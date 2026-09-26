@@ -225,6 +225,7 @@ question below.
    - (b) No-go: the measured ceiling is 0.12 ms per keystroke and 0.22 ms per wheel sweep, and the
      root breaks selection, hit-testing, focus checks and the keymap in every engine.
    - **Recommendation: (b).** Phase 1 alone removes four times what a root could.
+   - Decided 2026-09-26: owner — (b), no-go.
 
 Decided 2026-09-26: research recommendation — mermaid gets a root for display only, with
 light-DOM measurement, because mermaid 11.16.1 cannot measure inside one.

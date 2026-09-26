@@ -55,6 +55,7 @@ Parked: EXT-07 and EXT-09 (Plan 087 automation, Plan 143 research, per-OS matrix
    page in Settings, opened from the row and project menus, editing those keys on the owning
    machine; (b) keep editing them as JSON and close LIFE-12. **Recommendation: (a).** Upstream's
    thread menu has it, and the keys are unusable without it. M.
+   Decided 2026-09-26: owner — (a).
 3. **EXT-12: idle worktree removal.** Upstream's age, merge and unchanged rules remove an idle
    thread's checkout and recreate it from the branch when the thread resumes. (a) Build that
    restore-on-resume step, off by default like upstream; (b) close EXT-12 with only

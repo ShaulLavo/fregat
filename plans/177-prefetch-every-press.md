@@ -208,6 +208,9 @@ The cap keeps a held arrow key from flooding: a guess is skipped while four are 
 
    **Recommendation: (b).** It is the per-surface control the owner asked for, and with three keys
    a master switch adds a dependency the settings page cannot show, for a saving of two clicks.
+   Decided 2026-09-26: owner — (c), and the settings page learns to show the dependency: a
+   `dependsOn` field in the registry renders child keys indented and disabled while the parent is
+   off ([Plan 167](167-settings-and-copy.md) Part D). The master switch is `prefetch.enabled`.
 
 ## Verification
 

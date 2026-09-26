@@ -220,9 +220,20 @@ folder", "does not register", a type error) are outside the sweep (D2). The sett
 - **D4 — sensible defaults, decided in the audit.** No owner table. Rows that stand out as not
   sensible change, and the report names each one.
 
+## Part D — settings that depend on another setting
+
+Added 2026-09-26 (owner, from [Plan 177](177-prefetch-every-press.md)'s settings question). A registry
+entry may name a parent with `dependsOn: '<key>'`. The settings page renders it indented under the
+parent and disabled while the parent is off, with the parent named in its details. The resolver
+treats a child as off whenever its parent is off, so consumers read one value. First users:
+`prefetch.files`, `prefetch.diffs` and `prefetch.chats` under `prefetch.enabled`; the Part A reading
+lists other keys that are really sub-options of a toggle. One registry field, one row treatment, a
+resolver test, and the settings scenario covers a disabled child.
+
 ## Phases
 
 1. Part A reading for all 80 rows; change the ones that are not sensible, in one commit.
 2. Part B field, row icon, schema and reference output, scenario; details for rows decided so far.
 3. Part C steps 1–2 (registry and catalog gates) with their fixes.
 4. Part C step 3, feature by feature.
+5. Part D `dependsOn`, before Plan 177's settings land.

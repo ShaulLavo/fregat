@@ -430,3 +430,4 @@ now uses):
    Linux and Windows. **Recommendation: (a)**: one engine on every desktop keeps the editor's
    EditContext route and `agent:browser trace` on the engine users run, and question 5 already
    gives the native look to anyone who turns on see-through windows.
+   Decided 2026-09-26: owner — (a).
