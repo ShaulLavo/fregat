@@ -58,9 +58,8 @@ test('file type dropdown filters every view, clears hidden selection, and retain
   const trigger = screen.getByRole('combobox', { name: 'File type' })
   trigger.focus()
   await userEvent.keyboard('{ArrowDown}')
-  await waitFor(() =>
-    expect(screen.getByRole('option', { name: 'Supported files (.ts, .md)' })).toBeVisible(),
-  )
+  // The popup becomes visible before keyboard focus reaches its selected option.
+  await waitFor(() => expect(screen.getByRole('option', { name: '.md' })).toHaveFocus())
   await userEvent.keyboard('{Escape}')
   expect(screen.getByRole('textbox', { name: 'Search files' })).toHaveValue('picker')
   expect(screen.getByRole('dialog', { name: 'Choose file' })).toBeVisible()
