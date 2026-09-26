@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readdir, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -98,6 +98,36 @@ describe('observability runtime', () => {
       const names = await readdir(logDir)
       expect(names).not.toContain('2020-01-01.jsonl')
       expect(names.some((name) => name.endsWith('.jsonl'))).toBe(true)
+    } finally {
+      setLogRetentionDays(() => 0)
+      await rm(logDir, { force: true, recursive: true })
+    }
+  })
+
+  it('writes a batch once when its retention throws', async () => {
+    const logDir = await mkdtemp(path.join(tmpdir(), 'platform-observability-retention-'))
+    try {
+      initializeObservabilityRuntime({
+        env: {
+          NODE_ENV: 'production',
+          OBSERVABILITY_BATCH_SIZE: '1',
+          OBSERVABILITY_CONSOLE: 'false',
+          OBSERVABILITY_DIR: logDir,
+          OBSERVABILITY_ENABLED: 'true',
+        },
+        source: 'test',
+      })
+      setLogRetentionDays(() => {
+        throw new TypeError('settings unavailable')
+      })
+      recordObservabilityInfo('test.retention_throws')
+      await flushObservability()
+
+      const names = (await readdir(logDir)).filter((name) => name.endsWith('.jsonl'))
+      const text = (
+        await Promise.all(names.map((name) => readFile(path.join(logDir, name), 'utf8')))
+      ).join('')
+      expect(text.match(/test\.retention_throws/gu)).toHaveLength(1)
     } finally {
       setLogRetentionDays(() => 0)
       await rm(logDir, { force: true, recursive: true })

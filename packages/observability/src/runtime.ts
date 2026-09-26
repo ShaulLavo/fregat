@@ -151,7 +151,16 @@ function createFileDrainAdapter(config: ObservabilityConfig): DrainAdapter {
     pretty: config.filePretty,
   })
   const pipeline = createAdapterPipeline('file', config)
-  const retention = createLogRetention(config.logDir, () => readLogRetentionDays())
+  const retention = createLogRetention(
+    config.logDir,
+    () => readLogRetentionDays(),
+    // Warned once per failing series; old days stay until a prune succeeds.
+    (error) =>
+      log.warn({
+        action: 'observability.log_retention_failed',
+        message: error instanceof Error ? error.message : 'unknown retention failure',
+      }),
+  )
 
   return {
     drain: pipeline(async (batch) => {

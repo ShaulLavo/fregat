@@ -21,15 +21,32 @@ export async function pruneExpiredLogs(dir: string, days: number, now = Date.now
   return results.filter((result) => result.status === 'fulfilled').length
 }
 
-/** Runs the prune once per UTC day and again whenever the retention changes. */
-export function createLogRetention(dir: string, readDays: () => number) {
+/**
+ * Runs the prune once per UTC day and again whenever the retention changes. It never throws: it
+ * runs after a batch is written, and a throw there makes the writer retry and write it again.
+ * `onFailure` hears the first failure of a series.
+ */
+export function createLogRetention(
+  dir: string,
+  readDays: () => number,
+  onFailure: (error: unknown) => void,
+) {
   let prunedFor = ''
+  let failing = false
   return async (now = Date.now()) => {
-    const days = readDays()
-    const key = `${utcDay(now)}:${days}`
-    if (key === prunedFor) return 0
-    prunedFor = key
-    return pruneExpiredLogs(dir, days, now)
+    try {
+      const days = readDays()
+      const key = `${utcDay(now)}:${days}`
+      if (key === prunedFor) return 0
+      const pruned = await pruneExpiredLogs(dir, days, now)
+      prunedFor = key
+      failing = false
+      return pruned
+    } catch (error) {
+      if (!failing) onFailure(error)
+      failing = true
+      return 0
+    }
   }
 }
 

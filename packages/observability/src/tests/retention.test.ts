@@ -49,7 +49,11 @@ it('keeps every day at 0', async () => {
 it('prunes once per day, and again when the retention changes', async () => {
   const dir = await logDir(['2026-09-20.jsonl', '2026-09-24.jsonl', '2026-09-26.jsonl'])
   let days = 5
-  const retention = createLogRetention(dir, () => days)
+  const retention = createLogRetention(
+    dir,
+    () => days,
+    () => {},
+  )
 
   expect(await retention(NOW)).toBe(1)
   await writeFile(path.join(dir, '2026-09-19.jsonl'), '{}\n')
@@ -59,4 +63,25 @@ it('prunes once per day, and again when the retention changes', async () => {
   days = 1
   expect(await retention(NOW)).toBe(2)
   expect(await readdir(dir)).toEqual(['2026-09-26.jsonl'])
+})
+
+it('never throws, and reports only the first failure of a series', async () => {
+  const dir = await logDir(['2026-09-20.jsonl', '2026-09-26.jsonl'])
+  const failures: unknown[] = []
+  let broken = true
+  const retention = createLogRetention(
+    dir,
+    () => {
+      if (broken) throw new TypeError('settings unavailable')
+      return 1
+    },
+    (error) => failures.push(error),
+  )
+
+  expect(await retention(NOW)).toBe(0)
+  expect(await retention(NOW)).toBe(0)
+  expect(failures).toHaveLength(1)
+
+  broken = false
+  expect(await retention(NOW)).toBe(1)
 })
