@@ -1,5 +1,26 @@
+import { FOCUS_AREAS, UNDO_OWNING_PANES } from './focus'
+import type { KeyChord } from '@singapore-editor/core/keymap'
 import { defineMetadata, type CommandKeyDefault } from './metadata'
 import { selectItemCommandId, sidebarPanelCommandId, type ItemPosition } from './item-position'
+
+/** Every pane without its own undo; text entry keeps its own through `yieldsToTextEntry`. */
+function sessionHistoryKeys(
+  chord: KeyChord[number],
+  railChord: KeyChord[number],
+): CommandKeyDefault[] {
+  const panes = FOCUS_AREAS.filter((pane) => !UNDO_OWNING_PANES.has(pane))
+  return [
+    ...panes.map((pane): CommandKeyDefault => ({
+      chord: [chord],
+      pane,
+      // The TUI's chat pane runs in a terminal, where Control+Z suspends; its rail takes U.
+      ...(pane === 'chat' ? { platforms: ['linux', 'mac', 'windows'] as const } : {}),
+      preventDefault: true,
+      yieldsToTextEntry: true,
+    })),
+    { chord: [railChord], pane: 'chat', platforms: ['tui'] },
+  ]
+}
 
 export const workspaceCommandMetadata = {
   'workspace.fixDiagnostic': defineMetadata({
@@ -47,19 +68,7 @@ export const workspaceCommandMetadata = {
     description: 'Undo the latest session lifecycle action.',
     id: 'workspace.undoSessionAction',
     execution: 'async',
-    // Every pane without its own undo; the composer, editors, terminals and the file tree keep theirs.
-    // The terminal keeps Control+Z for suspend, so the TUI rail takes U.
-    keys: [
-      ...(['global', 'git', 'logs', 'problems', 'search', 'settings'] as const).map(
-        (pane): CommandKeyDefault => ({
-          chord: ['Mod+Z'],
-          pane,
-          preventDefault: true,
-          yieldsToTextEntry: true,
-        }),
-      ),
-      { chord: ['U'], pane: 'chat', platforms: ['tui'] },
-    ],
+    keys: sessionHistoryKeys('Mod+Z', 'U'),
     target: 'workspace',
     undoCategory: 'workspace-operation',
     when: ['sessionActionUndoable'],
@@ -70,17 +79,7 @@ export const workspaceCommandMetadata = {
     description: 'Redo the session lifecycle action undone last.',
     id: 'workspace.redoSessionAction',
     execution: 'async',
-    keys: [
-      ...(['global', 'git', 'logs', 'problems', 'search', 'settings'] as const).map(
-        (pane): CommandKeyDefault => ({
-          chord: ['Mod+Shift+Z'],
-          pane,
-          preventDefault: true,
-          yieldsToTextEntry: true,
-        }),
-      ),
-      { chord: ['Shift+U'], pane: 'chat', platforms: ['tui'] },
-    ],
+    keys: sessionHistoryKeys('Mod+Shift+Z', 'Shift+U'),
     target: 'workspace',
     undoCategory: 'workspace-operation',
     when: ['sessionActionRedoable'],
