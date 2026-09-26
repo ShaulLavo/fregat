@@ -126,6 +126,13 @@ change can reach. The targets are confirmed or revised by phase 0's measurements
    `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}`.
 6. **Fewer jobs per run** (S, after 1–4). With setup down to seconds, merge small jobs (packages,
    parity, typecheck) so one run takes fewer of the 20 runners, and wave 2's eight lanes queue less.
+   Done 2026-09-26 (wave 2 lane B): package tests (57 s job, 20 s of it setup) run as the last
+   step of the typecheck job, which already prepares the Electrobun devkit they need. A full code
+   run now holds 10 runners for real work (lint, typecheck + packages, four web shards, two server
+   shards, TUI, browser) plus the seconds-long `Changes` and `CI` jobs; phase 3's second server
+   shard took back the slot this saved. Merging further lengthens the run: TUI (136 s) and browser
+   (109 s) together would outlast a web shard. Runs that touch one app or only docs use fewer
+   (phase 2).
 
 ### Editor (singapore `ci.yml`)
 

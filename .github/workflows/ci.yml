@@ -143,12 +143,13 @@ jobs:
       - name: Unused code
         run: bun run unused:check
 
+  # Package tests ride here: they share the devkit, and alone they cost a runner for under a minute.
   typecheck:
-    name: Typecheck, generated
+    name: Typecheck, generated, packages
     needs: changes
     if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -196,6 +197,12 @@ jobs:
       # shared runner. It builds itself and never reads a cached bundle-stats.json.
       - name: First-load gate
         run: bun run --cwd apps/web bundle:gate
+
+      # Package tests also read app sources (the session vocabulary scans `apps/web`), so they
+      # run for any code change.
+      - name: Package tests
+        if: ${{ !cancelled() }}
+        run: bun run test:scripts && bun run --filter '@workspace/*' test && bun run --cwd apps/desktop test
 
   # Web is most of the time, so it is sharded by file, balanced by recorded durations
   # (`apps/web/test/shard-sequencer.ts`). The `test` scripts in `apps/web` and `packages/tree`
@@ -257,34 +264,6 @@ jobs:
       - name: Test
         run: bun run --cwd apps/tui test
 
-  # Package tests also read app sources (the session vocabulary scans `apps/web`), so they run
-  # for any code change.
-  test-packages:
-    name: Test (packages)
-    needs: changes
-    if: ${{ needs.changes.outputs.code == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup
-        uses: ./.github/actions/setup
-
-      - name: Cache Hutch store
-        uses: actions/cache@v4
-        with:
-          path: ~/.hutch
-          key: ${{ runner.os }}-hutch-${{ hashFiles('apps/desktop/package.json') }}
-
-      - name: Prepare Electrobun devkit
-        working-directory: apps/desktop
-        run: node_modules/.bin/electrobun prepare
-
-      - name: Test
-        run: bun run test:scripts && bun run --filter '@workspace/*' test && bun run --cwd apps/desktop test
-
   browser:
     name: Browser tests
     needs: changes
@@ -323,7 +302,7 @@ jobs:
   # change cannot affect it counts as passed.
   verdict:
     name: CI
-    needs: [changes, docs, lint, typecheck, test-web, test-server, test-tui, test-packages, browser]
+    needs: [changes, docs, lint, typecheck, test-web, test-server, test-tui, browser]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
