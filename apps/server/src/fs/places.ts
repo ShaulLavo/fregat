@@ -121,12 +121,13 @@ async function existingPlace(
   const info = await stat(place.absolute).catch(() => null)
   if (!info?.isDirectory()) return null
   try {
+    const real = await realpath(place.absolute)
     return {
       kind: place.kind,
       label: place.label,
-      path: paths.toRelative(place.absolute),
+      path: paths.toRealRelative(real),
       // Case-insensitive volumes answer both `~/Projects` and `~/projects` with one folder.
-      real: await realpath(place.absolute),
+      real,
     }
   } catch {
     return null

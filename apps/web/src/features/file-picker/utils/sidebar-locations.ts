@@ -11,7 +11,7 @@ export type SidebarLocation = {
   path: string
   /** App chrome keeps its own glyph; `null` is a folder and wears the file tree's. */
   icon: Icon | null
-  /** A short mono fact after the label: checkouts in a project folder, free space on a drive. */
+  /** A short mono fact after the label: checkouts in a project folder, used and total space on a drive. */
   detail: string | null
   /** The native tooltip: the full path plus what `detail` abbreviates. */
   title: string
@@ -56,7 +56,11 @@ export function sidebarSectionsFor({
       label: 'Places',
       locations: [homeLocation(homePath), ...placeLocations(data)].filter(automatic),
     },
-    { id: 'projects', label: 'Projects', locations: projectLocations(data).filter(automatic) },
+    {
+      id: 'projects',
+      label: 'Project folders',
+      locations: projectLocations(data).filter(automatic),
+    },
     { id: 'drives', label: 'Drives', locations: driveLocations(data).filter(automatic) },
   ]
   return sections
@@ -112,7 +116,7 @@ function projectLocations(data: PlacesData | null): SidebarLocation[] {
     label: folder.label,
     path: folder.path,
     icon: null,
-    detail: folder.repoCount > 0 ? String(folder.repoCount) : null,
+    detail: checkoutCount(folder.repoCount),
     title: `${displayPath(folder.path)} · ${checkoutCount(folder.repoCount)}`,
     pinned: false,
   }))
@@ -124,18 +128,23 @@ function driveLocations(data: PlacesData | null): SidebarLocation[] {
     label: drive.label,
     path: drive.path,
     icon: HardDrivesIcon,
-    detail: drive.freeBytes === null ? null : formatSize(drive.freeBytes),
+    detail: driveUsage(drive),
     title: driveTitle(drive),
     pinned: false,
   }))
 }
 
 function checkoutCount(count: number) {
-  return count === 1 ? '1 git checkout' : `${count} git checkouts`
+  return count === 1 ? '1 Git checkout' : `${count} Git checkouts`
+}
+
+function driveUsage(drive: PlacesData['drives'][number]) {
+  if (drive.freeBytes === null || drive.totalBytes === null) return null
+  return `${formatSize(drive.totalBytes - drive.freeBytes)} / ${formatSize(drive.totalBytes)} used`
 }
 
 function driveTitle(drive: PlacesData['drives'][number]) {
   const where = displayPath(drive.path)
-  if (drive.freeBytes === null || drive.totalBytes === null) return where
-  return `${where} · ${formatSize(drive.freeBytes)} free of ${formatSize(drive.totalBytes)}`
+  const usage = driveUsage(drive)
+  return usage ? `${where} · ${usage}` : where
 }
