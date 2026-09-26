@@ -33,6 +33,8 @@ import { projectGrouping } from './project-grouping'
 import { sessionSearch, sessionSearchEnvironments } from './session-search'
 import { sessionUnread } from './session-unread'
 import { mcpApproval } from './mcp-approval'
+import { mcpSettings } from './mcp-settings'
+import { mcpStatus } from './mcp-status'
 import { nativePermissionGrant } from './native-permission-grant'
 import { resetCreditRedemption } from './reset-credit-redemption'
 import { pullRequestLookupFailure } from './pull-request-lookup-failure'
@@ -342,6 +344,8 @@ export const scenarios: readonly Scenario[] = [
   sessionNotifications,
   composerDefaults,
   mcpApproval,
+  mcpStatus,
+  mcpSettings,
   nativePermissionGrant,
   resetCreditRedemption,
   pullRequestLookupFailure,

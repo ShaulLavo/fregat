@@ -546,6 +546,8 @@ export const selectors = {
     page.locator('[data-slot="combobox-group-label"]', { hasText: name }),
   chooseFolder: (page: Page) => page.getByRole('button', { name: 'Choose folder', exact: true }),
   settingsDialog: (page: Page) => page.getByRole('dialog', { name: 'Settings', exact: true }),
+  mcpSettings: (page: Page) => page.locator('[data-mcp-section]'),
+  mcpSettingsRow: (page: Page, name: string) => page.locator(`[data-mcp-server="${name}"]`),
   settingsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search settings' }),
   settingsShowAll: (page: Page) => page.getByRole('button', { name: 'Show all settings' }),
   settingsCategoryHeading: (page: Page, name: string) =>

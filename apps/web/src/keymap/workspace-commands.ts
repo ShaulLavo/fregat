@@ -27,6 +27,7 @@ import {
   FloppyDiskIcon,
   FolderOpenIcon,
   GaugeIcon,
+  PlugsConnectedIcon,
   GitForkIcon,
   GitPullRequestIcon,
   GearSixIcon,
@@ -856,6 +857,14 @@ export const workspaceCommands = [
     run: ({ invocation, runtime }) =>
       transitionStart(
         runtime.shell.showSettings(invocation.origin as FocusTargetToken | null, 'usage'),
+      ),
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.showMcpServers'],
+    icon: PlugsConnectedIcon,
+    run: ({ invocation, runtime }) =>
+      transitionStart(
+        runtime.shell.showSettings(invocation.origin as FocusTargetToken | null, 'mcp'),
       ),
   }),
   defineCommand({

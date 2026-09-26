@@ -1,6 +1,7 @@
 # Plan 174: Managed external MCP servers
 
-Status: **RESEARCH DONE 2026-09-26 — no second MCP manager: both harnesses already list, add,
+Status: **PHASES 1–6 LANDED 2026-09-26 (wave 2 lane M, PRs #121, #124, #125 and the phase 6 PR);
+earlier: RESEARCH DONE 2026-09-26 — no second MCP manager: both harnesses already list, add,
 remove, toggle, reconnect and sign in; Platform adds a richer status view, a machine-level MCP
 page that writes each harness's own config, per-session off switches, a trust gate for Claude
 project servers, and sign-in from any device.** Unscheduled. Split out of
@@ -141,6 +142,14 @@ Each phase ships and deploys on its own; phases 1, 3, 5 and 6 change the server
    `packages/contracts/src/provider.ts`, `provider/adapters/claude.ts`, `codex.ts`,
    `features/chat/components/mcp-server-row.tsx`, `utils/mcp-status.ts`; scenario
    `claude-session-tools` asserts the failure row.
+   Landed 2026-09-26 (wave 2 lane M). Codex's source and transport come from `config/read`
+   (`origins` names the layer per key; `config/read` and `config/batchWrite` joined the generated
+   protocol), and a failed read leaves them empty rather than failing the list. The popover prints
+   the facts under each name (`User · https://mcp.linear.app · 2 tools`). Claude reads
+   `mcpServerStatus()` after `init` and at each result and reports a server once when it moves into
+   `failed` or `needs-auth`; the chat row reads "… needs sign-in" for the latter.
+   Not run: `claude-session-tools` (a real Claude turn, a wave 2 hard stop). Covered by adapter
+   tests with the fake CLI and the fixture-Codex scenario `mcp-status`.
 2. **Trust gate for Claude project servers (M, blocked on Q2).** At Claude CLI start, read the
    checkout's `.mcp.json` names and Claude's approval (`enableAllProjectMcpServers`,
    `enabledMcpjsonServers` in the user, project and local settings files). Unapproved names go
@@ -171,17 +180,50 @@ Each phase ships and deploys on its own; phases 1, 3, 5 and 6 change the server
    staleTime. Row actions: reconnect, sign in (Codex now, Claude after phase 6), remove. Files: new
    `apps/server/src/provider/mcp-config-routes.ts` and `provider-service.ts` methods,
    `features/settings/components/mcp-section.tsx` + rows, `utils/query-keys.ts`/`mutation-keys.ts`.
+   Landed 2026-09-26 (wave 2 lane M) with phase 4. Each adapter exposes `mcpConfig` (list, add,
+   remove, read) and `mcp-config-routes.ts` serves it; no `provider-service.ts` methods were needed.
+   The page reads one instance at a time, only when the owner picks it, because a read starts every
+   server once (and would reach a real account from a scenario). It reads from the home folder, or
+   from a folder the owner picks to see that folder's local and project servers. The Claude probe
+   keeps unapproved project servers off, exactly as a session does, and polls `mcpServerStatus()`
+   until nothing is `pending` (8 s cap): the CLI has no push stream. Reconnect became "Check
+   again" (a new probe): the probe process is gone once it answers. Sign-in lands with phase 6.
+   Command: `Open MCP servers` (settings search `mcp`).
 4. **Add and copy (M).** An add/edit dialog (stdio: command, arguments, environment; HTTP: URL,
    headers) with targets Claude user/local/project and Codex user. Writes go through
    `claude mcp add-json` and `config/batchWrite`, then running Codex sessions get
    `config/mcpServer/reload` and Claude rows say "Applies to new sessions". "Also add to Codex /
    Claude" on a row copies it through the same translation. Refuses `platform` and names already
    used in the target. Scenario: add in both, see both connected in a new session, remove.
+   Landed 2026-09-26 (wave 2 lane M). Environment and header values are typed into masked fields
+   and go straight to the harness writer; a copy reads the stored definition server-side, so the
+   page never holds a value. A copy lands in the same scope when the target keeps it, else in the
+   target's user config. Adding a Claude project server records the Platform approval for it, since
+   the owner wrote it. A Codex write reloads every live Codex session's servers.
+   Not run: the two-provider scenario, which needs real Claude and Codex sessions (a wave 2 hard
+   stop). Covered by `mcp-config-routes.test.ts` (Claude through a fake `claude mcp` over real
+   files), the Codex adapter test (`config/batchWrite` with `expectedVersion`) and the fixture-Codex
+   scenario `mcp-settings` (list, add with a masked header, delete).
 5. **Off for this session (M).** A popover switch per server. Stored on the session projection
    (migration) as a list of names, re-sent on every Codex start/resume/fork (the same `config`
    path as Plan 087's endpoint) and as Claude flag settings at CLI start. The switch's
    description names the checkout-wide alternative. Files: orchestration session projection,
    `provider-command-reactor.ts`, both adapters, popover. Scenarios per provider.
+   Landed 2026-09-26 (wave 2 lane M), stored on the provider binding's runtime payload
+   (`mcpOff`), not the session projection. The binding already outlives restarts and holds
+   what a start needs; the projection would have needed a `SCHEMA_VERSION` bump, which means
+   deleting every database. `ProviderService` puts the list into every runtime start and every
+   turn (a turn may reopen its runtime). Codex sends
+   `config['mcp_servers.<name>.enabled'] = false` on `thread/start`, `resume` and `fork`, only for
+   names `config/read` still defines. Claude sends `disabledMcpjsonServers` for `.mcp.json` names and
+   `deniedMcpServers` for the rest. An idle session reopens on its conversation at once; a busy one
+   at its next turn, because the off list is part of each adapter's reuse check. The popover row
+   has a switch (`<name> in this session`) and reads "Off for this session".
+   Not built: Claude's "Off in this checkout" (`toggleMcpServer`) action. The switch and the
+   settings page's Delete cover the two cases the owner asked for.
+   Not run: the Claude scenario (a real Claude session, a wave 2 hard stop). Covered by the Claude
+   adapter test (flag settings and restart) and, for Codex, the fixture scenario `mcp-status`,
+   whose resume carries the config.
 6. **Sign in from any device (M, blocked on Q3).** Claude: run `claude mcp login --no-browser
 <name>` with the instance environment, show its URL as "Open sign-in page", then take the
    final page address the user pastes and write it to the CLI's stdin. Codex: the same paste
@@ -189,6 +231,29 @@ Each phase ships and deploys on its own; phases 1, 3, 5 and 6 change the server
    `state` match the pending `mcpServer/oauth/login`. On the server machine's own browser, both
    complete without pasting. First step: an OAuth-protected fixture server to verify the Claude
    `--no-browser` exchange.
+   Verified 2026-09-26 against a throwaway `CLAUDE_CONFIG_DIR` and a local OAuth fixture server
+   (dynamic registration, PKCE, token, Streamable HTTP), Claude CLI 2.1.283, with no account or
+   model involved. `claude mcp login --no-browser` prints the page address with a `redirect_uri` of
+   `http://localhost:<port>/callback` and also listens on that port. With a pipe for stdin it refuses
+   ("stdin isn't a terminal") even after the callback arrives. In a terminal (Bun's `terminal`
+   spawn option) both routes work: the pasted address typed at its prompt, or the callback
+   delivered to its port. The server list then reads Connected.
+   Landed 2026-09-26 (wave 2 lane M). `provider/mcp-sign-in.ts` holds each pending sign-in as a
+   flow (page address, `finish`, `done`), and `McpSignInAttempts` tracks them by id: five minutes
+   to finish, and the server's stop cancels them. A pasted address is accepted only when it is
+   `http`, its host is loopback, its port and path are those of the attempt's `redirect_uri`, and
+   its `state` matches. It is then delivered to the redirect's own origin (`localhost` may resolve
+   to `::1`). Claude runs `claude mcp login --no-browser` in a terminal and types the address at
+   its prompt; a session sign-in reconnects the live session afterwards, so Claude sessions can now
+   sign in too. Codex replays the address against its loopback listener. Outside a session it
+   uses its own app-server, kept until `mcpServer/oauthLogin/completed`. Routes:
+   `POST /providers/:id/mcp/:name/sign-in`, `GET|POST /providers/mcp-sign-in/:attemptId`. Both
+   the popover and the settings rows show the page link and a paste field, and poll the attempt,
+   so a browser on the server machine finishes without pasting.
+   Not run: a Claude end-to-end scenario, because it needs the real CLI. The exchange was verified
+   by hand as above, and `mcp-sign-in.test.ts` covers the terminal handling with a fake CLI.
+   Covered for Codex by the fixture scenario `mcp-settings` (sign in by pasting, as from a phone)
+   and the adapter test.
 
 ## Owner questions
 

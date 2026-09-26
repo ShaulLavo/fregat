@@ -26,6 +26,7 @@ import {
 import * as v from 'valibot'
 import { readFsLogs } from 'evlog/fs'
 import { CodexProviderAdapter } from '../codex'
+import { McpSignInAttempts } from '../../mcp-sign-in'
 import { createNativeSessionProjection } from '../../../orchestration/tests/factories/native-session'
 import { SESSION_ID } from '../../../orchestration/tests/factories/projection'
 import { codexHistoryResponseSchema } from '../utils/codex-history'
@@ -354,10 +355,40 @@ function handle(message) {
     record({ event: message.method, params: message.params });
     const base = { resourceTemplates: [], resources: [], tools: {} };
     send({ id: message.id, result: { data: [
-      { ...base, name: 'linear', authStatus: 'oAuth', runtimeStatus: 'connected' },
+      { ...base, name: 'linear', authStatus: 'oAuth', runtimeStatus: 'connected', httpOrigin: 'https://mcp.linear.app', tools: { list_issues: { name: 'list_issues', inputSchema: {} } } },
       { ...base, name: 'github', authStatus: 'notLoggedIn', runtimeStatus: 'authenticationRequired' },
       { ...base, name: 'broken', authStatus: 'unsupported', runtimeStatus: 'failed', toolsError: 'spawn ENOENT' },
     ], nextCursor: null } });
+    return;
+  }
+  if (message.method === 'config/read') {
+    record({ event: message.method, params: message.params });
+    const user = { name: { type: 'user', file: '/home/dev/.codex/config.toml', profile: null }, version: 'v1' };
+    const project = { name: { type: 'project', dotCodexFolder: '/repo/.codex' }, version: 'v2' };
+    send({ id: message.id, result: {
+      config: { mcp_servers: {
+        linear: { url: 'https://mcp.linear.app/mcp' },
+        github: { url: 'https://api.github.test/mcp' },
+        broken: { command: 'broken-server', env: { TOKEN: 'secret' } },
+      } },
+      origins: { 'mcp_servers.linear.url': user, 'mcp_servers.github.url': user, 'mcp_servers.broken.command': project, ...(process.env.PLATFORM_FAKE_CODEX_MODE === 'platform-mcp-configured' ? { 'mcp_servers.platform.url': user } : {}) },
+      layers: message.params.includeLayers ? [
+        { ...user, disabledReason: null, config: { mcp_servers: {
+          linear: { url: 'https://mcp.linear.app/mcp', http_headers: { Authorization: 'Bearer lin' } },
+          github: { url: 'https://api.github.test/mcp' },
+        } } },
+        { ...project, disabledReason: null, config: { mcp_servers: { broken: { command: 'broken-server' } } } },
+      ] : null,
+    } });
+    return;
+  }
+  if (message.method === 'config/batchWrite') {
+    record({ event: message.method, params: message.params });
+    if (message.params.expectedVersion !== 'v1') {
+      send({ id: message.id, error: { code: -32600, message: 'Configuration was modified since last read. Fetch latest version and retry.' } });
+      return;
+    }
+    send({ id: message.id, result: { status: 'ok', version: 'v2', filePath: '/home/dev/.codex/config.toml', overriddenMetadata: null } });
     return;
   }
   if (message.method === 'config/mcpServer/reload') {
@@ -367,7 +398,21 @@ function handle(message) {
   }
   if (message.method === 'mcpServer/oauth/login') {
     record({ event: message.method, params: message.params });
-    send({ id: message.id, result: { authorizationUrl: 'https://auth.example.test/login' } });
+    if (message.params.threadId) {
+      send({ id: message.id, result: { authorizationUrl: 'https://auth.example.test/login' } });
+      return;
+    }
+    // Outside a session: listen on loopback the way Codex does, and report the callback.
+    const listener = require('node:http').createServer((request, response) => {
+      const url = new URL(request.url, 'http://127.0.0.1');
+      const success = url.searchParams.get('state') === 'fake-state' && url.searchParams.has('code');
+      send({ method: 'mcpServer/oauthLogin/completed', params: { name: message.params.name, success } });
+      response.end('done', () => setTimeout(() => listener.close(), 50));
+    });
+    listener.listen(0, '127.0.0.1', () => {
+      const redirect = encodeURIComponent('http://127.0.0.1:' + listener.address().port + '/callback');
+      send({ id: message.id, result: { authorizationUrl: 'https://auth.example.test/login?redirect_uri=' + redirect + '&state=fake-state' } });
+    });
     return;
   }
   if (message.method === 'hooks/list') {
@@ -377,13 +422,6 @@ function handle(message) {
       { ...hook, handlerType: 'command', command: 'guard.sh', matcher: 'shell' },
       { ...hook, key: 'k2', handlerType: 'mcpTool', server: 'linear', tool: 'check' },
     ] }] } });
-    return;
-  }
-  if (message.method === 'config/read') {
-    const origins = process.env.PLATFORM_FAKE_CODEX_MODE === 'platform-mcp-configured'
-      ? { 'mcp_servers.platform.url': { name: { type: 'user' }, version: '1' } }
-      : {};
-    send({ id: message.id, result: { config: {}, origins } });
     return;
   }
   if (message.method === 'thread/goal/set') {
@@ -884,6 +922,7 @@ type FakeCodexLogEntry = {
     | 'thread/revert'
     | 'thread/goal/set'
     | 'thread/goal/clear'
+    | 'config/batchWrite'
 }
 
 type EchoedModeParams = {
@@ -3004,6 +3043,155 @@ describe('CodexProviderAdapter', () => {
     })
   })
 
+  it('keeps the Platform endpoint and session off list together on thread start and resume', async () => {
+    await withFakeCodex(async ({ spawnLogPath }) => {
+      const adapter = new CodexProviderAdapter()
+      const input = {
+        ...providerTurnInput(),
+        platformMcp: { token: 'grant-token', url: 'http://127.0.0.1:3301/mcp' },
+        mcpOff: ['ghost', 'linear'],
+      }
+      try {
+        await adapter.startRuntime(input)
+        await adapter.applyMcpSessionOff({ off: ['linear'], sessionId: input.sessionId })
+        const opened = (await readFakeCodexLog(spawnLogPath)).filter(
+          (entry) => entry.event === 'thread/start' || entry.event === 'thread/resume',
+        )
+        expect(opened.map((entry) => entry.event)).toEqual(['thread/start', 'thread/resume'])
+        for (const entry of opened) {
+          expect(entry.params?.config).toEqual({
+            'features.mcp_2026_07_28': true,
+            'mcp_servers.platform.http_headers': { Authorization: 'Bearer grant-token' },
+            'mcp_servers.platform.url': input.platformMcp.url,
+            suppress_unstable_features_warning: true,
+            'mcp_servers.linear.enabled': false,
+          })
+        }
+      } finally {
+        await adapter.stopAll()
+      }
+    })
+  })
+
+  it('opens a thread without the servers turned off for the session, and reopens it when the list changes', async () => {
+    await withFakeCodex(async ({ spawnLogPath }) => {
+      const adapter = new CodexProviderAdapter()
+      const input = providerTurnInput()
+      try {
+        await adapter.startRuntime({ ...input, mcpOff: ['ghost', 'linear'] })
+        await adapter.applyMcpSessionOff({ off: [], sessionId: input.sessionId })
+
+        const opened = (await readFakeCodexLog(spawnLogPath)).filter(
+          (entry) => entry.event === 'thread/start' || entry.event === 'thread/resume',
+        )
+        expect(opened.map((entry) => [entry.event, entry.params?.config])).toEqual([
+          // `ghost` is in no config: an `enabled` key alone would leave a half table.
+          ['thread/start', { 'mcp_servers.linear.enabled': false }],
+          ['thread/resume', undefined],
+        ])
+      } finally {
+        await adapter.stopAll()
+      }
+    })
+  })
+
+  it('signs in outside a session: a pasted address reaches its own app-server loopback', async () => {
+    await withFakeCodex(async ({ projectPath }) => {
+      const adapter = new CodexProviderAdapter()
+      const signIns = new McpSignInAttempts()
+      try {
+        const flow = await adapter.mcpConfig.signIn({ folder: projectPath, name: 'github' })
+        const { attemptId, authorizationUrl } = signIns.start('github', flow)
+        const redirect = new URL(new URL(authorizationUrl).searchParams.get('redirect_uri') ?? '')
+
+        await expect(
+          signIns.finish(
+            attemptId ?? '',
+            `http://example.test${redirect.pathname}?state=fake-state`,
+          ),
+        ).rejects.toMatchObject({ code: 'provider.MCP_SIGN_IN_ADDRESS_MISMATCH' })
+        const finished = await signIns.finish(
+          attemptId ?? '',
+          `http://localhost:${redirect.port}/callback?code=abc&state=fake-state`,
+        )
+
+        expect(finished).toMatchObject({ name: 'github', state: 'succeeded' })
+      } finally {
+        signIns.cancelAll()
+        await adapter.stopAll()
+      }
+    })
+  })
+
+  it('lists configured MCP servers with their files and writes through config/batchWrite', async () => {
+    await withFakeCodex(async ({ projectPath, spawnLogPath }) => {
+      const adapter = new CodexProviderAdapter()
+      const write = { folder: projectPath, scope: 'user' as const }
+      try {
+        const servers = await adapter.mcpConfig.list({ folder: projectPath })
+        expect(servers.map((server) => [server.name, server.scope, server.file])).toEqual([
+          ['linear', 'user', '/home/dev/.codex/config.toml'],
+          ['github', 'user', '/home/dev/.codex/config.toml'],
+          ['broken', null, '/repo/.codex/config.toml'],
+        ])
+        expect(JSON.stringify(servers)).not.toContain('Bearer')
+
+        await adapter.mcpConfig.add({
+          ...write,
+          definition: {
+            transport: 'http',
+            url: 'https://docs.example.test/mcp',
+            headers: { Authorization: 'Bearer docs' },
+          },
+          name: 'docs',
+        })
+        await expect(
+          adapter.mcpConfig.add({
+            ...write,
+            definition: { transport: 'stdio', command: 'linear', args: [], env: {} },
+            name: 'linear',
+          }),
+        ).rejects.toMatchObject({ code: 'provider.MCP_NAME_TAKEN' })
+        await expect(
+          adapter.mcpConfig.remove({ ...write, scope: 'project', name: 'broken' }),
+        ).rejects.toMatchObject({ code: 'provider.MCP_SCOPE_UNSUPPORTED' })
+        await adapter.mcpConfig.remove({ ...write, name: 'github' })
+        expect(await adapter.mcpConfig.read({ ...write, name: 'linear' })).toEqual({
+          transport: 'http',
+          url: 'https://mcp.linear.app/mcp',
+          headers: { Authorization: 'Bearer lin' },
+        })
+
+        const writes = (await readFakeCodexLog(spawnLogPath)).filter(
+          (entry) => entry.event === 'config/batchWrite',
+        )
+        expect(writes.map((entry) => entry.params)).toEqual([
+          {
+            edits: [
+              {
+                keyPath: 'mcp_servers.docs',
+                mergeStrategy: 'replace',
+                value: {
+                  url: 'https://docs.example.test/mcp',
+                  http_headers: { Authorization: 'Bearer docs' },
+                },
+              },
+            ],
+            expectedVersion: 'v1',
+            reloadUserConfig: true,
+          },
+          {
+            edits: [{ keyPath: 'mcp_servers.github', mergeStrategy: 'replace', value: null }],
+            expectedVersion: 'v1',
+            reloadUserConfig: true,
+          },
+        ])
+      } finally {
+        await adapter.stopAll()
+      }
+    })
+  })
+
   it('passes a turn’s output schema to turn/start', async () => {
     await withFakeCodex(async ({ spawnLogPath }) => {
       const adapter = new CodexProviderAdapter()
@@ -3029,14 +3217,42 @@ describe('CodexProviderAdapter', () => {
         await adapter.startRuntime(input)
 
         expect(await adapter.mcpServers({ sessionId: input.sessionId })).toEqual([
-          { error: null, name: 'linear', status: 'connected' },
-          { error: null, name: 'github', status: 'needs-auth' },
-          { error: 'spawn ENOENT', name: 'broken', status: 'failed' },
+          {
+            auth: 'signed-in',
+            error: null,
+            name: 'linear',
+            origin: 'https://mcp.linear.app',
+            source: 'user',
+            status: 'connected',
+            tools: ['list_issues'],
+            transport: 'http',
+          },
+          {
+            auth: 'signed-out',
+            error: null,
+            name: 'github',
+            origin: null,
+            source: 'user',
+            status: 'needs-auth',
+            tools: [],
+            transport: 'http',
+          },
+          {
+            auth: 'unsupported',
+            error: 'spawn ENOENT',
+            name: 'broken',
+            origin: null,
+            source: 'project',
+            status: 'failed',
+            tools: [],
+            transport: 'stdio',
+          },
         ])
         await adapter.reconnectMcpServer({ name: 'broken', sessionId: input.sessionId })
         expect(
-          await adapter.signInMcpServer({ name: 'github', sessionId: input.sessionId }),
-        ).toEqual({ authorizationUrl: 'https://auth.example.test/login' })
+          (await adapter.signInMcpServer({ name: 'github', sessionId: input.sessionId }))
+            .authorizationUrl,
+        ).toBe('https://auth.example.test/login')
         expect(await adapter.configuredHooks({ cwd: '/repo', sessionId: input.sessionId })).toEqual(
           {
             errors: ['one hook skipped'],
@@ -3061,7 +3277,7 @@ describe('CodexProviderAdapter', () => {
         const records = await readFakeCodexLog(spawnLogPath)
         expect(records).toContainEqual({
           event: 'mcpServer/oauth/login',
-          params: { name: 'github', threadId: 'provider-thread-1' },
+          params: { name: 'github', threadId: 'provider-thread-1', timeoutSecs: 300 },
         })
       } finally {
         await adapter.stopAll()

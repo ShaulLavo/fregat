@@ -31,7 +31,7 @@ a bare root `bun run verify`.
 | [177 — prefetch every press](177-prefetch-every-press.md)                               | **PROPOSED 2026-09-26 — RESEARCH FIRST**                                            |
 | [176 — one markdown parser](176-markdown-parser.md)                                     | **RESEARCH — AUTHORIZED 2026-09-26; REPLACES 108 D5**                               |
 | [175 — opening a very large folder](175-large-folder-open.md)                           | **DONE 2026-09-26 — DEPLOYED `plan-175`, PROD CHECKED**                             |
-| [174 — managed external MCP servers](174-external-mcp-servers.md)                       | **PLACEHOLDER — SPLIT FROM 087 M2/M3; UNSCHEDULED**                                 |
+| [174 — managed external MCP servers](174-external-mcp-servers.md)                       | **P1–P6 LANDED 2026-09-26 (wave 2 lane M); CLAUDE SCENARIOS NOT RUN (REAL CLI)**    |
 | [173 — two devices opening one workspace](173-two-devices-one-workspace.md)             | **RESEARCH — BEFORE PLAN 143'S PHONE SHELL**                                        |
 | [172 — one shared undo/redo stack](172-shared-undo-stack.md)                            | **RESEARCH — LIFE-13 FIRST; NOTICE-ONLY MOD+Z FIX ORDERED**                         |
 | [171 — the chat composer runs on our own editor](171-composer-on-our-editor.md)         | **PHASE 1 IMPLEMENTED 2026-09-26; PROSE WRAP, E058 THEN PHASE 3 (WAVE 2 E2)**       |
