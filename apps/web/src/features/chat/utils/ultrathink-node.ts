@@ -50,7 +50,7 @@ export class ChatInputUltrathinkNode extends TextNode {
   }
 }
 
-export function $createChatInputUltrathinkNode(text: string) {
+function $createChatInputUltrathinkNode(text: string) {
   return $applyNodeReplacement(new ChatInputUltrathinkNode(text))
 }
 

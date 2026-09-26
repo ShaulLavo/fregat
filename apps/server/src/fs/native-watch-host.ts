@@ -15,7 +15,7 @@ export type NativeWatchCallbacks = {
   readonly error: (error: NativeWatchError) => void
 }
 
-export type NativeWatchAttach =
+type NativeWatchAttach =
   | {
       readonly status: 'attached'
       readonly attachMs: number
