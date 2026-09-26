@@ -18,7 +18,6 @@ import type {
   ProviderMcpDefinition,
   ProviderMcpScope,
   ProviderMcpServer,
-  ProviderMcpSignIn,
   ProviderSessionHooks,
   ProviderInstanceId,
   ProviderLoginAttempt,
@@ -36,6 +35,7 @@ import type {
   TurnId,
   UserInputQuestions,
 } from '@workspace/contracts'
+import type { McpSignInFlow } from './mcp-sign-in'
 import type { ProviderUsageAmounts, ProviderUsageTotals } from './utils/usage-totals'
 import type { ProviderUsageProbe, ProviderUsageUpdate } from './utils/usage-windows'
 
@@ -610,6 +610,8 @@ export type ProviderMcpConfigAccess = {
   remove: (input: ProviderMcpWrite) => Promise<void>
   /** The stored definition, secrets included; used only to copy a server to another instance. */
   read: (input: ProviderMcpWrite) => Promise<ProviderMcpDefinition>
+  /** Starts an OAuth sign-in for one HTTP server, outside any session. */
+  signIn: (input: { folder: string; name: string }) => Promise<McpSignInFlow>
 }
 
 export type ProviderAdapter = {
@@ -655,7 +657,7 @@ export type ProviderAdapter = {
   reconnectMcpServer?: (input: { name: string; sessionId: SessionId }) => Promise<void>
   /** Approves a checkout's project server this session turned off, and restarts an idle session. */
   approveMcpServer?: (input: { name: string; sessionId: SessionId }) => Promise<void>
-  signInMcpServer?: (input: { name: string; sessionId: SessionId }) => Promise<ProviderMcpSignIn>
+  signInMcpServer?: (input: { name: string; sessionId: SessionId }) => Promise<McpSignInFlow>
   /** The instance's configured MCP servers, outside any session. */
   mcpConfig?: ProviderMcpConfigAccess
   /**

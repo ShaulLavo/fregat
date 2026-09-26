@@ -5,6 +5,7 @@ import type {
   ProviderMcpAddBody,
   ProviderMcpCopyBody,
   ProviderMcpRemoveBody,
+  ProviderMcpSignIn,
 } from '@workspace/contracts'
 
 import { settingsQueryKeys } from '@/features/settings/utils/query-keys'
@@ -68,6 +69,20 @@ export async function copyMcpServer(
     .mcp({ name })
     .copy.post(body)
   if (response.error) throw createRpcError(response.error)
+}
+
+export async function signInMcpServer(
+  owner: QueryClient,
+  providerInstanceId: ProviderInstanceId,
+  name: string,
+  folder: string | null,
+) {
+  const response = await clientForQueryClient(owner)
+    .providers({ providerInstanceId })
+    .mcp({ name })
+    ['sign-in'].post({ folder })
+  if (response.error) throw createRpcError(response.error)
+  return response.data as ProviderMcpSignIn
 }
 
 /** A write changes what the next probe reports, for the instance written and any copy target. */

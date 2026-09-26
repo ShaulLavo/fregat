@@ -96,3 +96,7 @@ export type ProviderInstanceMcp = v.InferOutput<typeof providerInstanceMcpSchema
 export type ProviderMcpAddBody = v.InferOutput<typeof providerMcpAddBodySchema>
 export type ProviderMcpRemoveBody = v.InferOutput<typeof providerMcpRemoveBodySchema>
 export type ProviderMcpCopyBody = v.InferOutput<typeof providerMcpCopyBodySchema>
+
+export const providerMcpSignInBodySchema = v.object({
+  folder: v.nullable(v.pipe(v.string(), v.trim(), v.minLength(1))),
+})

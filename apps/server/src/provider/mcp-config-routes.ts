@@ -8,6 +8,10 @@ import {
   providerMcpCopyBodySchema,
   providerMcpRemoveBodySchema,
   providerMcpServerNameSchema,
+  providerMcpSignInAttemptSchema,
+  providerMcpSignInBodySchema,
+  providerMcpSignInFinishBodySchema,
+  providerMcpSignInSchema,
   type ProviderInstanceId,
   type ProviderMcpScope,
 } from '@workspace/contracts'
@@ -15,10 +19,12 @@ import * as v from 'valibot'
 
 import { recordChatPipelineInfo } from '../orchestration/orchestration-logging'
 import { providerErrors } from '../observability/structured-errors'
+import type { McpSignInAttempts } from './mcp-sign-in'
 import type { ProviderAdapterRegistry } from './provider-adapter-registry'
 import { mcpConfigErrors } from './structured-errors'
 
 const instanceParamsSchema = v.object({ providerInstanceId: providerInstanceIdSchema })
+const attemptParamsSchema = v.object({ attemptId: v.pipe(v.string(), v.uuid()) })
 const serverParamsSchema = v.object({
   providerInstanceId: providerInstanceIdSchema,
   name: providerMcpServerNameSchema,
@@ -28,7 +34,10 @@ const serverParamsSchema = v.object({
  * Settings › MCP servers: each instance's servers as its harness keeps them. Writes go through the
  * harness's own writer, so Platform stores no server list of its own.
  */
-export function mcpConfigRoutes(adapterRegistry: ProviderAdapterRegistry) {
+export function mcpConfigRoutes(
+  adapterRegistry: ProviderAdapterRegistry,
+  signIns: McpSignInAttempts,
+) {
   const access = (providerInstanceId: ProviderInstanceId) => {
     const adapter = adapterRegistry.adapter(providerInstanceId)
     if (!adapter) throw providerErrors.INSTANCE_NOT_FOUND({ providerInstanceId })
@@ -85,6 +94,36 @@ export function mcpConfigRoutes(adapterRegistry: ProviderAdapterRegistry) {
         await config.remove({ folder, name: params.name, scope: body.scope })
       },
       { body: providerMcpRemoveBodySchema, params: serverParamsSchema },
+    )
+    .post(
+      '/providers/:providerInstanceId/mcp/:name/sign-in',
+      async ({ body, params }) => {
+        const config = access(params.providerInstanceId)
+        recordChatPipelineInfo('chat.pipeline.mcp_config.sign_in', {
+          name: params.name,
+          providerInstanceId: params.providerInstanceId,
+        })
+        const flow = await config.signIn({ folder: body.folder ?? homedir(), name: params.name })
+        return signIns.start(params.name, flow)
+      },
+      {
+        body: providerMcpSignInBodySchema,
+        params: serverParamsSchema,
+        response: providerMcpSignInSchema,
+      },
+    )
+    .get('/providers/mcp-sign-in/:attemptId', ({ params }) => signIns.read(params.attemptId), {
+      params: attemptParamsSchema,
+      response: providerMcpSignInAttemptSchema,
+    })
+    .post(
+      '/providers/mcp-sign-in/:attemptId',
+      ({ body, params }) => signIns.finish(params.attemptId, body.callbackUrl),
+      {
+        body: providerMcpSignInFinishBodySchema,
+        params: attemptParamsSchema,
+        response: providerMcpSignInAttemptSchema,
+      },
     )
     .post(
       '/providers/:providerInstanceId/mcp/:name/copy',

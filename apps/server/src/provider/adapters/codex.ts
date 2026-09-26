@@ -51,6 +51,8 @@ import {
   type TurnId,
 } from '@workspace/contracts'
 import * as v from 'valibot'
+import type { McpSignInFlow } from '../mcp-sign-in'
+import { replayMcpCallback } from '../mcp-sign-in'
 import type {
   ProviderAdapter,
   ProviderMcpConfigAccess,
@@ -151,6 +153,8 @@ const REQUEST_TIMEOUT_MS = 30_000
 /** How long a set or resumed goal may take to start its first turn before `/goal` answers itself. */
 const GOAL_TURN_WAIT_MS = 5_000
 const PROVIDER_PROBE_TIMEOUT_MS = 8_000
+/** Matches the sign-in attempt's own five minutes. */
+const CODEX_SIGN_IN_TIMEOUT_SECS = 300
 const CODEX_USAGE_TIMEOUT_MS = 3_000
 const CODEX_DISCOVERY_PAGE_SIZE = 50
 const ANSI_ESCAPE_CHAR = String.fromCharCode(27)
@@ -497,6 +501,27 @@ export class CodexProviderAdapter
         codexMcpDefinition(await readCodexConfig(client, folder), name),
       )
     },
+    signIn: ({ folder, name }) => this.signInOutsideSession(folder, name),
+  }
+
+  /** Its own app-server, kept until the sign-in settles: the redirect lands on its loopback. */
+  private async signInOutsideSession(folder: string, name: string) {
+    const client = CodexAppServerRpcClient.start(this.env, folder)
+    try {
+      await initializeCodexClient(client)
+      const flow = await startCodexMcpSignIn(client, { name, threadId: null })
+      void flow.done.catch(noop).finally(() => void client.close())
+      return {
+        ...flow,
+        cancel: () => {
+          flow.cancel()
+          void client.close()
+        },
+      }
+    } catch (error) {
+      await client.close()
+      throw error
+    }
   }
 
   private async listConfiguredMcpServers(folder: string) {
@@ -949,12 +974,8 @@ class CodexAppServerSession extends SessionContext {
     await this.client.request('config/mcpServer/reload', undefined)
   }
 
-  async signInMcpServer(name: string) {
-    const response = await this.client.request('mcpServer/oauth/login', {
-      name,
-      threadId: this.providerConversationMarker,
-    })
-    return { authorizationUrl: response.authorizationUrl }
+  async signInMcpServer(name: string): Promise<McpSignInFlow> {
+    return startCodexMcpSignIn(this.client, { name, threadId: this.providerConversationMarker })
   }
 
   /** A resumed thread keeps its goal; the indicator learns of it before the first turn. */
@@ -2958,6 +2979,50 @@ async function configuredMcpOff(
 
   const definitions = await readCodexMcpDefinitions(client, cwd)
   return mcpOff.filter((name) => definitions.has(name))
+}
+
+/**
+ * `mcpServer/oauth/login` on a live app-server. It reports the outcome as
+ * `mcpServer/oauthLogin/completed`; a pasted address is replayed against its loopback listener.
+ */
+async function startCodexMcpSignIn(
+  client: CodexAppServerRpcClient,
+  input: { name: string; threadId: string | null },
+): Promise<McpSignInFlow> {
+  const outcome = Promise.withResolvers<void>()
+  client.onMessage((message) => {
+    if (message.method !== 'mcpServer/oauthLogin/completed') return
+    const params = asRecord(message.params)
+    if (params.name !== input.name) return
+    if (params.success === true) {
+      outcome.resolve()
+      return
+    }
+    outcome.reject(
+      mcpConfigErrors.MCP_SIGN_IN_FAILED({
+        internal: { reported: typeof params.error === 'string', stage: 'exchange' },
+      }),
+    )
+  })
+  const response = await client
+    .request('mcpServer/oauth/login', {
+      name: input.name,
+      timeoutSecs: CODEX_SIGN_IN_TIMEOUT_SECS,
+      ...(input.threadId ? { threadId: input.threadId } : {}),
+    })
+    .catch((error: unknown) => {
+      throw mcpConfigErrors.MCP_SIGN_IN_UNSUPPORTED({
+        cause: error instanceof Error ? error : undefined,
+        internal: { name: input.name },
+      })
+    })
+  return {
+    authorizationUrl: response.authorizationUrl,
+    cancel: () =>
+      outcome.reject(mcpConfigErrors.MCP_SIGN_IN_FAILED({ internal: { stage: 'cancelled' } })),
+    done: outcome.promise,
+    finish: replayMcpCallback,
+  }
 }
 
 function readCodexConfig(client: CodexAppServerRpcClient, cwd: string) {

@@ -3,12 +3,14 @@ import { useMutationState } from '@tanstack/react-query'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 
+import { McpSignInFinish } from '@/components/mcp-sign-in-finish'
 import { McpServerRow } from '@/features/chat/components/mcp-server-row'
 import { useApproveMcpServer } from '@/features/chat/hooks/use-approve-mcp-server'
 import { useReconnectMcpServer } from '@/features/chat/hooks/use-reconnect-mcp-server'
 import { useSetMcpSessionOff } from '@/features/chat/hooks/use-set-mcp-session-off'
 import type { useSessionMcp } from '@/features/chat/hooks/use-session-mcp'
 import { useSignInMcpServer } from '@/features/chat/hooks/use-sign-in-mcp-server'
+import { sessionClient } from '@/features/chat/transport/session-tools'
 import { chatMutationKeys } from '@/features/chat/utils/mutation-keys'
 import { errorMessage } from '@/lib/error-message'
 
@@ -79,11 +81,9 @@ export function SessionMcpList({
   if (!mcp.data.running) return <EmptyState align='start' title='The session is not running.' />
   if (mcp.data.servers.length === 0) return <EmptyState align='start' title='No MCP servers' />
 
+  const started = signIn.isSuccess && signIn.data.attemptId ? signIn.data : null
   return mcp.data.servers.map((server) => (
     <McpServerRow
-      authorizationUrl={
-        signIn.isSuccess && signIn.variables === server.name ? signIn.data.authorizationUrl : null
-      }
       busy={busy.includes(server.name)}
       canReconnect={mcp.data.canReconnect}
       canSignIn={mcp.data.canSignIn}
@@ -97,6 +97,17 @@ export function SessionMcpList({
         mcp.data.canTurnOff && server.status !== 'unapproved'
           ? mcp.data.off.includes(server.name)
           : null
+      }
+      signInPanel={
+        started?.attemptId && signIn.variables === server.name ? (
+          <McpSignInFinish
+            attemptId={started.attemptId}
+            authorizationUrl={started.authorizationUrl}
+            client={sessionClient(sessionRef)}
+            name={server.name}
+            onSignedIn={() => void mcp.refetch()}
+          />
+        ) : null
       }
     />
   ))

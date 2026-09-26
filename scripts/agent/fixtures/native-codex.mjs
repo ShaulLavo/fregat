@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:http'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createInterface } from 'node:readline'
@@ -273,6 +274,14 @@ function mcpStatusOf(name, table) {
       httpOrigin: 'https://mcp.linear.app',
       tools: { list_issues: MCP_TOOL('list_issues'), create_issue: MCP_TOOL('create_issue') },
     }
+  if (name === 'sentry' && existsSync(join(root, 'sentry-signed-in')))
+    return {
+      ...base,
+      authStatus: 'oAuth',
+      runtimeStatus: 'connected',
+      httpOrigin: 'https://mcp.sentry.dev',
+      tools: { issues: MCP_TOOL('issues') },
+    }
   if (name === 'sentry')
     return {
       ...base,
@@ -373,6 +382,37 @@ function handleMcpStatus(message) {
   }
   if (message.method === 'config/mcpServer/reload') {
     send({ id: message.id, result: {} })
+    return true
+  }
+  if (message.method === 'mcpServer/oauth/login') {
+    // Stands in for the provider's page and Codex's loopback listener, on one fixture port.
+    const name = message.params.name
+    const listener = createServer((request, response) => {
+      const url = new URL(request.url, 'http://127.0.0.1')
+      if (url.pathname === '/authorize') {
+        const redirect = new URL(url.searchParams.get('redirect_uri'))
+        redirect.searchParams.set('code', 'fixture-code')
+        redirect.searchParams.set('state', url.searchParams.get('state'))
+        response.writeHead(302, { location: redirect.toString() })
+        response.end()
+        return
+      }
+      const success = url.searchParams.get('state') === 'fixture-state'
+      record({ event: 'oauth-callback', name, success })
+      if (success) writeFileSync(join(root, `${name}-signed-in`), 'yes')
+      response.end('Signed in. You can close this tab.')
+      send({ method: 'mcpServer/oauthLogin/completed', params: { name, success } })
+    })
+    listener.listen(0, '127.0.0.1', () => {
+      const origin = `http://127.0.0.1:${listener.address().port}`
+      const redirect = encodeURIComponent(`${origin}/callback`)
+      send({
+        id: message.id,
+        result: {
+          authorizationUrl: `${origin}/authorize?redirect_uri=${redirect}&state=fixture-state`,
+        },
+      })
+    })
     return true
   }
   if (message.method === 'hooks/list') {

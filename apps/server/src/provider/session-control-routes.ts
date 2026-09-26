@@ -12,6 +12,7 @@ import {
   trimmedNonEmptyStringSchema,
 } from '@workspace/contracts'
 import * as v from 'valibot'
+import type { McpSignInAttempts } from './mcp-sign-in'
 import type { ProviderService } from './provider-service'
 
 const sessionParamsSchema = v.object({ sessionId: sessionIdSchema })
@@ -25,7 +26,7 @@ const taskParamsSchema = v.object({
 })
 
 /** A session's live provider controls: background tasks, schedules, goal, MCP servers and hooks. */
-export function sessionControlRoutes(providerService: ProviderService) {
+export function sessionControlRoutes(providerService: ProviderService, signIns: McpSignInAttempts) {
   return new Elysia({ name: 'session-control-routes' })
     .get(
       '/providers/sessions/:sessionId/background-tasks',
@@ -89,7 +90,8 @@ export function sessionControlRoutes(providerService: ProviderService) {
     )
     .post(
       '/providers/sessions/:sessionId/mcp/:name/sign-in',
-      ({ params }) => providerService.signInMcpServer(params),
+      async ({ params }) =>
+        signIns.start(params.name, await providerService.signInMcpServer(params)),
       { params: serverParamsSchema, response: providerMcpSignInSchema },
     )
     .get(

@@ -383,7 +383,7 @@
     "thread/started": 3,
     "thread/status/changed": 2,
     "thread/tokenUsage/updated": 2,
-    "threadId": 30,
+    "threadId": 35,
     "threadResumeParams": 4,
     "threadStartParams": 2,
     "threadStateFromValue": 2
@@ -448,7 +448,7 @@
     "thread/turns/list": 8,
     "threadApprovalsReviewer": 3,
     "threadEphemeral": 4,
-    "threadId": 103,
+    "threadId": 104,
     "threadPersistsExtendedHistory": 4,
     "threadSettings": 1,
     "threadStartCount": 3,

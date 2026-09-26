@@ -11,9 +11,13 @@ import { environmentClientFor } from '@/lib/client'
 import { unwrapEdenResponse } from '@/lib/eden-events'
 import { confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
 
+/** The session's own machine: its MCP servers and sign-ins live there. */
+export function sessionClient(ref: ScopedSessionRef) {
+  return environmentClientFor(confirmedEnvironmentOrigin(ref.environmentId))
+}
+
 function sessionControls(ref: ScopedSessionRef) {
-  const client = environmentClientFor(confirmedEnvironmentOrigin(ref.environmentId))
-  return client.providers.sessions({ sessionId: ref.sessionId })
+  return sessionClient(ref).providers.sessions({ sessionId: ref.sessionId })
 }
 
 export async function fetchSessionMcp(ref: ScopedSessionRef, signal: AbortSignal) {

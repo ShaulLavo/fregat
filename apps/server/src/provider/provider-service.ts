@@ -984,12 +984,15 @@ export class ProviderService {
     return this.sessionMcp(input.sessionId)
   }
 
+  /** The sign-in's redirect goes to the provider's loopback; the caller tracks the attempt. */
   async signInMcpServer(input: { name: string; sessionId: SessionId }) {
     const adapter = this.requireSessionControl(input.sessionId, 'signInMcpServer')
     const signIn = adapter.signInMcpServer
     if (!signIn) throw sessionIdentityErrors.SESSION_CONTROL_UNSUPPORTED({ internal: input })
 
-    return v.parse(providerMcpSignInSchema, await signIn.call(adapter, input))
+    const flow = await signIn.call(adapter, input)
+    v.parse(providerMcpSignInSchema, { authorizationUrl: flow.authorizationUrl })
+    return flow
   }
 
   async sessionHooks(sessionId: SessionId): Promise<ProviderSessionHooks> {

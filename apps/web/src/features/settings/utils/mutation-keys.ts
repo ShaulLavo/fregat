@@ -15,6 +15,8 @@ export const settingsMutationKeys = {
       ['settings', 'mcp', 'remove', providerInstanceId, name] as const,
     copy: (providerInstanceId: ProviderInstanceId, name: string) =>
       ['settings', 'mcp', 'copy', providerInstanceId, name] as const,
+    signIn: (providerInstanceId: ProviderInstanceId, name: string) =>
+      ['settings', 'mcp', 'sign-in', providerInstanceId, name] as const,
   },
   push: {
     subscribe: ['push', 'subscribe'] as const,

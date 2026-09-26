@@ -223,6 +223,30 @@ export const mcpConfigErrors = defineErrorCatalog('provider', {
     why: 'Another editor wrote the same config file after it was read.',
     fix: 'Reload the MCP servers list and make the change again.',
   },
+  MCP_SIGN_IN_GONE: {
+    status: 404,
+    message: 'That sign-in is no longer waiting.',
+    why: 'It finished, timed out after five minutes, or the server restarted.',
+    fix: 'Start the sign-in again.',
+  },
+  MCP_SIGN_IN_ADDRESS_MISMATCH: {
+    status: 400,
+    message: 'That is not the address this sign-in is waiting for.',
+    why: 'The page ends on a localhost address with the port and state this sign-in started with.',
+    fix: 'Copy the whole address from the tab the sign-in page ended on, then paste it again.',
+  },
+  MCP_SIGN_IN_FAILED: {
+    status: 502,
+    message: 'The MCP server sign-in did not finish.',
+    why: 'The provider CLI stopped before it received a token.',
+    fix: 'Start the sign-in again, and finish it within five minutes.',
+  },
+  MCP_SIGN_IN_UNSUPPORTED: {
+    status: 409,
+    message: 'This server does not sign in with a browser.',
+    why: 'Only HTTP servers that ask for OAuth sign in this way.',
+    fix: 'Set its key or token in the server’s headers or environment instead.',
+  },
   MCP_PROBE_FAILED: {
     status: 502,
     message: 'The MCP servers could not be read.',

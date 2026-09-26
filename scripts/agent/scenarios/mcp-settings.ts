@@ -1,4 +1,4 @@
-import { deepStrictEqual } from 'node:assert/strict'
+import { deepStrictEqual, ok } from 'node:assert/strict'
 import { selectors } from '../selectors'
 import { isolatedNativeScenario, nativeLog } from './native-provider-verification'
 
@@ -6,7 +6,7 @@ import { isolatedNativeScenario, nativeLog } from './native-provider-verificatio
 export const mcpSettings = isolatedNativeScenario({
   name: 'mcp-settings',
   description:
-    'Settings › MCP servers with a fixture Codex: picking the instance lists its user and project servers with status, facts and files; Add server writes an HTTP server through config/batchWrite with a masked header; Delete removes it again.',
+    'Settings › MCP servers with a fixture Codex: picking the instance lists its user and project servers with status, facts and files; Add server writes an HTTP server through config/batchWrite with a masked header; Delete removes it again; a signed-out server signs in by pasting the address its page ended on, as from a phone.',
   fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
   async drive(page, { root, step }) {
     await selectors.sidebarSettingsButton(page, 'Chat').click()
@@ -45,6 +45,27 @@ export const mcpSettings = isolatedNativeScenario({
     await selectors.mcpSettingsRow(page, 'docs').waitFor({ state: 'detached', timeout: 30_000 })
     await step('removed')
 
+    // A phone: the page ends on the server's loopback, which the phone cannot load, so the
+    // address it ended on is pasted back.
+    const sentry = selectors.mcpSettingsRow(page, 'sentry')
+    await sentry.getByRole('button', { name: 'Sign in' }).click()
+    const pageLink = sentry.getByRole('link', { name: 'Open sign-in page for sentry' })
+    const authorizationUrl = await pageLink.getAttribute('href')
+    ok(authorizationUrl, 'The sign-in page link carries an address')
+    const ended = await page.request.get(authorizationUrl, { maxRedirects: 0 })
+    const callbackUrl = ended.headers().location
+    ok(callbackUrl, 'The sign-in page redirects to the loopback callback')
+    await sentry.getByLabel(/Paste that address here/).fill(callbackUrl)
+    await step('sign-in-paste')
+    await sentry.getByRole('button', { name: 'Finish' }).click()
+    await sentry.getByText('Connected').waitFor({ timeout: 30_000 })
+    await step('signed-in')
+
+    const callbacks = (await nativeLog(root)).filter((entry) => entry.event === 'oauth-callback')
+    deepStrictEqual(
+      callbacks.map((entry) => [entry.name, entry.success]),
+      [['sentry', true]],
+    )
     const writes = (await nativeLog(root)).filter((entry) => entry.event === 'config/batchWrite')
     deepStrictEqual(
       writes.map((entry) => entry.edits),

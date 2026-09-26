@@ -13,6 +13,7 @@ import { mcpConfigErrors } from '../../structured-errors'
 import type { ProviderMcpConfigAccess } from '../../types'
 import { claudeMcpServer, gatedProjectMcpServer } from './claude-mcp-status'
 import { approveProjectMcpServer, unapprovedProjectMcpServers } from './claude-project-mcp'
+import { startClaudeMcpSignIn, type ClaudeMcpLoginSpawn } from './claude-mcp-sign-in'
 import { mcpDefinitionFrom } from './mcp-definition'
 
 const CLI_TIMEOUT_MS = 30_000
@@ -197,6 +198,7 @@ export function claudeMcpConfigAccess(input: {
   approvalsFile: string
   cli: ClaudeMcpCli
   env: NodeJS.ProcessEnv
+  loginSpawn: ClaudeMcpLoginSpawn
   probe: (folder: string, unapproved: readonly string[]) => Promise<McpServerStatus[]>
 }): ProviderMcpConfigAccess {
   const { approvalsFile, cli, env } = input
@@ -233,5 +235,6 @@ export function claudeMcpConfigAccess(input: {
       await runClaudeMcpWrite(cli, ['mcp', 'remove', '-s', scope, name], folder)
     },
     read: ({ folder, name, scope }) => readClaudeMcpDefinition({ env, folder, name, scope }),
+    signIn: ({ folder, name }) => startClaudeMcpSignIn(input.loginSpawn, { folder, name }),
   }
 }

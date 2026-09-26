@@ -134,6 +134,11 @@ import {
   type ClaudeMcpCli,
 } from './utils/claude-mcp-config'
 import {
+  defaultClaudeMcpLoginSpawn,
+  startClaudeMcpSignIn,
+  type ClaudeMcpLoginSpawn,
+} from './utils/claude-mcp-sign-in'
+import {
   ClaudeMcpStatusWatch,
   claudeMcpServer,
   gatedProjectMcpServer,
@@ -191,6 +196,8 @@ export type ClaudeAdapterOptions = {
   projectMcpApprovalsFile?: string
   /** Runs `claude mcp …`; replaced in tests so no real CLI edits a real config. */
   mcpCli?: ClaudeMcpCli
+  /** Runs `claude mcp login` in a terminal; replaced in tests. */
+  mcpLoginSpawn?: ClaudeMcpLoginSpawn
   enabled?: boolean
   /**
    * Per-instance spawn env. Isolation rides on `CLAUDE_CONFIG_DIR`, never on
@@ -270,6 +277,7 @@ export class ClaudeProviderAdapter
   private readonly startInputs = new Map<SessionId, ProviderRuntimeStartInput>()
   private readonly projectMcpApprovalsFile: string
   readonly mcpConfig: ProviderMcpConfigAccess
+  private readonly mcpLoginSpawn: ClaudeMcpLoginSpawn
 
   /**
    * `createQuery` is the seam every test depends on: without it each test spawns
@@ -294,10 +302,13 @@ export class ClaudeProviderAdapter
     this.createQuery = options.createQuery ?? defaultClaudeCreateQuery
     this.projectMcpApprovalsFile =
       options.projectMcpApprovalsFile ?? defaultProjectMcpApprovalsPath()
+    this.mcpLoginSpawn =
+      options.mcpLoginSpawn ?? defaultClaudeMcpLoginSpawn(() => this.executablePath(), env)
     this.mcpConfig = claudeMcpConfigAccess({
       approvalsFile: this.projectMcpApprovalsFile,
       cli: options.mcpCli ?? defaultClaudeMcpCli(() => this.executablePath(), env),
       env,
+      loginSpawn: this.mcpLoginSpawn,
       probe: async (folder, unapproved) =>
         probeClaudeMcpStatus({
           createQuery: this.createQuery,
@@ -572,6 +583,28 @@ export class ClaudeProviderAdapter
       ...input,
       resumeExisting: input.resumeExisting || session.hasConversation(),
     })
+  }
+
+  /** Signs in through the CLI in the session's folder; the live session reconnects afterwards. */
+  async signInMcpServer({ name, sessionId }: { name: string; sessionId: SessionId }) {
+    const session = this.sessions.get(sessionId)
+    const input = this.startInputs.get(sessionId)
+    if (!session || !input)
+      throw sessionIdentityErrors.SESSION_NOT_RUNNING({ internal: { sessionId } })
+
+    const flow = await startClaudeMcpSignIn(this.mcpLoginSpawn, {
+      folder: normalizeWorkspaceCwd(input.cwd),
+      name,
+    })
+    const reconnect = () =>
+      session.reconnectMcpServer(name).catch((error: unknown) =>
+        recordChatPipelineWarning('chat.pipeline.claude_adapter.mcp_reconnect_after_sign_in', {
+          error,
+          name,
+          sessionId,
+        }),
+      )
+    return { ...flow, done: flow.done.then(reconnect) }
   }
 
   /** Flag settings apply at CLI start, so an idle session restarts on its conversation now. */

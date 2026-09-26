@@ -353,6 +353,23 @@ export const providerMcpSignInSchema = v.object({
     v.url(),
     v.regex(/^https?:\/\//i, 'Use an HTTP or HTTPS sign-in address.'),
   ),
+  /** Names the pending sign-in a pasted address finishes. */
+  attemptId: v.optional(trimmedNonEmptyStringSchema),
+})
+
+/**
+ * The address the sign-in page ended on, pasted from any device. The server hands it to the
+ * harness waiting on its own loopback, and only when it matches that pending sign-in.
+ */
+export const providerMcpSignInFinishBodySchema = v.object({
+  callbackUrl: v.pipe(v.string(), v.trim(), v.minLength(1, 'Paste the address the page ended on.')),
+})
+
+export const providerMcpSignInAttemptSchema = v.object({
+  attemptId: trimmedNonEmptyStringSchema,
+  name: trimmedNonEmptyStringSchema,
+  state: v.picklist(['pending', 'succeeded', 'failed']),
+  message: v.nullable(v.string()),
 })
 
 export const providerConfiguredHookSchema = v.object({
@@ -377,6 +394,7 @@ export type ProviderMcpTransport = v.InferOutput<typeof providerMcpTransportSche
 export type ProviderMcpAuth = v.InferOutput<typeof providerMcpAuthSchema>
 export type ProviderSessionMcp = v.InferOutput<typeof providerSessionMcpSchema>
 export type ProviderMcpSignIn = v.InferOutput<typeof providerMcpSignInSchema>
+export type ProviderMcpSignInAttempt = v.InferOutput<typeof providerMcpSignInAttemptSchema>
 export type ProviderConfiguredHook = v.InferOutput<typeof providerConfiguredHookSchema>
 export type ProviderSessionHooks = v.InferOutput<typeof providerSessionHooksSchema>
 export type ProviderAgent = v.InferOutput<typeof providerAgentSchema>

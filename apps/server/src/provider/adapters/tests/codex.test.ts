@@ -16,6 +16,7 @@ import {
 import * as v from 'valibot'
 import { readFsLogs } from 'evlog/fs'
 import { CodexProviderAdapter } from '../codex'
+import { McpSignInAttempts } from '../../mcp-sign-in'
 import { createNativeSessionProjection } from '../../../orchestration/tests/factories/native-session'
 import { SESSION_ID } from '../../../orchestration/tests/factories/projection'
 import { codexHistoryResponseSchema } from '../utils/codex-history'
@@ -386,7 +387,21 @@ function handle(message) {
   }
   if (message.method === 'mcpServer/oauth/login') {
     record({ event: message.method, params: message.params });
-    send({ id: message.id, result: { authorizationUrl: 'https://auth.example.test/login' } });
+    if (message.params.threadId) {
+      send({ id: message.id, result: { authorizationUrl: 'https://auth.example.test/login' } });
+      return;
+    }
+    // Outside a session: listen on loopback the way Codex does, and report the callback.
+    const listener = require('node:http').createServer((request, response) => {
+      const url = new URL(request.url, 'http://127.0.0.1');
+      const success = url.searchParams.get('state') === 'fake-state' && url.searchParams.has('code');
+      send({ method: 'mcpServer/oauthLogin/completed', params: { name: message.params.name, success } });
+      response.end('done', () => setTimeout(() => listener.close(), 50));
+    });
+    listener.listen(0, '127.0.0.1', () => {
+      const redirect = encodeURIComponent('http://127.0.0.1:' + listener.address().port + '/callback');
+      send({ id: message.id, result: { authorizationUrl: 'https://auth.example.test/login?redirect_uri=' + redirect + '&state=fake-state' } });
+    });
     return;
   }
   if (message.method === 'hooks/list') {
@@ -2913,6 +2928,34 @@ describe('CodexProviderAdapter', () => {
     })
   })
 
+  it('signs in outside a session: a pasted address reaches its own app-server loopback', async () => {
+    await withFakeCodex(async ({ projectPath }) => {
+      const adapter = new CodexProviderAdapter()
+      const signIns = new McpSignInAttempts()
+      try {
+        const flow = await adapter.mcpConfig.signIn({ folder: projectPath, name: 'github' })
+        const { attemptId, authorizationUrl } = signIns.start('github', flow)
+        const redirect = new URL(new URL(authorizationUrl).searchParams.get('redirect_uri') ?? '')
+
+        await expect(
+          signIns.finish(
+            attemptId ?? '',
+            `http://example.test${redirect.pathname}?state=fake-state`,
+          ),
+        ).rejects.toMatchObject({ code: 'provider.MCP_SIGN_IN_ADDRESS_MISMATCH' })
+        const finished = await signIns.finish(
+          attemptId ?? '',
+          `http://localhost:${redirect.port}/callback?code=abc&state=fake-state`,
+        )
+
+        expect(finished).toMatchObject({ name: 'github', state: 'succeeded' })
+      } finally {
+        signIns.cancelAll()
+        await adapter.stopAll()
+      }
+    })
+  })
+
   it('lists configured MCP servers with their files and writes through config/batchWrite', async () => {
     await withFakeCodex(async ({ projectPath, spawnLogPath }) => {
       const adapter = new CodexProviderAdapter()
@@ -3024,8 +3067,9 @@ describe('CodexProviderAdapter', () => {
         ])
         await adapter.reconnectMcpServer({ name: 'broken', sessionId: input.sessionId })
         expect(
-          await adapter.signInMcpServer({ name: 'github', sessionId: input.sessionId }),
-        ).toEqual({ authorizationUrl: 'https://auth.example.test/login' })
+          (await adapter.signInMcpServer({ name: 'github', sessionId: input.sessionId }))
+            .authorizationUrl,
+        ).toBe('https://auth.example.test/login')
         expect(await adapter.configuredHooks({ cwd: '/repo', sessionId: input.sessionId })).toEqual(
           {
             errors: ['one hook skipped'],
@@ -3050,7 +3094,7 @@ describe('CodexProviderAdapter', () => {
         const records = await readFakeCodexLog(spawnLogPath)
         expect(records).toContainEqual({
           event: 'mcpServer/oauth/login',
-          params: { name: 'github', threadId: 'provider-thread-1' },
+          params: { name: 'github', threadId: 'provider-thread-1', timeoutSecs: 300 },
         })
       } finally {
         await adapter.stopAll()

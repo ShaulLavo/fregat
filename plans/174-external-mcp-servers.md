@@ -1,6 +1,7 @@
 # Plan 174: Managed external MCP servers
 
-Status: **RESEARCH DONE 2026-09-26 — no second MCP manager: both harnesses already list, add,
+Status: **PHASES 1–6 LANDED 2026-09-26 (wave 2 lane M, PRs #121, #124, #125 and the phase 6 PR);
+earlier: RESEARCH DONE 2026-09-26 — no second MCP manager: both harnesses already list, add,
 remove, toggle, reconnect and sign in; Platform adds a richer status view, a machine-level MCP
 page that writes each harness's own config, per-session off switches, a trust gate for Claude
 project servers, and sign-in from any device.** Unscheduled. Split out of
@@ -230,6 +231,29 @@ Each phase ships and deploys on its own; phases 1, 3, 5 and 6 change the server
    `state` match the pending `mcpServer/oauth/login`. On the server machine's own browser, both
    complete without pasting. First step: an OAuth-protected fixture server to verify the Claude
    `--no-browser` exchange.
+   Verified 2026-09-26 against a throwaway `CLAUDE_CONFIG_DIR` and a local OAuth fixture server
+   (dynamic registration, PKCE, token, Streamable HTTP), Claude CLI 2.1.283, with no account or
+   model involved. `claude mcp login --no-browser` prints the page address with a `redirect_uri` of
+   `http://localhost:<port>/callback` and also listens on that port. With a pipe for stdin it refuses
+   ("stdin isn't a terminal") even after the callback arrives. In a terminal (Bun's `terminal`
+   spawn option) both routes work: the pasted address typed at its prompt, or the callback
+   delivered to its port. The server list then reads Connected.
+   Landed 2026-09-26 (wave 2 lane M). `provider/mcp-sign-in.ts` holds each pending sign-in as a
+   flow (page address, `finish`, `done`), and `McpSignInAttempts` tracks them by id: five minutes
+   to finish, and the server's stop cancels them. A pasted address is accepted only when it is
+   `http`, its host is loopback, its port and path are those of the attempt's `redirect_uri`, and
+   its `state` matches. It is then delivered to the redirect's own origin (`localhost` may resolve
+   to `::1`). Claude runs `claude mcp login --no-browser` in a terminal and types the address at
+   its prompt; a session sign-in reconnects the live session afterwards, so Claude sessions can now
+   sign in too. Codex replays the address against its loopback listener. Outside a session it
+   uses its own app-server, kept until `mcpServer/oauthLogin/completed`. Routes:
+   `POST /providers/:id/mcp/:name/sign-in`, `GET|POST /providers/mcp-sign-in/:attemptId`. Both
+   the popover and the settings rows show the page link and a paste field, and poll the attempt,
+   so a browser on the server machine finishes without pasting.
+   Not run: a Claude end-to-end scenario, because it needs the real CLI. The exchange was verified
+   by hand as above, and `mcp-sign-in.test.ts` covers the terminal handling with a fake CLI.
+   Covered for Codex by the fixture scenario `mcp-settings` (sign in by pasting, as from a phone)
+   and the adapter test.
 
 ## Owner questions
 
