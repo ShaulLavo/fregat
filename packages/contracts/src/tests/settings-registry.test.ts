@@ -216,7 +216,9 @@ describe('settings registry', () => {
 
   it('derives defaults from the descriptors rather than a second list', () => {
     for (const id of SETTING_IDS) {
-      if (settingParentId(id) !== undefined) continue
+      // A boolean child reads off under its off parent; every other key keeps its default.
+      if (settingParentId(id) !== undefined && typeof descriptorFor(id).default === 'boolean')
+        continue
       expect(DEFAULT_SETTING_VALUES[id]).toBe(descriptorFor(id).default)
     }
   })
@@ -246,7 +248,7 @@ describe('settings registry', () => {
   })
 
   it('rejects a dependsOn parent the page cannot place the child under', () => {
-    const toggle = (overrides: { category?: string; dependsOn?: string } = {}) =>
+    const toggle = (overrides: { category?: string; dependsOn?: string; rowOwner?: string } = {}) =>
       defineSetting({
         schema: v.boolean(),
         default: true,
@@ -271,6 +273,9 @@ describe('settings registry', () => {
       }),
       'a.underNumber': toggle({ dependsOn: 'a.number' }),
       'a.elsewhere': toggle({ category: 'Y', dependsOn: 'a.parent' }),
+      'a.self': toggle({ dependsOn: 'a.self' }),
+      'a.owned': toggle({ rowOwner: 'a.parent' }),
+      'a.underOwned': toggle({ dependsOn: 'a.owned' }),
     })
 
     expect(problems.map((problem) => problem.id)).toEqual([
@@ -278,6 +283,8 @@ describe('settings registry', () => {
       'a.missing',
       'a.underNumber',
       'a.elsewhere',
+      'a.self',
+      'a.underOwned',
     ])
   })
 
