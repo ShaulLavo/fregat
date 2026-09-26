@@ -83,6 +83,18 @@ export const SETTINGS_REGISTRY = {
     description:
       'Show the Plan mode picker and /plan and /default commands for providers that support them. Stored draft preferences are retained while hidden.',
   }),
+  'agent.diagnosticsFeedback': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Chat',
+    title: 'Errors after agent edits',
+    details:
+      'Only errors the edit introduced, from the language server already open for that file: up to 10 per file.',
+    description:
+      'After an agent edits a file, tell it the errors that edit introduced, so it can fix them in the same turn.',
+  }),
   'chat.activeFileContext': defineSetting({
     schema: v.boolean(),
     default: false,
@@ -747,6 +759,35 @@ export const SETTINGS_REGISTRY = {
     description:
       'How markdown files open: source text, source beside a rendered view, or rendered in place while you edit. Cycle markdown view changes one file.',
     keywords: ['markdown', 'preview', 'split', 'render'],
+  }),
+  'editor.spellcheck': defineSetting({
+    schema: v.picklist(['off', 'prose', 'proseAndCode'] as const),
+    // Off for files until marks stop costing a keystroke several milliseconds (E058 question 3).
+    default: 'off',
+    // Suppression, not execution: it only decides which words are marked, so a docs repository may
+    // turn it on for itself.
+    scope: 'window',
+    widget: 'enum',
+    category: 'Editor',
+    title: 'Spellcheck',
+    description:
+      'Mark misspelled words: in plain text and Markdown prose, or also in code comments and strings. Right-click a marked word for suggestions.',
+    keywords: ['spelling', 'spellcheck', 'dictionary', 'typo', 'prose'],
+  }),
+  'spellcheck.words': defineSetting({
+    schema: v.record(v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)), v.boolean()),
+    default: {},
+    merge: 'record',
+    // Suppression only: a workspace dictionary lists the words its files use.
+    scope: 'window',
+    widget: 'complex',
+    // Words arrive from the editor menu; settings.json is where a list is edited by hand.
+    visibility: 'internal',
+    category: 'Editor',
+    title: 'Spellcheck dictionary',
+    description:
+      'Words spellcheck never marks. Set a word to false to mark it again where another scope accepts it.',
+    keywords: ['spelling', 'spellcheck', 'dictionary', 'words', 'ignore'],
   }),
   'editor.diff.viewMode': defineSetting({
     schema: v.picklist(['split', 'stacked'] as const),
@@ -1456,8 +1497,10 @@ export const SETTINGS_REGISTRY = {
     scope: 'application',
     widget: 'keybindings',
     category: 'Keyboard shortcuts',
-    description:
-      'Command id to shortcut: one hotkey or two separated by a single space. A missing key keeps the default; an explicit null unbinds the command.',
+    title: 'Shortcuts',
+    description: 'Every command and its keys.',
+    details:
+      'In settings.json this is command id to shortcut: one hotkey, or two separated by a single space. A missing command keeps its default; null unbinds it.',
     // The one key that merges rather than replaces: a later layer should be able
     // to bind a command without dropping every other binding the user set.
     merge: 'record',

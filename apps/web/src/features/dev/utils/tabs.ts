@@ -1,6 +1,7 @@
 export const DEV_TABS = [
   { id: 'loaders', label: 'Loaders' },
   { id: 'physical', label: 'Physical' },
+  { id: 'shortcuts', label: 'Shortcuts' },
   { id: 'handles', label: 'Handles' },
 ] as const
 

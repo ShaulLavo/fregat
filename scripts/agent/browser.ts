@@ -162,8 +162,13 @@ async function main() {
     throw createScriptError(
       `Scenario ${scenario.name} writes state, so it does not run against production (${options.url}). Drop --url to run it against the dev page with a throwaway server.`,
     )
-  if (!needsIsolatedServer(verb, scenario, options, values['shared-dev']))
+  if (!needsIsolatedServer(verb, scenario, options, values['shared-dev'])) {
+    if (scenario?.requiresIsolatedServer)
+      throw createScriptError(
+        `Scenario ${scenario.name} requires a throwaway server with fixture-only providers.`,
+      )
     return runVerb(verb, scenario, options, values['shared-dev'])
+  }
   const prepared = await scenario?.prepareServer?.()
   const server = await startIsolatedServer(new URL(options.url), {
     pathPrefix: prepared?.pathPrefix,

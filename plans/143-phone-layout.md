@@ -452,7 +452,8 @@ See "Proposed phases" under Research findings. The owner answered its questions 
 - **Frame.** `viewport-fit=cover` and `interactive-widget=resizes-content`; safe-area padding; a
   `visualViewport` keyboard inset for iOS; `h-dvh`. A phone density step in `globals.css`
   (`:root[data-shell='phone']`: 48px bars, 44px controls and rows, text-xs 13px and text-sm 15px),
-  16px fields so iOS never zooms, a `phone:` variant, and no shortcut chips (`Kbd` hides itself).
+  16px fields so iOS never zooms, a `phone:` variant, and no shortcut chips in menus and the
+  palette (the shortcuts editor still shows its bindings).
 - **Tooling.** `agent:browser --touch` (and `capture.touch` on a scenario) emulates a touch phone;
   `waitForApp` accepts the phone shell. Scenario `phone-shell` walks the whole stack on a fixture
   repository with a scripted mock turn and checks nothing scrolls sideways.

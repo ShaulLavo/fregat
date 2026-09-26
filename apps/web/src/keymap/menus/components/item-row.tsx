@@ -91,8 +91,9 @@ export function MenuItemRow({
       {item.icon ? <item.icon /> : null}
       <span className={item.mono ? 'font-mono' : undefined}>{item.label}</span>
       {item.reason ? <ContextMenuShortcut>{item.reason}</ContextMenuShortcut> : null}
+      {/* A touch keyboard has no chords: the phone shell draws none. */}
       {item.shortcut ? (
-        <ContextMenuShortcut>
+        <ContextMenuShortcut className='phone:hidden'>
           <Kbd>{item.shortcut}</Kbd>
         </ContextMenuShortcut>
       ) : null}

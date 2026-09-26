@@ -25,8 +25,8 @@ is prefetched on idle or on a real signal (D4) and has a loader and an error bou
 | `lib`, `state`, `keymap`, `components`, `hooks`, `providers` | boot              | Shared layers the frame is built from.                                            |
 | `features/git`                                               | first interaction | A sidebar pane; boot only when it was the open pane.                              |
 | `features/search`                                            | first interaction | Opens from a chord or the rail.                                                   |
-| `features/command-palette`                                   | first interaction | Opens from a chord; must answer the first keystroke.                              |
-| `features/file-picker`                                       | first interaction | Opens from a chord or a dialog.                                                   |
+| `features/command-palette`                                   | first interaction | Input opens immediately; content and previews load through a module query.        |
+| `features/file-picker`                                       | first interaction | Dialog loads on demand, prefetched on idle.                                       |
 | `features/terminal`                                          | on demand         | Behind its boundary since Phase 3 (idle prefetch).                                |
 | `features/settings`                                          | on demand         | Behind its boundary since Phase 3 (idle prefetch).                                |
 | `features/logs`                                              | on demand         | A tool pane opened on purpose.                                                    |
@@ -39,11 +39,15 @@ workbench mode is a product call, because a first chord into chat would then wai
 ## Loading boundaries
 
 A boundary is a dynamic `import()` at a point where a feature is absent from the first frame, with
-no static import of the same module left (Rolldown reports `[INEFFECTIVE_DYNAMIC_IMPORT]`
-otherwise). It is `use()` over a cached import (`lib/retryable-import.ts`), so Retry in the
-surrounding `RenderErrorBoundary` asks the network again. It prefetches on idle or on a real
-signal, never on click, and a pending boundary renders a real loader. Terminal and settings are
-the two boundaries today.
+no static import of the same module left. Terminal, settings, the file picker and command palette
+content use shared module query options on the resource query client. The query owns pending,
+error, retry and the loaded module; idle prefetch uses those same options. Closed dialogs keep
+their queries disabled. Their loading views remain dismissible, and the palette's controlled input
+retains typing while its content loads. Failed imports show Retry and Reload; a browser that
+retains a failed module URL may require Reload.
+
+`agent:browser scenario deferred-dialogs` delays both dialog modules and checks typing across
+palette load and closing/reopening the pending picker.
 
 ## The first-load gate
 
@@ -64,3 +68,23 @@ gate has no `--dir`, so it never reads a stale `bundle-stats.json`.
 `carryAssets` in `scripts/deploy/release.ts` hardlinks into each new release the served release's
 hashed assets it lacks, up to a week old, so a page loaded before a deploy keeps resolving its lazy
 chunks. A hash names one content, so a carried file never shadows a new one.
+
+## September 26 dialog split
+
+The pin was last set at `ef0d170a0`. Rebuilding that commit with the current linked Editor
+`0f87310155df0720968e7bf8739d65cb18cd6249` gives 1,751,113 B gzip; its historical pin was
+1,743,278 B. Main at `9aaaeee87`, with the same linked Editor, gives 1,761,157 B. The dialog
+split gives **1,722,852 B**, removing 38,305 B and ending 20,426 B below the historical pin.
+The new total limit is 1,740,081 B; the 1% total and 5%/2 KB owner margins are unchanged.
+
+Between the two rebuilt commits, chat adds 31,620 rendered bytes from goals, schedules and MCP
+approval, the picker adds 12,247 from places and drives, and contracts add 6,790. Client-core
+removes 25,514 rendered bytes when editor commands move to the Editor catalog. The historical
+Editor pin also predates the currently linked build. These are separate from this change's
+removal of picker and palette content from first load.
+
+Owner gzip estimates divide each chunk's gzip by rendered module share. Splitting chunks can
+increase an owner's estimate while reducing its rendered bytes. The pin history records a line
+for every owner whose estimate rises above the historical pin, including those redistributions.
+The picker falls from 24,536 to 81 B and the palette from 17,277 to 1,781 B attributed gzip.
+Shared component code falls from 28,888 to 21,588 B.

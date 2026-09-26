@@ -66,6 +66,11 @@ function appendOperationMetadata(
     for (const ref of operation.order) appendUnique(affectedIds, modelRefKey(ref))
     return
   }
+  // The word itself stays out of the log: it is text the user typed.
+  if (operation.kind === 'spellcheck.setWord') {
+    appendUnique(settingIds, 'spellcheck.words')
+    return
+  }
   if (operation.kind === 'project.set') {
     appendUnique(settingIds, operation.key)
     appendUnique(affectedIds, operation.projectId)

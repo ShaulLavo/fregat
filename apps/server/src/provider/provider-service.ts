@@ -1,5 +1,6 @@
 import type { ProviderUsagePurpose } from '@workspace/contracts'
 import { BackgroundTaskRegistry } from './background-liveness'
+import type { McpGrantRegistry } from '../mcp/grants'
 import { SessionScheduleRegistry } from './session-schedules'
 import { SessionGoalRegistry } from './session-goals'
 import { elapsedMs } from '@workspace/utils/timing'
@@ -77,6 +78,8 @@ import {
 
 export type ProviderServiceOptions = {
   adapterRegistry?: ProviderAdapterRegistry
+  /** Platform's MCP endpoint; each chat runtime gets a token scoped to its session and checkout. */
+  mcp?: { readonly endpoint: string; readonly grants: McpGrantRegistry }
   /** Overridden in tests that need the deadline to be reachable within one. */
   idleSessionDeadlineMs?: number
   sessionDirectory?: ProviderSessionDirectory
@@ -146,6 +149,7 @@ export class ProviderService {
   private readonly backgroundTasks = new BackgroundTaskRegistry()
   private readonly taskRosters = new Map<SessionId, ProviderBackgroundTask[]>()
   private readonly schedules = new SessionScheduleRegistry()
+  private readonly mcp: ProviderServiceOptions['mcp'] | null
   private readonly goals = new SessionGoalRegistry()
   private readonly reaperTimer: ReturnType<typeof setInterval>
   private readonly reaper: ProviderSessionReaper
@@ -174,6 +178,7 @@ export class ProviderService {
   constructor(options: ProviderServiceOptions = {}) {
     this.adapterRegistry = options.adapterRegistry ?? createDefaultProviderAdapterRegistry()
     this.sessionDirectory = options.sessionDirectory ?? new ProviderSessionDirectory()
+    this.mcp = options.mcp ?? null
     this.reaper = new ProviderSessionReaper({
       deadlineMs: options.idleSessionDeadlineMs,
       directory: this.sessionDirectory,
@@ -389,10 +394,16 @@ export class ProviderService {
     })
     this.requireSdkOwnership(input.sessionId)
     this.recordLaunch(input, adapter)
-    const session = await adapter.startRuntime({
-      ...providerRuntimeStartInput(input, input.runtimePayload, continuation),
-      ...(!existing && input.fork ? { fork: input.fork.native } : {}),
-    })
+    const session = await adapter
+      .startRuntime({
+        ...providerRuntimeStartInput(input, input.runtimePayload, continuation),
+        ...this.mcpBinding(input.sessionId, input.runtimeEpoch, input.runtimePayload.cwd),
+        ...(!existing && input.fork ? { fork: input.fork.native } : {}),
+      })
+      .catch((error: unknown) => {
+        this.mcp?.grants.revoke(input.sessionId, input.runtimeEpoch)
+        throw error
+      })
     this.requireRunning()
     const binding = this.sessionDirectory.upsert({
       adapterKey: adapter.adapterKey,
@@ -500,6 +511,7 @@ export class ProviderService {
     }
     const task = new ProviderTextGenerationTask({
       interrupt,
+      outputSchema: input.outputSchema,
       providerInstanceId,
       purpose: input.purpose,
       ...ids,
@@ -517,12 +529,15 @@ export class ProviderService {
 
     try {
       throwIfTextGenerationAborted(input.signal)
-      isolatedCwd = await mkdtemp(path.join(tmpdir(), 'platform-provider-text-'))
+      if (!input.cwd) isolatedCwd = await mkdtemp(path.join(tmpdir(), 'platform-provider-text-'))
+      const cwd = input.cwd ?? isolatedCwd ?? ''
+      const interactionMode = input.interactionMode ?? DEFAULT_INTERACTION_MODE
       startPromise = adapter.startRuntime({
-        cwd: isolatedCwd,
+        cwd,
         ephemeral: true,
-        interactionMode: DEFAULT_INTERACTION_MODE,
+        interactionMode,
         modelSelection: input.modelSelection,
+        ...(input.outputSchema ? { outputSchema: input.outputSchema } : {}),
         providerInstanceId,
         runtimeMode: 'approval-required',
         sessionId: ids.sessionId,
@@ -534,11 +549,12 @@ export class ProviderService {
       await adapter.sendTurn({
         attachments: input.attachments ?? [],
         attachmentsDir: input.attachmentsDir,
-        cwd: isolatedCwd,
+        cwd,
         ephemeral: true,
-        interactionMode: DEFAULT_INTERACTION_MODE,
+        interactionMode,
         messageText: input.messageText,
         modelSelection: input.modelSelection,
+        ...(input.outputSchema ? { outputSchema: input.outputSchema } : {}),
         providerInstanceId,
         runtimeMode: 'approval-required',
         sessionId: ids.sessionId,
@@ -1024,7 +1040,22 @@ export class ProviderService {
     )
   }
 
+  /** A turn may reopen its runtime, so it carries the same binding the start did. */
   private turnWithResumeCursor(
+    input: ProviderTurnInput,
+    adapter: ReturnType<ProviderAdapterRegistry['getByInstance']>,
+  ): ProviderTurnInput {
+    const bound = { ...input, ...this.mcpBinding(input.sessionId, input.runtimeEpoch, input.cwd) }
+    return this.withResumeCursor(bound, adapter)
+  }
+
+  private mcpBinding(sessionId: SessionId, runtimeEpoch: string, cwd: string) {
+    if (!this.mcp) return {}
+    const token = this.mcp.grants.bind({ cwd, runtimeEpoch, sessionId })
+    return { platformMcp: { token, url: this.mcp.endpoint } }
+  }
+
+  private withResumeCursor(
     input: ProviderTurnInput,
     adapter: ReturnType<ProviderAdapterRegistry['getByInstance']>,
   ): ProviderTurnInput {
@@ -1053,6 +1084,7 @@ export class ProviderService {
   private releaseUnroutedBinding(binding: ProviderRuntimeBindingWithMetadata) {
     this.backgroundTasks.clear(binding.sessionId)
     this.schedules.clear(binding.sessionId)
+    this.mcp?.grants.revoke(binding.sessionId)
     this.goals.clear(binding.sessionId)
     this.releaseWorktree(binding.sessionId)
     recordChatPipelineWarning(
@@ -1169,6 +1201,7 @@ export class ProviderService {
     this.taskRosters.delete(sessionId)
     this.schedules.clear(sessionId)
     this.goals.clear(sessionId)
+    this.mcp?.grants.revoke(sessionId)
     this.releaseWorktree(sessionId)
   }
 
@@ -1265,6 +1298,9 @@ export class ProviderService {
     this.adapterSubscriptions.set(providerInstanceId, {
       adapter,
       unsubscribe: adapter.subscribeEvents((event) => {
+        // Revoke synchronously, including startup failures and exits queued behind a turn.
+        if (event.type === 'runtime.exited')
+          this.mcp?.grants.revoke(event.sessionId, event.runtimeEpoch)
         void this.runtimeEvents.enqueue({ adapter, event, providerInstanceId }).catch((error) => {
           recordChatPipelineWarning('chat.pipeline.provider_service.runtime_stream.failed', {
             adapterKey: adapter.adapterKey,
@@ -1607,5 +1643,5 @@ function textGenerationResult(task: ProviderTextGenerationTask): ProviderTextGen
     )
   }
 
-  return { text: outcome.text }
+  return { structured: outcome.structured, text: outcome.text }
 }

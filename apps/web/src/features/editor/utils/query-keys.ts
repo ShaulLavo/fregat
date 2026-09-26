@@ -11,9 +11,12 @@ export type LanguageServerMatchConfigurationSnapshot = {
 }
 
 export const editorQueryKeys = {
+  languageCensus: (root: string) => ['editor', 'language-census', root] as const,
   themes: ['editor', 'theme'] as const,
   theme: (id: string) => ['editor', 'theme', id] as const,
   storedHistory: (id: string) => ['editor', 'stored-history', id] as const,
+  allSpellingSuggestions: ['editor', 'spelling-suggestions'] as const,
+  spellingSuggestions: (word: string) => ['editor', 'spelling-suggestions', word] as const,
   languageServerMatches: (
     rootPath: string,
     matchPath: string,
