@@ -257,14 +257,15 @@ stays safe to read, share and export.
 
 ## Search
 
-| Setting                   | Default     | Scope  | What it does                                            |
-| ------------------------- | ----------- | ------ | ------------------------------------------------------- |
-| `search.defaultMatchMode` | `"literal"` | window | How a new search interprets the query.                  |
-| `search.caseSensitive`    | `false`     | window | Match case by default.                                  |
-| `search.wholeWord`        | `false`     | window | Match whole words by default.                           |
-| `search.maxResults`       | `20000`     | window | How many matches a workspace search returns.            |
-| `search.maxResultFiles`   | `20000`     | window | How many files a workspace search returns matches from. |
-| `search.quickOpenLimit`   | `80`        | window | How many files the file picker lists.                   |
+| Setting                   | Default     | Scope       | What it does                                            |
+| ------------------------- | ----------- | ----------- | ------------------------------------------------------- |
+| `search.defaultMatchMode` | `"literal"` | window      | How a new search interprets the query.                  |
+| `search.caseSensitive`    | `false`     | window      | Match case by default.                                  |
+| `search.wholeWord`        | `false`     | window      | Match whole words by default.                           |
+| `search.maxResults`       | `20000`     | window      | How many matches a workspace search returns.            |
+| `search.maxResultFiles`   | `20000`     | window      | How many files a workspace search returns matches from. |
+| `search.quickOpenLimit`   | `80`        | window      | How many files the file picker lists.                   |
+| `search.quickOpenPreview` | `false`     | application | Show the highlighted file below the quick open list.    |
 
 ### Details
 

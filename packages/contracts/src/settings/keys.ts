@@ -1045,6 +1045,16 @@ export const SETTINGS_REGISTRY = {
     visibility: 'advanced',
     keywords: ['search', 'quick open', 'picker', 'files', 'limit'],
   }),
+  'search.quickOpenPreview': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Search',
+    title: 'Preview files in quick open',
+    description: 'Show the highlighted file below the quick open list.',
+    keywords: ['search', 'quick open', 'preview', 'files'],
+  }),
   'chat.keepImportedSessionsUpdated': defineSetting({
     schema: v.boolean(),
     default: true,
