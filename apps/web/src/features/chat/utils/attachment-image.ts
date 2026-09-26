@@ -71,10 +71,3 @@ export function stagedAttachmentImages(
     src: attachment.previewUrl,
   }))
 }
-
-export function chatImageCrossOrigin(source: string) {
-  const url = URL.parse(source)
-  return url?.pathname.endsWith('/fs/blob') && url.searchParams.has('path')
-    ? 'anonymous'
-    : undefined
-}

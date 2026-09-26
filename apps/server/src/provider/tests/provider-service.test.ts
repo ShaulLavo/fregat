@@ -41,9 +41,67 @@ import { MOCK_DRIVER_KIND, mockDriver } from '../drivers/mock'
 import { ProviderAdapterRegistry } from '../provider-adapter-registry'
 import { ProviderService } from '../provider-service'
 import { ProviderSessionDirectory } from '../provider-session-directory'
+import { ProviderRuntimeEventStream } from '../provider-runtime-event-stream'
 import type { ProviderRuntimeEvent, ProviderTurnInput } from '../types'
 
 describe('ProviderService', () => {
+  it('removes a stopped task before returning, while preserving failed stops and other tasks', async () => {
+    const fixture = createFixture()
+    const stream = new ProviderRuntimeEventStream()
+    const stop = vi.fn(async () => {})
+    const adapter = Object.assign(new MockProviderAdapter(), { stopBackgroundTask: stop })
+    const subscribe = adapter.subscribeEvents.bind(adapter)
+    adapter.subscribeEvents = (subscriber) => {
+      const off = subscribe(subscriber)
+      const offTasks = stream.subscribe(subscriber)
+      return () => {
+        off()
+        offTasks()
+      }
+    }
+    const service = new ProviderService({
+      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      sessionDirectory: new ProviderSessionDirectory(fixture.database),
+    })
+    const input = providerTurnInput()
+    try {
+      await service.ensureRuntime({
+        providerInstanceId: input.providerInstanceId,
+        runtimeMode: input.runtimeMode,
+        runtimePayload: providerSessionPayload(input),
+        runtimeEpoch: input.runtimeEpoch,
+        sessionId: input.sessionId,
+      })
+      stream.publish({
+        type: 'tasks.roster',
+        eventId: 'tasks',
+        createdAt: new Date().toISOString(),
+        sessionId: input.sessionId,
+        runtimeEpoch: input.runtimeEpoch,
+        payload: {
+          tasks: [
+            { taskId: 'one', taskType: 'shell', description: 'Watch files' },
+            { taskId: 'two', taskType: 'shell', description: 'Run tests' },
+          ],
+        },
+      })
+      await service.drainRuntimeEvents()
+      stop.mockRejectedValueOnce(new Error('stop rejected'))
+      await expect(
+        service.stopBackgroundTask({ sessionId: input.sessionId, taskId: 'one' }),
+      ).rejects.toThrow('stop rejected')
+      expect(service.backgroundTaskRoster(input.sessionId).tasks).toHaveLength(2)
+      await service.stopBackgroundTask({ sessionId: input.sessionId, taskId: 'one' })
+      expect(service.backgroundTaskRoster(input.sessionId)).toEqual({
+        supported: true,
+        tasks: [{ taskId: 'two', taskType: 'shell', description: 'Run tests' }],
+      })
+    } finally {
+      await service.shutdown()
+      fixture.close()
+    }
+  })
+
   it('reclaims an idle runtime periodically without another launch and clears its timer on shutdown', async () => {
     vi.useFakeTimers()
     const fixture = createFixture()
@@ -325,6 +383,52 @@ describe('ProviderService', () => {
     fixture.close()
   })
 
+  it('uses the captured native boundary only on the first start', async () => {
+    const fixture = createFixture()
+    const adapter = new MockProviderAdapter()
+    const directory = new ProviderSessionDirectory(fixture.database)
+    const service = new ProviderService({
+      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      sessionDirectory: directory,
+    })
+    const input = providerTurnInput()
+    const source = v.parse(sessionIdSchema, '5b2b1c8e-4b5a-4d8a-9d0e-8a7c1a2b3c4d')
+    directory.upsert({
+      adapterKey: adapter.adapterKey,
+      providerDriverKind: adapter.driverKind,
+      providerInstanceId: input.providerInstanceId,
+      providerBindingHandle: `mock:${source}`,
+      providerResumeCursor: 'source-conversation',
+      runtimeMode: input.runtimeMode,
+      runtimePayload: providerSessionPayload(input),
+      sessionId: source,
+      runtimeEpoch: 'source-epoch',
+    })
+    const fork = {
+      native: { conversationId: 'captured-conversation', boundaryId: 'captured-turn' },
+      sessionId: source,
+      turnId: input.turnId,
+    }
+    const ensure = (runtimeEpoch: string) =>
+      service.ensureRuntime({
+        fork,
+        providerInstanceId: input.providerInstanceId,
+        runtimeMode: input.runtimeMode,
+        runtimePayload: providerSessionPayload(input),
+        runtimeEpoch,
+        sessionId: input.sessionId,
+      })
+
+    await ensure(input.runtimeEpoch)
+    await ensure('second-epoch')
+
+    expect(adapter.startedSessions.map((session) => session.fork ?? null)).toEqual([
+      fork.native,
+      null,
+    ])
+    fixture.close()
+  })
+
   it('hands a turn the cursor of the conversation it continues', async () => {
     const fixture = createFixture()
     const adapter = new MockProviderAdapter()
@@ -462,10 +566,11 @@ describe('ProviderService', () => {
     expect(fanOutEvents.map((event) => event.type)).toContain('assistant.delta')
     expect(fanOutEvents.map((event) => event.type)).toContain('assistant.complete')
     expect(fanOutEvents.map((event) => event.type)).toContain('turn.completed')
-    expect(fanOutEvents.map((event) => event.type).slice(-4)).toEqual([
+    expect(fanOutEvents.map((event) => event.type).slice(-5)).toEqual([
       'assistant.delta',
       'assistant.complete',
       'usage.totals',
+      'conversation.token-usage.updated',
       'turn.completed',
     ])
     expect(activeSessions).toContainEqual(expect.objectContaining({ sessionId: input.sessionId }))

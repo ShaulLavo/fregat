@@ -213,6 +213,7 @@ async function get(
   if (/^\/providers\/[^/]+\/commands$/u.test(url.pathname))
     return json({
       providerInstanceId: url.pathname.split('/')[2],
+      agents: [],
       commands: [],
       skills: [],
       supported: false,

@@ -26,6 +26,7 @@ import { deriveWriteTarget, policyControlledIds } from '@workspace/contracts'
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
 
 import { useDirectoryTransition } from '@/features/file-picker/hooks/use-directory-transition'
+import { useIntentHitLog } from '@/features/file-picker/hooks/use-intent-hit-log'
 import { useFilePickerPathInput } from '@/features/file-picker/hooks/use-path-input'
 import { IconTooltip } from '@/features/file-picker/components/icon-tooltip'
 import { FileList } from '@/features/file-picker/components/list'
@@ -55,7 +56,6 @@ import {
 import { useFilePickerSession } from '@/features/file-picker/state/picker'
 import { useDirectoryLoad } from '@/features/file-picker/hooks/use-directory-load'
 import { useRecentEntries } from '@/features/file-picker/hooks/use-recent-entries'
-import { useRecordRecentMutation } from '@/features/file-picker/hooks/use-record-recent-mutation'
 import { useServerInfoForOpen } from '@/features/file-picker/hooks/use-server-info-for-open'
 import {
   isGoToFolderShortcut,
@@ -107,7 +107,6 @@ export function FilePickerDialog({
     serverInfo,
     serverInfoError,
   } = useServerInfoForOpen(open, session.initializeOpenSession, session.resetOpenSession)
-  const recordRecentMutation = useRecordRecentMutation()
   const {
     currentEntry,
     isFetching: isDirectoryFetching,
@@ -127,12 +126,14 @@ export function FilePickerDialog({
     serverInfo,
     showHidden,
   })
-  const { beginDirectoryIntent, loadDirectory, preloadDirectory } = useDirectoryTransition({
-    currentPath: session.currentPath,
-    enabled: open && session.isInitialized && Boolean(serverInfo),
-    mode,
-    showHidden,
-  })
+  const { beginDirectoryIntent, guessDirectory, loadDirectory, preloadDirectory } =
+    useDirectoryTransition({
+      currentPath: session.currentPath,
+      enabled: open && session.isInitialized && Boolean(serverInfo),
+      mode,
+      showHidden,
+    })
+  useIntentHitLog(open)
   const navigateSessionTo = session.navigateTo
   const selectSessionEntry = session.setSelectedEntry
   const loadAndNavigate = (path: string, intentId: number) => {
@@ -237,7 +238,6 @@ export function FilePickerDialog({
     if (commitStartedRef.current) return
 
     commitStartedRef.current = true
-    recordRecentMutation.mutate(entry)
     onPick(entry)
     onOpenChange(false)
   }
@@ -539,7 +539,7 @@ export function FilePickerDialog({
                 listRef={listRef}
                 loadState={loadState}
                 mode={mode}
-                onDirectoryIntent={preloadDirectory}
+                onDirectoryIntent={guessDirectory}
                 onEntryDoubleClick={handleEntryDoubleClick}
                 onCommitEntry={(entry) => {
                   if (isDirectoryEntry(entry) && mode === 'file') {

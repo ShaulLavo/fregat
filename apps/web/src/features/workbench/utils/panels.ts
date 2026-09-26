@@ -48,6 +48,8 @@ export type WorkbenchPanels = {
   readonly gitHistory: GitHistoryView
   readonly gitChangesOpen: { readonly staged: boolean; readonly worktree: boolean }
   readonly sidebarOpen: boolean
+  /** The tab rail; toggle-sidebar hides it with the pane, a rail click hides the pane alone. */
+  readonly sidebarRailOpen: boolean
   /** Last id number handed out; ids never repeat within a workspace. */
   readonly terminalTabSequence: number
   readonly terminalTabs: readonly TerminalTabRecord[]
@@ -73,6 +75,7 @@ export function createDefaultWorkbenchPanels(): WorkbenchPanels {
     gitHistory: createDefaultGitHistoryView(),
     gitChangesOpen: { staged: true, worktree: true },
     sidebarOpen: true,
+    sidebarRailOpen: true,
     terminalTabSequence: 1,
     terminalTabs: [terminal],
   }
@@ -277,6 +280,13 @@ export function setWorkbenchBottomTab(
   return { ...panels, activeBottomTab }
 }
 
+/** Shows or hides the whole sidebar, rail included, and keeps its selected tab. */
+export function setWorkbenchSidebarOpen(panels: WorkbenchPanels, open: boolean): WorkbenchPanels {
+  if (panels.sidebarOpen === open && panels.sidebarRailOpen === open) return panels
+
+  return { ...panels, sidebarOpen: open, sidebarRailOpen: open }
+}
+
 /**
  * The visibility half of the pane commands: pressing the shortcut for the tab
  * already showing hides the pane, anything else reveals that tab.
@@ -297,9 +307,10 @@ export function showWorkbenchSidebarTab(
   panels: WorkbenchPanels,
   activeSidebarTab: WorkbenchSidebarTab,
 ): WorkbenchPanels {
-  if (panels.sidebarOpen && panels.activeSidebarTab === activeSidebarTab) return panels
+  if (panels.sidebarOpen && panels.sidebarRailOpen && panels.activeSidebarTab === activeSidebarTab)
+    return panels
 
-  return { ...panels, activeSidebarTab, sidebarOpen: true }
+  return { ...panels, activeSidebarTab, sidebarOpen: true, sidebarRailOpen: true }
 }
 
 export function toggleWorkbenchBottomTab(
@@ -335,6 +346,7 @@ export function normalizeWorkbenchPanels(value: WorkbenchPanels): WorkbenchPanel
     gitHistory: value.gitHistory,
     gitChangesOpen: value.gitChangesOpen,
     sidebarOpen: value.sidebarOpen,
+    sidebarRailOpen: value.sidebarRailOpen,
     terminalTabSequence: value.terminalTabSequence,
     terminalTabs: value.terminalTabs,
   }

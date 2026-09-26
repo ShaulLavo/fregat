@@ -5,7 +5,12 @@ import {
   type KeymapSequenceEvent,
   type PendingChordLabel,
 } from '@singapore-editor/core/keymap'
-import { parseHotkey, rawHotkeyToParsedHotkey, detectPlatform } from '@tanstack/hotkeys'
+import {
+  parseHotkey,
+  rawHotkeyToParsedHotkey,
+  detectPlatform,
+  normalizeKeyName,
+} from '@tanstack/hotkeys'
 
 import type { PlatformCommandBus } from '@/keymap/providers/command-context'
 import type { PlatformKeyBinding } from '@/keymap/types'
@@ -30,12 +35,15 @@ type Configuration = {
 }
 
 type StrokeContext = {
+  readonly strokeIndex: number
+  readonly altGraph: boolean
   readonly commands: ReturnType<PlatformCommandBus['capture']>
   readonly targetsTextEntry: boolean
 }
 
 export function createPlatformKeymapSession(initial: Configuration) {
   let config = initial
+  let strokeIndex = 0
   let runtime: KeymapRuntime<Candidate> | null = null
   let unsubscribeFocus: (() => void) | undefined
   let owner: FocusTargetToken | null = null
@@ -46,7 +54,12 @@ export function createPlatformKeymapSession(initial: Configuration) {
     const commands = config.bus.capture({ event, source: { kind: 'keybinding' } })
     const target = commands.inspect('editor.selectAll').target
     const editorInput = target?.kind === 'editor' ? target.inputElement : null
-    return { commands, targetsTextEntry: eventTargetsTextEntry(event, editorInput) }
+    return {
+      altGraph: event.getModifierState('AltGraph'),
+      strokeIndex,
+      commands,
+      targetsTextEntry: eventTargetsTextEntry(event, editorInput),
+    }
   }
 
   function focusIdentity() {
@@ -80,7 +93,10 @@ export function createPlatformKeymapSession(initial: Configuration) {
         const command = payload.binding.command
         return command ? context.commands.dispatch(command).claimed : true
       },
-      onPendingChange: (pending) => config.onPendingChange(pending),
+      onPendingChange: (pending) => {
+        strokeIndex = pending ? strokeIndex + 1 : 0
+        config.onPendingChange(pending)
+      },
       onSequence: (sequence) => reportSequence(sequence, config.focusedPane),
     })
     cancelOnFocusChange()
@@ -142,7 +158,21 @@ function runtimeBindings(
   })
 }
 
-function candidateAvailable({ payload }: KeymapBinding<Candidate>, context: StrokeContext) {
+function candidateAvailable(
+  { payload }: KeymapBinding<Candidate>,
+  context: StrokeContext,
+  event: KeyboardEvent,
+) {
+  if (context.altGraph) {
+    if (altGraphTypedCharacter(event)) return false
+    const stroke = payload.binding.chord[context.strokeIndex]
+    if (!stroke) return false
+    const parsed =
+      typeof stroke === 'string'
+        ? parseHotkey(stroke, detectPlatform())
+        : rawHotkeyToParsedHotkey(stroke, detectPlatform())
+    if (parsed.key !== normalizeKeyName(event.key)) return false
+  }
   const { binding, firesWhileTyping } = payload
   if (context.targetsTextEntry && !firesWhileTyping) return false
   if (!binding.command) return true
@@ -166,4 +196,14 @@ function reportSequence(event: KeymapSequenceEvent<Candidate>, pane: FocusArea) 
     prefix: event.keys.split(' ')[0],
     strokeCount: event.strokeCount,
   })
+}
+
+/**
+ * Windows reports AltGr as Ctrl+Alt, so AltGr+9 typing `]` on a German layout looks like
+ * Ctrl+Alt+]. A printable key its physical key does not produce unmodified is text, never a chord.
+ */
+function altGraphTypedCharacter(event: KeyboardEvent) {
+  if ([...event.key].length !== 1) return false
+  const base = /^(?:Key|Digit)(.)$/u.exec(event.code)?.[1]
+  return base?.toLowerCase() !== event.key.toLowerCase()
 }

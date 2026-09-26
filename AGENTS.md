@@ -228,6 +228,15 @@ Interaction treatments are utilities, not strings to copy:
 - Retries live in the mutation's `retry` / `retryDelay`, not in a loop written inside `onSuccess`. A retry the mutation cache cannot see is a retry devtools, `isPending` and the wide event cannot see either.
 - Exceptions exist and each one carries a comment saying why: streaming transports (terminal input, orchestration WebSocket frames), and intent queues that already serialize by resource (`runIntent`, `runTreeIntent`, the workspace-edit lifecycle behind `runWorkspaceMutation`). Those still settle the cache when they finish.
 
+## Git: One Shared Checkout
+
+- Several sessions work in this checkout on `main` at the same time. Every uncommitted change in the tree may be another session's live work.
+- **Never stash.** No `git stash`, in any form, for any reason. A stash pulls other sessions' edits out from under them mid-task, and a stash popped by the wrong session lands someone else's work.
+- The same goes for anything else that takes changes out of the tree: no `git reset --hard`, `git checkout -- <path>`, `git restore`, `git clean` or branch switching on this checkout.
+- Commit your own work: stage the files you changed by path and push. Leave other sessions' changes in the tree for them.
+- Never split a file. When a file you changed also holds another session's edits, commit the whole file, and say so in the message. Only then does their work go in with yours.
+- A rejected push means `git pull --rebase`, then push again.
+
 ## Greenfield, No Backward Compatibility
 
 - This project is greenfield and not live: no releases, no external users, no data anyone needs migrated.
@@ -315,6 +324,7 @@ Interaction treatments are utilities, not strings to copy:
 - `GET /platform/release` reports the served release name, commit and dirty-file count, the release the running server bundle came from, and `pending`, `phase` and `liveCheck` for a staged update. That is how "did it land" is answered.
 - The procedure lives in `scripts/deploy/`: `mesh.ts` (the command), `live-check.mjs` (the browser check, run by the command or after a restart by the promotion step; a failure the previous release already had is reported but does not fail the deploy), `systemd/promote.ts` (the promotion step and the only `SIGUSR2` sender, installed into `/work/platform-production/bin/`), and `systemd/platform-prod.service` (the unit template, rendered and installed by the command; a changed unit applies at the next restart). The mesh route itself is set up once by hand: `mesh serve omarchy 3301 --at /platform --isolate`.
 - `ghostty-webgpu` is a `link:` to `/work/projects/ghostty-webgpu`. A change there needs `bun run build` in that repo before the web build picks it up.
+- CI builds the Editor at the commit pinned as `editor-ref` in `.github/actions/setup/action.yml`. A Platform change that needs newer Editor code bumps that pin in the same commit.
 - A release's `server/node_modules` is a symlink to the checkout's `apps/server/node_modules`: the bundle resolves language servers and its external packages at runtime. Rolling back a release does not roll back a `bun install`.
 
 ## Testing

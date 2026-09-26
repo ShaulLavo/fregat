@@ -62,6 +62,7 @@ export function sessionShellFromRow(
     titleRegeneration: parseJson(row.titleRegenerationJson),
     latestTurn: parseJson(row.latestTurnJson),
     planProgress: parseJson(row.planProgressJson),
+    forkedFrom: parseJson(row.forkedFromJson),
     runtime: runtime ? runtimeFromRow(runtime) : null,
   })
 }

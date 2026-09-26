@@ -1,5 +1,6 @@
 import { SETUP_TIMEOUT_MS } from './setup-runner'
 import { commandUploadClaim } from './command-attachments'
+import { copyForkAttachments, discardUnclaimedForkAttachments } from '../attachments/fork'
 import { withAttachmentLanes } from '../attachments/lanes'
 import { createAttachmentOwnership, type AttachmentOwnership } from '../attachments/ownership'
 import { sessionTitleMessages } from './title-messages'
@@ -71,7 +72,8 @@ import { decideOrchestrationCommand } from './decider'
 import { OrchestrationEventStore, type OrchestrationDatabase } from './event-store'
 import { OrchestrationProjectionPipeline } from './projection-pipeline'
 import { bootstrapOrchestration } from './bootstrap'
-import { createEmptyReadModel } from './read-model'
+import { createEmptyReadModel, requireSession, requireWorktree } from './read-model'
+import { forkMessages } from './utils/fork-messages'
 import { prepareProjectRegistration, type RegistrationBoundary } from './registration'
 import { registrationResult } from './registration-decider'
 import { commandFingerprint } from './utils/command-intent'
@@ -87,6 +89,7 @@ import { SessionDiscoveryReconciler } from './session-discovery'
 import { sessionImportErrors } from './import-errors'
 import { importedHistoryMessages, historyRevision } from './utils/import-history'
 import type { ProviderHistoryMessage } from '../provider/types'
+import { checkpointErrors } from './structured-errors'
 import { resolveSessionOwner } from './session-owner'
 import {
   createDefaultProviderAdapterRegistry,
@@ -159,6 +162,7 @@ export class OrchestrationEngine {
   // Set once a restart is accepted and never cleared: the process exits after it.
   private startsHeld = false
   private queue = Promise.resolve()
+  private readonly workspaceOperations = new Set<string>()
   private readonly attachmentOwnership: AttachmentOwnership
   private readonly attachmentsDir: string
   private checkpointReactor: CheckpointReactor | null = null
@@ -294,14 +298,24 @@ export class OrchestrationEngine {
       this.attachmentsDir,
       this.attachmentOwnership,
     )
-    const result = await this.enqueue(ingested.command, ingested.attachmentIngest, fingerprint)
-    return result
+    try {
+      return await this.enqueue(ingested.command, ingested.attachmentIngest, fingerprint)
+    } catch (error) {
+      if (prepared.type === 'session.fork')
+        await discardUnclaimedForkAttachments(
+          this.attachmentsDir,
+          prepared.attachmentCopies,
+          this.attachmentOwnership,
+        )
+      throw error
+    }
   }
 
   private async prepare(
     command: ClientOrchestrationCommand,
     fingerprint: string,
   ): Promise<OrchestrationCommand> {
+    if (command.type === 'session.fork') return this.prepareFork(command)
     if (command.type !== 'project.create') {
       if (this.worktreePreparation) return this.worktreePreparation.prepare(command, fingerprint)
       return v.parse(orchestrationCommandSchema, command)
@@ -321,6 +335,44 @@ export class OrchestrationEngine {
     return prepared
   }
 
+  private async prepareFork(
+    command: Extract<ClientOrchestrationCommand, { type: 'session.fork' }>,
+  ) {
+    const model = this.commandReadModel(command)
+    const source = requireSession(model, command.sourceSessionId)
+    const worktree = requireWorktree(model, source.worktreeId)
+    const messages = forkMessages(source, command.throughTurnId)
+    const providerTurnId = this.forkProviderTurn(source.id, command.throughTurnId)
+    if (!this.providerService || !providerTurnId)
+      throw sessionIdentityErrors.FORK_POINT_UNAVAILABLE({
+        internal: { sessionId: source.id, turnId: command.throughTurnId },
+      })
+    const native = await this.providerService.prepareFork({
+      cwd: worktree.canonicalPath,
+      providerTurnId,
+      conversationId: source.forkedFrom?.native.conversationId,
+      providerInstanceId: source.modelSelection.providerInstanceId,
+      sessionId: source.id,
+    })
+    const attachmentCopies = await copyForkAttachments(
+      this.attachmentsDir,
+      command.commandId,
+      messages,
+    )
+    return { ...command, native, attachmentCopies }
+  }
+
+  private forkProviderTurn(sessionId: SessionId, turnId: string): string | null {
+    let source = this.readModel.sessions.get(sessionId)
+    while (source) {
+      const native = this.eventStore.providerTurnId(source.id, turnId)
+      if (native) return native
+      if (!source.forkedFrom) return null
+      source = this.readModel.sessions.get(source.forkedFrom.sessionId)
+    }
+    return null
+  }
+
   async dispatch(command: OrchestrationCommand, attachmentIngest?: CommandAttachmentIngest) {
     await this.ready
     return this.enqueue(command, attachmentIngest)
@@ -329,6 +381,41 @@ export class OrchestrationEngine {
   async dispatchProviderCommand(command: OrchestrationCommand, source: ProviderRuntimeSource) {
     await this.ready
     return this.enqueueProviderCommand(command, source)
+  }
+
+  async runWorkspaceOperation<T>(sessionId: SessionId, operation: () => Promise<T>): Promise<T> {
+    await this.ready
+    const path = await this.schedule(() => {
+      const { worktree } = resolveSessionOwner(this.readModel, sessionId)
+      this.requireWorkspaceAvailable(worktree.canonicalPath)
+      this.workspaceOperations.add(worktree.canonicalPath)
+      return worktree.canonicalPath
+    })
+    try {
+      return await operation()
+    } finally {
+      this.workspaceOperations.delete(path)
+    }
+  }
+
+  private requireWorkspaceAvailable(path: string | undefined) {
+    if (path && this.workspaceOperations.has(path))
+      throw checkpointErrors.WORKSPACE_BUSY({ internal: { path } })
+  }
+
+  private requireWorkspaceCommandAvailable(command: OrchestrationCommand) {
+    if (command.type !== 'session.turn.start' && command.type !== 'session.checkpoint.revert')
+      return
+    const bootstrap =
+      command.type === 'session.turn.start'
+        ? command.bootstrap?.createSession?.worktreeTarget
+        : undefined
+    const targetId =
+      bootstrap?.kind === 'current'
+        ? bootstrap.worktreeId
+        : this.readModel.sessions.get(command.sessionId)?.worktreeId
+    const worktree = targetId ? this.readModel.worktrees.get(targetId) : undefined
+    this.requireWorkspaceAvailable(worktree?.canonicalPath)
   }
 
   private schedule<T>(operation: () => T | Promise<T>) {
@@ -351,7 +438,9 @@ export class OrchestrationEngine {
       this.attachmentsDir,
       claim.attachments.map((attachment) => attachment.id),
       async () => {
-        for (const attachment of claim.attachments)
+        for (const attachment of claim.attachments.filter((entry) =>
+          entry.id.startsWith('upload-'),
+        ))
           await validateAttachmentUpload(
             this.attachmentsDir,
             attachment,
@@ -449,6 +538,10 @@ export class OrchestrationEngine {
   async sessionDetailPage(input: OrchestrationSessionDetailPageInput) {
     await this.ready
     return this.snapshotQuery.sessionDetailPage(input)
+  }
+  async sessionTranscript(sessionId: string) {
+    await this.ready
+    return this.snapshotQuery.sessionTranscript(sessionId)
   }
   async replay(input: Parameters<OrchestrationEventStore['readAfter']>[0]) {
     await this.ready
@@ -565,6 +658,7 @@ export class OrchestrationEngine {
     if (existing) return this.dispatchFromReceipt(existing, command.type, fingerprint)
     this.requireStartsOpen(command)
 
+    this.requireWorkspaceCommandAvailable(command)
     const committed = this.commitNewCommand(command, summary, fingerprint)
     recordChatPipelineInfo('chat.pipeline.command.complete', {
       ...summary,
@@ -644,7 +738,11 @@ export class OrchestrationEngine {
         command.type === 'session.lifecycle.restore'
           ? this.receipts.find(command.restoreCommandId)
           : null
-      const pendingEvents = decideOrchestrationCommand(command, this.readModel, restoreReceipt)
+      const pendingEvents = decideOrchestrationCommand(
+        command,
+        this.commandReadModel(command),
+        restoreReceipt,
+      )
       recordChatPipelineInfo('chat.pipeline.command.decided', {
         ...summary,
         eventCount: pendingEvents.length,
@@ -658,6 +756,18 @@ export class OrchestrationEngine {
       this.recordDispatchFailure(command, summary, error, fingerprint)
       throw error
     }
+  }
+
+  private commandReadModel(
+    command: OrchestrationCommand | ClientOrchestrationCommand,
+  ): OrchestrationReadModel {
+    if (command.type !== 'session.fork') return this.readModel
+    const source = this.readModel.sessions.get(command.sourceSessionId)
+    if (!source) return this.readModel
+    const messages = this.snapshotQuery.sessionTranscript(source.id).session.messages
+    const sessions = new Map(this.readModel.sessions)
+    sessions.set(source.id, { ...source, messages })
+    return { ...this.readModel, sessions }
   }
 
   // Checked on the dispatch queue, so nothing can land between this read and the decision.

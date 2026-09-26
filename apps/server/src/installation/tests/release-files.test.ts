@@ -8,6 +8,7 @@ import {
   PTY_HOST,
   reachablePackages,
   REMOTE_SUPPORT,
+  WATCH_WORKER,
   RUNTIME_PACKAGES,
   runtimeManifest,
   writeRuntimeManifest,
@@ -61,6 +62,12 @@ test('the server build writes the terminal host bundle from its entry', async ()
   )
 })
 
+test('the server build writes the watch worker beside the bundle', async () => {
+  expect(await buildScript()).toContain(
+    `bun build src/fs/watch-worker.ts --target bun --outfile dist/${WATCH_WORKER}`,
+  )
+})
+
 test('manifest versions come from bun.lock, with the server workspace resolution first', () => {
   const lock = fixtureLock({
     sharp: 'sharp@0.1.0',
@@ -110,6 +117,7 @@ test('a built server directory reports the release files it lacks', async () => 
       'runtime/bun.lock',
       REMOTE_SUPPORT,
       PTY_HOST,
+      WATCH_WORKER,
     ])
     const lockfile = path.join(server, 'bun.lock')
     await writeFile(
@@ -118,8 +126,9 @@ test('a built server directory reports the release files it lacks', async () => 
     )
     await writeRuntimeManifest(server, lockfile)
     await writeFile(path.join(server, REMOTE_SUPPORT), '')
-    expect(await missingReleaseFiles(server)).toEqual([PTY_HOST])
+    expect(await missingReleaseFiles(server)).toEqual([PTY_HOST, WATCH_WORKER])
     await writeFile(path.join(server, PTY_HOST), '')
+    await writeFile(path.join(server, WATCH_WORKER), '')
     expect(await missingReleaseFiles(server)).toEqual([])
   } finally {
     await rm(server, { force: true, recursive: true })

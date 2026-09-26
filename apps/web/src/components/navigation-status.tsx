@@ -3,6 +3,7 @@ import { Alert, AlertDescription } from '@workspace/ui/components/alert'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { useNavigation } from '@/hooks/use-navigation'
 import { FixWithAgentButton } from '@/components/fix-with-agent-button'
+import { WorkspaceSwitchPending } from '@/components/workspace-switch-pending'
 
 export function NavigationStatus() {
   const navigation = useNavigation()
@@ -17,6 +18,8 @@ export function NavigationStatus() {
         </AlertDescription>
       </Alert>
     )
+  if (status.target)
+    return <WorkspaceSwitchPending key={status.target.path} target={status.target} />
   return (
     <LoadingState label='Opening destination'>
       <div className='skeleton-sweep h-1 w-32' />

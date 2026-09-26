@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { parseCliVersion } from '../../utils/cli-version'
 import {
-  parseClaudeVersion,
   resolveClaudeExecutable,
   type ClaudeExecutable,
   type ClaudeExecutableProbe,
@@ -93,9 +93,9 @@ describe('resolveClaudeExecutable', () => {
   })
 })
 
-describe('parseClaudeVersion', () => {
+describe('parseCliVersion', () => {
   it('reads the version out of `claude --version`', () => {
-    expect(parseClaudeVersion('2.1.281 (Claude Code)\n')).toBe('2.1.281')
-    expect(parseClaudeVersion('command not found')).toBeNull()
+    expect(parseCliVersion('2.1.281 (Claude Code)\n')).toBe('2.1.281')
+    expect(parseCliVersion('command not found')).toBeNull()
   })
 })

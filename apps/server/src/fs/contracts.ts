@@ -92,12 +92,14 @@ const workspaceSearchIndexReadinessSchema = v.union([
   v.literal('ready'),
   v.literal('stale'),
   v.literal('failed'),
+  v.literal('off'),
 ])
 const workspaceSearchIndexFallbackReasonSchema = v.union([
   v.literal('building'),
   v.literal('cold'),
   v.literal('disabled'),
   v.literal('failed'),
+  v.literal('off'),
   v.literal('regex-name-query'),
   v.literal('root-mismatch'),
   v.literal('stale'),

@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto'
+import { providerResetCreditOutcomeSchema } from '@workspace/contracts'
+import path from 'node:path'
 import { defaultAttachmentsDir } from '../../attachments/store'
 import { resolveCodexAttachments } from './utils/codex-attachments'
 import { codexAsyncQuestions } from './utils/codex-async-questions'
@@ -18,6 +21,8 @@ import {
   type ApprovalRequestId,
   type ChatAgent,
   type InteractionMode,
+  type ProviderConfiguredHook,
+  type ProviderMcpServer,
   type ProviderModel,
   type ProviderInstanceId,
   type ProviderInstanceSettings,
@@ -35,6 +40,8 @@ import type {
   ProviderApprovalResponseInput,
   ProviderCommandCatalogInput,
   ProviderCommandCatalogResult,
+  ProviderForkStart,
+  ProviderHookOutcome,
   ProviderRuntimeEvent,
   ProviderRuntimeStartInput,
   ProviderTurnInput,
@@ -42,6 +49,7 @@ import type {
   ProviderUserInputResponseInput,
   ProviderSessionDiscoveryInput,
   ProviderSessionHistoryInput,
+  ProviderForkInput,
 } from '../types'
 import { isNotInstalledError, requestGone, sessionIdentityErrors } from '../structured-errors'
 import { RuntimeAdapter } from './state/runtime-adapter'
@@ -61,11 +69,14 @@ import {
   type CodexClientRequestMethod,
   type CodexClientRequestParamsByMethod,
   type CodexClientRequestResultByMethod,
+  type CodexHookMetadata,
+  type CodexHookRunSummary,
+  type CodexMcpServerStatus,
   type CodexServerNotificationParamsByMethod,
   type CodexSkillMetadata,
 } from './codex-protocol'
 import { errorMessage as providerErrorMessage } from '@workspace/contracts'
-import { prepareCodexRewind } from './utils/codex-rewind'
+import { codexTurnExists, prepareCodexRewind } from './utils/codex-rewind'
 import { activeProviderTurn, type ActiveProviderTurn } from './utils/active-turn'
 import { codexDeveloperInstructions } from './utils/codex-instructions'
 import { modelOptionValue, type ModelOptions } from './utils/model-options'
@@ -93,10 +104,13 @@ import {
   codexDiscoveredSession,
   codexHistoryMessages,
   codexHistoryResponseSchema,
+  codexRolloutPathSchema,
 } from './utils/codex-history'
 import { discoveryInputSchema } from '../utils/discovery-metadata'
-import { codexSessionResumeSchema } from './utils/codex-session'
+import { codexSessionResumeSchema, readCodexUsageBaseline } from './utils/codex-session'
 import { sessionHistoryInputSchema } from '../utils/session-history'
+import { codexRolloutUsage, isCodexUsageLine } from '../utils/imported-usage'
+import { readJsonLines } from '../utils/json-lines'
 
 const DEFAULT_CODEX_BINARY = 'codex'
 const DEFAULT_CODEX_MODEL = 'gpt-5.5'
@@ -217,6 +231,11 @@ export class CodexProviderAdapter
     }
   }
 
+  async executablePath() {
+    const binary = codexBinary(this.env)
+    return Bun.which(binary, { PATH: this.env.PATH ?? '' }) ?? binary
+  }
+
   discoverSessions(input: ProviderSessionDiscoveryInput) {
     const request = v.parse(discoveryInputSchema, input)
     return inspectCodexHistory(this.env, async (client) => {
@@ -244,6 +263,75 @@ export class CodexProviderAdapter
           'The Codex conversation belongs to a different working directory.',
         )
       return codexHistoryMessages(thread)
+    })
+  }
+
+  async prepareFork(input: ProviderForkInput): Promise<ProviderForkStart> {
+    const exists = await inspectCodexHistory(this.env, (client) =>
+      codexTurnExists({
+        conversationId: input.conversationId,
+        turnId: input.providerTurnId,
+        request: (method, params) =>
+          client.requestRaw(method, params, REQUEST_TIMEOUT_MS, (response) => response),
+      }),
+    )
+    if (!exists)
+      throw sessionIdentityErrors.FORK_POINT_UNAVAILABLE({
+        internal: { conversationId: input.conversationId, turnId: input.providerTurnId },
+      })
+    return { boundaryId: input.providerTurnId, conversationId: input.conversationId }
+  }
+
+  /** Reads the rollout file itself: token counts never reach `thread/read`. */
+  readSessionUsage(input: ProviderSessionHistoryInput) {
+    const request = v.parse(sessionHistoryInputSchema, input)
+    return inspectCodexHistory(this.env, async (client) => {
+      const { thread } = await client.requestRaw(
+        'thread/read',
+        { threadId: request.sessionId, includeTurns: false },
+        REQUEST_TIMEOUT_MS,
+        (response) => v.parse(codexRolloutPathSchema, response),
+      )
+      if (thread.id !== request.sessionId || !thread.path) return []
+      if (normalizeWorkspaceCwd(thread.cwd) !== normalizeWorkspaceCwd(request.cwd)) return []
+
+      return codexRolloutUsage(await readJsonLines(thread.path, isCodexUsageLine))
+    })
+  }
+
+  async consumeResetCredit(input: {
+    idempotencyKey: string
+    accountKey: string
+    creditId: string
+  }) {
+    return inspectCodexHistory(this.env, async (client) => {
+      const { account } = await client.request('account/read', {}, PROVIDER_PROBE_TIMEOUT_MS)
+      if (account?.type !== 'chatgpt')
+        throw sessionIdentityErrors.RESET_CREDIT_REJECTED({
+          reason: 'Reset credits require a signed-in Codex account.',
+        })
+      const usage = await client.request(
+        'account/rateLimits/read',
+        undefined,
+        CODEX_USAGE_TIMEOUT_MS,
+      )
+      if (!usage.accountId || codexResetAccountKey(usage.accountId) !== input.accountKey)
+        throw sessionIdentityErrors.RESET_CREDIT_REJECTED({
+          reason: 'The signed-in Codex account changed before the reset.',
+        })
+      const response = await client
+        .request(
+          'account/rateLimitResetCredit/consume',
+          { idempotencyKey: input.idempotencyKey, creditId: input.creditId },
+          CODEX_USAGE_TIMEOUT_MS,
+        )
+        .catch((error: unknown) => {
+          if (!(error instanceof Error) || !answeredRpcErrors.has(error)) throw error
+          throw sessionIdentityErrors.RESET_CREDIT_REJECTED({
+            reason: `Codex declined the reset credit: ${error.message}`,
+          })
+        })
+      return v.parse(providerResetCreditOutcomeSchema, response.outcome)
     })
   }
 
@@ -333,6 +421,28 @@ export class CodexProviderAdapter
     }
 
     return this.requireSession(sessionId, 'thread/revert').prepareRollbackSession(numTurns)
+  }
+
+  async mcpServers({ sessionId }: { sessionId: SessionId }) {
+    return (await this.activeSession(sessionId)?.mcpServers()) ?? null
+  }
+
+  /** Codex reloads every server from config; there is no per-server reconnect. */
+  async reconnectMcpServer({ sessionId }: { name: string; sessionId: SessionId }) {
+    await this.requireSession(sessionId, 'config/mcpServer/reload').reloadMcpServers()
+  }
+
+  async signInMcpServer({ name, sessionId }: { name: string; sessionId: SessionId }) {
+    return this.requireSession(sessionId, 'mcpServer/oauth/login').signInMcpServer(name)
+  }
+
+  async configuredHooks({ cwd, sessionId }: { cwd: string; sessionId: SessionId }) {
+    return (await this.activeSession(sessionId)?.configuredHooks(cwd)) ?? null
+  }
+
+  private activeSession(sessionId: SessionId) {
+    const session = this.sessions.get(sessionId)
+    return session?.isActive() ? session : null
   }
 
   async sendTurn(input: ProviderTurnInput) {
@@ -449,6 +559,7 @@ export class CodexProviderAdapter
       runtimeMode: input.runtimeMode,
       runtimeEpoch: input.runtimeEpoch,
       sessionId: input.sessionId,
+      ...(input.fork ? { fork: input.fork } : {}),
     })
     this.sessions.set(input.sessionId, session)
     recordChatPipelineInfo('chat.pipeline.codex_adapter.session.started', {
@@ -479,6 +590,7 @@ class CodexAppServerSession extends SessionContext {
   private status: ProviderAdapterRuntime['status'] = 'ready'
   /** Latest running token totals per thread, recorded as usage when a root turn ends. */
   private readonly conversationUsage = new Map<string, ProviderUsageTotals>()
+  private initialUsage: ProviderUsageTotals | null = null
   private readonly resumedConversationMarker: string | null
   /** This session's view of the plan windows, read back when a turn stops on one. */
   private usageWindows: ProviderUsageWindow[] = []
@@ -538,6 +650,7 @@ class CodexAppServerSession extends SessionContext {
   }
 
   static async start(input: {
+    fork?: ProviderForkStart
     onClient: (client: CodexAppServerRpcClient) => void
     cwd: string
     emit: (event: ProviderRuntimeEvent) => void
@@ -590,6 +703,11 @@ class CodexAppServerSession extends SessionContext {
       })
       session.emitSessionStarted(input.providerResumeCursor ?? null)
       session.emitConversationStarted()
+      session.initialUsage = await readCodexUsageBaseline({
+        model: input.model,
+        resumed: typeof input.providerResumeCursor === 'string',
+        thread: response.thread,
+      })
 
       return session
     } catch (error) {
@@ -650,6 +768,45 @@ class CodexAppServerSession extends SessionContext {
     }
   }
 
+  async mcpServers(): Promise<ProviderMcpServer[]> {
+    const servers: ProviderMcpServer[] = []
+    let cursor: string | null = null
+    do {
+      const page: CodexClientRequestResultByMethod['mcpServerStatus/list'] =
+        await this.client.request('mcpServerStatus/list', {
+          threadId: this.providerConversationMarker,
+          ...(cursor ? { cursor } : {}),
+        })
+      servers.push(...page.data.map(codexMcpServer))
+      cursor = page.nextCursor ?? null
+    } while (cursor)
+    return servers
+  }
+
+  async reloadMcpServers() {
+    await this.client.request('config/mcpServer/reload', undefined)
+  }
+
+  async signInMcpServer(name: string) {
+    const response = await this.client.request('mcpServer/oauth/login', {
+      name,
+      threadId: this.providerConversationMarker,
+    })
+    return { authorizationUrl: response.authorizationUrl }
+  }
+
+  async configuredHooks(cwd: string) {
+    const response = await this.client.request('hooks/list', { cwds: [cwd] })
+    const entries = response.data.filter((entry) => entry.cwd === cwd)
+    return {
+      errors: entries.flatMap((entry) => [
+        ...entry.errors.map((error) => `${error.path}: ${error.message}`),
+        ...entry.warnings,
+      ]),
+      hooks: entries.flatMap((entry) => entry.hooks.map(codexConfiguredHook)),
+    }
+  }
+
   async prepareRollbackSession(numTurns: number) {
     const commit = await prepareCodexRewind({
       numTurns,
@@ -678,12 +835,26 @@ class CodexAppServerSession extends SessionContext {
     void activeTurn.promise.catch(noop)
 
     this.ingestSession('running', input.turnId)
+    if (this.initialUsage) {
+      this.conversationUsage.set(this.initialUsage.scope, this.initialUsage)
+      this.emitUsageTotals(activeTurn)
+      this.initialUsage = null
+    }
     try {
       recordChatPipelineInfo('chat.pipeline.codex_session.turn_start_request', {
         providerConversationMarker: this.providerConversationMarker,
         sessionId: this.sessionId,
         turnId: input.turnId,
       })
+      if (input.kind === 'compact') {
+        // Compaction runs as a native turn; its id arrives on `turn/started`, which
+        // attaches the pending turn.
+        await this.client.request('thread/compact/start', {
+          threadId: this.providerConversationMarker,
+        })
+        await activeTurn.promise
+        return
+      }
       const response = await this.client.request('turn/start', turnStartParams(this, input))
       const providerTurnId = readTurnIdFromTurnResponse(response)
       recordChatPipelineInfo('chat.pipeline.codex_session.turn_start_response', {
@@ -1341,31 +1512,20 @@ class CodexAppServerSession extends SessionContext {
   }
 
   private handleHookStartedNotification(params: unknown) {
-    const record = asRecord(params)
-    this.emitRuntimeNotification(
-      'hook.started',
-      {
-        hookEvent: stringField(record, 'hookEvent') ?? 'unknown',
-        hookId: stringField(record, 'hookId') ?? `hook:${crypto.randomUUID()}`,
-        hookName: stringField(record, 'hookName') ?? 'Hook',
-      },
-      'hook/started',
-      params,
-    )
+    const { run } = parseCodexServerNotification('hook/started', params)
+    this.emitRuntimeNotification('hook.started', codexHookIdentity(run), 'hook/started', params)
     return true
   }
 
   private handleHookCompletedNotification(params: unknown) {
-    const record = asRecord(params)
+    const { run } = parseCodexServerNotification('hook/completed', params)
+    const output = run.entries.map((entry) => entry.text).join('\n')
     this.emitRuntimeNotification(
       'hook.completed',
       {
-        exitCode: numberField(record, 'exitCode') ?? undefined,
-        hookId: stringField(record, 'hookId') ?? `hook:${crypto.randomUUID()}`,
-        outcome: hookOutcome(record),
-        output: stringField(record, 'output') ?? undefined,
-        stderr: stringField(record, 'stderr') ?? undefined,
-        stdout: stringField(record, 'stdout') ?? undefined,
+        ...codexHookIdentity(run),
+        outcome: codexHookOutcome(run.status),
+        ...(output ? { output } : {}),
       },
       'hook/completed',
       params,
@@ -1609,6 +1769,10 @@ class CodexAppServerSession extends SessionContext {
 
   private async handleItemCompletedNotification(params: unknown) {
     const item = notificationItem(params)
+    // Codex reports compaction as an item now; `thread/compacted` is deprecated upstream.
+    if (stringField(asRecord(item), 'type') === 'contextCompaction') {
+      return this.handleSessionCompactedNotification(params)
+    }
     if (!isReasoningItem(item)) {
       const handled = await this.handleAssistantMessageItemCompleted(params, item)
       if (handled) return true
@@ -2335,7 +2499,9 @@ class CodexAppServerRpcClient {
     clearTimeout(pending.timer)
     this.pending.delete(id)
     if (message.error) {
-      pending.reject(createInternalError(jsonRpcErrorMessage(message.error)))
+      const error = createInternalError(jsonRpcErrorMessage(message.error))
+      answeredRpcErrors.add(error)
+      pending.reject(error)
       return
     }
 
@@ -2422,7 +2588,11 @@ async function readCodexUsage(client: CodexAppServerRpcClient): Promise<Provider
   )
   const snapshot = response.rateLimitsByLimitId?.codex ?? response.rateLimits
 
-  return { kind: 'reading', update: codexUsageUpdate(snapshot) }
+  return {
+    kind: 'reading',
+    update: codexUsageUpdate(snapshot),
+    resetCredits: codexResetCredits(response),
+  }
 }
 
 async function inspectCodexHistory<T>(
@@ -2497,7 +2667,12 @@ async function probeCodexCommandCatalog(
       PROVIDER_PROBE_TIMEOUT_MS,
     )
 
-    return { commands: [], skills: codexCatalogSkills(codexSkillCatalog(response), cwd) }
+    // Codex has no app-server method that lists or selects agent definitions.
+    return {
+      agents: [],
+      commands: [],
+      skills: codexCatalogSkills(codexSkillCatalog(response), cwd),
+    }
   } finally {
     await client.close()
   }
@@ -2621,12 +2796,14 @@ async function openCodexSession(
   input: {
     cwd: string
     ephemeral: boolean
+    fork?: ProviderForkStart
     model: string
     modelOptions: CodexModelOptions
     providerResumeCursor?: unknown | null
     runtimeMode: RuntimeMode
   },
 ) {
+  if (input.fork) return forkCodexConversation(client, { ...input, fork: input.fork })
   const resumeSessionId =
     typeof input.providerResumeCursor === 'string' ? input.providerResumeCursor : null
   if (!resumeSessionId) return client.request('thread/start', threadStartParams(input))
@@ -2641,6 +2818,55 @@ async function openCodexSession(
     REQUEST_TIMEOUT_MS,
     (response) => v.parse(codexSessionResumeSchema, response),
   )
+}
+
+function codexMcpServer(server: CodexMcpServerStatus): ProviderMcpServer {
+  return {
+    error: server.toolsError ?? null,
+    name: server.name,
+    status: codexMcpStatus(server),
+  }
+}
+
+function codexMcpStatus(server: CodexMcpServerStatus): ProviderMcpServer['status'] {
+  const runtime = server.runtimeStatus
+  if (runtime === 'connected') return 'connected'
+  if (runtime === 'disabled') return 'disabled'
+  if (runtime === 'failed' || runtime === 'cancelled') return 'failed'
+  if (runtime === 'authenticationRequired' || server.authStatus === 'notLoggedIn')
+    return 'needs-auth'
+
+  return 'pending'
+}
+
+function codexConfiguredHook(hook: CodexHookMetadata): ProviderConfiguredHook {
+  return {
+    enabled: hook.enabled,
+    eventName: hook.eventName,
+    handler: codexHookHandler(hook),
+    matcher: hook.matcher ?? null,
+    sourcePath: hook.sourcePath,
+  }
+}
+
+function codexHookHandler(hook: CodexHookMetadata) {
+  if (hook.handlerType === 'command') return hook.command
+  if (hook.handlerType === 'mcpTool') return `${hook.server} · ${hook.tool}`
+
+  return hook.handlerType
+}
+
+/** A thread that never ran here was discovered, and a discovered session's id is its thread id. */
+async function forkCodexConversation(
+  client: CodexAppServerRpcClient,
+  input: Parameters<typeof threadResumeParams>[0] & { fork: ProviderForkStart },
+) {
+  return client.request('thread/fork', {
+    ...threadResumeParams(input),
+    excludeTurns: true,
+    lastTurnId: input.fork.boundaryId,
+    threadId: input.fork.conversationId,
+  })
 }
 
 async function requestCodexModels(client: CodexAppServerRpcClient) {
@@ -2948,6 +3174,9 @@ function parseJsonRpcMessage(line: string): JsonRpcMessage {
 function isJsonRpcResponse(message: JsonRpcMessage) {
   return message.id !== undefined && !message.method
 }
+
+/** Errors the app-server answered itself, as opposed to timeouts and dropped connections. */
+const answeredRpcErrors = new WeakSet<Error>()
 
 function jsonRpcErrorMessage(error: unknown) {
   const errorRecord = asRecord(error)
@@ -3289,9 +3518,18 @@ function itemDetail(record: Record<string, unknown>) {
   return stringField(record, 'detail') ?? stringField(record, 'text') ?? undefined
 }
 
-function hookOutcome(record: Record<string, unknown>) {
-  const outcome = stringField(record, 'outcome') ?? stringField(record, 'status')
-  if (outcome === 'success' || outcome === 'error' || outcome === 'cancelled') return outcome
+function codexHookIdentity(run: CodexHookRunSummary) {
+  return {
+    hookEvent: run.eventName,
+    hookId: run.id,
+    hookName: path.basename(run.sourcePath) || run.handlerType,
+  }
+}
+
+function codexHookOutcome(status: CodexHookRunSummary['status']): ProviderHookOutcome {
+  if (status === 'blocked') return 'blocked'
+  if (status === 'failed') return 'error'
+  if (status === 'stopped') return 'cancelled'
 
   return 'success'
 }
@@ -3326,5 +3564,21 @@ function realtimePayload(method: string, params: unknown) {
       return { reason: stringField(record, 'reason') ?? undefined }
     default:
       return { message: stringField(record, 'message') ?? 'Realtime error' }
+  }
+}
+
+function codexResetAccountKey(accountId: string) {
+  return createHash('sha256').update(`codex-reset\0${accountId}`).digest('hex')
+}
+
+function codexResetCredits(response: CodexClientRequestResultByMethod['account/rateLimits/read']) {
+  const credit = response.rateLimitResetCredits?.credits?.find(
+    (entry) => entry.status === 'available',
+  )
+  if (!response.accountId) return null
+  return {
+    accountKey: codexResetAccountKey(response.accountId),
+    creditId: credit?.id ?? null,
+    available: Math.max(0, response.rateLimitResetCredits?.availableCount ?? 0),
   }
 }

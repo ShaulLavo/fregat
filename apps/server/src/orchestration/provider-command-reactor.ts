@@ -400,6 +400,7 @@ export class ProviderCommandReactor {
 
   private ensureSessionForTurn(context: ProviderTurnContext) {
     return this.providerService.ensureRuntime({
+      fork: context.session.forkedFrom,
       providerInstanceId: context.modelSelection.providerInstanceId,
       runtimeMode: context.runtimeMode,
       runtimePayload: runtimePayloadFromSessionContext(context),
@@ -419,6 +420,7 @@ export class ProviderCommandReactor {
         cwd: context.worktree.canonicalPath,
         interactionMode: context.interactionMode,
         messageText: context.message.text,
+        ...(event.payload.kind ? { kind: event.payload.kind } : {}),
         modelSelection: context.modelSelection,
         providerInstanceId: context.modelSelection.providerInstanceId,
         runtimeMode: context.runtimeMode,
@@ -1034,6 +1036,7 @@ function runtimePayloadFromSessionContext(
   context: ProviderSessionContext,
 ): ProviderRuntimeStartPayload {
   return {
+    ...(context.session.agent ? { agent: context.session.agent } : {}),
     cwd: context.worktree.canonicalPath,
     interactionMode: context.interactionMode,
     modelSelection: context.modelSelection,

@@ -2,6 +2,7 @@ import type { ProviderInstanceConfig } from '@workspace/contracts'
 import { Badge } from '@workspace/ui/components/badge'
 import { Switch } from '@workspace/ui/components/switch'
 
+import { ProviderUpdate } from '@/features/settings/components/provider-update'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 
 export function ProviderRow({ instance }: { instance: ProviderInstanceConfig }) {
@@ -12,11 +13,13 @@ export function ProviderRow({ instance }: { instance: ProviderInstanceConfig }) 
   return (
     <div
       className='flex items-center gap-(--density-control-gap) px-(--density-control-padding-x) py-(--density-section-gap)'
+      data-provider-instance={instance.providerInstanceId}
       title={`${instance.providerInstanceId} · ${binary}`}
     >
       <div className='flex min-w-0 flex-1 flex-col'>
         <span className='text-foreground truncate text-sm'>{label}</span>
         <span className='text-muted-foreground truncate text-xs'>{binary}</span>
+        <ProviderUpdate label={label} providerInstanceId={instance.providerInstanceId} />
       </div>
       <Badge variant='secondary'>{instance.driverKind}</Badge>
       <Switch

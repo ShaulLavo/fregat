@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import { projectIdSchema, worktreeIdSchema } from '@workspace/contracts'
+import { projectIdSchema, worktreeIdSchema, providerInstanceIdSchema } from '@workspace/contracts'
 import { meaningfulDraft, recoverableDraftRows } from '../../utils/recoverable-drafts'
 import { testScopedStorage } from '../../../../../test/factories/scoped-storage'
 import { TEST_ENVIRONMENT_ID as FIXTURE_ENVIRONMENT_ID } from '../../../../../test/factories/chat'
@@ -59,6 +59,36 @@ test('persists a draft with images without writing the image bytes', () => {
   expect(JSON.parse(raw).version).toBe(2)
   // The composer still shows the attachment — only the persisted copy loses it.
   expect(useChatInputDraftStore.getState().getDraft(TARGET).attachments).toHaveLength(1)
+})
+
+test('persists the agent owner and clears the selection when switching provider instances', () => {
+  const owner = v.parse(providerInstanceIdSchema, 'claude-work')
+  const agent = { name: 'reviewer', providerInstanceId: owner }
+  const store = useChatInputDraftStore.getState()
+  const worktreeId = v.parse(worktreeIdSchema, 'eaf8e4af-df45-4948-ad27-7c22a04c60dd')
+  store.setIdentity(TARGET, {
+    id: TARGET.draftKey!,
+    projectId: v.parse(projectIdSchema, 'dd7e57bd-496f-42e2-aac8-63d2e15e7a05'),
+    rootPath: TARGET.rootPath,
+    baseWorktreeId: worktreeId,
+    worktreeTarget: { kind: 'current', worktreeId },
+    agent,
+    createdAt: '2026-09-25T12:00:00.000Z',
+  })
+  store.setPrompt(TARGET, 'Review this change')
+  store.setModelSelection(TARGET, { model: 'opus', providerInstanceId: owner })
+  expect(flushChatInputDraftStorage()).toBe(true)
+  resetChatInputDraftStore()
+  hydrateChatInputDraftStoreFromStorage(testScopedStorage)
+  const restored = useChatInputDraftStore.getState()
+  expect(restored.getDraft(TARGET).identity?.agent).toEqual(agent)
+  restored.setModelSelection(TARGET, { model: 'sonnet', providerInstanceId: owner })
+  expect(restored.getDraft(TARGET).identity?.agent).toEqual(agent)
+  restored.setModelSelection(TARGET, {
+    model: 'sonnet',
+    providerInstanceId: v.parse(providerInstanceIdSchema, 'claude-personal'),
+  })
+  expect(restored.getDraft(TARGET).identity?.agent).toBeNull()
 })
 
 test('concurrent prepared batches cannot overfill the attachment contract', () => {

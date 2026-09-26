@@ -24,7 +24,7 @@ const EFFORT_LABELS: Readonly<Record<string, string>> = {
 
 const EFFORT_DESCRIPTIONS: Readonly<Record<string, string>> = {
   ultracode: 'Extra high effort plus multi-agent workflow orchestration',
-  ultrathink: 'Starts your prompt with “Ultrathink:”',
+  ultrathink: 'Asks Claude for its deepest thinking on every message',
 }
 
 type ClaudeModelOverlay = {

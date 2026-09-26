@@ -411,7 +411,12 @@ test('correction retry consumes content while model and mode choices reach the n
       })
       useChatProjectionStore.getState().syncSessionDetailSnapshot(TEST_ENVIRONMENT_ID, snapshot)
     })
-    act(() => useComposerInboxStore.getState().queueText('Now implement it.'))
+    act(() =>
+      useComposerInboxStore.getState().queueText('Now implement it.', {
+        environmentId: target.environmentId,
+        rootPath: target.rootPath,
+      }),
+    )
     await waitFor(() =>
       expect(useChatInputDraftStore.getState().getDraft(target).prompt).toBe('Now implement it. '),
     )

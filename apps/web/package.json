@@ -45,6 +45,7 @@
     "@elysia/eden": "^1.4.10",
     "@foresightjs/react": "^1.0.0",
     "@lexical/react": "^0.45.0",
+    "@lexical/text": "^0.45.0",
     "@phosphor-icons/react": "^2.1.10",
     "@shikijs/langs": "4.4.3",
     "@singapore-editor/core": "0.1.2",

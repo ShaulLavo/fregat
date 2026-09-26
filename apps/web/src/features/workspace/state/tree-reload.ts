@@ -5,7 +5,7 @@ import * as v from 'valibot'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { writeWorkspaceCacheEntry } from '@/lib/workspace-cache-storage'
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import type { TreeModel } from '@/lib/tree-model'
+import type { DirectoryLoadError, TreeModel } from '@/lib/tree-model'
 
 const KEY = 'workspace.tree-display.v1'
 export const TREE_RELOAD_MAX_BYTES = 262_144
@@ -61,7 +61,7 @@ export function prepareTreeReload(owner: QueryClient, storage: ScopedStorage) {
           entriesByTreePath: new Map(record.entries),
           loadedDirectoryPaths: new Set(record.loaded),
           loadingDirectoryPaths: new Set<string>(),
-          errorByDirectoryPath: new Map<string, string>(),
+          errorByDirectoryPath: new Map<string, DirectoryLoadError>(),
         },
       }
     : null

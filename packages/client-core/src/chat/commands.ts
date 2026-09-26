@@ -21,10 +21,12 @@ import {
   type ProjectMetaUpdateCommand,
   type ProjectReorderCommand,
   type ProviderApprovalDecision,
+  type ProviderAgentSelection,
   type ProviderUserInputAnswers,
   type RuntimeMode,
   type SessionApprovalRespondCommand,
   type SessionArchiveCommand,
+  type SessionForkCommand,
   type SessionCheckpointRevertCommand,
   type SessionDeleteCommand,
   type SessionId,
@@ -182,6 +184,7 @@ export function createSteerSubmission({
 }
 
 export function createDraftSessionSubmission({
+  agent,
   attachments = [],
   createdAt,
   interactionMode = DEFAULT_INTERACTION_MODE,
@@ -193,6 +196,8 @@ export function createDraftSessionSubmission({
   text,
   title: titleOverride,
 }: {
+  /** The harness agent definition the new session runs as. */
+  agent?: ProviderAgentSelection | null
   attachments?: ChatAttachmentUpload[]
   createdAt: string
   interactionMode?: InteractionMode
@@ -228,6 +233,9 @@ export function createDraftSessionSubmission({
       ...submission.command,
       bootstrap: {
         createSession: {
+          ...(agent?.providerInstanceId === modelSelection.providerInstanceId
+            ? { agent: agent.name }
+            : {}),
           interactionMode,
           modelSelection,
           worktreeTarget,
@@ -308,6 +316,48 @@ export function createSessionArchiveCommand({
     commandId: createCommandId(),
     sessionId,
     type: 'session.archive',
+  }
+}
+
+/**
+ * A turn that compacts the conversation. The session's own modes ride along so the
+ * turn never changes them; the text is the harness's own command.
+ */
+export function createSessionCompactCommand({
+  interactionMode,
+  runtimeMode,
+  sessionId,
+}: {
+  interactionMode: InteractionMode
+  runtimeMode: RuntimeMode
+  sessionId: SessionId
+}): SessionTurnStartCommand {
+  return {
+    commandId: createCommandId(),
+    interactionMode,
+    kind: 'compact',
+    message: { attachments: [], messageId: createMessageId(), role: 'user', text: '/compact' },
+    runtimeMode,
+    sessionId,
+    turnId: createTurnId(),
+    type: 'session.turn.start',
+  }
+}
+
+/** The new session's id is minted here, so the caller can open it once the fork lands. */
+export function createSessionForkCommand({
+  sourceSessionId,
+  throughTurnId,
+}: {
+  sourceSessionId: SessionId
+  throughTurnId: TurnId
+}): SessionForkCommand {
+  return {
+    commandId: createCommandId(),
+    sessionId: createSessionId(),
+    sourceSessionId,
+    throughTurnId,
+    type: 'session.fork',
   }
 }
 

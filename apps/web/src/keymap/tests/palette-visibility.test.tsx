@@ -123,14 +123,14 @@ test('keeps global preferences and relevant disabled commands while hiding other
     expect.arrayContaining(['workspace.showSettings', 'workspace.selectColorTheme']),
   )
   expect(visible()).not.toContain('workspace.openSearchEditor')
-  expect(visible()).not.toContain('workspace.nextSession')
+  expect(visible()).not.toContain('workspace.newSession')
   expect(visible()).toContain('workspace.saveFile')
   expect(bus.capture(invocation).inspect('workspace.saveFile').status).toBe('disabled')
 
   runtime.workspace.getState().switchWorkspace(rootFolder)
   runtime.workspace.getState().setUiMode('workbench')
   expect(visible()).toContain('workspace.openSearchEditor')
-  expect(visible()).not.toContain('workspace.nextSession')
+  expect(visible()).not.toContain('workspace.newSession')
   runtime.workspace.getState().setUiMode('chat')
-  expect(visible()).toContain('workspace.nextSession')
+  expect(visible()).toContain('workspace.newSession')
 })

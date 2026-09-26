@@ -35,6 +35,8 @@ export function fileDiff(
     patch: `diff --git a/${relative} b/${relative}\n--- a/${relative}\n+++ b/${relative}\n${patch}`,
     hunks: [
       {
+        // The demo never undoes a hunk; any id unique to the file will do.
+        id: `demo:${relative}`,
         header,
         oldStart: 1,
         oldLines: oldLines.length,

@@ -24,7 +24,10 @@ export function SidebarPanel({
   const surface = usePanelSurface()
 
   return (
-    <aside className={cn(surface.panel, 'flex h-full min-h-0 min-w-0 overflow-hidden')}>
+    <aside
+      className={cn(surface.panel, 'flex h-full min-h-0 min-w-0 overflow-hidden')}
+      data-screen-sidebar=''
+    >
       <div className='min-h-0 min-w-0 flex-1 overflow-hidden'>
         <RenderErrorBoundary
           label={workbenchSidebarTabLabel(panels.activeSidebarTab)}

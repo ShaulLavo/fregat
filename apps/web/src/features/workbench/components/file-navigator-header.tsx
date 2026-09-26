@@ -5,6 +5,7 @@ import { Button } from '@workspace/ui/components/button'
 import { useSyncExternalStore } from 'react'
 
 import { ToolPaneHeader } from '@/components/tool-pane-header'
+import { LiveUpdatesLimited } from '@/features/workbench/components/live-updates-limited'
 import type { TreeToolbarStore } from '@/features/workbench/utils/tree-toolbar-store'
 import type { VisibleTreeItemCountStore } from '@/features/workbench/utils/visible-tree-item-count-store'
 import type { LoadState } from '@/lib/load-state'
@@ -38,6 +39,7 @@ export function FileNavigatorHeader({
     <ToolPaneHeader
       actions={
         <>
+          <LiveUpdatesLimited rootPath={rootPath} />
           <Tooltip>
             <TooltipTrigger
               render={

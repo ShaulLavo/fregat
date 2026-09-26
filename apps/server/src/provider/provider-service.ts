@@ -10,9 +10,14 @@ import { sessionIdentityErrors } from './structured-errors'
 
 import type {
   ModelSelection,
+  ProviderBackgroundTask,
+  ProviderBackgroundTasks,
   ProviderInstanceId,
+  ProviderSessionHooks,
+  ProviderSessionMcp,
   ProviderSnapshot,
   RuntimeMode,
+  SessionForkSource,
   SessionId,
   WorktreeId,
 } from '@workspace/contracts'
@@ -20,6 +25,7 @@ import {
   DEFAULT_INTERACTION_MODE,
   jsonEqual,
   DEFAULT_RUNTIME_MODE,
+  providerMcpSignInSchema,
   sessionIdSchema,
   turnIdSchema,
 } from '@workspace/contracts'
@@ -55,6 +61,7 @@ import type {
   ProviderTurnSteerInput,
   ProviderUserInputResponseInput,
   ProviderSessionDiscoveryInput,
+  ProviderImportedUsage,
   ProviderSessionHistoryInput,
 } from './types'
 import {
@@ -71,6 +78,8 @@ export type ProviderServiceOptions = {
 }
 
 export type ProviderEnsureRuntimeInput = {
+  /** Applies only to a session that has never had a binding: its first start forks. */
+  fork?: SessionForkSource | null
   providerInstanceId: ProviderInstanceId
   runtimeMode: RuntimeMode
   runtimePayload: ProviderRuntimeStartPayload
@@ -100,6 +109,11 @@ export type ProviderUsageListener = (
   purpose: ProviderUsagePurpose,
 ) => void
 
+export type ProviderImportedUsageListener = (
+  input: { providerInstanceId: ProviderInstanceId; sessionId: SessionId },
+  usage: readonly ProviderImportedUsage[],
+) => void
+
 /** The adapter a stream belongs to, kept beside its teardown so a replacement can be spotted. */
 type AdapterSubscription = {
   adapter: ReturnType<ProviderAdapterRegistry['getByInstance']>
@@ -125,6 +139,7 @@ export class ProviderService {
   private readonly externalSessions = new Map<SessionId, 'terminal' | 'history' | 'unknown'>()
   private readonly pendingLaunches = new Map<SessionId, PendingProviderLaunch>()
   private readonly backgroundTasks = new BackgroundTaskRegistry()
+  private readonly taskRosters = new Map<SessionId, ProviderBackgroundTask[]>()
   private readonly reaperTimer: ReturnType<typeof setInterval>
   private readonly reaper: ProviderSessionReaper
   private readonly runtimeEventListeners = new Set<ProviderRuntimeEventListener>()
@@ -135,6 +150,7 @@ export class ProviderService {
   /** Ended text-generation sessions whose late events are dropped, by what they were for. */
   private readonly suppressedTextGenerationSessions = new Map<SessionId, ProviderUsagePurpose>()
   private readonly usageListeners = new Set<ProviderUsageListener>()
+  private readonly importedUsageListeners = new Set<ProviderImportedUsageListener>()
   private readonly textGenerationTasks = new Map<SessionId, ProviderTextGenerationTask>()
   private worktreeExecution: ProviderWorktreeExecution | null = null
   private readonly worktreeLeases = new Map<
@@ -301,9 +317,10 @@ export class ProviderService {
     })
     this.requireSdkOwnership(input.sessionId)
     this.recordLaunch(input, adapter)
-    const session = await adapter.startRuntime(
-      providerRuntimeStartInput(input, input.runtimePayload, continuation),
-    )
+    const session = await adapter.startRuntime({
+      ...providerRuntimeStartInput(input, input.runtimePayload, continuation),
+      ...(!existing && input.fork ? { fork: input.fork.native } : {}),
+    })
     this.requireRunning()
     const binding = this.sessionDirectory.upsert({
       adapterKey: adapter.adapterKey,
@@ -649,6 +666,26 @@ export class ProviderService {
     return boundedProviderOperation(adapter, adapter.readSessionHistory(input))
   }
 
+  /**
+   * Reads what an imported session already spent and hands it to the listeners. A
+   * provider that cannot read its transcripts' usage imports nothing.
+   */
+  async importSessionUsage(
+    input: ProviderSessionHistoryInput & { providerInstanceId: ProviderInstanceId },
+  ) {
+    const adapter = this.adapterRegistry.getByInstance(input.providerInstanceId)
+    if (!adapter.readSessionUsage) return 0
+    const usage = await boundedProviderOperation(adapter, adapter.readSessionUsage(input))
+    for (const listener of this.importedUsageListeners) listener(input, usage)
+    return usage.length
+  }
+
+  subscribeImportedUsage(listener: ProviderImportedUsageListener) {
+    this.importedUsageListeners.add(listener)
+
+    return () => this.importedUsageListeners.delete(listener)
+  }
+
   discoverSessions(
     input: ProviderSessionDiscoveryInput & { providerInstanceId: ProviderInstanceId },
   ) {
@@ -799,6 +836,81 @@ export class ProviderService {
     }
   }
 
+  /** Live background tasks of one session, as the provider last reported them. */
+  backgroundTaskRoster(sessionId: SessionId): ProviderBackgroundTasks {
+    const routed = this.routeSession(sessionId)
+    return {
+      supported: Boolean(routed?.adapter.stopBackgroundTask),
+      tasks: this.taskRosters.get(sessionId) ?? [],
+    }
+  }
+
+  async stopBackgroundTask(input: { sessionId: SessionId; taskId: string }) {
+    this.requireRunning()
+    const routed = this.routeSession(input.sessionId)
+    const stop = routed?.adapter.stopBackgroundTask
+    if (!stop)
+      throw sessionIdentityErrors.TASK_STOP_UNSUPPORTED({
+        internal: { routed: Boolean(routed), sessionId: input.sessionId },
+      })
+    await stop.call(routed.adapter, input)
+    await this.drainRuntimeEvents()
+    const tasks = this.taskRosters.get(input.sessionId) ?? []
+    this.taskRosters.set(
+      input.sessionId,
+      tasks.filter((task) => task.taskId !== input.taskId),
+    )
+  }
+
+  async sessionMcp(sessionId: SessionId): Promise<ProviderSessionMcp> {
+    const adapter = this.routeSession(sessionId)?.adapter
+    const servers = adapter?.mcpServers ? await adapter.mcpServers({ sessionId }) : null
+    return {
+      canReconnect: Boolean(adapter?.reconnectMcpServer),
+      canSignIn: Boolean(adapter?.signInMcpServer),
+      running: servers !== null,
+      servers: servers ?? [],
+    }
+  }
+
+  async reconnectMcpServer(input: { name: string; sessionId: SessionId }) {
+    const adapter = this.requireSessionControl(input.sessionId, 'reconnectMcpServer')
+    await adapter.reconnectMcpServer?.(input)
+    return this.sessionMcp(input.sessionId)
+  }
+
+  async signInMcpServer(input: { name: string; sessionId: SessionId }) {
+    const adapter = this.requireSessionControl(input.sessionId, 'signInMcpServer')
+    const signIn = adapter.signInMcpServer
+    if (!signIn) throw sessionIdentityErrors.SESSION_CONTROL_UNSUPPORTED({ internal: input })
+
+    return v.parse(providerMcpSignInSchema, await signIn.call(adapter, input))
+  }
+
+  async sessionHooks(sessionId: SessionId): Promise<ProviderSessionHooks> {
+    const routed = this.routeSession(sessionId)
+    const cwd = routed?.binding.runtimePayload?.cwd
+    const configured = routed?.adapter.configuredHooks
+    if (!configured || !cwd)
+      return { errors: [], hooks: [], running: Boolean(routed), supported: Boolean(configured) }
+
+    const hooks = await configured.call(routed.adapter, { cwd, sessionId })
+    return { errors: [], hooks: [], ...hooks, running: hooks !== null, supported: true }
+  }
+
+  private requireSessionControl(
+    sessionId: SessionId,
+    control: 'reconnectMcpServer' | 'signInMcpServer',
+  ) {
+    this.requireRunning()
+    const adapter = this.routeSession(sessionId)?.adapter
+    if (adapter?.[control]) return adapter
+
+    throw sessionIdentityErrors.SESSION_CONTROL_UNSUPPORTED({
+      internal: { control, routed: Boolean(adapter), sessionId },
+    })
+  }
+
   bindingForSession(sessionId: SessionId) {
     return this.sessionDirectory.getBinding(sessionId)
   }
@@ -806,6 +918,28 @@ export class ProviderService {
   /** For a deleted session, once its runtime is released. */
   deleteBinding(sessionId: SessionId) {
     this.sessionDirectory.delete(sessionId)
+  }
+
+  async prepareFork(
+    input: ProviderSessionHistoryInput & {
+      providerInstanceId: ProviderInstanceId
+      providerTurnId: string
+      conversationId?: string
+    },
+  ) {
+    const adapter = this.adapterRegistry.getByInstance(input.providerInstanceId)
+    if (!adapter.prepareFork)
+      throw sessionIdentityErrors.FORK_POINT_UNAVAILABLE({
+        internal: { sessionId: input.sessionId, providerInstanceId: input.providerInstanceId },
+      })
+    const binding = this.sessionDirectory.getBinding(input.sessionId)
+    return boundedProviderOperation(
+      adapter,
+      adapter.prepareFork({
+        ...input,
+        conversationId: forkConversationId(binding, input),
+      }),
+    )
   }
 
   private turnWithResumeCursor(
@@ -948,6 +1082,7 @@ export class ProviderService {
       throw createInternalError('The provider still owns its runtime after stopping.')
     }
     this.backgroundTasks.clear(sessionId)
+    this.taskRosters.delete(sessionId)
     this.releaseWorktree(sessionId)
   }
 
@@ -1085,6 +1220,7 @@ export class ProviderService {
     if (binding && binding.runtimeEpoch !== task.event.runtimeEpoch) return
 
     this.backgroundTasks.accept(task.event)
+    this.acceptTaskRoster(task.event)
     this.recordRuntimeEvent(task.event, task.adapter)
     this.publishUsage(task.event, 'turn')
     await this.emitRuntimeEvent(task.event)
@@ -1097,6 +1233,16 @@ export class ProviderService {
     if (binding.providerInstanceId !== providerInstanceId) return
 
     await this.emitRuntimeEvent(event)
+  }
+
+  private acceptTaskRoster(event: ProviderRuntimeEvent) {
+    if (event.type === 'tasks.roster') {
+      this.taskRosters.set(event.sessionId, event.payload.tasks)
+      return
+    }
+    // A restarted or exited CLI takes its tasks with it; a new roster follows.
+    if (event.type === 'runtime.started' || event.type === 'runtime.exited')
+      this.taskRosters.delete(event.sessionId)
   }
 
   private async stopReplacedBinding(
@@ -1178,6 +1324,16 @@ async function activeProviderBinding(
  * continuation identity — repointing a session at another provider or another
  * account correctly starts a fresh conversation.
  */
+/** A fork that has run natively owns its transcript; only an unrun fork reads its source's. */
+function forkConversationId(
+  binding: ProviderRuntimeBindingWithMetadata | null,
+  input: { conversationId?: string; sessionId: SessionId },
+) {
+  if (typeof binding?.providerResumeCursor === 'string') return binding.providerResumeCursor
+  if (binding) return input.sessionId
+  return input.conversationId ?? input.sessionId
+}
+
 function continuableBinding(
   binding: ProviderRuntimeBindingWithMetadata | null,
   adapter: ReturnType<ProviderAdapterRegistry['getByInstance']>,
@@ -1215,6 +1371,7 @@ function providerRuntimeStartInput(
   reusableBinding?: ProviderRuntimeBindingWithMetadata | null,
 ): ProviderRuntimeStartInput {
   return {
+    ...(payload.agent ? { agent: payload.agent } : {}),
     cwd: payload.cwd,
     interactionMode: payload.interactionMode,
     modelSelection: payload.modelSelection,

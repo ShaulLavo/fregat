@@ -70,7 +70,8 @@ symbol tools over grep once those tools exist.
 
 - **D1 — Active file: implicit or explicit.** Recommended: a chip the user can see and remove,
   off until they turn it on in a setting. VS Code attaches it implicitly; silent context is hard
-  to audit.
+  to audit. Decided 2026-09-25: recommendation (completion wave). Setting `chat.activeFileContext`
+  (application scope, off).
 - **D2 — Route for diagnostics feedback.** Recommended: decide after research question 3. If the
   harnesses' own IDE integration can carry diagnostics, use it; otherwise wait for plans 087/088.
   Research question 3 runs now (decided 2026-09-25: owner).
@@ -99,11 +100,40 @@ Deliverable: rewritten Phases with named files and mutation keys; a statement of
 move under plans 087/088; settings (if any) with scopes — a value that changes what reaches the
 agent is `application` or `machine`, never `window`.
 
+### Research answers (2026-09-25, lane L8)
+
+1. **Attach home:** a narrow context in `lib/composer-attach` (`ComposerAttach`,
+   `useAttachToComposer(rootPath)`), implemented by chat (`features/chat/state/composer-attach.ts`,
+   `createComposerAttach(bus)`) and mounted by `providers/composer-attach-provider.tsx`. Commands
+   reach the same implementation through `WorkspaceCommandRuntime.composer`.
+2. **Editor seams:** no Editor change. A command reads the active tab's view from the document
+   store (`getEditorView(tabId)` → `view.getSelections()`), resolves anchors with
+   `resolveSelection` from `@singapore-editor/core/document`, and reads only the selected range
+   with `getTextSnapshot().readRange`. `keymap/` registers the commands with
+   `when: ['fileBackedTab']` and an editor-pane key.
+   3–5. Not answered in this wave: they decide P4 and P5, which wait on plans 087/088 (parked).
+
 ## Phases (provisional)
 
 1. Shared attach action with workspace identity (also unblocks plan 139 phase 1).
+   **Done 2026-09-25 (lane L8):** `lib/composer-attach` holds the context and
+   `useAttachToComposer(rootPath)`; chat implements it (`useComposerAttach`, mounted by
+   `providers/composer-attach-provider.tsx`). Inbox entries carry `{ environmentId, rootPath }` and
+   a composer takes only its own workspace's.
 2. Editor selection and file to chat; active-file chip.
+   **Done 2026-09-25 (lane L8):** `workspace.addSelectionToChat` (`Mod+L` in the editor; the
+   file when nothing is selected) and `workspace.addFileToChat`, both in the editor text menu;
+   `chat.activeFileContext` shows the active file as a removable chip and sends it as a mention.
+   Scenario `editor-add-to-chat`.
 3. Fix with AI, per `docs/diagnostic-ai-fix-plan.md`.
+   **Partly done 2026-09-25 (lane L8):** the shared handoff (`lib/diagnostic-ai`: request model,
+   bounded excerpt with unsaved text, stale-range refusal `DIAGNOSTIC_CHANGED`, keyed mutation
+   `diagnosticAiMutationKeys.fix`; `state/diagnostic-fix.ts` behind `DiagnosticFixProvider`) and
+   the Problems list entry (a per-row button, and `Mod+.` on the active problem so the tree keeps
+   one Tab stop), and the keyboard diagnostic popup (`DiagnosticPeekFixButton`, reading the
+   tracked range against the text as it is now). Scenario `problems-panel-rows` covers both.
+   **Left:** the hover action, which needs a generic per-note action in the Editor repo; handed
+   to lane L7.
 4. Diagnostics feedback, by the route D2 picks.
 5. Symbol-tool steering hooks, after plan 088.
 
@@ -288,6 +318,7 @@ SubagentStop, Stop and Interrupt (`config/src/hook_config.rs`). There are two ha
    diffs the same way it does in VS Code. This is the one place `/ide` does work. Options:
    (a) a separate plan later, (b) not wanted. Recommendation: (a), at low priority. It writes
    into the user's shared `~/.claude` directory, and it helps terminal sessions only, not chat.
+   Decided 2026-09-26: owner — (a): its own plan, [Plan 183](183-claude-ide-in-terminals.md), low priority.
 
 ### Proposed phases (4 and 5; Phases 1–3 are in PR #33)
 

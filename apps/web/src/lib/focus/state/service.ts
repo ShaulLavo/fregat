@@ -36,6 +36,8 @@ type FocusEditorCapability = {
 }
 
 type FocusTargetCapabilities = {
+  readonly fixDiagnostic?: () => boolean
+  readonly toggleCheckpointChange?: () => boolean
   readonly editor?: FocusEditorCapability
   readonly overlay?: boolean
 }
@@ -159,6 +161,8 @@ function freezeCapabilities(capabilities?: FocusTargetCapabilities): FocusTarget
 
   const editor = capabilities.editor ? Object.freeze({ ...capabilities.editor }) : undefined
   return Object.freeze({
+    fixDiagnostic: capabilities.fixDiagnostic,
+    toggleCheckpointChange: capabilities.toggleCheckpointChange,
     ...(editor ? { editor } : {}),
     ...(capabilities.overlay === undefined ? {} : { overlay: capabilities.overlay }),
   })
@@ -166,6 +170,8 @@ function freezeCapabilities(capabilities?: FocusTargetCapabilities): FocusTarget
 
 function capabilitiesEqual(left: FocusTargetCapabilities, right: FocusTargetCapabilities): boolean {
   if (left.overlay !== right.overlay) return false
+  if (Boolean(left.fixDiagnostic) !== Boolean(right.fixDiagnostic)) return false
+  if (Boolean(left.toggleCheckpointChange) !== Boolean(right.toggleCheckpointChange)) return false
 
   return left.editor?.writable === right.editor?.writable
 }

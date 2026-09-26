@@ -5,7 +5,7 @@ import type { FocusArea } from '@/lib/focus/state/service'
 import type { HotkeyMeta } from '@tanstack/hotkeys'
 
 // `import type` on purpose: it is erased, so the command table can keep reading
-// `SESSION_JUMP_POSITIONS` from here without a runtime cycle.
+// `ITEM_POSITIONS` from here without a runtime cycle.
 import type { WorkspaceCommandId } from '@/keymap/workspace-commands'
 import type { editorCommands } from '@/keymap/editor-commands'
 
@@ -13,9 +13,10 @@ import type { editorCommands } from '@/keymap/editor-commands'
 export type KeyBindingSource = 'default' | 'user'
 
 export {
-  SESSION_JUMP_POSITIONS,
-  sessionJumpCommandId,
-} from '@workspace/client-core/commands/session-jump'
+  ITEM_POSITIONS,
+  selectItemCommandId,
+  sidebarPanelCommandId,
+} from '@workspace/client-core/commands/item-position'
 
 type EditorPlatformCommandId = (typeof editorCommands)[number]['id']
 

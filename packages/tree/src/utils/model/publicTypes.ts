@@ -380,9 +380,16 @@ export interface FileTreeCompositionOptions {
   header?: FileTreeHeaderCompositionOptions
 }
 
+/** A small button after the decoration text, such as "Fix with AI" beside an error. */
+export interface FileTreeRowDecorationAction {
+  label: string
+  onActivate: () => void
+}
+
 interface FileTreeRowDecorationText {
   text: string
   title?: string
+  action?: FileTreeRowDecorationAction
 }
 
 interface FileTreeRowDecorationIcon {

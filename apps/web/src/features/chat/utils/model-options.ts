@@ -22,18 +22,22 @@ export function descriptorSummary(
   prompt = '',
 ) {
   const effort = promptEffortState(descriptors, prompt)
-  const labels = descriptors
+  const parts = descriptors
     .map((descriptor) => {
-      if (effort.controlled && descriptor.id === effort.descriptorId) return 'Ultrathink'
-      return activeChoiceLabel(descriptor, selection)
+      const label =
+        effort.controlled && descriptor.id === effort.descriptorId
+          ? 'Ultrathink'
+          : activeChoiceLabel(descriptor, selection)
+      return { id: descriptor.id, label }
     })
-    .filter((label): label is string => label !== null)
+    .filter((part): part is { id: string; label: string } => part.label !== null)
   const fast = descriptors.some(
     (descriptor) =>
       descriptor.id === FAST_MODE_OPTION_ID && effectiveOptionValue(descriptor, selection) === true,
   )
+  const label = parts.map((part) => part.label).join(' · ') || (fast ? 'Fast' : 'Options')
 
-  return { fast, label: labels.join(' · ') || (fast ? 'Fast' : 'Options') }
+  return { fast, label, parts }
 }
 
 function activeChoiceLabel(descriptor: ProviderOptionDescriptor, selection: ModelSelection) {
@@ -45,6 +49,7 @@ function activeChoiceLabel(descriptor: ProviderOptionDescriptor, selection: Mode
   return descriptor.options.find((choice) => choice.id === value)?.label ?? null
 }
 
+/** A typed "ultrathink" decides the effort for that message, so the menu defers to it. */
 export function promptEffortState(
   descriptors: readonly ProviderOptionDescriptor[],
   prompt: string,
@@ -52,20 +57,5 @@ export function promptEffortState(
   const primary = descriptors.find((descriptor) => descriptor.type === 'select')
   const controlled =
     Boolean(primary?.promptInjectedValues?.length) && /\bultrathink\b/i.test(prompt)
-  return {
-    descriptorId: primary?.id,
-    controlled,
-    inBody: controlled && /\bultrathink\b/i.test(withoutUltrathinkPrefix(prompt)),
-  }
-}
-
-export function withoutUltrathinkPrefix(prompt: string) {
-  return prompt.replace(/^Ultrathink:\s*/i, '')
-}
-
-export function withUltrathinkPrefix(prompt: string) {
-  const trimmed = prompt.trim()
-  if (!trimmed) return 'Ultrathink:\n'
-  if (/^\/[^\s/]+(?:\s|$)/u.test(trimmed) || trimmed.startsWith('Ultrathink:')) return trimmed
-  return `Ultrathink:\n${trimmed}`
+  return { descriptorId: primary?.id, controlled }
 }

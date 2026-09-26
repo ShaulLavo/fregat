@@ -51,6 +51,7 @@ test('a candidate without the terminal host bundle fails verification', async ()
     for (const file of [
       'index.js',
       'remote-support.js',
+      'watch-worker.ts',
       'runtime/package.json',
       'runtime/bun.lock',
     ])
