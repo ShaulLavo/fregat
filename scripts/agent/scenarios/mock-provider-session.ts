@@ -12,7 +12,13 @@ import { settingsSnapshot, writeSettings } from './native-provider-verification'
 export async function createMockProviderSession(
   page: Page,
   orchestration: string,
-  input: { readonly name: string; readonly displayLabel: string; readonly config: object },
+  input: {
+    readonly name: string
+    readonly displayLabel: string
+    readonly config: object
+    /** The checkout the session runs in; the first registered one when absent. */
+    readonly worktreeId?: string
+  },
 ) {
   const base = orchestration.replace(/\/orchestration$/, '')
   const before = await settingsSnapshot(page, base)
@@ -34,12 +40,12 @@ export async function createMockProviderSession(
       },
     },
   ])
-  const worktree = await firstWorktree(page, orchestration)
+  const worktreeId = input.worktreeId ?? (await firstWorktree(page, orchestration)).id
   await dispatch(page, orchestration, {
     type: 'session.create',
     sessionId,
     title,
-    worktreeTarget: { kind: 'current', worktreeId: worktree.id },
+    worktreeTarget: { kind: 'current', worktreeId },
     modelSelection: { providerInstanceId, model: 'gpt-5.5' },
   })
   await selectors.sessionSearch(page).fill(title)

@@ -95,6 +95,7 @@ import { chatDisclosureSettle } from './chat-disclosure-settle'
 import { chatTurnAnatomy } from './chat-turn-anatomy'
 import { chatSleepingSession } from './chat-sleeping-session'
 import { chatSessionGoal } from './chat-session-goal'
+import { chatAgentReview } from './chat-agent-review'
 import { fileTreeHoverPrefetch } from './file-tree-hover-prefetch'
 import { prefetchChatSwitch } from './prefetch-chat-switch'
 import { prefetchFirstPaint } from './prefetch-first-paint'
@@ -537,6 +538,7 @@ export const scenarios: readonly Scenario[] = [
   chatTurnAnatomy,
   chatSleepingSession,
   chatSessionGoal,
+  chatAgentReview,
   fileTreeHoverPrefetch,
   prefetchFirstPaint,
   prefetchChatSwitch,

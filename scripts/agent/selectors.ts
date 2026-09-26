@@ -761,6 +761,9 @@ export const selectors = {
     page.getByRole('button', { name: 'Send correction', exact: true }),
   chatStop: (page: Page) => page.getByRole('button', { name: 'Stop current turn', exact: true }),
   chatSend: (page: Page) => page.getByRole('button', { name: 'Send message', exact: true }),
+  reviewChanges: (page: Page) =>
+    page.getByRole('button', { name: 'Review changes', exact: true }).first(),
+  reviewComments: (page: Page) => page.getByRole('group', { name: 'Review comments' }),
   sleepingSchedules: (page: Page) =>
     page.getByRole('button', { name: /^(Sleeping until|Wake-up due)/ }).first(),
   cancelSchedules: (page: Page) =>

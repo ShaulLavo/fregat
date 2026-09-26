@@ -517,12 +517,15 @@ export class ProviderService {
 
     try {
       throwIfTextGenerationAborted(input.signal)
-      isolatedCwd = await mkdtemp(path.join(tmpdir(), 'platform-provider-text-'))
+      if (!input.cwd) isolatedCwd = await mkdtemp(path.join(tmpdir(), 'platform-provider-text-'))
+      const cwd = input.cwd ?? isolatedCwd ?? ''
+      const interactionMode = input.interactionMode ?? DEFAULT_INTERACTION_MODE
       startPromise = adapter.startRuntime({
-        cwd: isolatedCwd,
+        cwd,
         ephemeral: true,
-        interactionMode: DEFAULT_INTERACTION_MODE,
+        interactionMode,
         modelSelection: input.modelSelection,
+        ...(input.outputSchema ? { outputSchema: input.outputSchema } : {}),
         providerInstanceId,
         runtimeMode: 'approval-required',
         sessionId: ids.sessionId,
@@ -534,11 +537,12 @@ export class ProviderService {
       await adapter.sendTurn({
         attachments: input.attachments ?? [],
         attachmentsDir: input.attachmentsDir,
-        cwd: isolatedCwd,
+        cwd,
         ephemeral: true,
-        interactionMode: DEFAULT_INTERACTION_MODE,
+        interactionMode,
         messageText: input.messageText,
         modelSelection: input.modelSelection,
+        ...(input.outputSchema ? { outputSchema: input.outputSchema } : {}),
         providerInstanceId,
         runtimeMode: 'approval-required',
         sessionId: ids.sessionId,
@@ -1601,5 +1605,5 @@ function textGenerationResult(task: ProviderTextGenerationTask): ProviderTextGen
     )
   }
 
-  return { text: outcome.text }
+  return { structured: outcome.structured, text: outcome.text }
 }
