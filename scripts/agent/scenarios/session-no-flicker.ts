@@ -13,6 +13,11 @@ export const sessionNoFlicker = isolatedNativeScenario({
     'Switch cold conversations in chat and the sidebar, checking blank frames, paired titles and scroll isolation with a fixture provider.',
   fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
   async drive(page, { step, root, orchestration, providerInstanceId, sessionId, worktreeId }) {
+    const duplicateKeys: string[] = []
+    page.on('console', (message) => {
+      if (message.text().includes('Encountered two children with the same key'))
+        duplicateKeys.push(message.text())
+    })
     const ids = [sessionId, crypto.randomUUID(), crypto.randomUUID()]
     const titles = ['Switch alpha', 'Switch bravo', 'Switch charlie']
     try {
@@ -136,6 +141,7 @@ export const sessionNoFlicker = isolatedNativeScenario({
         strictEqual(await page.locator(selectors.conversationLoadingSelector).count(), 0)
         await step(`${surface}-uncached-session-reconnecting`)
       }
+      strictEqual(duplicateKeys.length, 0, duplicateKeys.join('\n'))
       strictEqual(blanks[0], 0, 'Main conversation blanked while switching sessions')
       strictEqual(blanks[1], 0, 'Sidebar conversation blanked while switching sessions')
       strictEqual(mismatches[0], 0, 'Main header and body name the same conversation')
