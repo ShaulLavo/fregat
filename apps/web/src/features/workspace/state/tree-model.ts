@@ -1,3 +1,4 @@
+// Modified for Platform from Pierre. Apache-2.0; see packages/tree/LICENSE-pierre and UPSTREAM.md.
 import { type FileTreeDensityPreset, resolveFileTreeDensity } from '@workspace/tree'
 import { FileTreeController } from '@workspace/tree'
 import { arePathSetsEqual } from '@workspace/tree'
