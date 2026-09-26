@@ -3,12 +3,15 @@
 - Status: PROPOSED. Size L. After [virtualization](virtualization.md) and [rows](rows.md). Starts
   with a spike (step 1).
 - Owns: moving the tree's drag onto dnd-kit inside the window while it stays a native drag outside
-  it, and a shared drag layer for the workspace.
+  it, and one app-wide drag layer that every dnd-kit surface uses.
 
 ## Outcome
 
 Inside the window, a tree drag is a dnd-kit drag: droppables, collision detection and drop handling
-are the same machinery the editor tabs and the session rail use, through one workspace drag layer.
+are the same machinery the editor tabs, the terminal list and the session rail use, through one
+app-wide drag layer. Every dnd-kit drag in the app runs in that one context, so any surface can
+later accept any kind of drag (a session into the composer, a file onto a machine) by registering a
+droppable, with no context boundary in the way.
 Once the pointer leaves the window, the same drag carries a native payload, so dropping on the
 desktop or another app works as it does today. Thresholds, long-press, hover-to-expand, edge scroll
 and the row-clone preview feel exactly as today. Sensors, drag data and edge scroll are shared.
@@ -16,8 +19,14 @@ and the row-clone preview feel exactly as today. Sensors, drag data and edge scr
 ## Owner direction (Q4)
 
 "Inside the app it's always dnd-kit, and if you drag outside the window the native takes over."
-No capability is lost. v6, one workspace context, no new drop behaviours beyond the Q2 bug fixes,
-no keyboard drag, the row-clone preview.
+No capability is lost. v6, no new drop behaviours beyond the Q2 bug fixes, no keyboard drag, the
+row-clone preview.
+
+2026-09-26, widening Q4: **one drag layer for everything.** Every surface that drags uses the same
+context, the rail and the terminal list included, so the app is ready for drag integrations that are
+not designed yet (anything into the chat, across machines). A draggable inside a nested
+`DndContext` cannot reach a droppable in an outer one, so a surface left on a local context would
+need rework the day it joins.
 
 ## Why the drag must start native
 
@@ -86,9 +95,17 @@ root-relative path (quirk 8); the editor's drop sets `dropEffect = 'copy'` again
    - `utils/native-drag-sensor.ts`: the sensor above.
    - `hooks/use-drag-sensors.ts`: one sensor hook with distance, delay and tolerance parameters,
      replacing `use-rail-drag-sensors.ts` and `use-tab-strip-sensors.ts`.
-   - `providers/workspace-drag-provider.tsx`: one context above the workbench and chat-mode layouts;
-     collision detection filtered by the active kind; composed announcements; the blur / Escape
-     cancel from `editor-groups-drag-provider.tsx:96-123`.
+   - `providers/drag-provider.tsx`: the one `DndContext`, at the app root above every layout (the
+     workbench, chat mode, the sidebar and the composer); collision detection filtered by the active
+     kind; composed announcements; the blur / Escape cancel from
+     `editor-groups-drag-provider.tsx:96-123`. Surfaces subscribe to the drags they care about
+     through `useDndMonitor` or a selector on the active `DragData` kind, not by reading the context
+     on every move.
+   - **One sensor set.** A context has one `sensors` list and every draggable receives every
+     sensor's activators, so each sensor's activator checks the draggable's `DragData` kind (v6
+     passes the active draggable node to the activator handler): the native sensor activates only
+     for `tree-paths`, the pointer sensor only for tabs, sessions and terminals, each with the
+     distance and delay its surface uses today.
    - `hooks/use-edge-auto-scroll.ts`: the tree's rAF edge scroll, fed by the sensor's coordinates;
      dnd-kit's own auto-scroll is excluded for the tree scroller with `canScroll`, as the editor strip
      already does.
@@ -104,8 +121,11 @@ root-relative path (quirk 8); the editor's drop sets `dropEffect = 'copy'` again
    (quirk 8); its string parser stays for OS files. An editor group accepts `tree-paths` and does
    what the editor's drop already intends, inserting the path text (quirk 9); opening the file there
    would be a new behaviour and is not in scope.
-6. **Editor provider** moves out of `code-panel.tsx` into the workspace provider. The rail and the
-   terminal list keep their local contexts and pointer sensors.
+6. **Every surface joins.** The editor provider moves out of `code-panel.tsx`; the session rail
+   (`session-rail.tsx:366`) and the terminal list (`terminal-list.tsx:63`) drop their local
+   `DndContext`s. Each keeps its own sortable behaviour, preview and thresholds (6px rail, 8px
+   tabs) as parameters of the shared sensor hook, and its `DragOverlay` renders only for its own
+   kind. Rail and tab reordering must feel exactly as today.
 7. **iOS.** Rows set `touch-callout: none` and `user-select: none` for long-press.
 
 ## Parity
@@ -118,21 +138,26 @@ Drag-out to the OS works as today.
 ## Delete
 
 `useFileTreeDrag.ts`, `dragPointer.ts` except `resolveDropTargetFromElement`,
-`use-rail-drag-sensors.ts`, `use-tab-strip-sensors.ts`.
+`use-rail-drag-sensors.ts`, `use-tab-strip-sensors.ts`, the local `DndContext`s in
+`session-rail.tsx`, `terminal-list.tsx` and `editor-groups-drag-provider.tsx`.
 
 ## Risks
 
 - **The sensor.** Unproven; the spike decides. If dnd-kit fights a native source, the fallback is
   keeping the tree's native drag and publishing typed `DragData` to the workspace provider's
   droppables by hand, which keeps drag-out and still shares the targets.
-- **Renders.** A v6 context re-renders every draggable and droppable consumer on each move; one
-  workspace context pulls editor tabs into tree drags. Measure `renders` and `trace` on a tree drag
-  and on `editor-split-drag`.
+- **Renders.** A v6 context re-renders every draggable and droppable consumer on each move, and one
+  app-wide context puts the tree, tabs, rail and terminals in the same drag. Measure `renders` and
+  `trace` on a tree drag, a rail reorder and `editor-split-drag`. If the cost shows, fix it inside
+  the layer (kind-filtered subscriptions, stable droppable data, memo boundaries under the provider);
+  splitting the context back up is not the fix.
 
 ## Verification
 
 - Harness drag tests (all ✗ today): targets, de-dup, hover-expand, edge scroll, Escape, touch.
 - A real row drag onto the composer (`chat-composer-insert` stops synthesizing the event), onto an
   editor group, and a drag-out (Playwright can assert the `dataTransfer` at the window edge).
-- `file-tree-undo`, `editor-split-drag`, `editor-split-targets`, `session-ordering`.
+- `file-tree-undo`, `editor-split-drag`, `editor-split-targets`, `session-ordering`, and the
+  terminal list reorder (`session-rail-drag.test.tsx` and the terminal list tests).
+- A grep finds one `DndContext` in `apps/web/src`.
 - `renders` and `trace` as above.

@@ -2,11 +2,11 @@
 
 ## Status and authorization
 
-- Status: PROPOSED, a plan of plans. Research done and Q1–Q4 answered 2026-09-26 (owner). Nothing
+- Status: PROPOSED, a plan of plans. Research done and Q1–Q5 answered 2026-09-26 (owner). Nothing
   here authorizes implementation.
 - Planned at: Platform `bfc48ef17`, 2026-09-26. Rewritten the same day from a single four-phase
   plan after the owner widened it (below).
-- Effort: twelve sub-plans, S to L. Each ships and deploys on its own and leaves the tree working.
+- Effort: thirteen sub-plans, S to L. Each ships and deploys on its own and leaves the tree working.
 - Companion: [Plan 179](179-isolating-foreign-content.md) looks at where a shadow root does help.
 
 ## Outcome
@@ -14,7 +14,9 @@
 The file tree looks and behaves as it does today, and every part of it is app machinery: it renders
 in the app's React root, is styled in Tailwind with theme tokens, rows are `ListRow`, windowing is
 `VirtualList`, keys go through `useListbox` and the keymap, the menu is `MenuSurface`, drag is
-dnd-kit inside the window and native drag outside it, icons are the app's. Where the app lacks
+dnd-kit inside the window and native drag outside it, through the one drag layer every surface
+uses, icons are the app's, and filter matching, path helpers and file order are the app's shared
+helpers. Its files are named and sized like the rest of the app. Where the app lacks
 something the tree does, the app gains it as a shared primitive and the other surfaces named in each
 sub-plan adopt it. Where the tree does something better than the app, the app aligns to the tree.
 `packages/tree` keeps only the DOM-free model the TUI also uses.
@@ -31,6 +33,14 @@ sub-plan adopt it. Where the tree does something better than the app, the app al
   the tree does better, and the app should follow it. Obvious bugs get fixed; product behaviour
   stays as it is. Drag uses dnd-kit inside the app and native drag once it leaves the window. No
   staged rollout: the app is not live, and a sub-plan is done when its adopters are done.
+- 2026-09-26, after reviewing the draft: **the tree's code is good, integrate it rather than throw
+  it away** — where its version is better (the virtualizer is a candidate), the app adopts it.
+  **Align it with the app:** kebab-case files and no folder-name prefixes, the big files split,
+  nothing left over from being a published package (presorted input, dead ids, private
+  attributes, the wide public surface). **One drag layer for everything** that drags, the rail and
+  terminals included, so future integrations (anything into the chat, across machines) need no
+  rework. **The other duplicates** — filter matching, path helpers, sort order, errors — are part
+  of this plan too.
 
 ## Why the tree is separate today
 
@@ -63,28 +73,32 @@ recovery, raw hex, and hand-written motion.
    through `@workspace/tree/model`.
 6. **Measure.** Scroll, render and drag claims cite `trace` and `renders` against the harness
    baseline.
+7. **App naming and size.** A file a sub-plan moves or rewrites leaves it kebab-case, without the
+   folder-name prefix, one component or hook per file, and split by concern once it passes about
+   500 lines ([app-owned-state](178-tree-in-the-app/app-owned-state.md) steps 2–3).
 
 ## Sub-plans
 
-| Sub-plan                                                                | Outcome                                                                                                          | Size | Depends on           | Other adopters                                                                |
-| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---- | -------------------- | ----------------------------------------------------------------------------- |
-| [parity-spec](178-tree-in-the-app/parity-spec.md)                       | The look and behaviour contract, with the quirks and rule conflicts to decide                                    | —    | —                    | —                                                                             |
-| [parity-harness](178-tree-in-the-app/parity-harness.md)                 | Matrix capture, pixel and style diff, a test for every uncovered behaviour                                       | M    | —                    | any rebuilt surface                                                           |
-| [out-of-the-root](178-tree-in-the-app/out-of-the-root.md)               | Custom element, shadow root and second React root gone; nothing changes on screen                                | M    | harness              | —                                                                             |
-| [app-owned-state](178-tree-in-the-app/app-owned-state.md)               | View moves into `features/workspace`; props and state replace the imperative facade                              | L    | out-of-the-root      | —                                                                             |
-| [rows](178-tree-in-the-app/rows.md)                                     | Rows on `ListRow` + a shared `TreeRowLead`, Tailwind and tokens                                                  | L    | app-owned-state      | git group headers, chat turn files, folder picker, search groups, diagnostics |
-| [icons](178-tree-in-the-app/icons.md)                                   | One icon path and sprite for every file row; icon hues as tokens                                                 | S–M  | app-owned-state      | every `FileTypeIcon` user                                                     |
-| [chrome](178-tree-in-the-app/chrome.md)                                 | `FilterField`, `InlineRenameInput`, shared scrollbar, real-row skeleton                                          | M    | app-owned-state      | five filter fields, session and terminal rename                               |
-| [context-menu](178-tree-in-the-app/context-menu.md)                     | `useListContextMenu` over `MenuSurface`                                                                          | S–M  | app-owned-state      | git changes, session rail, search results                                     |
-| [virtualization](178-tree-in-the-app/virtualization.md)                 | `VirtualList` gains count mode, kept rows, sticky chains, scroll padding, settlement                             | L    | app-owned-state      | search, git changes, diagnostics headers; logs, chat                          |
-| [keyboard-and-selection](178-tree-in-the-app/keyboard-and-selection.md) | Shared selection model, multi-select `useListbox`, tree commands in the keymap                                   | L    | virtualization       | session rail                                                                  |
-| [drag-and-drop](178-tree-in-the-app/drag-and-drop.md)                   | Tree on dnd-kit through a workspace drag layer; typed drops on composer and editor                               | L    | virtualization, rows | editor tabs, session rail sensors, composer                                   |
-| [tree-leads](178-tree-in-the-app/tree-leads.md)                         | The app adopts what the tree does better: truncation, scrollbar, pressed tint, and whatever the harness turns up | M    | parity-harness       | every list with a path, every scroller                                        |
-| [cleanup](178-tree-in-the-app/cleanup.md)                               | Stylesheet, bridges and exemptions gone; package is model-only                                                   | S    | all                  | —                                                                             |
+| Sub-plan                                                                | Outcome                                                                                                           | Size | Depends on           | Other adopters                                                                |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---- | -------------------- | ----------------------------------------------------------------------------- |
+| [parity-spec](178-tree-in-the-app/parity-spec.md)                       | The look and behaviour contract, with the quirks and rule conflicts to decide                                     | —    | —                    | —                                                                             |
+| [parity-harness](178-tree-in-the-app/parity-harness.md)                 | Matrix capture, pixel and style diff, a test for every uncovered behaviour                                        | M    | —                    | any rebuilt surface                                                           |
+| [out-of-the-root](178-tree-in-the-app/out-of-the-root.md)               | Custom element, shadow root and second React root gone; nothing changes on screen                                 | M    | harness              | —                                                                             |
+| [app-owned-state](178-tree-in-the-app/app-owned-state.md)               | View moves into `features/workspace`, renamed and split; props and state replace the facade; package leftovers go | L    | out-of-the-root      | —                                                                             |
+| [rows](178-tree-in-the-app/rows.md)                                     | Rows on `ListRow` + a shared `TreeRowLead`, Tailwind and tokens                                                   | L    | app-owned-state      | git group headers, chat turn files, folder picker, search groups, diagnostics |
+| [icons](178-tree-in-the-app/icons.md)                                   | One icon path and sprite for every file row; icon hues as tokens                                                  | S–M  | app-owned-state      | every `FileTypeIcon` user                                                     |
+| [chrome](178-tree-in-the-app/chrome.md)                                 | `FilterField`, `InlineRenameInput`, shared scrollbar, real-row skeleton                                           | M    | app-owned-state      | five filter fields, session and terminal rename                               |
+| [context-menu](178-tree-in-the-app/context-menu.md)                     | `useListContextMenu` over `MenuSurface`                                                                           | S–M  | app-owned-state      | git changes, session rail, search results                                     |
+| [virtualization](178-tree-in-the-app/virtualization.md)                 | `VirtualList` gains count mode, kept rows, sticky chains, scroll padding, settlement                              | L    | app-owned-state      | search, git changes, diagnostics headers; logs, chat                          |
+| [keyboard-and-selection](178-tree-in-the-app/keyboard-and-selection.md) | Shared selection model, multi-select `useListbox`, tree commands in the keymap                                    | L    | virtualization       | session rail                                                                  |
+| [drag-and-drop](178-tree-in-the-app/drag-and-drop.md)                   | Tree on dnd-kit through the one app-wide drag layer; typed drops on composer and editor                           | L    | virtualization, rows | editor tabs, session rail, terminal list, composer                            |
+| [helpers](178-tree-in-the-app/helpers.md)                               | One filter matcher, path helper set, file-order comparator and error catalog, shared with the app                 | M    | app-owned-state      | quick open, search, git, chat turn files, file picker, filter fields          |
+| [tree-leads](178-tree-in-the-app/tree-leads.md)                         | The app adopts what the tree does better: truncation, scrollbar, pressed tint, and whatever the harness turns up  | M    | parity-harness       | every list with a path, every scroller                                        |
+| [cleanup](178-tree-in-the-app/cleanup.md)                               | Stylesheet, bridges and exemptions gone; package is model-only                                                    | S    | all                  | —                                                                             |
 
 Order: harness → out-of-the-root → app-owned-state; then rows, icons, chrome and context-menu in
 parallel with virtualization; keyboard-and-selection and drag-and-drop after virtualization;
-tree-leads any time after the harness; cleanup last. Rows, icons and chrome touch the same row component, so they land one after the
+helpers any time after app-owned-state; tree-leads any time after the harness; cleanup last. Rows, icons and chrome touch the same row component, so they land one after the
 other in that lane.
 
 ## Decisions
@@ -118,8 +132,8 @@ Answered 2026-09-26 (owner).
 - **Q4. Drag.** Both, no loss: dnd-kit inside the window, native once the drag leaves it. The drag
   starts as a native drag and a custom dnd-kit sensor reads its events, because a browser cannot
   turn a pointer drag into a native one partway through (see
-  [drag-and-drop](178-tree-in-the-app/drag-and-drop.md)). dnd-kit v6; one workspace drag context
-  for the tree, editor and composer; no new drop behaviours beyond the Q2 fixes; no keyboard drag;
+  [drag-and-drop](178-tree-in-the-app/drag-and-drop.md)). dnd-kit v6; one app-wide drag context
+  for every dnd-kit surface (widened the same day to include the session rail and terminal list); no new drop behaviours beyond the Q2 fixes; no keyboard drag;
   the preview stays the row clone.
 - **Q5. Rollout.** None. Each sub-plan moves the tree and all its named adopters; it is done when
   they are.

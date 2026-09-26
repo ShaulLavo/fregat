@@ -29,4 +29,13 @@
 
 ## Verification
 
-`bun run gates`, the harness, every tree scenario, the TUI tree tests.
+`bun run gates`, the harness, every tree scenario, the TUI tree tests, and these greps, each empty:
+
+- a PascalCase or camelCase file name under `packages/tree/src` or the moved tree files in
+  `features/workspace` (rule 7);
+- a file over about 500 lines among them without a recorded reason;
+- `data-file-tree-`, `data-item-`, `--trees-`, `FLATTENED_PREFIX`, `FileTreePublicId`,
+  `preparePresorted` anywhere in the repo;
+- a second `DndContext` in `apps/web/src`;
+- a file-order comparator or filter matcher outside the shared ones [helpers](helpers.md) names,
+  unless it carries the reason it differs.

@@ -13,19 +13,19 @@ app adopt `TreeRowLead`.
 
 ## Reuse
 
-| Row part                 | Today                                      | Becomes                                                                                          | Gap                        |
-| ------------------------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------ | -------------------------- |
-| Row box, hover, selected | `style.css:600-718` + unsafe overrides     | `ListRow` (`packages/ui/src/patterns/list-row.tsx`)                                              | small                      |
-| Selected bar             | `::after` in `treeUnsafeCss`               | a `ListRow` variant                                                                              | small                      |
-| Focus ring on the row    | `::before`, shown while the tree has focus | a `ListRow` cursor state ringed under the list's `:focus-within`                                 | small                      |
-| Roving tab stop          | tabIndex 0 on the focused row              | none: one tab stop on the list (Q3)                                                              | small                      |
-| Indent, guides, chevron  | spacers + `border-left` + sprite chevron   | new `TreeRowLead` in `packages/ui/src/patterns/`                                                 | build                      |
-| Name, chain, truncation  | `MiddleTruncate`, chain spans              | `FileLabel` (`components/file-label.tsx`) gains extension-preserving truncation and a chain mode | small                      |
-| Git colour and letter    | `style.css:1103-1160`                      | `FileStatusCell`, `gitStatusSymbol`, status tokens                                               | align maps                 |
-| Change dot on folders    | 6px `--warning` at 0.5                     | Plan 157's `StatusDot`                                                                           | wait for 157 or build here |
-| Decorations and action   | text lane + `span role=button`             | component slot, `Button` + `data-tooltip`                                                        | none                       |
-| Loading file             | own shimmer keyframes                      | `Shimmer`                                                                                        | none                       |
-| Drag source dim          | opacity 0.5                                | stays (drag sub-plan)                                                                            | none                       |
+| Row part                 | Today                                      | Becomes                                                                                          | Gap                      |
+| ------------------------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------ | ------------------------ |
+| Row box, hover, selected | `style.css:600-718` + unsafe overrides     | `ListRow` (`packages/ui/src/patterns/list-row.tsx`)                                              | small                    |
+| Selected bar             | `::after` in `treeUnsafeCss`               | a `ListRow` variant                                                                              | small                    |
+| Focus ring on the row    | `::before`, shown while the tree has focus | a `ListRow` cursor state ringed under the list's `:focus-within`                                 | small                    |
+| Roving tab stop          | tabIndex 0 on the focused row              | none: one tab stop on the list (Q3)                                                              | small                    |
+| Indent, guides, chevron  | spacers + `border-left` + sprite chevron   | new `TreeRowLead` in `packages/ui/src/patterns/`                                                 | build                    |
+| Name, chain, truncation  | `MiddleTruncate`, chain spans              | `FileLabel` (`components/file-label.tsx`) gains extension-preserving truncation and a chain mode | small                    |
+| Git colour and letter    | `style.css:1103-1160`                      | `FileStatusCell`, `gitStatusSymbol`, status tokens                                               | align maps               |
+| Change dot on folders    | 6px `--warning` at 0.5                     | Plan 157's `StatusDot`                                                                           | 157 lands first (queued) |
+| Decorations and action   | text lane + `span role=button`             | component slot, `Button` + `data-tooltip`                                                        | none                     |
+| Loading file             | own shimmer keyframes                      | `Shimmer`                                                                                        | none                     |
+| Drag source dim          | opacity 0.5                                | stays (drag sub-plan)                                                                            | none                     |
 
 ### ListRow extensions
 
@@ -55,6 +55,23 @@ entry citing Q1.
   `paddingLeft: depth*0.875rem`), folder picker (`breadcrumb-picker-row.tsx`, `depth*1rem`), search
   result groups (`file-group.tsx`), diagnostics and references. Today there are six chevron copies
   in two conventions and three indent units.
+
+### Attributes and ids
+
+The row's state is ARIA and `ListRow`'s own attributes (`aria-selected`, `aria-expanded`,
+`aria-level`, `data-marked`), nothing else. The tree's ~50 private `data-file-tree-*` and
+`data-item-*` attributes go, with the constants in `utils/constants.ts` that name them.
+
+- Read outside the tree today, so each gets a replacement in this pass: `data-item-path` (a row's
+  path; becomes the `ListRow` key plus a `data-path` only if a reader still needs it),
+  `data-file-tree-virtualized-scroll` (the scroller; the list's `role` and label), `data-item-section`,
+  `data-item-loading`, `data-file-tree-sticky-row`, `data-file-tree-search-input` /
+  `-search-container` (the `FilterField`), `data-file-tree-context-menu-root` (gone with
+  [out-of-the-root](out-of-the-root.md)), `data-item-selected`, `data-item-focused`,
+  `data-item-rename-input`.
+- Readers to move: `tree-pane.tsx`, the tree tests, `scripts/agent/selectors.ts`, the scenarios
+  and `apps/web/scripts/*` named in out-of-the-root. Selectors go through roles and labels first.
+- The `id` on the tree's list stays only as the `aria-activedescendant` base (Q3).
 
 ### New tokens
 
