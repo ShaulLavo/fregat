@@ -38,8 +38,6 @@
     "@elysiajs/cors": "^1.4.2",
     "@modelcontextprotocol/server": "2.1.0",
     "@singapore-editor/lsp": "0.1.1",
-    "@singapore-editor/typescript-lsp": "0.1.1",
-    "@tanstack/pacer": "^0.22.0",
     "@tanstack/query-core": "^5.104.0",
     "@workspace/contracts": "workspace:*",
     "@workspace/observability": "workspace:*",
@@ -53,14 +51,11 @@
     "fflate": "^0.8.3",
     "ignore": "^7.0.10",
     "jsonc-parser": "3.3.1",
-    "nanoid": "6.0.1",
     "pngjs": "^7.0.0",
     "subset-font": "^2.9.0",
     "typescript": "^7.0.2",
     "typescript-language-server": "6.0.1",
-    "typescript-language-service": "npm:typescript@6.0.3",
-    "valibot": "^1.5.0",
-    "vscode-languageserver-protocol": "^3.18.4"
+    "valibot": "^1.5.0"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
@@ -72,6 +67,7 @@
     "eslint": "^10.11.0",
     "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
+    "typescript-language-service": "npm:typescript@6.0.3",
     "vitest": "catalog:",
     "vscode-langservers-extracted": "4.10.0"
   }
