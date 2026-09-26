@@ -10,6 +10,9 @@
   parent, scenario `settings-dependent-row`. First users: `lsp.semanticTokens.delta` under
   `lsp.semanticTokens.enabled`; `editor.history.persistDays` and `persistBudget` under
   `editor.history.persist` (non-boolean children keep their value; only the row is disabled).
+- Parts A and B landed 2026-09-26 (wave 2, lane S): see "Part A results" below. `details` is on
+  42 rows, shown behind an info icon (scenario `settings-row-details`), in schema hover and in the
+  reference's per-category Details lists.
 - Already landed with this plan: `lsp.semanticTokens.delta` defaults to on, its description is
   rewritten, and `AGENTS.md` has a **Copy** section (say what a thing is; never what it is not).
 - Effort: L. Three independent parts; each is its own phase and can ship alone.
@@ -145,6 +148,36 @@ is already known; an empty note means the row is still unread.
 - `chat.contextWindowMeterEnabled` shipped in Plan 141 and is off.
 - `chat.textGenerationModel` points at Codex, which has no credit until 2026-09-26. The provider
   fallback covers it; check whether the default should be the model that usually answers.
+
+### Part A results (2026-09-26)
+
+All 105 keys read (the inventory above predates 25 of them: `chat.sendShortcut`,
+`chat.activeFileContext`, `chat.pushNotifications`, the `chat.autoSettle*`, `git.*`, `workbench.sounds.*`,
+`workbench.feel`, `editor.markdownView`, `files.picker.view`, `files.watchDirectoryLimit`,
+`developer.*Minutes`, `models.favorites`).
+
+- **Changed:** `chat.contextWindowMeterEnabled` defaults to on. It was off only to match T3 Code's
+  default; the meter and its popover (what fills the window, compaction reserve, session cost) are
+  built and nothing else shows them.
+- **New `dependsOn`:** `chat.defaultInteractionMode` under `chat.planModeEnabled` (the composer forces
+  default mode while plan mode is off, so the row had nothing to pick).
+- **Kept, with the reason in `details`:** every other default. `lsp.semanticTokens.enabled` stays off:
+  on a first open with no saved paint the host notifies contributions before syntax is requested
+  (`Editor.ts` document notify, then syntax request) and the semantic layer paints without waiting
+  for syntax, so the 1.5 s race is still there; reopening with a saved paint is safe (the
+  provisional view skips range highlights). Turning it on needs the Editor to hold semantic paint
+  until syntax has painted once.
+- **Inventory note corrected:** `chat.textGenerationModel` picks the session-title model only;
+  commit messages have their own fallback chain in `commit-message-generator.ts`.
+- **Copy fixed in the registry:** `workbench.surface.continuousSeams`, `editor.inputRoute`,
+  `lsp.experimental.tyForPython` (contrast phrasing), and the "…is independent" clauses on
+  `chat.contextWindowMeterEnabled`, `chat.textGenerationModel`, `chat.sessionSortOrder`,
+  `lsp.semanticTokens.servers`; `chat.followUpBehavior` now names the alternate key correctly.
+- **Found, left for later:** `requiresRestart` on `editor.minimap.enabled` and
+  `editor.guides.indentation` looks stale (both now rebuild the editor's plugins from the live
+  value in `editor.tsx`); enum options show raw ids for several keys (`chat.sendShortcut`,
+  `chat.defaultRuntimeMode`, `files.autoSave`, `window.transparency`, …) because
+  `settingOptionTitle` names only three keys.
 
 ## Part B — details on every setting that has a story
 

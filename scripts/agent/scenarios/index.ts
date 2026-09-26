@@ -132,6 +132,7 @@ import { physicalChat } from './physical-chat'
 import { connectionFrame } from './connection-frame'
 import { settingsValueGrids } from './settings-value-grids'
 import { settingsDependentRow } from './settings-dependent-row'
+import { settingsRowDetails } from './settings-row-details'
 import { tailFollow } from './tail-follow'
 import { checkpointRestore } from './checkpoint-restore'
 import { themeStudioAsync } from './theme-studio-async'
@@ -425,6 +426,7 @@ export const scenarios: readonly Scenario[] = [
   connectionFrame,
   settingsValueGrids,
   settingsDependentRow,
+  settingsRowDetails,
   tailFollow,
   checkpointRestore,
   filePickerBrowse,

@@ -13,7 +13,7 @@ import {
 export const composerDefaults = isolatedNativeScenario({
   name: 'composer-defaults',
   description:
-    'Plan and occupancy controls are opt-in; hiding Plan retains preference while the next native turn uses default mode.',
+    'Plan is opt-in and the occupancy meter can be switched off; hiding Plan keeps the preference while the next native turn uses default mode.',
   fixture: new URL('../fixtures/native-titles.mjs', import.meta.url),
   async drive(page, { step, root, orchestration }) {
     const base = orchestration.replace(/\/orchestration$/, '')
