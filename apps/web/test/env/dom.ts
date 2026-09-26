@@ -2,7 +2,6 @@ import { healthDescriptorSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 import { activeServerOrigin } from '@/lib/client'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
-import { WORKSPACE_CACHE_STORAGE_NAMESPACE } from '@/lib/workspace-cache-storage'
 import { TEST_ENVIRONMENT_ID } from '../factories/chat'
 import { act, cleanup } from '@testing-library/react'
 import { toast } from 'sonner'
@@ -12,6 +11,7 @@ import { createInProcessClient } from '../client'
 import { installTestClient } from '../factories/client-binding'
 import { makeTestServer, type TestServer } from '../server'
 import './jest-dom'
+import './workspace-cache'
 
 // Every provider stack these tests mount reads settings through `getClient()`.
 // Left at its production default that client opens a real socket to a port no
@@ -47,14 +47,7 @@ let toastsBefore = new Set<string | number>()
 
 beforeEach(() => {
   toastsBefore = new Set(toast.getHistory().map((shown) => shown.id))
-  forgetWorkspaceCaches()
 })
-
-// Every application runtime persists its workspace, so a test starts from the cache it seeds.
-function forgetWorkspaceCaches() {
-  for (const key of Object.keys(localStorage))
-    if (key.includes(WORKSPACE_CACHE_STORAGE_NAMESPACE)) localStorage.removeItem(key)
-}
 
 // Flush dismissal frames while the Toaster is mounted, then drain the removal timers
 // before environment teardown: their uncancelled setState callbacks still read `window`.
