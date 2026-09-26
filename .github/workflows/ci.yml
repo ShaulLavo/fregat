@@ -14,10 +14,103 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  # Three jobs and a test matrix instead of one runner doing everything in turn:
-  # each pays for setup once, and no suite shares four cores with another.
+  # A PR runs only the jobs its files can affect. `code` is anything outside plans and docs;
+  # web and TUI tests drive the real server, so a server change runs them too. Main runs
+  # everything: collapsed pending runs mean one run's diff is not everything since the last verdict.
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ github.event_name != 'pull_request' || steps.filter.outputs.code == 'true' || steps.filter.outputs.generated == 'true' }}
+      web: ${{ github.event_name != 'pull_request' || steps.filter.outputs.web == 'true' }}
+      server: ${{ github.event_name != 'pull_request' || steps.filter.outputs.server == 'true' }}
+      tui: ${{ github.event_name != 'pull_request' || steps.filter.outputs.tui == 'true' }}
+      docs: ${{ steps.filter.outputs.docs == 'true' }}
+      docs_files: ${{ steps.filter.outputs.docs_files }}
+    steps:
+      - name: Classify changed files
+        id: filter
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          predicate-quantifier: some-with-excludes
+          list-files: json
+          filters: |
+            code:
+              - '**'
+              - '!plans/**'
+              - '!docs/**'
+              - '!*.md'
+            web:
+              - '**'
+              - '!apps/tui/**'
+              - '!apps/desktop/**'
+              - '!apps/mac/**'
+              - '!apps/site/**'
+              - '!plans/**'
+              - '!docs/**'
+              - '!*.md'
+            server:
+              - '**'
+              - '!apps/web/**'
+              - '!apps/tui/**'
+              - '!apps/desktop/**'
+              - '!apps/mac/**'
+              - '!apps/site/**'
+              - '!plans/**'
+              - '!docs/**'
+              - '!*.md'
+            tui:
+              - '**'
+              - '!apps/web/**'
+              - '!apps/desktop/**'
+              - '!apps/mac/**'
+              - '!apps/site/**'
+              - '!plans/**'
+              - '!docs/**'
+              - '!*.md'
+            # Written by `generated:check`'s generators, so a hand edit is a code change.
+            generated:
+              - 'docs/settings-reference.md'
+              - 'docs/native-syntax-coverage.*'
+            docs:
+              - added|modified: 'plans/**'
+              - added|modified: 'docs/**'
+              - added|modified: '*.md'
+
+  # No workspace's `format:check` reaches plans and docs, so their changed files are checked here.
+  docs:
+    name: Docs format
+    needs: changes
+    if: ${{ needs.changes.outputs.docs == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: Format
+        env:
+          FILES: ${{ needs.changes.outputs.docs_files }}
+        run: |
+          version=$(jq -r '.devDependencies.oxfmt' package.json)
+          jq -r '.[] | "./" + .' <<<"$FILES" | xargs -d '\n' bunx "oxfmt@$version" --check
+
+  # Jobs instead of one runner doing everything in turn: each pays for setup once,
+  # and no suite shares four cores with another.
   lint:
     name: Format, lint, census
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -52,6 +145,8 @@ jobs:
 
   typecheck:
     name: Typecheck, generated
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -102,26 +197,69 @@ jobs:
       - name: First-load gate
         run: bun run --cwd apps/web bundle:gate
 
-  test:
-    name: Test (${{ matrix.suite.name }})
+  # Web is most of the time, so it is sharded by file. The `test` scripts in `apps/web` and
+  # `packages/tree` are scoped to `--project node --project dom`; their browser projects are
+  # the browser job.
+  test-web:
+    name: Test (web ${{ matrix.shard }})
+    needs: changes
+    if: ${{ needs.changes.outputs.web == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        suite:
-          # Web is most of the time, so it is sharded by file. The `test` scripts
-          # in `apps/web` and `packages/tree` are scoped to `--project node --project
-          # dom`; their browser projects are the separate job below.
-          - { name: web 1/4, run: 'bun run --cwd apps/web test --shard=1/4' }
-          - { name: web 2/4, run: 'bun run --cwd apps/web test --shard=2/4' }
-          - { name: web 3/4, run: 'bun run --cwd apps/web test --shard=3/4' }
-          - { name: web 4/4, run: 'bun run --cwd apps/web test --shard=4/4' }
-          - { name: server, run: 'bun run --cwd apps/server test' }
-          - { name: tui, run: 'bun run --cwd apps/tui test' }
-          - name: packages
-            devkit: true
-            run: bun run test:scripts && bun run --filter '@workspace/*' test && bun run --cwd apps/desktop test
+        shard: [1/4, 2/4, 3/4, 4/4]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Test
+        run: bun run --cwd apps/web test --shard=${{ matrix.shard }}
+
+  test-server:
+    name: Test (server)
+    needs: changes
+    if: ${{ needs.changes.outputs.server == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Test
+        run: bun run --cwd apps/server test
+
+  test-tui:
+    name: Test (tui)
+    needs: changes
+    if: ${{ needs.changes.outputs.tui == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Test
+        run: bun run --cwd apps/tui test
+
+  # Package tests also read app sources (the session vocabulary scans `apps/web`), so they run
+  # for any code change.
+  test-packages:
+    name: Test (packages)
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -130,22 +268,22 @@ jobs:
         uses: ./.github/actions/setup
 
       - name: Cache Hutch store
-        if: ${{ matrix.suite.devkit }}
         uses: actions/cache@v4
         with:
           path: ~/.hutch
           key: ${{ runner.os }}-hutch-${{ hashFiles('apps/desktop/package.json') }}
 
       - name: Prepare Electrobun devkit
-        if: ${{ matrix.suite.devkit }}
         working-directory: apps/desktop
         run: node_modules/.bin/electrobun prepare
 
       - name: Test
-        run: ${{ matrix.suite.run }}
+        run: bun run test:scripts && bun run --filter '@workspace/*' test && bun run --cwd apps/desktop test
 
   browser:
     name: Browser tests
+    needs: changes
+    if: ${{ needs.changes.outputs.web == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -175,3 +313,17 @@ jobs:
       - name: Browser test (tree)
         if: ${{ !cancelled() }}
         run: bun run --cwd packages/tree test:browser
+
+  # The one status to read: red when any job failed or was cancelled; a job skipped because the
+  # change cannot affect it counts as passed.
+  verdict:
+    name: CI
+    needs: [changes, docs, lint, typecheck, test-web, test-server, test-tui, test-packages, browser]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verdict
+        env:
+          FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: test "$FAILED" = false
