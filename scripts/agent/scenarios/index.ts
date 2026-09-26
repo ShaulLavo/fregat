@@ -285,6 +285,7 @@ import { gitMergeRequest } from './git-merge-request'
 import { gitClonePublish } from './git-clone-publish'
 import { worktreeSetupImport } from './worktree-setup-import'
 import { gitHistory } from './git-history'
+import { gitHistoryNoFlicker } from './git-history-no-flicker'
 import { editorCaretBurst } from './editor-caret-burst'
 import { editorFocusClicks } from './editor-focus-clicks'
 import { editorProportionalFont } from './editor-proportional-font'
@@ -518,6 +519,7 @@ export const scenarios: readonly Scenario[] = [
   demoThemeStartup,
   demoWallpaperStartup,
   gitHistory,
+  gitHistoryNoFlicker,
   editorLargePaste,
   editorFastScroll,
   editorDiagnosticsLifecycle,
