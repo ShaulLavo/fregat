@@ -22,7 +22,7 @@ test('round-trips semantic operations through the real server', async ({ client 
       mutationId: 'api-round-trip',
       operations: [
         { key: 'workbench.colorTheme', kind: 'set', value: 'dark' },
-        { command: 'workspace.saveFile', keys: 'mod+s', kind: 'keybinding.set' },
+        { command: 'workspace.saveFile', keys: ['mod+s'], kind: 'keybinding.set' },
       ],
       target: 'user',
     },
@@ -31,7 +31,7 @@ test('round-trips semantic operations through the real server', async ({ client 
 
   expect(result.snapshot.values['workbench.colorTheme']).toBe('dark')
   expect(result.snapshot.values['keybindings.overrides']).toEqual({
-    'workspace.saveFile': 'mod+s',
+    'workspace.saveFile': ['mod+s'],
   })
   expect((await fetchSettings(undefined, getClient())).values).toEqual(result.snapshot.values)
 })
@@ -86,16 +86,16 @@ test('round-trips a two-stroke shortcut through the real server', async ({ clien
     {
       mutationId: 'api-chord-round-trip',
       operations: [
-        { command: 'workspace.showSettings', keys: 'Mod+K Mod+S', kind: 'keybinding.set' },
+        { command: 'workspace.showSettings', keys: ['Mod+K Mod+S'], kind: 'keybinding.set' },
       ],
       target: 'user',
     },
     getClient(),
   )
 
-  expect(result.snapshot.values['keybindings.overrides']['workspace.showSettings']).toBe(
+  expect(result.snapshot.values['keybindings.overrides']['workspace.showSettings']).toEqual([
     'Mod+K Mod+S',
-  )
+  ])
   expect((await fetchSettings(undefined, getClient())).values).toEqual(result.snapshot.values)
 })
 
@@ -106,7 +106,11 @@ test('rejects a third stroke before changing the settings document', async ({ cl
       {
         mutationId: 'api-chord-too-long',
         operations: [
-          { command: 'workspace.showSettings', keys: 'Mod+K Mod+S Mod+X', kind: 'keybinding.set' },
+          {
+            command: 'workspace.showSettings',
+            keys: ['Mod+K Mod+S Mod+X'],
+            kind: 'keybinding.set',
+          },
         ],
         target: 'user',
       },

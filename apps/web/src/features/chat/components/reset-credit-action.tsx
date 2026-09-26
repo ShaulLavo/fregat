@@ -21,15 +21,17 @@ export function ResetCreditAction({ account }: { account: ProviderAccountUsage }
   if (available === 0 && !account.resetPending && !mutation.data && !mutation.error) return null
   return (
     <div className='mt-2 flex flex-col gap-2'>
-      <Button
-        onClick={() => setConfirmation(account)}
-        disabled={mutation.isPending || (available === 0 && !account.resetPending)}
-        size='sm'
-        variant='secondary'
-      >
-        {mutation.isPending ? <Spinner /> : null}
-        {account.resetPending ? 'Check reset attempt…' : 'Use reset credit…'}
-      </Button>
+      {available > 0 || account.resetPending ? (
+        <Button
+          onClick={() => setConfirmation(account)}
+          disabled={mutation.isPending}
+          size='sm'
+          variant='secondary'
+        >
+          {mutation.isPending ? <Spinner /> : null}
+          {account.resetPending ? 'Check reset attempt…' : 'Use reset credit…'}
+        </Button>
+      ) : null}
       {mutation.error ? (
         <p role='alert' className='text-destructive text-xs'>
           {errorMessage(mutation.error, 'The reset could not be confirmed.')}

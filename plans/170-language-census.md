@@ -1,12 +1,14 @@
 # Plan 170: Language census for grammar and theme prefetch
 
-Status: **Phase 1 done 2026-09-26** (wave 2 lane W: `GET /fs/workspace-index/languages?root=`, on the per-root indexes of [Plan 173](173-two-devices-one-workspace.md)); research done 2026-09-25 (findings below; the in-app before/after paint measurement belongs to the implementation phases). Split out of [Plan 110](110-workspace-indexing.md) question 7. Decided 2026-09-25: owner — split the language census into its own small plan. Amended 2026-09-26: tree-sitter warm-up joins the scope (see "Tree-sitter has no warm-up"). [Root PLAN.md](../PLAN.md) owns scheduling.
+Status: **Phases 1–3 done 2026-09-26; Phase 4 and the full Phase 5 matrix remain** (wave 2 lane W: `GET /fs/workspace-index/languages?root=`, on the per-root indexes of [Plan 173](173-two-devices-one-workspace.md)); research done 2026-09-25 (findings below; the in-app before/after paint measurement belongs to the implementation phases). Split out of [Plan 110](110-workspace-indexing.md) question 7. Decided 2026-09-25: owner — split the language census into its own small plan. Amended 2026-09-26: tree-sitter warm-up joins the scope (see "Tree-sitter has no warm-up"). [Root PLAN.md](../PLAN.md) owns scheduling.
 
 Editor fix (owner question 1, answer (a)) done 2026-09-26 in wave 2, lane E1:
 [singapore#41](https://github.com/ShaulLavo/singapore/pull/41), in `editor-ref` `ec3fc15`. A Shiki
 session's open carries only its own grammar, edits carry no registrations (84 grammars cost 18.1 ms
 to clone per keystroke; now under 0.1 ms), and the worker schedules background languages once per
-language. Phase 3's getter and the census phases remain.
+language. The getter and shared document-language resolver landed in
+[singapore#49](https://github.com/ShaulLavo/singapore/pull/49); the Platform consumer and
+measurement are recorded below.
 
 ## Why
 
@@ -263,3 +265,71 @@ safe to use: stale entries are still present and counted.
    fetched, first highlighted paint, and worker busy time after paint. For tree-sitter: time to the
    first tree-sitter result for the session's first markdown file, and frames until its decorations
    appear, using [Plan 177](177-prefetch-every-press.md)'s Phase 0 scenario.
+
+## Phases 2–3 implementation (2026-09-26)
+
+- [x] Add the editor-owned `languageCensus(root)` query in the owning machine's query client,
+      with a five-minute stale time and request cancellation.
+- [x] Map census keys through `languageIdForFilePath` and the Editor's
+      `shikiLanguageForDocument`; aggregate aliases by grammar before applying the inclusive
+      0.5% share of all counted files. Unsupported keys still count in the denominator.
+- [x] Bind the active editor runtime to a getter that reads its current root and query cache.
+      `ready` and `stale` counts select grammars; absent, cold, building and failed censuses retain
+      the full-list fallback. The Editor always adds the open document's own grammar.
+- [x] Pin CI's Editor to `b27dbb90aa0a69efedd10be58bc9a1d931600c32`, containing singapore#49,
+      E052 (#46), E058 (#57), and #47/#48. Built an isolated snapshot of that exact commit;
+      Platform's web build, full repository typecheck and `bun run gates` pass against it.
+      The shared Editor checkout remains at `0f873101`.
+- [x] Mapping tests cover JSX/TSX, named files, unsupported keys, alias aggregation,
+      the exact floor, and empty counts. A DOM test uses the real in-process census route
+      and filesystem streams, then verifies cache updates, root changes, machine changes,
+      fallback and unmount cleanup through the same getter.
+- [x] Record first-highlight and background-preload measurements below.
+
+Phase 4 (tree-sitter warm-up) remains separate.
+
+### Platform before/after measurement
+
+Same worktree, Editor `b27dbb90`, Chromium, Shiki, file `shiki-languages.ts`.
+The baseline restores the full-list consumer; the after run uses the census getter.
+Both use the isolated Vite mesh route on port 5170 and a throwaway API/state home.
+Commands: `WEB_PORT=5170 bun run agent:browser trace editor-reload-paint` and
+`trace editor-syntax-shiki-settled`, with `--workspace work/worktrees/platform/w2-cx-170
+--file shiki-languages.ts`; the after commands also pass `--compare` with the baseline directory.
+
+| Measurement                                           |  Full list | Census getter |
+| ----------------------------------------------------- | ---------: | ------------: |
+| Requested grammar entry modules                       |         53 |             5 |
+| Unique grammar registrations (including dependencies) |         84 |             5 |
+| Fetched grammar chunk closure                         | 82 modules |     5 modules |
+| Grammar closure transfer bytes                        | 10,566,918 |     1,703,602 |
+| Grammar closure decoded body bytes                    | 10,542,318 |     1,702,102 |
+| Open action to first authoritative highlighted paint  | 1,219.4 ms |    1,160.4 ms |
+| First Shiki open request round trip                   |   246.3 ms |      261.5 ms |
+| Reload navigation to first highlighted editor frame   |   2,080 ms |      1,932 ms |
+| Unhighlighted editor frames during reload             |          0 |             0 |
+
+The five grammars are TypeScript, TSX, JavaScript, JSON and Markdown. The after-run server log
+confirms the census returned `ready` (38 extension/basename keys). The byte comparison walks
+static imports from the fetched `@shikijs_langs_*` entry modules and sums their Resource Timing
+transfer/body sizes. Registration counts resolve those same entry modules and deduplicate by
+registration name. These are Vite development modules, including development overhead;
+they are **not production wire sizes**. The reduction is 83.9% of grammar transfer bytes.
+
+These are one before/after pair on a busy shared machine. First highlight is before background
+preloading, so the timings demonstrate the path still works, not a causal first-highlight speedup.
+Shiki preload-message round trips were 267.0/38.1/22.9 ms before and 261.6/59.7 ms after; these
+acknowledgements do not measure the deferred worker grammar-loading task. The full worker-busy-time,
+production-byte and vscode matrix remains Phase 5 work. Both runs had the same Inter/JetBrains Mono
+font-cache 403s in this isolated Vite setup, used fallback fonts, and logged no server warnings/errors.
+Both screenshots were read back and showed highlighted TypeScript.
+
+Evidence directories under `/work/tmp/fregat-evidence/`:
+
+- `20260926T202438Z-look-1440x1000` — app health passed; screenshot inspected.
+- `20260926T202447Z-trace-editor-reload-paint` — baseline reload.
+- `20260926T202543Z-trace-editor-syntax-shiki-settled` — baseline open/preload.
+- `20260926T202952Z-trace-editor-reload-paint` — after reload, with trace comparison.
+- `20260926T203029Z-trace-editor-syntax-shiki-settled` — after open/preload, with trace comparison.
+
+The final web build also passes against the new Editor pin. No deployment was performed.

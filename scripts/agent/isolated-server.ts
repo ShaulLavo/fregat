@@ -1,5 +1,7 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+
+import { DEFAULT_PROVIDER_INSTANCES } from '../../apps/server/src/provider/drivers/built-in'
 
 import { promote } from '../deploy/systemd/promote'
 import { stopTerminalHost } from '../../apps/server/src/terminal-host/identity'
@@ -44,6 +46,16 @@ export async function startIsolatedServer(
   const productionRoot = path.join(directory, 'production')
   mkdirSync(home)
   mkdirSync(productionRoot)
+  // Disable account discovery before startup; scenarios explicitly install their fixture drivers.
+  writeFileSync(
+    path.join(home, 'settings.json'),
+    JSON.stringify({
+      'providers.instances': DEFAULT_PROVIDER_INSTANCES.map((provider) => ({
+        ...provider,
+        enabled: false,
+      })),
+    }),
+  )
   const port = await prepareHome(home, webOrigin).catch((error: unknown) => {
     rmSync(directory, { recursive: true, force: true })
     throw error

@@ -2,7 +2,7 @@ import { CodeIcon, SlidersHorizontalIcon } from '@phosphor-icons/react'
 import { Tabs, TabsList, TabsTab } from '@workspace/ui/components/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 
-import { selectSettingsScope, settingsScope } from '../state/scope-store'
+import { selectSettingsScope, useSettingsScope } from '../state/scope-store'
 import { selectSettingsView, useSettingsView, type SettingsView } from '../state/view-store'
 
 /**
@@ -18,30 +18,41 @@ import { selectSettingsView, useSettingsView, type SettingsView } from '../state
  */
 export function ViewToggle() {
   const view = useSettingsView()
+  const scope = useSettingsScope()
+  const selectView = (next: SettingsView) => {
+    selectSettingsScope(next === 'form' && scope === 'default' ? 'user' : scope)
+    selectSettingsView(next)
+  }
 
   return (
     <Tabs value={view} onValueChange={(next: SettingsView) => selectView(next)}>
       <TabsList aria-label='Settings view' variant='segmented'>
-        <ViewTab icon={<SlidersHorizontalIcon aria-hidden />} label='Settings' value='form' />
-        <ViewTab icon={<CodeIcon aria-hidden />} label='settings.json' value='json' />
+        <ViewTab
+          onSelect={selectView}
+          icon={<SlidersHorizontalIcon aria-hidden />}
+          label='Settings'
+          value='form'
+        />
+        <ViewTab
+          onSelect={selectView}
+          icon={<CodeIcon aria-hidden />}
+          label='settings.json'
+          value='json'
+        />
       </TabsList>
     </Tabs>
   )
 }
 
-// The defaults tab has no form, so asking for one means leaving that tab.
-function selectView(view: SettingsView) {
-  if (view === 'form' && settingsScope() === 'default') selectSettingsScope('user')
-  selectSettingsView(view)
-}
-
 function ViewTab({
   icon,
   label,
+  onSelect,
   value,
 }: {
   icon: React.ReactNode
   label: string
+  onSelect: (view: SettingsView) => void
   value: SettingsView
 }) {
   return (
@@ -50,6 +61,7 @@ function ViewTab({
         render={
           <TabsTab
             aria-label={label}
+            onClick={() => onSelect(value)}
             className='w-(--density-control-height-sm) px-0'
             value={value}
           />

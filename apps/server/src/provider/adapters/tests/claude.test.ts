@@ -1,3 +1,4 @@
+import type { AgentDiagnosticsSource } from '../../../lsp/agent-diagnostics'
 import { BackgroundTaskRegistry } from '../../background-liveness'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -373,6 +374,87 @@ describe('ClaudeProviderAdapter', () => {
     })
     await harness.adapter.stopAll()
   })
+
+  it('approves only registered read-only tools from this runtime’s Platform MCP binding', async () => {
+    const harness = claudeHarness()
+    await harness.adapter.startRuntime({
+      ...sessionStartInput({ runtimeMode: 'approval-required' }),
+      platformMcp: { token: 'private-token', url: 'http://127.0.0.1:39087/mcp' },
+    })
+    const canUseTool = latestOptions(harness).canUseTool
+    assert(canUseTool)
+    const servers = harness.queries.at(-1)?.mcpBindings[0]
+    assert(servers)
+    const name = Object.keys(servers)[0]!
+    try {
+      for (const tool of ['read_file', 'workspace_info']) {
+        expect(
+          await canUseTool(
+            `mcp__${name}__${tool}`,
+            {},
+            {
+              ...canUseToolOptions(),
+              mcpServer: { name, source: 'dynamic' },
+            },
+          ),
+        ).toEqual({ behavior: 'allow', updatedInput: {} })
+      }
+      expect(harness.events.filter((event) => event.type === 'request.opened')).toEqual([])
+    } finally {
+      await harness.adapter.stopAll()
+    }
+  })
+
+  it.each([
+    { binding: false, name: 'platform', source: 'project', tool: 'read_file' },
+    { binding: true, name: 'platform__evil', source: 'project', tool: 'delete' },
+    { binding: true, name: 'registered', source: 'project', tool: 'read_file' },
+    { binding: true, name: 'registered', source: 'user', tool: 'read_file' },
+    { binding: true, name: 'registered', source: 'unknown-source', tool: 'read_file' },
+    { binding: true, name: 'registered', source: 'dynamic', tool: 'delete' },
+    { binding: true, name: 'registered', source: undefined, tool: 'read_file' },
+    { binding: true, name: 'platform', source: 'dynamic', tool: 'read_file' },
+  ])(
+    'asks approval for untrusted MCP provenance $name/$source/$tool with binding=$binding',
+    async (testCase) => {
+      const harness = claudeHarness()
+      const input = sessionStartInput({ runtimeMode: 'approval-required' })
+      await harness.adapter.startRuntime({
+        ...input,
+        ...(testCase.binding
+          ? {
+              platformMcp: { token: 'private-token', url: 'http://127.0.0.1:39087/mcp' },
+            }
+          : {}),
+      })
+      const servers = harness.queries.at(-1)?.mcpBindings[0]
+      const name = testCase.name === 'registered' ? Object.keys(servers ?? {})[0]! : testCase.name
+      const canUseTool = latestOptions(harness).canUseTool
+      assert(canUseTool)
+      try {
+        const permission = canUseTool(
+          `mcp__${name}__${testCase.tool}`,
+          {},
+          {
+            ...canUseToolOptions(),
+            ...(testCase.source ? { mcpServer: { name, source: testCase.source } } : {}),
+          },
+        )
+        // Approval creation is synchronous; an auto-allow returns without creating one.
+        const opened = harness.events.find((event) => event.type === 'request.opened')
+        assert(opened?.type === 'request.opened')
+        assert(opened.requestId)
+        await harness.adapter.respondApproval({
+          decision: 'decline',
+          requestId: v.parse(approvalRequestIdSchema, opened.requestId),
+          sessionId: input.sessionId,
+        })
+        expect(await permission).toMatchObject({ behavior: 'deny' })
+      } finally {
+        await harness.adapter.stopAll()
+      }
+    },
+  )
 
   it('opens an approval request per canUseTool call and resolves it with the decision', async () => {
     const harness = claudeHarness()
@@ -769,6 +851,18 @@ describe('ClaudeProviderAdapter', () => {
     await harness.adapter.stopAll()
   })
 
+  it('adds the edit diagnostics hooks beside the Stop hook when a reader is wired', async () => {
+    const reader: AgentDiagnosticsSource = { enabled: () => true, errors: async () => null }
+    const harness = claudeHarness(true, undefined, reader)
+    await harness.adapter.startRuntime(sessionStartInput({}))
+    expect(Object.keys(latestOptions(harness).hooks ?? {}).toSorted()).toEqual([
+      'PostToolUse',
+      'PreToolUse',
+      'Stop',
+    ])
+    await harness.adapter.stopAll()
+  })
+
   it('keeps ephemeral utility sessions free of the schedule hook', async () => {
     const harness = claudeHarness()
     await harness.adapter.startRuntime(sessionStartInput({ ephemeral: true }))
@@ -1071,7 +1165,7 @@ describe('ClaudeProviderAdapter', () => {
       path.join(cwd, '.mcp.json'),
       JSON.stringify({ mcpServers: { deploy: { command: 'deploy-server' } } }),
     )
-    const harness = claudeHarness(true, undefined, approvalsFile)
+    const harness = claudeHarness(true, undefined, undefined, approvalsFile)
     const input = { ...sessionStartInput({}), cwd }
     try {
       await harness.adapter.startRuntime(input)
@@ -1413,6 +1507,24 @@ describe('ClaudeProviderAdapter', () => {
     await harness.adapter.stopAll()
   })
 
+  it('adds Platform’s MCP endpoint to a session that has a binding, always loaded', async () => {
+    const harness = claudeHarness()
+    const platformMcp = { token: 'grant-token', url: 'http://127.0.0.1:3301/mcp' }
+    await harness.adapter.startRuntime({ ...sessionStartInput({}), platformMcp })
+    expect(latestOptions(harness).mcpServers).toBeUndefined()
+    const bindings = harness.queries.at(-1)?.mcpBindings[0]
+    assert(bindings)
+    expect(Object.values(bindings)).toEqual([
+      {
+        alwaysLoad: true,
+        headers: { Authorization: 'Bearer grant-token' },
+        type: 'http',
+        url: 'http://127.0.0.1:3301/mcp',
+      },
+    ])
+    await harness.adapter.stopAll()
+  })
+
   it('disables provider transcript persistence only for ephemeral sessions', async () => {
     const normal = claudeHarness()
     await normal.adapter.startRuntime(sessionStartInput({}))
@@ -1423,6 +1535,17 @@ describe('ClaudeProviderAdapter', () => {
     await ephemeral.adapter.startRuntime(sessionStartInput({ ephemeral: true }))
     expect(latestOptions(ephemeral).persistSession).toBe(false)
     await ephemeral.adapter.stopAll()
+  })
+
+  it('asks for the output schema a session was started with, and reports the parsed answer', async () => {
+    const harness = claudeHarness()
+    const schema = { type: 'object', properties: { ok: { type: 'boolean' } } }
+    await harness.adapter.startRuntime({
+      ...sessionStartInput({ ephemeral: true }),
+      outputSchema: schema,
+    })
+    expect(latestOptions(harness).outputFormat).toEqual({ type: 'json_schema', schema })
+    await harness.adapter.stopAll()
   })
 
   it('treats ultrathink as a prompt keyword instead of an effort flag', async () => {
@@ -1591,6 +1714,7 @@ describe('ClaudeProviderAdapter catalog', () => {
 function claudeHarness(
   acknowledgeStop = true,
   historyRunner?: ClaudeHistoryRunner,
+  agentDiagnostics?: AgentDiagnosticsSource,
   projectMcpApprovalsFile?: string,
 ): ClaudeHarness {
   const events: ProviderRuntimeEvent[] = []
@@ -1600,6 +1724,7 @@ function claudeHarness(
   const queries: FakeClaudeQuery[] = []
 
   const adapter = new ClaudeProviderAdapter({
+    ...(agentDiagnostics ? { agentDiagnostics } : {}),
     ...(projectMcpApprovalsFile ? { projectMcpApprovalsFile } : {}),
     historyRunner,
     attachmentsDir,

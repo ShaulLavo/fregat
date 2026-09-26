@@ -14,7 +14,7 @@ test.for([{ keys: 'F8' }, { keys: null }])(
     const state = session.getSnapshot()
     if (state.kind !== 'ready') return expect.unreachable('Expected ready session')
     const submission = state.owner.submit('user', [
-      { kind: 'keybinding.set', command: 'workspace.dismiss', keys },
+      { kind: 'keybinding.set', command: 'workspace.dismiss', keys: keys === null ? null : [keys] },
     ])
     if (submission.kind === 'submitted') await submission.settled
     const frame = await renderTui(
@@ -72,7 +72,7 @@ test('a rebound Dismiss key cancels a settings editor', async ({ server }) => {
   const state = session.getSnapshot()
   if (state.kind !== 'ready') return expect.unreachable('Expected ready session')
   const submission = state.owner.submit('user', [
-    { kind: 'keybinding.set', command: 'workspace.dismiss', keys: 'F8' },
+    { kind: 'keybinding.set', command: 'workspace.dismiss', keys: ['F8'] },
   ])
   if (submission.kind === 'submitted') await submission.settled
   const frame = await renderTui(
@@ -121,7 +121,7 @@ test('a rebound Dismiss key returns from a narrow file preview before closing Fi
   const state = session.getSnapshot()
   if (state.kind !== 'ready') return expect.unreachable('Expected ready session')
   const submission = state.owner.submit('user', [
-    { kind: 'keybinding.set', command: 'workspace.dismiss', keys: 'F8' },
+    { kind: 'keybinding.set', command: 'workspace.dismiss', keys: ['F8'] },
   ])
   if (submission.kind === 'submitted') await submission.settled
   const frame = await renderTui(

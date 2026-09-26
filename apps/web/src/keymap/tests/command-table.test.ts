@@ -194,6 +194,7 @@ const WORKSPACE_OPERATION_COMMAND_IDS = [
 
 const FILE_BACKED_COMMAND_IDS = [
   'workspace.cycleMarkdownView',
+  'workspace.showSpellingSuggestions',
   'workspace.addSelectionToChat',
   'workspace.addFileToChat',
   'workspace.goToLine',
