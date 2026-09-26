@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -541,11 +541,63 @@ function scrollPageTurn(message, text) {
   endTurn(turn, 'completed')
 }
 
+/**
+ * Tool steps first, which release the send-time park, then the long streamed answer: the path a
+ * real agent turn takes while the transcript follows its end.
+ */
+function scrollToolTurn(message, chunks) {
+  const turn = startOwnTurn(message)
+  const step = (index) => {
+    if (index === 16) {
+      streamAnswer(turn, `${turn}-answer`, [...chunks, 'SCROLL_STREAM_DONE'], 45)
+      return
+    }
+    const item = { id: `${turn}-step-${String(index).padStart(2, '0')}`, type: 'commandExecution' }
+    const command = `echo SCROLL_TOOL_${index}`
+    if (index % 4 === 3) writeToolFile(index)
+    send({
+      method: 'item/started',
+      params: { threadId, turnId: turn, item: { ...item, command, status: 'inProgress' } },
+    })
+    send({
+      method: 'item/completed',
+      params: {
+        threadId,
+        turnId: turn,
+        item: {
+          ...item,
+          command,
+          status: 'completed',
+          exitCode: 0,
+          aggregatedOutput: `SCROLL_TOOL_${index}\n`,
+        },
+      },
+    })
+    setTimeout(() => step(index + 1), 80)
+  }
+  step(0)
+}
+
+/** Every fourth step edits a file in the checkout `tool-writes.json` names, so the turn has a diff. */
+function writeToolFile(index) {
+  const control = join(root, 'tool-writes.json')
+  if (!existsSync(control)) return
+  const { cwd } = JSON.parse(readFileSync(control, 'utf8'))
+  mkdirSync(join(cwd, 'scroll-tool', `part-${index % 2}`), { recursive: true })
+  writeFileSync(
+    join(cwd, 'scroll-tool', `part-${index % 2}`, `step-${index}.ts`),
+    `export const step = ${index}\n`,
+  )
+}
+
 function chatScroll(message) {
   const text = promptText(message)
   record({ event: 'turn/start', input: text })
   if (text.startsWith('PAGE')) return scrollPageTurn(message, text)
   if (text.startsWith('HISTORY')) return scrollHistory(message)
+  if (text.startsWith('TOOLS briefly'))
+    return scrollToolTurn(message, SCROLL_STREAM_CHUNKS.slice(0, 12))
+  if (text.startsWith('TOOLS')) return scrollToolTurn(message, SCROLL_STREAM_CHUNKS)
   const turn = startOwnTurn(message)
   streamAnswer(turn, `${turn}-answer`, [...SCROLL_STREAM_CHUNKS, 'SCROLL_STREAM_DONE'], 45)
 }

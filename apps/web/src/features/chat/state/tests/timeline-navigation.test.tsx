@@ -73,6 +73,24 @@ test('the transcript edges are jumps the timeline makes, not the browser animati
   release()
 })
 
+test('Home and End inside tool output move the output until it reaches that edge', () => {
+  const { events, output, release, starts } = navigationFixture()
+  Object.defineProperties(output, { clientHeight: { value: 100 }, scrollHeight: { value: 400 } })
+  output.scrollTop = 80
+
+  fireEvent.keyDown(output, { key: 'Home' })
+  fireEvent.keyDown(output, { key: 'End' })
+  expect(events).toEqual([])
+  output.scrollTop = 300
+  fireEvent.keyDown(output, { key: 'End' })
+  output.scrollTop = 0
+  fireEvent.keyDown(output, { key: 'Home' })
+
+  expect(events).toEqual([{ type: 'jump-to-end' }, { type: 'user-navigated' }])
+  expect(starts).toHaveLength(1)
+  release()
+})
+
 test('navigation at an output boundary stays in its scrollable parent group', () => {
   const { events, output, release } = navigationFixture()
   const group = document.createElement('div')

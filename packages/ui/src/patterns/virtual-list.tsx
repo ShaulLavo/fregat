@@ -19,14 +19,7 @@ import { useTailFollow } from '@workspace/ui/patterns/use-tail-follow'
 
 export type VirtualListHandle = Pick<
   Virtualizer<HTMLDivElement, HTMLDivElement>,
-  | 'scrollToIndex'
-  | 'scrollToOffset'
-  | 'scrollToEnd'
-  | 'measure'
-  | 'getTotalSize'
-  | 'getVirtualItems'
-  | 'isAtEnd'
-  | 'getDistanceFromEnd'
+  'scrollToIndex' | 'scrollToOffset' | 'measure' | 'getTotalSize' | 'getVirtualItems'
 >
 
 export type VirtualListVirtualizer = Virtualizer<HTMLDivElement, HTMLDivElement>
@@ -163,6 +156,8 @@ export function VirtualList<T>({
   const rows = virtualizer.getVirtualItems()
   const previousHeight = useRef(rowHeight)
   const previousActiveIndex = useRef(activeIndex)
+  const estimated = estimateSize !== undefined
+  const previousEstimated = useRef(estimated)
   const startIndex = rows[0]?.index ?? -1
   const endIndex = rows.at(-1)?.index ?? -1
 
@@ -185,6 +180,13 @@ export function VirtualList<T>({
     const next = virtualizer.getOffsetForIndex(anchor.index, 'start')
     if (next) virtualizer.scrollToOffset(next[0] + fraction * rowHeight)
   }, [rowHeight, virtualizer, densitySized, measureItems])
+
+  // Measurements rebuild when the key function changes, and that follows the rows alone.
+  useLayoutEffect(() => {
+    if (previousEstimated.current === estimated) return
+    previousEstimated.current = estimated
+    virtualizer.measure()
+  }, [estimated, virtualizer])
 
   useLayoutEffect(() => {
     const changed = previousActiveIndex.current !== activeIndex

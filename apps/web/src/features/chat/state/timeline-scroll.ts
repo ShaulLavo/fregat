@@ -6,10 +6,19 @@ import {
   timelineAnchoredTurnMetrics,
   TIMELINE_ANCHOR_OFFSET_PX,
   TIMELINE_COMPOSER_INSET_PX,
+  TIMELINE_RELEASED_THRESHOLD_PX,
   type TimelineScrollEvent,
   type TimelineScrollState,
 } from '@/features/chat/utils/timeline-scroll-anchoring'
 import { readTimelineViewport } from '@/features/chat/state/timeline-navigation'
+
+/**
+ * Releases end pinning the moment a gesture leaves the end. The render that follows sets the same
+ * threshold; a row resize landing before it would pin the list and swallow the gesture.
+ */
+export function releaseTimelineEnd(virtualizer: TimelineVirtualizer) {
+  virtualizer.options.scrollEndThreshold = TIMELINE_RELEASED_THRESHOLD_PX
+}
 
 export type DisclosureSettle = { readonly disclosure: Element; readonly measured: boolean }
 

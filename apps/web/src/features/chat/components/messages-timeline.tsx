@@ -12,6 +12,7 @@ import {
   timelineScrollReducer,
   TIMELINE_COMPOSER_INSET_PX,
   TIMELINE_END_THRESHOLD_PX,
+  TIMELINE_RELEASED_THRESHOLD_PX,
   TIMELINE_TOP_INSET_PX,
 } from '@/features/chat/utils/timeline-scroll-anchoring'
 import { TimelineRow } from '@/features/chat/components/timeline-row'
@@ -76,9 +77,7 @@ export function MessagesTimeline({
       paddingEnd={TIMELINE_COMPOSER_INSET_PX + scrollState.anchoredEndSpace}
       anchorTo={endAnchored ? 'end' : 'start'}
       followOnAppend={following}
-      // A reader who scrolled away is never at the end to the virtualizer: its pin to a growing
-      // last row would land between their wheel and its first scroll and swallow the gesture.
-      scrollEndThreshold={following ? TIMELINE_END_THRESHOLD_PX : -1}
+      scrollEndThreshold={following ? TIMELINE_END_THRESHOLD_PX : TIMELINE_RELEASED_THRESHOLD_PX}
       contentClassName='[overflow-anchor:none]'
       renderRow={(item) => (
         <TimelineRow

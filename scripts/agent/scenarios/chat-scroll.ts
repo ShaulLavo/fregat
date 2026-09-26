@@ -1,14 +1,17 @@
 import { ok } from 'node:assert/strict'
+import { writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { Page } from 'playwright'
+import { createGitFixture, fixtureGit, releaseFixture } from '../fixture-workspace'
 import { chatMessagesLogSelector, selectors } from '../selectors'
 import { sendPrompt, withUserSetting } from './native-provider-verification'
 import { isolatedNativeScenario } from './native-provider-verification'
 import { streamCompleted } from './stream-frames'
 
 /**
- * Chat scroll behaviours (Plan 181): the growing end stays visible while pinned, a reader who
- * scrolled up is not moved, the jump button returns to the live edge and keeps following, and
- * "Load earlier" keeps the row under the reader where it was.
+ * Chat scroll behaviours: the transcript stays at its end while it follows, the park keeps the
+ * growing answer in view, a reader who scrolled up is not moved, the jump button returns to the
+ * live edge, and "Load earlier" keeps the row under the reader where it was.
  */
 
 type ScrollFrame = {
@@ -19,14 +22,26 @@ type ScrollFrame = {
   readonly scrollTop: number
   readonly textLength: number
   readonly time: number
+  /** The transcript is following its end (`data-pinned`). */
+  readonly pinned: boolean
+  /** Scroll distance left to the end of the transcript. */
+  readonly distance: number
+  /**
+   * `frame` samples at the start of a frame, before the browser reports resizes; `painted`
+   * samples from a resize observer made after the virtualizer's, so after its corrections and
+   * before the frame paints.
+   */
+  readonly phase: 'frame' | 'painted'
+  readonly rows: number
+  /** Which animation frame the sample belongs to; a painted sample shares its frame's number. */
+  readonly frame: number
 }
 
 // Page scripts are strings: the scripts project compiles without the DOM lib.
 const startScrollRecorder = `(logSelector) => {
-  const recorder = { frames: [], running: true, reference: null }
+  const recorder = { frames: [], running: true, reference: null, frame: 0 }
   window.__chatScrollRecorder = recorder
-  const sample = () => {
-    if (!recorder.running) return
+  const record = (phase) => {
     const log = document.querySelector(logSelector)
     if (log) {
       const box = log.getBoundingClientRect()
@@ -41,11 +56,29 @@ const startScrollRecorder = `(logSelector) => {
         scrollTop: log.scrollTop,
         textLength: answer ? (answer.textContent || '').length : 0,
         time: performance.now(),
+        pinned: log.hasAttribute('data-pinned'),
+        distance: log.scrollHeight - log.scrollTop - log.clientHeight,
+        phase,
+        rows: log.querySelectorAll('[data-index]').length,
+        frame: recorder.frame,
       })
     }
+  }
+  const sample = () => {
+    if (!recorder.running) return
+    recorder.frame += 1
+    record('frame')
     requestAnimationFrame(sample)
   }
   requestAnimationFrame(sample)
+  const log = document.querySelector(logSelector)
+  const observer = new ResizeObserver(() => {
+    if (!recorder.running) return observer.disconnect()
+    record('painted')
+  })
+  // The transcript resizes when its content grows and when the composer below it grows.
+  if (log) observer.observe(log)
+  if (log && log.firstElementChild) observer.observe(log.firstElementChild)
 }`
 
 const stopScrollRecorder = `(() => {
@@ -54,11 +87,18 @@ const stopScrollRecorder = `(() => {
   return recorder.frames
 })()`
 
+/** Samples taken at the start of each animation frame. */
+async function stopRecording(page: Page) {
+  const frames = await stopRecordingAll(page)
+  return frames.filter((frame) => frame.phase === 'frame')
+}
+
 async function startRecording(page: Page) {
   await page.evaluate(`(${startScrollRecorder})(${JSON.stringify(chatMessagesLogSelector)})`)
 }
 
-async function stopRecording(page: Page) {
+/** Every sample, both phases, in the order they were taken. */
+async function stopRecordingAll(page: Page) {
   return page.evaluate<ScrollFrame[]>(stopScrollRecorder)
 }
 
@@ -130,10 +170,10 @@ function describe(frames: readonly ScrollFrame[], pick: (frame: ScrollFrame) => 
 const TOKEN_STREAMING = { key: 'chat.responseStreamingMode', value: 'token' }
 const fixture = new URL('../fixtures/native-codex.mjs', import.meta.url)
 
-export const chatScrollPinned = isolatedNativeScenario({
-  name: 'chat-scroll-pinned',
+export const chatScrollPark = isolatedNativeScenario({
+  name: 'chat-scroll-park',
   description:
-    'Stream a long answer below a scrolled transcript: once it outgrows the viewport, its growing end stays visible in every frame.',
+    'Send a prompt that streams a long answer with no tool steps: the prompt parks near the top, and once the answer outgrows the viewport its growing end stays visible in every frame.',
   fixture,
   async drive(page, { step, orchestration, root }) {
     await seedHistory(page)
@@ -147,23 +187,98 @@ export const chatScrollPinned = isolatedNativeScenario({
       await page.waitForTimeout(500)
       const frames = await stopRecording(page)
       await step('stream-done')
-      const overflowing = frames.filter((frame) => frame.textLength > 0)
-      const firstHidden = overflowing.findIndex((frame) => (frame.endHidden ?? 0) > 2)
-      const lateFrames = overflowing.slice(Math.max(0, firstHidden))
-      const hidden = lateFrames.filter((frame) => (frame.endHidden ?? 0) > 2)
-      console.log(
-        `chat-scroll-pinned: end hidden ${describe(overflowing, (frame) => frame.endHidden)}`,
-      )
-      console.log(
-        `chat-scroll-pinned: ${hidden.length} of ${overflowing.length} frames hid the growing end`,
-      )
+      const answered = frames.filter((frame) => frame.textLength > 0)
+      const hidden = answered.filter((frame) => (frame.endHidden ?? 0) > 2)
+      console.log(`chat-scroll-park: end hidden ${describe(answered, (frame) => frame.endHidden)}`)
       ok(
         hidden.length === 0,
-        `${hidden.length} of ${overflowing.length} frames hid the growing end; worst ${Math.max(...hidden.map((frame) => frame.endHidden ?? 0)).toFixed(1)} px`,
+        `${hidden.length} of ${answered.length} frames hid the growing end; worst ${Math.max(...hidden.map((frame) => frame.endHidden ?? 0)).toFixed(1)} px`,
       )
     })
   },
 })
+
+/** Rounding noise only: the virtualizer's own end threshold. */
+const TIMELINE_END_SLACK_PX = 2
+
+/**
+ * What each animation frame painted. A frame-start sample reads layout before the browser reports
+ * resizes, so a line that arrived since the last paint reads as one line off the end; when the
+ * frame then reported a resize, the sample taken after the virtualizer's correction is what paints.
+ */
+function paintedFrames(samples: readonly ScrollFrame[]) {
+  const byFrame = new Map<number, ScrollFrame>()
+  for (const sample of samples) {
+    if (sample.phase === 'painted' || !byFrame.has(sample.frame)) byFrame.set(sample.frame, sample)
+  }
+  return [...byFrame.values()]
+}
+
+export const chatScrollFollowing = isolatedNativeScenario({
+  name: 'chat-scroll-following',
+  description:
+    'Send a prompt whose turn runs tool steps that edit files and then streams a long answer, while a draft grows in the composer: the steps release the park, and while the transcript follows its end every painted frame sits on the end, through the changed-files card that lands when the turn settles.',
+  fixture,
+  prepareWorktree: async () => {
+    const checkout = await createGitFixture('chat-scroll-following')
+    await writeFile(join(checkout, 'README.md'), 'Scroll fixture\n')
+    await fixtureGit(checkout, ['add', '--all'])
+    await fixtureGit(checkout, ['commit', '--quiet', '-m', 'fixture'])
+    return { path: checkout, release: () => releaseFixture(checkout) }
+  },
+  async drive(page, { step, orchestration, root, worktreePath }) {
+    await writeFile(join(root, 'tool-writes.json'), JSON.stringify({ cwd: worktreePath }))
+    await seedHistory(page)
+    await step('history')
+    await withUserSetting(page, orchestration, TOKEN_STREAMING, async () => {
+      await startRecording(page)
+      await sendPrompt(page, 'TOOLS then a long answer.')
+      await answerOverflows(page)
+      await step('answer-overflows')
+      // A draft growing in the composer shortens the transcript's viewport mid-stream.
+      const composer = selectors.chatMessage(page)
+      await composer.click()
+      for (let line = 0; line < 6; line += 1) {
+        await page.keyboard.type(`Draft line ${line + 1}`)
+        await page.keyboard.press('Shift+Enter')
+        await page.waitForTimeout(120)
+      }
+      await step('composer-grown')
+      await streamCompleted(root)
+      await selectors.changedFilesTree(page).last().waitFor({ timeout: 15_000 })
+      await page.waitForTimeout(800)
+      const samples = await stopRecordingAll(page)
+      await step('stream-done')
+      const painted = paintedFrames(samples).filter((frame) => frame.pinned)
+      const offEnd = painted.filter((frame) => frame.distance > TIMELINE_END_SLACK_PX)
+      const started = samples.filter((frame) => frame.pinned && frame.phase === 'frame')
+      console.log(
+        `chat-scroll-following: painted distance ${describe(painted, (frame) => frame.distance)}; frame-start distance ${describe(started, (frame) => frame.distance)}`,
+      )
+      if (offEnd.length > 0)
+        console.log(`chat-scroll-following: ${followingSeries(samples, offEnd)}`)
+      ok(painted.length > 60, `The transcript followed its end for ${painted.length} frames`)
+      ok(
+        offEnd.length === 0,
+        `${offEnd.length} of ${painted.length} painted frames sat off the end; worst ${Math.max(...offEnd.map((frame) => frame.distance))} px`,
+      )
+    })
+  },
+})
+
+/** The samples of two frames either side of each failing frame, as `frame phase:distance@scrollTop/rows`. */
+function followingSeries(samples: readonly ScrollFrame[], failing: readonly ScrollFrame[]) {
+  const near = new Set(
+    failing.flatMap((frame) => [-2, -1, 0, 1, 2].map((step) => frame.frame + step)),
+  )
+  return samples
+    .filter((frame) => near.has(frame.frame))
+    .map(
+      (frame) =>
+        `${frame.frame}${frame.phase[0]}:${frame.distance}@${frame.scrollTop}/${frame.rows}${frame.pinned ? '' : '(free)'}`,
+    )
+    .join(' ')
+}
 
 async function readerHeld(
   page: Page,
@@ -188,7 +303,7 @@ async function readerHeld(
     const frames = await stopRecording(page)
     await context.step(`${label}-stream-done`)
     // The settled turn trades its Working row above the answer for a status row below it, which
-    // moves an answer being read by one row (an owner question in Plan 181); streaming may not.
+    // moves an answer being read by one row; streaming may not.
     const finalLength = Math.max(...frames.map((frame) => frame.textLength))
     const streaming = frames.filter((frame) => frame.textLength < finalLength)
     const tracked = streaming.filter((frame) => frame.referenceTop !== null)
@@ -425,7 +540,7 @@ export const chatScrollLoadEarlierJump = isolatedNativeScenario({
     const distance = await selectors
       .chatMessages(page)
       .evaluate((log) => log.scrollHeight - log.scrollTop - log.clientHeight)
-    ok(distance <= 24, `The view stopped ${distance} px above the end`)
+    ok(distance <= TIMELINE_END_SLACK_PX, `The view stopped ${distance} px above the end`)
   },
 })
 
@@ -458,7 +573,7 @@ async function disclosureRow(page: Page, position: 'first' | 'last') {
 export const chatScrollDisclosure = isolatedNativeScenario({
   name: 'chat-scroll-disclosure',
   description:
-    'Open a disclosure at the live edge and one deep in history: each row stays under the pointer, and following stops at the edge.',
+    'Open a disclosure at the live edge while following, and one deep in history: each row stays under the pointer, and opening stops following.',
   fixture,
   async drive(page, { step }) {
     const long = Array.from({ length: 30 }, (_, line) => `Line ${line + 1} of a long prompt.`)
@@ -467,13 +582,16 @@ export const chatScrollDisclosure = isolatedNativeScenario({
     await messages.getByText('SCROLL_HISTORY_23 paragraph 1', { exact: false }).waitFor({
       timeout: 30_000,
     })
-    await sendPrompt(page, 'PAGE 0')
-    await messages.getByText('PAGE_ANSWER_0 paragraph 4', { exact: false }).waitFor({
-      timeout: 30_000,
-    })
+    // Tool steps release the send-time park, so the live edge is opened while following.
+    await sendPrompt(page, 'TOOLS briefly, then a short answer.')
+    await messages.getByText('SCROLL_STREAM_DONE', { exact: false }).waitFor({ timeout: 30_000 })
     await selectors.chatStop(page).waitFor({ state: 'hidden', timeout: 30_000 })
     await page.waitForTimeout(300)
     await step('at-the-edge')
+    ok(
+      (await messages.getAttribute('data-pinned')) !== null,
+      'The transcript follows its end before the disclosure opens',
+    )
     await openHeldStill(page, await disclosureRow(page, 'last'), 'live-edge')
     await step('opened-at-the-edge')
     const jump = selectors.timelineJumpToLatest(page)

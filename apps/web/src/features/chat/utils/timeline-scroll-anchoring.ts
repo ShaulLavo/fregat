@@ -23,6 +23,12 @@ const TIMELINE_FOLLOW_REARM_BAND_PX = 40
 export const TIMELINE_END_THRESHOLD_PX = 2
 
 /**
+ * The virtualizer's end threshold while the reader is away from the end: no distance is that
+ * close, so it never pins a growing last row or follows an append.
+ */
+export const TIMELINE_RELEASED_THRESHOLD_PX = -1
+
+/**
  * Space reserved below the last row so the final line never sits flush against
  * the composer. It is part of the scrollable content, so distance-to-end has to
  * subtract it to measure the distance to the *real* content bottom.

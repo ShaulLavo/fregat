@@ -11,7 +11,7 @@ import { TailJumpButton } from '@workspace/ui/patterns/tail-jump-button'
 import { TickerNumber } from '@/components/ticker-number'
 import { useTimelineArrivals } from '@/features/chat/hooks/use-timeline-arrivals'
 import { useLiveEntrances } from '@/features/chat/hooks/use-live-entrances'
-import { useEffect, useLayoutEffect, type Dispatch } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, type Dispatch } from 'react'
 import type { VirtualListLayout } from '@workspace/ui/patterns/virtual-list'
 import type { ChatSession } from '@workspace/client-core/chat/types'
 import type { ChatTimelineItem } from '@/features/chat/utils/timeline-items'
@@ -39,6 +39,7 @@ import {
 import {
   applyTimelineScroll,
   holdTimelineMeasurements,
+  releaseTimelineEnd,
   type DisclosureSettle,
 } from '@/features/chat/state/timeline-scroll'
 import { ChatWelcomeView } from '@/features/chat/components/chat-welcome-view'
@@ -129,12 +130,30 @@ export function TimelineViewport({
     virtualizer,
   ])
 
+  const holdEndOnResize = useEffectEvent((element: HTMLDivElement) => {
+    if (scrollState.followMode !== 'following-end') return
+    element.scrollTop = element.scrollHeight
+  })
+
+  // A growing composer shortens the viewport; the virtualizer only hears of it on its next
+  // render, a frame late, so the end is held from the resize itself, before the frame paints.
+  useEffect(() => {
+    if (!scrollElement) return
+
+    const observer = new ResizeObserver(() => holdEndOnResize(scrollElement))
+    observer.observe(scrollElement)
+    return () => observer.disconnect()
+  }, [scrollElement])
+
   useEffect(() => {
     if (!scrollElement) return
 
     return attachTimelineNavigationListeners({
       element: scrollElement,
-      dispatch,
+      dispatch: (event) => {
+        if (event.type === 'user-navigated') releaseTimelineEnd(virtualizer)
+        dispatch(event)
+      },
       suspendForDisclosure: (disclosure) => onDisclosureSettle({ disclosure, measured: false }),
       scrollToStart: () => virtualizer.scrollToOffset(0),
     })

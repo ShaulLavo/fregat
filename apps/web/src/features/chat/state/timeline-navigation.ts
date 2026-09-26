@@ -35,12 +35,12 @@ export function attachTimelineNavigationListeners({
 
   const handleWheel = (event: WheelEvent) => {
     if (event.deltaY >= 0 || !contentScrollsUp()) return
-    if (toolOutputConsumesUpwardNavigation(event.target, element)) return
+    if (toolOutputConsumesNavigation(event.target, element, 'start')) return
 
     navigate()
   }
   const handleTouchMove = (event: TouchEvent) => {
-    if (!awayFromEnd() || toolOutputConsumesUpwardNavigation(event.target, element)) return
+    if (!awayFromEnd() || toolOutputConsumesNavigation(event.target, element, 'start')) return
 
     navigate()
   }
@@ -66,23 +66,20 @@ export function attachTimelineNavigationListeners({
     // The browser animates Home and End; row measurements landing on the way cancel the
     // animation partway, so the edges are instant jumps the virtualizer lands exactly.
     const edge = timelineEdgeKey(event)
+    if (edge && toolOutputConsumesNavigation(event.target, element, edge)) return
     if (edge === 'end') {
       event.preventDefault()
       dispatch({ type: 'jump-to-end' })
       return
     }
-    if (
-      edge === 'start' &&
-      contentScrollsUp() &&
-      !toolOutputConsumesUpwardNavigation(event.target, element)
-    ) {
+    if (edge === 'start' && contentScrollsUp()) {
       event.preventDefault()
       navigate()
       scrollToStart()
       return
     }
     if (!isTimelineNavigationKey(event)) return
-    if (!contentScrollsUp() || toolOutputConsumesUpwardNavigation(event.target, element)) return
+    if (!contentScrollsUp() || toolOutputConsumesNavigation(event.target, element, 'start')) return
 
     navigate()
   }
@@ -110,7 +107,7 @@ function timelineEdgeKey(event: KeyboardEvent): 'start' | 'end' | null {
   if (event.defaultPrevented || event.isComposing) return null
   if (event.altKey || event.shiftKey) return null
   if (!(event.target instanceof Element)) return null
-  if (event.target.closest(`${EDITABLE_SELECTOR}, [data-tool-group-scroll]`)) return null
+  if (event.target.closest(EDITABLE_SELECTOR)) return null
   if (event.key === 'Home') return 'start'
   if (event.key === 'End') return 'end'
   if (!event.metaKey) return null
@@ -129,7 +126,12 @@ function isTimelineNavigationKey(event: KeyboardEvent) {
   return event.key === 'ArrowUp' || event.key === 'Home' || event.key === 'PageUp'
 }
 
-function toolOutputConsumesUpwardNavigation(target: EventTarget | null, timeline: HTMLElement) {
+/** Whether scrolled tool output between the target and the timeline can still move toward `edge`. */
+function toolOutputConsumesNavigation(
+  target: EventTarget | null,
+  timeline: HTMLElement,
+  edge: 'start' | 'end',
+) {
   if (!(target instanceof Element)) return false
 
   const group = target.closest('[data-tool-group-scroll]')
@@ -137,7 +139,9 @@ function toolOutputConsumesUpwardNavigation(target: EventTarget | null, timeline
 
   for (let node: Element | null = target; node && node !== timeline; node = node.parentElement) {
     const overflow = getComputedStyle(node).overflowY
-    if (node.scrollTop > 0 && (overflow === 'auto' || overflow === 'scroll')) return true
+    if (overflow !== 'auto' && overflow !== 'scroll') continue
+    if (edge === 'start' && node.scrollTop > 0) return true
+    if (edge === 'end' && node.scrollTop + node.clientHeight < node.scrollHeight - 1) return true
   }
 
   return false
