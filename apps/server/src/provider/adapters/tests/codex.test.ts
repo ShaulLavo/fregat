@@ -371,7 +371,7 @@ function handle(message) {
         github: { url: 'https://api.github.test/mcp' },
         broken: { command: 'broken-server', env: { TOKEN: 'secret' } },
       } },
-      origins: { 'mcp_servers.linear.url': user, 'mcp_servers.github.url': user, 'mcp_servers.broken.command': project },
+      origins: { 'mcp_servers.linear.url': user, 'mcp_servers.github.url': user, 'mcp_servers.broken.command': project, ...(process.env.PLATFORM_FAKE_CODEX_MODE === 'platform-mcp-configured' ? { 'mcp_servers.platform.url': user } : {}) },
       layers: message.params.includeLayers ? [
         { ...user, disabledReason: null, config: { mcp_servers: {
           linear: { url: 'https://mcp.linear.app/mcp', http_headers: { Authorization: 'Bearer lin' } },
@@ -422,13 +422,6 @@ function handle(message) {
       { ...hook, handlerType: 'command', command: 'guard.sh', matcher: 'shell' },
       { ...hook, key: 'k2', handlerType: 'mcpTool', server: 'linear', tool: 'check' },
     ] }] } });
-    return;
-  }
-  if (message.method === 'config/read') {
-    const origins = process.env.PLATFORM_FAKE_CODEX_MODE === 'platform-mcp-configured'
-      ? { 'mcp_servers.platform.url': { name: { type: 'user' }, version: '1' } }
-      : {};
-    send({ id: message.id, result: { config: {}, origins } });
     return;
   }
   if (message.method === 'thread/goal/set') {
