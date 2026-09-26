@@ -6,9 +6,13 @@ import { createSession, dispatch, openChatWorkspace } from './chat-verification'
 export const dialogEscape: Scenario = {
   name: 'dialog-escape',
   description:
-    'Close dialogs with one Escape after initial focus, including settings and confirmation.',
+    'One Escape closes a dialog (general smoke: palette, delete confirmation, settings) and, ' +
+    "specifically, a dialog whose close button gets the opening focus — the close button's " +
+    'tooltip must not swallow that first Escape.',
   requiresIsolatedServer: true,
   async run(page, { step }) {
+    // General smoke: these dialogs close on one Escape, but none of them lands
+    // opening focus on a close button (the regression check is further down).
     await page.keyboard.press('Control+Shift+P')
     await selectors.paletteDialog(page).waitFor()
     await page.keyboard.press('Escape')
@@ -51,6 +55,9 @@ export const dialogEscape: Scenario = {
     await selectors.settingsDialog(page).waitFor({ state: 'hidden' })
     await step('settings-closed')
 
+    // Regression check: the physical gallery's preview dialog has no other
+    // focusable content, so Base UI's opening focus lands on the close button
+    // and its tooltip is the one that can eat the first Escape.
     home.pathname = '/dev/physical'
     await page.addInitScript(() => {
       localStorage.clear()
@@ -65,9 +72,9 @@ export const dialogEscape: Scenario = {
       await selectors.dialogClose(dialog).evaluate((node) => node === document.activeElement),
       true,
     )
-    await step('initial-close-focus')
+    await step('regression-initial-close-focus')
     await page.keyboard.press('Escape')
     await dialog.waitFor({ state: 'hidden' })
-    await step('first-escape-closed')
+    await step('regression-first-escape-closed')
   },
 }

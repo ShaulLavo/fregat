@@ -3,6 +3,12 @@ import { afterEach, expect, it } from 'vitest'
 import { page, userEvent } from 'vitest/browser'
 import { Button } from '@workspace/ui/components/button'
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@workspace/ui/components/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@workspace/ui/components/dropdown-menu'
 import { TooltipLayer } from '@workspace/ui/patterns/tooltip-layer'
 import { mount } from '../../../test/render'
 
@@ -49,6 +55,37 @@ it('keeps the close tooltip on hover and the close button clickable', async () =
   await close.hover()
   await expect.element(page.getByText('Close', { exact: true })).toBeVisible()
   await close.click()
+  await expect.element(page.getByRole('dialog', { name: 'Details' })).not.toBeInTheDocument()
+})
+
+it('gives Escape to a nested menu before the dialog', async () => {
+  cleanups.push(
+    mount(
+      <>
+        <TooltipLayer />
+        <Dialog defaultOpen>
+          <DialogTrigger>Open dialog</DialogTrigger>
+          <DialogContent>
+            <DialogTitle>Details</DialogTitle>
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button />}>Options</DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem>Sample action</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </DialogContent>
+        </Dialog>
+      </>,
+    ).unmount,
+  )
+  await page.getByRole('button', { name: 'Options' }).click()
+  await expect.element(page.getByRole('menuitem', { name: 'Sample action' })).toBeVisible()
+  await userEvent.keyboard('{Escape}')
+  await expect
+    .element(page.getByRole('menuitem', { name: 'Sample action' }))
+    .not.toBeInTheDocument()
+  await expect.element(page.getByRole('dialog', { name: 'Details' })).toBeVisible()
+  await userEvent.keyboard('{Escape}')
   await expect.element(page.getByRole('dialog', { name: 'Details' })).not.toBeInTheDocument()
 })
 

@@ -83,16 +83,7 @@ function DialogContent({
       >
         {children}
         {showCloseButton && (
-          <Tooltip
-            onOpenChange={(open, details) => {
-              if (!open || details.reason !== 'trigger-focus') return
-
-              // Initial focus enters from outside the dialog; its tooltip would consume Escape.
-              const previous = details.event.relatedTarget
-              const popup = details.trigger?.closest('[data-slot="dialog-content"]')
-              if (!(previous instanceof Node) || !popup?.contains(previous)) details.cancel()
-            }}
-          >
+          <Tooltip>
             <TooltipTrigger
               render={
                 <DialogPrimitive.Close
