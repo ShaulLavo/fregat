@@ -60,6 +60,11 @@ runs 2–4); log numbers are production client events, 2026-09-20 to 26. Method 
   - Palette `@` symbols and the breadcrumbs store different shapes under one query key (found by
     reading the code, not reproduced).
   - `editor.command.select_file` logs its target as `[circular]`.
+  - Fixed 2026-09-26 (wave 2 lane B), the four above: a file opened from the chat git pane
+    reuses the pane's whitespace-counted turn diff; `POST /fs/workspace-address` is a query per
+    folder (addresses are permanent per canonical path); the symbol key carries its shape (`flat`
+    or `tree`); the log sanitizer marks only a real cycle `[circular]` (a value two fields share
+    was the `select_file` case).
   - `SIDEBAR_SESSION_DETAIL_PREWARM_LIMIT` has no reader.
   - `presentationReady` in `diff-pane.tsx` gates a snapshot the diff never has.
 
