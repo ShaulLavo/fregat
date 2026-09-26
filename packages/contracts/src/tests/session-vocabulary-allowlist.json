@@ -443,7 +443,7 @@
     "thread/resume": 5,
     "thread/revert": 7,
     "thread/settings/updated": 1,
-    "thread/start": 5,
+    "thread/start": 6,
     "thread/started": 5,
     "thread/status/changed": 2,
     "thread/tokenUsage/updated": 2,

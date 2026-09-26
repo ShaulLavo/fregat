@@ -2,6 +2,9 @@ import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/cli
 import { Elysia } from 'elysia'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { Database } from 'bun:sqlite'
 import { sessionIdSchema } from '@workspace/contracts'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
@@ -32,7 +35,12 @@ function endpoint() {
 
 type Handler = { handle(request: Request): Promise<Response> }
 
-async function callWorkspaceInfo(app: Handler, token: string) {
+async function callTool(
+  app: Handler,
+  token: string,
+  name: string,
+  args: Record<string, unknown> = {},
+) {
   const client = new Client(
     { name: 'platform-test', version: '0' },
     { versionNegotiation: { mode: { pin: '2026-07-28' } } },
@@ -48,9 +56,13 @@ async function callWorkspaceInfo(app: Handler, token: string) {
       }),
     )
   await client.connect(new StreamableHTTPClientTransport(new URL(ENDPOINT), { fetch }))
-  const result = await client.callTool({ name: 'workspace_info', arguments: {} })
+  const result = await client.callTool({ name, arguments: args })
   await client.close()
-  return result.structuredContent
+  return result
+}
+
+async function callWorkspaceInfo(app: Handler, token: string) {
+  return (await callTool(app, token, 'workspace_info')).structuredContent
 }
 
 function post(app: Handler, headers: Record<string, string>, body: unknown = {}) {
@@ -62,6 +74,37 @@ function post(app: Handler, headers: Record<string, string>, body: unknown = {})
     }),
   )
 }
+
+describe('the checkout boundary', () => {
+  it('reads a file in its own checkout, and nothing in a sibling with the same paths', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'platform-mcp-boundary-'))
+    cleanups.push(() => rm(root, { force: true, recursive: true }))
+    for (const name of ['a', 'b']) {
+      await mkdir(path.join(root, name, 'src'), { recursive: true })
+      await writeFile(path.join(root, name, 'src/secret.ts'), `export const owner = '${name}'\n`)
+    }
+    await symlink(path.join(root, 'b/src'), path.join(root, 'a/linked'))
+    const { app, grants } = endpoint()
+    const token = grants.issue({ cwd: path.join(root, 'a'), runtimeEpoch: 'e1', sessionId: 'a' })
+    const read = async (file: string) => {
+      const result = await callTool(app, token, 'read_file', { path: file })
+      const [content] = result.content as { text: string }[]
+      return { error: Boolean(result.isError), text: content?.text ?? '' }
+    }
+
+    expect(await read('src/secret.ts')).toEqual({
+      error: false,
+      text: "export const owner = 'a'\n",
+    })
+    expect(await read(path.join(root, 'a/src/secret.ts'))).toMatchObject({ error: false })
+    for (const escape of [
+      path.join(root, 'b/src/secret.ts'),
+      '../b/src/secret.ts',
+      'linked/secret.ts',
+    ])
+      expect(await read(escape)).toMatchObject({ error: true })
+  })
+})
 
 describe("Platform's MCP endpoint", () => {
   it('answers a pinned 2026-07-28 client with the grant its token carries, per request', async () => {

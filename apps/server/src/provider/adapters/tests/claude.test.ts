@@ -374,6 +374,19 @@ describe('ClaudeProviderAdapter', () => {
     await harness.adapter.stopAll()
   })
 
+  it('runs Platform’s own read-only tools without an approval, even when approvals are required', async () => {
+    const harness = claudeHarness()
+    await harness.adapter.startRuntime(sessionStartInput({ runtimeMode: 'approval-required' }))
+    const canUseTool = latestOptions(harness).canUseTool
+    assert(canUseTool, 'canUseTool was not passed to the SDK')
+
+    expect(
+      await canUseTool('mcp__platform__read_file', { path: 'a.ts' }, canUseToolOptions()),
+    ).toEqual({ behavior: 'allow', updatedInput: { path: 'a.ts' } })
+    expect(harness.events.filter((event) => event.type === 'request.opened')).toEqual([])
+    await harness.adapter.stopAll()
+  })
+
   it('opens an approval request per canUseTool call and resolves it with the decision', async () => {
     const harness = claudeHarness()
     const sessionId = v.parse(sessionIdSchema, '8d0c6924-9495-5fd9-a04a-08b1e925b65d')

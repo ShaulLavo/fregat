@@ -65,6 +65,7 @@ import {
 import {
   CODEX_CLIENT_REQUEST_METHODS,
   CodexAccountRateLimitsUpdatedNotificationSchema,
+  CodexMcpServerStatusUpdatedNotificationSchema,
   CodexThreadGoalUpdatedNotificationSchema,
   CodexThreadTokenUsageUpdatedNotificationSchema,
   parseCodexServerNotification,
@@ -698,7 +699,12 @@ class CodexAppServerSession extends SessionContext {
     input.onClient(client)
     try {
       await initializeCodexClient(client)
-      const response = await openCodexSession(client, input)
+      // A same-named server in the user's config merges into ours and breaks the binding.
+      const platformMcp =
+        input.platformMcp && !(await configuresPlatformMcp(client, input.cwd))
+          ? input.platformMcp
+          : undefined
+      const response = await openCodexSession(client, { ...input, platformMcp })
       const providerConversationMarker = response.thread.id
       recordChatPipelineInfo('chat.pipeline.codex_session.started', {
         providerConversationMarker,
@@ -723,6 +729,7 @@ class CodexAppServerSession extends SessionContext {
       })
       session.emitSessionStarted(input.providerResumeCursor ?? null)
       session.emitConversationStarted()
+      if (input.platformMcp && !platformMcp) session.warnPlatformMcpShadowed()
       if (typeof input.providerResumeCursor === 'string')
         void session.readGoal().catch((error: unknown) =>
           recordChatPipelineWarning('chat.pipeline.codex_session.goal_read.failed', {
@@ -1733,7 +1740,30 @@ class CodexAppServerSession extends SessionContext {
     return true
   }
 
+  warnPlatformMcpShadowed() {
+    this.emitRuntimeNotification(
+      'runtime.warning',
+      {
+        message:
+          "This session runs without Platform's tools: your Codex config defines its own MCP server named platform.",
+      },
+      'config/read',
+      null,
+    )
+  }
+
   private handleMcpStatusUpdatedNotification(params: unknown) {
+    const parsed = v.safeParse(CodexMcpServerStatusUpdatedNotificationSchema, params)
+    if (parsed.success && parsed.output.name === 'platform' && parsed.output.status === 'failed')
+      this.emitRuntimeNotification(
+        'runtime.warning',
+        {
+          detail: params,
+          message: `Platform's tools did not start in this session: ${parsed.output.error ?? 'Codex gave no reason'}.`,
+        },
+        'mcpServer/startupStatus/updated',
+        params,
+      )
     this.emitRuntimeNotification(
       'mcp.status.updated',
       { status: params },
@@ -3794,4 +3824,18 @@ function codexMcpConfig(binding: PlatformMcpBinding | undefined) {
       suppress_unstable_features_warning: true,
     },
   }
+}
+
+/** Whether the user's or project's Codex config already names an MCP server `platform`. */
+async function configuresPlatformMcp(client: CodexAppServerRpcClient, cwd: string) {
+  const response = await client
+    .requestRaw('config/read', { cwd }, REQUEST_TIMEOUT_MS, (value) => value)
+    .catch((error: unknown) => {
+      // Unread config binds anyway: a clash then shows as the server's startup failure.
+      recordChatPipelineWarning('chat.pipeline.codex_session.config_read.failed', { error })
+      return null
+    })
+  return Object.keys(asRecord(asRecord(response).origins)).some(
+    (key) => key === 'mcp_servers.platform' || key.startsWith('mcp_servers.platform.'),
+  )
 }
