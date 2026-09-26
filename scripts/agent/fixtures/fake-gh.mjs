@@ -52,8 +52,11 @@ if (args[0] === 'pr' && args[1] === 'view') {
 }
 if (args[0] === 'pr' && args[1] === 'list') {
   const head = args[args.indexOf('--head') + 1]
-  const pullRequest = forge().branches?.[head]
-  out(pullRequest && pullRequest.state === 'OPEN' ? [pullRequest] : [])
+  const branches = forge().branches ?? {}
+  const pullRequest = branches[head] ?? branches['*']
+  // A malformed answer goes out as it is, so the caller has to treat it as a failed read.
+  const malformed = pullRequest && typeof pullRequest.number !== 'number'
+  out(pullRequest && (malformed || pullRequest.state === 'OPEN') ? [pullRequest] : [])
   process.exit(0)
 }
 process.stderr.write(`fake gh: unsupported ${args.join(' ')}\n`)

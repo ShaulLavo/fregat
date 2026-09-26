@@ -130,7 +130,8 @@ export const selectors = {
     page
       .getByRole('region', { name: 'Agent question', exact: true })
       .filter({ hasText: prompt })
-      .getByRole('status'),
+      .getByRole('status')
+      .filter({ hasText: prompt }),
   questionAttachment: (page: Page, name: string) =>
     page.getByRole('button', { name: `Remove ${name}`, exact: true }),
   asyncQuestionAction: (page: Page, prompt: string, action: string) =>
@@ -145,6 +146,8 @@ export const selectors = {
     page
       .getByRole('region', { name: 'App access', exact: true })
       .getByRole('button', { name: label, exact: true }),
+  genericApproval: (page: Page) =>
+    page.getByRole('region', { name: 'Approval requested', exact: true }),
   commandApproval: (page: Page) => page.getByRole('region', { name: 'Run a command', exact: true }),
   commandApprovalDecision: (page: Page, label: string | RegExp) =>
     page

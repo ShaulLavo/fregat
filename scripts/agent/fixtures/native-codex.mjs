@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { appendFileSync, readFileSync } from 'node:fs'
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createInterface } from 'node:readline'
@@ -102,6 +102,10 @@ function streamAnswer(turn, itemId, chunks, delayMs) {
 const LONG_ANSWER = Array.from(
   { length: 40 },
   (_, index) => `Paragraph ${index + 1} of a long answer that makes the transcript scroll.\n\n`,
+)
+const OVERFLOW_PARAGRAPHS = Array.from(
+  { length: 2500 },
+  (_, index) => `Overflow paragraph ${index + 1}.\n\n`,
 )
 const AMBIGUOUS_TAIL_CHUNKS = [
   'Intro line.\n\n',
@@ -242,6 +246,57 @@ function historyPages(message) {
   })
 }
 
+/**
+ * A signed-in account at its session limit with one reset credit. Each usage read spawns a fresh
+ * process, so whether the credit was spent lives in a file beside the log.
+ */
+function resetCreditAccount(message) {
+  const redeemedFile = join(root, 'reset-redeemed')
+  let redeemed = false
+  try {
+    redeemed = readFileSync(redeemedFile, 'utf8') === 'yes'
+  } catch {}
+  if (message.method === 'account/read') {
+    send({
+      id: message.id,
+      result: {
+        account: { type: 'chatgpt', email: 'verify@example.test', planType: 'pro' },
+        requiresOpenaiAuth: false,
+      },
+    })
+    return
+  }
+  if (message.method === 'account/rateLimitResetCredit/consume') {
+    record({ event: 'reset-consume', params: message.params })
+    writeFileSync(redeemedFile, 'yes')
+    send({ id: message.id, result: { outcome: 'reset' } })
+    return
+  }
+  const resetsAt = Math.floor(Date.now() / 1000) + 3600
+  send({
+    id: message.id,
+    result: {
+      accountId: 'verify-account',
+      rateLimits: {
+        planType: 'pro',
+        primary: { usedPercent: redeemed ? 0 : 100, resetsAt, windowDurationMins: 300 },
+        secondary: { usedPercent: 40, resetsAt: resetsAt + 86_400, windowDurationMins: 10_080 },
+      },
+      rateLimitResetCredits: {
+        availableCount: redeemed ? 0 : 1,
+        credits: [
+          {
+            id: 'credit-verify',
+            grantedAt: 0,
+            resetType: 'codexRateLimits',
+            status: redeemed ? 'redeemed' : 'available',
+          },
+        ],
+      },
+    },
+  })
+}
+
 function handle(message) {
   if (scenario === 'chat-history-pages' && message.method === 'turn/start')
     return historyPages(message)
@@ -293,6 +348,39 @@ function handle(message) {
       ].join('\n'),
     )
     endTurn(turn, 'completed')
+    return
+  }
+  if (scenario === 'stream-overflow' && message.method === 'turn/start') {
+    // One paragraph per delta, all at once: more live events than a subscription may hold.
+    const turn = startOwnTurn(message)
+    const itemId = `${turn}-answer`
+    for (const paragraph of OVERFLOW_PARAGRAPHS) agentDelta(turn, itemId, paragraph)
+    agentMessage(turn, itemId, OVERFLOW_PARAGRAPHS.join(''))
+    endTurn(turn, 'completed')
+    record({ event: 'overflow-sent', paragraphs: OVERFLOW_PARAGRAPHS.length })
+    return
+  }
+  if (scenario === 'reset-credit-redemption' && message.method?.startsWith('account/'))
+    return resetCreditAccount(message)
+  if (scenario === 'native-permission-grant' && message.method === 'turn/start') {
+    const turn = startOwnTurn(message)
+    send({
+      id: 992,
+      method: 'item/permissions/requestApproval',
+      params: {
+        threadId,
+        turnId: turn,
+        itemId: `${turn}-permission`,
+        reason: 'Reach the package registry',
+        permissions: { network: { enabled: true } },
+      },
+    })
+    return
+  }
+  if (scenario === 'native-permission-grant' && message.id === 992 && !message.method) {
+    record({ event: 'permission-response', id: message.id, result: message.result })
+    agentMessage(activeTurnId, `${activeTurnId}-answer`, 'PERMISSION_GRANT_VERIFIED')
+    endTurn(activeTurnId, 'completed')
     return
   }
   if (scenario === 'stream-ambiguous-tail' && message.method === 'turn/start') {
@@ -644,6 +732,7 @@ function handle(message) {
           mode: 'form',
           message: 'Allow ChatGPT to use Verification App?',
           serverName: 'verification-only',
+          _meta: { persist: ['session', 'always'] },
           requestedSchema: {
             properties: {
               approval: {

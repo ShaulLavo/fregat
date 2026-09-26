@@ -30,6 +30,10 @@ import { projectGrouping } from './project-grouping'
 import { sessionSearch, sessionSearchEnvironments } from './session-search'
 import { sessionUnread } from './session-unread'
 import { mcpApproval } from './mcp-approval'
+import { nativePermissionGrant } from './native-permission-grant'
+import { resetCreditRedemption } from './reset-credit-redemption'
+import { pullRequestLookupFailure } from './pull-request-lookup-failure'
+import { streamOverflow } from './stream-overflow'
 import { chatScreenshot } from './chat-screenshot'
 import { chatMultipleModels } from './chat-multiple-models'
 import { chatComposerEditing } from './chat-composer-editing'
@@ -317,6 +321,10 @@ export const scenarios: readonly Scenario[] = [
   sessionNotifications,
   composerDefaults,
   mcpApproval,
+  nativePermissionGrant,
+  resetCreditRedemption,
+  pullRequestLookupFailure,
+  streamOverflow,
   chatScreenshot,
   chatMultipleModels,
   chatComposerEditing,
