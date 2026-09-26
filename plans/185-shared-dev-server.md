@@ -31,24 +31,32 @@ localhost:3001 ─┴─▶ mesh daemon (T28) ─┴─▶ 127.0.0.1:13001  API 
   so it counts; a session that only edits files does not, and does not need the server.
 - `mesh ls` shows the server as a labelled session, `mesh <ID>` attaches to its output, and
   `mesh serve ls` shows `stopped`, `starting`, `running (N conns)` or `failed`.
+- The route is local-only (no `--at`) and named by its first listen port: `:5173` in `mesh serve ls`,
+  addressed as `mesh serve start|stop :5173` and `mesh unserve :5173`. The command runs through the
+  user's login shell (`$SHELL -lc`), so mise's bun is on PATH; `--cwd` defaults to where `mesh serve`
+  runs. It is ready once 15173 and 13001 both accept on `127.0.0.1`.
+- An idle keep-alive connection counts as open until the daemon's 2-minute idle timeout closes it,
+  so the effective idle window after the last tab closes is up to 17 minutes.
 
 ## Work
 
 1. **Ports.** `scripts/dev.ts` stops hunting for a free port when 5173 is taken, and binds the
-   internal ports it's given. The server's allowed origins and the client's API URL use the
+   internal ports it's given on `127.0.0.1` (mesh probes IPv4 loopback; `localhost` resolving to
+   `::1` alone would never read as ready). The server's allowed origins and the client's API URL use the
    _public_ ports; both are already computed from the chosen port (Plan 132 item 9), so they get
    the public one.
 2. **Registration.** `bun run dev:serve` runs the one idempotent
-   `mesh serve omarchy --run 'bun run dev:web' --cwd <checkout> --listen 5173=15173 --listen 3001=13001 --idle <window>`,
-   with the dev state home and `.env`; `dev:unserve` removes it. The idle window is a machine-scope
+   `mesh serve omarchy --run 'bun run dev:web' --cwd <checkout> --listen 5173=15173 --listen 3001=13001 --idle <window>`
+   (local-only; `--run` cannot be combined with `--public`),
+   with the dev state home and `.env`; `dev:unserve` runs `mesh unserve :5173`. The idle window is a machine-scope
    settings entry that `dev:serve` passes as `--idle`.
 3. **Restart-on-change.** The API's `restart-on-change.ts` keeps restarting its child inside the
    session. A connection during that gap fails as it does today; the route stays up.
 4. **Manual runs.** `bun run dev` while mesh holds 5173 fails with a structured error naming the
-   route and `mesh serve stop /platform-dev` as the fix, never a port hunt.
+   route and `mesh serve stop :5173` as the fix, never a port hunt.
 5. **Rule.** Rewrite the `AGENTS.md` line: "The dev server starts on first connection to 5173/3001
    and exits after the idle window; never start one by hand. `mesh serve ls` shows it, and
-   `mesh ls` lists its session for the output."
+   `mesh ls` lists its session for the output; `mesh serve stop :5173` stops it now."
 
 ## Owner decisions (2026-09-26, all as recommended)
 
