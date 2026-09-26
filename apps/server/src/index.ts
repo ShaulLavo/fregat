@@ -67,7 +67,11 @@ export const app = createApp({
     watch: Bun.env.FS_WATCH !== 'false',
   },
   systemRoot,
-  themes: { seedWallpapers: true },
+  themes: {
+    seedWallpapers: true,
+    // An agent:browser run's home is thrown away with the run; importing the machine's art there is waste.
+    importOmarchyWallpapers: Bun.env.PLATFORM_AGENT_HARNESS !== '1',
+  },
   treeConcurrency,
   watch,
   update: {
@@ -75,6 +79,7 @@ export const app = createApp({
     // After the POST answer flushes; closeApp runs before the listener stops.
     restart: (record) => setImmediate(() => stop({ reason: 'restart', record })),
   },
+  mcp: { endpoint: `http://${hostname === '::1' ? '[::1]' : hostname}:${port}/mcp` },
   web: { root: webRoot, serverReleaseFile },
   webOrigin: configuredOrigins?.[0] ?? loopbackOrigins(hostname, port)[0],
   workspaceRoot: configuredWorkspaceRoot,
