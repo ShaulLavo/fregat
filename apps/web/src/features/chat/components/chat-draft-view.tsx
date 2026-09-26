@@ -224,12 +224,15 @@ export function ChatDraftView({
       setSendError(backgroundError)
       return 'rejected'
     }
-    // A model left over from a fan-out retries its own start, on its own new worktree.
-    const fanOutRetry = models.length === 1 && unsettledFanOut(payload, target)
-    if ((models.length > 1 || fanOutRetry) && !background)
-      return sendToModels(payload, models, operation)
+    if (models.length > 1) return sendToModels(payload, models, operation)
 
-    const outcome = await startSession(payload, target, { background })
+    // Both send intents reuse a fan-out's unconfirmed start on its original new worktree.
+    const outcome = await startSession(
+      payload,
+      target,
+      { background },
+      unsettledFanOut(payload, target),
+    )
     if (!outcome.ok) {
       setSendError(outcome.message)
       return 'rejected'

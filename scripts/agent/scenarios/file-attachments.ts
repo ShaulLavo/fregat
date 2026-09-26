@@ -43,8 +43,21 @@ export const fileAttachments = isolatedNativeScenario({
     ok(edited > 0, 'The stored draft carries its upload expiry')
     await page.goto(sessionUrl)
     const expired = selectors.chatStagedFile(page, 'notes.txt')
-    await expired.waitFor({ timeout: 30_000 })
-    await page.getByText('Upload failed', { exact: true }).first().waitFor()
+    await expired.waitFor({ state: 'attached', timeout: 30_000 })
+    await page.getByText('Upload failed', { exact: true }).first().waitFor({ state: 'attached' })
+    const filename = await expired.evaluate((element) => ({
+      width: element.getBoundingClientRect().width,
+      textWidth: element.scrollWidth,
+    }))
+    ok(
+      filename.width > 0 && filename.width >= filename.textWidth,
+      'The failed chip shows the whole short filename',
+    )
+    strictEqual(
+      await page.getByRole('status').getByText('Preparing attachments…').count(),
+      0,
+      'A failed upload has no active preparation status',
+    )
     await step('expired-upload-says-so')
     await page.getByRole('button', { name: 'Retry notes.txt', exact: true }).click()
     await page.getByText('Upload failed', { exact: true }).waitFor({ state: 'detached' })
