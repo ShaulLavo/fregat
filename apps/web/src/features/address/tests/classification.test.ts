@@ -120,6 +120,7 @@ describe('the encoder cannot emit what it cannot reach', () => {
       'passthrough',
       'rail',
       'rejectedEnvironment',
+      'screen',
       'search',
       'settings',
       'side',

@@ -40,6 +40,7 @@ const messagesByCategory: Record<ErrorCategory, string> = {
 type FsErrorCode =
   | 'UNAUTHORIZED'
   | 'FORBIDDEN_ORIGIN'
+  | 'DEVICE_NOT_PAIRED'
   | 'PATH_OUTSIDE_WORKSPACE'
   | 'GIT_COMMAND_FAILED'
   | 'GIT_REPOSITORY_NOT_FOUND'
@@ -60,6 +61,7 @@ const categoryByFsErrorCode: Record<FsErrorCode, ErrorCategory> = {
   PATH_OUTSIDE_WORKSPACE: 'permission_denied',
   UNAUTHORIZED: 'permission_denied',
   FORBIDDEN_ORIGIN: 'permission_denied',
+  DEVICE_NOT_PAIRED: 'permission_denied',
   NOT_A_FILE: 'not_a_file',
   NOT_A_DIRECTORY: 'not_a_directory',
   PERMISSION_DENIED: 'permission_denied',

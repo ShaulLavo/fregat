@@ -7,7 +7,12 @@ import { isRecord } from '@workspace/utils/objects'
 import { expect } from 'vitest'
 import type { App } from '../src/app'
 
-export function createInProcessTerminalSocket(app: App, input: TerminalOpenInput, origin: string) {
+export function createInProcessTerminalSocket(
+  app: App,
+  input: TerminalOpenInput,
+  origin: string,
+  headers: Readonly<Record<string, string>> = {},
+) {
   const hooks: unknown = app.routes.find((route) => route.path === '/terminal')?.hooks
   if (
     !isRecord(hooks) ||
@@ -21,7 +26,7 @@ export function createInProcessTerminalSocket(app: App, input: TerminalOpenInput
   const socket = {
     raw: {},
     data: {
-      headers: { origin },
+      headers: { ...headers, origin },
       query: Object.fromEntries(Object.entries(input).map(([key, value]) => [key, String(value)])),
     },
     send(raw: string | Uint8Array) {

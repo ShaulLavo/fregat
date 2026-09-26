@@ -1,14 +1,14 @@
 import { MAX_TURN_MESSAGE_CHARS } from '@workspace/contracts'
-import {
-  appendTerminalContextsToPrompt,
-  type TerminalContextSelection,
-} from '@workspace/client-core/chat/terminal-context'
+import { messagePrompt } from '@workspace/client-core/chat/commands'
+import type { SentReviewComment } from '@workspace/client-core/chat/review-comments'
+import type { TerminalContextSelection } from '@workspace/client-core/chat/terminal-context'
 
 export function chatSubmissionValidation(
   text: string,
   contexts: readonly TerminalContextSelection[],
+  reviewComments: readonly SentReviewComment[] = [],
 ) {
-  const length = appendTerminalContextsToPrompt(text, contexts).length
+  const length = messagePrompt(text, contexts, reviewComments).length
   if (length <= MAX_TURN_MESSAGE_CHARS) return null
 
   const excess = (length - MAX_TURN_MESSAGE_CHARS).toLocaleString('en-US')

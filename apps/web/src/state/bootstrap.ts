@@ -6,13 +6,15 @@ import type { createNavigation } from '@/state/navigation'
 import { primaryServerOrigin } from '@/lib/client'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { readEnvironmentDescriptor } from '@/lib/environments/utils/descriptor'
-import { toConnectionError } from '@/lib/client-error-taxonomy'
+import { extractFsErrorCode, toConnectionError } from '@/lib/client-error-taxonomy'
 import { selectServerConnection } from '@workspace/client-core/environments/state/store'
 import { replacePrimaryIdentity } from '@/state/primary-identity'
 
 type BootstrapState = {
   readonly application: ApplicationRuntime | null
   readonly error: string | null
+  /** The machine answered, and lets this device in once it is paired. */
+  readonly unpaired: boolean
 }
 
 // Prepared before createRoot. React's effect replay must never destroy retained documents.
@@ -23,6 +25,7 @@ export function createBootstrap(
   const store = createStore<BootstrapState>(() => ({
     application: prepareCachedRuntime(navigation),
     error: null,
+    unpaired: false,
   }))
   let abort: AbortController | null = null
   let detach: (() => void) | undefined
@@ -59,6 +62,13 @@ export function createBootstrap(
         if (controller.signal.aborted) return
         const failure = toConnectionError(cause, 'Cannot connect to the local machine.')
         if (replacingIdentity) return
+        if (extractFsErrorCode(cause) === 'DEVICE_NOT_PAIRED') {
+          detach?.()
+          detach = undefined
+          store.getState().application?.dispose()
+          store.setState({ application: null, error: null, unpaired: true })
+          return
+        }
         const phase = useEnvironmentsStore.getState().entries[primaryServerOrigin()]?.phase
         if (phase === 'identity-drift' || phase === 'blocked') {
           detach?.()
@@ -102,7 +112,7 @@ export function createBootstrap(
       abort = null
       detach?.()
       detach = undefined
-      store.setState({ error: null })
+      store.setState({ error: null, unpaired: false })
       start()
     },
   }

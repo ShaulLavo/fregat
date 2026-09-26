@@ -71,6 +71,7 @@
         "themes/generate-palette-css.ts",
         "icons/generate.ts",
         "install-server.ts",
+        "pair.ts",
         "prod.ts",
         "tui.ts",
         "web-layering.mjs",

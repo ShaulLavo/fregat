@@ -27,7 +27,12 @@ import {
   type TerminalServerMessage,
 } from '@workspace/contracts'
 
-import { authenticateWebSocketData, type AuthConfig } from '../auth'
+import {
+  authenticateWebSocketData,
+  holdWebSocket,
+  releaseWebSocket,
+  type AuthConfig,
+} from '../auth'
 import { FsError, isFsError } from '../fs/errors'
 import type { WorkspacePaths } from '../fs/path'
 import { limitText, recordProcessInfo, recordProcessWarning } from '../observability'
@@ -501,6 +506,7 @@ export class TerminalService {
       socket.close()
       return
     }
+    holdWebSocket(socket.data, auth, () => socket.close(1008, 'device removed'))
     this.opening.add(socket.key)
     const root = await this.resolveWorktree(socket.input.worktreeId)
       .then((worktreePath) => this.resolveRoot(worktreePath))
@@ -686,6 +692,7 @@ export class TerminalService {
     if (!socket) return
 
     this.opening.delete(socket.key)
+    releaseWebSocket(socket.data)
     const session = socketSessions.get(socket.key)
     socketSessions.delete(socket.key)
     session?.detach(socket.key)

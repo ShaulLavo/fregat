@@ -2,6 +2,8 @@ import type { ProviderInstanceId } from '@workspace/contracts'
 
 export const chatMutationKeys = {
   mermaidRender: ['chat', 'mermaid-render'] as const,
+  openReviewSource: (environmentId: string) =>
+    ['chat', 'open-review-source', environmentId] as const,
   resetCredit: (accountKey: string) => ['chat', 'reset-credit', accountKey] as const,
   composer: (environmentId: string, sessionId: string | null) =>
     ['chat', 'composer', environmentId, sessionId] as const,

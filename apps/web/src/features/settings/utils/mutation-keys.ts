@@ -18,6 +18,10 @@ export const settingsMutationKeys = {
     signIn: (providerInstanceId: ProviderInstanceId, name: string) =>
       ['settings', 'mcp', 'sign-in', providerInstanceId, name] as const,
   },
+  pairing: {
+    link: ['pairing', 'link'] as const,
+    remove: (deviceId: string) => ['pairing', 'remove', deviceId] as const,
+  },
   push: {
     subscribe: ['push', 'subscribe'] as const,
     test: (deviceId: string) => ['push', 'test', deviceId] as const,

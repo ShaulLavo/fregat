@@ -11,7 +11,7 @@ import {
 } from '@/lib/checkpoint-diff-query'
 import { errorMessage } from '@/lib/error-message'
 
-import { blobDiffQueryOptions } from '@/features/git/utils/blob-diff-query'
+import { blobDiffQueryOptions } from '@/lib/blob-diff-query'
 import {
   checkpointBlobRequest,
   displayedCheckpointEntry,

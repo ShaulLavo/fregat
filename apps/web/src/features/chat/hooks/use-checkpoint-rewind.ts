@@ -6,6 +6,7 @@ import {
 } from '@workspace/contracts'
 import { createCheckpointRevertCommand } from '@workspace/client-core/chat/commands'
 import { extractTerminalContexts } from '@workspace/client-core/chat/terminal-context'
+import { extractReviewComments } from '@workspace/client-core/chat/review-comments'
 import {
   useChatInputDraftStore,
   type ChatInputDraftTarget,
@@ -18,6 +19,7 @@ import { dispatchChatCommand } from '@/features/chat/utils/command-dispatch'
 import { confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
 import { createChatPipelineScope } from '@/features/chat/utils/pipeline-logging'
 import { serverEndpoint } from '@/lib/client'
+import { addReviewComment } from '@/lib/review-draft/state/store'
 import { createClientInvariantError } from '@/lib/structured-errors'
 
 export type CheckpointRewindVariables = {
@@ -72,14 +74,20 @@ async function rewind(
     const event = await awaitRewind(transport, command, outcome.result.sequence)
     useChatProjectionStore.getState().applyOrchestrationEvents(target.environmentId, [event])
     const original = extractTerminalContexts(message.text)
+    const review = extractReviewComments(original.text)
     drafts.restoreContent(target, {
-      prompt: original.text,
+      prompt: review.text,
       attachments: images,
       terminalContexts: original.contexts.map((context) => ({
         ...context,
         id: crypto.randomUUID(),
       })),
     })
+    for (const comment of review.comments)
+      addReviewComment({
+        ...comment,
+        destination: { environmentId: target.environmentId, rootPath: target.rootPath },
+      })
     scope.set({ outcome: 'ok', restoredImageCount: images.length })
   } catch (error) {
     scope.warn('Checkpoint rewind failed.', { error })
