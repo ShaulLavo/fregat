@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, type ReactNode } from 'react'
 
+import { useLanguageCensus } from '@/features/editor/hooks/use-language-census'
 import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import { useLanguageServerMatchConfiguration } from '@/features/editor/providers/language-server-match-context'
 import { MountedEditorProvider } from '@/features/editor/providers/mounted-editor-provider'
@@ -26,6 +27,7 @@ export function EditorStateProvider({
   readonly children: ReactNode
   readonly runtime: EditorRuntime
 }) {
+  useLanguageCensus(runtime)
   useFileAvailability(runtime)
   useSpellcheckDictionary(runtime.spellcheck)
   const { appliedThemeContentHash, appliedThemeId, selectedThemeId } = useEditorColorTheme()
