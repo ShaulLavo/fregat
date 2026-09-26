@@ -29,9 +29,12 @@ import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 import { FocusProvider } from '@/lib/focus/providers/provider'
 import { FocusService } from '@/lib/focus/state/service'
 import { TestCommandProvider } from '../../../test/factories/command-runtime'
+import { paletteContentQueryOptions } from '@/features/command-palette/utils/content-query'
 import {
   AppProviders,
   createTestQueryClient,
+  holdDeferredDialog,
+  loadDeferredDialogs,
   seedBootMirrorTheme,
   renderHookWithProviders,
 } from '../../../test/render'
@@ -430,23 +433,8 @@ test('deepest event target wins and read-only focus cannot fall through', async 
 })
 
 test('palette and settings restore only after their modal targets depart', async () => {
-  const focus = new FocusService()
-  const queryClient = createTestQueryClient()
-  seedBootMirrorTheme('dark')
-  mount(
-    <AppProviders command={false} focusService={focus} queryClient={queryClient}>
-      <EditorStateProvider>
-        <EditorTabActionsProvider
-          requestCloseTab={rejectCloseTab}
-          requestCloseTabs={rejectCloseTabs}
-        >
-          <CommandProvider>
-            <OverlayOrigins />
-          </CommandProvider>
-        </EditorTabActionsProvider>
-      </EditorStateProvider>
-    </AppProviders>,
-  )
+  await loadDeferredDialogs()
+  const focus = mountOverlayOrigins()
 
   const paletteOrigin = await element('[data-open-palette]')
   paletteOrigin.focus()
@@ -492,6 +480,42 @@ test('palette and settings restore only after their modal targets depart', async
   await commands.proofKeyPress({ key: 'ControlOrMeta+s' })
   await expect.poll(() => document.querySelectorAll('[role="dialog"]').length).toBe(1)
   await expect.poll(() => document.querySelector('output')?.textContent).toBe('')
+})
+
+test('a palette opened before its module loads keeps focus and restores its origin', async () => {
+  await loadDeferredDialogs()
+  const release = holdDeferredDialog(paletteContentQueryOptions.queryKey, loadPaletteContent)
+  const focus = mountOverlayOrigins()
+  const origin = await element('[data-open-palette]')
+  const originId = { key: 'palette-origin', kind: 'editor', surface: 'document' }
+
+  origin.focus()
+  origin.click()
+  const shellInput = await element<HTMLInputElement>('input[placeholder="Search…"]')
+  await expect.poll(() => document.activeElement).toBe(shellInput)
+  await commands.proofKeyPress({ key: 'Escape' })
+
+  await expect.poll(() => document.querySelector('[role="dialog"]')).toBeNull()
+  await expect.poll(() => document.activeElement).toBe(origin)
+  expect(focus.getSnapshot().currentOwner?.id).toEqual(originId)
+
+  origin.click()
+  const heldInput = await element<HTMLInputElement>('input[placeholder="Search…"]')
+  await expect.poll(() => document.activeElement).toBe(heldInput)
+  await commands.proofKeyPress({ key: 'a' })
+  await expect.poll(() => heldInput.value).toMatch(/a$/)
+  const typed = heldInput.value
+  release()
+
+  const paletteInput = await element<HTMLInputElement>('input[placeholder="Search commands…"]')
+  await expect.poll(() => document.activeElement).toBe(paletteInput)
+  expect(paletteInput.value).toBe(typed)
+  expect(focus.getSnapshot().currentOwner?.area).toBe('command-palette')
+  await commands.proofKeyPress({ key: 'Escape' })
+
+  await expect.poll(() => document.querySelector('[role="dialog"]')).toBeNull()
+  await expect.poll(() => document.activeElement).toBe(origin)
+  expect(focus.getSnapshot().currentOwner?.id).toEqual(originId)
 })
 
 test('a virtual menu restores the context target rather than prior DOM focus', async () => {
@@ -582,6 +606,30 @@ function useEditorTarget(key: string, writable: boolean) {
       return true
     },
   })
+}
+
+function mountOverlayOrigins() {
+  const focus = new FocusService()
+  seedBootMirrorTheme('dark')
+  mount(
+    <AppProviders command={false} focusService={focus} queryClient={createTestQueryClient()}>
+      <EditorStateProvider>
+        <EditorTabActionsProvider
+          requestCloseTab={rejectCloseTab}
+          requestCloseTabs={rejectCloseTabs}
+        >
+          <CommandProvider>
+            <OverlayOrigins />
+          </CommandProvider>
+        </EditorTabActionsProvider>
+      </EditorStateProvider>
+    </AppProviders>,
+  )
+  return focus
+}
+
+function loadPaletteContent() {
+  return import('@/features/command-palette/components/content')
 }
 
 function OverlayOrigins() {
