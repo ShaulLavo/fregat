@@ -306,6 +306,26 @@ export class TerminalService {
     return { closed }
   }
 
+  /**
+   * Ends the worktree's shells that sit at their prompt, keeping their saved output; a shell
+   * running a program stays. The one case where a worktree shell does not outlive its sessions:
+   * the orchestration calls it once no live session uses the worktree.
+   */
+  async closeIdleWorktreeShells(worktreeId: WorktreeId) {
+    let closed = 0
+    for (const [key, session] of [...this.persistentSessions]) {
+      const decoded = decodeSessionKey(key)
+      if (decoded?.kind !== 'shell' || decoded.worktreeId !== worktreeId) continue
+      await this.runExclusive(key, async () => {
+        if (this.persistentSessions.get(key) !== session) return
+        if (!(await session.atPrompt())) return
+        await session.dispose({ kill: true })
+        closed++
+      })
+    }
+    return { closed }
+  }
+
   // With no boot listing, recovery left every host shell alone; the deleted session's are killed here.
   private async killUnrecoveredAgentShells(sessionId: SessionId) {
     if (!this.host || (await this.listHostSessions())) return 0
@@ -897,6 +917,13 @@ export class TerminalSession {
       void this.pollProcess()
     }, this.processPollMs)
     this.processTimer.unref?.()
+  }
+
+  /** True while the shell itself holds the foreground: no command is running in it. */
+  async atPrompt() {
+    const pty = this.pty
+    if (!pty || this.disposed || this.terminating || this.exitCode !== null) return false
+    return (await this.foregroundProcess(pty.pid)) === null
   }
 
   private async pollProcess() {

@@ -78,6 +78,7 @@ import { readBranchPullRequests, type ForgeBoundaries } from './git/pull-request
 import type { BranchPullRequestLookup } from './orchestration/pull-request-sync-reactor'
 import { TerminalService, type TerminalPtyFactory } from './terminal/service'
 import type { TerminalHostClient } from './terminal/host-client'
+import type { ForegroundProcessReader } from './terminal/foreground'
 import { wallpaperRoutes } from './wallpaper/routes'
 import { webRoutes, type WebOptions } from './web/routes'
 import { readReleaseInfoSync } from './web/release'
@@ -112,6 +113,8 @@ export type AppOptions = FileSystemServiceOptions & {
     env?: NodeJS.ProcessEnv
     ptyFactory?: TerminalPtyFactory
     hostClient?: TerminalHostClient
+    /** Test seam: what runs in a shell's foreground, which fake PTYs cannot answer. */
+    foregroundProcess?: ForegroundProcessReader
   }
   fonts?: FontCatalogService
   themes?: {
