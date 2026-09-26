@@ -315,6 +315,7 @@ import { editorEditContextInput } from './editor-edit-context-input'
 import { editorProduct } from './editor-product'
 import { treeFileClicks } from './tree-file-clicks'
 import { treeStickyScroll } from './tree-sticky-scroll'
+import { treeLargeScroll } from './tree-large-scroll'
 import { treeParity } from './tree-parity'
 import { fileIconHues } from './file-icon-hues'
 import { treeParityBehaviour } from './tree-parity-behaviour'
@@ -618,6 +619,7 @@ export const scenarios: readonly Scenario[] = [
   editorEditContextInput,
   editorProduct,
   treeStickyScroll,
+  treeLargeScroll,
   treeParity,
   fileIconHues,
   treeParityBehaviour,

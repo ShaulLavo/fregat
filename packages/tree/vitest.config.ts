@@ -41,7 +41,8 @@ async function touchSession(page: CommandPage) {
 const treeCommands = {
   async treeClock(context, action: 'pause' | 'advance', milliseconds = 0) {
     if (action === 'advance') return context.page.clock.runFor(milliseconds)
-    const now = Date.now()
+    // The page's clock, which runs ahead of this process's once an earlier test advanced it.
+    const now = await context.page.evaluate(() => Date.now())
     await context.page.clock.install({ time: now })
     await context.page.clock.pauseAt(now)
     pausedClocks.add(context.page)
