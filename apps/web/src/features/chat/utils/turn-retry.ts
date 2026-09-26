@@ -1,3 +1,4 @@
+import { extractReviewComments } from '@workspace/client-core/chat/review-comments'
 import type { ChatSession } from '@workspace/client-core/chat/types'
 
 import type { ChatInputSubmitPayload } from '@/features/chat/utils/composed-message'
@@ -23,11 +24,14 @@ export function tryAgainPayload(session: RetrySession): ChatInputSubmitPayload |
   )
   if (!message) return null
 
+  // The review goes back out as records, so the retried message composes it the same way.
+  const review = extractReviewComments(message.text)
   return {
     ...retrySettings(session),
     attachments: [...(message.attachments ?? [])],
+    reviewComments: review.comments,
     terminalContexts: [],
-    text: message.text,
+    text: review.text,
   }
 }
 

@@ -42,6 +42,7 @@ type ApprovalRulesProvider = {
 function approvalRulesScenario(provider: ApprovalRulesProvider): Scenario {
   return {
     name: provider.name,
+    realProviders: true,
     description: provider.description,
     async run(page, { step }) {
       const orchestration = await openChat(page)

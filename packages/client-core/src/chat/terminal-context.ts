@@ -1,5 +1,7 @@
 import * as v from 'valibot'
 
+import { escapeContextMarkup, unescapeContextMarkup } from './context-markup'
+
 /**
  * A slice of terminal output handed to the agent as context.
  *
@@ -39,20 +41,6 @@ const SELECTION_CLOSE = '</selection>'
 const TRAILING_BLOCK_PATTERN = /\n*<terminal_context>\n([\s\S]*?)\n<\/terminal_context>\s*$/
 const SELECTION_PATTERN =
   /<selection source="([^"]*)" lines="(\d+)(?:-(\d+))?">\n([\s\S]*?)\n<\/selection>/g
-const ESCAPED_PATTERN = /&(amp|lt|gt|quot);/g
-const ESCAPES: Readonly<Record<string, string>> = {
-  '"': '&quot;',
-  '&': '&amp;',
-  '<': '&lt;',
-  '>': '&gt;',
-}
-const UNESCAPES: Readonly<Record<string, string>> = {
-  amp: '&',
-  gt: '>',
-  lt: '<',
-  quot: '"',
-}
-
 export function normalizeTerminalContextText(text: string) {
   const normalized = text.replace(/\r\n/g, '\n').replace(/^\n+|\n+$/g, '')
   // A drag that caught only padding is not context, however many cells it spanned.
@@ -109,7 +97,7 @@ export function buildTerminalContextBlock(contexts: readonly TerminalContextSele
     const selection = normalizeTerminalContextSelection(context)
     if (!selection) continue
 
-    lines.push(openSelectionTag(selection), escapeMarkup(selection.text), SELECTION_CLOSE)
+    lines.push(openSelectionTag(selection), escapeContextMarkup(selection.text), SELECTION_CLOSE)
   }
   if (lines.length === 0) return ''
 
@@ -124,8 +112,8 @@ export function parseTerminalContextBlock(block: string): TerminalContextSelecti
     const selection = normalizeTerminalContextSelection({
       lineEnd: match[3] === undefined ? lineStart : Number(match[3]),
       lineStart,
-      source: unescapeMarkup(match[1] ?? ''),
-      text: unescapeMarkup(match[4] ?? ''),
+      source: unescapeContextMarkup(match[1] ?? ''),
+      text: unescapeContextMarkup(match[4] ?? ''),
     })
     if (!selection) continue
 
@@ -171,17 +159,5 @@ function openSelectionTag(selection: TerminalContextSelection) {
       ? `${selection.lineStart}`
       : `${selection.lineStart}-${selection.lineEnd}`
 
-  return `<selection source="${escapeMarkup(selection.source)}" lines="${lines}">`
-}
-
-function escapeMarkup(text: string) {
-  return text.replace(/["&<>]/g, (character) => ESCAPES[character] ?? character)
-}
-
-/**
- * One pass, so text that was literally `&lt;` before capture comes back as
- * `&lt;` rather than being unescaped a second time into `<`.
- */
-function unescapeMarkup(text: string) {
-  return text.replace(ESCAPED_PATTERN, (match, entity: string) => UNESCAPES[entity] ?? match)
+  return `<selection source="${escapeContextMarkup(selection.source)}" lines="${lines}">`
 }

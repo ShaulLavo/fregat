@@ -1,11 +1,12 @@
+import '@/features/workspace/components/tree-pane.css'
 import { captureTree, savedTree } from '@/features/workspace/state/tree-reload'
 import { addLifecycleFlush } from '@/lib/lifecycle-flush'
 import { disabledFileQueryKey } from '@/features/workspace/utils/query-keys'
 import type { FileTreeDropContext, FileTreeDropResult, FileTreeRenameEvent } from '@workspace/tree'
-import { FileTree } from '@workspace/tree'
-import { useFileTree } from '@workspace/tree'
+import { TreeHost } from '@/features/workspace/components/tree-host'
+import { useTreeModel } from '@/features/workspace/hooks/use-tree-model'
 import type { GitStatusEntry } from '@workspace/tree'
-import type { FileTreeModel } from '@workspace/tree'
+import type { TreeViewModel } from '@/features/workspace/state/tree-model'
 import { WarningCircleIcon } from '@phosphor-icons/react'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 
@@ -145,7 +146,7 @@ function ReadyTreePane({
     rootPath: restored ? rootPath : null,
     selectedFilePath: restored ? selectedFilePath : undefined,
   })
-  const treeRef = useRef<FileTreeModel | null>(null)
+  const treeRef = useRef<TreeViewModel | null>(null)
   const observedGit = useRef(savedTree(queryClient, rootPath, worktree)?.record.git)
   const [initialGitStatus] = useState(
     () =>
@@ -165,7 +166,7 @@ function ReadyTreePane({
   const createEntryRef = useRef(fsActions.actions.createEntry)
   const revealActiveFileRef = useRef<() => boolean>(() => false)
   const limited = useWatchCoverage(rootPath)?.mode === 'limited'
-  const loadExpandedDirectoriesForCurrentModel = useEffectEvent((currentTree: FileTreeModel) => {
+  const loadExpandedDirectoriesForCurrentModel = useEffectEvent((currentTree: TreeViewModel) => {
     expandedDirectoryPathsRef.current = loadExpandedDirectories(
       currentTree,
       model,
@@ -174,7 +175,7 @@ function ReadyTreePane({
       limited,
     )
   })
-  const publishVisibleTreeItemCount = useEffectEvent((currentTree: FileTreeModel) => {
+  const publishVisibleTreeItemCount = useEffectEvent((currentTree: TreeViewModel) => {
     publishVisibleItemCountAction(visibleTreeItemCount(currentTree, modelRef.current))
   })
   const resumeDeferredCreate = useEffectEvent(() => fsActions.resumeDeferredCreate())
@@ -182,7 +183,7 @@ function ReadyTreePane({
   const initialSelectedPaths = selectedFilePath
     ? [treePathForSelectedPath(rootPath, selectedFilePath)]
     : undefined
-  const { model: tree } = useFileTree({
+  const { model: tree } = useTreeModel({
     density: 'compact',
     itemHeight: rowHeight,
     flattenEmptyDirectories: true,
@@ -232,7 +233,6 @@ function ReadyTreePane({
     },
     renderRowDecoration: (context) =>
       treeRowDecoration(modelRef.current, context, (error) => void fixWithAgent(error)),
-    unsafeCSS: treeUnsafeCss,
   })
 
   useLayoutEffect(() => {
@@ -395,7 +395,7 @@ function ReadyTreePane({
 
   return (
     <div className='h-full' ref={treeFocusTargetRef}>
-      <FileTree
+      <TreeHost
         aria-label='Folder tree'
         className='block h-full'
         model={tree}
@@ -457,7 +457,7 @@ function selectionSyncPlan({
   rootPath: FilesystemPath
   selectedFilePath: string | null
   state: SelectionSyncState
-  tree: FileTreeModel
+  tree: TreeViewModel
 }): SelectionSyncPlan {
   const treePath = selectedTreePath(rootPath, selectedFilePath)
   const canComplete = selectedFilePathCanCompleteSync(tree, treePath, selectedFilePath)
@@ -479,7 +479,7 @@ function selectedTreePath(rootPath: FilesystemPath, selectedFilePath: string | n
 }
 
 function selectedFilePathCanCompleteSync(
-  tree: FileTreeModel,
+  tree: TreeViewModel,
   treePath: string | null,
   selectedFilePath: string | null,
 ) {
@@ -602,85 +602,3 @@ function fileTreeStyle(
     ...fileTreeIndentGuideVariables(editorTheme),
   } as CSSProperties
 }
-
-const treeUnsafeCss = `
-  :host {
-    color: var(--foreground);
-    background: transparent;
-    font-family: var(--workbench-tree-font-family);
-    font-size: var(--workbench-tree-font-size);
-  }
-
-  button[data-type='item'] {
-    border-radius: 0;
-  }
-
-  button[data-type='item'][data-item-selected='true']::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 4px;
-    bottom: 4px;
-    width: 2px;
-    background: var(--foreground);
-    pointer-events: none;
-  }
-
-  /* The tree's own focus ring only while the tree actually has focus. The
-   * package paints it for its remembered focus row even when the editor owns
-   * the keyboard, which read as a second, stray selection. */
-  :host(:not(:focus-within)) button[data-type='item'][data-item-focused='true']::before {
-    outline-color: transparent;
-  }
-
-  [data-file-tree-search-container] {
-    align-items: center;
-    height: var(--bar-height);
-    margin: 0;
-    padding-inline: var(--bar-padding-x);
-  }
-
-  [data-file-tree-search-input] {
-    height: var(--density-control-height-sm);
-    line-height: normal;
-    margin-block: 0;
-    padding-inline: var(--density-control-padding-x);
-    border-radius: var(--radius-md);
-    border-color: var(--input);
-    background-color: color-mix(in oklch, var(--input) 30%, transparent);
-    font-family: var(--font-ui);
-    font-size: var(--text-xs);
-  }
-
-  :host(:hover) [data-item-section='spacing-item'] {
-    border-left-color: var(--trees-indent-guide-current-bg);
-  }
-
-  [data-item-section='spacing-item'] {
-    border-left-color: var(--border);
-  }
-
-  button[data-item-loading='true'] [data-item-section='content'] {
-    background-image:
-      linear-gradient(90deg, transparent 0%, var(--foreground) 50%, transparent 100%),
-      linear-gradient(var(--muted-foreground), var(--muted-foreground));
-    background-repeat: no-repeat;
-    background-size: 45% 100%, auto;
-    background-clip: text;
-    color: transparent;
-    animation: file-tree-loading-shimmer 2s linear infinite;
-  }
-
-  @keyframes file-tree-loading-shimmer {
-    from { background-position: -100% 0, 0 0; }
-    to { background-position: 250% 0, 0 0; }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    button[data-item-loading='true'] [data-item-section='content'] {
-      animation: none;
-      background-image: none;
-      color: var(--muted-foreground);
-    }
-  }
-`

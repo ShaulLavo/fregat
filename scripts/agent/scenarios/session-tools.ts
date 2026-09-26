@@ -55,6 +55,7 @@ type SessionToolsProvider = {
 function sessionToolsScenario(provider: SessionToolsProvider): Scenario {
   return {
     name: provider.name,
+    realProviders: true,
     description: provider.description,
     async run(page, { step }) {
       const orchestration = await openChat(page)

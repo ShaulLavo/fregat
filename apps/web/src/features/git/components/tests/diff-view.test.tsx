@@ -9,7 +9,7 @@ import type { ReactElement } from 'react'
 
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../../test/factories/editor-state-provider'
 import { fetchDiff } from '@/features/git/utils/api'
-import { fetchBlobDiff } from '@/features/git/utils/blob-diff-query'
+import { fetchBlobDiff } from '@/lib/blob-diff-query'
 import { DiffView } from '@/features/git/components/diff-view'
 import { useDiffDocumentDiffs } from '@/features/git/hooks/use-diff-document-diffs'
 import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'

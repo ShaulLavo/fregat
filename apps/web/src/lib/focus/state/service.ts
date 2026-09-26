@@ -232,27 +232,7 @@ function sourceElement(source: FocusOriginSource): Element | null {
 }
 
 function registrationContainsElement(registration: InternalRegistration, element: Element) {
-  return composedElementContains(registration.element, element)
-}
-
-function composedElementContains(container: Element, element: Element) {
-  let current: Node | null = element
-  while (current) {
-    if (current === container) return true
-
-    current = composedParent(current)
-  }
-
-  return false
-}
-
-function composedParent(node: Node): Node | null {
-  if (node instanceof Element && node.assignedSlot) return node.assignedSlot
-  if (node.parentNode) return node.parentNode
-  if (node.nodeType !== Node.DOCUMENT_FRAGMENT_NODE) return null
-  if (!('host' in node)) return null
-
-  return node.host instanceof Element ? node.host : null
+  return registration.element.contains(element)
 }
 
 function deepestContaining(
@@ -269,7 +249,7 @@ function deepestContaining(
       if (candidate === other) return true
       if (candidate.element === other.element) return true
 
-      return !composedElementContains(candidate.element, other.element)
+      return !candidate.element.contains(other.element)
     }),
   )
   if (deepest.length !== 1) return { status: 'ambiguous' }

@@ -14,4 +14,6 @@ export const settingsQueryKeys = {
     ['providers', 'mcp-config', providerInstanceId, folder ?? '~'] as const,
   pushDevices: ['push', 'devices'] as const,
   pushThisDevice: ['push', 'this-device'] as const,
+  pairingStatus: ['pairing', 'status'] as const,
+  pairedDevices: ['pairing', 'devices'] as const,
 } as const

@@ -36,6 +36,7 @@ import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-
 import type { ApplicationRuntime } from '@/state/application-runtime'
 import { documentTokenForContent } from '@/features/address/utils/document-token'
 import type { Address } from '@workspace/client-core/address/grammar'
+import { addressedPhoneScreen } from '@/lib/shell/state/store'
 
 function snapshotFromStore(
   storeApi: EditorWorkspaceStoreApi,
@@ -62,6 +63,7 @@ function snapshotFromStore(
     editorTabContents: editorOpenContentsForWorkbenchPanels(panels),
     workspaceAddress: state.rootFolder?.workspaceAddress ?? null,
     passthrough,
+    phoneScreen: addressedPhoneScreen(),
     mode: state.uiMode === 'chat' ? ('chat' as const) : ('workbench' as const),
     rootPath,
     railView: useSessionRailStore.getState().view === 'archived' ? ('archived' as const) : null,

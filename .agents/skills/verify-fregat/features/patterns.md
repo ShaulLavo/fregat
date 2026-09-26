@@ -24,7 +24,7 @@ Expand a session's **Changed files** section. `scenario chat-changed-files` insp
 
 ## Workbench lists
 
-`scenario workbench-list-focus` walks the titlebar, files, git changes, logs, terminal tabs and session rail. It enters and exits each list with Tab, asserts no extra row stops, and checks arrow navigation and session group collapse/expand. The file tree retains its existing single roving row in its shadow root. Terminal processes opened by this scenario are isolated and removed at the end.
+`scenario workbench-list-focus` walks the titlebar, files, git changes, logs, terminal tabs and session rail. It enters and exits each list with Tab, asserts no extra row stops, and checks arrow navigation and session group collapse/expand. The file tree keeps its single roving row. Terminal processes opened by this scenario are isolated and removed at the end.
 
 `scenario file-picker` checks virtual row positions, typeahead-ready focus and End navigation in the folder picker. `scenario file-picker-navigation` checks Backspace/Left from empty folders and page navigation across grouped search headings. `scenario git-history-scroll` leaves and reopens scrolled history without selecting a commit. `scenario search-results` searches the workspace and checks result selection and file-group collapse. `scenario terminal-tabs` checks navigation, rename, keyboard reordering, and pointer activation returning focus to terminal input. `scenario session-rail` opens existing conversations without sending messages, then picks up a row with Space, moves it with an arrow and cancels with Escape. Cancellation must preserve the saved order and return focus to the list.
 

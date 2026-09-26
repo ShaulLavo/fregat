@@ -26,7 +26,6 @@ import type {
   FileTreeMutationSemanticEvent,
   FileTreeOptions,
   FileTreePreparedInput,
-  FileTreeProps,
   FileTreePublicId,
   FileTreeRemoveOptions,
   FileTreeRenameEvent,
@@ -44,12 +43,9 @@ import type {
   GitStatus,
   GitStatusEntry,
   RemappedIcon,
-  UseFileTreeResult,
 } from '@workspace/tree'
 
 type PublicTypeAllowlist = readonly [
-  FileTreeProps,
-  UseFileTreeResult,
   FileTreeOptions,
   FileTreePreparedInput,
   FileTreePublicId,
@@ -97,13 +93,29 @@ type PublicTypesAreNameable = PublicTypeAllowlist extends readonly unknown[] ? t
 
 const publicTypesAreNameable: PublicTypesAreNameable = true
 
-test('exports only the reviewed runtime and type API', () => {
+test('exports the model and the helpers the app view renders with', () => {
   expect(Object.keys(treePackage).toSorted()).toEqual([
-    'FileTree',
-    'FileTreeModel',
+    'CONTEXT_MENU_TRIGGER_TYPE',
+    'FILE_TREE_DEFAULT_ITEM_HEIGHT',
+    'FILE_TREE_DEFAULT_OVERSCAN',
+    'FILE_TREE_DEFAULT_VIEWPORT_HEIGHT',
+    'FileTreeController',
+    'GIT_STATUS_DESCENDANT_TITLE',
+    'GIT_STATUS_LABEL',
+    'GIT_STATUS_TITLE',
+    'applyFileTreeGitStatusPatch',
+    'arePathSetsEqual',
+    'computeFileTreeLayout',
+    'computeStickyRows',
+    'getBuiltInFileIconName',
+    'getBuiltInSpriteSheet',
+    'isColoredBuiltInIconSet',
+    'normalizeFileTreeIcons',
     'prepareFileTreeInput',
     'preparePresortedFileTreeInput',
-    'useFileTree',
+    'resolveBuiltInFileIconToken',
+    'resolveFileTreeDensity',
+    'resolveFileTreeGitStatusState',
   ])
   expect(publicTypesAreNameable).toBe(true)
 })

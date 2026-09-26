@@ -15,6 +15,7 @@ const DONE = 'CONTEXT_READY'
 
 export const claudeContextPopover: Scenario = {
   name: 'claude-context-popover',
+  realProviders: true,
   description:
     "Real Claude (Haiku), one turn: the context ring's popover shows what fills the window by category, the deferred tools apart, and this session's tokens and cost. Removes the fixture, session and project.",
   async run(page, { step }) {
