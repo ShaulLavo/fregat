@@ -31,7 +31,12 @@ import { authenticateWebSocketData, type AuthConfig } from '../auth'
 import { FsError, isFsError } from '../fs/errors'
 import type { WorkspacePaths } from '../fs/path'
 import { limitText, recordProcessInfo, recordProcessWarning } from '../observability'
-import { readForegroundProcessName, type ForegroundProcessReader } from './foreground'
+import {
+  readForegroundProcessName,
+  readShellHasCommand,
+  type ForegroundProcessReader,
+  type ShellCommandReader,
+} from './foreground'
 import { hostPtyFactory, TerminalHostClient } from './host-client'
 import { terminalHostErrors, type HostSessionInfo } from '../terminal-host/protocol'
 import { isTestProcess, platformHomePath } from '../home'
@@ -47,6 +52,8 @@ export type TerminalServiceOptions = {
   database: PlatformDatabase
   env?: NodeJS.ProcessEnv
   foregroundProcess?: ForegroundProcessReader
+  /** Whether a shell runs any command; decides which shells count as idle. */
+  shellCommand?: ShellCommandReader
   processPollMs?: number
   paths: WorkspacePaths
   resolveWorktree: (worktreeId: WorktreeId) => Promise<string>
@@ -84,6 +91,7 @@ export class TerminalService {
   private readonly database: PlatformDatabase
   private readonly env: NodeJS.ProcessEnv
   private readonly foregroundProcess: ForegroundProcessReader
+  private readonly shellCommand: ShellCommandReader
   private readonly processPollMs: number
   private readonly paths: WorkspacePaths
   private readonly resolveWorktree: TerminalServiceOptions['resolveWorktree']
@@ -103,6 +111,7 @@ export class TerminalService {
     database,
     env = process.env,
     foregroundProcess = readForegroundProcessName,
+    shellCommand = readShellHasCommand,
     processPollMs = TERMINAL_PROCESS_POLL_MS,
     paths,
     resolveWorktree,
@@ -115,6 +124,7 @@ export class TerminalService {
     this.database = database
     this.env = env
     this.foregroundProcess = foregroundProcess
+    this.shellCommand = shellCommand
     this.processPollMs = processPollMs
     this.paths = paths
     this.resolveWorktree = resolveWorktree
@@ -307,9 +317,9 @@ export class TerminalService {
   }
 
   /**
-   * Ends the worktree's shells that sit at their prompt, keeping their saved output; a shell
-   * running a program stays. The one case where a worktree shell does not outlive its sessions:
-   * the orchestration calls it once no live session uses the worktree.
+   * Ends the worktree's shells that run no command, keeping their saved output; a shell with a
+   * foreground, background or suspended job stays. The one case where a worktree shell does not
+   * outlive its sessions: the orchestration calls it once no live session uses the worktree.
    */
   async closeIdleWorktreeShells(worktreeId: WorktreeId) {
     let closed = 0
@@ -318,9 +328,7 @@ export class TerminalService {
       if (decoded?.kind !== 'shell' || decoded.worktreeId !== worktreeId) continue
       await this.runExclusive(key, async () => {
         if (this.persistentSessions.get(key) !== session) return
-        if (!(await session.atPrompt())) return
-        await session.dispose({ kill: true })
-        closed++
+        if (await session.closeIfIdle(this.shellCommand)) closed++
       })
     }
     return { closed }
@@ -919,11 +927,25 @@ export class TerminalSession {
     this.processTimer.unref?.()
   }
 
-  /** True while the shell itself holds the foreground: no command is running in it. */
-  async atPrompt() {
+  /**
+   * Kills the shell when it runs no command and nothing was typed or printed while that was
+   * checked: a command started during the check may miss the process table, but its input or
+   * echo lands. Its saved output stays.
+   */
+  async closeIfIdle(shellCommand: ShellCommandReader) {
     const pty = this.pty
     if (!pty || this.disposed || this.terminating || this.exitCode !== null) return false
-    return (await this.foregroundProcess(pty.pid)) === null
+    const mark = this.activityMark()
+    if (await shellCommand(pty.pid)) return false
+    if (this.pty !== pty || this.disposed || this.terminating) return false
+    if (this.activityMark() !== mark) return false
+    await this.dispose({ kill: true })
+    return true
+  }
+
+  // Both counters only grow, so the sum changes when either does.
+  private activityMark() {
+    return this.inputMessageCount + this.outputMessageCount
   }
 
   private async pollProcess() {

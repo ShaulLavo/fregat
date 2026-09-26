@@ -6,7 +6,8 @@ import { createInProcessTerminalSocket } from '../../../test/terminal-socket'
 
 type Fixture = Awaited<ReturnType<typeof createAgentTerminalFixture>>
 
-// Fake PTY pids start at 10000; the second shell opened runs a program in its foreground.
+// Fake PTY pids start at 10000; the second shell opened runs a command (foreground,
+// background or suspended alike: the reader answers for the whole process table).
 const BUSY_PID = 10_001
 
 async function openShells(fixture: Fixture) {
@@ -36,12 +37,12 @@ function history(fixture: Fixture, terminalId: string) {
     .all().length
 }
 
-function busyForeground(pid: number) {
-  return Promise.resolve(pid === BUSY_PID ? 'vim' : null)
+function busyShell(pid: number) {
+  return Promise.resolve(pid === BUSY_PID)
 }
 
 test('settling the last live session closes its worktree shells at a prompt and keeps their output', async () => {
-  const fixture = await createAgentTerminalFixture({ foregroundProcess: busyForeground })
+  const fixture = await createAgentTerminalFixture({ shellCommand: busyShell })
   try {
     const { idle, busy } = await openShells(fixture)
 
@@ -61,7 +62,7 @@ test('settling the last live session closes its worktree shells at a prompt and 
 })
 
 test('a worktree keeps its shells while another session on it is live', async () => {
-  const fixture = await createAgentTerminalFixture({ foregroundProcess: busyForeground })
+  const fixture = await createAgentTerminalFixture({ shellCommand: busyShell })
   try {
     const other = crypto.randomUUID()
     await fixture.engine.dispatchClientCommand({
@@ -89,6 +90,32 @@ test('a worktree keeps its shells while another session on it is live', async ()
     })
     await expect.poll(() => idle.killed).toBe(true)
     expect(busy.killed).toBe(false)
+  } finally {
+    await fixture.close()
+  }
+})
+
+test('a shell that prints or takes input while it is checked stays open', async () => {
+  let checking: (() => void) | null = null
+  const fixture = await createAgentTerminalFixture({
+    shellCommand: async (pid) => {
+      // A command typed during the check: its echo lands before the table is read back.
+      if (pid !== BUSY_PID) checking?.()
+      return pid === BUSY_PID
+    },
+  })
+  try {
+    const { idle } = await openShells(fixture)
+    checking = () => idle.emit(new TextEncoder().encode('make\r\n'))
+
+    await fixture.engine.dispatchClientCommand({
+      type: 'session.settle',
+      commandId: 'settle-during-typing',
+      sessionId: fixture.sessionId,
+    })
+    await fixture.engine.providerRuntimeIdle()
+
+    expect(idle.killed).toBe(false)
   } finally {
     await fixture.close()
   }

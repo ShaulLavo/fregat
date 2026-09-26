@@ -21,14 +21,14 @@ import type { ProviderDriver } from '../../src/provider/driver'
 import { testSettingsOptions } from '../../src/settings/testing'
 import { createFakePtyFactory } from './terminal'
 import type { TerminalHostClient } from '../../src/terminal/host-client'
-import type { ForegroundProcessReader } from '../../src/terminal/foreground'
+import type { ShellCommandReader } from '../../src/terminal/foreground'
 import { createInProcessTerminalSocket } from '../terminal-socket'
 
 export async function createAgentTerminalFixture(
   options: {
     pty?: Parameters<typeof createFakePtyFactory>[0]
     hostClient?: TerminalHostClient
-    foregroundProcess?: ForegroundProcessReader
+    shellCommand?: ShellCommandReader
     binaryPath?: string
     driverKind?: 'claude' | 'codex'
     provider?: Pick<
@@ -83,7 +83,7 @@ export async function createAgentTerminalFixture(
       workspaceEditJournalRoot: path.join(root, 'journals'),
       terminal: {
         ...(options.hostClient ? { hostClient: options.hostClient } : { ptyFactory: pty.factory }),
-        ...(options.foregroundProcess ? { foregroundProcess: options.foregroundProcess } : {}),
+        ...(options.shellCommand ? { shellCommand: options.shellCommand } : {}),
       },
       orchestration: {
         database: handle.db,
