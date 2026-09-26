@@ -1,17 +1,27 @@
+import { diffLines } from 'diff'
+
 import type { AgentDiagnostic } from '../../lsp/agent-diagnostics'
 
 /** The caps Claude Code's own LSP attachment uses. */
 const PER_FILE_LIMIT = 10
 const CHARACTER_LIMIT = 4_000
 
-/** Errors in `after` that `before` did not have, matched by code and message, as a multiset. */
+/** Subtract old occurrences at their edit-adjusted lines, preserving duplicate locations. */
 export function newErrors(
   before: readonly AgentDiagnostic[],
   after: readonly AgentDiagnostic[],
+  source: { beforeText: string; afterText: string; timeoutMs: number },
 ): AgentDiagnostic[] {
+  if (source.timeoutMs <= 0) return []
+  const lines = unchangedLines(source)
+  if (!lines) return []
   const remaining = new Map<string, number>()
-  for (const error of before)
-    remaining.set(errorKey(error), (remaining.get(errorKey(error)) ?? 0) + 1)
+  for (const error of before) {
+    const line = lines.get(error.line)
+    if (line === undefined) continue
+    const key = errorKey({ ...error, line })
+    remaining.set(key, (remaining.get(key) ?? 0) + 1)
+  }
   const introduced: AgentDiagnostic[] = []
   for (const error of after) {
     const left = remaining.get(errorKey(error)) ?? 0
@@ -44,5 +54,21 @@ export function diagnosticsFeedback(displayPath: string, errors: readonly AgentD
 }
 
 function errorKey(error: AgentDiagnostic) {
-  return `${error.code ?? ''}\u0000${error.message}`
+  return `${error.line}\u0000${error.code ?? ''}\u0000${error.message}`
+}
+
+function unchangedLines(source: { beforeText: string; afterText: string; timeoutMs: number }) {
+  const changes = diffLines(source.beforeText, source.afterText, { timeout: source.timeoutMs })
+  if (!changes) return null
+  const lines = new Map<number, number>()
+  let beforeLine = 1
+  let afterLine = 1
+  for (const change of changes) {
+    if (!change.added && !change.removed)
+      for (let offset = 0; offset < change.count; offset += 1)
+        lines.set(beforeLine + offset, afterLine + offset)
+    if (!change.added) beforeLine += change.count
+    if (!change.removed) afterLine += change.count
+  }
+  return lines
 }

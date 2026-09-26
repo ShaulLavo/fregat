@@ -109,7 +109,7 @@ describe('the errors an agent edit introduced, from a running language server', 
         settings: () => SETTINGS,
       })
       if (native)
-        expect(await reader.errors(filePath, root, 20_000)).toEqual({ mode: 'pull', errors: [] })
+        expect(await reader.errors(filePath, root, 20_000)).toEqual({ mode: 'pull', text: clean, errors: [] })
       if (!native)
         await notify(session, 'textDocument/didOpen', {
           textDocument: { languageId: 'typescript', text: clean, uri, version: 1 },
@@ -124,6 +124,7 @@ describe('the errors an agent edit introduced, from a running language server', 
         })
 
       expect(await reading).toEqual({
+        text: broken,
         mode: native ? 'pull' : 'push',
         errors: [
           { code: '2322', line: 1, message: "Type 'string' is not assignable to type 'number'." },

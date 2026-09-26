@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises'
+
 import { fileUriForPath } from '@workspace/contracts'
 import { isRecord } from '@workspace/utils/objects'
 
@@ -18,6 +20,7 @@ export type AgentDiagnostic = {
 }
 
 type AgentFileErrors = {
+  readonly text: string
   readonly mode: LspFileDiagnostics['mode']
   readonly errors: readonly AgentDiagnostic[]
 }
@@ -59,12 +62,14 @@ export class AgentDiagnosticsReader implements AgentDiagnosticsSource {
   }
 
   async errors(filePath: string, workspaceRoot: string, timeoutMs: number) {
+    const text = await readFile(filePath, 'utf8').catch(() => null)
+    if (text === null) return null
     const matches = await matchLspServers({ filePath, settings: this.settings(), workspaceRoot })
     const match = bestLspMatchForFeature(matches, 'diagnostics') ?? matches[0]
     if (!match) return null
     const result = await this.pool().fileDiagnostics(match, fileUriForPath(filePath), timeoutMs)
     if (!result) return null
-    return { mode: result.mode, errors: result.diagnostics.flatMap(agentError) }
+    return { text, mode: result.mode, errors: result.diagnostics.flatMap(agentError) }
   }
 }
 

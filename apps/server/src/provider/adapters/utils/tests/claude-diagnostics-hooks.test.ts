@@ -6,6 +6,7 @@ import { diagnosticsFeedback, newErrors } from '../../../utils/agent-diagnostics
 import { claudeDiagnosticsHooks } from '../claude-diagnostics-hooks'
 
 const CWD = '/repo'
+const TEXT = Array.from({ length: 12 }, (_, line) => `line ${line}`).join('\n')
 const existing: AgentDiagnostic = { line: 3, message: 'Old problem.', code: '2304' }
 const introduced: AgentDiagnostic = { line: 7, message: 'New problem.', code: '2322' }
 
@@ -17,7 +18,7 @@ function source(reads: readonly (readonly AgentDiagnostic[] | null)[], enabled =
     errors: async (filePath) => {
       calls.push(filePath)
       const errors = queue.shift()
-      return errors === null ? null : { mode: 'pull', errors: errors ?? [] }
+      return errors === null ? null : { mode: 'pull', text: TEXT, errors: errors ?? [] }
     },
   }
   return { calls, reader }
@@ -93,8 +94,25 @@ describe('diagnostics after an agent edit', () => {
     expect(off.calls).toEqual([])
   })
 
+  it('reports the inserted duplicate location and suppresses the moved old occurrence', () => {
+    const beforeText = Array.from({ length: 10 }, (_, i) => i === 9 ? 'missing()' : `// ${i}`).join('\n')
+    const afterLines = beforeText.split('\n')
+    afterLines.splice(1, 0, 'missing()')
+    const old = { ...existing, line: 10 }
+    const inserted = { ...existing, line: 2 }
+    const moved = { ...existing, line: 11 }
+    expect(newErrors(
+      [old], [inserted, moved],
+      { beforeText, afterText: afterLines.join('\n'), timeoutMs: 750 },
+    )).toEqual([inserted])
+    expect(newErrors(
+      [old], [moved],
+      { beforeText, afterText: `// added\n${beforeText}`, timeoutMs: 750 },
+    )).toEqual([])
+  })
+
   it('matches errors as a multiset and caps what one file reports', () => {
-    expect(newErrors([existing], [existing, existing])).toEqual([existing])
+    expect(newErrors([existing], [existing, existing], { beforeText: TEXT, afterText: TEXT, timeoutMs: 750 })).toEqual([existing])
     const many = Array.from({ length: 12 }, (_, line) => ({ ...introduced, line: line + 1 }))
     const text = diagnosticsFeedback('a.ts', many) ?? ''
     expect(text).toContain('introduced 12 errors')
