@@ -410,6 +410,11 @@
       "markdownDescription": "Highlight invisible Unicode characters. Hover a highlight for its code point.\n\nAn invisible character draws nothing. A bidirectional override can reorder a line so the code the compiler reads differs from the line on screen.",
       "type": "boolean"
     },
+    "environments.devicePairing": {
+      "default": true,
+      "description": "A browser on another device, such as a phone reaching this machine over the mesh, shows a pairing screen until a link from this machine pairs it. This machine’s own browser needs no pairing.",
+      "type": "boolean"
+    },
     "environments.machines": {
       "additionalProperties": {
         "oneOf": [

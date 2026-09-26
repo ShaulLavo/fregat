@@ -1067,6 +1067,22 @@ export {
   type PushSubscriptionInput,
 } from './push'
 export {
+  PAIRING_CODE_ALPHABET,
+  PAIRING_CODE_LENGTH,
+  pairedDeviceSchema,
+  pairedDevicesSchema,
+  pairingClaimSchema,
+  pairingCodeSchema,
+  pairingLinkSchema,
+  pairingStatusSchema,
+  pairingTrustSchema,
+  type PairedDevice,
+  type PairingClaim,
+  type PairingLink,
+  type PairingStatus,
+  type PairingTrust,
+} from './pairing'
+export {
   createSessionNotificationTracker,
   hasNativeNotifications,
   hasNotificationSound,

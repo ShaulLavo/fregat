@@ -106,6 +106,9 @@ import type { TailnetStatusCommand } from './machines/tailnet-hosts'
 import { createMachineProxyRoutes } from './machines/proxy'
 import type { PushFetcher } from './push/delivery'
 import { pushRoutes } from './push/routes'
+import { DeviceStore } from './devices/device-store'
+import { pairingRoutes } from './devices/routes'
+import { DevicePairing } from './devices/service'
 import { PushService } from './push/service'
 import { sessionLink } from './push/session-link'
 import { SessionNoticePush } from './push/session-notices'
@@ -166,6 +169,12 @@ export type AppOptions = FileSystemServiceOptions & {
   /** Staged releases and Restart. Absent leaves both inert, as in dev and tests. */
   update?: UpdateOptions
   push?: { fetcher?: PushFetcher }
+  /** Paired devices: where they are kept, the cookie naming one, and this machine's addresses. */
+  devices?: {
+    readonly filePath?: string
+    readonly cookieName?: string
+    readonly ownAddresses?: () => ReadonlySet<string>
+  }
 }
 
 const appOrchestration = new WeakMap<object, OrchestrationEngine>()
@@ -418,7 +427,13 @@ export function createApp(options: AppOptions) {
     readModel: () => orchestration.readModelSnapshot(),
   })
   const sessionSearch = new OrchestrationSessionSearchQuery(database)
-  const auth = createAuthConfig(options.auth)
+  const devices = new DevicePairing({
+    store: new DeviceStore(options.devices?.filePath ?? platformHomePath('devices.json')),
+    required: () => settings.snapshot().values['environments.devicePairing'],
+    cookieName: options.devices?.cookieName ?? 'platform_device',
+    ownAddresses: options.devices?.ownAddresses,
+  })
+  const auth = createAuthConfig(options.auth, devices)
   const push = new PushService({ database, settings, fetcher: options.push?.fetcher })
   const presence = new ClientPresence()
   const sessionPush = new SessionNoticePush({
@@ -527,6 +542,8 @@ export function createApp(options: AppOptions) {
     .onBeforeHandle(({ request }) => {
       recordClientInstance(request)
     })
+    // Before the pairing guard: an unpaired device must reach these to pair.
+    .use(pairingRoutes(devices, auth))
     // Auth runs after the WS upgrade so the browser receives the explicit 1008 refusal.
     .use(
       orchestrationWsRoutes(orchestration, auth, identity, orchestrationSockets, update, presence),

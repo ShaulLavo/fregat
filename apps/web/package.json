@@ -91,6 +91,7 @@
     "server": "workspace:*",
     "shiki": "4.4.3",
     "sonner": "^2.0.8",
+    "uqr": "0.1.3",
     "valibot": "^1.5.0",
     "zustand": "^5.0.15"
   },

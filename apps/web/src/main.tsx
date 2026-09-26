@@ -43,6 +43,12 @@ import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/pe
 import { reportReactError } from '@/lib/react-error-reporting.ts'
 import { applicationHost } from '@/lib/application-host'
 import { configureIntentPrediction } from '@/lib/intent-prefetch-options'
+import { runMutation } from '@/lib/mutations/run'
+import { clientErrorDescription, toClientError } from '@/lib/client-error-taxonomy'
+import { takePairingCodeFromLocation } from '@/lib/pairing/state/link-claim'
+import { usePairingLinkStore } from '@/lib/pairing/state/link-outcome'
+import { claimPairingMutationOptions } from '@/lib/pairing/utils/api'
+import { deviceLabel } from '@/lib/pairing/utils/device-label'
 
 installEditorPerformanceTraceFromUrl()
 configureIntentPrediction()
@@ -79,6 +85,10 @@ for (const font of fontsInUse(boot))
     .then(() => undefined)
     .catch(() => undefined)
 
+// First: the code must leave the address bar before anything records the location.
+const pairingCode = takePairingCodeFromLocation(
+  new URL(import.meta.env.BASE_URL, location.href).href,
+)
 // Preserve explicit fields before Router normalizes defaults; boot merges them with the cache.
 const initialHref = applicationHost()?.initialAddress ?? selectInitialAddress(window.location.href)
 const initialIntent = parseAddressIntent(initialHref)
@@ -95,6 +105,14 @@ const restoredWorkspace = bootstrap
   .getState()
   .application?.getSnapshot()
   .editor.workspaceStore.getState()
+// Paired before the bootstrap asks the machine anything, so its first request already carries the cookie.
+if (pairingCode)
+  await runMutation(primaryQueryClient(), claimPairingMutationOptions(), {
+    code: pairingCode,
+    label: deviceLabel(navigator.userAgent),
+  }).catch((cause: unknown) =>
+    usePairingLinkStore.setState({ failure: clientErrorDescription(toClientError(cause)) }),
+  )
 const warmViews: Promise<unknown>[] = []
 if (restoredWorkspace?.selectedTabContent?.kind === 'settings')
   warmViews.push(

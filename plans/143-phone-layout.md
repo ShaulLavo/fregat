@@ -369,6 +369,34 @@ the whole guard.
 Decided (Owner answer 3): pairing is required and is part of the phone work, after the M4
 session model.
 
+#### Phase 4, implemented 2026-09-26 (wave 2, lane P)
+
+- **Who is asked.** A request that reached the server directly, or through the mesh proxy from one
+  of this machine's own addresses (loopback, its tailnet address), is this machine: it passes as
+  before. Any other forwarded request (`X-Forwarded-For` naming another device) needs a paired
+  device's cookie; without one it gets `401 DEVICE_NOT_PAIRED`, over HTTP and on every socket.
+  The origin allowlist still runs first. One trust level: a paired device has full access, and
+  both pairing surfaces say so.
+- **Pairing.** Settings › Machines › Paired devices, in this machine's own browser: Pair a device
+  makes a one-time code (12 characters, no 0/1/I/O, 5 minutes, consumed atomically, 10 wrong
+  codes a minute stop all claims) and shows it as a QR code and a link, `…/pair#token=CODE`. The
+  device opens the link; the boot strips it from the address before anything reads the location,
+  then trades the code for an `HttpOnly; SameSite=Strict; Secure` cookie. A device that cannot
+  open the link types the code on the pairing screen it gets instead of the app. `bun run pair`
+  prints a link from this machine's shell, for when no browser here is at hand.
+- **Devices.** Kept in `devices.json` in the state home (mode 0600, secrets stored as SHA-256
+  hashes), not in the database: a table would bump the schema version and reset every session.
+  The list shows label, paired and last-seen times; any trusted browser removes a device except
+  itself; a device unseen for 30 days drops off. Codes live in memory only.
+- **Switch.** `environments.devicePairing` (machine scope, on by default) turns the requirement
+  off without a deploy.
+- **Not done:** socket tickets and bearer tokens for a native app (the cookie serves the browser);
+  renaming a device; a log-hygiene unit test (the wide events carry the outcome only, checked in
+  the scenario's server log).
+- Evidence: scenario `device-pairing` (Settings link and QR, the phone's pairing screen at 390px
+  through a forwarded address, a claim, the phone in the list, a second claim refused).
+- Owner check pending: pairing a real phone through the mesh, and the MacBook once after deploy.
+
 ### Q6: native app technology
 
 |      | SwiftUI (beside `apps/mac`)                                                                                                                                                                                                                                                                                                                | Expo / React Native                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
