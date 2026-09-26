@@ -5,9 +5,7 @@ import {
   ArrowUpIcon,
   type Icon,
 } from '@phosphor-icons/react'
-import { Button } from '@workspace/ui/components/button'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { useEffect, useState, type RefObject } from 'react'
 
 import { KeyButton } from '@/features/phone/components/key-button'
@@ -41,7 +39,8 @@ export function TerminalKeys({
     if (!host || !control) return
     const onBeforeInput = (event: InputEvent) => {
       const chord = event.data ? controlKeyFor(event.data) : null
-      if (!chord) return
+      // A composing keyboard (Android's) sends an input that cannot be cancelled; it stays text.
+      if (!chord || !event.cancelable) return
       event.preventDefault()
       setControl(false)
       press(host, chord, true)
@@ -61,36 +60,10 @@ export function TerminalKeys({
     <PaneBar aria-label='Terminal keys' role='toolbar'>
       <KeyButton label='Esc' onPress={() => send(TERMINAL_KEYS.escape)} />
       <KeyButton label='Tab' onPress={() => send(TERMINAL_KEYS.tab)} />
-      <Button
-        aria-pressed={control}
-        className='aria-pressed:bg-accent font-mono'
-        size='sm'
-        type='button'
-        variant='ghost'
-        onClick={() => setControl((held) => !held)}
-        onPointerDown={(event) => event.preventDefault()}
-      >
-        Ctrl
-      </Button>
+      <KeyButton label='Ctrl' pressed={control} onPress={() => setControl((held) => !held)} />
       <span className='ml-auto flex shrink-0 items-center gap-(--density-gap-tight)'>
         {ARROWS.map(([key, Glyph]) => (
-          <Tooltip key={key.id}>
-            <TooltipTrigger
-              render={
-                <Button
-                  aria-label={key.label}
-                  size='icon-sm'
-                  type='button'
-                  variant='ghost'
-                  onClick={() => send(key)}
-                  onPointerDown={(event) => event.preventDefault()}
-                >
-                  <Glyph className='size-(--icon-size)' />
-                </Button>
-              }
-            />
-            <TooltipContent>{key.label}</TooltipContent>
-          </Tooltip>
+          <KeyButton icon={Glyph} key={key.id} label={key.label} onPress={() => send(key)} />
         ))}
       </span>
     </PaneBar>

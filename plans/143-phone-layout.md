@@ -466,34 +466,39 @@ See "Proposed phases" under Research findings. The owner answered its questions 
 
 ### Phase 3: touch paths (implemented 2026-09-26)
 
-- **Long press opens every context menu.** `keymap/menus/state/long-press.ts`, installed once on a
-  touch device, dispatches `contextmenu` at the press point after 550ms, so every surface's
-  `onContextMenu` works on iOS, which fires none. It stands down for good once the platform shows
-  it fires its own (Android Chrome), and Base UI triggers keep their own 500ms long press. The
-  finger's lifting click is swallowed; the phone frame turns the iOS callout off.
-- **Hover-revealed controls show at rest** on `(hover: none)` through a new `touch:` variant: git
-  row actions, search match actions, prompt-stash delete, wallpaper actions, editor tab close.
-- **The phone's session list scrolls.** Rows were `touch-action: none` for the pointer drag; in the
-  phone shell they scroll, a press never starts a reorder (keyboard reordering stays), and the
-  list's keyboard cursor stays hidden until a key moves it.
-- **Palette:** a button on the session list's bar, and Command palette in the session menu, for the
-  chat commands that have chords and no control.
-- **Terminal key row:** Esc, Tab, Ctrl (held for the next letter typed) and the arrows, sent as the
-  keydowns a hardware keyboard produces, so the terminal encodes them for the program's modes.
-  Decided 2026-09-26: interactive with a key row (wave 2), as Owner answer 2 left open.
-- **Tooltips:** surveyed, and no tap-to-open added. Every `Tooltip` trigger is a control whose
-  `aria-label` names it; the one explanation that only hover showed (the usage meter) already
-  opens a popover on press.
+- **Long press opens every context menu** (`keymap/menus/state/long-press.ts`, installed by the
+  phone shell). iOS fires no `contextmenu`, so after 550ms it dispatches one at the press point.
+  The finger's lift is cancelled (a non-passive `touchend`), so however long the hold, nothing under
+  the finger is pressed. A press on selectable text, or one that grows a selection, is the
+  platform's text selection. A native `contextmenu` during the press or just after the lift (Android,
+  a Windows touchscreen) turns the dispatcher off, and a native one that follows ours is swallowed.
+  `-webkit-touch-callout: none` sits on the phone root in `globals.css`, so portaled menus, dialogs
+  and the palette carry it too.
+- **Hover-revealed controls show at rest** on `(hover: none)`, through one `touch:` variant: git
+  row actions, search match and result-line actions, prompt-stash delete, wallpaper actions,
+  message metadata and copy actions (formerly `[@media(hover:hover)]:opacity-0`).
+- **The phone's session list scrolls.** In the standalone list (`data-standalone` on the rail) rows
+  take touch scrolling, a press never starts a reorder (keyboard reordering stays), and the
+  keyboard cursor stays hidden until the first arrow key shows it where it is.
+- **Palette:** a button on the session list's bar, and Command palette in the session menu.
+- **Terminal key row:** Esc, Tab, Ctrl (held for the next letter) and the arrows, one `KeyButton`
+  that never takes focus from the terminal. Decided 2026-09-26: owner — interactive.
+- **Tooltips:** icon-only controls keep their `aria-label`; a chat link's destination, shown only
+  in its hover tooltip, now heads its context menu.
+- Scenario `phone-shell` asserts each: the list scrolls under a CDP touch drag without reordering,
+  a 1.6s hold leaves the menu open and the session untouched, the Stage action draws at opacity 1
+  with no hover, the session menu opens the palette, and the key row's Up and Esc reach the
+  terminal's shell connection (`\x1b[A\x1b` sent) while the terminal keeps focus.
 
 Owner check pending: the phone shell on a real iPhone (WebKit: focus zoom, keyboard inset, safe
-areas, Back swipe, long press on a row and in a reply) and an Android phone (`interactive-widget`,
-the native long-press menu), through the mesh.
+areas, Back swipe, long press on a row, text selection in a reply) and an Android phone
+(`interactive-widget`, the native long-press menu, and Ctrl then a letter in the terminal: a
+composing keyboard such as Gboard may type the letter), through the mesh.
 
 ### Owner questions (wave 2)
 
 - The phone still downloads the workbench (see First load above). Keep, or schedule a chunking
   change that splits it without growing the desktop's first load?
-- The terminal shipped interactive with a key row. Say if it should be read-only on the phone.
 
 ## Follow-up items
 

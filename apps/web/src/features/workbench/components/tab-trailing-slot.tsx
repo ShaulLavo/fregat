@@ -55,7 +55,7 @@ export function TabTrailingSlot({
         <StatusDot
           className={cn(
             'pointer-events-none absolute transition-opacity',
-            'opacity-100 group-focus-within/proof-tab:opacity-0 group-hover/proof-tab:opacity-0 touch:opacity-0',
+            'opacity-100 group-focus-within/proof-tab:opacity-0 group-hover/proof-tab:opacity-0',
           )}
           data-workbench-tab-dirty-indicator=''
           tone='warning'

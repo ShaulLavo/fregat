@@ -237,8 +237,10 @@ export function SessionRail({
 
   return (
     <aside
-      className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'
+      className='group/rail flex h-full min-h-0 min-w-0 flex-col overflow-hidden'
       data-screen-sidebar=''
+      // Rows read this: a list that is its own screen scrolls under a finger, and never drags.
+      data-standalone={standalone || undefined}
       onKeyDown={handleKeyDown}
     >
       <div className='flex shrink-0 items-center gap-1 px-2 pt-(--density-section-gap)'>
@@ -376,6 +378,12 @@ export function SessionRail({
         <div
           {...list.containerProps}
           onKeyDown={(event) => {
+            if (!keyed && isArrowKey(event.key)) {
+              // The first arrow shows the cursor where it is; the next one moves it.
+              event.preventDefault()
+              setKeyed(true)
+              return
+            }
             setKeyed(true)
             if (!draggingProjectId) list.containerProps.onKeyDown(event)
           }}
@@ -435,4 +443,8 @@ export function SessionRail({
       {isSessionBulkSelection(markedSessionIds) ? <SessionBulkBar /> : null}
     </aside>
   )
+}
+
+function isArrowKey(key: string) {
+  return key === 'ArrowDown' || key === 'ArrowUp'
 }
