@@ -1,3 +1,4 @@
+// Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
 // Converts underlying store mutation events into FileTree's narrower public mutation surface.
 import type {
   FileTreeBatchEvent,

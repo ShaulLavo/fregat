@@ -1,3 +1,4 @@
+// Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
 import type { ResolvedPathStoreOptions } from './internal-types'
 import type { PathStoreOptions } from './public-types'
 

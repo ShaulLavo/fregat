@@ -1,3 +1,4 @@
+// Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
 // Tracks the library-owned slotted nodes so header content can move with the
 // host element without clobbering user-managed light-DOM children.
 export class FileTreeManagedSlotHost {

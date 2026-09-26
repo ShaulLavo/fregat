@@ -61,6 +61,25 @@ describe('web routes', () => {
     expect(icon.headers.get('cache-control')).toBe('no-cache')
   })
 
+  it('serves the notices index and exact web and server texts', async () => {
+    const app = await webApp()
+    const redirect = await app.handle(navigation('/licenses'))
+    expect(redirect.status).toBe(308)
+    expect(redirect.headers.get('location')).toBe('licenses/')
+    for (const location of ['/licenses/']) {
+      const response = await app.handle(navigation(location))
+      expect(response.status).toBe(200)
+      expect(await response.text()).toContain('Third-party notices')
+    }
+    for (const location of ['/licenses/THIRD_PARTY_NOTICES.txt', '/licenses/server.txt']) {
+      const response = await app.handle(new Request(`http://local${location}`))
+      expect(response.status).toBe(200)
+      expect(response.headers.get('content-type')).toContain('text/plain')
+      expect(response.headers.get('cache-control')).toBe('no-cache')
+      expect(await response.text()).toContain('Copyright fixture')
+    }
+  })
+
   it('returns 404 for missing files and unknown routes, never index.html', async () => {
     const app = await webApp()
     for (const pathname of ['/assets/missing.js', '/worker.js', '/fs/nope', '/~x/app.js']) {
@@ -181,6 +200,11 @@ async function webApp({ devPage = true } = {}) {
   const web = path.join(release, 'web')
   await mkdir(path.join(web, 'assets'), { recursive: true })
   await mkdir(path.join(web, 'vscode-icons'), { recursive: true })
+  await mkdir(path.join(web, 'licenses'), { recursive: true })
+  await mkdir(path.join(release, 'server'), { recursive: true })
+  await writeFile(path.join(web, 'licenses/index.html'), '<main>Third-party notices</main>')
+  await writeFile(path.join(web, 'licenses/THIRD_PARTY_NOTICES.txt'), 'Copyright fixture web')
+  await writeFile(path.join(release, 'server/THIRD_PARTY_NOTICES.txt'), 'Copyright fixture server')
   await writeFile(path.join(web, 'index.html'), '<html><body><div id="root"></div></body></html>')
   if (devPage)
     await writeFile(path.join(web, 'dev.html'), '<html><body><div id="dev"></div></body></html>')

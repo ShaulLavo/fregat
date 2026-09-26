@@ -71,3 +71,8 @@ equivalent symbol.
 This intentionally diverges from Pierre's wider package surface. Upstream public additions are
 reviewed as behavior and do not widen the local root API without a product consumer or an explicit,
 measured exception.
+
+## Redistribution notices
+
+`LICENSE-pierre` contains the upstream Apache-2.0 text. Surviving mapped source files carry
+a modification notice. The served copy is `/licenses/pierre-tree.txt`.

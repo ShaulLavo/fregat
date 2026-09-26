@@ -1,3 +1,4 @@
+// Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
 // Pure scroll-target arithmetic for the virtualized file tree. Extracting these
 // keeps every numeric edge case (clamp to zero, clamp to max, top inset,
 // already-in-view short circuit) unit-testable without a real scroll element.

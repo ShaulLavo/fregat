@@ -10,6 +10,7 @@ import {
   openFixtureWorkspace,
   releaseFixture,
 } from '../fixture-workspace'
+import { preserveAppearance, writeUserSetting } from '../preserve-settings'
 import { chords, selectors } from '../selectors'
 
 /** Search and preview changes must keep their loaded content through the next read. */
@@ -18,7 +19,9 @@ export const quickOpenNoFlicker: Scenario = {
   description: 'Type a file name, then arrow through delayed previews and count blank frames.',
   async run(page, { step }) {
     const fixture = await createGitFixture('quick-open-no-flicker')
+    const restoreSettings = await preserveAppearance(page, ['search.quickOpenPreview'])
     try {
+      await writeUserSetting(page, 'search.quickOpenPreview', true)
       for (const name of ['alpha', 'bravo', 'charlie']) {
         await writeFile(path.join(fixture, `preview-switch-${name}.txt`), `${name}\n`.repeat(100))
       }
@@ -73,6 +76,7 @@ export const quickOpenNoFlicker: Scenario = {
       ok(new Set(frames.map((frame) => frame.body)).size >= 3, 'all three previews painted')
       await page.keyboard.press('Escape')
     } finally {
+      await restoreSettings()
       await releaseFixture(fixture)
     }
   },
