@@ -15,6 +15,7 @@ import { ToolPaneHeader } from '@/components/tool-pane-header'
 import { SessionActionsButton } from '@/components/session-actions-button'
 import { BackgroundTasksButton } from '@/features/chat/components/background-tasks-button'
 import { SchedulesButton } from '@/features/chat/components/schedules-button'
+import { ReviewButton } from '@/features/chat/components/review-button'
 import { SessionToolsButton } from '@/features/chat/components/session-tools-button'
 import { SessionRename } from '@/components/session-rename'
 import { useSessionRenaming } from '@/hooks/use-session-renaming'
@@ -117,6 +118,9 @@ export function ChatPanelHeader({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          {session?.worktreePath ? (
+            <ReviewButton rootPath={session.worktreePath} sessionRef={session.ref} />
+          ) : null}
           {session ? <BackgroundTasksButton sessionRef={session.ref} /> : null}
           {session ? <SchedulesButton sessionRef={session.ref} /> : null}
           {session ? <SessionToolsButton sessionRef={session.ref} /> : null}

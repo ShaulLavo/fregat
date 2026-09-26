@@ -38,6 +38,8 @@ export type ClaudeQueryOptionsInput = ClaudeRuntimeSelection & {
   /** The instance's resolved CLI; without it the SDK runs its bundled one. */
   executablePath: string
   model: string
+  /** The JSON schema every final message must match; the result carries it parsed. */
+  outputSchema?: Record<string, unknown>
   /** False keeps isolated utility turns out of the provider's transcript store. */
   persistSession?: boolean
   /** Effort/thinking for this session; absent means "send neither". */
@@ -150,6 +152,9 @@ export function claudeQueryOptions(input: ClaudeQueryOptionsInput): Options {
     ...claudeSessionOptions(input),
     ...(input.canUseTool ? { canUseTool: input.canUseTool } : {}),
     ...(input.hooks ? { hooks: input.hooks } : {}),
+    ...(input.outputSchema
+      ? { outputFormat: { type: 'json_schema' as const, schema: input.outputSchema } }
+      : {}),
     // Absent `env` makes the CLI inherit process.env untouched, which is what a
     // single-instance install wants. When it is present it carries
     // CLAUDE_CONFIG_DIR for the instance — NEVER an overridden HOME: that

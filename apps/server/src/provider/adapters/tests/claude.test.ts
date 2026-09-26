@@ -1229,6 +1229,14 @@ describe('ClaudeProviderAdapter', () => {
     await ephemeral.adapter.stopAll()
   })
 
+  it('asks for the output schema a session was started with, and reports the parsed answer', async () => {
+    const harness = claudeHarness()
+    const schema = { type: 'object', properties: { ok: { type: 'boolean' } } }
+    await harness.adapter.startRuntime({ ...sessionStartInput({ ephemeral: true }), outputSchema: schema })
+    expect(latestOptions(harness).outputFormat).toEqual({ type: 'json_schema', schema })
+    await harness.adapter.stopAll()
+  })
+
   it('treats ultrathink as a prompt keyword instead of an effort flag', async () => {
     const harness = claudeHarness()
     const input = providerTurnInput({

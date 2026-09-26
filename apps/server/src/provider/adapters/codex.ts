@@ -2946,6 +2946,7 @@ function turnStartParams(
     sandboxPolicy: runtime.sandboxPolicy,
     ...(modelOptions.effort ? { effort: modelOptions.effort } : {}),
     ...(modelOptions.serviceTier ? { serviceTier: modelOptions.serviceTier } : {}),
+    ...(input.outputSchema ? { outputSchema: input.outputSchema } : {}),
     threadId: session.providerConversationMarkerForTurn(),
   } as CodexClientRequestParamsByMethod['turn/start']
 }

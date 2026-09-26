@@ -2696,6 +2696,22 @@ describe('CodexProviderAdapter', () => {
     })
   })
 
+  it('passes a turn’s output schema to turn/start', async () => {
+    await withFakeCodex(async ({ spawnLogPath }) => {
+      const adapter = new CodexProviderAdapter()
+      const outputSchema = { type: 'object', properties: { ok: { type: 'boolean' } } }
+      try {
+        await adapter.sendTurn({ ...providerTurnInput(), outputSchema })
+        const records = await readFakeCodexLog(spawnLogPath)
+        expect(records.find((record) => record.event === 'turn/start')?.params).toMatchObject({
+          outputSchema,
+        })
+      } finally {
+        await adapter.stopAll()
+      }
+    })
+  })
+
   it('reads MCP server states and configured hooks from the live app-server', async () => {
     await withFakeCodex(async ({ spawnLogPath }) => {
       const adapter = new CodexProviderAdapter()

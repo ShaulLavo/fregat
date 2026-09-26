@@ -6,6 +6,7 @@ import { CaretRightIcon } from '@phosphor-icons/react'
 
 import { BackgroundTasksButton } from '@/features/chat/components/background-tasks-button'
 import { SchedulesButton } from '@/features/chat/components/schedules-button'
+import { ReviewButton } from '@/features/chat/components/review-button'
 import { SessionAgentChip } from '@/features/chat/components/session-agent-chip'
 import { SessionToolsButton } from '@/features/chat/components/session-tools-button'
 import { ContextUsageRing } from '@/features/chat/components/context-usage-ring'
@@ -67,6 +68,9 @@ export function StageHeader({
             <ContextUsageRing sessionRef={session?.ref ?? null} usage={contextUsage} />
           ) : null}
           {session ? <SessionAgentChip sessionRef={session.ref} /> : null}
+          {session ? (
+            <ReviewButton rootPath={session.worktreePath ?? rootPath} sessionRef={session.ref} />
+          ) : null}
           {session ? <BackgroundTasksButton sessionRef={session.ref} /> : null}
           {session ? <SchedulesButton sessionRef={session.ref} /> : null}
           {session ? <SessionToolsButton sessionRef={session.ref} /> : null}
