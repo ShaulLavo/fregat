@@ -17,7 +17,7 @@ export const connectionRefusalRetention: Scenario = {
     const descriptor = await response.json()
     const sockets = new Set<WebSocketRoute>()
     let refusal: 'protocol' | 'identity' | null = null
-    await page.routeWebSocket(/\/orchestration\/rpc$/, (route) => {
+    await page.routeWebSocket(/\/orchestration\/rpc(?:\?|$)/, (route) => {
       const server = route.connectToServer()
       sockets.add(route)
       server.onMessage((raw) => {

@@ -49,7 +49,7 @@ export const approvalReconnect = isolatedNativeScenario({
 async function droppableOrchestrationSocket(page: Page) {
   const open = new Set<WebSocketRoute>()
   let dropped = false
-  await page.routeWebSocket(/\/orchestration\/rpc$/, (route) => {
+  await page.routeWebSocket(/\/orchestration\/rpc(?:\?|$)/, (route) => {
     if (dropped) {
       void route.close({ code: 4000, reason: 'Verification drop' })
       return

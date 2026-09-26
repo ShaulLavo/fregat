@@ -42,7 +42,7 @@ export const cachedProtocolStartup: Scenario = {
     const requested = Promise.withResolvers<void>()
     let socketCount = 0
     const observeSocket = (socket: WebSocket) => {
-      if (socket.url().endsWith('/orchestration/rpc')) socketCount += 1
+      if (new URL(socket.url()).pathname.endsWith('/orchestration/rpc')) socketCount += 1
     }
     page.on('websocket', observeSocket)
     await page.route(healthUrl, async (route) => {
@@ -59,7 +59,7 @@ export const cachedProtocolStartup: Scenario = {
         `Cached protocol ${previousProtocol} retains the workbench while fresh health is pending`,
       )
       const connected = page.waitForEvent('websocket', {
-        predicate: (socket) => socket.url().endsWith('/orchestration/rpc'),
+        predicate: (socket) => new URL(socket.url()).pathname.endsWith('/orchestration/rpc'),
       })
       gate.resolve()
       await connected

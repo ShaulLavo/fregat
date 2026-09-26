@@ -113,5 +113,8 @@
     "node": ">=22.12"
   },
   "packageManager": "bun@1.4.2",
-  "//singapore-editor-links": "The @singapore-editor/* `link:` overrides above resolve through a `bun link` registration pointing at the sibling ../../Editor checkout — there is no npm fallback (@singapore-editor/decode is unpublished). CI reproduces that by cloning ShaulLavo/singapore as a sibling, building it, and linking each package; see .github/actions/setup/action.yml."
+  "//singapore-editor-links": "The @singapore-editor/* `link:` overrides above resolve through a `bun link` registration pointing at the sibling ../../Editor checkout — there is no npm fallback (@singapore-editor/decode is unpublished). CI reproduces that by cloning ShaulLavo/singapore as a sibling, building it, and linking each package; see .github/actions/setup/action.yml.",
+  "patchedDependencies": {
+    "vitest@5.0.2": "patches/vitest@5.0.2.patch"
+  }
 }

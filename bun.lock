@@ -421,6 +421,9 @@
       },
     },
   },
+  "patchedDependencies": {
+    "vitest@5.0.2": "patches/vitest@5.0.2.patch",
+  },
   "overrides": {
     "@singapore-editor/core": "link:@singapore-editor/core",
     "@singapore-editor/decode": "link:@singapore-editor/decode",
