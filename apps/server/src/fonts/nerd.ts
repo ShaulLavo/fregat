@@ -1,6 +1,6 @@
-import * as cheerio from 'cheerio'
+import { unzipSync } from 'fflate'
+import * as v from 'valibot'
 import { mkdir, writeFile } from 'node:fs/promises'
-import { createRequire } from 'node:module'
 import path from 'node:path'
 
 import { fontOperationFailed, readBinaryFile, readJsonFile } from './cache-files'
@@ -10,30 +10,23 @@ import { Inflight } from './inflight'
 
 export type FontLinks = Record<string, string>
 
-type ZipArchive = {
-  readonly files: Record<string, { readonly dir: boolean }>
-  file(filename: string): { async(type: 'arraybuffer'): Promise<ArrayBuffer> } | null
-}
-type JSZipModule = {
-  loadAsync(data: Buffer): Promise<ZipArchive>
-}
-
 type NerdFontProviderOptions = {
   cacheRoot: string
   fetcher: Fetcher
   subsetter: FontSubsetter
 }
 
-const nerdFontsDownloadUrl = 'https://www.nerdfonts.com/font-downloads'
-// The scraped links point at release assets; nothing else may be fetched from them.
+const nerdFontsDownloadUrl = 'https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest'
+const releaseSchema = v.object({
+  assets: v.array(v.object({ browser_download_url: v.string() })),
+})
+// Only Nerd Fonts release assets may be fetched.
 const archiveHosts = new Set(['github.com'])
-// The links page is small; a release archive can be tens of MB.
+// The release metadata is small; an archive can be tens of MB.
 const LINKS_TIMEOUT_MS = 10_000
 const ARCHIVE_TIMEOUT_MS = 120_000
-const require = createRequire(import.meta.url)
-const JSZip = require('jszip') as JSZipModule
 
-/** Nerd Fonts, scraped from the downloads page; each archive's Regular face is cached as ttf. */
+/** Nerd Fonts release assets; each archive's Regular face is cached as ttf. */
 export class NerdFontProvider {
   private readonly fetcher: Fetcher
   private readonly fontDirectory: string
@@ -62,11 +55,11 @@ export class NerdFontProvider {
 
     const response = await this.fetcher(nerdFontsDownloadUrl, {
       signal: AbortSignal.timeout(LINKS_TIMEOUT_MS),
+      headers: { Accept: 'application/vnd.github+json' },
     })
     if (!response.ok) throw fontOperationFailed('failed to fetch Nerd Fonts links', response)
 
-    const html = await response.text()
-    const links = parseNerdFontLinks(html)
+    const links = parseNerdFontLinks(await response.json())
     await writeFile(this.linksFile, JSON.stringify(links, null, 2))
 
     return links
@@ -120,7 +113,7 @@ export class NerdFontProvider {
 
   private async downloadFontZip(zipUrl: string) {
     // The links file is a cache on disk; it never widens where the server fetches from.
-    if (!archiveHosts.has(new URL(zipUrl).hostname)) return null
+    if (!parsedFontLink(zipUrl)) return null
 
     const response = await this.fetcher(zipUrl, { signal: AbortSignal.timeout(ARCHIVE_TIMEOUT_MS) })
     if (!response.ok) throw fontOperationFailed('failed to download font archive', response)
@@ -134,47 +127,30 @@ export class NerdFontProvider {
   }
 }
 
-export function parseNerdFontLinks(html: string): FontLinks {
-  const $ = cheerio.load(html)
+export function parseNerdFontLinks(release: unknown): FontLinks {
+  const { assets } = v.parse(releaseSchema, release)
   const links: FontLinks = {}
-
-  for (const link of $('a').toArray()) {
-    const text = $(link).text().trim().toLowerCase()
-    if (text !== 'download') continue
-
-    const href = $(link).attr('href')
-    const parsed = parsedFontLink(href)
-    if (!parsed) continue
-
-    links[parsed.name] = parsed.url
+  for (const asset of assets) {
+    const parsed = parsedFontLink(asset.browser_download_url)
+    if (parsed) links[parsed.name] = parsed.url
   }
-
   return links
 }
 
-async function extractRegularFont(zipBuffer: Buffer) {
-  const zip = await JSZip.loadAsync(zipBuffer)
-  const filename = selectRegularFontFile(zip)
+function extractRegularFont(zipBuffer: Buffer) {
+  const files: string[] = []
+  // Read the directory first so only the selected face is inflated.
+  unzipSync(zipBuffer, {
+    filter: ({ name }) => {
+      if (name.endsWith('.ttf') || name.endsWith('.otf')) files.push(name)
+      return false
+    },
+  })
+  const filename = files.find(isRegularFontFile) ?? files[0]
   if (!filename) return null
-
-  const file = zip.file(filename)
-  if (!file) return null
-
-  return Buffer.from(await file.async('arraybuffer'))
-}
-
-function selectRegularFontFile(zip: ZipArchive) {
-  const files = Object.keys(zip.files).filter((filename) => isFontFile(zip, filename))
-  const regular = files.find(isRegularFontFile)
-  if (regular) return regular
-
-  return files[0] ?? null
-}
-
-function isFontFile(zip: ZipArchive, filename: string) {
-  if (zip.files[filename]?.dir) return false
-
-  return filename.endsWith('.ttf') || filename.endsWith('.otf')
+  const extracted = unzipSync(zipBuffer, { filter: ({ name }) => name === filename })
+  const font = extracted[filename]
+  return font ? Buffer.from(font) : null
 }
 
 function isRegularFontFile(filename: string) {
@@ -186,8 +162,10 @@ function isRegularFontFile(filename: string) {
 function parsedFontLink(href: string | undefined) {
   if (!href) return null
 
-  const url = new URL(href, nerdFontsDownloadUrl)
+  const url = URL.parse(href)
+  if (!url || url.protocol !== 'https:') return null
   if (!archiveHosts.has(url.hostname)) return null
+  if (!url.pathname.startsWith('/ryanoasis/nerd-fonts/releases/download/')) return null
   if (!url.pathname.endsWith('.zip')) return null
 
   const name = path.basename(url.pathname, '.zip')
