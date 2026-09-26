@@ -255,8 +255,11 @@ export const selectors = {
   machineDialog: (page: Page) => page.getByRole('dialog', { name: 'Connect machine', exact: true }),
   machineAdd: (page: Page) => page.getByRole('button', { name: 'Add machine', exact: true }),
   machineConnect: (page: Page) => page.getByRole('button', { name: 'Connect', exact: true }),
+  // SSH host rows in the add form are titled buttons too; they carry role="option".
   machinePickerRows: (page: Page) =>
-    page.getByRole('dialog', { name: 'Connect machine', exact: true }).locator('button[title]'),
+    page
+      .getByRole('dialog', { name: 'Connect machine', exact: true })
+      .locator('button[title]:not([role="option"])'),
   fixWithAi: (scope: Page | Locator) =>
     scope.getByRole('button', { name: 'Fix with AI', exact: true }),
   machineTarget: (page: Page) => page.getByRole('textbox', { name: 'SSH target', exact: true }),
