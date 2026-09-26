@@ -1,3 +1,6 @@
+import { useDiffIntent } from '@/lib/intent-prefetch/hooks/use-diff-intent'
+import type { QueryExecuteOptions } from '@tanstack/react-query'
+import type { GitFileDiff } from '@workspace/contracts'
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'
 import type { KeyboardEvent, MouseEventHandler, ReactNode } from 'react'
@@ -24,7 +27,9 @@ export function GitFileRow({
   rowProps,
   onContextMenu,
   onMenuKey,
+  prefetch,
 }: {
+  prefetch?: QueryExecuteOptions<readonly GitFileDiff[]> | null
   path: string
   oldPath?: string
   rootPath: string
@@ -40,6 +45,7 @@ export function GitFileRow({
   onContextMenu?: MouseEventHandler<HTMLDivElement>
   onMenuKey?: (event: KeyboardEvent<HTMLDivElement>) => boolean
 }) {
+  const intent = useDiffIntent(prefetch ?? null, rootPath, rowProps?.['data-active'] === true)
   const relativePath = toTreePath(path, rootPath)
   const changed = stat && stat.additions + stat.deletions > 0 ? stat : undefined
   const tooltip = encodeTooltipParts([
@@ -64,6 +70,7 @@ export function GitFileRow({
   return (
     <ListRow
       {...rowProps}
+      {...intent}
       role={role}
       aria-level={treeLevel(role, historical)}
       aria-busy={loading || undefined}

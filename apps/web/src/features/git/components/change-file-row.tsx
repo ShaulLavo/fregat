@@ -1,3 +1,4 @@
+import { diffQueryOptions } from '@/features/git/utils/diff-query'
 import { use } from 'react'
 import { useGitState } from '@/features/git/state/store'
 import { ChangesContext } from '@/features/git/providers/changes-context'
@@ -36,6 +37,7 @@ export function ChangeFileRow({
     <>
       <GitFileRow
         rowProps={rowProps}
+        prefetch={diffQueryOptions(row.file.path, row.section === 'staged')}
         path={row.file.path}
         oldPath={row.file.oldPath}
         rootPath={rootPath}
