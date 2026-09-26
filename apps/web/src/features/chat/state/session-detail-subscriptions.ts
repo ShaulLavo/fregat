@@ -72,6 +72,8 @@ type SessionDetailSubscriptionEntry = {
   active: boolean
   evictionTimeoutId: TimeoutHandle | null
   failureCount: number
+  /** When the entry's first stream started; cleared once its snapshot lands (`firstSnapshotMs`). */
+  firstStartedAt: number | null
   lastAccessedAt: number
   /** True once the session has been seen in the projection, so a later absence means deletion. */
   observedInProjection: boolean
@@ -195,6 +197,7 @@ export function createSessionDetailSubscriptionCache(
       active: false,
       evictionTimeoutId: null,
       failureCount: 0,
+      firstStartedAt: now(),
       lastAccessedAt: now(),
       observedInProjection:
         selectChatProjectionSlice(store.getState(), options.environmentId).sessionById[sessionId]
@@ -360,6 +363,9 @@ export function createSessionDetailSubscriptionCache(
     })
     if (item.kind === 'snapshot') {
       store.getState().syncSessionDetailSnapshot(options.environmentId, item.snapshot)
+      if (entry.firstStartedAt === null) return
+      entry.scope.set({ firstSnapshotMs: now() - entry.firstStartedAt })
+      entry.firstStartedAt = null
       return
     }
 

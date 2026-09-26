@@ -19,6 +19,7 @@ import { useEditorTypography } from '@/features/editor/hooks/use-editor-typograp
 import type { DiffLanguageServerContext } from '@/features/editor/utils/diff-language-context'
 import { HOSTED_EDITOR_KEYMAP } from '@/keymap/editor-keymap'
 import { log } from '@/lib/client-logging'
+import { notePressPaint } from '@/lib/intent-prefetch/state/press-paint'
 import { useEditorFocusTarget } from '@/lib/focus/hooks/use-editor-target'
 import {
   bindDiffPlugin,
@@ -153,6 +154,7 @@ export function DiffPane({
     }
     persistence?.restore(editor)
     editor.setPresentationReady(plugin.isSyntaxReady())
+    notePressPaint('diffs', file.path, 'text')
   }, [controller, file, persistence, plugin, rows, text])
 
   // A parse landing later changes the tokens without changing a row.
@@ -160,7 +162,11 @@ export function DiffPane({
     const tokens = plugin.getTokens()
     const editor = controller.getEditor()
     editor?.setTokens(tokens)
-    if (file && rows === plugin.getRows()) editor?.setPresentationReady(plugin.isSyntaxReady())
+    if (file && rows === plugin.getRows()) {
+      editor?.setPresentationReady(plugin.isSyntaxReady())
+      if (!highlight) notePressPaint('diffs', file.path, 'colour', { highlight: 'off' })
+      else if (plugin.isSyntaxReady()) notePressPaint('diffs', file.path, 'colour')
+    }
     log.debug({
       action: 'editor.diff.syntax',
       area: 'editor',
