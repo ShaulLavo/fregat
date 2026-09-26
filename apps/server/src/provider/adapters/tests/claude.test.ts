@@ -1205,7 +1205,12 @@ describe('ClaudeProviderAdapter', () => {
       path.join(cwd, '.mcp.json'),
       JSON.stringify({ mcpServers: { deploy: { command: 'deploy-server' } } }),
     )
-    const harness = claudeHarness(true, undefined, path.join(root, 'state', 'approvals.json'))
+    const harness = claudeHarness(
+      true,
+      undefined,
+      undefined,
+      path.join(root, 'state', 'approvals.json'),
+    )
     const input = { ...sessionStartInput({}), cwd }
     try {
       await harness.adapter.startRuntime(input)
