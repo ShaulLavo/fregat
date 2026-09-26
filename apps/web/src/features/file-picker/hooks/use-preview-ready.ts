@@ -7,7 +7,7 @@ import { previewQueryOptions } from '@/lib/file-preview/utils/preview-query'
 import { previewImageUrl } from '@/lib/file-preview/utils/preview'
 import type { FsEntry } from '@/lib/file-system-types'
 import { directoryQueryOptions } from '@/features/file-picker/utils/directory-query'
-import { imageReadyQueryOptions } from '@/features/file-picker/utils/image-ready-query'
+import { imageReadyQueryOptions } from '@/lib/file-preview/utils/image-ready-query'
 import type { FilePickerMode } from '@/features/file-picker/utils/model'
 import { previewKind } from '@/features/file-picker/utils/preview'
 

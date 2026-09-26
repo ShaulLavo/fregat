@@ -1,6 +1,6 @@
 import { queryOptions } from '@tanstack/react-query'
 
-import { filePickerKeys } from '@/lib/query-keys'
+import { filePreviewKeys } from '@/lib/query-keys'
 
 /**
  * Whether the browser has decoded the image, so the thumbnail mounts complete. A failed decode is
@@ -8,7 +8,7 @@ import { filePickerKeys } from '@/lib/query-keys'
  */
 export function imageReadyQueryOptions(src: string) {
   return queryOptions({
-    queryKey: filePickerKeys.imageReady(src),
+    queryKey: filePreviewKeys.imageReady(src),
     staleTime: Number.POSITIVE_INFINITY,
     queryFn: () => decodeImage(src),
   })
