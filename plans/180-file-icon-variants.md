@@ -169,10 +169,12 @@ Measured with the app's own resolver (`iconForEntry` imported from `lib/file-ico
   yellow, Astro purple over pink, webpack blue over cyan. (c) (b) plus a neutral grey back layer on
   the file and language `-duo` glyphs. **Recommendation: (b).** They are the brands' own colours, the
   pack already draws them, and the cost is one custom property on three glyphs.
+  Decided 2026-09-26: owner — (b); the tinted back layers stay as they are.
 - **Q2. Light-mode palette.** (a) Pack 600 for every hue, as today. (b) The 700 level for yellow,
   orange, mint, teal and cyan, so every hue clears 3:1 on a light background; dark unchanged.
   **Recommendation: (b).** The JavaScript icon is 2.0:1 in light today; see sheet section 2's last
   column for the look.
+  Decided 2026-09-26: owner — (b).
 - **Q3. File types with no glyph** (media, PDF, Java, Kotlin, PHP, Lua and similar; 2.1% of files
   after aliasing). (a) Leave them generic. (b) Draw about six glyphs in the pack's style (audio,
   video, PDF, Java, Kotlin, one generic "source" shape). (c) Borrow Phosphor's fill glyphs.
