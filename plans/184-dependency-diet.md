@@ -119,30 +119,28 @@ device on the mesh (scenario or the owner's phone).
 
 ## Integrated branch verification, 2026-09-27
 
-Merged #113 → #114 → #119 → #117 → #118 → #120 onto `fe39528db`. The integration
-keeps lazy external Web Push, the image worker, complete release notices and the
-runtime manifest. Both notices review blockers are fixed: missing full texts fail
-generation unless an exact-version reviewed text exists, and runtime packages resolve
-from their declaring workspace. Release candidate tests now require the image worker
-and notices as well as the terminal host.
+Merged #113 → #114 → #119 → #117 → #118 → #120 onto `fe39528db`, then merged main
+`86843435b`. Both notices blockers are fixed: exact-version reviewed full texts
+replace missing-text placeholders, unresolved packages fail generation, and runtime
+notices resolve through the declaring workspace.
 
-| Measurement                   | Main `fe39528db` |  Integrated |      Change |
+Main advanced while this integration ran. Merged `86843435b` and resolved its wallpaper changes by adding header-only and single-rendition operations to the isolated Bun worker. Imports remain lazy, color sampling requests the library's display rendition, and uploads retain full decoding and process deadlines. The separate main build proved the `apps/web/src/lib` pin stale: 69,219 gzip bytes exceeds the old 68,670 allowance. Only that owner is re-pinned to the main baseline; integrated size is 69,627. Total and all other owner pins stay unchanged.
+
+| Measurement                   | Main `86843435b` |  Integrated |      Change |
 | ----------------------------- | ---------------: | ----------: | ----------: |
-| Server bundle bytes           |        6,022,939 |   4,771,763 |  -1,251,176 |
-| All web JS bytes              |       62,097,119 |  61,970,825 |    -126,294 |
-| All web JS gzip bytes         |        9,177,259 |   9,141,949 |     -35,310 |
-| First-load JS gzip bytes      |        1,733,845 |   1,731,035 |      -2,810 |
+| Server bundle bytes           |        6,102,591 |   4,852,550 |  -1,250,041 |
+| All web JS bytes              |       62,156,876 |  62,030,505 |    -126,371 |
+| All web JS gzip bytes         |        9,195,489 |   9,160,162 |     -35,327 |
+| First-load JS gzip bytes      |        1,738,773 |   1,736,047 |      -2,726 |
 | Linux runtime installed bytes |      588,395,127 | 545,821,872 | -42,573,255 |
-| Lockfile package resolutions  |            1,350 |       1,333 |         -17 |
+| Lockfile package resolutions  |            1,351 |       1,334 |         -17 |
 
 Measured with the same build commands. Baseline source was exported inside the worktree. Server figures are raw, unminified output and include source-path comments. Runtime sizes follow symlinks and count each file inode once; these are logical installed bytes, not reclaimed cache space.
 
 Generated notices add 412,445 web bytes for 258 package/version entries and 367,881 server bytes for 156 entries. The baseline had no generated notice files.
 
-Frozen workspace/runtime installs, gates including knip, every workspace typecheck,
-server build and web bundle gate passed. Verification also passed 104 server tests,
-23 notices/deploy tests, 10 licence route tests, and the isolated bundled font/image/push
-probe from `/`. The six deduplication targets each have one package root in the build.
-Workspace typechecks bypassed the shared Editor auto-rebuild step. No deployment or
-live model calls; macOS and device push delivery remain unverified. Evidence:
-`/work/tmp/w2-184-integration-evidence/`.
+Frozen workspace/runtime installs, gates including knip, every workspace typecheck, server build and web bundle gate passed. Tests passed: 117 server tests, including fonts, images, push, release files, TypeScript runtimes and licence routes; 18 notices/deploy tests; 16 wallpaper catalog/import/route tests. The final decoder/color subset passed 22 tests after the resize type fix. The isolated bundled probe ran from `/` and passed font extraction, full image decoding, header-only reads, both individual renditions, VAPID generation and subset-font loading.
+
+The six deduplication targets each have one package root. Workspace typechecks skip
+the shared Editor auto-rebuild step. No deployment or live model calls; macOS and
+device push delivery remain unverified. Evidence: `/work/tmp/w2-184-integration-evidence/`.

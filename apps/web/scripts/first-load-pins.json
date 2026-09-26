@@ -7,7 +7,7 @@
     "apps/web/src/features/chat": 165397,
     "apps/web/src/features/editor": 88802,
     "packages/tree": 77926,
-    "apps/web/src/lib": 65400,
+    "apps/web/src/lib": 69219,
     "packages/client-core": 53629,
     "apps/web/src/features/chat-mode": 48400,
     "apps/web/src/features/search": 43253,
@@ -85,6 +85,11 @@
       "at": "2026-09-26T19:06:54.953Z",
       "scriptGzip": 1722852,
       "reason": "Defer the file picker and command palette content behind shared module queries; prefetch both on idle. Compare ef0d170a0 and 9aaaeee87 with Editor 0f873101, then reset total and owners to the smaller build. Per-owner gzip is apportioned by rendered share, so chunk splits redistribute estimates even when an owner's rendered bytes fall.\nnode_modules: merged dependency consumers plus gzip redistribution; rendered bytes fall from 3324241 before this change.\nEditor: the linked Editor advanced since the historical pin; this comparison holds 0f873101 fixed, and splitting shared chunks redistributes gzip.\napps/web/src/features/chat: merged goal controls, sleeping-session schedules and MCP approval UI.\npackages/tree: gzip redistribution from the dialog split; rendered bytes decrease from 457160.\napps/web/src/lib: merged intent-prefetch changes, then shared-chunk gzip redistribution; rendered bytes decrease from 378095.\npackages/contracts: merged goal/schedule contracts, filesystem places metadata, settings and session notices.\npackages/ui: merged resizable width handle plus shared-chunk gzip redistribution; rendered bytes decrease from 195670.\napps/web/src/keymap: merged project-settings command and function-key handling plus shared-chunk gzip redistribution.\napps/web/src/state: merged database-identity recovery, navigation and machine-event recovery.\napps/web/src/features/settings: merged settings actions/diagnostics plus shared-chunk gzip redistribution; the settings page remains lazy.\napps/web/src/features/environments: merged identity-replacement recovery and picker changes; project picking now uses the deferred dialog.\npackages/markdown: merged user-content fragment-link handling plus shared-chunk gzip redistribution.\npackages/observability: merged log sanitization and runtime maintenance.\napps/web/src: two idle module prefetch calls.\npackages/utils: gzip redistribution; rendered bytes remain 4603 throughout all three builds."
+    },
+    {
+      "at": "2026-09-26T21:37:00.999Z",
+      "scriptGzip": 1722852,
+      "reason": "Accept the measured apps/web/src/lib baseline on main 86843435b: 69,219 gzip bytes, above the previous 68,670 allowance. Plan 184 measures 69,627. Total and all other owner pins remain unchanged."
     }
   ]
 }

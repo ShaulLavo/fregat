@@ -39,9 +39,9 @@ async function decode(bytes: Uint8Array) {
 }
 
 function renderRendition(bytes: Uint8Array, kind: 'thumbnail' | 'display') {
-  const size = kind === 'thumbnail' ? ([480, 300] as const) : ([2560, 2560] as const)
+  const [width, height] = kind === 'thumbnail' ? ([480, 300] as const) : ([2560, 2560] as const)
   return new Bun.Image(bytes, options)
-    .resize(...size, { fit: 'inside', withoutEnlargement: true })
+    .resize(width, height, { fit: 'inside', withoutEnlargement: true })
     .webp({ quality: kind === 'thumbnail' ? 75 : 85 })
     .bytes()
 }
