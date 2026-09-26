@@ -765,6 +765,7 @@ export const selectors = {
     page.getByRole('button', { name: /^(Sleeping until|Wake-up due)/ }).first(),
   cancelSchedules: (page: Page) =>
     page.getByRole('button', { name: 'Cancel schedules', exact: true }),
+  sessionGoal: (page: Page) => page.getByRole('button', { name: /^Goal: / }).first(),
   turnCarryOn: (page: Page) => page.getByRole('button', { name: 'Carry on', exact: true }),
   turnTryAgain: (page: Page) => page.getByRole('button', { name: 'Try again', exact: true }),
   incompleteAnswer: (page: Page) =>

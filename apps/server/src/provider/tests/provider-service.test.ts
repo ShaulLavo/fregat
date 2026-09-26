@@ -218,6 +218,93 @@ describe('ProviderService', () => {
     }
   })
 
+  it('reads a goal set with /goal, and pauses and clears it through the service', async () => {
+    const fixture = createFixture()
+    const adapter = new MockProviderAdapter()
+    const service = new ProviderService({
+      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      sessionDirectory: new ProviderSessionDirectory(fixture.database),
+    })
+    const turn = { ...providerTurnInput(), messageText: '/goal Make the suite green' }
+    try {
+      await service.sendTurn(turn)
+      await service.drainRuntimeEvents()
+      expect(service.sessionGoal(turn.sessionId)).toMatchObject({
+        controllable: true,
+        goal: { objective: 'Make the suite green', status: 'active' },
+      })
+      expect(
+        await service.controlGoal({ action: 'pause', sessionId: turn.sessionId }),
+      ).toMatchObject({ goal: { status: 'paused' } })
+      expect(
+        await service.controlGoal({ action: 'clear', sessionId: turn.sessionId }),
+      ).toMatchObject({ goal: null })
+    } finally {
+      await service.shutdown()
+      fixture.close()
+    }
+  })
+
+  it('keeps a runtime working toward an active goal, and reclaims it once the goal pauses', async () => {
+    vi.useFakeTimers()
+    const fixture = createFixture()
+    const stream = new ProviderRuntimeEventStream()
+    const adapter = new MockProviderAdapter()
+    const subscribe = adapter.subscribeEvents.bind(adapter)
+    adapter.subscribeEvents = (subscriber) => {
+      const off = subscribe(subscriber)
+      const offGoals = stream.subscribe(subscriber)
+      return () => {
+        off()
+        offGoals()
+      }
+    }
+    const service = new ProviderService({
+      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      sessionDirectory: new ProviderSessionDirectory(fixture.database),
+    })
+    try {
+      const input = await startReadyRuntime(service, fixture.database)
+      const report = (status: 'active' | 'paused') =>
+        stream.publish({
+          type: 'goal.updated',
+          eventId: crypto.randomUUID(),
+          createdAt: new Date().toISOString(),
+          sessionId: input.sessionId,
+          runtimeEpoch: input.runtimeEpoch,
+          payload: {
+            goal: {
+              objective: 'Ship',
+              status,
+              tokenBudget: null,
+              tokensUsed: 1,
+              timeUsedSeconds: 1,
+              iterations: null,
+              lastReason: null,
+            },
+          },
+        })
+      report('active')
+      await service.drainRuntimeEvents()
+      expect(service.sessionGoal(input.sessionId)).toMatchObject({
+        controllable: true,
+        goal: { objective: 'Ship', status: 'active' },
+      })
+      await vi.advanceTimersByTimeAsync(40 * 60 * 1000)
+      expect(await adapter.hasRuntime({ sessionId: input.sessionId })).toBe(true)
+
+      report('paused')
+      await service.drainRuntimeEvents()
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000)
+      expect(await adapter.hasRuntime({ sessionId: input.sessionId })).toBe(false)
+      expect(service.sessionGoal(input.sessionId).goal).toBeNull()
+    } finally {
+      await service.shutdown()
+      fixture.close()
+      vi.useRealTimers()
+    }
+  })
+
   it('closes a launch that resolves after the shutdown wait times out', async () => {
     const fixture = createFixture()
     const adapter = new MockProviderAdapter({ operationTimeoutMs: 5 })

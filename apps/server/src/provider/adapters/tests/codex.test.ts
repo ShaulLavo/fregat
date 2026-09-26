@@ -368,6 +368,23 @@ function handle(message) {
     ] }] } });
     return;
   }
+  if (message.method === 'thread/goal/set') {
+    record({ event: message.method, params: message.params });
+    const goal = { threadId: message.params.threadId, objective: (globalThis.goalObjective = message.params.objective ?? globalThis.goalObjective ?? 'Ship it'), status: message.params.status ?? 'active', tokenBudget: 1000, tokensUsed: 10, timeUsedSeconds: 3, createdAt: 1, updatedAt: 2 };
+    send({ id: message.id, result: { goal } });
+    send({ method: 'thread/goal/updated', params: { threadId: message.params.threadId, turnId: null, goal } });
+    if (goal.status !== 'active') return;
+    const turn = { id: 'goal-turn-1', status: 'inProgress', items: [] };
+    send({ method: 'turn/started', params: { threadId: message.params.threadId, turn } });
+    send({ method: 'turn/completed', params: { threadId: message.params.threadId, turn: { ...turn, status: 'completed' } } });
+    return;
+  }
+  if (message.method === 'thread/goal/clear') {
+    record({ event: message.method, params: message.params });
+    send({ id: message.id, result: { cleared: true } });
+    send({ method: 'thread/goal/cleared', params: { threadId: message.params.threadId } });
+    return;
+  }
   if (message.method === 'thread/compact/start') {
     record({ event: message.method, params: message.params });
     send({ id: message.id, result: {} });
@@ -846,6 +863,8 @@ type FakeCodexLogEntry = {
     | 'thread/start'
     | 'thread/turns/list'
     | 'thread/revert'
+    | 'thread/goal/set'
+    | 'thread/goal/clear'
 }
 
 type EchoedModeParams = {
@@ -1434,15 +1453,14 @@ describe('CodexProviderAdapter', () => {
     })
   })
 
-  it('discovers skills in the project directory and offers no slash commands', async () => {
+  it('discovers skills in the project directory and offers only the /goal command Platform answers', async () => {
     await withFakeCodex(async ({ projectPath }) => {
       const adapter = new CodexProviderAdapter()
 
       const catalog = await adapter.listCommands({ cwd: projectPath })
 
-      // Codex has no prompt or command listing at all, so the empty half of the
-      // catalog is the honest answer rather than a read this skipped.
-      expect(catalog.commands).toEqual([])
+      // Codex lists no commands; `/goal` is the one Platform maps onto the thread goal API.
+      expect(catalog.commands.map((command) => command.name)).toEqual(['goal'])
       // Skills come back scoped to the requested directory, which is how
       // `<cwd>/.codex/skills` is reachable at all. A disabled skill stays in the
       // list as unavailable, a nameless one is dropped, and the same name listed
@@ -2738,6 +2756,104 @@ describe('CodexProviderAdapter', () => {
         expect(events.filter((event) => event.type === 'conversation.state.changed')).toMatchObject(
           [{ payload: { state: 'compacted' }, turnId: providerTurnInput().turnId }],
         )
+      } finally {
+        await adapter.stopAll()
+      }
+    })
+  })
+
+  it('sets a goal for /goal and settles on the turn the goal starts', async () => {
+    await withFakeCodex(async ({ spawnLogPath }) => {
+      const adapter = new CodexProviderAdapter()
+      const events: ProviderRuntimeEvent[] = []
+      collectAdapterEvents(adapter, events)
+      try {
+        await adapter.sendTurn({
+          ...providerTurnInput(),
+          messageText: '/goal Make the suite green',
+        })
+        await settleRuntimeEvents()
+        const records = await readFakeCodexLog(spawnLogPath)
+        expect(records.find((record) => record.event === 'thread/goal/set')).toMatchObject({
+          params: { objective: 'Make the suite green', status: 'active' },
+        })
+        expect(records.map((record) => record.event)).not.toContain('turn/start')
+        expect(events.filter((event) => event.type === 'turn.started')).toMatchObject([
+          { providerRefs: { providerTurnId: 'goal-turn-1' }, turnId: providerTurnInput().turnId },
+        ])
+        expect(events.find((event) => event.type === 'goal.updated')).toMatchObject({
+          payload: {
+            goal: {
+              objective: 'Make the suite green',
+              status: 'active',
+              tokenBudget: 1000,
+              tokensUsed: 10,
+            },
+          },
+        })
+      } finally {
+        await adapter.stopAll()
+      }
+    })
+  })
+
+  it('answers a typed /goal pause and /goal resume with the goal they changed', async () => {
+    await withFakeCodex(async () => {
+      const adapter = new CodexProviderAdapter()
+      const events: ProviderRuntimeEvent[] = []
+      collectAdapterEvents(adapter, events)
+      const input = providerTurnInput()
+      const typed = (turnId: string, messageText: string) =>
+        adapter.sendTurn({ ...input, turnId: v.parse(turnIdSchema, turnId), messageText })
+      const reply = (turnId: string) =>
+        events.find((event) => event.type === 'assistant.delta' && event.turnId === turnId)
+      try {
+        await typed('goal-set', '/goal Make the suite green')
+        await typed('goal-pause', '/goal pause')
+        await settleRuntimeEvents()
+        expect(reply('goal-pause')).toMatchObject({ delta: 'Goal paused: Make the suite green' })
+        expect(events.filter((event) => event.type === 'goal.updated').at(-1)).toMatchObject({
+          payload: { goal: { status: 'paused' } },
+        })
+      } finally {
+        await adapter.stopAll()
+      }
+    })
+  })
+
+  it('pauses without a turn, and answers /goal clear itself', async () => {
+    await withFakeCodex(async ({ spawnLogPath }) => {
+      const adapter = new CodexProviderAdapter()
+      const events: ProviderRuntimeEvent[] = []
+      collectAdapterEvents(adapter, events)
+      const input = providerTurnInput()
+      try {
+        await adapter.sendTurn({ ...input, messageText: '/goal Make the suite green' })
+        await adapter.controlGoal({ action: 'pause', sessionId: input.sessionId })
+        await settleRuntimeEvents()
+        const goals = events.filter((event) => event.type === 'goal.updated')
+        expect(goals.at(-1)).toMatchObject({ payload: { goal: { status: 'paused' } } })
+
+        const clearTurn = {
+          ...input,
+          turnId: v.parse(turnIdSchema, 'goal-clear'),
+          messageText: '/goal clear',
+        }
+        await adapter.sendTurn(clearTurn)
+        await settleRuntimeEvents()
+        const records = await readFakeCodexLog(spawnLogPath)
+        expect(records.map((record) => record.event)).toContain('thread/goal/clear')
+        expect(events.filter((event) => event.type === 'goal.updated').at(-1)).toMatchObject({
+          payload: { goal: null },
+        })
+        expect(
+          events.find((event) => event.type === 'assistant.delta' && event.turnId === 'goal-clear'),
+        ).toMatchObject({ delta: 'Goal cleared.' })
+        expect(
+          events.filter(
+            (event) => event.type === 'turn.completed' && event.turnId === 'goal-clear',
+          ),
+        ).toHaveLength(1)
       } finally {
         await adapter.stopAll()
       }

@@ -494,7 +494,7 @@ phases or splits them into executable plans; not all research happens up front.
 | [141](plans/141-usage-and-rate-limits.md)      | executable             | Rate-limit meter, usage page with cost, usage history                                                                       |
 | 142 (done)                                     | executable             | Web Push from the mesh server                                                                                               |
 | [143](plans/143-phone-layout.md)               | direction approved     | What the phone is for; web layout versus the later companion app                                                            |
-| [144](plans/144-unattended-agent-work.md)      | in progress (P2 done)  | Scheduled, looping and multi-agent work: surface what the harnesses already do, build only the rest                         |
+| [144](plans/144-unattended-agent-work.md)      | in progress (P2–P3)    | Scheduled, looping and multi-agent work: surface what the harnesses already do, build only the rest                         |
 | [145](plans/145-harness-controls.md)           | small executable plans | Fork, approval rules, MCP status, background tasks, hooks, custom agents, compact, export                                   |
 | [172](plans/172-shared-undo-stack.md)          | research               | One undo/redo stack behind Mod+Z, extracted from the existing undo implementations; Plan 126 LIFE-13 first                  |
 | [173](plans/173-two-devices-one-workspace.md)  | research               | Two clients opening a workspace on one server: per-client open generations, what the losing client sees                     |
