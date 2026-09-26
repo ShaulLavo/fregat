@@ -25,8 +25,9 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  # A PR that changes only plans, docs or root Markdown runs no job below; nothing in them is
-  # built, typechecked or tested (package READMEs are code: tests read them). Main runs
+  # A PR that changes only Markdown under plans or docs, or root Markdown, runs no job below; none
+  # of it is built, typechecked or tested. Other files there are data tests read (stress#test reads
+  # docs/performance), and package READMEs are code too: tests read them. Main runs
   # everything: collapsed pending runs mean one run's diff is not everything since the last verdict.
   changes:
     name: Changes
@@ -47,8 +48,8 @@ jobs:
           filters: |
             code:
               - '**'
-              - '!plans/**'
-              - '!docs/**'
+              - '!plans/**/*.md'
+              - '!docs/**/*.md'
               - '!*.md'
 
   # Three jobs side by side: checks, core's tests (the longest, and the only ones that need
