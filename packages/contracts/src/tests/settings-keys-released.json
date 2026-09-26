@@ -59,6 +59,8 @@
     "environments.machines",
     "files.autoSave",
     "files.autoSaveDelay",
+    "files.picker.pinnedLocations",
+    "files.picker.hiddenLocations",
     "files.picker.view",
     "files.previewKilobytes",
     "files.searchIndexIdleMinutes",
