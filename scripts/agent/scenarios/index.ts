@@ -145,6 +145,7 @@ import { themeStudioAsync } from './theme-studio-async'
 import { themeStudioPreview } from './theme-studio-preview'
 import { filePickerSelection } from './file-picker-selection'
 import { filePickerBrowse } from './file-picker-browse'
+import { filePickerLocations } from './file-picker-locations'
 import { filePickerAppearance } from './file-picker-appearance'
 import { quickOpenPreview } from './quick-open-preview'
 import { themeStudio } from './theme-studio'
@@ -440,6 +441,7 @@ export const scenarios: readonly Scenario[] = [
   tailFollow,
   checkpointRestore,
   filePickerBrowse,
+  filePickerLocations,
   filePickerAppearance,
   filePickerSelection,
   themeStudioPreview,

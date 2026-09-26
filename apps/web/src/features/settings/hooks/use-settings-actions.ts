@@ -80,10 +80,12 @@ import { withMovedModel } from '@/features/settings/utils/patch'
 const SETTINGS_MUTATION_SCOPE = 'settings-document'
 
 /** Semantic settings actions shared by commands and settings controls. */
-export function useSettingsActions() {
-  const queryClient = useSettingsOwner()
+/** `owner` writes another machine's settings, such as the one a file picker browses. */
+export function useSettingsActions(owner?: QueryClient) {
+  const settingsOwner = useSettingsOwner()
+  const queryClient = owner ?? settingsOwner
   const client = clientForQueryClient(queryClient)
-  const projection = useSettingsProjection()
+  const projection = useSettingsProjection(queryClient)
   const transport = useMutation(
     {
       mutationFn: (entry: ActiveSettingsIntent) =>

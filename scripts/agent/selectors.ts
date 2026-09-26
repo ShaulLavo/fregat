@@ -291,6 +291,16 @@ export const selectors = {
       exact: true,
     }),
   pickerPreviewPath: (page: Page, path: string) => page.locator(`[data-file-preview="${path}"]`),
+  pickerSidebarSection: (page: Page, name: string) =>
+    selectors.pickerDialog(page).getByRole('region', { name, exact: true }),
+  pickerPinFolder: (page: Page, pinned: boolean) =>
+    page.getByRole('button', {
+      name: pinned ? 'Unpin this folder' : 'Pin this folder',
+      exact: true,
+    }),
+  /** A preview showing content: code, a decoded image or a folder's children. */
+  pickerPreviewContentSelector:
+    '[data-file-preview] [data-file-preview-text], [data-file-preview] img, [data-file-preview] ul',
   paletteImportText: (page: Page) =>
     page.getByRole('textbox', { name: 'Palette JSON', exact: true }),
   pickerPreview: (page: Page) => page.locator('[data-file-preview]'),
