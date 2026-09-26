@@ -130,7 +130,8 @@ export const selectors = {
     page
       .getByRole('region', { name: 'Agent question', exact: true })
       .filter({ hasText: prompt })
-      .getByRole('status'),
+      .getByRole('status')
+      .filter({ hasText: prompt }),
   questionAttachment: (page: Page, name: string) =>
     page.getByRole('button', { name: `Remove ${name}`, exact: true }),
   asyncQuestionAction: (page: Page, prompt: string, action: string) =>
