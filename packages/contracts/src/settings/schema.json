@@ -551,6 +551,13 @@
       "enum": ["15m", "1h", "24h", "6h", "all"],
       "type": "string"
     },
+    "logs.retentionDays": {
+      "default": 0,
+      "description": "Days of server log files this machine keeps, today included; older days are deleted once a day. 0 keeps every day, up to the writer's 60-file cap.",
+      "maximum": 3650,
+      "minimum": 0,
+      "type": "integer"
+    },
     "logs.slowThresholdMs": {
       "default": 500,
       "description": "How many milliseconds counts as a slow operation.",

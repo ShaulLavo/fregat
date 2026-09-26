@@ -46,6 +46,7 @@ import {
   recordRequestContext,
   recordRequestError,
   runDetached,
+  setLogRetentionDays,
 } from './observability'
 import { OrchestrationEngine } from './orchestration/engine'
 import { requireWorktree } from './orchestration/read-model'
@@ -213,6 +214,7 @@ export function createApp(options: AppOptions) {
   // keeps a test run from writing into the developer's real settings.
   const settings = new SettingsStore({ ...options.settings, workspaceRoot: fs.paths.workspaceRoot })
   fs.watchDirectoryLimit = () => settings.snapshot().values['files.watchDirectoryLimit']
+  setLogRetentionDays(() => settings.snapshot().values['logs.retentionDays'])
   let watchDirectoryLimit = settings.snapshot().values['files.watchDirectoryLimit']
   settings.onChange(() => {
     const next = settings.snapshot().values['files.watchDirectoryLimit']

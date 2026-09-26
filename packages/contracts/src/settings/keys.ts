@@ -949,6 +949,19 @@ export const SETTINGS_REGISTRY = {
     visibility: 'advanced',
     keywords: ['logs', 'time', 'range', 'filter'],
   }),
+  'logs.retentionDays': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(3650)),
+    default: 0,
+    // Machine scope: it deletes files on this machine, which no workspace file may ask for.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Logs',
+    title: 'Log retention',
+    description:
+      "Days of server log files this machine keeps, today included; older days are deleted once a day. 0 keeps every day, up to the writer's 60-file cap.",
+    visibility: 'advanced',
+    keywords: ['logs', 'retention', 'delete', 'days', 'disk', 'cleanup'],
+  }),
   'logs.slowThresholdMs': defineSetting({
     schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(60_000)),
     default: 500,
