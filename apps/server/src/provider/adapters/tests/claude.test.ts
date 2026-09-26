@@ -841,7 +841,7 @@ describe('ClaudeProviderAdapter', () => {
     await harness.adapter.stopAll()
   })
 
-  it('reports the Stop hook’s schedules, and says a replaced query ended them', async () => {
+  it('reports the Stop hook’s schedules', async () => {
     const harness = claudeHarness()
     const sessionId = v.parse(sessionIdSchema, '2f6b8c1d-4e3a-5b7c-9d8e-1a2b3c4d5e6f')
     await harness.adapter.startRuntime(sessionStartInput({ options: { effort: 'low' }, sessionId }))
@@ -872,11 +872,6 @@ describe('ClaudeProviderAdapter', () => {
       },
       sessionId,
     })
-
-    await harness.adapter.startRuntime(sessionStartInput({ options: { effort: 'max' }, sessionId }))
-    expect(runtimeWarnings(harness).map((event) => event.payload.message)).toEqual([
-      'Claude restarted with the new settings and ended its 2 schedules.',
-    ])
     await harness.adapter.stopAll()
   })
 

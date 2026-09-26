@@ -582,7 +582,6 @@ export class ClaudeProviderAdapter
         runtimeEpoch: input.runtimeEpoch,
         sessionId: input.sessionId,
       })
-      existing.warnSchedulesDropped()
       await existing.close()
       this.sessions.delete(input.sessionId)
     }
@@ -660,8 +659,6 @@ class ClaudeAgentSession extends SessionContext {
   private status: ProviderAdapterRuntime['status'] = 'starting'
   /** `type:resetsAt` of the limit stops this turn has already announced. */
   private readonly announcedLimitStops = new Set<string>()
-  /** How many schedules the last Stop hook listed; a replaced query drops them. */
-  private scheduleCount = 0
   private readonly scopedUsageModel: () => string | null
   private readonly resumed: boolean
 
@@ -969,7 +966,6 @@ class ClaudeAgentSession extends SessionContext {
         recurring: cron.recurring,
         schedule: cron.schedule,
       }))
-      this.scheduleCount = schedules.length
       this.emit({
         createdAt: new Date().toISOString(),
         eventId: runtimeEventId('claude-schedules-updated'),
@@ -984,14 +980,6 @@ class ClaudeAgentSession extends SessionContext {
       })
       return {}
     }
-  }
-
-  /** The replacement query starts without the old process's schedules; the timeline says so. */
-  warnSchedulesDropped() {
-    if (this.scheduleCount === 0) return
-    const count = this.scheduleCount === 1 ? 'its schedule' : `its ${this.scheduleCount} schedules`
-    this.emitRuntimeWarning(`Claude restarted with the new settings and ended ${count}.`)
-    this.scheduleCount = 0
   }
 
   async close() {

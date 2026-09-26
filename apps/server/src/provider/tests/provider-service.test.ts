@@ -125,6 +125,48 @@ describe('ProviderService', () => {
     }
   })
 
+  it('names the schedules a settings change ends, on the new runtime’s timeline', async () => {
+    const fixture = createFixture()
+    const adapter = new MockProviderAdapter({ wakeupMinutes: 30 })
+    const service = new ProviderService({
+      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      sessionDirectory: new ProviderSessionDirectory(fixture.database),
+    })
+    const events: ProviderRuntimeEvent[] = []
+    service.subscribeRuntimeEvents((event) => {
+      events.push(event)
+    })
+    const turn = providerTurnInput()
+    try {
+      await service.sendTurn(turn)
+      await service.drainRuntimeEvents()
+      expect(service.sleepingUntil(turn.sessionId)).not.toBeNull()
+
+      await service.ensureRuntime({
+        providerInstanceId: turn.providerInstanceId,
+        runtimeMode: turn.runtimeMode,
+        runtimeEpoch: 'runtime-epoch-2',
+        sessionId: turn.sessionId,
+        runtimePayload: {
+          ...providerSessionPayload(turn),
+          modelSelection: { ...turn.modelSelection, model: 'gpt-5.5' },
+        },
+      })
+      await service.drainRuntimeEvents()
+
+      expect(events.filter((event) => event.type === 'runtime.warning')).toMatchObject([
+        {
+          payload: { message: 'The agent restarted with the new settings and ended its schedule.' },
+          runtimeEpoch: 'runtime-epoch-2',
+        },
+      ])
+      expect(service.sleepingUntil(turn.sessionId)).toBeNull()
+    } finally {
+      await service.shutdown()
+      fixture.close()
+    }
+  })
+
   it('keeps a sleeping runtime past the idle deadline, and reclaims it once its schedules end', async () => {
     vi.useFakeTimers()
     const fixture = createFixture()

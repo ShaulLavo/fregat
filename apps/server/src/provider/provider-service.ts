@@ -212,8 +212,35 @@ export class ProviderService {
     }
   }
 
-  /** Background work and schedules both live in the provider process; reaping it loses them. */
-  private keepsProcess(sessionId: SessionId) {
+  /** Stamped with the new runtime's epoch, so the timeline keeps it. */
+  private warnSchedulesDropped(
+    adapter: ReturnType<ProviderAdapterRegistry['getByInstance']>,
+    input: ProviderEnsureRuntimeInput,
+    count: number,
+  ) {
+    const schedules = count === 1 ? 'its schedule' : `its ${count} schedules`
+    const event: ProviderRuntimeEvent = {
+      createdAt: new Date().toISOString(),
+      eventId: `schedules-dropped:${crypto.randomUUID()}`,
+      payload: { message: `The agent restarted with the new settings and ended ${schedules}.` },
+      provider: adapter.driverKind,
+      providerInstanceId: input.providerInstanceId,
+      runtimeEpoch: input.runtimeEpoch,
+      sessionId: input.sessionId,
+      type: 'runtime.warning',
+    }
+    void this.runtimeEvents
+      .enqueue({ adapter, event, providerInstanceId: input.providerInstanceId })
+      .catch((error) =>
+        recordChatPipelineWarning('chat.pipeline.provider_service.runtime_stream.failed', {
+          error,
+          providerInstanceId: input.providerInstanceId,
+        }),
+      )
+  }
+
+  /** Background work and schedules both live in the provider process; stopping it loses them. */
+  keepsProcess(sessionId: SessionId) {
     return this.backgroundTasks.get(sessionId) !== null || this.schedules.has(sessionId)
   }
 
@@ -329,6 +356,8 @@ export class ProviderService {
       return { binding, reused: true }
     }
 
+    // A replaced process takes its schedules with it; count them before the new one starts.
+    const droppedSchedules = existing ? this.schedules.list(input.sessionId).length : 0
     await this.stopReplacedBinding(existing, input.providerInstanceId)
     // A parameter change (model, runtime mode, cwd) restarts the session but
     // must not restart the *conversation*: the cursor of the account we are
@@ -359,8 +388,10 @@ export class ProviderService {
 
     recordChatPipelineInfo('chat.pipeline.provider_service.ensure_session.complete', {
       ...providerBindingSummary(binding),
+      droppedSchedules,
       reused: false,
     })
+    if (droppedSchedules > 0) this.warnSchedulesDropped(adapter, input, droppedSchedules)
 
     return { binding, reused: false }
   }
