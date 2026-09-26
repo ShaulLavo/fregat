@@ -246,7 +246,11 @@ export function ChatDraftView({
       return 'started'
     }
 
-    useChatInputDraftStore.getState().setIdentity(draftTarget, null)
+    // Nulling only the identity left the prompt behind, and mutating the draft here
+    // trips ChatInput's own post-send clear (it treats any change during the send as
+    // the user still typing). The identity-recreation effect above re-forms an
+    // identity around that leftover text, which is how a sent draft outlives its send.
+    useChatInputDraftStore.getState().clearDraft(draftTarget)
     if (navigation.getSnapshot() === operation) onSessionCreated(outcome.sessionId)
 
     return 'sent'
