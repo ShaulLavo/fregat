@@ -41,6 +41,7 @@ type DiagnosticsPool = {
     match: LspServerMatch,
     uri: string,
     timeoutMs: number,
+    text: string,
   ): Promise<LspFileDiagnostics | null>
 }
 
@@ -70,7 +71,12 @@ export class AgentDiagnosticsReader implements AgentDiagnosticsSource {
       ])
       const match = bestLspMatchForFeature(matches, 'diagnostics') ?? matches[0]
       if (!match || remaining() <= 0) return null
-      const result = await this.pool().fileDiagnostics(match, fileUriForPath(filePath), remaining())
+      const result = await this.pool().fileDiagnostics(
+        match,
+        fileUriForPath(filePath),
+        remaining(),
+        text,
+      )
       if (!result) return null
       return { text, mode: result.mode, errors: result.diagnostics.flatMap(agentError) }
     })

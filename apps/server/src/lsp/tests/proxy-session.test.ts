@@ -75,9 +75,13 @@ describe('agent diagnostics deadlines', () => {
     const result = { capabilities: { diagnosticProvider: {} } }
     fixture.respond({ id: fixture.serverMessages[0]?.id, jsonrpc: '2.0', result })
     await initializing
-    const joining = second.handleClientMessage(json(initializeRequest(2, {
-      initializationOptions: { sibling: true },
-    })))
+    const joining = second.handleClientMessage(
+      json(
+        initializeRequest(2, {
+          initializationOptions: { sibling: true },
+        }),
+      ),
+    )
     await waitFor(() => sibling.messages.length === 1, 'expected sibling initialize')
     sibling.respond({ id: sibling.messages[0]?.id, jsonrpc: '2.0', result })
     await joining
@@ -85,12 +89,18 @@ describe('agent diagnostics deadlines', () => {
     vi.useFakeTimers()
     try {
       let settled = false
-      const reading = fixture.pool.fileDiagnostics(fixture.match, 'file:///repo/a.ts', 100)
-        .then((value) => { settled = true; return value })
+      const reading = fixture.pool
+        .fileDiagnostics(fixture.match, 'file:///repo/a.ts', 100, '')
+        .then((value) => {
+          settled = true
+          return value
+        })
       await vi.advanceTimersByTimeAsync(101)
       expect(settled).toBe(true)
       expect(await reading).toBeNull()
-      expect(sibling.messages.some((message) => message.method === 'textDocument/diagnostic')).toBe(false)
+      expect(sibling.messages.some((message) => message.method === 'textDocument/diagnostic')).toBe(
+        false,
+      )
     } finally {
       await vi.runAllTimersAsync()
       vi.useRealTimers()
@@ -104,22 +114,49 @@ describe('agent diagnostics deadlines', () => {
     await writeFile(path.join(fixture.match.root, 'tsconfig.json'), '{}')
     const uri = fileUriForPath(filePath)
     await fixture.first.handleClientMessage(json(didOpen(uri, 'export const value = 1')))
-    fixture.respond({ jsonrpc: '2.0', method: 'textDocument/publishDiagnostics', params: { uri, diagnostics: [] } })
+    fixture.respond({
+      jsonrpc: '2.0',
+      method: 'textDocument/publishDiagnostics',
+      params: { uri, diagnostics: [] },
+    })
     let poolReads = 0
     const reader = new AgentDiagnosticsReader({
       enabled: () => true,
-      pool: () => { poolReads += 1; return fixture.pool },
-      settings: () => ({ servers: {}, languageServers: { typescript: ['typescript'] }, tyForPython: false }),
+      pool: () => {
+        poolReads += 1
+        return fixture.pool
+      },
+      settings: () => ({
+        servers: {},
+        languageServers: { typescript: ['typescript'] },
+        tyForPython: false,
+      }),
     })
     // The same real filesystem lookup reaches the backend when it is not delayed.
     const good = reader.errors(filePath, fixture.match.root, 500)
-    setTimeout(() => fixture.respond({ jsonrpc: '2.0', method: 'textDocument/publishDiagnostics', params: { uri, diagnostics: [] } }), 30)
-    await expect(good).resolves.toEqual({ mode: 'push', text: 'export const value = 1', errors: [] })
+    setTimeout(
+      () =>
+        fixture.respond({
+          jsonrpc: '2.0',
+          method: 'textDocument/publishDiagnostics',
+          params: { uri, diagnostics: [] },
+        }),
+      30,
+    )
+    await expect(good).resolves.toEqual({
+      mode: 'push',
+      text: 'export const value = 1',
+      errors: [],
+    })
     expect(poolReads).toBe(1)
     let entered!: () => void
     let release!: () => void
-    const matching = new Promise<void>((resolve) => { entered = resolve })
-    const gate = new Promise<void>((resolve) => { release = resolve })
+    const matching = new Promise<void>((resolve) => {
+      entered = resolve
+    })
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
     const access = fs.access
     const delayed = vi.spyOn(fs, 'access').mockImplementation(async (...args) => {
       entered()

@@ -324,11 +324,12 @@ export class LspSessionPool implements LspSessionSource {
     match: LspServerMatch,
     uri: string,
     timeoutMs: number,
+    text: string,
   ): Promise<LspFileDiagnostics | null> {
     return withinDiagnosticsBudget(timeoutMs, async (remaining) => {
       for (const session of this.liveSessions(lspProxySessionKey(match))) {
         if (remaining() <= 0) return null
-        const result = await session.fileDiagnostics(uri, remaining())
+        const result = await session.fileDiagnostics(uri, remaining(), text)
         if (result) return result
       }
       return null
@@ -402,8 +403,8 @@ class PooledLspProxySession {
   readonly key: string
   private readonly match: LspServerMatch
   private readonly pendingRequests = new Map<JsonRpcId, PendingBackendRequest>()
-  /** Callers waiting for a file's next publish, per uri. */
-  private readonly publishWaiters = new Map<string, Set<() => void>>()
+  /** Readers waiting for document synchronization or diagnostics, per uri. */
+  private readonly fileWaiters = new Map<string, Set<() => void>>()
   private readonly idleTimeoutMs: () => number
   private readonly deltaEnabled: () => boolean
   private readonly pool: LspSessionPool
@@ -494,26 +495,57 @@ class PooledLspProxySession {
     return negotiatedSemanticTokens(this.initializeResult?.result)
   }
 
-  /**
-   * A pull server is told the file changed on disk, then asked; the watcher's own notice comes
-   * after its flush, too late for the answer. A push server answers with its next publish for an
-   * open document, which the editor's sync of the disk edit triggers.
-   */
-  async fileDiagnostics(uri: string, timeoutMs: number): Promise<LspFileDiagnostics | null> {
-    if (this.disposed || !this.initializeResult) return null
-    if (supportsPullDiagnostics(this.initializeResult.result)) {
-      this.notifyWatchedFiles([{ uri, type: FILE_CHANGED }])
-      const response = await this.backendRequest(
-        'textDocument/diagnostic',
-        { textDocument: { uri } },
-        timeoutMs,
-      )
-      const items = isRecord(response?.result) ? response.result.items : null
-      return Array.isArray(items) ? { mode: 'pull', diagnostics: items } : null
-    }
+  /** Open documents must match the disk snapshot before their diagnostics can describe the edit. */
+  fileDiagnostics(
+    uri: string,
+    timeoutMs: number,
+    text: string,
+  ): Promise<LspFileDiagnostics | null> {
+    return withinDiagnosticsBudget(timeoutMs, async (remaining) => {
+      if (this.disposed || !this.initializeResult) return null
+      const synchronized = await this.waitForFileState(uri, remaining(), () => {
+        const document = this.documents.get(uri)
+        return !document || document.text === text
+      })
+      if (!synchronized || remaining() <= 0) return null
+      if (supportsPullDiagnostics(this.initializeResult.result))
+        return this.pullFileDiagnostics(uri, text, remaining())
+      return this.publishedFileDiagnostics(uri, text, remaining())
+    })
+  }
+
+  private async pullFileDiagnostics(
+    uri: string,
+    text: string,
+    timeoutMs: number,
+  ): Promise<LspFileDiagnostics | null> {
+    const document = this.documents.get(uri)
+    if (document && document.text !== text) return null
+    const version = document?.backendVersion
+    this.notifyWatchedFiles([{ uri, type: FILE_CHANGED }])
+    const response = await this.backendRequest(
+      'textDocument/diagnostic',
+      { textDocument: { uri } },
+      timeoutMs,
+    )
+    if (this.documents.get(uri) !== document || document?.backendVersion !== version) return null
+    const items = isRecord(response?.result) ? response.result.items : null
+    return Array.isArray(items) ? { mode: 'pull', diagnostics: items } : null
+  }
+
+  private async publishedFileDiagnostics(
+    uri: string,
+    text: string,
+    timeoutMs: number,
+  ): Promise<LspFileDiagnostics | null> {
     if (!this.documents.has(uri)) return null
-    await this.nextPublish(uri, timeoutMs)
-    const published = publishedDiagnostics(this.documents.get(uri)?.diagnostics ?? null)
+    const ready = await this.waitForFileState(uri, timeoutMs, () => {
+      const document = this.documents.get(uri)
+      return !document || (document.text === text && document.diagnostics !== null)
+    })
+    const document = this.documents.get(uri)
+    if (!ready || document?.text !== text) return null
+    const published = publishedDiagnostics(document.diagnostics)
     return published ? { mode: 'push', diagnostics: published } : null
   }
 
@@ -540,18 +572,28 @@ class PooledLspProxySession {
     })
   }
 
-  private nextPublish(uri: string, timeoutMs: number) {
-    return new Promise<void>((resolve) => {
-      const waiters = this.publishWaiters.get(uri) ?? new Set<() => void>()
-      const done = () => {
+  private waitForFileState(uri: string, timeoutMs: number, ready: () => boolean): Promise<boolean> {
+    if (this.disposed || timeoutMs <= 0) return Promise.resolve(false)
+    if (ready()) return Promise.resolve(true)
+    return new Promise<boolean>((resolve) => {
+      const waiters = this.fileWaiters.get(uri) ?? new Set<() => void>()
+      const done = (value: boolean) => {
         clearTimeout(timer)
-        waiters.delete(done)
-        resolve()
+        waiters.delete(check)
+        if (waiters.size === 0) this.fileWaiters.delete(uri)
+        resolve(value)
       }
-      const timer = setTimeout(done, timeoutMs)
-      waiters.add(done)
-      this.publishWaiters.set(uri, waiters)
+      const check = () => {
+        if (this.disposed || ready()) done(!this.disposed)
+      }
+      const timer = setTimeout(() => done(false), timeoutMs)
+      waiters.add(check)
+      this.fileWaiters.set(uri, waiters)
     })
+  }
+
+  private wakeFileReaders(uri: string): void {
+    for (const waiter of this.fileWaiters.get(uri) ?? []) waiter()
   }
 
   connect(socket: LspProxySocket): LspProxyClientSession {
@@ -1170,6 +1212,7 @@ class PooledLspProxySession {
     shared.text = opened.text
     shared.owners.set(connection, synchronizedOwner(opened, shared))
     connection.addDocument(opened.uri)
+    this.wakeFileReaders(opened.uri)
   }
 
   private openBackendDocument(
@@ -1189,6 +1232,7 @@ class PooledLspProxySession {
     this.documents.set(document.uri, shared)
     owner.addDocument(document.uri)
     this.writeToServer(JSON.stringify(rewriteTextDocumentVersion(message, shared.backendVersion)))
+    this.wakeFileReaders(document.uri)
   }
 
   private handleDidChange(connection: LspProxyConnection, message: JsonRpcNotification): void {
@@ -1237,6 +1281,7 @@ class PooledLspProxySession {
     owner.lastSyncEpoch = syncEpoch
     owner.synchronizedBackendVersion = backendVersion
     owner.text = text
+    this.wakeFileReaders(change.uri)
   }
 
   private handleDidClose(connection: LspProxyConnection, message: JsonRpcNotification): void {
@@ -1258,6 +1303,7 @@ class PooledLspProxySession {
     if (document.owners.size > 0) return
 
     this.documents.delete(uri)
+    this.wakeFileReaders(uri)
     // The server's own cache for this document dies with the `didClose`, so a
     // baseline kept past it would be a `previousResultId` nothing can diff.
     this.semanticTokenBaselines.delete(uri)
@@ -1545,7 +1591,7 @@ class PooledLspProxySession {
     if (!document || !Array.isArray(params.diagnostics)) return
     if (params.version !== undefined && params.version !== document.backendVersion) return
     document.diagnostics = notification
-    for (const waiter of this.publishWaiters.get(params.uri) ?? []) waiter()
+    this.wakeFileReaders(params.uri)
   }
 
   private broadcastServerMessage(message: string): void {
@@ -1695,6 +1741,7 @@ class PooledLspProxySession {
 
   /** Says why, then closes; the editor reports the close as `LspServerExitedError`. */
   private closeConnections(outcome: string): void {
+    for (const uri of this.fileWaiters.keys()) this.wakeFileReaders(uri)
     const exit = JSON.stringify({
       jsonrpc: '2.0',
       method: LSP_SERVER_EXITED,

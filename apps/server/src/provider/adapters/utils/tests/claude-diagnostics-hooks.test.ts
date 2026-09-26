@@ -95,24 +95,38 @@ describe('diagnostics after an agent edit', () => {
   })
 
   it('reports the inserted duplicate location and suppresses the moved old occurrence', () => {
-    const beforeText = Array.from({ length: 10 }, (_, i) => i === 9 ? 'missing()' : `// ${i}`).join('\n')
+    const beforeText = Array.from({ length: 10 }, (_, i) =>
+      i === 9 ? 'missing()' : `// ${i}`,
+    ).join('\n')
     const afterLines = beforeText.split('\n')
     afterLines.splice(1, 0, 'missing()')
     const old = { ...existing, line: 10 }
     const inserted = { ...existing, line: 2 }
     const moved = { ...existing, line: 11 }
-    expect(newErrors(
-      [old], [inserted, moved],
-      { beforeText, afterText: afterLines.join('\n'), timeoutMs: 750 },
-    )).toEqual([inserted])
-    expect(newErrors(
-      [old], [moved],
-      { beforeText, afterText: `// added\n${beforeText}`, timeoutMs: 750 },
-    )).toEqual([])
+    expect(
+      newErrors([old], [inserted, moved], {
+        beforeText,
+        afterText: afterLines.join('\n'),
+        timeoutMs: 750,
+      }),
+    ).toEqual([inserted])
+    expect(
+      newErrors([old], [moved], {
+        beforeText,
+        afterText: `// added\n${beforeText}`,
+        timeoutMs: 750,
+      }),
+    ).toEqual([])
   })
 
   it('matches errors as a multiset and caps what one file reports', () => {
-    expect(newErrors([existing], [existing, existing], { beforeText: TEXT, afterText: TEXT, timeoutMs: 750 })).toEqual([existing])
+    expect(
+      newErrors([existing], [existing, existing], {
+        beforeText: TEXT,
+        afterText: TEXT,
+        timeoutMs: 750,
+      }),
+    ).toEqual([existing])
     const many = Array.from({ length: 12 }, (_, line) => ({ ...introduced, line: line + 1 }))
     const text = diagnosticsFeedback('a.ts', many) ?? ''
     expect(text).toContain('introduced 12 errors')

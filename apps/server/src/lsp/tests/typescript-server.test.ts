@@ -1,3 +1,5 @@
+import { claudeDiagnosticsHooks } from '../../provider/adapters/utils/claude-diagnostics-hooks'
+
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { mkdir, rename, rm, symlink, writeFile } from 'node:fs/promises'
@@ -80,36 +82,13 @@ describe('the errors an agent edit introduced, from a running language server', 
     async ({ packageName, native }) => {
       const clean = 'export const count: number = 1\n'
       const broken = 'export const count: number = "one"\n'
-      const fixture = await installedTypeScriptRuntimeFixture(packageName, {
-        'package.json': '{"private":true,"type":"module"}\n',
-        'tsconfig.json': '{"compilerOptions":{"strict":true},"files":["probe.ts"]}\n',
-        'probe.ts': clean,
-      })
-      fixtures.push(fixture)
-      const { root } = fixture
-      const filePath = path.join(root, 'probe.ts')
-      const uri = fileUriForPath(filePath)
-      const match = await resolveLspServer({
-        filePath,
-        serverId: 'typescript',
-        settings: SETTINGS,
-        workspaceRoot: root,
-      })
-      if (!match) throw createInternalError('TypeScript fixture did not match its language server')
-      const { pool } = watchedPool()
-      const socket = new RecordingSocket()
-      const session = await pool.acquire(socket, match, root)
-      if (!session)
-        throw createInternalError('TypeScript fixture did not start its language server')
-      await request(session, socket, 1, 'initialize', initializeParams(root))
-      await notify(session, 'initialized', {})
-      const reader = new AgentDiagnosticsReader({
-        enabled: () => true,
-        pool: () => pool,
-        settings: () => SETTINGS,
-      })
+      const { root, filePath, uri, session, reader } = await agentFileFixture(packageName, clean)
       if (native)
-        expect(await reader.errors(filePath, root, 20_000)).toEqual({ mode: 'pull', text: clean, errors: [] })
+        expect(await reader.errors(filePath, root, 20_000)).toEqual({
+          mode: 'pull',
+          text: clean,
+          errors: [],
+        })
       if (!native)
         await notify(session, 'textDocument/didOpen', {
           textDocument: { languageId: 'typescript', text: clean, uri, version: 1 },
@@ -133,6 +112,165 @@ describe('the errors an agent edit introduced, from a running language server', 
     },
   )
 })
+
+describe('Claude edit hooks with an open TypeScript document', () => {
+  it.each(RUNTIMES)(
+    'waits for editor synchronization with $packageName',
+    async ({ packageName, native }) => {
+      const clean = 'export const count: number = 1\n'
+      const broken = 'export const count: number = "one"\n'
+      const fixture = await agentFileFixture(packageName, clean)
+      const { root, filePath, uri, session, reader } = fixture
+      await openAgentFile(fixture, clean, native, [])
+      const hooks = claudeDiagnosticsHooks(reader)
+      await runDiagnosticHook(hooks, 'PreToolUse', root)
+      await writeFile(filePath, broken)
+      let settled = false
+      const reading = runDiagnosticHook(hooks, 'PostToolUse', root).then((result) => {
+        settled = true
+        return result
+      })
+      await new Promise((resolve) => setTimeout(resolve, 150))
+      const completedBeforeSync = settled
+      await notify(session, 'textDocument/didChange', {
+        contentChanges: [{ text: broken }],
+        textDocument: { uri, version: 2 },
+      })
+      const output = await reading
+      expect(completedBeforeSync).toBe(false)
+      expect(output).toMatchObject({
+        hookSpecificOutput: {
+          additionalContext: expect.stringContaining('- line 1: Type'),
+        },
+      })
+    },
+  )
+
+  it.each(RUNTIMES)(
+    'returns unavailable without editor synchronization with $packageName',
+    async ({ packageName, native }) => {
+      const clean = 'export const count: number = 1\n'
+      const fixture = await agentFileFixture(packageName, clean)
+      const { root, filePath, reader } = fixture
+      await openAgentFile(fixture, clean, native, [])
+      await writeFile(filePath, 'export const count: number = "one"\n')
+      expect(await reader.errors(filePath, root, 100)).toBeNull()
+    },
+  )
+
+  it.each(RUNTIMES)(
+    'reports the inserted duplicate at line 2 with $packageName',
+    async ({ packageName, native }) => {
+      const before =
+        Array.from({ length: 10 }, (_, line) => (line === 9 ? 'missing()' : `// ${line}`)).join(
+          '\n',
+        ) + '\n'
+      const lines = before.split('\n')
+      lines.splice(1, 0, 'missing()')
+      const after = lines.join('\n')
+      const fixture = await agentFileFixture(packageName, before)
+      const { root, filePath, uri, session, reader } = fixture
+      await openAgentFile(fixture, before, native, [2304])
+      const hooks = claudeDiagnosticsHooks(reader)
+      await runDiagnosticHook(hooks, 'PreToolUse', root)
+      await writeFile(filePath, after)
+      const reading = runDiagnosticHook(hooks, 'PostToolUse', root)
+      await notify(session, 'textDocument/didChange', {
+        contentChanges: [{ text: after }],
+        textDocument: { uri, version: 2 },
+      })
+      expect(await reading).toMatchObject({
+        hookSpecificOutput: {
+          additionalContext: [
+            '<new-diagnostics>',
+            'Your edit to probe.ts introduced 1 error:',
+            "- line 2: Cannot find name 'missing'. (2304)",
+            '</new-diagnostics>',
+          ].join('\n'),
+        },
+      })
+    },
+  )
+})
+
+async function openAgentFile(
+  fixture: Awaited<ReturnType<typeof agentFileFixture>>,
+  text: string,
+  native: boolean,
+  codes: readonly number[],
+) {
+  const { session, socket, uri } = fixture
+  await notify(session, 'textDocument/didOpen', {
+    textDocument: { languageId: 'typescript', text, uri, version: 1 },
+  })
+  if (native) {
+    const result = await request(session, socket, 2, 'textDocument/diagnostic', {
+      textDocument: { uri },
+    })
+    expect(errorCodes(result, 'items')).toEqual(codes)
+    return
+  }
+  await expect
+    .poll(() => errorCodes(socket.notification('textDocument/publishDiagnostics'), 'diagnostics'), {
+      timeout: 20_000,
+    })
+    .toEqual(codes)
+}
+
+async function agentFileFixture(packageName: string, clean: string) {
+  const fixture = await installedTypeScriptRuntimeFixture(packageName, {
+    'package.json': '{"private":true,"type":"module"}\n',
+    'tsconfig.json': '{"compilerOptions":{"strict":true},"files":["probe.ts"]}\n',
+    'probe.ts': clean,
+  })
+  fixtures.push(fixture)
+  const { root } = fixture
+  const filePath = path.join(root, 'probe.ts')
+  const uri = fileUriForPath(filePath)
+  const match = await resolveLspServer({
+    filePath,
+    serverId: 'typescript',
+    settings: SETTINGS,
+    workspaceRoot: root,
+  })
+  if (!match) throw createInternalError('TypeScript fixture did not match its language server')
+  const { pool } = watchedPool()
+  const socket = new RecordingSocket()
+  const session = await pool.acquire(socket, match, root)
+  if (!session) throw createInternalError('TypeScript fixture did not start its language server')
+  await request(session, socket, 1, 'initialize', initializeParams(root))
+  await notify(session, 'initialized', {})
+  const reader = new AgentDiagnosticsReader({
+    enabled: () => true,
+    pool: () => pool,
+    settings: () => SETTINGS,
+  })
+  return { root, filePath, uri, session, socket, reader }
+}
+
+function runDiagnosticHook(
+  hooks: ReturnType<typeof claudeDiagnosticsHooks>,
+  event: 'PreToolUse' | 'PostToolUse',
+  cwd: string,
+) {
+  const callback = hooks[event]?.[0]?.hooks[0]
+  if (!callback) throw createInternalError('Missing diagnostic hook')
+  const input = {
+    cwd,
+    session_id: 'fixture',
+    transcript_path: '/unused',
+    tool_name: 'Edit',
+    tool_use_id: 'edit',
+    tool_input: { file_path: 'probe.ts' },
+  }
+  return callback(
+    event === 'PreToolUse'
+      ? { ...input, hook_event_name: event }
+      : { ...input, hook_event_name: event, tool_response: {} },
+    'edit',
+    { signal: new AbortController().signal },
+  )
+}
 
 describe('workspace TypeScript against real language servers', () => {
   it.each(RUNTIMES)(

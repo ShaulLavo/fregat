@@ -19,7 +19,10 @@ const BUDGET_MS = 1_500
 export function claudeDiagnosticsHooks(
   source: AgentDiagnosticsSource,
 ): Partial<Record<HookEvent, HookCallbackMatcher[]>> {
-  const baselines = new Map<string, NonNullable<Awaited<ReturnType<AgentDiagnosticsSource['errors']>>>>()
+  const baselines = new Map<
+    string,
+    NonNullable<Awaited<ReturnType<AgentDiagnosticsSource['errors']>>>
+  >()
   const before: HookCallback = async (input) => {
     if (input.hook_event_name !== 'PreToolUse' || !source.enabled()) return {}
     const filePath = editedPath(input.tool_input, input.cwd)
@@ -37,11 +40,13 @@ export function claudeDiagnosticsHooks(
     if (!filePath || !baseline || !source.enabled()) return {}
     const startedAt = performance.now()
     const result = await source.errors(filePath, input.cwd, BUDGET_MS / 2)
-    const introduced = result ? newErrors(baseline.errors, result.errors, {
-      beforeText: baseline.text,
-      afterText: result.text,
-      timeoutMs: BUDGET_MS / 2 - (performance.now() - startedAt),
-    }) : []
+    const introduced = result
+      ? newErrors(baseline.errors, result.errors, {
+          beforeText: baseline.text,
+          afterText: result.text,
+          timeoutMs: BUDGET_MS / 2 - (performance.now() - startedAt),
+        })
+      : []
     recordChatPipelineInfo('agent.diagnostics', {
       durationMs: elapsedMs(startedAt),
       errorsAfter: result?.errors.length ?? null,

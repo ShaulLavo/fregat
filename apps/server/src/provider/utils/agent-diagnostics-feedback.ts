@@ -13,6 +13,7 @@ export function newErrors(
   source: { beforeText: string; afterText: string; timeoutMs: number },
 ): AgentDiagnostic[] {
   if (source.timeoutMs <= 0) return []
+  const deadline = performance.now() + source.timeoutMs
   const lines = unchangedLines(source)
   if (!lines) return []
   const remaining = new Map<string, number>()
@@ -31,7 +32,7 @@ export function newErrors(
     }
     introduced.push(error)
   }
-  return introduced
+  return performance.now() < deadline ? introduced : []
 }
 
 /** What the agent reads after its edit; null when there is nothing new to say. */
@@ -64,11 +65,19 @@ function unchangedLines(source: { beforeText: string; afterText: string; timeout
   let beforeLine = 1
   let afterLine = 1
   for (const change of changes) {
-    if (!change.added && !change.removed)
-      for (let offset = 0; offset < change.count; offset += 1)
-        lines.set(beforeLine + offset, afterLine + offset)
+    if (!change.added && !change.removed) mapLineRange(lines, beforeLine, afterLine, change.count)
     if (!change.added) beforeLine += change.count
     if (!change.removed) afterLine += change.count
   }
   return lines
+}
+
+function mapLineRange(
+  lines: Map<number, number>,
+  beforeLine: number,
+  afterLine: number,
+  count: number,
+) {
+  for (let offset = 0; offset < count; offset += 1)
+    lines.set(beforeLine + offset, afterLine + offset)
 }
