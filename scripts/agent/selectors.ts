@@ -131,7 +131,8 @@ export const selectors = {
     page
       .getByRole('region', { name: 'Agent question', exact: true })
       .filter({ hasText: prompt })
-      .getByRole('status'),
+      .getByRole('status')
+      .filter({ hasText: prompt }),
   questionAttachment: (page: Page, name: string) =>
     page.getByRole('button', { name: `Remove ${name}`, exact: true }),
   asyncQuestionAction: (page: Page, prompt: string, action: string) =>
@@ -292,6 +293,16 @@ export const selectors = {
       exact: true,
     }),
   pickerPreviewPath: (page: Page, path: string) => page.locator(`[data-file-preview="${path}"]`),
+  pickerSidebarSection: (page: Page, name: string) =>
+    selectors.pickerDialog(page).getByRole('region', { name, exact: true }),
+  pickerPinFolder: (page: Page, pinned: boolean) =>
+    page.getByRole('button', {
+      name: pinned ? 'Unpin this folder' : 'Pin this folder',
+      exact: true,
+    }),
+  /** A preview showing content: code, a decoded image or a folder's children. */
+  pickerPreviewContentSelector:
+    '[data-file-preview] [data-file-preview-text], [data-file-preview] img, [data-file-preview] ul',
   paletteImportText: (page: Page) =>
     page.getByRole('textbox', { name: 'Palette JSON', exact: true }),
   pickerPreview: (page: Page) => page.locator('[data-file-preview]'),
@@ -304,6 +315,8 @@ export const selectors = {
     page.locator(`[data-studio-themes] [role="option"][data-theme-id="${id}"]`),
   titlebar: (page: Page) => page.locator('header[data-native-window-drag-region]').first(),
   themeStudioOpen: (page: Page) => page.getByRole('button', { name: 'Open studio', exact: true }),
+  quickOpenPreviewHeaderSelector: '[aria-label="File preview"] header',
+  quickOpenPreviewTextSelector: '[aria-label="File preview"] [data-file-preview-text]',
   quickOpenPreview: (page: Page) => page.getByRole('region', { name: 'File preview', exact: true }),
   pickerColumn: (page: Page, index: number) => page.locator(`[data-picker-column="${index}"]`),
   pickerColumnBox: (page: Page, index: number) =>
@@ -523,6 +536,14 @@ export const selectors = {
   chooseFolder: (page: Page) => page.getByRole('button', { name: 'Choose folder', exact: true }),
   settingsDialog: (page: Page) => page.getByRole('dialog', { name: 'Settings', exact: true }),
   settingsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search settings' }),
+  settingsShowAll: (page: Page) => page.getByRole('button', { name: 'Show all settings' }),
+  settingsCategoryHeading: (page: Page, name: string) =>
+    page.getByRole('heading', { name, exact: true }),
+  projectSettingsSection: (page: Page, title: string) =>
+    page.getByRole('region', { name: `${title} settings` }),
+  projectSetting: (page: Page, name: string) => page.getByRole('combobox', { name, exact: true }),
+  projectSettingOption: (page: Page, name: string | RegExp) =>
+    page.getByRole('option', { name, exact: true }),
   settingsFeel: (page: Page) => page.getByRole('combobox', { name: 'Feel', exact: true }),
   feelOption: (page: Page, name: string) => page.getByRole('option', { name, exact: true }),
   physicalGallery: (page: Page) => page.locator('[data-physical-gallery]'),

@@ -71,6 +71,11 @@ function appendOperationMetadata(
     appendUnique(settingIds, 'spellcheck.words')
     return
   }
+  if (operation.kind === 'project.set') {
+    appendUnique(settingIds, operation.key)
+    appendUnique(affectedIds, operation.projectId)
+    return
+  }
 
   appendUnique(settingIds, 'providers.instances')
   appendUnique(affectedIds, operation.providerInstanceId)
