@@ -15,6 +15,7 @@ import { noteKeyboardEvent, useKeyboardSeen } from '@/features/settings/state/ke
 import { recordingStep } from '@/features/settings/utils/shortcut-recording'
 
 export type RecorderPreview = {
+  readonly blockedBy: string | null
   /** Commands the candidate chord would take, with where each uses it. */
   readonly takes: readonly { readonly title: string; readonly where: string }[]
   /** Set when the browser acts on the chord before the page sees it. */
@@ -58,7 +59,7 @@ export function ShortcutRecorder({
     if (step.kind === 'record') setStrokes(step.strokes)
     if (step.kind === 'clear') setStrokes([])
     if (step.kind === 'close') onClose()
-    if (step.kind === 'save' && keys) onSave(keys)
+    if (step.kind === 'save' && keys && !checked?.blockedBy) onSave(keys)
   }
 
   return (
@@ -118,6 +119,11 @@ export function ShortcutRecorder({
             </p>
           </div>
         ) : null}
+        {checked?.blockedBy ? (
+          <p className='bg-warning/10 text-warning rounded-md p-2 text-xs'>
+            Taken by {checked.blockedBy}. Choose another shortcut or change that command first.
+          </p>
+        ) : null}
         {checked?.kept ? (
           <p className='bg-warning/10 text-warning flex items-center gap-1 rounded-md p-2 text-xs font-medium'>
             <WarningIcon aria-hidden className='size-(--icon-size-sm) shrink-0' />
@@ -130,7 +136,11 @@ export function ShortcutRecorder({
             <Button onClick={onClose} size='sm' variant='secondary'>
               Cancel
             </Button>
-            <Button disabled={!keys} onClick={() => keys && onSave(keys)} size='sm'>
+            <Button
+              disabled={!keys || !!checked?.blockedBy}
+              onClick={() => keys && !checked?.blockedBy && onSave(keys)}
+              size='sm'
+            >
               Save
             </Button>
           </span>

@@ -233,3 +233,54 @@ test('VS Code mode lists the bindings it cannot carry', async ({ client }) => {
   await userEvent.click(await screen.findByText('VS Code shortcuts not available here'))
   expect(await screen.findByText('workbench.action.quickOpenPreviousEditor')).toBeDefined()
 })
+
+for (const action of ['Change shortcut', 'Add shortcut']) {
+  test(`${action} from the row menu keeps the recorder open`, async ({ client }) => {
+    expect(client).toBeDefined()
+    if (action === 'Add shortcut') {
+      await saveSettings(
+        {
+          mutationId: 'shortcuts-menu-unbind',
+          operations: [{ command: 'workspace.saveFile', keys: null, kind: 'keybinding.set' }],
+          target: 'user',
+        },
+        getClient(),
+      )
+    }
+    renderWithProviders(<KeybindingSection />)
+    await showOnly('Save')
+    fireEvent.contextMenu(row('workspace.saveFile'))
+    await userEvent.click(await screen.findByRole('menuitem', { name: new RegExp(action) }))
+    const recorder = await screen.findByRole('textbox', { name: 'Press the new shortcut for Save' })
+    press(recorder, 'j', { ctrl: true, alt: true })
+    press(recorder, 'Enter')
+    await waitFor(async () =>
+      expect((await overrides())['workspace.saveFile']).toEqual(['Mod+Alt+J']),
+    )
+  })
+}
+
+test('refuses a recorded chord shadowed by a later override', async ({ client }) => {
+  expect(client).toBeDefined()
+  await saveSettings(
+    {
+      mutationId: 'shortcuts-earlier-override',
+      operations: [
+        { command: 'workspace.saveFile', keys: ['Mod+Alt+J'], kind: 'keybinding.set' },
+        { command: 'workspace.togglePanel', keys: ['Mod+Alt+K'], kind: 'keybinding.set' },
+      ],
+      target: 'user',
+    },
+    getClient(),
+  )
+  renderWithProviders(<KeybindingSection />)
+  await showOnly('Save')
+  fireEvent.doubleClick(row('workspace.saveFile'))
+  const recorder = await screen.findByRole('textbox', { name: 'Press the new shortcut for Save' })
+  press(recorder, 'k', { ctrl: true, alt: true })
+  expect(await screen.findByText(/Taken by Toggle panel/)).toBeDefined()
+  expect(screen.getByRole('button', { name: /^Save$/ })).toBeDisabled()
+  press(recorder, 'Enter')
+  expect(recorder).toBeInTheDocument()
+  expect((await overrides())['workspace.saveFile']).toEqual(['Mod+Alt+J'])
+})

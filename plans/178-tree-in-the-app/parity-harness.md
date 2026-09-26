@@ -1,6 +1,6 @@
 # Plan 178: parity harness
 
-- Status: PROPOSED. Size M. First sub-plan; every other one depends on it.
+- Status: DONE 2026-09-26 (wave 2, lane T). Size M. First sub-plan; every other one depends on it.
 - Owns: the tooling that proves a replacement kept the tree's look and behaviour.
 
 ## Outcome
@@ -53,3 +53,59 @@ it passes before any replacement starts.
 
 Any surface that is rebuilt and must look the same: the git changes list, the session rail and
 search results when they adopt the primitives this plan builds.
+
+## Landed
+
+- **Run it:** `WEB_PORT=<port> bun run agent:browser scenario tree-parity` (scale 2, 1440×900 by
+  default). Drift fails the run; `tree-parity/<state>/<combo>.diff.png` and `.styles.txt` in the
+  evidence directory show it. `TREE_PARITY_UPDATE=1` rewrites the baseline, `TREE_PARITY_STATES`
+  limits the states. Committed baseline: `scripts/agent/baselines/tree-parity/` (60 PNGs and gzipped
+  style maps, about 5 MB).
+- **Pieces:** fixture `scripts/agent/tree-parity/fixture.ts` (every git state including a merge
+  conflict, flattened chains, a long name, an unreadable folder, a 48-file folder for sticky rows);
+  state drivers `states.ts` (real input; `/fs/read` and `/fs/tree` held open or failed through
+  routes); probe `probe.ts` (the `scope` line is the one switch out-of-the-root changes, part
+  selectors are in `PARTS`); dependency-free pixel diff `pixel-diff.ts` (browser codecs, channel
+  tolerance 2).
+- **Checked:** two compare runs in a row with zero mismatched pixels and zero style lines; a 0.5px
+  name padding fails the style diff (45 lines per combo), a 4% darker `--success` on added rows fails
+  the pixel diff (650–940 pixels per combo) and the style diff.
+- **Behaviour:** `packages/tree/src/tests/parity-{keyboard,scroll-menu,drag,chrome}.browser.tsx`
+  (45 tests, real keys, mouse, wheel and CDP touch through `vitest.config.ts` commands; the helpers
+  in `parity-harness.tsx` resolve the shadow root or the host, so they survive out-of-the-root), and
+  the scenario `tree-parity-behaviour` for what needs the app (Mod+F, folder hover prefetch, focus
+  after delete, deferred create, reload restore, a real row drag onto the composer).
+- **Baselines outside the repo:** `trace` and `renders` of `tree-sticky-scroll` in
+  `/work/reports/tree-parity/baselines/`. `workspace-open-large-root` fails on `origin/main` before
+  the tree opens, so it has none.
+- **Spec corrections** found while pinning today's behaviour are in the parity spec under
+  "Harness findings".
+
+## PR 68 follow-up verification
+
+The harness now verifies both bundled font families loaded and records its 1440×900 viewport and
+DPR 2 in `tree-parity-environment.json`. A missing font fails before baseline capture. Selecting
+`TREE_PARITY_STATES=folder-error` also runs its loading-folder prerequisite.
+
+Tree tests serialize browser files, release held mouse/touch input during cleanup, and disable
+touch emulation after each test. Expansion waits for rendered rows. The 50ms scroll-menu boundary
+uses Playwright's clock with real wheel and mouse input. Frame-driven drag scrolling has a bounded
+3s assertion deadline. CPU-constrained runs exposed the former frame-count and wall-clock races.
+
+Verification on 2026-09-26, through the wave-heavy runner:
+
+- Two full compare runs at `/work/tmp/fregat-evidence/20260926T184525Z-scenario-tree-parity/` and
+  `/work/tmp/fregat-evidence/20260926T184846Z-scenario-tree-parity/`: 60 captures each, zero pixel
+  mismatches and zero style differences, about 58s each. Baselines remain unchanged.
+- Temporary 0.5px row-name padding: all four rest captures failed, 45 style differences each and
+  24,369–24,994 mismatched pixels. Evidence:
+  `/work/tmp/fregat-evidence/20260926T184713Z-scenario-tree-parity/`.
+- Temporary ArrowDown reversal: the real-input keyboard test failed, expecting `src/b.ts` and
+  receiving `src/lib/`. Both mutations were restored byte for byte. Logs:
+  `/work/tmp/w2-cx-68-style-mutation.log` and `/work/tmp/w2-cx-68-behaviour-mutation.log`.
+- Tree browser suite: 69 tests. Also exercised with the entire runner and Chromium restricted to
+  one CPU core. No model requests are needed for these fixtures.
+
+The visual matrix remains an explicit local scenario, so this PR adds no matrix work to CI. The
+existing browser CI job has a 15-minute cap; local tree browser runs take about 10–12s with serial
+input. Every polling wait and animation wait remains bounded.

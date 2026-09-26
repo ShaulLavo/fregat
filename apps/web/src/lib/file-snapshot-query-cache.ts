@@ -1,7 +1,7 @@
 import { markEditorOpenBenchmark } from '@/lib/editor-open-benchmark-mark'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
-import type { Query, QueryClient, QueryKey } from '@tanstack/react-query'
+import type { Query, QueryClient, QueryFilters, QueryKey } from '@tanstack/react-query'
 
 import type { FileResult } from '@/lib/file-system-types'
 import { fetchFile } from '@/lib/file-server'
@@ -140,6 +140,11 @@ function isFileSnapshotQueryKey(
     queryKey[1] === fileSystemKeys.fileSnapshots()[1] &&
     typeof queryKey[2] === 'string'
   )
+}
+
+/** Every file-snapshot read, and no other query under the snapshot key family. */
+export const fileSnapshotReads: QueryFilters = {
+  predicate: (query) => isFileSnapshotQueryKey(query.queryKey),
 }
 
 export function fileSnapshotPathFromQueryKey(queryKey: QueryKey): FilesystemPath | null {

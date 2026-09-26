@@ -5,7 +5,7 @@ import type { ServerInfo } from '@/lib/file-system-types'
 import { filePickerKeys } from '@/lib/query-keys'
 import { fetchPlaces } from '@/features/file-picker/utils/data-helpers'
 
-/** Desktop, Documents and Downloads as the browsed machine has them; none until it answers. */
+/** The browsed machine's places, project folders and drives; null until it answers. */
 export function usePlaces(open: boolean, serverInfo: ServerInfo | null) {
   const query = useQuery({
     enabled: open && Boolean(serverInfo),
@@ -13,5 +13,5 @@ export function usePlaces(open: boolean, serverInfo: ServerInfo | null) {
     queryKey: filePickerKeys.places(),
   })
 
-  return { places: query.data ?? [], refresh: query.refetch }
+  return { places: query.data ?? null, refresh: query.refetch }
 }

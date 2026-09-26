@@ -69,7 +69,11 @@ export function ShortcutsTab() {
             onClose={() => setAnchor(null)}
             onSave={() => setAnchor(null)}
             platform={platform}
-            preview={() => ({ kept: null, takes: [{ title: 'Quick Open', where: 'Everywhere' }] })}
+            preview={() => ({
+              blockedBy: null,
+              kept: null,
+              takes: [{ title: 'Quick Open', where: 'Everywhere' }],
+            })}
             title='Go to line'
           />
         ) : null}

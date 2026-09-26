@@ -32,6 +32,7 @@ import {
   shortcutRows,
   shortcutListWith,
   shortcutRowsWithChord,
+  shortcutTitle,
   type ShortcutFilter,
   type ShortcutRow as ShortcutRowModel,
 } from '@/features/settings/utils/shortcut-rows'
@@ -137,7 +138,8 @@ export function KeybindingSection() {
       .filter((row) => row.shadowedBy === command && row.command !== command)
       .map((row) => ({ title: row.title, where: shortcutPlacesLabel(row.places) }))
 
-    return { kept: kept(keys), takes }
+    const winner = candidate.find((row) => row.command === command && row.keys === keys)?.shadowedBy
+    return { blockedBy: winner ? shortcutTitle(winner) : null, kept: kept(keys), takes }
   }
 
   return (
@@ -222,7 +224,6 @@ export function KeybindingSection() {
         <ShortcutMenu
           anchor={overlay.anchor}
           onChange={(mode) => setOverlay({ ...overlay, kind: mode })}
-          // The menu closes as its item runs; an item that opened the recorder keeps it open.
           onClose={() => setOverlay((current) => (current?.kind === 'menu' ? null : current))}
           onShowConflicts={(keys) => {
             setOverlay(null)
