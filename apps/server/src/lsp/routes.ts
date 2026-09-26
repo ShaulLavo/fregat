@@ -7,7 +7,12 @@ import {
 import { isRecord } from '@workspace/utils/objects'
 import * as v from 'valibot'
 
-import { authenticateWebSocketData, type AuthConfig } from '../auth'
+import {
+  authenticateWebSocketData,
+  holdWebSocket,
+  releaseWebSocket,
+  type AuthConfig,
+} from '../auth'
 import { pathSchema } from '../fs/contracts'
 import type { WorkspacePaths } from '../fs/path'
 import {
@@ -125,6 +130,7 @@ export function lspRoutes(fs: LspRouteFileSystem, auth: AuthConfig, deps: LspRou
         socket.close(1008, 'unauthorized')
         return
       }
+      holdWebSocket(socket.data, auth, () => socket.close(1008, 'device removed'))
 
       const target = resolveRouteTarget(fs.paths, socket)
       if (!target) {
@@ -194,6 +200,7 @@ export function lspRoutes(fs: LspRouteFileSystem, auth: AuthConfig, deps: LspRou
       const socket = websocketObject(ws)
       if (!socket) return
 
+      releaseWebSocket(socket.data)
       const pending = sessions.get(socket.key)
       sessions.delete(socket.key)
       // A refused socket was already reported by the refusal and is no longer in the map.

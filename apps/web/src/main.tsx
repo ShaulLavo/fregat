@@ -44,6 +44,7 @@ import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/pe
 import { reportReactError } from '@/lib/react-error-reporting.ts'
 import { applicationHost } from '@/lib/application-host'
 import { configureIntentPrediction } from '@/lib/intent-prefetch-options'
+import { takePairingCodeFromLocation } from '@/lib/pairing/state/link-claim'
 import { useShellStore, watchShellKind } from '@/lib/shell/state/store'
 import { COARSE_POINTER_QUERY } from '@/lib/shell/utils/kind'
 import { shellQueryOptions } from '@/features/workspace/utils/shell-query'
@@ -83,6 +84,10 @@ for (const font of fontsInUse(boot))
     .then(() => undefined)
     .catch(() => undefined)
 
+// First: the code must leave the address bar before anything records the location.
+const pairingCode = takePairingCodeFromLocation(
+  new URL(import.meta.env.BASE_URL, location.href).href,
+)
 // Preserve explicit fields before Router normalizes defaults; boot merges them with the cache.
 const initialHref = applicationHost()?.initialAddress ?? selectInitialAddress(window.location.href)
 const initialIntent = parseAddressIntent(initialHref)
@@ -106,6 +111,12 @@ const restoredWorkspace = bootstrap
   .getState()
   .application?.getSnapshot()
   .editor.workspaceStore.getState()
+// Paired before the bootstrap asks the machine anything, so its first request carries the cookie.
+// Loaded only for a pairing link; if it fails to load, the pairing screen still takes the code.
+if (pairingCode)
+  await import('@/lib/pairing/state/claim-at-boot')
+    .then(({ claimAtBoot }) => claimAtBoot(pairingCode))
+    .catch(() => undefined)
 // The boot script already preloads the chosen shell's chunks; this evaluates them before the first render.
 const warmViews: Promise<unknown>[] = [
   resourceQueryClient

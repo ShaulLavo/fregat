@@ -1,6 +1,7 @@
 import { Elysia } from 'elysia'
 
 import { authGuard, type AuthConfig } from '../auth'
+import { headersReader } from '../devices/trust'
 import { recordRequestContext } from '../observability'
 import { createMachineProxyError } from './proxy-errors'
 import {
@@ -44,7 +45,9 @@ export function createMachineProxyRoutes({ auth, resolve, fetcher = fetch }: Mac
 
     target.protocol = 'ws:'
     // Elysia's .ws() parses JSON before custom parsers. Raw Bun hooks preserve every frame.
-    const data = createMachineProxySocket(target, headers, params.name)
+    const data = createMachineProxySocket(target, headers, params.name, (close) =>
+      auth.devices ? auth.devices.hold(headersReader(request.headers), close) : noop,
+    )
     if (!server?.upgrade(request, { data })) throw createMachineProxyError()
   }
   for (const method of PROXY_METHODS) {
@@ -58,3 +61,5 @@ type MachineProxyContext = {
   readonly params: { readonly name: string; readonly '*': string }
   readonly server: { upgrade(request: Request, options: { data: unknown }): boolean } | null
 }
+
+function noop() {}

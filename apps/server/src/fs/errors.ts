@@ -10,6 +10,7 @@ import { EvlogError } from 'evlog'
 export type FsErrorCode =
   | 'UNAUTHORIZED'
   | 'FORBIDDEN_ORIGIN'
+  | 'DEVICE_NOT_PAIRED'
   | 'PATH_OUTSIDE_WORKSPACE'
   | 'GIT_COMMAND_FAILED'
   | 'GIT_REPOSITORY_NOT_FOUND'
@@ -39,6 +40,7 @@ export type FsErrorCode =
 const statusByCode: Record<FsErrorCode, number> = {
   UNAUTHORIZED: 401,
   FORBIDDEN_ORIGIN: 403,
+  DEVICE_NOT_PAIRED: 401,
   PATH_OUTSIDE_WORKSPACE: 403,
   GIT_COMMAND_FAILED: 500,
   GIT_REPOSITORY_NOT_FOUND: 404,
@@ -69,6 +71,7 @@ const statusByCode: Record<FsErrorCode, number> = {
 const messageByCode: Record<FsErrorCode, string> = {
   UNAUTHORIZED: 'request is not from a trusted local app origin',
   FORBIDDEN_ORIGIN: 'origin is not allowed',
+  DEVICE_NOT_PAIRED: 'this device is not paired with this machine',
   PATH_OUTSIDE_WORKSPACE: 'path is outside the workspace',
   GIT_COMMAND_FAILED: 'git command failed',
   GIT_REPOSITORY_NOT_FOUND: 'git repository not found',

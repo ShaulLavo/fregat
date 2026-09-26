@@ -77,7 +77,7 @@
   {
     "file": "apps/web/src/features/chat/components/message-completion-divider.tsx",
     "class": "truncate",
-    "reason": "D3: \"Worked for …\" is app-authored."
+    "reason": "D3: \"Worked for \u2026\" is app-authored."
   },
   {
     "file": "apps/web/src/features/chat/components/composer-controls-menu.tsx",
@@ -198,5 +198,45 @@
     "file": "apps/web/src/features/settings/components/usage-model-row.tsx",
     "class": "rounded-full",
     "reason": "A chart legend swatch in a categorical chart fill (chartFill), keyed to a bar segment. It marks a series, not a status, so StatusDot's status tones cannot draw it."
+  },
+  {
+    "file": "apps/web/src/features/workspace/components/tree-menu-trigger.tsx",
+    "class": "<button>",
+    "reason": "The file tree's own row machinery, moved into the app unchanged by Plan 178 app-owned-state; the rows and chrome sub-plans rebuild it on ListRow, InputGroup and the app's truncation, and delete this entry."
+  },
+  {
+    "file": "apps/web/src/features/workspace/components/tree-rename-input.tsx",
+    "class": "<input>",
+    "reason": "The file tree's own row machinery, moved into the app unchanged by Plan 178 app-owned-state; the rows and chrome sub-plans rebuild it on ListRow, InputGroup and the app's truncation, and delete this entry."
+  },
+  {
+    "file": "apps/web/src/features/workspace/components/tree-row.tsx",
+    "class": "role=\"button\"",
+    "reason": "The file tree's own row machinery, moved into the app unchanged by Plan 178 app-owned-state; the rows and chrome sub-plans rebuild it on ListRow, InputGroup and the app's truncation, and delete this entry."
+  },
+  {
+    "file": "apps/web/src/features/workspace/components/tree-row.tsx",
+    "class": "<button>",
+    "reason": "The file tree's own row machinery, moved into the app unchanged by Plan 178 app-owned-state; the rows and chrome sub-plans rebuild it on ListRow, InputGroup and the app's truncation, and delete this entry."
+  },
+  {
+    "file": "apps/web/src/features/workspace/components/tree-view.tsx",
+    "class": "<input>",
+    "reason": "The file tree's own row machinery, moved into the app unchanged by Plan 178 app-owned-state; the rows and chrome sub-plans rebuild it on ListRow, InputGroup and the app's truncation, and delete this entry."
+  },
+  {
+    "file": "apps/web/src/features/workspace/components/tree-menu-trigger.tsx",
+    "class": "missing Tooltip",
+    "reason": "The file tree's own row machinery, moved into the app unchanged by Plan 178 app-owned-state; the rows and chrome sub-plans rebuild it on ListRow, InputGroup and the app's truncation, and delete this entry."
+  },
+  {
+    "file": "apps/web/src/features/workspace/components/tree-overflow-text.tsx",
+    "class": "truncate",
+    "reason": "The file tree's own row machinery, moved into the app unchanged by Plan 178 app-owned-state; the rows and chrome sub-plans rebuild it on ListRow, InputGroup and the app's truncation, and delete this entry."
+  },
+  {
+    "file": "apps/web/src/features/workspace/components/tree-truncate.tsx",
+    "class": "truncate",
+    "reason": "The file tree's own row machinery, moved into the app unchanged by Plan 178 app-owned-state; the rows and chrome sub-plans rebuild it on ListRow, InputGroup and the app's truncation, and delete this entry."
   }
 ]

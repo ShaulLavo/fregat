@@ -223,21 +223,6 @@ test('selects the deepest registered target in a composed path', () => {
   ).toBe(childTarget.token)
 })
 
-test('captures an origin through a shadow root', () => {
-  const service = new FocusService()
-  const target = appendElement()
-  const host = document.createElement('div')
-  const anchor = document.createElement('button')
-  target.append(host)
-  host.attachShadow({ mode: 'open' }).append(anchor)
-  const registration = registerTarget(service, {
-    element: target,
-    id: { kind: 'file-tree', rootPath: '/repo' },
-  })
-
-  expect(service.captureOrigin(anchor)).toBe(registration.token)
-})
-
 test('resolves path, origin, current, exact, and last owner in order', () => {
   const service = new FocusService()
   const path = registerEditor(service, 'path')

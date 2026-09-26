@@ -27,7 +27,7 @@ import { MenuSection } from './section'
  *   open state. Correct for anything that renders its own DOM node.
  * - pass `anchor` + `open` + `onOpenChange` and the menu opens at a virtual
  *   rect with no trigger at all. The path for surfaces with nothing to wrap:
- *   the terminal canvas, the shadow-DOM file tree, keyboard invocation.
+ *   the terminal canvas, the file tree, keyboard invocation.
  */
 export function MenuSurface({
   anchor,
@@ -35,7 +35,6 @@ export function MenuSurface({
   menu,
   onOpenChange,
   open,
-  popupProps,
   returnFocusTo,
   surface,
   trigger,
@@ -45,12 +44,6 @@ export function MenuSurface({
   readonly menu: Menu
   readonly onOpenChange?: (open: boolean) => void
   readonly open?: boolean
-  /**
-   * Data attributes for the portalled popup. Surfaces that run their own
-   * outside-click detection need to recognise our menu as inside — the file
-   * tree looks for `data-file-tree-context-menu-root`.
-   */
-  readonly popupProps?: Readonly<Record<`data-${string}`, string>>
   /**
    * The list that opened the menu. Closing without handing focus elsewhere
    * returns there, where the pane's own focus target would pick its input.
@@ -163,7 +156,6 @@ export function MenuSurface({
         className={className}
         data-menu-surface={surface}
         finalFocus={false}
-        {...popupProps}
       >
         {sections.map((section, index) => (
           <MenuSection index={index} key={section.id} onInvoke={handleInvoke} section={section} />

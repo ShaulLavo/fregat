@@ -21,6 +21,7 @@ function manualCompactionScenario(provider: {
 }): Scenario {
   return {
     name: provider.name,
+    realProviders: true,
     description: `Real ${provider.model.providerInstanceId}: after one turn, Compact Conversation from the session menu runs the harness's own compaction as a turn while the unsent draft stays in the composer. Removes the fixture, session and project.`,
     async run(page, { step }) {
       const orchestration = await openChat(page)

@@ -1,7 +1,11 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { DEFAULT_PROVIDER_INSTANCES } from '../../apps/server/src/provider/drivers/built-in'
+import {
+  DEFAULT_PROVIDER_INSTANCES,
+  HARNESS_FIXTURE_ROOT_ENV,
+  HARNESS_REAL_PROVIDERS_ENV,
+} from '../../apps/server/src/provider/drivers/built-in'
 
 import { promote } from '../deploy/systemd/promote'
 import { stopTerminalHost } from '../../apps/server/src/terminal-host/identity'
@@ -38,7 +42,11 @@ export type IsolatedServer = {
  */
 export async function startIsolatedServer(
   webOrigin: URL,
-  { pathPrefix, scratchRoot = '/work/tmp' }: { pathPrefix?: string; scratchRoot?: string } = {},
+  {
+    pathPrefix,
+    realProviders = false,
+    scratchRoot = '/work/tmp',
+  }: { pathPrefix?: string; realProviders?: boolean; scratchRoot?: string } = {},
 ): Promise<IsolatedServer> {
   const directory = mkdtempSync(path.join(scratchRoot, 'fregat-agent-'))
   const home = path.join(directory, 'home')
@@ -46,39 +54,32 @@ export async function startIsolatedServer(
   const productionRoot = path.join(directory, 'production')
   mkdirSync(home)
   mkdirSync(productionRoot)
-  // Disable account discovery before startup; scenarios explicitly install their fixture drivers.
-  writeFileSync(
-    path.join(home, 'settings.json'),
-    JSON.stringify({
-      'providers.instances': DEFAULT_PROVIDER_INSTANCES.map((provider) => ({
-        ...provider,
-        enabled: false,
-      })),
-    }),
-  )
+  // Scenarios install their own fixture drivers; only an owner's --real-providers run keeps the
+  // built-in accounts on.
+  if (!realProviders)
+    writeFileSync(
+      path.join(home, 'settings.json'),
+      JSON.stringify({
+        'providers.instances': DEFAULT_PROVIDER_INSTANCES.map((provider) => ({
+          ...provider,
+          enabled: false,
+        })),
+      }),
+    )
   const port = await prepareHome(home, webOrigin).catch((error: unknown) => {
     rmSync(directory, { recursive: true, force: true })
     throw error
   })
-  const env: Record<string, string | undefined> = {
-    ...process.env,
-    FS_HOST: '127.0.0.1',
-    // The run copies this log before the server stops, so a 5 s batch would drop the run's tail.
-    OBSERVABILITY_BATCH_INTERVAL_MS: '200',
-    FS_METADATA_DB: path.join(home, 'fs-metadata.sqlite'),
-    OBSERVABILITY_DIR: logs,
-    PATH: pathPrefix ? `${pathPrefix}${path.delimiter}${process.env.PATH ?? ''}` : process.env.PATH,
-    // Offers the mock provider driver, so a scenario can script a whole turn.
-    PLATFORM_AGENT_HARNESS: '1',
-    PLATFORM_HOME: home,
-    PLATFORM_PRODUCTION_ROOT: productionRoot,
-    PORT: String(port),
-    SERVER_ALLOWED_ORIGINS: allowedOriginsForWebPort(
-      undefined,
-      webOrigin.hostname,
-      Number(webOrigin.port),
-    ),
-  }
+  const env = isolatedServerEnv({
+    home,
+    logs,
+    pathPrefix,
+    port,
+    productionRoot,
+    realProviders,
+    scratchRoot,
+    webOrigin,
+  })
   const spawn = () =>
     Bun.spawn({
       cmd: [
@@ -142,6 +143,47 @@ export async function startIsolatedServer(
     signal,
     stop,
   }
+}
+
+/**
+ * The throwaway server's environment. Codex and Claude run only fixture binaries under
+ * `scratchRoot` unless the owner passed `--real-providers`; an inherited opt-in is dropped.
+ */
+export function isolatedServerEnv(input: {
+  home: string
+  logs: string
+  pathPrefix?: string
+  port: number
+  productionRoot: string
+  realProviders: boolean
+  scratchRoot: string
+  webOrigin: URL
+}) {
+  const { home, logs, pathPrefix, port, productionRoot, webOrigin } = input
+  const env: Record<string, string | undefined> = {
+    ...process.env,
+    FS_HOST: '127.0.0.1',
+    // The run copies this log before the server stops, so a 5 s batch would drop the run's tail.
+    OBSERVABILITY_BATCH_INTERVAL_MS: '200',
+    FS_METADATA_DB: path.join(home, 'fs-metadata.sqlite'),
+    OBSERVABILITY_DIR: logs,
+    PATH: pathPrefix ? `${pathPrefix}${path.delimiter}${process.env.PATH ?? ''}` : process.env.PATH,
+    // Offers the mock provider driver, so a scenario can script a whole turn.
+    PLATFORM_AGENT_HARNESS: '1',
+    [HARNESS_FIXTURE_ROOT_ENV]: input.scratchRoot,
+    PLATFORM_HOME: home,
+    PLATFORM_PRODUCTION_ROOT: productionRoot,
+    PORT: String(port),
+    SERVER_ALLOWED_ORIGINS: allowedOriginsForWebPort(
+      undefined,
+      webOrigin.hostname,
+      Number(webOrigin.port),
+    ),
+  }
+  delete env[HARNESS_REAL_PROVIDERS_ENV]
+  if (input.realProviders) env[HARNESS_REAL_PROVIDERS_ENV] = '1'
+
+  return env
 }
 
 async function prepareHome(home: string, webOrigin: URL) {
