@@ -35,6 +35,7 @@ export async function readProjectFolders(
     })),
   )
   const kept = measured
+    .filter((folder): folder is typeof folder & { repoCount: number } => folder.repoCount !== null)
     .filter((folder) => folder.repoCount >= 2 || folder.openedCount >= 2)
     .sort((a, b) => b.openedCount - a.openedCount || b.repoCount - a.repoCount)
     .slice(0, PROJECT_FOLDER_LIMIT)
@@ -70,8 +71,10 @@ function realRelative(paths: WorkspacePaths, absolute: string) {
   }
 }
 
+// Null when the folder is gone or unreadable: its stored picks and workspaces outlive it.
 async function countRepositories(absolute: string) {
-  const entries = await readdir(absolute, { withFileTypes: true }).catch(() => [])
+  const entries = await readdir(absolute, { withFileTypes: true }).catch(() => null)
+  if (!entries) return null
   const folders = entries
     .slice(0, CHILD_SCAN_LIMIT)
     .filter((entry) => entry.isDirectory() || entry.isSymbolicLink())

@@ -90,6 +90,23 @@ describe('filesystem places', () => {
     ])
   })
 
+  it('drops a projects folder once it is deleted, though its picks remain', async () => {
+    const root = await fixtureRoot()
+    await mkdir(path.join(root, 'home'))
+    for (const name of ['alpha', 'beta'])
+      await mkdir(path.join(root, 'gone', name), { recursive: true })
+    const app = testApp(root)
+    for (const folder of ['gone/alpha', 'gone/beta'])
+      await request(app, '/fs/recents', { method: 'POST', body: JSON.stringify({ path: folder }) })
+    expect((await places(root, app)).projects).toEqual([
+      { label: 'gone', path: 'gone', repoCount: 0 },
+    ])
+
+    await rm(path.join(root, 'gone'), { recursive: true })
+
+    expect((await places(root, app)).projects).toEqual([])
+  })
+
   it('always offers the browsable root as a drive', async () => {
     const root = await fixtureRoot()
     const { drives } = await places(root)
