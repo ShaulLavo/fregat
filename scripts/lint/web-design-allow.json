@@ -198,5 +198,15 @@
     "file": "apps/web/src/features/chat/components/timeline-row.tsx",
     "class": "opacity-50",
     "reason": "Turns a checkpoint restore is about to remove recede as whole rows while it runs, the treatment a disabled control gets; nothing can act on them until the timeline settles."
+  },
+  {
+    "file": "apps/web/src/features/chat/components/context-segments-meter.tsx",
+    "class": "rounded-full",
+    "reason": "A chart legend swatch in a categorical chart fill (chartFill), keyed to a bar segment. It marks a series, not a status, so StatusDot's status tones cannot draw it."
+  },
+  {
+    "file": "apps/web/src/features/settings/components/usage-model-row.tsx",
+    "class": "rounded-full",
+    "reason": "A chart legend swatch in a categorical chart fill (chartFill), keyed to a bar segment. It marks a series, not a status, so StatusDot's status tones cannot draw it."
   }
 ]

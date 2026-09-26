@@ -9,7 +9,7 @@ One file per user-facing surface. Each answers: what it is, how a user reaches i
 | File icons                      | [file-icons.md](file-icons.md)       |
 | Search and replace              | [search.md](search.md)               |
 | Quick open                      | [quick-open.md](quick-open.md)       |
-| File and folder picker | [file-picker.md](file-picker.md) |
+| File and folder picker          | [file-picker.md](file-picker.md)     |
 | Chat                            | [chat.md](chat.md)                   |
 | Terminal                        | [terminal.md](terminal.md)           |
 | Git                             | [git.md](git.md)                     |
