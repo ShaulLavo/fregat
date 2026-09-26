@@ -203,7 +203,8 @@ E011, E015/E016 until 112 says so; E023; 105 P4.
 Start conditions: the merge train is done (L6's 132 P4 and `query:check` rerun included), the
 coordinator has landed `coord/next-wave`, and `origin/main` is green.
 
-Each lane is one session in `/work/projects/platform`, started with:
+The coordinator launches every lane itself as a background agent (the owner starts only the
+coordinator; its brief is `/work/reports/next-wave/coordinator-handoff.md`). Each lane gets:
 
 > You are lane `<X>` of wave 2. Read `docs/next-wave.md` (your lane, the protocol and the landing
 > rules) and `AGENTS.md`, then work through your queue. Every run starts by finding your place:
