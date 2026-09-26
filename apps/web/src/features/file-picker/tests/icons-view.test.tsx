@@ -9,7 +9,13 @@ import { renderWithProviders } from '../../../../test/render'
 function icons(loadState: EntriesLoadState, onRetry = () => {}) {
   return (
     <FilePickerSessionActionsContext
-      value={{ jumpTo() {}, navigateTo() {}, revealEntry() {}, selectEntry() {} }}
+      value={{
+        jumpTo() {},
+        navigateTo() {},
+        resizeColumn() {},
+        revealEntry() {},
+        selectEntry() {},
+      }}
     >
       <IconsView
         entries={[]}

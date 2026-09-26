@@ -61,7 +61,9 @@ export function ColumnRow({
       }}
     >
       <EntryIcon className='size-(--icon-size) shrink-0' entry={entry} open={selected} />
-      <span className={cn('min-w-0 flex-1 truncate', ENTRY_NAME_TEXT)}>{entry.name}</span>
+      <span className={cn('min-w-0 flex-1 truncate', ENTRY_NAME_TEXT)} data-entry-name=''>
+        {entry.name}
+      </span>
       {directory ? (
         <CaretRightIcon
           aria-hidden='true'

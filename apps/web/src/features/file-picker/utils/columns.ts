@@ -32,6 +32,11 @@ export function shownPickerView(
   return width !== null && width < COLUMNS_MIN_WIDTH ? 'list' : 'columns'
 }
 
+/** A column's folder as its name; the root has none. */
+export function folderLabel(path: string) {
+  return path.split('/').at(-1) || 'Root'
+}
+
 /** The selection in each column, starting with the current folder's. */
 export type ColumnTrail = readonly FsEntry[]
 

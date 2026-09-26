@@ -9,6 +9,7 @@ import { renderWithProviders } from '../../../../test/render'
 const actions = {
   jumpTo: () => undefined,
   navigateTo: () => undefined,
+  resizeColumn: () => undefined,
   revealEntry: () => undefined,
   selectEntry: () => undefined,
 }

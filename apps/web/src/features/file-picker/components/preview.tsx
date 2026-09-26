@@ -17,14 +17,12 @@ import { PREVIEW_SETTLE_MS } from '@/lib/file-preview/utils/preview'
  */
 export function PreviewPane({
   accept,
-  className = 'hidden lg:flex',
   entry,
   isSearching,
   mode,
   showHidden,
 }: {
   accept?: readonly string[]
-  className?: string
   entry: FsEntry | null
   isSearching: boolean
   mode: FilePickerMode
@@ -38,7 +36,7 @@ export function PreviewPane({
     <ToolPane
       actions={fetching ? <Spinner label='Loading preview' size='xs' /> : null}
       title='Preview'
-      className={className}
+      className='h-full'
       bodyClassName='flex flex-col gap-(--density-section-padding) p-(--density-section-padding)'
     >
       {shown ? (
