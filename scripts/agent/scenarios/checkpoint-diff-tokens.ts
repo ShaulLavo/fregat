@@ -77,7 +77,7 @@ export const checkpointDiffTokens = isolatedNativeScenario({
     await git.waitFor({ timeout: 20_000 })
     if (!(await selectors.gitPanel(page).isVisible())) await git.click()
     await selectors.gitDiffScope(page, 'Turn').click()
-    const second = selectors.turnFiles(page).getByRole('option', { name: /second\.ts/ })
+    const second = selectors.turnFiles(page).getByRole('treeitem', { name: /second\.ts/ })
     await second.waitFor({ timeout: 15_000 })
     await second.click()
     await selectors.diffRows(page).first().waitFor({ timeout: 15_000 })

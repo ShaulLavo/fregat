@@ -7,7 +7,7 @@ import { createGitFixture, fixtureGit, releaseFixture } from '../fixture-workspa
 import { selectors } from '../selectors'
 import { isolatedNativeScenario } from './native-provider-verification'
 
-async function prepareFixture() {
+export async function prepareFixture() {
   const fixture = await createGitFixture('checkpoint-states')
   await mkdir(join(fixture, 'src'), { recursive: true })
   await writeFile(join(fixture, 'src/app.ts'), 'export const app = 1\n')
@@ -22,7 +22,20 @@ async function sendTurn(page: Page, text: string) {
   await selectors.chatMessages(page).getByText('CHECKPOINT_TURN_DONE').nth(0).waitFor()
 }
 
-async function showTurnScope(page: Page) {
+/** One native turn that edits src/app.ts in the fixture worktree. */
+export async function changeAppConstant(page: Page, root: string, worktreePath: string) {
+  await writeFile(
+    join(root, 'checkpoint-control.json'),
+    JSON.stringify({
+      cwd: worktreePath,
+      hold: false,
+      turns: [[{ op: 'write', path: 'src/app.ts', text: 'export const app = 2\n' }]],
+    }),
+  )
+  await sendTurn(page, 'Change the app constant.')
+}
+
+export async function showTurnScope(page: Page) {
   const git = selectors.chatToolTab(page, 'Git')
   await git.waitFor({ timeout: 20_000 })
   if (!(await selectors.gitPanel(page).isVisible())) await git.click()
@@ -36,18 +49,10 @@ export const checkpointStates = isolatedNativeScenario({
   fixture: new URL('../fixtures/native-checkpoint.mjs', import.meta.url),
   prepareWorktree: prepareFixture,
   async drive(page, { root, step, worktreePath }) {
-    await writeFile(
-      join(root, 'checkpoint-control.json'),
-      JSON.stringify({
-        cwd: worktreePath,
-        hold: false,
-        turns: [[{ op: 'write', path: 'src/app.ts', text: 'export const app = 2\n' }]],
-      }),
-    )
-    await sendTurn(page, 'Change the app constant.')
+    await changeAppConstant(page, root, worktreePath)
     await selectors.changedFilesTree(page).last().waitFor({ timeout: 30_000 })
     await showTurnScope(page)
-    await selectors.turnFiles(page).getByRole('option').first().waitFor({ timeout: 15_000 })
+    await selectors.turnFiles(page).getByRole('treeitem').first().waitFor({ timeout: 15_000 })
     await step('available')
 
     await selectors.chatMessage(page).fill('Say done without editing anything.')

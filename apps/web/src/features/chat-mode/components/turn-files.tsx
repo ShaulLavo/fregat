@@ -28,9 +28,12 @@ import { checkpointChangeStatus } from '@/lib/git-status-symbols'
  */
 export function TurnFiles({
   summary,
+  rootPath,
   onOpenFile,
 }: {
   summary: NonNullable<ReturnType<typeof useSessionDiffScope>['turnSummary']>
+  /** The session's worktree; rows name files relative to it, as the Working tree scope does. */
+  rootPath: string
   onOpenFile: (path: string) => void
 }) {
   const client = clientForQueryClient(useQueryClient())
@@ -138,7 +141,7 @@ export function TurnFiles({
               }
               key={row.id}
               path={row.file.path}
-              rootPath=''
+              rootPath={rootPath}
               rowProps={list.rowProps(row.id)}
               stat={row.file}
               status={checkpointChangeStatus(row.file.kind)}

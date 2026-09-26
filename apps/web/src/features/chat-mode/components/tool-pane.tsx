@@ -168,7 +168,7 @@ function gitToolPane(rootPath: string, diffScope: SessionDiffScopeState) {
       }
     >
       {scope.kind === 'turn' ? (
-        turnScopeBody(diffScope)
+        turnScopeBody(rootPath, diffScope)
       ) : (
         <GitPanel rootPath={filesystemPath(rootPath)} />
       )}
@@ -176,10 +176,10 @@ function gitToolPane(rootPath: string, diffScope: SessionDiffScopeState) {
   )
 }
 
-function turnScopeBody({ openTurnFile, turnSummary }: SessionDiffScopeState) {
+function turnScopeBody(rootPath: string, { openTurnFile, turnSummary }: SessionDiffScopeState) {
   const availability = checkpointAvailability(turnSummary)
   if (availability.kind === 'pending') return <CheckpointLoading />
   if (availability.kind !== 'available') return <CheckpointState availability={availability} />
 
-  return <TurnFiles summary={availability.summary} onOpenFile={openTurnFile} />
+  return <TurnFiles rootPath={rootPath} summary={availability.summary} onOpenFile={openTurnFile} />
 }

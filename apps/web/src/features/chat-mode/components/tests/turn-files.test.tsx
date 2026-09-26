@@ -57,6 +57,7 @@ test('undoes one change of a turn from its row and puts it back', async ({ clien
 
   renderWithProviders(
     <TurnFiles
+      rootPath=''
       summary={{
         assistantMessageId: null,
         checkpointRef,

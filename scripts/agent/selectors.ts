@@ -937,7 +937,7 @@ export const selectors = {
     page
       .getByRole('tablist', { name: 'Diff scope' })
       .getByRole('tab', { name: scope, exact: true }),
-  turnFiles: (page: Page) => page.getByRole('listbox', { name: 'Turn changed files' }),
+  turnFiles: (page: Page) => page.getByRole('tree', { name: 'Turn changed files' }),
   worktreeFiles: (page: Page) => page.locator('[data-git-file]:not([data-history-file])'),
   historyList: (page: Page) => page.getByRole('listbox', { name: 'Commit history' }),
   historyRowSelector: '[data-history-commit]',
