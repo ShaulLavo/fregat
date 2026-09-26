@@ -109,6 +109,41 @@ function startPayload(command: ProviderStartCommand) {
   }
 }
 
+const ACTIVE_START_STATES = new Set(['blocked-on-worktree', 'queued', 'claimed', 'adopted'])
+
+/**
+ * A harness turn joins the log only when no requested turn is still starting or running: that
+ * turn owns the runtime until it settles, and a second running turn would be settled with it.
+ */
+export function decideProviderStartedTurn(
+  command: Extract<OrchestrationCommand, { type: 'session.turn.provider-start' }>,
+  model: OrchestrationReadModel,
+  at: string,
+) {
+  const session = requireSession(model, command.sessionId)
+  if (session.deletedAt) return []
+  const turn = session.latestTurn
+  if (turn?.turnId === command.turnId) return []
+  if (turn && turn.state === 'running' && ACTIVE_START_STATES.has(turn.providerStartState)) {
+    throw sessionDomainErrors.START_STATE_CONFLICT({
+      sessionId: command.sessionId,
+      internal: {
+        at: 'provider-started-turn',
+        observed: { turnId: turn.turnId, providerStartState: turn.providerStartState },
+        expected: { providerStartState: 'settled' },
+      },
+    })
+  }
+
+  return one(command, at, 'session.turn-provider-started', {
+    sessionId: command.sessionId,
+    turnId: command.turnId,
+    origin: command.origin,
+    runtimeEpoch: command.runtimeEpoch,
+    createdAt: command.createdAt,
+  })
+}
+
 export function decideRuntimeRecovery(
   command: Extract<OrchestrationCommand, { type: 'session.runtime.recover' }>,
   model: OrchestrationReadModel,

@@ -903,6 +903,8 @@ export const selectors = {
     page.getByRole('menuitem', { name: `Open pull request #${number}`, exact: true }),
   bootstrapRetry: (page: Page) =>
     page.getByRole('button', { name: 'Retry connection', exact: true }),
+  connectionRefused: (page: Page) =>
+    page.getByText('Cannot connect to the server', { exact: true }),
   bootstrapFailure: (page: Page) =>
     page.getByText('Cannot connect to the local machine', { exact: true }),
   windowToolbar: (page: Page) => page.getByLabel('Window toolbar', { exact: true }),

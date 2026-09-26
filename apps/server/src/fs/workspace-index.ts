@@ -1261,19 +1261,6 @@ function emptyStatus(scanRoot: string): WorkspaceIndexStatus {
   }
 }
 
-export function inactiveWorkspaceIndexStatus(): WorkspaceIndexStatus {
-  return {
-    entryCount: 0,
-    fileCount: 0,
-    pendingCreatedPathCount: 0,
-    readiness: 'cold',
-    scanRoot: null,
-    scanWarningCount: 0,
-    skippedEntryCount: 0,
-    staleEntryCount: 0,
-  }
-}
-
 function readyStatus(
   scanRoot: string,
   counts: WorkspaceIndexCounts,

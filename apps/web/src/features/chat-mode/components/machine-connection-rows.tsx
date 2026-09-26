@@ -27,7 +27,10 @@ export function MachineConnectionRows() {
       label: machine.config.label ?? machine.name,
       phase: machine.phase,
       lastError: machine.lastError,
-      retry: () => connections.retryMachine(machine.name),
+      retry:
+        machine.phase === 'identity-drift'
+          ? () => connections.trustMachine(machine.name)
+          : () => connections.retryMachine(machine.name),
     }))
   if (primary && hasConnectionNotice(primary))
     machines.unshift({
@@ -36,7 +39,10 @@ export function MachineConnectionRows() {
       label: primary.label ?? primary.name,
       phase: primary.phase,
       lastError: primary.lastError,
-      retry: () => connections.retryPrimary(),
+      retry: async () =>
+        primary.phase === 'identity-drift'
+          ? connections.trustPrimary()
+          : connections.retryPrimary(),
     })
   if (!machines.length) return null
   return (

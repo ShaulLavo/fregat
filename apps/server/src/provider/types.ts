@@ -20,6 +20,7 @@ import type {
   ProviderSignInMethod,
   ProviderSkill,
   ProviderSlashCommand,
+  ProviderTurnOrigin,
   SessionRuntimeStatus,
   SessionTurnKind,
   ProviderSnapshot,
@@ -377,7 +378,8 @@ export type ProviderRuntimeEventPayload =
     })
   | (ProviderRuntimeBaseEvent & {
       type: 'turn.started'
-      payload: { effort?: string; model?: string }
+      /** `origin` marks a turn the harness started with no prompt of ours. */
+      payload: { effort?: string; model?: string; origin?: ProviderTurnOrigin }
     })
   | (ProviderRuntimeBaseEvent & {
       type: 'turn.completed'

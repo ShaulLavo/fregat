@@ -88,6 +88,8 @@ export function claudeUserMessage(input: {
 
   return {
     message: { content, role: 'user' },
+    // The SDK treats a prompt without an origin as unattributed; this one is the owner's keyboard.
+    origin: { kind: 'human' },
     parent_tool_use_id: null,
     session_id: '',
     type: 'user',

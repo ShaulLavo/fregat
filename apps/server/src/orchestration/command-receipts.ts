@@ -194,6 +194,7 @@ export function commandAggregate(command: ReceiptCommand) {
     case 'session.provider-start.adopt':
     case 'session.provider-start.claim':
     case 'session.provider-start.settle':
+    case 'session.turn.provider-start':
     case 'session.revert.complete':
     case 'session.runtime-mode.set':
     case 'session.runtime.recover':

@@ -8,7 +8,6 @@ import { environmentActivitySignal } from '@/lib/environments/state/activity'
 import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
 import { runMutation } from '@/lib/mutations/run'
 import { openWorkspaceRootMutationOptions } from '@/features/workspace/utils/open-root-mutation'
-import { claimWorkspaceOpenGeneration } from '@/features/workspace/state/open-generation'
 import { toClientError, type ErrorCategory } from '@/lib/client-error-taxonomy'
 import { log } from '@/lib/client-logging'
 
@@ -91,9 +90,9 @@ async function validateRootPath(
     const result = await runMutation(
       queryClient,
       openWorkspaceRootMutationOptions(filesystemPath(path)),
-      { generation: claimWorkspaceOpenGeneration(), signal },
+      { signal },
     )
-    if (result.status === 'opened' && result.entry) confirm(result.entry)
+    confirm(result.entry)
   } catch (error) {
     if (signal.aborted) return
 

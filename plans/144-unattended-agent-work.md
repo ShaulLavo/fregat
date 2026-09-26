@@ -324,7 +324,37 @@ which is Plan 142.
 Proposed under Research findings; approved as wave 2 lanes (`docs/next-wave.md`): lane B runs
 Phase 1, lane A Phases 2–3.
 
-- **Phase 2 — done 2026-09-26 (lane A).** An in-process `Stop` hook (`ClaudeAgentSession.stopHook`,
+### Phase 1: harness-started turns (landed 2026-09-26, wave 2 lane B)
+
+- Claude: prompts carry `origin: { kind: 'human' }` beside their uuid. `command_lifecycle` frames
+  (outside the SDK's message union, read by shape) drive the turn: `started` with an unknown uuid
+  adopts a wakeup or cron as its own turn (`origin: 'scheduled'`); an `init` with nothing running
+  adopts the task-notification turn (`'task'`) or anything else (`'provider'`). A prompt sent while
+  a harness turn runs waits as the pending turn and starts on its own lifecycle frame, so it gets
+  its own result. A harness turn that runs ahead of a queued prompt (a wakeup or task notification
+  between push and `started`) streams onto the owner's turn and its `result` is skipped.
+- Codex: `turn/started` on the root thread with no turn of ours pending is adopted (`'provider'`).
+- Orchestration: `turn.started` with an origin dispatches the internal
+  `session.turn.provider-start`, whose `session.turn-provider-started` event makes a running,
+  adopted turn the latest turn; the runtime settles it like any other. The decider refuses it
+  while a requested turn is still starting or running (that turn owns the runtime). A
+  `turn.provider-started` info activity labels the turn ("Scheduled wake-up", "A background task
+  finished", "The agent started this turn"). The composer already queues a follow-up while a turn
+  runs, so a prompt sent during a harness turn is delivered after it.
+- `MockProviderAdapter.startProviderTurn` fakes a harness turn for tests.
+- Once the CLI has sent any `command_lifecycle` frame, an owner turn counts as started only at
+  its own `started`: a wakeup or task notification that runs between the push and that frame is
+  someone else's turn, and its `result` is skipped. Every turn's end reports `ready` with that
+  turn's id, so the end of a harness turn the log left out cannot settle a requested turn.
+- A harness turn gets a checkpoint like any other: the settle-time capture uses the latest turn.
+- Not done here: interrupting the owner's prompt while it waits behind a harness turn (Stop
+  interrupts the harness turn; the log refuses a requested turn while a harness turn runs, so this
+  is reachable only in a race); a browser scenario and a `look` of a turn with no user message,
+  which need a way to make the dev app's mock provider start a harness turn.
+
+### Phase 2: sleeping sessions (landed 2026-09-26, wave 2 lane A)
+
+- An in-process `Stop` hook (`ClaudeAgentSession.stopHook`,
   not on ephemeral sessions) emits `schedules.updated` with the session's `session_crons`.
   `SessionScheduleRegistry` (`provider/session-schedules.ts`) holds them per session, cleared when
   the runtime starts, exits or stops; `utils/cron-next.ts` computes each next fire in local time

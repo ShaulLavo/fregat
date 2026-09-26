@@ -18,6 +18,7 @@ import {
   approvalRequestIdSchema,
   providerApprovalDecisionSchema,
   messageIdSchema,
+  turnIdSchema,
   type ApprovalRequestId,
   type ChatAgent,
   type InteractionMode,
@@ -1968,13 +1969,16 @@ class CodexAppServerSession extends SessionContext {
       sessionId: this.sessionId,
     })
     this.attachPendingTurn(params.turn.id)
-    const turn = this.turnForProviderTurnId(params.turn.id)
+    const known = this.turnForProviderTurnId(params.turn.id)
+    // No turn of ours is starting: the app server started this one itself (a goal continuation).
+    const adopted = known ? null : this.adoptProviderTurn(params)
+    const turn = known ?? adopted
     if (!turn) return
 
     this.emit({
       createdAt: new Date().toISOString(),
       eventId: runtimeEventId('codex-turn-started'),
-      payload: { model: this.model },
+      payload: { model: this.model, ...(adopted ? { origin: 'provider' as const } : {}) },
       provider: DEFAULT_CODEX_PROVIDER_SETTINGS.driverKind,
       providerInstanceId: this.providerInstanceId,
       providerRefs: { providerTurnId: params.turn.id },
@@ -1985,6 +1989,25 @@ class CodexAppServerSession extends SessionContext {
       turnId: turn.canonicalTurnId,
       type: 'turn.started',
     })
+    if (adopted) this.ingestSession('running', adopted.canonicalTurnId)
+  }
+
+  private adoptProviderTurn(params: CodexServerNotificationParamsByMethod['turn/started']) {
+    if (params.threadId !== this.providerConversationMarker) return null
+
+    const turnId = v.parse(turnIdSchema, `provider:${crypto.randomUUID()}`)
+    const turn = activeProviderTurn({
+      canonicalTurnId: turnId,
+      messageId: v.parse(messageIdSchema, `assistant:${turnId}`),
+    })
+    void turn.promise.catch(noop)
+    this.attachProviderTurn(params.turn.id, turn)
+    recordChatPipelineInfo('chat.pipeline.codex_session.provider_turn.adopted', {
+      providerTurnId: params.turn.id,
+      sessionId: this.sessionId,
+      turnId,
+    })
+    return turn
   }
 
   private async handleTurnCompleted(
@@ -2073,7 +2096,7 @@ class CodexAppServerSession extends SessionContext {
       turnId: turn.canonicalTurnId,
       type: 'turn.completed',
     })
-    this.ingestSession('ready', null)
+    this.ingestSession('ready', turn.canonicalTurnId)
     this.resolveTurn(providerTurnId, turn)
   }
 
@@ -2107,7 +2130,7 @@ class CodexAppServerSession extends SessionContext {
       turnId: turn.canonicalTurnId,
       type: 'assistant.complete',
     })
-    this.ingestSession('ready', null)
+    this.ingestSession('ready', turn.canonicalTurnId)
     this.resolveTurn(providerTurnId, turn)
   }
 

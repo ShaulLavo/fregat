@@ -16,6 +16,11 @@ export type WorkspaceIndexStatus = {
   staleEntryCount: number
 }
 
+/** One index per open root; `holderCount` is the open project streams keeping it warm. */
+export type WorkspaceIndexScopeStatus = WorkspaceIndexStatus & {
+  holderCount: number
+}
+
 /** Shape of `FsService.info()`; the server types its return against this. */
 export type ServerInfo = {
   workspaceRoot: string
@@ -24,7 +29,7 @@ export type ServerInfo = {
   defaultPath: string
   metadataDbPath: string
   maxTextFileBytes: number
-  workspaceIndex: WorkspaceIndexStatus
+  workspaceIndexes: WorkspaceIndexScopeStatus[]
   nativeWatcherCount: number
   openFileWatcherCount: number
   shallowWatcherCount: number

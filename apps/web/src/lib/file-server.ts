@@ -71,9 +71,7 @@ type DeleteResult = {
 }
 
 type OpenWorkspaceRootResult = {
-  entry?: Omit<WorkspaceRootEntry, 'path'> & { path: FilesystemPath }
-  status: 'opened' | 'superseded'
-  workspaceIndex: NonNullable<ServerInfo['workspaceIndex']>
+  entry: Omit<WorkspaceRootEntry, 'path'> & { path: FilesystemPath }
 }
 
 export type RecentEntriesOptions = {
@@ -523,7 +521,7 @@ export async function fetchServerInfo(signal: AbortSignal, client: Client) {
     },
     (info) => ({
       homePath: info.homePath,
-      workspaceIndexReadiness: info.workspaceIndex?.readiness,
+      workspaceIndexCount: info.workspaceIndexes.length,
     }),
   )
 }
@@ -559,7 +557,6 @@ export async function statPath(path: FilesystemPath, signal: AbortSignal, client
 
 export async function openWorkspaceRootPath(
   path: FilesystemPath,
-  generation: number,
   signal: AbortSignal,
   client: Client,
 ) {
@@ -568,31 +565,21 @@ export async function openWorkspaceRootPath(
       ...clientLogContext(client),
       action: 'fs.open_workspace_root',
       area: 'fs',
-      generation,
       method: 'POST',
       path,
       route: '/fs/workspace-root',
       signal,
     },
     async () => {
-      const response = await client.fs['workspace-root'].post(
-        { generation, path },
-        { fetch: { signal } },
-      )
+      const response = await client.fs['workspace-root'].post({ path }, { fetch: { signal } })
 
       if (response.error) throw createRpcError(response.error)
 
-      const result = response.data
       return {
-        ...result,
-        entry: result.entry ? metadataFromResponse(result.entry) : undefined,
+        entry: metadataFromResponse(response.data.entry),
       } satisfies OpenWorkspaceRootResult
     },
-    (result) => ({
-      openStatus: result.status,
-      scanRoot: result.workspaceIndex.scanRoot,
-      workspaceIndexReadiness: result.workspaceIndex.readiness,
-    }),
+    (result) => ({ canonicalPath: result.entry.path }),
   )
 }
 

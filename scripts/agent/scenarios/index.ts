@@ -2,6 +2,7 @@ import { settingsRoutePreparation } from './settings-route-preparation'
 import { settingsModuleFailure } from './settings-module-failure'
 import { connectionRefusalRetention } from './connection-refusal-retention'
 import { cachedProtocolStartup } from './cached-protocol-startup'
+import { primaryIdentityReplacement } from './primary-identity-replacement'
 import { editorLspTabSwitch } from './editor-lsp-tab-switch'
 import { editorLspServerExit } from './editor-lsp-server-exit'
 import { editorTypography } from './editor-typography'
@@ -206,6 +207,7 @@ import { visualSearchPerformance } from './visual-search-performance'
 import { visualSearchHeaders } from './visual-search-headers'
 import { visualSearchScrollContent } from './visual-search-scroll-content'
 import { quickOpenNewFile } from './quick-open-new-file'
+import { workspaceTwoRoots } from './workspace-two-roots'
 import { quickOpenLinkedFile } from './quick-open-linked-file'
 import { quickOpenNoFlicker } from './quick-open-no-flicker'
 import { gitHistorySearchNoFlicker } from './git-history-search-no-flicker'
@@ -303,6 +305,7 @@ export const scenarios: readonly Scenario[] = [
   sessionLifecycle,
   sessionUndo,
   cachedProtocolStartup,
+  primaryIdentityReplacement,
   connectionRefusalRetention,
   sessionNavigation,
   sessionOrdering,
@@ -477,6 +480,7 @@ export const scenarios: readonly Scenario[] = [
   visualSearchHeaders,
   visualSearchScrollContent,
   quickOpenNewFile,
+  workspaceTwoRoots,
   quickOpenLinkedFile,
   quickOpenNoFlicker,
   gitHistorySearchNoFlicker,
