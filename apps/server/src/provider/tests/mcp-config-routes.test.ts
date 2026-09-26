@@ -10,6 +10,11 @@ import { closeTestApps, createTestApp } from '../../../test/server'
 import { resolveFakeClaudeExecutable } from '../../../test/factories/claude-models'
 import { signedInClaudeAuth } from '../../../test/factories/fake-claude-query'
 import { ClaudeProviderAdapter, type ClaudeCreateQuery } from '../adapters/claude'
+import type { ProviderMcpConfigAccess } from '../types'
+import {
+  approveProjectMcpServer,
+  unapprovedProjectMcpServers,
+} from '../adapters/utils/claude-project-mcp'
 import { MockProviderAdapter } from '../adapters/mock'
 import type { ClaudeMcpCli } from '../adapters/utils/claude-mcp-config'
 import { ProviderAdapterRegistry } from '../provider-adapter-registry'
@@ -94,7 +99,7 @@ function fakeProbe(configDir: string, probes: Options[]): ClaudeCreateQuery {
   }
 }
 
-async function harness() {
+async function harness(codexConfig?: ProviderMcpConfigAccess) {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-mcp-config-'))
   roots.push(root)
   const configDir = path.join(root, 'claude-config')
@@ -131,13 +136,23 @@ async function harness() {
   const app = createTestApp({
     auth: { allowedOrigins: [TRUSTED_ORIGIN] },
     orchestration: {
-      providerAdapterRegistry: new ProviderAdapterRegistry([claude, new MockProviderAdapter()]),
+      providerAdapterRegistry: new ProviderAdapterRegistry([
+        claude,
+        Object.assign(new MockProviderAdapter(), codexConfig ? { mcpConfig: codexConfig } : {}),
+      ]),
     },
     settings: testSettingsOptions(root),
     watch: false,
     workspaceRoot: root,
   })
-  return { app, calls, configDir, probes, project }
+  return {
+    app,
+    calls,
+    configDir,
+    probes,
+    project,
+    approvalsFile: path.join(root, 'state', 'approvals.json'),
+  }
 }
 
 async function send(app: App, method: string, route: string, body?: unknown) {
@@ -266,6 +281,65 @@ describe('MCP config routes', () => {
       ['mcp', 'add-json', '-s', 'local'],
       ['mcp', 'remove', '-s', 'user'],
     ])
+  })
+
+  it('refuses copying an unapproved project server to Codex until its exact definition is approved', async () => {
+    const writes: unknown[] = []
+    const { app, project, approvalsFile } = await harness({
+      scopes: ['user'],
+      list: async () => [],
+      add: async (input) => {
+        writes.push(input)
+      },
+      remove: async () => {},
+      read: async () => ({ transport: 'stdio', command: 'unused', args: [], env: {} }),
+    })
+    const body = { scope: 'project', folder: project, target: { providerInstanceId: 'codex' } }
+    const denied = await send(app, 'POST', '/providers/claude/mcp/deploy/copy', body)
+    expect(denied.status).toBe(409)
+    expect(denied.body).toMatchObject({ error: { code: 'provider.MCP_APPROVAL_REQUIRED' } })
+    expect(writes).toEqual([])
+
+    await approveProjectMcpServer({ approvalsFile, cwd: project, name: 'deploy' })
+    expect((await send(app, 'POST', '/providers/claude/mcp/deploy/copy', body)).status).toBe(200)
+    expect(writes).toHaveLength(1)
+    await writeFile(
+      path.join(project, '.mcp.json'),
+      JSON.stringify({ mcpServers: { deploy: { command: 'changed' } } }),
+    )
+    expect((await send(app, 'POST', '/providers/claude/mcp/deploy/copy', body)).status).toBe(409)
+    expect(writes).toHaveLength(1)
+  })
+
+  it.each(['user', 'local'] as const)(
+    'refuses copying an unapproved project server into Claude %s scope',
+    async (scope) => {
+      const { app, calls, project } = await harness()
+      const result = await send(app, 'POST', '/providers/claude/mcp/deploy/copy', {
+        scope: 'project',
+        folder: project,
+        target: { providerInstanceId: 'claude', scope },
+      })
+      expect(result.status).toBe(409)
+      expect(calls).toEqual([])
+    },
+  )
+
+  it('refuses a project name defined in a parent folder without writing or approving it', async () => {
+    const { app, calls, project, approvalsFile } = await harness()
+    const folder = path.join(project, 'packages', 'web')
+    await mkdir(folder, { recursive: true })
+    const result = await send(app, 'POST', '/providers/claude/mcp', {
+      name: 'deploy',
+      scope: 'project',
+      folder,
+      definition: { transport: 'stdio', command: 'owner-server', args: [], env: {} },
+    })
+    expect(result.status).toBe(409)
+    expect(result.body).toMatchObject({ error: { code: 'provider.MCP_NAME_TAKEN' } })
+    expect(calls).toEqual([])
+    expect(await readFile(path.join(folder, '.mcp.json'), 'utf8').catch(() => null)).toBeNull()
+    expect(await unapprovedProjectMcpServers({ approvalsFile, cwd: folder })).toEqual(['deploy'])
   })
 
   it('answers an instance without MCP config (the mock Codex) with a conflict', async () => {

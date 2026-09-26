@@ -76,7 +76,7 @@ export async function splitSessionOffMcp(
 }
 
 /** Every server the CLI would load, fingerprinted by each file that defines it and how. */
-async function projectMcpServers(cwd: string): Promise<ProjectMcpServer[]> {
+export async function projectMcpServers(cwd: string): Promise<ProjectMcpServer[]> {
   const definitions = new Map<string, Array<[string, unknown]>>()
   for (const file of await mcpConfigFiles(cwd)) {
     const servers = (await readJson(file))?.mcpServers
