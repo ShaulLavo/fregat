@@ -1,3 +1,5 @@
+import { checkpointIntentOptions } from '@/lib/checkpoint-intent'
+import { useDiffIntent } from '@/lib/intent-prefetch/hooks/use-diff-intent'
 import { useChatTransport } from '@/features/chat/hooks/use-chat-transport'
 import { CaretRightIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
@@ -31,6 +33,7 @@ import { DiffStatLabel } from '@/components/diff-stat-label'
 
 export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDiffSummary }) {
   const { openCheckpointDiff, openSessionCheckpointDiff } = useChatTimelineActions()
+  const intent = useDiffIntent(checkpointIntentOptions(summary), summary.sessionId)
   const { environmentId } = useChatTransport()
   const expansionKey = chatChangedFilesExpansionKey(environmentId, summary)
   const expansion = useChatChangedFilesExpansionStore((state) => state.expansionByKey[expansionKey])
@@ -73,6 +76,7 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
 
   return (
     <section
+      {...intent}
       className='bg-card/45 @container/changed-files mt-2 rounded-lg p-2.5'
       data-changed-files-state={expanded ? 'expanded' : 'preview'}
     >

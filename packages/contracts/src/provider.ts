@@ -306,10 +306,29 @@ export const providerMcpServerStatusSchema = v.picklist([
   'unapproved',
 ])
 
+export const providerMcpTransportSchema = v.picklist(['stdio', 'http', 'sse', 'sdk'])
+
+export const providerMcpAuthSchema = v.picklist([
+  'unsupported',
+  'signed-in',
+  'signed-out',
+  'unknown',
+])
+
+/**
+ * One MCP server as the harness reports it. No configuration values: commands, headers and
+ * environment can hold secrets, so only the HTTP origin leaves the server.
+ */
 export const providerMcpServerSchema = v.object({
   name: trimmedNonEmptyStringSchema,
   status: providerMcpServerStatusSchema,
   error: v.nullable(v.string()),
+  /** Where the definition lives: `user`, `project`, `local`, `plugin`, `claudeai`, … (open set). */
+  source: v.nullable(v.string()),
+  transport: v.nullable(providerMcpTransportSchema),
+  origin: v.nullable(v.string()),
+  tools: v.array(v.string()),
+  auth: providerMcpAuthSchema,
 })
 
 /**
@@ -320,8 +339,13 @@ export const providerSessionMcpSchema = v.object({
   running: v.boolean(),
   canReconnect: v.boolean(),
   canSignIn: v.boolean(),
+  /** The session can start without a server; `off` names the ones it runs without. */
+  canTurnOff: v.boolean(),
+  off: v.array(v.string()),
   servers: v.array(providerMcpServerSchema),
 })
+
+export const providerMcpSessionOffBodySchema = v.object({ off: v.boolean() })
 
 export const providerMcpSignInSchema = v.object({
   authorizationUrl: v.pipe(
@@ -329,6 +353,23 @@ export const providerMcpSignInSchema = v.object({
     v.url(),
     v.regex(/^https?:\/\//i, 'Use an HTTP or HTTPS sign-in address.'),
   ),
+  /** Names the pending sign-in a pasted address finishes. */
+  attemptId: v.optional(trimmedNonEmptyStringSchema),
+})
+
+/**
+ * The address the sign-in page ended on, pasted from any device. The server hands it to the
+ * harness waiting on its own loopback, and only when it matches that pending sign-in.
+ */
+export const providerMcpSignInFinishBodySchema = v.object({
+  callbackUrl: v.pipe(v.string(), v.trim(), v.minLength(1, 'Paste the address the page ended on.')),
+})
+
+export const providerMcpSignInAttemptSchema = v.object({
+  attemptId: trimmedNonEmptyStringSchema,
+  name: trimmedNonEmptyStringSchema,
+  state: v.picklist(['pending', 'succeeded', 'failed']),
+  message: v.nullable(v.string()),
 })
 
 export const providerConfiguredHookSchema = v.object({
@@ -349,8 +390,11 @@ export const providerSessionHooksSchema = v.object({
 
 export type ProviderMcpServer = v.InferOutput<typeof providerMcpServerSchema>
 export type ProviderMcpServerStatus = v.InferOutput<typeof providerMcpServerStatusSchema>
+export type ProviderMcpTransport = v.InferOutput<typeof providerMcpTransportSchema>
+export type ProviderMcpAuth = v.InferOutput<typeof providerMcpAuthSchema>
 export type ProviderSessionMcp = v.InferOutput<typeof providerSessionMcpSchema>
 export type ProviderMcpSignIn = v.InferOutput<typeof providerMcpSignInSchema>
+export type ProviderMcpSignInAttempt = v.InferOutput<typeof providerMcpSignInAttemptSchema>
 export type ProviderConfiguredHook = v.InferOutput<typeof providerConfiguredHookSchema>
 export type ProviderSessionHooks = v.InferOutput<typeof providerSessionHooksSchema>
 export type ProviderAgent = v.InferOutput<typeof providerAgentSchema>

@@ -1,7 +1,7 @@
 import { Tabs, TabsList, TabsTab } from '@workspace/ui/components/tabs'
 
 import { selectSettingsScope, useSettingsScope, type SettingsScope } from '../state/scope-store'
-import { selectSettingsView } from '../state/view-store'
+import { selectSettingsView, useSettingsView } from '../state/view-store'
 
 /**
  * User, Workspace and Defaults. There is no Folder tab: this app holds exactly
@@ -19,12 +19,18 @@ export function ScopeTabs({
   hasWorkspace: boolean
 }) {
   const scope = useSettingsScope()
+  const view = useSettingsView()
+  const selectScope = (next: SettingsScope) => {
+    selectSettingsScope(next)
+    selectSettingsView(next === 'default' ? 'json' : view)
+  }
 
   return (
     <Tabs value={scope} onValueChange={(next: SettingsScope) => selectScope(next)}>
       <TabsList aria-label='Settings scope'>
-        <ScopeTab label='User' scope='user' />
+        <ScopeTab onSelect={selectScope} label='User' scope='user' />
         <ScopeTab
+          onSelect={selectScope}
           // Gated on a folder being open rather than hidden: the tab is real, it
           // just has no file to write to until there is a workspace.
           disabledReason={hasWorkspace ? null : 'Open a folder to use workspace settings'}
@@ -32,6 +38,7 @@ export function ScopeTabs({
           scope='workspace'
         />
         <ScopeTab
+          onSelect={selectScope}
           disabledReason={hasDefaults ? null : 'Open Settings in a tab to read the defaults'}
           label='Defaults'
           scope='default'
@@ -41,22 +48,24 @@ export function ScopeTabs({
   )
 }
 
-function selectScope(scope: SettingsScope) {
-  selectSettingsScope(scope)
-  if (scope === 'default') selectSettingsView('json')
-}
-
 function ScopeTab({
   disabledReason = null,
   label,
+  onSelect,
   scope,
 }: {
   disabledReason?: string | null
   label: string
+  onSelect: (scope: SettingsScope) => void
   scope: SettingsScope
 }) {
   return (
-    <TabsTab disabled={disabledReason !== null} title={disabledReason ?? undefined} value={scope}>
+    <TabsTab
+      onClick={() => onSelect(scope)}
+      disabled={disabledReason !== null}
+      title={disabledReason ?? undefined}
+      value={scope}
+    >
       {label}
     </TabsTab>
   )

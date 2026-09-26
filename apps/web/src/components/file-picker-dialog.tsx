@@ -676,7 +676,7 @@ export function FilePickerDialog({
                 error={pathInput.error}
                 inputRef={pathInput.inputRef}
                 isEditing={pathInput.isEditing}
-                isPending={pathInput.isPending}
+                isPending={pathInput.isPending || isDirectoryFetching}
                 onCancel={pathInput.close}
                 onChange={pathInput.change}
                 onEdit={pathInput.open}

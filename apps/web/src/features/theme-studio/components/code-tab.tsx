@@ -1,9 +1,12 @@
+import { Spinner } from '@workspace/ui/components/spinner'
+import { ToolPane } from '@workspace/ui/patterns/tool-pane'
+import { useCodeThemePreview } from '@/lib/code-theme/hooks/use-preview'
 import type { ColorMode, ThemeVariantPatch } from '@workspace/contracts'
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import { VirtualList } from '@workspace/ui/patterns/virtual-list'
 
 import { CodeThemePreview } from '@/lib/code-theme/components/preview'
-import { editorThemeOptions } from '@/lib/code-theme/utils/catalog'
+import { editorThemeColorMode, editorThemeOptions } from '@/lib/code-theme/utils/catalog'
 import { useStudioList } from '@/features/theme-studio/hooks/use-studio-list'
 
 /**
@@ -20,6 +23,10 @@ export function CodeTab({
   onEdit: (patch: ThemeVariantPatch) => void
 }) {
   const options = editorThemeOptions(mode)
+  const preview = useCodeThemePreview(codeTheme)
+  const theme = editorThemeOptions(editorThemeColorMode(preview.themeId) ?? mode).find(
+    (option) => option.id === preview.themeId,
+  )
   const { containerRef, virtualRef, list } = useStudioList({
     items: options.map((option) => ({ id: option.id, label: option.label })),
     activeId: codeTheme,
@@ -49,10 +56,15 @@ export function CodeTab({
         )}
         scrollRef={containerRef}
       />
-      <CodeThemePreview
-        className='min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-md'
-        themeId={codeTheme}
-      />
+      <ToolPane
+        title={theme?.label ?? preview.themeId}
+        actions={
+          preview.isFetching ? <Spinner label='Loading code theme preview' size='xs' /> : null
+        }
+        className='min-w-0'
+      >
+        <CodeThemePreview preview={preview} className='rounded-md' />
+      </ToolPane>
     </div>
   )
 }

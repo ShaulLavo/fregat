@@ -72,6 +72,7 @@ test.each([
   ['workspace.showFontSettings', 'font'],
   ['workspace.showWatchSettings', 'files.watchDirectoryLimit'],
   ['workspace.showUsage', 'usage'],
+  ['workspace.showMcpServers', 'mcp'],
   ['workspace.showTransparencySettings', 'workbench.surface'],
 ] as const)('%s opens the settings controls matching its search', async (command, query) => {
   await primaryQueryClient().query(settingsPageQueryOptions)

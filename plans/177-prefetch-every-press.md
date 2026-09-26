@@ -184,6 +184,47 @@ post-deploy check.
 
 ### Phase 2 — Diff queries (S)
 
+Implemented 2026-09-26 in wave 2 lane F, awaiting coordinator merge. The `prefetch.diffs`
+application setting depends on the master. Git change and commit file rows prepare their read on
+hover, focus and the keyboard cursor; checkpoint turn files and changed-files cards share the turn
+read; history prepares the cursor's neighbours. Query-owned leases deduplicate, cap the diff family
+at four per environment, and keep admitted reads fetching through row leave until the response
+settles. Git read routes do not propagate aborts, so client cancellation would free room while the
+server keeps working. Checkpoint open commands claim the shared read for both clicks and keyboard
+activation, including when the counted-turn read is still pending. No hover issues a provider command. Commit details hold their displayed subject while the
+next query resolves.
+
+PR #136 review fixes are covered by real delayed Git subprocesses and the checkpoint turn-files
+list. Leaving eight rows admits four Git operations; revisiting shares the pending read, and
+settlement frees capacity. Enter survives cursor movement and list unmount while both turn reads
+are pending; click remains covered. Admitted queries retain an observer through settlement so a
+viewer mounting and unmounting cannot abort them.
+
+The response-seeding prerequisite was missing: `/git/diff` returned patches without sources.
+Single-file responses now include the immutable blob text using the existing text-size guards;
+directory reads remain patch-only. The shared query options seed the blob key before returning.
+The checkpoint whitespace fix was already merged in #87. Phase 3 syntax preparation is unchanged.
+
+Proof: `prefetch-first-paint` trace before
+`/work/tmp/fregat-evidence/20260926T202105Z-trace-prefetch-first-paint/`, after with `--compare`
+`/work/tmp/fregat-evidence/20260926T203737Z-trace-prefetch-first-paint/`. First diff text ms:
+Markdown 136 → 104, TypeScript 99 → 71; second files 89 → 58 and 94 → 70. Revisit text
+60 → 69 and 61 → 61. Colour still follows text, as expected before Phase 3.
+`prefetch-diff-queries`, with a 300 ms delayed read, measured 397 ms off versus 37 ms on,
+zero blank frames, zero blob requests and zero provider commands. Its screenshots and
+`inspection.json` cache dump are in
+`/work/tmp/fregat-evidence/20260926T203844Z-scenario-prefetch-diff-queries/`.
+The final rebased scenario also checks history neighbour and commit-file reuse, with zero blank
+frames during commit selection: 412 ms off versus 70 ms on, evidence at
+`/work/tmp/fregat-evidence/20260926T205522Z-scenario-prefetch-diff-queries/`.
+Settings dependency proof: `/work/tmp/fregat-evidence/20260926T204110Z-scenario-prefetch-settings/`.
+The focused scheduler, blob-reuse and diff-syntax tests pass, as do the server's single-file,
+immutable-snapshot and text-limit checks. Browser font requests hit Vite's worktree symlink
+allow-list, so captures use fallback fonts; the baseline and after run share that limitation. The P0 trace screenshot also catches fixture
+teardown notices after all measurements; the dedicated query scenario leaves the page before cleanup.
+Whole-trace scripting increased 312 ms across the roughly 55-second run, so the performance claim
+is the measured diff press latency, not overall CPU use.
+
 - Seed `gitKeys.blobDiff` from the `gitKeys.diff` response in `state/navigation.ts:673`, so a diff
   open is one round trip.
 - Fix the checkpoint `ignoreWhitespace` miss (`features/chat/hooks/use-open-checkpoint-diff-document.ts`

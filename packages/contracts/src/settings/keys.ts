@@ -1209,6 +1209,18 @@ export const SETTINGS_REGISTRY = {
       'Read a file and colour its syntax while the pointer heads for its tree row, tab or definition link.',
     keywords: ['prefetch', 'preload', 'files', 'tree', 'tabs', 'hover', 'syntax'],
   }),
+  'prefetch.diffs': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Prefetch',
+    dependsOn: 'prefetch.enabled',
+    title: 'Prefetch diffs',
+    description:
+      'Load changes, commit files and checkpoint diffs when their rows are hovered or active.',
+    keywords: ['prefetch', 'preload', 'diffs', 'git', 'history', 'checkpoints'],
+  }),
   'files.autoSave': defineSetting({
     schema: v.picklist(['off', 'afterDelay', 'onFocusChange', 'onWindowChange'] as const),
     default: 'off',
@@ -1537,7 +1549,7 @@ export const SETTINGS_REGISTRY = {
     title: 'Shortcuts',
     description: 'Every command and its keys.',
     details:
-      'In settings.json this is command id to shortcut: one hotkey, or two separated by a single space. A missing command keeps its default; null unbinds it.',
+      'In settings.json this is command id to its complete list of shortcuts, each one hotkey or two separated by a single space. A missing command keeps its defaults; null or an empty list unbinds it.',
     // The one key that merges rather than replaces: a later layer should be able
     // to bind a command without dropping every other binding the user set.
     merge: 'record',

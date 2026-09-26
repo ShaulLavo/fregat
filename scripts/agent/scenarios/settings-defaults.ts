@@ -26,6 +26,7 @@ export const settingsDefaults: Scenario = {
     await step('after-typing')
     await selectors.settingsScopeTab(page, 'User').click()
     await selectors.settingsDefaultsBanner(page).waitFor({ state: 'hidden' })
+    await selectors.settingsScopeTab(page, 'User', true).waitFor()
     await step('back-to-user')
   },
 }

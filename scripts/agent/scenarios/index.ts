@@ -1,4 +1,14 @@
+import { sessionNoFlicker } from './session-no-flicker'
+import { restNoFlicker } from './rest-no-flicker'
 import { deferredDialogs } from './deferred-dialogs'
+import { rootSwitchNoFlicker } from './root-switch-no-flicker'
+import { turnFilesNoFlicker } from './turn-files-no-flicker'
+import { branchActionsNoFlicker } from './branch-actions-no-flicker'
+import {
+  diffNoFlicker,
+  savedComparisonNoFlicker,
+  historyComparisonNoFlicker,
+} from './comparison-no-flicker'
 import { textFieldFkeys } from './text-field-fkeys'
 import { settingsRoutePreparation } from './settings-route-preparation'
 import { settingsModuleFailure } from './settings-module-failure'
@@ -18,6 +28,8 @@ import { chatStream } from './chat-stream'
 import { chatHistoryPages } from './chat-history-pages'
 import { chatStashContext } from './chat-stash-context'
 import { chatQueue } from './chat-queue'
+import { chatQueueAway } from './chat-queue-away'
+import { chatQueueStopUpload } from './chat-queue-stop-upload'
 import { providerModelOptions } from './provider-model-options'
 import { fileAttachments } from './file-attachments'
 import { sessionTitles } from './session-titles'
@@ -32,12 +44,16 @@ import { projectGrouping } from './project-grouping'
 import { sessionSearch, sessionSearchEnvironments } from './session-search'
 import { sessionUnread } from './session-unread'
 import { mcpApproval } from './mcp-approval'
+import { mcpSettings } from './mcp-settings'
+import { mcpStatus } from './mcp-status'
 import { nativePermissionGrant } from './native-permission-grant'
 import { resetCreditRedemption } from './reset-credit-redemption'
 import { pullRequestLookupFailure } from './pull-request-lookup-failure'
 import { streamOverflow } from './stream-overflow'
+import { questionHistory } from './question-history'
 import { chatScreenshot } from './chat-screenshot'
 import { chatMultipleModels } from './chat-multiple-models'
+import { chatMultipleModelsLostAck } from './chat-multiple-models-lost-ack'
 import { chatComposerEditing } from './chat-composer-editing'
 import { chatArtifactTemplate } from './chat-artifact-template'
 import { chatModelFavorites } from './chat-model-favorites'
@@ -104,6 +120,7 @@ import { chatSessionGoal } from './chat-session-goal'
 import { chatAgentReview } from './chat-agent-review'
 import { fileTreeHoverPrefetch } from './file-tree-hover-prefetch'
 import { prefetchChatSwitch } from './prefetch-chat-switch'
+import { prefetchDiffQueries } from './prefetch-diff-queries'
 import { prefetchFirstPaint } from './prefetch-first-paint'
 import { prefetchSettings } from './prefetch-settings'
 import {
@@ -225,6 +242,7 @@ import { quickOpenNewFile } from './quick-open-new-file'
 import { projectSettings } from './project-settings'
 import { workspaceTwoRoots } from './workspace-two-roots'
 import { quickOpenLinkedFile } from './quick-open-linked-file'
+import { paletteThemeNoFlicker, studioThemeNoFlicker } from './code-theme-no-flicker'
 import { quickOpenNoFlicker } from './quick-open-no-flicker'
 import { gitHistorySearchNoFlicker } from './git-history-search-no-flicker'
 import { logsSearchNoFlicker } from './logs-search-no-flicker'
@@ -304,6 +322,7 @@ import { gitMergeRequest } from './git-merge-request'
 import { gitClonePublish } from './git-clone-publish'
 import { worktreeSetupImport } from './worktree-setup-import'
 import { gitHistory } from './git-history'
+import { gitHistoryNoFlicker } from './git-history-no-flicker'
 import { editorCaretBurst } from './editor-caret-burst'
 import { editorFocusClicks } from './editor-focus-clicks'
 import { editorProportionalFont } from './editor-proportional-font'
@@ -312,6 +331,7 @@ import { editorProduct } from './editor-product'
 import { treeFileClicks } from './tree-file-clicks'
 import { treeStickyScroll } from './tree-sticky-scroll'
 import { treeParity } from './tree-parity'
+import { fileIconHues } from './file-icon-hues'
 import { treeParityBehaviour } from './tree-parity-behaviour'
 import { demoWorkspace } from './demo-workspace'
 import { demoAgentGit } from './demo-agent-git'
@@ -321,6 +341,9 @@ import { demoThemeStartup } from './demo-theme-startup'
 import { demoWallpaperStartup } from './demo-wallpaper-startup'
 
 export const scenarios: readonly Scenario[] = [
+  diffNoFlicker,
+  savedComparisonNoFlicker,
+  historyComparisonNoFlicker,
   terminalHistory,
   responseDelivery,
   archiveLifecycle,
@@ -339,12 +362,16 @@ export const scenarios: readonly Scenario[] = [
   sessionNotifications,
   composerDefaults,
   mcpApproval,
+  mcpStatus,
+  mcpSettings,
   nativePermissionGrant,
   resetCreditRedemption,
   pullRequestLookupFailure,
   streamOverflow,
+  questionHistory,
   chatScreenshot,
   chatMultipleModels,
+  chatMultipleModelsLostAck,
   chatComposerEditing,
   chatArtifactTemplate,
   chatModelFavorites,
@@ -361,7 +388,10 @@ export const scenarios: readonly Scenario[] = [
   chatStashContext,
   chatStream,
   chatHistoryPages,
+  sessionNoFlicker,
   chatQueue,
+  chatQueueAway,
+  chatQueueStopUpload,
   providerModelOptions,
   draftRecovery,
   asyncQuestions,
@@ -379,6 +409,7 @@ export const scenarios: readonly Scenario[] = [
   chatModelPicker,
   chatUsageMeter,
   chatComposerNarrow,
+  restNoFlicker,
   settingsUsage,
   pushSubscribe,
   pushSessionNotice,
@@ -518,7 +549,12 @@ export const scenarios: readonly Scenario[] = [
   projectSettings,
   workspaceTwoRoots,
   quickOpenLinkedFile,
+  rootSwitchNoFlicker,
   quickOpenNoFlicker,
+  paletteThemeNoFlicker,
+  studioThemeNoFlicker,
+  turnFilesNoFlicker,
+  branchActionsNoFlicker,
   gitHistorySearchNoFlicker,
   logsSearchNoFlicker,
   searchTypeDelete,
@@ -548,6 +584,7 @@ export const scenarios: readonly Scenario[] = [
   demoThemeStartup,
   demoWallpaperStartup,
   gitHistory,
+  gitHistoryNoFlicker,
   editorLargePaste,
   editorFastScroll,
   editorDiagnosticsLifecycle,
@@ -574,6 +611,7 @@ export const scenarios: readonly Scenario[] = [
   chatAgentReview,
   fileTreeHoverPrefetch,
   prefetchFirstPaint,
+  prefetchDiffQueries,
   prefetchChatSwitch,
   prefetchSettings,
   workspaceOpenLargeRoot,
@@ -610,6 +648,7 @@ export const scenarios: readonly Scenario[] = [
   editorProduct,
   treeStickyScroll,
   treeParity,
+  fileIconHues,
   treeParityBehaviour,
   treeFileClicks,
 ]

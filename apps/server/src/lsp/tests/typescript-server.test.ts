@@ -120,17 +120,18 @@ describe('Claude edit hooks with an open TypeScript document', () => {
       const clean = 'export const count: number = 1\n'
       const broken = 'export const count: number = "one"\n'
       const fixture = await agentFileFixture(packageName, clean)
-      const { root, filePath, uri, session, reader } = fixture
+      const { root, filePath, uri, session, reader, pool } = fixture
       await openAgentFile(fixture, clean, native, [])
       const hooks = claudeDiagnosticsHooks(reader)
       await runDiagnosticHook(hooks, 'PreToolUse', root)
       await writeFile(filePath, broken)
+      const reads = vi.spyOn(pool, 'fileDiagnostics')
       let settled = false
       const reading = runDiagnosticHook(hooks, 'PostToolUse', root).then((result) => {
         settled = true
         return result
       })
-      await new Promise((resolve) => setTimeout(resolve, 150))
+      await expect.poll(() => reads.mock.calls.at(-1)?.[3]).toBe(broken)
       const completedBeforeSync = settled
       await notify(session, 'textDocument/didChange', {
         contentChanges: [{ text: broken }],
@@ -210,14 +211,14 @@ async function openAgentFile(
     expect(errorCodes(result, 'items')).toEqual(codes)
     return
   }
-  await expect
-    .poll(() => errorCodes(socket.notification('textDocument/publishDiagnostics'), 'diagnostics'), {
-      timeout: 20_000,
-    })
-    .toEqual(codes)
+  // An absent publication is still loading, even when the expected error list is empty.
+  await expect.poll(() => publishedErrors(socket, uri), { timeout: 20_000 }).toEqual(codes)
 }
 
-async function agentFileFixture(packageName: string, clean: string) {
+async function agentFileFixture(
+  packageName: (typeof RUNTIMES)[number]['packageName'],
+  clean: string,
+) {
   const fixture = await installedTypeScriptRuntimeFixture(packageName, {
     'package.json': '{"private":true,"type":"module"}\n',
     'tsconfig.json': '{"compilerOptions":{"strict":true},"files":["probe.ts"]}\n',
@@ -245,7 +246,7 @@ async function agentFileFixture(packageName: string, clean: string) {
     pool: () => pool,
     settings: () => SETTINGS,
   })
-  return { root, filePath, uri, session, socket, reader }
+  return { root, filePath, uri, session, socket, reader, pool }
 }
 
 function runDiagnosticHook(
@@ -643,7 +644,7 @@ type Probe = {
 }
 
 async function openProbe(
-  packageName: string,
+  packageName: (typeof RUNTIMES)[number]['packageName'],
   files: Readonly<Record<string, string>>,
   source: string,
 ): Promise<Probe> {

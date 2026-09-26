@@ -29,7 +29,11 @@ export {
   repositoryKey,
   worktreeIdForCheckout,
 } from './orchestration/utils/repository-ids'
-export type { ProviderDiscoveredSession, ProviderSessionDiscoveryInput } from './provider/types'
+export type {
+  ProviderDiscoveredSession,
+  ProviderSessionDiscoveryInput,
+  ProviderTurnInput,
+} from './provider/types'
 export { LspSessionPool } from './lsp/proxy-session'
 export { spawnTypeScript } from './lsp/typescript/runtime'
 export type { LspProxyClientSession } from './lsp/proxy-session'

@@ -1,9 +1,11 @@
-import { htmlVoidElements } from 'html-void-elements'
-
 const TAG = /<(\/?)([A-Za-z][\w:-]*)(?:\s[^>]*?)?(\/?)>/g
 const COMMENT_OR_CDATA = /<!--[\s\S]*?(?:-->|$)|<!\[CDATA\[[\s\S]*?(?:\]\]>|$)/g
 
-const VOID_TAGS = new Set(htmlVoidElements)
+const VOID_TAGS = new Set(
+  'area base basefont bgsound br col command embed frame hr image img input keygen link meta param source track wbr'.split(
+    ' ',
+  ),
+)
 
 /** Elements the HTML parser closes on its own; a missing end tag pins nothing. */
 const OPTIONAL_END_TAGS = new Set([

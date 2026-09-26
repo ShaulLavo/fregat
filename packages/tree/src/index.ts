@@ -1,5 +1,4 @@
 export {
-  getBuiltInFileIconColor,
   getBuiltInFileIconName,
   getBuiltInSpriteSheet,
   isColoredBuiltInIconSet,

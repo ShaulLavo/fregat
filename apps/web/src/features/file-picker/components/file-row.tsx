@@ -1,4 +1,4 @@
-import { useForesight } from '@foresightjs/react'
+import { useForesight } from '@/hooks/use-foresight'
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { cn } from '@workspace/ui/lib/utils'

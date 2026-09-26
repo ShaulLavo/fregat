@@ -1,4 +1,4 @@
-import { XIcon, FileIcon } from '@phosphor-icons/react'
+import { ArrowClockwiseIcon, FileIcon, XIcon } from '@phosphor-icons/react'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { Button } from '@workspace/ui/components/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
@@ -113,9 +113,26 @@ export function ChatInputAttachmentList({
             )}
           </span>
           {attachment.upload?.status === 'failed' && onRetry && (
-            <Button size='xs' variant='ghost' onClick={() => onRetry(attachment.id)}>
-              Retry {attachment.name}
-            </Button>
+            // An icon, so the chip keeps room for the name it is retrying.
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    aria-label={`Retry ${attachment.name}`}
+                    className='text-muted-foreground'
+                    disabled={disabled}
+                    focusableWhenDisabled
+                    size='icon-xs'
+                    type='button'
+                    variant='ghost'
+                    onClick={() => onRetry(attachment.id)}
+                  />
+                }
+              >
+                <ArrowClockwiseIcon className='size-(--icon-size-sm)' />
+              </TooltipTrigger>
+              <TooltipContent>Retry upload</TooltipContent>
+            </Tooltip>
           )}
           <Tooltip>
             <TooltipTrigger

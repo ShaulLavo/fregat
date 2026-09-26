@@ -1,5 +1,4 @@
 import { createECDH } from 'node:crypto'
-import { generateVAPIDKeys } from 'web-push'
 import { VAPID_PRIVATE_KEY_REF } from '../settings/secrets'
 import type { SettingsStore } from '../settings/store'
 
@@ -17,6 +16,7 @@ export async function loadVapidKeys(
   settings: SettingsStore,
   onGenerate: () => void,
 ): Promise<VapidKeys> {
+  const { generateVAPIDKeys } = await import('@workspace/push')
   const privateKey = await settings.ensureSecret(VAPID_PRIVATE_KEY_REF, () => {
     onGenerate()
     return generateVAPIDKeys().privateKey

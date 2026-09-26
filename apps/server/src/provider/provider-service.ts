@@ -394,9 +394,11 @@ export class ProviderService {
     })
     this.requireSdkOwnership(input.sessionId)
     this.recordLaunch(input, adapter)
+    const mcpOff = existing?.runtimePayload?.mcpOff
     const session = await adapter
       .startRuntime({
         ...providerRuntimeStartInput(input, input.runtimePayload, continuation),
+        ...(mcpOff?.length ? { mcpOff } : {}),
         ...this.mcpBinding(input.sessionId, input.runtimeEpoch, input.runtimePayload.cwd),
         ...(!existing && input.fork ? { fork: input.fork.native } : {}),
       })
@@ -959,9 +961,31 @@ export class ProviderService {
     return {
       canReconnect: Boolean(adapter?.reconnectMcpServer),
       canSignIn: Boolean(adapter?.signInMcpServer),
+      canTurnOff: Boolean(adapter?.applyMcpSessionOff),
+      off: this.sessionDirectory.getBinding(sessionId)?.runtimePayload?.mcpOff ?? [],
       running: servers !== null,
       servers: servers ?? [],
     }
+  }
+
+  /** The off list lives on the binding, so every later start, resume and restart carries it. */
+  async setMcpSessionOff(input: { name: string; off: boolean; sessionId: SessionId }) {
+    const adapter = this.requireSessionControl(input.sessionId, 'applyMcpSessionOff')
+    const binding = this.sessionDirectory.getBinding(input.sessionId)
+    if (!binding)
+      throw sessionIdentityErrors.SESSION_NOT_RUNNING({ internal: { sessionId: input.sessionId } })
+    const current = binding.runtimePayload?.mcpOff ?? []
+    const off = input.off
+      ? [...new Set([...current, input.name])].sort()
+      : current.filter((name) => name !== input.name)
+    this.sessionDirectory.upsert({ ...bindingForUpsert(binding), runtimePayload: { mcpOff: off } })
+    recordChatPipelineInfo('chat.pipeline.provider_service.mcp_session_off', {
+      name: input.name,
+      off: input.off,
+      sessionId: input.sessionId,
+    })
+    await adapter.applyMcpSessionOff?.({ off, sessionId: input.sessionId })
+    return this.sessionMcp(input.sessionId)
   }
 
   async reconnectMcpServer(input: { name: string; sessionId: SessionId }) {
@@ -976,12 +1000,15 @@ export class ProviderService {
     return this.sessionMcp(input.sessionId)
   }
 
+  /** The sign-in's redirect goes to the provider's loopback; the caller tracks the attempt. */
   async signInMcpServer(input: { name: string; sessionId: SessionId }) {
     const adapter = this.requireSessionControl(input.sessionId, 'signInMcpServer')
     const signIn = adapter.signInMcpServer
     if (!signIn) throw sessionIdentityErrors.SESSION_CONTROL_UNSUPPORTED({ internal: input })
 
-    return v.parse(providerMcpSignInSchema, await signIn.call(adapter, input))
+    const flow = await signIn.call(adapter, input)
+    v.parse(providerMcpSignInSchema, { authorizationUrl: flow.authorizationUrl })
+    return flow
   }
 
   async sessionHooks(sessionId: SessionId): Promise<ProviderSessionHooks> {
@@ -998,7 +1025,12 @@ export class ProviderService {
 
   private requireSessionControl(
     sessionId: SessionId,
-    control: 'approveMcpServer' | 'reconnectMcpServer' | 'signInMcpServer' | 'controlGoal',
+    control:
+      | 'applyMcpSessionOff'
+      | 'approveMcpServer'
+      | 'reconnectMcpServer'
+      | 'signInMcpServer'
+      | 'controlGoal',
   ) {
     this.requireRunning()
     const adapter = this.routeSession(sessionId)?.adapter
@@ -1059,14 +1091,16 @@ export class ProviderService {
     input: ProviderTurnInput,
     adapter: ReturnType<ProviderAdapterRegistry['getByInstance']>,
   ): ProviderTurnInput {
-    if (input.providerResumeCursor !== undefined && input.providerResumeCursor !== null)
-      return input
-
     const binding = this.sessionDirectory.getBinding(input.sessionId)
-    const continuation = continuableBinding(binding, adapter, input.providerInstanceId)
-    if (!continuation) return input
+    const mcpOff = binding?.runtimePayload?.mcpOff
+    // A turn may reopen its runtime, so it carries the servers the session runs without.
+    const turn = mcpOff?.length ? { ...input, mcpOff } : input
+    if (turn.providerResumeCursor !== undefined && turn.providerResumeCursor !== null) return turn
 
-    return { ...input, providerResumeCursor: continuation.providerResumeCursor }
+    const continuation = continuableBinding(binding, adapter, input.providerInstanceId)
+    if (!continuation) return turn
+
+    return { ...turn, providerResumeCursor: continuation.providerResumeCursor }
   }
 
   /** `adapter` is null when the binding's instance has left the registry. */

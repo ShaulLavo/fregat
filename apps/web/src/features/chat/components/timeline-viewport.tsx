@@ -69,6 +69,11 @@ export function TimelineViewport({
     disclosure: Element
     measured: boolean
   } | null>(null)
+  const [previousSessionId, setPreviousSessionId] = useState(session.id)
+  if (previousSessionId !== session.id) {
+    setPreviousSessionId(session.id)
+    setDisclosureSettle(null)
+  }
   const unmeasuredDisclosure = disclosureSettle?.measured
     ? null
     : (disclosureSettle?.disclosure ?? null)
@@ -122,7 +127,7 @@ export function TimelineViewport({
 
   useLayoutEffect(() => {
     if (!scrollElement) return
-    if (items.length === 0) return
+    if (items.length === 0 || scrollState.sessionId !== session.id) return
 
     applyTimelineScroll({
       dispatch,
@@ -139,6 +144,7 @@ export function TimelineViewport({
     items,
     scrollElement,
     scrollState,
+    session.id,
     viewportHeight,
     virtualizer,
   ])

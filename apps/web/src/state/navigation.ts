@@ -1,3 +1,5 @@
+import { diffQueryOptions } from '@/features/git/utils/diff-query'
+import { claimDiffIntent } from '@/lib/intent-prefetch/state/query-intent'
 import { workspacePathLeaf } from '@workspace/client-core/files/path'
 import { createComposerDraftNavigation } from '@/state/composer-draft-navigation'
 import { supersededNavigation } from '@/state/navigation-result'
@@ -15,7 +17,7 @@ import {
   scopedMainSelection,
   workspaceAddressFor,
 } from '@/state/navigation-workspace'
-import { fetchDiff, fetchGitFile } from '@/features/git/utils/api'
+import { fetchGitFile } from '@/features/git/utils/api'
 import { snapshotDocument } from '@/lib/documents/utils/comparisons'
 import {
   createTabId,
@@ -680,7 +682,7 @@ export function createNavigation(
     openFile,
     openContent,
     openChat,
-    startComposerDraft: createComposerDraftNavigation(coordinator, openChat),
+    ...createComposerDraftNavigation(coordinator, openChat),
     openWorkspace,
     openDiff({ owner, row }: { readonly owner: EditorWorkspaceStoreApi; readonly row: ChangeRow }) {
       const staged = row.section === 'staged'
@@ -694,17 +696,14 @@ export function createNavigation(
         const queryClient = application.getSnapshot().queryClient
         const listCached = queryClient.getQueryData(gitKeys.diff(path, staged)) !== undefined
         // Query signal only: a fetch shared by key must not die with one caller's navigation.
-        const diffs = await queryClient.query({
-          queryFn: ({ signal, client }) =>
-            fetchDiff(path, staged, signal, clientForQueryClient(client)),
-          queryKey: gitKeys.diff(path, staged),
-          staleTime: 1000,
-        })
+        claimDiffIntent(queryClient, gitKeys.diff(path, staged))
+        const diffs = await queryClient.query(diffQueryOptions(path, staged))
         const diff = diffs.find((entry) => entry.path === path || entry.oldPath === path)
         const document = diff ? snapshotDocument(diff) : null
         if (!document)
           throw createClientInvariantError('The requested change has no available file snapshot.')
         const blobCached =
+          listCached &&
           queryClient.getQueryData(diffDocumentQueryKey(document.source)) !== undefined
         notePressPrefetch('diffs', path, diffPrefetch(listCached, blobCached))
         const next = addressWithContent(

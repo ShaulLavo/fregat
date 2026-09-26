@@ -90,14 +90,14 @@ test('collection edits use semantic operations and advanced records reject stale
     expect(
       await saveSettingDraft({
         id: 'keybindings.overrides',
-        draft: '{"workspace.showSettings":"F8"}',
+        draft: '{"workspace.showSettings":["F8"]}',
         snapshot,
         owner,
         target: 'user',
       }),
     ).toBe('acknowledged')
     expect(owner.readSettingsMirror()['keybindings.overrides']).toEqual({
-      'workspace.showSettings': 'F8',
+      'workspace.showSettings': ['F8'],
     })
     const current = owner.getSnapshot().snapshot
     const layer = current.layers.find((entry) => entry.id === 'user')
@@ -132,8 +132,8 @@ test('editing one collection entry preserves another client’s changes to other
   const owner = await makeSettingsOwner(client)
   try {
     const initial = owner.submit('user', [
-      { kind: 'keybinding.set', command: 'workspace.showSettings', keys: 'F8' },
-      { kind: 'keybinding.set', command: 'workspace.showQuickAccess', keys: 'F9' },
+      { kind: 'keybinding.set', command: 'workspace.showSettings', keys: ['F8'] },
+      { kind: 'keybinding.set', command: 'workspace.showQuickAccess', keys: ['F9'] },
     ])
     if (initial.kind === 'submitted') await initial.settled
     const base = owner.getSnapshot().snapshot
@@ -142,22 +142,24 @@ test('editing one collection entry preserves another client’s changes to other
       request: {
         mutationId: 'other-entry-change',
         target: 'user',
-        operations: [{ kind: 'keybinding.set', command: 'workspace.showQuickAccess', keys: 'F10' }],
+        operations: [
+          { kind: 'keybinding.set', command: 'workspace.showQuickAccess', keys: ['F10'] },
+        ],
       },
     })
     await saveSettingDraft({
       id: 'keybindings.overrides',
       draft: JSON.stringify({
-        'workspace.showSettings': 'F7',
-        'workspace.showQuickAccess': 'F9',
+        'workspace.showSettings': ['F7'],
+        'workspace.showQuickAccess': ['F9'],
       }),
       snapshot: base,
       owner,
       target: 'user',
     })
     expect(owner.readSettingsMirror()['keybindings.overrides']).toEqual({
-      'workspace.showSettings': 'F7',
-      'workspace.showQuickAccess': 'F10',
+      'workspace.showSettings': ['F7'],
+      'workspace.showQuickAccess': ['F10'],
     })
   } finally {
     owner.dispose()
