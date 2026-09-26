@@ -1214,11 +1214,31 @@ function inlineWidgetAdvanceDelta(
     if (widget.localEnd > localOffset) break
     const width = inlineWidgetsByView.get(view)?.hosts.get(widget.id)?.measuredWidth
     if (width === null || width === undefined) continue
-    const start = estimatedDisplayCellForColumn(content, widget.localStart, view.tabSize)
-    const end = estimatedDisplayCellForColumn(content, widget.localEnd, view.tabSize)
-    delta += width - (end - start) * characterWidth(view)
+    const start = textPixelsBeforeColumn(view, content, widget.localStart)
+    const end = textPixelsBeforeColumn(view, content, widget.localEnd)
+    delta += width - (end - start)
   }
   return delta
+}
+
+function pixelsBeforeWidgetAdvances(
+  view: VirtualizedTextViewInternal,
+  content: MeasuredText,
+  widgets: readonly InlineWidgetRun[],
+  pixels: number,
+  bias: 'before' | 'after',
+): number {
+  let delta = 0
+  for (const widget of widgets) {
+    const width = inlineWidgetsByView.get(view)?.hosts.get(widget.id)?.measuredWidth
+    if (width === null || width === undefined) continue
+    const start = textPixelsBeforeColumn(view, content, widget.localStart)
+    if (pixels < start + delta) break
+    const end = textPixelsBeforeColumn(view, content, widget.localEnd)
+    if (pixels <= start + delta + width) return bias === 'before' ? start : end
+    delta += width - (end - start)
+  }
+  return pixels - delta
 }
 
 function columnBeforeWidgetAdvances(
@@ -1945,8 +1965,8 @@ function horizontalChunkWindow(
   snapshot = view.virtualizer.getSnapshot(),
   widgets: readonly InlineWidgetRun[] = [],
 ): HorizontalChunkWindow {
-  if (view.glyphs && widgets.length === 0) {
-    return proportionalChunkWindow(view, content, snapshot, view.glyphs)
+  if (view.glyphs) {
+    return proportionalChunkWindow(view, content, snapshot, view.glyphs, widgets)
   }
   const { text } = content
   const viewportColumns = horizontalViewportColumns(view, snapshot.viewportWidth)
@@ -1988,13 +2008,16 @@ function proportionalChunkWindow(
   content: MeasuredText,
   snapshot: FixedRowVirtualizerSnapshot,
   glyphs: GlyphAdvances,
+  widgets: readonly InlineWidgetRun[],
 ): HorizontalChunkWindow {
   const { text } = content
   const left = horizontalTextScrollLeft(view, snapshot.scrollLeft)
   const overscan = view.horizontalOverscanColumns * characterWidth(view)
   const right = left + Math.max(0, snapshot.viewportWidth - gutterWidth(view)) + overscan
-  const startColumn = columnAtPixels(text, left - overscan, glyphs, view.tabSize, 'before')
-  const endColumn = columnAtPixels(text, right, glyphs, view.tabSize, 'after')
+  const startPixels = pixelsBeforeWidgetAdvances(view, content, widgets, left - overscan, 'before')
+  const endPixels = pixelsBeforeWidgetAdvances(view, content, widgets, right, 'after')
+  const startColumn = columnAtPixels(text, startPixels, glyphs, view.tabSize, 'before')
+  const endColumn = columnAtPixels(text, endPixels, glyphs, view.tabSize, 'after')
   const start = alignChunkStart(startColumn, view.longLineChunkSize)
   const end = clamp(alignChunkEnd(endColumn, view.longLineChunkSize), start, text.length)
   if (isSimpleRowText(content)) return { start, end }

@@ -940,6 +940,7 @@ export class VirtualizedTextView {
   private applyMetrics(metrics: BrowserTextMetrics): void {
     const view = this.view
     view.metrics = metrics
+    resetContentWidthScan(view)
     clearRowGeometryCaches(view)
     const rowHeightValue = metrics.rowHeight
     applyRowHeight(view, rowHeightValue)

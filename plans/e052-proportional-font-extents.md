@@ -155,8 +155,8 @@ so the "no word-boundary wrapping" limit is gone and the measured path serves bo
   `measured` shape the design proposed being the existing `indexed` one.
 - **Step 4, spacer and extent:** `proportionalRows.ts` keeps pixel prefixes every 512 code units per
   long row. The left spacer, the window a scroll offset mounts (`proportionalChunkWindow`) and the
-  content-width scan read them when `view.glyphs` is set. Rows holding rendered widgets keep the column
-  window.
+  content-width scan read them when `view.glyphs` is set. Rows holding rendered widgets use the same
+  pixel window, adjusting both its bounds and the spacer for each measured widget width.
 - **Step 5, monospace control:** `bench:virtualization` A/B against the word-wrap branch, three
   alternating rounds at load 17: wrap-enable 35.6–38.7 ms before, 35.4–39.4 after; wrap-resize
   34.4–42.5 before, 35.5–40.6 after. The E002 input-latency gate and the first-paint matrix were
@@ -168,6 +168,16 @@ so the "no word-boundary wrapping" limit is gone and the measured path serves bo
   is what a full-width layout puts there). Four of the five fail on the column path.
 - **Not done:** Firefox and WebKit runs of the new browser tests; kerning or ligature shaping beyond
   the margin.
+
+### PR #46 review fixes (2026-09-26)
+
+- Widget rows now choose their horizontal window from measured text advances, with measured widget
+  widths replacing placeholder advances in both the window lookup and the left spacer.
+- Applying changed font metrics resets the grow-only content-width scan even with wrapping disabled.
+- `proportionalRows.browser.test.ts` reproduces the blank viewport on a 20,000-character proportional
+  row with 40px and 800px widgets, and the stale extent after a monospace-to-proportional face swap.
+  Both fail before these fixes and pass after. The reverse face swap is covered too. The face test
+  uses `VirtualizedTextView` directly because the full Editor can refresh projection state separately.
 
 ## Compact blank lines (absorbed from E022)
 
