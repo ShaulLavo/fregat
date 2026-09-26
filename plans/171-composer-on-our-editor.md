@@ -7,8 +7,8 @@
 - Priority: P2. The composer works today; this removes a second editor framework.
 - Planned at: Platform `9f343825`, Editor `e2fd299`, 2026-09-25. Origin: Plan 126
   [INTERACTION-11](126-t3code-alignment/interaction.md) owner ruling.
-- Depends on: [Plan 111](111-editor-decorations.md) (decorations, question 7) first, and an Editor
-  spellcheck (owner, 2026-09-26; researched in round 2).
+- Depends on: [Plan 111](111-editor-decorations.md) (decorations, question 7) first, and the Editor
+  spellcheck, [Editor E058](../../Editor/plans/e058-spellcheck.md) (owner, 2026-09-26).
 
 ## Outcome
 
