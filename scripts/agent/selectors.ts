@@ -37,6 +37,7 @@ function sessionRowForWorktree(page: Page, worktreeId: string) {
 }
 
 export const selectors = {
+  pullRequestLookupRetry: (page: Page) => page.locator('[data-pull-request-lookup-retry]'),
   liveWorkLogToggle: (page: Page) =>
     page.locator('[data-live-activity]').getByRole('button').first(),
   workLogGroup: (page: Page) => page.getByRole('region', { name: 'Tool calls', exact: true }),
@@ -146,6 +147,8 @@ export const selectors = {
     page
       .getByRole('region', { name: 'App access', exact: true })
       .getByRole('button', { name: label, exact: true }),
+  genericApproval: (page: Page) =>
+    page.getByRole('region', { name: 'Approval requested', exact: true }),
   commandApproval: (page: Page) => page.getByRole('region', { name: 'Run a command', exact: true }),
   commandApprovalDecision: (page: Page, label: string | RegExp) =>
     page
@@ -1011,7 +1014,11 @@ export const selectors = {
   historyList: (page: Page) => page.getByRole('listbox', { name: 'Commit history' }),
   historyRowSelector: '[data-history-commit]',
   logRowSelector: '[data-log-row-summary]',
-  /** Every rendered assistant answer in the chat timeline, for page-side frame samplers. */
+  chatAssistantMarkdown: (page: Page) =>
+    page.locator(
+      `${chatMessagesLogSelector} article:not(:has([data-user-message-body])) [data-chat-markdown]`,
+    ),
+  /** Every rendered markdown body in the chat timeline, including user messages. */
   chatMarkdownSelector: '[role="log"][aria-label="Messages"] [data-chat-markdown]',
   chatCodeBlockSelector: '[data-markdown="code-block"]',
   logCopyButtons: (page: Page) => page.getByRole('button', { name: 'Copy log event', exact: true }),

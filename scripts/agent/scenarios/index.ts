@@ -32,6 +32,10 @@ import { projectGrouping } from './project-grouping'
 import { sessionSearch, sessionSearchEnvironments } from './session-search'
 import { sessionUnread } from './session-unread'
 import { mcpApproval } from './mcp-approval'
+import { nativePermissionGrant } from './native-permission-grant'
+import { resetCreditRedemption } from './reset-credit-redemption'
+import { pullRequestLookupFailure } from './pull-request-lookup-failure'
+import { streamOverflow } from './stream-overflow'
 import { chatScreenshot } from './chat-screenshot'
 import { chatMultipleModels } from './chat-multiple-models'
 import { chatComposerEditing } from './chat-composer-editing'
@@ -252,6 +256,8 @@ export type Scenario = {
   readonly capture?: Partial<CaptureSize>
   readonly run: (page: Page, context: ScenarioContext) => Promise<void>
   readonly inspect?: (page: Page) => Promise<unknown>
+  /** Fixture scenarios must reject shared servers before opening the first page. */
+  readonly requiresIsolatedServer?: boolean
   /**
    * Runs before the throwaway server starts. A directory it returns goes first on the server's
    * PATH, which is how a scenario stands in for an outside CLI such as `gh`.
@@ -331,6 +337,10 @@ export const scenarios: readonly Scenario[] = [
   sessionNotifications,
   composerDefaults,
   mcpApproval,
+  nativePermissionGrant,
+  resetCreditRedemption,
+  pullRequestLookupFailure,
+  streamOverflow,
   chatScreenshot,
   chatMultipleModels,
   chatComposerEditing,

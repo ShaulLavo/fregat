@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { expect, it } from 'vitest'
 
@@ -18,6 +18,21 @@ it('ends the isolated host and its live shell before removing its home', async (
   })
   void shell.exited.catch(() => {})
   try {
+    const settings = JSON.parse(readFileSync(`${server.home}/settings.json`, 'utf8'))
+    expect(
+      settings['providers.instances'].map((provider: { driverKind: string; enabled: boolean }) => [
+        provider.driverKind,
+        provider.enabled,
+      ]),
+    ).toEqual([
+      ['codex', false],
+      ['claude', false],
+    ])
+    const usage = await fetch(`${server.origin}/providers/usage`, {
+      headers: { origin: 'http://localhost:5214' },
+    })
+    expect(usage.ok).toBe(true)
+    expect(await usage.json()).toMatchObject({ accounts: [] })
     client.close()
     await server.stop()
     await expect.poll(() => alive(host.pid), { timeout: 1_000 }).toBe(false)
