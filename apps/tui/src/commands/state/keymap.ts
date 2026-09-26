@@ -146,5 +146,7 @@ function swallow(event: TerminalKeyEvent) {
 
 function firesWhileTyping(stroke: KeyStroke | null): boolean {
   if (!stroke) return false
-  return stroke.ctrl || /^F\d+$/u.test(stroke.key) || stroke.key === 'Escape' || stroke.key === 'Tab'
+  return (
+    stroke.ctrl || /^F\d+$/u.test(stroke.key) || stroke.key === 'Escape' || stroke.key === 'Tab'
+  )
 }
