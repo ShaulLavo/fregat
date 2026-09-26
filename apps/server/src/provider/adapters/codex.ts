@@ -827,16 +827,18 @@ class CodexAppServerSession extends SessionContext {
     if (response.goal) this.emitGoal(response.goal)
   }
 
-  async controlGoal(action: ProviderGoalAction) {
+  /** Resolves with the goal as it stands after the change; null once cleared. */
+  async controlGoal(action: ProviderGoalAction): Promise<CodexThreadGoal | null> {
     const threadId = this.providerConversationMarker
     if (action === 'clear') {
       await this.client.request('thread/goal/clear', { threadId })
       this.emitGoal(null)
-      return
+      return null
     }
     const status = action === 'pause' ? 'paused' : 'active'
     const response = await this.client.request('thread/goal/set', { threadId, status })
     this.emitGoal(response.goal)
+    return response.goal
   }
 
   private emitGoal(goal: CodexThreadGoal | null) {
@@ -996,7 +998,7 @@ class CodexAppServerSession extends SessionContext {
         ).goal
         this.emitGoal(goal)
       } else if (command.kind === 'action') {
-        await this.controlGoal(command.action)
+        goal = await this.controlGoal(command.action)
       } else {
         goal = (await this.client.request('thread/goal/get', { threadId })).goal ?? null
       }

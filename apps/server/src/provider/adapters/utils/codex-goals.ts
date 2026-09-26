@@ -58,5 +58,12 @@ export function codexGoalReply(command: CodexGoalCommand, goal: ProviderSessionG
   if (command.kind === 'objective') return `Goal set: ${command.objective}`
   if (command.kind === 'action' && command.action === 'clear') return 'Goal cleared.'
   if (!goal) return 'No goal is set.'
+  if (command.kind === 'action') return `${ACTION_REPLIES[command.action]}: ${goal.objective}`
   return `Goal (${goal.status}): ${goal.objective}`
+}
+
+const ACTION_REPLIES: Record<ProviderGoalAction, string> = {
+  clear: 'Goal cleared',
+  pause: 'Goal paused',
+  resume: 'Goal resumed',
 }

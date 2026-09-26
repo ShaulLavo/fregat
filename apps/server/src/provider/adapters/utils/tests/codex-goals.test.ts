@@ -28,5 +28,8 @@ describe('codex goal commands', () => {
     expect(codexSessionGoal(goal)).toMatchObject({ status: 'budget-limited', tokenBudget: null })
     expect(codexSessionGoal({ ...goal, status: 'dreaming' }).status).toBe('blocked')
     expect(codexGoalReply({ kind: 'show' }, null)).toBe('No goal is set.')
+    const paused = codexSessionGoal({ ...goal, status: 'paused' })
+    expect(codexGoalReply({ kind: 'action', action: 'pause' }, paused)).toBe('Goal paused: Ship')
+    expect(codexGoalReply({ kind: 'action', action: 'resume' }, paused)).toBe('Goal resumed: Ship')
   })
 })
