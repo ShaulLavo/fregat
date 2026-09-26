@@ -31,6 +31,7 @@ import {
   shortcutPlacesLabel,
   shortcutRows,
   shortcutRowsWithChord,
+  shortcutTitle,
   type ShortcutFilter,
   type ShortcutRow as ShortcutRowModel,
 } from '@/features/settings/utils/shortcut-rows'
@@ -120,7 +121,8 @@ export function KeybindingSection() {
       .filter((row) => row.shadowedBy === command)
       .map((row) => ({ title: row.title, where: shortcutPlacesLabel(row.places) }))
 
-    return { kept: kept(keys), takes }
+    const winner = candidate.find((row) => row.command === command)?.shadowedBy
+    return { blockedBy: winner ? shortcutTitle(winner) : null, kept: kept(keys), takes }
   }
 
   return (
@@ -203,7 +205,7 @@ export function KeybindingSection() {
         <ShortcutMenu
           anchor={overlay.anchor}
           onChange={() => setOverlay({ ...overlay, kind: 'record' })}
-          onClose={() => setOverlay(null)}
+          onClose={() => setOverlay((current) => (current?.kind === 'menu' ? null : current))}
           onShowConflicts={(keys) => {
             setOverlay(null)
             setFilter('conflicts')
