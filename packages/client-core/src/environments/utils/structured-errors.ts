@@ -36,7 +36,7 @@ export function createEnvironmentIdentityDriftError(
     status: 403,
     message: `The server at ${origin} has a different environment identity.`,
     why: 'This origin answered with a different database identity than the one already recorded.',
-    fix: 'Reconnect the original server, or restart the client to trust the replacement.',
+    fix: 'Trust replacement connects to the new database and clears what this browser cached for the old one.',
     internal: { origin, expected, received },
   })
 }

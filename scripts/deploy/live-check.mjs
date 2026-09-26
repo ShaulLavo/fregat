@@ -7,6 +7,7 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import { attachObserver, observedProblems, serializable } from '../agent/observe.mjs'
+import { readRefusals, refusalFailures } from './live-refusals.mjs'
 
 const origin = 'https://omarchy.mesh.shaulavo.dev'
 const base = `${origin}/platform/`
@@ -26,6 +27,9 @@ const { values } = parseArgs({
 })
 
 const report = { release: values.release, target: values.target, failures: [], preexisting: [] }
+const startedAt = new Date().toISOString()
+// The connection gate and a failed boot both render this frame in place of the workbench.
+const errorFrame = '[data-slot="status-frame"][data-tone="error"]'
 const waitMs = Number(values['wait-for-server'])
 if (waitMs > 0 && !(await serverReports(values.release, waitMs))) {
   report.failures = [`server did not report ${values.release} within ${waitMs}ms`]
@@ -42,18 +46,25 @@ const observed = attachObserver(page, base)
 
 try {
   await page.goto(values.target, { waitUntil: 'domcontentloaded' })
-  await page.getByLabel('Window toolbar', { exact: true }).waitFor({ timeout: 45_000 })
+  await page
+    .locator(`[aria-label="Window toolbar"], ${errorFrame}`)
+    .first()
+    .waitFor({ timeout: 45_000 })
   await page.waitForTimeout(8_000)
   const served = await (await page.request.get(`${base}release`)).json()
   const publicFavicon = await page.evaluate(loadImage, publicFaviconUrl)
-  const rendered = await page.evaluate(() => ({
-    crossOriginIsolated,
-    rootChildren: document.querySelector('#root')?.childElementCount ?? 0,
-    wallpaperPreloads: [...document.querySelectorAll('link[rel="preload"][as="image"]')].map(
-      (link) => link.href,
-    ),
-    wallpaperHandoff: window.platformBootWallpaper ?? null,
-  }))
+  const rendered = await page.evaluate(
+    (errorFrame) => ({
+      crossOriginIsolated,
+      errorFrame: document.querySelector(errorFrame)?.textContent ?? null,
+      rootChildren: document.querySelector('#root')?.childElementCount ?? 0,
+      wallpaperPreloads: [...document.querySelectorAll('link[rel="preload"][as="image"]')].map(
+        (link) => link.href,
+      ),
+      wallpaperHandoff: window.platformBootWallpaper ?? null,
+    }),
+    errorFrame,
+  )
   await page.screenshot({ path: resolve(values.out, 'live.png') })
   Object.assign(report, {
     finalUrl: page.url(),
@@ -78,6 +89,12 @@ try {
 
 report.logNoise = await logNoise(values.logs)
 report.failures.push(...report.logNoise.failures)
+try {
+  report.refusals = await readRefusals(values.logs, { release: values.release, since: startedAt })
+  report.failures.push(...refusalFailures(report.refusals, values.release))
+} catch (error) {
+  report.failures.push(`refusal log scan did not run: ${error.message}`)
+}
 report.preexisting = await baselineFailures(values.baseline, report.logNoise.failures)
 await finish(report.preexisting)
 
@@ -125,6 +142,10 @@ function failures({ served, rendered, publicFavicon, observed }) {
   if (values.release && served.release !== values.release)
     found.push(`served release is ${served.release}, expected ${values.release}`)
   found.push(...observedProblems(observed))
+  if (rendered.errorFrame)
+    found.push(
+      `page shows an error frame on ${values.release ?? 'this release'}: ${rendered.errorFrame}`,
+    )
   if (!rendered.crossOriginIsolated) found.push('page is not cross-origin isolated')
   if (!(publicFavicon.width > 0)) found.push('public favicon did not load')
   if (rendered.wallpaperPreloads.length !== 1)
