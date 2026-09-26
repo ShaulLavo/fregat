@@ -42,7 +42,8 @@ test('Files opens the selected project and navigates parents, history, and proje
       frame.mockInput.pressKey('BACKSPACE')
     })
     await expect.poll(currentPath).toBe(server.root)
-    expect(frame.captureCharFrame()).toContain('outside-project.txt')
+    // The poll reads the committed tree; the frame repaints on its own timer, so paint before reading it.
+    expect(await frameText()).toContain('outside-project.txt')
     await act(async () => {
       frame.mockInput.pressKey('BACKSPACE')
     })

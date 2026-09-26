@@ -1,0 +1,56 @@
+{
+  "engine": "node",
+  "rows": [
+    {
+      "mib": 511.9,
+      "textDecoder": { "ok": true, "length": 536766054 },
+      "responseText": { "ok": true, "length": 536766054 },
+      "responseJson": { "ok": true, "length": 536766054 }
+    },
+    {
+      "mib": 512.1,
+      "textDecoder": {
+        "ok": false,
+        "error": "Cannot create a string longer than 0x1fffffe8 characters"
+      },
+      "responseText": {
+        "ok": false,
+        "error": "Cannot create a string longer than 0x1fffffe8 characters"
+      },
+      "responseJson": {
+        "ok": false,
+        "error": "Cannot create a string longer than 0x1fffffe8 characters"
+      }
+    },
+    {
+      "mib": 768,
+      "textDecoder": {
+        "ok": false,
+        "error": "Cannot create a string longer than 0x1fffffe8 characters"
+      },
+      "responseText": {
+        "ok": false,
+        "error": "Cannot create a string longer than 0x1fffffe8 characters"
+      },
+      "responseJson": {
+        "ok": false,
+        "error": "Cannot create a string longer than 0x1fffffe8 characters"
+      }
+    },
+    {
+      "mib": 1023.9,
+      "textDecoder": {
+        "ok": false,
+        "error": "Cannot create a string longer than 0x1fffffe8 characters"
+      },
+      "responseText": {
+        "ok": false,
+        "error": "Cannot create a string longer than 0x1fffffe8 characters"
+      },
+      "responseJson": {
+        "ok": false,
+        "error": "Cannot create a string longer than 0x1fffffe8 characters"
+      }
+    }
+  ]
+}

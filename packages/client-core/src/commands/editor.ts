@@ -623,13 +623,13 @@ export const editorCommandMetadata = {
   jumpBack: defineEditorMetadata({
     id: 'jumpBack',
     undoCategory: 'view-only',
-    title: 'Go back in jump history',
+    title: 'Go back',
     vscodeCommandIds: ['workbench.action.navigateBack'],
   }),
   jumpForward: defineEditorMetadata({
     id: 'jumpForward',
     undoCategory: 'view-only',
-    title: 'Go forward in jump history',
+    title: 'Go forward',
     vscodeCommandIds: ['workbench.action.navigateForward'],
   }),
   cursorUndo: defineEditorMetadata({
