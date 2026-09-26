@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import type { WorkspacePaths } from './path'
 
-export type UserPlaceId = 'desktop' | 'documents' | 'downloads'
+type UserPlaceId = 'desktop' | 'documents' | 'downloads'
 
 export type UserPlace = { id: UserPlaceId; path: string }
 

@@ -57,7 +57,7 @@ export const readQuerySchema = v.object({
 })
 
 /** A preview's budget: at most 1 MiB of a file's head. */
-export const HEAD_MAX_BYTES = 1024 * 1024
+const HEAD_MAX_BYTES = 1024 * 1024
 
 export const headQuerySchema = v.object({
   path: pathSchema,

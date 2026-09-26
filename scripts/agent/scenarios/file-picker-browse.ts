@@ -1,7 +1,7 @@
 import { ok } from 'node:assert/strict'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import type { Page } from 'playwright'
+import type { Locator, Page } from 'playwright'
 import { selectors } from '../selectors'
 import type { Scenario } from './index'
 
@@ -19,8 +19,33 @@ async function createTree() {
     'export function greet(name: string) {\n  return `hi ${name}`\n}\n',
   )
   await writeFile(path.join(root, 'pixel.png'), PNG)
+  // Past the 64 KB preview budget, with a first line far wider than the preview.
+  const lines = Array.from({ length: 4000 }, (_, index) => `export const line${index} = ${index}`)
+  await writeFile(path.join(root, 'long.ts'), [`// ${'wide '.repeat(80)}`, ...lines].join('\n'))
   await writeFile(path.join(root, 'nested', 'inside.md'), '# Inside\n')
   return root
+}
+
+async function width(locator: Locator) {
+  const box = await locator.boundingBox()
+  ok(box, 'The element is on screen')
+  return box.width
+}
+
+async function drag(page: Page, handle: Locator, dx: number) {
+  const box = await handle.boundingBox()
+  ok(box, 'The handle is on screen')
+  const x = box.x + box.width / 2
+  const y = box.y + box.height / 2
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x + dx / 2, y, { steps: 4 })
+  await page.mouse.move(x + dx, y, { steps: 4 })
+  await page.mouse.up()
+}
+
+function near(actual: number, expected: number, message: string) {
+  ok(Math.abs(actual - expected) <= 2, `${message}: ${actual} is not ${expected}`)
 }
 
 async function goTo(page: Page, folder: string) {
@@ -44,6 +69,45 @@ export const filePickerBrowse: Scenario = {
         /^\d+ items?$/.test(await selectors.pickerStatus(page).innerText()),
         'The footer counts the listing',
       )
+
+      // Every pane and every column resizes; panes persist, column widths last the session.
+      const column = await width(selectors.pickerColumnBox(page, 0))
+      await drag(page, selectors.pickerColumnHandle(page, 0), 80)
+      near(await width(selectors.pickerColumnBox(page, 0)), column + 80, 'The column drags wider')
+      await selectors.pickerColumnHandle(page, 0).dblclick()
+      ok(
+        (await width(selectors.pickerColumnBox(page, 0))) < column,
+        'Double-clicking the handle fits the column to its short names',
+      )
+      await drag(page, selectors.pickerColumnHandle(page, 0), 120)
+      const places = await width(selectors.pickerPane(page, 0))
+      const preview = await width(selectors.pickerPane(page, 2))
+      await drag(page, selectors.pickerPaneHandle(page, 0), 60)
+      await drag(page, selectors.pickerPaneHandle(page, 1), -80)
+      const resized = {
+        places: await width(selectors.pickerPane(page, 0)),
+        preview: await width(selectors.pickerPane(page, 2)),
+      }
+      near(resized.places, places + 60, 'The places sidebar drags wider')
+      near(resized.preview, preview + 80, 'The preview drags wider')
+      await step('resized')
+      await page.keyboard.press('Escape')
+      await selectors.pickerDialog(page).waitFor({ state: 'hidden' })
+      await selectors.projectMenu(page).click()
+      await selectors.openFolderMenu(page).click()
+      await goTo(page, root)
+      near(await width(selectors.pickerPane(page, 0)), resized.places, 'Places keep their width')
+      near(
+        await width(selectors.pickerPane(page, 2)),
+        resized.preview,
+        'The preview keeps its width',
+      )
+      near(
+        await width(selectors.pickerColumnBox(page, 0)),
+        column,
+        'A new session opens columns at the default',
+      )
+      await step('reopened')
 
       // Columns are the default when choosing a folder.
       await selectors.pickerRow(page, 'nested').click()
@@ -89,6 +153,41 @@ export const filePickerBrowse: Scenario = {
         .getByText('greet')
         .waitFor()
       await step('code-preview')
+
+      await selectors.pickerRow(page, 'long.ts').click()
+      await selectors.pickerPreviewNote(page).waitFor()
+      ok(
+        /^First 64 KB of \d/.test(await selectors.pickerPreviewNote(page).innerText()),
+        'A file past the budget says how much the preview shows',
+      )
+      await selectors.pickerPreviewScroll(page).hover()
+      await page.mouse.wheel(0, 200_000)
+      await page.mouse.wheel(20_000, 0)
+      // Wheel scrolling lands over a few frames; wait for it rather than read mid-flight.
+      await page
+        .waitForFunction(
+          () => {
+            const lines = document.querySelector('[data-file-preview-lines]')
+            return lines !== null && lines.scrollLeft > 0
+          },
+          undefined,
+          { timeout: 3000 },
+        )
+        .catch(() => undefined)
+      const edges = await page.evaluate(() => {
+        const vertical = document.querySelector('[data-file-preview-scroll]')
+        const horizontal = document.querySelector('[data-file-preview-lines]')
+        if (!vertical || !horizontal) return null
+        return {
+          bottom: vertical.scrollHeight - vertical.scrollTop - vertical.clientHeight,
+          right: horizontal.scrollWidth - horizontal.scrollLeft - horizontal.clientWidth,
+          wide: horizontal.scrollWidth > horizontal.clientWidth,
+        }
+      })
+      ok(edges?.wide, 'The first line is wider than the preview')
+      ok(edges.bottom <= 1, `The preview scrolls to its end (${edges.bottom}px left)`)
+      ok(edges.right <= 1, `The preview scrolls to its right edge (${edges.right}px left)`)
+      await step('long-preview-end')
 
       await selectors.pickerRow(page, 'pixel.png').click()
       await page.waitForFunction(() => {
