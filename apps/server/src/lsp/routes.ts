@@ -1,5 +1,9 @@
 import { adaptWebSocket, isAbnormalWebSocketClose } from '../utils/websocket'
-import { LSP_SERVER_EXITED, type LspNegotiatedSemanticTokens } from '@workspace/contracts'
+import {
+  LSP_SERVER_EXITED,
+  type LspNegotiatedSemanticTokens,
+  type LspServerExitedParams,
+} from '@workspace/contracts'
 import { isRecord } from '@workspace/utils/objects'
 import * as v from 'valibot'
 
@@ -217,7 +221,12 @@ function closeWithReason(socket: LspWebSocket, outcome: string, serverId: string
     JSON.stringify({
       jsonrpc: '2.0',
       method: LSP_SERVER_EXITED,
-      params: { exitCode: null, exitSignal: null, outcome, serverId },
+      params: {
+        exitCode: null,
+        exitSignal: null,
+        outcome,
+        serverId,
+      } satisfies LspServerExitedParams,
     }),
   )
   socket.close()

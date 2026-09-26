@@ -1,3 +1,5 @@
+import { useDiagnosticFix } from '@/lib/diagnostic-ai/hooks/use-diagnostic-fix'
+import { diagnosticHoverActions } from '@/features/editor/utils/diagnostic-hover-actions'
 import { useLanguageServerMatchConfiguration } from '@/features/editor/providers/language-server-match-context'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import { filesystemPath } from '@/lib/documents/utils/identity'
@@ -56,6 +58,15 @@ export function useLanguageServerPlugin({
     documentKey === null ? null : (state.liveDocumentsByKey[documentKey]?.buffer ?? null),
   )
   const origin = originForQueryClient(useQueryClient())
+  const {
+    available,
+    mutation: { mutateAsync },
+  } = useDiagnosticFix()
+  // The plugin memo depends on this callback; pending mutation updates preserve its identity.
+  const getDiagnosticActions = useMemo(
+    () => (available ? diagnosticHoverActions(mutateAsync) : undefined),
+    [available, mutateAsync],
+  )
   const { service: fileOpenIntent } = useFileOpenIntent()
   // Manual memo: `languageServerStatusSource` is a useMemo dependency, and the compiler's cache is a
   // cache, not an identity guarantee — when it recomputes, the useMemo re-runs.
@@ -97,6 +108,7 @@ export function useLanguageServerPlugin({
       onOpenDefinition,
       onOpenReferences,
       onDidNavigateDiagnostic,
+      getDiagnosticActions,
     })
   }, [
     documentKey,
@@ -114,6 +126,7 @@ export function useLanguageServerPlugin({
     onOpenDefinition,
     onOpenReferences,
     onDidNavigateDiagnostic,
+    getDiagnosticActions,
     rootPath,
     // `target` is not rebuilt every render: the compiler keys it on filePath and
     // languageServerTarget. Verified with `bun run compiler:explain` on this file.

@@ -49,6 +49,8 @@ export async function startIsolatedServer(
   const env: Record<string, string | undefined> = {
     ...process.env,
     FS_HOST: '127.0.0.1',
+    // The run copies this log before the server stops, so a 5 s batch would drop the run's tail.
+    OBSERVABILITY_BATCH_INTERVAL_MS: '200',
     FS_METADATA_DB: path.join(home, 'fs-metadata.sqlite'),
     OBSERVABILITY_DIR: logs,
     PATH: pathPrefix ? `${pathPrefix}${path.delimiter}${process.env.PATH ?? ''}` : process.env.PATH,

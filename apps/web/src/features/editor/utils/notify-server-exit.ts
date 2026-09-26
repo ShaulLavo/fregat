@@ -1,14 +1,16 @@
-import { toClientError } from '@/lib/client-error-taxonomy'
+import { LspServerExitedError } from '@singapore-editor/lsp'
+
 import { toastError } from '@/lib/toast-error'
 
-/** Only a backend that died carries an error; one this app closed says nothing. */
-export function notifyServerExit(serverId: string, params: unknown) {
-  const error = toClientError(params)
-  if (!error.code) return
+/** Only a backend that died carries guidance; one this app closed, or a lost socket, says nothing. */
+export function notifyServerExit(serverId: string, error: unknown) {
+  if (!(error instanceof LspServerExitedError)) return
+  const guidance = error.params.error
+  if (!guidance) return
 
   toastError(
-    error.message,
-    { id: `language-server-exit:${serverId}`, description: error.fix },
-    error,
+    guidance.message,
+    { id: `language-server-exit:${serverId}`, description: guidance.fix },
+    guidance,
   )
 }

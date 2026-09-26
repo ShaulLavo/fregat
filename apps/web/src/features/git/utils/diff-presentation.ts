@@ -49,20 +49,26 @@ function isRenamedDiff(diff: GitFileDiff) {
   return Boolean(diff.oldPath && diff.oldPath !== diff.path)
 }
 
+export type DiffFileNotice = { readonly kind: 'partial' | 'unchanged'; readonly message: string }
+
 /**
- * Why a file the pane *is* drawing has no changes in it. Null for an ordinary diff, where the
- * hunks say it themselves.
+ * A line of chrome above a file the pane *is* drawing. Null for an ordinary diff, where the hunks
+ * say it themselves.
  *
- * The file is shown either way — this is a line of chrome above it, not a replacement for it —
- * because a reader who opened a rename cannot otherwise tell a rename from a file nobody touched.
+ * A rename is shown with its notice because a reader cannot otherwise tell it from a file nobody
+ * touched. A partial patch is drawn uncoloured, so the notice says why.
  */
-export function unchangedFileNotice(file: DiffFile, rootPath: string): string | null {
+export function diffFileNotice(file: DiffFile, rootPath: string): DiffFileNotice | null {
+  if (file.isPartial) {
+    return { kind: 'partial', message: 'Changed lines only. Syntax colors need the whole file.' }
+  }
   if (file.hunks.length > 0) return null
 
   const oldPath = file.oldPath
   if (oldPath && oldPath !== file.newPath) {
-    return `Renamed from ${toTreePath(oldPath, rootPath)} — no content changes`
+    const message = `Renamed from ${toTreePath(oldPath, rootPath)} — no content changes`
+    return { kind: 'unchanged', message }
   }
 
-  return 'No content changes'
+  return { kind: 'unchanged', message: 'No content changes' }
 }

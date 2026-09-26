@@ -16,8 +16,7 @@ Git history is the archive.
 
 The [Editor backlog](../Editor/plans/README.md) contains 30 stable entries from its 22-topic
 wishlist. Its suggested order is advisory; promote selected work into this execution roadmap
-when scheduled. Completed entries link to permanent references. The backlog also links the
-existing Plan 071 syntax-retry proposal.
+when scheduled. Completed entries link to permanent references.
 
 ## Verified completed foundations
 
@@ -118,7 +117,7 @@ records the per-host comparison and the owner checks still pending on the Mac.
 
 ## Document contribution refactor
 
-[Plan 099](plans/099-document-contributions.md) is proposed; implementation has not started.
+[Plan 099](plans/099-document-contributions.md) is proposed; its session diff source correction is implemented in L7 (2026-09-25).
 Decided 2026-09-25: owner — units 0–1 are approved to start; units 2–7 stay gated as the plan says.
 It extends Editor's existing buffer owner with one committed-revision publication path and a
 document contribution runtime. Tree-sitter, Shiki, minimap, and language-service adapters share
@@ -463,7 +462,7 @@ Suggested order (steps 1–4 done by 2026-09-23; step 5 is in progress):
    decided by substring match, and the desktop app can kill a process it does not own. Both are
    small and both need a `--server` or desktop restart, so batch them.
 2. [E047](../Editor/docs/display/e047-point-queries.md), then
-   [Plan 130](plans/130-ask-the-editor.md) Phases 1 and 4. One point query in the Editor removes the
+   Plan 130 Phases 1 and 4. One point query in the Editor removes the
    search-result row arithmetic, the unicode hover's marker scan and the residue in `diffRowAtEvent`.
    Done: E047 landed in Editor `6656eb7`, and Plan 130 Phases 1, 2 and 4 are implemented and verified.
 3. [E048](../Editor/docs/display/e048-minimap-document-space.md) and
@@ -473,11 +472,11 @@ Suggested order (steps 1–4 done by 2026-09-23; step 5 is in progress):
    `f715d11`; Plan 133's four phases 2026-09-23, D1 moved to Plan 134 and closed there.
 5. [E050](../Editor/docs/architecture/e050-host-obligations.md) row by row, each unlocking its Plan 130
    Phase 5 item. In progress: rows re-checked 2026-09-24; row 1 (`setText` with tokens), row 5 (press
-   participants), row 6 (plugin keymap context keys) and typography options (2026-09-25) done.
-   Rows 8 (`onDidScroll`) and 4 (theme keys) unlock Plan 130 Phase 5 items 8 and 10; the rest are
-   Editor-only. Plan 130 Phase 3 (`getStackedRows`) is a separate small Editor change.
+   participants), row 6 (plugin keymap context keys) and typography options (2026-09-25) done;
+   rows 2, 7, 8, 9, 11 and the rest of row 5 done 2026-09-25 (lane L7), row 8 closing Plan 130
+   item 8. Row 4 and `getStackedRows` close Plan 130 on 2026-09-25. The diff comment layer asks the mounted plugin, and theme colours flow through EditorTheme; light/dark browser proof passes.
 
-Left in the lane: Plan 132 Phases 2–4, the Plan 130 remainder and the E050 rows.
+Left in the lane: Plan 132 Phases 2–4. E050 and Plan 130 are complete.
 
 The owner decided Plan 132 D4 on 2026-09-21: the server's migrations are deleted and the schema
 starts from scratch (Plan 132 Phase 4). External-change
@@ -594,6 +593,7 @@ surfaces, the file picker and the site. The owner is taking it one topic at a ti
 | [180](plans/180-file-icon-variants.md)          | Quick research: more glyphs, variants and per-mode colours from the icon pack we already use                              |
 | [181](plans/181-chat-timeline-end-anchoring.md) | The chat timeline on TanStack's end anchoring after a 3.14.13 upgrade; prerequisite to 178's virtualization               |
 | [182](plans/182-search-view-rendering.md)       | Quick research: why the full search view renders slowly, and what would fix it                                            |
+| [188](plans/188-server-typescript-only.md)      | Platform uses only the server TypeScript backend; the browser worker stays an Editor feature (owner ruling, closes 153)   |
 
 Suggested order:
 

@@ -43,7 +43,10 @@ export async function readTextFile(
     const target = await resolveExistingPath(paths, input)
     const stats = await stat(target.absolutePath)
     assertFile(stats)
-    if (stats.size > maxBytes) throw new FsError('FILE_TOO_LARGE')
+    if (stats.size > maxBytes)
+      throw new FsError('FILE_TOO_LARGE', undefined, undefined, {
+        internal: { size: stats.size, maxBytes },
+      })
     const bytes = await readFile(target.absolutePath)
     const decoded = decodeText(bytes)
     if (decoded.seemsBinary && options.acceptTextOnly) throw new FsError('FILE_IS_BINARY')

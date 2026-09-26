@@ -7,10 +7,19 @@ async function countText(page: Parameters<Scenario['run']>[0]): Promise<string> 
   return (await selectors.editorFindCount(page).first().textContent()) ?? ''
 }
 
+// The widget steps clear of width other contributions reserve on its edge, such as the minimap.
+async function widgetOverlap(page: Parameters<Scenario['run']>[0]): Promise<number> {
+  const widget = await selectors.editorFindWidget(page).first().boundingBox()
+  const minimap = await selectors.editorMinimap(page).first().boundingBox()
+  if (!widget) throw new Error('find widget has no box')
+  if (!minimap) throw new Error('no minimap to step clear of; editor.minimap.enabled defaults on')
+  return Math.max(0, widget.x + widget.width - minimap.x)
+}
+
 export const editorFind: Scenario = {
   name: 'editor-find',
   description:
-    'Open find in a file, type a dense and a sparse query, step through matches, jump to one off screen, then search for text that is not there.',
+    'Open find in a file clear of the minimap, type a dense and a sparse query, step through matches, jump to one off screen, then search for text that is not there.',
   async run(page, { file, step }) {
     await openFileByName(page, file)
     await focusEditor(page)
@@ -18,6 +27,10 @@ export const editorFind: Scenario = {
     await page.keyboard.press('Control+f')
     const input = selectors.editorFindInput(page).first()
     await input.waitFor({ timeout: 5_000 })
+
+    const overlap = await widgetOverlap(page)
+    if (overlap > 0) throw new Error(`find widget covers the minimap by ${overlap}px`)
+    await step('widget clear of the minimap')
 
     await input.fill('e')
     await page.waitForTimeout(200)

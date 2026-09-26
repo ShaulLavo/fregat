@@ -60,6 +60,7 @@ The chat mode button in the window toolbar, or an address URL with `/chat/`.
 
 `scenario chat-diff-syntax --url <session-diff-address>` checks painted syntax colors in a session checkpoint diff.
 
+`scenario checkpoint-diff-tokens` needs no tokens: the native checkpoint fixture edits lines 5 and 30 of two files and re-indents line 3, and the second file's checkpoint diff must colour every keyword row from its own source line, stacked and then split under tree-sitter and Shiki. With `FS_DEV_MAX_TEXT_FILE_BYTES=500` the blob pair is over the text limit, so it asserts the partial notice and no parsed tokens instead. Without it, a partial notice fails the run.
 `scenario chat-markdown-fence` uses the isolated native fixture to answer with a fenced `ts` block and waits for the fence to paint more than one token colour, the path that loads `shiki/core` and its JavaScript engine lazily. It removes its session and provider. Against the dev page it runs Vite's module graph, not the built `core-*.js` chunks.
 
 Commands dispatch over the orchestration socket when it is live and over HTTP otherwise. The HTTP path refetches the shell snapshot itself.

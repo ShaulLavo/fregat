@@ -5,12 +5,18 @@ import type { Page } from 'playwright'
 import { createScriptError } from '../../structured-errors'
 import type { Scenario } from './index'
 import { openFixtureWorkspace, processesIn, releaseFixture } from '../fixture-workspace'
-import { focusEditor, openFileFromTree, selectors, waitForLspErrorPaint } from '../selectors'
+import {
+  focusEditor,
+  openFileFromTree,
+  selectors,
+  settleAnimations,
+  waitForLspErrorPaint,
+} from '../selectors'
 
 export const editorLspServerExit: Scenario = {
   name: 'editor-lsp-server-exit',
   description:
-    'Kill the language server behind an open TypeScript file: it restarts and diagnostics return with no toast. Keep killing it and the toast says it stopped and what to do.',
+    'Kill the language server behind an open TypeScript file: it restarts and diagnostics return with no toast. Keep killing it and one toast says it stopped and what to do.',
   async run(page, { step }) {
     const originalUrl = page.url()
     const fixture = await mkdtemp('/work/tmp/fregat-lsp-exit-')
@@ -34,12 +40,15 @@ export const editorLspServerExit: Scenario = {
 
       // A server that dies every time it starts runs out the reconnect attempts. The toast closes
       // on its own, so it is looked for between kills rather than after the last one.
+      const laneFailed = laneFailedLog(page)
       await killUntilToast(page, fixture)
-      ok(
-        /Run the language server from a terminal/.test(await toast(page).innerText()),
-        'names the fix',
-      )
+      await settleAnimations(toast(page))
+      ok(new RegExp(FIX).test(await toast(page).innerText()), 'names the fix')
+      strictEqual(await toast(page).count(), 1, 'one toast for the stopped server')
+      strictEqual(await selectors.textAnywhere(page, FIX).count(), 1, 'the fix is shown once')
       await step('server-exit-toast')
+      // Leaving the page before the batched drain sends it would drop the give-up record.
+      await laneFailed
     } catch (error) {
       await step('failure-before-cleanup')
       throw error
@@ -50,8 +59,22 @@ export const editorLspServerExit: Scenario = {
   },
 }
 
+const FIX = 'Run the language server from a terminal'
+
 function toast(page: Page) {
   return selectors.toast(page, 'language server stopped')
+}
+
+function laneFailedLog(page: Page) {
+  const response = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname.endsWith('/_log/ingest') &&
+      (response.request().postData() ?? '').includes('lsp.lane_failed'),
+    { timeout: 90_000 },
+  )
+  // Awaited only on the success path; a failed run must not surface it as unhandled.
+  response.catch(() => undefined)
+  return response
 }
 
 /** Only this fixture's language server: not the user's, and not the fixture's terminal shell. */

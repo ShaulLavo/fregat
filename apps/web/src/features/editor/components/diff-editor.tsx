@@ -1,3 +1,4 @@
+import type { TabPresentation } from '@/features/editor/state/tab-presentation'
 import type { TabId } from '@/lib/documents/utils/types'
 import { type DiffFile, type DiffRegionStore } from '@singapore-editor/diff'
 import {
@@ -22,9 +23,8 @@ import type { EditorDiffViewMode } from '@/features/editor/utils/diff-view-mode'
 /**
  * A diff, drawn as one or two real `Editor`s with the diff plugin supplying the rows.
  *
- * `editor-diff-view` on the root is not decoration: it is where both the package's own
- * `--editor-diff-*` block and the app's override of it are declared, and a context row carries no
- * row class of its own, so inheritance from here is the only way the variables reach it.
+ * `editor-diff-view` on the root is not decoration: the package declares its `--editor-diff-*`
+ * block there, and a context row carries no row class of its own, so it inherits from here.
  */
 export function DiffEditor({
   file,
@@ -32,12 +32,14 @@ export function DiffEditor({
   languageServer = null,
   mode,
   regions,
+  presentation: suppliedPresentation,
   tabId,
 }: {
   file: DiffFile | null
   failure?: string | null
   languageServer?: DiffLanguageServerContext | null
   mode: EditorDiffViewMode
+  presentation?: TabPresentation
   regions?: DiffRegionStore
   tabId?: TabId
 }) {
@@ -48,7 +50,8 @@ export function DiffEditor({
   // Split is two plugin instances, and a separator row is one region shown twice. Without a shared
   // store a gutter click would expand one pane and leave the other where it was, misaligning every
   // row below — the one property split mode exists to hold.
-  const presentation = useTabPresentation(tabId)
+  const tabPresentation = useTabPresentation(tabId)
+  const presentation = suppliedPresentation ?? tabPresentation
   const regionStore = regions ?? presentation.regions
   const panes = useDiffPanes()
   const layout = presentation.diffLayout

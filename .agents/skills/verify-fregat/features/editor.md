@@ -64,11 +64,15 @@ The click scenario waits 750ms between clicks so debounced document highlights, 
 
 `scenario editor-typography` opens a fixture file with a tab-indented line, changes `editor.fontSize`, `editor.lineHeight` and `editor.tabSize` (restored afterwards) and checks the open editor at each step: the row pitch equals the line height, the caret stands before the glyph it precedes, a tab spans the tab size, and the size variable popups copy matches.
 
+`scenario editor-decode-reveal` sets `editor.decode.mode` to `diffusion` (restored afterwards), opens a TypeScript fixture file and records the decode reveal: the rows hide on open, the diffusion overlay's glyphs already carry token colours when it appears (the reveal waited for the settled highlight), and the rows come back highlighted.
+
 `scenario editor-conflict-merge` opens a disposable file, types an unsaved edit, writes the file externally, chooses Compare in the conflict toast, and takes Accept Current Change from the merge lens. The resolved file on disk must keep the local edit and drop the incoming one, with no marker left, and the conflict toast must close. A clean external write goes first, so the file watch is live before the conflicting one.
 
 `scenario editor-lsp-hover --file main.tsx` inserts a `const`, hovers its name, checks the language server tooltip names it, then inserts a name with a Cyrillic letter and checks that its diagnostic and its character warning share one tooltip. Undoes both edits.
 
-`scenario editor-lsp-deprecated --file main.tsx` inserts a `.substr()` call and checks the `-deprecated` CSS highlight covers exactly `substr`, then undoes it and checks the strike clears.
+`scenario editor-lsp-deprecated` opens its own temp workspace with a `tags.ts` that calls `.substr()`, and checks the strike overlay covers exactly `substr` in an explicit syntax colour. `scenario editor-lsp-unnecessary` does the same for the fade on an unused `const`. Both ignore `--file`.
+
+`scenario editor-diagnostic-hover-fix` hovers a diagnostic, takes its Fix with AI action, and checks the draft carries the exact problem and the unsaved source excerpt. It needs the diagnostic-ai provider (`useDiagnosticFix`).
 
 `scenario editor-lsp-rename-key` puts the caret on a TypeScript identifier and presses F2, which the Editor's default keymap binds to rename (before E054 only its VS Code preset did), then checks the prompt opens on the identifier's name. Escape has to hand focus back to the editor: the undo that follows only reaches the file if it did, and the scenario fails unless the file reads as it did before.
 
@@ -102,4 +106,4 @@ Editor title actions are the active tab's controls at the end of its tab strip, 
 
 `scenario editor-lsp-tab-switch` opens a TypeScript error in an isolated workspace, switches away and back, checks the diagnostic is already painted with no LSP close/reopen, then closes the tab and checks `didClose`.
 
-`scenario editor-lsp-server-exit` opens a TypeScript error in an isolated workspace and SIGKILLs the language server running in that fixture (never the user's). The server must restart and the error return with no toast. It then kills every restarted server until the reconnect attempts run out, and checks the `lsp.SERVER_EXITED` toast names the server and the fix. Run against the mesh with `OBSERVABILITY_DIR=/work/platform-production/logs`.
+`scenario editor-lsp-server-exit` opens a TypeScript error in an isolated workspace and SIGKILLs the language server running in that fixture (never the user's). The server must restart and the error return with no toast. It then kills every restarted server until the reconnect attempts run out, and checks that one `lsp.SERVER_EXITED` toast names the server and the fix, and that the fix appears once on the page. Run against the mesh with `OBSERVABILITY_DIR=/work/platform-production/logs`.

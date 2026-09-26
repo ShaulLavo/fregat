@@ -20,8 +20,7 @@ test('a scroll in one pane is mirrored onto the other', () => {
 })
 
 test('the horizontal axis is mirrored too, which is the whole reason this is host code', () => {
-  // `EditorViewContributionContext.setScrollTop` is vertical-only; a diff has to carry both axes,
-  // so a mirror that quietly dropped `left` would look fine on every vertical test.
+  // A mirror that quietly dropped `left` would look fine on every vertical test.
   const { panes, new: right } = mountPanes()
 
   panes.handleScroll('old', { left: 140, top: 20 })
@@ -33,7 +32,8 @@ test('the mirrored pane answering back does not move the pane the reader is driv
   const { panes, old: left, new: right } = mountPanes()
 
   panes.handleScroll('old', { left: 0, top: 300 })
-  // The mirror's own viewport update, reporting where it landed.
+  // The mirror already reported its move from inside `setScrollPosition`; a late repeat of it
+  // (the browser's own scroll event) changes nothing either.
   panes.handleScroll('new', right.position)
 
   expect(left.position).toEqual({ left: 0, top: 0 })
@@ -131,18 +131,25 @@ type FakeEditor = {
   setSelection: ReturnType<typeof vi.fn>
 }
 
-/** An `Editor` reduced to the two methods this controller drives, plus a clamp to model a pane
- *  that cannot scroll as far as its sibling. */
-function fakeEditor(maxLeft: number): FakeEditor & Editor {
+/** An `Editor` reduced to the methods this controller drives, plus a clamp to model a pane that
+ *  cannot scroll as far as its sibling. Like the real one, it reports a move from inside
+ *  `setScrollPosition` (`onDidScroll`), and only when the position changed. */
+function fakeEditor(
+  maxLeft: number,
+  report: (position: { left: number; top: number }) => void,
+): FakeEditor & Editor {
   const state: FakeEditor = { position: { left: 0, top: 0 }, setSelection: vi.fn() }
 
   return {
     getScrollPosition: () => state.position,
     setScrollPosition: (next: { left?: number; top?: number }) => {
-      state.position = {
+      const moved = {
         left: Math.min(next.left ?? state.position.left, maxLeft),
         top: next.top ?? state.position.top,
       }
+      if (moved.left === state.position.left && moved.top === state.position.top) return
+      state.position = moved
+      report(moved)
     },
     get setSelection() {
       return state.setSelection
@@ -155,8 +162,10 @@ function fakeEditor(maxLeft: number): FakeEditor & Editor {
 
 function mountPanes({ newMaxLeft = Number.POSITIVE_INFINITY } = {}) {
   const { result } = renderHook(() => useDiffPanes())
-  const left = fakeEditor(Number.POSITIVE_INFINITY)
-  const right = fakeEditor(newMaxLeft)
+  const left = fakeEditor(Number.POSITIVE_INFINITY, (position) =>
+    result.current.handleScroll('old', position),
+  )
+  const right = fakeEditor(newMaxLeft, (position) => result.current.handleScroll('new', position))
   result.current.registerEditor('old', left)
   result.current.registerEditor('new', right)
 

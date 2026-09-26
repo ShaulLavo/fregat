@@ -1,3 +1,4 @@
+import type { DiffPlugin } from '@singapore-editor/diff'
 import type { EditorPlugin, EditorViewContributionContext } from '@singapore-editor/core/extensions'
 import type { Editor } from '@singapore-editor/core/editor'
 import type { DiffPanePresentation } from '@/features/editor/state/tab-presentation'
@@ -52,5 +53,12 @@ export function createDiffPresentationBinding(presentation: DiffPanePresentation
       if (scroll) editor.setScrollPosition(scroll)
       restored = true
     },
+  }
+}
+
+export function bindDiffPlugin(presentation: DiffPanePresentation, plugin: DiffPlugin) {
+  presentation.plugin = plugin
+  return () => {
+    presentation.plugin = null
   }
 }

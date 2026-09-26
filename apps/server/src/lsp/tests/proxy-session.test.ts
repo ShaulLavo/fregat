@@ -1154,11 +1154,11 @@ describe('LspSessionPool ownership', () => {
     fixture.pool.disposeAll()
 
     expect(fixture.firstSocket.sent.at(-1)).toMatchObject({
-      method: '$/platform/serverExited',
+      method: '$/serverExited',
       params: { outcome: 'app_shutdown', serverId: 'typescript' },
     })
     expect(fixture.secondSocket.sent.at(-1)).toMatchObject({
-      method: '$/platform/serverExited',
+      method: '$/serverExited',
       params: { outcome: 'app_shutdown' },
     })
   })
@@ -1173,7 +1173,7 @@ describe('LspSessionPool ownership', () => {
     fixture.process.process.emit('exit', 3, null)
 
     expect(fixture.firstSocket.sent.at(-1)).toMatchObject({
-      method: '$/platform/serverExited',
+      method: '$/serverExited',
       params: {
         error: {
           code: 'lsp.SERVER_EXITED',

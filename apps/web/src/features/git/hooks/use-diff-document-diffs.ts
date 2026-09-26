@@ -2,6 +2,7 @@ import type { GitFileDiff } from '@workspace/contracts'
 import { comparisonRequest } from '@/lib/documents/utils/comparisons'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { useQueries, useQuery, type UseQueryOptions } from '@tanstack/react-query'
+import { useMemo } from 'react'
 
 import {
   checkpointDiffRetry,
@@ -11,7 +12,11 @@ import {
 import { errorMessage } from '@/lib/error-message'
 
 import { blobDiffQueryOptions } from '@/features/git/utils/blob-diff-query'
-import { checkpointBlobRequest } from '@/features/git/utils/checkpoint-blob-request'
+import {
+  checkpointBlobRequest,
+  displayedCheckpointEntry,
+  withCheckpointSources,
+} from '@/features/git/utils/checkpoint-blob-request'
 import type { GitComparison } from '@/lib/documents/utils/types'
 import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
 
@@ -26,17 +31,28 @@ type DiffQueryOptions = UseQueryOptions<DiffList, Error, DiffList, readonly unkn
  */
 export function useDiffDocumentDiffs(info: GitComparison) {
   const query = useQuery(diffDocumentQueryOptions(info))
-  const blobRequest = info.kind === 'snapshot' ? null : checkpointBlobRequest(query.data ?? [])
+  const displayed = info.kind === 'snapshot' ? null : displayedCheckpointEntry(query.data ?? [])
+  const blobRequest = checkpointBlobRequest(displayed)
   // Checkpoints list patch snippets; only the displayed file needs its complete Git blobs.
   const queries: DiffQueryOptions[] = blobRequest ? [blobDiffQueryOptions(blobRequest)] : []
   const [blob] = useQueries({ queries })
   const error = query.error ?? blob?.error
-  const diffs = blob ? blob.data : query.data
+  const listedData = query.data
+  const blobData = blob?.data
+  const blobPending = Boolean(blob?.isPending)
+  const resolving = blobRequest !== null
+  // Manual memo: DiffView's useMemo keys its parsed files on this list, and a fresh list would
+  // re-project the diff and drop the scroll position.
+  const diffs = useMemo(() => {
+    if (!displayed || !listedData || !resolving) return listedData
+
+    return withCheckpointSources(listedData, displayed, { data: blobData, isPending: blobPending })
+  }, [blobData, blobPending, displayed, listedData, resolving])
 
   return {
     diffs: diffs ?? [],
     failure: error ? errorMessage(error, 'Diff unavailable.') : null,
-    pending: query.isPending || Boolean(blob?.isPending),
+    pending: query.isPending || blobPending,
   }
 }
 

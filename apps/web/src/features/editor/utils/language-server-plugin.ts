@@ -11,6 +11,7 @@ import type {
   LanguageServerPlugin,
 } from '@singapore-editor/lsp-plugin/websocket'
 import type {
+  LanguageServerDiagnosticActions,
   LanguageServerDiagnosticMarkerClaim,
   LanguageServerDiagnosticMarkerEvent,
   LanguageServerFeatureRanks,
@@ -21,9 +22,9 @@ import type {
 } from '@singapore-editor/lsp-plugin'
 import { createLanguageServerSetPlugin } from '@singapore-editor/lsp-plugin/websocket'
 import {
+  errorMessage,
   LSP_FEATURE_IDS,
   LSP_SEMANTIC_TOKENS_REFRESH,
-  LSP_SERVER_EXITED,
   type LspFeatureId,
   type LspMatch,
 } from '@workspace/contracts'
@@ -39,8 +40,8 @@ import {
   clientCapabilitiesForServer,
 } from '@/lib/language-server-capabilities'
 import { languageServerWebSocketConstructor } from '@/lib/server-sockets'
-import { toClientError } from '@/lib/client-error-taxonomy'
 import { notifyServerExit } from '@/features/editor/utils/notify-server-exit'
+import { serverExitFields } from '@/features/editor/utils/server-exit-fields'
 import { environmentClientFor } from '@/lib/client'
 import { environmentActivitySignal } from '@/lib/environments/state/activity'
 import { markerStore } from '@/lib/markers/store'
@@ -70,6 +71,7 @@ type MatchedLanguageServerPluginOptions = {
   statusSource: EditorLanguageServerStatusSource
   target: LanguageServerDocumentTarget
   onApplyWorkspaceEdit: OnApplyWorkspaceEdit
+  getDiagnosticActions?: LanguageServerDiagnosticActions
   onDefinitionLinkHover?: (target: LanguageServerDefinitionTarget) => void
   onOpenDefinition?: (target: LanguageServerDefinitionTarget) => void | boolean
   onOpenReferences?: (result: LanguageServerReferencesResult) => void | boolean
@@ -95,6 +97,7 @@ export function createMatchedLanguageServerPlugin({
   onOpenDefinition,
   onOpenReferences,
   onDidNavigateDiagnostic,
+  getDiagnosticActions,
 }: MatchedLanguageServerPluginOptions): LanguageServerPlugin {
   const eligible = enabled ? (matches ?? []) : []
   if (eligible.length === 0 || document === null)
@@ -163,6 +166,7 @@ export function createMatchedLanguageServerPlugin({
         onOpenDefinition,
         onOpenReferences,
         onDidNavigateDiagnostic,
+        getDiagnosticActions,
       })
       return [...pluginDisposables(plugin.activate(context)), { dispose: unsubscribe }]
     },
@@ -236,7 +240,6 @@ function liveLanguageServerLane({
   statusSource: EditorLanguageServerStatusSource
   target: LanguageServerDocumentTarget
 }): LanguageServerLaneOptions {
-  const exit: ServerExit = { params: null }
   return {
     ...languageServerLaneOptions({
       origin,
@@ -250,23 +253,10 @@ function liveLanguageServerLane({
       rootPath,
       target,
     }),
-    notificationHandlers: laneNotificationHandlers(match.serverId, semanticControllers, exit),
+    notificationHandlers: laneNotificationHandlers(match.serverId, semanticControllers),
     onStatusChange: (status) => {
       // A server that stopped or failed keeps no claim on its markers.
       if (status !== 'ready') markerStore.removeOwner(match.serverId)
-      // The connection restarts a server that exited; the user hears only if that gave up.
-      if (status === 'error') {
-        log.warn({
-          action: 'lsp.reconnect_gave_up',
-          area: 'lsp',
-          serverId: match.serverId,
-          serverFailed: exit.params !== null,
-        })
-      }
-      if (status === 'error' && exit.params !== null) {
-        notifyServerExit(match.serverId, exit.params)
-        exit.params = null
-      }
       statusSource.setServerStatus(match.serverId, status)
     },
     onDiagnostics: (diagnostics) => {
@@ -287,7 +277,18 @@ function liveLanguageServerLane({
         serverId: match.serverId,
       })
     },
-    onError: () => statusSource.setServerStatus(match.serverId, 'error'),
+    // Runs when reconnecting gave up, or when the lane's ready notifications failed.
+    onError: (error) => {
+      log.warn({
+        action: 'lsp.lane_failed',
+        area: 'lsp',
+        error: errorMessage(error),
+        serverId: match.serverId,
+        ...serverExitFields(error),
+      })
+      notifyServerExit(match.serverId, error)
+      statusSource.setServerStatus(match.serverId, 'error')
+    },
   }
 }
 
@@ -327,28 +328,15 @@ export function languageServerLaneOptions({
   }
 }
 
-/**
- * The last exit that carried the server's own error, kept across restarts: the attempt that finally
- * fails can be one whose server died before it said anything.
- */
-type ServerExit = { params: unknown }
-
 function laneNotificationHandlers(
   serverId: string,
   semanticControllers: ReadonlyMap<string, Set<SemanticTokenController>>,
-  exit: ServerExit,
 ) {
   return {
     [LSP_SEMANTIC_TOKENS_REFRESH]: () => {
       const semanticTokens = semanticControllers.get(serverId) ?? null
       if (semanticTokens) for (const controller of semanticTokens) controller.handleRefresh()
       return (semanticTokens?.size ?? 0) > 0
-    },
-    [LSP_SERVER_EXITED]: (_client: unknown, params: unknown) => {
-      const failed = Boolean(toClientError(params).code)
-      log.info({ action: 'lsp.server_exit', area: 'lsp', serverId, failed })
-      if (failed) exit.params = params
-      return true
     },
   }
 }

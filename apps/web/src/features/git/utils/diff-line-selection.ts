@@ -1,5 +1,5 @@
+import type { DiffFile, DiffRenderRow } from '@singapore-editor/diff'
 import { markdownFence } from '@/lib/markdown-fence'
-import { createStackedProjection, type DiffFile, type DiffRenderRow } from '@singapore-editor/diff'
 
 type DiffLineRange = { readonly start: number; readonly end: number }
 
@@ -14,18 +14,6 @@ type DiffLineRange = { readonly start: number; readonly end: number }
 export type DiffLineAddress = {
   readonly newRange: DiffLineRange | null
   readonly oldRange: DiffLineRange | null
-}
-
-/**
- * An address is resolved against both sides of the change, and in split mode no
- * plugin instance is holding a stacked projection to ask, so it is built here
- * over the plugin's own expansion state.
- */
-export function stackedDiffRows(
-  file: DiffFile,
-  expandedRegions: ReadonlySet<string>,
-): readonly DiffRenderRow[] {
-  return createStackedProjection(file, { expandedRegions }).rows
 }
 
 /**
