@@ -28,7 +28,7 @@ import { SettingRow } from '@/features/settings/components/setting-row'
 import { StatusMessage } from '@/components/status-message'
 import { ViewToggle } from '@/features/settings/components/view-toggle'
 import { useHasWorkspace } from '@/features/settings/hooks/use-has-workspace'
-import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
+import { useSettingsSaving } from '@/features/settings/hooks/use-settings-saving'
 import { useSettingsDisplay } from '@/features/settings/hooks/use-settings-display'
 import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 import { SettingsOwnerProvider } from '@/features/settings/providers/owner-provider'
@@ -69,7 +69,7 @@ export function SettingsPage({
   const editorOwner = useQueryClient()
   const settingsOwner = useSettingsOwner()
   const { document, projection } = useSettingsDisplay(showJson ? editorOwner : undefined)
-  const { isSaving } = useSettingsActions()
+  const isSaving = useSettingsSaving()
   const editorHasWorkspace = useHasWorkspace()
   const hasWorkspace =
     showJson || editorOwner === settingsOwner
