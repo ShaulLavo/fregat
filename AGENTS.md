@@ -112,7 +112,7 @@
 
 ## Dev, Gates, Verification
 
-- A dev server is always running (Vite on 5173, API on 3001); never start another. State homes: production `~/.platform`, dev `/work/platform-dev/home`, each `agent:browser` run a temp home. `/dev` (and `/platform/dev` on the mesh) is a component gallery; add a tab for anything worth eyeballing.
+- No dev server runs by default until [Plan 185](plans/185-shared-dev-server.md)'s on-demand shared server lands. Until then, when you need one, start your own Vite from your checkout or worktree on a free port (`cd apps/web && WEB_PORT=<port> bun ../../scripts/run-with-env.ts vite --port <port> --strictPort`), drive it with `WEB_PORT=<port> bun run agent:browser …`, and stop it when you are done. Never leave one running. State homes: production `~/.platform`, dev `/work/platform-dev/home`, each `agent:browser` run a temp home. `/dev` (and `/platform/dev` on the mesh) is a component gallery; add a tab for anything worth eyeballing.
 - `bun run gates` (`dupes:functions`, `dupes`, `design:census`, `compiler:census`, `errors:census`, `query:check`) runs in pre-commit, `verify` and CI. `bun run hooks:pre-commit` is not a dry run: it stages what it fixes.
 - Prove changes with the `verify-fregat` skill (`bun run agent:browser look|scenario|trace|renders|caches`); evidence lands in `/work/tmp/fregat-evidence/<run>/`. Read the screenshot back and name the directory. Performance claims cite `trace --compare`, render claims `renders` before and after, settlement claims `caches`. Reproduce a bug on its surface before fixing it. A surface with no scenario gets one in `scripts/agent/scenarios/`, selectors in `scripts/agent/selectors.ts`.
 
