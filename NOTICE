@@ -1,0 +1,9 @@
+Third-party material shipped with this project
+
+File icons (apps/web/src/lib/vscode-icon-glyphs.ts) are generated from @pierre/vscode-icons
+(MIT, The Pierre Computer Company) by scripts/icons/generate.ts, which is modelled on
+pierrecomputer/pierre packages/trees/scripts/generate-built-in-icons.ts (Apache-2.0).
+
+The `claude` file icon is the Codicons `claude` icon, Copyright (c) Microsoft Corporation,
+licensed under the Creative Commons Attribution 4.0 International licence (CC-BY-4.0),
+https://github.com/microsoft/vscode-codicons. The mark it depicts belongs to Anthropic.

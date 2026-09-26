@@ -101,7 +101,6 @@ test('exports only the reviewed runtime and type API', () => {
   expect(Object.keys(treePackage).toSorted()).toEqual([
     'FileTree',
     'FileTreeModel',
-    'getBuiltInFileIconColor',
     'prepareFileTreeInput',
     'preparePresortedFileTreeInput',
     'useFileTree',
