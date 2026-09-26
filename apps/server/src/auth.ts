@@ -42,7 +42,7 @@ export function createAuthConfig(options: AuthOptions = {}): AuthConfig {
 
 export function authGuard(auth: AuthConfig) {
   return ({ request, set }: { request: Request; set: { status?: number | string } }) => {
-    const origin = browserRequestOrigin(request)
+    const origin = browserRequestOrigin(request, auth)
     const error = localBrowserOriginError(auth, origin)
     if (!error) {
       recordRequestContext({ auth: { outcome: 'success' } })
@@ -86,17 +86,19 @@ function hasTrustedOrigin(auth: AuthConfig, origin: string | null) {
   return auth.allowedOrigins.includes(origin)
 }
 
-function browserRequestOrigin(request: Request): string | null {
+function browserRequestOrigin(request: Request, auth: AuthConfig): string | null {
   const origin = request.headers.get('origin')
   if (origin !== null) return origin
 
-  // Browsers omit Origin on GET navigations, including a download link from the dev page on
-  // another port (same-site). The referrer must still resolve to an exact allowlisted origin.
+  // Cross-port download navigations omit Origin. Accept their referrer only
+  // when the browser reports same-site and its origin exactly matches the allowlist.
   const site = request.headers.get('sec-fetch-site')
   if (site !== 'same-origin' && site !== 'same-site') return null
 
   const referer = request.headers.get('referer')
-  return referer ? (URL.parse(referer)?.origin ?? null) : null
+  const refererOrigin = referer ? (URL.parse(referer)?.origin ?? null) : null
+  if (site === 'same-site' && !hasTrustedOrigin(auth, refererOrigin)) return null
+  return refererOrigin
 }
 
 function originFromWebSocketData(data: unknown) {
