@@ -36,6 +36,9 @@ import type {
 import type { ProviderUsageAmounts, ProviderUsageTotals } from './utils/usage-totals'
 import type { ProviderUsageProbe, ProviderUsageUpdate } from './utils/usage-windows'
 
+/** Platform's MCP endpoint and the bearer token one provider runtime reaches it with. */
+export type PlatformMcpBinding = { readonly url: string; readonly token: string }
+
 export type ProviderTurnInput = {
   attachments: readonly ChatAttachment[]
   attachmentsDir?: string
@@ -47,6 +50,8 @@ export type ProviderTurnInput = {
   kind?: SessionTurnKind
   messageText: string
   modelSelection: ModelSelection
+  /** Absent for utility turns and when no endpoint is served. */
+  platformMcp?: PlatformMcpBinding
   sessionId: SessionId
   runtimeEpoch: string
   providerInstanceId: ProviderInstanceId
@@ -74,6 +79,7 @@ export type ProviderRuntimeStartInput = {
   ephemeral?: boolean
   interactionMode?: InteractionMode
   modelSelection: ModelSelection
+  platformMcp?: PlatformMcpBinding
   providerInstanceId: ProviderInstanceId
   providerResumeCursor?: unknown | null
   runtimeMode: RuntimeMode

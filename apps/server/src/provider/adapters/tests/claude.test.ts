@@ -1298,6 +1298,21 @@ describe('ClaudeProviderAdapter', () => {
     await harness.adapter.stopAll()
   })
 
+  it('adds Platform’s MCP endpoint to a session that has a binding, always loaded', async () => {
+    const harness = claudeHarness()
+    const platformMcp = { token: 'grant-token', url: 'http://127.0.0.1:3301/mcp' }
+    await harness.adapter.startRuntime({ ...sessionStartInput({}), platformMcp })
+    expect(latestOptions(harness).mcpServers).toEqual({
+      platform: {
+        alwaysLoad: true,
+        headers: { Authorization: 'Bearer grant-token' },
+        type: 'http',
+        url: 'http://127.0.0.1:3301/mcp',
+      },
+    })
+    await harness.adapter.stopAll()
+  })
+
   it('disables provider transcript persistence only for ephemeral sessions', async () => {
     const normal = claudeHarness()
     await normal.adapter.startRuntime(sessionStartInput({}))
