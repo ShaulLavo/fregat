@@ -1,7 +1,7 @@
 import type { GitFileDiff } from '@workspace/contracts'
 import { queryOptions } from '@tanstack/react-query'
 import { fetchDiff } from '@/features/git/utils/api'
-import { blobDiffQueryKey } from '@/features/git/utils/blob-diff-query'
+import { blobDiffQueryKey } from '@/lib/blob-diff-query'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { gitKeys } from '@/lib/query-keys'
 

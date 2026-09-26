@@ -1,4 +1,5 @@
 import { persistedAttachmentDraftSchema } from './attachment-draft'
+import { sentReviewCommentSchema } from '@workspace/client-core/chat/review-comments'
 import { readWorkspaceCacheEntry, writeWorkspaceCacheEntry } from '@/lib/workspace-cache-storage'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import type { EnvironmentId } from '@workspace/contracts'
@@ -37,6 +38,8 @@ const composedMessageSchema = v.object({
 })
 const promptStashEntrySchema = v.object({
   ...composedMessageSchema.entries,
+  /** Review comments and quoted replies that were riding with the stashed message. */
+  reviewComments: v.optional(v.array(sentReviewCommentSchema), []),
   createdAt: v.string(),
   id: trimmedNonEmptyStringSchema,
 })

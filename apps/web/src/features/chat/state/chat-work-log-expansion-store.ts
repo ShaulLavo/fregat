@@ -14,6 +14,7 @@ type ChatWorkLogExpansionStore = {
   userExpandedRowIds: Record<string, boolean>
   setAutoRowsExpanded: (rowIds: readonly string[], expanded: boolean) => void
   toggleUserRowExpanded: (rowId: string) => void
+  expandGroup: (groupId: string) => void
   toggleGroupExpanded: (groupId: string) => void
   toggleRowExpanded: (rowId: string) => void
 }
@@ -39,6 +40,12 @@ export const useChatWorkLogExpansionStore = create<ChatWorkLogExpansionStore>((s
         [rowId]: !(state.userExpandedRowIds[rowId] ?? state.autoExpandedRowIds[rowId] ?? false),
       },
     })),
+  expandGroup: (groupId) =>
+    set((state) =>
+      state.expandedGroupIds[groupId]
+        ? state
+        : { expandedGroupIds: { ...state.expandedGroupIds, [groupId]: true } },
+    ),
   toggleGroupExpanded: (groupId) =>
     set((state) => ({
       expandedGroupIds: {
