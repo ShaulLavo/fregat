@@ -17,7 +17,9 @@ import {
   FILE_SNAPSHOT_STALE_MS,
   fileSnapshotPathFromQueryKey,
   fileSnapshotQueryOptions,
+  fileSnapshotReads,
 } from '@/lib/file-snapshot-query-cache'
+import { hasPrefetchRoom, prefetchSurfaceEnabled } from '@/lib/intent-prefetch/state/scheduler'
 import type {
   PreparedCleanFileOpenClaim,
   PreparedFileOpenClaim,
@@ -163,6 +165,8 @@ export type FileOpenIntentServiceOwner = {
 export type FileOpenIntentServiceOwnerDependencies = {
   readonly createBuffer?: (text: string) => EditorTextBuffer
   readonly createEvent?: FileOpenIntentEventFactory
+  /** The `prefetch.files` switch; read per intent. */
+  readonly isEnabled?: () => boolean
   readonly getLiveDocument: (path: FilesystemPath) => FileOpenIntentLiveDocument | null
   readonly getRetainedScrollPosition: (path: FilesystemPath) => EditorScrollPosition | null
   readonly isActive: (path: FilesystemPath) => boolean
@@ -231,6 +235,8 @@ type FileOpenIntentPromotion =
     }
 
 type FileOpenIntentOperation = {
+  /** Whether every stage had settled when a press claimed the record. */
+  claimOutcome: 'hit' | 'partial'
   readonly detectedAt: number
   readonly event: WideEventScope
   hasTab: boolean
@@ -291,6 +297,7 @@ class FileOpenIntentOwner implements FileOpenIntentServiceOwner {
       dependencies.runtime,
       dependencies.createEvent,
       dependencies.createBuffer,
+      dependencies.isEnabled,
     )
     this.service = {
       claimLive: (path) => (this.canConsume() ? this.state.claimLive(path) : null),
@@ -473,6 +480,7 @@ class FileOpenIntentServiceState {
   private readonly relatedOperations = new Set<Promise<void>>()
   private readonly intentOperations = new Map<FilesystemPath, FileOpenIntentOperation>()
   private readonly promotedIntentOperations = new Map<FilesystemPath, FileOpenIntentOperation>()
+  private readonly warmingPaths = new Set<FilesystemPath>()
 
   constructor(
     private readonly queryClient: QueryClient,
@@ -490,6 +498,7 @@ class FileOpenIntentServiceState {
     private readonly runtime: FileOpenIntentRuntime = defaultFileOpenIntentRuntime,
     private readonly createEvent: FileOpenIntentEventFactory = createWideEventScope,
     private readonly createBuffer: (text: string) => EditorTextBuffer = createEditorTextBuffer,
+    private readonly isEnabled: () => boolean = () => prefetchSurfaceEnabled('files'),
   ) {
     this.environment = preparer.environment
   }
@@ -641,6 +650,7 @@ class FileOpenIntentServiceState {
     const canonicalRoot = canonicalPath(intent.rootPath)
     const canonical = canonicalPath(intent.path)
     if (this.benchmarkScope?.quarantined) return
+    if (!this.isEnabled()) return
     if (canonicalRoot !== this.rootPath) return
     if (!this.pathBelongsToRoot(canonical)) return
     if (intent.knownSize !== undefined && intent.knownSize > MAX_PREPARED_FILE_BYTES) {
@@ -669,10 +679,7 @@ class FileOpenIntentServiceState {
     }
 
     this.pruneExpired()
-    if (this.recordIsCurrent(canonical)) {
-      this.refreshQueuedStructuralRange(canonical)
-      return
-    }
+    if (this.recordIsCurrent(canonical)) return
     if (this.activePath === canonical) return
     if (this.queuedPathSet.has(canonical)) {
       this.raiseQueuedPriority(canonical)
@@ -686,7 +693,24 @@ class FileOpenIntentServiceState {
       this.createIntentOperation(intent, canonicalRoot, canonical),
     )
     this.noteBenchmarkIntent(canonical)
+    this.warmSnapshot(canonical)
     this.runNext()
+  }
+
+  /**
+   * Starts a queued path's read now, while stages stay one path at a time: up to four reads
+   * share the snapshot key family with clicks, and a guess past that waits for its turn.
+   */
+  private warmSnapshot(path: FilesystemPath): void {
+    if (!this.running || this.getLiveDocument(path)) return
+    const { queryKey } = fileSnapshotQueryOptions(path)
+    if (freshFileQueryState(this.queryClient.getQueryState(queryKey), this.runtime.now())) return
+    if (!hasPrefetchRoom('files', this.queryClient, fileSnapshotReads)) return
+
+    this.warmingPaths.add(path)
+    void ensureFileSnapshotQuery(this.queryClient, path)
+      .catch(() => undefined)
+      .finally(() => this.warmingPaths.delete(path))
   }
 
   claimLive(path: FilesystemPath): PreparedLiveFileOpenClaim | null {
@@ -777,11 +801,12 @@ class FileOpenIntentServiceState {
     if (this.claimIsCurrent(record.claim)) {
       if (this.activePath === canonical) this.activeAbortController = null
       this.noteBenchmarkClaim(canonical, record.estimatedBytes, record.preparedDocument)
-      this.promoteIntent(canonical, record.documentKey, {
-        promotion: {
-          kind: record.claim.kind,
-          stages: preparationStageProgress(record),
-        },
+      const stages = preparationStageProgress(record)
+      const settled = Object.values(stages).every(
+        (progress) => progress !== 'queued' && progress !== 'started',
+      )
+      this.promoteIntent(canonical, record.documentKey, settled ? 'hit' : 'partial', {
+        promotion: { kind: record.claim.kind, stages },
       })
       return record.claim
     }
@@ -809,10 +834,7 @@ class FileOpenIntentServiceState {
 
   reconcileLiveAuthority(): void {
     for (const [path, record] of this.records) {
-      if (this.liveAuthorityMatches(record.claim)) {
-        this.refreshQueuedStructuralRange(path)
-        continue
-      }
+      if (this.liveAuthorityMatches(record.claim)) continue
 
       this.disposeRecord(path, record)
       this.finishIntent(path, 'invalidated', { reason: 'document-changed' })
@@ -846,6 +868,13 @@ class FileOpenIntentServiceState {
     this.cancelExpiryTimer?.()
     this.cancelExpiryTimer = null
     for (const [path, record] of this.records) this.disposeRecord(path, record)
+    for (const path of this.warmingPaths) {
+      void this.queryClient.cancelQueries({
+        exact: true,
+        queryKey: fileSnapshotQueryOptions(path).queryKey,
+      })
+    }
+    this.warmingPaths.clear()
     for (const path of this.intentOperations.keys()) {
       this.finishIntent(path, 'aborted', { reason })
     }
@@ -890,7 +919,7 @@ class FileOpenIntentServiceState {
   ): Promise<void> {
     try {
       await this.runPreparationStages(path, record, lifecycleGeneration)
-      this.intentOperations.get(path)?.event.set({ preparation: { status: 'ready' } })
+      this.markPrepared(path, 'ready')
     } catch (error) {
       this.intentOperations.get(path)?.event.error(error)
       if (this.records.get(path) === record) this.disposeRecord(path, record)
@@ -930,7 +959,7 @@ class FileOpenIntentServiceState {
         )
         if (record) await this.runPreparationStages(path, record, lifecycleGeneration)
         if (record) {
-          event.set({ preparation: { status: 'ready-live' } })
+          this.markPrepared(path, 'ready-live')
           return
         }
 
@@ -975,7 +1004,7 @@ class FileOpenIntentServiceState {
           await this.runPreparationStages(path, record, lifecycleGeneration)
         }
         if (record) {
-          event.set({ preparation: { status: 'ready-live' } })
+          this.markPrepared(path, 'ready-live')
           return
         }
 
@@ -1038,7 +1067,7 @@ class FileOpenIntentServiceState {
         abortController,
       )
       await this.runPreparationStages(path, record, lifecycleGeneration)
-      event.set({ preparation: { status: 'ready-clean' } })
+      this.markPrepared(path, 'ready-clean')
     } catch (error) {
       const record = this.records.get(path)
       if (record) this.disposeRecord(path, record)
@@ -1102,52 +1131,72 @@ class FileOpenIntentServiceState {
     return this.store(path, document.key, claim, prepared, structuralRange, abortController)
   }
 
+  // Highlighter and structural stages run on different workers, so they run side by side.
   private async runPreparationStages(
     path: FilesystemPath,
     record: PreparedOpenRecord,
     lifecycleGeneration: number,
   ): Promise<void> {
     while (this.recordCanRun(path, record, lifecycleGeneration)) {
-      const stageRecord = nextQueuedStage(record)
-      if (!stageRecord) return
+      const queued = queuedStages(record)
+      if (queued.length === 0) return
 
-      stageRecord.progress = 'started'
-      this.touchRecord(path, record)
-      const startedAt = this.runtime.now()
-      this.intentOperations.get(path)?.event.set({
-        preparation: {
-          providerConfiguration: {
-            [stageRecord.stage.family]: {
-              configurationTag: stageRecord.stage.configurationTag,
-              generation: this.environmentGeneration,
-            },
-          },
-          ranges: { [stageRecord.stage.family]: stageRecord.stage.range ?? null },
-        },
-      })
-      await this.runtime.schedule(async () => {
-        if (!this.recordCanRun(path, record, lifecycleGeneration)) return
-
-        const outcome = stageRecord.stage.start()
-        this.noteBenchmarkRuntimeSessionIds(record.preparedDocument)
-        await outcome
-      })
-      if (!this.recordCanRun(path, record, lifecycleGeneration)) return
-      if (record.stages.get(stageRecord.stage.family) !== stageRecord) continue
-
-      stageRecord.progress = 'settled'
-      this.intentOperations.get(path)?.event.set({
-        preparation: { estimatedBytes: record.estimatedBytes },
-        stages: {
-          [stageRecord.stage.family]: {
-            durationMs: this.runtime.now() - startedAt,
-            status: 'ready',
-          },
-        },
-      })
-      this.touchRecord(path, record)
-      this.pruneBounds()
+      await Promise.all(
+        queued.map((stageRecord) =>
+          this.runPreparationStage(path, record, stageRecord, lifecycleGeneration),
+        ),
+      )
     }
+  }
+
+  private async runPreparationStage(
+    path: FilesystemPath,
+    record: PreparedOpenRecord,
+    stageRecord: PreparedStageRecord,
+    lifecycleGeneration: number,
+  ): Promise<void> {
+    stageRecord.progress = 'started'
+    this.touchRecord(path, record)
+    const startedAt = this.runtime.now()
+    this.intentOperations.get(path)?.event.set({
+      preparation: {
+        providerConfiguration: {
+          [stageRecord.stage.family]: {
+            configurationTag: stageRecord.stage.configurationTag,
+            generation: this.environmentGeneration,
+          },
+        },
+        ranges: { [stageRecord.stage.family]: stageRecord.stage.range ?? null },
+      },
+    })
+    await this.runtime.schedule(async () => {
+      if (!this.recordCanRun(path, record, lifecycleGeneration)) return
+
+      const outcome = stageRecord.stage.start()
+      this.noteBenchmarkRuntimeSessionIds(record.preparedDocument)
+      await outcome
+    })
+    if (!this.recordCanRun(path, record, lifecycleGeneration)) return
+    if (record.stages.get(stageRecord.stage.family) !== stageRecord) return
+
+    stageRecord.progress = 'settled'
+    const durationMs = this.runtime.now() - startedAt
+    const event = this.intentOperations.get(path)?.event
+    event?.increment('workerMs', durationMs)
+    event?.set({
+      preparation: { estimatedBytes: record.estimatedBytes },
+      stages: { [stageRecord.stage.family]: { durationMs, status: 'ready' } },
+    })
+    this.touchRecord(path, record)
+    this.pruneBounds()
+  }
+
+  private markPrepared(path: FilesystemPath, status: string): void {
+    const operation = this.intentOperations.get(path)
+    operation?.event.set({
+      preparation: { status },
+      prepareMs: this.runtime.now() - operation.detectedAt,
+    })
   }
 
   private recordCanRun(
@@ -1261,20 +1310,10 @@ class FileOpenIntentServiceState {
         preparation: { ranges: { structural: structural.stage.range ?? structuralRange } },
       })
     }
-    if (!nextQueuedStage(record)) return
+    if (queuedStages(record).length === 0) return
     if (this.activePath === path) return
 
     this.enqueuePath(path)
-  }
-
-  private refreshQueuedStructuralRange(path: FilesystemPath): void {
-    const record = this.records.get(path)
-    const structural = record?.stages.get('structural')
-    if (!record || structural?.progress !== 'queued') return
-
-    const range = this.structuralRange(path, record.claim.buffer)
-    if (sameStructuralRange(record.structuralRange, range)) return
-    this.reconcileRecord(path, record, this.preparer, range)
   }
 
   private structuralRange(
@@ -1335,7 +1374,7 @@ class FileOpenIntentServiceState {
     const liveDocument = this.getLiveDocument(claim.path)
     if (claim.kind === 'clean') {
       if (liveDocument !== null || claim.buffer.isDirty()) return false
-      return this.cleanClaimMatchesFreshQuery(claim)
+      return this.cleanClaimMatchesCachedQuery(claim)
     }
     if (!liveDocument) return false
     if (liveDocument.buffer !== claim.buffer) return false
@@ -1419,21 +1458,24 @@ class FileOpenIntentServiceState {
     const rejection = this.cleanPreparationRejection(path, file, lifecycleGeneration, abortSignal)
     if (rejection) return rejection
     if (this.getLiveDocument(path)) return 'live-document-changed'
-    if (!this.cleanFileMatchesFreshQuery(file)) return 'query-version-changed'
+    if (!this.cleanFileMatchesCachedQuery(file)) return 'query-version-changed'
     return null
   }
 
-  private cleanFileMatchesFreshQuery(file: FileResultIdentity): boolean {
+  /**
+   * Age is not checked: an old record still paints, and the opened tab's own snapshot query
+   * refetches once stale and replaces a clean document whose version moved.
+   */
+  private cleanFileMatchesCachedQuery(file: FileResultIdentity): boolean {
     const queryKey = fileSnapshotQueryOptions(file.path).queryKey
     const state = this.queryClient.getQueryState<FileResult>(queryKey)
     if (state?.status !== 'success' || !state.data) return false
-    if (this.runtime.now() - state.dataUpdatedAt > FILE_SNAPSHOT_STALE_MS) return false
 
     return state.data.path === file.path && state.data.version === file.version
   }
 
-  private cleanClaimMatchesFreshQuery(claim: PreparedCleanFileOpenClaim): boolean {
-    return this.cleanFileMatchesFreshQuery({ path: claim.path, version: claim.fileVersion })
+  private cleanClaimMatchesCachedQuery(claim: PreparedCleanFileOpenClaim): boolean {
+    return this.cleanFileMatchesCachedQuery({ path: claim.path, version: claim.fileVersion })
   }
 
   private generationIsCurrent(generation: number): boolean {
@@ -1492,10 +1534,12 @@ class FileOpenIntentServiceState {
     const detectedAt = this.runtime.now()
     const hasTab = intent.tabId !== undefined
     return {
+      claimOutcome: 'hit',
       detectedAt,
       event: this.createEvent({
-        action: 'editor.file_open_intent',
+        action: 'prefetch.intent',
         area: 'editor',
+        surface: 'files',
         dedupeCount: 0,
         preparationEnvironment: {
           configurationTag: this.environment.configurationTag,
@@ -1506,6 +1550,7 @@ class FileOpenIntentServiceState {
           },
         },
         hasTab,
+        inFlight: this.queryClient.isFetching(fileSnapshotReads),
         knownSize: intent.knownSize ?? null,
         path,
         pathClassification: path === rootPath ? 'root' : 'descendant',
@@ -1553,12 +1598,14 @@ class FileOpenIntentServiceState {
   private promoteIntent(
     path: FilesystemPath,
     documentKey: DocumentKey,
+    claimOutcome: 'hit' | 'partial',
     context: Record<string, unknown>,
   ): void {
     const operation = this.intentOperations.get(path)
     if (!operation) return
 
     this.intentOperations.delete(path)
+    operation.claimOutcome = claimOutcome
     const previous = this.promotedIntentOperations.get(path)
     if (previous) this.finishPromotion(path, 'superseded')
     operation.postActivationBaseline = postActivationWorkSnapshot(path)
@@ -1566,7 +1613,7 @@ class FileOpenIntentServiceState {
     operation.event.set({
       ...context,
       leadMs: promotionAt - operation.detectedAt,
-      outcome: 'promoted',
+      outcome: claimOutcome,
     })
     const cancelPaintTimeout = this.runtime.scheduleTimer(
       () => this.finishPromotion(path, 'timeout', { reason: 'initial-paint-timeout' }),
@@ -1595,7 +1642,7 @@ class FileOpenIntentServiceState {
     this.promotedIntentOperations.delete(path)
     promotion.cancelPaintTimeout()
     const counters = postActivationWorkSince(operation.postActivationBaseline, path)
-    const outcome = paintOutcome === 'abandoned' ? 'aborted' : 'promoted'
+    const outcome = paintOutcome === 'abandoned' ? 'aborted' : operation.claimOutcome
     operation.event.set({
       postActivation: counters,
       promotion: { paintOutcome },
@@ -1757,12 +1804,11 @@ function stageRecords(
   return records
 }
 
-function nextQueuedStage(record: PreparedOpenRecord): PreparedStageRecord | null {
-  for (const family of preparationFamilies) {
+function queuedStages(record: PreparedOpenRecord): PreparedStageRecord[] {
+  return preparationFamilies.flatMap((family) => {
     const stage = record.stages.get(family)
-    if (stage?.progress === 'queued') return stage
-  }
-  return null
+    return stage?.progress === 'queued' ? [stage] : []
+  })
 }
 
 function sameStage(

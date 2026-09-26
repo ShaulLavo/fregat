@@ -845,6 +845,17 @@
       },
       "type": "array"
     },
+    "prefetch.enabled": {
+      "default": true,
+      "description": "Start loading what a press will open while the pointer heads for it or a key moves to it, so it paints at once. Folder listings follow this switch; each other surface has its own switch under it.",
+      "type": "boolean"
+    },
+    "prefetch.files": {
+      "default": true,
+      "description": "Read a file and colour its syntax while the pointer heads for its tree row, tab or definition link.",
+      "markdownDescription": "Read a file and colour its syntax while the pointer heads for its tree row, tab or definition link.\n\nApplies while `prefetch.enabled` is on.",
+      "type": "boolean"
+    },
     "providers.instances": {
       "default": [],
       "description": "Configured provider instances, in the order the picker shows them.",

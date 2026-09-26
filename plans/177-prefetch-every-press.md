@@ -150,6 +150,23 @@ revisit 130 / 269; TS diff first 381 / 897, revisit 104 / 496; chat switch 63–
 
 ### Phase 1 — Shared scheduler and the file fixes (M)
 
+Done 2026-09-26 (wave 2, lane F). `lib/intent-prefetch/state/scheduler.ts` holds the switches and
+the four-in-flight room check; `lib/prefetch-room.ts` is gone and tree and picker folder guesses
+(surface `folders`) follow `prefetch.enabled`. `prefetch.enabled` and `prefetch.files`
+(`dependsOn` the master) are registered, application scope, default on, category Prefetch.
+The files preparer: a clean record is claimed whatever its age (the opened tab's own snapshot
+query refetches once stale and replaces the document if the version moved); both stages start
+together; a queued path's read starts at once while another path prepares, up to four snapshot
+reads in flight. `editor.file_open_intent` is now `prefetch.intent` with `surface: 'files'`,
+`outcome` `hit` or `partial` in place of `promoted`, and `prepareMs`, `workerMs`, `inFlight`.
+Deviations: disabled intents log nothing (`skipped-disabled` would be one line per hover); a
+record whose started family changes with the environment is rebuilt, since no family waits
+queued any more, and the queued-structural-range refresh is deleted with it. Proof
+(`/work/tmp/fregat-evidence/20260926T143828Z-scenario-prefetch-first-paint/`): 7 s hover md
+67 / 67 ms (was 100 / 141), 1.5 s hover TS 70 / 70 (was 64 / 180). Settings rows:
+`…T144001Z-scenario-prefetch-settings/`. Production `stale` counts are the coordinator's
+post-deploy check.
+
 - `lib/intent-prefetch/`: the scheduler, the settings gate, the cap and the `prefetch.intent`
   event. `lib/prefetch-room.ts` folds into it, so the tree and picker directory prefetch count
   against the same cap.

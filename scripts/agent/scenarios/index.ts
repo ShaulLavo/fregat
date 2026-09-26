@@ -95,6 +95,7 @@ import { chatTurnAnatomy } from './chat-turn-anatomy'
 import { fileTreeHoverPrefetch } from './file-tree-hover-prefetch'
 import { prefetchChatSwitch } from './prefetch-chat-switch'
 import { prefetchFirstPaint } from './prefetch-first-paint'
+import { prefetchSettings } from './prefetch-settings'
 import {
   filePickerPrefetchBound,
   workspaceOpenLargeRoot,
@@ -526,6 +527,7 @@ export const scenarios: readonly Scenario[] = [
   fileTreeHoverPrefetch,
   prefetchFirstPaint,
   prefetchChatSwitch,
+  prefetchSettings,
   workspaceOpenLargeRoot,
   workspaceOpenUnreadableChild,
   workspaceSwitchClickDuringOpen,
