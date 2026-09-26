@@ -25,10 +25,38 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  # A PR that changes only plans, docs or root Markdown runs no job below; nothing in them is
+  # built, typechecked or tested (package READMEs are code: tests read them). Main runs
+  # everything: collapsed pending runs mean one run's diff is not everything since the last verdict.
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ github.event_name != 'pull_request' || steps.filter.outputs.code == 'true' }}
+    steps:
+      - name: Classify changed files
+        id: filter
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          predicate-quantifier: some-with-excludes
+          filters: |
+            code:
+              - '**'
+              - '!plans/**'
+              - '!docs/**'
+              - '!*.md'
+
   # Three jobs side by side: checks, core's tests (the longest, and the only ones that need
   # Firefox and WebKit), and every other package's tests.
   check:
     name: Typecheck, lint, catalog
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -57,6 +85,8 @@ jobs:
 
   core:
     name: Test (core)
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -98,6 +128,8 @@ jobs:
 
   packages:
     name: Test (packages)
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -165,3 +197,17 @@ jobs:
       - name: Prune turbo cache
         if: ${{ always() }}
         run: find .turbo/cache -type f -mtime +3 -delete 2>/dev/null || true
+
+  # The one status to read: red when any job failed or was cancelled; a job skipped because the
+  # change cannot affect it counts as passed.
+  verdict:
+    name: CI
+    needs: [changes, check, core, packages]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verdict
+        env:
+          FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: test "$FAILED" = false
