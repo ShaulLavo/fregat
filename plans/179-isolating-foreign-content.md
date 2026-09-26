@@ -6,6 +6,10 @@
   chat markdown, previews and the editor get none. Two live bugs found on the way (raw-HTML DOM
   clobbering breaks the editor; occurrence highlights rewrite a head `<style>` every ~3.5 keys).
   Phases below are ready to execute; one owner question on the editor root.
+- Phase 1 done 2026-09-26 (wave 2, lane E1): [singapore#42](https://github.com/ShaulLavo/singapore/pull/42),
+  in `editor-ref` `ec3fc15`. `p179-type-burst` on a production build, two traces each: head
+  `<style>` writes 42 → 1, style recalc 358 → 203 ms (1.26 → 0.71 ms per key on a busier machine
+  than the research's 0.76 baseline), recalcs over 100 elements 84 → 1.
 - Planned at: Platform `d103638de`, Editor `74e76be`, 2026-09-26. Researched at Platform
   `c130dd35a`, Editor `74e76be`. Origin: a discussion of the file tree's shadow root.
   [Plan 178](178-tree-in-the-app.md) removes that root; this plan asks where a root earns its place.
@@ -182,7 +186,7 @@ Each phase is independent and shippable. Verification runs through `agent:browse
    - An injected `style-marks.ts` that marks each `<style>` text change and `adoptedStyleSheets`
      write; the summary charges the following recalc to it. Port from
      `/work/tmp/research2/179/agent/`.
-1. **Editor: stop the occurrence-rule churn (S, Editor `virtualizedTextViewHighlights.ts`).** An
+1. **Done (singapore#42).** **Editor: stop the occurrence-rule churn (S, Editor `virtualizedTextViewHighlights.ts`).** An
    empty group keeps its rule (as `renderPaintGroup` already keeps it registered), so only a style
    change bumps `rangeHighlightRuleVersion`. Gate: `trace editor-type-burst --compare` shows head
    writes near 0 and style ≤0.35 ms per key. Editor-side test beside `editor.test.ts`'s
@@ -192,6 +196,11 @@ Each phase is independent and shippable. Verification runs through `agent:browse
    `rehypeDecorate`. Tests: `hast.test.ts` footnote case plus `<img name="getSelection">`,
    `<form name>`, raw `id`. Scenario: commit `p179-clobber` as `markdown-preview-clobber` (no page
    errors, `typeof document.getSelection === 'function'`).
+   Landed 2026-09-26 (wave 2 lane B): `toHast` leaves ids bare, the sanitizer prefixes every
+   `id`, `name` and aria reference with `user-content-` (`MARKDOWN_ID_PREFIX`), and
+   `rehypeDecorate` prefixes in-document `#` hrefs; chat's fragment-link resolver drops the prefix
+   before matching a heading slug. Scenario `markdown-preview-clobber` fails on the old sanitizer
+   (`typeof document.getSelection === 'object'`) and passes now.
 3. **Mermaid in a root (M, `features/chat`).**
    - Render as today (light-DOM measurement), then mount the SVG into an open shadow root on the
      `role="img"` host with one adopted sheet shared by every diagram (`:host` font, colours from
@@ -207,6 +216,8 @@ Each phase is independent and shippable. Verification runs through `agent:browse
 4. **`/fs/blob` headers (S, `apps/server/src/fs/routes.ts`).** `x-content-type-options: nosniff` on
    every response; `content-security-policy: sandbox` on HTML, SVG and XML. Route test in
    `apps/server/src/fs/tests/`.
+   Landed 2026-09-26 (wave 2 lane B), with `application/xhtml+xml` and XML covered too; route test
+   `fs/tests/blob-headers.test.ts`.
 5. **App CSS hygiene (S, `packages/ui/src/styles/globals.css`).** Move the spinner palette off the
    universal bucket (a class-keyed selector at zero specificity via `:where()` around a single
    class, the `@supports` block flattened), and audit the Tailwind `:is(… *)` star variants the

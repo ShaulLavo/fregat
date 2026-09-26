@@ -20,6 +20,7 @@ import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
 import { createFederationHarness } from '../../../../test/factories/federation'
 import { createTestNavigation } from '../../../../test/factories/navigation'
 import { renderApplication } from '../../../../test/render'
+import { fileSystemKeys } from '@/lib/query-keys'
 import { deferredWorkspaceClient } from '../../../../test/factories/deferred-workspace-client'
 import { registerTestWorkspaceAddress } from '../../../../test/factories/workspace-address'
 import { workspaceToken } from '@workspace/client-core/address/workspace'
@@ -181,6 +182,8 @@ test('a completed rename in a retained environment follows its pending return wi
     })
     const localPaths = editorTabContents(local.editor.workspaceStore)
     registerEnvironmentQueryClient(remote.queryClient, remote.origin, delayed.client)
+    // The first open cached the folder's address; drop it so this open waits on the server.
+    remote.queryClient.removeQueries({ queryKey: fileSystemKeys.workspaceAddress('repo') })
     const pending = navigation.openWorkspace({
       environmentId: federation.descriptorB.environmentId,
       path: 'repo',

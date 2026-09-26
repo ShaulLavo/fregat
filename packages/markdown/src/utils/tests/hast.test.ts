@@ -127,6 +127,22 @@ describe('decoration', () => {
     expect(elements(tree, 'li').some((item) => item.properties.id === target)).toBe(true)
   })
 
+  test('raw HTML cannot name a document property', () => {
+    const tree = render('<img name="getSelection" src="x.png" alt="x">', withRaw)
+    const [image] = elements(tree, 'img')
+
+    expect(image?.properties.name).toBe('user-content-getSelection')
+  })
+
+  test('raw ids are prefixed and an in-document link follows them', () => {
+    const tree = render('<div id="main">raw id</div>\n\n[go](#main)', withRaw)
+    const [target] = elements(tree, 'div')
+    const [link] = elements(tree, 'a')
+
+    expect(target?.properties.id).toBe('user-content-main')
+    expect(link?.properties.href).toBe('#user-content-main')
+  })
+
   test('block code is not given the inline code class', () => {
     const tree = render('`inline` and\n\n```\nblock\n```')
     const [inline, block] = elements(tree, 'code')

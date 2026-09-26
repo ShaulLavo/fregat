@@ -3,7 +3,7 @@ import { isDirectoryEntry, isFileEntry } from '@/lib/file-system-types'
 import { isImageName } from '@/lib/file-preview/utils/preview'
 
 /** A folder previews this many of its children, from the listing already cached. */
-export const PREVIEW_CHILDREN = 12
+export const PREVIEW_CHILDREN = 100
 
 export type PreviewKind = 'image' | 'text' | 'folder' | 'none'
 

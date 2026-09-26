@@ -3,13 +3,14 @@
 ## Status and authorization
 
 - Status: RESEARCH DONE 2026-09-26 — recommendation: one parser, `tree-sitter-md` (a custom
-  tree-sitter block grammar and a Rust inline resolver in one wasm module, its own repository),
+  tree-sitter block grammar and an inline resolver in one wasm module, its own repository),
   behind live preview, colours, folds and fence injections; remark stays in chat. It passes 672/676
   spec examples (lezer 662), has no real mismatch on our corpus (lezer about 20), and keystrokes at
   1 MB cost 0.49 ms median, 1.0 ms p95 (lezer 0.59 and 3.0 ms in the same runs). See
   [Custom grammar + Rust resolver spike](#custom-grammar--rust-resolver-spike). The lezer
   findings below stand as the benchmark it was measured against. Adopted by the owner 2026-09-26
-  (question 1 (d)); the phases below are scheduled in the waves.
+  (question 1 (d)); the phases below are scheduled in the waves. The spike's resolver is Rust; the
+  release's is C (owner, 2026-09-26; Phase 0).
   Calibrated 2026-09-26 ([tree-sitter-calibration.md](../docs/markdown-parser/tree-sitter-calibration.md)):
   the 42 ms tree-sitter keystroke was the first reparse of a freshly parsed tree. A careful
   integration of today's grammar costs 2.4 ms at 1 MB.
@@ -32,6 +33,11 @@ it is acceptable. remark stays in chat until a candidate matches it.
 Owner, 2026-09-26: explore a custom tree-sitter grammar with a Rust inline resolver in its own repo
 (`tree-sitter-md` on npm), consumed by the Editor as wasm; it is the preferred shape if it clears
 the bar.
+
+Owner, 2026-09-26: the resolver moves to C. The block grammar is a tree-sitter fork, so its scanner,
+parse tables and runtime are C already; Rust only made sense for a parser written from scratch. One
+language and one clang toolchain build the whole module, and the inline pass is vendored from the
+CommonMark reference implementation (`commonmark/cmark`).
 
 ## What exists today
 
@@ -78,7 +84,7 @@ the bar.
 | tree-sitter-markdown with a grown scanner | Fork or upstream the C external scanner                                                                             | Parser work in C against the spec examples                                |
 | A Rust parser compiled to wasm            | `pulldown-cmark`, `comrak`, `markdown-rs`                                                                           | None is incremental; a wasm load before the first parse                   |
 | `@lezer/markdown`, forked if needed       | Hand-written TypeScript that emits Lezer trees and reuses old tree fragments when it reparses; ships GFM extensions | Does not validate link references; a second tree format                   |
-| `tree-sitter-md` (owner direction)        | Custom block grammar + Rust inline resolver in one wasm module, own repository                                      | Its own tree-sitter runtime; 193 KB gzip                                  |
+| `tree-sitter-md` (owner direction)        | Custom block grammar + C inline resolver in one wasm module, own repository                                         | Its own tree-sitter runtime; 193 KB gzip                                  |
 | micromark (remark)                        | Today's chat parser, the baseline                                                                                   | One-shot parse; the editor would reparse the whole document per keystroke |
 
 ## Findings
@@ -181,7 +187,8 @@ reference links whose label has no definition, which neither tree-sitter nor lez
 Measured 2026-09-26 in [ShaulLavo/tree-sitter-md](https://github.com/ShaulLavo/tree-sitter-md)
 `b962319` (`/work/projects/tree-sitter-md`; findings in its `docs/FINDINGS.md`, method and rows
 in [measurements](../docs/markdown-parser/measurements.md#tree-sitter-md-custom-grammar--rust-resolver)).
-It clears every bar.
+It clears every bar. The resolver measured here is Rust on pulldown-cmark; Phase 0 rewrites it in
+C and must match these numbers.
 
 - **Shape.** A fork of tree-sitter-markdown v0.5.3's block grammar with one token per line (556
   parse states against 925), and a Rust pass that runs each leaf block (paragraph, heading
@@ -230,8 +237,8 @@ It clears every bar.
   the requested rows, so a keystroke resolves one paragraph.
 - **Not done in the spike.** pulldown-cmark runs its whole pipeline per leaf, with continuation
   lines re-indented by four virtual spaces so it cannot start a block the grammar ruled out;
-  production vendors its inline pass with a leaf entry point. No footnotes, math or CJK flanking
-  (chat features). No license chosen. Not published: `npm publish` needs an npm login with
+  Phase 0 replaces it with cmark's inline pass in C behind a leaf entry point. No footnotes, math
+  or CJK flanking (chat features). No license chosen. Not published: `npm publish` needs an npm login with
   rights to the free `tree-sitter-md` name (and 2FA if the account has it), a license, and the
   wasm built before `npm pack`.
 
@@ -254,17 +261,28 @@ Decided 2026-09-26: research recommendation — the document lives on the main t
 worker: a keystroke costs 0.49 ms median and 1.0 ms p95 at 1 MB, the first frame needs a
 main-thread instance anyway, and one instance avoids parsing twice. The combined inline injection
 is closed (finding 6). A Rust parser alone stays closed (none is
-incremental; comrak's AST crossing costs more than a JavaScript parse); a Rust inline pass behind
-an incremental block grammar, per leaf and cached, is the shape that works.
+incremental; comrak's AST crossing costs more than a JavaScript parse); an inline pass behind
+an incremental block grammar, per leaf and cached, is the shape that works (Rust in the spike, C
+from Phase 0).
 
 ## Proposed phases
 
-0. **tree-sitter-md to a release** (M; repository `ShaulLavo/tree-sitter-md`). Vendor
-   pulldown-cmark's inline pass with a one-leaf entry point and delete the virtual-indent
-   workaround; fix the four spec failures and add a frontmatter switch; cargo tests, the spec floor
-   (672/676), the corpus check and the fuzz test in CI with a wasm build job; publish 0.1 to npm
-   (MIT, chosen 2026-09-26; publishing needs the owner's `npm login`). Keep the MIT notices for tree-sitter-markdown, pulldown-cmark, markdown-rs
-   and tree-sitter.
+0. **tree-sitter-md to a release** (M; repository `ShaulLavo/tree-sitter-md`). First a C resolver
+   spike on a branch: replace the Rust crate with C that builds on `commonmark/cmark` 0.31.2's
+   inline parser (`inlines.c` and what it needs; BSD-2) through a one-leaf entry point, with GFM
+   strikethrough and autolink literals ported from `github/cmark-gfm`'s extensions (BSD-2; its own
+   core follows spec 0.29, so only the extensions come from it). The per-leaf cache, label-based
+   definition invalidation and the record, highlight, fold and injection outputs move to C; the JS
+   API stays, and the virtual-indent workaround goes with pulldown-cmark. clang builds grammar,
+   scanner, runtime and resolver for `wasm32`. The spike merges only if it holds the Rust build's
+   numbers: 672/676 spec examples or better, 0 real corpus mismatches, fuzz clean, and keystroke
+   median and p95 at 1 MB no slower than the Rust build in the same runs (0.49 and 1.0 ms at the
+   spike); size and memory reported. It also answers whether grammar and resolver can load as one web-tree-sitter side
+   module sharing the Editor's runtime (Plan 189 Pass 2 acts on the answer).
+   Then: fix the four spec failures and add a frontmatter switch; C tests, the spec floor, the corpus check and
+   the fuzz test in CI with a wasm build job; publish 0.1 to npm (MIT, chosen 2026-09-26;
+   publishing needs the owner's `npm login`). Notices: tree-sitter-markdown, tree-sitter, cmark
+   and cmark-gfm; pulldown-cmark's and markdown-rs's leave with their code.
 1. **Markdown document in `@singapore-editor/markdown`** (M; Editor `packages/markdown`). Depend
    on `tree-sitter-md`; one `MarkdownDocument` per open markdown file on the main thread, edited
    inside the edit operation; `setText` parses a 60-row prefix and appends the rest in idle time
@@ -286,6 +304,10 @@ an incremental block grammar, per leaf and cached, is the shape that works.
    worker repairs from the calibration that still apply to fence layers: discover injections from
    changed ranges plus the edit, bound each input read to its range, one idle reparse after a
    full parse.
+   The worker repairs landed 2026-09-26 in wave 2, lane E1 ([singapore#43](https://github.com/ShaulLavo/singapore/pull/43),
+   in `editor-ref` `db3e1bd`): injections found from changed ranges plus the edit, bounded input
+   reads, one idle reparse after a full parse, and the cap refilled after deletes. Worker bench at
+   1 MB: keystroke median 37 → 10 ms, first keystroke 82 → 20 ms. This phase keeps the rest.
 
 Chat: no phase while question 2 stands at (a).
 

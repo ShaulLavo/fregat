@@ -60,6 +60,11 @@ runs 2–4); log numbers are production client events, 2026-09-20 to 26. Method 
   - Palette `@` symbols and the breadcrumbs store different shapes under one query key (found by
     reading the code, not reproduced).
   - `editor.command.select_file` logs its target as `[circular]`.
+  - Fixed 2026-09-26 (wave 2 lane B), the four above: a file opened from the chat git pane
+    reuses the pane's whitespace-counted turn diff; `POST /fs/workspace-address` is a query per
+    folder (addresses are permanent per canonical path); the symbol key carries its shape (`flat`
+    or `tree`); the log sanitizer marks only a real cycle `[circular]` (a value two fields share
+    was the `select_file` case).
   - `SIDEBAR_SESSION_DETAIL_PREWARM_LIMIT` has no reader.
   - `presentationReady` in `diff-pane.tsx` gates a snapshot the diff never has.
 
@@ -222,7 +227,7 @@ The cap keeps a held arrow key from flooding: a guess is skipped while four are 
    a master switch adds a dependency the settings page cannot show, for a saving of two clicks.
    Decided 2026-09-26: owner — (c), and the settings page learns to show the dependency: a
    `dependsOn` field in the registry renders child keys indented and disabled while the parent is
-   off ([Plan 167](167-settings-and-copy.md) Part D). The master switch is `prefetch.enabled`.
+   off (Plan 167 Part D, done). The master switch is `prefetch.enabled`.
 
 ## Verification
 

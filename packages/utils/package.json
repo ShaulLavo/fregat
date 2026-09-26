@@ -14,6 +14,7 @@
     "./keyboard": "./src/keyboard.ts",
     "./compare": "./src/compare.ts",
     "./strings": "./src/strings.ts",
+    "./copy": "./src/copy.ts",
     "./token-match": "./src/token-match.ts",
     "./json": "./src/json.ts",
     "./slash-paths": "./src/slash-paths.ts"

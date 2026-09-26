@@ -1,6 +1,7 @@
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 
+import { LocationIcon } from '@/features/file-picker/components/location-icon'
 import {
   SIDEBAR_NAV_BUTTON_BASE_CLASS,
   SIDEBAR_NAV_BUTTON_IDLE_CLASS,
@@ -18,7 +19,6 @@ export function LocationButton({
 }) {
   const { jumpTo } = useFilePickerSessionActions()
   const selected = currentPath === location.path
-  const Icon = selected && 'openIcon' in location ? location.openIcon : location.icon
 
   return (
     <Button
@@ -33,13 +33,7 @@ export function LocationButton({
       type='button'
       variant='ghost'
     >
-      <Icon
-        className={cn(
-          'size-(--icon-size) shrink-0',
-          selected ? 'text-info' : 'text-muted-foreground',
-        )}
-        weight='duotone'
-      />
+      <LocationIcon location={location} selected={selected} />
       <span className='truncate'>{location.label}</span>
     </Button>
   )
