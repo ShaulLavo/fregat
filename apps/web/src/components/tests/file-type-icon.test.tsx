@@ -56,3 +56,16 @@ test('the icon takes its hue as a class, with no inline colour', () => {
   expect(svg.getAttribute('class')).toContain('text-file-icon-blue')
   expect(svg.getAttribute('style')).toBeNull()
 })
+
+test('a Catppuccin icon paints its own colours through the hue tokens', () => {
+  const { container } = renderWithProviders(
+    <FileTypeIcon icon={iconForEntry({ name: 'Main.java', type: 'file' })} />,
+  )
+  const styles = Array.from(container.querySelectorAll('path'), (path) =>
+    path.getAttribute('style'),
+  )
+
+  expect(styles).toContain('stroke:var(--file-icon-red)')
+  expect(styles).toContain('stroke:var(--file-icon-neutral)')
+  expect(container.innerHTML).not.toMatch(/#[0-9a-f]{6}/iu)
+})

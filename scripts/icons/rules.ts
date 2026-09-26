@@ -269,3 +269,86 @@ export const PACK_EXTENSIONS_THAT_ARE_FILE_NAMES = new Set([
   'CONTRIBUTORS',
   'CHANGELOG',
 ])
+
+/**
+ * Catppuccin Macchiato colours as the icons carry them, mapped onto our hues so light and dark each
+ * take their own values. `neutral` is Catppuccin's text colour: the line work of most glyphs.
+ */
+export const CATPPUCCIN_HUES: Readonly<Record<string, IconHue | 'neutral'>> = {
+  '#cad3f5': 'neutral',
+  '#8087a2': 'gray',
+  '#ed8796': 'red',
+  '#ee99a0': 'red',
+  '#f5a97f': 'orange',
+  '#eed49f': 'yellow',
+  '#a6da95': 'green',
+  '#8bd5ca': 'mint',
+  '#91d7e3': 'cyan',
+  '#7dc4e4': 'cyan',
+  '#8aadf4': 'blue',
+  '#b7bdf8': 'indigo',
+  '#c6a0f6': 'purple',
+  '#f5bde6': 'pink',
+  '#f0c6c6': 'pink',
+  '#f4dbd6': 'pink',
+}
+
+export type CatppuccinRule = Omit<IconRule, 'glyph' | 'backHue'> & {
+  /** The icon's name in `@iconify-json/catppuccin`. */
+  readonly icon: string
+}
+
+/**
+ * Types the pack has no glyph for (owner, Plan 180 Q3): Catppuccin's icons (MIT) in their own
+ * colours. `hue` is the glyph's accent, for listings; the glyph paints its own colours.
+ */
+export const CATPPUCCIN_RULES: Readonly<Record<string, CatppuccinRule>> = {
+  audio: {
+    icon: 'audio',
+    hue: 'red',
+    extensions: ['.mp3', '.wav', '.aac', '.flac', '.ogg', '.oga', '.opus', '.m4a', '.aiff'],
+  },
+  video: {
+    icon: 'video',
+    hue: 'cyan',
+    extensions: ['.mp4', '.mov', '.webm', '.mkv', '.avi', '.m4v', '.ogv'],
+  },
+  pdf: { icon: 'pdf', hue: 'red', extensions: ['.pdf'] },
+  java: { icon: 'java', hue: 'red', extensions: ['.java'] },
+  kotlin: { icon: 'kotlin', hue: 'purple', extensions: ['.kt', '.kts'] },
+  scala: { icon: 'scala', hue: 'red', extensions: ['.scala', '.sc'] },
+  groovy: { icon: 'groovy', hue: 'cyan', extensions: ['.groovy', '.gvy'] },
+  php: { icon: 'php', hue: 'blue', extensions: ['.php'] },
+  lua: { icon: 'lua', hue: 'blue', extensions: ['.lua'] },
+  latex: { icon: 'latex', hue: 'gray', extensions: ['.tex', '.sty', '.cls', '.bib'] },
+  dart: { icon: 'dart', hue: 'cyan', extensions: ['.dart'] },
+  r: { icon: 'r', hue: 'blue', extensions: ['.r'] },
+  julia: { icon: 'julia', hue: 'purple', extensions: ['.jl'] },
+  perl: { icon: 'perl', hue: 'blue', extensions: ['.pl', '.pm'] },
+  clojure: { icon: 'clojure', hue: 'green', extensions: ['.clj', '.cljs', '.cljc', '.edn'] },
+  elixir: { icon: 'elixir', hue: 'purple', extensions: ['.ex', '.exs'] },
+  haskell: { icon: 'haskell', hue: 'purple', extensions: ['.hs', '.lhs'] },
+  erlang: { icon: 'erlang', hue: 'red', extensions: ['.erl', '.hrl'] },
+  fsharp: { icon: 'fsharp', hue: 'blue', extensions: ['.fs', '.fsx', '.fsi'] },
+  makefile: {
+    icon: 'makefile',
+    hue: 'orange',
+    fileNames: ['makefile', 'gnumakefile'],
+    extensions: ['.mk'],
+  },
+  cmake: { icon: 'cmake', hue: 'green', fileNames: ['cmakelists.txt'], extensions: ['.cmake'] },
+  proto: { icon: 'proto', hue: 'blue', extensions: ['.proto'] },
+  bazel: {
+    icon: 'bazel',
+    hue: 'green',
+    fileNames: ['build.bazel', 'workspace', 'workspace.bazel', 'module.bazel', '.bazelrc'],
+    extensions: ['.bzl', '.bazel'],
+  },
+  shader: {
+    icon: 'shader',
+    hue: 'purple',
+    extensions: ['.glsl', '.hlsl', '.wgsl', '.vert', '.frag', '.shader'],
+  },
+  certificate: { icon: 'certificate', hue: 'red', extensions: ['.pem', '.crt', '.cer'] },
+  key: { icon: 'key', hue: 'gray', extensions: ['.key'] },
+}

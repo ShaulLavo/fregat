@@ -6,7 +6,7 @@ import { writeUserOperations } from '../preserve-settings'
 import { chords, openFileByName, openGitPanel, selectors } from '../selectors'
 import type { Scenario } from './index'
 
-/** One file per hue and per two-hue icon, plus the aliases and pack maps the rules added. */
+/** One file per hue and two-hue icon, the aliases and pack maps, and the Catppuccin types. */
 const FILES = [
   'app.ts',
   'view.tsx',
@@ -36,6 +36,16 @@ const FILES = [
   'go.mod',
   'lib.rs',
   'build.zig',
+  'Main.java',
+  'app.kt',
+  'song.mp3',
+  'clip.mp4',
+  'paper.pdf',
+  'Makefile',
+  'index.php',
+  'init.lua',
+  'paper.tex',
+  'server.pem',
 ] as const
 
 /**
