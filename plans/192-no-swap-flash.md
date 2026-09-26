@@ -31,8 +31,8 @@ subjects and reads `blank-frames-0`, like `quick-open-no-flicker`.
 | --- | ------------------------------------------------------------------------------------------------------------ | ---------------------------- | ---------------------------------------- | ------------- |
 | 1   | `features/file-picker/components/preview.tsx`                                                                | picker selection             | tile/skeleton under new name             | **fixed**     |
 | 2   | `features/command-palette/components/file-preview-panel.tsx`, `lib/file-preview/components/text-preview.tsx` | quick-open highlight         | panel blanks and collapses               | **fixed**     |
-| 3   | `features/command-palette/components/code-theme-preview-panel.tsx`, `lib/code-theme/hooks/use-preview.ts`    | palette theme arrow          | new label over skeleton                  | confirmed     |
-| 4   | `features/theme-studio/components/code-tab.tsx`                                                              | theme studio list            | skeleton                                 | confirmed     |
+| 3   | `features/command-palette/components/code-theme-preview-panel.tsx`, `lib/code-theme/hooks/use-preview.ts`    | palette theme arrow          | new label over skeleton                  | **fixed**     |
+| 4   | `features/theme-studio/components/code-tab.tsx`                                                              | theme studio list            | skeleton                                 | **fixed**     |
 | 5   | `features/git/components/history.tsx` (`key={selected}`), `commit-details.tsx`, `utils/history-query.ts`     | commit selection             | new hash over skeleton                   | confirmed     |
 | 6   | `features/git/utils/history-query.ts`, `HistoryList key`                                                     | ref switch                   | skeleton, scroll lost (deliberate today) | confirmed     |
 | 7   | `features/git/components/panel.tsx` (`History key={rootPath}`)                                               | root switch                  | remount + skeleton                       | likely        |
@@ -72,3 +72,26 @@ cover successful, binary and missing-file reads.
 
 - Before: `/work/tmp/fregat-evidence/20260926T184042Z-scenario-quick-open-no-flicker/`
 - After: `/work/tmp/fregat-evidence/20260926T184641Z-scenario-quick-open-no-flicker/`
+
+## Rows 3 and 4 proof
+
+The shared `useCodeThemePreview` holds its theme ID with `useHeldUntilReady`; a passive query
+observer reads that subject's highlighted tokens. Both headers and bodies render the held subject,
+and the selected theme's query drives a header Spinner. Theme Studio now names its sample in a
+`ToolPane` header. Pending first loads and errors retain their existing states.
+
+The `palette-theme-no-flicker` and `studio-theme-no-flicker` scenarios arrow through three cold
+themes with a 500ms module delay. `countBlankFrames` measured **13 → 0** in the palette and
+**62 → 0** in the studio. Both final runs also sampled zero header/body mismatches and checked
+that each replacement painted. Four hook tests cover first load, cold replacement, failure and
+recovery, and a superseded highlight completing after a return to cached content.
+
+Evidence, screenshots read back, on the worker's Vite port 5248 with throwaway API homes:
+
+- Palette before: `/work/tmp/fregat-evidence/20260926T184106Z-scenario-palette-theme-no-flicker/`.
+- Palette after: `/work/tmp/fregat-evidence/20260926T184750Z-scenario-palette-theme-no-flicker/`.
+- Studio before: `/work/tmp/fregat-evidence/20260926T184127Z-scenario-studio-theme-no-flicker/`.
+- Studio after: `/work/tmp/fregat-evidence/20260926T184803Z-scenario-studio-theme-no-flicker/`.
+
+The baseline's linked font files were blocked by the worktree Vite allow-list; the final runs
+allowed the dependency directory and had no failed requests or error logs. No model was invoked.
