@@ -9,6 +9,12 @@
 - Phase 1's two keymap fixes landed 2026-09-26 (wave 2, lane S): an override keeps every default
   (pane, `editorWhen`) template of its command, and the recorder keeps Control and Meta apart
   (`recordedStroke(event, platform)`; the TUI records as Linux).
+- Phases 1–6 landed 2026-09-26 (wave 2, lane S): the row model (`features/settings/utils/shortcut-rows.ts`),
+  browser-kept table (`client-core/commands/browser-kept.ts`), `/dev/shortcuts`, the desktop page,
+  recording popover, narrow layout, the resolution report behind Copy resolution report, settings
+  search that brings matching shortcuts (Q2 (b)), and scenario `settings-keybindings`. Phase 7 is
+  next. Left from these phases: the command-title case sweep (smaller findings) and the iPhone
+  check (owner).
 - Priority: P2 in the UI refresh lane. The owner asked for it on 2026-09-25: research how VS Code
   does it, make it work on a phone, and redo it.
 - Effort: M overall. Phase 1 fixes two live keymap bugs. Phase 7 (several shortcuts per command,

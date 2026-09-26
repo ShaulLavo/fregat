@@ -40,17 +40,17 @@ export function useWallpaperActions() {
     },
     owner,
   )
-  const importDirectory = useMutation(
+  const install = useMutation(
     {
       ...defaults,
-      mutationKey: wallpaperMutationKeys.import,
-      mutationFn: async () => {
-        const response = await client.themes.wallpapers['import-directory'].post({})
+      mutationKey: wallpaperMutationKeys.install,
+      mutationFn: async (id: AssetId) => {
+        const response = await client.themes.wallpapers.catalog({ id }).post()
         if (response.error) throw createRpcError(response.error)
         return response.data
       },
     },
     owner,
   )
-  return { upload, remove, importDirectory }
+  return { upload, remove, install }
 }

@@ -13,6 +13,7 @@ import {
 } from '@singapore-editor/tree-sitter'
 import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '@singapore-editor/tree-sitter-languages'
 
+import { workspacePreloadLanguages } from '@/features/editor/state/language-census'
 import {
   activeEditorThemeUsesShiki,
   activeShikiThemeId,
@@ -23,7 +24,6 @@ import {
 import { editorPerformanceFeatureDisabled } from '@/features/editor/state/performance-trace'
 import {
   EDITOR_SHIKI_LANGUAGE_MAP,
-  EDITOR_SHIKI_PRELOAD_LANGUAGES,
   resolveShikiLanguageRegistrations,
 } from '@/features/editor/utils/shiki-languages'
 import { isBuiltinEditorThemeId } from '@/lib/code-theme/utils/catalog'
@@ -86,7 +86,7 @@ export function editorShikiHighlighterProvider(): EditorHighlighterProvider {
 
   shikiHighlighterProvider = createShikiHighlighterProvider({
     languages: EDITOR_SHIKI_LANGUAGE_MAP,
-    preloadLanguages: EDITOR_SHIKI_PRELOAD_LANGUAGES,
+    preloadLanguages: workspacePreloadLanguages,
     onThemeChanged: subscribeActiveShikiTheme,
     resolveLanguage: resolveShikiLanguageRegistrations,
     resolveTheme: resolveEditorShikiThemeRegistration,

@@ -1,15 +1,9 @@
-import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import { Elysia, t } from 'elysia'
 import { observeRequestOperation } from '../../observability'
 import { wallpaperColors } from './colors'
 import { wallpaperErrors } from './structured-errors'
-import {
-  displayName,
-  OMARCHY_THEMES_DIRECTORY,
-  parseAssetId,
-  type WallpaperLibrary,
-} from './library'
+import { OMARCHY_THEMES_DIRECTORY, parseAssetId, type WallpaperLibrary } from './library'
 
 export function wallpaperLibraryRoutes(library: WallpaperLibrary) {
   return new Elysia({ name: 'wallpaper-library' }).group('/themes/wallpapers', (app) =>
@@ -17,13 +11,10 @@ export function wallpaperLibraryRoutes(library: WallpaperLibrary) {
       .get('', () =>
         observeRequestOperation(
           { area: 'wallpaper', operation: 'library.list', sourceKind: 'library' },
-          async () => ({
-            assets: await library.list(),
-            omarchyAvailable: await stat(OMARCHY_THEMES_DIRECTORY).then(
-              (entry) => entry.isDirectory(),
-              () => false,
-            ),
-          }),
+          async () => {
+            const assets = await library.list()
+            return { assets, catalog: library.catalog(assets) }
+          },
         ),
       )
       .post(
@@ -44,6 +35,18 @@ export function wallpaperLibraryRoutes(library: WallpaperLibrary) {
             () => library.importDirectory(body.path ?? OMARCHY_THEMES_DIRECTORY),
           ),
         { body: t.Object({ path: t.Optional(t.String()) }) },
+      )
+      .post('/catalog/:id', ({ params }) =>
+        observeRequestOperation(
+          {
+            area: 'wallpaper',
+            operation: 'library.catalog-install',
+            sourceKind: 'library',
+            assetId: params.id,
+          },
+          () => library.installCatalog(parseAssetId(params.id)),
+          (asset) => ({ assetId: asset.id }),
+        ),
       )
       .get('/:id/asset', ({ params }) => media(library, params.id, 'asset'))
       .get('/:id/display', ({ params }) => media(library, params.id, 'display'))
@@ -82,12 +85,11 @@ function media(library: WallpaperLibrary, input: string, kind: MediaKind) {
     { area: 'wallpaper', operation: `library.${kind}`, sourceKind: 'library', assetId: id },
     async () => {
       const asset = await library.read(id)
-      const names = {
-        asset: `${id}.${asset.extension}`,
-        display: displayName(id),
-        thumbnail: asset.thumbnail,
-      }
-      const file = Bun.file(path.join(await library.assetDirectory(id), names[kind]))
+      const file = Bun.file(
+        kind === 'asset'
+          ? path.join(await library.assetDirectory(id), `${id}.${asset.extension}`)
+          : await library.rendition(id, kind),
+      )
       if (!(await file.exists()))
         throw wallpaperErrors.NOT_FOUND({ internal: { at: 'serve', asset: id, kind } })
       return new Response(file, {
