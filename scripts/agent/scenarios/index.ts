@@ -93,6 +93,7 @@ import { chatComposerInsert } from './chat-composer-insert'
 import { chatDisclosureSettle } from './chat-disclosure-settle'
 import { chatTurnAnatomy } from './chat-turn-anatomy'
 import { chatSleepingSession } from './chat-sleeping-session'
+import { chatAgentReview } from './chat-agent-review'
 import { fileTreeHoverPrefetch } from './file-tree-hover-prefetch'
 import { prefetchChatSwitch } from './prefetch-chat-switch'
 import { prefetchFirstPaint } from './prefetch-first-paint'
@@ -525,6 +526,7 @@ export const scenarios: readonly Scenario[] = [
   chatDisclosureSettle,
   chatTurnAnatomy,
   chatSleepingSession,
+  chatAgentReview,
   fileTreeHoverPrefetch,
   prefetchFirstPaint,
   prefetchChatSwitch,
