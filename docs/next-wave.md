@@ -41,11 +41,10 @@ merge, and a day of rebasing. Wave 2 keeps the lanes and changes how work lands.
 
 ## Owner decisions still open before or during the wave
 
-| Plan | Question                                                          | Blocks                     |
-| ---- | ----------------------------------------------------------------- | -------------------------- |
-| 176  | Parser behind live preview (lezer recommended); chat parser after | 176 P1–P4, 108 P2 (wave 3) |
-| —    | Merge cadence and lane count below                                | Starting the wave          |
-| —    | Project LICENSE                                                   | Nothing scheduled          |
+| Plan | Question                           | Blocks            |
+| ---- | ---------------------------------- | ----------------- |
+| —    | Merge cadence and lane count below | Starting the wave |
+| —    | Project LICENSE                    | Nothing scheduled |
 
 ## Lane protocol
 
@@ -93,10 +92,10 @@ Platform's `features/editor/**`.
    editor skips caret measuring on open and reads padding once (helps every editor).
 2. 170 Editor fix (owner: first): sessions send their grammar once, edits send none, worker dedupes.
 3. 179 P1: occurrence-highlight `<style>` churn.
-4. 176 P0 (now M): table cells parsed, the 255-paragraph cap gone, injection child-node rule, and
-   the worker fixes from the calibration: re-find paragraphs only where the edit reaches (today 12 ms
-   per keystroke at 46 KB, 34–77 ms at 1 MB), stop reads at each range end, one idle reparse after a
-   full parse; long-doc scenario. Branch `research/176b` holds the measurements.
+4. The tree-sitter worker fixes from the calibration, for the fence and other injection layers:
+   discover injections from changed ranges plus the edit (today every paragraph re-parses per
+   keystroke: 12 ms at 46 KB, 34–77 ms at 1 MB), bound each input read to its range, one idle
+   reparse after a full parse.
 5. 122 P1–P2: E027 lifecycle ownership; per-event dispatch (quadratic loop, double pass).
 6. E057: delete the SAB transport.
 7. 122 P3–P5: `createPlugin` (one public API, owner), E026 commands, E028 modal (keys split by
@@ -163,6 +162,13 @@ dependency manifests, `vite.config.ts`.
 
 ### Tier 2 (start as tier 1 lanes finish)
 
+**MD — tree-sitter-md · port 5234 · Tier 1 if a slot is free, else first in Tier 2.** Owns the
+`ShaulLavo/tree-sitter-md` repo and Editor `packages/markdown`. Plan 176 (owner adopted 2026-09-26):
+P0 release (vendored inline pass, the four spec failures, frontmatter switch, CI, npm publish once
+the owner logs in), P1 the markdown document on the main thread, P2 live preview from records (needs
+E2's 111 P1 `trigger: 'edit'`), P3 colours, folds and injections from the same document, deleting the
+two old markdown grammars and the 256-layer cap path.
+
 **D — documents and large files · port 5229.** 099 units 0–1 (harness extension first), then 112
 P2–P4 (raw-byte transport, thresholds after the minimap fold fix, tiers).
 
@@ -177,8 +183,7 @@ checks are owner checks.
 
 ## Wave 3 (what wave 2 unblocks)
 
-171 composer (if E2 did not reach it); 111 P4–P5 → 108 P2–P3; 176 P1–P4 after the owner's
-decision; 122 P6–P9 and E025; 088 after 087; 178 drag-and-drop and cleanup;
+171 composer (if E2 did not reach it); 111 P4–P5 → 108 P2–P3; 122 P6–P9 and E025; 088 after 087; 178 drag-and-drop and cleanup;
 143 P5–P6 and 155 (after 143); 156 P3–P5; 126 batches G (four drivers), H (pairing, balancing),
 I (PR review workspace); 177 P3 if it slipped.
 
