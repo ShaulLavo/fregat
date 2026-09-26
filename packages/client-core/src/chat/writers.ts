@@ -438,6 +438,11 @@ function applyFreshSessionEvent(
       return writeCreatedSession(state, event)
     case 'session.deleted':
       return removeSessionState(state, event.payload.sessionId)
+    case 'session.lifecycle-restored':
+      return patchSession(state, event.payload.sessionId, {
+        ...event.payload.state,
+        updatedAt: event.payload.updatedAt,
+      })
     case 'session.archived':
       return patchSession(state, event.payload.sessionId, {
         archivedAt: event.payload.archivedAt,

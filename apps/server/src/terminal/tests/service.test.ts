@@ -1,4 +1,5 @@
 import * as v from 'valibot'
+import { terminalHistoryChunks } from '../../db/schema'
 import { mkdir, realpath, rm, symlink } from 'node:fs/promises'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -9,6 +10,7 @@ import {
   parseTerminalServerMessage,
   type TerminalServerMessage,
   worktreeIdSchema,
+  sessionIdSchema,
 } from '@workspace/contracts'
 
 import { createOrchestrationFixture } from '../../../test/factories/orchestration'
@@ -843,6 +845,93 @@ describe('terminal service', () => {
     expect(terminalOutputBytes(reopened.messages)).toHaveLength(0)
   })
 
+  it('does not scan completed agent history again after a service restart', async () => {
+    const root = await fixtureRoot()
+    const fixture = requiredFixture(root)
+    const sessionId = v.parse(sessionIdSchema, '00000000-0000-4000-8000-000000000001')
+    await testService(root).closeSessionTerminals(sessionId)
+    fixture.sqlite.run(
+      "CREATE TRIGGER detect_history_scan BEFORE DELETE ON terminal_history_chunks BEGIN SELECT RAISE(ABORT, 'history scanned again'); END",
+    )
+    fixture.database
+      .insert(terminalHistoryChunks)
+      .values({
+        owner: JSON.stringify(['other-worktree', 'agent', sessionId]),
+        sequence: 1,
+        data: Buffer.from('scan detector'),
+      })
+      .run()
+    try {
+      await expect(testService(root).closeSessionTerminals(sessionId)).resolves.toEqual({
+        closed: 0,
+      })
+    } finally {
+      fixture.sqlite.run('DROP TRIGGER detect_history_scan')
+    }
+  })
+
+  it('refuses an agent terminal whose open was in flight when the session was cleaned up', async () => {
+    const root = await fixtureRoot()
+    const sessionId = v.parse(sessionIdSchema, '00000000-0000-4000-8000-000000000002')
+    const pty = createFakePtyFactory()
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const service = testService(root, {
+      ptyFactory: pty.factory,
+      resolveAgentSession: async () => {
+        entered.resolve()
+        await release.promise
+        return { command: ['agent'], env: {}, release() {}, async reconcile() {} }
+      },
+    })
+    const socket = fakeSocket(root, '', 'agent-racing-delete')
+    const agentSocket = {
+      ...socket,
+      data: { ...socket.data, query: { ...socket.data.query, agentSessionId: sessionId } },
+    }
+    const opening = service.routes(auth()).open(agentSocket)
+    await entered.promise
+    await expect(service.closeSessionTerminals(sessionId)).resolves.toEqual({ closed: 0 })
+    release.resolve()
+    await opening
+    expect(pty.ptys).toHaveLength(0)
+    expect(agentSocket.closeDetails).toEqual({ code: 1008, reason: 'session-deleted' })
+  })
+
+  it('refuses unconfirmed agent cleanup and preserves history until retry succeeds', async () => {
+    const root = await fixtureRoot()
+    const fixture = requiredFixture(root)
+    const sessionId = v.parse(sessionIdSchema, '00000000-0000-4000-8000-000000000001')
+    const pty = createFakePtyFactory()
+    let failReconcile = true
+    const service = testService(root, {
+      ptyFactory: pty.factory,
+      resolveAgentSession: async () => ({
+        command: ['agent'],
+        env: {},
+        release() {},
+        async reconcile() {
+          if (failReconcile) throw new Error('reconciliation failed')
+        },
+      }),
+    })
+    const socket = fakeSocket(root, '', 'agent-cleanup')
+    const agentSocket = {
+      ...socket,
+      data: { ...socket.data, query: { ...socket.data.query, agentSessionId: sessionId } },
+    }
+    await service.routes(auth()).open(agentSocket)
+    expect(pty.ptys).toHaveLength(1)
+    pty.ptys[0]!.emit(Buffer.from('retained agent output'))
+    await expect(service.closeSessionTerminals(sessionId)).rejects.toMatchObject({
+      code: 'terminal.CLEANUP_UNCONFIRMED',
+    })
+    expect(fixture.database.select().from(terminalHistoryChunks).all()).not.toHaveLength(0)
+    failReconcile = false
+    await expect(service.closeSessionTerminals(sessionId)).resolves.toEqual({ closed: 1 })
+    expect(fixture.database.select().from(terminalHistoryChunks).all()).toHaveLength(0)
+  })
+
   it('restarts only the selected shell, preserves viewers and dimensions, and removes old replay', async () => {
     const root = await fixtureRoot()
     const pty = createFakePtyFactory()
@@ -962,6 +1051,7 @@ function testService(
     paths?: WorkspacePaths
     processPollMs?: number
     ptyFactory?: TerminalPtyFactory
+    resolveAgentSession?: import('../agent-launch').AgentTerminalResolver
     lifecycle?: import('../lease').TerminalLeaseBoundary
   } = {},
 ) {

@@ -1,3 +1,5 @@
+import { connectionRefusalRetention } from './connection-refusal-retention'
+import { cachedProtocolStartup } from './cached-protocol-startup'
 import { editorLspTabSwitch } from './editor-lsp-tab-switch'
 import { editorLspServerExit } from './editor-lsp-server-exit'
 import { editorTypography } from './editor-typography'
@@ -16,6 +18,7 @@ import { sessionOrdering } from './session-ordering'
 import { backgroundLiveness } from './background-liveness'
 import { spinnerPalette } from './spinner-palette'
 import { sessionLifecycle } from './session-lifecycle'
+import { sessionUndo } from './session-undo'
 import { asyncQuestions } from './async-questions'
 import { projectGrouping } from './project-grouping'
 import { sessionSearch, sessionSearchEnvironments } from './session-search'
@@ -82,9 +85,12 @@ import { chatModelPicker } from './chat-model-picker'
 import { chatUsageMeter } from './chat-usage-meter'
 import { chatComposerNarrow } from './chat-composer-narrow'
 import { settingsUsage } from './settings-usage'
+import { pushSubscribe } from './push-subscribe'
+import { pushSessionNotice } from './push-session-notice'
 import { chatClaudeCatalog } from './chat-claude-catalog'
 import { chatDraftContextStrip } from './chat-draft-context-strip'
 import { machineConnectError } from './machine-connect-error'
+import { machineProtocolMismatch } from './machine-protocol-mismatch'
 import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalBackground } from './terminal-background'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
@@ -166,6 +172,8 @@ export type Scenario = {
   readonly surface?: 'site' | 'demo'
   /** Only reads, so it may run against production (`--url …/platform/`). */
   readonly readOnly?: boolean
+  /** Runs full Chromium with notification permission granted; the headless shell denies it. */
+  readonly notifications?: boolean
   readonly name: string
   readonly description: string
   readonly run: (page: Page, context: ScenarioContext) => Promise<void>
@@ -207,6 +215,7 @@ import { sessionBranchDrift } from './session-branch-drift'
 import { sessionPullRequestStart } from './session-pull-request-start'
 import { worktreeCleanupOnDelete } from './worktree-cleanup-on-delete'
 import { sessionPullRequestSync } from './session-pull-request-sync'
+import { sessionPullRequestBadge } from './session-pull-request-badge'
 import { sessionAutoSettle } from './session-auto-settle'
 import { gitMergeRequest } from './git-merge-request'
 import { gitClonePublish } from './git-clone-publish'
@@ -235,6 +244,9 @@ export const scenarios: readonly Scenario[] = [
   sessionSearchEnvironments,
   projectGrouping,
   sessionLifecycle,
+  sessionUndo,
+  cachedProtocolStartup,
+  connectionRefusalRetention,
   sessionNavigation,
   sessionOrdering,
   sessionTitles,
@@ -276,9 +288,12 @@ export const scenarios: readonly Scenario[] = [
   chatUsageMeter,
   chatComposerNarrow,
   settingsUsage,
+  pushSubscribe,
+  pushSessionNotice,
   chatClaudeCatalog,
   chatDraftContextStrip,
   machineConnectError,
+  machineProtocolMismatch,
   wallpaperIconHints,
   gitChanges,
   logsPanel,
@@ -424,6 +439,7 @@ export const scenarios: readonly Scenario[] = [
   sessionPullRequestStart,
   worktreeCleanupOnDelete,
   sessionPullRequestSync,
+  sessionPullRequestBadge,
   sessionAutoSettle,
   gitMergeRequest,
   gitClonePublish,

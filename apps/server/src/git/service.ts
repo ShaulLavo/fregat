@@ -1642,7 +1642,12 @@ export class GitService {
     args: readonly string[],
     options: GitCommandOptions = {},
   ): Promise<GitCommandResult> {
-    if (isReadOnlyGit(args)) return this.runGit(cwd, args, options)
+    if (isReadOnlyGit(args))
+      return this.runGit(cwd, args, {
+        ...options,
+        // Status refreshes otherwise write the index outside the mutation lane.
+        env: { ...options.env, GIT_OPTIONAL_LOCKS: '0' },
+      })
     const common = await this.commonDirectory(cwd)
     return withGitRepositoryLane(common, async () => {
       try {

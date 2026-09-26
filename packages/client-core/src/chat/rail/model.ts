@@ -1,6 +1,9 @@
-import { sessionRailStatus, type SessionRailStatus } from './status'
 import { effectiveSnoozed } from './snooze'
-import type { HealthDescriptor } from '@workspace/contracts'
+import {
+  sessionRailStatus,
+  type HealthDescriptor,
+  type SessionRailStatus,
+} from '@workspace/contracts'
 import {
   projectGroups,
   type ProjectGroupMember,

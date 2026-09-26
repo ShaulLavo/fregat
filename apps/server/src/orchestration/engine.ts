@@ -38,6 +38,7 @@ import {
   orchestrationCommandSchema,
   type OrchestrationCommand,
   type OrchestrationDispatchResult,
+  type OrchestrationCommandResult,
   type OrchestrationEvent,
   type OrchestrationSessionDetailPageInput,
   commandIdSchema,
@@ -62,6 +63,7 @@ import { requireActionableSourcePlan } from './command-invariants'
 
 import { CheckpointReactor } from './checkpoint-reactor'
 import { isDurableCommandRejection, OrchestrationCommandReceipts } from './command-receipts'
+import { lifecycleResult } from './lifecycle-restore'
 import { decideOrchestrationCommand } from './decider'
 import { OrchestrationEventStore, type OrchestrationDatabase } from './event-store'
 import { OrchestrationProjectionPipeline } from './projection-pipeline'
@@ -209,7 +211,7 @@ export class OrchestrationEngine {
         this.createPullRequestSync(options)
         this.createSettlement(options)
         this.createWorktreeCleanup(options)
-        this.createDeletionReactor()
+        this.createDeletionReactor(options.terminalService)
         this.createDiscoveryReconciler()
       },
       recover: () => this.recover(),
@@ -475,7 +477,7 @@ export class OrchestrationEngine {
   ) {
     verifyReceiptIntent(receipt, type, fingerprint)
     if (receipt.status === 'rejected') throw previouslyRejectedCommandError(receipt)
-    return { deduped: true, sequence: receipt.resultSequence, result: receipt.result }
+    return { deduped: true, sequence: receipt.resultSequence, ...receiptResult(receipt.result) }
   }
 
   private dispatchNow(
@@ -498,13 +500,13 @@ export class OrchestrationEngine {
       reactorCount: committed.published.reactorCount,
       reactorFailures: committed.published.failures,
       sequence: committed.sequence,
-      result: committed.receipt.result,
+      ...receiptResult(committed.receipt.result),
     })
 
     return {
       deduped: false,
       sequence: committed.sequence,
-      result: committed.receipt.result,
+      ...receiptResult(committed.receipt.result),
     }
   }
 
@@ -552,7 +554,11 @@ export class OrchestrationEngine {
       if (command.type === 'session.turn.steer')
         this.providerService?.requireSteeringAvailable(command.sessionId)
       this.requireSourceProposedPlan(command)
-      const pendingEvents = decideOrchestrationCommand(command, this.readModel)
+      const restoreReceipt =
+        command.type === 'session.lifecycle.restore'
+          ? this.receipts.find(command.restoreCommandId)
+          : null
+      const pendingEvents = decideOrchestrationCommand(command, this.readModel, restoreReceipt)
       recordChatPipelineInfo('chat.pipeline.command.decided', {
         ...summary,
         eventCount: pendingEvents.length,
@@ -685,7 +691,7 @@ export class OrchestrationEngine {
       const result =
         command.type === 'project.create' || command.type === 'project.revive'
           ? registrationResult(command, this.readModel)
-          : null
+          : lifecycleResult(command, this.readModel)
       const receipt = receipts.recordAccepted(
         command,
         eventStore.currentSequence(),
@@ -712,8 +718,9 @@ export class OrchestrationEngine {
     })
   }
 
-  private createDeletionReactor() {
+  private createDeletionReactor(terminals: TerminalService | undefined) {
     const reactor = new SessionDeletionReactor({
+      terminals: terminals ?? null,
       attachmentsDir: this.attachmentsDir,
       database: this.database,
       providerService: this.providerService,
@@ -1565,6 +1572,11 @@ function previouslyRejectedCommandError(
     internal: { storedError: receipt.error },
     message: receipt.error ?? undefined,
   })
+}
+
+function receiptResult(result: OrchestrationCommandResult | null) {
+  if (result && 'kind' in result) return { result: null, lifecycle: result }
+  return { result }
 }
 
 /** A pasted URL names its repository; the same number in another one is another pull request. */

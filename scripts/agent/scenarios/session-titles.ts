@@ -10,6 +10,7 @@ import {
   isolatedNativeScenario,
   nativeLog,
   settingsSnapshot,
+  writeRawSetting,
   writeSettings,
 } from './native-provider-verification'
 
@@ -75,16 +76,10 @@ export const sessionTitles = isolatedNativeScenario({
       ok(registration, 'Title project registration returns its identity')
       projectId = registration.projectId
       const worktreeId = registration.worktreeId
-      await writeSettings(page, base, [
-        {
-          kind: 'set',
-          key: 'chat.projectTextGenerationModels',
-          value: {
-            ...before.values['chat.projectTextGenerationModels'],
-            [projectId]: { providerInstanceId, model: 'gpt-5.5' },
-          },
-        },
-      ])
+      await writeRawSetting(page, base, 'chat.projectTextGenerationModels', {
+        ...before.values['chat.projectTextGenerationModels'],
+        [projectId]: { providerInstanceId, model: 'gpt-5.5' },
+      })
       await control('success', title)
       await dispatch(page, orchestration, {
         type: 'session.create',
@@ -168,15 +163,11 @@ export const sessionTitles = isolatedNativeScenario({
         JSON.stringify(overrides) ===
           JSON.stringify(before.values['chat.projectTextGenerationModels'])
       if (projectId) await dispatch(page, orchestration, { type: 'project.delete', projectId })
-      await writeSettings(page, base, [
-        reset
-          ? { kind: 'reset', keys: ['chat.projectTextGenerationModels'] }
-          : {
-              kind: 'set',
-              key: 'chat.projectTextGenerationModels',
-              value: overrides,
-            },
-      ])
+      if (reset)
+        await writeSettings(page, base, [
+          { kind: 'reset', keys: ['chat.projectTextGenerationModels'] },
+        ])
+      else await writeRawSetting(page, base, 'chat.projectTextGenerationModels', overrides)
     }
   },
 })

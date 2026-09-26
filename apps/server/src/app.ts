@@ -81,6 +81,12 @@ import { MachineService, type MachineServiceOptions } from './machines/service'
 import { machineRoutes } from './machines/routes'
 import type { TailnetStatusCommand } from './machines/tailnet-hosts'
 import { createMachineProxyRoutes } from './machines/proxy'
+import type { PushFetcher } from './push/delivery'
+import { pushRoutes } from './push/routes'
+import { PushService } from './push/service'
+import { sessionLink } from './push/session-link'
+import { SessionNoticePush } from './push/session-notices'
+import { ClientPresence } from './orchestration/client-presence'
 
 import type { LogReaderService } from './observability/log-reader'
 
@@ -127,6 +133,7 @@ export type AppOptions = FileSystemServiceOptions & {
   /** The origin forwarded to remote machines as this app's web origin. */
   webOrigin?: string
   web?: WebOptions
+  push?: { fetcher?: PushFetcher }
 }
 
 const appOrchestration = new WeakMap<object, OrchestrationEngine>()
@@ -309,6 +316,17 @@ export function createApp(options: AppOptions) {
   const checkpointDiff = new OrchestrationCheckpointDiffQuery(database, git)
   const sessionSearch = new OrchestrationSessionSearchQuery(database)
   const auth = createAuthConfig(options.auth)
+  const push = new PushService({ database, settings, fetcher: options.push?.fetcher })
+  const presence = new ClientPresence()
+  const sessionPush = new SessionNoticePush({
+    environmentId: identity.id,
+    engine: orchestration,
+    settings,
+    presence,
+    push,
+    link: ({ notice, worktreeId }) =>
+      sessionLink(orchestration, fs, notice.ref.sessionId, worktreeId),
+  })
   const machines = new MachineService({
     ...options.machines,
     environmentId: identity.id,
@@ -352,6 +370,7 @@ export function createApp(options: AppOptions) {
     orchestration,
     machines,
     providerPrices,
+    sessionPush,
   )
 
   const app = new Elysia({ name: 'platform' })
@@ -382,7 +401,7 @@ export function createApp(options: AppOptions) {
       recordClientInstance(request)
     })
     // Auth runs after the WS upgrade so the browser receives the explicit 1008 refusal.
-    .use(orchestrationWsRoutes(orchestration, auth, identity))
+    .use(orchestrationWsRoutes(orchestration, auth, identity, presence))
     .onBeforeHandle(authGuard(auth))
     .use(
       machineRoutes(
@@ -405,6 +424,9 @@ export function createApp(options: AppOptions) {
           label: hostname(),
           protocolVersion: serverConfig.protocolVersion,
           serverVersion: serverConfig.serverVersion,
+          release: options.web?.serverReleaseFile
+            ? path.basename(path.dirname(options.web.serverReleaseFile))
+            : null,
           capabilities: {
             sessionSettlement: true,
             sessionSnooze: true,
@@ -443,6 +465,7 @@ export function createApp(options: AppOptions) {
     .use(fontRoutes(fonts))
     .use(wallpaperRoutes())
     .use(settingsRoutes(settings))
+    .use(pushRoutes(push))
     .use(themeRoutes(palettes))
     .use(bundleRoutes(bundles))
     .use(wallpaperLibraryRoutes(wallpapers))
@@ -505,6 +528,7 @@ function appCleanup(
   orchestration: OrchestrationEngine,
   machines: MachineService,
   providerPrices: ProviderPriceCatalog,
+  sessionPush: SessionNoticePush,
 ) {
   let closed = false
 
@@ -512,6 +536,7 @@ function appCleanup(
     if (closed) return
 
     closed = true
+    sessionPush.close()
     await machines.close()
     await terminal.dispose()
     // Language servers are child processes. Without this, jdtls, gopls and

@@ -64,7 +64,8 @@ function receive(
   const parsed = v.safeParse(orchestrationWsClientMessageSchema, JSON.parse(data))
   if (!parsed.success) return
   const message = parsed.output
-  if (message.kind === 'subscription.ack') return
+  // The demo has no push, so presence has no one to tell.
+  if (message.kind === 'subscription.ack' || message.kind === 'presence') return
   if (message.kind === 'ping') {
     send({ kind: 'pong', requestId: message.requestId })
     return

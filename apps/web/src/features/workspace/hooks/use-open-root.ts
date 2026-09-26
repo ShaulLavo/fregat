@@ -10,10 +10,11 @@ export type { OpenWorkspaceRootResult } from '@/features/workspace/state/open-ro
 export function useOpenWorkspaceRoot() {
   const navigation = useNavigation()
   const workspace = useEditorWorkspaceStoreApi()
-  const environmentId = confirmedEnvironmentId(originForQueryClient(useQueryClient()))
+  const origin = originForQueryClient(useQueryClient())
   // Recent-root recovery keeps this opener in its effect dependencies.
   return useCallback(
     async (path: string): Promise<OpenWorkspaceRootResult> => {
+      const environmentId = confirmedEnvironmentId(origin)
       const previousRoot = workspace.getState().rootFolder?.path
       const result = await navigation.openWorkspace({ environmentId, path })
       if (result.status === 'applied') {
@@ -24,6 +25,6 @@ export function useOpenWorkspaceRoot() {
       }
       return result.status === 'superseded' ? 'superseded' : 'failed'
     },
-    [navigation, environmentId, workspace],
+    [navigation, origin, workspace],
   )
 }
