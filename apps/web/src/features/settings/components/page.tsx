@@ -149,7 +149,7 @@ export function SettingsPage({
                 key={showJson ? 'editor' : 'global'}
                 queryClient={showJson ? editorOwner : settingsOwner}
               >
-                <PageActions scope={writableSettingsScope(scope)} />
+                {project ? null : <PageActions scope={writableSettingsScope(scope)} />}
               </SettingsOwnerProvider>
             </div>
           }

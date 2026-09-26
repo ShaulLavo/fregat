@@ -4,7 +4,7 @@ import { useSessionMenuActions } from '@/hooks/use-session-menu-actions'
 import { openSessionRow, startSessionDraft } from '@/features/chat-mode/state/session-commands'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
 import { sessionMenu } from '@/features/chat-mode/utils/session-menu'
-import { useOpenProjectSettings } from '@/features/chat-mode/hooks/use-open-project-settings'
+import { useOpenProjectSettings } from '@/keymap/hooks/use-open-project-settings'
 
 /** The rail row's menu: the shared session actions plus open, draft and project filter. */
 export function useSessionMenu(session: SessionRailItem) {

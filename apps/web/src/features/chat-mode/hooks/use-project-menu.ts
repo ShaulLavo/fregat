@@ -6,7 +6,7 @@ import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-sto
 import { projectMenu } from '@/features/chat-mode/utils/project-menu'
 import type { SessionRailGroup } from '@workspace/client-core/chat/rail/model'
 import { copyTextToClipboard } from '@/lib/clipboard'
-import { useOpenProjectSettings } from '@/features/chat-mode/hooks/use-open-project-settings'
+import { useOpenProjectSettings } from '@/keymap/hooks/use-open-project-settings'
 
 /**
  * Built from the group rather than the raw store so the collapse item mirrors what
