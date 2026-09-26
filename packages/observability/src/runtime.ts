@@ -11,6 +11,7 @@ import {
   type ObservabilityConfig,
   type ObservabilityEnv,
 } from './config'
+import { createLogRetention } from './retention'
 
 export type ObservabilityDrain = PipelineDrainFn<DrainContext>
 
@@ -41,6 +42,14 @@ const disabledConfig = observabilityConfigFromEnv({
 let runtime: ObservabilityRuntime = {
   config: disabledConfig,
   drain: null,
+}
+
+// The server's `logs.retentionDays`; the settings store starts after the logger.
+let readLogRetentionDays: () => number = () => 0
+
+/** How many UTC days of log files the file writer keeps; read at each day's first write. */
+export function setLogRetentionDays(read: () => number) {
+  readLogRetentionDays = read
 }
 
 export function initializeObservabilityRuntime(options: InitializeObservabilityOptions) {
@@ -142,12 +151,24 @@ function createFileDrainAdapter(config: ObservabilityConfig): DrainAdapter {
     pretty: config.filePretty,
   })
   const pipeline = createAdapterPipeline('file', config)
+  const retention = createLogRetention(
+    config.logDir,
+    () => readLogRetentionDays(),
+    // Warned once per failing series; old days stay until a prune succeeds.
+    (error) =>
+      log.warn({
+        action: 'observability.log_retention_failed',
+        message: error instanceof Error ? error.message : 'unknown retention failure',
+      }),
+  )
 
   return {
     drain: pipeline(async (batch) => {
       if (!batch.length) return
 
       await fsDrain(batch)
+      const pruned = await retention()
+      if (pruned > 0) log.info({ action: 'observability.logs_pruned', fileCount: pruned })
     }),
   }
 }

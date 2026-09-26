@@ -33,7 +33,7 @@ a bare root `bun run verify`.
 | [174 — managed external MCP servers](174-external-mcp-servers.md)                       | **PLACEHOLDER — SPLIT FROM 087 M2/M3; UNSCHEDULED**                                 |
 | [173 — two devices opening one workspace](173-two-devices-one-workspace.md)             | **RESEARCH — BEFORE PLAN 143'S PHONE SHELL**                                        |
 | [172 — one shared undo/redo stack](172-shared-undo-stack.md)                            | **RESEARCH — LIFE-13 FIRST; NOTICE-ONLY MOD+Z FIX ORDERED**                         |
-| [171 — the chat composer runs on our own editor](171-composer-on-our-editor.md)         | **RESEARCH — AFTER PLAN 111**                                                       |
+| [171 — the chat composer runs on our own editor](171-composer-on-our-editor.md)         | **PHASE 1 IMPLEMENTED 2026-09-26; PROSE WRAP, E058 THEN PHASE 3 (WAVE 2 E2)**       |
 | [170 — language census for grammar and theme prefetch](170-language-census.md)          | **PROPOSED — SPLIT FROM 110 Q7; TREE-SITTER WARM-UP ADDED 2026-09-26**              |
 | [167 — settings defaults, setting details, and copy](167-settings-and-copy.md)          | **PROPOSED — READY; D1–D4 DECIDED**                                                 |
 | [166 — keyboard shortcuts, redone](166-shortcuts-editor.md)                             | **PROPOSED — RESEARCH FIRST; D1–D6 DECIDED**                                        |
@@ -69,7 +69,7 @@ a bare root `bun run verify`.
 | [108 — two markdown modes](108-markdown-modes.md)                                       | **PROPOSED — PHASE 1 READY; PHASE 2 NEEDS 111 AND 176**                             |
 | [109 — boot boundaries and gate](109-boot-boundaries.md)                                | **PHASES 2–3 IMPLEMENTED 2026-09-21; GATE NOT STARTED**                             |
 | [110 — workspace indexing](110-workspace-indexing.md)                                   | **RESEARCH — NO IMPLEMENTATION SCOPE YET**                                          |
-| [111 — editor decorations](111-editor-decorations.md)                                   | **RESEARCH — AUTHORIZED 2026-09-25; BEFORE THE NEXT WAVE**                          |
+| [111 — editor decorations](111-editor-decorations.md)                                   | **PHASE 1 IMPLEMENTED 2026-09-26 (WAVE 2 E2); PHASES 4–5 WAVE 3**                   |
 | [112 — the large-file ceiling](112-large-file-ceiling.md)                               | **RESEARCH — ONE LANE WITH EDITOR E015, 112 FIRST**                                 |
 | [094 — client-core web and TUI parity](094-client-core-web-tui-parity.md)               | **PARTIAL — 2 OF 23 DONE; 096 COMPLETE**                                            |
 | [095 — server plumbing](095-server-plumbing.md)                                         | **PARTIAL — IDENTICAL HALVES MERGED; REGISTRY STREAM BUG OPEN**                     |

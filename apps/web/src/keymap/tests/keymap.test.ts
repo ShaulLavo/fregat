@@ -59,14 +59,11 @@ describe('resolvedPlatformKeyBindings', () => {
       (binding) => binding.command === 'workspace.undoSessionAction',
     )
 
-    expect(overridden.map((binding) => binding.pane).toSorted()).toEqual([
-      'git',
-      'global',
-      'logs',
-      'problems',
-      'search',
-      'settings',
-    ])
+    const defaultPanes = defaultPlatformKeyBindings('linux')
+      .filter((binding) => binding.command === 'workspace.undoSessionAction')
+      .map((binding) => binding.pane)
+    expect(overridden.map((binding) => binding.pane).toSorted()).toEqual(defaultPanes.toSorted())
+    expect(defaultPanes.length).toBeGreaterThan(1)
     expect(overridden.every((binding) => binding.keys === 'Mod+Alt+Z')).toBe(true)
     expect(commands(activeBindings(resolved, 'git'))).toContain('workspace.undoSessionAction')
   })
