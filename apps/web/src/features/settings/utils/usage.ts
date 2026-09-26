@@ -19,6 +19,7 @@ const PURPOSE_LABELS: Record<ProviderUsagePurpose, string> = {
   turn: 'Chat turns',
   title: 'Session titles',
   'commit-message': 'Commit messages',
+  review: 'Reviews',
 }
 
 export function usagePurposeLabel(purpose: ProviderUsagePurpose) {
