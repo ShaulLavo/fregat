@@ -5,6 +5,10 @@ import { createOrchestrationFixture } from '../../../../../server/test/factories
 import { createMetadataDatabase } from '../../../../../server/src/db/client'
 import { initializePlatformDatabase } from '../../../../../server/src/db/initialize'
 import { TerminalHistory } from '../../../../../server/src/terminal/history'
+import {
+  pinnedT3codeSource,
+  requireT3codeReference,
+} from '../../../../../server/src/testing/t3code-reference'
 
 // SQLite is the persistence boundary; no simulated storage or PTY is involved here.
 test('reopening the database retains raw bytes and clear affects only the selected owner', async () => {
@@ -63,19 +67,11 @@ test('a failed persistence transaction preserves the previously accepted replay'
   )
 })
 
-test('matches pinned terminal history for text split across byte and line boundaries', async () => {
-  const { execFileSync } = await import('node:child_process')
-  const reference = new URL('../../../../../../references/t3code', import.meta.url).pathname
-  const source = execFileSync(
-    'git',
-    [
-      '-C',
-      reference,
-      'show',
-      '7445aa733ada33e45289e5aa5055f79142556513:apps/server/src/terminal/Manager.ts',
-    ],
-    { encoding: 'utf8' },
-  )
+test('matches pinned terminal history for text split across byte and line boundaries', async ({
+  skip,
+}) => {
+  requireT3codeReference(skip)
+  const source = pinnedT3codeSource('apps/server/src/terminal/Manager.ts')
   const classSource = source.slice(
     source.indexOf('export class BoundedTerminalHistory'),
     source.indexOf('\nfunction isCsiFinalByte'),
