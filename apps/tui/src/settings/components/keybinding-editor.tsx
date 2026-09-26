@@ -45,7 +45,8 @@ export function KeybindingEditor({
   const resolution = effectiveTerminalBindings(overrides, commands.kitty)
   const nextOverrides = { ...overrides }
   if (active && recorded === undefined) delete nextOverrides[active]
-  if (active && recorded !== undefined) nextOverrides[active] = recorded
+  if (active && recorded !== undefined)
+    nextOverrides[active] = recorded === null ? null : [recorded]
   const preview = effectiveTerminalBindings(nextOverrides, commands.kitty)
   const diagnostics =
     state.kind === 'review'
@@ -94,7 +95,11 @@ export function KeybindingEditor({
     const operation =
       state.keys === undefined
         ? { kind: 'keybinding.remove' as const, command: state.command }
-        : { kind: 'keybinding.set' as const, command: state.command, keys: state.keys }
+        : {
+            kind: 'keybinding.set' as const,
+            command: state.command,
+            keys: state.keys === null ? null : [state.keys],
+          }
     const submission = owner.submit('user', [operation], 'tui.settings.recorder')
     const result = submission.kind === 'submitted' ? await submission.settled : 'discarded'
     if (lifetime.signal.aborted) return

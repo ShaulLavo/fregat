@@ -66,7 +66,7 @@ describe('settings request rejection', () => {
 
   it('checks a non-`set` operation against its own branch only', () => {
     expect(
-      reject(write([{ kind: 'keybinding.set', command: '', keys: 'ctrl+k' }])).message,
+      reject(write([{ kind: 'keybinding.set', command: '', keys: ['ctrl+k'] }])).message,
     ).toMatch(/^Cannot set operations\.0: command: Invalid length/)
   })
 

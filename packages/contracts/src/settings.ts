@@ -116,11 +116,15 @@ export const keybindingChordSchema = v.pipe(
   v.regex(KEYBINDING_CHORD_PATTERN, 'a binding is one hotkey, or two separated by a single space'),
 )
 
-// A missing command keeps its default; null explicitly unbinds it.
-export const keybindingOverridesSchema = v.record(
-  keybindingCommandIdSchema,
-  v.nullable(keybindingChordSchema),
+/** Most shortcuts one command carries; a longer list is a file written by hand in error. */
+export const MAX_KEYBINDINGS_PER_COMMAND = 8
+
+/** A command's complete shortcut list. `null` or `[]` unbinds it; an absent command keeps its defaults. */
+export const keybindingListSchema = v.nullable(
+  v.pipe(v.array(keybindingChordSchema), v.maxLength(MAX_KEYBINDINGS_PER_COMMAND)),
 )
+
+export const keybindingOverridesSchema = v.record(keybindingCommandIdSchema, keybindingListSchema)
 
 /**
  * One entry of the LSP server override table.
@@ -181,7 +185,8 @@ export type SemanticTokenServerOverrides = v.InferOutput<typeof semanticTokenSer
 export type ProviderEnvironmentVariable = v.InferOutput<typeof providerEnvironmentVariableSchema>
 export type ProviderInstanceConfig = v.InferOutput<typeof providerInstanceConfigSchema>
 export type ModelRef = v.InferOutput<typeof modelRefSchema>
-export type KeybindingOverrides = v.InferOutput<typeof keybindingOverridesSchema>
+/** Readonly, so a stored value and a candidate list built by the page both fit. */
+export type KeybindingOverrides = Readonly<Record<string, readonly string[] | null>>
 
 function lspFeatureRankOverrideSchema() {
   return v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))

@@ -35,7 +35,6 @@ a bare root `bun run verify`.
 | [172 — one shared undo/redo stack](172-shared-undo-stack.md)                            | **RESEARCH — LIFE-13 FIRST; NOTICE-ONLY MOD+Z FIX ORDERED**                         |
 | [171 — the chat composer runs on our own editor](171-composer-on-our-editor.md)         | **PHASE 1 IMPLEMENTED 2026-09-26; PROSE WRAP, E058 THEN PHASE 3 (WAVE 2 E2)**       |
 | [170 — language census for grammar and theme prefetch](170-language-census.md)          | **PROPOSED — SPLIT FROM 110 Q7; TREE-SITTER WARM-UP ADDED 2026-09-26**              |
-| [166 — keyboard shortcuts, redone](166-shortcuts-editor.md)                             | **PROPOSED — RESEARCH FIRST; D1–D6 DECIDED**                                        |
 | [156 — documents in the editor](156-documents-in-the-editor.md)                         | **PLACEHOLDER — FAR FUTURE; RESEARCH FIRST**                                        |
 | [155 — site demo becomes an animated replica](155-site-demo-replica.md)                 | **PLACEHOLDER — RESEARCH NOT STARTED**                                              |
 | [152 — dev primary ships its working tree](152-remote-dev-builds.md)                    | **PROPOSED — NICE TO HAVE; AFTER 151**                                              |

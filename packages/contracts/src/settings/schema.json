@@ -565,10 +565,14 @@
       "additionalProperties": {
         "anyOf": [
           {
-            "maxLength": 64,
-            "minLength": 1,
-            "pattern": "^\\S+(?: \\S+)?$",
-            "type": "string"
+            "items": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^\\S+(?: \\S+)?$",
+              "type": "string"
+            },
+            "maxItems": 8,
+            "type": "array"
           },
           {
             "type": "null"
@@ -576,7 +580,8 @@
         ]
       },
       "default": {},
-      "description": "Command id to shortcut: one hotkey or two separated by a single space. A missing key keeps the default; an explicit null unbinds the command.",
+      "description": "Every command and its keys.",
+      "markdownDescription": "Every command and its keys.\n\nIn settings.json this is command id to its complete list of shortcuts, each one hotkey or two separated by a single space. A missing command keeps its defaults; null or an empty list unbinds it.",
       "propertyNames": {
         "maxLength": 120,
         "minLength": 1,

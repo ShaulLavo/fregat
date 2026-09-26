@@ -573,7 +573,7 @@ surfaces, the file picker and the site. The owner is taking it one topic at a ti
 | ~~162~~                                         | Done 2026-09-25 (lane L3): context breakdown, usable window, session total, usage-page honesty                            |
 | 163 (done, lane L2)                             | Screenshot attachment in the composer (export shipped with Plan 145)                                                      |
 | 165 (done)                                      | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                                    |
-| [166](plans/166-shortcuts-editor.md)            | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, several per command                |
+| 166 (done, wave 2 lane S)                       | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, several per command                |
 | [155](plans/155-site-demo-replica.md)           | Placeholder: the site hero becomes an animated replica of the app, like cursor.com                                        |
 | [156](plans/156-documents-in-the-editor.md)     | Placeholder, far future: PDF, DOCX, XLSX, PPTX and CSV as editor documents agents can edit                                |
 | [178](plans/178-tree-in-the-app.md)             | Plan of plans: the file tree rebuilt on app primitives (VirtualList, useListbox, dnd-kit, icons, Tailwind) at full parity |

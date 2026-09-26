@@ -91,7 +91,8 @@ type ValueWidget<TValue> =
   | (TValue extends readonly ProviderInstanceConfig[] ? 'providers' : never)
   | (TValue extends readonly ModelRef[] ? 'models' : never)
   | (TValue extends Readonly<Record<string, MachineDefinition>> ? 'machines' : never)
-  | (TValue extends Readonly<Record<string, string | null>> ? 'record' | 'keybindings' : never)
+  | (TValue extends Readonly<Record<string, string | null>> ? 'record' : never)
+  | (TValue extends Readonly<Record<string, readonly string[] | null>> ? 'keybindings' : never)
 
 /**
  * How two layers combine for one key.

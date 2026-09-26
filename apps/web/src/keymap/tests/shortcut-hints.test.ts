@@ -38,7 +38,7 @@ describe('shortcutHintLabel', () => {
   test('follows an override and hides for an unbound or two-stroke one', () => {
     const rebound = resolvedPlatformKeyBindings(
       platform,
-      { 'workspace.selectItem1': 'Alt+Q' },
+      { 'workspace.selectItem1': ['Alt+Q'] },
       'linux',
     )
     expect(shortcutHintLabel(rebound, 'workspace.selectItem1', ctrl, 'linux')).toBeNull()
@@ -60,7 +60,7 @@ describe('shortcutHintLabel', () => {
 
     const chord = resolvedPlatformKeyBindings(
       platform,
-      { 'workspace.selectItem1': 'Mod+K 1' },
+      { 'workspace.selectItem1': ['Mod+K 1'] },
       'linux',
     )
     expect(shortcutHintLabel(chord, 'workspace.selectItem1', ctrl, 'linux')).toBeNull()

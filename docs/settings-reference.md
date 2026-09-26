@@ -180,7 +180,11 @@ stays safe to read, share and export.
 | Setting                 | Default     | Scope       | What it does                                                                                                                                                  |
 | ----------------------- | ----------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `keybindings.preset`    | `"default"` | application | Shortcuts your overrides apply on top of. VS Code keeps VS Code bindings. Platform starts from them and adds its own keys for tabs, chats and sidebar panels. |
-| `keybindings.overrides` | `{}`        | application | Command id to shortcut: one hotkey or two separated by a single space. A missing key keeps the default; an explicit null unbinds the command.                 |
+| `keybindings.overrides` | `{}`        | application | Every command and its keys.                                                                                                                                   |
+
+### Details
+
+- `keybindings.overrides`: In settings.json this is command id to its complete list of shortcuts, each one hotkey or two separated by a single space. A missing command keeps its defaults; null or an empty list unbinds it.
 
 ## Language servers
 

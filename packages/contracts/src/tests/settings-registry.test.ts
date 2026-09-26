@@ -14,6 +14,7 @@ import { defineSetting, registryProblems } from '../settings/registry'
 import {
   keybindingChordSchema,
   keybindingOverridesSchema,
+  MAX_KEYBINDINGS_PER_COMMAND,
   lspServerOverridesSchema,
   MAX_KEYBINDING_CHORD_STROKES,
   modelRefListSchema,
@@ -21,14 +22,14 @@ import {
 } from '../settings'
 
 describe('keybinding chord shape', () => {
-  it.each(['Mod+S', 'Mod+K Mod+S', null])('accepts %s', (keys) => {
+  it.each([['Mod+S'], ['Mod+K Mod+S', 'F1'], [], null])('accepts %j', (keys) => {
     expect(v.safeParse(keybindingOverridesSchema, { 'workspace.saveFile': keys }).success).toBe(
       true,
     )
   })
 
   it.each(['Mod+K Mod+S Mod+X', '', '  ', 'Mod+K  Mod+S', 'Mod+K\tMod+S'])('rejects %s', (keys) => {
-    expect(v.safeParse(keybindingOverridesSchema, { 'workspace.saveFile': keys }).success).toBe(
+    expect(v.safeParse(keybindingOverridesSchema, { 'workspace.saveFile': [keys] }).success).toBe(
       false,
     )
   })
@@ -37,6 +38,19 @@ describe('keybinding chord shape', () => {
     const accepted = Array.from({ length: MAX_KEYBINDING_CHORD_STROKES }, () => 'Mod+K').join(' ')
     expect(v.safeParse(keybindingChordSchema, accepted).success).toBe(true)
     expect(v.safeParse(keybindingChordSchema, `${accepted} Mod+S`).success).toBe(false)
+  })
+
+  it('rejects a bare string where the list belongs, and a list past the cap', () => {
+    expect(v.safeParse(keybindingOverridesSchema, { 'workspace.saveFile': 'Mod+S' }).success).toBe(
+      false,
+    )
+    const tooMany = Array.from(
+      { length: MAX_KEYBINDINGS_PER_COMMAND + 1 },
+      (_, index) => `F${index + 1}`,
+    )
+    expect(v.safeParse(keybindingOverridesSchema, { 'workspace.saveFile': tooMany }).success).toBe(
+      false,
+    )
   })
 
   it('limits the stored shortcut length', () => {
@@ -67,11 +81,11 @@ const _serversAreOverrides: SettingsValues['lsp.servers'] = v.parse(lspServerOve
   'custom-lsp': { command: ['custom-lsp-server', '--stdio'], extensions: ['.custom'] },
 })
 const _overridesAreNullableStrings: SettingsValues['keybindings.overrides'] = {
-  'workspace.saveFile': 'Mod+S',
+  'workspace.saveFile': ['Mod+S', 'F2'],
   'workspace.saveAllFiles': null,
 }
 
-// @ts-expect-error a keybinding override is a string or null, never a number
+// @ts-expect-error a keybinding override is a list of strings or null, never a number
 const _overrideRejectsNumber: SettingsValues['keybindings.overrides'] = { 'a.b': 3 }
 // @ts-expect-error the instance list is an array, not a bare object
 const _instancesRejectObject: SettingsValues['providers.instances'] = { providerInstanceId: 'x' }

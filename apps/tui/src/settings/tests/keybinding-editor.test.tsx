@@ -57,7 +57,7 @@ test('records a real two-stroke shortcut without firing commands, saves semantic
       request: {
         mutationId: 'other-shortcut',
         target: 'user',
-        operations: [{ kind: 'keybinding.set', command: 'workspace.openAddress', keys: 'F8' }],
+        operations: [{ kind: 'keybinding.set', command: 'workspace.openAddress', keys: ['F8'] }],
       },
     })
     await act(async () => {
@@ -70,7 +70,7 @@ test('records a real two-stroke shortcut without firing commands, saves semantic
           ? state.owner.readSettingsMirror()['keybindings.overrides']
           : null
       })
-      .toEqual({ 'settings.edit': 'Mod+K E', 'workspace.openAddress': 'F8' })
+      .toEqual({ 'settings.edit': ['Mod+K E'], 'workspace.openAddress': ['F8'] })
     await act(async () => {
       frame.mockInput.pressKey('ESCAPE')
     })
@@ -116,7 +116,7 @@ test('records a real two-stroke shortcut without firing commands, saves semantic
           ? state.owner.readSettingsMirror()['keybindings.overrides']
           : null
       })
-      .toEqual({ 'workspace.openAddress': 'F8' })
+      .toEqual({ 'workspace.openAddress': ['F8'] })
   } finally {
     await frame.cleanup()
     session.dispose()

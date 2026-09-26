@@ -1282,5 +1282,23 @@
     "to": "workbench",
     "module": "features/workbench/utils/panels.ts",
     "reason": "shared → lib: createDefaultWorkbenchPanels, normalizeWorkbenchPanels, type WorkbenchPanels is reused by workspace outside workbench; move this shared behavior with its consumers."
+  },
+  {
+    "from": "dev",
+    "to": "settings",
+    "module": "features/settings/components/shortcut-recorder.tsx",
+    "reason": "owner: the /dev gallery shows the settings shortcut rows and recorder over fixture overrides, so a phone check needs no settings state."
+  },
+  {
+    "from": "dev",
+    "to": "settings",
+    "module": "features/settings/components/shortcut-row.tsx",
+    "reason": "owner: the /dev gallery shows the settings shortcut rows and recorder over fixture overrides, so a phone check needs no settings state."
+  },
+  {
+    "from": "dev",
+    "to": "settings",
+    "module": "features/settings/utils/shortcut-rows.ts",
+    "reason": "owner: the /dev gallery shows the settings shortcut rows and recorder over fixture overrides, so a phone check needs no settings state."
   }
 ]

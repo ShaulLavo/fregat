@@ -246,7 +246,8 @@ export function useSettingsActions() {
       return setSetting(parsed.output.key, parsed.output.value, target)
     },
     setColorTheme,
-    setKeybinding: (command: PlatformCommandId, keys: string | null) =>
+    /** The command's complete list; an empty list or `null` unbinds it. */
+    setKeybinding: (command: PlatformCommandId, keys: readonly string[] | null) =>
       submit(targetFor('keybindings.overrides'), [{ command, keys, kind: 'keybinding.set' }]),
     setModelHidden: (ref: ModelRef, hidden: boolean) =>
       submit(targetFor('models.hidden'), [{ hidden, kind: 'model.setHidden', ref }]),
