@@ -18,12 +18,7 @@ import {
 const CHUNK_SIZE = 16 * 1024
 
 function payloadLengths(descriptor: TreeSitterSourceDescriptor): Map<string, number> {
-  return new Map(
-    descriptor.chunks.map((chunk) => [
-      chunk.chunkId,
-      chunk.kind === 'string' ? chunk.text.length : chunk.length,
-    ]),
-  )
+  return new Map(descriptor.chunks.map((chunk) => [chunk.chunkId, chunk.text.length]))
 }
 
 function resolveText(cache: TreeSitterSourceCache, descriptor: TreeSitterSourceDescriptor): string {
@@ -31,16 +26,15 @@ function resolveText(cache: TreeSitterSourceCache, descriptor: TreeSitterSourceD
   return readTreeSitterInputRange(input, 0, input.length)
 }
 
-function expectReclaimedSource(snapshot: PieceTableSnapshot, useSharedBuffers: boolean): void {
+function expectReclaimedSource(snapshot: PieceTableSnapshot): void {
   const expected = materializePieceTableFullText(snapshot)
   const cache: TreeSitterSourceCache = new Map()
-  const before = createTreeSitterSourceDescriptor(snapshot, { useSharedBuffers })
+  const before = createTreeSitterSourceDescriptor(snapshot)
   expect(resolveText(cache, before)).toBe(expected)
 
   const compact = reclaimPieceTableText(snapshot)
   expect(compact.buffers).not.toBe(snapshot.buffers)
   const after = createTreeSitterSourceDescriptor(compact, {
-    useSharedBuffers,
     sentChunkLengths: payloadLengths(before),
   })
   expect(after.chunks.length).toBeGreaterThan(0)
@@ -52,24 +46,22 @@ function expectReclaimedSource(snapshot: PieceTableSnapshot, useSharedBuffers: b
     true,
   )
   const unchanged = createTreeSitterSourceDescriptor(compact, {
-    useSharedBuffers,
     sentChunkLengths: new Map([...payloadLengths(before), ...payloadLengths(after)]),
   })
   expect(unchanged.chunks).toEqual([])
   expect(resolveText(cache, unchanged)).toBe(expected)
 }
 
-describe.each([false, true])('physical source reclamation, shared buffers: %s', (shared) => {
+describe('physical source reclamation', () => {
   it('resends only trimmed sparse spans and reuses the unchanged writable tail', () => {
     const original = createPieceTableSnapshot('x'.repeat(200000))
     const appended = insertIntoPieceTable(original, original.length, 'tail')
     const first = reclaimPieceTableText(deleteFromPieceTable(appended, 90000, 10))
-    const before = createTreeSitterSourceDescriptor(first, { useSharedBuffers: shared })
+    const before = createTreeSitterSourceDescriptor(first)
     const cache: TreeSitterSourceCache = new Map()
     expect(resolveText(cache, before)).toBe('x'.repeat(199990) + 'tail')
     const second = reclaimPieceTableText(deleteFromPieceTable(first, 180000, 10))
     const after = createTreeSitterSourceDescriptor(second, {
-      useSharedBuffers: shared,
       sentChunkLengths: payloadLengths(before),
     })
     expect([...payloadLengths(after).values()].reduce((sum, size) => sum + size, 0)).toBeLessThan(
@@ -86,7 +78,7 @@ describe.each([false, true])('physical source reclamation, shared buffers: %s', 
     const suffix = '\uDC00\nconst last = "🚀";'
     const original = createPieceTableSnapshot(prefix + deleted + suffix)
     const snapshot = deleteFromPieceTable(original, prefix.length, deleted.length)
-    expectReclaimedSource(snapshot, shared)
+    expectReclaimedSource(snapshot)
   })
 
   it('reads partial closed append chunks and keeps the writable tail', () => {
@@ -94,24 +86,22 @@ describe.each([false, true])('physical source reclamation, shared buffers: %s', 
     const inserted = insertIntoPieceTable(createPieceTableSnapshot('original\n'), 0, text)
     const partial = deleteFromPieceTable(inserted, 8, text.length - 8)
     const snapshot = insertIntoPieceTable(partial, partial.length, 'tail 🚀')
-    expectReclaimedSource(snapshot, shared)
+    expectReclaimedSource(snapshot)
   })
 
   it('sends distinct equal-length fork contents and can revisit the earlier branch', () => {
     const base = insertIntoPieceTable(createPieceTableSnapshot('original\n'), 0, 'prefix')
     const left = insertIntoPieceTable(base, 6, 'LEFT')
     const right = insertIntoPieceTable(base, 6, 'RITE')
-    const first = createTreeSitterSourceDescriptor(left, { useSharedBuffers: shared })
+    const first = createTreeSitterSourceDescriptor(left)
     const cache: TreeSitterSourceCache = new Map()
     expect(resolveText(cache, first)).toBe('prefixLEFToriginal\n')
     const second = createTreeSitterSourceDescriptor(right, {
-      useSharedBuffers: shared,
       sentChunkLengths: payloadLengths(first),
     })
     expect(second.chunks.length).toBeGreaterThan(0)
     expect(resolveText(cache, second)).toBe('prefixRITEoriginal\n')
     const revisited = createTreeSitterSourceDescriptor(left, {
-      useSharedBuffers: shared,
       sentChunkLengths: payloadLengths(second),
     })
     expect(resolveText(cache, revisited)).toBe('prefixLEFToriginal\n')

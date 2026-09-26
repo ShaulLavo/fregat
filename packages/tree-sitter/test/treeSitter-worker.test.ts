@@ -48,7 +48,7 @@ describe('tree-sitter worker internals', () => {
 
   it('reads parser input from piece-table chunks without flattening', () => {
     const snapshot = insertIntoPieceTable(createPieceTableSnapshot('a😀\n'), 4, 'tail')
-    const descriptor = createTreeSitterSourceDescriptor(snapshot, { useSharedBuffers: false })
+    const descriptor = createTreeSitterSourceDescriptor(snapshot)
     const input = resolveTreeSitterSourceDescriptor(new Map(), 'doc', descriptor)
 
     expect(input.chunks.length).toBeGreaterThan(1)
@@ -61,7 +61,7 @@ describe('tree-sitter worker internals', () => {
 
   it('caps parser input reads to fit the web-tree-sitter UTF-16 callback buffer', () => {
     const snapshot = createPieceTableSnapshot('a'.repeat(10_000))
-    const descriptor = createTreeSitterSourceDescriptor(snapshot, { useSharedBuffers: false })
+    const descriptor = createTreeSitterSourceDescriptor(snapshot)
     const input = resolveTreeSitterSourceDescriptor(new Map(), 'doc', descriptor)
 
     expect(readTreeSitterPieceTableInput(input, 0)).toHaveLength(4096)
@@ -71,10 +71,9 @@ describe('tree-sitter worker internals', () => {
 
   it('builds full descriptors with only unsent chunk payloads', () => {
     const snapshot = createPieceTableSnapshot('const answer = 1;\n')
-    const first = createTreeSitterSourceDescriptor(snapshot, { useSharedBuffers: false })
+    const first = createTreeSitterSourceDescriptor(snapshot)
     const second = createTreeSitterSourceDescriptor(snapshot, {
       sentChunkLengths: sentChunkLengthsOf(first),
-      useSharedBuffers: false,
     })
 
     expect(first.length).toBe(snapshot.length)
@@ -88,11 +87,10 @@ describe('tree-sitter worker internals', () => {
 
   it('sends only new chunks after edits while preserving current ordered spans', () => {
     const previous = createPieceTableSnapshot('ab\ncd')
-    const first = createTreeSitterSourceDescriptor(previous, { useSharedBuffers: false })
+    const first = createTreeSitterSourceDescriptor(previous)
     const next = applyBatchToPieceTable(previous, [{ from: 3, to: 5, text: 'xyz' }])
     const edited = createTreeSitterSourceDescriptor(next, {
       sentChunkLengths: sentChunkLengthsOf(first),
-      useSharedBuffers: false,
     })
     const input = resolveTreeSitterSourceDescriptor(cacheWith('doc', first), 'doc', edited)
 
@@ -105,7 +103,7 @@ describe('tree-sitter worker internals', () => {
 
   it('re-sends the tail chunk grown in place by coalesced typing inserts', () => {
     const base = insertIntoPieceTable(createPieceTableSnapshot('const answer = 1;\n'), 18, 'q')
-    const first = createTreeSitterSourceDescriptor(base, { useSharedBuffers: false })
+    const first = createTreeSitterSourceDescriptor(base)
     const cache = cacheWith('doc', first)
 
     // The second keystroke coalesces into the newest piece buffer: the chunk
@@ -113,7 +111,6 @@ describe('tree-sitter worker internals', () => {
     const next = insertIntoPieceTable(base, 19, 'w')
     const edited = createTreeSitterSourceDescriptor(next, {
       sentChunkLengths: sentChunkLengthsOf(first),
-      useSharedBuffers: false,
     })
     const input = resolveTreeSitterSourceDescriptor(cache, 'doc', edited)
 
@@ -126,27 +123,21 @@ describe('tree-sitter worker internals', () => {
     expect(readTreeSitterPieceTableInput(input, next.length - 1)).toBe('w')
   })
 
-  it('reads string and shared UTF-16 source chunks across piece boundaries', () => {
+  it('reads source chunks across piece boundaries', () => {
     const snapshot = insertIntoPieceTable(createPieceTableSnapshot('a😀\n'), 4, 'tail')
-    const stringInput = resolveTreeSitterSourceDescriptor(
+    const input = resolveTreeSitterSourceDescriptor(
       new Map(),
       'strings',
-      createTreeSitterSourceDescriptor(snapshot, { useSharedBuffers: false }),
-    )
-    const sharedInput = resolveTreeSitterSourceDescriptor(
-      new Map(),
-      'shared',
-      createTreeSitterSourceDescriptor(snapshot, { useSharedBuffers: true }),
+      createTreeSitterSourceDescriptor(snapshot),
     )
 
-    expect(readTreeSitterInputRange(stringInput, 0, snapshot.length)).toBe('a😀\ntail')
-    expect(readTreeSitterInputRange(sharedInput, 0, snapshot.length)).toBe('a😀\ntail')
-    expect(readTreeSitterPieceTableInput(sharedInput, 1)).toBe('😀\n')
+    expect(readTreeSitterInputRange(input, 0, snapshot.length)).toBe('a😀\ntail')
+    expect(readTreeSitterPieceTableInput(input, 1)).toBe('😀\n')
   })
 
   it('resolves empty descriptors', () => {
     const snapshot = createPieceTableSnapshot('')
-    const descriptor = createTreeSitterSourceDescriptor(snapshot, { useSharedBuffers: false })
+    const descriptor = createTreeSitterSourceDescriptor(snapshot)
     const input = resolveTreeSitterSourceDescriptor(new Map(), 'empty', descriptor)
 
     expect(descriptor).toEqual({ length: 0, pieces: [], chunks: [] })
@@ -274,7 +265,7 @@ function sentChunkLengthsOf(
 ): Map<string, number> {
   const sent = new Map<string, number>()
   for (const chunk of descriptor.chunks) {
-    sent.set(chunk.chunkId, chunk.kind === 'string' ? chunk.text.length : chunk.length)
+    sent.set(chunk.chunkId, chunk.text.length)
   }
   return sent
 }

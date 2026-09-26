@@ -8,6 +8,7 @@
     "bench:hidden": "node hidden.mjs",
     "bench:reclamation": "node reclamation.mjs",
     "bench:first-paint": "node first-paint.mjs",
+    "bench:dispatch": "node dispatch.mjs",
     "fixtures": "node fixtures.mjs",
     "first-paint:proof": "node test/verify-first-paint.mjs results/first-paint",
     "compare": "node compare.mjs",

@@ -1,4 +1,4 @@
-import type { EditorCommandId } from './editor/commands'
+import type { EditorAnyCommandId } from './editor/commandCatalog'
 import type { EditorCommandHandler, EditorDisposable } from './plugins'
 import { editorKeyConditionMatches, type EditorKeymapContext } from './keymap/conditions'
 import { defaultEditorKeyBindings, type EditorKeyBinding } from './keymap/presets'
@@ -16,7 +16,7 @@ export type TestKeymap = {
  */
 export function createTestKeymap(
   root: HTMLElement,
-  commands: ReadonlyMap<EditorCommandId, EditorCommandHandler>,
+  commands: ReadonlyMap<EditorAnyCommandId, EditorCommandHandler>,
 ): TestKeymap {
   const keys = new Map<string, () => boolean>()
   const captureContext = (): EditorKeymapContext => ({

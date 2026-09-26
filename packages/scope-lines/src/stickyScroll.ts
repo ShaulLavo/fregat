@@ -95,6 +95,8 @@ function createStickyScrollContribution(
 }
 
 class StickyScrollContribution implements EditorViewContribution {
+  // Which scopes the viewport hides is the whole input; the caret changes none of it.
+  readonly inputs = ['content', 'tokens', 'viewport', 'layout'] as const
   private readonly context: EditorViewContributionContext
   private readonly options: ResolvedStickyScrollOptions
   private readonly root: HTMLDivElement
@@ -115,12 +117,9 @@ class StickyScrollContribution implements EditorViewContribution {
 
   public update(
     snapshot: EditorViewSnapshot,
-    kind: EditorViewContributionUpdateKind,
+    _kind: EditorViewContributionUpdateKind,
     _change?: EditorContributionChange | null,
   ): void {
-    // Which scopes the viewport hides is the whole input, and moving the caret changes none of it.
-    if (kind === 'selection') return
-
     this.renderSnapshot(snapshot)
   }
 

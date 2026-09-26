@@ -97,7 +97,7 @@ not preserve their meaning across restart.
 This is documentation work. Check links, export paths, type definitions, and the actual
 encoder and decoder pairs. Do not run the repository's test suite to validate prose.
 
-Use [Tree-sitter source tests](../packages/tree-sitter/test/source-sharedChunks.test.ts) and
+Use [Tree-sitter source tests](../packages/tree-sitter/test/source-chunks.test.ts) and
 [LSP positions tests](../packages/lsp/test/positions.test.ts) as existing evidence for transfer
 and coordinate claims. Inspect their assertions before stating the behavior they establish.
 

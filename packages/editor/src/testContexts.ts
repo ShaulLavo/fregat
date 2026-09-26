@@ -7,7 +7,7 @@ import type {
   EditorEditContributionContext,
   EditorPluginContext,
   EditorLineStartsView,
-  EditorViewContributionContext,
+  EditorInternalViewContributionContext,
   EditorViewSnapshot,
 } from './plugins'
 
@@ -75,14 +75,19 @@ export function createTestEditContributionContext(
 }
 
 export function createTestViewContributionContext(
-  overrides: Partial<EditorViewContributionContext> = {},
-): EditorViewContributionContext {
+  overrides: Partial<EditorInternalViewContributionContext> = {},
+): EditorInternalViewContributionContext {
   const ownerDocument = overrides.scrollElement?.ownerDocument ?? document
   const scrollElement = overrides.scrollElement ?? ownerDocument.createElement('div')
   const container = overrides.container ?? ownerDocument.createElement('div')
   if (!overrides.container && !overrides.scrollElement) container.appendChild(scrollElement)
 
-  const defaults: EditorViewContributionContext = {
+  const defaults: EditorInternalViewContributionContext = {
+    unstableEditor: null,
+    getSelections: () => [],
+    applyEdits: () => undefined,
+    registerCommand: () => noDisposal,
+    refreshInputs: () => undefined,
     container,
     scrollElement,
     contentElement: scrollElement,

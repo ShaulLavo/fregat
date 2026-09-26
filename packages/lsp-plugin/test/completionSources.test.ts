@@ -19,7 +19,7 @@ import {
 } from '../src/completionProviders'
 import { createLanguageServerAdapterPlugin } from '../src/plugin'
 import { createTestKeymap, type TestKeymap } from '@singapore-editor/core/testing'
-import type { EditorCommandId } from '@singapore-editor/core/editor'
+import type { EditorAnyCommandId } from '@singapore-editor/core/editor'
 import {
   documentSyncSnapshotFields,
   viewSnapshotStructuralFields,
@@ -224,7 +224,7 @@ async function connectedEditor(options: {
     channel.registerProvider(COMPLETION_SOURCES, { language: '*' }, source),
   )
 
-  const commands = new Map<EditorCommandId, EditorCommandHandler>()
+  const commands = new Map<EditorAnyCommandId, EditorCommandHandler>()
   const provider = activateProvider(transport, features, applyEdits, commands, options.onError)
   const keymap = createTestKeymap(element, commands)
   keymaps.push(keymap)
@@ -333,7 +333,7 @@ function activateProvider(
   transport: LspManagedTransport,
   features: Map<unknown, unknown>,
   applyEdits: EditorEditContributionContext['applyEdits'],
-  commands: Map<EditorCommandId, EditorCommandHandler>,
+  commands: Map<EditorAnyCommandId, EditorCommandHandler>,
   onError?: (error: unknown) => void,
 ): EditorViewContributionProvider {
   let provider: EditorViewContributionProvider | null = null

@@ -53,6 +53,11 @@ import {
 import {
   createEditorCapabilityToken,
   createEditorLanguageFeatureToken,
+  createChannel,
+  createPlugin,
+  derive,
+  selectionInput,
+  type EditorViewScope,
   EDITOR_FIND_FEATURE,
   EDITOR_FIND_FEATURE_ID,
   type EditorAutoClosingPair,
@@ -540,6 +545,19 @@ describe('public API facade', () => {
     ])
 
     expect(copies).toEqual(['name', 'NAME'])
+  })
+
+  it('exports the experimental plugin authoring model from the extensions entrypoint', () => {
+    const caret = derive([selectionInput], (selections) => selections[0]?.headOffset ?? null)
+    const setup = (scope: EditorViewScope) => void scope.watch(caret, () => undefined)
+    const plugin = createPlugin({ name: 'test.caret', view: setup })
+
+    expect(plugin.name).toBe('test.caret')
+    expect(plugin.activate).toBeTypeOf('function')
+    expect(caret.kinds).toEqual(selectionInput.kinds)
+    expect(createChannel<string>('test.channel', { kind: 'many' }).input.id).toBe(
+      'channel(test.channel)',
+    )
   })
 
   it('exposes the pass and cursor-history methods hosts drive the editor through', () => {

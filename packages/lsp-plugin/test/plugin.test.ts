@@ -3,7 +3,7 @@ import type { LspReconnectOptions } from '../src/lspConnection'
 import { createLanguageServerDocument } from '../src/document'
 import { createEditorTextBuffer, createEditorBufferSession } from '@singapore-editor/core/document'
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
-import type { EditorCommandId } from '@singapore-editor/core/editor'
+import type { EditorAnyCommandId } from '@singapore-editor/core/editor'
 import {
   createEditorCapabilityToken,
   type EditorCommandContributionContext,
@@ -1162,11 +1162,11 @@ function activatePlugin(
   options: ActivationOptions,
 ): {
   readonly provider: EditorViewContributionProvider
-  readonly commands: ReadonlyMap<EditorCommandId, EditorCommandHandler>
+  readonly commands: ReadonlyMap<EditorAnyCommandId, EditorCommandHandler>
   readonly features: ReadonlyMap<unknown, unknown>
 } {
   let provider: EditorViewContributionProvider | null = null
-  const commands = new Map<EditorCommandId, EditorCommandHandler>()
+  const commands = new Map<EditorAnyCommandId, EditorCommandHandler>()
   const features = new Map<unknown, unknown>()
   plugin.activate(
     createTestPluginContext({
@@ -1190,7 +1190,7 @@ function activatePlugin(
 }
 
 function commandContributionContext(
-  commands: Map<EditorCommandId, EditorCommandHandler>,
+  commands: Map<EditorAnyCommandId, EditorCommandHandler>,
 ): EditorCommandContributionContext {
   return {
     registerCommand: (commandId, handler) => {
@@ -1215,8 +1215,8 @@ function editContributionContext(
 }
 
 function command(
-  commands: ReadonlyMap<EditorCommandId, EditorCommandHandler>,
-  commandId: EditorCommandId,
+  commands: ReadonlyMap<EditorAnyCommandId, EditorCommandHandler>,
+  commandId: EditorAnyCommandId,
 ): EditorCommandHandler {
   const handler = commands.get(commandId)
   if (!handler) throw new Error(`missing command ${commandId}`)

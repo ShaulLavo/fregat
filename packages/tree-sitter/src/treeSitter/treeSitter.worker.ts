@@ -412,7 +412,44 @@ const parseFullDocument = async (
   assertNotCancelled(context)
   assertRuntimeSessionActive(request.runtimeSessionId)
   replaceCachedDocument(request.runtimeSessionId, parsedDocument)
+  scheduleIdleReparse(request.runtimeSessionId, parsedDocument, runtime)
   return parsedDocument
+}
+
+// The first edit of a freshly parsed tree can reparse the whole document: tree-sitter refuses to
+// reuse a node whose first token was lexed in another state, and markdown's external scanner makes
+// that every block (43 ms at 1 MB). One unchanged reparse while the worker is idle takes it off the
+// first keystroke.
+const scheduleIdleReparse = (
+  runtimeSessionId: string,
+  document: ParsedDocument,
+  runtime: Runtime,
+): void => {
+  // @justification Runs once after the parse answer is posted; it re-checks that the document is
+  // still cached and idle, so a late or stale callback does nothing.
+  setTimeout(() => reparseIdleDocument(runtimeSessionId, document, runtime), 0)
+}
+
+const reparseIdleDocument = (
+  runtimeSessionId: string,
+  document: ParsedDocument,
+  runtime: Runtime,
+): void => {
+  if (activeRuntimeTasks.has(runtimeSessionId)) return
+  const cache = documentCaches.get(runtimeSessionId)
+  const index = cache?.snapshots.indexOf(document) ?? -1
+  if (!cache || index === -1) return
+
+  const [root, ...injections] = document.layers
+  if (!root) return
+  const context = createCancellationContext(undefined, PARSE_BUDGET_MS)
+  try {
+    const tree = parseSource(runtime.parser, document.source, root.tree, context)
+    cache.snapshots[index] = { ...document, layers: [{ ...root, tree }, ...injections] }
+    root.tree.delete()
+  } catch (error) {
+    recordOptionalWorkerPhaseFailure('idle reparse', error, [], 'optional-phase-failed')
+  }
 }
 
 const editDocument = async (
@@ -445,8 +482,12 @@ const editDocument = async (
     const changedRanges = runWorkerPhase('changed ranges', () =>
       treeChangedRanges(reusableTree, rootLayer.tree),
     )
-    // Delimiter edits can invalidate descendants outside the edited range.
-    const injectionRanges = [{ startIndex: 0, endIndex: source.length }]
+    // A delimiter edit that moves structure outside the edited range shows up in the root's
+    // changed ranges; an edit inside an injection's text may change no root structure at all.
+    const injectionRanges = enclosingRanges(
+      [...changedRanges, ...editedRanges(request.inputEdits, source.length)],
+      [reusableTree, rootLayer.tree],
+    )
     const degraded: TreeSitterDegradedState[] = []
     const parsedDocument = await runAsyncWorkerPhase('parse injections', () =>
       parseParsedDocument({
@@ -755,7 +796,8 @@ type ParseParsedDocumentOptions = {
   readonly context: CancellationContext
   readonly oldDocument: ParsedDocument | null
   readonly inputEdits: readonly TreeSitterEditRequest['inputEdits'][number][]
-  readonly injectionRanges: readonly TreeSitterSyntaxRange[] | null
+  // Grows as reparsed layers report their own changed ranges, so their children are found too.
+  readonly injectionRanges: TreeSitterSyntaxRange[] | null
   readonly degraded: TreeSitterDegradedState[]
 }
 
@@ -769,13 +811,15 @@ type InjectionGroup = Omit<PendingInjectionPlan, 'kind' | 'patternIndex' | 'rang
 
 type ReusableLayer = {
   readonly layer: ParsedLayer
-  state: 'available' | 'consumed' | 'carried'
+  state: 'available' | 'consumed'
 }
 
 type ParseInjectionContext = ParseParsedDocumentOptions & {
   readonly reusableLayers: ReusableLayer[]
   readonly missingLanguages: Set<string>
   readonly reservedLayerIds: Set<string>
+  /** Layers already present, when a pass may find them again. */
+  readonly knownLayers?: ReadonlySet<string>
 }
 
 const parseRootLayer = (
@@ -813,8 +857,11 @@ const parseParsedDocument = async (
   try {
     const parsedLayers: ParsedLayer[] = []
     await appendInjectionLayers(parsedLayers, options.rootLayer, context)
-    if (options.injectionRanges) await appendCarriedLayers(parsedLayers, context)
-    const layers = orderParsedLayers(options.rootLayer, parsedLayers)
+    if (options.injectionRanges) {
+      await appendCarriedLayers(parsedLayers, context)
+      await refillCappedLayers(parsedLayers, context)
+    }
+    const layers = cappedLayers(orderParsedLayers(options.rootLayer, parsedLayers))
 
     return {
       snapshotVersion: options.snapshotVersion,
@@ -892,6 +939,7 @@ const appendInjectionLayers = async (
 
   for (const plan of plans) {
     if (layers.length >= MAX_INJECTION_LAYERS) break
+    if (options.knownLayers?.has(layerIdentity(plan))) continue
     if (isNonProgressingInjection(plan, parent, layers, options.rootLayer)) continue
     if (!languageDescriptors.has(plan.languageId)) {
       options.missingLanguages.add(plan.languageId)
@@ -911,6 +959,29 @@ const appendInjectionLayers = async (
       )
     }
   }
+}
+
+// A capped document never parsed the layers past the cap. Once an edit leaves room, the next ones
+// are found after the last kept layer, as a full parse would find them.
+const refillCappedLayers = async (
+  layers: ParsedLayer[],
+  options: ParseInjectionContext,
+): Promise<void> => {
+  const oldLayers = options.oldDocument?.layers.length ?? 0
+  if (oldLayers <= MAX_INJECTION_LAYERS || layers.length >= MAX_INJECTION_LAYERS) return
+
+  let tailStart = 0
+  for (const layer of layers) tailStart = Math.max(tailStart, rangeSpan(layer.ranges).endIndex)
+  await appendInjectionLayers(layers, options.rootLayer, {
+    ...options,
+    injectionRanges: [{ startIndex: tailStart, endIndex: options.source.length }],
+    knownLayers: new Set(layers.map(layerIdentity)),
+  })
+}
+
+const layerIdentity = (layer: Pick<ParsedLayer, 'languageId' | 'parentId' | 'ranges'>): string => {
+  const span = rangeSpan(layer.ranges)
+  return `${layer.languageId}\u0000${layer.parentId}\u0000${span.startIndex}\u0000${span.endIndex}`
 }
 
 const isNonProgressingInjection = (
@@ -958,10 +1029,79 @@ const parseInjectionLayer = async (
         options.context,
       ),
     )
+    recordLayerChanges(options.injectionRanges, resolvedPlan.ranges, oldTree, tree)
     return { ...resolvedPlan, tree }
   } finally {
     oldTree?.delete()
   }
+}
+
+const recordLayerChanges = (
+  injectionRanges: TreeSitterSyntaxRange[] | null,
+  ranges: readonly TreeSitterRange[],
+  oldTree: Tree | null,
+  tree: Tree,
+): void => {
+  if (!injectionRanges) return
+  if (!oldTree) {
+    injectionRanges.push(rangeSpan(ranges))
+    return
+  }
+  appendItems(injectionRanges, enclosingRanges(treeChangedRanges(oldTree, tree), [oldTree, tree]))
+}
+
+// Changed ranges miss structure that moved without its first node changing: deleting a fence's
+// opening leaves the heading it becomes as the only change, and the fence's content turns into a
+// paragraph unreported. Each range grows to the smallest named node holding it in either tree.
+const enclosingRanges = (
+  ranges: readonly TreeSitterSyntaxRange[],
+  trees: readonly Tree[],
+): TreeSitterSyntaxRange[] =>
+  ranges.map((range) => {
+    let { startIndex, endIndex } = range
+    for (const tree of trees) {
+      const node = tree.rootNode.namedDescendantForIndex(range.startIndex, range.endIndex)
+      if (!node) continue
+      startIndex = Math.min(startIndex, node.startIndex)
+      endIndex = Math.max(endIndex, node.endIndex)
+    }
+    return { startIndex, endIndex }
+  })
+
+/** Each edit's inserted text in the final document, widened by one unit to catch adjacency. */
+const editedRanges = (
+  edits: readonly TreeSitterEditRequest['inputEdits'][number][],
+  length: number,
+): TreeSitterSyntaxRange[] => {
+  const ranges: TreeSitterSyntaxRange[] = []
+  for (const edit of edits) {
+    for (let index = 0; index < ranges.length; index += 1) {
+      ranges[index] = rangeAfterEdit(ranges[index]!, edit)
+    }
+    ranges.push({ startIndex: edit.startIndex, endIndex: edit.newEndIndex })
+  }
+  return ranges.map((range) => ({
+    startIndex: Math.max(0, range.startIndex - 1),
+    endIndex: Math.min(length, range.endIndex + 1),
+  }))
+}
+
+const rangeAfterEdit = (
+  range: TreeSitterSyntaxRange,
+  edit: TreeSitterEditRequest['inputEdits'][number],
+): TreeSitterSyntaxRange => ({
+  startIndex: indexAfterEdit(range.startIndex, edit, edit.startIndex),
+  endIndex: indexAfterEdit(range.endIndex, edit, edit.newEndIndex),
+})
+
+const indexAfterEdit = (
+  index: number,
+  edit: TreeSitterEditRequest['inputEdits'][number],
+  inside: number,
+): number => {
+  if (index <= edit.startIndex) return index
+  if (index >= edit.oldEndIndex) return index + edit.newEndIndex - edit.oldEndIndex
+  return inside
 }
 
 const takeReusableLayer = (
@@ -1096,7 +1236,10 @@ const appendCarriedLayers = async (
     if (!carried) continue
 
     layers.push(carried)
-    availableParentIds.add(carried.id)
+    // Its reparse may have grown children its old tree did not have.
+    const firstChild = layers.length
+    await appendInjectionLayers(layers, carried, options)
+    for (const layer of [carried, ...layers.slice(firstChild)]) availableParentIds.add(layer.id)
   }
 }
 
@@ -1108,10 +1251,9 @@ const carryReusableLayer = async (
   const layerChanged = reusable.layer.ranges.some((range) => {
     return rangeIntersectsChangedRanges(range, changedRanges)
   })
-  if (!layerChanged) {
-    reusable.state = 'carried'
-    return reusable.layer
-  }
+  // Reparsed, not kept: an edit before a layer still touches its first token's padding, and the
+  // kept tree then differs from what a fresh parse gives. An unchanged reparse is cheap.
+  if (!layerChanged) return reparseCarriedLayer(reusable, options)
 
   if (reusable.layer.kind !== 'combined-injection') return null
   const contentRanges = rangesWithoutBridgeNewlines(reusable.layer.ranges, options.source)
@@ -1120,6 +1262,22 @@ const carryReusableLayer = async (
   })
   if (untouchedRanges.length === 0) return null
   return reparsePartialCombinedLayer(reusable, untouchedRanges, options)
+}
+
+const reparseCarriedLayer = async (
+  reusable: ReusableLayer,
+  options: ParseInjectionContext,
+): Promise<ParsedLayer | null> => {
+  try {
+    return await parseInjectionLayer(
+      injectionPlanForLayer(reusable.layer, reusable.layer.ranges),
+      options,
+    )
+  } catch (error) {
+    if (error instanceof SyntaxRequestCancelled) throw error
+    recordOptionalWorkerPhaseFailure('parse injection', error, options.degraded, 'injection-failed')
+    return null
+  }
 }
 
 const reparsePartialCombinedLayer = async (
@@ -1176,6 +1334,16 @@ const orderParsedLayers = (
   return ordered
 }
 
+// Carried layers join the ones found near an edit, so the cap a full parse applies in discovery
+// order is applied here in the same order; the layers past it are the ones a full parse never makes.
+const cappedLayers = (layers: ParsedLayer[]): ParsedLayer[] => {
+  const limit = MAX_INJECTION_LAYERS + 1
+  if (layers.length <= limit) return layers
+
+  for (const layer of layers.slice(limit)) layer.tree.delete()
+  return layers.slice(0, limit)
+}
+
 const appendOrderedChildren = (
   ordered: ParsedLayer[],
   parentId: string,
@@ -1212,7 +1380,7 @@ const findInjections = (
   runtime: Runtime,
   source: TreeSitterPieceTableInput,
   context: CancellationContext,
-  changedRanges: readonly TreeSitterSyntaxRange[] | null,
+  changedRanges: TreeSitterSyntaxRange[] | null,
 ): InjectionPlan[] => {
   if (parent.depth >= MAX_INJECTION_DEPTH) return []
 
@@ -1228,13 +1396,28 @@ const findInjections = (
     addUniqueInjectionMatches(parent, matches, source, singles, groups, seen)
   }
 
+  const matchSpans: TreeSitterSyntaxRange[] = []
   for (const range of changedRanges ?? []) {
     const matches = query.matches(parent.tree.rootNode, queryOptions(context, range))
     assertNotCancelled(context)
     addUniqueInjectionMatches(parent, matches, source, singles, groups, seen)
+    for (const match of matches) matchSpans.push(injectionMatchSpan(match))
   }
+  // A match touched by the edit owns all of its content: an edit to a fence's language leaves the
+  // content untouched, and the layer carried over from before would outlive its injection.
+  if (changedRanges) appendItems(changedRanges, matchSpans)
 
   return singlesToPlans(singles).concat(groupsToPlans(groups, source)).sort(compareInjectionPlans)
+}
+
+const injectionMatchSpan = (match: ReturnType<Query['matches']>[number]): TreeSitterSyntaxRange => {
+  let startIndex = Number.POSITIVE_INFINITY
+  let endIndex = 0
+  for (const capture of match.captures) {
+    startIndex = Math.min(startIndex, capture.node.startIndex)
+    endIndex = Math.max(endIndex, capture.node.endIndex)
+  }
+  return { startIndex: Number.isFinite(startIndex) ? startIndex : 0, endIndex }
 }
 
 const addUniqueInjectionMatches = (
@@ -1582,13 +1765,35 @@ const parseInjectedSource = (
   oldTree: Tree | null,
   context: CancellationContext,
 ): Tree => {
-  const tree = parser.parse((index) => readTreeSitterPieceTableInput(source, index), oldTree, {
+  const tree = parser.parse((index) => readInjectedInput(source, ranges, index), oldTree, {
     includedRanges: [...ranges],
     progressCallback: () => isCancelled(context),
   })
   if (tree) return tree
   if (isCancelled(context)) throw new SyntaxRequestCancelled()
   throw new Error('Tree-sitter injection parse returned no tree')
+}
+
+// A read stops at the end of the range it starts in: past it the parser jumps to the next range,
+// and a batch read there would copy text the layer never sees into wasm memory.
+const readInjectedInput = (
+  source: TreeSitterPieceTableInput,
+  ranges: readonly TreeSitterRange[],
+  index: number,
+): string | undefined => {
+  const end = readEndForRanges(ranges, index)
+  if (end === null) return undefined
+
+  const text = readTreeSitterPieceTableInput(source, index)
+  if (text === undefined || index + text.length <= end) return text
+  return text.slice(0, end - index)
+}
+
+const readEndForRanges = (ranges: readonly TreeSitterRange[], index: number): number | null => {
+  for (const range of ranges) {
+    if (index < range.endIndex) return range.endIndex
+  }
+  return null
 }
 
 const packHighlights = (

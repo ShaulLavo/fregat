@@ -14,17 +14,14 @@ const original = createPieceTableSnapshot('x'.repeat(units))
 const appended = insertIntoPieceTable(original, units, 'tail')
 const first = reclaimPieceTableText(deleteFromPieceTable(appended, units / 2, 10))
 const prefix = bufferSpanAt(first.buffers, first.buffers.original, 0)
-const before = createTreeSitterSourceDescriptor(first, { useSharedBuffers: false })
+const before = createTreeSitterSourceDescriptor(first)
 const sentChunkLengths = new Map(before.chunks.map((chunk) => [chunk.chunkId, chunk.text.length]))
 const deleted = deleteFromPieceTable(first, units - 100, 10)
 const started = performance.now()
 const second = reclaimPieceTableText(deleted)
 const reclaimMs = performance.now() - started
 const descriptorStarted = performance.now()
-const after = createTreeSitterSourceDescriptor(second, {
-  useSharedBuffers: false,
-  sentChunkLengths,
-})
+const after = createTreeSitterSourceDescriptor(second, { sentChunkLengths })
 const descriptorMs = performance.now() - descriptorStarted
 const resentUnits = after.chunks.reduce((sum, chunk) => sum + chunk.text.length, 0)
 assert.equal(bufferSpanAt(second.buffers, second.buffers.original, 0), prefix)

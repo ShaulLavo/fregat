@@ -25,26 +25,20 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  verify:
+  # Three jobs side by side: checks, core's tests (the longest, and the only ones that need
+  # Firefox and WebKit), and every other package's tests.
+  check:
+    name: Typecheck, lint, catalog
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup
+        uses: ./.github/actions/setup
 
-      # `bun run test` runs each package's `vitest run`, and vitest's bin is a Node script — so the
-      # tests execute on Node, not on Bun, and the runner's default Node is older than this repo
-      # assumes. `packages/find` uses RegExp modifier groups (`(?s:a.b)`), which V8 only gained
-      # recently, so without this the suite fails on a feature the code legitimately relies on.
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      - name: Check turbo inputs
+        run: bun scripts/check-turbo-inputs.mjs
 
       - name: Check native language catalog
         run: bun run --cwd packages/tree-sitter-languages languages:generate -- --check
@@ -55,20 +49,95 @@ jobs:
       - name: Lint
         run: bun run lint
 
+      # Every save carries the restored entries forward, so entries written over three days ago go;
+      # one still in use is rebuilt once.
+      - name: Prune turbo cache
+        if: ${{ always() }}
+        run: find .turbo/cache -type f -mtime +3 -delete 2>/dev/null || true
+
+  core:
+    name: Test (core)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
       # Browser projects check geometry and CSS behavior that happy-dom cannot reproduce.
       # Run the workspace's own Playwright, not `bunx playwright` — bare `bunx` fetches the latest
       # from the registry, which downloads browsers into a revision directory the pinned 1.60.0
       # does not look in, so the install "succeeds" and the launch still fails.
       #
-      # Both browsers, deliberately: vitest browser mode runs `headless: true`, which launches
-      # `chrome-headless-shell`, a separate download from `chromium`.
+      # Chromium and its headless shell, deliberately: vitest browser mode runs `headless: true`,
+      # which launches `chrome-headless-shell`, a separate download from `chromium`. Firefox and
+      # WebKit are for core's highlight-paint project.
       - name: Install Playwright browsers
         working-directory: packages/editor
         run: ./node_modules/.bin/playwright install --with-deps chromium chromium-headless-shell firefox webkit
 
+      - name: Test
+        run: bun run test -- --filter=@singapore-editor/core
+
+      - name: Prune turbo cache
+        if: ${{ always() }}
+        run: find .turbo/cache -type f -mtime +3 -delete 2>/dev/null || true
+
+  packages:
+    name: Test (packages)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Install Playwright browsers
+        working-directory: packages/editor
+        run: ./node_modules/.bin/playwright install --with-deps chromium chromium-headless-shell
+
+      # The worker test imports built packages; turbo replays the build from the cache.
+      - name: Build packages
+        run: bun run build -- --filter='./packages/*'
+
       - name: Test tree-sitter browser worker
         run: bun run --cwd packages/tree-sitter test:browser
 
-      # Serial package execution keeps browser processes within the runner's capacity.
-      - name: Test
-        run: bun run test -- --concurrency=1
+      # Packages without browser projects share the runner. Everything else, a new package
+      # included until it is listed here, runs one package at a time to keep browser processes
+      # within the runner's capacity.
+      - name: Test (no browser)
+        run: >-
+          bun run test --
+          --filter=@singapore-editor/decode
+          --filter=@singapore-editor/diff
+          --filter=@singapore-editor/gutters
+          --filter=@singapore-editor/lsp
+          --filter=@singapore-editor/lsp-plugin
+          --filter=@singapore-editor/markdown
+          --filter=@singapore-editor/panes
+          --filter=@singapore-editor/textbuffer
+          --filter=@singapore-editor/tree-sitter-languages
+          --filter=@singapore-editor/typescript-lsp
+
+      - name: Test (browser)
+        if: ${{ !cancelled() }}
+        run: >-
+          bun run test -- --concurrency=1
+          --filter=!@singapore-editor/core
+          --filter=!@singapore-editor/decode
+          --filter=!@singapore-editor/diff
+          --filter=!@singapore-editor/gutters
+          --filter=!@singapore-editor/lsp
+          --filter=!@singapore-editor/lsp-plugin
+          --filter=!@singapore-editor/markdown
+          --filter=!@singapore-editor/panes
+          --filter=!@singapore-editor/textbuffer
+          --filter=!@singapore-editor/tree-sitter-languages
+          --filter=!@singapore-editor/typescript-lsp
+
+      - name: Prune turbo cache
+        if: ${{ always() }}
+        run: find .turbo/cache -type f -mtime +3 -delete 2>/dev/null || true

@@ -1701,6 +1701,7 @@ describe.skipIf(typeof globalThis.Highlight === 'undefined')('BiDi geometry brow
           offset: 11,
           affinity: 'after',
         })
+        mixed.view.focusInput()
         mixed.view.setSelection(8, 8, 'before')
         assertCaretLayerPositions(mixed.container, mixed.row, mixedBoundary[0]!, mixedBoundary[1]!)
 
@@ -3805,6 +3806,7 @@ function mountBidiEditor(
   editor.attachSession(session)
   const view = Reflect.get(editor, 'view') as VirtualizedTextView
   view.setScrollMetrics(0, height, width)
+  view.focusInput()
   const row = view.getState().mountedRows[0]
   expect(row).toBeDefined()
 

@@ -53,7 +53,7 @@ describe('editor plugin lifecycle', () => {
     editor.dispose()
   })
 
-  test('uses one host context across plugin activations', () => {
+  test('gives each plugin its own context', () => {
     const editor = createEditor()
     const contexts: EditorPluginContext[] = []
     const first = createContextCapturePlugin(contexts)
@@ -62,7 +62,83 @@ describe('editor plugin lifecycle', () => {
     editor.setPlugins([first, second])
 
     expect(contexts).toHaveLength(2)
-    expect(contexts[0]).toBe(contexts[1])
+    expect(contexts[0]).not.toBe(contexts[1])
+    editor.dispose()
+  })
+
+  test('releases what a contribution registered through its context when the plugin goes', () => {
+    const editor = createEditor()
+    const plugin: EditorPlugin = {
+      name: 'forgetful',
+      activate: (context) =>
+        context.registerViewContribution({
+          createContribution: (view) => {
+            view.registerKeymapContextKey('probe.visible', () => true)
+            view.onDidType(() => undefined)
+            // Its own dispose forgets both registrations.
+            return { update: () => undefined, dispose: () => undefined }
+          },
+        }),
+    }
+
+    editor.setPlugins([plugin])
+    expect(editor.getKeymapContext()['probe.visible']).toBe(true)
+    editor.setPlugins([])
+
+    expect(editor.getKeymapContext()['probe.visible']).toBeUndefined()
+    expect((Reflect.get(editor, 'typedTextListeners') as Set<unknown>).size).toBe(0)
+    editor.dispose()
+  })
+
+  test('releases what a contribution registered after it was created', () => {
+    const editor = createEditor()
+    const later: (() => void)[] = []
+    const plugin: EditorPlugin = {
+      name: 'late-key',
+      activate: (context) =>
+        context.registerViewContribution({
+          createContribution: (view) => {
+            later.push(() => void view.registerKeymapContextKey('probe.late', () => true))
+            return { update: () => undefined, dispose: () => undefined }
+          },
+        }),
+    }
+
+    editor.setPlugins([plugin])
+    for (const register of later) register()
+    expect(editor.getKeymapContext()['probe.late']).toBe(true)
+    editor.setPlugins([])
+
+    expect(editor.getKeymapContext()['probe.late']).toBeUndefined()
+    editor.dispose()
+  })
+
+  test('releases a registration the plugin made after activate returned', async () => {
+    const editor = createEditor()
+    let calls = 0
+    const plugin: EditorPlugin = {
+      name: 'late',
+      activate: (context) => {
+        void Promise.resolve().then(() =>
+          context.registerCommandContribution({
+            createContribution: (commands) =>
+              commands.registerCommand('goToDefinition', () => {
+                calls += 1
+                return true
+              }),
+          }),
+        )
+      },
+    }
+
+    editor.setPlugins([plugin])
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(editor.dispatchCommand('goToDefinition')).toBe(true)
+    editor.setPlugins([])
+
+    expect(editor.dispatchCommand('goToDefinition')).toBe(false)
+    expect(calls).toBe(1)
     editor.dispose()
   })
 
@@ -578,7 +654,7 @@ describe('editor plugin lifecycle', () => {
     expect(disposedSubscriptions).toEqual(['subscription-1', 'subscription-2'])
   })
 
-  test('stops tracking host-owned registrations the caller released before teardown', () => {
+  test('stops tracking late registrations the plugin released before teardown', () => {
     const host = new EditorPluginHost()
     let captured: EditorPluginContext | null = null
     host.setPlugins([
@@ -596,7 +672,7 @@ describe('editor plugin lifecycle', () => {
     for (let index = 0; index < 3; index += 1)
       context.registerSyntaxProvider({ createSession: () => null }).dispose()
 
-    expect(hostRegistrationCount(host)).toBe(0)
+    expect(lateRegistrationCount(host)).toBe(0)
 
     host.dispose()
   })
@@ -844,9 +920,20 @@ function requireContext(context: EditorPluginContext | null): EditorPluginContex
   return context
 }
 
-function hostRegistrationCount(host: EditorPluginHost): number {
-  return (host as unknown as { readonly hostRegistrations: { readonly size: number } })
-    .hostRegistrations.size
+function lateRegistrationCount(host: EditorPluginHost): number {
+  type Stores = {
+    readonly active: { readonly size: number } | null
+    readonly installed: { readonly size: number }
+  }
+  const installed = Reflect.get(host, 'installedPlugins') as Map<
+    unknown,
+    { readonly registrations: Stores }
+  >
+  let count = 0
+  for (const { registrations } of installed.values()) {
+    count += (registrations.active?.size ?? 0) + registrations.installed.size
+  }
+  return count
 }
 
 function findVirtualRow(index: number): HTMLElement | null {

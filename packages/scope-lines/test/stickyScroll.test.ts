@@ -195,12 +195,12 @@ describe('createStickyScrollPlugin', () => {
     expect(mirroredLines(testContext)).toEqual(DEEP_LINES.slice(0, 5))
   })
 
-  it('re-renders for the viewport but not for a moved caret', () => {
+  it('re-renders for the viewport and does not ask for caret moves', () => {
     const registration = registeredProvider(createStickyScrollPlugin())
     const testContext = context(scrolledSnapshot(60))
     const contribution = registration?.createContribution(testContext)
-    contribution?.update(scrolledSnapshot(100), 'selection')
 
+    expect(contribution?.inputs).not.toContain('selection')
     expect(mirroredLines(testContext)).toEqual(['function outer() {', '  if (a) {'])
 
     contribution?.update(scrolledSnapshot(100), 'viewport')

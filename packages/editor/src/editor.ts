@@ -83,6 +83,7 @@ export type {
   HighlightRegistry,
 } from './editor/types'
 export type { EditorCommandContext, EditorCommandId } from './editor/commands'
+export type { EditorAnyCommandId } from './editor/commandCatalog'
 export {
   defaultEditorCommandPacks,
   defaultEditorKeyBindings,

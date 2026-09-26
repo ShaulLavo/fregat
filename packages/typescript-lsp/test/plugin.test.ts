@@ -1,6 +1,6 @@
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
 import { createStringTextSnapshot, type TextReadSnapshot } from '@singapore-editor/core/document'
-import type { EditorCommandId } from '@singapore-editor/core/editor'
+import type { EditorAnyCommandId } from '@singapore-editor/core/editor'
 import type {
   DocumentSessionChange,
   DocumentSyncPoint,
@@ -1691,7 +1691,7 @@ function activatePluginWithCommands(
   options?: FeatureContributionContextOptions,
 ): {
   readonly provider: EditorViewContributionProvider
-  readonly commands: ReadonlyMap<EditorCommandId, EditorCommandHandler>
+  readonly commands: ReadonlyMap<EditorAnyCommandId, EditorCommandHandler>
   readonly features: ReadonlyMap<unknown, unknown>
 }
 function activatePluginWithCommands(
@@ -1699,11 +1699,11 @@ function activatePluginWithCommands(
   options?: FeatureContributionContextOptions,
 ): {
   readonly provider: EditorViewContributionProvider
-  readonly commands: ReadonlyMap<EditorCommandId, EditorCommandHandler>
+  readonly commands: ReadonlyMap<EditorAnyCommandId, EditorCommandHandler>
   readonly features: ReadonlyMap<unknown, unknown>
 } {
   let provider: EditorViewContributionProvider | null = null
-  const commands = new Map<EditorCommandId, EditorCommandHandler>()
+  const commands = new Map<EditorAnyCommandId, EditorCommandHandler>()
   const features = options?.features ?? new Map<string, unknown>()
   plugin.activate(
     createTestPluginContext({
@@ -1760,7 +1760,7 @@ type FeatureContributionContextOptions = {
 }
 
 function commandContributionContext(
-  commands: Map<EditorCommandId, EditorCommandHandler>,
+  commands: Map<EditorAnyCommandId, EditorCommandHandler>,
 ): EditorCommandContributionContext {
   return {
     registerCommand: (commandId, handler) => {
@@ -1784,8 +1784,8 @@ function editContributionContext(
 }
 
 function command(
-  commands: ReadonlyMap<EditorCommandId, EditorCommandHandler>,
-  commandId: EditorCommandId,
+  commands: ReadonlyMap<EditorAnyCommandId, EditorCommandHandler>,
+  commandId: EditorAnyCommandId,
 ): EditorCommandHandler {
   const handler = commands.get(commandId)
   if (!handler) throw new Error(`missing command ${commandId}`)

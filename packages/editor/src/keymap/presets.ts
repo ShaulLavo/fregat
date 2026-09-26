@@ -1,20 +1,10 @@
 import { detectPlatform, type RawHotkey, type RawModifiers } from '@tanstack/hotkeys'
 import { EDITOR_FOLD_LEVELS, type EditorCommandId } from '../editor/commands'
+import { editorCommandDeclaration, type EditorCommandPack } from '../editor/commandCatalog'
 import type { KeyChord } from './types'
 import { type EditorKeyCondition, editorCommandMutates } from './conditions'
 type EditorPlatform = ReturnType<typeof detectPlatform>
-export type EditorCommandPack =
-  | 'navigation'
-  | 'selection'
-  | 'find'
-  | 'text-editing'
-  | 'advanced-editing'
-  | 'multi-cursor'
-  | 'folding'
-  | 'lsp-navigation'
-  | 'lsp-editing'
-  | 'inline-suggest'
-  | 'suggest'
+export type { EditorCommandPack } from '../editor/commandCatalog'
 
 export type EditorKeymapLayerSource = 'core' | 'app'
 
@@ -151,19 +141,8 @@ export function filterEditorKeymapLayersByCommandPacks(
 }
 
 export function editorCommandPackForCommand(command: EditorCommandId): EditorCommandPack | null {
-  if (NAVIGATION_COMMANDS.has(command)) return 'navigation'
-  if (SELECTION_COMMANDS.has(command)) return 'selection'
-  if (FIND_COMMANDS.has(command)) return 'find'
-  if (TEXT_EDITING_COMMANDS.has(command)) return 'text-editing'
-  if (ADVANCED_EDITING_COMMANDS.has(command)) return 'advanced-editing'
-  if (MULTI_CURSOR_COMMANDS.has(command)) return 'multi-cursor'
-  if (FOLDING_COMMANDS.has(command)) return 'folding'
-  if (LSP_NAVIGATION_COMMANDS.has(command)) return 'lsp-navigation'
-  if (LSP_EDITING_COMMANDS.has(command)) return 'lsp-editing'
-  if (INLINE_SUGGEST_COMMANDS.has(command)) return 'inline-suggest'
-  if (SUGGEST_COMMANDS.has(command)) return 'suggest'
-
-  return null
+  const category = editorCommandDeclaration(command).category
+  return category === 'merge-conflict' ? null : category
 }
 
 function editorKeyBindingsForCommandPack(
@@ -194,173 +173,6 @@ function editorCommandInPacks(
 
   return packs.has(pack)
 }
-
-const NAVIGATION_COMMANDS = new Set<EditorCommandId>([
-  'cursorLeft',
-  'cursorRight',
-  'cursorUp',
-  'cursorDown',
-  'cursorWordLeft',
-  'cursorWordRight',
-  'cursorWordPartLeft',
-  'cursorWordPartRight',
-  'cursorLineStart',
-  'cursorLineEnd',
-  'cursorPageUp',
-  'cursorPageDown',
-  'cursorDocumentStart',
-  'cursorDocumentEnd',
-  'editor.action.jumpToBracket',
-  // Soft wrap decides whether a long line is walked sideways or read down the page, which is a
-  // question for whoever is reading the document rather than whoever is writing it — so it is
-  // offered and withdrawn with the rest of the keys for getting through one.
-  'editor.action.toggleWordWrap',
-])
-
-const SELECTION_COMMANDS = new Set<EditorCommandId>([
-  'selectAll',
-  'editor.action.smartSelect.expand',
-  'editor.action.smartSelect.shrink',
-  'selectLeft',
-  'selectRight',
-  'selectUp',
-  'selectDown',
-  'selectWordLeft',
-  'selectWordRight',
-  'cursorWordPartLeftSelect',
-  'cursorWordPartRightSelect',
-  'selectLineStart',
-  'selectLineEnd',
-  'selectPageUp',
-  'selectPageDown',
-  'selectDocumentStart',
-  'selectDocumentEnd',
-  'cursorColumnSelectLeft',
-  'cursorColumnSelectRight',
-  'cursorColumnSelectUp',
-  'cursorColumnSelectDown',
-  'cursorColumnSelectPageUp',
-  'cursorColumnSelectPageDown',
-])
-
-const FIND_COMMANDS = new Set<EditorCommandId>([
-  'find',
-  'findNext',
-  'findPrevious',
-  'closeFind',
-  'toggleFindCaseSensitive',
-  'toggleFindWholeWord',
-  'toggleFindRegex',
-  'toggleFindInSelection',
-  'togglePreserveCase',
-])
-
-const TEXT_EDITING_COMMANDS = new Set<EditorCommandId>([
-  'undo',
-  'redo',
-  'jumpBack',
-  'jumpForward',
-  'cursorUndo',
-  'cursorRedo',
-  'deleteBackward',
-  'deleteForward',
-  'indentSelection',
-  'outdentSelection',
-  // Handing Tab back to the page belongs with the keys that took it, so a host cannot end up
-  // offering the trap without the way out of it.
-  'editor.action.toggleTabFocusMode',
-  'findReplace',
-  'replaceOne',
-  'replaceAll',
-])
-
-const ADVANCED_EDITING_COMMANDS = new Set<EditorCommandId>([
-  'deleteWordLeft',
-  'deleteWordRight',
-  'deleteWordPartLeft',
-  'deleteWordPartRight',
-  'editor.action.commentLine',
-  'editor.action.blockComment',
-  'editor.action.indentLines',
-  'editor.action.outdentLines',
-  'editor.action.reindentlines',
-  'editor.action.reindentselectedlines',
-  'editor.action.deleteLines',
-  'editor.action.copyLinesUpAction',
-  'editor.action.copyLinesDownAction',
-  'editor.action.moveLinesUpAction',
-  'editor.action.moveLinesDownAction',
-  'editor.action.insertLineBefore',
-  'editor.action.insertLineAfter',
-  'editor.action.trimTrailingWhitespace',
-  'editor.action.sortLinesAscending',
-  'editor.action.sortLinesDescending',
-  'editor.action.joinLines',
-  'editor.action.duplicateSelection',
-  'editor.action.transformToUppercase',
-  'editor.action.transformToLowercase',
-  'editor.action.transformToTitlecase',
-])
-
-const MULTI_CURSOR_COMMANDS = new Set<EditorCommandId>([
-  'addNextOccurrence',
-  'clearSecondarySelections',
-  'selectAllMatches',
-  'editor.action.insertCursorAbove',
-  'editor.action.insertCursorBelow',
-  'editor.action.selectHighlights',
-  'editor.action.changeAll',
-  'editor.action.moveSelectionToNextFindMatch',
-])
-
-const FOLDING_COMMANDS = new Set<EditorCommandId>([
-  'editor.fold',
-  'editor.unfold',
-  'editor.foldRecursively',
-  'editor.unfoldRecursively',
-  'editor.foldAll',
-  'editor.unfoldAll',
-  'editor.createFoldingRangeFromSelection',
-  'editor.removeManualFoldingRanges',
-  ...EDITOR_FOLD_LEVELS.map((level) => `editor.foldLevel${level}` as const),
-])
-
-const LSP_NAVIGATION_COMMANDS = new Set<EditorCommandId>([
-  'editor.action.showHover',
-  'goToDefinition',
-  'editor.action.goToDefinition',
-  'editor.action.goToReferences',
-  'editor.action.peekDefinition',
-  'editor.action.revealDefinitionAside',
-  'editor.action.goToImplementation',
-  'editor.action.goToTypeDefinition',
-  'editor.action.marker.next',
-  'editor.action.marker.prev',
-])
-
-const LSP_EDITING_COMMANDS = new Set<EditorCommandId>([
-  'editor.action.formatDocument',
-  'editor.action.rename',
-  'editor.action.autoFix',
-])
-
-const INLINE_SUGGEST_COMMANDS = new Set<EditorCommandId>([
-  'editor.action.inlineSuggest.commit',
-  'editor.action.inlineSuggest.acceptNextWord',
-])
-
-const SUGGEST_COMMANDS = new Set<EditorCommandId>([
-  'editor.action.triggerSuggest',
-  'selectNextSuggestion',
-  'selectPrevSuggestion',
-  'selectNextPageSuggestion',
-  'selectPrevPageSuggestion',
-  'acceptSelectedSuggestion',
-  'hideSuggestWidget',
-  'closeParameterHints',
-  'showNextParameterHint',
-  'showPrevParameterHint',
-])
 
 /**
  * The completion list before the signature hint, and both before whatever else owns the key: one
@@ -826,10 +638,11 @@ export function vscodeEditorKeyBindings(
     (binding) => !replaced.has(binding.command),
   )
   // The suggest pack outranks the overrides as it outranks every default layer.
-  const suggest = defaults.filter((binding) => SUGGEST_COMMANDS.has(binding.command))
+  const suggests = (binding: EditorKeyBinding) =>
+    editorCommandPackForCommand(binding.command) === 'suggest'
   return [
-    ...suggest,
+    ...defaults.filter(suggests),
     ...overrides.map(withEditorConditions),
-    ...defaults.filter((binding) => !SUGGEST_COMMANDS.has(binding.command)),
+    ...defaults.filter((binding) => !suggests(binding)),
   ]
 }

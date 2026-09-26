@@ -1545,7 +1545,7 @@ export class InputSelectionController {
     })
   }
 
-  syncDomSelection(): void {
+  syncDomSelection(options: { readonly notify?: boolean } = {}): void {
     const session = this.session
     if (!session) return
 
@@ -1559,19 +1559,19 @@ export class InputSelectionController {
 
     if (this.hasFocusedExternalElement()) {
       this.syncSessionSelectionHighlight()
-      this.options.notifyViewContributions('selection', null)
+      this.notifySelection(options.notify ?? true)
       return
     }
 
     if (this.isInputFocused()) {
       this.syncSessionSelectionHighlight()
-      this.options.notifyViewContributions('selection', null)
+      this.notifySelection(options.notify ?? true)
       return
     }
 
     if (this.options.selectionSyncMode === 'none') {
       this.syncSessionSelectionHighlight()
-      this.options.notifyViewContributions('selection', null)
+      this.notifySelection(options.notify ?? true)
       return
     }
 
@@ -1580,7 +1580,11 @@ export class InputSelectionController {
     domSelection?.removeAllRanges()
     if (range) domSelection?.addRange(range)
     this.syncSessionSelectionHighlight()
-    this.options.notifyViewContributions('selection', null)
+    this.notifySelection(options.notify ?? true)
+  }
+
+  private notifySelection(notify: boolean): void {
+    if (notify) this.options.notifyViewContributions('selection', null)
   }
 
   syncSessionSelectionHighlight(): void {

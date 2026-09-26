@@ -241,7 +241,7 @@ describe('Tree-sitter syntax capture conversion', () => {
 
   it('keeps worker parse and edit requests source-based', () => {
     const snapshot = createPieceTableSnapshot('const a = 1;\n')
-    const source = createTreeSitterSourceDescriptor(snapshot, { useSharedBuffers: false })
+    const source = createTreeSitterSourceDescriptor(snapshot)
     const parseRequest: TreeSitterParseRequest = {
       type: 'parse',
       documentId: 'file.ts',

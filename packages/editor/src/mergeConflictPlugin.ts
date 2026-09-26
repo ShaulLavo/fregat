@@ -115,11 +115,11 @@ const INCOMING_HEADER_ROW: VirtualizedTextRowDecoration = {
 export function createMergeConflictPlugin(
   options: EditorMergeConflictPluginOptions = {},
 ): EditorPlugin {
-  let controller: EditorMergeConflictController | null = null
-
   return {
     name: EDITOR_MERGE_CONFLICT_FEATURE_ID,
     activate(context) {
+      // Per activation: one plugin object in two editors must not share a controller.
+      let controller: EditorMergeConflictController | null = null
       const internalContext = context as EditorInternalPluginContext
       const disposables: EditorDisposable[] = [
         internalContext.registerEditorFeatureContribution({
@@ -360,6 +360,8 @@ class EditorMergeConflictController {
  * empty row injected above the `<<<<<<<` marker, and the overview-ruler marks in the minimap.
  */
 class MergeConflictViewContribution implements EditorViewContribution {
+  // Lenses sit on the mounted rows; the caret changes none of them.
+  readonly inputs = ['content', 'tokens', 'viewport', 'layout'] as const
   private readonly root: HTMLDivElement
   private readonly subscription: EditorDisposable
   private readonly minimap: EditorMinimapFeature | null

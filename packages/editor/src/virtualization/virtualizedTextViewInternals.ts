@@ -1,3 +1,4 @@
+import type { ScheduledFrame } from '../editor/scheduleFrame'
 import type { WrapAdvance, WrapBreak } from './displayProjectionTypes'
 import type { GlyphAdvances } from './glyphAdvances'
 import type { HighlightOverlayRange } from './highlightOverlay'
@@ -82,6 +83,8 @@ export interface VirtualizedTextViewInternal {
   readonly caretLayerElement: HTMLDivElement
   readonly caretElement: HTMLDivElement
   readonly secondaryCaretElements: HTMLDivElement[]
+  /** A caret render waiting for the next frame because the editor does not hold focus. */
+  deferredCaret: ScheduledFrame | null
   readonly styleEl: HTMLStyleElement
   readonly highlightScope: string
   readonly virtualizer: FixedRowVirtualizer
