@@ -286,6 +286,10 @@ an incremental block grammar, per leaf and cached, is the shape that works.
    worker repairs from the calibration that still apply to fence layers: discover injections from
    changed ranges plus the edit, bound each input read to its range, one idle reparse after a
    full parse.
+   The worker repairs landed 2026-09-26 in wave 2, lane E1 ([singapore#43](https://github.com/ShaulLavo/singapore/pull/43),
+   in `editor-ref` `db3e1bd`): injections found from changed ranges plus the edit, bounded input
+   reads, one idle reparse after a full parse, and the cap refilled after deletes. Worker bench at
+   1 MB: keystroke median 37 → 10 ms, first keystroke 82 → 20 ms. This phase keeps the rest.
 
 Chat: no phase while question 2 stands at (a).
 
