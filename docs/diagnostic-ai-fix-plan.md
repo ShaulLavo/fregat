@@ -1,6 +1,6 @@
 # Fix diagnostics with AI
 
-Status: the diagnostic hover entry is implemented in lane L7, using the shared draft handoff from lane L8. The Problems list and keyboard diagnostic popup are implemented in L8. Landing requires owner approval for Platform #33/#37 and Editor #34–#36.
+Status: the Problems list and keyboard diagnostic popup are implemented in lane L8 (Platform #33). The Editor side of the hover entry is on Editor main (per-diagnostic hover actions, Editor #36). The Platform hover caller is next wave: it needs L8's `useDiagnosticFix`, so it lands after #33. Its implementation is commit `7e7072132` on `lane/L7`, reverted before merge.
 
 Clicking **Fix with AI** opens a chat draft containing the diagnostic and its source context. The user reviews and sends it through the existing agent workflow. Keep native language-server quick fixes alongside it. This action must work even when the server offers no code actions.
 
@@ -69,11 +69,10 @@ The regression test failed before the proxy fix. All 71 proxy tests and the serv
 
 A durable fix for the declaration issue remains separate. Evaluate resolving workspace imports against source during development or changing Editor's build publication so consumers never observe JavaScript without its declarations. Prove the chosen change against the linked-package reproduction. Do not hide TS7016 or add an ambient declaration that erases the module's types.
 
-## Hover verification
+## Hover entry (next wave)
 
-`editor-diagnostic-hover-fix` opens a real TypeScript error, edits the source without saving,
-then invokes its hover action with Enter. The resulting draft carries the exact diagnostic
-and the unsaved source excerpt. Browser evidence on 2026-09-25 is in
-`/work/tmp/fregat-evidence/20260925T192101Z-scenario-editor-diagnostic-hover-fix/`.
-Editor action tests also cover pointer/Space activation, pending and failed actions,
-progressive hover updates, Escape focus and stale diagnostic refusal.
+After Platform #33 lands, cherry-pick `7e7072132` from `lane/L7`: `useLanguageServerPlugin` passes
+`diagnosticHoverActions(mutateAsync)` as `getDiagnosticActions` to both LSP backends, and the
+`editor-diagnostic-hover-fix` scenario proves the draft carries the exact diagnostic and the
+unsaved source. It passed on a local L7+L8 merge on 2026-09-25
+(`/work/tmp/fregat-evidence/20260925T192101Z-scenario-editor-diagnostic-hover-fix/`).

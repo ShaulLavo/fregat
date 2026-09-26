@@ -11,7 +11,6 @@ import type {
   LanguageServerPlugin,
 } from '@singapore-editor/lsp-plugin/websocket'
 import type {
-  LanguageServerDiagnosticActions,
   LanguageServerDiagnosticMarkerClaim,
   LanguageServerDiagnosticMarkerEvent,
   LanguageServerFeatureRanks,
@@ -71,7 +70,6 @@ type MatchedLanguageServerPluginOptions = {
   statusSource: EditorLanguageServerStatusSource
   target: LanguageServerDocumentTarget
   onApplyWorkspaceEdit: OnApplyWorkspaceEdit
-  getDiagnosticActions?: LanguageServerDiagnosticActions
   onDefinitionLinkHover?: (target: LanguageServerDefinitionTarget) => void
   onOpenDefinition?: (target: LanguageServerDefinitionTarget) => void | boolean
   onOpenReferences?: (result: LanguageServerReferencesResult) => void | boolean
@@ -97,7 +95,6 @@ export function createMatchedLanguageServerPlugin({
   onOpenDefinition,
   onOpenReferences,
   onDidNavigateDiagnostic,
-  getDiagnosticActions,
 }: MatchedLanguageServerPluginOptions): LanguageServerPlugin {
   const eligible = enabled ? (matches ?? []) : []
   if (eligible.length === 0 || document === null)
@@ -166,7 +163,6 @@ export function createMatchedLanguageServerPlugin({
         onOpenDefinition,
         onOpenReferences,
         onDidNavigateDiagnostic,
-        getDiagnosticActions,
       })
       return [...pluginDisposables(plugin.activate(context)), { dispose: unsubscribe }]
     },

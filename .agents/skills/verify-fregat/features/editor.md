@@ -72,8 +72,6 @@ The click scenario waits 750ms between clicks so debounced document highlights, 
 
 `scenario editor-lsp-deprecated` opens its own temp workspace with a `tags.ts` that calls `.substr()`, and checks the strike overlay covers exactly `substr` in an explicit syntax colour. `scenario editor-lsp-unnecessary` does the same for the fade on an unused `const`. Both ignore `--file`.
 
-`scenario editor-diagnostic-hover-fix` hovers a diagnostic, takes its Fix with AI action, and checks the draft carries the exact problem and the unsaved source excerpt. It needs the diagnostic-ai provider (`useDiagnosticFix`).
-
 `scenario editor-typescript-worker` switches `lsp.typescript.backend` to `worker` and renames across files, imports a missing symbol and formats, all through the browser worker. `scenario editor-typescript-worker-memory` measures the worker heap on `apps/web` and records its preload limits.
 
 `scenario editor-lsp-rename-key` puts the caret on a TypeScript identifier and presses F2, which the Editor's default keymap binds to rename (before E054 only its VS Code preset did), then checks the prompt opens on the identifier's name. Escape has to hand focus back to the editor: the undo that follows only reaches the file if it did, and the scenario fails unless the file reads as it did before.
