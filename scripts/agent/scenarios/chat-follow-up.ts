@@ -9,10 +9,10 @@ export const chatFollowUp: Scenario = {
     'Send a follow-up during a real Codex turn, then close its runtime and resume with another message.',
   async run(page, { step }) {
     const connected = page.waitForEvent('websocket', {
-      predicate: (socket) => socket.url().endsWith('/orchestration/rpc'),
+      predicate: (socket) => new URL(socket.url()).pathname.endsWith('/orchestration/rpc'),
     })
     await page.goto(page.url().replace(/\/workbench(?:\?.*)?$/, '/chat'))
-    const rpcUrl = (await connected).url()
+    const rpcUrl = (await connected).url().split('?')[0]!
     await selectors.chatNewSession(page).click()
     await page.waitForTimeout(1_500)
     await selectors.chatMessage(page).click()

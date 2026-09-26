@@ -32,13 +32,18 @@ type Stale = {
   readonly newestSource: string
 }
 
+const unfinishedWalks: string[] = []
+
 function newestMtime(dir: string, deadline: number): { ms: number; file: string } {
   let best = { ms: 0, file: dir }
   if (!fs.existsSync(dir)) return best
 
   const stack = [dir]
   while (stack.length > 0) {
-    if (Date.now() > deadline) return best
+    if (Date.now() > deadline) {
+      unfinishedWalks.push(dir)
+      return best
+    }
 
     const current = stack.pop()
     if (current === undefined) break
@@ -118,6 +123,17 @@ const stale = packages
   .filter((pkg) => !SKIP.has(pkg.name))
   .map((pkg) => staleness(pkg, deadline))
   .filter((entry): entry is Stale => entry !== null)
+
+// A walk that ran out of budget judged freshness from part of the tree; say so.
+if (unfinishedWalks.length > 0) {
+  console.warn(
+    [
+      'Linked-source freshness is unverified: the walk ran out of its 5 s budget in',
+      ...unfinishedWalks.map((dir) => `  ${dir}`),
+      'Rebuild the sibling checkout if typecheck reports stale editor types.',
+    ].join('\n'),
+  )
+}
 
 if (stale.length === 0) process.exit(0)
 

@@ -42,6 +42,7 @@ import {
   observabilityRoutes,
   recordClientInstance,
   recordProcessInfo,
+  recordProcessWarning,
   recordRequestContext,
   recordRequestError,
   runDetached,
@@ -53,7 +54,12 @@ import { OrchestrationCheckpointDiffQuery } from './orchestration/checkpoint-dif
 import type { OrchestrationDatabase } from './orchestration/event-store'
 import { orchestrationRoutes } from './orchestration/routes'
 import { OrchestrationSessionSearchQuery } from './orchestration/session-search-query'
-import { orchestrationWsRoutes, orchestrationWsServerConfig } from './orchestration/ws-rpc'
+import {
+  createOrchestrationSockets,
+  orchestrationWsRoutes,
+  orchestrationWsServerConfig,
+  type OrchestrationSockets,
+} from './orchestration/ws-rpc'
 import {
   createDefaultProviderAdapterRegistry,
   type ProviderAdapterRegistry,
@@ -71,8 +77,12 @@ import { autoSettleRules } from './orchestration/utils/auto-settle-settings'
 import { readBranchPullRequests, type ForgeBoundaries } from './git/pull-request'
 import type { BranchPullRequestLookup } from './orchestration/pull-request-sync-reactor'
 import { TerminalService, type TerminalPtyFactory } from './terminal/service'
+import type { TerminalHostClient } from './terminal/host-client'
 import { wallpaperRoutes } from './wallpaper/routes'
 import { webRoutes, type WebOptions } from './web/routes'
+import { readReleaseInfoSync } from './web/release'
+import { serverUpdateRoutes } from './update/routes'
+import { ServerUpdate, type UpdateOptions } from './update/service'
 import { ProviderSessionDirectory } from './provider/provider-session-directory'
 import { ProviderService } from './provider/provider-service'
 import { ProviderUsageHistoryReader } from './provider/usage-history'
@@ -101,6 +111,7 @@ export type AppOptions = FileSystemServiceOptions & {
   terminal?: {
     env?: NodeJS.ProcessEnv
     ptyFactory?: TerminalPtyFactory
+    hostClient?: TerminalHostClient
   }
   fonts?: FontCatalogService
   themes?: {
@@ -137,6 +148,8 @@ export type AppOptions = FileSystemServiceOptions & {
   /** The origin forwarded to remote machines as this app's web origin. */
   webOrigin?: string
   web?: WebOptions
+  /** Staged releases and Restart. Absent leaves both inert, as in dev and tests. */
+  update?: UpdateOptions
   push?: { fetcher?: PushFetcher }
 }
 
@@ -153,6 +166,14 @@ export function orchestrationForApp(app: object) {
   const engine = appOrchestration.get(app)
   if (!engine) throw createInternalError('App has no orchestration engine')
   return engine
+}
+
+const appUpdates = new WeakMap<object, ServerUpdate>()
+
+export function updateForApp(app: object) {
+  const update = appUpdates.get(app)
+  if (!update) throw createInternalError('App has no server update')
+  return update
 }
 
 const appCleanups = new WeakMap<object, () => Promise<void>>()
@@ -180,8 +201,9 @@ export function createApp(options: AppOptions) {
         throw createInternalError('Terminal requires a ready worktree')
       return worktree.canonicalPath
     },
-    lifecycle: { begin: (worktreeId) => orchestration.beginTerminalLease(worktreeId) },
+    lifecycle: { begin: (worktreeId, key) => orchestration.beginTerminalLease(worktreeId, key) },
     resolveAgentSession: (input) => orchestration.beginAgentTerminal(input),
+    resolveAdoptedLease: (key) => orchestration.adoptedLeaseForKey(key),
   })
   const fonts = options.fonts ?? new FontCatalogService()
 
@@ -390,7 +412,9 @@ export function createApp(options: AppOptions) {
       () => settings.snapshot().values['lsp.semanticTokens.delta'],
       treeWatchSource(fs.changes, fs.paths),
     )
+  const orchestrationSockets = createOrchestrationSockets()
   const cleanup = appCleanup(
+    orchestrationSockets,
     terminal,
     fs,
     settings,
@@ -403,6 +427,12 @@ export function createApp(options: AppOptions) {
     providerResetCredits,
     sessionPush,
   )
+  const update = new ServerUpdate({
+    root: options.update?.root ?? null,
+    restart: options.update?.restart ?? noop,
+    serverRelease: readReleaseInfoSync(options.web?.serverReleaseFile).release,
+    gate: orchestration,
+  })
 
   const app = new Elysia({ name: 'platform' })
   applyObservability(app)
@@ -427,13 +457,16 @@ export function createApp(options: AppOptions) {
     // origin is known. Mounted before every parent hook: an Elysia plugin
     // mounted after one parent `onBeforeHandle` inherits the parent's later
     // hooks too, which would put the auth guard in front of index.html.
-    .use(webRoutes(options.web ?? {}))
+    .use(webRoutes(options.web ?? {}, update, terminal))
     .onBeforeHandle(({ request }) => {
       recordClientInstance(request)
     })
     // Auth runs after the WS upgrade so the browser receives the explicit 1008 refusal.
-    .use(orchestrationWsRoutes(orchestration, auth, identity, presence))
+    .use(
+      orchestrationWsRoutes(orchestration, auth, identity, orchestrationSockets, update, presence),
+    )
     .onBeforeHandle(authGuard(auth))
+    .use(serverUpdateRoutes(update))
     .use(
       machineRoutes(
         machines,
@@ -523,8 +556,15 @@ export function createApp(options: AppOptions) {
       void providerPrices.refresh()
     })
     .onStop(cleanup)
+  // Recovery starts for in-process apps too; terminal opens wait until lease adoption finishes.
+  void terminal
+    .reattach()
+    .catch((error: unknown) =>
+      recordProcessWarning('terminal.host.recovery_failed', { area: 'terminal', error }),
+    )
   appCleanups.set(configured, cleanup)
   appOrchestration.set(configured, orchestration)
+  appUpdates.set(configured, update)
   appMachines.set(configured, machines)
   return configured
 }
@@ -560,6 +600,7 @@ function providerInstancesEqual(
 }
 
 function appCleanup(
+  orchestrationSockets: OrchestrationSockets,
   terminal: TerminalService,
   fs: FileSystemService,
   settings: SettingsStore,
@@ -578,13 +619,15 @@ function appCleanup(
     if (closed) return
 
     closed = true
+    // A signal stop admits no provider start while the runtime shuts down.
+    orchestration.holdProviderStarts()
+    orchestrationSockets.closeAll()
     sessionPush.close()
+    // Kills the language servers, before any await: the service manager signals them with the
+    // server, and an exit that lands before this is logged as a crash.
+    lspPool.disposeAll()
     await machines.close()
     await terminal.dispose()
-    // Language servers are child processes. Without this, jdtls, gopls and
-    // rust-analyzer outlive the server and idle on the machine until someone
-    // notices and kills them by hand.
-    lspPool.disposeAll()
     // Releases the settings file watchers; without this a test run leaks a
     // native handle per app it builds.
     settings.close()
@@ -623,7 +666,7 @@ function appErrorPayload(
 function errorForResponse(code: unknown, error: unknown) {
   if (isFsError(error)) return error
   if (isEvlogError(error)) return error
-  if (code === 'NOT_FOUND') return new FsError('NOT_FOUND', 'Route not found')
+  if (code === 'NOT_FOUND') return new FsError('ROUTE_NOT_FOUND')
   if (code === 'VALIDATION') return new FsError('INVALID_PATH', errorMessage(error))
 
   return new FsError('OPERATION_FAILED', undefined, error)
@@ -651,3 +694,5 @@ function responseErrorPayload(error: { code?: string; message: string; statusCod
 function definedOnly(values: Record<string, string | undefined>) {
   return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined))
 }
+
+function noop() {}

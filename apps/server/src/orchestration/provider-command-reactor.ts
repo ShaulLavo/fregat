@@ -6,8 +6,9 @@ import { runtimeEventId } from '../provider/adapters/utils/runtime-ids'
 import { errorMessage as providerErrorMessage, errorStringField } from '@workspace/contracts'
 import { resolveSessionOwner } from './session-owner'
 import { internalCommandKey } from './utils/repository-ids'
-import { createInternalError } from '../observability/structured-errors'
+import { createInternalError, isEvlogError } from '../observability/structured-errors'
 import { sessionIdentityErrors } from '../provider/structured-errors'
+import { sessionDomainErrors } from './structured-errors'
 
 import type {
   InteractionMode,
@@ -319,7 +320,7 @@ export class ProviderCommandReactor {
     context.runtimeEpoch = mustRelease
       ? crypto.randomUUID()
       : (observation.epoch ?? crypto.randomUUID())
-    await this.dispatch({
+    const claimed = await this.dispatchClaim({
       type: 'session.provider-start.claim',
       sessionId: context.session.id,
       turnId: turn.turnId,
@@ -337,9 +338,28 @@ export class ProviderCommandReactor {
         ),
       ),
     })
+    if (!claimed) return false
     if ('error' in observation) throw observation.error
     if (mustRelease) await this.providerService.stopRuntime({ sessionId: context.session.id })
     return true
+  }
+
+  // A restart holds the turn queued; the next server starts it at boot.
+  private async dispatchClaim(
+    command: Extract<OrchestrationCommand, { type: 'session.provider-start.claim' }>,
+  ) {
+    try {
+      await this.dispatch?.(command)
+      return true
+    } catch (error) {
+      if (!isEvlogError(error) || error.code !== sessionDomainErrors.SERVER_RESTARTING.code)
+        throw error
+      recordChatPipelineInfo('chat.pipeline.provider_reactor.turn_start.held_for_restart', {
+        sessionId: command.sessionId,
+        turnId: command.turnId,
+      })
+      return false
+    }
   }
 
   private async adoptTurn(

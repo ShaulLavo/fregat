@@ -1,6 +1,9 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import path from 'node:path'
 
+import { stopTerminalHost } from '../../apps/server/src/terminal-host/identity'
+import { hostPaths } from '../../apps/server/src/terminal-host/protocol'
+
 import { allowedOriginsForWebPort, isPortAvailable, selectAvailablePort } from '../runtime-network'
 import { linkWallpaperLibrary, productionStateHome } from '../state-home'
 import { createScriptError } from '../structured-errors'
@@ -15,6 +18,9 @@ export type IsolatedServer = {
   readonly directory: string
   readonly home: string
   readonly logs: string
+  /** The server's `PLATFORM_PRODUCTION_ROOT`: stage a release by linking `pending` here. */
+  readonly productionRoot: string
+  signal(signal: NodeJS.Signals): void
   stop(): Promise<void>
 }
 
@@ -25,12 +31,14 @@ export type IsolatedServer = {
  */
 export async function startIsolatedServer(
   webOrigin: URL,
-  pathPrefix?: string,
+  { pathPrefix, scratchRoot = '/work/tmp' }: { pathPrefix?: string; scratchRoot?: string } = {},
 ): Promise<IsolatedServer> {
-  const directory = mkdtempSync('/work/tmp/fregat-agent-')
+  const directory = mkdtempSync(path.join(scratchRoot, 'fregat-agent-'))
   const home = path.join(directory, 'home')
   const logs = path.join(directory, 'logs')
+  const productionRoot = path.join(directory, 'production')
   mkdirSync(home)
+  mkdirSync(productionRoot)
   if (existsSync(path.join(productionStateHome, 'wallpapers'))) linkWallpaperLibrary(home)
   const port = await selectAvailablePort({
     isAvailable: (candidate) => isPortAvailable('127.0.0.1', candidate),
@@ -41,11 +49,13 @@ export async function startIsolatedServer(
   const env: Record<string, string | undefined> = {
     ...process.env,
     FS_HOST: '127.0.0.1',
+    FS_METADATA_DB: path.join(home, 'fs-metadata.sqlite'),
     OBSERVABILITY_DIR: logs,
     PATH: pathPrefix ? `${pathPrefix}${path.delimiter}${process.env.PATH ?? ''}` : process.env.PATH,
     // Offers the mock provider driver, so a scenario can script a whole turn.
     PLATFORM_AGENT_HARNESS: '1',
     PLATFORM_HOME: home,
+    PLATFORM_PRODUCTION_ROOT: productionRoot,
     PORT: String(port),
     SERVER_ALLOWED_ORIGINS: allowedOriginsForWebPort(
       undefined,
@@ -53,7 +63,6 @@ export async function startIsolatedServer(
       Number(webOrigin.port),
     ),
   }
-  delete env.FS_METADATA_DB
   const child = Bun.spawn({
     cmd: [
       process.execPath,
@@ -68,7 +77,11 @@ export async function startIsolatedServer(
   })
   const origin = `http://localhost:${port}`
   let stopping: Promise<void> | undefined
-  const stop = () => (stopping ??= stopServer(child, directory))
+  const stop = () => {
+    process.off('SIGINT', onSignal)
+    process.off('SIGTERM', onSignal)
+    return (stopping ??= stopServer(child, directory))
+  }
   const onSignal = (signal: NodeJS.Signals) => {
     void stop().finally(() => process.kill(process.pid, signal))
   }
@@ -80,7 +93,10 @@ export async function startIsolatedServer(
     await stop()
     throw error
   }
-  return { port, origin, directory, home, logs, stop }
+  const signal = (name: NodeJS.Signals) => {
+    if (child.exitCode === null) child.kill(name)
+  }
+  return { port, origin, directory, home, logs, productionRoot, signal, stop }
 }
 
 async function waitForHealth(
@@ -117,5 +133,7 @@ async function stopServer(child: Bun.Subprocess, directory: string) {
     if (!stopped) child.kill('SIGKILL')
     await child.exited
   }
+  await stopTerminalHost(path.join(directory, 'home'))
+  rmSync(hostPaths(path.join(directory, 'home')).directory, { force: true, recursive: true })
   rmSync(directory, { force: true, recursive: true })
 }

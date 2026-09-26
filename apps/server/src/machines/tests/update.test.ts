@@ -21,6 +21,7 @@ import {
   type UpdateEvent,
 } from '../update'
 import { releaseLauncherSource } from '../../installation/install'
+import { PTY_HOST } from '../../installation/release-files'
 import {
   localSsh,
   remotePath,
@@ -308,7 +309,22 @@ test('a staged release ships itself, and its local links stay behind', async () 
   expect(await readdir(shipped)).toEqual(['server'])
   expect(await realpath(path.join(shipped, 'server/node_modules'))).toContain(
     path.join(serverRoot, 'runtime'),
+  ) // The server launches its terminal host from this file; a remote without it has no shells.
+  expect(await readFile(path.join(shipped, 'server', PTY_HOST), 'utf8')).toBe(
+    '// 20260925T130447Z-fb16d1cc-lane-l5 terminal host\n',
   )
+})
+
+test('a release without its terminal host bundle cannot be shipped', async () => {
+  const { local } = await updateFixture()
+  await shippableRelease(local, 'hostless')
+  await rm(path.join(local, 'releases/hostless/server', PTY_HOST))
+  const source = releaseSource(path.join(local, 'releases/hostless/server'))
+  expect(await source.available()).toBe(false)
+  await expect(source.prepare()).rejects.toMatchObject({
+    code: 'machines.SSH_UPDATE_NOT_A_RELEASE',
+    internal: { missing: [PTY_HOST] },
+  })
 })
 
 test('a release deployed before releases carried a runtime manifest cannot be shipped', async () => {

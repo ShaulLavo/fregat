@@ -648,6 +648,21 @@ export const selectors = {
   rewindFiles: (page: Page) =>
     page.getByRole('button', { name: 'Rewind and restore files', exact: true }),
   rewindDialog: (page: Page) => page.getByRole('alertdialog'),
+  serverUpdate: (page: Page) => page.locator('[data-server-update]'),
+  serverUpdateRestarting: (page: Page) => page.locator('[data-server-update="restarting"]'),
+  serverUpdateRestart: (page: Page) =>
+    page.locator('[data-server-update]').getByRole('button', { name: 'Restart', exact: true }),
+  // Scoped to the dialog: the rail lists the same session titles.
+  restartDialog: (page: Page) => page.getByRole('alertdialog', { name: 'Restart server' }),
+  restartDialogSession: (page: Page, title: string) =>
+    page
+      .getByRole('alertdialog', { name: 'Restart server' })
+      .getByRole('listitem')
+      .filter({ hasText: title }),
+  restartDialogCancel: (page: Page) =>
+    page
+      .getByRole('alertdialog', { name: 'Restart server' })
+      .getByRole('button', { name: 'Cancel', exact: true }),
   chatComposerFileInput: (page: Page) =>
     page
       .getByRole('button', { name: 'Attach', exact: true })
@@ -699,7 +714,13 @@ export const selectors = {
     page.getByRole('menuitem', { name: 'Select All', exact: true }),
   terminalAskAgent: (page: Page) =>
     page.getByRole('menuitem', { name: 'Ask the Agent', exact: true }),
+  terminalRendererRow: (page: Page) => page.getByRole('menuitem', { name: /^Renderer: / }),
   chatMessages: (page: Page) => page.getByRole('log', { name: 'Messages', exact: true }),
+  chatCodeBlockBody: (page: Page, language: string) =>
+    page
+      .getByRole('log', { name: 'Messages', exact: true })
+      .locator(`[data-markdown="code-block"][data-language="${language}"]`)
+      .locator('[data-markdown="code-block-body"]'),
   chatDisclosures: (page: Page) =>
     page
       .getByRole('log', { name: 'Messages', exact: true })

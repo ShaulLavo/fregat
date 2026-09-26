@@ -361,7 +361,8 @@ readers migrate with each shared-settings cutover. Native Swift theme UI is outs
 
 Requested 2026-09-13. Six plans from one review, and a seventh added 2026-09-20 of the production web build. At the review the
 deployed release sent 2421 KB gzip of JavaScript before the first frame, 2311 KB of it in a single chunk.
-Plans 106, 107, 109 (Phases 2–3) and 129 (Phases 1–2) brought it to 1,610,904 B gz by 2026-09-21. The
+Plans 106, 107, 109 (Phases 2–3) and 129 brought it to 1,607,295 B gz ([disk], 2026-09-25), the number
+`bun run --cwd apps/web bundle:gate` pins per owner in `apps/web/scripts/first-load-pins.json`. The
 cause is not bundler configuration — Rolldown is already in use and `apps/web/vite.config.ts` has no
 chunking options because the application declares almost no loading boundaries. Chunk boundaries
 come only from dynamic `import()` in source.
@@ -378,7 +379,7 @@ Execution order is strict:
 3. [Plan 108](plans/108-markdown-modes.md) gives markdown a split view on that package and finishes
    the existing live-preview experiment rather than deleting it. Phase 1 needs 107; Phase 2 is
    blocked on 111.
-4. [Plan 109](plans/109-boot-boundaries.md) defines boot, decides where loading boundaries belong
+4. Plan 109 ([boot and first load](docs/boot-and-first-load.md)) defines boot, decides where loading boundaries belong
    from 106's attribution data, and pins a first-load gate. It runs last because 107 and 108 both
    move the number. Revised 2026-09-20: the per-owner attribution now exists, which unblocks its
    Phases 2 and 3 and refuted two of the three boundaries anyone had proposed. Two survive, worth
@@ -388,7 +389,7 @@ Execution order is strict:
    the terminal and settings load behind boundaries, first-load JS 1,722,976 → 1,610,904 gz. The
    written boot definition and the Phase 4 gate remain.
 
-5. [Plan 129](plans/129-dependency-shape.md) owns the bytes 109 measured and handed off because no
+5. Plan 129 (done) owned the bytes 109 measured and handed off because no
    loading boundary reaches them: the Editor's three inline worker blobs, 579 KB gz and 25.5% of
    first-load JavaScript, and the `thin` and `light` Phosphor weights no call site draws. It does
    not depend on 108 or 109 and is the largest available cut, so it may run first; 109's gate
@@ -419,7 +420,9 @@ Replacing React with a smaller reimplementation was considered and rejected: Rea
 first load, so it is revisited only once it is the largest remaining line item.
 
 Plans 106 and 107 are done and deleted. What remains of the lane is 108 Phase 1, 109's gate
-(Phase 4) and its Phase 1 doc, and 129 Phase 3 (Q2–Q4).
+(Phase 4) and its Phase 1 doc. Plan 129 is done (lane L4): Q2 moved Shiki behind its lazy
+promise (first load −45,874 gz), Q3 and Q4 were measured and dropped, and a duplicated evlog is
+deduped in `vite.config.ts`.
 
 ## React compiler and pane lifetime lane
 
@@ -440,7 +443,7 @@ contract for hiding and revealing a populated list. Its `AGENTS.md` sections are
 because none of its three patterns can be gated by tooling.
 
 Neither plan reorders another lane. The scoped error boundary and the `<Activity>` counter-example
-are shared with [Plan 109](plans/109-boot-boundaries.md); whichever lands first owns the
+are shared with Plan 109 ([boot and first load](docs/boot-and-first-load.md)); whichever lands first owns the
 implementation and the others consume it. Verification tooling reconciles with Plan 119 and mutation
 shape with Plan 118. No measurement has been taken for either plan: the dev server is down, only the
 mesh answers, and every `agent:browser` line in both is a prescription for the implementer.
@@ -540,8 +543,8 @@ of the plans, both logs and the service journal named what stands in the way. Th
 | [147](plans/147-log-hygiene-and-noise-gate.md) | Producer fixes, level rules, the reaper give-up, ACK timeout vs overflow, a `logs:census` gate                           |
 | [175](plans/175-large-folder-open.md)          | Opening a huge folder: watch limit, unreadable folders, switch not cancelled by clicks, bounded prefetch                 |
 | [177](plans/177-prefetch-every-press.md)       | Prefetch on intent for every async press (diffs, chats, quick open, search), per-surface toggles                         |
-| [148](plans/148-restart-when-idle.md)          | `deploy --server` stages; the server restarts when no turn is running                                                    |
-| [149](plans/149-terminal-host.md)              | A PTY host that survives server restarts                                                                                 |
+| 148 (done)                                     | `deploy --server` stages; the app shows "Update available" and restarts on a click                                       |
+| [Terminal host](docs/terminal-host.md)         | Implemented: shells survive server restarts; desktop quit ends its host                                                  |
 | 150 (done)                                     | Remote servers are checked for protocol; a stale one relaunches or reads "Server out of date"                            |
 | 151 (done)                                     | Done: releases ship their runtime; Update server installs them over SSH ([record](docs/remote-server-releases.md))       |
 | 152 (done)                                     | Done: a dev primary builds its tree and installs it in its own remote channel ([record](docs/remote-server-releases.md)) |
@@ -551,8 +554,9 @@ Suggested order:
 1. ~~Plan 146~~ — implemented and deployed 2026-09-25. Prod keeps `~/.platform`, dev uses
    `/work/platform-dev/home`, and every `agent:browser` run has its own throwaway server.
 2. Plan 147, after 146 removes the pollution it would otherwise re-level.
-3. Plan 148, so Platform can deploy itself without killing the deploying turn.
-4. Plan 149, so terminals and dev servers survive the same restart.
+3. ~~Plan 148~~ — implemented 2026-09-25 (lane L4, PR #32). A `--server` deploy stages; the app
+   restarts on a click.
+4. Terminal persistence is implemented. See [terminal host](docs/terminal-host.md).
 5. ~~Plan 150~~ — done 2026-09-25 (completion wave): protocol check at both ends of the SSH
    launch, stale relaunch, structured machine errors, "Server out of date". Plan 151 done 2026-09-25
    (completion wave; live Mac update is an owner check). Plan 152 done the same day.

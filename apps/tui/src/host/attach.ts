@@ -65,12 +65,31 @@ export async function runTerminalAttach(
     } finally {
       host.input.pause()
       host.input.setRawMode(wasRaw)
-      host.output.write(
-        '\x1b[<99u\x1b[=0u\x1b[?2026l\x1b[?2027l\x1b[?2031l\x1b[?2048l\x1b[?1l\x1b>\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?1004l\x1b[?2004l\x1b[?25h\x1b[0m\x1b[?1049l',
-      )
+      host.output.write(DETACH_RESET)
     }
   }
 }
+
+// Modes an attached program may leave set; detaching returns the user's terminal to its defaults.
+const DETACH_RESET = [
+  '\x1b[<99u', // pop the kitty keyboard protocol stack
+  '\x1b[=0u', // kitty keyboard flags off
+  '\x1b[?2026l', // synchronized output off
+  '\x1b[?2027l', // grapheme clustering off
+  '\x1b[?2031l', // color-scheme change reports off
+  '\x1b[?2048l', // in-band resize reports off
+  '\x1b[?1l', // cursor keys back to normal mode
+  '\x1b>', // keypad back to numeric mode
+  '\x1b[?1000l', // mouse click reporting off
+  '\x1b[?1002l', // mouse drag reporting off
+  '\x1b[?1003l', // mouse motion reporting off
+  '\x1b[?1006l', // SGR mouse encoding off
+  '\x1b[?1004l', // focus reports off
+  '\x1b[?2004l', // bracketed paste off
+  '\x1b[?25h', // cursor visible
+  '\x1b[0m', // attributes reset
+  '\x1b[?1049l', // leave the alternate screen
+].join('')
 
 export function createDetachDecoder(send: (data: Uint8Array) => void, detach: () => void) {
   let prefix = false

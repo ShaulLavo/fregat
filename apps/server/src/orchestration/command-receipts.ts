@@ -163,6 +163,7 @@ export function commandAggregate(command: ReceiptCommand) {
     case 'terminal.lease.terminate':
     case 'terminal.lease.end':
     case 'terminal.lease.mark-unknown':
+    case 'terminal.lease.adopt':
     case 'worktree.register':
     case 'worktree.revive':
       return { id: command.worktreeId, kind: 'worktree' as const }

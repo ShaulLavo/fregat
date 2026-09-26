@@ -5,6 +5,6 @@ export const wallpaperQueryKeys = {
 }
 
 export const projectMenuQueryKeys = {
-  canonicalRoot: (path: string) => ['project-menu', 'canonical-root', path] as const,
+  canonicalRoots: (paths: readonly string[]) => ['project-menu', 'canonical-roots', paths] as const,
   checkouts: (path: string) => ['project-menu', 'checkouts', path] as const,
 }

@@ -22,3 +22,8 @@ export function platformHomePath(...segments: string[]): string {
 export function platformCachePath(...segments: string[]): string {
   return path.join(homedir(), PLATFORM_HOME_DIRECTORY, ...segments)
 }
+
+/** Vitest, or an explicit test run: such a process must never reach the real state root. */
+export function isTestProcess(): boolean {
+  return Bun.env.VITEST === 'true' || Bun.env.NODE_ENV === 'test'
+}

@@ -97,6 +97,7 @@
 - One wide event per operation (evlog): add fields, not extra lines.
 - Never `new Error`: use the feature's `structured-errors.ts` (`createStructuredError`, `defineErrorCatalog`) so errors carry `code`, `status`, `why`, `fix`. `why` and `fix` reach the user's toast, so write `fix` for them. Runtime facts (observed vs expected, exit code, state) go in `internal`; `bun run errors:census` fails a constant-message error without them.
 - Never put a setting value, file content or secret in a message or `internal`; name the type and constraint.
+- Levels: `error` means someone must act; `warn` means degraded and recovered or gave up; a missing file the caller asked about is `info`, no stack. A recovering failure series logs `warn` once at its start and `info` with a count at its end, never per attempt. Every retry loop, reaper and sweep has a give-up. `bun run logs:census` fails on noise (a group over 50 lines, or one repeating for over an hour); `scripts/lint/log-noise-allow.json` excuses a group only with a reason.
 
 ## Git: One Shared Checkout
 
@@ -112,8 +113,8 @@
 
 ## Deployment: The Mesh
 
-- Every finished change ships: `bun run deploy` (web only, reuses the server bundle) or `bun run deploy --server` (also rebuilds and restarts the server). `--rollback` reverts. It serves `https://omarchy.mesh.shaulavo.dev/platform` from `platform-prod.service` on port 3301, private to the owner's Tailscale. The route was set up once by hand: `mesh serve omarchy 3301 --at /platform --isolate`.
-- `GET /platform/release` reports the served release, commit and dirty count.
+- Every finished change ships: `bun run deploy` (web only, reuses the server bundle) or `bun run deploy --server`, which builds the server and stages it as `/work/platform-production/pending`: the app shows "Update available" and the server restarts only when someone clicks Restart, so verify a server change on the dev server first. `--rollback` drops a staged release and moves `current` back; if the app does not return after Restart, run it from a terminal outside Platform. It serves `https://omarchy.mesh.shaulavo.dev/platform` from `platform-prod.service` on port 3301, private to the owner's Tailscale. The route was set up once by hand: `mesh serve omarchy 3301 --at /platform --isolate`.
+- `GET /platform/release` reports the served release, commit and dirty count, plus `pending`, `phase` and `liveCheck` for a staged update.
 - `ghostty-webgpu` is a `link:`; run `bun run build` there first. CI builds the Editor at `editor-ref` in `.github/actions/setup/action.yml`; bump it in the same commit when Platform needs newer Editor code.
 - A release's `server/node_modules` symlinks to the checkout's, so rollback does not undo a `bun install`.
 

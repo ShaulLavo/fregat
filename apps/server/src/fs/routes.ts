@@ -1,10 +1,12 @@
 import { Elysia } from 'elysia'
 import {
+  appWriteQuerySchema,
   copyBodySchema,
   createFileBodySchema,
   createFolderBodySchema,
   deleteBodySchema,
   eventsQuerySchema,
+  lookupWorkspaceAddressesBodySchema,
   openWorkspaceRootBodySchema,
   pathQuerySchema,
   readQuerySchema,
@@ -38,6 +40,10 @@ export function fsRoutes(fs: FileSystemService) {
       })
       .get('/tree', ({ query }) => fs.tree(query.path, query.depth, query.entryType), {
         query: treeQuerySchema,
+      })
+      // The dev server asks whether a change it saw is the app's own save.
+      .get('/app-write', ({ query }) => fs.isAppWrite(query.path, query.version), {
+        query: appWriteQuerySchema,
       })
       .get('/read', ({ query }) => fs.read(query.path, query.acceptTextOnly), {
         query: readQuerySchema,
@@ -81,6 +87,7 @@ export function fsRoutes(fs: FileSystemService) {
           query: eventsQuerySchema,
         },
       )
+      // Recents that are gone are skipped and pruned from the store.
       .get('/recents', ({ query }) => fs.recents(query), {
         query: recentsQuerySchema,
       })
@@ -92,6 +99,11 @@ export function fsRoutes(fs: FileSystemService) {
       })
       .post('/workspace-address', ({ body }) => fs.registerWorkspaceAddress(body.path), {
         body: registerWorkspaceAddressBodySchema,
+      })
+      // A read in POST form. A path that cannot be a root answers null; one that is gone is
+      // also pruned from the recents.
+      .post('/workspace-addresses', ({ body }) => fs.lookupWorkspaceAddresses(body.paths), {
+        body: lookupWorkspaceAddressesBodySchema,
       })
       .get('/workspace-address/:id', ({ params }) => fs.resolveWorkspaceAddress(params.id), {
         params: workspaceAddressParamsSchema,

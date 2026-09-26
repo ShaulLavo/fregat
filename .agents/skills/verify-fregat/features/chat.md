@@ -60,6 +60,8 @@ The chat mode button in the window toolbar, or an address URL with `/chat/`.
 
 `scenario chat-diff-syntax --url <session-diff-address>` checks painted syntax colors in a session checkpoint diff.
 
+`scenario chat-markdown-fence` uses the isolated native fixture to answer with a fenced `ts` block and waits for the fence to paint more than one token colour, the path that loads `shiki/core` and its JavaScript engine lazily. It removes its session and provider. Against the dev page it runs Vite's module graph, not the built `core-*.js` chunks.
+
 Commands dispatch over the orchestration socket when it is live and over HTTP otherwise. The HTTP path refetches the shell snapshot itself.
 
 - `mcp-approval`: isolated fake native Codex provider, advertised app-access choices after reload, permanent approval wire reply, and session/provider cleanup. No external app access.

@@ -11,6 +11,8 @@ export type LogEvent = Record<string, unknown> & {
 export type LogFilter = {
   readonly action?: string
   readonly area?: string
+  /** Defaults to this checkout's logs, or `OBSERVABILITY_DIR`. */
+  readonly directory?: string
   readonly level?: LogEvent['level']
   readonly requestId?: string
   readonly since: Date
@@ -28,7 +30,7 @@ function logsDirectory() {
 
 export async function readLogs(filter: LogFilter): Promise<LogEvent[]> {
   const until = filter.until ?? new Date()
-  const files = await logFilesBetween(filter.since, until)
+  const files = await logFilesBetween(filter.since, until, filter.directory ?? logsDirectory())
   const minimum = LEVELS.indexOf(filter.level ?? 'debug')
   const events: LogEvent[] = []
   for (const file of files) {
@@ -70,13 +72,12 @@ export function parseSince(value: string): Date {
 }
 
 // A day rolls into numbered continuations; the highest number is the newest.
-async function logFilesBetween(since: Date, until: Date) {
+async function logFilesBetween(since: Date, until: Date, directory: string) {
   const days = new Set<string>()
   for (let at = dayStart(since); at <= until.getTime(); at += 86_400_000) {
     days.add(new Date(at).toISOString().slice(0, 10))
   }
   days.add(until.toISOString().slice(0, 10))
-  const directory = logsDirectory()
   const names = (await readdir(directory).catch(() => [] as string[])).filter((name) =>
     name.endsWith('.jsonl'),
   )

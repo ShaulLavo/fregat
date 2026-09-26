@@ -300,17 +300,33 @@ export const terminalLeaseSchema = v.object({
   worktreeId: worktreeIdSchema,
   runtimeEpoch: text,
   state: terminalLeaseStateSchema,
+  /** The host session key this lease belongs to; `recover()` checks host liveness by it. */
+  key: v.nullable(text),
   createdAt: text,
   updatedAt: text,
 })
 const leaseCommand = { ...target, terminalLeaseId: terminalLeaseIdSchema, runtimeEpoch: text }
 export const terminalLeaseCommandSchemas = [
-  v.object({ ...leaseCommand, type: v.literal('terminal.lease.request') }),
+  v.object({ ...leaseCommand, type: v.literal('terminal.lease.request'), key: v.optional(text) }),
   v.object({ ...leaseCommand, type: v.literal('terminal.lease.claim') }),
   v.object({ ...leaseCommand, type: v.literal('terminal.lease.activate') }),
   v.object({ ...leaseCommand, type: v.literal('terminal.lease.terminate') }),
-  v.object({ ...leaseCommand, type: v.literal('terminal.lease.end') }),
+  v.object({
+    ...leaseCommand,
+    type: v.literal('terminal.lease.end'),
+    /** Set once the host confirms the process is gone; only then may `end` clear `ownership-unknown`. */
+    hostConfirmedGone: v.optional(v.boolean()),
+  }),
   v.object({ ...leaseCommand, type: v.literal('terminal.lease.mark-unknown') }),
+  v.object({
+    ...target,
+    type: v.literal('terminal.lease.adopt'),
+    terminalLeaseId: terminalLeaseIdSchema,
+    /** The new runtime epoch taking ownership. */
+    runtimeEpoch: text,
+    /** The epoch the lease must currently hold, so a stale adopt cannot hijack a live one. */
+    fromRuntimeEpoch: text,
+  }),
 ] as const
 
 const changed = { worktreeId: worktreeIdSchema, updatedAt: text }

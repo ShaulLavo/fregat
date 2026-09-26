@@ -12,7 +12,7 @@ export function recordingPtyFactory() {
   return { factory, spawns, processes }
 }
 
-type TerminalPty = ReturnType<TerminalPtyFactory>
+type TerminalPty = Awaited<ReturnType<TerminalPtyFactory>>
 
 class RecordingPty implements TerminalPty {
   killed = false

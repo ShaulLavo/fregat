@@ -46,6 +46,11 @@ export const pathQuerySchema = v.object({
   path: v.optional(pathSchema, ''),
 })
 
+export const appWriteQuerySchema = v.object({
+  path: pathSchema,
+  version: v.pipe(v.string(), v.maxLength(128)),
+})
+
 export const readQuerySchema = v.object({
   path: v.optional(pathSchema, ''),
   acceptTextOnly: v.optional(booleanQueryValueSchema),
@@ -186,6 +191,9 @@ export const openWorkspaceRootBodySchema = v.object({
 })
 
 export const registerWorkspaceAddressBodySchema = v.object({ path: pathSchema })
+export const lookupWorkspaceAddressesBodySchema = v.object({
+  paths: v.pipe(v.array(pathSchema), v.maxLength(1024), v.readonly()),
+})
 export const workspaceAddressParamsSchema = v.object({ id: workspaceAddressIdSchema })
 
 export const writeBodySchema = v.object({

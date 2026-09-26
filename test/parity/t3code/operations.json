@@ -274,6 +274,7 @@
       "session.turn.start",
       "session.worktree.release",
       "terminal.lease.activate",
+      "terminal.lease.adopt",
       "terminal.lease.claim",
       "terminal.lease.end",
       "terminal.lease.mark-unknown",

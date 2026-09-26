@@ -1,12 +1,15 @@
 import * as v from 'valibot'
-import { terminalHistoryChunks } from '../../db/schema'
-import { mkdir, realpath, rm, symlink } from 'node:fs/promises'
+import { terminalHistoryChunks, terminalSessionOffsets } from '../../db/schema'
+import { mkdir, realpath, rm, symlink, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ElysiaWS } from 'elysia/ws'
+import type { WideEvent } from 'evlog'
+import { readFsLogs } from 'evlog/fs'
 import {
   TERMINAL_MAX_COLS,
   TERMINAL_MIN_ROWS,
+  terminalLeaseIdSchema,
   parseTerminalServerMessage,
   type TerminalServerMessage,
   worktreeIdSchema,
@@ -14,24 +17,43 @@ import {
 } from '@workspace/contracts'
 
 import { createOrchestrationFixture } from '../../../test/factories/orchestration'
+import { createTestTerminalHost } from '../../../test/factories/terminal-host'
+import { createFakeTerminalHost } from '../../../test/factories/fake-terminal-host'
 import {
   createFakePtyFactory,
   terminalOutputBytes,
   terminalOutputText,
 } from '../../../test/factories/terminal'
 import { requireWorktree } from '../../orchestration/read-model'
+import { terminalHostErrors } from '../../terminal-host/protocol'
+import { TerminalHistory } from '../history'
 import { projectionTerminalLeases } from '../../db/schema'
 import { createAuthConfig } from '../../auth'
 import { createWorkspacePaths, type WorkspacePaths } from '../../fs/path'
-import { TerminalService, type TerminalPtyFactory } from '../service'
+import {
+  flushObservability,
+  initializeObservability,
+  resetObservabilityForTests,
+} from '../../observability/runtime'
+import {
+  TerminalService,
+  terminalSessionKey,
+  type TerminalPtyFactory,
+  type TerminalServiceOptions,
+} from '../service'
 
 const TRUSTED_ORIGIN = 'http://localhost:5173'
 const fixtures = new Map<string, Awaited<ReturnType<typeof createOrchestrationFixture>>>()
 const registrations = new Map<string, string>()
 const services: TerminalService[] = []
 
+const hosts: Awaited<ReturnType<typeof createTestTerminalHost>>[] = []
+const fakeHosts: Awaited<ReturnType<typeof createFakeTerminalHost>>[] = []
+
 afterEach(async () => {
   await Promise.all(services.splice(0).map((service) => service.dispose()))
+  await Promise.all(hosts.splice(0).map((host) => host.close()))
+  await Promise.all(fakeHosts.splice(0).map((host) => host.close()))
   await Promise.all([...fixtures.values()].map((fixture) => fixture.close()))
   fixtures.clear()
   registrations.clear()
@@ -154,7 +176,7 @@ describe('terminal service', () => {
     expect(pty.ptys[0]?.resizes).toEqual([[TERMINAL_MAX_COLS, TERMINAL_MIN_ROWS]])
   })
 
-  it('keeps the PTY alive on socket close and kills it on disposal', async () => {
+  it('keeps the PTY alive on socket close and on service disposal', async () => {
     const root = await fixtureRoot()
     const pty = createFakePtyFactory()
     const service = testService(root, { ptyFactory: pty.factory })
@@ -167,9 +189,10 @@ describe('terminal service', () => {
     expect(pty.ptys).toHaveLength(1)
     expect(pty.ptys[0]?.killed).toBe(false)
 
+    // Service dispose detaches (Plan 149 D7); only a user kill/restart ends the shell.
     await service.dispose()
 
-    expect(pty.ptys[0]?.killed).toBe(true)
+    expect(pty.ptys[0]?.killed).toBe(false)
   })
 
   it('does not spawn a PTY when disposed during worktree resolution', async () => {
@@ -336,7 +359,7 @@ describe('terminal service', () => {
     routes.close(second)
     expect(pty.ptys[0]?.killed).toBe(false)
     await service.dispose()
-    expect(pty.ptys[0]?.killed).toBe(true)
+    expect(pty.ptys[0]?.killed).toBe(false)
   })
 
   it('reports shared dimensions in band only while mode 2048 is enabled', async () => {
@@ -434,7 +457,7 @@ describe('terminal service', () => {
     expect(pty.ptys).toHaveLength(1)
     expect(terminalOutputText(second.messages)).toBe('output while detached')
     await service.dispose()
-    expect(pty.ptys[0]?.killed).toBe(true)
+    expect(pty.ptys[0]?.killed).toBe(false)
   })
 
   it('reports the foreground process name while a viewer is attached', async () => {
@@ -484,6 +507,51 @@ describe('terminal service', () => {
     await service.dispose()
   })
 
+  it('logs the signal exit of a shell it killed as closed at info', async () => {
+    const root = await fixtureRoot()
+    const logDir = observedLogDir(root)
+    const pty = createFakePtyFactory({ holdUntilExit: true })
+    const service = testService(root, { ptyFactory: pty.factory })
+    const routes = service.routes(auth())
+    const ws = fakeSocket(root, '', 'terminal-1')
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+
+    try {
+      await routes.open(ws)
+      const killing = service.kill({ terminalId: 'terminal-1', worktreeId })
+      await vi.waitFor(() => expect(pty.ptys[0]?.killed).toBe(true))
+      pty.ptys[0]?.exit(129, 'SIGHUP')
+
+      expect(await killing).toEqual({ killed: true })
+      expect(await terminalSessionEvents(logDir)).toEqual([
+        expect.objectContaining({ exitCode: 129, level: 'info', outcome: 'closed' }),
+      ])
+    } finally {
+      await resetObservabilityForTests()
+    }
+  })
+
+  it('warns when a shell exits non-zero without being asked to', async () => {
+    const root = await fixtureRoot()
+    const logDir = observedLogDir(root)
+    const pty = createFakePtyFactory({ holdUntilExit: true })
+    const service = testService(root, { ptyFactory: pty.factory })
+    const ws = fakeSocket(root, '', 'terminal-1')
+
+    try {
+      await service.routes(auth()).open(ws)
+      pty.ptys[0]?.exit(137, 'SIGKILL')
+      await vi.waitFor(() => expect(ws.closed).toBe(true))
+
+      expect(pty.ptys[0]?.killed).toBe(false)
+      expect(await terminalSessionEvents(logDir)).toEqual([
+        expect.objectContaining({ exitCode: 137, level: 'warn', outcome: 'failed' }),
+      ])
+    } finally {
+      await resetObservabilityForTests()
+    }
+  })
+
   it('persists request and claim before the PTY factory can spawn', async () => {
     const root = await fixtureRoot()
     const fixture = requiredFixture(root)
@@ -531,7 +599,7 @@ describe('terminal service', () => {
     ).toBe(0)
   })
 
-  it('keeps its durable lease and gate through detach and kill without positive exit', async () => {
+  it('keeps its durable lease and gate through service dispose, detached not killed', async () => {
     const root = await fixtureRoot()
     const fixture = requiredFixture(root)
     const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
@@ -548,29 +616,22 @@ describe('terminal service', () => {
       reason: 'active-terminal',
     })
     routes.close(socket)
-    let disposed = false
-    const disposal = service.dispose().then(() => {
-      disposed = true
-    })
-    await expect.poll(() => pty.ptys[0]?.killed).toBe(true)
-    expect(disposed).toBe(false)
-    expect(service.hasWorktreeRuntime(worktreeId)).toBe(true)
+
+    // A shutdown detaches (Plan 149 D7): the shell, its lease and the gate all survive.
+    await service.dispose()
+
+    expect(pty.ptys[0]?.killed).toBe(false)
+    expect(service.hasWorktreeRuntime(worktreeId)).toBe(false)
     expect(
       requireWorktree(await fixture.engine.readModelSnapshot(), worktreeId).activeTerminalCount,
     ).toBe(1)
     expect([...(await fixture.engine.readModelSnapshot()).terminalLeases.values()][0]?.state).toBe(
-      'termination-requested',
+      'active',
     )
-    pty.ptys[0]?.exit(0)
-    await disposal
-    expect(disposed).toBe(true)
-    await expect.poll(() => service.hasWorktreeRuntime(worktreeId)).toBe(false)
-    expect(
-      requireWorktree(await fixture.engine.readModelSnapshot(), worktreeId).activeTerminalCount,
-    ).toBe(0)
-    const exclusive = fixture.engine.worktreeExecutionGate.tryAcquireExclusive(worktreeId)
-    expect(exclusive.acquired).toBe(true)
-    if (exclusive.acquired) exclusive.release()
+    expect(fixture.engine.worktreeExecutionGate.tryAcquireExclusive(worktreeId)).toEqual({
+      acquired: false,
+      reason: 'active-terminal',
+    })
   })
 
   it('retains ownership and reports a rejected native exit promise', async () => {
@@ -594,47 +655,8 @@ describe('terminal service', () => {
       acquired: false,
       reason: 'active-terminal',
     })
+    // Dispose detaches; a service that already failed native cleanup still forgets the session.
     await service.dispose()
-    expect(service.hasWorktreeRuntime(worktreeId)).toBe(true)
-  })
-
-  it('waits for the durable lease to end after native child completion during disposal', async () => {
-    const root = await fixtureRoot()
-    const fixture = requiredFixture(root)
-    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
-    const pty = createFakePtyFactory({ holdUntilExit: true })
-    const ending = Promise.withResolvers<void>()
-    const finishEnd = Promise.withResolvers<void>()
-    const service = testService(root, {
-      ptyFactory: pty.factory,
-      lifecycle: {
-        begin: async (id) => {
-          const lease = await fixture.engine.beginTerminalLease(id)
-          return {
-            ...lease,
-            end: async () => {
-              ending.resolve()
-              await finishEnd.promise
-              await lease.end()
-            },
-          }
-        },
-      },
-    })
-    await service.routes(auth()).open(fakeSocket(root, ''))
-    let disposed = false
-    const disposal = service.dispose().then(() => {
-      disposed = true
-    })
-    await expect.poll(() => pty.ptys[0]?.killed).toBe(true)
-    pty.ptys[0]?.exit(0)
-    await ending.promise
-
-    expect(disposed).toBe(false)
-    expect(service.hasWorktreeRuntime(worktreeId)).toBe(true)
-    finishEnd.resolve()
-    await disposal
-    expect(disposed).toBe(true)
     expect(service.hasWorktreeRuntime(worktreeId)).toBe(false)
   })
 
@@ -715,8 +737,10 @@ describe('terminal service', () => {
 
   it('reconnects to the same native shell after eleven detached minutes', async () => {
     const root = await fixtureRoot()
+    const host = await nativeHost()
     const service = testService(root, {
       env: { HOME: root, PATH: process.env.PATH, SHELL: '/bin/sh' },
+      ptyFactory: host.factory,
     })
     const routes = service.routes(auth())
     const first = fakeSocket(root, '', 'native-retained-job')
@@ -737,7 +761,7 @@ describe('terminal service', () => {
     await service.dispose()
   })
 
-  it('restores raw history after service restart without retaining the old process', async () => {
+  it('restores raw history after service restart', async () => {
     const root = await fixtureRoot()
     const pty = createFakePtyFactory()
     const firstService = testService(root, { ptyFactory: pty.factory })
@@ -746,7 +770,7 @@ describe('terminal service', () => {
     const bytes = new Uint8Array([0xff, 0, 0xf0, 0x9f, 0x98, 0x80])
     pty.ptys[0]?.emit(bytes)
     await firstService.dispose()
-    expect(pty.ptys[0]?.killed).toBe(true)
+    expect(pty.ptys[0]?.killed).toBe(false)
     const secondService = testService(root, { ptyFactory: pty.factory })
     const second = fakeSocket(root, '', 'restart-history')
     await secondService.routes(auth()).open(second)
@@ -996,8 +1020,10 @@ describe('terminal service', () => {
 
   it('replaces a real native shell without disconnecting its viewer', async () => {
     const root = await fixtureRoot()
+    const host = await nativeHost()
     const service = testService(root, {
       env: { HOME: root, PATH: process.env.PATH, SHELL: '/bin/sh' },
+      ptyFactory: host.factory,
     })
     const routes = service.routes(auth())
     const socket = fakeSocket(root, '', 'native-restart')
@@ -1016,14 +1042,16 @@ describe('terminal service', () => {
     await service.dispose()
   })
 
-  it('spawns a native shell directly beneath the server and streams its output', async () => {
+  it('spawns a native shell beneath the terminal host and streams its output', async () => {
     const root = await fixtureRoot()
+    const host = await nativeHost()
     const service = testService(root, {
       env: {
         HOME: root,
         PATH: process.env.PATH,
         SHELL: '/bin/sh',
       },
+      ptyFactory: host.factory,
     })
     const routes = service.routes(auth())
     const ws = fakeSocket(root, '')
@@ -1034,13 +1062,379 @@ describe('terminal service', () => {
       new TextEncoder().encode('printf \'\\137\\137PTY_PARENT:%s\\137\\137\\n\' "$PPID"; exit\n'),
     )
 
-    await waitForTerminalOutput(ws.messages, `__PTY_PARENT:${process.pid}__`)
+    const hostPid = (await host.client.host()).pid
+    await waitForTerminalOutput(ws.messages, `__PTY_PARENT:${hostPid}__`)
     const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
     await expect.poll(() => service.hasWorktreeRuntime(worktreeId)).toBe(false)
     expect(ws.messages.at(-1)).toEqual({ type: 'exit', exitCode: 0 })
-    expect(terminalOutputText(ws.messages)).toContain(`__PTY_PARENT:${process.pid}__`)
+    expect(hostPid).not.toBe(process.pid)
+  })
+
+  it('detaches every session on dispose, leaving the shell alive in the host', async () => {
+    const root = await fixtureRoot()
+    const host = await nativeHost()
+    const service = testService(root, {
+      env: { HOME: root, PATH: process.env.PATH, SHELL: '/bin/sh' },
+      hostClient: host.client,
+    })
+    const routes = service.routes(auth())
+    const socket = fakeSocket(root, '', 'detach-term')
+    await routes.open(socket)
+    routes.message(socket, Buffer.from('printf "PID:%s\\n" "$$"\n'))
+    await waitForTerminalOutput(socket.messages, 'PID:')
+
+    await service.dispose()
+
+    const sessions = await host.connect().list()
+    expect(sessions.filter((session) => !session.exited)).toHaveLength(1)
+  })
+
+  it.each(['after recovery', 'during recovery', 'after clearing history'] as const)(
+    'preserves the shell when a browser reconnects %s',
+    async (timing) => {
+      const root = await fixtureRoot()
+      const host = await nativeHost()
+      const env = { HOME: root, PATH: process.env.PATH, SHELL: '/bin/sh' }
+      const serviceA = testService(root, { env, hostClient: host.client })
+      const routesA = serviceA.routes(auth())
+      const socketA = fakeSocket(root, '', 'reattach-term')
+      await routesA.open(socketA)
+      routesA.message(socketA, Buffer.from('printf "PID:%s\\n" "$$"\n'))
+      await waitForTerminalOutput(socketA.messages, 'PID:')
+      const pid = terminalOutputText(socketA.messages).match(/PID:(\d+)/)?.[1]
+      if (!pid) throw new TypeError('Missing pid marker in the first shell output')
+
+      if (timing === 'after clearing history') {
+        await serviceA.clear({
+          worktreeId: v.parse(worktreeIdSchema, registrations.get(root)),
+          terminalId: 'reattach-term',
+        })
+      }
+      await serviceA.dispose()
+
+      const serviceB = testService(root, { env, hostClient: host.connect() })
+      const recovering = serviceB.reattach()
+      if (timing === 'after recovery') await recovering
+      const routesB = serviceB.routes(auth())
+      const socketB = fakeSocket(root, '', 'reattach-term')
+      await Promise.all([recovering, routesB.open(socketB)])
+      // Replayed from the persisted history, not from a fresh spawn.
+      if (timing !== 'after clearing history')
+        await waitForTerminalOutput(socketB.messages, `PID:${pid}`)
+      // Shells without line editing leave Clear's form feed in the pending input.
+      routesB.message(socketB, Buffer.from('\u0015printf "PID2:%s\\n" "$$"\n'))
+      await waitForTerminalOutput(socketB.messages, `PID2:${pid}`)
+      if (timing === 'after clearing history')
+        expect(terminalOutputText(socketB.messages)).not.toContain(`PID:${pid}`)
+    },
+  )
+
+  it('continues recovery and admits terminal operations after one lease attachment fails', async () => {
+    const root = await fixtureRoot()
+    const host = await nativeHost()
+    const env = { HOME: root, PATH: process.env.PATH, SHELL: '/bin/sh' }
+    const first = testService(root, { env, hostClient: host.client })
+    await first.routes(auth()).open(fakeSocket(root, '', 'failed'))
+    await first.routes(auth()).open(fakeSocket(root, '', 'survived'))
+    await first.dispose()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const next = testService(root, {
+      env,
+      hostClient: host.connect(),
+      resolveAdoptedLease: async (key) => {
+        if (key === terminalSessionKey(worktreeId, 'failed'))
+          throw new TypeError('Recovery fixture failure')
+        return fixtures.get(root)!.engine.adoptedLeaseForKey(key)
+      },
+    })
+    await expect(next.reattach()).resolves.toBeUndefined()
+    expect(next.hasWorktreeRuntime(worktreeId)).toBe(true)
+    await expect(next.clear({ worktreeId, terminalId: 'failed' })).resolves.toEqual({
+      cleared: true,
+    })
+    const socket = fakeSocket(root, '', 'new-terminal')
+    await next.routes(auth()).open(socket)
+    expect(socket.messages.some((message) => message.type === 'ready')).toBe(true)
+  })
+
+  it('keeps the same unreachable host snapshot for lease adoption and orphan recovery', async () => {
+    const root = await fixtureRoot()
+    const host = await nativeHost()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const shell = await host.client.spawn({
+      key: terminalSessionKey(worktreeId, 'unknown'),
+      command: ['/bin/sh'],
+      onData: () => {},
+    })
+    host.client.close()
+    const token = await readFile(host.paths.token)
+    const service = testService(root, { hostClient: host.connect() })
+    await writeFile(host.paths.token, 'wrong-token')
+    expect(await service.listHostSessions()).toBeNull()
+    await writeFile(host.paths.token, token)
+    await service.reattach()
+    const observer = host.connect()
+    expect((await observer.list()).map((info) => info.pid)).toContain(shell.pid)
+    await Bun.sleep(50)
+    expect((await observer.list()).find((info) => info.pid === shell.pid)?.exited).toBe(false)
+  })
+
+  it('forgets an exited host session after recovery confirms it has no lease', async () => {
+    const root = await fixtureRoot()
+    const host = await nativeHost()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const exitFile = path.join(host.paths.directory, 'exit')
+    await host.client.spawn({
+      key: terminalSessionKey(worktreeId, 'exited'),
+      command: ['/bin/sh', '-c', 'while [ ! -f "$1" ]; do sleep 0.01; done', 'sh', exitFile],
+      onData: () => {},
+    })
+    host.client.close()
+    const observer = host.connect()
+    await observer.list()
+    await writeFile(exitFile, '')
+    await expect.poll(async () => (await observer.list())[0]?.exited).toBe(true)
+    const service = testService(root, { hostClient: host.connect() })
+    await service.reattach()
+    await expect.poll(() => observer.list()).toEqual([])
+  })
+
+  it('saves the final output of a real shell that exited while the server was down', async () => {
+    const root = await fixtureRoot()
+    const host = await nativeHost()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const key = terminalSessionKey(worktreeId, 'exited-native')
+    const exitFile = path.join(host.paths.directory, 'exit')
+    await host.client.spawn({
+      key,
+      command: [
+        '/bin/sh',
+        '-c',
+        'while [ ! -f "$1" ]; do sleep 0.01; done; echo LAST_WORDS',
+        'sh',
+        exitFile,
+      ],
+      onData: () => {},
+    })
+    host.client.close()
+    const observer = host.connect()
+    await observer.list()
+    await writeFile(exitFile, '')
+    await expect.poll(async () => (await observer.list())[0]?.exited).toBe(true)
+    const service = testService(root, { hostClient: host.connect() })
+
+    await service.reattach()
+
+    const history = new TerminalHistory(requiredFixture(root).database, key)
+    expect(Buffer.concat(history.values()).toString()).toContain('LAST_WORDS')
+    await expect.poll(() => observer.list()).toEqual([])
+  })
+
+  it('keeps streaming a shell after the host connection drops', async () => {
+    const root = await fixtureRoot()
+    const host = await fakeHost()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const service = testService(root, { hostClient: host.connect() })
+    const socket = fakeSocket(root, '', 'dropped')
+    await service.routes(auth()).open(socket)
+    const [session] = host.sessions.values()
+    host.write(session!.session, 'before-drop;')
+    await waitForTerminalOutput(socket.messages, 'before-drop;')
+
+    host.drop()
+    host.write(session!.session, 'after-drop;')
+
+    await waitForTerminalOutput(socket.messages, 'after-drop;')
+    expect(socket.closed).toBe(false)
+    expect(service.hasWorktreeRuntime(worktreeId)).toBe(true)
+  })
+
+  it('marks ownership unknown and forgets the session when the host cannot be reached again', async () => {
+    const root = await fixtureRoot()
+    const fixture = requiredFixture(root)
+    const host = await fakeHost()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const service = testService(root, { hostClient: host.connect() })
+    const socket = fakeSocket(root, '', 'stranded')
+    await service.routes(auth()).open(socket)
+
+    await host.stop()
+
+    await expect.poll(() => service.hasWorktreeRuntime(worktreeId)).toBe(false)
+    expect(socket.closed).toBe(true)
+    expect([...(await fixture.engine.readModelSnapshot()).terminalLeases.values()][0]?.state).toBe(
+      'ownership-unknown',
+    )
+    expect(fixture.engine.worktreeExecutionGate.tryAcquireExclusive(worktreeId).acquired).toBe(true)
+  })
+
+  it('starts a fresh shell on reopen after the host connection was lost', async () => {
+    const root = await fixtureRoot()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const pty = createFakePtyFactory({ holdUntilExit: true })
+    const service = testService(root, { ptyFactory: pty.factory })
+    const routes = service.routes(auth())
+    await routes.open(fakeSocket(root, '', 'lost'))
+
+    pty.ptys[0]?.fail(terminalHostErrors.HOST_UNREACHABLE({ internal: { reason: 'test' } }))
+    await expect.poll(() => service.hasWorktreeRuntime(worktreeId)).toBe(false)
+    const reopened = fakeSocket(root, '', 'lost')
+    await routes.open(reopened)
+
+    expect(pty.spawns).toHaveLength(2)
+    expect(reopened.messages.some((message) => message.type === 'ready')).toBe(true)
+  })
+
+  it('saves the final output of a shell that exited while the server was down', async () => {
+    const root = await fixtureRoot()
+    const fixture = requiredFixture(root)
+    const host = await fakeHost()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const key = terminalSessionKey(worktreeId, 'exited-offline')
+    new TerminalHistory(fixture.database, key).append(Buffer.from('seen;'), 5)
+    const session = host.add(key, 'seen;last words;')
+    host.exit(session.session, 0)
+    const service = testService(root, { hostClient: host.connect() })
+
+    await service.reattach()
+
+    const history = new TerminalHistory(fixture.database, key)
+    expect(Buffer.concat(history.values()).toString()).toBe('seen;last words;')
+    expect(history.offset).toBe(16)
+    expect(host.sessions.size).toBe(0)
+  })
+
+  it('kills the host session and ends its lease when reattaching fails', async () => {
+    const root = await fixtureRoot()
+    const host = await fakeHost()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const session = host.add(terminalSessionKey(worktreeId, 'unattachable'))
+    host.refused.add('attach')
+    const lease = recordingLease()
+    const service = testService(root, {
+      hostClient: host.connect(),
+      resolveAdoptedLease: async () => lease,
+    })
+
+    await service.reattach()
+
+    await expect
+      .poll(() => host.received)
+      .toContainEqual({ type: 'kill', session: session.session })
+    expect(lease.ended).toBe(1)
+    expect(service.hasWorktreeRuntime(worktreeId)).toBe(false)
+  })
+
+  it('kills the host session when its recovery throws', async () => {
+    const root = await fixtureRoot()
+    const host = await fakeHost()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const session = host.add(terminalSessionKey(worktreeId, 'throws'))
+    const service = testService(root, {
+      hostClient: host.connect(),
+      resolveAdoptedLease: async () => {
+        throw new TypeError('Recovery fixture failure')
+      },
+    })
+
+    await service.reattach()
+
+    await expect
+      .poll(() => host.received)
+      .toContainEqual({ type: 'kill', session: session.session })
+  })
+
+  it("closes a deleted session's agent shell that the host kept across a restart", async () => {
+    const root = await fixtureRoot()
+    const host = await fakeHost()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const sessionId = v.parse(sessionIdSchema, '00000000-0000-4000-8000-000000000003')
+    const session = host.add(terminalSessionKey(worktreeId, sessionId, sessionId), 'agent;')
+    const lease = recordingLease()
+    const service = testService(root, {
+      hostClient: host.connect(),
+      resolveAdoptedLease: async () => lease,
+    })
+
+    // Recovery is still running when the deletion arrives.
+    const recovering = service.reattach()
+    await expect(service.closeSessionTerminals(sessionId)).resolves.toEqual({ closed: 1 })
+    await recovering
+
+    expect(host.received).toContainEqual(
+      expect.objectContaining({ type: 'kill', session: session.session }),
+    )
+    expect(lease.ended).toBe(1)
+    expect(service.hasWorktreeRuntime(worktreeId)).toBe(false)
+  })
+
+  it('deletes the output an exited agent shell saves during recovery, with its stream offset', async () => {
+    const root = await fixtureRoot()
+    const fixture = requiredFixture(root)
+    const host = await fakeHost()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const sessionId = v.parse(sessionIdSchema, '00000000-0000-4000-8000-000000000004')
+    const key = terminalSessionKey(worktreeId, sessionId, sessionId)
+    new TerminalHistory(fixture.database, key).append(Buffer.from('seen;'), 5)
+    host.exit(host.add(key, 'seen;last words;').session, 0)
+    const service = testService(root, { hostClient: host.connect() })
+
+    const recovering = service.reattach()
+    await expect(service.closeSessionTerminals(sessionId)).resolves.toEqual({ closed: 0 })
+    await recovering
+
+    expect(fixture.database.select().from(terminalHistoryChunks).all()).toEqual([])
+    expect(fixture.database.select().from(terminalSessionOffsets).all()).toEqual([])
+    expect(host.sessions.size).toBe(0)
+  })
+
+  it("kills a deleted session's agent shells that recovery skipped for want of a host listing", async () => {
+    const root = await fixtureRoot()
+    const host = await fakeHost()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const sessionId = v.parse(sessionIdSchema, '00000000-0000-4000-8000-000000000005')
+    const agent = host.add(terminalSessionKey(worktreeId, sessionId, sessionId))
+    const shell = host.add(terminalSessionKey(worktreeId, 'worktree-shell'))
+    const service = testService(root, { hostClient: host.connect() })
+    host.refused.add('list')
+    expect(await service.listHostSessions()).toBeNull()
+    host.refused.delete('list')
+
+    await expect(service.closeSessionTerminals(sessionId)).resolves.toEqual({ closed: 1 })
+
+    await expect.poll(() => host.received).toContainEqual({ type: 'kill', session: agent.session })
+    expect(host.received).not.toContainEqual({ type: 'kill', session: shell.session })
   })
 })
+
+// Shells run in a real terminal host in a throwaway state root.
+async function nativeHost() {
+  const host = await createTestTerminalHost()
+  hosts.push(host)
+  return host
+}
+
+// Speaks the host protocol in-process, so recovery runs without a native PTY.
+async function fakeHost() {
+  const host = await createFakeTerminalHost()
+  fakeHosts.push(host)
+  return host
+}
+
+function recordingLease() {
+  const lease = {
+    terminalLeaseId: v.parse(terminalLeaseIdSchema, crypto.randomUUID()),
+    runtimeEpoch: 'recording',
+    ended: 0,
+    activate: async () => {},
+    terminate: async () => {},
+    end: async () => {
+      lease.ended += 1
+    },
+    markUnknown: async () => {},
+  }
+  return lease
+}
 
 function testService(
   root: string,
@@ -1053,6 +1447,8 @@ function testService(
     ptyFactory?: TerminalPtyFactory
     resolveAgentSession?: import('../agent-launch').AgentTerminalResolver
     lifecycle?: import('../lease').TerminalLeaseBoundary
+    hostClient?: import('../host-client').TerminalHostClient
+    resolveAdoptedLease?: TerminalServiceOptions['resolveAdoptedLease']
   } = {},
 ) {
   const fixture = fixtures.get(root)
@@ -1065,7 +1461,8 @@ function testService(
       await beforeWorktreeResolution
       return requireWorktree(await fixture.engine.readModelSnapshot(), id).canonicalPath
     },
-    lifecycle: { begin: (id) => fixture.engine.beginTerminalLease(id) },
+    lifecycle: { begin: (id, key) => fixture.engine.beginTerminalLease(id, key) },
+    resolveAdoptedLease: (key) => fixture.engine.adoptedLeaseForKey(key),
     ...serviceOptions,
   })
   services.push(service)
@@ -1134,7 +1531,30 @@ async function waitForTerminalOutput(messages: readonly TerminalServerMessage[],
     await Bun.sleep(25)
   }
 
-  throw new TypeError(`Timed out waiting for terminal output: ${text}`)
+  throw new TypeError(
+    `Timed out waiting for terminal output: ${text}; received ${JSON.stringify(terminalOutputText(messages))}`,
+  )
+}
+
+function observedLogDir(root: string) {
+  const logDir = path.join(requiredFixture(root).root, 'logs')
+  initializeObservability({
+    OBSERVABILITY_CONSOLE: 'false',
+    OBSERVABILITY_DIR: logDir,
+    OBSERVABILITY_ENABLED: 'true',
+    OBSERVABILITY_INFO_SAMPLE_RATE: '100',
+    NODE_ENV: 'production',
+  })
+  return logDir
+}
+
+async function terminalSessionEvents(logDir: string) {
+  await flushObservability()
+  const events: WideEvent[] = []
+  for await (const event of readFsLogs({ dir: logDir })) {
+    if (event.action === 'terminal.session') events.push(event)
+  }
+  return events
 }
 
 function requiredFixture(root: string) {
