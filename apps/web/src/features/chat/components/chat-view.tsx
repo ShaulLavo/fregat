@@ -268,7 +268,7 @@ export function ChatView({
               onRestore={composer.restore}
             />
             <ChatInput
-              key={`input:${sessionKey}`}
+              key={`composer:${sessionKey}`}
               busy={busy}
               correctionDisabledReason={correctionUnavailableReason(session)}
               disabledReason={disabledReason}

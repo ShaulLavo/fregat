@@ -105,7 +105,6 @@ export class WallpaperLibrary {
 
   /** Omarchy wallpapers on GitHub that no library entry covers yet, matched by theme and file stem. */
   catalog(assets: readonly WallpaperAsset[]): WallpaperCatalogEntry[] {
-    if (!this.#settings.snapshot().values['workbench.wallpaper.omarchyCatalog']) return []
     const installed = new Set<string>()
     for (const asset of assets) {
       const bundled = bundledWallpaperFor(asset.id)
@@ -134,21 +133,18 @@ export class WallpaperLibrary {
   }
 
   async #download(entry: WallpaperCatalogEntry) {
-    const timeoutMs = this.#settings.snapshot().values['workbench.wallpaper.downloadTimeoutMs']
     const unavailable = (stage: string, cause?: unknown, facts: Record<string, unknown> = {}) =>
       wallpaperErrors.DOWNLOAD({
         cause: cause instanceof Error ? cause : undefined,
-        internal: { asset: entry.asset, stage, timeoutMs, ...facts },
+        internal: { asset: entry.asset, stage, ...facts },
       })
     const mismatch = (stage: string, facts: Record<string, unknown>) =>
       wallpaperErrors.DOWNLOAD_MISMATCH({
         internal: { asset: entry.asset, stage, expectedBytes: entry.bytes, ...facts },
       })
-    const response = await fetch(entry.source, { signal: AbortSignal.timeout(timeoutMs) }).catch(
-      (cause: unknown) => {
-        throw unavailable('request', cause)
-      },
-    )
+    const response = await fetch(entry.source).catch((cause: unknown) => {
+      throw unavailable('request', cause)
+    })
     if (!response.ok) {
       await response.body?.cancel()
       throw unavailable('status', undefined, { status: response.status })

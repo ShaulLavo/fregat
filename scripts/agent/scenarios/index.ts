@@ -332,6 +332,7 @@ import { editorFocusClicks } from './editor-focus-clicks'
 import { editorProportionalFont } from './editor-proportional-font'
 import { editorEditContextInput } from './editor-edit-context-input'
 import { editorProduct } from './editor-product'
+import { editorTerminalSurface } from './editor-terminal-surface'
 import { treeFileClicks } from './tree-file-clicks'
 import { treeStickyScroll } from './tree-sticky-scroll'
 import { treeParity } from './tree-parity'
@@ -654,6 +655,7 @@ export const scenarios: readonly Scenario[] = [
   editorProportionalFont,
   editorEditContextInput,
   editorProduct,
+  editorTerminalSurface,
   treeStickyScroll,
   treeParity,
   fileIconHues,
