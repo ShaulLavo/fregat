@@ -1,4 +1,10 @@
-import type { ProviderInstanceConfig, SettingsOperation } from '@workspace/contracts'
+import type {
+  ColorMode,
+  ProviderInstanceConfig,
+  SettingsOperation,
+  ThemeCustomization,
+  ThemeVariantPatch,
+} from '@workspace/contracts'
 
 export function providerEnabledOperation(
   instance: ProviderInstanceConfig,
@@ -15,5 +21,15 @@ export function providerEnabledOperation(
     enabled,
     kind: 'provider.setEnabled',
     providerInstanceId: instance.providerInstanceId,
+  }
+}
+
+/** The customization a theme keeps: each half's changes from the theme, dropping unchanged halves. */
+export function themeCustomization(
+  patches: Readonly<Record<ColorMode, ThemeVariantPatch | null>>,
+): ThemeCustomization {
+  return {
+    ...(patches.light ? { light: patches.light } : {}),
+    ...(patches.dark ? { dark: patches.dark } : {}),
   }
 }

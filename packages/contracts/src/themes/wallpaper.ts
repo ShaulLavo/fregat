@@ -39,3 +39,21 @@ export const wallpaperAssetSchema = v.object({
 })
 export type WallpaperAsset = v.InferOutput<typeof wallpaperAssetSchema>
 export const wallpaperIndexSchema = v.array(wallpaperAssetSchema)
+
+const clusterColorSchema = v.object({
+  l: v.number(),
+  c: v.number(),
+  h: v.number(),
+  alpha: v.number(),
+})
+
+/** A wallpaper's dominant colors, heaviest first, with each one's share of the image. */
+export const wallpaperColorsSchema = v.object({
+  clusters: v.array(
+    v.object({
+      color: clusterColorSchema,
+      weight: v.pipe(v.number(), v.minValue(0), v.maxValue(1)),
+    }),
+  ),
+})
+export type WallpaperColors = v.InferOutput<typeof wallpaperColorsSchema>

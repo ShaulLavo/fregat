@@ -537,6 +537,10 @@ export {
   WORKBENCH_DENSITIES,
   isWorkbenchDensity,
   type WorkbenchDensity,
+  DEFAULT_WORKBENCH_FEEL,
+  WORKBENCH_FEELS,
+  isWorkbenchFeel,
+  type WorkbenchFeel,
 } from './settings/boot-defaults'
 export {
   DEFAULT_SETTINGS_DOCUMENT_REVISION,
@@ -897,6 +901,7 @@ export {
   flatten,
   normalizeColor,
   oklch,
+  oklchFromRgb,
   parseColor,
   toCss,
   toHex,
@@ -943,7 +948,9 @@ export {
   wallpaperSelectionSchema,
   wallpaperAssetSchema,
   wallpaperIndexSchema,
+  wallpaperColorsSchema,
   type AssetId,
+  type WallpaperColors,
   type WallpaperSource,
   type WallpaperSelection,
   type WallpaperAsset,

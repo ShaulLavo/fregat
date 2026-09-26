@@ -109,6 +109,11 @@ export function fileItemValue(item: FilePaletteItem) {
   return `file:${item.entry.path}`
 }
 
+/** The file row cmdk has highlighted, which the preview follows. */
+export function highlightedFileItem(items: readonly FilePaletteItem[], value: string | undefined) {
+  return items.find((item) => fileItemValue(item) === value) ?? null
+}
+
 export function editorPaletteItems(
   contents: readonly TabContent[],
   selected: TabContent | null,
@@ -132,14 +137,19 @@ function commandKeywords(spec: CommandSpec) {
   ]
 }
 
-export function isColorPreviewMode(mode: QuickAccessMode): boolean {
-  return (
-    mode === 'colorMode' ||
-    mode === 'colorTheme' ||
-    mode === 'appColors' ||
-    mode === 'themeBundle' ||
-    mode === 'wallpaper'
-  )
+/** The palette scopes that repaint the app for the highlighted row. */
+export const PREVIEW_SCOPES = [
+  'colorTheme',
+  'colorMode',
+  'appColors',
+  'themeBundle',
+  'wallpaper',
+] as const satisfies readonly QuickAccessMode[]
+
+export type PreviewScope = (typeof PREVIEW_SCOPES)[number]
+
+export function isPreviewScope(mode: QuickAccessMode): mode is PreviewScope {
+  return (PREVIEW_SCOPES as readonly QuickAccessMode[]).includes(mode)
 }
 
 /**

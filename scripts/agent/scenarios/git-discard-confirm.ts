@@ -7,13 +7,13 @@ import {
   openFixtureWorkspace,
   releaseFixture,
 } from '../fixture-workspace'
-import { openGitPanel, selectors } from '../selectors'
+import { holdToConfirm, openGitPanel, selectors } from '../selectors'
 import type { Scenario } from './index'
 
 export const gitDiscardConfirm: Scenario = {
   name: 'git-discard-confirm',
   description:
-    'Discard asks first: Cancel keeps the change, Discard restores it, Delete removes a new file.',
+    'Discard asks first: Cancel keeps the change, holding Discard restores it, holding Delete removes a new file.',
   async run(page, { step }) {
     // Never the dev workspace: confirming a discard there destroys real work.
     const fixture = await mkdtemp('/work/tmp/fregat-git-discard-')
@@ -51,8 +51,11 @@ export const gitDiscardConfirm: Scenario = {
 
       await tracked.hover()
       await selectors.gitFileRowAction(page, 'tracked.txt', 'Discard file').click()
-      await discardDialog.getByRole('button', { name: 'Discard', exact: true }).click()
-      await discardDialog.waitFor({ state: 'hidden' })
+      await holdToConfirm(
+        page,
+        discardDialog.getByRole('button', { name: 'Discard', exact: true }),
+        () => discardDialog.waitFor({ state: 'hidden' }),
+      )
       await tracked.waitFor({ state: 'detached' })
       strictEqual(await readFile(path.join(fixture, 'tracked.txt'), 'utf8'), 'base\n')
       await step('discarded')
@@ -64,7 +67,12 @@ export const gitDiscardConfirm: Scenario = {
       await deleteDialog.waitFor()
       await page.waitForTimeout(400)
       await step('delete-asks')
-      await deleteDialog.getByRole('button', { name: 'Delete', exact: true }).click()
+      await holdToConfirm(
+        page,
+        deleteDialog.getByRole('button', { name: 'Delete', exact: true }),
+        // The modal hides the rows behind it, so the row reads as gone before anything happened.
+        () => deleteDialog.waitFor({ state: 'hidden' }),
+      )
       await untracked.waitFor({ state: 'detached' })
       await step('deleted')
       strictEqual(await fixturePorcelain(fixture), '')

@@ -214,6 +214,8 @@ export type GitCommitProgressEvent =
 export type GitWorktree = {
   absolutePath: string
   branch: string | null
+  /** Source branch recorded when the app created this worktree; null when unknown. */
+  baseBranch?: string | null
   commit: string | null
   detached: boolean
   locked: boolean

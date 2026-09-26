@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@workspace/ui/components/dialog'
+import { HoldButton } from '@workspace/ui/components/hold-button'
 import { Spinner } from '@workspace/ui/components/spinner'
 import type { WorktreeConfirmation } from '@workspace/client-core/chat/worktrees/commands'
 import { InlineError } from '@/components/inline-error'
@@ -51,14 +52,18 @@ export function WorktreeCleanupDialog({
           <Button disabled={pending} variant='outline' onClick={onCancel}>
             Cancel
           </Button>
-          <Button
-            disabled={pending}
-            variant={force ? 'destructive' : 'default'}
-            onClick={onConfirm}
-          >
-            {pending ? <Spinner /> : null}
-            {action}
-          </Button>
+          {/* Only a forced removal deletes files; releasing and resolving an absent checkout do not. */}
+          {force ? (
+            <HoldButton disabled={pending} onConfirm={onConfirm}>
+              {pending ? <Spinner /> : null}
+              {action}
+            </HoldButton>
+          ) : (
+            <Button disabled={pending} onClick={onConfirm}>
+              {pending ? <Spinner /> : null}
+              {action}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

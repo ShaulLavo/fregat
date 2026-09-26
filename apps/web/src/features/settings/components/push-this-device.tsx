@@ -5,7 +5,7 @@ import { Spinner } from '@workspace/ui/components/spinner'
 
 import { InlineError } from '@/components/inline-error'
 import { usePushSubscribe } from '@/features/settings/hooks/use-push-subscribe'
-import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
+import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 import { settingsMutationKeys } from '@/features/settings/utils/mutation-keys'
 import type { ThisDevice } from '@/features/settings/utils/push-browser'
 import { thisDeviceBlocker } from '@/features/settings/utils/push-device'

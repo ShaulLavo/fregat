@@ -80,7 +80,7 @@ export const selectors = {
   sessionInShelf: (page: Page, title: string, shelf: string) =>
     page.getByRole('region', { name: shelf, exact: true }).getByTitle(title, { exact: true }),
   snoozePreset: (page: Page) => page.getByRole('button', { name: /In 1 hour/ }),
-  snoozeDurationMode: (page: Page) => page.getByRole('button', { name: 'Duration', exact: true }),
+  snoozeDurationMode: (page: Page) => page.getByRole('tab', { name: 'Duration', exact: true }),
   snoozeAmount: (page: Page) => page.getByRole('spinbutton', { name: 'Duration', exact: true }),
   snoozeCustomSubmit: (page: Page) =>
     page.getByRole('button', { name: 'Snooze until chosen time', exact: true }),
@@ -149,14 +149,6 @@ export const selectors = {
     page.getByRole('button', { name: 'Conversation history', exact: true }),
   hint: (page: Page, label: string) =>
     page.locator('[data-slot="tooltip-content"]').filter({ hasText: label }),
-  paletteCardActions: (page: Page) =>
-    page
-      .getByRole('radiogroup', { name: 'App colors', exact: true })
-      .getByRole('button', { name: / actions$/ }),
-  wallpaperClose: (page: Page) =>
-    page
-      .getByRole('dialog', { name: 'Wallpaper', exact: true })
-      .getByRole('button', { name: 'Close', exact: true }),
   popupMenu: (page: Page) => page.getByRole('menu'),
   draftAgent: (page: Page) => page.getByRole('button', { name: 'Run the session as an agent' }),
   draftAgentChoice: (page: Page, name: string) =>
@@ -180,6 +172,7 @@ export const selectors = {
     page
       .getByRole('group', { name: group, exact: true })
       .getByRole('menuitemradio', { name: choice, exact: true }),
+  branchLanes: (page: Page) => page.locator('[data-slot="branch-lane"]'),
   draftWorkspace: (page: Page) => page.getByRole('button', { name: 'Workspace', exact: true }),
   draftBaseBranch: (page: Page) =>
     page.getByRole('button', { name: 'Start from branch', exact: true }),
@@ -199,8 +192,7 @@ export const selectors = {
     page
       .getByRole('log', { name: 'Messages', exact: true })
       .locator('[data-index] > [data-timeline-row-id]'),
-  timelineJumpToLatest: (page: Page) =>
-    page.getByRole('button', { name: 'Scroll to latest message', exact: true }),
+  timelineJumpToLatest: (page: Page) => page.locator('[data-slot="tail-jump-button"]'),
   breadcrumbCrumb: (page: Page, label: string) =>
     page
       .getByRole('navigation', { name: 'Breadcrumbs', exact: true })
@@ -276,6 +268,37 @@ export const selectors = {
   pickerSearch: (page: Page) =>
     page.getByRole('textbox', { name: 'Search files and folders', exact: true }),
   pickerEmpty: (page: Page) => page.getByText('Nothing here', { exact: true }),
+  pickerRow: (page: Page, name: string) =>
+    page
+      .getByRole('dialog', { name: 'Choose folder', exact: true })
+      .getByRole('option')
+      .filter({ hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }),
+  pickerHiddenToggle: (page: Page, shown: boolean) =>
+    page.getByRole('button', {
+      name: shown ? 'Hide hidden files' : 'Show hidden files',
+      exact: true,
+    }),
+  pickerPreviewPath: (page: Page, path: string) => page.locator(`[data-file-preview="${path}"]`),
+  paletteImportText: (page: Page) =>
+    page.getByRole('textbox', { name: 'Palette JSON', exact: true }),
+  pickerPreview: (page: Page) => page.locator('[data-file-preview]'),
+  themeStudio: (page: Page) => page.getByRole('region', { name: 'Theme studio', exact: true }),
+  themeStudioTab: (page: Page, name: string) =>
+    page
+      .getByRole('region', { name: 'Theme studio', exact: true })
+      .getByRole('tab', { name, exact: true }),
+  themeStudioCard: (page: Page, id: string) =>
+    page.locator(`[data-studio-themes] [role="option"][data-theme-id="${id}"]`),
+  titlebar: (page: Page) => page.locator('header[data-native-window-drag-region]').first(),
+  themeStudioOpen: (page: Page) => page.getByRole('button', { name: 'Open studio', exact: true }),
+  quickOpenPreview: (page: Page) => page.getByRole('region', { name: 'File preview', exact: true }),
+  pickerColumn: (page: Page, index: number) => page.locator(`[data-picker-column="${index}"]`),
+  pickerView: (page: Page, view: 'Columns' | 'List' | 'Icons') =>
+    page
+      .getByRole('tablist', { name: 'View', exact: true })
+      .getByRole('tab', { name: view, exact: true }),
+  pickerStatus: (page: Page) =>
+    page.getByRole('dialog', { name: 'Choose folder', exact: true }).getByRole('status').last(),
   pickerChoose: (page: Page) =>
     page
       .getByRole('dialog', { name: 'Choose folder', exact: true })
@@ -440,17 +463,6 @@ export const selectors = {
   codeThemeOption: (page: Page, id: string) => page.locator(`[data-value="color-theme:${id}"]`),
   wallpaperAsset: (page: Page, id: string) =>
     page.locator(`${wallpaperStillSelector}[src*="${id}"]`),
-  themeGallery: (page: Page) => page.getByLabel('Theme bundles', { exact: true }),
-  themeCard: (page: Page, id: string) =>
-    page.locator(`[data-theme-bundle="${id}"]`).getByRole('button'),
-  paletteActions: (page: Page, name: string) =>
-    page.getByRole('button', { name: `${name} actions`, exact: true }),
-  paletteMenuAction: (page: Page, name: string) =>
-    page.getByRole('menuitem', { name, exact: true }),
-  themeAction: (page: Page, name: string) => page.getByRole('button', { name, exact: true }),
-  themeEditor: (page: Page) => page.getByRole('dialog', { name: 'Create a theme bundle' }),
-  themeName: (page: Page) => page.getByRole('textbox', { name: 'Name', exact: true }),
-  themeEditorPalette: (page: Page, mode: string) => page.locator(`#theme-palette-${mode}`),
   themeRoot: (page: Page) => page.locator('html'),
 
   editorHover: (page: Page) => page.locator('.editor-plugin-hover:not([hidden])'),
@@ -485,6 +497,20 @@ export const selectors = {
   chooseFolder: (page: Page) => page.getByRole('button', { name: 'Choose folder', exact: true }),
   settingsDialog: (page: Page) => page.getByRole('dialog', { name: 'Settings', exact: true }),
   settingsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search settings' }),
+  settingsFeel: (page: Page) => page.getByRole('combobox', { name: 'Feel', exact: true }),
+  feelOption: (page: Page, name: string) => page.getByRole('option', { name, exact: true }),
+  physicalGallery: (page: Page) => page.locator('[data-physical-gallery]'),
+  physicalButton: (page: Page, name: string) => page.getByRole('button', { name, exact: true }),
+  physicalSwitch: (page: Page, name: string) => page.getByRole('switch', { name, exact: true }),
+  physicalThumb: (page: Page) =>
+    page
+      .getByRole('switch', { name: 'Preview switch', exact: true })
+      .locator('[data-slot="switch-thumb"]'),
+  physicalField: (page: Page) => page.getByRole('textbox', { name: 'Preview field', exact: true }),
+  physicalMenu: (page: Page) => page.getByRole('menu'),
+  physicalDialog: (page: Page) =>
+    page.getByRole('dialog', { name: 'Physical dialog', exact: true }),
+  physicalRow: (page: Page) => page.getByRole('option', { name: 'Silent row', exact: true }),
   settingsHeader: (page: Page) => page.locator('[data-settings-header]'),
   settingsContinuousSeams: (page: Page) =>
     page.getByRole('switch', { name: 'Continuous panel background', exact: true }),
@@ -492,8 +518,7 @@ export const selectors = {
     page.getByRole('combobox', { name: 'Interface density', exact: true }),
   settingsDensityOption: (page: Page, density: 'compact' | 'cozy') =>
     page.getByRole('option', { name: density, exact: true }),
-  settingsJsonView: (page: Page) =>
-    page.getByRole('button', { name: 'settings.json', exact: true }),
+  settingsJsonView: (page: Page) => page.getByRole('tab', { name: 'settings.json', exact: true }),
   settingsScopeTab: (page: Page, name: 'User' | 'Workspace' | 'Defaults') =>
     page.getByRole('tab', { name, exact: true }),
   settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),
@@ -526,17 +551,10 @@ export const selectors = {
     page.getByRole('button', { name: `Copy ${label}`, exact: true }),
   copiedButton: (page: Page, label: string) =>
     page.getByRole('button', { name: `Copied ${label}`, exact: true }),
-  wallpaperTile: (page: Page) =>
-    page.getByRole('button', { name: 'Choose wallpaper', exact: true }),
-  wallpaperPicker: (page: Page) => page.getByRole('dialog', { name: 'Wallpaper', exact: true }),
   wallpaperCards: (page: Page) =>
     page.getByRole('button', { name: /^Select .+/ }).filter({ has: page.locator('img') }),
   wallpaperCard: (page: Page, name: string) =>
     page.getByRole('button', { name: `Select ${name}`, exact: true }),
-  wallpaperSelectedChoice: (page: Page) =>
-    page.getByRole('dialog').locator('section button[aria-pressed="true"]'),
-  wallpaperChoice: (page: Page, label: string) =>
-    page.getByRole('dialog').locator('section').getByRole('button', { name: label, exact: true }),
   wallpaperFilter: (page: Page) => page.getByRole('textbox', { name: 'Filter wallpapers' }),
   wallpaperUploadInput: (page: Page) => page.getByLabel('Upload wallpapers', { exact: true }),
   wallpaperActions: (page: Page, name: string) =>
@@ -764,8 +782,6 @@ export const selectors = {
   agentTreeChild: (page: Page, threadId: string) =>
     page.locator(`[data-agent-tree-level="child"] [data-agent-thread-id="${threadId}"]`),
   modelSwitch: (page: Page) => page.locator('[data-model-switch]').first(),
-  jumpToLatest: (page: Page) =>
-    page.getByRole('button', { name: 'Scroll to latest message', exact: true }),
   composerActions: (page: Page) => page.locator('[data-composer-actions]'),
   usageMeter: (page: Page) => page.locator('[data-composer-actions] [data-usage-meter]'),
   usagePopover: (page: Page) => page.locator('[data-usage-popover]'),
@@ -882,19 +898,31 @@ export const selectors = {
       .locator('[data-git-file]')
       .filter({ has: page.getByText(name, { exact: true }) })
       .getByRole('button', { name: label, exact: true }),
+  statusFrame: (page: Page, tone: 'pending' | 'error') =>
+    page.locator(`[data-slot="status-frame"][data-tone="${tone}"]`),
+  statusFrameBody: (page: Page) => page.locator('[data-slot="status-frame"] > div'),
+  valueGridRow: (page: Page, label: string) =>
+    page
+      .locator('[data-slot="value-grid-row"]')
+      .filter({ has: page.getByRole('term').getByText(label, { exact: true }) }),
+  tailJump: (page: Page) => page.locator('[data-slot="tail-jump-button"]'),
+  holdButton: (scope: Locator, name: string) =>
+    scope.locator('[data-slot="hold-button"]').filter({ hasText: name }),
+  tabsIndicator: (page: Page, list: string) =>
+    page.getByRole('tablist', { name: list, exact: true }).locator('[data-slot="tabs-indicator"]'),
   gitDiscardDialog: (page: Page, title: string) =>
     page.getByRole('alertdialog', { name: title, exact: true }),
   unexpectedError: (page: Page) => page.getByText('Something unexpected went wrong.'),
   focusGitCommand: (page: Page) => page.getByRole('option', { name: /Focus Git/ }),
-  graphButton: (page: Page) => page.getByRole('button', { name: 'Graph', exact: true }),
+  graphButton: (page: Page) => page.getByRole('tab', { name: 'Graph', exact: true }),
   // The Changes tab's accessible name carries its live file count.
   gitChangesTab: (page: Page) =>
-    page.getByRole('region', { name: 'Git panel' }).getByRole('button', { name: /^Changes\b/ }),
+    page.getByRole('region', { name: 'Git panel' }).getByRole('tab', { name: /^Changes\b/ }),
   changesToggle: (page: Page) => page.getByRole('button', { name: 'Changes', exact: true }),
   gitDiffScope: (page: Page, scope: 'Working tree' | 'Turn') =>
     page
-      .getByRole('group', { name: 'Diff scope' })
-      .getByRole('button', { name: scope, exact: true }),
+      .getByRole('tablist', { name: 'Diff scope' })
+      .getByRole('tab', { name: scope, exact: true }),
   turnFiles: (page: Page) => page.getByRole('listbox', { name: 'Turn changed files' }),
   worktreeFiles: (page: Page) => page.locator('[data-git-file]:not([data-history-file])'),
   historyList: (page: Page) => page.getByRole('listbox', { name: 'Commit history' }),
@@ -953,6 +981,17 @@ export async function openGitPanel(page: Page) {
   await input.fill('>Focus Git')
   await selectors.focusGitCommand(page).first().click()
   await selectors.gitPanel(page).waitFor({ timeout: 15_000 })
+}
+
+/** Holds a hold-to-confirm button until `done` resolves, the way a user keeps the mouse down. */
+export async function holdToConfirm(page: Page, button: Locator, done: () => Promise<unknown>) {
+  await button.hover()
+  await page.mouse.down()
+  try {
+    await done()
+  } finally {
+    await page.mouse.up()
+  }
 }
 
 export async function focusEditor(page: Page) {

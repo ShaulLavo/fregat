@@ -34,7 +34,9 @@ export function ReferenceRow({
       }}
       onMouseEnter={() => onPreviewReference(target)}
     >
-      <span className='text-muted-foreground text-2xs text-right tabular-nums'>{line}</span>
+      <span className='text-muted-foreground text-2xs text-right font-mono tabular-nums'>
+        {line}
+      </span>
       <span className='text-muted-foreground group-hover:text-foreground text-2xs min-w-0 truncate font-mono'>
         {preview}
       </span>

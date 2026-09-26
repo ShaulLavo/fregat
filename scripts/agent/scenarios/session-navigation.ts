@@ -1,14 +1,19 @@
 import { ok, strictEqual } from 'node:assert/strict'
 import type { Scenario } from './index'
-import { selectors } from '../selectors'
-import { dispatch, openChatShell, readShell } from './chat-verification'
+import { holdToConfirm, selectors } from '../selectors'
+import { createGitFixture, fixtureGit, releaseFixture } from '../fixture-workspace'
+import { dispatch, openChat, readShell } from './chat-verification'
+import { registerFixtureProject } from './native-provider-verification'
 
 export const sessionNavigation: Scenario = {
   name: 'session-navigation',
   description:
-    'Archive the current session into its project draft, preserve a background archive route, and delete into the first surviving session. Uses three disposable sessions on one connected owner.',
+    'Archive the current session into its project draft, preserve a background archive route, and delete into the first surviving session. Uses three sessions in a disposable project.',
   async run(page, { step }) {
-    const { base, project, worktree } = await openChatShell(page)
+    const base = await openChat(page)
+    const root = await createGitFixture('session-navigation')
+    await fixtureGit(root, ['commit', '--quiet', '-m', 'fixture'])
+    const worktree = await registerFixtureProject(page, base, root)
     const ids = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()]
     const prefix = `Navigation verification ${ids[0]!.slice(0, 8)}`
     const titles = ids.map((_, index) => `${prefix} ${index + 1}`)
@@ -19,7 +24,7 @@ export const sessionNavigation: Scenario = {
           type: 'session.create',
           sessionId,
           title: titles[index],
-          modelSelection: project.defaultModelSelection,
+          modelSelection: { providerInstanceId: 'codex', model: 'gpt-5.5' },
           worktreeTarget: { kind: 'current', worktreeId: worktree.id },
         })
         created.push(sessionId)
@@ -58,9 +63,10 @@ export const sessionNavigation: Scenario = {
       await selectors.sessionByTitle(page, titles[1]!).waitFor()
       await selectors.sessionByTitle(page, titles[0]!).click({ button: 'right' })
       await selectors.deleteSession(page).click()
+      const landed = () => page.waitForURL((url) => decodeURIComponent(url.href).includes(ids[1]!))
       if (await selectors.confirmSessionDelete(page).isVisible())
-        await selectors.confirmSessionDelete(page).click()
-      await page.waitForURL((url) => decodeURIComponent(url.href).includes(ids[1]!))
+        await holdToConfirm(page, selectors.confirmSessionDelete(page), landed)
+      await landed()
       await step('delete-opens-first-surviving-project-session')
       ok(
         !(await readShell(page, base)).sessions.some((session) => session.id === ids[0]),
@@ -72,6 +78,12 @@ export const sessionNavigation: Scenario = {
         if (!remaining.sessions.some((session) => session.id === sessionId)) continue
         await dispatch(page, base, { type: 'session.delete', sessionId })
       }
+      await dispatch(page, base, {
+        type: 'project.delete',
+        projectId: worktree.projectId,
+        force: true,
+      })
+      await releaseFixture(root)
     }
   },
 }

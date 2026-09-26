@@ -1,6 +1,12 @@
 import { AnimatedCounter } from 'react-animated-counter'
+import { Ticker } from '@workspace/ui/components/ticker'
+import { useSettingValue } from '@/hooks/use-setting-value'
 
-import { TICKER_FONT_SIZES, type TickerSize } from '@/components/utils/ticker-size'
+import {
+  TICKER_FONT_SIZES,
+  TICKER_SIZE_CLASSES,
+  type TickerSize,
+} from '@/components/utils/ticker-size'
 
 const CONTAINER_STYLES = {
   display: 'inline-flex',
@@ -39,6 +45,13 @@ export function TickerNumber({
   size?: TickerSize
   value: number
 }) {
+  const feel = useSettingValue('workbench.feel')
+  if (feel !== 'flat')
+    return (
+      <span className={TICKER_SIZE_CLASSES[size]}>
+        <Ticker value={value} />
+      </span>
+    )
   return (
     <span aria-label={value.toLocaleString()} className='font-mono' role='img'>
       <AnimatedCounter

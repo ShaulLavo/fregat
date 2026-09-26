@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { Tabs, TabsList, TabsTab } from '@workspace/ui/components/tabs'
 import type { ProviderInstanceConfig } from '@workspace/contracts'
 
 import { providerListQueryOptions } from '@/lib/provider-query'
@@ -7,7 +9,7 @@ import { providerSettingRows } from '../utils/provider-rows'
 import { EmptyRow } from './empty-row'
 import { ProviderLoading } from './provider-loading'
 import { ProviderRow } from './provider-row'
-import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
+import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 
 /**
  * The provider list, as the control for `providers.instances`.
@@ -23,15 +25,34 @@ import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
 export function ProviderSection({ saved }: { saved: readonly ProviderInstanceConfig[] }) {
   const { data, isPending } = useQuery(providerListQueryOptions(), useSettingsOwner())
   const instances = providerSettingRows({ saved, snapshots: data?.providers ?? [] })
+  const [agentView, setAgentView] = useState(false)
+  const hasEnvironment = instances.some((instance) => instance.environment.length > 0)
 
   if (isPending && instances.length === 0) return <ProviderLoading />
   if (instances.length === 0) return <EmptyRow>No providers are available.</EmptyRow>
 
   return (
-    <div className='bg-muted flex w-96 max-w-full min-w-0 flex-col rounded-lg @max-3xl/settings:w-full'>
-      {instances.map((instance) => (
-        <ProviderRow key={instance.providerInstanceId} instance={instance} />
-      ))}
+    <div className='flex w-96 max-w-full min-w-0 flex-col gap-2 @max-3xl/settings:w-full'>
+      {hasEnvironment ? (
+        <Tabs
+          value={agentView ? 'agent' : 'values'}
+          onValueChange={(view: string) => setAgentView(view === 'agent')}
+        >
+          <TabsList aria-label='Environment view' variant='segmented'>
+            <TabsTab value='values'>Values</TabsTab>
+            <TabsTab value='agent'>Agent view</TabsTab>
+          </TabsList>
+        </Tabs>
+      ) : null}
+      <div className='bg-muted flex flex-col rounded-lg'>
+        {instances.map((instance) => (
+          <ProviderRow
+            agentView={agentView}
+            key={instance.providerInstanceId}
+            instance={instance}
+          />
+        ))}
+      </div>
     </div>
   )
 }

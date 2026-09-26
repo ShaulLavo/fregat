@@ -1,6 +1,6 @@
 import { strictEqual } from 'node:assert/strict'
 import type { Scenario } from './index'
-import { selectors } from '../selectors'
+import { holdToConfirm, selectors } from '../selectors'
 import { createSession, dispatch, openChatShell } from './chat-verification'
 
 export const checkpointRewind: Scenario = {
@@ -35,8 +35,9 @@ export const checkpointRewind: Scenario = {
       )
       await page.waitForTimeout(250)
       await step('explicit-conversation-only-choice')
-      await selectors.rewindConversation(page).click()
-      await selectors.rewindDialog(page).waitFor({ state: 'hidden', timeout: 60_000 })
+      await holdToConfirm(page, selectors.rewindConversation(page), () =>
+        selectors.rewindDialog(page).waitFor({ state: 'hidden', timeout: 60_000 }),
+      )
       strictEqual(
         (await selectors.chatMessage(page).innerText()).trim(),
         `${prompt}\n\nKeep this newer draft.`,

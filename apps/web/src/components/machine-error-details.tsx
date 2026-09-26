@@ -21,7 +21,7 @@ export function MachineErrorDetails({ label, error }: { label: string; error: Co
       </PopoverTrigger>
       <PopoverContent align='start' className='max-w-[calc(100vw-2rem)]'>
         <PopoverTitle>{label} connection</PopoverTitle>
-        <PopoverDescription className='max-h-60 overflow-auto wrap-anywhere whitespace-pre-wrap'>
+        <PopoverDescription className='max-h-60 overflow-auto overscroll-contain wrap-anywhere whitespace-pre-wrap'>
           {error.message}
         </PopoverDescription>
         {error.why ? (

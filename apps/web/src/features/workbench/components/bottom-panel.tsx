@@ -41,7 +41,8 @@ export function BottomPanel({
     <ToolPane
       className='h-full min-w-0 overflow-hidden'
       header={null}
-      bodyClassName='flex overflow-hidden'
+      bodyClassName='flex'
+      scroll={false}
       subheader={
         <PaneHeaderMenu
           title={workbenchBottomTabLabel(panels.activeBottomTab)}
@@ -101,6 +102,7 @@ function bottomTab({
 }) {
   return (
     <button
+      data-feedback='silent'
       aria-selected={active}
       className={barTabClassName(active, 'focus-ring-inset outline-none')}
       role='tab'

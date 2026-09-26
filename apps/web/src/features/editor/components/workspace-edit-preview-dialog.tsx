@@ -136,7 +136,7 @@ export function WorkspaceEditPreviewDialog() {
                       {resourcePathLabel(row)}
                     </div>
                     {row.beforeText !== undefined && row.afterText !== undefined ? (
-                      <div className='text-2xs mt-2 grid max-h-52 grid-cols-2 overflow-auto rounded-lg font-mono leading-relaxed'>
+                      <div className='text-2xs mt-2 grid max-h-52 grid-cols-2 overflow-auto overscroll-contain rounded-lg font-mono leading-relaxed'>
                         <pre className='bg-diff-removed/10 text-diff-removed min-w-0 overflow-visible p-2 whitespace-pre-wrap'>
                           {row.beforeText}
                         </pre>

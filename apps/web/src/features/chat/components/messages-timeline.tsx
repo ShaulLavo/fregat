@@ -13,6 +13,8 @@ import {
   TIMELINE_TOP_INSET_PX,
 } from '@/features/chat/utils/timeline-scroll-anchoring'
 import { TimelineRow } from '@/features/chat/components/timeline-row'
+import { useRestoringCheckpoint } from '@/features/chat/hooks/use-restoring-checkpoint'
+import { checkpointRestoreRoles } from '@/features/chat/utils/checkpoint-restore'
 import { TimelineViewport } from '@/features/chat/components/timeline-viewport'
 import { useReasoningAutoFold } from '@/features/chat/hooks/use-reasoning-auto-fold'
 
@@ -38,6 +40,7 @@ export function MessagesTimeline({
   })
 
   const { environmentId } = useChatTransport()
+  const restoreRoles = checkpointRestoreRoles(items, useRestoringCheckpoint(session.id))
   const [initialView] = useState(() =>
     timelineInitialView(readTimelineReload(environmentId), session, items),
   )
@@ -61,7 +64,11 @@ export function MessagesTimeline({
       paddingEnd={TIMELINE_COMPOSER_INSET_PX + scrollState.anchoredEndSpace}
       contentClassName='[overflow-anchor:none]'
       renderRow={(item) => (
-        <TimelineRow checkpointRevertPending={checkpointRevertPending} item={item} />
+        <TimelineRow
+          checkpointRevertPending={checkpointRevertPending}
+          item={item}
+          restoreRole={restoreRoles?.get(item.id)}
+        />
       )}
       renderLayout={(layout) => (
         <TimelineViewport

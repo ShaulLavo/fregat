@@ -6,7 +6,7 @@ export function PageLoading({ showJson }: { showJson: boolean }) {
   return (
     <ToolPane
       className='bg-background @container/settings h-full'
-      bodyClassName='overflow-hidden'
+      scroll={false}
       header={
         <PageHeader
           scope={

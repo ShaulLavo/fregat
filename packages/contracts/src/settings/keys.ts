@@ -25,6 +25,8 @@ import {
   DEFAULT_WALLPAPER_SELECTION,
   DEFAULT_WORKBENCH_DENSITY,
   WORKBENCH_DENSITIES,
+  DEFAULT_WORKBENCH_FEEL,
+  WORKBENCH_FEELS,
 } from './boot-defaults'
 import { defineSetting, type SettingDescriptor } from './registry'
 import { WORKSPACE_SEARCH_LIMIT_MAX } from '../workspace-search'
@@ -356,10 +358,10 @@ export const SETTINGS_REGISTRY = {
     scope: 'application',
     widget: 'theme',
     category: 'Appearance',
-    title: 'Theme bundles',
+    title: 'Theme',
     description:
-      'A light and dark version of your app colors, code colors, wallpaper and material.',
-    keywords: ['theme', 'bundle', 'light', 'dark', 'wallpaper'],
+      'App colors, code colors, wallpaper and surfaces, in a light and a dark version. Try them in the theme studio.',
+    keywords: ['theme', 'studio', 'light', 'dark', 'wallpaper', 'colors', 'palette'],
   }),
   'workbench.theme.customizations': defineSetting({
     schema: themeCustomizationsSchema,
@@ -388,6 +390,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'application',
     widget: 'palette',
     category: 'Appearance',
+    // Chosen in the theme studio, which writes it as part of the theme.
+    visibility: 'internal',
     title: 'App colors',
     description:
       'Colors for app backgrounds, text, borders, accents and the terminal. Pick a palette or make your own.',
@@ -409,6 +413,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'window',
     widget: 'code-theme',
     category: 'Appearance',
+    // Chosen in the theme studio, which writes it as part of the theme.
+    visibility: 'internal',
     title: 'Code theme in dark mode',
     description: 'Colors for code in editors and chat code blocks when the app uses dark mode.',
     keywords: ['syntax', 'highlighting', 'theme', 'native', 'vscode', 'colour'],
@@ -419,6 +425,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'window',
     widget: 'code-theme',
     category: 'Appearance',
+    // Chosen in the theme studio, which writes it as part of the theme.
+    visibility: 'internal',
     title: 'Code theme in light mode',
     description: 'Colors for code in editors and chat code blocks when the app uses light mode.',
     keywords: ['syntax', 'highlighting', 'theme', 'native', 'vscode', 'colour'],
@@ -443,6 +451,67 @@ export const SETTINGS_REGISTRY = {
     description: 'Font for the words the app writes: titles, labels, menus and prose.',
     keywords: ['font', 'typeface', 'interface', 'ui', 'sans', 'appearance'],
   }),
+  'workbench.sounds.controls': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Sounds',
+    title: 'Controls',
+    description: 'Play clicks when pressing controls and changing values with the pointer.',
+    keywords: ['sound', 'audio', 'click', 'feedback'],
+  }),
+  'workbench.sounds.errors': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Sounds',
+    title: 'Errors',
+    description: 'Play a short rattle when an error toast appears.',
+    keywords: ['sound', 'audio', 'error', 'toast', 'feedback'],
+  }),
+  'workbench.sounds.git': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Sounds',
+    title: 'Git results',
+    description:
+      'Play two rising clicks when a commit is created, a push finishes or a pull request opens.',
+    keywords: ['sound', 'audio', 'git', 'commit', 'push', 'pull request', 'feedback'],
+  }),
+  'workbench.sounds.terminalBell': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Sounds',
+    title: 'Terminal bell',
+    description: 'Play a click when a terminal program rings the bell.',
+    keywords: ['sound', 'audio', 'terminal', 'bell', 'bel', 'feedback'],
+  }),
+  'workbench.sounds.volume': defineSetting({
+    schema: percentSchema,
+    default: 50,
+    scope: 'application',
+    widget: 'number',
+    category: 'Sounds',
+    title: 'Volume',
+    description: 'Loudness of every sound, agent notifications included.',
+    keywords: ['sound', 'audio', 'volume', 'loudness'],
+  }),
+  'workbench.feel': defineSetting({
+    schema: v.picklist(WORKBENCH_FEELS),
+    default: DEFAULT_WORKBENCH_FEEL,
+    scope: 'window',
+    widget: 'enum',
+    category: 'Appearance',
+    title: 'Feel',
+    description: 'Motion and control depth: Flat, Seam, Brisk, Relaxed or Playful.',
+    keywords: ['motion', 'spring', 'physical', 'animation', 'depth'],
+  }),
   'workbench.density': defineSetting({
     schema: v.picklist(WORKBENCH_DENSITIES),
     default: DEFAULT_WORKBENCH_DENSITY,
@@ -459,6 +528,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'window',
     widget: 'number',
     category: 'Appearance',
+    // Chosen in the theme studio, which writes it as part of the theme.
+    visibility: 'internal',
     description:
       'How opaque panels and sidebars are over the wallpaper. 100 turns the glass material off.',
     keywords: ['transparency', 'opacity', 'glass', 'material', 'blur'],
@@ -469,6 +540,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'window',
     widget: 'number',
     category: 'Appearance',
+    // Chosen in the theme studio, which writes it as part of the theme.
+    visibility: 'internal',
     // Drives --content-opacity: the well is a second layer over a panel that
     // already painted one, so 50 over 80 composites to 90.
     description:
@@ -483,6 +556,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'window',
     widget: 'number',
     category: 'Appearance',
+    // Chosen in the theme studio, which writes it as part of the theme.
+    visibility: 'internal',
     description: 'Backdrop blur radius, in pixels, behind translucent surfaces.',
     keywords: ['blur', 'glass', 'material', 'vibrancy'],
   }),
@@ -493,7 +568,8 @@ export const SETTINGS_REGISTRY = {
     widget: 'number',
     category: 'Appearance',
     description: 'Backdrop saturation, as a percentage, behind translucent surfaces.',
-    visibility: 'advanced',
+    // Chosen in the theme studio, which writes it as part of the theme.
+    visibility: 'internal',
     keywords: ['saturation', 'glass', 'material', 'vibrancy'],
   }),
   'workbench.surface.continuousSeams': defineSetting({
@@ -516,6 +592,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'application',
     widget: 'wallpaper',
     category: 'Appearance',
+    // Chosen in the theme studio, which writes it as part of the theme.
+    visibility: 'internal',
     description: 'Choose a wallpaper and turn it on or off without losing the selection.',
     keywords: ['wallpaper', 'background', 'desktop'],
   }),
@@ -932,6 +1010,17 @@ export const SETTINGS_REGISTRY = {
     category: 'Files',
     description: 'Milliseconds of quiet before an automatic save, when saving after a delay.',
     keywords: ['autosave', 'delay', 'debounce', 'files'],
+  }),
+  'files.picker.view': defineSetting({
+    schema: v.picklist(['auto', 'columns', 'list', 'icons'] as const),
+    default: 'auto',
+    scope: 'application',
+    widget: 'enum',
+    category: 'Files',
+    title: 'File picker view',
+    description:
+      'How the file picker shows a folder: columns, a list, or icons. Auto uses columns when choosing a folder and a list when choosing a file.',
+    keywords: ['files', 'folders', 'picker', 'columns', 'list', 'icons', 'finder'],
   }),
   'files.showHidden': defineSetting({
     schema: v.boolean(),

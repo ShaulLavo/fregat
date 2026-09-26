@@ -5,7 +5,7 @@ import { Spinner } from '@workspace/ui/components/spinner'
 
 import { CopyButton } from '@/components/copy-button'
 import { useProviderUpdate } from '@/features/settings/hooks/use-provider-update'
-import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
+import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 import { settingsMutationKeys } from '@/features/settings/utils/mutation-keys'
 import { providerUpdateQueryOptions } from '@/features/settings/utils/provider-update-query'
 import { updateLine } from '@/features/settings/utils/provider-update-line'

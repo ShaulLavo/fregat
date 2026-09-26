@@ -1,13 +1,14 @@
 import { CaretDownIcon } from '@phosphor-icons/react'
 import type { ProviderSnapshot } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
+import { StatusDot } from '@workspace/ui/components/status-dot'
 import { PopoverTrigger } from '@workspace/ui/components/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
-import { cn } from '@workspace/ui/lib/utils'
 
 import { ProviderGlyph } from '@/features/chat/components/provider-glyph'
 import { useModelPicker } from '@/features/chat/hooks/use-model-picker'
 import { providerModelDisplayLabel, providerStatusLabel } from '@/features/chat/utils/formatters'
+import { providerTriggerTone } from '@/features/chat/utils/provider-status-tone'
 import { providerRequiresSignIn } from '@workspace/client-core/chat/providers/auth'
 
 /**
@@ -63,13 +64,7 @@ export function ModelPickerTrigger({
               </span>
             ) : null}
             <CaretDownIcon className='size-(--icon-size-sm) shrink-0' />
-            <span
-              aria-label={statusLabel}
-              className={cn(
-                'size-1.5 shrink-0 rounded-full',
-                triggerStatusDotClass(provider, busy),
-              )}
-            />
+            <StatusDot aria-label={statusLabel} tone={providerTriggerTone(provider, busy)} />
           </PopoverTrigger>
         }
       />
@@ -86,14 +81,4 @@ function triggerStatusLabel(provider: ProviderSnapshot | undefined) {
   }
 
   return providerStatusLabel(provider)
-}
-
-function triggerStatusDotClass(provider: ProviderSnapshot | undefined, busy: boolean) {
-  if (busy) return 'bg-info'
-  if (!provider) return 'bg-muted-foreground/35'
-  if (providerRequiresSignIn(provider)) return 'bg-destructive'
-  if (provider.status === 'ready') return 'bg-success'
-  if (provider.status === 'warning') return 'bg-warning'
-
-  return 'bg-destructive'
 }

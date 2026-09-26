@@ -40,7 +40,7 @@ export function SessionPaletteRow({ session }: { readonly session: SessionRailIt
         descriptionClassName='flex items-center gap-1.5'
         label={session.title}
       />
-      <CommandShortcut className='tabular-nums'>
+      <CommandShortcut className='font-mono tabular-nums'>
         {formatChatRelativeTime(session.activityAt, nowMs)}
       </CommandShortcut>
     </CommandItem>

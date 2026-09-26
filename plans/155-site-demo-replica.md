@@ -52,7 +52,7 @@ loops, pauses off-screen and holds a final frame under reduced motion.
 - Keep the live demo at all? It costs a whole MSW backend kept in step with the app.
 - How does the replica keep up when the app's look changes: shared tokens from `packages/ui`,
   real primitives rendered at build time, or accepted drift with a periodic refresh?
-- Does the replica use physical mode's feel ([Plan 154](154-physical-mode.md)) to show it off?
+- Does the replica use physical mode's feel ([physical feel](../docs/physical-feel.md)) to show it off?
 
 ## Research findings (2026-09-25)
 
@@ -209,7 +209,7 @@ way to touch fregat without cloning.
   drift, and refresh the replica when a pane's structure changes. A side-by-side screenshot of the
   replica's end frame against the app's is enough of a check.
 - **Physical mode.** Recommendation: not in the first version. The story has one pointer press
-  (Allow once). If [Plan 154](154-physical-mode.md) has shipped by then, that press can use its
+  (Allow once). If [physical feel](../docs/physical-feel.md) has shipped by then, that press can use its
   spring token, which is one class. Sound stays off: the page must not make noise unasked.
 
 ### Owner questions

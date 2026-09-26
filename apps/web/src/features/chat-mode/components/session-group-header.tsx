@@ -59,11 +59,11 @@ export function SessionGroupHeader({
             </span>
           ) : null}
           {project.unreadCount > 0 ? (
-            <span className='text-info shrink-0 tabular-nums' title='Unread sessions'>
+            <span className='text-info shrink-0 font-mono tabular-nums' title='Unread sessions'>
               {project.unreadCount}
             </span>
           ) : null}
-          <span className='text-muted-foreground text-2xs h-auto shrink-0 justify-start tabular-nums'>
+          <span className='text-muted-foreground text-2xs h-auto shrink-0 justify-start font-mono tabular-nums'>
             {project.sessionCount}
           </span>
         </ListRow>

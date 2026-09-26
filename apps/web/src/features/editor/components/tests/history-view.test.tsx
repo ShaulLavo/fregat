@@ -18,6 +18,7 @@ import {
   commitHistoryBarrier,
   historyDocument,
 } from '../../../../../test/factories/history-document'
+import { holdToConfirm } from '../../../../../test/hold'
 
 const FILE = filesystemPath('repo/a.ts')
 const SAVED = 'alpha\nbeta\n'
@@ -56,7 +57,7 @@ test('clears history after confirmation and leaves the text alone', async () => 
   const buffer = requireBuffer(rendered.buffer)
 
   await user.click(screen.getByRole('button', { name: 'Clear history' }))
-  await user.click(await screen.findByRole('button', { name: 'Clear history' }))
+  holdToConfirm(await screen.findByRole('button', { name: 'Clear history' }))
 
   await waitFor(() => expect(screen.getAllByRole('option')).toHaveLength(1))
   expect(buffer.materializeFullText()).toBe('alphaonetwo\nbeta\n')

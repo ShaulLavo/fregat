@@ -23,6 +23,7 @@ test('failed creation blocks the original message and retry forks the saved comm
   const failed = await fixture.create()
   unsubscribe()
   expect(failed.lifecycle.state).toBe('creation-failed')
+  expect(failed).toMatchObject({ baseBranch: 'main' })
   expect(fixture.adapter.startedTurns).toHaveLength(0)
   expect((await fixture.engine.shellSnapshot()).sessions[0]).toMatchObject({
     attentionState: 'needs-input',
@@ -32,10 +33,12 @@ test('failed creation blocks the original message and retry forks the saved comm
   await unlink(failed.canonicalPath)
   await writeFile(path.join(fixture.root, 'tracked.txt'), 'base moved\n')
   await runGit(fixture.root, ['commit', '-am', 'move base'], { cwdMode: 'option' })
+  await runGit(fixture.root, ['checkout', '-b', 'later-base'], { cwdMode: 'option' })
   await fixture.command({ type: 'worktree.retry', worktreeId: lifecycleWorktreeId })
   await fixture.engine.providerRuntimeIdle()
   const model = await fixture.engine.readModelSnapshot()
   expect(model.worktrees.get(lifecycleWorktreeId)?.lifecycle.state).toBe('ready')
+  expect(model.worktrees.get(lifecycleWorktreeId)).toMatchObject({ baseBranch: 'main' })
   expect(
     (
       await runGit(failed.canonicalPath, ['rev-parse', 'HEAD'], { cwdMode: 'option' })

@@ -40,7 +40,7 @@ export function WorktreeSetupStatus({
         </p>
       ) : null}
       {setup && setup.state !== 'done' && setup.output.length > 0 ? (
-        <pre className='bg-muted text-muted-foreground text-2xs max-h-24 overflow-auto rounded-md px-2 py-1 font-mono whitespace-pre-wrap'>
+        <pre className='bg-muted text-muted-foreground text-2xs max-h-24 overflow-auto overscroll-contain rounded-md px-2 py-1 font-mono whitespace-pre-wrap'>
           {setup.output.slice(-6).join('\n')}
         </pre>
       ) : null}

@@ -30,6 +30,11 @@ export const filePickerKeys = {
     [...filePickerKeys.recents(), 'list', { mode, showHidden }] as const,
 }
 
+export const filePreviewKeys = {
+  all: ['file-preview'] as const,
+  preview: (path: string) => [...filePreviewKeys.all, path] as const,
+}
+
 export const gitKeys = {
   all: ['git'] as const,
   branches: (path: string) => [...gitKeys.all, 'branches', path] as const,

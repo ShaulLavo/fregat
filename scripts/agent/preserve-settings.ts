@@ -13,17 +13,21 @@ function settingsApi(page: Page) {
 type SettingOperation =
   | { readonly kind: 'set'; readonly key: string; readonly value: unknown }
   | { readonly kind: 'reset'; readonly keys: readonly string[] }
+  | { readonly kind: 'machine.set'; readonly name: string; readonly machine: unknown }
 
-async function writeUserOperations(page: Page, operations: readonly SettingOperation[]) {
+export async function writeUserOperations(page: Page, operations: readonly SettingOperation[]) {
   const { base, headers } = settingsApi(page)
   const response = await page.request.post(`${base}settings/write`, {
     headers,
     data: { mutationId: crypto.randomUUID(), target: 'user', operations },
   })
-  const keys = operations.flatMap((operation) =>
-    operation.kind === 'set' ? [operation.key] : operation.keys,
+  const keys = operations.flatMap(operationKeys)
+  if (response.ok()) return
+  strictEqual(
+    response.ok(),
+    true,
+    `Write user settings ${keys.join(', ')}: ${response.status()} ${await response.text()}`,
   )
-  strictEqual(response.ok(), true, `Write user settings ${keys.join(', ')}`)
 }
 
 export async function writeUserSetting(page: Page, key: string, value: unknown) {
@@ -56,4 +60,10 @@ export async function preserveAppearance(page: Page, onlyKeys?: readonly string[
     return entry ? { kind: 'set', key, value: entry[1] } : { kind: 'reset', keys: [key] }
   })
   return () => writeUserOperations(page, operations)
+}
+
+function operationKeys(operation: SettingOperation): readonly string[] {
+  if (operation.kind === 'set') return [operation.key]
+  if (operation.kind === 'reset') return operation.keys
+  return [`environments.machines.${operation.name}`]
 }

@@ -41,6 +41,7 @@ export function createWorktreeDomain() {
       projectId: DOMAIN_IDS.project,
       branch: `worktree/${MANAGED_ID}`,
       baseCommit: 'a'.repeat(40),
+      baseBranch: 'main',
       path: '/managed/checkout',
       canonicalPath: '/managed/checkout',
     }

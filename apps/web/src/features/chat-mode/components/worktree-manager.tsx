@@ -44,7 +44,7 @@ export function WorktreeManager() {
         if (!value) close()
       }}
     >
-      <DialogContent className='max-h-[80vh] max-w-xl overflow-y-auto'>
+      <DialogContent className='max-h-[80vh] max-w-xl overflow-y-auto overscroll-contain'>
         <DialogHeader>
           <DialogTitle>Worktrees</DialogTitle>
           <DialogDescription>

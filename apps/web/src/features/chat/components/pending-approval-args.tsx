@@ -8,7 +8,7 @@ export function PendingApprovalArgs({
   return (
     <dl
       aria-label={label}
-      className='text-2xs grid max-h-20 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 overflow-auto'
+      className='text-2xs grid max-h-20 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 overflow-auto overscroll-contain'
     >
       {args.map(([name, value]) => (
         <div className='contents' key={name}>

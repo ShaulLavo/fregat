@@ -13,11 +13,14 @@ type RemoteWrite<T> = {
   readonly scope?: MutationScope
   /** `checkout` refetches only this checkout's git queries; the default refetches every repository's. */
   readonly refetch?: 'checkout' | 'workspace'
+  /** Runs before the refetch starts. */
+  readonly onSuccess?: () => void
 }
 
 /** A write whose effects reach past the status it could return, so the workspace refetches. */
 export function useRemoteMutation<T>({
   mutationKey,
+  onSuccess,
   refetch = 'workspace',
   rootPath,
   run,
@@ -30,8 +33,10 @@ export function useRemoteMutation<T>({
     },
     mutationKey,
     onError: notifyMutationError,
-    onSuccess: (_result, _variables, _onMutateResult, { client }) =>
-      invalidateWorkspace(client, refetch === 'checkout' ? rootPath : undefined),
+    onSuccess: (_result, _variables, _onMutateResult, { client }) => {
+      onSuccess?.()
+      return invalidateWorkspace(client, refetch === 'checkout' ? rootPath : undefined)
+    },
     scope,
   })
 }

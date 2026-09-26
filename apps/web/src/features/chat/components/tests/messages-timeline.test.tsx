@@ -349,7 +349,7 @@ function conversation(count: number) {
 }
 
 function jumpToLatest() {
-  return screen.getByRole('button', { name: 'Scroll to latest message' })
+  return screen.getByRole('button', { name: /^(Follow output|\d+ new messages?)$/ })
 }
 
 function contentHeight() {

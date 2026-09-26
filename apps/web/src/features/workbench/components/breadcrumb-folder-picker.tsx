@@ -96,7 +96,7 @@ export function BreadcrumbFolderPicker({
     <div
       {...list.containerProps}
       aria-label='Folder contents'
-      className='app-scrollbar-thin focus-ring-inset max-h-[inherit] overflow-y-auto py-(--density-gap-tight)'
+      className='focus-ring-inset max-h-[inherit] overflow-y-auto overscroll-contain py-(--density-gap-tight)'
     >
       <BreadcrumbFolderRows
         rows={rows}

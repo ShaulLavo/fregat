@@ -20,7 +20,10 @@ export function CodeThemePreviewPanel({ query }: { readonly query: string }) {
   }
 
   return (
-    <section aria-label='Code theme sample' className='max-h-[45dvh] shrink-0 overflow-y-auto'>
+    <section
+      aria-label='Code theme sample'
+      className='max-h-[45dvh] shrink-0 overflow-y-auto overscroll-contain'
+    >
       <div
         className='text-muted-foreground flex items-center justify-between gap-3 px-3 py-2 text-xs'
         aria-live='polite'

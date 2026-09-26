@@ -42,7 +42,8 @@ test('batched command filtering and Enter use the submitted native query', async
 
 test.for([
   ['edt editor', 'Open editors'],
-  ['theme sage', 'Code themes'],
+  ['theme sage', 'Themes'],
+  ['code sage', 'Code themes'],
   ['run test', 'Scripts'],
   ['@symbol', 'Symbols'],
   [':42', 'Go to line'],

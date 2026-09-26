@@ -107,6 +107,16 @@
   --duration-enter: 140ms;
   --duration-exit: 100ms;
   --duration-color: var(--duration-exit);
+  --fade-fast: 120ms;
+  --duration-shake: 320ms;
+  --fade-normal: 200ms;
+  --shadow-key: none;
+  --shadow-well: none;
+  /* A live status mark's full breath, slow enough to read as calm. */
+  --duration-breathe: 2.6s;
+  /* How long an irreversible confirm must be held, and how fast an early release springs back. */
+  --duration-hold: 1200ms;
+  --duration-hold-release: 180ms;
   /* Tailwind reads both of these for every bare `transition-*` utility, so a call
      site that does not name a duration or a curve still gets the system rather
      than Tailwind's 150ms cubic-bezier(0.4,0,0.2,1). Never hand-write either. */
@@ -191,6 +201,15 @@
      pre-compaction typography through its shadow host. */
   --icon-size: 1rem;
   --icon-size-sm: 0.875rem;
+  --status-dot-size: 0.375rem;
+  /* One folder column in the file picker's columns view. */
+  --picker-column-width: 15rem;
+  /* One tile in the file picker's icons view; `TILE_WIDTH_PX` in the picker must match. */
+  --picker-tile-width: 7rem;
+  --scrollbar-track: 6px;
+  --scrollbar-thumb: color-mix(in oklch, var(--muted-foreground) 45%, transparent);
+  /* How deep a scroller's edge fades once content is past it. */
+  --scroll-fade-size: 1.5rem;
   --density-control-height: 2rem;
   --density-control-height-sm: 1.75rem;
   --density-control-height-lg: 2.25rem;
@@ -575,8 +594,6 @@
   }
 }
 
-/* Press feedback: the control takes a 1px step down under the pointer. Not when
-   it owns a popup — the menu is anchored to the trigger and would travel with it. */
 /* A small uppercase label above a group, in the metadata mono at the quietest
    size. Colour stays at the call site. */
 @utility section-label {
@@ -599,9 +616,115 @@
   );
 }
 
+/* Press feedback: the control takes a 1px step down under the pointer. Not when
+   it owns a popup — the menu is anchored to the trigger and would travel with it. */
 @utility pressable {
   @apply transition-[color,background-color,border-color,box-shadow] active:not-disabled:not-aria-disabled:not-aria-[haspopup]:translate-y-px;
   transition-duration: var(--duration-color);
+}
+
+:root[data-feel]:not([data-feel='flat']) :is(.pressable, [data-press-depth]) {
+  transition-property: color, background-color, border-color, box-shadow, scale, opacity;
+  transition-duration: var(--spring-snappy-duration);
+  transition-timing-function: var(--spring-snappy);
+  &:is(:active, [data-pressing]):not(:disabled, [aria-disabled='true'], [data-disabled]) {
+    translate: none;
+    scale: 0.97;
+    transition-duration: var(--spring-press-duration);
+    transition-timing-function: var(--spring-press);
+  }
+  &:is([aria-haspopup], [data-variant='ghost'], [data-variant='link']):is(
+      :active,
+      [data-pressing]
+    ) {
+    scale: 1;
+    opacity: 0.7;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    transition-property: color, background-color, border-color, box-shadow, opacity;
+    transition-duration: var(--fade-fast);
+    &:is(:active, [data-pressing]):not(:disabled, [aria-disabled='true'], [data-disabled]) {
+      scale: 1;
+      opacity: 0.7;
+    }
+  }
+}
+
+/* A scroller's edge fades only while content lies past it, so the list is crisp at rest.
+   A scroll timeline drives both depths, so there is no script and no scroll listener; an
+   engine without scroll timelines keeps both edges crisp. */
+@property --scroll-fade-top {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --scroll-fade-bottom {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@utility scroll-fade {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--scroll-fade-top),
+    #000 calc(100% - var(--scroll-fade-bottom)),
+    transparent 100%
+  );
+
+  @supports (animation-timeline: scroll()) {
+    animation:
+      app-scroll-fade-top linear both,
+      app-scroll-fade-bottom linear both;
+    animation-range:
+      0 calc(var(--scroll-fade-size) * 4),
+      calc(100% - var(--scroll-fade-size) * 4) 100%;
+    animation-timeline: scroll(self y), scroll(self y);
+  }
+}
+
+/* A view following its tail hides its thumb: it would report a position the reader is not
+   choosing, and slide on every new line. The lane stays, so the text does not reflow. */
+@utility scroll-pinned {
+  scrollbar-color: transparent transparent;
+
+  &::-webkit-scrollbar-thumb {
+    background-color: transparent;
+  }
+}
+
+/* Hold to confirm. The fill sweeps linearly (it is progress, not decoration) and springs back
+   on release. The button trembles harder as the fill closes in; reduced motion drops only that. */
+@property --hold-shake {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@utility hold-button {
+  &[data-holding] {
+    animation:
+      app-hold-shake 260ms linear infinite,
+      app-hold-shake-grow var(--duration-hold) cubic-bezier(0.8, 0, 1, 1) forwards;
+  }
+}
+
+@utility hold-button-fill {
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path var(--duration-hold-release) var(--ease-out-strong);
+
+  [data-holding] > & {
+    clip-path: inset(0 0 0 0);
+    transition: clip-path var(--duration-hold) linear;
+  }
+}
+
+/* A live status mark breathes in opacity only; a glow would be a shadow outside
+   the three elevations. */
+@utility status-breathe {
+  animation: app-status-breathe var(--duration-breathe) ease-in-out infinite;
 }
 
 /* A skeleton bar. The tint is the floor; the sweep is what says "incoming".
@@ -644,6 +767,11 @@
 /* Reduced motion keeps both readable and stops the travel: the skeleton falls
    back to its flat tint, the label back to its own color. */
 @media (prefers-reduced-motion: reduce) {
+  .status-breathe,
+  .hold-button[data-holding] {
+    animation: none;
+  }
+
   .skeleton-sweep,
   .text-shimmer {
     animation: none;
@@ -859,6 +987,59 @@
   }
 }
 
+@keyframes app-scroll-fade-top {
+  from {
+    --scroll-fade-top: 0px;
+  }
+
+  to {
+    --scroll-fade-top: var(--scroll-fade-size);
+  }
+}
+
+@keyframes app-scroll-fade-bottom {
+  from {
+    --scroll-fade-bottom: var(--scroll-fade-size);
+  }
+
+  to {
+    --scroll-fade-bottom: 0px;
+  }
+}
+
+@keyframes app-hold-shake-grow {
+  to {
+    --hold-shake: 0.75px;
+  }
+}
+
+@keyframes app-hold-shake {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  25% {
+    translate: calc(var(--hold-shake) * -1) calc(var(--hold-shake) * 0.4);
+  }
+  50% {
+    translate: var(--hold-shake) calc(var(--hold-shake) * -0.3);
+  }
+  75% {
+    translate: calc(var(--hold-shake) * -0.7) calc(var(--hold-shake) * -0.5);
+  }
+}
+
+@keyframes app-status-breathe {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
 @keyframes app-skeleton-sweep {
   from {
     background-position:
@@ -876,6 +1057,34 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+  }
+  /* Every scroller shares one bar: thin, invisible at rest, shown while the pointer or the
+     focus is inside it. Chromium and Firefox read the standard pair; WebKit reads the rest. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  *:hover,
+  *:focus-within {
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+  ::-webkit-scrollbar {
+    height: var(--scrollbar-track);
+    width: var(--scrollbar-track);
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    background-clip: content-box;
+    border: 1px solid transparent;
+    border-radius: calc(var(--scrollbar-track) / 2);
+  }
+  *:hover::-webkit-scrollbar-thumb,
+  *:focus-within::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
   }
   html {
     /* Solid floor: translucent surfaces must never composite against the UA
@@ -932,34 +1141,25 @@
   width: 100%;
 }
 
-.app-scrollbar-thin {
-  scrollbar-width: thin;
-  scrollbar-color: var(--muted-foreground) transparent;
-}
-
-.app-scrollbar-thin::-webkit-scrollbar,
+/* The editor keeps its own always-visible 6px track: the minimap lane measures it. */
 .app-editor-host .editor-virtualized::-webkit-scrollbar {
   height: 6px;
   width: 6px;
 }
 
-.app-scrollbar-thin::-webkit-scrollbar-track,
 .app-editor-host .editor-virtualized::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.app-scrollbar-thin::-webkit-scrollbar-thumb,
 .app-editor-host .editor-virtualized::-webkit-scrollbar-thumb {
   background-color: var(--muted-foreground);
   border-radius: 3px;
 }
 
-.app-scrollbar-thin::-webkit-scrollbar-thumb:hover,
 .app-editor-host .editor-virtualized::-webkit-scrollbar-thumb:hover {
   background-color: var(--foreground);
 }
 
-.app-scrollbar-thin::-webkit-scrollbar-corner,
 .app-editor-host .editor-virtualized::-webkit-scrollbar-corner {
   background: transparent;
 }
@@ -1287,4 +1487,1405 @@
   background-image: var(--burst-wash);
   opacity: 0;
   animation: app-effort-wash calc(var(--burst-duration) * 1.2) var(--ease-out-strong) both;
+}
+
+/* BEGIN GENERATED SPRINGS */
+:root[data-feel='seam'] {
+  --spring-press: linear(
+    0,
+    0.03087,
+    0.10133,
+    0.1888,
+    0.28038,
+    0.36902,
+    0.45117,
+    0.52528,
+    0.59101,
+    0.64862,
+    0.69873,
+    0.74207,
+    0.77941,
+    0.81148,
+    0.83898,
+    0.86252,
+    0.88266,
+    0.89987,
+    0.91456,
+    0.92711,
+    0.93782,
+    0.94696,
+    0.95476,
+    0.96141,
+    0.96708,
+    0.97193,
+    0.97606,
+    0.97958,
+    0.98258,
+    0.98514,
+    0.98733,
+    0.98919,
+    0.99078,
+    0.99214,
+    0.9933,
+    0.99428,
+    0.99512,
+    0.99584,
+    0.99645,
+    0.99697,
+    0.99742,
+    0.9978,
+    0.99812,
+    0.9984,
+    0.99863,
+    0.99884,
+    1
+  );
+  --spring-press-duration: 366ms;
+  --spring-snappy: linear(
+    0,
+    0.01686,
+    0.06023,
+    0.1211,
+    0.19247,
+    0.26903,
+    0.34686,
+    0.4231,
+    0.49577,
+    0.56359,
+    0.62579,
+    0.682,
+    0.73216,
+    0.77641,
+    0.81504,
+    0.84843,
+    0.87704,
+    0.90133,
+    0.92177,
+    0.93881,
+    0.95289,
+    0.96442,
+    0.97376,
+    0.98124,
+    0.98717,
+    0.9918,
+    0.99535,
+    0.99803,
+    1,
+    1.0014,
+    1.00236,
+    1.00296,
+    1.00329,
+    1.00343,
+    1.00341,
+    1.00329,
+    1.0031,
+    1.00287,
+    1.00261,
+    1.00234,
+    1.00208,
+    1.00182,
+    1.00158,
+    1.00136,
+    1.00116,
+    1
+  );
+  --spring-snappy-duration: 357ms;
+  --spring-surface: linear(
+    0,
+    0.01025,
+    0.03777,
+    0.07824,
+    0.12804,
+    0.18415,
+    0.24408,
+    0.30583,
+    0.36778,
+    0.42867,
+    0.48752,
+    0.54363,
+    0.59648,
+    0.64575,
+    0.69125,
+    0.7329,
+    0.77072,
+    0.8048,
+    0.8353,
+    0.86238,
+    0.88626,
+    0.90717,
+    0.92535,
+    0.94103,
+    0.95445,
+    0.96584,
+    0.97542,
+    0.98339,
+    0.98995,
+    0.99527,
+    0.99953,
+    1.00286,
+    1.00542,
+    1.00731,
+    1.00864,
+    1.00951,
+    1.01,
+    1.01019,
+    1.01014,
+    1.0099,
+    1.00951,
+    1.00903,
+    1.00847,
+    1.00786,
+    1.00724,
+    1.0066,
+    1.00598,
+    1.00537,
+    1.00479,
+    1.00425,
+    1.00373,
+    1.00326,
+    1.00283,
+    1.00243,
+    1.00207,
+    1.00175,
+    1.00147,
+    1.00122,
+    1
+  );
+  --spring-surface-duration: 459ms;
+  --spring-bouncy: linear(
+    0,
+    0.01251,
+    0.04727,
+    0.10017,
+    0.16727,
+    0.24486,
+    0.3295,
+    0.41811,
+    0.50794,
+    0.59662,
+    0.68216,
+    0.76293,
+    0.83767,
+    0.90542,
+    0.96557,
+    1.01776,
+    1.06188,
+    1.09803,
+    1.1265,
+    1.14772,
+    1.16224,
+    1.17067,
+    1.17371,
+    1.17207,
+    1.16648,
+    1.15764,
+    1.14626,
+    1.13297,
+    1.11838,
+    1.10305,
+    1.08744,
+    1.07199,
+    1.05704,
+    1.04289,
+    1.02976,
+    1.01783,
+    1.00721,
+    0.99797,
+    0.99013,
+    0.98368,
+    0.97857,
+    0.97473,
+    0.97207,
+    0.97047,
+    0.96984,
+    0.97003,
+    0.97092,
+    0.97239,
+    0.97432,
+    0.97659,
+    0.97911,
+    0.98176,
+    0.98447,
+    0.98716,
+    0.98977,
+    0.99225,
+    0.99455,
+    0.99665,
+    0.99853,
+    1.00017,
+    1.00156,
+    1.00271,
+    1.00363,
+    1.00432,
+    1.00481,
+    1.0051,
+    1.00524,
+    1.00522,
+    1.00508,
+    1.00483,
+    1.00451,
+    1.00412,
+    1.00369,
+    1.00323,
+    1.00276,
+    1.00229,
+    1.00183,
+    1.0014,
+    1
+  );
+  --spring-bouncy-duration: 617ms;
+}
+
+:root[data-feel='brisk'] {
+  --spring-press: linear(
+    0,
+    0.04539,
+    0.13692,
+    0.23855,
+    0.33601,
+    0.42429,
+    0.50226,
+    0.57027,
+    0.62926,
+    0.68026,
+    0.7243,
+    0.76229,
+    0.79505,
+    0.82331,
+    0.84767,
+    0.86867,
+    0.88678,
+    0.90239,
+    0.91585,
+    0.92745,
+    0.93745,
+    0.94608,
+    0.95351,
+    0.95992,
+    0.96545,
+    0.97021,
+    0.97432,
+    0.97786,
+    0.98091,
+    0.98354,
+    0.98581,
+    0.98777,
+    0.98946,
+    0.99091,
+    0.99216,
+    0.99324,
+    0.99418,
+    0.99498,
+    0.99567,
+    0.99627,
+    0.99678,
+    0.99723,
+    0.99761,
+    0.99794,
+    0.99822,
+    0.99847,
+    0.99868,
+    0.99886,
+    1
+  );
+  --spring-press-duration: 378ms;
+  --spring-snappy: linear(
+    0,
+    0.02645,
+    0.08831,
+    0.16711,
+    0.25162,
+    0.33526,
+    0.41437,
+    0.48712,
+    0.55278,
+    0.61129,
+    0.66295,
+    0.70826,
+    0.74782,
+    0.78223,
+    0.8121,
+    0.83796,
+    0.86032,
+    0.87963,
+    0.8963,
+    0.91068,
+    0.92308,
+    0.93376,
+    0.94296,
+    0.95089,
+    0.95772,
+    0.9636,
+    0.96866,
+    0.97302,
+    0.97677,
+    0.98001,
+    0.98279,
+    0.98518,
+    0.98724,
+    0.98902,
+    0.99055,
+    0.99186,
+    0.993,
+    0.99397,
+    0.99481,
+    0.99553,
+    0.99615,
+    0.99669,
+    0.99715,
+    0.99755,
+    0.99789,
+    0.99818,
+    0.99843,
+    0.99865,
+    0.99884,
+    1
+  );
+  --spring-snappy-duration: 388ms;
+  --spring-surface: linear(
+    0,
+    0.01744,
+    0.06069,
+    0.11925,
+    0.18583,
+    0.25543,
+    0.32473,
+    0.39158,
+    0.45466,
+    0.51326,
+    0.56705,
+    0.61597,
+    0.66014,
+    0.69981,
+    0.73527,
+    0.76684,
+    0.79488,
+    0.81971,
+    0.84166,
+    0.86102,
+    0.87809,
+    0.8931,
+    0.90631,
+    0.91791,
+    0.92809,
+    0.93702,
+    0.94486,
+    0.95173,
+    0.95775,
+    0.96302,
+    0.96764,
+    0.97168,
+    0.97522,
+    0.97832,
+    0.98103,
+    0.98341,
+    0.98548,
+    0.9873,
+    0.98889,
+    0.99028,
+    0.9915,
+    0.99257,
+    0.9935,
+    0.99431,
+    0.99502,
+    0.99565,
+    0.99619,
+    0.99667,
+    0.99709,
+    0.99745,
+    0.99777,
+    0.99805,
+    0.9983,
+    0.99851,
+    0.9987,
+    0.99886,
+    1
+  );
+  --spring-surface-duration: 448ms;
+  --spring-bouncy: linear(
+    0,
+    0.02008,
+    0.07258,
+    0.14728,
+    0.23567,
+    0.33091,
+    0.4276,
+    0.52168,
+    0.61021,
+    0.69121,
+    0.76348,
+    0.82648,
+    0.88013,
+    0.92477,
+    0.96096,
+    0.98947,
+    1.01115,
+    1.0269,
+    1.03763,
+    1.04419,
+    1.0474,
+    1.04798,
+    1.04657,
+    1.04374,
+    1.03995,
+    1.0356,
+    1.03098,
+    1.02635,
+    1.02189,
+    1.01772,
+    1.01393,
+    1.01056,
+    1.00765,
+    1.00518,
+    1.00314,
+    1.0015,
+    1.00022,
+    0.99925,
+    0.99856,
+    0.9981,
+    0.99782,
+    0.99771,
+    0.9977,
+    0.99779,
+    0.99794,
+    0.99813,
+    0.99834,
+    0.99857,
+    0.99879,
+    1
+  );
+  --spring-bouncy-duration: 386ms;
+}
+
+:root[data-feel='relaxed'] {
+  --spring-press: linear(
+    0,
+    0.01655,
+    0.05802,
+    0.11478,
+    0.17993,
+    0.24864,
+    0.31759,
+    0.38456,
+    0.44814,
+    0.5075,
+    0.56221,
+    0.61214,
+    0.65734,
+    0.698,
+    0.73438,
+    0.76679,
+    0.79556,
+    0.82101,
+    0.84347,
+    0.86325,
+    0.88064,
+    0.89589,
+    0.90925,
+    0.92094,
+    0.93116,
+    0.94009,
+    0.94788,
+    0.95467,
+    0.96059,
+    0.96574,
+    0.97023,
+    0.97414,
+    0.97753,
+    0.98049,
+    0.98305,
+    0.98529,
+    0.98722,
+    0.98891,
+    0.99037,
+    0.99164,
+    0.99275,
+    0.99371,
+    0.99454,
+    0.99526,
+    0.99589,
+    0.99643,
+    0.9969,
+    0.99731,
+    0.99767,
+    0.99798,
+    0.99824,
+    0.99848,
+    0.99868,
+    0.99885,
+    1
+  );
+  --spring-press-duration: 429ms;
+  --spring-snappy: linear(
+    0,
+    0.00902,
+    0.03325,
+    0.06893,
+    0.11294,
+    0.1627,
+    0.21608,
+    0.27137,
+    0.3272,
+    0.38247,
+    0.43636,
+    0.48822,
+    0.53761,
+    0.58421,
+    0.62782,
+    0.66834,
+    0.70574,
+    0.74007,
+    0.77138,
+    0.79981,
+    0.82549,
+    0.84858,
+    0.86924,
+    0.88765,
+    0.90397,
+    0.91839,
+    0.93107,
+    0.94217,
+    0.95185,
+    0.96024,
+    0.96749,
+    0.97371,
+    0.97903,
+    0.98355,
+    0.98736,
+    0.99056,
+    0.99322,
+    0.99542,
+    0.99722,
+    0.99867,
+    0.99983,
+    1.00073,
+    1.00143,
+    1.00195,
+    1.00232,
+    1.00257,
+    1.00272,
+    1.00279,
+    1.0028,
+    1.00275,
+    1.00267,
+    1.00256,
+    1.00243,
+    1.00229,
+    1.00214,
+    1.00198,
+    1.00182,
+    1.00167,
+    1.00152,
+    1.00138,
+    1.00124,
+    1.00112,
+    1
+  );
+  --spring-snappy-duration: 492ms;
+  --spring-surface: linear(
+    0,
+    0.00601,
+    0.02256,
+    0.04765,
+    0.07951,
+    0.11661,
+    0.15761,
+    0.20135,
+    0.24687,
+    0.29331,
+    0.33999,
+    0.38632,
+    0.43181,
+    0.47608,
+    0.51883,
+    0.55983,
+    0.59888,
+    0.63588,
+    0.67075,
+    0.70345,
+    0.73397,
+    0.76232,
+    0.78857,
+    0.81275,
+    0.83495,
+    0.85525,
+    0.87373,
+    0.89051,
+    0.90567,
+    0.91931,
+    0.93155,
+    0.94247,
+    0.95218,
+    0.96078,
+    0.96835,
+    0.97499,
+    0.98077,
+    0.98578,
+    0.9901,
+    0.99378,
+    0.99691,
+    0.99953,
+    1.0017,
+    1.00348,
+    1.00492,
+    1.00605,
+    1.00691,
+    1.00755,
+    1.00798,
+    1.00825,
+    1.00838,
+    1.00839,
+    1.00829,
+    1.00812,
+    1.00788,
+    1.0076,
+    1.00727,
+    1.00691,
+    1.00654,
+    1.00615,
+    1.00576,
+    1.00537,
+    1.00498,
+    1.0046,
+    1.00424,
+    1.00389,
+    1.00355,
+    1.00323,
+    1.00293,
+    1.00264,
+    1.00237,
+    1.00213,
+    1.0019,
+    1.00168,
+    1.00149,
+    1.00131,
+    1.00114,
+    1
+  );
+  --spring-surface-duration: 616ms;
+  --spring-bouncy: linear(
+    0,
+    0.00783,
+    0.02977,
+    0.06363,
+    0.10728,
+    0.15876,
+    0.21624,
+    0.27804,
+    0.34263,
+    0.40866,
+    0.47493,
+    0.54038,
+    0.60414,
+    0.66545,
+    0.7237,
+    0.77841,
+    0.82921,
+    0.87585,
+    0.91817,
+    0.9561,
+    0.98964,
+    1.01887,
+    1.04391,
+    1.06495,
+    1.08219,
+    1.09587,
+    1.10626,
+    1.11365,
+    1.11831,
+    1.12054,
+    1.12063,
+    1.11887,
+    1.11552,
+    1.11085,
+    1.10511,
+    1.09853,
+    1.09133,
+    1.08368,
+    1.07578,
+    1.06777,
+    1.05979,
+    1.05196,
+    1.04439,
+    1.03714,
+    1.03029,
+    1.02389,
+    1.01798,
+    1.01258,
+    1.00771,
+    1.00338,
+    0.99956,
+    0.99627,
+    0.99347,
+    0.99114,
+    0.98926,
+    0.98779,
+    0.98671,
+    0.98597,
+    0.98555,
+    0.9854,
+    0.9855,
+    0.9858,
+    0.98628,
+    0.98691,
+    0.98765,
+    0.98849,
+    0.98938,
+    0.99032,
+    0.99129,
+    0.99226,
+    0.99321,
+    0.99415,
+    0.99504,
+    0.9959,
+    0.9967,
+    0.99745,
+    0.99813,
+    0.99876,
+    0.99932,
+    0.99981,
+    1.00024,
+    1.00061,
+    1.00093,
+    1.00118,
+    1.00139,
+    1.00154,
+    1.00165,
+    1.00172,
+    1.00176,
+    1.00176,
+    1.00174,
+    1.00169,
+    1.00162,
+    1.00154,
+    1.00145,
+    1.00134,
+    1.00123,
+    1.00112,
+    1
+  );
+  --spring-bouncy-duration: 779ms;
+}
+
+:root[data-feel='playful'] {
+  --spring-press: linear(
+    0,
+    0.03213,
+    0.10997,
+    0.21183,
+    0.32269,
+    0.43257,
+    0.53528,
+    0.62739,
+    0.70735,
+    0.77493,
+    0.83071,
+    0.87578,
+    0.91144,
+    0.93908,
+    0.96004,
+    0.97556,
+    0.98675,
+    0.99456,
+    0.99978,
+    1.00306,
+    1.00494,
+    1.00582,
+    1.00603,
+    1.0058,
+    1.00531,
+    1.00468,
+    1.00401,
+    1.00335,
+    1.00274,
+    1.00219,
+    1.00172,
+    1.00132,
+    1
+  );
+  --spring-press-duration: 249ms;
+  --spring-snappy: linear(
+    0,
+    0.01569,
+    0.05843,
+    0.12201,
+    0.20073,
+    0.28946,
+    0.38368,
+    0.47953,
+    0.57382,
+    0.66396,
+    0.74796,
+    0.82439,
+    0.8923,
+    0.95117,
+    1.00085,
+    1.0415,
+    1.07352,
+    1.0975,
+    1.11418,
+    1.12436,
+    1.12893,
+    1.12875,
+    1.12469,
+    1.11758,
+    1.10819,
+    1.09722,
+    1.08528,
+    1.07292,
+    1.06058,
+    1.04864,
+    1.03739,
+    1.02704,
+    1.01775,
+    1.0096,
+    1.00264,
+    0.99686,
+    0.99222,
+    0.98866,
+    0.98609,
+    0.98441,
+    0.9835,
+    0.98326,
+    0.98358,
+    0.98433,
+    0.98543,
+    0.98676,
+    0.98826,
+    0.98984,
+    0.99145,
+    0.99302,
+    0.99452,
+    0.99591,
+    0.99718,
+    0.9983,
+    0.99927,
+    1.00009,
+    1.00075,
+    1.00128,
+    1.00167,
+    1.00193,
+    1.00209,
+    1.00216,
+    1.00215,
+    1.00208,
+    1.00195,
+    1.00179,
+    1.00161,
+    1.00141,
+    1.0012,
+    1
+  );
+  --spring-snappy-duration: 552ms;
+  --spring-surface: linear(
+    0,
+    0.01141,
+    0.04312,
+    0.09142,
+    0.15279,
+    0.22393,
+    0.30182,
+    0.38373,
+    0.46726,
+    0.55029,
+    0.63106,
+    0.70811,
+    0.78027,
+    0.84666,
+    0.90666,
+    0.95988,
+    1.00613,
+    1.04541,
+    1.07789,
+    1.10384,
+    1.12365,
+    1.13778,
+    1.14677,
+    1.15116,
+    1.15155,
+    1.14851,
+    1.14261,
+    1.13442,
+    1.12445,
+    1.11318,
+    1.10106,
+    1.08848,
+    1.0758,
+    1.0633,
+    1.05124,
+    1.03982,
+    1.0292,
+    1.0195,
+    1.0108,
+    1.00314,
+    0.99654,
+    0.991,
+    0.98647,
+    0.98292,
+    0.98026,
+    0.97844,
+    0.97737,
+    0.97696,
+    0.97712,
+    0.97776,
+    0.97881,
+    0.98017,
+    0.98177,
+    0.98354,
+    0.98542,
+    0.98734,
+    0.98926,
+    0.99114,
+    0.99293,
+    0.99462,
+    0.99618,
+    0.99759,
+    0.99885,
+    0.99995,
+    1.00088,
+    1.00166,
+    1.00229,
+    1.00277,
+    1.00312,
+    1.00335,
+    1.00347,
+    1.0035,
+    1.00344,
+    1.00332,
+    1.00314,
+    1.00292,
+    1.00266,
+    1.00239,
+    1.0021,
+    1.0018,
+    1.00152,
+    1.00123,
+    1
+  );
+  --spring-surface-duration: 655ms;
+  --spring-bouncy: linear(
+    0,
+    0.01221,
+    0.04707,
+    0.10167,
+    0.1729,
+    0.25755,
+    0.35235,
+    0.45409,
+    0.55971,
+    0.66631,
+    0.77124,
+    0.87212,
+    0.96691,
+    1.05386,
+    1.13161,
+    1.19913,
+    1.25571,
+    1.301,
+    1.33493,
+    1.35772,
+    1.36984,
+    1.37196,
+    1.36494,
+    1.34979,
+    1.3276,
+    1.29956,
+    1.26686,
+    1.23072,
+    1.19232,
+    1.15278,
+    1.11317,
+    1.07444,
+    1.03745,
+    1.00292,
+    0.97146,
+    0.94354,
+    0.91953,
+    0.89963,
+    0.88396,
+    0.8725,
+    0.86515,
+    0.86171,
+    0.86191,
+    0.86542,
+    0.87184,
+    0.88076,
+    0.89173,
+    0.90431,
+    0.91804,
+    0.9325,
+    0.94727,
+    0.96196,
+    0.97623,
+    0.98977,
+    1.00233,
+    1.01368,
+    1.02368,
+    1.0322,
+    1.03917,
+    1.04456,
+    1.04839,
+    1.05071,
+    1.0516,
+    1.05116,
+    1.04954,
+    1.04687,
+    1.04332,
+    1.03905,
+    1.03423,
+    1.02902,
+    1.02359,
+    1.01809,
+    1.01265,
+    1.0074,
+    1.00246,
+    0.9979,
+    0.99381,
+    0.99024,
+    0.98722,
+    0.98479,
+    0.98295,
+    0.98168,
+    0.98097,
+    0.98079,
+    0.98108,
+    0.9818,
+    0.98289,
+    0.98429,
+    0.98595,
+    0.98779,
+    0.98976,
+    0.99179,
+    0.99384,
+    0.99585,
+    0.99777,
+    0.99958,
+    1.00123,
+    1.0027,
+    1.00397,
+    1.00503,
+    1.00588,
+    1.0065,
+    1.00691,
+    1.00712,
+    1.00714,
+    1.00699,
+    1.00668,
+    1.00624,
+    1.00568,
+    1.00505,
+    1.00435,
+    1.0036,
+    1.00284,
+    1.00208,
+    1.00134,
+    1.00064,
+    0.99998,
+    0.99938,
+    0.99885,
+    0.9984,
+    0.99803,
+    0.99774,
+    0.99753,
+    0.9974,
+    0.99734,
+    0.99735,
+    0.99743,
+    0.99756,
+    0.99773,
+    0.99795,
+    0.99819,
+    0.99846,
+    0.99874,
+    1
+  );
+  --spring-bouncy-duration: 1057ms;
+}
+/* END GENERATED SPRINGS */
+
+:root[data-feel]:not([data-feel='flat']) {
+  --shadow-key:
+    inset 0 1px 0 color-mix(in srgb, white 35%, transparent),
+    0 1px 2px color-mix(in srgb, black 18%, transparent);
+  --shadow-well: inset 0 1px 2px color-mix(in srgb, black 12%, transparent);
+  &.dark {
+    --shadow-key:
+      inset 0 1px 0 color-mix(in srgb, white 12%, transparent),
+      0 1px 2px color-mix(in srgb, black 40%, transparent);
+    --shadow-well: inset 0 1px 3px color-mix(in srgb, black 40%, transparent);
+  }
+}
+
+/* Base UI owns popup position and lifetime; standalone scale preserves both. */
+:root[data-feel]:not([data-feel='flat']) {
+  :is(
+    [data-slot='popover-content'],
+    [data-slot='dropdown-menu-content'],
+    [data-slot='dropdown-menu-sub-content'],
+    [data-slot='context-menu-content'],
+    [data-slot='context-menu-sub-content'],
+    [data-slot='select-content'],
+    [data-slot='combobox-content'],
+    [data-slot='tooltip-content'],
+    [data-slot='dialog-content']
+  ) {
+    animation: none;
+    scale: 1;
+    opacity: 1;
+    transition:
+      scale var(--spring-surface-duration) var(--spring-surface),
+      opacity var(--fade-normal) var(--ease-out-strong),
+      translate var(--spring-surface-duration) var(--spring-surface);
+    &[data-starting-style] {
+      scale: 0.95;
+      opacity: 0;
+    }
+    &[data-ending-style] {
+      scale: 0.96;
+      opacity: 0;
+      transition-duration: var(--duration-exit);
+      transition-timing-function: var(--ease-out-strong);
+    }
+    &[data-instant] {
+      transition-duration: 0s;
+    }
+  }
+  [data-slot='dialog-content'][data-side='center']:is([data-starting-style], [data-ending-style]) {
+    scale: 0.96;
+    translate: -50% calc(-50% + 8px);
+  }
+  [data-slot='dialog-content'][data-side='right'] {
+    scale: 1;
+    &:is([data-starting-style], [data-ending-style]) {
+      translate: 100% 0;
+    }
+  }
+  [data-slot='dialog-overlay'] {
+    animation: none;
+    transition: opacity var(--fade-normal) var(--ease-out-strong);
+    &:is([data-starting-style], [data-ending-style]) {
+      opacity: 0;
+    }
+  }
+  :is([data-slot='accordion-content'], [data-slot='collapsible-content']) {
+    animation: none;
+    overflow: hidden;
+    height: var(--accordion-panel-height, var(--collapsible-panel-height));
+    transition:
+      height var(--spring-snappy-duration) var(--spring-snappy),
+      opacity var(--fade-normal) var(--ease-out-strong);
+    &:is([data-starting-style], [data-ending-style]) {
+      height: 0;
+      opacity: 0;
+    }
+  }
+  [data-sonner-toast] {
+    transition:
+      transform var(--spring-surface-duration) var(--spring-surface),
+      opacity var(--fade-normal) var(--ease-out-strong),
+      height var(--spring-snappy-duration) var(--spring-snappy);
+    &[data-mounted='false'] {
+      --y: translateY(calc(var(--lift) * -24px));
+    }
+    &[data-removed='true'][data-swipe-out='false'] {
+      --y: translateY(calc(var(--lift) * -16px));
+    }
+  }
+  :is(
+    [data-slot='button'],
+    [data-slot='input'],
+    [data-slot='textarea'],
+    [data-slot='input-group'],
+    [data-slot='select-trigger']
+  ) {
+    corner-shape: squircle;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :is(
+      [data-slot='popover-content'],
+      [data-slot='dropdown-menu-content'],
+      [data-slot='dropdown-menu-sub-content'],
+      [data-slot='context-menu-content'],
+      [data-slot='context-menu-sub-content'],
+      [data-slot='select-content'],
+      [data-slot='combobox-content'],
+      [data-slot='tooltip-content'],
+      [data-slot='dialog-content']
+    ) {
+      scale: 1;
+      transition-property: opacity;
+      &:is([data-starting-style], [data-ending-style]) {
+        scale: 1;
+      }
+    }
+    [data-slot='dialog-content'][data-side='center']:is(
+        [data-starting-style],
+        [data-ending-style]
+      ) {
+      translate: -50% -50%;
+    }
+    [data-slot='dialog-content'][data-side='right']:is([data-starting-style], [data-ending-style]) {
+      translate: none;
+    }
+    :is([data-slot='accordion-content'], [data-slot='collapsible-content']) {
+      transition-property: opacity;
+    }
+    [data-sonner-toast] {
+      transition-property: opacity;
+      &[data-mounted='false'],
+      &[data-removed='true'][data-swipe-out='false'] {
+        --y: translateY(0);
+      }
+    }
+  }
+}
+
+:root[data-feel]:not([data-feel='flat']) {
+  [data-slot='switch-thumb'] {
+    transition:
+      translate var(--spring-snappy-duration) var(--spring-snappy),
+      scale var(--spring-press-duration) var(--spring-press);
+    transform-origin: left;
+    &[data-checked] {
+      transform-origin: right;
+    }
+  }
+  [data-slot='switch']:is(:active, [data-pressing]):not([data-disabled])
+    [data-slot='switch-thumb'] {
+    scale: 1.25 1;
+  }
+  [data-slot='slider-thumb'] {
+    transition: scale var(--spring-snappy-duration) var(--spring-snappy);
+    &[data-dragging] {
+      scale: 1.02;
+    }
+  }
+  [data-slot='tabs-indicator'] {
+    transition-duration: var(--spring-snappy-duration);
+    transition-timing-function: var(--spring-snappy);
+  }
+  [data-slot='check-indicator'] {
+    display: inline-flex;
+    scale: 1;
+    opacity: 1;
+    transition:
+      scale var(--spring-snappy-duration) var(--spring-snappy),
+      opacity var(--fade-fast) var(--ease-out-strong);
+    @starting-style {
+      scale: 0.5;
+      opacity: 0;
+    }
+  }
+  :is([data-slot='input'], [data-slot='textarea'])[aria-invalid='true'],
+  [data-slot='input-group']:has([aria-invalid='true']) {
+    animation: app-invalid var(--duration-shake) var(--ease-in-out-strong);
+  }
+  [data-entering] {
+    animation: app-live-enter var(--spring-snappy-duration) var(--spring-snappy);
+  }
+  [data-usage-fill] {
+    transition: width var(--spring-snappy-duration) var(--spring-snappy);
+  }
+  [data-copy-icon] {
+    transition: opacity var(--fade-fast) var(--ease-out-strong);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-slot='switch-thumb'] {
+      transition: none;
+    }
+    [data-slot='switch']:is(:active, [data-pressing]):not([data-disabled])
+      [data-slot='switch-thumb'] {
+      scale: 1;
+    }
+    [data-slot='tabs-indicator'],
+    [data-usage-fill] {
+      transition: none;
+    }
+    [data-slot='slider-thumb'][data-dragging] {
+      scale: 1;
+      opacity: 0.7;
+    }
+    [data-slot='check-indicator'] {
+      transition-property: opacity;
+      @starting-style {
+        scale: 1;
+      }
+    }
+    :is([data-slot='input'], [data-slot='textarea'])[aria-invalid='true'],
+    [data-slot='input-group']:has([aria-invalid='true']) {
+      animation-name: app-invalid-fade;
+    }
+    [data-entering] {
+      animation: app-live-fade var(--fade-normal) var(--ease-out-strong);
+    }
+  }
+}
+
+@keyframes app-invalid {
+  0%,
+  100% {
+    translate: 0;
+  }
+  20% {
+    translate: -6px;
+  }
+  40% {
+    translate: 6px;
+  }
+  60% {
+    translate: -4px;
+  }
+  80% {
+    translate: 4px;
+  }
+}
+@keyframes app-invalid-fade {
+  50% {
+    opacity: 0.45;
+  }
+}
+@keyframes app-live-enter {
+  from {
+    opacity: 0;
+    scale: 0.96;
+    translate: 0 4px;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+    translate: 0;
+  }
+}
+@keyframes app-live-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+:root[data-feel]:not([data-feel='flat']) [data-slot='ticker-digit'] {
+  transition: transform var(--spring-snappy-duration) var(--spring-snappy);
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+:root[data-feel]:not([data-feel='flat']) .hold-button-fill {
+  --duration-hold-release: var(--spring-press-duration);
+}
+:root[data-feel]:not([data-feel='flat']) [data-slot='hold-button'][data-cancelled] {
+  animation: app-invalid var(--duration-shake) var(--ease-in-out-strong);
+  @media (prefers-reduced-motion: reduce) {
+    animation-name: app-invalid-fade;
+  }
+}
+
+:root[data-feel]:not([data-feel='flat']) [data-slot='accordion-trigger-icon'] {
+  transition: rotate var(--spring-snappy-duration) var(--spring-snappy);
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 }

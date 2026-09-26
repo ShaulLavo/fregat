@@ -56,7 +56,7 @@ export function HistoryList({
       handleRef={virtualList}
       activeIndex={listbox.activeIndex}
       aria-label='Commit history'
-      className='app-scrollbar-thin focus-ring-inset min-h-0 flex-1 overflow-auto outline-none'
+      className='focus-ring-inset min-h-0 flex-1 overflow-auto outline-none'
       items={rows}
       getKey={(row) => row.commit.id}
       initialOffset={scrollTop}

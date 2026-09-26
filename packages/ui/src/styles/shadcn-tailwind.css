@@ -84,6 +84,12 @@
   }
 }
 
+/* Reserves the bar's lane on a vertical scroller that crosses the overflow threshold while the
+   user watches, so the text does not jump sideways. Never on a horizontal strip. */
+@utility scroll-gutter {
+  scrollbar-gutter: stable;
+}
+
 @utility no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;

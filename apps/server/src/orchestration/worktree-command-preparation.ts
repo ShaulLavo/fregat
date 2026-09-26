@@ -81,6 +81,7 @@ export class WorktreeCommandPreparation {
         worktreeId: target.worktreeId,
         baseWorktreeId: target.baseWorktreeId,
         projectId: base.projectId,
+        baseBranch: prepared.baseBranch,
         baseCommit: prepared.baseCommit,
         branch: prepared.branch,
         path: this.options.paths.toRealRelative(prepared.absolutePath),

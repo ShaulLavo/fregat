@@ -215,7 +215,7 @@ function isAbortError(input: unknown): boolean {
 }
 
 // The web layer over the shared peel: a bare top-level `code` on the input also counts.
-function extractFsErrorCode(input: unknown): FsErrorCode | null {
+export function extractFsErrorCode(input: unknown): FsErrorCode | null {
   return fsErrorCode(rpcErrorPayload(input)) ?? fsErrorCode(input)
 }
 

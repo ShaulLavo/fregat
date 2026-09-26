@@ -1,4 +1,5 @@
 import { Badge } from '@workspace/ui/components/badge'
+import { StatusDot } from '@workspace/ui/components/status-dot'
 import { CommandItem } from '@workspace/ui/components/command'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { stackedListRowClassName } from '@workspace/ui/patterns/list-row-classes'
@@ -6,10 +7,8 @@ import { cn } from '@workspace/ui/lib/utils'
 
 import { ProviderGlyph } from '@/features/chat/components/provider-glyph'
 import { isNewProviderModel, modelPickerRowBadges } from '@/features/chat/utils/model-picker-badges'
-import type {
-  ProviderModelDisabledKind,
-  ProviderModelOption,
-} from '@workspace/client-core/chat/providers/models'
+import type { ProviderModelOption } from '@workspace/client-core/chat/providers/models'
+import { modelDisabledTone } from '@/features/chat/utils/provider-status-tone'
 
 /**
  * One model in the picker list: name over a provider line, with metadata chips
@@ -79,12 +78,7 @@ export function ModelPickerRow({
             {badge.label}
           </Badge>
         ))}
-        {disabled ? (
-          <span
-            aria-hidden='true'
-            className={cn('size-1.5 shrink-0 rounded-full', statusDotClass(disabledReason.kind))}
-          />
-        ) : null}
+        {disabled ? <StatusDot tone={modelDisabledTone(disabledReason.kind)} /> : null}
       </span>
     </CommandItem>
   )
@@ -99,12 +93,4 @@ export function ModelPickerRow({
       </TooltipContent>
     </Tooltip>
   )
-}
-
-// Signing in is the one blocker the user can clear from this panel, so it reads
-// as a warning rather than as a failure the row cannot do anything about.
-function statusDotClass(kind: ProviderModelDisabledKind) {
-  if (kind === 'sign-in') return 'bg-warning'
-
-  return 'bg-destructive'
 }

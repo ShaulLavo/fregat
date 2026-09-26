@@ -7,6 +7,7 @@ import { cn } from '@workspace/ui/lib/utils'
 import { Activity, type ComponentProps } from 'react'
 import { useIsFetching } from '@tanstack/react-query'
 import { Button } from '@workspace/ui/components/button'
+import { Tabs, TabsList, TabsTab } from '@workspace/ui/components/tabs'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { GitBranchIcon, GitDiffIcon } from '@phosphor-icons/react'
 import { History } from '@/features/git/components/history'
@@ -70,7 +71,8 @@ export function Panel({ className, rootPath }: ComponentProps<'section'> & { roo
     >
       <StaleNotice />
       <ToolPane
-        bodyClassName='flex flex-col overflow-hidden'
+        bodyClassName='flex flex-col'
+        scroll={false}
         state={{
           pending: status.isPending,
           error: status.isError && !status.data,
@@ -101,29 +103,21 @@ export function Panel({ className, rootPath }: ComponentProps<'section'> & { roo
         }
         header={
           <PaneBar>
-            <Button
-              size='sm'
-              variant='ghost'
-              aria-pressed={view === 'changes'}
-              className='aria-pressed:bg-accent'
-              onClick={() => setView('changes')}
-            >
-              <GitDiffIcon />
-              Changes
-              <span className='text-muted-foreground text-2xs tabular-nums'>
-                <TickerNumber value={files.length} />
-              </span>
-            </Button>
-            <Button
-              size='sm'
-              variant='ghost'
-              aria-pressed={view === 'graph'}
-              className='aria-pressed:bg-accent'
-              onClick={() => setView('graph')}
-            >
-              <GitBranchIcon />
-              Graph
-            </Button>
+            <Tabs value={view} onValueChange={(next: typeof view) => setView(next)}>
+              <TabsList aria-label='Git view'>
+                <TabsTab value='changes'>
+                  <GitDiffIcon />
+                  Changes
+                  <span className='text-muted-foreground text-2xs tabular-nums'>
+                    <TickerNumber value={files.length} />
+                  </span>
+                </TabsTab>
+                <TabsTab value='graph'>
+                  <GitBranchIcon />
+                  Graph
+                </TabsTab>
+              </TabsList>
+            </Tabs>
           </PaneBar>
         }
       >

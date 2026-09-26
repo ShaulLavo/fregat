@@ -99,13 +99,13 @@ export function RawConflictBanner({ documentKey }: { readonly documentKey: Docum
         <div className='grid gap-2 lg:grid-cols-2'>
           <div className='min-w-0'>
             <p className='text-muted-foreground mb-1 text-xs font-medium'>Local edits</p>
-            <pre className='bg-background-solid max-h-48 overflow-auto rounded-lg p-2 text-xs whitespace-pre-wrap'>
+            <pre className='bg-background-solid max-h-48 overflow-auto overscroll-contain rounded-lg p-2 text-xs whitespace-pre-wrap'>
               {localText}
             </pre>
           </div>
           <div className='min-w-0'>
             <p className='text-muted-foreground mb-1 text-xs font-medium'>Confirmed file</p>
-            <pre className='bg-background-solid max-h-48 overflow-auto rounded-lg p-2 text-xs whitespace-pre-wrap'>
+            <pre className='bg-background-solid max-h-48 overflow-auto overscroll-contain rounded-lg p-2 text-xs whitespace-pre-wrap'>
               {confirmedText ?? ''}
             </pre>
           </div>

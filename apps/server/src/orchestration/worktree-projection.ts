@@ -89,6 +89,7 @@ export function applyWorktreeEvent(database: PlatformDatabase, event: Orchestrat
     case 'worktree.released':
       update(database, event.payload.worktreeId, {
         ownership: 'external',
+        baseBranch: null,
         updatedAt: event.payload.updatedAt,
       })
       return true

@@ -313,7 +313,8 @@ export function TerminalPanel({
   return (
     <ToolPane
       header={null}
-      bodyClassName='relative flex min-h-0 min-w-0 flex-col overflow-hidden'
+      bodyClassName='relative flex min-h-0 min-w-0 flex-col'
+      scroll={false}
       aria-label='Terminal'
       {...sectionProps}
       className={cn('relative flex min-h-0 min-w-0 flex-col overflow-hidden', className)}

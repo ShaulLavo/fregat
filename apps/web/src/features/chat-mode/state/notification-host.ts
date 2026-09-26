@@ -9,7 +9,7 @@ import {
   type SessionNotice,
 } from '@workspace/contracts'
 import { toast } from 'sonner'
-import { readSettingsMirror } from '@/lib/settings-boot-mirror'
+import { feedbackOutput } from '@workspace/ui/patterns/feedback-layer'
 import { chatNotificationQueryKeys } from '@/features/chat-mode/utils/query-keys'
 
 export function createNotificationHost({
@@ -23,21 +23,15 @@ export function createNotificationHost({
 }) {
   const pending = new Map<string, { environmentId: EnvironmentId; notification: Notification }>()
   const badge = createNotificationBadge()
-  let audio: AudioContext | null = null
   let disposed = false
-  const unlock = () => {
-    if (typeof AudioContext === 'undefined') return
-    audio ??= new AudioContext()
-    void audio.resume().catch(() => undefined)
-  }
   const clear = () => {
     for (const entry of pending.values()) entry.notification.close()
     pending.clear()
     badge.set(0)
   }
   const play = async (kind: SessionNotice['kind']) => {
-    const context = audio
-    if (!context || context.state !== 'running') return
+    const audio = feedbackOutput('agent')
+    if (!audio) return
     try {
       const buffer = await queryClient.query(
         queryOptions({
@@ -49,19 +43,15 @@ export function createNotificationHost({
               window.location.href,
             )
             const response = await fetch(url, { signal })
-            return context.decodeAudioData(await response.arrayBuffer())
+            return audio.context.decodeAudioData(await response.arrayBuffer())
           },
         }),
       )
-      if (
-        disposed ||
-        !hasNotificationSound(readSettingsMirror()['chat.notificationMode']) ||
-        context.state !== 'running'
-      )
-        return
-      const source = context.createBufferSource()
+      const output = feedbackOutput('agent')
+      if (disposed || !output) return
+      const source = output.context.createBufferSource()
       source.buffer = buffer
-      source.connect(context.destination)
+      source.connect(output.output)
       source.start()
     } catch {
       // Audio availability and autoplay permission differ between browsers.
@@ -88,12 +78,7 @@ export function createNotificationHost({
     configure(mode: NotificationMode) {
       clear()
       window.removeEventListener('focus', clear)
-      document.removeEventListener('pointerdown', unlock)
-      document.removeEventListener('keydown', unlock)
       if (hasNativeNotifications(mode)) window.addEventListener('focus', clear)
-      if (!hasNotificationSound(mode)) return
-      document.addEventListener('pointerdown', unlock)
-      document.addEventListener('keydown', unlock)
     },
     retain(owners: ReadonlySet<EnvironmentId>) {
       for (const [tag, entry] of pending) {
@@ -124,9 +109,6 @@ export function createNotificationHost({
       disposed = true
       clear()
       window.removeEventListener('focus', clear)
-      document.removeEventListener('pointerdown', unlock)
-      document.removeEventListener('keydown', unlock)
-      void audio?.close().catch(() => undefined)
     },
   }
 }

@@ -72,7 +72,8 @@ export function LogsPanel({ active }: LogsPanelProps) {
       className='text-foreground flex h-full min-h-0 flex-col'
     >
       <ToolPane
-        bodyClassName='flex flex-col overflow-hidden'
+        bodyClassName='flex flex-col'
+        scroll={false}
         state={{
           pending: events.isPending,
           error: events.isError || summary.isError,

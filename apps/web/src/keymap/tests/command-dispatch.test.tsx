@@ -41,7 +41,7 @@ afterEach(() => {
 
 test.each([
   ['workspace.selectAppColors', 'colors '],
-  ['workspace.selectThemeBundle', 'bundle '],
+  ['workspace.selectThemeBundle', 'theme '],
   ['workspace.selectWallpaper', 'wallpaper '],
   ['workspace.runProjectScript', 'run '],
   ['workspace.switchSession', 'sess '],

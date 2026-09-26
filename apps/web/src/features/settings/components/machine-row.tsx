@@ -11,6 +11,7 @@ import { useSettingsActions } from '@/features/settings/hooks/use-settings-actio
 import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
 import { useWorkingMachines } from '@/lib/environments/hooks/use-working-machines'
 import { InlineError } from '@/components/inline-error'
+import { MachineValues } from '@/features/settings/components/machine-values'
 
 export function MachineRow({
   name,
@@ -68,9 +69,7 @@ export function MachineRow({
         <span className='min-w-0 flex-1 truncate text-sm font-medium'>{machine.label ?? name}</span>
         <span className='text-muted-foreground text-xs'>{phase}</span>
       </div>
-      <p className='text-muted-foreground truncate font-mono text-xs' title={detail}>
-        {detail}
-      </p>
+      <MachineValues machine={machine} name={name} />
       {/* Always mounted: the reconnect loop clears and restores lastError on
           every retry, and a line that comes and goes shifts the whole page. */}
       <div className='flex h-6 items-center gap-1 text-xs'>

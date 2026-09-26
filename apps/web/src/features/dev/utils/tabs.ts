@@ -1,4 +1,7 @@
-export const DEV_TABS = [{ id: 'loaders', label: 'Loaders' }] as const
+export const DEV_TABS = [
+  { id: 'loaders', label: 'Loaders' },
+  { id: 'physical', label: 'Physical' },
+] as const
 
 export type DevTabId = (typeof DEV_TABS)[number]['id']
 
