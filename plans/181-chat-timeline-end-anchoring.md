@@ -2,7 +2,8 @@
 
 ## Status and authorization
 
-- Status: PROPOSED. Requested 2026-09-26 (owner). Nothing here authorizes implementation.
+- Status: IMPLEMENTED 2026-09-27 on wave 2 lane V (branch `w2/v-181`); two owner questions open
+  (below). Requested 2026-09-26 (owner).
 - Planned at: Platform `d5a901726`, 2026-09-26.
 - Effort: M. Runs before [Plan 178](178-tree-in-the-app.md)'s
   [virtualization](178-tree-in-the-app/virtualization.md) sub-plan, which builds on the upgraded
@@ -87,6 +88,72 @@ library now owns.
 7. **Known race.** #1267 (open): `scrollToEnd` during an in-flight prepend strands the view one
    page above the end. The jump button and "Load earlier" must not overlap; a scenario covers it.
 
+## Results (2026-09-27, lane V)
+
+**The owner's list.** No list was written down: not in this plan, the wave-2 inventory, the owner
+questions log or the session where the plan was made ("we have problems with it already"). The
+scenarios below cover the documented behaviours and every failure found while writing them; the
+owner's own list is Owner question 1.
+
+**Scenarios** (`scripts/agent/scenarios/chat-scroll.ts`, native Codex fixture, no real model):
+
+| Scenario                        | What it checks                                                       | `main`                        | After |
+| ------------------------------- | -------------------------------------------------------------------- | ----------------------------- | ----- |
+| `chat-scroll-pinned`            | the growing end stays visible in every frame while following         | pass                          | pass  |
+| `chat-scroll-reader-held`       | a reader scrolled into history does not move while an answer streams | pass                          | pass  |
+| `chat-scroll-fold-held`         | an answer spanning the fold grows without dragging the view (#1236)  | pass                          | pass  |
+| `chat-scroll-jump`              | the jump button shows, returns to the end and keeps following        | pass                          | pass  |
+| `chat-scroll-load-earlier`      | "Load earlier" keeps the row under the reader where it was           | **fail**: 80–264 px jump      | pass  |
+| `chat-scroll-load-earlier-jump` | jump pressed while a page loads ends at the latest message (#1267)   | pass                          | pass  |
+| `chat-scroll-home`              | Ctrl+Home in a reloaded long session reaches the first row           | **fail**: stops 114–1876 px   | pass  |
+| `chat-scroll-disclosure`        | a disclosure opened at the live edge and in history stays put        | pass                          | pass  |
+| `chat-scroll-reload`            | a reload of a long session reopens on the latest answer, twice       | pass (4 of 5; one blank page) | pass  |
+
+- **Upgrade.** 3.14.13 / `virtual-core` 3.17.11 was already on `main` (70f57fa83, "Dependencies to
+  latest"). The scenarios gave the same results on 3.14.2 and 3.14.13: the upgrade alone fixed none
+  of the failures.
+- **Load earlier.** The hand-written absorption read the shift off the previously first row, whose
+  position still held estimates; `anchorTo: 'end'` with keys that follow the rows holds it exactly.
+- **Ctrl+Home.** The browser animates Home; the first measurement of each estimated row above the
+  reader moves `scrollTop` to compensate, and that write cancels the animation partway. Home, End,
+  Cmd+Up and Cmd+Down are now instant jumps the virtualizer lands (`timelineEdgeKey`).
+- **Found while adopting end anchoring.** Its pin to a growing last row fired between a wheel-up and
+  that wheel's first scroll, re-armed following and swallowed the gesture (1 of 5 runs of
+  `chat-scroll-reader-held`). Outside following the virtualizer's `scrollEndThreshold` is -1, so
+  only the reducer decides when a reader is back at the end.
+- **Kept, with the reason.** The park (`anchoring-new-turn`) and a settling disclosure anchor to the
+  start: end anchoring would pin a disclosure opened at the live edge, and pull the growing answer
+  under a parked prompt. The follow effect keeps one `scrollToEnd` for what is not an append or a
+  last-row growth: a jump, a released park, a shorter viewport, a replaced last row. The scroll
+  handler still reads "at the end" from the element, with the virtualizer's 2 px threshold: the
+  virtualizer's tracked offset can lag the event it is handling. Reload restore and the minimap are
+  unchanged.
+- **Deleted.** `absorbTimelinePrepend`, `timelinePrependedScrollTop`, `timelineRemeasureScrollDelta`,
+  `prependedAboveItemId` / `firstItemId` / `prepend-absorbed`; the remeasure predicate is now only
+  the disclosure hold (`holdTimelineMeasurements`).
+- **`directDomUpdates`: not adopted.** It writes `transform` or `top` on absolutely positioned rows.
+  The chat and git changes are both flow layout (git changes moved to measured flow rows after this
+  plan was written), so neither can take it; the remaining absolute lists (history, search results,
+  picker columns) are for Plan 178's virtualization sub-plan to weigh.
+- **Plan 158's tail-follow.** Its only consumer, the log, follows the start edge; end anchoring does
+  not apply there, so `tail-follow.ts` is unchanged.
+- **Cost.** `trace chat-scroll-pinned --compare`: scripting 5401 → 5135 ms, tasks over 16 ms 56 →
+  37, over 50 ms 10 → 9. `renders chat-scroll-pinned`: `MessagesTimeline` 386 on `main`, 398 and
+  443 on two runs after; the spread between runs covers the difference.
+- **Not a scroll change: a turn's end moves an answer being read by one row.** A turn with no tool
+  steps shows "Working for Ns" between the prompt and the answer; when it settles that row goes and
+  "Worked for Ns" appears under the answer, so a reader mid-answer sees the text rise 34 px (on
+  `main` too). Owner question 2.
+
+### Owner questions
+
+1. Which chat scroll problems have you seen? None were written down; the scenarios above cover the
+   documented behaviours plus the two failures found (Load earlier, Ctrl+Home). Each problem you name
+   gets a scenario.
+2. When a turn with no tool steps settles, should "Worked for Ns" take the Working row's place under
+   the prompt, as it already does for turns with steps? Recommendation: yes; it removes the 34 px
+   rise at turn end. It changes Plan 160's turn anatomy, so it waits for you.
+
 ## Relation to Plan 158
 
 Plan 158 item 1 (the "N new" pill and `VirtualList`'s `follow` prop, `patterns/tail-follow.ts`)
@@ -97,8 +164,10 @@ store keeps only the arrivals count and the pill. Holding the reader across a pr
 
 ## Verification
 
-- Step 1 scenarios, plus `chat-follow-up`, `chat-queue`, `chat-turn-anatomy`,
-  `chat-disclosure-settle`, `chat-timeline-pattern`, `stream-frames`, `stream-ambiguous-tail`.
+- Step 1 scenarios, plus `chat-queue`, `chat-turn-anatomy`, `chat-history-pages`, `chat-stream`,
+  `stream-ambiguous-tail`. `chat-follow-up` runs a real Codex or Claude turn: never from a lane.
+  `chat-disclosure-settle` and `chat-timeline` need sessions the throwaway server lacks;
+  `chat-scroll-disclosure` covers the first.
 - Unit tests: `timeline-scroll-anchoring.test.ts`, `timeline-navigation.test.tsx`,
   `timeline-reload-discard.test.tsx`, `messages-timeline.test.tsx`, `timeline-minimap.test.ts`,
   rewritten where the geometry moved to the library.

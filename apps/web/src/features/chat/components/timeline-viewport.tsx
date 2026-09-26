@@ -11,7 +11,7 @@ import { TailJumpButton } from '@workspace/ui/patterns/tail-jump-button'
 import { TickerNumber } from '@/components/ticker-number'
 import { useTimelineArrivals } from '@/features/chat/hooks/use-timeline-arrivals'
 import { useLiveEntrances } from '@/features/chat/hooks/use-live-entrances'
-import { useEffect, useLayoutEffect, useState, type Dispatch } from 'react'
+import { useEffect, useLayoutEffect, type Dispatch } from 'react'
 import type { VirtualListLayout } from '@workspace/ui/patterns/virtual-list'
 import type { ChatSession } from '@workspace/client-core/chat/types'
 import type { ChatTimelineItem } from '@/features/chat/utils/timeline-items'
@@ -37,9 +37,9 @@ import {
   readTimelineViewport,
 } from '@/features/chat/state/timeline-navigation'
 import {
-  absorbTimelinePrepend,
   applyTimelineScroll,
-  observeTimelineMeasurements,
+  holdTimelineMeasurements,
+  type DisclosureSettle,
 } from '@/features/chat/state/timeline-scroll'
 import { ChatWelcomeView } from '@/features/chat/components/chat-welcome-view'
 import { TimelineLoadEarlier } from '@/features/chat/components/timeline-load-earlier'
@@ -54,26 +54,21 @@ export function TimelineViewport({
   session,
   scrollState,
   dispatch,
+  disclosureSettle,
+  onDisclosureSettle,
 }: VirtualListLayout & {
   items: readonly ChatTimelineItem[]
   session: ChatSession
   scrollState: TimelineScrollState
   dispatch: Dispatch<TimelineScrollEvent>
+  /** A toggled disclosure keeps its row still until the row's new size has been measured. */
+  disclosureSettle: DisclosureSettle | null
+  onDisclosureSettle: (settle: DisclosureSettle | null) => void
 }) {
   'use no memo' // Minimap and follow state read the virtualizer's mutable geometry.
   const { environmentId } = useChatTransport()
   const scrollElement = virtualizer.scrollElement
   useLiveEntrances(scrollElement, items)
-  // A disclosure keeps its row still until the row's new size has been measured.
-  const [disclosureSettle, setDisclosureSettle] = useState<{
-    disclosure: Element
-    measured: boolean
-  } | null>(null)
-  const [previousSessionId, setPreviousSessionId] = useState(session.id)
-  if (previousSessionId !== session.id) {
-    setPreviousSessionId(session.id)
-    setDisclosureSettle(null)
-  }
   const unmeasuredDisclosure = disclosureSettle?.measured
     ? null
     : (disclosureSettle?.disclosure ?? null)
@@ -92,13 +87,12 @@ export function TimelineViewport({
     virtualItems[0]?.index === 0
 
   useLayoutEffect(
-    () => observeTimelineMeasurements(virtualizer, disclosureSettling),
+    () => holdTimelineMeasurements(virtualizer, disclosureSettling),
     [disclosureSettling, virtualizer],
   )
 
   useLayoutEffect(() => {
     dispatch({
-      firstItemId: items[0]?.id ?? null,
       latestUserItemId: resolveTimelineAnchorItemId(items),
       sessionId: session.id,
       type: 'items-changed',
@@ -110,20 +104,6 @@ export function TimelineViewport({
         ),
     })
   }, [dispatch, environmentId, items, session.id])
-
-  // Restore a prepended page's anchor before other effects measure the viewport.
-  useLayoutEffect(() => {
-    if (!scrollElement) return
-    if (!scrollState.prependedAboveItemId) return
-
-    absorbTimelinePrepend({
-      dispatch,
-      itemId: scrollState.prependedAboveItemId,
-      items,
-      scrollElement,
-      virtualizer,
-    })
-  }, [dispatch, items, scrollElement, scrollState.prependedAboveItemId, virtualizer])
 
   useLayoutEffect(() => {
     if (!scrollElement) return
@@ -155,9 +135,10 @@ export function TimelineViewport({
     return attachTimelineNavigationListeners({
       element: scrollElement,
       dispatch,
-      suspendForDisclosure: (disclosure) => setDisclosureSettle({ disclosure, measured: false }),
+      suspendForDisclosure: (disclosure) => onDisclosureSettle({ disclosure, measured: false }),
+      scrollToStart: () => virtualizer.scrollToOffset(0),
     })
-  }, [dispatch, scrollElement])
+  }, [dispatch, onDisclosureSettle, scrollElement, virtualizer])
 
   useEffect(() => {
     if (!unmeasuredDisclosure || !scrollElement) return
@@ -166,11 +147,11 @@ export function TimelineViewport({
     // after the virtualizer's own observer has measured the toggle.
     const observer = new ResizeObserver(() => {
       observer.disconnect()
-      setDisclosureSettle({ disclosure: unmeasuredDisclosure, measured: true })
+      onDisclosureSettle({ disclosure: unmeasuredDisclosure, measured: true })
     })
     observer.observe(unmeasuredDisclosure.closest('[data-index]') ?? scrollElement)
     return () => observer.disconnect()
-  }, [scrollElement, unmeasuredDisclosure])
+  }, [onDisclosureSettle, scrollElement, unmeasuredDisclosure])
 
   // Read in the commit that carries the measured size: the virtualizer re-renders
   // after its observer returns, so the observer itself still sees the old height.
@@ -178,13 +159,12 @@ export function TimelineViewport({
     if (!disclosureSettle?.measured || !scrollElement) return
 
     // Measure-then-update is what a layout effect is for; nothing paints in between.
-    // oxlint-disable-next-line oxc-react-compiler/set-state-in-effect
-    setDisclosureSettle(null)
+    onDisclosureSettle(null)
     dispatch({
       atContentEnd: isTimelineAtContentEnd(readTimelineViewport(scrollElement)),
       type: 'scrolled',
     })
-  }, [disclosureSettle, dispatch, scrollElement])
+  }, [disclosureSettle, dispatch, onDisclosureSettle, scrollElement])
 
   useEffect(() => {
     const capture = () =>

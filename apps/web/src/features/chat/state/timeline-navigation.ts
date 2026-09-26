@@ -21,10 +21,12 @@ export function attachTimelineNavigationListeners({
   element,
   dispatch,
   suspendForDisclosure,
+  scrollToStart,
 }: {
   element: HTMLDivElement
   dispatch: (event: TimelineScrollEvent) => void
   suspendForDisclosure: (disclosure: Element) => void
+  scrollToStart: () => void
 }) {
   const contentScrollsUp = () => timelineContentScrollsUp(readTimelineViewport(element))
   const awayFromEnd = () =>
@@ -61,6 +63,24 @@ export function attachTimelineNavigationListeners({
     if (disclosure.hasAttribute('aria-expanded')) navigate()
   }
   const handleKeyDown = (event: KeyboardEvent) => {
+    // The browser animates Home and End; row measurements landing on the way cancel the
+    // animation partway, so the edges are instant jumps the virtualizer lands exactly.
+    const edge = timelineEdgeKey(event)
+    if (edge === 'end') {
+      event.preventDefault()
+      dispatch({ type: 'jump-to-end' })
+      return
+    }
+    if (
+      edge === 'start' &&
+      contentScrollsUp() &&
+      !toolOutputConsumesUpwardNavigation(event.target, element)
+    ) {
+      event.preventDefault()
+      navigate()
+      scrollToStart()
+      return
+    }
     if (!isTimelineNavigationKey(event)) return
     if (!contentScrollsUp() || toolOutputConsumesUpwardNavigation(event.target, element)) return
 
@@ -84,6 +104,19 @@ export function attachTimelineNavigationListeners({
 
 function disclosureTarget(target: EventTarget | null) {
   return target instanceof Element ? target.closest(DISCLOSURE_SELECTOR) : null
+}
+
+function timelineEdgeKey(event: KeyboardEvent): 'start' | 'end' | null {
+  if (event.defaultPrevented || event.isComposing) return null
+  if (event.altKey || event.shiftKey) return null
+  if (!(event.target instanceof Element)) return null
+  if (event.target.closest(`${EDITABLE_SELECTOR}, [data-tool-group-scroll]`)) return null
+  if (event.key === 'Home') return 'start'
+  if (event.key === 'End') return 'end'
+  if (!event.metaKey) return null
+  if (event.key === 'ArrowUp') return 'start'
+  if (event.key === 'ArrowDown') return 'end'
+  return null
 }
 
 function isTimelineNavigationKey(event: KeyboardEvent) {

@@ -7,12 +7,9 @@ import {
   timelineAnchoredTurnMetrics,
   timelineContentScrollsUp,
   timelineDistanceToContentEnd,
-  timelinePrependedScrollTop,
-  timelineRemeasureScrollDelta,
   timelineScrollReducer,
   TIMELINE_ANCHOR_OFFSET_PX,
   TIMELINE_COMPOSER_INSET_PX,
-  TIMELINE_TOP_INSET_PX,
   type TimelineScrollState,
   type TimelineViewportMetrics,
 } from '@/features/chat/utils/timeline-scroll-anchoring'
@@ -78,7 +75,6 @@ function openedSession(
   latestUserItemId: string | null = 'message:u1',
 ) {
   return timelineScrollReducer(initialTimelineScrollState, {
-    firstItemId: 'message:u1',
     latestUserItemId,
     sessionId,
     type: 'items-changed',
@@ -91,7 +87,6 @@ function itemsChanged(
   sessionId = 'ad686244-5b2e-59be-805f-ef86eac80feb',
 ) {
   return {
-    firstItemId: 'message:u1',
     latestUserItemId,
     sessionId,
     type: 'items-changed',
@@ -279,93 +274,6 @@ test('unchanged input leaves the state object identical', () => {
   expect(timelineScrollReducer(state, { type: 'initial-scroll-done' })).toBe(state)
 })
 
-test('a page landing above the reader is marked for absorption', () => {
-  const reading = timelineScrollReducer(afterInitialScroll(openedSession()), {
-    type: 'user-navigated',
-  })
-
-  const prepended = timelineScrollReducer(reading, {
-    firstItemId: 'message:older',
-    latestUserItemId: 'message:u1',
-    sessionId: 'ad686244-5b2e-59be-805f-ef86eac80feb',
-    type: 'items-changed',
-  })
-
-  expect(prepended.prependedAboveItemId).toBe('message:u1')
-  expect(prepended.firstItemId).toBe('message:older')
-  expect(prepended.followMode).toBe('free-scrolling')
-  expect(timelineScrollReducer(prepended, { type: 'prepend-absorbed' }).prependedAboveItemId).toBe(
-    null,
-  )
-})
-
-test('a front change while following the end is not a prepend to absorb', () => {
-  // Pinned to the live edge, the offset is re-derived every frame; compensating
-  // for a front change on top of that would fight `scrollToEnd`.
-  const following = afterInitialScroll(openedSession())
-
-  const changed = timelineScrollReducer(following, {
-    firstItemId: 'message:older',
-    latestUserItemId: 'message:u1',
-    sessionId: 'ad686244-5b2e-59be-805f-ef86eac80feb',
-    type: 'items-changed',
-  })
-
-  expect(changed.prependedAboveItemId).toBeNull()
-  expect(changed.firstItemId).toBe('message:older')
-})
-
-test('sending while a prepend is unabsorbed hands the offset to the anchor', () => {
-  const reading = timelineScrollReducer(afterInitialScroll(openedSession()), {
-    type: 'user-navigated',
-  })
-  const prepended = timelineScrollReducer(reading, {
-    firstItemId: 'message:older',
-    latestUserItemId: 'message:u1',
-    sessionId: 'ad686244-5b2e-59be-805f-ef86eac80feb',
-    type: 'items-changed',
-  })
-
-  const sent = timelineScrollReducer(prepended, {
-    firstItemId: 'message:older',
-    latestUserItemId: 'message:u2',
-    sessionId: 'ad686244-5b2e-59be-805f-ef86eac80feb',
-    type: 'items-changed',
-  })
-
-  expect(sent.followMode).toBe('anchoring-new-turn')
-  expect(sent.prependedAboveItemId).toBeNull()
-})
-
-test('the absorbed offset keeps the reader on the same row', () => {
-  const scrollTop = 900
-  const rowStartBefore = 1_200
-  // The page pushed everything down: the previously-first row now starts 640px
-  // below the top inset instead of sitting on it.
-  const shift = 640
-  const scrolled = timelinePrependedScrollTop({
-    anchorRow: { size: 40, start: TIMELINE_TOP_INSET_PX + shift },
-    scrollTop,
-    topInset: TIMELINE_TOP_INSET_PX,
-  })
-
-  expect(scrolled).toBe(scrollTop + shift)
-  expect(rowStartBefore + shift - (scrolled ?? 0)).toBe(rowStartBefore - scrollTop)
-})
-
-test('a page that turned out to be empty moves nothing', () => {
-  expect(
-    timelinePrependedScrollTop({
-      anchorRow: { size: 40, start: TIMELINE_TOP_INSET_PX },
-      scrollTop: 900,
-      topInset: TIMELINE_TOP_INSET_PX,
-    }),
-  ).toBeNull()
-  expect(
-    timelinePrependedScrollTop({ anchorRow: undefined, scrollTop: 900, topInset: 16 }),
-  ).toBeNull()
-})
-
 test('an anchored turn parks the sent message near the top', () => {
   const metrics = timelineAnchoredTurnMetrics({
     anchorOffset: TIMELINE_ANCHOR_OFFSET_PX,
@@ -462,50 +370,4 @@ test('unmeasured rows produce no anchor decision', () => {
       lastRow: { size: 1, start: 0 },
     }),
   ).toBeNull()
-})
-
-test('remeasuring a row above the viewport keeps the visible content still', () => {
-  const scrollTop = 1000
-  const offScreenRow = { size: 64, start: 400 }
-  const visibleRowStart = 1200
-  const delta = 120
-
-  const adjustment = timelineRemeasureScrollDelta({
-    delta,
-    rowStart: offScreenRow.start,
-    scrollTop,
-    suspended: false,
-  })
-
-  // The off-screen row grew, so everything below it moved down by `delta`.
-  const visibleTopInViewportBefore = visibleRowStart - scrollTop
-  const visibleTopInViewportAfter = visibleRowStart + delta - (scrollTop + adjustment)
-  expect(visibleTopInViewportAfter).toBe(visibleTopInViewportBefore)
-})
-
-test('remeasuring a row at or below the viewport top needs no compensation', () => {
-  const scrollTop = 1000
-
-  expect(
-    timelineRemeasureScrollDelta({ delta: 120, rowStart: scrollTop, scrollTop, suspended: false }),
-  ).toBe(0)
-  expect(
-    timelineRemeasureScrollDelta({ delta: 120, rowStart: 1400, scrollTop, suspended: false }),
-  ).toBe(0)
-})
-
-test('compensation applies while scrolling up, which is when the jump is felt', () => {
-  // Nothing in the decision depends on scroll direction — only on position.
-  expect(
-    timelineRemeasureScrollDelta({ delta: -80, rowStart: 100, scrollTop: 1000, suspended: false }),
-  ).toBe(-80)
-})
-
-test('a settling disclosure suspends compensation', () => {
-  expect(
-    timelineRemeasureScrollDelta({ delta: 120, rowStart: 100, scrollTop: 1000, suspended: true }),
-  ).toBe(0)
-  expect(
-    timelineRemeasureScrollDelta({ delta: 0, rowStart: 100, scrollTop: 1000, suspended: false }),
-  ).toBe(0)
 })

@@ -4,58 +4,22 @@ import type { ChatTimelineItem } from '@/features/chat/utils/timeline-items'
 import {
   shouldReleaseTimelineAnchorForActivity,
   timelineAnchoredTurnMetrics,
-  timelinePrependedScrollTop,
-  timelineRemeasureScrollDelta,
   TIMELINE_ANCHOR_OFFSET_PX,
   TIMELINE_COMPOSER_INSET_PX,
-  TIMELINE_TOP_INSET_PX,
   type TimelineScrollEvent,
   type TimelineScrollState,
 } from '@/features/chat/utils/timeline-scroll-anchoring'
 import { readTimelineViewport } from '@/features/chat/state/timeline-navigation'
 
-export function observeTimelineMeasurements(virtualizer: TimelineVirtualizer, suspended: boolean) {
-  virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item, delta, instance) =>
-    timelineRemeasureScrollDelta({
-      delta,
-      rowStart: item.start,
-      scrollTop: instance.scrollOffset ?? 0,
-      suspended,
-    }) !== 0
+export type DisclosureSettle = { readonly disclosure: Element; readonly measured: boolean }
+
+/** A toggled disclosure holds its row still: no re-measure moves the offset until it settles. */
+export function holdTimelineMeasurements(virtualizer: TimelineVirtualizer, held: boolean) {
+  if (!held) return
+  virtualizer.shouldAdjustScrollPositionOnItemSizeChange = () => false
   return () => {
     virtualizer.shouldAdjustScrollPositionOnItemSizeChange = undefined
   }
-}
-
-// Browser anchoring is disabled; restore the reader after history is prepended.
-export function absorbTimelinePrepend({
-  dispatch,
-  itemId,
-  items,
-  scrollElement,
-  virtualizer,
-}: {
-  dispatch: Dispatch<TimelineScrollEvent>
-  itemId: string
-  items: readonly ChatTimelineItem[]
-  scrollElement: HTMLDivElement
-  virtualizer: TimelineVirtualizer
-}) {
-  const index = items.findIndex((item) => item.id === itemId)
-  if (index < 0) {
-    dispatch({ type: 'prepend-absorbed' })
-    return
-  }
-
-  const scrollTop = timelinePrependedScrollTop({
-    anchorRow: virtualizer.measurementsCache[index],
-    scrollTop: readTimelineViewport(scrollElement).scrollTop,
-    topInset: TIMELINE_TOP_INSET_PX,
-  })
-  dispatch({ type: 'prepend-absorbed' })
-  if (scrollTop === null) return
-
-  virtualizer.scrollToOffset(scrollTop, { behavior: 'auto' })
 }
 
 export function applyTimelineScroll({
@@ -88,6 +52,9 @@ export function applyTimelineScroll({
     return
   }
   if (scrollState.followMode !== 'following-end') return
+  // Growth and appends at the end are the virtualizer's (end anchoring); this catches the rest:
+  // a jump or release into following, a shorter viewport, a replaced last row.
+  if (virtualizer.isAtEnd()) return
 
   virtualizer.scrollToEnd({ behavior: 'auto' })
 }

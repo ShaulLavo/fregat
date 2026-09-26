@@ -61,6 +61,18 @@ test('native document-start shortcuts release transcript following', () => {
   release()
 })
 
+test('the transcript edges are jumps the timeline makes, not the browser animation', () => {
+  const { element, events, release, starts } = navigationFixture()
+
+  const home = fireEvent.keyDown(element, { ctrlKey: true, key: 'Home' })
+  const end = fireEvent.keyDown(element, { key: 'End' })
+
+  expect([home, end]).toEqual([false, false])
+  expect(starts).toHaveLength(1)
+  expect(events).toEqual([{ type: 'user-navigated' }, { type: 'jump-to-end' }])
+  release()
+})
+
 test('navigation at an output boundary stays in its scrollable parent group', () => {
   const { events, output, release } = navigationFixture()
   const group = document.createElement('div')
@@ -81,6 +93,7 @@ function navigationFixture() {
   const element = document.createElement('div')
   const output = document.createElement('pre')
   const events: TimelineScrollEvent[] = []
+  const starts: number[] = []
   Object.defineProperties(element, {
     clientHeight: { value: 600 },
     scrollHeight: { value: 2000 },
@@ -94,11 +107,14 @@ function navigationFixture() {
     dispatch: (event) => events.push(event),
     element,
     suspendForDisclosure() {},
+    scrollToStart: () => starts.push(element.scrollTop),
   })
 
   return {
+    element,
     events,
     output,
+    starts,
     release() {
       detach()
       element.remove()

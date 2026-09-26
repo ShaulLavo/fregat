@@ -502,6 +502,54 @@ function resetCreditAccount(message) {
   })
 }
 
+/** A transcript taller than the viewport: finished answers of uneven length. */
+function scrollHistory(message) {
+  const turn = startOwnTurn(message)
+  for (let index = 0; index < 24; index += 1) {
+    const paragraphs = Array.from(
+      { length: 2 + (index % 5) },
+      (_, line) => `SCROLL_HISTORY_${index} paragraph ${line + 1} of an earlier answer.`,
+    )
+    agentMessage(turn, `${turn}-history-${String(index).padStart(2, '0')}`, paragraphs.join('\n\n'))
+  }
+  endTurn(turn, 'completed')
+}
+
+/** A long answer streamed in small pieces, so the last row grows for several seconds. */
+const SCROLL_STREAM_CHUNKS = Array.from({ length: 180 }, (_, index) =>
+  index % 6 === 5 ? `sentence ${index}.\n\n` : `SCROLL_STREAM words ${index} `,
+)
+
+/**
+ * One turn of eleven messages: a detail window of 200 then holds about eighteen turns. Ids sort
+ * in emission order, because messages sent in one millisecond are ordered by id.
+ */
+function scrollPageTurn(message, text) {
+  const turn = startOwnTurn(message)
+  const page = text.split(' ')[1]
+  for (let index = 0; index < 10; index += 1)
+    agentMessage(
+      turn,
+      `${turn}-item-${String(index).padStart(2, '0')}`,
+      `PAGE_STEP_${page}_${index}`,
+    )
+  const answer = Array.from(
+    { length: 4 },
+    (_, line) => `PAGE_ANSWER_${page} paragraph ${line + 1} of this turn's answer.`,
+  )
+  agentMessage(turn, `${turn}-item-10`, answer.join('\n\n'))
+  endTurn(turn, 'completed')
+}
+
+function chatScroll(message) {
+  const text = promptText(message)
+  record({ event: 'turn/start', input: text })
+  if (text.startsWith('PAGE')) return scrollPageTurn(message, text)
+  if (text.startsWith('HISTORY')) return scrollHistory(message)
+  const turn = startOwnTurn(message)
+  streamAnswer(turn, `${turn}-answer`, [...SCROLL_STREAM_CHUNKS, 'SCROLL_STREAM_DONE'], 45)
+}
+
 function handle(message) {
   if (scenario === 'session-no-flicker' && message.method === 'turn/start') {
     const turn = startOwnTurn(message)
@@ -515,6 +563,8 @@ function handle(message) {
     return
   }
   if (scenario.startsWith('mcp-') && scenario !== 'mcp-approval' && handleMcpStatus(message)) return
+  if (scenario.startsWith('chat-scroll') && message.method === 'turn/start')
+    return chatScroll(message)
   if (scenario === 'chat-history-pages' && message.method === 'turn/start')
     return historyPages(message)
   if (scenario === 'chat-stream' && message.method === 'turn/start') return streamWorkLog(message)

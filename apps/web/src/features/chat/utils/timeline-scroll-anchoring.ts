@@ -16,10 +16,11 @@ const TIMELINE_FOLLOW_REARM_BAND_PX = 40
 
 /**
  * Slack allowed when testing whether the viewport is parked on the scroll
- * bottom. Only fractional-pixel noise, never a usable gesture distance — a band
- * here would swallow small scrolls whole (see `isTimelineAtContentEnd`).
+ * bottom, here and as the virtualizer's `scrollEndThreshold`. Only
+ * fractional-pixel noise, never a usable gesture distance — a band here would
+ * swallow small scrolls whole (see `isTimelineAtContentEnd`).
  */
-const TIMELINE_AT_END_EPSILON_PX = 2
+export const TIMELINE_END_THRESHOLD_PX = 2
 
 /**
  * Space reserved below the last row so the final line never sits flush against
@@ -74,17 +75,10 @@ export interface TimelineAnchoredTurnMetrics {
 export interface TimelineScrollState {
   readonly anchorItemId: string | null
   readonly anchoredEndSpace: number
-  /** The row currently at index 0, so a page landing above it is detectable. */
-  readonly firstItemId: string | null
   readonly followMode: TimelineFollowMode
   readonly latestUserItemId: string | null
   readonly parkedAnchorItemId: string | null
   readonly pendingInitialScroll: boolean
-  /**
-   * The row that used to be first, while the scroll offset still has to absorb
-   * the page that landed in front of it. Null once absorbed.
-   */
-  readonly prependedAboveItemId: string | null
   readonly sessionId: string | null
 }
 
@@ -93,11 +87,9 @@ export type TimelineScrollEvent =
   | { readonly type: 'anchor-parked' }
   | { readonly type: 'initial-scroll-done' }
   | { readonly type: 'jump-to-end' }
-  | { readonly type: 'prepend-absorbed' }
   | { readonly type: 'user-navigated' }
   | { readonly type: 'scrolled'; readonly atContentEnd: boolean }
   | {
-      readonly firstItemId: string | null
       readonly latestUserItemId: string | null
       readonly sessionId: string
       readonly type: 'items-changed'
@@ -107,12 +99,10 @@ export type TimelineScrollEvent =
 export const initialTimelineScrollState: TimelineScrollState = {
   anchorItemId: null,
   anchoredEndSpace: 0,
-  firstItemId: null,
   followMode: 'following-end',
   latestUserItemId: null,
   parkedAnchorItemId: null,
   pendingInitialScroll: false,
-  prependedAboveItemId: null,
   sessionId: null,
 }
 
@@ -142,7 +132,7 @@ export function isTimelineWithinFollowBand(
  * than the tolerance — which is exactly the transcript fighting back.
  */
 export function isTimelineAtContentEnd(viewport: TimelineViewportMetrics): boolean {
-  return timelineDistanceToContentEnd(viewport, 0) <= TIMELINE_AT_END_EPSILON_PX
+  return timelineDistanceToContentEnd(viewport, 0) <= TIMELINE_END_THRESHOLD_PX
 }
 
 /** Content short enough to fit the viewport cannot carry a navigation gesture. */
@@ -205,58 +195,6 @@ export function timelineAnchoredTurnMetrics({
   }
 }
 
-/**
- * How much to move the scroll offset when a row's measured size replaces its
- * estimate. Only rows that start above the viewport top matter: growing them
- * pushes everything visible down by `delta`, so the offset has to absorb it or
- * the text under the cursor jumps. Deliberately compensates while scrolling up
- * too — that is exactly when a reader notices the jump.
- */
-export function timelineRemeasureScrollDelta({
-  delta,
-  rowStart,
-  scrollTop,
-  suspended,
-}: {
-  delta: number
-  rowStart: number
-  scrollTop: number
-  suspended: boolean
-}): number {
-  if (suspended) return 0
-  if (!Number.isFinite(delta) || delta === 0) return 0
-  if (!Number.isFinite(rowStart)) return 0
-  if (rowStart >= scrollTop) return 0
-
-  return delta
-}
-
-/**
- * Where the viewport has to move so the row under the reader's eyes stays where
- * it was after a page landed above it.
- *
- * The shift is read off the previously-first row: before the page arrived its
- * `start` was exactly the top inset, so whatever it is now is how far every
- * visible row was pushed down. Returns null when nothing moved — an empty page,
- * or rows that turned out to be already held.
- */
-export function timelinePrependedScrollTop({
-  anchorRow,
-  scrollTop,
-  topInset,
-}: {
-  anchorRow: TimelineRowMetrics | undefined
-  scrollTop: number
-  topInset: number
-}): number | null {
-  if (!isMeasuredRow(anchorRow)) return null
-
-  const shift = anchorRow.start - topInset
-  if (shift <= 0) return null
-
-  return scrollTop + shift
-}
-
 export function timelineScrollReducer(
   state: TimelineScrollState,
   event: TimelineScrollEvent,
@@ -264,10 +202,6 @@ export function timelineScrollReducer(
   switch (event.type) {
     case 'items-changed':
       return reduceItemsChanged(state, event)
-    case 'prepend-absorbed':
-      if (state.prependedAboveItemId === null) return state
-
-      return { ...state, prependedAboveItemId: null }
     case 'initial-scroll-done':
       if (!state.pendingInitialScroll) return state
 
@@ -294,7 +228,6 @@ export function timelineScrollReducer(
 function reduceItemsChanged(
   state: TimelineScrollState,
   {
-    firstItemId,
     latestUserItemId,
     sessionId,
     preserveReadingPosition,
@@ -303,50 +236,26 @@ function reduceItemsChanged(
   if (sessionId !== state.sessionId) {
     return {
       ...initialTimelineScrollState,
-      firstItemId,
       latestUserItemId,
       pendingInitialScroll: true,
       sessionId,
     }
   }
 
-  const withFront = reduceTimelineFront(state, firstItemId)
-  if (latestUserItemId === state.latestUserItemId) return withFront
-  if (latestUserItemId === null) return { ...withFront, latestUserItemId: null }
+  if (latestUserItemId === state.latestUserItemId) return state
+  if (latestUserItemId === null) return { ...state, latestUserItemId: null }
   if (preserveReadingPosition && state.followMode === 'free-scrolling')
-    return { ...withFront, latestUserItemId }
+    return { ...state, latestUserItemId }
 
   // A brand new user message means the user just sent something: park it near
   // the top instead of pinning to the bottom, even if they were reading history.
-  // The park owns the offset from here, so any unabsorbed prepend is moot.
   return {
-    ...withFront,
+    ...state,
     anchorItemId: latestUserItemId,
     followMode: 'anchoring-new-turn',
     latestUserItemId,
     parkedAnchorItemId: null,
-    prependedAboveItemId: null,
   }
-}
-
-/**
- * A new row at index 0 with the old one still in the list is a page that landed
- * in front of the transcript, and the scroll offset owes it a compensation.
- *
- * Only while free-scrolling: end-follow re-pins to the bottom on its own, and an
- * anchored turn is already driving the offset from the other direction. Those
- * are also the only modes a reader can be in when they reach the top and ask.
- */
-function reduceTimelineFront(
-  state: TimelineScrollState,
-  firstItemId: string | null,
-): TimelineScrollState {
-  if (firstItemId === state.firstItemId) return state
-  if (state.followMode !== 'free-scrolling' || state.firstItemId === null) {
-    return { ...state, firstItemId }
-  }
-
-  return { ...state, firstItemId, prependedAboveItemId: state.firstItemId }
 }
 
 function reduceScrolled(state: TimelineScrollState, atContentEnd: boolean): TimelineScrollState {
@@ -368,8 +277,6 @@ function releasedAnchor() {
     anchorItemId: null,
     anchoredEndSpace: 0,
     parkedAnchorItemId: null,
-    // Back at the live edge, so there is no reading position left to preserve.
-    prependedAboveItemId: null,
   }
 }
 

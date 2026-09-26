@@ -1,6 +1,7 @@
 import { useChatTransport } from '@/features/chat/hooks/use-chat-transport'
 import { readTimelineReload, timelineInitialView } from '@/features/chat/state/timeline-reload'
 import { useReducer, useState } from 'react'
+import type { DisclosureSettle } from '@/features/chat/state/timeline-scroll'
 import { VirtualList } from '@workspace/ui/patterns/virtual-list'
 import type { ChatSession } from '@workspace/client-core/chat/types'
 
@@ -10,6 +11,7 @@ import {
   initialTimelineScrollState,
   timelineScrollReducer,
   TIMELINE_COMPOSER_INSET_PX,
+  TIMELINE_END_THRESHOLD_PX,
   TIMELINE_TOP_INSET_PX,
 } from '@/features/chat/utils/timeline-scroll-anchoring'
 import { TimelineRow } from '@/features/chat/components/timeline-row'
@@ -48,7 +50,17 @@ export function MessagesTimeline({
     timelineScrollReducer,
     initialView?.scrollState ?? initialTimelineScrollState,
   )
+  const [disclosureSettle, setDisclosureSettle] = useState<DisclosureSettle | null>(null)
+  const [previousSessionId, setPreviousSessionId] = useState(session.id)
+  if (previousSessionId !== session.id) {
+    setPreviousSessionId(session.id)
+    setDisclosureSettle(null)
+  }
   useReasoningAutoFold(items, scrollState.followMode !== 'free-scrolling')
+  // The park and a settling disclosure each hold a row still; end anchoring would pull the
+  // growing end into view instead.
+  const endAnchored = scrollState.followMode !== 'anchoring-new-turn' && disclosureSettle === null
+  const following = scrollState.followMode === 'following-end'
 
   return (
     <VirtualList
@@ -62,6 +74,11 @@ export function MessagesTimeline({
       measureItems
       paddingStart={TIMELINE_TOP_INSET_PX}
       paddingEnd={TIMELINE_COMPOSER_INSET_PX + scrollState.anchoredEndSpace}
+      anchorTo={endAnchored ? 'end' : 'start'}
+      followOnAppend={following}
+      // A reader who scrolled away is never at the end to the virtualizer: its pin to a growing
+      // last row would land between their wheel and its first scroll and swallow the gesture.
+      scrollEndThreshold={following ? TIMELINE_END_THRESHOLD_PX : -1}
       contentClassName='[overflow-anchor:none]'
       renderRow={(item) => (
         <TimelineRow
@@ -77,6 +94,8 @@ export function MessagesTimeline({
           session={session}
           scrollState={scrollState}
           dispatch={dispatch}
+          disclosureSettle={disclosureSettle}
+          onDisclosureSettle={setDisclosureSettle}
         />
       )}
     />
