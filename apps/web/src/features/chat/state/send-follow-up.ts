@@ -43,6 +43,7 @@ export async function sendFollowUp({
         prompt: input.payload.text,
         attachments: draft.attachments,
         terminalContexts: draft.terminalContexts,
+        reviewComments: input.payload.reviewComments ?? [],
       },
       afterToolActivityId: toolId,
       held: false,

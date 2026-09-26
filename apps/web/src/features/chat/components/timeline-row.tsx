@@ -12,6 +12,7 @@ import { TurnRetryActions } from './turn-retry-actions'
 import { LiveActivityRow } from '@/features/chat/components/live-activity-row'
 import { timelineRowSpacing } from '@/features/chat/utils/timeline-items'
 import { cn } from '@workspace/ui/lib/utils'
+import { useTimelineRevealStore } from '@/features/chat/state/timeline-reveal-store'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 import { AgentsRow } from '@/features/chat/components/agents-row'
 import { ReasoningRow } from '@/features/chat/components/reasoning-row'
@@ -34,6 +35,7 @@ export function TimelineRow({
     (state) => state.expandedGroupIds[foldId] ?? false,
   )
   const toggleGroupExpanded = useChatWorkLogExpansionStore((state) => state.toggleGroupExpanded)
+  const revealed = useTimelineRevealStore((state) => state.highlighted === item.id)
 
   return (
     <div
@@ -41,7 +43,9 @@ export function TimelineRow({
         'mx-auto w-full max-w-3xl min-w-0 transition-opacity',
         timelineRowSpacing(item),
         restoreRole === 'receding' && 'opacity-50',
+        revealed && 'bg-info/10',
       )}
+      data-revealed={revealed ? '' : undefined}
       data-restore-role={restoreRole}
       data-timeline-row-id={item.id}
       data-timeline-row-type={item.type}

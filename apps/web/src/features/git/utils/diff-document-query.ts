@@ -1,6 +1,6 @@
 import { comparisonRequest } from '@/lib/documents/utils/comparisons'
 import { checkpointDiffQueryKey } from '@/lib/checkpoint-diff-query'
-import { blobDiffQueryKey } from '@/features/git/utils/blob-diff-query'
+import { blobDiffQueryKey } from '@/lib/blob-diff-query'
 import type { GitComparison } from '@/lib/documents/utils/types'
 
 export function diffDocumentQueryKey(info: GitComparison) {

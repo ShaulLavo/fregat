@@ -1,6 +1,7 @@
 import type { Address } from '@workspace/client-core/address/grammar'
 import { descriptorFor, SETTING_IDS } from '@workspace/contracts'
 import type { AddressApplyReason } from '@/features/address/state/apply-view'
+import { setPhoneScreen } from '@/lib/shell/state/store'
 import { settingsCategoryForSlug } from '@/features/address/utils/settings-category'
 import { searchStateFor } from '@/features/address/utils/search-params'
 import { logsFiltersFor } from '@/features/address/utils/logs-params'
@@ -38,6 +39,7 @@ export function applyAddressFields({
   const state = workspaceStore.getState()
   const mode = address.mode ?? (reason === 'boot' ? null : 'workbench')
   if (mode) state.setUiMode(mode)
+  setPhoneScreen(address.screen)
   if (address.settings || reason !== 'boot') applySettingsCategory(address)
   if (reason === 'traverse') {
     if (address.mode === 'chat' && address.editor && address.tool === 'editor')

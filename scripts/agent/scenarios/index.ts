@@ -53,6 +53,10 @@ import { streamOverflow } from './stream-overflow'
 import { questionHistory } from './question-history'
 import { chatScreenshot } from './chat-screenshot'
 import { chatMultipleModels } from './chat-multiple-models'
+import { chatAssistantCitation } from './chat-assistant-citation'
+import { chatCitationElsewhere } from './chat-citation-elsewhere'
+import { chatFindingSource } from './chat-finding-source'
+import { chatReviewContext } from './chat-review-context'
 import { chatMultipleModelsLostAck } from './chat-multiple-models-lost-ack'
 import { chatComposerEditing } from './chat-composer-editing'
 import { chatArtifactTemplate } from './chat-artifact-template'
@@ -116,6 +120,8 @@ import { chatComposerInsert } from './chat-composer-insert'
 import { chatDisclosureSettle } from './chat-disclosure-settle'
 import { chatTurnAnatomy } from './chat-turn-anatomy'
 import { devicePairing } from './device-pairing'
+import { phoneShell } from './phone-shell'
+import { shellSwitch } from './shell-switch'
 import { chatSleepingSession } from './chat-sleeping-session'
 import { chatSessionGoal } from './chat-session-goal'
 import { chatAgentReview } from './chat-agent-review'
@@ -373,6 +379,10 @@ export const scenarios: readonly Scenario[] = [
   questionHistory,
   chatScreenshot,
   chatMultipleModels,
+  chatAssistantCitation,
+  chatCitationElsewhere,
+  chatFindingSource,
+  chatReviewContext,
   chatMultipleModelsLostAck,
   chatComposerEditing,
   chatArtifactTemplate,
@@ -609,6 +619,8 @@ export const scenarios: readonly Scenario[] = [
   chatDisclosureSettle,
   chatTurnAnatomy,
   devicePairing,
+  phoneShell,
+  shellSwitch,
   chatSleepingSession,
   chatSessionGoal,
   chatAgentReview,

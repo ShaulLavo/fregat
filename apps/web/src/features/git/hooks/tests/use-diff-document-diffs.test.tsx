@@ -1,5 +1,5 @@
 import { diffQueryOptions } from '@/features/git/utils/diff-query'
-import { blobDiffQueryOptions } from '@/features/git/utils/blob-diff-query'
+import { blobDiffQueryOptions } from '@/lib/blob-diff-query'
 import { createObservedInProcessClient } from '../../../../../test/client'
 import {
   registerEnvironmentQueryClient,
@@ -13,7 +13,7 @@ import path from 'node:path'
 
 import { useDiffDocumentDiffs } from '@/features/git/hooks/use-diff-document-diffs'
 import { fetchDiff } from '@/features/git/utils/api'
-import { blobDiffQueryKey } from '@/features/git/utils/blob-diff-query'
+import { blobDiffQueryKey } from '@/lib/blob-diff-query'
 import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
 import type { Client } from '@/lib/client'
 import { fileResource, filesystemPath } from '@/lib/documents/utils/identity'

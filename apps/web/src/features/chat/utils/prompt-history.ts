@@ -1,3 +1,4 @@
+import { extractReviewComments } from '@workspace/client-core/chat/review-comments'
 import { extractTerminalContexts } from '@workspace/client-core/chat/terminal-context'
 
 export type PromptHistoryEntry = { id: string; prompt: string }
@@ -8,7 +9,7 @@ export function promptHistoryEntries(
   const entries: PromptHistoryEntry[] = []
   for (const message of messages) {
     if (message.role !== 'user') continue
-    const prompt = extractTerminalContexts(message.text).text.trim()
+    const prompt = extractReviewComments(extractTerminalContexts(message.text).text).text.trim()
     if (!prompt || prompt.startsWith('PLEASE IMPLEMENT THIS PLAN:')) continue
     if (entries.at(-1)?.prompt === prompt) entries.pop()
     entries.push({ id: message.id, prompt })
