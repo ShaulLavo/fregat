@@ -3,7 +3,8 @@ import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { PassThrough } from 'node:stream'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
+import { DEFAULT_SETTING_VALUES } from '@workspace/contracts'
 import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 import type { WideEvent } from 'evlog'
 import { readFsLogs } from 'evlog/fs'
@@ -1543,6 +1544,14 @@ describe('LspSessionPool watched files', () => {
     await expect.poll(() => fixture.serverResponse('watch-2')).toBeDefined()
     fixture.pool.disposeAll()
     await expect.poll(() => heldWatchers(fixture.hub())).toBe(0)
+
+    // The idle watch closes once the room it holds is needed.
+    hubDirectoryLimit = 0
+    onTestFinished(() => {
+      hubDirectoryLimit = undefined
+    })
+    fixture.hub().rebalance()
+    await expect.poll(() => fixture.hub().info().nativeWatcherCount).toBe(0)
   })
 })
 
@@ -1552,10 +1561,14 @@ function heldWatchers(hub: FileChangeHub) {
 }
 
 const watchHubs = new Map<string, FileChangeHub>()
+let hubDirectoryLimit: number | undefined
 
 function hubWatch(root: string) {
   const paths = createWorkspacePaths(root)
-  const hub = new FileChangeHub(paths, { enabled: true })
+  const hub = new FileChangeHub(paths, {
+    enabled: true,
+    directoryLimit: () => hubDirectoryLimit ?? DEFAULT_SETTING_VALUES['files.watchDirectoryLimit'],
+  })
   hubs.push(hub)
   watchHubs.set(root, hub)
   return treeWatchSource(hub, paths)
