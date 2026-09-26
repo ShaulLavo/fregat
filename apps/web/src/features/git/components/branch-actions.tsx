@@ -22,6 +22,7 @@ import { Button, buttonVariants } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 import { changeRequestLabel } from '@/features/git/utils/forge-terms'
 import { PublishRepositoryDialog } from '@/features/git/components/publish-repository-dialog'
+import { PullRequestLookupRetry } from '@/features/git/components/pull-request-lookup-retry'
 
 /**
  * Publish, push and open-a-pull-request, in the header where the branch already
@@ -49,14 +50,17 @@ export function BranchActions({
       rootPath: nextRootPath,
       pullRequestTitle: nextTitle,
       state: branch.data,
-      pullRequestState: pullRequest.data,
+      pullRequestState: pullRequest.isSuccess ? pullRequest.data : undefined,
+      requestLabel: changeRequestLabel(pullRequest.data?.forge),
     }),
-    [nextRootPath, nextTitle, branch.data, pullRequest.data],
+    [nextRootPath, nextTitle, branch.data, pullRequest.data, pullRequest.isSuccess],
   )
-  const { rootPath, pullRequestTitle, state, pullRequestState } = useHeldUntilReady(next, !loading)
+  const { rootPath, pullRequestTitle, state, pullRequestState, requestLabel } = useHeldUntilReady(
+    next,
+    !loading,
+  )
   const push = usePushRemoteMutation(rootPath)
   const createPullRequest = useCreatePullRequestMutation(rootPath)
-  const requestLabel = changeRequestLabel(pullRequestState?.forge)
   const ship = usePushAndOpenPullRequestMutation(rootPath, requestLabel)
   const [publishing, setPublishing] = useState<string | null>(null)
   const spinner = loading ? <Spinner label='Loading branch actions' size='xs' /> : null
@@ -131,6 +135,7 @@ export function BranchActions({
           <ArrowSquareOutIcon className='size-(--icon-size-sm) opacity-60' />
         </a>
       ) : null}
+      <PullRequestLookupRetry requestLabel={requestLabel} rootPath={rootPath} />
       {canCreatePullRequest(state, pullRequestState) ? (
         <Button
           className='text-2xs'
