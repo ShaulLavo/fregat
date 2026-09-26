@@ -116,3 +116,33 @@ Per slice: the narrow tests of the touched feature, `bun run gates`, the bundle 
 slices, and a release install for slice 1. Slice 4: `server/index.js` holds no `web-push` code,
 a server with push off never loads the push package, and Send test still reaches a registered
 device on the mesh (scenario or the owner's phone).
+
+## Integrated branch verification, 2026-09-27
+
+Merged #113 → #114 → #119 → #117 → #118 → #120 onto `fe39528db`. The integration
+keeps lazy external Web Push, the image worker, complete release notices and the
+runtime manifest. Both notices review blockers are fixed: missing full texts fail
+generation unless an exact-version reviewed text exists, and runtime packages resolve
+from their declaring workspace. Release candidate tests now require the image worker
+and notices as well as the terminal host.
+
+| Measurement                   | Main `fe39528db` |  Integrated |      Change |
+| ----------------------------- | ---------------: | ----------: | ----------: |
+| Server bundle bytes           |        6,022,939 |   4,771,763 |  -1,251,176 |
+| All web JS bytes              |       62,097,119 |  61,970,825 |    -126,294 |
+| All web JS gzip bytes         |        9,177,259 |   9,141,949 |     -35,310 |
+| First-load JS gzip bytes      |        1,733,845 |   1,731,035 |      -2,810 |
+| Linux runtime installed bytes |      588,395,127 | 545,821,872 | -42,573,255 |
+| Lockfile package resolutions  |            1,350 |       1,333 |         -17 |
+
+Measured with the same build commands. Baseline source was exported inside the worktree. Server figures are raw, unminified output and include source-path comments. Runtime sizes follow symlinks and count each file inode once; these are logical installed bytes, not reclaimed cache space.
+
+Generated notices add 412,445 web bytes for 258 package/version entries and 367,881 server bytes for 156 entries. The baseline had no generated notice files.
+
+Frozen workspace/runtime installs, gates including knip, every workspace typecheck,
+server build and web bundle gate passed. Verification also passed 104 server tests,
+23 notices/deploy tests, 10 licence route tests, and the isolated bundled font/image/push
+probe from `/`. The six deduplication targets each have one package root in the build.
+Workspace typechecks bypassed the shared Editor auto-rebuild step. No deployment or
+live model calls; macOS and device push delivery remain unverified. Evidence:
+`/work/tmp/w2-184-integration-evidence/`.

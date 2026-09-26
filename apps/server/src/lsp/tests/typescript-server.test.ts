@@ -217,7 +217,10 @@ async function openAgentFile(
     .toEqual(codes)
 }
 
-async function agentFileFixture(packageName: string, clean: string) {
+async function agentFileFixture(
+  packageName: (typeof RUNTIMES)[number]['packageName'],
+  clean: string,
+) {
   const fixture = await installedTypeScriptRuntimeFixture(packageName, {
     'package.json': '{"private":true,"type":"module"}\n',
     'tsconfig.json': '{"compilerOptions":{"strict":true},"files":["probe.ts"]}\n',

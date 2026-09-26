@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import * as v from 'valibot'
+import { createScriptError } from '../structured-errors'
 
 const packageSchema = v.object({
   name: v.string(),
@@ -24,12 +25,21 @@ export function packageNotices(files: readonly string[]) {
     )
     const label = `${metadata.name}@${metadata.version}`
     const selected = permissiveChoices[metadata.name] ?? metadata.license
-    const texts = noticeFiles(root).map(
-      (file) => `${path.relative(root, file)}\n\n${readFileSync(file, 'utf8').trim()}`,
-    )
+    const texts = noticeFiles(root).flatMap((file) => {
+      const text = readFileSync(file, 'utf8').trim()
+      return text ? [`${path.relative(root, file)}\n\n${text}`] : []
+    })
+    if (!texts.some((text) => text.trim())) {
+      const fallback = path.join(import.meta.dirname, 'texts', `${label.replaceAll('/', '+')}.txt`)
+      if (existsSync(fallback)) texts.push(readFileSync(fallback, 'utf8').trim())
+    }
+    if (!texts.some((text) => text.trim()))
+      throw createScriptError(
+        `Missing full licence text for ${label}. Add a reviewed version-specific text in scripts/licenses/texts.`,
+      )
     entries.set(
       label,
-      `${label}\nLicence: ${selected ?? 'See package licence files'}\nSource: https://www.npmjs.com/package/${metadata.name}/v/${metadata.version}\n\n${texts.join('\n\n') || 'The published package contains no licence text. See its source and licence declaration above.'}`,
+      `${label}\nLicence: ${selected ?? 'See package licence files'}\nSource: https://www.npmjs.com/package/${metadata.name}/v/${metadata.version}\n\n${texts.join('\n\n')}`,
     )
   }
   return (
