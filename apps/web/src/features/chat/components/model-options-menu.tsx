@@ -27,9 +27,9 @@ import {
   withUltrathinkPrefix,
   withoutUltrathinkPrefix,
 } from '../utils/model-options'
-import { EffortSparkle } from '@/features/chat/components/effort-sparkle'
-import { triggerSparkleLevel } from '@/features/chat/utils/effort-sparkle'
+import { composerEffortTier } from '@/features/chat/utils/effort-tier'
 import { ModelOptionsGroup } from './model-options-group'
+import { ModelOptionsSummary } from './model-options-summary'
 import { ModelOptionsTriggerIcon } from './model-options-trigger-icon'
 
 export function ModelOptionsMenu({
@@ -55,7 +55,7 @@ export function ModelOptionsMenu({
   const selection = modelSelection
   const summary = descriptorSummary(descriptors, selection, prompt)
   const effort = promptEffortState(descriptors, prompt)
-  const sparkle = triggerSparkleLevel(descriptors, selection, prompt)
+  const ultra = composerEffortTier(descriptors, selection, prompt) === 'ultra'
   const selects = descriptors.filter(
     (descriptor): descriptor is Extract<ProviderOptionDescriptor, { type: 'select' }> =>
       descriptor.type === 'select',
@@ -86,16 +86,20 @@ export function ModelOptionsMenu({
               render={
                 <Button
                   aria-label='Model options'
-                  className='text-muted-foreground relative min-w-0 gap-1 text-xs font-normal'
+                  className='group/options text-muted-foreground min-w-0 gap-1 text-xs font-normal'
                   disabled={disabled}
                   focusableWhenDisabled
                   size='sm'
                   type='button'
                   variant='ghost'
                 >
-                  <EffortSparkle level={sparkle} />
-                  <ModelOptionsTriggerIcon compact={compact} fast={summary.fast} />
-                  {compact ? null : <span className='truncate'>{summary.label}</span>}
+                  <ModelOptionsTriggerIcon compact={compact} fast={summary.fast} ultra={ultra} />
+                  {compact ? null : (
+                    <ModelOptionsSummary
+                      parts={summary.parts}
+                      ultraPartId={ultra ? effort.descriptorId : undefined}
+                    />
+                  )}
                   {narrow ? null : (
                     <CaretUpDownIcon className='size-(--icon-size-sm) shrink-0 opacity-60' />
                   )}

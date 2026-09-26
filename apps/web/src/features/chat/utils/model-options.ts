@@ -22,18 +22,22 @@ export function descriptorSummary(
   prompt = '',
 ) {
   const effort = promptEffortState(descriptors, prompt)
-  const labels = descriptors
+  const parts = descriptors
     .map((descriptor) => {
-      if (effort.controlled && descriptor.id === effort.descriptorId) return 'Ultrathink'
-      return activeChoiceLabel(descriptor, selection)
+      const label =
+        effort.controlled && descriptor.id === effort.descriptorId
+          ? 'Ultrathink'
+          : activeChoiceLabel(descriptor, selection)
+      return { id: descriptor.id, label }
     })
-    .filter((label): label is string => label !== null)
+    .filter((part): part is { id: string; label: string } => part.label !== null)
   const fast = descriptors.some(
     (descriptor) =>
       descriptor.id === FAST_MODE_OPTION_ID && effectiveOptionValue(descriptor, selection) === true,
   )
+  const label = parts.map((part) => part.label).join(' · ') || (fast ? 'Fast' : 'Options')
 
-  return { fast, label: labels.join(' · ') || (fast ? 'Fast' : 'Options') }
+  return { fast, label, parts }
 }
 
 function activeChoiceLabel(descriptor: ProviderOptionDescriptor, selection: ModelSelection) {

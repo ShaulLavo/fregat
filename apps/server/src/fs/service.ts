@@ -174,6 +174,11 @@ export class FileSystemService {
     return this.workspaceIndexScope?.index
   }
 
+  /** `files.watchDirectoryLimit`, read at each attach; the settings store is built after this service. */
+  set watchDirectoryLimit(read: () => number) {
+    this.changes.directoryLimit = read
+  }
+
   info() {
     return {
       workspaceRoot: this.paths.workspaceRoot,
@@ -735,6 +740,10 @@ async function startWorkspaceIndex(
   try {
     await watcher.ready
     if (signal.aborted) return
+    if (watcher.coverage?.mode === 'limited') {
+      index.turnOff('watch-limit')
+      return
+    }
 
     await index.rebuild({ reason: 'workspace-root-opened', signal })
   } catch {

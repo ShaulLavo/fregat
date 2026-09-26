@@ -68,7 +68,7 @@ export type {
   GitShipResult,
 } from './git'
 export { GIT_FORGE_KINDS, WORKTREE_SUBMODULE_MODES } from './git'
-export type { WatchClientMessage, WatchServerMessage } from './watch-events'
+export type { WatchClientMessage, WatchCoverage, WatchServerMessage } from './watch-events'
 export {
   parseTerminalClientMessage,
   parseTerminalServerMessage,

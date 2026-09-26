@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rename, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -232,6 +232,116 @@ describe.runIf(process.platform === 'linux')('native watch lifetime', () => {
           shallowWatcherCount: 0,
         })
     } finally {
+      await hub.close()
+    }
+  })
+})
+
+describe('watch error delivery', () => {
+  it('sends a watcher error only to streams that use that watcher', async () => {
+    const root = await fixtureRoot()
+    const hub = new FileChangeHub(createWorkspacePaths(root), { enabled: false })
+    const abort = new AbortController()
+    const covered = hub.stream(['work/projects'], abort.signal)[Symbol.asyncIterator]()
+    const unrelated = hub.stream(['home'], abort.signal)[Symbol.asyncIterator]()
+    try {
+      expect(await nextRequiredEvent(covered)).toMatchObject({ type: 'ready' })
+      expect(await nextRequiredEvent(unrelated)).toMatchObject({ type: 'ready' })
+
+      hub.emit({ code: 'WATCH_FAILED', message: 'failed', path: 'work', type: 'error' })
+
+      expect(await nextRequiredEvent(covered)).toMatchObject({ path: 'work', type: 'error' })
+      expect(await nextOptionalEvent(unrelated, 20)).toBeUndefined()
+    } finally {
+      abort.abort()
+      await covered.return?.()
+      await unrelated.return?.()
+      await hub.close()
+    }
+  })
+})
+
+describe.runIf(process.platform === 'linux')('native watch limit and unreadable folders', () => {
+  // Root reads every directory, so only an ordinary user can see an unreadable one.
+  it.skipIf(process.getuid?.() === 0)(
+    'keeps watching past an unreadable directory without reporting an error',
+    async () => {
+      const root = await fixtureRoot()
+      const locked = path.join(root, 'locked')
+      await mkdir(path.join(locked, 'inner'), { recursive: true })
+      await mkdir(path.join(root, 'open'))
+      await chmod(locked, 0o000)
+      const hub = new FileChangeHub(createWorkspacePaths(root), { enabled: true })
+      const abort = new AbortController()
+      const events = collect(hub.stream([''], abort.signal))
+      try {
+        await expect.poll(() => events.length).toBeGreaterThan(0)
+        expect(events[0]).toMatchObject({ type: 'ready', watch: { mode: 'recursive' } })
+
+        await writeFile(path.join(root, 'open/file.txt'), 'x')
+
+        await expect.poll(() => paths(events), { timeout: 3000 }).toContain('open/file.txt')
+        expect(events.some((event) => event.type === 'error')).toBe(false)
+      } finally {
+        abort.abort()
+        await hub.close()
+        await chmod(locked, 0o755)
+      }
+    },
+  )
+
+  it('watches only the top level of a root over the directory limit', async () => {
+    const root = await fixtureRoot()
+    await mkdir(path.join(root, 'a/b/c'), { recursive: true })
+    await mkdir(path.join(root, 'd'))
+    // The root, a, a/b, a/b/c and d: five directories against a limit of three.
+    const hub = new FileChangeHub(createWorkspacePaths(root), {
+      enabled: true,
+      directoryLimit: () => 3,
+    })
+    const abort = new AbortController()
+    const events = collect(hub.stream([''], abort.signal))
+    try {
+      await expect.poll(() => events.length).toBeGreaterThan(0)
+      expect(events[0]).toMatchObject({ type: 'ready', watch: { mode: 'limited', limit: 3 } })
+
+      await writeFile(path.join(root, 'a/b/nested.txt'), 'x')
+      await writeFile(path.join(root, 'top.txt'), 'x')
+
+      await expect.poll(() => paths(events), { timeout: 3000 }).toContain('top.txt')
+      expect(paths(events)).not.toContain('a/b/nested.txt')
+      expect(hub.info()).toMatchObject({ watchedDirectoryCount: 0 })
+    } finally {
+      abort.abort()
+      await hub.close()
+    }
+  })
+
+  it('shares one limit across every root and frees it when a root closes', async () => {
+    const root = await fixtureRoot()
+    await mkdir(path.join(root, 'one/x'), { recursive: true })
+    await mkdir(path.join(root, 'two/y'), { recursive: true })
+    const hub = new FileChangeHub(createWorkspacePaths(root), {
+      enabled: true,
+      directoryLimit: () => 3,
+    })
+    const firstAbort = new AbortController()
+    const secondAbort = new AbortController()
+    const first = collect(hub.stream(['one'], firstAbort.signal))
+    try {
+      await expect.poll(() => first.length).toBeGreaterThan(0)
+      expect(first[0]).toMatchObject({ watch: { mode: 'recursive', directoryCount: 2 } })
+
+      const second = collect(hub.stream(['two'], secondAbort.signal))
+      await expect.poll(() => second.length).toBeGreaterThan(0)
+      expect(second[0]).toMatchObject({ watch: { mode: 'limited', available: 1 } })
+      expect(hub.info()).toMatchObject({ watchedDirectoryCount: 2 })
+
+      firstAbort.abort()
+      await expect.poll(() => hub.info().watchedDirectoryCount).toBe(0)
+    } finally {
+      firstAbort.abort()
+      secondAbort.abort()
       await hub.close()
     }
   })

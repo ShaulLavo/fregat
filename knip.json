@@ -8,6 +8,7 @@
     "apps/server": {
       "entry": [
         "src/provider/claude-discovery-worker.ts",
+        "src/fs/watch-worker.ts",
         "src/installation/remote-support.ts",
         "scripts/pty-benchmark.ts",
         "scripts/pty-smoke.ts",

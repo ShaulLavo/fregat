@@ -29,7 +29,7 @@ test('correlates repeated real write/create echoes and hides only issued tempora
   await vi.waitFor(() => expect(targetEvents(events).length).toBeGreaterThanOrEqual(2))
   await delay(100)
   expect(targetEvents(events).every((event) => event.writeId === 'write')).toBe(true)
-  expect(events.some((event) => 'path' in event && event.path.endsWith('.tmp'))).toBe(false)
+  expect(events.some((event) => 'path' in event && event.path?.endsWith('.tmp'))).toBe(false)
 
   events.length = 0
   await utimes(path.join(root, 'physical/file.txt'), 1_800_000_000, 1_800_000_000)

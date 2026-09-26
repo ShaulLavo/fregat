@@ -153,6 +153,9 @@ export const selectors = {
   modelPickerOption: (page: Page, label: string) =>
     page.getByRole('option').filter({ has: page.getByText(label, { exact: true }) }),
   modelOptions: (page: Page) => page.getByRole('button', { name: 'Model options', exact: true }),
+  /** The one-shot burst under the composer when the effort rises to max or ultra. */
+  effortBurst: (page: Page, tier: 'max' | 'ultra') => page.locator(`[data-effort-burst="${tier}"]`),
+  effortRainbow: (scope: Locator) => scope.locator('.rainbow-text'),
   modelOptionChoice: (page: Page, group: string, choice: string) =>
     page
       .getByRole('group', { name: group, exact: true })

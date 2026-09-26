@@ -2,8 +2,8 @@
 
 ## Status and authorization
 
-- Status: PROPOSED (2026-09-26). D1–D4 need the owner; everything else takes the default written
-  here. Nothing here authorizes implementation.
+- Status: DECIDED 2026-09-26 — the owner took every recommendation and made the worker (D3)
+  unconditional. Implementation authorized.
 - Priority: P1. Opening `/work` froze the prod server for 10.8 s and left it holding 92% of the
   machine's inotify watches.
 - Planned at: Platform `86ac6f6b0`, 2026-09-26. Origin: the owner opened `/work` as a workspace in
@@ -112,7 +112,9 @@ recreated directories.
 
 ## Decisions
 
-Each says whether it leaves the code simpler, the same, or more complex.
+Each says whether it leaves the code simpler, the same, or more complex. Decided 2026-09-26:
+the owner took every recommendation, and D3 without its condition ("we are not scared of
+complexity that much").
 
 - **D1 — The watch limit.** Recommended: a server-wide total of directories under recursive
   watches, setting `files.watchDirectoryLimit`, `machine` scope (inotify is per machine, and a
@@ -129,14 +131,14 @@ Each says whether it leaves the code simpler, the same, or more complex.
 - **D3 — A worker for the watch.** Moving `fs.watch` into a Bun worker frees the main thread
   during the walk: over this checkout the longest main-thread gap drops from 136 ms to 6 ms, with
   the attach unchanged (128 → 131 ms). More complex: a worker module and an event relay, about 80
-  lines. Recommended only if Phase 3's cold measurement at the limit stalls the main thread for
-  more than 500 ms; D1 bounds the walk either way.
+  lines. Decided: always, with no measurement gate.
 - **D4 — Clicks during a folder switch.** Recommended: the switch wins. A navigation whose
   destination is the workspace being left settles `superseded` at once and leaves the switch
   running; browser Back and Forward still cancel it. `NavigationStatus` names the folder being
   opened. One guard over the existing `pendingOutsideWorkspace` (`navigation-coordinator.ts:563`),
   slightly more code. Alternative: keep "last navigation wins" and show a notice when a switch is
-  cancelled.
+  cancelled. Decided: the guard, as a stopgap. The owner's better answer is an optimistic switch
+  that lands before the server answers, which makes the window disappear; that is a separate plan.
 
 ## Phases
 
@@ -213,10 +215,10 @@ shallow watch; two roots whose sum passes the limit leave the second limited; in
 top-level write arrives and a write two levels down does not. No index scope for a limited root,
 and quick open answers through `fd`.
 
-### Phase 4 — The watch in a worker (only on D3)
+### Phase 4 — The watch in a worker
 
 More complex. `fs.watch` moves into a Bun worker that posts `{ event, filename }` batches and
-errors; `handleNodeEvent` and everything after it stay on the main thread. Proof: Phase 3's cold
+errors; `handleNodeEvent` and everything after it stay on the main thread. Proof: Phase 3's
 measurement repeated, longest main-thread gap under 50 ms.
 
 ### Phase 5 — A folder switch finishes
@@ -278,4 +280,4 @@ Then `bun run deploy --server` and re-open `/work` in prod: the server's inotify
 ## Order
 
 Phase 1 first. Phase 2 next: it is the smallest, and it fixes symptoms 2 and 5 and the failed
-index. Then Phases 3, 5 and 6 in any order, then Phase 7. Phase 4 runs only if D3 calls for it.
+index. Then Phases 3, 4, 5 and 6 in any order, then Phase 7.

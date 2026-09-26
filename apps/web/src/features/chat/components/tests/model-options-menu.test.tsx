@@ -303,27 +303,28 @@ function renderMenu({
   )
 }
 
-test('the trigger sparkles at max and the menu previews every sparkling level', async () => {
+test('only ultra levels wear the rainbow, on the trigger and in the menu', async () => {
   renderMenu({
     options: { effort: 'max' },
     capabilities: { optionDescriptors: promptDescriptors },
   })
   const trigger = screen.getByRole('button', { name: 'Model options' })
-  expect(trigger.querySelector('[data-effort-sparkle="max"]')).not.toBeNull()
+  expect(trigger.querySelector('.rainbow-text')).toBeNull()
 
-  await userEvent.click(screen.getByRole('button', { name: 'Model options' }))
-  const sparkles = (name: string) =>
-    screen.getByRole('menuitemradio', { name }).querySelector('[data-effort-sparkle]')
-  expect(sparkles('High')).toBeNull()
-  expect(sparkles('Max')).not.toBeNull()
-  expect(sparkles('Ultrathink')).not.toBeNull()
+  await userEvent.click(trigger)
+  const rainbow = (name: string) =>
+    screen.getByRole('menuitemradio', { name }).querySelector('.rainbow-text')
+  expect(rainbow('High')).toBeNull()
+  expect(rainbow('Max')).toBeNull()
+  expect(rainbow('Ultrathink')).not.toBeNull()
 })
 
-test('a high effort does not sparkle', () => {
+test('an ultrathink prompt paints the trigger label', () => {
   renderMenu({
+    prompt: 'Ultrathink:\nExplain the code',
     options: { effort: 'high' },
     capabilities: { optionDescriptors: promptDescriptors },
   })
   const trigger = screen.getByRole('button', { name: 'Model options' })
-  expect(trigger.querySelector('[data-effort-sparkle]')).toBeNull()
+  expect(trigger.querySelector('.rainbow-text')?.textContent).toBe('Ultrathink')
 })

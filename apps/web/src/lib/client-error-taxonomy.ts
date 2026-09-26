@@ -48,11 +48,11 @@ type FsErrorCode =
   | 'INVALID_PATH'
   | 'NOT_A_FILE'
   | 'NOT_A_DIRECTORY'
+  | 'PERMISSION_DENIED'
   | 'FILE_TOO_LARGE'
   | 'FILE_IS_BINARY'
   | 'LOSSY_WRITE_BLOCKED'
   | 'OPERATION_FAILED'
-  | 'WATCH_FAILED'
 
 const categoryByFsErrorCode: Record<FsErrorCode, ErrorCategory> = {
   NOT_FOUND: 'not_found',
@@ -61,6 +61,7 @@ const categoryByFsErrorCode: Record<FsErrorCode, ErrorCategory> = {
   FORBIDDEN_ORIGIN: 'permission_denied',
   NOT_A_FILE: 'not_a_file',
   NOT_A_DIRECTORY: 'not_a_directory',
+  PERMISSION_DENIED: 'permission_denied',
   FILE_TOO_LARGE: 'too_large',
   FILE_IS_BINARY: 'binary_file',
   LOSSY_WRITE_BLOCKED: 'lossy_write',
@@ -70,7 +71,6 @@ const categoryByFsErrorCode: Record<FsErrorCode, ErrorCategory> = {
   OPERATION_FAILED: 'io_error',
   GIT_COMMAND_FAILED: 'io_error',
   GIT_REPOSITORY_NOT_FOUND: 'io_error',
-  WATCH_FAILED: 'io_error',
 }
 
 export function toClientError(input: unknown): ClientError {
@@ -81,7 +81,8 @@ export function toClientError(input: unknown): ClientError {
   if (isConnectivityError(input)) return categorizedClientError('connectivity', input)
 
   const code = extractFsErrorCode(input)
-  if (code) return categorizedClientError(categoryByFsErrorCode[code], input)
+  if (code)
+    return { ...categorizedClientError(categoryByFsErrorCode[code], input), ...guidance(input) }
 
   // Structured errors from any non-fs catalog — settings, orchestration — carry
   // their own message, `why` and `fix`. Falling through to `unknown` here is
@@ -258,6 +259,13 @@ function structuredError(input: unknown) {
   if (!code || !message) return null
 
   return { code, fix: text(error.fix), message, why: text(error.why) }
+}
+
+/** A catalog error's own `why` and `fix`, kept under the category's wording. */
+function guidance(input: unknown) {
+  const structured = structuredError(input)
+  if (!structured) return {}
+  return { code: structured.code, fix: structured.fix, why: structured.why }
 }
 
 function text(value: unknown) {

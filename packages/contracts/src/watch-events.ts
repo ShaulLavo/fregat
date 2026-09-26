@@ -1,7 +1,17 @@
 import type { TreeEntry } from './tree-entry'
 
+/** How a stream's roots are watched; `limited` roots watch their own entries only. */
+export type WatchCoverage = {
+  mode: 'recursive' | 'shallow' | 'limited'
+  /** Directories counted under the root; for `limited`, the tally when counting stopped. */
+  directoryCount?: number
+  /** Directories the limit still had free when this root attached. */
+  available?: number
+  limit?: number
+}
+
 export type WatchServerMessage =
-  | { type: 'ready'; root: string; sequence?: number }
+  | { type: 'ready'; root: string; sequence?: number; watch?: WatchCoverage }
   | { type: 'subscribed'; path: string; sequence?: number }
   | { type: 'unsubscribed'; path: string; sequence?: number }
   | { type: 'pong'; sequence?: number }
@@ -41,7 +51,16 @@ export type WatchServerMessage =
       version?: string
       writeId?: string
     }
-  | { type: 'error'; code: string; message: string; sequence?: number }
+  | {
+      type: 'error'
+      code: string
+      message: string
+      why?: string
+      fix?: string
+      /** The watcher root or open file that failed; streams that do not use it never see the error. */
+      path?: string
+      sequence?: number
+    }
 
 export type WatchClientMessage =
   | { type: 'subscribe'; path: string }

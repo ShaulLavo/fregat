@@ -186,6 +186,7 @@ export function createApp(options: AppOptions) {
   // app was given — in tests that is the in-memory database, which is what
   // keeps a test run from writing into the developer's real settings.
   const settings = new SettingsStore({ ...options.settings, workspaceRoot: fs.paths.workspaceRoot })
+  fs.watchDirectoryLimit = () => settings.snapshot().values['files.watchDirectoryLimit']
   const themesRoot = options.themes?.root ?? platformHomePath()
   const wallpapers = new WallpaperLibrary({
     directory: path.join(themesRoot, 'wallpapers'),

@@ -11,7 +11,17 @@ const FRAME = 'apps/web/src/features/chat/utils/work-log.ts:30'
 
 type Evidence = {
   liveRowHeights: number[]
-  reducedMotionCell: { animationName: string; opacity: string } | null
+  maxBurst: { sweeps: number; rainbowOnTrigger: number } | null
+  reducedMotionSweep: string | null
+  ultra: {
+    burst: boolean
+    burstMs: number
+    triggerLabel: string | null
+    glintRanges: number
+    driftAtRest: string
+    driftOnHover: string
+    rainbowRows: string[]
+  } | null
   ultrathinkRanges: number
 }
 
@@ -21,16 +31,22 @@ const evidenceByPage = new WeakMap<Page, Evidence>()
 export const chatTurnAnatomy: Scenario = {
   name: 'chat-turn-anatomy',
   description:
-    'A scripted mock turn: reasoning fold, fixed live tail, settled summary with failures, stack-frame links, dropped plan step, agent tree, effort sparkle, the model marker and the reader-kept reasoning fold.',
+    'A scripted mock turn: reasoning fold, fixed live tail, settled summary with failures, stack-frame links, dropped plan step, agent tree, max and ultra effort bursts, the ultra rainbow, the model marker and the reader-kept reasoning fold.',
   inspect: async (page) => evidenceByPage.get(page) ?? null,
   async run(page, { step }) {
-    const evidence: Evidence = { liveRowHeights: [], reducedMotionCell: null, ultrathinkRanges: 0 }
+    const evidence: Evidence = {
+      liveRowHeights: [],
+      maxBurst: null,
+      reducedMotionSweep: null,
+      ultra: null,
+      ultrathinkRanges: 0,
+    }
     evidenceByPage.set(page, evidence)
     const { base, cleanup, sessionId } = await createScriptedSession(page, await openChat(page))
     try {
       await firstTurn(page, step, evidence)
       await verifyTurnDuration(page, `${base}/orchestration`, sessionId)
-      await effortSparkle(page, step, evidence)
+      await maxBurst(page, step, evidence)
       await secondTurn(page, step)
       await thirdTurn(page, step)
       await ultrathinkWord(page, step, evidence)
@@ -99,22 +115,34 @@ async function verifyTurnDuration(page: Page, orchestration: string, sessionId: 
   ok(!/Worked for \d+ms/.test(await fold.innerText()), 'The fold reports seconds of work')
 }
 
-async function effortSparkle(page: Page, step: Step, evidence: Evidence) {
+async function maxBurst(page: Page, step: Step, evidence: Evidence) {
   await selectors.modelOptions(page).click()
   await page.getByRole('menuitemradio', { name: 'Max', exact: true }).click()
-  const cells = selectors.modelOptions(page).locator('[data-effort-sparkle="max"] > span')
-  await cells.first().waitFor({ state: 'attached' })
-  await step('sparkle-max')
+  const burst = selectors.effortBurst(page, 'max')
+  await burst.waitFor({ state: 'attached' })
+  // Mid-sweep, so the screenshot shows the band crossing.
+  await page.waitForTimeout(300)
+  await step('burst-max')
+  evidence.maxBurst = {
+    sweeps: await burst.locator('.effort-sweep').count(),
+    rainbowOnTrigger: await selectors.effortRainbow(selectors.modelOptions(page)).count(),
+  }
+  await burst.waitFor({ state: 'detached' })
+  equal(evidence.maxBurst.sweeps, 1, 'Max plays the smaller, single-band burst')
+  equal(evidence.maxBurst.rainbowOnTrigger, 0, 'Max leaves the trigger plain')
 
+  // Leaving and re-entering max replays it; reduced motion keeps only the wash.
   await page.emulateMedia({ reducedMotion: 'reduce' })
-  evidence.reducedMotionCell = await cells.first().evaluate((cell) => {
-    const style = getComputedStyle(cell)
-    return { animationName: style.animationName, opacity: style.opacity }
-  })
-  await step('sparkle-reduced-motion')
+  await selectors.modelOptions(page).click()
+  await page.getByRole('menuitemradio', { name: 'High', exact: true }).click()
+  await selectors.modelOptions(page).click()
+  await page.getByRole('menuitemradio', { name: 'Max', exact: true }).click()
+  evidence.reducedMotionSweep = await burst
+    .locator('.effort-sweep')
+    .evaluate((sweep) => getComputedStyle(sweep).display)
+  await burst.waitFor({ state: 'detached' })
   await page.emulateMedia({ reducedMotion: 'no-preference' })
-  equal(evidence.reducedMotionCell.animationName, 'none', 'Reduced motion stops the twinkle')
-  ok(Number(evidence.reducedMotionCell.opacity) > 0, 'Reduced motion keeps a still sprinkle')
+  equal(evidence.reducedMotionSweep, 'none', 'Reduced motion drops the moving band')
 }
 
 async function secondTurn(page: Page, step: Step) {
@@ -170,8 +198,69 @@ async function ultrathinkWord(page: Page, step: Step, evidence: Evidence) {
     () => CSS.highlights.get('ultrathink-0')?.size ?? 0,
   )
   ok(evidence.ultrathinkRanges > 0, 'The composer colours the word ultrathink')
-  await step('composer-ultrathink')
+
+  const burst = selectors.effortBurst(page, 'ultra')
+  const burstSeen = await burst
+    .waitFor({ state: 'attached', timeout: 2_000 })
+    .then(() => true)
+    .catch(() => false)
+  const burstStart = Date.now()
+  await page.waitForTimeout(350)
+  await step('burst-ultra')
+  await burst.waitFor({ state: 'detached', timeout: 5_000 })
+  const burstMs = Date.now() - burstStart
+  const glintRanges = await glintSize(page)
+
+  const trigger = selectors.modelOptions(page)
+  const label = selectors.effortRainbow(trigger)
+  const drift = () => label.evaluate((node) => getComputedStyle(node).animationPlayState)
+  const driftAtRest = await drift()
+  await trigger.hover()
+  const driftOnHover = await drift()
+  await step('trigger-ultra-hover')
+  await trigger.click()
+  await page.getByRole('menuitemradio', { name: 'Ultrathink', exact: true }).waitFor()
+  const rainbowRows = await page
+    .getByRole('menuitemradio')
+    .filter({ has: page.locator('.rainbow-text') })
+    .allInnerTexts()
+  // The word in the body locks the menu, so its rows are read, not hovered.
+  await step('menu-ultra-rows')
+  await page.keyboard.press('Escape')
+
+  evidence.ultra = {
+    burst: burstSeen,
+    burstMs,
+    triggerLabel: await label.textContent(),
+    glintRanges,
+    driftAtRest,
+    driftOnHover,
+    rainbowRows,
+  }
+  ok(burstSeen, 'Typing ultrathink plays the ultra burst')
+  ok(burstMs < 2_500, `The ultra burst ends on its own: ${burstMs}ms`)
+  equal(await burst.count(), 0, 'Hovering and opening the menu do not replay it')
+  equal(evidence.ultra.triggerLabel, 'Ultrathink', 'The trigger paints the ultra effort')
+  equal(driftAtRest, 'paused', 'The rainbow rests until hovered')
+  equal(driftOnHover, 'running', 'Hover sets the rainbow drifting')
+  equal(rainbowRows.join(), 'Ultrathink', 'Only the ultra row wears the rainbow')
   await selectors.chatMessage(page).fill('')
+}
+
+/** The glint rests between sweeps, so wait for the next pass instead of sampling once. */
+async function glintSize(page: Page) {
+  const handle = await page.waitForFunction(
+    () => {
+      const size = Array.from(
+        { length: 7 },
+        (_, hue) => CSS.highlights.get(`ultrathink-glint-${hue}`)?.size ?? 0,
+      ).reduce((sum, count) => sum + count, 0)
+      return size > 0 ? size : null
+    },
+    undefined,
+    { timeout: 5_000 },
+  )
+  return Number(await handle.jsonValue())
 }
 
 async function stackFrame(page: Page, step: Step) {
@@ -200,8 +289,11 @@ async function streamingReasoning(page: Page) {
 /** The same transcript in dark mode and at cozy density. */
 async function otherLooks(page: Page, step: Step, base: string) {
   await writeSettings(page, base, [{ kind: 'set', key: 'workbench.colorTheme', value: 'dark' }])
-  await page.waitForTimeout(500)
+  await selectors.chatMessage(page).fill('Please ultrathink about the parser.')
+  // Past the ultra burst, so the shot shows the resting rainbow.
+  await page.waitForTimeout(1_600)
   await step('dark-mode')
+  await selectors.chatMessage(page).fill('')
   await writeSettings(page, base, [
     { kind: 'reset', keys: ['workbench.colorTheme'] },
     { kind: 'set', key: 'workbench.density', value: 'cozy' },
