@@ -982,8 +982,8 @@ export const selectors = {
   settingsNoModels: (page: Page) => page.getByText('No models are available yet.'),
   settingsProviderRow: (page: Page, providerInstanceId: string) =>
     page.locator(`[data-provider-instance="${providerInstanceId}"]`),
-  providerUpdateChecking: (page: Page) =>
-    page.getByRole('status', { name: 'Checking for updates' }),
+  providerUpdateChecking: (row: Locator) =>
+    row.getByRole('status', { name: 'Checking for updates' }),
   paletteScriptsLoading: (page: Page) => page.getByRole('status', { name: 'Loading scripts' }),
   paletteNoScripts: (page: Page) => page.getByText('No scripts in this project.'),
   paletteDialog: (page: Page) => page.getByRole('dialog', { name: 'Command Palette', exact: true }),
@@ -1259,6 +1259,8 @@ export async function settleAnimations(target: Locator) {
     await Promise.all(
       element
         .getAnimations({ subtree: true })
+        // Scroll-driven animations (`scroll-fade`) follow the scroll position and never finish.
+        .filter((animation) => animation.timeline instanceof DocumentTimeline)
         // A toast can be dismissed mid-animation; a cancelled one is settled, not a failure.
         .map((animation) => animation.finished.catch(() => undefined)),
     )

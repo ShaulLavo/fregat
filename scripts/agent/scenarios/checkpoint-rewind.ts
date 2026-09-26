@@ -5,6 +5,7 @@ import { createSession, dispatch, openChatShell } from './chat-verification'
 
 export const checkpointRewind: Scenario = {
   name: 'checkpoint-rewind',
+  realProviders: true,
   description:
     'Rewind one disposable real-provider conversation, preserving and restoring composer text. Uses provider tokens and removes its own session.',
   async run(page, { step }) {
