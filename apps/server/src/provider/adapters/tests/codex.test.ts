@@ -370,7 +370,7 @@ function handle(message) {
   }
   if (message.method === 'thread/goal/set') {
     record({ event: message.method, params: message.params });
-    const goal = { threadId: message.params.threadId, objective: message.params.objective ?? 'Ship it', status: message.params.status ?? 'active', tokenBudget: 1000, tokensUsed: 10, timeUsedSeconds: 3, createdAt: 1, updatedAt: 2 };
+    const goal = { threadId: message.params.threadId, objective: (globalThis.goalObjective = message.params.objective ?? globalThis.goalObjective ?? 'Ship it'), status: message.params.status ?? 'active', tokenBudget: 1000, tokensUsed: 10, timeUsedSeconds: 3, createdAt: 1, updatedAt: 2 };
     send({ id: message.id, result: { goal } });
     send({ method: 'thread/goal/updated', params: { threadId: message.params.threadId, turnId: null, goal } });
     if (goal.status !== 'active') return;
@@ -2742,6 +2742,30 @@ describe('CodexProviderAdapter', () => {
               tokensUsed: 10,
             },
           },
+        })
+      } finally {
+        await adapter.stopAll()
+      }
+    })
+  })
+
+  it('answers a typed /goal pause and /goal resume with the goal they changed', async () => {
+    await withFakeCodex(async () => {
+      const adapter = new CodexProviderAdapter()
+      const events: ProviderRuntimeEvent[] = []
+      collectAdapterEvents(adapter, events)
+      const input = providerTurnInput()
+      const typed = (turnId: string, messageText: string) =>
+        adapter.sendTurn({ ...input, turnId: v.parse(turnIdSchema, turnId), messageText })
+      const reply = (turnId: string) =>
+        events.find((event) => event.type === 'assistant.delta' && event.turnId === turnId)
+      try {
+        await typed('goal-set', '/goal Make the suite green')
+        await typed('goal-pause', '/goal pause')
+        await settleRuntimeEvents()
+        expect(reply('goal-pause')).toMatchObject({ delta: 'Goal paused: Make the suite green' })
+        expect(events.filter((event) => event.type === 'goal.updated').at(-1)).toMatchObject({
+          payload: { goal: { status: 'paused' } },
         })
       } finally {
         await adapter.stopAll()
