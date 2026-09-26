@@ -32,7 +32,10 @@ import { useFsActions } from '@/features/workspace/hooks/use-fs-actions'
 import { useProjectedTreeModel } from '@/features/workspace/hooks/use-projected-tree-model'
 import { hasPendingTreeMove } from '@/features/workspace/state/tree-intents'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
-import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
+import {
+  selectedTabContentForRoot,
+  useEditorWorkspaceState,
+} from '@/features/editor/state/workspace-state'
 import { tabFileResource } from '@/lib/documents/utils/capabilities'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
@@ -102,7 +105,7 @@ function ReadyTreePane({
   const { editorTheme } = useEditorColorTheme()
   const rowHeight = useRowHeight()
   const selectedFilePath = useEditorWorkspaceState(
-    (store) => tabFileResource(store.selectedTabContent)?.path ?? null,
+    (store) => tabFileResource(selectedTabContentForRoot(store, rootPath))?.path ?? null,
   )
   const selectedDiskPath = selectedFilePath
   const selectedFileQueryKey = selectedDiskPath

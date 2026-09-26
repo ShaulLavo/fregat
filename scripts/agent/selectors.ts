@@ -896,6 +896,10 @@ export const selectors = {
       .getByRole('alert')
       .filter({ hasText: /not initialized/ })
       .getByRole('button', { name: 'Initialize', exact: true }),
+  filesPaneError: (page: Page) =>
+    page.getByRole('status').filter({ hasText: 'Unable to load files' }),
+  filesPaneLoading: (page: Page) =>
+    page.getByRole('status', { name: 'Loading files', exact: true }),
   folderTreeScroll: (page: Page) =>
     page.locator(folderTreeShadowHost).locator('[data-file-tree-virtualized-scroll]'),
   folderTree: (page: Page) => page.getByLabel('Folder tree', { exact: true }),

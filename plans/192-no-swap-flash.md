@@ -76,6 +76,7 @@ restoration. No provider turn runs.
 - After evidence: `/work/tmp/fregat-evidence/20260926T190147Z-scenario-root-switch-no-flicker/`.
   Screenshots read back. DOM tests cover first load, delayed/superseded/error Git switches and
   commit drafts; tree record tests cover per-root expansion and scroll retention.
+
 ## Row 2 proof
 
 Quick open holds the shown file with `useHeldUntilReady`, including its filename, until its head
@@ -89,3 +90,31 @@ cover successful, binary and missing-file reads.
 
 - Before: `/work/tmp/fregat-evidence/20260926T184042Z-scenario-quick-open-no-flicker/`
 - After: `/work/tmp/fregat-evidence/20260926T184641Z-scenario-quick-open-no-flicker/`
+
+## Rows 8 and 16 review corrections
+
+The shown tree resolves its active file from that root's active or parked workspace. Its
+selection capture and ancestor-directory fetch use the same root, so switching to another
+workspace's selected file cannot overwrite the saved expansion or scroll association.
+
+A missing root, a root replaced by a file, or an invalid root path discards the saved model and
+shows the terminal load error. The rejected root stays marked until a successful root read,
+preventing a held pane's cleanup from saving the removed rows again after query eviction.
+Permission-denied refreshes retain the saved rows and show the refresh warning. Invalidating
+one root preserves the other root's persisted observation.
+
+- Failing before: selecting different files in A and B made the expansion/scroll return check
+  time out in `/work/tmp/fregat-evidence/20260926T200109Z-scenario-root-switch-no-flicker/`.
+  The delayed deleted-directory DOM test expected `error` and received `ready` with saved rows.
+- Focused verification: 59 tests across tree loading, reload observations, tree synchronization,
+  and editor workspace state passed. The tests include real missing-directory, non-directory,
+  and permission-denied responses, plus cleanup after query eviction and subsequent recovery.
+- Repository typecheck passed. The bundle gate failed only on the total: 1,761,886 gzip bytes
+  against a 1,760,711 limit, 1,175 bytes over. No owner failed; pins were left unchanged.
+- Final browser proof: `/work/tmp/fregat-evidence/20260926T201142Z-scenario-root-switch-no-flicker/`.
+  The scenario selects different files before B's first tree read, checks A's scroll during the
+  delayed hold, restores A's expansion and scroll, and records zero blank frames for both panes.
+  It then deletes A during a held root read and verifies that the settled error replaces all rows.
+  Screenshots 04, 06, and 10 were read back. The sole failed response is the intentional missing
+  root's 404; no page errors. Mock provider only, no model turns. Vite 5254 stopped after the run.
+- `bun run gates`, including knip, and the final scripts typecheck passed. No deployment.
