@@ -222,6 +222,8 @@ Chat: no phase while question 2 stands at (a).
    (0.4 ms to the viewport against a 7–133 ms whole-document block parse), 97.9% against 93.3% on
    the spec, 0.09–0.8 ms per edit against 0.8–42 ms, and its failures are TypeScript; the price is
    20 KB gzip and a second markdown tree.
+   Owner, 2026-09-26: not decided yet. The owner reviews the measurements first; Phase 0 (the
+   tree-sitter repairs every option needs) may proceed meanwhile.
 2. **Chat.** The rule says remark leaves only for a candidate close to micromark with remark's
    features closed. (a) Keep remark in chat. (b) Move chat to lezer after Phase 3, with math and
    footnote extensions, a CJK fork and a lezer-to-mdast adapter. (c) Move chat to tree-sitter.
@@ -229,6 +231,7 @@ Chat: no phase while question 2 stands at (a).
    footnotes and chat's math rules; remark streams a real 8.6 KB message at 0.23 ms per chunk; and
    both candidates already agree with it on all 183 real messages, so editor and chat will not
    visibly diverge.
+   Owner, 2026-09-26: too early; chat is decided only after the editor's markdown is settled.
 
 ## What this plan does not do
 
