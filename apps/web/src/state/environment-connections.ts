@@ -8,6 +8,7 @@ import {
 } from '@/lib/environments/state/binding-cache'
 import { createClientError } from '@workspace/client-core/errors'
 import type {
+  ConnectionError,
   EnvironmentId,
   HealthDescriptor,
   MachineDefinition,
@@ -28,14 +29,14 @@ import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { primaryQueryClient, queryClientFor } from '@/lib/environments/state/query-clients'
 import {
   environmentMutationKeys,
+  serverUpdateScope,
   type MachineMutationAction,
 } from '@/lib/environments/utils/mutation-keys'
 import { runMutation } from '@/lib/mutations/run'
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { readEnvironmentDescriptor } from '@/lib/environments/utils/descriptor'
 import { createClientInvariantError } from '@/lib/structured-errors'
-import { errorMessage } from '@/lib/error-message'
-import { clientErrorText } from '@/lib/client-error-taxonomy'
+import { toConnectionError } from '@/lib/client-error-taxonomy'
 import { createEnvironmentRecovery } from '@/state/environment-recovery'
 import { initializeEnvironmentPersistence } from '@/state/environment-persistence'
 import { readConnectedMachines, writeConnectedMachines } from '@/state/connected-machines'
@@ -43,6 +44,7 @@ import {
   answerMachineAuth,
   connectSshMachine,
   disconnectSshMachine,
+  updateSshServer,
 } from '@/lib/environments/machine-client'
 import { startMachineEvents } from '@/state/machine-events'
 import { createConnectionNotices } from '@/state/connection-notices'
@@ -51,7 +53,7 @@ export type ConnectedMachine = {
   readonly name: string
   readonly config: MachineDefinition
   readonly phase: EnvironmentPhase
-  readonly lastError: string | null
+  readonly lastError: ConnectionError | null
   readonly lastErrorAt: number | null
   readonly environmentId: EnvironmentId | null
   readonly origin: string | null
@@ -59,6 +61,14 @@ export type ConnectedMachine = {
 }
 
 type ConnectionResult = 'connected' | 'failed' | 'cancelled'
+
+type MachineFailure = { readonly phase: EnvironmentPhase; readonly error: ConnectionError }
+
+type ResolvedMachine = {
+  readonly origin: string
+  readonly descriptor: HealthDescriptor
+  readonly localPort: number | null
+}
 
 type LiveConnection = {
   readonly origin: string
@@ -101,7 +111,7 @@ export function createEnvironmentConnections({
       machines: machines.map((entry) => (entry.name === name ? { ...entry, ...change } : entry)),
     }))
   }
-  function phase(name: string, next: EnvironmentPhase, error: string | null = null) {
+  function phase(name: string, next: EnvironmentPhase, error: ConnectionError | null = null) {
     const machine = store.getState().machines.find((entry) => entry.name === name)
     if (!machine) return
     update(name, {
@@ -122,7 +132,7 @@ export function createEnvironmentConnections({
     environmentId: EnvironmentId,
     origin: string,
     next: EnvironmentPhase,
-    error: string | null,
+    error: ConnectionError | null,
   ) {
     useEnvironmentsStore.getState().setPhase(origin, next, error)
     const actual = useEnvironmentsStore.getState().entries[origin]?.phase ?? next
@@ -178,7 +188,10 @@ export function createEnvironmentConnections({
       environmentId
     )
   }
-  async function resolveMachine(machine: ConnectedMachine, signal: AbortSignal) {
+  async function resolveMachine(
+    machine: ConnectedMachine,
+    signal: AbortSignal,
+  ): Promise<ResolvedMachine | { readonly failure: MachineFailure }> {
     if (machine.config.kind === 'origin') {
       const origin = canonicalServerOrigin(machine.config.url)
       const descriptor = await readEnvironmentDescriptor(
@@ -189,7 +202,7 @@ export function createEnvironmentConnections({
     }
     const state = await connectSshMachine(machine.name, signal)
     signal.throwIfAborted()
-    if (state.phase !== 'live') throw sshConnectionError(state)
+    if (state.phase !== 'live') return { failure: sshFailure(state) }
     return state
   }
   function runMachineMutation<T>(
@@ -265,6 +278,10 @@ export function createEnvironmentConnections({
     try {
       const result = await resolveMachine(machine, abort.signal)
       abort.signal.throwIfAborted()
+      if ('failure' in result) {
+        const cause = createClientError({ ...result.failure.error, status: 502 })
+        return failConnection(name, event, result.failure, cause)
+      }
       if (machine.environmentId && machine.environmentId !== result.descriptor.environmentId)
         throw createEnvironmentIdentityDriftError(
           result.origin,
@@ -303,22 +320,27 @@ export function createEnvironmentConnections({
       return 'connected'
     } catch (error) {
       if (abort.signal.aborted) return 'cancelled'
-      const code = error && typeof error === 'object' && 'code' in error ? error.code : null
-      const drift = code === 'ENVIRONMENT_IDENTITY_DRIFT'
-      const blocked =
-        drift || code === 'ENVIRONMENT_PROTOCOL_MISMATCH' || code === 'MACHINE_BLOCKED'
-      let failurePhase: EnvironmentPhase = 'offline'
-      if (blocked) failurePhase = 'blocked'
-      if (drift) failurePhase = 'identity-drift'
-      event.error(error)
-      event.set({ outcome: failurePhase })
-      phase(name, failurePhase, clientErrorText(error, `Cannot connect to ${name}.`))
-      recovery?.schedule(name, blocked)
-      return 'failed'
+      const failure = {
+        phase: failurePhaseOf(error),
+        error: toConnectionError(error, `Cannot connect to ${name}.`),
+      }
+      return failConnection(name, event, failure, error)
     } finally {
       event.end({ cancelled: abort.signal.aborted })
       if (attempts.get(name) === abort) attempts.delete(name)
     }
+  }
+  function failConnection(
+    name: string,
+    event: ReturnType<typeof createWideEventScope>,
+    failure: MachineFailure,
+    cause: unknown,
+  ): ConnectionResult {
+    event.error(cause)
+    event.set({ outcome: failure.phase, errorCode: failure.error.code })
+    phase(name, failure.phase, failure.error)
+    recovery?.schedule(name, failure.phase !== 'offline')
+    return 'failed'
   }
   function releaseConnection(machine: ConnectedMachine) {
     if (!machine.environmentId) return
@@ -368,7 +390,7 @@ export function createEnvironmentConnections({
       return await performConnection(machine.name, begun, abort)
     } catch (error) {
       if (abort.signal.aborted) return 'cancelled'
-      phase(machine.name, 'offline', clientErrorText(error, `Cannot reconnect ${machine.name}.`))
+      phase(machine.name, 'offline', toConnectionError(error, `Cannot reconnect ${machine.name}.`))
       recovery?.schedule(machine.name)
       return 'failed'
     } finally {
@@ -394,10 +416,42 @@ export function createEnvironmentConnections({
         if (machine.config.kind === 'ssh') await disconnectSshMachine(name)
       } catch (error) {
         if (!desired.has(name))
-          phase(name, 'offline', errorMessage(error, `Could not stop ${name}.`))
+          phase(name, 'offline', toConnectionError(error, `Could not stop ${name}.`))
         throw error
       }
     })
+  }
+  /** The server connects the machine once its release is installed; this client then attaches. */
+  async function updateServer(name: string): Promise<boolean> {
+    notices.reset(`machine:${name}`)
+    let attached = false
+    // Settlement reports the failure on the machine, where its fix and Fix with AI show.
+    const settled = await runMutation(
+      primaryQueryClient(),
+      {
+        mutationKey: environmentMutationKeys.machine('update', name),
+        scope: serverUpdateScope(name),
+        mutationFn: () => updateSshServer(name),
+        onSettled: async (state, error) => {
+          attached = (await settleServerUpdate(name, state, error)) === 'connected'
+        },
+      },
+      undefined,
+    ).then(
+      () => true,
+      () => false,
+    )
+    // The machine's phase turns live only once the shell stream delivers, after this resolves.
+    return settled && attached
+  }
+  async function settleServerUpdate(
+    name: string,
+    state: MachineConnectionState | undefined,
+    error: unknown,
+  ) {
+    if (state?.phase === 'live') return connectMachine(name)
+    if (state) return phase(name, state.phase, 'lastError' in state ? state.lastError : null)
+    phase(name, 'blocked', toConnectionError(error, `Could not update the server on ${name}.`))
   }
   function cancelMachine(name: string) {
     const prompt = authStore.getState().prompt
@@ -529,7 +583,11 @@ export function createEnvironmentConnections({
       if (abort.signal.aborted) return
       useEnvironmentsStore
         .getState()
-        .setPhase(origin, 'offline', errorMessage(error, 'Cannot connect to the local machine.'))
+        .setPhase(
+          origin,
+          'offline',
+          toConnectionError(error, 'Cannot connect to the local machine.'),
+        )
       const phase = useEnvironmentsStore.getState().entries[origin]?.phase
       recovery?.schedule('@primary', phase === 'blocked' || phase === 'identity-drift')
     } finally {
@@ -639,16 +697,8 @@ export function createEnvironmentConnections({
       }
       authStore.setState({ prompt: event.prompt, pending: false, error: null })
     })
-    const primary = useEnvironmentsStore.getState().entries[primaryServerOrigin()]
-    if (primary?.descriptor && primary.phase !== 'offline') {
-      retain(primary.origin, primary.descriptor)
-      recordEnvironmentCacheBinding(environmentScopedStorage(primary.environmentId!), {
-        names: ['local'],
-        origin: primary.origin,
-        descriptor: primary.descriptor,
-      })
-    }
-    if (primary?.phase === 'offline') void retryPrimary()
+    // Cached identities prepare the workbench; only fresh health may open its transport.
+    void retryPrimary()
     for (const machine of store.getState().machines) {
       if (desired.has(machine.name)) void connectMachine(machine.name)
     }
@@ -676,6 +726,7 @@ export function createEnvironmentConnections({
     configureMachines,
     connectMachine,
     disconnectMachine,
+    updateServer,
     cancelMachine,
     retryPrimary,
     retryMachine: async (name: string) => {
@@ -698,15 +749,18 @@ function sameConnectionConfiguration(left: MachineDefinition, right: MachineDefi
   return left.target === right.target && left.remotePort === right.remotePort
 }
 
-function sshConnectionError(state: Exclude<MachineConnectionState, { phase: 'live' }>) {
-  let code = 'MACHINE_CONNECTION_FAILED'
-  if (state.phase === 'blocked') code = 'MACHINE_BLOCKED'
-  if (state.phase === 'identity-drift') code = 'ENVIRONMENT_IDENTITY_DRIFT'
-  return createClientError({
-    code,
-    status: state.phase === 'blocked' ? 403 : 502,
-    message: 'lastError' in state ? state.lastError : 'The SSH machine has not connected.',
-    why: 'The server refused or could not establish this SSH connection.',
-    fix: 'Resolve the machine error in Settings before reconnecting.',
-  })
+/** The server already decided the phase; its catalog error is what the machine keeps. */
+function sshFailure(state: Exclude<MachineConnectionState, { phase: 'live' }>): MachineFailure {
+  if ('lastError' in state) return { phase: state.phase, error: state.lastError }
+  return {
+    phase: 'offline',
+    error: { code: 'MACHINE_CONNECTION_FAILED', message: 'The SSH machine has not connected.' },
+  }
+}
+
+function failurePhaseOf(error: unknown): EnvironmentPhase {
+  const code = error && typeof error === 'object' && 'code' in error ? error.code : null
+  if (code === 'ENVIRONMENT_IDENTITY_DRIFT') return 'identity-drift'
+  if (code === 'ENVIRONMENT_PROTOCOL_MISMATCH') return 'blocked'
+  return 'offline'
 }

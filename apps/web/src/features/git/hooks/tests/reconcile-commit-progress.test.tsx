@@ -21,6 +21,8 @@ test.for([null, 'previous-commit'])(
     const status: GitStatusResult = {
       repository: { branch: 'main', commit, ahead: 0, behind: 0, path: 'repo' },
       files: [],
+      uninitializedSubmodules: 0,
+      autoPull: null,
     }
     queryClient.setQueryData(gitKeys.status('repo'), status)
     for (const root of ['repo', 'other']) {

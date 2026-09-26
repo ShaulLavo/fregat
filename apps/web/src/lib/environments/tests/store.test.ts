@@ -241,5 +241,5 @@ test('refused origins cannot route scoped actions using their previously accepte
   expect(() => confirmedEnvironmentId(originA)).toThrow('different environment identity')
   recordHandshake(originA, config)
   expect(() => recordHandshake(originA, { ...config, protocolVersion: 999 })).toThrow()
-  expect(() => confirmedEnvironmentOrigin(config.environmentId)).toThrow('incompatible protocol')
+  expect(() => confirmedEnvironmentOrigin(config.environmentId)).toThrow('speaks protocol 999')
 })

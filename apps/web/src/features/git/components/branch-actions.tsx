@@ -1,4 +1,11 @@
-import { ArrowSquareOutIcon, GitPullRequestIcon, UploadSimpleIcon } from '@phosphor-icons/react'
+import { Spinner } from '@workspace/ui/components/spinner'
+import {
+  ArrowSquareOutIcon,
+  CloudArrowUpIcon,
+  GitPullRequestIcon,
+  UploadSimpleIcon,
+} from '@phosphor-icons/react'
+import { useState } from 'react'
 import type {
   GitBranchRemoteState,
   GitPullRequest,
@@ -8,15 +15,18 @@ import type {
 import { useBranchRemoteState } from '@/features/git/hooks/use-branch-remote-state'
 import { useCreatePullRequestMutation } from '@/features/git/hooks/use-create-pull-request-mutation'
 import { usePullRequestState } from '@/features/git/hooks/use-pull-request-state'
+import { usePushAndOpenPullRequestMutation } from '@/features/git/hooks/use-push-and-open-pull-request-mutation'
 import { usePushRemoteMutation } from '../hooks/use-push-remote-mutation'
 import { Button, buttonVariants } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
+import { changeRequestLabel } from '@/features/git/utils/forge-terms'
+import { PublishRepositoryDialog } from '@/features/git/components/publish-repository-dialog'
 
 /**
  * Publish, push and open-a-pull-request, in the header where the branch already
  * is. Everything here is conditional on what the branch actually needs: a branch
  * with nothing to push shows no push button, and Create is offered only when we
- * were able to ask GitHub and it said there is none.
+ * were able to ask the forge and it said there is none.
  */
 export function BranchActions({
   pullRequestTitle,
@@ -28,11 +38,34 @@ export function BranchActions({
 }) {
   const { data: state } = useBranchRemoteState(rootPath)
   // Its own query, and never awaited by the rest: reading a pull request shells
-  // out to `gh`, and Publish must not wait on GitHub to appear.
+  // out to the forge CLI, and Publish must not wait on the network to appear.
   const { data: pullRequestState } = usePullRequestState(rootPath)
   const push = usePushRemoteMutation(rootPath)
   const createPullRequest = useCreatePullRequestMutation(rootPath)
+  const requestLabel = changeRequestLabel(pullRequestState?.forge)
+  const ship = usePushAndOpenPullRequestMutation(rootPath, requestLabel)
+  const [publishing, setPublishing] = useState(false)
   if (!state?.branch) return null
+  if (!state.hasRemote)
+    return (
+      <>
+        <Button
+          className='text-2xs'
+          size='sm'
+          type='button'
+          variant='ghost'
+          onClick={() => setPublishing(true)}
+        >
+          <CloudArrowUpIcon className='size-(--icon-size-sm)' />
+          Publish repository
+        </Button>
+        <PublishRepositoryDialog
+          open={publishing}
+          onOpenChange={setPublishing}
+          rootPath={rootPath}
+        />
+      </>
+    )
 
   return (
     <span className='flex shrink-0 items-center gap-1'>
@@ -45,8 +78,21 @@ export function BranchActions({
           variant='ghost'
           onClick={() => push.mutate()}
         >
-          <UploadSimpleIcon className='size-(--icon-size-sm)' />
+          {push.isPending ? <Spinner /> : <UploadSimpleIcon className='size-(--icon-size-sm)' />}
           {pushLabel(state)}
+        </Button>
+      ) : null}
+      {canShip(state, pullRequestState) ? (
+        <Button
+          className='text-2xs'
+          disabled={ship.isPending || push.isPending}
+          size='sm'
+          type='button'
+          variant='ghost'
+          onClick={() => ship.mutate({ title: pullRequestTitle })}
+        >
+          {ship.isPending ? <Spinner /> : <GitPullRequestIcon className='size-(--icon-size-sm)' />}
+          Push and open {requestLabel.toLowerCase()}
         </Button>
       ) : null}
       {pullRequestState?.pullRequest ? (
@@ -77,7 +123,7 @@ export function BranchActions({
           onClick={() => createPullRequest.mutate({ title: pullRequestTitle })}
         >
           <GitPullRequestIcon className='size-(--icon-size-sm)' />
-          Pull request
+          {requestLabel}
         </Button>
       ) : null}
     </span>
@@ -96,7 +142,7 @@ function pushLabel(state: GitBranchRemoteState) {
 }
 
 /**
- * Only when GitHub actually answered. `support` short of `ready` means we could
+ * Only when the forge actually answered. `support` short of `ready` means we could
  * not ask, and offering Create then is how someone ends up trying to open a
  * second pull request for a branch that already has one.
  */
@@ -104,7 +150,15 @@ function canCreatePullRequest(
   branch: GitBranchRemoteState,
   pullRequest: GitPullRequestState | undefined,
 ) {
-  if (!branch.hasUpstream) return false
+  // Commits still to send make it Push and open's job.
+  if (!branch.hasUpstream || pushLabel(branch)) return false
+
+  return pullRequest?.support === 'ready' && !pullRequest.pullRequest
+}
+
+/** Commits to send and a forge that says there is no pull request yet: one click does both. */
+function canShip(branch: GitBranchRemoteState, pullRequest: GitPullRequestState | undefined) {
+  if (!pushLabel(branch)) return false
 
   return pullRequest?.support === 'ready' && !pullRequest.pullRequest
 }

@@ -6,6 +6,7 @@ import type {
 } from '@workspace/client-core/chat/rail/model'
 import type { SessionId } from '@workspace/contracts'
 import { worktreeSummary } from '@/worktrees/utils/summary'
+import { pullRequestBadge } from '@workspace/client-core/chat/worktrees/pull-request'
 
 export type RailRow =
   | { readonly kind: 'project'; readonly project: SessionRailProject }
@@ -34,7 +35,7 @@ export function railRows(
         rows.push({
           key: session.key,
           name: `${marked.includes(session.id) ? '☑' : ' '} ${session.unread ? '● ' : ''}${session.title}`,
-          description: `${worktreeSummary(session.worktree, session.repositoryKind)} · ${search[session.key]?.snippet.replaceAll(/\s+/g, ' ') ?? section.title}${session.archived ? ' · archived' : ''}${session.origin === 'discovered' ? ' · imported' : ''}`,
+          description: `${pullRequestPrefix(session)}${worktreeSummary(session.worktree, session.repositoryKind)} · ${search[session.key]?.snippet.replaceAll(/\s+/g, ' ') ?? section.title}${session.archived ? ' · archived' : ''}${session.origin === 'discovered' ? ' · imported' : ''}`,
           value: { kind: 'session', session },
         })
     }
@@ -50,4 +51,10 @@ export function railRows(
     })
   }
   return rows
+}
+
+// Ahead of the branch: a `worktree/<uuid>` branch fills the rail's width on its own.
+function pullRequestPrefix(session: SessionRailItem) {
+  const badge = pullRequestBadge(session.worktree.pullRequest)
+  return badge ? `${badge.summary} · ` : ''
 }

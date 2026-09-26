@@ -1,4 +1,4 @@
-import type { SessionRailStatus } from '@workspace/client-core/chat/rail/status'
+import type { SessionRailStatus } from '@workspace/contracts'
 import { StatusDot } from '@workspace/ui/components/status-dot'
 import { sessionStatusLabel, sessionStatusTone } from '@/features/chat-mode/utils/attention-state'
 

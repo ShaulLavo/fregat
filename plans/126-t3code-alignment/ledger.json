@@ -144,6 +144,7 @@
         "notifications-delivery.md",
         "Historical release 20260920T153923Z-b915d3e0-plan126-stash-notices-history; /work/tmp/fregat-evidence/20260920T154618Z-scenario-session-notifications/summary.md records completed headed browser verification",
         "Recorded proof covers toast navigation, native Notification construction, favicon count, click/focus cleanup, silent reload and archive; pinned decision comparison covers 900 cases",
+        "Push delivery (Plan 142, docs/web-push.md): the server derives the same notices from the shell stream with the shared contracts derivation, skips history, replay, boot recovery and archived sessions, holds pushes while a window is focused, and opens the session on click; apps/server/src/push/tests/session-notices.test.ts and scenario push-session-notice (/work/tmp/fregat-evidence/20260925T134236Z-scenario-push-session-notice)",
         "Remaining: visible operating-system popup and audible output, desktop bridges and badges, cross-machine live navigation, and full upstream runtime comparison",
         "Decided 2026-09-25: owner — close on the existing scenarios: scripts/agent/scenarios/session-notifications.ts passed at /work/tmp/fregat-evidence/20260920T154618Z-scenario-session-notifications, with the pinned decision comparison (900 cases). OS popup and sound, desktop bridges and badges carry on under EXT-09; push is Plan 142."
       ]
@@ -228,7 +229,8 @@
       "acceptance": "lifecycle.md, LIFE-09, Acceptance / verification",
       "execution_evidence": [
         "lifecycle-grouping-delivery.md",
-        "Live lifecycle evidence /work/tmp/fregat-evidence/20260920T140116Z-scenario-session-lifecycle; screenshots reviewed; multi-owner grouping live prerequisite unavailable; repository_path subproject registration remains open"
+        "Live lifecycle evidence /work/tmp/fregat-evidence/20260920T140116Z-scenario-session-lifecycle; screenshots reviewed; multi-owner grouping live prerequisite unavailable; repository_path subproject registration remains open",
+        "Two-owner live run 2026-09-25 (completion wave, lane L5): scripts/agent/scenarios/project-grouping.ts now starts a second throwaway server and connects it as a Remote URL machine (scripts/agent/second-owner.ts); /work/tmp/fregat-evidence/20260925T141833Z-scenario-project-grouping shows repository and repository_path merging both owners with a two-owner delete preview, and separate mode keeping them apart with a one-owner preview. repository_path for subprojects still needs a membership entity: owner question (126 D4, no written recommendation)"
       ]
     },
     {
@@ -252,16 +254,18 @@
       "title": "P2: Implement generated title lifecycle and regeneration actions",
       "report": "lifecycle.md",
       "wave": "2",
-      "status": "in-progress",
-      "evidence_level": "historical-local-and-browser-evidence; full-acceptance-pending",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "lifecycle.md, LIFE-11, Acceptance / verification",
       "execution_evidence": [
+        "scripts/agent/scenarios/session-titles.ts (re-run 2026-09-25, /work/tmp/fregat-evidence/20260925T141451Z-scenario-session-titles): initial generation, regeneration, pending request, manual rename surviving a late result and reload, visible failure and retry",
         "titles-delivery.md",
         "title-context-delivery.md",
         "title-links-delivery.md",
         "Historical release 20260920T151610Z-b915d3e0-plan126-titles-files; /work/tmp/fregat-evidence/20260920T152237Z-scenario-session-titles/summary.md records completed initial generation, regeneration, manual rename during pending generation, reload, visible failure and retry",
         "Recorded pure context comparison covers 144 pinned cases; linked-source lookup has local policy/process tests only and its deployment is unconfirmed",
-        "Remaining: text-generation policy overrides, authenticated linked-source lookup, full provider/source-control matrix and upstream runtime comparison; fixture titles do not measure provider output quality"
+        "Live authenticated linked-source lookup 2026-09-25: resolveSessionTitleLinks through the real gh CLI returned the title and body of fregat PR #38 (completion wave, lane L5)",
+        "Per-project title models are the chat.projectTextGenerationModels override the title reactor reads; it has no structured write operation, so today it is set in the settings document (its Settings destination is the LIFE-12 Project settings owner question). The provider matrix needs provider accounts and is parked with RUNTIME-02"
       ]
     },
     {
@@ -277,7 +281,9 @@
         "common-actions-delivery.md",
         "/work/tmp/fregat-evidence/20260920T161205Z-scenario-draft-recovery/summary.md records completed distinct-draft reload, uploaded-file and worktree-target recovery, and safe discard",
         "/work/tmp/fregat-evidence/20260920T152347Z-scenario-session-navigation/summary.md records completed owner path, branch and session-ID clipboard checks",
-        "Remaining: owner-scoped project settings, orphaned-worktree cleanup, session-owned terminal deletion and full upstream runtime comparison"
+        "scripts/agent/scenarios/worktree-cleanup-on-delete.ts: deleting the last session offers worktree removal; surviving and archived references keep it (repository-delivery.md, EXT-12)",
+        "Session-owned terminals (completion wave, lane L5): deleting a session removes its agent terminals' saved history and ends any it still owns; worktree shells stay; boot recovery sweeps deleted sessions; a live agent terminal still refuses deletion with SESSION_IN_TERMINAL. Test apps/server/src/terminal/tests/session-terminal-cleanup.test.ts",
+        "Remaining: owner-scoped project settings (owner question: no written recommendation for its destination) and full upstream runtime comparison"
       ]
     },
     {
@@ -537,40 +543,57 @@
       "title": "Match source-control provider capabilities",
       "report": "adjacent.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-01, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/git-merge-request.ts",
+        "repository-delivery.md",
+        "apps/server/src/git/tests/forges.test.ts",
+        "/work/tmp/fregat-evidence/20260925T130215Z-scenario-git-merge-request/"
+      ]
     },
     {
       "id": "EXT-02",
       "title": "Complete the pull-request workflow and session linkage",
       "report": "adjacent.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-02, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/session-pull-request-start.ts",
+        "scripts/agent/scenarios/git-merge-request.ts",
+        "repository-delivery.md",
+        "apps/server/src/orchestration/tests/pull-request-session.test.ts",
+        "packages/contracts/src/tests/pull-request-reference.test.ts"
+      ]
     },
     {
       "id": "EXT-03",
       "title": "Add clone and repository publication workflows",
       "report": "adjacent.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-03, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/git-clone-publish.ts",
+        "repository-delivery.md",
+        "apps/server/src/git/tests/clone.test.ts",
+        "apps/server/src/git/tests/publish.test.ts",
+        "/work/tmp/fregat-evidence/20260925T131311Z-scenario-git-clone-publish/"
+      ]
     },
     {
       "id": "EXT-04",
       "title": "Match project configuration and worktree setup scripts",
       "report": "adjacent.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-04, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": ["scripts/agent/scenarios/worktree-setup-import.ts"]
     },
     {
       "id": "EXT-05",
@@ -597,10 +620,14 @@
     {
       "id": "EXT-12",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-12, Acceptance / verification",
-      "execution_evidence": [],
+      "execution_evidence": [
+        "scripts/agent/scenarios/worktree-cleanup-on-delete.ts",
+        "repository-delivery.md",
+        "apps/server/src/orchestration/tests/worktree-cleanup.test.ts"
+      ],
       "report": "adjacent.md",
       "title": "Port automatic worktree and storage cleanup policy"
     },
@@ -609,10 +636,15 @@
       "title": "P1: Add server-owned automatic settlement",
       "report": "lifecycle.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "lifecycle.md, LIFE-06, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/session-auto-settle.ts",
+        "repository-delivery.md",
+        "apps/server/src/orchestration/tests/session-auto-settle.test.ts",
+        "/work/tmp/fregat-evidence/20260925T120806Z-scenario-session-auto-settle/"
+      ]
     },
     {
       "id": "EXT-07",
@@ -649,20 +681,31 @@
       "title": "P2: Offer Undo for settle, snooze, archive and unpin, with a mod+z binding",
       "report": "lifecycle.md",
       "wave": "2",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "lifecycle.md, LIFE-13, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/session-undo.ts (evidence /work/tmp/fregat-evidence/20260925T132247Z-scenario-session-undo): unpin, settle, snooze and archive undone by the notice and by Mod+Z; pin keys and order restored; the archived open session reopens; composer Mod+Z stays the composer undo; an expired notice leaves Mod+Z to the browser",
+        "Real-server DOM tests: components/tests/session-undo.test.tsx (7), state/tests/session-undo.test.tsx (3); keymap pane test in keymap/tests/keymap.test.ts; client-core chat/rail/tests/lifecycle-undo.test.ts (11); TUI archive Undo in agent-rail/tests/rail.test.tsx",
+        "Remaining: two-owner live run; upstream reveals the preceding group after an Undo, the plan keeps one slot"
+      ]
     },
     {
       "id": "LIFE-14",
       "title": "P2: Show linked pull-request state on sidebar rows with background sync",
       "report": "lifecycle.md",
       "wave": "2",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "lifecycle.md, LIFE-14, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/session-pull-request-sync.ts",
+        "repository-delivery.md",
+        "apps/server/src/orchestration/tests/pull-request-sync.test.ts",
+        "/work/tmp/fregat-evidence/20260925T115511Z-scenario-session-pull-request-sync/",
+        "scripts/agent/scenarios/session-pull-request-badge.ts (evidence /work/tmp/fregat-evidence/20260925T140706Z-scenario-session-pull-request-badge): open, draft, merged, closed and unknown badges on rail rows, none shows nothing, click opens the pull request, long worktree branches never scroll the rail sideways",
+        "pull-request-badge-delivery.md"
+      ]
     },
     {
       "id": "INTERACTION-13",
@@ -693,20 +736,30 @@
       "title": "Keep the default-branch checkout current by fast-forward pull",
       "report": "adjacent.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-14, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/git-auto-pull.ts",
+        "repository-delivery.md",
+        "apps/server/src/git/tests/auto-pull.test.ts",
+        "/work/tmp/fregat-evidence/20260925T113952Z-scenario-git-auto-pull/"
+      ]
     },
     {
       "id": "EXT-15",
       "title": "Choose how new worktrees initialize submodules",
       "report": "adjacent.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-15, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/git-submodules-init.ts",
+        "repository-delivery.md",
+        "apps/server/src/orchestration/tests/worktree-submodules.test.ts",
+        "/work/tmp/fregat-evidence/20260925T113220Z-scenario-git-submodules-init/"
+      ]
     },
     {
       "id": "EXT-16",
@@ -735,10 +788,15 @@
       "title": "Follow worktree branch drift so the session's branch stays true",
       "report": "adjacent.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-18, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/session-branch-drift.ts",
+        "repository-delivery.md",
+        "apps/server/src/orchestration/tests/worktree-branch-drift.test.ts",
+        "/work/tmp/fregat-evidence/20260925T114547Z-scenario-session-branch-drift/"
+      ]
     }
   ]
 }

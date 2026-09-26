@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { execFileSync } from 'node:child_process'
 import { appendFileSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -79,6 +80,11 @@ function applyEdit(edit) {
   }
   if (edit.op === 'delete') {
     rmSync(inside(edit.path))
+    return
+  }
+  // What an agent's shell does in its checkout: `git checkout -b`, `git commit`.
+  if (edit.op === 'git') {
+    execFileSync('git', ['-C', threadCwd, ...edit.args], { stdio: 'ignore' })
     return
   }
   if (edit.op === 'rename') {

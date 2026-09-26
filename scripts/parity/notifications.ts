@@ -5,7 +5,7 @@ import {
   sessionNotificationTransition,
   type NotificationCursor,
   type NotificationSession,
-} from '../../packages/client-core/src/chat/notifications'
+} from '../../packages/contracts/src/session-notices'
 import { pin, readPinned } from './pinned'
 
 const path = 'apps/web/src/components/ThreadNotificationCoordinator.tsx'

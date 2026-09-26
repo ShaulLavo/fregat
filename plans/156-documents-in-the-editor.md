@@ -182,14 +182,17 @@ Shipped weight is esbuild-minified JS plus runtime wasm, gzip -9.
    - (a) An optional per-machine capability with a browser fallback. **Recommended.**
    - (b) Required on every machine.
    - (c) Never used.
+   - Decided 2026-09-26: owner — (a): optional per machine, browser-first; every document stays viewable in the browser without it.
 3. **In-app editing beyond CSV, ever?**
    - (a) No; agents edit. **Recommended for now.**
    - (b) XLSX cell editing after an IronCalc spike, once its XLSX wasm ships on npm.
    - (c) DOCX WYSIWYG, which today means AGPL or a 0.x package.
+   - Decided 2026-09-26: owner — yes: XLSX cell editing (b), then DOCX later (c).
 4. **PDF engine.**
    - (a) pdf.js, 493 KB. **Recommended.**
    - (b) EmbedPDF, 2.3 MB, for annotation, forms, redaction and signing, which nothing on the
      roadmap needs.
+   - Decided 2026-09-26: recommendation (owner deferred) — (a) pdf.js.
 
 ### Proposed phases
 

@@ -1,10 +1,6 @@
 import { onTestFinished, vi } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
 import { environmentIdSchema, sessionIdSchema } from '@workspace/contracts'
-import {
-  createSessionNotificationTracker,
-  type NotificationSession,
-} from '@workspace/client-core/chat/notifications'
 import { createTurnSubmission } from '@workspace/client-core/chat/commands'
 import { MockProviderAdapter } from 'server/testing'
 import * as v from 'valibot'
@@ -125,30 +121,6 @@ test('agent sounds wait for a gesture, play through the shared output and rechec
   configureFeedback({ channels: ['agent'], volume: 50 })
   host.deliver(notice, 'sound', false)
   await expect.poll(() => platform.audio.plays).toBe(1)
-})
-
-test('tracker forgets removed owners and disconnect history, and attention is owner scoped', () => {
-  const tracker = createSessionNotificationTracker()
-  const session: NotificationSession = {
-    id: sessionId,
-    title: 'Fixture',
-    archivedAt: null,
-    latestTurn: null,
-    runtime: null,
-    pendingApprovalCount: 0,
-    pendingUserInputCount: 0,
-    backgroundLiveness: null,
-  }
-  expect(tracker.update(environmentId, true, [session])).toEqual([])
-  expect(tracker.update(remoteId, true, [session])).toEqual([])
-  const input = { ...session, pendingUserInputCount: 1 }
-  expect(tracker.update(environmentId, true, [input])).toHaveLength(1)
-  expect(tracker.update(environmentId, true, [input])).toEqual([])
-  expect(tracker.update(remoteId, true, [input])).toHaveLength(1)
-  tracker.update(environmentId, false, [session])
-  expect(tracker.update(environmentId, true, [input])).toEqual([])
-  tracker.retain(new Set())
-  expect(tracker.update(remoteId, true, [input])).toEqual([])
 })
 
 test('real completed turns notify once and reconnect history stays silent', async ({

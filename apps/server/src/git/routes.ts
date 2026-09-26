@@ -1,9 +1,12 @@
 import { Elysia } from 'elysia'
+import type { WorktreeSubmoduleMode } from '@workspace/contracts'
 import {
   gitApplyPatchBodySchema,
   gitBlobDiffQuerySchema,
   gitBranchDiffQuerySchema,
   gitCheckoutBodySchema,
+  gitCloneBodySchema,
+  gitPublishBodySchema,
   gitCommitBodySchema,
   gitCommitMessageResultSchema,
   gitCreateBranchBodySchema,
@@ -31,6 +34,9 @@ export function gitRoutes(
     resolveBaseCommit?: (path: string) => Promise<string | null>
     worktreeBaseBranches?: () => Promise<ReadonlyMap<string, string | null>>
     refreshMetadata?: (path: string) => Promise<void>
+    submoduleMode?: (path: string) => Promise<WorktreeSubmoduleMode>
+    /** Registers a finished clone as a project; returns its id. */
+    registerClone?: (absolutePath: string) => Promise<string | null>
   } = {},
 ) {
   const worktrees = new GitWorktreeService(git)
@@ -147,6 +153,31 @@ export function gitRoutes(
       .post('/fetch', ({ body }) => git.fetch(body.path), {
         body: gitPathBodySchema,
       })
+      // An explicit request: `none` only stops automatic initialization.
+      .post(
+        '/submodules/init',
+        async ({ body }) => {
+          const mode = (await options.submoduleMode?.(body.path)) ?? 'recursive'
+          return git.initializeSubmodules(body.path, mode === 'none' ? 'top-level' : mode)
+        },
+        { body: gitPathBodySchema },
+      )
+      // Streamed, so a large transfer shows its progress; closing the stream cancels the clone.
+      .post(
+        '/clone-stream',
+        ({ body, request }) =>
+          sseResponse(
+            toSse(
+              git.cloneProgress(body, options.registerClone ?? (async () => null), request.signal),
+              {
+                event: (event) => event.kind,
+              },
+            ),
+            request.signal,
+          ),
+        { body: gitCloneBodySchema },
+      )
+      .post('/publish', ({ body }) => git.publish(body), { body: gitPublishBodySchema })
       .post('/pull', ({ body }) => git.pull(body.path), {
         body: gitPathBodySchema,
       })
@@ -160,6 +191,9 @@ export function gitRoutes(
         query: gitPathQuerySchema,
       })
       .post('/pull-request', ({ body }) => git.createPullRequest(body), {
+        body: gitCreatePullRequestBodySchema,
+      })
+      .post('/push-and-pull-request', ({ body }) => git.pushAndOpenPullRequest(body), {
         body: gitCreatePullRequestBodySchema,
       }),
   )

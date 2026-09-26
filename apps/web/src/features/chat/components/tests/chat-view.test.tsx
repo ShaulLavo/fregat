@@ -1,7 +1,7 @@
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 import { settingsSnapshot } from '../../../../../test/factories/settings'
 import { createClientError } from '@workspace/client-core/errors'
-import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
+import { providerListQueryOptions } from '@/lib/provider-query'
 import {
   resetChatInputDraftStore,
   useChatInputDraftStore,
@@ -91,7 +91,9 @@ test('selecting a cached session keeps its transcript readable and resumes detai
       ),
     )
     expect(view.getByText('Cached question')).toBeInTheDocument()
-    const subscription = JSON.parse(socket.sent[0]!)
+    const subscription = socket.sent
+      .map((frame) => JSON.parse(frame))
+      .find((frame) => frame.kind === 'subscribe')
     act(() =>
       socket.deliver({
         kind: 'subscription.next',

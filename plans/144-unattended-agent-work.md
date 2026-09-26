@@ -2,9 +2,11 @@
 
 ## Status and authorization
 
-- Status: RESEARCH PLAN — the research phase decides what Platform builds; no implementation
-  scope yet. Q1–Q3 decided 2026-09-25. The research phase runs after PRs #32 (Plan 148) and #35
-  (Plan 145) merge.
+- Status: RESEARCH DONE 2026-09-25 — findings, capability matrix and proposed phases below;
+  phases await owner approval. Q1–Q3 decided 2026-09-25. PRs #32 (Plan 148) and #35 (Plan 145)
+  were still open, so the research read their lane branches as current truth. One gap: the
+  Platform-side rendering of a self-started turn is established by code reading, because the dev
+  server was down (see Q1).
 - Priority: P2. High value for how the owner already works; depends on answers below.
 - Effort: research M; implementation unknown until the capability matrix exists.
 - Risk: MED. Building what a harness already does creates two schedulers and two agent trees.
@@ -122,9 +124,202 @@ surface needed × build or surface) in this file, then split executable plans. L
 host and show harness schedules and loops; show and stop background agents and workflows;
 decision trail and recap; cross-harness agent tools on Plan 087.
 
+## Research findings (2026-09-25)
+
+Read at: `origin/main` `116f0c611`; `lane/L3` `eed58a4c5` (Plan 145, PR #35, open); `lane/L4`
+`68cd13a6f` (Plan 148, PR #32, open). Both PRs were unmerged, so the lane branches are the current
+truth for background tasks, hooks and restart. Harness versions: Claude Code CLI 2.1.282, Agent SDK
+0.3.281, `codex-cli` 0.157.0 (pinned `rust-v0.157.0`). Line numbers are `origin/main` unless
+marked L3 or L4.
+
+### Method
+
+The dev server (Vite on 5173) was down, and AGENTS.md forbids starting one, so no Platform session
+could be driven end to end. Instead, `/work/tmp/research/144/probe.ts` runs `query()` with the
+options `claudeQueryOptions` builds (streaming prompt queue, `settingSources` user/project/local,
+`claude_code` preset, `bypassPermissions`, `includeHookEvents`, the installed CLI), adds in-process
+hook callbacks, and logs every SDK message; `debugFile` captures the CLI's scheduler log.
+`/work/tmp/research/144/codex-goal.ts` drives `codex app-server` over stdio. What Platform does with
+the messages comes from reading the adapter and ingestion code. The runs cost about $1.
+
+| Run   | What was asked                                                         | Observed                                                                                                           |
+| ----- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| A     | `ScheduleWakeup` 60 s, one-shot `CronCreate`, background `sleep 600`   | Neither fired in 6 min. `CronList` at 6 min still listed both.                                                     |
+| D     | `ScheduleWakeup` 60 s alone                                            | Fired at +73 s as its own turn.                                                                                    |
+| E     | Wakeup, cron, background `sleep 400`                                   | Neither fired in 200 s. The scheduler took its lock and never scheduled a fire.                                    |
+| F     | Wakeup and cron, no background task                                    | Both fired on the minute boundary as two consecutive turns.                                                        |
+| B     | `CronCreate` with `durable: true`                                      | Result: "Session-only (not written to disk, dies when Claude exits)". Durable crons are feature-gated off.         |
+| G     | Background `sleep 20` plus a wakeup; a prompt pushed during the wakeup | The task's completion started its own turn at +22.7 s. The pushed prompt was `queued` and ran after that `result`. |
+| H     | `/goal A file named done.txt exists … and contains OK`                 | Goal set, the agent wrote the file, the goal check passed, one `result`.                                           |
+| Codex | `thread/goal/set` on an idle thread                                    | The app-server started a turn 0.2 s later with no `turn/start`; the goal went `active` → `complete`.               |
+
+The gate in run B is in the CLI bundle: `durable:i=!1 … let s=i&&qse()`, where `qse()` reads the
+`tengu_kairos_cron_durable` flag.
+
+### Q1: Reachability
+
+A session built with Platform's options has these tools (run A, `system/init`): `Task`, `Bash`,
+`CronCreate`, `CronDelete`, `CronList`, `Monitor`, `PushNotification`, `RemoteTrigger`,
+`ScheduleWakeup`, `SendMessage`, `TaskStop`, `Workflow`, among others. `initializationResult().commands`
+includes `loop`, `schedule`, `goal` and `recap`. Platform disables none of them.
+
+Capability matrix:
+
+| Capability                                     | Reachable in a Platform session                                                               | Evidence                                                                                                                       | Platform surface needed                      | Build or surface                 |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------- | -------------------------------- |
+| `ScheduleWakeup`, `/loop`                      | Yes. Fires as a harness-started turn while the CLI process lives.                             | Runs D, F                                                                                                                      | Adopt the turn; "Sleeping until"; keep alive | Surface (phases 1–2)             |
+| Session cron (`CronCreate`)                    | Yes, session-only. `durable` is gated off for this account.                                   | Runs F, B                                                                                                                      | Same as above                                | Surface (phases 1–2)             |
+| Background task finishes after its turn        | Yes, today. The harness starts a turn to read the notification.                               | Run G                                                                                                                          | Adopt the turn                               | Surface (phase 1); a live defect |
+| Cloud routines (`/schedule`, `RemoteTrigger`)  | The tool is reachable. Runs in Anthropic's cloud.                                             | `init` tools                                                                                                                   | None (Q1 decided A)                          | Neither                          |
+| `Workflow`                                     | Tool present; not exercised (each run spawns agents)                                          | `init` tools; `task_type: local_workflow` + `name` (`sdk.d.ts:5838`)                                                           | Background-task roster and stop              | Done in Plan 145 (lane L3)       |
+| Background subagents, `SendMessage`, `Monitor` | Yes                                                                                           | `init` tools; runs A, G                                                                                                        | Roster, stop, liveness                       | Done in Plan 145 (lane L3)       |
+| `PushNotification`                             | Tool present; not exercised: it would reach the owner's phone (`agentPushNotifEnabled` is on) | `init` tools                                                                                                                   | Plan 142                                     | Neither                          |
+| Claude `/goal`                                 | Yes                                                                                           | Run H                                                                                                                          | Goal indicator; clear                        | Surface (phase 3)                |
+| Codex goals (`thread/goal/*`)                  | Yes, and no longer experimental in 0.157                                                      | Codex run; `features/src/lib.rs:1672` (`Stage::Stable`, on by default); test `thread_goal_methods_are_not_marked_experimental` | Set, get, clear; adopt continuation turns    | Surface (phase 3)                |
+| Codex cloud tasks, `codex exec`                | Out of process; not a Platform session                                                        | —                                                                                                                              | None                                         | Neither                          |
+
+What Platform does with a turn the harness started (code reading):
+
+- Claude: `handleStreamEvent` drops every delta when there is no `activeTurn`
+  (`claude.ts:1481` on L3). The assistant text still becomes an `item.completed` without a turn id,
+  and ingestion treats a turnless message as already projected, so it finalizes with no fallback
+  text (`provider-runtime-ingestion.ts:372-374`): the reply is lost. The `result` only logs
+  `result.no_active_turn` (`claude.ts:1656` on L3), and `command_lifecycle` frames fall through to
+  `recordUnmappedMessage`.
+- Codex: `turn/started` with no pending turn returns early (`codex.ts:1806-1808`) and
+  `turn/completed` logs `turn_completed.missing_turn` (`codex.ts:1838`).
+- Attribution race (run G): `sendTurn` attributes the next `result` after its push to its own turn.
+  When a wakeup or task-notification turn is running, the owner's prompt waits in the harness queue
+  and the harness turn's `result` arrives first, so Platform would close the owner's turn with the
+  wrong result and drop the real reply. Platform pushes user messages without a `uuid`
+  (`claude-turn-input.ts:100`), which is the join key `command_lifecycle` reports as `queued`,
+  `started` and `completed`. It also omits `origin: { kind: 'human' }`, which the SDK says a host
+  wrapping keyboard input must stamp (`sdk.d.ts:5136`).
+
+Task-notification turns already happen whenever a background shell or subagent finishes after its
+turn ends, so the first two bullets and the race affect Plan 145's background tasks today, before any
+schedule exists.
+
+### Q2: Does a session survive until its wakeup?
+
+The CLI process outlives the turn: the adapter feeds a streaming prompt queue and the query ends only
+on `close()` (`claude.ts` `attach`/`pump`). Wakeups and crons fire in SDK mode (runs D, F). Every
+session cron lives in that process's memory, and these end it:
+
+1. The idle reaper stops a `ready` session after 30 minutes, sweeping every 5 minutes
+   (`provider-session-reaper.ts:13,21`; `provider-service.ts:156,167`). Its only exemption is the
+   background-task roster, and crons are not in the roster: run A's `background_tasks_changed`
+   listed only the shell. A wakeup longer than 30 minutes (the tool allows 3600 s) or any later cron
+   is lost.
+2. Restart (Plan 148, lane L4) counts running, starting, waiting, rewinding and background work as
+   busy (`engine.ts:490-497` on L4), not schedules. A sleeping session reads as idle and its crons die
+   without a warning.
+3. Changing model, effort, mode or cwd replaces the query (`claude.ts:576-584` on L3).
+4. Durable crons are gated off (run B). Where they are on, they still fire only inside a running CLI
+   for that project; a one-shot missed while no CLI ran is surfaced at the next start.
+5. Recurring crons expire after 7 days (`CronCreateInput.recurring` docs, `sdk-tools.d.ts`).
+
+A running background task holds back every fire (runs A and E against F). The cause is inferred from
+an early return in the scheduler tick; the behaviour is observed. A "sleeping until" label has to say
+so when background work is running.
+
+Keeping a session alive costs one CLI process: idle `claude` processes on this machine measured
+160–490 MB RSS (`ps -eo rss`, eight processes).
+
+Codex goal continuations run inside the app-server process, under the same reaper. Codex has no
+scheduler.
+
+### Q3: What each capability emits
+
+| Signal                                                                                                                                 | Where                                        | Use                                                                               |
+| -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------- |
+| `ScheduleWakeup` result `{ scheduledFor, clampedDelaySeconds, wasClamped }`                                                            | Tool result in the stream                    | "Sleeping until" at once                                                          |
+| `CronCreate` result `{ id, humanSchedule, recurring, durable }`                                                                        | Tool result                                  | A schedule row                                                                    |
+| Stop hook input `session_crons: [{ id, schedule, recurring, prompt }]`, `background_tasks`                                             | In-process `hooks: { Stop }` callback option | The authoritative list after every turn, harness turns included; no settings file |
+| Fire: `command_lifecycle started` with a uuid Platform never sent, `system/init`, assistant, `result`, `command_lifecycle completed`   | Stream                                       | Adopt the turn as scheduled                                                       |
+| Task-notification turn: `task_notification`, then `system/init` with no lifecycle frame                                                | Stream                                       | Adopt the turn as a task wake-up                                                  |
+| `UserPromptSubmit` hook `prompt` (the fired prompt); `source` is `null` in 2.1.282                                                     | In-process hook callback                     | The harness turn's title                                                          |
+| Transcript `turnOrigin: "scheduled"`, `promptSource: "system"`                                                                         | `~/.claude/projects/…/<session>.jsonl`       | History import                                                                    |
+| Codex `thread/goal/updated` `{ turnId, goal: { objective, status, tokenBudget, tokensUsed, timeUsedSeconds } }`, `thread/goal/cleared` | App-server notifications                     | Goal indicator                                                                    |
+
+Codex goal statuses are `active`, `paused`, `blocked`, `usageLimited`, `budgetLimited` and
+`complete` (`protocol.rs:4092` at the pin); the model has `create_goal`, `get_goal` and
+`update_goal` tools (`ext/goal/src/spec.rs:9-11`). Platform's Codex generator lists none of
+`thread/goal/*` (`generate.ts` `CLIENT_REQUEST_METHODS` on L3).
+
+Stopping: `Query` has `interrupt`, `stopTask` and `backgroundTasks` but nothing that lists or deletes
+a cron (`sdk.d.ts:2719-3085`). A cron ends through the model (`CronDelete`, `ScheduleWakeup` with
+`stop: true`) or with the process.
+
+### Q4: Gaps no harness covers
+
+- **Schedules that outlive the CLI process.** Claude's durable crons are gated off here and fire only
+  inside a live CLI anyway; Codex has none. This is a real gap. A Platform scheduler that starts
+  Claude runs can declare them with `CLAUDE_CODE_HOST_SCHEDULED_RUN=1`, so the harness frames the
+  turn as a `scheduled-trigger` (`sdk.d.ts:5174-5180`).
+- **Claude↔Codex orchestration.** `SendMessage`, `Workflow` and Codex child agents each stay inside
+  one harness. This is Platform-only and belongs on Plan 087 (Q2 decided).
+- **Decision log and recap.** Already reachable: `show-me-your-work` (TSV decision log) loads as a
+  user skill in every Platform Claude session, Claude has `/recap`, Codex has a recap prompt
+  (`codex-rs/context-fragments/src/recap_prompt.rs`), and Plan 145 added transcript export. Nothing
+  to build.
+- **Goal verification.** Native on both: Codex's continuation prompt carries a completion audit
+  (`ext/goal/templates/goals/continuation.md`), and Claude's `/goal` checks its condition in a Stop
+  hook. Surface only.
+
+Q3's premise is already met: `DEFAULT_RUNTIME_MODE` is `full-access`
+(`packages/contracts/src/orchestration-runtime.ts:106`). What an unattended run still needs is a way
+to reach the owner when a harness-started turn opens an approval in an `approval-required` session,
+which is Plan 142.
+
+### Recommendations
+
+- Recommendation: adopt harness-started turns as real turns with an origin (`scheduled`, `loop`,
+  `task`, `goal`), matched by stamping a `uuid` on every prompt Platform pushes. Hiding them loses
+  replies and misattributes the owner's next turn.
+- Recommendation: read schedules from an in-process `Stop` hook callback. No `CronList` prompt, no
+  settings file, no transcript parsing.
+- Recommendation: the reaper exempts a session with a pending cron or an active Codex goal, and the
+  Plan 148 Restart confirmation lists sleeping sessions with the schedules it will drop.
+- Recommendation: "Cancel schedules" stops the runtime, which drops every cron. Removing one cron is
+  a request to the agent.
+- Recommendation: Plan 087's agent tools are `list_sessions`, `start_session` (provider, model,
+  worktree, prompt), `send_prompt` (optional wait), `wait_for_session`, `read_session_reply` and
+  `interrupt_session`. No schedule tools: the harnesses own those.
+- Recommendation: drop the "decision trail and recap" split, and the "background agents and
+  workflows" split, which Plan 145 finished on lane L3.
+
+### Owner questions
+
+1. **Schedules that must outlive the CLI** (Restart, reaper, model switch).
+   - A: accept the loss; Restart and model switch name the schedules they drop.
+   - B: build a Platform scheduler now (Paseo's model) for prompts that must survive.
+   - Recommendation: A. Revisit B when a real daily routine needs it; no harness offers it today.
+2. **Keep-alive budget.** Each sleeping Claude session keeps a 160–490 MB process.
+   - A: no cap; the rail shows sleeping sessions and the wide event carries the count.
+   - B: cap sleeping sessions at N and refuse new schedules past it.
+   - Recommendation: A, on this 31 GB machine with the count logged.
+
+### Proposed phases
+
+1. **Harness-started turns (Claude and Codex).** S–M, server and web. Stamp `uuid` and
+   `origin: { kind: 'human' }` on pushed prompts; settle a turn by its own `command_lifecycle`;
+   adopt a Claude turn with an unknown or missing lifecycle uuid and a Codex `turn/started` with no
+   pending turn as a provider-started turn with an origin; label it in the timeline. Scenarios: a
+   background `sleep 20` that ends after its turn shows the follow-up reply; a prompt sent during a
+   wakeup turn gets its own reply. Fixes a live defect in Plan 145's background tasks.
+2. **Sleeping sessions.** S–M. A `Stop` hook callback feeds a per-session schedule list kept like
+   the roster in `ProviderService`; the header shows "Sleeping until …" and the list; the reaper
+   and Plan 148 Restart account for schedules; replacing the query warns; "Cancel schedules" stops
+   the runtime. Depends on 1.
+3. **Goals.** M. Codex `thread/goal/set|get|clear` and goal notifications (schema refresh adds the
+   methods); Claude `/goal` from the composer; a goal indicator with status and budget, clear and
+   pause. Depends on 1.
+4. **Cross-harness agent tools.** On Plan 087 M1+, after the owner's discussion of it.
+
 ## Phases
 
-Written after the research phase.
+Proposed under Research findings; not yet approved.
 
 ## Dependencies
 

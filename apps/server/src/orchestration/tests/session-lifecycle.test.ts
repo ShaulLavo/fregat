@@ -1,8 +1,9 @@
+import { OrchestrationCommandReceipts } from '../command-receipts'
 import archivePolicy from '../../../../../test/parity/t3code/archive.json'
 import { Database } from 'bun:sqlite'
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as v from 'valibot'
 import {
   orderKeyBetween,
@@ -19,6 +20,7 @@ const fixtures: Array<{ close: () => void }> = []
 let commandCounter = 0
 
 afterEach(() => {
+  vi.useRealTimers()
   for (const fixture of fixtures.splice(0)) fixture.close()
   commandCounter = 0
 })
@@ -1140,3 +1142,240 @@ async function createEngineWithSession() {
 
   return { database, engine }
 }
+
+describe('atomic lifecycle history', () => {
+  it('rejects Undo after another client changes the wake time', async () => {
+    const { database, engine } = await createEngineWithSession()
+    const first = await engine.dispatch(snoozeCommand())
+    await engine.dispatch(snoozeCommand({ snoozedUntil: futureWakeTime(2) }))
+    expect(first.lifecycle).toMatchObject({
+      kind: 'session.lifecycle',
+      before: { snoozedUntil: null },
+    })
+    if (!first.lifecycle || !('before' in first.lifecycle))
+      throw new Error('Missing lifecycle receipt')
+    await expect(
+      engine.dispatch(
+        command({
+          type: 'session.lifecycle.restore',
+          sessionId: '00000000-0000-4000-8000-000000000001',
+          expectedRevision: first.sequence,
+          restoreCommandId: first.lifecycle.commandId,
+        }),
+      ),
+    ).rejects.toMatchObject({ code: 'orchestration.LIFECYCLE_CONFLICT', status: 409 })
+    expect(sessionRow(database).snoozedUntil).toBe(futureWakeTime(2))
+  })
+
+  it('restores every lifecycle field atomically from the authoritative receipt and supports redo', async () => {
+    const { database, engine } = await createEngineWithSession()
+    await engine.dispatch(pinCommand({ orderKey: 'm' }))
+    await engine.dispatch(snoozeCommand())
+    const before = sessionRow(database)
+    const action = settleCommand()
+    const settled = await engine.dispatch(action)
+    expect(settled.lifecycle).toMatchObject({
+      kind: 'session.lifecycle',
+      before: { pinnedAt: before.pinnedAt },
+    })
+    if (!settled.lifecycle || !('before' in settled.lifecycle))
+      throw new Error('Missing lifecycle receipt')
+    expect(await engine.dispatch(action)).toMatchObject({ ...settled, deduped: true })
+    const restore = command({
+      type: 'session.lifecycle.restore',
+      sessionId: before.sessionId,
+      expectedRevision: settled.sequence,
+      restoreCommandId: settled.lifecycle.commandId,
+    })
+    const undone = await engine.dispatch(restore)
+    expect(undone.sequence).toBe(settled.sequence + 1)
+    expect(sessionRow(database)).toMatchObject(settled.lifecycle.before)
+    if (!undone.lifecycle || !('before' in undone.lifecycle))
+      throw new Error('Missing inverse receipt')
+    await engine.dispatch(
+      command({
+        type: 'session.lifecycle.restore',
+        sessionId: before.sessionId,
+        expectedRevision: undone.sequence,
+        restoreCommandId: undone.lifecycle.commandId,
+      }),
+    )
+    expect(sessionRow(database).settledOverride).toBe('settled')
+    await expect(
+      engine.dispatch(command({ ...restore, commandId: 'stale-restore' })),
+    ).rejects.toMatchObject({ code: 'orchestration.LIFECYCLE_CONFLICT' })
+  })
+})
+
+it('persists the restore guard across restart and permits only one concurrent inverse', async () => {
+  const { database, engine } = await createEngineWithSession()
+  const action = await engine.dispatch(snoozeCommand())
+  if (!action.lifecycle) throw new Error('Missing lifecycle receipt')
+  await engine.close()
+  const restarted = new OrchestrationEngine(database)
+  const restore = {
+    type: 'session.lifecycle.restore',
+    sessionId: action.lifecycle.sessionId,
+    expectedRevision: action.sequence,
+    restoreCommandId: action.lifecycle.commandId,
+  }
+  const outcomes = await Promise.allSettled([
+    restarted.dispatch(command(restore)),
+    restarted.dispatch(command(restore)),
+  ])
+  expect(outcomes.filter((result) => result.status === 'fulfilled')).toHaveLength(1)
+  const refused = outcomes.find((result) => result.status === 'rejected')
+  expect(refused).toMatchObject({ reason: { code: 'orchestration.LIFECYCLE_CONFLICT' } })
+  expect(sessionRow(database).snoozedUntil).toBeNull()
+  await restarted.close()
+})
+
+it('refuses redo after a new pending request arrives', async () => {
+  const { database, engine } = await createEngineWithSession()
+  const settled = await engine.dispatch(settleCommand())
+  if (!settled.lifecycle) throw new Error('Missing lifecycle receipt')
+  const undone = await engine.dispatch(
+    command({
+      type: 'session.lifecycle.restore',
+      sessionId: settled.lifecycle.sessionId,
+      expectedRevision: settled.sequence,
+      restoreCommandId: settled.lifecycle.commandId,
+    }),
+  )
+  await engine.dispatch(activityCommand('approval.requested', 'approval'))
+  await expect(
+    engine.dispatch(
+      command({
+        type: 'session.lifecycle.restore',
+        sessionId: settled.lifecycle.sessionId,
+        expectedRevision: undone.sequence,
+        restoreCommandId: undone.lifecycle?.commandId,
+      }),
+    ),
+  ).rejects.toMatchObject({ code: 'orchestration.LIFECYCLE_CONFLICT' })
+  expect(sessionRow(database).settledOverride).toBeNull()
+})
+
+it('checks the persisted revision inside the restore transaction when a decision cache is stale', async () => {
+  const { database, engine } = await createEngineWithSession()
+  const action = await engine.dispatch(snoozeCommand())
+  if (!action.lifecycle) throw new Error('Missing lifecycle receipt')
+  const stale = new OrchestrationEngine(database)
+  await stale.readModelSnapshot()
+  await engine.dispatch(snoozeCommand({ snoozedUntil: futureWakeTime(2) }))
+  await expect(
+    stale.dispatch(
+      command({
+        type: 'session.lifecycle.restore',
+        sessionId: action.lifecycle.sessionId,
+        expectedRevision: action.sequence,
+        restoreCommandId: action.lifecycle.commandId,
+      }),
+    ),
+  ).rejects.toMatchObject({ code: 'orchestration.LIFECYCLE_CONFLICT' })
+  expect(sessionRow(database).snoozedUntil).toBe(futureWakeTime(2))
+  await stale.close()
+})
+
+it('does not reinstate a snooze whose deadline passed while settled', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2030-01-01T12:00:00.000Z'))
+  const { database, engine } = await createEngineWithSession()
+  await engine.dispatch(snoozeCommand({ snoozedUntil: '2030-01-01T12:01:00.000Z' }))
+  const settled = await engine.dispatch(settleCommand())
+  if (!settled.lifecycle) throw new Error('Missing lifecycle receipt')
+  vi.setSystemTime(new Date('2030-01-01T12:02:00.000Z'))
+  await engine.dispatch(
+    command({
+      type: 'session.lifecycle.restore',
+      sessionId: settled.lifecycle.sessionId,
+      expectedRevision: settled.sequence,
+      restoreCommandId: settled.lifecycle.commandId,
+    }),
+  )
+  expect(sessionRow(database)).toMatchObject({ snoozedUntil: null, snoozedAt: null })
+})
+
+it('refuses to restore another session receipt and rejects client-provided snapshots', async () => {
+  const { engine } = await createEngineWithSession()
+  const other = '00000000-0000-4000-8000-000000000002'
+  await engine.dispatch(sessionCreateCommand(other))
+  const foreign = await engine.dispatch(snoozeCommand({ sessionId: other }))
+  const action = await engine.dispatch(snoozeCommand())
+  if (!action.lifecycle || !foreign.lifecycle) throw new Error('Missing lifecycle receipt')
+  await expect(
+    engine.dispatch(
+      command({
+        type: 'session.lifecycle.restore',
+        sessionId: action.lifecycle.sessionId,
+        expectedRevision: action.sequence,
+        restoreCommandId: foreign.lifecycle.commandId,
+      }),
+    ),
+  ).rejects.toMatchObject({ code: 'orchestration.LIFECYCLE_RESTORE_UNAVAILABLE' })
+  expect(() =>
+    command({
+      type: 'session.lifecycle.restore',
+      sessionId: action.lifecycle!.sessionId,
+      expectedRevision: action.sequence,
+      restoreCommandId: action.lifecycle!.commandId,
+      state: action.lifecycle!.before,
+    }),
+  ).toThrow()
+})
+
+it('keeps snooze Undo valid while ordinary tool activity continues', async () => {
+  const { database, engine } = await createEngineWithSession()
+  await engine.dispatch(sessionSetCommand('running'))
+  const action = await engine.dispatch(snoozeCommand())
+  if (!action.lifecycle) throw new Error('Missing lifecycle receipt')
+  await engine.dispatch(activityCommand('tool.started', 'info', null))
+  await engine.dispatch(
+    command({
+      type: 'session.lifecycle.restore',
+      sessionId: action.lifecycle.sessionId,
+      expectedRevision: action.sequence,
+      restoreCommandId: action.lifecycle.commandId,
+    }),
+  )
+  expect(sessionRow(database).snoozedUntil).toBeNull()
+})
+
+it.each(['session.archive', 'session.settle', 'session.pin'] as const)(
+  'deduplicates historical %s receipts without rewriting stored data',
+  async (type) => {
+    const { database, engine } = await createEngineWithSession()
+    const action = command({
+      type,
+      sessionId: '00000000-0000-4000-8000-000000000001',
+      orderKey: 'm',
+    })
+    const accepted = await engine.dispatch(action)
+    database
+      .update(schema.orchestrationCommandReceipts)
+      .set({ resultJson: null })
+      .where(eq(schema.orchestrationCommandReceipts.commandId, action.commandId))
+      .run()
+    const restarted = new OrchestrationEngine(database)
+    const repeated = await restarted.dispatch(action)
+    expect(repeated).toEqual({ sequence: accepted.sequence, deduped: true, result: null })
+    const persisted = database
+      .select()
+      .from(schema.orchestrationCommandReceipts)
+      .where(eq(schema.orchestrationCommandReceipts.commandId, action.commandId))
+      .get()
+    expect(persisted?.resultJson).toBeNull()
+    expect(persisted?.resultSequence).toBe(accepted.sequence)
+  },
+)
+
+it('requires the durable lifecycle result before writing a new accepted receipt', async () => {
+  const { database } = await createEngineWithSession()
+  const action = command({
+    type: 'session.archive',
+    sessionId: '00000000-0000-4000-8000-000000000001',
+  })
+  const receipts = new OrchestrationCommandReceipts(database)
+  expect(() => receipts.recordAccepted(action, 99, null)).toThrow()
+  expect(receipts.find(action.commandId)).toBeNull()
+})

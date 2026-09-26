@@ -1,5 +1,6 @@
 import {
   ORCHESTRATION_WS_PROTOCOL_VERSION,
+  type ConnectionError,
   type HealthDescriptor,
   type OrchestrationWsServerConfig,
 } from '@workspace/contracts'
@@ -11,6 +12,7 @@ import {
   connectionAfterDescriptor,
   createEnvironmentEntry,
   initialServerConnection,
+  sameConnectionError,
   type EnvironmentEntry,
   type EnvironmentPhase,
   type ServerConnectionState,
@@ -34,7 +36,7 @@ type EnvironmentsActions = {
     origin: string,
     machine: Pick<EnvironmentEntry, 'name' | 'kind' | 'label' | 'localPort'>,
   ): void
-  setPhase(origin: string, phase: EnvironmentPhase, error?: string | null): void
+  setPhase(origin: string, phase: EnvironmentPhase, error?: ConnectionError | null): void
   markDisconnected(origin: string): void
   recordHandshake(origin: string, config: OrchestrationWsServerConfig): void
   recordDescriptor(origin: string, descriptor: HealthDescriptor): void
@@ -91,7 +93,7 @@ export function createEnvironmentsStore({ primaryOrigin }: { readonly primaryOri
       const connection = selectServerConnection(get(), origin)
       if (connection.phase === 'identity-drift') phase = 'identity-drift'
       if (connection.phase === 'protocol-mismatch') phase = 'blocked'
-      if (entry.phase === phase && entry.lastError === error) return
+      if (entry.phase === phase && sameConnectionError(entry.lastError, error)) return
       set({
         entries: {
           ...entries,

@@ -1,4 +1,4 @@
-import { hasNotificationSound } from '@workspace/client-core/chat/notifications'
+import { hasNotificationSound } from '@workspace/contracts'
 import { configureFeedback, type FeedbackChannel } from '@workspace/ui/patterns/feedback-layer'
 import { useEffect } from 'react'
 

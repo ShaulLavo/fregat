@@ -25,6 +25,7 @@ export function projectWorktreeEvent(
       )
     return {
       ...base,
+      setup: payload.setup ?? base.setup,
       operationId: payload.operationId,
       baseCommit: payload.baseCommit,
       baseBranch: payload.baseBranch ?? null,
@@ -61,9 +62,14 @@ export function projectWorktreeEvent(
       branch: event.payload.branch,
       updatedAt: event.payload.updatedAt,
     }
+  if (event.type === 'worktree.setup-updated')
+    return { ...held, setup: event.payload.setup, updatedAt: event.payload.updatedAt }
+  if (event.type === 'worktree.pull-request-synced')
+    return { ...held, pullRequest: event.payload.pullRequest, updatedAt: event.payload.updatedAt }
   if (event.type === 'worktree.metadata-refreshed')
     return {
       ...held,
+      pullRequest: held.branch === event.payload.branch ? held.pullRequest : null,
       branch: event.payload.branch,
       headCommit: event.payload.headCommit,
       metadataVersion: event.payload.metadataVersion,
@@ -105,6 +111,8 @@ function registeredWorktree(
     terminalOwnershipUnknown: false,
     externalDriverUnverified: false,
     removedAt: null,
+    pullRequest: null,
+    setup: null,
     worktreeCreationCapability: creationCapability({ state: 'ready' }, repositoryKind),
     cleanupEligibility: {
       reason: 'not-ready',

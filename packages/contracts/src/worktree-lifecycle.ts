@@ -20,6 +20,7 @@ export const sessionWorktreeTargetSchema = v.variant('kind', [
     baseWorktreeId: worktreeIdSchema,
     /** A local branch to start from; absent means the base worktree's HEAD. */
     baseBranch: v.optional(text),
+    skipSetup: v.optional(v.boolean()),
   }),
 ])
 
@@ -97,6 +98,46 @@ export const worktreeCleanupEligibilitySchema = v.object({
   canResolveMissing: v.boolean(),
 })
 
+/**
+ * The pull request for a dedicated worktree's branch, as the forge last answered. `unknown` is a
+ * failed lookup with nothing known before it; it never stands for "no pull request".
+ */
+export const worktreePullRequestSchema = v.variant('status', [
+  v.object({ status: v.literal('none') }),
+  v.object({ status: v.literal('unknown') }),
+  v.object({
+    status: v.literal('unsupported'),
+    support: v.picklist(['cli-missing', 'unauthenticated', 'no-forge']),
+  }),
+  v.object({
+    status: v.literal('found'),
+    identity: v.optional(
+      v.object({ remoteUrl: text, number: v.pipe(v.number(), v.integer(), v.minValue(1)) }),
+    ),
+    number: v.pipe(v.number(), v.integer(), v.minValue(1)),
+    title: v.string(),
+    url: text,
+    state: v.picklist(['open', 'closed', 'merged']),
+    draft: v.boolean(),
+    /** When it was merged or closed; settlement compares it with the session's last request. */
+    closedAt: v.optional(v.nullable(v.string()), null),
+  }),
+])
+
+/**
+ * The project's setup script in this worktree. `queued` and `cancelling` are requests the
+ * lifecycle reactor acts on; a foreground setup holds the first turn until it finishes.
+ */
+export const worktreeSetupSchema = v.object({
+  name: text,
+  foreground: v.boolean(),
+  state: v.picklist(['queued', 'running', 'cancelling', 'done', 'failed', 'cancelled', 'skipped']),
+  exitCode: v.nullable(v.number()),
+  /** The last lines it printed, ANSI stripped. */
+  output: v.array(v.string()),
+  updatedAt: text,
+})
+
 export const worktreeLifecycleEntries = {
   lifecycle: worktreeLifecycleSchema,
   operationId: v.nullable(commandIdSchema),
@@ -165,6 +206,14 @@ export const worktreeResolveMissingCommandSchema = v.strictObject({
   type: v.literal('worktree.resolve-missing'),
   authorization: worktreeMissingAuthorizationSchema,
 })
+export const worktreeSetupRunCommandSchema = v.strictObject({
+  ...target,
+  type: v.literal('worktree.setup.run'),
+})
+export const worktreeSetupCancelCommandSchema = v.strictObject({
+  ...target,
+  type: v.literal('worktree.setup.cancel'),
+})
 export const worktreeClientCommandSchemas = [
   worktreeRetryCommandSchema,
   worktreeCleanupCommandSchema,
@@ -173,6 +222,8 @@ export const worktreeClientCommandSchemas = [
   worktreeAdoptCommandSchema,
   worktreeReleaseCommandSchema,
   worktreeResolveMissingCommandSchema,
+  worktreeSetupRunCommandSchema,
+  worktreeSetupCancelCommandSchema,
 ] as const
 
 const cleanupResult = { ...target, ...operation, mode: worktreeCleanupModeSchema }
@@ -203,6 +254,13 @@ export const worktreeInternalCommandSchemas = [
     type: v.literal('worktree.metadata.refresh'),
     expectedMetadataVersion: count,
     ...metadata,
+  }),
+  v.object({ ...target, type: v.literal('worktree.setup.update'), setup: worktreeSetupSchema }),
+  v.object({
+    ...target,
+    type: v.literal('worktree.pull-request.sync'),
+    branch: text,
+    pullRequest: worktreePullRequestSchema,
   }),
   v.object({
     ...target,
@@ -261,6 +319,7 @@ export const terminalLeaseCommandSchemas = [
 const changed = { worktreeId: worktreeIdSchema, updatedAt: text }
 export const WORKTREE_EVENT_PAYLOADS = {
   'worktree.create-requested': v.object({
+    setup: v.optional(worktreeSetupSchema),
     ...worktreeProvisioningSchema.entries,
     ...operation,
     createdAt: text,
@@ -295,6 +354,12 @@ export const WORKTREE_EVENT_PAYLOADS = {
   'worktree.adopted': v.object({ ...changed, branch: v.nullable(text), headCommit: text }),
   'worktree.missing': v.object(changed),
   'worktree.metadata-refreshed': v.object({ ...changed, ...metadata, metadataVersion: count }),
+  'worktree.setup-updated': v.object({ ...changed, setup: worktreeSetupSchema }),
+  'worktree.pull-request-synced': v.object({
+    ...changed,
+    branch: text,
+    pullRequest: worktreePullRequestSchema,
+  }),
   'worktree.orphan-registered': v.object({
     ...changed,
     projectId: projectIdSchema,
@@ -327,4 +392,6 @@ export type WorktreeCreationCapability = v.InferOutput<typeof worktreeCreationCa
 export type WorktreeCleanupPreview = v.InferOutput<typeof worktreeCleanupPreviewSchema>
 export type WorktreeMissingPreview = v.InferOutput<typeof worktreeMissingPreviewSchema>
 export type TerminalLease = v.InferOutput<typeof terminalLeaseSchema>
+export type WorktreePullRequest = v.InferOutput<typeof worktreePullRequestSchema>
+export type WorktreeSetup = v.InferOutput<typeof worktreeSetupSchema>
 export type TerminalLeaseId = v.InferOutput<typeof terminalLeaseIdSchema>

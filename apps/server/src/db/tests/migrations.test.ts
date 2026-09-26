@@ -100,6 +100,7 @@ describe('platform migration ledger', () => {
       { version: 29, name: 'turn_end_reason' },
       { version: 30, name: 'message_model_selection' },
       { version: 35, name: 'worktree_base_branch' },
+      { version: 37, name: 'terminal_session_cleanup' },
     ])
     expect(columnNames(handle, 'projection_turns')).toContain('end_reason')
     expect(columnNames(handle, 'projection_session_messages')).toContain('model_selection_json')
@@ -115,8 +116,43 @@ describe('platform migration ledger', () => {
     expect(tableNames(handle)).toContain('push_devices')
     expect(columnNames(handle, 'projection_sessions')).toContain('lifecycle_revision')
     expect(ledgerVersions(handle)).toEqual(
-      [...ledgerVersionNumbers, 25, 26, 27, 28].sort((a, b) => a - b),
+      [...new Set([...ledgerVersionNumbers, 25, 26, 27, 28])].sort((a, b) => a - b),
     )
+    expect(migratePlatformDatabase(handle.db)).toEqual([])
+  })
+
+  it('adds push, lifecycle and turn metadata above the deployed worktree migrations', () => {
+    const handle = openTempDatabase()
+    migratePlatformDatabase(
+      handle.db,
+      platformMigrations.filter((migration) => migration.version <= 26),
+    )
+    insertTopology(handle)
+    handle.db.run(
+      sql`UPDATE projection_worktrees SET pull_request_json = '{"number":31}', setup_json = '{"state":"ready"}'`,
+    )
+    expect(ledgerRow(handle, 25)?.name).toBe('worktree_pull_requests')
+    expect(ledgerRow(handle, 26)?.name).toBe('worktree_setup')
+    expect(columnNames(handle, 'projection_turns')).not.toContain('end_reason')
+    expect(columnNames(handle, 'projection_session_messages')).not.toContain('model_selection_json')
+
+    const applied = migratePlatformDatabase(handle.db)
+
+    expect(applied.map(({ version, name }) => ({ version, name }))).toEqual([
+      { version: 27, name: 'push_devices' },
+      { version: 28, name: 'session_lifecycle_revision' },
+      { version: 29, name: 'turn_end_reason' },
+      { version: 30, name: 'message_model_selection' },
+      { version: 35, name: 'worktree_base_branch' },
+      { version: 37, name: 'terminal_session_cleanup' },
+    ])
+    expect(columnNames(handle, 'push_devices')).toContain('revision')
+    expect(columnNames(handle, 'projection_sessions')).toContain('lifecycle_revision')
+    expect(columnNames(handle, 'projection_turns')).toContain('end_reason')
+    expect(columnNames(handle, 'projection_session_messages')).toContain('model_selection_json')
+    expect(
+      rows(handle, sql`SELECT pull_request_json, setup_json FROM projection_worktrees`),
+    ).toEqual([{ pull_request_json: '{"number":31}', setup_json: '{"state":"ready"}' }])
     expect(migratePlatformDatabase(handle.db)).toEqual([])
   })
 

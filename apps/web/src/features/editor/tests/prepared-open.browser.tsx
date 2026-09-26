@@ -13,6 +13,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, expect, test, vi } from 'vitest'
 import { ForesightManager } from 'js.foresight'
 import { createBrowserWorkspace } from '../../../../test/factories/browser-workspace'
+import { holdWallClock } from '../../../../test/factories/wall-clock'
 
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
@@ -108,6 +109,7 @@ test(
       name: expect.stringContaining('editor-tab:'),
     })
     performance.clearMarks('editor.worker.request')
+    holdWallClock()
     await triggerForesightIntent()
     await expect
       .poll(preparationRequestTypes, { timeout: 20_000 })
@@ -163,6 +165,7 @@ test(
     await expect.poll(() => runtime).not.toBeNull()
     await expect.poll(activeThemeIdentity, { timeout: 10_000 }).toBe('dark-plus|dark-plus')
 
+    holdWallClock()
     await ensureFileSnapshotQuery(queryClient, PATH)
     diagnostics = []
     performance.clearMarks('editor.file_open.file_read')
@@ -294,6 +297,7 @@ test(
     expect(await harness.commands.openSearchEditor(ROOT_PATH)).toEqual({ status: 'applied' })
     const sampleId = await beginBenchmarkSampleWhenReady()
     workerRequestGate = installEditorWorkerRequestGate(['queryRange'])
+    holdWallClock()
 
     await triggerForesightIntent()
     await expect.poll(workerRequestGate.heldTypes, { timeout: 20_000 }).toEqual(['queryRange'])

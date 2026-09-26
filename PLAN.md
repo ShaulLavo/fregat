@@ -236,8 +236,10 @@ Requested 2026-09-11. [Plan 087](plans/087-stateless-mcp.md) precedes
 [Plan 088](plans/088-native-code-intelligence.md). Both are proposed; implementation has not started.
 Decided 2026-09-25: owner — approve 087 milestone M0 only; M1+ is discussed with the owner before
 anything else in 087 or 088 starts.
+Decided 2026-09-26: recommendation (owner deferred) — 087 narrows to our own tool endpoint; managed
+external MCP servers (former M2/M3) move to the unscheduled [Plan 174](plans/174-external-mcp-servers.md).
 
-Plan 087 delivers managed external MCP servers and an authenticated native tool endpoint. The
+Plan 087 delivers an authenticated native tool endpoint. The
 required wire revision is stateless MCP `2026-07-28`, implemented with explicitly configured SDK v2.
 Scoped machine-client authentication and real MCP calls from both providers are prerequisites,
 not assumptions supplied by existing provider MCP event handling.
@@ -493,18 +495,18 @@ asked which large agent features Platform lacks. The owner grouped the answers i
 Research plans do enough research to be correct, then their research phase rewrites their own
 phases or splits them into executable plans; not all research happens up front.
 
-| Plan                                          | Kind                     | Owns                                                                                                                        |
-| --------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| 138 (done)                                    | executable               | Claude models from the Claude CLI; chat runs the installed CLI                                                              |
-| [139](plans/139-acting-on-agent-diffs.md)     | research                 | Keep or undo agent edits per hunk, batched diff comments to the agent, review mode, second-model review, plan line feedback |
-| [140](plans/140-editor-agent-advantage.md)    | research                 | Editor context into chat, fix with AI, diagnostics fed back to the agent                                                    |
-| [141](plans/141-usage-and-rate-limits.md)     | executable               | Rate-limit meter, usage page with cost, usage history                                                                       |
-| [142](plans/142-web-push.md)                  | executable after a spike | Web Push from the mesh server                                                                                               |
-| [143](plans/143-phone-layout.md)              | direction approved       | What the phone is for; web layout versus the later companion app                                                            |
-| [144](plans/144-unattended-agent-work.md)     | research                 | Scheduled, looping and multi-agent work: surface what the harnesses already do, build only the rest                         |
-| [145](plans/145-harness-controls.md)          | small executable plans   | Fork, approval rules, MCP status, background tasks, hooks, custom agents, compact, export                                   |
-| [172](plans/172-shared-undo-stack.md)         | research                 | One undo/redo stack behind Mod+Z, extracted from the existing undo implementations; Plan 126 LIFE-13 first                  |
-| [173](plans/173-two-devices-one-workspace.md) | research                 | Two clients opening a workspace on one server: per-client open generations, what the losing client sees                     |
+| Plan                                          | Kind                   | Owns                                                                                                                        |
+| --------------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 138 (done)                                    | executable             | Claude models from the Claude CLI; chat runs the installed CLI                                                              |
+| [139](plans/139-acting-on-agent-diffs.md)     | research               | Keep or undo agent edits per hunk, batched diff comments to the agent, review mode, second-model review, plan line feedback |
+| [140](plans/140-editor-agent-advantage.md)    | research               | Editor context into chat, fix with AI, diagnostics fed back to the agent                                                    |
+| [141](plans/141-usage-and-rate-limits.md)     | executable             | Rate-limit meter, usage page with cost, usage history                                                                       |
+| 142 (done)                                    | executable             | Web Push from the mesh server                                                                                               |
+| [143](plans/143-phone-layout.md)              | direction approved     | What the phone is for; web layout versus the later companion app                                                            |
+| [144](plans/144-unattended-agent-work.md)     | research               | Scheduled, looping and multi-agent work: surface what the harnesses already do, build only the rest                         |
+| [145](plans/145-harness-controls.md)          | small executable plans | Fork, approval rules, MCP status, background tasks, hooks, custom agents, compact, export                                   |
+| [172](plans/172-shared-undo-stack.md)         | research               | One undo/redo stack behind Mod+Z, extracted from the existing undo implementations; Plan 126 LIFE-13 first                  |
+| [173](plans/173-two-devices-one-workspace.md) | research               | Two clients opening a workspace on one server: per-client open generations, what the losing client sees                     |
 
 [Plan 126](plans/126-t3code-alignment.md) also gained the T3 features shipped after its
 2026-09-19 audit, and four reopened non-parity decisions.
@@ -514,7 +516,8 @@ Suggested order:
 1. ~~Plan 138~~ — implemented 2026-09-24.
 2. Quick wins: ~~Plan 141 Phases 1–3~~ (meter, per-turn recording, usage page; 2026-09-25), the
    small Plan 145 plans (~~approval-rules~~, merged in `89c58188`), and the small new Plan 126 rows.
-3. Plan 142 after its spike. It needs only a minimal web app manifest, not Plan 143.
+3. ~~Plan 142~~ — implemented 2026-09-25 (completion wave, lane L5). The phone checks and the
+   owner question are in the [delivery record](docs/web-push.md).
 4. The research phases of Plans 139 and 140. Plan 140's diagnostics work waits on Plans 087 and
    088; its editor-to-chat work does not.
 5. Plan 144's capability inventory. It decides how much of that lane is built rather than surfaced.
@@ -530,15 +533,15 @@ Requested 2026-09-25. The owner is moving to Platform as their main agentic codi
 of the plans, both logs and the service journal named what stands in the way. The unit file's
 `SuccessExitStatus=143` was fixed on the spot.
 
-| Plan                                           | Owns                                                                                            |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| 146 (done)                                     | Dev and prod stop sharing `~/.platform`; each `agent:browser` run gets its own server and state |
-| [147](plans/147-log-hygiene-and-noise-gate.md) | Producer fixes, level rules, the reaper give-up, ACK timeout vs overflow, a `logs:census` gate  |
-| [148](plans/148-restart-when-idle.md)          | `deploy --server` stages; the server restarts when no turn is running                           |
-| [149](plans/149-terminal-host.md)              | A PTY host that survives server restarts                                                        |
-| [150](plans/150-remote-server-version.md)      | Remote servers are checked for protocol and updated                                             |
-| [151](plans/151-remote-server-releases.md)     | Production ships its built server release to remote machines; Update/Install server button      |
-| [152](plans/152-remote-dev-builds.md)          | Dev primary builds this working tree and ships it through Plan 151, in its own remote channel   |
+| Plan                                           | Owns                                                                                                                     |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| 146 (done)                                     | Dev and prod stop sharing `~/.platform`; each `agent:browser` run gets its own server and state                          |
+| [147](plans/147-log-hygiene-and-noise-gate.md) | Producer fixes, level rules, the reaper give-up, ACK timeout vs overflow, a `logs:census` gate                           |
+| [148](plans/148-restart-when-idle.md)          | `deploy --server` stages; the server restarts when no turn is running                                                    |
+| [149](plans/149-terminal-host.md)              | A PTY host that survives server restarts                                                                                 |
+| 150 (done)                                     | Remote servers are checked for protocol; a stale one relaunches or reads "Server out of date"                            |
+| 151 (done)                                     | Done: releases ship their runtime; Update server installs them over SSH ([record](docs/remote-server-releases.md))       |
+| 152 (done)                                     | Done: a dev primary builds its tree and installs it in its own remote channel ([record](docs/remote-server-releases.md)) |
 
 Suggested order:
 
@@ -547,8 +550,9 @@ Suggested order:
 2. Plan 147, after 146 removes the pollution it would otherwise re-level.
 3. Plan 148, so Platform can deploy itself without killing the deploying turn.
 4. Plan 149, so terminals and dev servers survive the same restart.
-5. Plan 150 Phase 1, then Plan 151, whenever the Mac is needed. Plan 152 after 151. `129fdea6`
-   already keeps the catalog why and fix on stored machine errors; the protocol check is left.
+5. ~~Plan 150~~ — done 2026-09-25 (completion wave): protocol check at both ends of the SSH
+   launch, stale relaunch, structured machine errors, "Server out of date". Plan 151 done 2026-09-25
+   (completion wave; live Mac update is an owner check). Plan 152 done the same day.
 6. Then Claude rewind and fork ([Plan 145 fork](plans/145-harness-controls/fork.md), Plan 126
    RUNTIME-01) and the Plan 139 research phase.
 
