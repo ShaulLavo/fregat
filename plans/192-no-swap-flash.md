@@ -245,10 +245,12 @@ scenario restores its fixture providers through the current raw-settings API.
 - Screenshots were read back. Vite ran on 5256; all servers use throwaway state and fixture/mock
   providers. No deployment or real model call was made.
 
-The remaining failure is `features/editor/components/tests/diff-layout.test.tsx`: switching
-tabs retains the old 40% pane layout instead of the next tab's saved 75%. #128 removed the
-resizable group's tab key. This integration preserves that reviewed behavior, so the coordinator
-must resolve this failure before treating the branch as fully green.
+The initial integration failed `features/editor/components/tests/diff-layout.test.tsx`: switching
+tabs retained the old 40% pane layout instead of the next tab's saved 75%. #128 removed the
+resizable group's tab key. The follow-up restores the shown comparison's saved layout through
+the group's imperative handle in a layout effect, before paint, while preserving both editors.
+Tabs without a saved layout receive the default 50/50 split. The original 75% expectation stays;
+the test now checks each restored split immediately after the render commits.
 
 Evidence directories under `/work/tmp/fregat-evidence/`:
 
@@ -270,3 +272,24 @@ a dependency installation, so verification used an identical source/dist copy wi
 inside this worktree's ignored `node_modules/.verification`, leaving the shared Editor untouched.
 Root deletion and malformed forge replies intentionally produce 404/502 evidence. Turn switching
 records cancelled checkpoint reads. Commands and retained logs: `/work/tmp/w2-cx-192-integration/`.
+
+### Split-layout follow-up for #137
+
+- Reproduced the original 40% versus 75% DOM failure before changing the editor.
+- The saved layout now applies in a layout effect when the shown presentation changes.
+  Both split editors remain mounted; an unsaved tab restores 50/50.
+- The layout test retains its 75% expectation and checks the new proportions synchronously.
+  The editor-instance reuse test also passes.
+- Diff/editor DOM checks: **33 files, 155 tests passed**. The held-comparison hook adds
+  **3 passing tests** for pending reads, superseded selections, and failed reads.
+- `bun run gates`, including knip, and the full `bun run typecheck` passed.
+- Row 13 now explicitly opens split mode, so its blank-frame measurement exercises both panes.
+- Split row 13 passed with **0 blank frames** and aligned tab/body samples:
+  `/work/tmp/fregat-evidence/20260926T212104Z-scenario-diff-no-flicker/`.
+  Both screenshots were read back. Doctor passed at
+  `/work/tmp/fregat-evidence/20260926T212054Z-look-1440x1000/`.
+- Verification used Vite 5257 with a local font-cache allow-list and throwaway API state.
+  Cold attempts reloaded during Vite's `remark-stringify` optimization; the warmed run passed.
+  No page errors, console errors, failed responses, or warning/error server logs on the passing run.
+  Console warnings were unavailable adapters and screenshot-related WebGL readbacks.
+  No real model was invoked. Vite 5257 stopped after verification. Nothing was deployed.

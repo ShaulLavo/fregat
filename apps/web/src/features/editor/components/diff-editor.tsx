@@ -2,11 +2,12 @@ import type { TabPresentation } from '@/features/editor/state/tab-presentation'
 import type { TabId } from '@/lib/documents/utils/types'
 import { type DiffFile, type DiffRegionStore } from '@singapore-editor/diff'
 import {
+  type GroupImperativeHandle,
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from '@workspace/ui/components/resizable'
-import { useLayoutEffect } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import { useTabPresentation } from '@/features/editor/hooks/use-tab-presentation'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 
@@ -55,6 +56,13 @@ export function DiffEditor({
   const regionStore = regions ?? presentation.regions
   const panes = useDiffPanes()
   const layout = presentation.diffLayout
+  const groupRef = useRef<GroupImperativeHandle | null>(null)
+  const split = file !== null && mode === 'split'
+  useLayoutEffect(() => {
+    if (!split) return
+    // The held comparison supplies its presentation; restore its split in the same paint.
+    groupRef.current?.setLayout(layout ?? { 'diff-old': 50, 'diff-new': 50 })
+  }, [layout, presentation, split])
   useLayoutEffect(() => {
     if (file) presentation.setDiffFile(file)
   }, [file, presentation])
@@ -92,6 +100,7 @@ export function DiffEditor({
       <ResizablePanelGroup
         className='min-h-0 min-w-0'
         defaultLayout={layout}
+        groupRef={groupRef}
         id={`diff-panes-${tabId ?? 'standalone'}`}
         onLayoutChanged={(layout, meta) => {
           if (meta.isUserInteraction) presentation.setDiffLayout(layout)

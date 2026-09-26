@@ -27,7 +27,7 @@ const comparisonFrame = `() => ({
 export const diffNoFlicker: Scenario = {
   name: 'diff-no-flicker',
   description:
-    'Switch changed files through delayed blob reads, retaining comparison rows and their tab label.',
+    'Switch split comparisons through delayed blob reads, retaining rows and their tab label.',
   async run(page, { step }) {
     const fixture = await createGitFixture('diff-no-flicker')
     try {
@@ -47,6 +47,9 @@ export const diffNoFlicker: Scenario = {
       })
       await selectors.worktreeFiles(page).filter({ hasText: 'alpha.txt' }).click()
       await selectors.diffRows(page).filter({ hasText: 'alpha after' }).waitFor()
+      if ((await selectors.diffPanes(page).count()) === 1)
+        await runPaletteCommand(page, 'Toggle diff view mode')
+      await selectors.diffPanes(page).nth(1).waitFor()
       await step('loaded')
       let blank = 0
       const frames = await recordFrames<ComparisonFrame>(page, comparisonFrame, async () => {
