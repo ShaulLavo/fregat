@@ -83,14 +83,33 @@ change can reach. The targets are confirmed or revised by phase 0's measurements
    lockfile, or build them in one upfront job and hand them to the others as an artifact. Same for
    the search tools. Cache `node_modules` keyed by the lockfile if `bun install` still costs seconds
    after the cache restore.
+   Done 2026-09-26 (wave 2 lane B): the Editor's `packages/*/dist` is cached by `editor-ref` and Bun
+   version (12 MB; examples are no longer built); ghostty's build already took 0.5 s and stays;
+   `fd` and `rg` are pinned release binaries checked by SHA-256; the t3code reference is cached by
+   its pin and checked out only on a miss. The Bun cache is gone: restoring its 1.35 GB took 23 s,
+   while a cold `bun install` from the registry takes 4–5 s on a runner (measured with the cache
+   removed). Warm run 36249174610: `Setup` median 19 s (12–24 s), 180 runner-seconds per run,
+   down from 74 s and 744. That run also waited up to 1,906 s for a runner while other lanes' runs
+   held all 20, so queueing, not setup, is now the largest cost: phases 2 and 6.
 2. **Skip what a change cannot affect** (S). A path filter job decides what runs: plan- and doc-only
    PRs run format and the doc checks only; a change confined to one app skips the other app's test
    shards. Branch protection keeps one required status that summarises the rest, so skipped jobs
    never block a merge.
+   Done 2026-09-26 (wave 2 lane B): a `changes` job (dorny/paths-filter, pinned by SHA) classifies
+   a PR. Plans, docs and root Markdown are not code (the two generated docs files are); a
+   docs-only PR runs `Docs format` (oxfmt on the changed files) and nothing else. Web tests and
+   the browser job skip when only `apps/tui`, `apps/desktop`, `apps/mac` or `apps/site` changed;
+   server tests skip for `apps/web` or `apps/tui` alone; TUI tests skip for `apps/web` alone (web
+   and TUI tests drive the real server, so a server change runs both). Lint, typecheck and package
+   tests run for any code change. Pushes to main run everything. One job, `CI`, is red when any job
+   failed or was cancelled and green when the rest passed or were skipped: it is the status to
+   read. The repository has no branch protection, so nothing else changes.
 3. **Balance the test shards** (S–M). Split server tests across shards (175–182 s in one job today),
    re-balance web and TUI shards by recorded durations instead of file count, and look for the
    slowest files in each (cold process spawns, real timers) before adding shards: shards cost
    runners, and runners are the queue.
+   Done 2026-09-26 (wave 2 lane B). Web shards by recorded file duration: `apps/web/test/shard-sequencer.ts` deals files out longest first, each to the lightest shard (file time plus 0.5 s of import and setup), from `apps/web/test/shard-durations.json`; `bun run --cwd apps/web test:durations` refreshes it. Stale or missing entries cost only balance: every shard computes the same assignment, and a test proves each file lands in exactly one shard. Vitest's path-hash split had put 93 s of recorded test time on one shard and 36 s on another; locally the four shards now take 49, 50, 56 and 50 s. Server tests split in two by Vitest's own hash (207 s and 182 s of file time, close enough to skip a durations file). TUI stays one job. Slowest files, left as leads: web `settings/tests/page.test.tsx` 27 s and `keybinding-section.test.tsx` 10 s; server `fs/tests/workspace-edit.test.ts` 40 s, `lsp/tests/typescript-server.test.ts` 37 s, `machines/tests/update.test.ts` 32 s, `terminal/tests/service.test.ts` 26 s.
+
 4. **Lint and boundaries** (S). Profile the 100 s lint and the 55 s feature-boundaries check: find out
    whether the time is the tool, a type-aware rule, or a whole-repo walk that could run once and feed
    both. Run them in parallel inside one job if they are independent.
@@ -107,6 +126,13 @@ change can reach. The targets are confirmed or revised by phase 0's measurements
    `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}`.
 6. **Fewer jobs per run** (S, after 1–4). With setup down to seconds, merge small jobs (packages,
    parity, typecheck) so one run takes fewer of the 20 runners, and wave 2's eight lanes queue less.
+   Done 2026-09-26 (wave 2 lane B): package tests (57 s job, 20 s of it setup) run as the last
+   step of the typecheck job, which already prepares the Electrobun devkit they need. A full code
+   run now holds 10 runners for real work (lint, typecheck + packages, four web shards, two server
+   shards, TUI, browser) plus the seconds-long `Changes` and `CI` jobs; phase 3's second server
+   shard took back the slot this saved. Merging further lengthens the run: TUI (136 s) and browser
+   (109 s) together would outlast a web shard. Runs that touch one app or only docs use fewer
+   (phase 2).
 
 ### Editor (singapore `ci.yml`)
 
@@ -130,6 +156,8 @@ with phase 5.
 - **E5. Skip what a change cannot affect** (S). Phase 2's path filter for the Editor: plan- and
   doc-only changes run format and the doc checks only, behind one required summary status.
 - Platform's side of the Editor (building it at `editor-ref` in every job) is phase 1.
+
+A green PR is green against the `main` it was tested with. A `pull_request` run checks out GitHub's merge ref, the PR merged with `main` as it stood when the run started; #59 and #60 were each green that way and red together (2026-09-26). The fix is to test against the `main` a PR merges into: re-run (or rebase) a PR after anything else merges and merge only on that run, or let GitHub enforce it with branch protection on `main` requiring the one `CI` status (phase 2) and "Require branches to be up to date before merging". GitHub's merge queue would batch this but is not offered for a repository owned by a user account. Branch protection is a repository setting: owner decision. Main's own runs now always finish (phase 5), so a combination that slips through shows as a red `main` run naming its commit range.
 
 Larger runners cost money, which is an owner decision; this plan does not buy them.
 

@@ -4,14 +4,17 @@ import * as v from 'valibot'
 import { installationErrors } from './structured-errors'
 
 /**
- * What the server bundle loads beside itself at runtime: the `build` script's `--external`s and
- * the `import.meta.resolve` targets. A release installs exactly these on each platform.
+ * What the server bundle loads beside itself at runtime: the `build` script's `--external`s, the
+ * `import.meta.resolve` targets and the `createRequire` requires. A release installs exactly these
+ * on each platform.
  */
 export const RUNTIME_PACKAGES = [
   'sharp',
   '@anthropic-ai/claude-agent-sdk',
   'typescript',
   'typescript-language-server',
+  'jszip',
+  'subset-font',
 ] as const
 
 export const RUNTIME_MANIFEST = 'runtime/package.json'

@@ -152,6 +152,18 @@
   {
     "from": "chat-mode",
     "to": "chat",
+    "module": "features/chat/components/schedules-button.tsx",
+    "reason": "couple: the stage header shows the chat session's schedules beside its background tasks, like ContextUsageRing; merge their ownership in a later pass."
+  },
+  {
+    "from": "chat-mode",
+    "to": "chat",
+    "module": "features/chat/components/goal-button.tsx",
+    "reason": "couple: the stage header shows the chat session's goal beside its schedules, like ContextUsageRing; merge their ownership in a later pass."
+  },
+  {
+    "from": "chat-mode",
+    "to": "chat",
     "module": "features/chat/components/session-tools-button.tsx",
     "reason": "couple: the stage header shows the chat session's MCP servers and hooks, like ContextUsageRing; merge their ownership in a later pass."
   },

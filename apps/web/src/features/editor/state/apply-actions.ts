@@ -54,6 +54,12 @@ import {
 } from '@/features/workbench/utils/panels'
 import { type SearchBufferStoreApi } from '@/features/search/state/buffer-state'
 import { log } from '@/lib/client-logging'
+import { createWideEventScope } from '@/lib/wide-event-scope'
+import {
+  beginPressPaint,
+  notePressPrefetch,
+  type PressPrefetch,
+} from '@/lib/intent-prefetch/state/press-paint'
 import type { PickedFsEntry } from '@/lib/file-system-types'
 import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
 import type {
@@ -86,7 +92,8 @@ export type EditorApplyActions = {
 }
 
 export type EditorActivation = {
-  activate(content: TabContent, tabId: TabId): void
+  /** What an intent had ready for a file; null for content that is not a file. */
+  activate(content: TabContent, tabId: TabId): PressPrefetch | null
   setRoot(rootPath: FilesystemPath | null): void
 }
 
@@ -180,21 +187,23 @@ function openTabContentSurface(
     workbenchPanels,
   )
 
-  logSelectTabTransition({
+  const press = beginSelectFilePress({
     nextSelection,
     requestedContent: selectedTabContent,
     workbenchPanels,
     workspace,
   })
 
-  activateWorkbenchSelection(workbenchPanels, activation)
+  const prefetch = activateWorkbenchSelection(workbenchPanels, activation)
+  if (press && prefetch) notePressPrefetch('files', press, prefetch)
   workspaceStore.setState({
     ...nextSelection,
     editorHistory: editorHistoryForSelection(workspace.editorHistory, selectedTabContent),
   })
 }
 
-function logSelectTabTransition({
+/** Opens the `select_file` event; it ends when the file paints colour (see `press-paint`). */
+function beginSelectFilePress({
   nextSelection,
   requestedContent,
   workbenchPanels,
@@ -207,21 +216,34 @@ function logSelectTabTransition({
 }) {
   const existingTab = editorTabForContent(workspace.workbenchPanels, requestedContent)
   const requestedTab = editorTabForContent(workbenchPanels, requestedContent)
+  const previousActiveTabId = activeEditorTabForWorkbenchPanels(workspace.workbenchPanels)?.id
 
-  log.info({
+  const scope = createWideEventScope({
     action: 'editor.command.select_file',
     area: 'editor',
     existingTabId: existingTab?.id ?? null,
     nextActiveTabId: activeEditorTabForWorkbenchPanels(workbenchPanels)?.id ?? null,
     nextOpenTabContents: nextSelection.openTabContents,
     nextSelectedTabContent: nextSelection.selectedTabContent,
-    previousActiveTabId: activeEditorTabForWorkbenchPanels(workspace.workbenchPanels)?.id ?? null,
+    previousActiveTabId: previousActiveTabId ?? null,
     previousOpenTabContents: workspace.openTabContents,
     previousSelectedTabContent: workspace.selectedTabContent,
     requestedContent,
     requestedTabActive: requestedTab?.id === activeEditorTabForWorkbenchPanels(workbenchPanels)?.id,
     requestedTabId: requestedTab?.id ?? null,
   })
+  const target = filePathForContent(requestedContent)
+  if (target === null || (existingTab && existingTab.id === previousActiveTabId)) {
+    scope.end()
+    return null
+  }
+  beginPressPaint('files', target, scope)
+  return target
+}
+
+export function filePathForContent(content: TabContent): FilesystemPath | null {
+  if (content.kind !== 'document' || content.document.kind !== 'file') return null
+  return content.document.resource.path
 }
 
 function openDefinition(
@@ -593,7 +615,7 @@ export function createEditorActivation(
 ): EditorActivation {
   return {
     activate: (content, tabId) => {
-      if (content.kind !== 'document' || content.document.kind !== 'file') return
+      if (content.kind !== 'document' || content.document.kind !== 'file') return null
       const filePath = content.document.resource.path
 
       const liveClaim = fileOpenIntent.claimLive(filePath)
@@ -601,18 +623,18 @@ export function createEditorActivation(
         documentStore
           .getState()
           .ensureEditorViewForDocument(tabId, liveClaim.documentKey, liveClaim)
-        return
+        return liveClaim.preparedDocument ? 'hit' : 'live'
       }
       const cleanClaim = fileOpenIntent.claimReadyClean(filePath)
       if (cleanClaim) {
         documentStore.getState().ensureEditorView(tabId, cleanClaim.file, cleanClaim)
-        return
+        return 'hit'
       }
 
       const liveDocument = documentStore.getState().getLiveEditorDocument(fileDocumentKey(filePath))
-      if (liveDocument) {
-        documentStore.getState().ensureEditorViewForDocument(tabId, liveDocument.key)
-      }
+      if (!liveDocument) return 'miss'
+      documentStore.getState().ensureEditorViewForDocument(tabId, liveDocument.key)
+      return 'live'
     },
     setRoot: (rootPath) => rootOwner.setRoot(rootPath),
   }
@@ -621,11 +643,11 @@ export function createEditorActivation(
 export function activateWorkbenchSelection(
   panels: WorkbenchPanels,
   activation: EditorActivation,
-): void {
+): PressPrefetch | null {
   const tab = activeEditorTabForWorkbenchPanels(panels)
-  if (!tab) return
+  if (!tab) return null
 
-  activation.activate(tab.content, tab.id)
+  return activation.activate(tab.content, tab.id)
 }
 
 function updateUiForClosedContent(

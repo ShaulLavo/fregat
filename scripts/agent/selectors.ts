@@ -4,6 +4,10 @@ import { createScriptError } from '../structured-errors'
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallpaper-layer="still"]'
 export const diffPaneSelector = '.editor-diff-pane'
+export const editorViewportSelector = '.editor-virtualized-viewport'
+/** Rows the markdown live preview has decorated (headings, lists, emphasis). */
+export const markdownPreviewRowSelector = '[class*="editor-inline-"]'
+export const chatMessagesLogSelector = '[role="log"][aria-label="Messages"]'
 export const editorRowSelector = '[data-editor-virtual-row]'
 export const sharedTokenHighlightPrefix = 'editor-shared-token-'
 /** The decode plugin's hidden-rows class, its diffusion overlay, and one overlay glyph. */
@@ -280,7 +284,8 @@ export const selectors = {
     page
       .getByRole('dialog', { name: 'Choose folder', exact: true })
       .getByRole('option')
-      .filter({ hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }),
+      // Folder glyphs carry whitespace between their paths, so the name follows it.
+      .filter({ hasText: new RegExp(`^\\s*${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }),
   pickerHiddenToggle: (page: Page, shown: boolean) =>
     page.getByRole('button', {
       name: shown ? 'Hide hidden files' : 'Show hidden files',
@@ -301,6 +306,19 @@ export const selectors = {
   themeStudioOpen: (page: Page) => page.getByRole('button', { name: 'Open studio', exact: true }),
   quickOpenPreview: (page: Page) => page.getByRole('region', { name: 'File preview', exact: true }),
   pickerColumn: (page: Page, index: number) => page.locator(`[data-picker-column="${index}"]`),
+  pickerColumnBox: (page: Page, index: number) =>
+    page.locator('[data-picker-column-folder]').nth(index),
+  pickerColumnHandle: (page: Page, index: number) =>
+    page.locator('[data-picker-column-folder]').nth(index).getByRole('separator'),
+  /** 0 is the places sidebar, 1 the browsing area, 2 the preview. */
+  pickerPane: (page: Page, index: number) =>
+    selectors.pickerDialog(page).locator('[data-slot="resizable-panel"]').nth(index),
+  /** 0 sits right of the places sidebar, 1 left of the preview. */
+  pickerPaneHandle: (page: Page, index: number) =>
+    selectors.pickerDialog(page).locator('[data-slot="resizable-handle"]').nth(index),
+  pickerPreviewScroll: (page: Page) => page.locator('[data-file-preview-scroll]'),
+  pickerPreviewLines: (page: Page) => page.locator('[data-file-preview-lines]'),
+  pickerPreviewNote: (page: Page) => page.locator('[data-file-preview-scroll] [role="note"]'),
   pickerView: (page: Page, view: 'Columns' | 'List' | 'Icons') =>
     page
       .getByRole('tablist', { name: 'View', exact: true })
@@ -520,6 +538,8 @@ export const selectors = {
     page.getByRole('dialog', { name: 'Physical dialog', exact: true }),
   physicalRow: (page: Page) => page.getByRole('option', { name: 'Silent row', exact: true }),
   settingsHeader: (page: Page) => page.locator('[data-settings-header]'),
+  settingDetailsButton: (page: Page, title: string) =>
+    page.getByRole('button', { name: `About ${title}`, exact: true }),
   settingsSwitch: (page: Page, title: string) =>
     page.getByRole('switch', { name: title, exact: true }),
   settingsDependencyNote: (page: Page, parentTitle: string) =>
@@ -742,6 +762,11 @@ export const selectors = {
     page.getByRole('button', { name: 'Send correction', exact: true }),
   chatStop: (page: Page) => page.getByRole('button', { name: 'Stop current turn', exact: true }),
   chatSend: (page: Page) => page.getByRole('button', { name: 'Send message', exact: true }),
+  sleepingSchedules: (page: Page) =>
+    page.getByRole('button', { name: /^(Sleeping until|Wake-up due)/ }).first(),
+  cancelSchedules: (page: Page) =>
+    page.getByRole('button', { name: 'Cancel schedules', exact: true }),
+  sessionGoal: (page: Page) => page.getByRole('button', { name: /^Goal: / }).first(),
   turnCarryOn: (page: Page) => page.getByRole('button', { name: 'Carry on', exact: true }),
   turnTryAgain: (page: Page) => page.getByRole('button', { name: 'Try again', exact: true }),
   incompleteAnswer: (page: Page) =>
@@ -894,6 +919,8 @@ export const selectors = {
     page.getByRole('menuitem', { name: `Open pull request #${number}`, exact: true }),
   bootstrapRetry: (page: Page) =>
     page.getByRole('button', { name: 'Retry connection', exact: true }),
+  connectionRefused: (page: Page) =>
+    page.getByText('Cannot connect to the server', { exact: true }),
   bootstrapFailure: (page: Page) =>
     page.getByText('Cannot connect to the local machine', { exact: true }),
   windowToolbar: (page: Page) => page.getByLabel('Window toolbar', { exact: true }),
@@ -986,6 +1013,7 @@ export const selectors = {
 export const chords = {
   commandPalette: 'Control+Shift+P',
   togglePanel: 'Control+J',
+  nextItem: 'Control+Alt+BracketRight',
   toggleSidebar: 'Control+B',
 }
 

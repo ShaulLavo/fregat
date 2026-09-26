@@ -6,6 +6,7 @@ const LABELS: Record<ProviderMcpServerStatus, string> = {
   failed: 'Failed',
   'needs-auth': 'Needs sign-in',
   pending: 'Starting',
+  unapproved: 'Not approved',
 }
 
 export function mcpStatusLabel(status: ProviderMcpServerStatus) {
@@ -14,7 +15,7 @@ export function mcpStatusLabel(status: ProviderMcpServerStatus) {
 
 export function mcpStatusClass(status: ProviderMcpServerStatus) {
   if (status === 'failed') return 'text-destructive'
-  if (status === 'needs-auth') return 'text-warning'
+  if (status === 'needs-auth' || status === 'unapproved') return 'text-warning'
   if (status === 'connected') return 'text-success'
 
   return 'text-muted-foreground'

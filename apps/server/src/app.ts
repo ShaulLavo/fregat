@@ -46,6 +46,7 @@ import {
   recordRequestContext,
   recordRequestError,
   runDetached,
+  setLogRetentionDays,
 } from './observability'
 import { OrchestrationEngine } from './orchestration/engine'
 import { requireWorktree } from './orchestration/read-model'
@@ -78,6 +79,7 @@ import { readBranchPullRequests, type ForgeBoundaries } from './git/pull-request
 import type { BranchPullRequestLookup } from './orchestration/pull-request-sync-reactor'
 import { TerminalService, type TerminalPtyFactory } from './terminal/service'
 import type { TerminalHostClient } from './terminal/host-client'
+import type { ShellCommandReader } from './terminal/foreground'
 import { wallpaperRoutes } from './wallpaper/routes'
 import { webRoutes, type WebOptions } from './web/routes'
 import { readReleaseInfoSync } from './web/release'
@@ -112,6 +114,8 @@ export type AppOptions = FileSystemServiceOptions & {
     env?: NodeJS.ProcessEnv
     ptyFactory?: TerminalPtyFactory
     hostClient?: TerminalHostClient
+    /** Test seam: whether a shell runs a command, which fake PTYs cannot answer. */
+    shellCommand?: ShellCommandReader
   }
   fonts?: FontCatalogService
   themes?: {
@@ -178,6 +182,16 @@ export function updateForApp(app: object) {
 
 const appCleanups = new WeakMap<object, () => Promise<void>>()
 
+const MIB = 1024 * 1024
+
+/**
+ * Every file the server opens has to save. A save is JSON, where a character can take six bytes
+ * (a `\u` escape); Bun's own default is 128 MiB, which failed every save of a 129–200 MiB file.
+ */
+export function requestBodyLimit(maxTextFileBytes: number) {
+  return maxTextFileBytes * 6 + MIB
+}
+
 export function createApp(options: AppOptions) {
   const fs = new FileSystemService(options)
   const git = new GitService(fs.paths, {
@@ -213,6 +227,14 @@ export function createApp(options: AppOptions) {
   // keeps a test run from writing into the developer's real settings.
   const settings = new SettingsStore({ ...options.settings, workspaceRoot: fs.paths.workspaceRoot })
   fs.watchDirectoryLimit = () => settings.snapshot().values['files.watchDirectoryLimit']
+  fs.searchIndexSettings = () => {
+    const values = settings.snapshot().values
+    return {
+      idleMinutes: values['files.searchIndexIdleMinutes'],
+      limit: values['files.searchIndexLimit'],
+    }
+  }
+  setLogRetentionDays(() => settings.snapshot().values['logs.retentionDays'])
   let watchDirectoryLimit = settings.snapshot().values['files.watchDirectoryLimit']
   settings.onChange(() => {
     const next = settings.snapshot().values['files.watchDirectoryLimit']
@@ -434,7 +456,10 @@ export function createApp(options: AppOptions) {
     gate: orchestration,
   })
 
-  const app = new Elysia({ name: 'platform' })
+  const app = new Elysia({
+    name: 'platform',
+    serve: { maxRequestBodySize: requestBodyLimit(fs.info().maxTextFileBytes) },
+  })
   applyObservability(app)
 
   const configured = app

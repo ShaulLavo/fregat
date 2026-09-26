@@ -195,6 +195,11 @@ function liveKeyBindings(
   // A discarded prefix must not suppress otherwise compatible sibling chords.
   for (const binding of bound.toReversed()) {
     const winner = bindingClaimingKey(liveOverrides, binding)
+    // One command's own templates share a pane when only their editor conditions differ.
+    if (winner?.command === binding.command) {
+      liveOverrides.push(binding)
+      continue
+    }
     if (winner) {
       recordShadowedCommand(shadowedBy, binding, winner)
       report.push(resolutionEntry(binding, report.length, 'override', winner.command))
@@ -276,25 +281,46 @@ function userKeyBinding(
   if (keys === null) return []
 
   const chord = parsedChord(keys, platform)
-  // The default carries the pane and event handling the command was designed
-  // for; only the keys are the user's to change.
-  const template = defaults.find((binding) => binding.command === command)
+  // The defaults carry the panes and event handling the command was designed
+  // for; only the keys are the user's to change. A command bound in six panes
+  // keeps all six.
+  const templates = bindingTemplates(defaults, command)
+  const shared = {
+    chord,
+    command,
+    keys: chordKeys(chord, platform),
+    meta: commandHotkeyMeta(command),
+    source: 'user',
+  } as const
+  if (templates.length === 0) return [{ ...shared, pane: commandDefaultPane(command) }]
 
-  return [
-    {
-      command,
-      chord,
-      editorWhen: template?.editorWhen,
-      keys: chordKeys(chord, platform),
-      meta: commandHotkeyMeta(command),
-      pane: template?.pane ?? commandDefaultPane(command),
-      preventDefault: template?.preventDefault,
-      source: 'user',
-      stopPropagation: template?.stopPropagation,
-      vscodeCommandId: template?.vscodeCommandId,
-      yieldsToTextEntry: template?.yieldsToTextEntry,
-    },
-  ]
+  return templates.map((template) => ({
+    ...shared,
+    editorWhen: template.editorWhen,
+    pane: template.pane ?? commandDefaultPane(command),
+    preventDefault: template.preventDefault,
+    stopPropagation: template.stopPropagation,
+    vscodeCommandId: template.vscodeCommandId,
+    yieldsToTextEntry: template.yieldsToTextEntry,
+  }))
+}
+
+/** One default binding per distinct (pane, editor condition) the command is bound under. */
+function bindingTemplates(
+  defaults: readonly PlatformKeyBinding[],
+  command: PlatformCommandId,
+): readonly PlatformKeyBinding[] {
+  const seen = new Set<string>()
+
+  return defaults.filter((binding) => {
+    if (binding.command !== command) return false
+
+    const slot = JSON.stringify([binding.pane ?? 'any', binding.editorWhen ?? []])
+    if (seen.has(slot)) return false
+
+    seen.add(slot)
+    return true
+  })
 }
 
 function commandDefaultPane(command: PlatformCommandId): PlatformKeyBinding['pane'] {

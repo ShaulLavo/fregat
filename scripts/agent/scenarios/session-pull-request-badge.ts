@@ -42,22 +42,22 @@ function plannedCases(): readonly Case[] {
     {
       name: 'open',
       forge: pullRequest(31, 'OPEN'),
-      badge: { state: 'open', label: 'Pull request #31 · Open: Badge change 31' },
+      badge: { state: 'open', label: 'Pull request fregat/fixture#31 · Open: Badge change 31' },
     },
     {
       name: 'draft',
       forge: pullRequest(32, 'OPEN', true),
-      badge: { state: 'draft', label: 'Pull request #32 · Draft: Badge change 32' },
+      badge: { state: 'draft', label: 'Pull request fregat/fixture#32 · Draft: Badge change 32' },
     },
     {
       name: 'merged',
       forge: pullRequest(33, 'MERGED'),
-      badge: { state: 'merged', label: 'Pull request #33 · Merged: Badge change 33' },
+      badge: { state: 'merged', label: 'Pull request fregat/fixture#33 · Merged: Badge change 33' },
     },
     {
       name: 'closed',
       forge: pullRequest(34, 'CLOSED'),
-      badge: { state: 'closed', label: 'Pull request #34 · Closed: Badge change 34' },
+      badge: { state: 'closed', label: 'Pull request fregat/fixture#34 · Closed: Badge change 34' },
     },
     { name: 'none', forge: null, badge: null },
     {

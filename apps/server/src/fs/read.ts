@@ -1,4 +1,4 @@
-import { readFile, stat } from 'node:fs/promises'
+import { open, readFile, stat } from 'node:fs/promises'
 import { FsError, mapNodeError } from './errors'
 import { resolveExistingPath, type WorkspacePaths } from './path'
 import { assertFile } from './stat'
@@ -65,6 +65,47 @@ export async function readTextFile(
     if (error instanceof FsError) throw error
     throw mapNodeError(error)
   }
+}
+
+export type TextHeadResult = {
+  path: string
+  content: string
+  size: number
+  /** The file goes on past `content`. */
+  truncated: boolean
+}
+
+/** The first `maxBytes` of a text file, cut at a line end so no character is split. */
+export async function readTextHead(
+  paths: WorkspacePaths,
+  input: string,
+  maxBytes: number,
+): Promise<TextHeadResult> {
+  try {
+    const target = await resolveExistingPath(paths, input)
+    const handle = await open(target.absolutePath, 'r')
+    try {
+      const stats = await handle.stat()
+      assertFile(stats)
+      const buffer = new Uint8Array(Math.min(maxBytes, stats.size))
+      const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0)
+      const truncated = stats.size > bytesRead
+      const decoded = decodeText(truncated ? wholeLines(buffer.subarray(0, bytesRead)) : buffer)
+      if (decoded.seemsBinary) throw new FsError('FILE_IS_BINARY')
+      return { path: target.relativePath, content: decoded.content, size: stats.size, truncated }
+    } finally {
+      await handle.close()
+    }
+  } catch (error) {
+    if (error instanceof FsError) throw error
+    throw mapNodeError(error)
+  }
+}
+
+// A budget cut can land inside a multi-byte character; ending at the last newline avoids that.
+function wholeLines(bytes: Uint8Array) {
+  const lastNewline = bytes.lastIndexOf(0x0a)
+  return lastNewline < 0 ? bytes : bytes.subarray(0, lastNewline + 1)
 }
 
 export async function getBlobFile(paths: WorkspacePaths, input: string): Promise<BlobFileResult> {

@@ -33,6 +33,8 @@ export type ClaudeQueryOptionsInput = ClaudeRuntimeSelection & {
   cwd: string
   /** Per-instance spawn env. Absent means "inherit the server's env untouched". */
   env?: NodeJS.ProcessEnv
+  /** In-process hook callbacks; they add to the hooks the user's settings declare. */
+  hooks?: Options['hooks']
   /** The instance's resolved CLI; without it the SDK runs its bundled one. */
   executablePath: string
   model: string
@@ -44,6 +46,8 @@ export type ClaudeQueryOptionsInput = ClaudeRuntimeSelection & {
   sessionId: SessionId
   /** The agent definition the main thread runs as (`--agent`). */
   agent?: string
+  /** The checkout's `.mcp.json` servers the owner has not approved; they stay off. */
+  unapprovedProjectMcpServers?: string[]
   /** A new session branching off `sourceSessionId`, cut after `resumeSessionAt` when set. */
   fork?: ClaudeForkOptions
 }
@@ -129,6 +133,18 @@ function claudeSessionOptions(input: {
   return { sessionId: input.sessionId }
 }
 
+/** Reasoning settings and the project MCP gate share the one flag-settings object. */
+function claudeSettingsOptions(
+  input: ClaudeQueryOptionsInput,
+): Pick<Options, 'effort' | 'settings'> {
+  const reasoning = claudeReasoningQueryOptions(input.reasoning ?? {})
+  const gated = input.unapprovedProjectMcpServers ?? []
+  if (gated.length === 0) return reasoning
+
+  const settings = typeof reasoning.settings === 'object' ? reasoning.settings : {}
+  return { ...reasoning, settings: { ...settings, disabledMcpjsonServers: gated } }
+}
+
 export function claudeQueryOptions(input: ClaudeQueryOptionsInput): Options {
   return {
     abortController: input.abortController,
@@ -143,10 +159,11 @@ export function claudeQueryOptions(input: ClaudeQueryOptionsInput): Options {
     ...(input.persistSession === undefined ? {} : { persistSession: input.persistSession }),
     settingSources: ['user', 'project', 'local'],
     systemPrompt: { preset: 'claude_code', type: 'preset' },
-    ...claudeReasoningQueryOptions(input.reasoning ?? {}),
+    ...claudeSettingsOptions(input),
     ...claudePermissionOptions(input),
     ...claudeSessionOptions(input),
     ...(input.canUseTool ? { canUseTool: input.canUseTool } : {}),
+    ...(input.hooks ? { hooks: input.hooks } : {}),
     // Absent `env` makes the CLI inherit process.env untouched, which is what a
     // single-instance install wants. When it is present it carries
     // CLAUDE_CONFIG_DIR for the instance — NEVER an overridden HOME: that

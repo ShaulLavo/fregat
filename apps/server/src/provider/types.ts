@@ -11,6 +11,8 @@ import type {
   ProviderAgent,
   ProviderAuth,
   ProviderBackgroundTask,
+  ProviderGoalAction,
+  ProviderSessionGoal,
   ProviderDriverKind,
   ProviderMcpServer,
   ProviderMcpSignIn,
@@ -20,6 +22,7 @@ import type {
   ProviderSignInMethod,
   ProviderSkill,
   ProviderSlashCommand,
+  ProviderTurnOrigin,
   SessionRuntimeStatus,
   SessionTurnKind,
   ProviderSnapshot,
@@ -158,6 +161,14 @@ type ProviderRuntimePlanStepStatus = 'pending' | 'inProgress' | 'completed'
 
 /** `blocked` is a hook that refused the action it guarded, which is not the same as failing. */
 export type ProviderHookOutcome = 'success' | 'blocked' | 'error' | 'cancelled'
+
+/** A session cron, `ScheduleWakeup` or `/loop` as the harness reports it (five-field cron). */
+export type ProviderHarnessSchedule = {
+  id: string
+  schedule: string
+  recurring: boolean
+  prompt: string
+}
 
 export type ProviderRuntimeEvent = ProviderRuntimeEventPayload & { runtimeEpoch: string }
 
@@ -369,7 +380,8 @@ export type ProviderRuntimeEventPayload =
     })
   | (ProviderRuntimeBaseEvent & {
       type: 'turn.started'
-      payload: { effort?: string; model?: string }
+      /** `origin` marks a turn the harness started with no prompt of ours. */
+      payload: { effort?: string; model?: string; origin?: ProviderTurnOrigin }
     })
   | (ProviderRuntimeBaseEvent & {
       type: 'turn.completed'
@@ -396,6 +408,16 @@ export type ProviderRuntimeEventPayload =
       /** Every live, non-ambient background task; replaces the previous set. */
       type: 'tasks.roster'
       payload: { tasks: ProviderBackgroundTask[] }
+    })
+  | (ProviderRuntimeBaseEvent & {
+      /** The session's goal as the harness last reported it; null once cleared or met. */
+      type: 'goal.updated'
+      payload: { goal: ProviderSessionGoal | null }
+    })
+  | (ProviderRuntimeBaseEvent & {
+      /** Every schedule the harness process holds after a turn; replaces the previous set. */
+      type: 'schedules.updated'
+      payload: { schedules: ProviderHarnessSchedule[] }
     })
   | (ProviderRuntimeBaseEvent & {
       type: 'hook.started'
@@ -605,6 +627,8 @@ export type ProviderAdapter = {
   /** The session's MCP servers; null when it has no live provider process to ask. */
   mcpServers?: (input: { sessionId: SessionId }) => Promise<ProviderMcpServer[] | null>
   reconnectMcpServer?: (input: { name: string; sessionId: SessionId }) => Promise<void>
+  /** Approves a checkout's project server this session turned off, and restarts an idle session. */
+  approveMcpServer?: (input: { name: string; sessionId: SessionId }) => Promise<void>
   signInMcpServer?: (input: { name: string; sessionId: SessionId }) => Promise<ProviderMcpSignIn>
   /** Hooks configured for the checkout; null when the session has no live provider process. */
   configuredHooks?: (input: {
@@ -613,6 +637,8 @@ export type ProviderAdapter = {
   }) => Promise<Pick<ProviderSessionHooks, 'errors' | 'hooks'> | null>
   /** Stops one background task without stopping the agent. */
   stopBackgroundTask?: (input: { sessionId: SessionId; taskId: string }) => Promise<void>
+  /** Pauses, resumes or clears the session's goal without a turn; the adapter reports the result. */
+  controlGoal?: (input: { action: ProviderGoalAction; sessionId: SessionId }) => Promise<void>
   prepareRollbackSession: (input: {
     numTurns: number
     sessionId: SessionId

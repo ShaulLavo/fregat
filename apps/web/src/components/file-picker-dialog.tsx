@@ -24,6 +24,11 @@ import {
 } from '@workspace/ui/components/dialog'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@workspace/ui/components/input-group'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
+import {
+  PersistedResizablePanelGroup,
+  ResizableHandle,
+  ResizablePanel,
+} from '@workspace/ui/components/resizable'
 import { Separator } from '@workspace/ui/components/separator'
 import { deriveWriteTarget, policyControlledIds } from '@workspace/contracts'
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
@@ -45,6 +50,8 @@ import {
   type PickerView,
 } from '@/features/file-picker/utils/columns'
 import { useElementWidth } from '@/hooks/use-element-width'
+import { useWideLayout } from '@/features/file-picker/hooks/use-wide-layout'
+import { BROWSE_MIN_PX, PLACES_PANE, PREVIEW_PANE } from '@/features/file-picker/utils/panes'
 import { Tabs, TabsList, TabsTab } from '@workspace/ui/components/tabs'
 import { ListHeader } from '@/features/file-picker/components/list-header'
 import {
@@ -57,7 +64,6 @@ import {
   pickerCopy,
   toPickedEntry,
   type EntriesLoadState,
-  type FilePickerIconMode,
   type FilePickerMode,
 } from '@/features/file-picker/utils/model'
 import { NewFolderPopover } from '@/features/file-picker/components/new-folder-popover'
@@ -79,6 +85,7 @@ import {
 import { useFilePickerSession } from '@/features/file-picker/state/picker'
 import { useDirectoryLoad } from '@/features/file-picker/hooks/use-directory-load'
 import { useRecentEntries } from '@/features/file-picker/hooks/use-recent-entries'
+import { usePlaces } from '@/features/file-picker/hooks/use-places'
 import { useServerInfoForOpen } from '@/features/file-picker/hooks/use-server-info-for-open'
 import {
   isBackShortcut,
@@ -100,7 +107,6 @@ import { useSettingsActions } from '@/features/settings/hooks/use-settings-actio
 
 type FilePickerDialogProps = {
   accept?: readonly string[]
-  iconMode?: FilePickerIconMode
   mode?: FilePickerMode
   open: boolean
   value: PickedFsEntry | null
@@ -114,7 +120,6 @@ export type { FilePickerMode }
 
 export function FilePickerDialog({
   accept,
-  iconMode,
   mode = 'folder',
   open,
   value,
@@ -150,6 +155,7 @@ export function FilePickerDialog({
     serverInfo,
     showHidden,
   })
+  const { places, refresh: refreshPlaces } = usePlaces(open, serverInfo)
   const { loadState: recentState, refresh: refreshRecents } = useRecentEntries({
     mode,
     open,
@@ -212,6 +218,7 @@ export function FilePickerDialog({
   const viewSetting = useSettingValue('files.picker.view')
   const chosenView = pickerView(viewSetting, mode)
   const [middleRef, middleWidth] = useElementWidth<HTMLDivElement>()
+  const wide = useWideLayout()
   const view = shownPickerView(chosenView, isSearching, middleWidth)
   const [trailState, setTrailState] = useState<{ path: string; trail: ColumnTrail } | null>(null)
   const heldTrail =
@@ -237,12 +244,12 @@ export function FilePickerDialog({
   const hiddenManagedByPolicy = policyControlledIds(settingsLayers).includes('files.showHidden')
   const hiddenSettingDisabled = !settings || hiddenManagedByPolicy
   const copy = pickerCopy(mode)
-  const displayedIconMode = iconMode ?? (mode === 'file' ? 'vscode' : 'default')
   // The list rows consume these actions through context, so identity must stay
   // stable while typing or scrolling to avoid rerendering every visible row.
   const sessionActions: FilePickerSessionActions = {
     jumpTo: navigateTo,
     navigateTo,
+    resizeColumn: session.setColumnWidth,
     revealEntry,
     selectEntry: session.setSelectedEntry,
   }
@@ -258,7 +265,7 @@ export function FilePickerDialog({
   }, [preloadDirectory, focusedEntry])
 
   function refresh() {
-    void Promise.all([refreshDirectory(), refreshRecents(), refreshServerInfo()])
+    void Promise.all([refreshDirectory(), refreshRecents(), refreshPlaces(), refreshServerInfo()])
   }
 
   function goBack() {
@@ -479,6 +486,73 @@ export function FilePickerDialog({
     session.setSelectedEntry(entry)
   }
 
+  const browsing = (
+    <div className='bg-background h-full min-h-0' ref={middleRef}>
+      {view === 'columns' ? (
+        <ColumnsView
+          accept={activeAccept}
+          columnWidths={session.columnWidths}
+          currentPath={session.currentPath}
+          isBusy={listInteractionPending}
+          mode={mode}
+          showHidden={showHidden}
+          trail={trail}
+          onCommit={commitEntry}
+          onDirectoryIntent={guessDirectory}
+          onGoParent={() => {
+            // Finder keeps the folder just left selected in the new first column.
+            if (session.canGoUp)
+              navigateSelecting(pickerParentPath(session.currentPath), currentEntry)
+          }}
+          onOpen={handleEntryDoubleClick}
+          onTrailChange={changeTrail}
+        />
+      ) : view === 'icons' ? (
+        <IconsView
+          entries={entries}
+          isBusy={listInteractionPending}
+          listRef={listRef}
+          loadState={loadState}
+          onRetry={refresh}
+          mode={mode}
+          selectedPath={selectedEntry?.path ?? null}
+          onCommitEntry={commitEntry}
+          onEntryDoubleClick={handleEntryDoubleClick}
+          onGoParent={() => {
+            if (session.canGoUp) navigateTo(pickerParentPath(session.currentPath))
+          }}
+        />
+      ) : (
+        <div className='grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]'>
+          <ListHeader
+            isLoading={loadState.status === 'loading' || listInteractionPending}
+            isSearching={isSearching}
+            mode={mode}
+            onSort={handleSort}
+            sort={effectiveSort}
+          />
+          <FileList
+            accept={activeAccept}
+            entries={entries}
+            isBusy={listInteractionPending}
+            isSearching={isSearching}
+            listRef={listRef}
+            loadState={loadState}
+            mode={mode}
+            onDirectoryIntent={guessDirectory}
+            onEntryDoubleClick={handleEntryDoubleClick}
+            onCommitEntry={commitEntry}
+            onGoParent={() => {
+              if (session.canGoUp) navigateTo(pickerParentPath(session.currentPath))
+            }}
+            onRetry={refresh}
+            selectedPath={selectedEntry?.path ?? null}
+          />
+        </div>
+      )}
+    </div>
+  )
+
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent
@@ -650,91 +724,55 @@ export function FilePickerDialog({
             <MobileLocations
               currentPath={session.currentPath}
               homePath={homePath}
+              places={places}
               recentState={recentState}
             />
           </div>
 
-          <div className='grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[170px_minmax(0,1fr)_240px]'>
-            <PlacesSidebar
-              currentPath={session.currentPath}
-              homePath={homePath}
-              recentState={recentState}
-            />
-            <div className='bg-background min-h-0' ref={middleRef}>
-              {view === 'columns' ? (
-                <ColumnsView
-                  accept={activeAccept}
+          {wide ? (
+            <PersistedResizablePanelGroup
+              className='min-h-0 flex-1'
+              id='file-picker'
+              storageKey='file-picker'
+            >
+              <ResizablePanel
+                className='min-h-0'
+                defaultSize={PLACES_PANE.defaultPx}
+                id='places'
+                maxSize={PLACES_PANE.maxPx}
+                minSize={PLACES_PANE.minPx}
+              >
+                <PlacesSidebar
                   currentPath={session.currentPath}
-                  iconMode={displayedIconMode}
-                  isBusy={listInteractionPending}
+                  homePath={homePath}
+                  places={places}
+                  recentState={recentState}
+                />
+              </ResizablePanel>
+              <ResizableHandle id='places-handle' withHandle />
+              <ResizablePanel className='min-h-0 min-w-0' id='browse' minSize={BROWSE_MIN_PX}>
+                {browsing}
+              </ResizablePanel>
+              <ResizableHandle id='preview-handle' withHandle />
+              <ResizablePanel
+                className='min-h-0 min-w-0'
+                defaultSize={PREVIEW_PANE.defaultPx}
+                id='preview'
+                maxSize={PREVIEW_PANE.maxPx}
+                minSize={PREVIEW_PANE.minPx}
+              >
+                <PreviewPane
+                  accept={activeAccept}
+                  entry={previewEntry}
+                  isSearching={isSearching}
                   mode={mode}
                   showHidden={showHidden}
-                  trail={trail}
-                  onCommit={commitEntry}
-                  onDirectoryIntent={guessDirectory}
-                  onGoParent={() => {
-                    // Finder keeps the folder just left selected in the new first column.
-                    if (session.canGoUp)
-                      navigateSelecting(pickerParentPath(session.currentPath), currentEntry)
-                  }}
-                  onOpen={handleEntryDoubleClick}
-                  onTrailChange={changeTrail}
                 />
-              ) : view === 'icons' ? (
-                <IconsView
-                  entries={entries}
-                  iconMode={displayedIconMode}
-                  isBusy={listInteractionPending}
-                  listRef={listRef}
-                  loadState={loadState}
-                  onRetry={refresh}
-                  mode={mode}
-                  selectedPath={selectedEntry?.path ?? null}
-                  onCommitEntry={commitEntry}
-                  onEntryDoubleClick={handleEntryDoubleClick}
-                  onGoParent={() => {
-                    if (session.canGoUp) navigateTo(pickerParentPath(session.currentPath))
-                  }}
-                />
-              ) : (
-                <div className='grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]'>
-                  <ListHeader
-                    isLoading={loadState.status === 'loading' || listInteractionPending}
-                    isSearching={isSearching}
-                    mode={mode}
-                    onSort={handleSort}
-                    sort={effectiveSort}
-                  />
-                  <FileList
-                    accept={activeAccept}
-                    entries={entries}
-                    iconMode={displayedIconMode}
-                    isBusy={listInteractionPending}
-                    isSearching={isSearching}
-                    listRef={listRef}
-                    loadState={loadState}
-                    mode={mode}
-                    onDirectoryIntent={guessDirectory}
-                    onEntryDoubleClick={handleEntryDoubleClick}
-                    onCommitEntry={commitEntry}
-                    onGoParent={() => {
-                      if (session.canGoUp) navigateTo(pickerParentPath(session.currentPath))
-                    }}
-                    onRetry={refresh}
-                    selectedPath={selectedEntry?.path ?? null}
-                  />
-                </div>
-              )}
-            </div>
-            <PreviewPane
-              accept={activeAccept}
-              entry={previewEntry}
-              iconMode={displayedIconMode}
-              isSearching={isSearching}
-              mode={mode}
-              showHidden={showHidden}
-            />
-          </div>
+              </ResizablePanel>
+            </PersistedResizablePanelGroup>
+          ) : (
+            <div className='min-h-0 flex-1'>{browsing}</div>
+          )}
 
           {mode === 'file' && accept?.length ? (
             <PaneBar className='shrink-0 justify-end'>
@@ -755,7 +793,7 @@ export function FilePickerDialog({
             </PaneBar>
           ) : null}
           <DialogFooter className='flex h-(--bar-height) shrink-0 flex-row items-center justify-between gap-(--density-control-gap) px-(--bar-padding-x) sm:justify-between'>
-            <SelectedSummary entry={selectedPickable} iconMode={displayedIconMode} mode={mode} />
+            <SelectedSummary entry={selectedPickable} mode={mode} />
             <span
               className='text-muted-foreground text-2xs ml-auto shrink-0 font-mono tabular-nums'
               role='status'

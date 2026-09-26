@@ -348,39 +348,27 @@ describe('fs rpc filesystem limits', () => {
     expect(await tree.json()).toMatchObject({ path: '' })
   })
 
-  it('reports no boot-time index root, then the folder opened through the app', async () => {
+  it('reports no index at boot, then one for the root a project stream holds', async () => {
     const root = await fixtureRoot()
     await mkdir(path.join(root, 'repo'), { recursive: true })
     const app = testApp(root, { watch: false })
-    const before = await app.handle(
-      new Request('http://local/health', { headers: trustedOriginHeaders() }),
+    const health = async () =>
+      (await (
+        await app.handle(new Request('http://local/health', { headers: trustedOriginHeaders() }))
+      ).json()) as { workspaceIndexes: { holderCount: number; scanRoot: string | null }[] }
+
+    expect((await health()).workspaceIndexes).toEqual([])
+
+    const stream = await app.handle(
+      new Request('http://local/fs/events?path=repo', { headers: trustedOriginHeaders() }),
     )
+    const events = createSseReader(stream)
+    expect(await events.next()).toMatchObject({ type: 'ready' })
 
-    expect(await before.json()).toMatchObject({
-      workspaceIndex: {
-        readiness: 'cold',
-        scanRoot: null,
-      },
-    })
-
-    const opened = await app.handle(
-      new Request('http://local/fs/workspace-root', {
-        body: JSON.stringify({ generation: 1, path: 'repo' }),
-        headers: trustedOriginHeaders({ 'content-type': 'application/json' }),
-        method: 'POST',
-      }),
-    )
-    expect(opened.status).toBe(200)
-
-    const health = await app.handle(
-      new Request('http://local/health', { headers: trustedOriginHeaders() }),
-    )
-    const payload = (await health.json()) as {
-      workspaceIndex: { readiness: string; scanRoot: string | null }
-    }
-
-    expect(payload.workspaceIndex.scanRoot).toBe(path.join(root, 'repo'))
-    expect(['cold', 'building', 'ready']).toContain(payload.workspaceIndex.readiness)
+    expect((await health()).workspaceIndexes).toMatchObject([
+      { holderCount: 1, scanRoot: path.join(root, 'repo') },
+    ])
+    await events.close()
   })
 
   it('rejects text reads above the configured cap', async () => {
@@ -580,17 +568,13 @@ describe('fs rpc filesystem limits', () => {
 
     expect(enabledPayload).toMatchObject({
       watchEnabled: true,
-      workspaceIndex: expect.objectContaining({
-        readiness: expect.any(String),
-      }),
+      workspaceIndexes: [],
     })
     expect(enabledPayload.nativeWatcherCount).toEqual(expect.any(Number))
     expect(disabledPayload).toMatchObject({
       nativeWatcherCount: 0,
       watchEnabled: false,
-      workspaceIndex: expect.objectContaining({
-        readiness: expect.any(String),
-      }),
+      workspaceIndexes: [],
     })
   })
 
@@ -615,11 +599,7 @@ describe('fs rpc filesystem limits', () => {
     expect(await health.json()).toMatchObject({
       nativeWatcherCount: 0,
       watchEnabled: true,
-      workspaceIndex: expect.objectContaining({
-        entryCount: 0,
-        readiness: 'cold',
-        scanRoot: null,
-      }),
+      workspaceIndexes: [],
       workspaceRoot: root,
     })
   })

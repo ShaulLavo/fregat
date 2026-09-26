@@ -2,6 +2,7 @@ import path from 'node:path'
 import react from '@vitejs/plugin-react'
 import { gitFixtureEnv } from 'server/testing/git-identity'
 import { defineConfig } from 'vitest/config'
+import DurationSequencer from './test/shard-sequencer'
 
 // Shared resolution so every project reads the same `@/` paths as the app.
 const alias = {
@@ -16,6 +17,8 @@ const reactPlugin = () => react({ compiler: true })
 export default defineConfig({
   test: {
     env: gitFixtureEnv,
+    // CI shards by recorded file durations; refresh them with `bun run test:durations`.
+    sequence: { sequencer: DurationSequencer },
     projects: [
       {
         // Pure logic + anything that talks to the in-process server. No DOM.

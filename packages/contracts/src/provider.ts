@@ -247,12 +247,63 @@ export const providerBackgroundTasksSchema = v.object({
   tasks: v.array(providerBackgroundTaskSchema),
 })
 
+/**
+ * One session-scoped schedule the harness will wake the session for: a cron, a
+ * `ScheduleWakeup` or a `/loop`. `nextFireAt` is null when the expression never matches again.
+ */
+export const providerSessionScheduleSchema = v.object({
+  id: trimmedNonEmptyStringSchema,
+  schedule: v.string(),
+  recurring: v.boolean(),
+  prompt: v.string(),
+  nextFireAt: v.nullable(isoDateTimeSchema),
+})
+
+/** `heldByBackgroundWork`: the harness fires nothing while background work runs. */
+export const providerSessionSchedulesSchema = v.object({
+  schedules: v.array(providerSessionScheduleSchema),
+  heldByBackgroundWork: v.boolean(),
+})
+
+export const providerSessionGoalStatusSchema = v.picklist([
+  'active',
+  'paused',
+  'blocked',
+  'usage-limited',
+  'budget-limited',
+  'complete',
+])
+
+/**
+ * The goal a harness works toward across turns: a Codex thread goal or a Claude `/goal`.
+ * Codex reports budget and use; Claude reports its check count and last verdict.
+ */
+export const providerSessionGoalSchema = v.object({
+  objective: v.string(),
+  status: providerSessionGoalStatusSchema,
+  tokenBudget: v.nullable(v.number()),
+  tokensUsed: v.nullable(v.number()),
+  timeUsedSeconds: v.nullable(v.number()),
+  iterations: v.nullable(v.number()),
+  lastReason: v.nullable(v.string()),
+})
+
+/** `controllable`: the provider pauses, resumes and clears on request; otherwise `/goal clear`. */
+export const providerSessionGoalStateSchema = v.object({
+  goal: v.nullable(providerSessionGoalSchema),
+  controllable: v.boolean(),
+})
+
+export const providerGoalActionSchema = v.picklist(['pause', 'resume', 'clear'])
+
 export const providerMcpServerStatusSchema = v.picklist([
   'connected',
   'failed',
   'needs-auth',
   'pending',
   'disabled',
+  // A checkout's project server the owner has not approved; it stays off until approved.
+  'unapproved',
 ])
 
 export const providerMcpServerSchema = v.object({
@@ -305,6 +356,12 @@ export type ProviderSessionHooks = v.InferOutput<typeof providerSessionHooksSche
 export type ProviderAgent = v.InferOutput<typeof providerAgentSchema>
 export type ProviderBackgroundTask = v.InferOutput<typeof providerBackgroundTaskSchema>
 export type ProviderBackgroundTasks = v.InferOutput<typeof providerBackgroundTasksSchema>
+export type ProviderSessionGoalStatus = v.InferOutput<typeof providerSessionGoalStatusSchema>
+export type ProviderSessionGoal = v.InferOutput<typeof providerSessionGoalSchema>
+export type ProviderSessionGoalState = v.InferOutput<typeof providerSessionGoalStateSchema>
+export type ProviderGoalAction = v.InferOutput<typeof providerGoalActionSchema>
+export type ProviderSessionSchedule = v.InferOutput<typeof providerSessionScheduleSchema>
+export type ProviderSessionSchedules = v.InferOutput<typeof providerSessionSchedulesSchema>
 export type ProviderSignInMethod = v.InferOutput<typeof providerSignInMethodSchema>
 export type ProviderLoginState = v.InferOutput<typeof providerLoginStateSchema>
 export type ProviderLoginAttempt = v.InferOutput<typeof providerLoginAttemptSchema>

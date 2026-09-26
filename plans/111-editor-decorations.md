@@ -1,6 +1,7 @@
 # Editor decorations: learn from CodeMirror and Lexical, then beat what we have
 
-Status: **research done 2026-09-25; proposed phases below await the owner questions.** Requested 2026-09-13.
+Status: **Phase 1 implemented 2026-09-26** (wave 2 lane E2, Editor `6544b02`); phases 2–3 are
+Plan 171's, phases 4–5 wave 3. Research done 2026-09-25. Requested 2026-09-13.
 
 Decided 2026-09-25: owner — the research is authorized, with the chat composer as its first consumer
 (question 7; Plan 126 INTERACTION-11 deletes Lexical). The owner wants it done before the next wave.
@@ -168,3 +169,27 @@ The follow-up plans this becomes; numbers are the coordinator's to assign.
 5. **Editor: block widgets** (L). Height sums in the display projection, measure-and-correct with scroll anchoring, caret and hit testing across block rows. Unblocks Plan 108 Phase 2.
 
 Phases 1–3 are the composer path; 4 and 5 are the markdown path and can run after.
+
+### Phase 1 as landed (2026-09-26)
+
+Editor PR singapore#37, merged as `6544b02` (commits `88a2a16` and the review fixes `42837cc`: a syntax-triggered provider's map is carried across
+edits by its anchors instead of rerun on stale captures, and an edit-triggered provider derives chips for text
+set after it registered), covered on `new Editor(element)` plus `setText` (`test/atomicReplacements.test.ts`,
+`test/atomicReplacements.browser.test.ts`, `test/pasteHandlers.test.ts` drop cases, `test/inlineMap.test.ts`
+reveal cases):
+
+- `InlineReplacementSpec` gains `reveal: 'touch' | 'inside' | 'never'`, `atomic` and `key`. Atomic spans stop
+  logical, word, visual and vertical motion at their edges; Backspace, Delete, word delete, selection delete
+  and soft-keyboard range deletes take them whole.
+- `registerInlineReplacementProvider(provider, { trigger: 'edit' })` (and `setInlineReplacementProvider`)
+  reruns inside every operation that edits or moves a selection, with no capture demand. The context gains
+  `selections`. Syntax-triggered providers rerun only when captures land; between parses their map is
+  carried to the current text by its anchors and merged with the edit-derived specs. The rename to `registerDecorationSource` stays with Phase 4, where the unified range set
+  lands.
+- Host shape from Plan 171: `scrollPastEnd`, `onDidChangeContentHeight` / `getContentHeight`, `inputLabel`,
+  `inputKind: 'prose'` (autocapitalize, autocorrect), `autoClosingPairs` and `surroundingPairs`, public
+  `getSelections()`, drops read through `EDITOR_PASTE_HANDLER` (`context.source`).
+- Bug fixed on the way: the display column at a visible replacement's end resolved to the replacement's start
+  under `before` bias, so Left from the column after a chip skipped the character next to it (Plan 171 row 1c).
+- Not in Phase 1: source `priority` (Phase 4), "wrap keeps a replacement whole" (lands with word-boundary
+  wrap, Plan 171 phase 2).

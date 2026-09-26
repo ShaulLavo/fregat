@@ -45,7 +45,7 @@ pattern layer must not.
 Features are leaves. `platform-boundaries/feature-imports` checks exact importer/module pairs in
 `scripts/lint/web-feature-allow.json`, rejects new edges and rejects stale or unexplained entries.
 The initial freeze contained 246 entries across 62 directed feature edges. The first migration
-removed eight entries and three edges. Run `bun run boundaries:check` to check the live graph.
+removed eight entries and three edges. Run `bun run --cwd apps/web lint` to check the live graph.
 
 Feature query and mutation keys live in `utils/query-keys.ts` and `utils/mutation-keys.ts`.
 Shared groups remain in `lib` only when multiple outside consumers use them. Streaming workspace

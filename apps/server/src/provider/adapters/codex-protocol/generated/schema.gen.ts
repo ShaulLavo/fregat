@@ -2846,6 +2846,76 @@ export type CodexThreadForkResponse = v.InferOutput<typeof CodexThreadForkRespon
 
 export type V2ThreadForkResponse = v.InferOutput<typeof CodexThreadForkResponseSchema>
 
+export type V2ThreadGoalClearedNotification = v.InferOutput<
+  typeof CodexThreadArchivedNotificationSchema
+>
+
+export type V2ThreadGoalClearParams = v.InferOutput<typeof CodexThreadArchivedNotificationSchema>
+
+export const CodexThreadGoalClearResponseSchema = v.looseObject({ cleared: v.boolean() })
+export type CodexThreadGoalClearResponse = v.InferOutput<typeof CodexThreadGoalClearResponseSchema>
+
+export type V2ThreadGoalClearResponse = v.InferOutput<typeof CodexThreadGoalClearResponseSchema>
+
+export type V2ThreadGoalGetParams = v.InferOutput<typeof CodexThreadArchivedNotificationSchema>
+
+export const CodexThreadGoalStatusSchema = openEnum([
+  'active',
+  'paused',
+  'blocked',
+  'usageLimited',
+  'budgetLimited',
+  'complete',
+])
+export type CodexThreadGoalStatus = v.InferOutput<typeof CodexThreadGoalStatusSchema>
+
+export const CodexThreadGoalSchema = v.looseObject({
+  createdAt: v.pipe(v.number(), v.integer()),
+  objective: v.string(),
+  status: CodexThreadGoalStatusSchema,
+  threadId: v.string(),
+  timeUsedSeconds: v.pipe(v.number(), v.integer()),
+  tokenBudget: v.optional(v.union([v.pipe(v.number(), v.integer()), v.null()])),
+  tokensUsed: v.pipe(v.number(), v.integer()),
+  updatedAt: v.pipe(v.number(), v.integer()),
+})
+export type CodexThreadGoal = v.InferOutput<typeof CodexThreadGoalSchema>
+
+export const CodexThreadGoalGetResponseSchema = v.looseObject({
+  goal: v.optional(v.union([CodexThreadGoalSchema, v.null()])),
+})
+export type CodexThreadGoalGetResponse = v.InferOutput<typeof CodexThreadGoalGetResponseSchema>
+
+export type V2ThreadGoalGetResponse = v.InferOutput<typeof CodexThreadGoalGetResponseSchema>
+
+export const CodexThreadGoalSetParamsSchema = v.looseObject({
+  objective: v.optional(v.union([v.string(), v.null()])),
+  status: v.optional(v.union([CodexThreadGoalStatusSchema, v.null()])),
+  threadId: v.string(),
+  tokenBudget: v.optional(v.union([v.pipe(v.number(), v.integer()), v.null()])),
+})
+export type CodexThreadGoalSetParams = v.InferOutput<typeof CodexThreadGoalSetParamsSchema>
+
+export type V2ThreadGoalSetParams = v.InferOutput<typeof CodexThreadGoalSetParamsSchema>
+
+export const CodexThreadGoalSetResponseSchema = v.looseObject({ goal: CodexThreadGoalSchema })
+export type CodexThreadGoalSetResponse = v.InferOutput<typeof CodexThreadGoalSetResponseSchema>
+
+export type V2ThreadGoalSetResponse = v.InferOutput<typeof CodexThreadGoalSetResponseSchema>
+
+export const CodexThreadGoalUpdatedNotificationSchema = v.looseObject({
+  goal: CodexThreadGoalSchema,
+  threadId: v.string(),
+  turnId: v.optional(v.union([v.string(), v.null()])),
+})
+export type CodexThreadGoalUpdatedNotification = v.InferOutput<
+  typeof CodexThreadGoalUpdatedNotificationSchema
+>
+
+export type V2ThreadGoalUpdatedNotification = v.InferOutput<
+  typeof CodexThreadGoalUpdatedNotificationSchema
+>
+
 export const CodexSortDirectionSchema = openEnum(['asc', 'desc'])
 export type CodexSortDirection = v.InferOutput<typeof CodexSortDirectionSchema>
 

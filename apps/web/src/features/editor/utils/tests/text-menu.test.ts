@@ -43,7 +43,7 @@ test('a misspelled word leads the menu with its replacements and the dictionarie
   })
   const menu = editorTextMenu(spelling)
   expect(menu[0]?.id).toBe('spelling')
-  const items = menu[0]?.items ?? []
+  const items = (menu[0]?.items ?? []).filter((item) => item !== null && item !== false)
   expect(items.map((item) => ('label' in item ? item.label : null))).toEqual([
     'before',
     'befog',
@@ -63,7 +63,9 @@ test('the spelling section says when suggestions are pending or there are none',
       hasWorkspace: false,
       replace: () => undefined,
       accept: () => undefined,
-    }).items.map((item) => ('label' in item ? item.label : null))
+    })
+      .items.filter((item) => item !== null && item !== false)
+      .map((item) => ('label' in item ? item.label : null))
   expect(section(null)).toEqual(['Finding suggestions…', 'Add to Dictionary'])
   expect(section([])).toEqual(['No suggestions for “qqzx”', 'Add to Dictionary'])
 })

@@ -6,6 +6,10 @@ import type {
   FileListSortDirection,
 } from '@/features/file-picker/utils/sort-entries'
 
+/** A name in a picker row, in the file tree's face and size at both densities. */
+export const ENTRY_NAME_TEXT =
+  'font-(family-name:--workbench-tree-font-family) text-(length:--workbench-tree-font-size)'
+
 const compactModifiedFormatter = new Intl.DateTimeFormat(undefined, {
   day: 'numeric',
   month: 'short',

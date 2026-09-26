@@ -96,8 +96,11 @@ function sanitizeDiagnosticValue(value: unknown, depth: number, walk: Walk): unk
   if (walk.seen.has(value)) return '[circular]'
   if (depth >= walk.limits.maxDepth) return '[truncated]'
 
+  // `seen` holds the ancestors only: an object reached twice by two fields is shared, not a cycle.
   walk.seen.add(value)
-  return sanitizeFields(value, depth + 1, walk)
+  const safe = sanitizeFields(value, depth + 1, walk)
+  walk.seen.delete(value)
+  return safe
 }
 
 function sanitizeArray(values: readonly unknown[], depth: number, walk: Walk) {
@@ -112,13 +115,15 @@ function sanitizeError(error: Error, depth: number, walk: Walk) {
   if (walk.seen.has(error)) return '[circular]'
 
   walk.seen.add(error)
-  return {
+  const safe = {
     cause: sanitizeDiagnosticValue(error.cause, depth + 1, walk),
     message: walk.policy.formatString(error.message),
     name: error.name,
     ...(walk.sensitiveFields.has('stack') ? {} : { stack: error.stack }),
     ...walk.policy.errorFields?.(error),
   }
+  walk.seen.delete(error)
+  return safe
 }
 
 export function limitDiagnosticString(value: string) {

@@ -3,6 +3,7 @@ import { useChatProjectionStore } from '@/features/chat/state/chat-projection-st
 import { createWideEventScope } from '@/lib/wide-event-scope'
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import {
+  forgetCachedEnvironment,
   readCachedEnvironmentBindings,
   recordEnvironmentCacheBinding,
 } from '@/lib/environments/state/binding-cache'
@@ -19,6 +20,7 @@ import type {
 import type { EnvironmentPhase } from '@workspace/client-core/environments/utils/connection'
 import { createEnvironmentIdentityDriftError } from '@workspace/client-core/environments/utils/structured-errors'
 import { canonicalServerOrigin } from '@workspace/client-core/transport/client'
+import { selectServerConnection } from '@workspace/client-core/environments/state/store'
 import { createStore } from 'zustand/vanilla'
 import { createChatTransport } from '@/features/chat/transport/create-chat-transport'
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
@@ -48,6 +50,7 @@ import {
 } from '@/lib/environments/machine-client'
 import { startMachineEvents } from '@/state/machine-events'
 import { createConnectionNotices } from '@/state/connection-notices'
+import { replacePrimaryIdentity } from '@/state/primary-identity'
 
 export type ConnectedMachine = {
   readonly name: string
@@ -89,7 +92,7 @@ export function createEnvironmentConnections({
     error: string | null
   }>(() => ({ prompt: null, pending: false, error: null }))
   const desired = new Set(readConnectedMachines())
-  const cachedBindings = readCachedEnvironmentBindings(['local', ...desired])
+  let cachedBindings = readCachedEnvironmentBindings(['local', ...desired])
   const connections = new Map<EnvironmentId, LiveConnection>()
   const owners = new Map<EnvironmentId, string>()
   const attempts = new Map<string, AbortController>()
@@ -560,6 +563,36 @@ export function createEnvironmentConnections({
       localPort: entry.localPort,
     })
   }
+  /** The page's own server answers with a new identity: forget the old one and reload. */
+  function trustPrimary() {
+    const connection = selectServerConnection(
+      useEnvironmentsStore.getState(),
+      primaryServerOrigin(),
+    )
+    if (connection.phase !== 'identity-drift') return
+    replacePrimaryIdentity(connection.expected, connection.received, { asked: true })
+  }
+  /** Accepts the identity a replaced machine now answers with and drops what was cached for the old one. */
+  async function trustMachine(name: string): Promise<ConnectionResult> {
+    const machine = machineFor(name)
+    notices.reset(`machine:${name}`)
+    // A machine that points at another owner's server shares that identity; only its own claim goes.
+    if (machine.environmentId && machine.origin && !hasAnotherOwner(machine))
+      forgetEnvironment(machine.environmentId, machine.origin)
+    update(name, { environmentId: null, lastError: null })
+    return connectMachine(name)
+  }
+  function forgetEnvironment(environmentId: EnvironmentId, origin: string) {
+    stopConnection(environmentId)
+    owners.delete(environmentId)
+    cachedBindings = cachedBindings.filter(
+      (binding) => binding.descriptor.environmentId !== environmentId,
+    )
+    useChatProjectionStore.getState().dropEnvironment(environmentId)
+    forgetCachedEnvironment(environmentId)
+    useEnvironmentsStore.getState().forgetIdentity(origin)
+    queryClientFor(origin).removeQueries()
+  }
   async function retryPrimary(): Promise<void> {
     if (!started || attempts.has('@primary')) return
     const origin = primaryServerOrigin()
@@ -729,6 +762,8 @@ export function createEnvironmentConnections({
     updateServer,
     cancelMachine,
     retryPrimary,
+    trustPrimary,
+    trustMachine,
     retryMachine: async (name: string) => {
       notices.reset(`machine:${name}`)
       const machine = machineFor(name)

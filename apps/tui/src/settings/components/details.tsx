@@ -1,4 +1,4 @@
-import { settingRowTitle } from '@workspace/client-core/settings/humanize'
+import { settingDependencyNote, settingRowTitle } from '@workspace/client-core/settings/humanize'
 import {
   descriptorFor,
   layerAllowsScope,
@@ -55,6 +55,11 @@ export function Details({ id, snapshot, theme, focused, target }: DetailsProps) 
             )}
             {descriptorFor(entry.id).readOnlyReason && (
               <text fg={theme.warning}>{descriptorFor(entry.id).readOnlyReason}</text>
+            )}
+            {settingDependencyNote(entry.id, snapshot.values) && (
+              <text fg={theme.mutedForeground}>
+                {settingDependencyNote(entry.id, snapshot.values)}
+              </text>
             )}
             <text fg={theme.foreground}>Effective value: {entry.value}</text>
           </box>
