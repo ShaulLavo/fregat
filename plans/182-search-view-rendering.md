@@ -101,6 +101,8 @@ the cost at best.
 **Recommendation: B.** VS Code's search editor does this, and on dense queries it cuts the rows up to
 fivefold with no information lost.
 
+Decided 2026-09-26: owner — B.
+
 ## Proposed phases
 
 Phases 1 and 2 stand whatever Q1 decides. Phases 3–5 assume Q1 = A; with Q1 = B, replace 3 with
