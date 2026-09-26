@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { SettingsMutationRequest } from '@workspace/contracts'
 
 import { expect, test } from '../../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../../test/render'
+import { createTestQueryClient, renderWithLoadedDialogs } from '../../../../test/render'
 import { TestCommandProvider } from '../../../../test/factories/command-runtime'
 import { CommandPalette } from '@/components/command-palette'
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../test/factories/editor-state-provider'
@@ -27,7 +27,7 @@ test('real palette preview and cancel write nothing while selection dispatches o
   const queryClient = createTestQueryClient()
   const before = await fetchSettings(undefined, getClient())
   queryClient.setQueryData(settingsKeys.document(), before)
-  const firstPalette = renderPalette(queryClient)
+  const firstPalette = await renderPalette(queryClient)
   const user = userEvent.setup()
   const input = await screen.findByPlaceholderText(/Select light or dark mode/)
 
@@ -55,7 +55,7 @@ test('real palette preview and cancel write nothing while selection dispatches o
   expect((await fetchSettings(undefined, getClient())).serverVersion).toEqual(before.serverVersion)
   firstPalette.unmount()
 
-  const secondPalette = renderPalette(queryClient)
+  const secondPalette = await renderPalette(queryClient)
   await screen.findByPlaceholderText(/Select light or dark mode/)
   await user.click(screen.getByText('Dark'))
 
@@ -106,7 +106,7 @@ function PaletteHarness() {
 }
 
 function renderPalette(queryClient: ReturnType<typeof createTestQueryClient>) {
-  return renderWithProviders(
+  return renderWithLoadedDialogs(
     <EditorStateProvider>
       <PaletteHarness />
     </EditorStateProvider>,
