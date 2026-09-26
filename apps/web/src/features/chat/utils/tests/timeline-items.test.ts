@@ -21,6 +21,7 @@ import { isPinnedWorkLogEntry } from '@/features/chat/utils/activity-visibility'
 import {
   chatTimelineItemEstimate,
   chatTimelineItems,
+  timelineRowPath,
   type ChatTimelineItem,
 } from '@/features/chat/utils/timeline-items'
 
@@ -483,6 +484,13 @@ describe('chat timeline items', () => {
       turnId,
     })
     expect(foldedItemIds(items[1])).toEqual(['message:message-2', 'activity-group:tool-1'])
+    // A reply inside the fold is found through it; the closing reply is a row of its own.
+    expect(timelineRowPath(items, 'message:message-2')).toEqual({
+      index: 1,
+      folds: ['turn-fold:turn-1'],
+    })
+    expect(timelineRowPath(items, 'message:message-3')).toEqual({ index: 2, folds: [] })
+    expect(timelineRowPath(items, 'message:gone')).toBeNull()
   })
 
   it('leaves the turn in flight unfolded', () => {

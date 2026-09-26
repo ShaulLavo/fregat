@@ -53,6 +53,10 @@ import { streamOverflow } from './stream-overflow'
 import { questionHistory } from './question-history'
 import { chatScreenshot } from './chat-screenshot'
 import { chatMultipleModels } from './chat-multiple-models'
+import { chatAssistantCitation } from './chat-assistant-citation'
+import { chatCitationElsewhere } from './chat-citation-elsewhere'
+import { chatFindingSource } from './chat-finding-source'
+import { chatReviewContext } from './chat-review-context'
 import { chatMultipleModelsLostAck } from './chat-multiple-models-lost-ack'
 import { chatComposerEditing } from './chat-composer-editing'
 import { chatArtifactTemplate } from './chat-artifact-template'
@@ -374,6 +378,10 @@ export const scenarios: readonly Scenario[] = [
   questionHistory,
   chatScreenshot,
   chatMultipleModels,
+  chatAssistantCitation,
+  chatCitationElsewhere,
+  chatFindingSource,
+  chatReviewContext,
   chatMultipleModelsLostAck,
   chatComposerEditing,
   chatArtifactTemplate,
