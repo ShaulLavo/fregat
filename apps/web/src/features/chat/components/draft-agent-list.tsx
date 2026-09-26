@@ -34,7 +34,7 @@ export function DraftAgentList({
       <DropdownMenuRadioItem closeOnClick value={DEFAULT_AGENT} onClick={() => onSelect(null)}>
         Default agent
       </DropdownMenuRadioItem>
-      {query.isPending ? (
+      {query.isLoading ? (
         <LoadingState label='Loading agents' className='px-2 py-1'>
           <div aria-hidden='true' className='skeleton-sweep h-3 w-28 rounded-md' />
         </LoadingState>

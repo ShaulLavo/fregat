@@ -144,7 +144,7 @@ export function ChatDraftView({
     fanOut = false,
   ) {
     const retryKey = draftSubmissionKey({
-      agent: identity?.agent ?? null,
+      agent: selectedAgent,
       payload,
       environmentId: transport.environmentId,
       worktreeTarget,
@@ -154,7 +154,7 @@ export function ChatDraftView({
       unsettledSubmissions.current.get(retryKey) ??
       createDraftSessionSubmission({
         ...payload,
-        agent: identity?.agent,
+        agent: selectedAgent,
         createdAt: new Date().toISOString(),
         worktreeTarget:
           fanOut && worktree ? fanOutWorktreeTarget(worktreeTarget, worktree.id) : worktreeTarget,

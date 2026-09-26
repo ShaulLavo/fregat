@@ -2745,6 +2745,28 @@ describe('CodexProviderAdapter', () => {
     })
   })
 
+  it('refuses a fork point the source conversation no longer holds', async () => {
+    await withFakeCodex(
+      async () => {
+        const adapter = new CodexProviderAdapter()
+        try {
+          const input = providerTurnInput()
+          await expect(
+            adapter.prepareFork({
+              cwd: input.cwd,
+              sessionId: input.sessionId,
+              conversationId: 'source-conversation',
+              providerTurnId: 'reverted-turn',
+            }),
+          ).rejects.toThrow('The fork point is not in the source conversation')
+        } finally {
+          await adapter.stopAll()
+        }
+      },
+      { mode: 'fork' },
+    )
+  })
+
   it.each(['fork', 'fork-advanced'])(
     'keeps the captured native fork boundary when the source is %s',
     async (mode) => {

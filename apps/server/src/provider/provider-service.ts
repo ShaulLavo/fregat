@@ -920,10 +920,7 @@ export class ProviderService {
       adapter,
       adapter.prepareFork({
         ...input,
-        conversationId:
-          typeof binding?.providerResumeCursor === 'string'
-            ? binding.providerResumeCursor
-            : (input.conversationId ?? input.sessionId),
+        conversationId: forkConversationId(binding, input),
       }),
     )
   }
@@ -1277,6 +1274,16 @@ async function activeProviderBinding(
  * continuation identity — repointing a session at another provider or another
  * account correctly starts a fresh conversation.
  */
+/** A fork that has run natively owns its transcript; only an unrun fork reads its source's. */
+function forkConversationId(
+  binding: ProviderRuntimeBindingWithMetadata | null,
+  input: { conversationId?: string; sessionId: SessionId },
+) {
+  if (typeof binding?.providerResumeCursor === 'string') return binding.providerResumeCursor
+  if (binding) return input.sessionId
+  return input.conversationId ?? input.sessionId
+}
+
 function continuableBinding(
   binding: ProviderRuntimeBindingWithMetadata | null,
   adapter: ReturnType<ProviderAdapterRegistry['getByInstance']>,

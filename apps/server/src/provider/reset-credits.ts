@@ -11,6 +11,7 @@ import type { PlatformDatabase } from '../db/client'
 import { providerResetCreditAttempts } from '../db/schema'
 import { createStructuredError } from '../observability/structured-errors'
 import type { ProviderAdapterRegistry } from './provider-adapter-registry'
+import { isResetCreditRejected } from './structured-errors'
 import type { ProviderUsageStore } from './usage-store'
 
 type Registry = Pick<ProviderAdapterRegistry, 'adapter' | 'usageAccount'>
@@ -122,6 +123,19 @@ export class ProviderResetCredits {
     })
   }
 
+  /** A declined attempt spent nothing, so the next confirmation starts a fresh one. */
+  private forgetAttempt(accountKey: string, idempotencyKey: string) {
+    this.database
+      .delete(providerResetCreditAttempts)
+      .where(
+        and(
+          eq(providerResetCreditAttempts.accountKey, accountKey),
+          eq(providerResetCreditAttempts.idempotencyKey, idempotencyKey),
+        ),
+      )
+      .run()
+  }
+
   private async run(
     instanceId: ProviderInstanceId,
     input: ProviderResetCreditBody,
@@ -146,7 +160,11 @@ export class ProviderResetCredits {
           accountKey: input.accountKey,
           creditId: attempt.creditId,
         })
-      } catch {
+      } catch (error) {
+        if (isResetCreditRejected(error)) {
+          this.forgetAttempt(input.accountKey, attempt.idempotencyKey)
+          throw error
+        }
         // A transport failure cannot tell whether the provider spent the credit.
         throw resetError(
           'UNCONFIRMED',

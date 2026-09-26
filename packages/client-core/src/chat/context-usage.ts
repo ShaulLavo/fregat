@@ -74,6 +74,7 @@ export function contextUsageForActivities(
   activities: readonly OrchestrationSessionActivity[],
 ): ContextUsage | null {
   let latest: ContextUsage | null = null
+  let latestTurnId: string | null = null
 
   for (let index = activities.length - 1; index >= 0; index -= 1) {
     const activity = activities[index]
@@ -81,7 +82,16 @@ export function contextUsageForActivities(
 
     const usage = contextUsageForPayload(activity.payload)
     if (!usage) continue
-    latest = latest ? completedUsage(latest, usage) : usage
+    if (!latest) {
+      latest = usage
+      latestTurnId = activity.turnId
+    } else if (activity.turnId === latestTurnId) {
+      latest = completedUsage(latest, usage)
+    } else {
+      // Segments describe one turn's fill, so an older turn only lends the window.
+      if (hasWindowAndBreakdown(latest)) return latest
+      latest = completedUsage(latest, { ...usage, segments: null })
+    }
     if (isComplete(latest)) return latest
   }
 
@@ -155,7 +165,11 @@ function completedUsage(newer: ContextUsage, older: ContextUsage): ContextUsage 
 }
 
 function isComplete(usage: ContextUsage) {
-  return usage.maxTokens !== null && usage.breakdown !== null && usage.segments !== null
+  return hasWindowAndBreakdown(usage) && usage.segments !== null
+}
+
+function hasWindowAndBreakdown(usage: ContextUsage) {
+  return usage.maxTokens !== null && usage.breakdown !== null
 }
 
 function roundedTo(value: number, decimals: number) {

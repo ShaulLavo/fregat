@@ -9,6 +9,25 @@ const turnPageSchema = v.object({
 })
 const revertedThreadSchema = v.object({ thread: v.object({ id: v.string() }) })
 
+type TurnPage = v.InferOutput<typeof turnPageSchema>
+
+async function turnPage(
+  request: CodexRequest,
+  conversationId: string,
+  query: { sortDirection: 'asc' | 'desc'; limit: number; cursor: string | null },
+): Promise<TurnPage> {
+  return v.parse(
+    turnPageSchema,
+    await request('thread/turns/list', {
+      threadId: conversationId,
+      sortDirection: query.sortDirection,
+      itemsView: 'notLoaded',
+      limit: query.limit,
+      ...(query.cursor ? { cursor: query.cursor } : {}),
+    }),
+  )
+}
+
 /** Reads a native turn by its position in the requested order. */
 async function codexTurnAtIndex({
   threadId,
@@ -25,16 +44,11 @@ async function codexTurnAtIndex({
   let cursor: string | null = null
   const seen = new Set<string>()
   while (remaining > 0) {
-    const page: v.InferOutput<typeof turnPageSchema> = v.parse(
-      turnPageSchema,
-      await request('thread/turns/list', {
-        threadId,
-        sortDirection,
-        itemsView: 'notLoaded',
-        limit: Math.min(remaining, 100),
-        ...(cursor ? { cursor } : {}),
-      }),
-    )
+    const page = await turnPage(request, threadId, {
+      sortDirection,
+      limit: Math.min(remaining, 100),
+      cursor,
+    })
     const target = page.data[remaining - 1]
     if (target) return target.id
     remaining -= page.data.length
@@ -43,6 +57,31 @@ async function codexTurnAtIndex({
     cursor = page.nextCursor
   }
   return null
+}
+
+/** Whether the native conversation still holds a turn; a revert removes turns a fork may name. */
+export async function codexTurnExists({
+  conversationId,
+  turnId,
+  request,
+}: {
+  readonly conversationId: string
+  readonly turnId: string
+  readonly request: CodexRequest
+}) {
+  let cursor: string | null = null
+  const seen = new Set<string>()
+  for (;;) {
+    const page = await turnPage(request, conversationId, {
+      sortDirection: 'desc',
+      limit: 100,
+      cursor,
+    })
+    if (page.data.some((turn) => turn.id === turnId)) return true
+    if (page.data.length === 0 || !page.nextCursor || seen.has(page.nextCursor)) return false
+    seen.add(page.nextCursor)
+    cursor = page.nextCursor
+  }
 }
 
 export async function prepareCodexRewind({

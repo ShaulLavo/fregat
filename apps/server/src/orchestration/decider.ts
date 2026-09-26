@@ -503,7 +503,10 @@ function sessionForked(
           : [
               {
                 createdAt: message.createdAt,
-                id: v.parse(messageIdSchema, `fork:${command.sessionId}:${index}`),
+                id: v.parse(
+                  messageIdSchema,
+                  `fork:${command.sessionId}:${String(index).padStart(10, '0')}`,
+                ),
                 role: message.role,
                 text: message.text,
                 turnId: message.turnId,

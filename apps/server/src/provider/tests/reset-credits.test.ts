@@ -9,6 +9,7 @@ import { migratePlatformDatabase } from '../../db/migrations'
 import { providerResetCreditAttempts } from '../../db/schema'
 import { MockProviderAdapter } from '../adapters/mock'
 import { ProviderResetCredits } from '../reset-credits'
+import { sessionIdentityErrors } from '../structured-errors'
 import type { ProviderAdapter } from '../types'
 
 const INSTANCE = v.parse(providerInstanceIdSchema, 'codex-a')
@@ -131,6 +132,21 @@ test('an ambiguous timeout survives restart and reuses the native idempotency ke
   f.restart()
   await f.service.redeem(INSTANCE, input)
   expect(keys).toHaveLength(2)
+})
+
+test('a declined attempt is cleared so the next confirmation can redeem', async () => {
+  const keys: string[] = []
+  const f = await fixture(async (key) => {
+    keys.push(key)
+    if (keys.length === 1)
+      throw sessionIdentityErrors.RESET_CREDIT_REJECTED({ reason: 'Fixture declined the credit.' })
+    return 'reset'
+  })
+  await expect(f.service.redeem(INSTANCE, input)).rejects.toThrow('Fixture declined the credit.')
+  expect(f.rows()).toHaveLength(0)
+  expect(await f.service.redeem(INSTANCE, input)).toMatchObject({ outcome: 'reset' })
+  expect(keys).toHaveLength(2)
+  expect(keys[0]).not.toBe(keys[1])
 })
 
 test('a refresh failure preserves the settled outcome and retry cannot spend again', async () => {

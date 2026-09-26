@@ -4,7 +4,7 @@ import type { ChatAttachment, OrchestrationMessage } from '@workspace/contracts'
 import { withAttachmentLanes } from './lanes'
 import type { AttachmentOwnership } from './ownership'
 import { attachmentFilePath, deleteAttachmentBlobs } from './store'
-import { createInternalError } from '../observability/structured-errors'
+import { createInternalError, createStructuredError } from '../observability/structured-errors'
 
 export async function copyForkAttachments(
   attachmentsDir: string,
@@ -33,7 +33,17 @@ async function copyBlob(attachmentsDir: string, source: ChatAttachment, copy: Ch
   if (!sourcePath || !destination)
     throw createInternalError(`Attachment ${source.name} is unavailable.`)
   await withAttachmentLanes(attachmentsDir, [source.id, copy.id], () =>
-    copyFile(sourcePath, destination),
+    copyFile(sourcePath, destination).catch((error: unknown) => {
+      throw createStructuredError({
+        cause: error,
+        code: 'attachments.FORK_SOURCE_MISSING',
+        status: 409,
+        message: `Attachment ${source.name} could not be copied into the fork.`,
+        why: 'Its file is missing or unreadable in the attachment store.',
+        fix: 'Fork from a turn before this attachment, or send it again in a new session.',
+        internal: { attachmentId: source.id },
+      })
+    }),
   )
 }
 
