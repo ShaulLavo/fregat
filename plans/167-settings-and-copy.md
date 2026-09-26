@@ -13,6 +13,10 @@
 - Parts A and B landed 2026-09-26 (wave 2, lane S): see "Part A results" below. `details` is on
   42 rows, shown behind an info icon (scenario `settings-row-details`), in schema hover and in the
   reference's per-category Details lists.
+- Part C steps 1–2 landed 2026-09-26 (wave 2, lane S): `contrastPhrase` in `@workspace/utils/copy`
+  is the one pattern; `settings-copy.test.ts` runs it over every registry text field and
+  `errors:census` over each catalog entry's `message`, `why` and `fix` (four fixed). Step 3, the UI
+  sweep, is next.
 - Already landed with this plan: `lsp.semanticTokens.delta` defaults to on, its description is
   rewritten, and `AGENTS.md` has a **Copy** section (say what a thing is; never what it is not).
 - Effort: L. Three independent parts; each is its own phase and can ship alone.

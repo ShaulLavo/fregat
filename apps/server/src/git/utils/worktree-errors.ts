@@ -67,7 +67,7 @@ export const gitWorktreeErrors = defineErrorCatalog('git', {
     status: 404,
     message: ({ path }: { path: string }) =>
       `No worktree of this repository is checked out at ${path}`,
-    why: 'Removal only ever targets a path git already reports as a worktree, so an unregistered path is refused rather than deleted from disk.',
+    why: 'Removal only ever targets a path git already reports as a worktree, so a path git does not list is refused and stays on disk.',
     fix: 'List the worktrees and remove one of the paths it reports.',
   },
   WORKTREE_OUTSIDE_REPOSITORY: {
