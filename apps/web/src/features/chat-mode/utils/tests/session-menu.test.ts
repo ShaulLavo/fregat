@@ -32,12 +32,17 @@ test('delete is the only destructive item', () => {
   expect(destructive).toEqual(['Delete'])
 })
 
-test('offers to narrow the list to the session’s project', () => {
-  expect(itemLabels(menuContext(), 'project')).toEqual(['Show Only This Project'])
+test('offers to narrow the list to the session’s project and open its settings', () => {
+  expect(itemLabels(menuContext(), 'project')).toEqual([
+    'Show Only This Project',
+    'Project Settings',
+  ])
 })
 
 test('omits the scope item when the list already shows only that project', () => {
-  expect(itemLabels(menuContext({ scopedToProject: true }), 'project')).toEqual([])
+  expect(itemLabels(menuContext({ scopedToProject: true }), 'project')).toEqual([
+    'Project Settings',
+  ])
 })
 
 test('offers to stop the agent only while a session is live', () => {
@@ -68,6 +73,7 @@ test('every item runs its own callback', () => {
     'exportTranscript:markdown',
     'exportTranscript:json',
     'scopeToProject',
+    'openProjectSettings',
     'stopAgent',
   ])
 })
@@ -159,6 +165,7 @@ function menuContext({
     scopedToProject,
     titleGeneration,
     scopeToProject: () => record.push('scopeToProject'),
+    openProjectSettings: () => record.push('openProjectSettings'),
     stopAgent: () => record.push('stopAgent'),
     unarchive: () => record.push('unarchive'),
   }

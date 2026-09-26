@@ -695,7 +695,24 @@ class CodexAppServerSession extends SessionContext {
       runtimeEpoch: input.runtimeEpoch,
       sessionId: input.sessionId,
     })
-    const client = CodexAppServerRpcClient.start(input.env, input.cwd)
+    const client = CodexAppServerRpcClient.start(input.env, input.cwd, (failed) => {
+      input.emit({
+        createdAt: new Date().toISOString(),
+        eventId: runtimeEventId('codex-session-exited'),
+        payload: {
+          exitKind: failed ? 'error' : 'graceful',
+          reason: 'Codex runtime ended.',
+          recoverable: true,
+        },
+        provider: DEFAULT_CODEX_PROVIDER_SETTINGS.driverKind,
+        providerInstanceId: input.providerInstanceId,
+        providerBindingHandle: null,
+        runtimeMode: input.runtimeMode,
+        runtimeEpoch: input.runtimeEpoch,
+        sessionId: input.sessionId,
+        type: 'runtime.exited',
+      })
+    })
     input.onClient(client)
     try {
       await initializeCodexClient(client)
@@ -2560,7 +2577,10 @@ class CodexAppServerRpcClient {
   /** Stderr is diagnostics, never classified: the last lines ride on the exit event. */
   private readonly stderrTail: string[] = []
 
-  private constructor(process: ChildProcessWithoutNullStreams) {
+  private readonly onEnd: ((failed: boolean) => void) | undefined
+
+  private constructor(process: ChildProcessWithoutNullStreams, onEnd?: (failed: boolean) => void) {
+    this.onEnd = onEnd
     this.process = process
     this.lifetime = new ProviderProcessLifetime(process)
     this.process.stdout.setEncoding('utf8')
@@ -2571,13 +2591,18 @@ class CodexAppServerRpcClient {
     this.process.on('exit', (code) => this.handleExit(code))
   }
 
-  static start(env: NodeJS.ProcessEnv = process.env, cwd?: string) {
+  static start(
+    env: NodeJS.ProcessEnv = process.env,
+    cwd?: string,
+    onEnd?: (failed: boolean) => void,
+  ) {
     return new CodexAppServerRpcClient(
       spawn(codexBinary(env), ['app-server'], {
         cwd,
         env,
         stdio: ['pipe', 'pipe', 'pipe'],
       }),
+      onEnd,
     )
   }
 
@@ -2668,7 +2693,7 @@ class CodexAppServerRpcClient {
   }
 
   async close() {
-    this.closeWithError(createInternalError('Codex app-server closed.'))
+    this.closeWithError(createInternalError('Codex app-server closed.'), false)
     await this.lifetime.close()
   }
 
@@ -2751,7 +2776,7 @@ class CodexAppServerRpcClient {
     }
     if (this.closed) return
 
-    this.closeWithError(sessionIdentityErrors.CODEX_EXITED({ internal: context }))
+    this.closeWithError(sessionIdentityErrors.CODEX_EXITED({ internal: context }), exitCode !== 0)
   }
 
   private rejectRequest(id: JsonRpcId, error: unknown) {
@@ -2763,8 +2788,10 @@ class CodexAppServerRpcClient {
     pending.reject(createInternalError(providerErrorMessage(error)))
   }
 
-  private closeWithError(error: Error) {
+  private closeWithError(error: Error, failed = true) {
+    if (this.closed) return
     this.closed = true
+    this.onEnd?.(failed)
     for (const [id, pending] of this.pending) {
       clearTimeout(pending.timer)
       this.pending.delete(id)

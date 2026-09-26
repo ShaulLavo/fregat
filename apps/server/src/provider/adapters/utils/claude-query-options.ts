@@ -38,8 +38,6 @@ export type ClaudeQueryOptionsInput = ClaudeRuntimeSelection & {
   /** The instance's resolved CLI; without it the SDK runs its bundled one. */
   executablePath: string
   model: string
-  /** Platform's own MCP endpoint for this session, with the token scoped to it. */
-  platformMcp?: { readonly url: string; readonly token: string }
   /** False keeps isolated utility turns out of the provider's transcript store. */
   persistSession?: boolean
   /** Effort/thinking for this session; absent means "send neither". */
@@ -48,6 +46,8 @@ export type ClaudeQueryOptionsInput = ClaudeRuntimeSelection & {
   sessionId: SessionId
   /** The agent definition the main thread runs as (`--agent`). */
   agent?: string
+  /** The checkout's `.mcp.json` servers the owner has not approved; they stay off. */
+  unapprovedProjectMcpServers?: string[]
   /** A new session branching off `sourceSessionId`, cut after `resumeSessionAt` when set. */
   fork?: ClaudeForkOptions
 }
@@ -133,6 +133,18 @@ function claudeSessionOptions(input: {
   return { sessionId: input.sessionId }
 }
 
+/** Reasoning settings and the project MCP gate share the one flag-settings object. */
+function claudeSettingsOptions(
+  input: ClaudeQueryOptionsInput,
+): Pick<Options, 'effort' | 'settings'> {
+  const reasoning = claudeReasoningQueryOptions(input.reasoning ?? {})
+  const gated = input.unapprovedProjectMcpServers ?? []
+  if (gated.length === 0) return reasoning
+
+  const settings = typeof reasoning.settings === 'object' ? reasoning.settings : {}
+  return { ...reasoning, settings: { ...settings, disabledMcpjsonServers: gated } }
+}
+
 export function claudeQueryOptions(input: ClaudeQueryOptionsInput): Options {
   return {
     abortController: input.abortController,
@@ -147,13 +159,10 @@ export function claudeQueryOptions(input: ClaudeQueryOptionsInput): Options {
     ...(input.persistSession === undefined ? {} : { persistSession: input.persistSession }),
     settingSources: ['user', 'project', 'local'],
     systemPrompt: { preset: 'claude_code', type: 'preset' },
-    ...claudeReasoningQueryOptions(input.reasoning ?? {}),
+    ...claudeSettingsOptions(input),
     ...claudePermissionOptions(input),
     ...claudeSessionOptions(input),
     ...(input.canUseTool ? { canUseTool: input.canUseTool } : {}),
-    ...(input.platformMcp
-      ? { mcpServers: { platform: platformMcpServer(input.platformMcp) } }
-      : {}),
     ...(input.hooks ? { hooks: input.hooks } : {}),
     // Absent `env` makes the CLI inherit process.env untouched, which is what a
     // single-instance install wants. When it is present it carries
@@ -161,15 +170,5 @@ export function claudeQueryOptions(input: ClaudeQueryOptionsInput): Options {
     // relocates the macOS login-keychain lookup ($HOME/Library/Keychains), the
     // CLI cannot find its stored OAuth credentials, and it reports "Not logged in".
     ...(input.env ? { env: input.env } : {}),
-  }
-}
-
-/** `alwaysLoad`: one small catalog, which would otherwise hide behind tool search. */
-function platformMcpServer(binding: { readonly url: string; readonly token: string }) {
-  return {
-    alwaysLoad: true,
-    headers: { Authorization: `Bearer ${binding.token}` },
-    type: 'http' as const,
-    url: binding.url,
   }
 }

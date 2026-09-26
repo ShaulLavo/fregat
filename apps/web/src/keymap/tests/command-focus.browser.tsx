@@ -686,3 +686,45 @@ function rejectCloseTab() {
 function rejectCloseTabs() {
   return { reason: 'not-found', status: 'rejected' } as const
 }
+
+test.each(['input', 'textarea', 'contenteditable', 'editor'])(
+  'F1 opens the palette from %s while letters still type',
+  async (kind) => {
+    const view = renderHookWithProviders(
+      () => ({ command: useCommand(), focus: useFocusService() }),
+      {
+        command: {
+          bindings: [
+            ...defaultPlatformKeyBindings(),
+            ...(kind === 'editor'
+              ? []
+              : [binding('x', { command: 'workspace.showCommandPalette' })]),
+          ],
+        },
+      },
+    )
+    const target = document.createElement(kind === 'textarea' ? 'textarea' : 'input')
+    const editable = document.createElement('div')
+    editable.contentEditable = 'true'
+    document.body.append(target, editable)
+    const editor =
+      kind === 'editor' ? createKeymapEditor(view.result.current.focus, { key: 'fkeys' }) : null
+    if (editor) nativeEditors.push(editor)
+    if (editor) editor.editor.focus()
+    else if (kind === 'contenteditable') editable.focus()
+    else target.focus()
+    try {
+      await commands.proofKeyPress({ key: 'x' })
+      expect(view.result.current.command.paletteOpen).toBe(false)
+      if (editor) expect(editor.editor.materializeFullText()).toContain('x')
+      else if (kind === 'contenteditable') expect(editable.textContent).toBe('x')
+      else expect(target.value).toBe('x')
+      await commands.proofKeyPress({ key: 'F1' })
+      await expect.poll(() => view.result.current.command.paletteOpen).toBe(true)
+    } finally {
+      view.unmount()
+      target.remove()
+      editable.remove()
+    }
+  },
+)

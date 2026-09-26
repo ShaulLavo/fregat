@@ -107,6 +107,17 @@ describe('the checkout boundary', () => {
 })
 
 describe("Platform's MCP endpoint", () => {
+  it('revokes only the ended epoch, keeping a replacement runtime authorized', async () => {
+    const { app, grants } = endpoint()
+    const first = grants.bind({ cwd: '/work/a', runtimeEpoch: 'old', sessionId: 'session-a' })
+    const second = grants.bind({ cwd: '/work/a', runtimeEpoch: 'new', sessionId: 'session-a' })
+    grants.revoke('session-a', 'old')
+    expect((await post(app, { authorization: `Bearer ${first}` })).status).toBe(401)
+    expect(await callWorkspaceInfo(app, second)).toEqual({ cwd: '/work/a', sessionId: 'session-a' })
+    grants.revoke('session-a', 'new')
+    expect((await post(app, { authorization: `Bearer ${second}` })).status).toBe(401)
+  })
+
   it('answers a pinned 2026-07-28 client with the grant its token carries, per request', async () => {
     const { app, grants } = endpoint()
     const first = grants.issue({ cwd: '/work/a', runtimeEpoch: 'e1', sessionId: 'session-a' })
