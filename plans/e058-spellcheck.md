@@ -7,8 +7,10 @@
 - The atomic-text-update browser regression reproduced the reported 0–0 range in all three
   engines. Range signatures now include the mounted row revision and slot identity, so a
   text-node rewrite or remount rebuilds live DOM ranges even at unchanged source offsets.
-- Remaining PR checklist: merge main, package and touched editor tests, Turbo input check,
-  typecheck, health baseline, Editor PR, Platform merge and pin, gates, scenario and Platform PR.
+- Verified after merging `origin/main`: 46 spellcheck tests, 327 core tests including the
+  touched overlay and editor tests, `check-turbo-inputs`, workspace typecheck, and health.
+  `health:write` found no public API baseline change; unrelated timer line-number churn was discarded.
+- Remaining PR checklist: Editor PR, Platform merge and pin, gates, scenario and Platform PR.
 - Kind: Implementation
 - Owner: Cross-repo
 - Priority: P2
