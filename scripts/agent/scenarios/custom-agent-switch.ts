@@ -12,7 +12,7 @@ import {
   openFixtureWorkspace,
 } from '../fixture-workspace'
 import { removeScenarioSessions } from './chat-verification'
-import { settingsSnapshot, writeSettings } from './native-provider-verification'
+import { settingsSnapshot, writeRawSetting, writeSettings } from './native-provider-verification'
 
 export const customAgentProviderSwitch: Scenario = {
   name: 'custom-agent-provider-switch',
@@ -81,11 +81,9 @@ export const customAgentProviderSwitch: Scenario = {
         sessions: [],
       })
       const raw = before.layers.find((layer) => layer.id === 'user')?.raw['providers.instances']
-      await writeSettings(page, base, [
-        raw === undefined
-          ? { kind: 'reset', keys: ['providers.instances'] }
-          : { kind: 'set', key: 'providers.instances', value: raw },
-      ])
+      if (raw === undefined)
+        await writeSettings(page, base, [{ kind: 'reset', keys: ['providers.instances'] }])
+      else await writeRawSetting(page, base, 'providers.instances', raw)
     }
   },
 }

@@ -1,3 +1,13 @@
+import { Database } from 'bun:sqlite'
+import { drizzle } from 'drizzle-orm/bun-sqlite'
+import { Elysia } from 'elysia'
+import { initializePlatformDatabase } from '../../../db/initialize'
+import * as schema from '../../../db/schema'
+import { McpGrantRegistry } from '../../../mcp/grants'
+import { mcpRoutes } from '../../../mcp/routes'
+import { ProviderService } from '../../provider-service'
+import { ProviderAdapterRegistry } from '../../provider-adapter-registry'
+import { ProviderSessionDirectory } from '../../provider-session-directory'
 import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -53,7 +63,7 @@ function record(entry) {
   if (!spawnLogPath) return;
   require('node:fs').appendFileSync(spawnLogPath, JSON.stringify(entry) + '\\n');
 }
-record({ cwd: process.cwd(), event: 'spawn' });
+record({ cwd: process.cwd(), event: 'spawn', pid: process.pid });
 
 function send(message) {
   process.stdout.write(JSON.stringify(message) + '\\n');
@@ -299,6 +309,7 @@ function handle(message) {
     return;
   }
   if (message.method === 'initialize') {
+    if (mode === 'startup-exit') process.exit(23);
     send({
       id: message.id,
       result: {
@@ -396,6 +407,13 @@ function handle(message) {
       { ...hook, handlerType: 'command', command: 'guard.sh', matcher: 'shell' },
       { ...hook, key: 'k2', handlerType: 'mcpTool', server: 'linear', tool: 'check' },
     ] }] } });
+    return;
+  }
+  if (message.method === 'config/read') {
+    const origins = process.env.PLATFORM_FAKE_CODEX_MODE === 'platform-mcp-configured'
+      ? { 'mcp_servers.platform.url': { name: { type: 'user' }, version: '1' } }
+      : {};
+    send({ id: message.id, result: { config: {}, origins } });
     return;
   }
   if (message.method === 'thread/goal/set') {
@@ -876,6 +894,7 @@ const RUNTIME_MODES = ['approval-required', 'auto-accept-edits', 'full-access'] 
 type FakeCodexContext = { readonly projectPath: string; readonly spawnLogPath: string }
 
 type FakeCodexLogEntry = {
+  readonly pid?: number
   readonly cwd?: string
   readonly params?: Record<string, unknown>
   readonly cwds?: readonly string[] | null
@@ -1407,6 +1426,131 @@ describe('CodexProviderAdapter', () => {
         expect(sessions).toHaveLength(1)
       },
       { mode: 'echo-mode-params' },
+    )
+  })
+
+  it('ends a failed Codex startup with its runtime epoch', async () => {
+    await withFakeCodex(
+      async () => {
+        const adapter = new CodexProviderAdapter()
+        const events: ProviderRuntimeEvent[] = []
+        collectAdapterEvents(adapter, events)
+        const input = providerTurnInput()
+        try {
+          await expect(adapter.startRuntime(input)).rejects.toThrow()
+          expect(events.filter((event) => event.type === 'runtime.exited')).toMatchObject([
+            {
+              sessionId: input.sessionId,
+              runtimeEpoch: input.runtimeEpoch,
+              payload: { exitKind: 'error' },
+            },
+          ])
+        } finally {
+          await adapter.stopAll()
+        }
+      },
+      { mode: 'startup-exit' },
+    )
+  })
+
+  it('revokes the MCP bearer when an idle Codex child crashes', async () => {
+    await withFakeCodex(async ({ projectPath, spawnLogPath }) => {
+      const sqlite = new Database(':memory:')
+      const database = drizzle({ client: sqlite, schema })
+      initializePlatformDatabase(database)
+      const adapter = new CodexProviderAdapter()
+      const grants = new McpGrantRegistry()
+      const endpoint = 'http://127.0.0.1:39087/mcp'
+      const service = new ProviderService({
+        adapterRegistry: new ProviderAdapterRegistry([adapter]),
+        sessionDirectory: new ProviderSessionDirectory(database),
+        mcp: { endpoint, grants },
+      })
+      const events: ProviderRuntimeEvent[] = []
+      collectAdapterEvents(adapter, events)
+      const input = providerTurnInput()
+      try {
+        await service.ensureRuntime({
+          sessionId: input.sessionId,
+          providerInstanceId: adapter.adapterKey,
+          runtimeEpoch: input.runtimeEpoch,
+          runtimeMode: input.runtimeMode,
+          runtimePayload: {
+            cwd: projectPath,
+            interactionMode: 'default',
+            modelSelection: input.modelSelection,
+          },
+        })
+        const records = await readFakeCodexLog(spawnLogPath)
+        const start = records.find((record) => record.event === 'thread/start')
+        const config = start?.params?.config as Record<string, unknown>
+        const headers = config['mcp_servers.platform.http_headers'] as { Authorization: string }
+        const app = new Elysia().use(mcpRoutes({ allowedOrigins: [], endpoint, grants }))
+        const call = () =>
+          app.handle(
+            new Request(endpoint, {
+              method: 'POST',
+              headers: { authorization: headers.Authorization },
+            }),
+          )
+        expect((await call()).status).not.toBe(401)
+        const pid = records.find((record) => record.event === 'spawn')?.pid
+        assert(pid)
+        process.kill(pid, 'SIGKILL')
+        await expect.poll(async () => (await call()).status, { timeout: 3000 }).toBe(401)
+        expect(events.filter((event) => event.type === 'runtime.exited')).toMatchObject([
+          { runtimeEpoch: input.runtimeEpoch, sessionId: input.sessionId },
+        ])
+      } finally {
+        await service.shutdown()
+        sqlite.close()
+      }
+    })
+  })
+
+  it('binds Platform’s MCP endpoint per thread, on the 2026-07-28 client', async () => {
+    await withFakeCodex(async ({ spawnLogPath }) => {
+      const adapter = new CodexProviderAdapter()
+      const platformMcp = { token: 'grant-token', url: 'http://127.0.0.1:3301/mcp' }
+      try {
+        await adapter.sendTurn({ ...providerTurnInput(), platformMcp })
+        const records = await readFakeCodexLog(spawnLogPath)
+        expect(records.find((record) => record.event === 'thread/start')?.params).toMatchObject({
+          config: {
+            'features.mcp_2026_07_28': true,
+            'mcp_servers.platform.http_headers': { Authorization: 'Bearer grant-token' },
+            'mcp_servers.platform.url': 'http://127.0.0.1:3301/mcp',
+            suppress_unstable_features_warning: true,
+          },
+        })
+      } finally {
+        await adapter.stopAll()
+      }
+    })
+  })
+
+  it('leaves the binding out, and says why, when the user config names its own platform server', async () => {
+    await withFakeCodex(
+      async ({ spawnLogPath }) => {
+        const adapter = new CodexProviderAdapter()
+        const events: ProviderRuntimeEvent[] = []
+        collectAdapterEvents(adapter, events)
+        const platformMcp = { token: 'grant-token', url: 'http://127.0.0.1:3301/mcp' }
+        try {
+          await adapter.sendTurn({ ...providerTurnInput(), platformMcp })
+          await settleRuntimeEvents()
+          const records = await readFakeCodexLog(spawnLogPath)
+          expect(
+            records.find((record) => record.event === 'thread/start')?.params,
+          ).not.toHaveProperty('config')
+          expect(events.filter((event) => event.type === 'runtime.warning')).toMatchObject([
+            { payload: { message: expect.stringContaining('its own MCP server named platform') } },
+          ])
+        } finally {
+          await adapter.stopAll()
+        }
+      },
+      { mode: 'platform-mcp-configured' },
     )
   })
 
@@ -2954,6 +3098,22 @@ describe('CodexProviderAdapter', () => {
             reloadUserConfig: true,
           },
         ])
+      } finally {
+        await adapter.stopAll()
+      }
+    })
+  })
+
+  it('passes a turn’s output schema to turn/start', async () => {
+    await withFakeCodex(async ({ spawnLogPath }) => {
+      const adapter = new CodexProviderAdapter()
+      const outputSchema = { type: 'object', properties: { ok: { type: 'boolean' } } }
+      try {
+        await adapter.sendTurn({ ...providerTurnInput(), outputSchema })
+        const records = await readFakeCodexLog(spawnLogPath)
+        expect(records.find((record) => record.event === 'turn/start')?.params).toMatchObject({
+          outputSchema,
+        })
       } finally {
         await adapter.stopAll()
       }

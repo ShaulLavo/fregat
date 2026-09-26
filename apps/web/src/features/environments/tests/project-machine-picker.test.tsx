@@ -11,7 +11,7 @@ import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { connectedMachines } from '@/lib/environments/utils/machines'
 import { createFederationHarness } from '../../../../test/factories/federation'
 import { expect, test } from '../../../../test/fixtures'
-import { renderWithProviders } from '../../../../test/render'
+import { renderWithLoadedDialogs } from '../../../../test/render'
 
 test.for(['row', 'path'])(
   'picking a project on B by %s registers only on B before opening its root',
@@ -27,7 +27,7 @@ test.for(['row', 'path'])(
     // The folder list is virtualized and mounts no rows while its scroll box measures zero.
     const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(600)
     onTestFinished(() => height.mockRestore())
-    renderWithProviders(
+    await renderWithLoadedDialogs(
       <ProjectPicker
         machines={connectedMachines(useEnvironmentsStore.getState().entries)}
         onClose={() => {}}

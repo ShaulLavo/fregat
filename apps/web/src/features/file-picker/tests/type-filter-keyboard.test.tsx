@@ -1,15 +1,15 @@
 import { vi } from 'vitest'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import { FilePickerDialog } from '@/components/file-picker-dialog'
+import { DeferredFilePickerDialog } from '@/components/deferred-file-picker-dialog'
 import { expect, test } from '../../../../test/fixtures'
-import { renderWithProviders } from '../../../../test/render'
+import { renderWithLoadedDialogs } from '../../../../test/render'
 
 test('Escape closes the file-type popup without clearing the picker search', async ({ client }) => {
   const onOpenChange = vi.fn()
   await client.fs['create-file'].post({ path: 'notes.md' })
-  renderWithProviders(
-    <FilePickerDialog
+  await renderWithLoadedDialogs(
+    <DeferredFilePickerDialog
       open
       mode='file'
       accept={['.ts', '.md']}

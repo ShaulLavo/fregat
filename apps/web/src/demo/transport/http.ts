@@ -142,7 +142,7 @@ async function get(
         )?.file,
       )
     case '/themes/wallpapers':
-      return json({ assets: [], omarchyAvailable: false })
+      return json({ assets: [], catalog: [] })
     case '/themes/palettes':
       return json({ palettes: [] })
     case '/providers':

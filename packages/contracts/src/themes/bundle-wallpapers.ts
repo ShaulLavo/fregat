@@ -7,8 +7,8 @@ export type BundledWallpaper = {
   readonly file: string
 }
 
-// Omarchy artwork is not redistributed; each entry is the sha256 the library
-// assigns when it imports that file, so the reference resolves after a seed.
+// Each entry is the sha256 of the copy the server packages, which is also the id
+// the library assigns on import, so the reference resolves after a seed.
 function omarchy(theme: string, file: string, sha256: string): BundledWallpaper {
   return { asset: v.parse(assetIdSchema, sha256), theme, file }
 }
