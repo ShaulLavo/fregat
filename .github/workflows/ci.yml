@@ -6,10 +6,12 @@ on:
     branches:
       - main
 
-# A second push to the same branch makes the first run's answer worthless.
+# A second push to a PR branch makes the first run's answer worthless. On main every
+# run finishes, so main always has a verdict; pushes during a run collapse into one
+# pending run of the newest commit, because GitHub keeps one pending run per group.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # Three jobs and a test matrix instead of one runner doing everything in turn:

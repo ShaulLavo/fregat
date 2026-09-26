@@ -66,10 +66,13 @@ change can reach. The targets are confirmed or revised by phase 0's measurements
    branches, and turn it off for main: `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}`.
    A running main run then finishes. GitHub keeps only the newest pending run per concurrency group,
    so pushes during a run collapse into one follow-up run of the latest commit, never a queue of
-   ten. Main then takes at most two runs (one running, one pending), or 20 of the 20 runners at
-   today's 10 jobs, so it only fits once phase 6 cuts jobs per run. Until then, measure how often
-   PR runs wait behind main. A red main run names a commit range (previous verdict to this one),
-   and `flake-watch.yml` still covers the nightly full suite.
+   ten. A pending run holds no runner, so main uses at most one run's jobs (10 of the 20 runners
+   today) at a time, the same as before; what changes is that it keeps them for a whole run instead
+   of releasing them at the next push. Measure how often PR runs wait behind main until phase 6
+   cuts jobs per run. A red main run names a commit range (previous verdict to this one), and
+   `flake-watch.yml` still covers the nightly full suite.
+   Landed 2026-09-26 (wave 2 lane B): `ci.yml` sets
+   `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}`.
 6. **Fewer jobs per run** (S, after 1–4). With setup down to seconds, merge small jobs (packages,
    parity, typecheck) so one run takes fewer of the 20 runners, and wave 2's eight lanes queue less.
 
