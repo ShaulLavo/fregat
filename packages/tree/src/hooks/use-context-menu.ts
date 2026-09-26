@@ -9,7 +9,7 @@ import {
 
 import { createMenuTriggerStore, type MenuTriggerStore } from '../state/menu-trigger'
 import type { FileTreeRowDom } from './useFileTreeRowDom'
-import { CONTEXT_MENU_SLOT_NAME, CONTEXT_MENU_TRIGGER_TYPE } from '../utils/constants'
+import { CONTEXT_MENU_TRIGGER_TYPE } from '../utils/constants'
 import type { FileTreeController } from '../utils/model/FileTreeController'
 import type {
   FileTreeCompositionOptions,
@@ -19,7 +19,6 @@ import type {
   FileTreeContextMenuTriggerMode,
   FileTreeVisibleRow,
 } from '../utils/model/publicTypes'
-import type { FileTreeSlotHost } from '../utils/model/internalTypes'
 import {
   createContextMenuItem,
   focusFirstMenuElement,
@@ -40,7 +39,6 @@ export interface ContextMenuOptions {
   readonly composition: FileTreeCompositionOptions | undefined
   readonly controller: FileTreeController
   readonly dom: FileTreeRowDom
-  readonly slotHost: FileTreeSlotHost | undefined
   readonly isScrolling: RefObject<boolean>
   readonly focusedPath: string | null
   readonly focusedRowHasVisibleAnchor: boolean
@@ -52,6 +50,8 @@ export interface ContextMenuOptions {
 
 export interface ContextMenuHandlers {
   readonly anchorRef: RefObject<HTMLDivElement | null>
+  /** Where a `composition.contextMenu.render` element mounts, inside the row's anchor. */
+  readonly contentHostRef: RefObject<HTMLDivElement | null>
   readonly triggerRef: RefObject<HTMLButtonElement | null>
   readonly clearHoverPath: () => void
   readonly closeContextMenu: (restoreFocus?: boolean) => void
@@ -96,10 +96,10 @@ export function useContextMenu(options: ContextMenuOptions): ContextMenuHandlers
     markActiveItem,
     ownsDomFocus,
     preserveStickyAtScrollTop,
-    slotHost,
   } = options
   const { getRoot, getRowButtons, getScroll, getStickyRowButtons } = dom
   const anchorRef = useRef<HTMLDivElement | null>(null)
+  const contentHostRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const [triggerStore] = useState(createMenuTriggerStore)
   const [contextMenuState, setContextMenuState] = useState<FileTreeContextMenuState | null>(null)
@@ -231,10 +231,7 @@ export function useContextMenu(options: ContextMenuOptions): ContextMenuHandlers
     contextMenuState == null ? null : `${contextMenuState.path}::${contextMenuState.source}`
 
   useLayoutEffect(() => {
-    if (activeContextMenuKey == null) {
-      slotHost?.clearSlotContent(CONTEXT_MENU_SLOT_NAME)
-      return
-    }
+    if (activeContextMenuKey == null) return
 
     const currentState = contextMenuStateRef.current
     if (currentState == null) {
@@ -261,7 +258,7 @@ export function useContextMenu(options: ContextMenuOptions): ContextMenuHandlers
       },
     }
     const menuContent = composition?.contextMenu?.render?.(currentState.item, context) ?? null
-    slotHost?.setSlotContent(CONTEXT_MENU_SLOT_NAME, menuContent)
+    if (menuContent) contentHostRef.current?.replaceChildren(menuContent)
     composition?.contextMenu?.onOpen?.(currentState.item, context)
     focusFirstMenuElement(menuContent)
     queueMicrotask(() => {
@@ -277,9 +274,9 @@ export function useContextMenu(options: ContextMenuOptions): ContextMenuHandlers
     })
 
     return () => {
-      slotHost?.clearSlotContent(CONTEXT_MENU_SLOT_NAME)
+      menuContent?.remove()
     }
-  }, [activeContextMenuKey, composition?.contextMenu, slotHost])
+  }, [activeContextMenuKey, composition?.contextMenu])
 
   useLayoutEffect(() => {
     if (contextMenuState == null || controller.getItem(contextMenuState.path) != null) return
@@ -296,8 +293,7 @@ export function useContextMenu(options: ContextMenuOptions): ContextMenuHandlers
       return
     }
 
-    const rootNode = getRoot()?.getRootNode()
-    const host = rootNode instanceof ShadowRoot ? rootNode.host : getRoot()
+    const host = getRoot()?.closest('[data-file-tree]') ?? getRoot()
     const onPointerDown = (event: MouseEvent): void => {
       const target = event.target
       if (!(target instanceof Node)) {
@@ -326,10 +322,11 @@ export function useContextMenu(options: ContextMenuOptions): ContextMenuHandlers
       }
     }
 
-    document.addEventListener('mousedown', onPointerDown, true)
+    // Bubble phase: React marks events from the tree's portals on the way down, before this runs.
+    document.addEventListener('mousedown', onPointerDown)
     document.addEventListener('keydown', onKeyDown, true)
     return () => {
-      document.removeEventListener('mousedown', onPointerDown, true)
+      document.removeEventListener('mousedown', onPointerDown)
       document.removeEventListener('keydown', onKeyDown, true)
     }
   }, [closeContextMenu, contextMenuState, getRoot])
@@ -409,6 +406,7 @@ export function useContextMenu(options: ContextMenuOptions): ContextMenuHandlers
 
   return {
     anchorRef,
+    contentHostRef,
     triggerRef,
     clearHoverPath,
     closeContextMenu,

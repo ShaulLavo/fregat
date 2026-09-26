@@ -202,3 +202,29 @@ describe('row menu', () => {
     expect(events.menus).toHaveLength(1)
   })
 })
+
+function rowBackgroundAt(point: { x: number; y: number }) {
+  const element = document.elementFromPoint(point.x, point.y)?.closest('[data-type="item"]')
+  if (!(element instanceof HTMLElement)) throw new Error('no row under the pointer')
+  return getComputedStyle(element).backgroundColor
+}
+
+describe('hover while scrolling', () => {
+  it('holds row hover until the scroll settles', async () => {
+    const { model } = await mountParityTree()
+    await expandPaths(model, ['src/', 'src/lib/'])
+    const point = center(row('src/lib/y.ts'))
+    const rest = rowBackgroundAt(point)
+    await mouse('move', point)
+    await vi.waitFor(() => expect(rowBackgroundAt(point)).not.toBe(rest))
+    const hovered = rowBackgroundAt(point)
+    await commands.treeClock('pause')
+    await wheel(ROW_HEIGHT)
+    await commands.treeClock('advance', 16)
+    await mouse('move', point)
+    expect(rowBackgroundAt(point)).toBe(rest)
+    await commands.treeClock('advance', 80)
+    await mouse('move', point)
+    expect(rowBackgroundAt(point)).toBe(hovered)
+  })
+})

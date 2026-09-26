@@ -1,3 +1,4 @@
+import '@/features/workspace/components/tree-pane.css'
 import { captureTree, savedTree } from '@/features/workspace/state/tree-reload'
 import { addLifecycleFlush } from '@/lib/lifecycle-flush'
 import { disabledFileQueryKey } from '@/features/workspace/utils/query-keys'
@@ -232,7 +233,6 @@ function ReadyTreePane({
     },
     renderRowDecoration: (context) =>
       treeRowDecoration(modelRef.current, context, (error) => void fixWithAgent(error)),
-    unsafeCSS: treeUnsafeCss,
   })
 
   useLayoutEffect(() => {
@@ -602,85 +602,3 @@ function fileTreeStyle(
     ...fileTreeIndentGuideVariables(editorTheme),
   } as CSSProperties
 }
-
-const treeUnsafeCss = `
-  :host {
-    color: var(--foreground);
-    background: transparent;
-    font-family: var(--workbench-tree-font-family);
-    font-size: var(--workbench-tree-font-size);
-  }
-
-  button[data-type='item'] {
-    border-radius: 0;
-  }
-
-  button[data-type='item'][data-item-selected='true']::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 4px;
-    bottom: 4px;
-    width: 2px;
-    background: var(--foreground);
-    pointer-events: none;
-  }
-
-  /* The tree's own focus ring only while the tree actually has focus. The
-   * package paints it for its remembered focus row even when the editor owns
-   * the keyboard, which read as a second, stray selection. */
-  :host(:not(:focus-within)) button[data-type='item'][data-item-focused='true']::before {
-    outline-color: transparent;
-  }
-
-  [data-file-tree-search-container] {
-    align-items: center;
-    height: var(--bar-height);
-    margin: 0;
-    padding-inline: var(--bar-padding-x);
-  }
-
-  [data-file-tree-search-input] {
-    height: var(--density-control-height-sm);
-    line-height: normal;
-    margin-block: 0;
-    padding-inline: var(--density-control-padding-x);
-    border-radius: var(--radius-md);
-    border-color: var(--input);
-    background-color: color-mix(in oklch, var(--input) 30%, transparent);
-    font-family: var(--font-ui);
-    font-size: var(--text-xs);
-  }
-
-  :host(:hover) [data-item-section='spacing-item'] {
-    border-left-color: var(--trees-indent-guide-current-bg);
-  }
-
-  [data-item-section='spacing-item'] {
-    border-left-color: var(--border);
-  }
-
-  button[data-item-loading='true'] [data-item-section='content'] {
-    background-image:
-      linear-gradient(90deg, transparent 0%, var(--foreground) 50%, transparent 100%),
-      linear-gradient(var(--muted-foreground), var(--muted-foreground));
-    background-repeat: no-repeat;
-    background-size: 45% 100%, auto;
-    background-clip: text;
-    color: transparent;
-    animation: file-tree-loading-shimmer 2s linear infinite;
-  }
-
-  @keyframes file-tree-loading-shimmer {
-    from { background-position: -100% 0, 0 0; }
-    to { background-position: 250% 0, 0 0; }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    button[data-item-loading='true'] [data-item-section='content'] {
-      animation: none;
-      background-image: none;
-      color: var(--muted-foreground);
-    }
-  }
-`

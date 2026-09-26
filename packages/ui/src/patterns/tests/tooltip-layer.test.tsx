@@ -11,31 +11,29 @@ function Probe() {
   return <output>{target?.text ?? ''}</output>
 }
 
-// A control inside a shadow root, as the file tree renders its rows.
-function shadowControl(label: string) {
-  const host = document.createElement('div')
-  document.body.append(host)
+// An icon inside a control that carries the tooltip, as tree rows render their actions.
+function tooltipControl(label: string) {
   const control = document.createElement('span')
   control.dataset.tooltip = label
   const icon = document.createElement('i')
   control.append(icon)
-  host.attachShadow({ mode: 'open' }).append(control)
-  cleanups.push(() => host.remove())
+  document.body.append(control)
+  cleanups.push(() => control.remove())
   return icon
 }
 
 function dispatch(target: EventTarget, type: string) {
-  target.dispatchEvent(new Event(type, { bubbles: true, composed: true }))
+  target.dispatchEvent(new Event(type, { bubbles: true }))
 }
 
 function settle() {
   return new Promise((resolve) => setTimeout(resolve, TOOLTIP_DELAY + 50))
 }
 
-it('opens for a control inside a shadow root on pointer moves alone', async () => {
+it('opens for a control on pointer moves alone', async () => {
   const mounted = mount(<Probe />)
   cleanups.push(mounted.unmount)
-  const icon = shadowControl('Fix with AI')
+  const icon = tooltipControl('Fix with AI')
 
   dispatch(icon, 'pointermove')
   await settle()
@@ -50,7 +48,7 @@ it('opens for a control inside a shadow root on pointer moves alone', async () =
 it('stays hidden over a pressed control until the pointer leaves it', async () => {
   const mounted = mount(<Probe />)
   cleanups.push(mounted.unmount)
-  const icon = shadowControl('Fix with AI')
+  const icon = tooltipControl('Fix with AI')
   const output = () => mounted.container.querySelector('output')?.textContent
 
   dispatch(icon, 'pointermove')

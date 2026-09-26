@@ -1,9 +1,5 @@
 // Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
-import { createTreeError } from '../structured-errors'
-
 import { getBuiltInSpriteSheet, isColoredBuiltInIconSet } from '../builtInIcons'
-import { FileTreeContainerLoaded, prepareFileTreeShadowRoot } from './web-components'
-import { FILE_TREE_TAG_NAME, FILE_TREE_UNSAFE_CSS_ATTRIBUTE, HEADER_SLOT_NAME } from '../constants'
 import { normalizeFileTreeIcons } from '../iconConfig'
 import { type FileTreeDensityPreset, resolveFileTreeDensity } from '../model/density'
 import { FileTreeController } from '../model/FileTreeController'
@@ -27,7 +23,6 @@ import type {
   FileTreeOptions,
   FileTreePublicId,
   FileTreeRemoveOptions,
-  FileTreeRenderProps,
   FileTreeResetOptions,
   FileTreeRowDecorationRenderer,
   FileTreeScrollToPathOptions,
@@ -38,24 +33,10 @@ import {
   FILE_TREE_DEFAULT_ITEM_HEIGHT,
   FILE_TREE_DEFAULT_VIEWPORT_HEIGHT,
 } from '../model/virtualization'
-import { wrapUnsafeCSS } from '../cssWrappers'
-import { renderFileTreeRoot, unmountFileTreeRoot } from '../../state/renderer'
 import { FileTreeRowElements, type FileTreeRowElement } from './rowElements'
-import { FileTreeManagedSlotHost } from './slotHost'
 
-let clientInstanceId = 0
-
-function createClientId(explicitId?: string): string {
-  if (explicitId != null && explicitId.length > 0) {
-    return explicitId
-  }
-
-  clientInstanceId += 1
-  return `pst_ft_${clientInstanceId}`
-}
-
-// Translates the public row-budget hint into the pixel height shared by SSR and
-// the first client render before the DOM can report a measured scroll viewport.
+// Translates the public row-budget hint into the pixel height the first render uses before the
+// DOM can report a measured scroll viewport.
 function resolveInitialViewportHeight({
   initialVisibleRowCount,
   itemHeight,
@@ -65,38 +46,19 @@ function resolveInitialViewportHeight({
     : Math.max(0, initialVisibleRowCount) * (itemHeight ?? FILE_TREE_DEFAULT_ITEM_HEIGHT)
 }
 
-function parseSpriteSheet(spriteSheet: string): SVGElement | undefined {
-  if (typeof document === 'undefined') {
-    return undefined
-  }
-
-  const wrapper = document.createElement('div')
-  wrapper.innerHTML = spriteSheet
-  const svg = wrapper.querySelector('svg')
-  return svg instanceof SVGElement ? svg : undefined
+/** The sprite sheets a mounted tree renders: the built-in glyphs, then the caller's. */
+export interface FileTreeSpriteSheets {
+  readonly builtIn: string
+  readonly coloredIcons: boolean
+  readonly custom: string | null
 }
 
-function isBuiltInSpriteSheet(spriteSheet: SVGElement): boolean {
-  return (
-    spriteSheet.querySelector('#file-tree-icon-chevron') instanceof SVGElement &&
-    spriteSheet.querySelector('#file-tree-icon-file') instanceof SVGElement &&
-    spriteSheet.querySelector('#file-tree-icon-dot') instanceof SVGElement &&
-    spriteSheet.querySelector('#file-tree-icon-lock') instanceof SVGElement
-  )
-}
-
-function getTopLevelSpriteSheets(shadowRoot: ShadowRoot): SVGElement[] {
-  return Array.from(shadowRoot.children).filter(
-    (element): element is SVGElement => element instanceof SVGElement,
-  )
-}
+/** What the view renders from the model; its identity changes with every view-visible setter. */
+export type FileTreeModelViewProps = Omit<FileTreeViewProps, 'instanceId'>
 
 export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHandle {
-  static LoadedCustomComponent: boolean = FileTreeContainerLoaded
-
   #composition: FileTreeCompositionOptions | undefined
   readonly #controller: FileTreeController
-  #id: string
   readonly #onSelectionChange: FileTreeSelectionChangeListener | undefined
   readonly #rowDecorationSource: FileTreeRowDecorationRenderer | undefined
   #renderRowDecoration: FileTreeRowDecorationRenderer | undefined
@@ -105,7 +67,6 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
   readonly #searchEnabled: boolean
   readonly #searchFakeFocus: boolean
   readonly #searchPlaceholder: string | undefined
-  readonly #slotHost = new FileTreeManagedSlotHost()
   readonly #rowElements = new FileTreeRowElements()
   #density: FileTreeDensityPreset
   readonly #viewOptions: Pick<
@@ -117,25 +78,16 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
     | 'initialScrollTop'
     | 'onScrollTopChange'
   >
-  #fileTreeContainer: HTMLElement | undefined
   #gitStatusState: FileTreeGitStatusState | null
   #icons: FileTreeOptions['icons']
   #loadingPaths: ReadonlySet<string> = new Set()
   readonly #densityListeners = new Set<FileTreeListener>()
   #densityVersion = 0
-  readonly #unsafeCSS: string | undefined
-  #unsafeCSSStyle: HTMLStyleElement | undefined
-  #appliedUnsafeCSS: string | undefined
+  readonly #viewListeners = new Set<FileTreeListener>()
+  #viewVersion = 0
+  #viewProps: FileTreeModelViewProps | null = null
   #selectionVersion: number
   #selectionSubscription: (() => void) | null = null
-  #wrapper: HTMLDivElement | undefined
-  // Per-instance ownership flags for the density CSS variables on the host.
-  // Flip true only when `#applyDensityHostStyle` actually wrote the var
-  // (i.e. nothing inline was already there); `#unmount()` uses these to strip
-  // exactly what we wrote so that hosts reused for a new instance start from
-  // a clean slate while SSR-supplied or caller-set values are left alone.
-  #wroteHostItemHeight = false
-  #wroteHostDensityFactor = false
 
   public constructor(options: FileTreeOptions) {
     const {
@@ -143,7 +95,6 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
       density,
       fileTreeSearchMode,
       gitStatus,
-      id,
       initialSearchQuery,
       icons,
       itemHeight,
@@ -157,17 +108,14 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
       searchFakeFocus,
       searchPlaceholder,
       stickyFolders,
-      unsafeCSS,
       initialVisibleRowCount,
       initialScrollTop,
       onScrollTopChange,
       ...controllerOptions
     } = options
     this.#composition = composition
-    this.#id = createClientId(id)
     this.#gitStatusState = resolveFileTreeGitStatusState(gitStatus)
     this.#icons = icons
-    this.#unsafeCSS = unsafeCSS
     this.#onSelectionChange = onSelectionChange
     this.#rowDecorationSource = renderRowDecoration
     this.#renderRowDecoration = renderRowDecoration
@@ -201,27 +149,11 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
           })
   }
 
-  public unmount(): void {
-    if (this.#wrapper != null) {
-      unmountFileTreeRoot(this.#wrapper)
-      delete this.#wrapper.dataset.fileTreeVirtualizedWrapper
-      this.#wrapper = undefined
-    }
-
-    this.#slotHost.clearAll()
-    this.#slotHost.setHost(null)
-    if (this.#fileTreeContainer != null) {
-      delete this.#fileTreeContainer.dataset.fileTreeVirtualized
-      this.#removeOwnedDensityHostStyle(this.#fileTreeContainer)
-      this.#fileTreeContainer = undefined
-    }
-  }
-
   public cleanUp(): void {
-    this.unmount()
     this.#selectionSubscription?.()
     this.#selectionSubscription = null
     this.#densityListeners.clear()
+    this.#viewListeners.clear()
     this.#controller.destroy()
   }
 
@@ -232,10 +164,6 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
 
   public subscribeRowElements(listener: () => void): () => void {
     return this.#rowElements.subscribe(listener)
-  }
-
-  public getFileTreeContainer(): HTMLElement | undefined {
-    return this.#fileTreeContainer
   }
 
   public getItem(path: string): FileTreeItemHandle | null {
@@ -282,18 +210,11 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
       return
     }
 
-    const mountedTree = this.#getMountedTreeElements()
-
     this.#density = nextDensity
     this.#viewOptions.itemHeight = nextDensity.itemHeight
     this.#densityVersion += 1
-
-    if (mountedTree != null) {
-      this.#refreshOwnedDensityHostStyle(mountedTree.host)
-      renderFileTreeRoot(mountedTree.wrapper, this.#getViewProps())
-    }
-
-    this.#emitDensityChange()
+    this.#invalidateView()
+    for (const listener of this.#densityListeners) listener()
   }
 
   public subscribeDensity(listener: FileTreeListener): () => void {
@@ -301,6 +222,38 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
 
     return () => {
       this.#densityListeners.delete(listener)
+    }
+  }
+
+  /** Notifies when the props the view renders change; `getViewProps` then has new ones. */
+  public subscribeView(listener: FileTreeListener): () => void {
+    this.#viewListeners.add(listener)
+
+    return () => {
+      this.#viewListeners.delete(listener)
+    }
+  }
+
+  public getViewVersion(): number {
+    return this.#viewVersion
+  }
+
+  /**
+   * The view's props at `version`. The version is the cache key: the model changes in place, so
+   * a memo keyed on its identity alone would serve stale props.
+   */
+  public getViewProps(_version: number): FileTreeModelViewProps {
+    this.#viewProps ??= this.#createViewProps()
+    return this.#viewProps
+  }
+
+  public getSpriteSheets(): FileTreeSpriteSheets {
+    const icons = normalizeFileTreeIcons(this.#icons)
+    const custom = icons.spriteSheet?.trim() ?? ''
+    return {
+      builtIn: getBuiltInSpriteSheet(icons.set),
+      coloredIcons: icons.colored && isColoredBuiltInIconSet(icons.set),
+      custom: custom.length > 0 ? custom : null,
     }
   }
 
@@ -351,13 +304,7 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
     }
 
     this.#gitStatusState = nextGitStatusState
-
-    const mountedTree = this.#getMountedTreeElements()
-    if (mountedTree == null) {
-      return
-    }
-
-    renderFileTreeRoot(mountedTree.wrapper, this.#getViewProps())
+    this.#invalidateView()
   }
 
   public move(fromPath: string, toPath: string, options?: FileTreeMoveOptions): void {
@@ -420,14 +367,7 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
   // callbacks return, so identity alone is not a reliable no-op signal.
   public setComposition(composition?: FileTreeCompositionOptions): void {
     this.#composition = composition
-
-    const mountedTree = this.#getMountedTreeElements()
-    if (mountedTree == null) {
-      return
-    }
-
-    this.#syncHeaderSlotContent()
-    renderFileTreeRoot(mountedTree.wrapper, this.#getViewProps())
+    this.#invalidateView()
   }
 
   public setGitStatus(gitStatus?: FileTreeOptions['gitStatus']): void {
@@ -437,25 +377,12 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
     }
 
     this.#gitStatusState = nextGitStatusState
-
-    const mountedTree = this.#getMountedTreeElements()
-    if (mountedTree == null) {
-      return
-    }
-
-    renderFileTreeRoot(mountedTree.wrapper, this.#getViewProps())
+    this.#invalidateView()
   }
 
   public setIcons(icons?: FileTreeOptions['icons']): void {
     this.#icons = icons
-
-    const mountedTree = this.#getMountedTreeElements()
-    if (mountedTree == null) {
-      return
-    }
-
-    this.#syncIconSurface(mountedTree.host, mountedTree.wrapper)
-    renderFileTreeRoot(mountedTree.wrapper, this.#getViewProps())
+    this.#invalidateView()
   }
 
   /**
@@ -467,38 +394,38 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
     if (!render) return
 
     this.#renderRowDecoration = (context) => render(context)
-    const mountedTree = this.#getMountedTreeElements()
-    if (!mountedTree) return
-
-    renderFileTreeRoot(mountedTree.wrapper, this.#getViewProps())
+    this.#invalidateView()
   }
 
   public setLoadingPaths(paths: readonly FileTreePublicId[]): void {
     if (arePathSetsEqual(this.#loadingPaths, paths)) return
 
     this.#loadingPaths = new Set(paths)
-    const mountedTree = this.#getMountedTreeElements()
-    if (!mountedTree) return
-
-    renderFileTreeRoot(mountedTree.wrapper, this.#getViewProps())
+    this.#invalidateView()
   }
 
-  public render({ containerWrapper, fileTreeContainer }: FileTreeRenderProps): void {
-    const host = this.#prepareHost(fileTreeContainer ?? this.#fileTreeContainer, containerWrapper)
-    const wrapper = this.#getOrCreateWrapper(host)
-    this.#syncHeaderSlotContent()
-    renderFileTreeRoot(wrapper, this.#getViewProps())
+  #invalidateView(): void {
+    this.#viewProps = null
+    this.#viewVersion += 1
+    for (const listener of this.#viewListeners) listener()
   }
 
-  #getInitialViewOptions(): {
-    initialScrollTop?: number
-    onScrollTopChange?: (scrollTop: number) => void
-    initialViewportHeight: number
-    itemHeight?: number
-    overscan?: number
-    stickyFolders?: boolean
-  } {
+  #createViewProps(): FileTreeModelViewProps {
     return {
+      composition: this.#composition,
+      controller: this.#controller,
+      gitStatusByPath: this.#gitStatusState?.statusByPath,
+      ignoredGitDirectories: this.#gitStatusState?.ignoredDirectoryPaths,
+      directoriesWithGitChanges: this.#gitStatusState?.directoriesWithChanges,
+      icons: this.#icons,
+      loadingPaths: this.#loadingPaths,
+      renamingEnabled: this.#renamingEnabled,
+      renderRowDecoration: this.#renderRowDecoration,
+      rowElements: this.#rowElements,
+      searchBlurBehavior: this.#searchBlurBehavior,
+      searchEnabled: this.#searchEnabled,
+      searchFakeFocus: this.#searchFakeFocus,
+      searchPlaceholder: this.#searchPlaceholder,
       initialScrollTop: this.#viewOptions.initialScrollTop,
       onScrollTopChange: this.#viewOptions.onScrollTopChange,
       initialViewportHeight: resolveInitialViewportHeight({
@@ -509,52 +436,6 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
       overscan: this.#viewOptions.overscan,
       stickyFolders: this.#viewOptions.stickyFolders,
     }
-  }
-
-  #getViewProps(): FileTreeViewProps {
-    return {
-      composition: this.#composition,
-      controller: this.#controller,
-      gitStatusByPath: this.#gitStatusState?.statusByPath,
-      ignoredGitDirectories: this.#gitStatusState?.ignoredDirectoryPaths,
-      directoriesWithGitChanges: this.#gitStatusState?.directoriesWithChanges,
-      icons: this.#icons,
-      instanceId: this.#id,
-      loadingPaths: this.#loadingPaths,
-      renamingEnabled: this.#renamingEnabled,
-      renderRowDecoration: this.#renderRowDecoration,
-      rowElements: this.#rowElements,
-      searchBlurBehavior: this.#searchBlurBehavior,
-      searchEnabled: this.#searchEnabled,
-      searchFakeFocus: this.#searchFakeFocus,
-      searchPlaceholder: this.#searchPlaceholder,
-      slotHost: this.#slotHost,
-      ...this.#getInitialViewOptions(),
-    }
-  }
-
-  // Resolves the mounted DOM surfaces so runtime setters can rerender in place.
-  #getMountedTreeElements(): {
-    host: HTMLElement
-    wrapper: HTMLDivElement
-  } | null {
-    const host = this.#fileTreeContainer
-    const wrapper = this.#wrapper
-    if (host == null || wrapper == null) {
-      return null
-    }
-
-    return { host, wrapper }
-  }
-
-  #syncIconSurface(host: HTMLElement, wrapper: HTMLElement): void {
-    const shadowRoot = host.shadowRoot
-    if (shadowRoot != null) {
-      this.#syncBuiltInSpriteSheet(shadowRoot)
-      this.#syncCustomSpriteSheet(shadowRoot)
-    }
-
-    this.#syncIconModeAttrs(wrapper)
   }
 
   #emitSelectionChange(): void {
@@ -570,217 +451,5 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
 
     this.#selectionVersion = nextSelectionVersion
     onSelectionChange(this.#controller.getSelectedPaths())
-  }
-
-  #emitDensityChange(): void {
-    for (const listener of this.#densityListeners) {
-      listener()
-    }
-  }
-
-  // Keeps header slot content attached to the host light DOM so hydration and
-  // later composition surfaces can share one host-managed slot path.
-  #syncHeaderSlotContent(): void {
-    const renderHeader = this.#composition?.header?.render
-    if (renderHeader != null) {
-      this.#slotHost.setSlotContent(HEADER_SLOT_NAME, renderHeader())
-      return
-    }
-
-    this.#slotHost.setSlotHtml(HEADER_SLOT_NAME, this.#composition?.header?.html ?? null)
-  }
-
-  #syncBuiltInSpriteSheet(shadowRoot: ShadowRoot): void {
-    const currentBuiltInSprite = getTopLevelSpriteSheets(shadowRoot).find((sprite) =>
-      isBuiltInSpriteSheet(sprite),
-    )
-    const nextBuiltInSprite = parseSpriteSheet(
-      getBuiltInSpriteSheet(normalizeFileTreeIcons(this.#icons).set),
-    )
-    if (nextBuiltInSprite == null) {
-      return
-    }
-
-    if (
-      currentBuiltInSprite != null &&
-      currentBuiltInSprite.outerHTML === nextBuiltInSprite.outerHTML
-    ) {
-      return
-    }
-
-    if (currentBuiltInSprite != null) {
-      currentBuiltInSprite.replaceWith(nextBuiltInSprite)
-    } else {
-      shadowRoot.prepend(nextBuiltInSprite)
-    }
-  }
-
-  #syncCustomSpriteSheet(shadowRoot: ShadowRoot): void {
-    const topLevelSprites = getTopLevelSpriteSheets(shadowRoot)
-    const builtInSprite = topLevelSprites.find((sprite) => isBuiltInSpriteSheet(sprite))
-    const currentCustomSprites = topLevelSprites.filter((sprite) => sprite !== builtInSprite)
-    const customSpriteSheet = normalizeFileTreeIcons(this.#icons).spriteSheet?.trim() ?? ''
-    if (customSpriteSheet.length === 0) {
-      for (const currentCustomSprite of currentCustomSprites) {
-        currentCustomSprite.remove()
-      }
-      return
-    }
-
-    const customSprite = parseSpriteSheet(customSpriteSheet)
-    if (customSprite == null) {
-      for (const currentCustomSprite of currentCustomSprites) {
-        currentCustomSprite.remove()
-      }
-      return
-    }
-
-    if (
-      currentCustomSprites.length === 1 &&
-      currentCustomSprites[0].outerHTML === customSprite.outerHTML
-    ) {
-      return
-    }
-
-    for (const currentCustomSprite of currentCustomSprites) {
-      currentCustomSprite.remove()
-    }
-    shadowRoot.appendChild(customSprite)
-  }
-
-  #syncIconModeAttrs(wrapper: HTMLElement): void {
-    const normalizedIcons = normalizeFileTreeIcons(this.#icons)
-    if (normalizedIcons.colored && isColoredBuiltInIconSet(normalizedIcons.set)) {
-      wrapper.dataset.fileTreeColoredIcons = 'true'
-    } else {
-      delete wrapper.dataset.fileTreeColoredIcons
-    }
-  }
-
-  #syncUnsafeCSS(shadowRoot: ShadowRoot): void {
-    const existingUnsafeStyle = shadowRoot.querySelector(`style[${FILE_TREE_UNSAFE_CSS_ATTRIBUTE}]`)
-    if (this.#unsafeCSSStyle == null && existingUnsafeStyle instanceof HTMLStyleElement) {
-      this.#unsafeCSSStyle = existingUnsafeStyle
-    }
-
-    if (this.#unsafeCSS == null || this.#unsafeCSS === '') {
-      this.#unsafeCSSStyle?.remove()
-      this.#unsafeCSSStyle = undefined
-      this.#appliedUnsafeCSS = undefined
-      return
-    }
-
-    if (
-      this.#unsafeCSSStyle?.parentNode === shadowRoot &&
-      this.#appliedUnsafeCSS === this.#unsafeCSS
-    ) {
-      return
-    }
-
-    this.#unsafeCSSStyle ??= document.createElement('style')
-    this.#unsafeCSSStyle.setAttribute(FILE_TREE_UNSAFE_CSS_ATTRIBUTE, '')
-    if (this.#unsafeCSSStyle.parentNode !== shadowRoot) {
-      shadowRoot.appendChild(this.#unsafeCSSStyle)
-    }
-    this.#unsafeCSSStyle.textContent = wrapUnsafeCSS(this.#unsafeCSS)
-    this.#appliedUnsafeCSS = this.#unsafeCSS
-  }
-
-  #getOrCreateWrapper(host: HTMLElement): HTMLDivElement {
-    if (this.#wrapper != null) {
-      return this.#wrapper
-    }
-
-    const shadowRoot = host.shadowRoot
-    if (shadowRoot == null) {
-      throw createTreeError('FileTree requires a shadow root')
-    }
-
-    const wrapperCandidates = Array.from(shadowRoot.children).filter(
-      (element): element is HTMLDivElement =>
-        element instanceof HTMLDivElement &&
-        typeof element.dataset.fileTreeId === 'string' &&
-        element.dataset.fileTreeId.length > 0,
-    )
-    const existingWrapper =
-      wrapperCandidates.find((element) => element.dataset.fileTreeId === this.#id) ??
-      wrapperCandidates[0]
-    if (existingWrapper != null) {
-      this.#id = existingWrapper.dataset.fileTreeId ?? this.#id
-    }
-    this.#wrapper = existingWrapper ?? document.createElement('div')
-    this.#wrapper.dataset.fileTreeId = this.#id
-    this.#wrapper.dataset.fileTreeVirtualizedWrapper = 'true'
-    this.#syncIconSurface(host, this.#wrapper)
-
-    if (this.#wrapper.parentNode !== shadowRoot) {
-      shadowRoot.appendChild(this.#wrapper)
-    }
-
-    return this.#wrapper
-  }
-
-  #prepareHost(fileTreeContainer?: HTMLElement, parentNode?: HTMLElement): HTMLElement {
-    const host =
-      fileTreeContainer ?? this.#fileTreeContainer ?? document.createElement(FILE_TREE_TAG_NAME)
-    if (parentNode != null && host.parentNode !== parentNode) {
-      parentNode.appendChild(host)
-    }
-
-    const shadowRoot = host.shadowRoot ?? host.attachShadow({ mode: 'open' })
-    prepareFileTreeShadowRoot(host, shadowRoot)
-    this.#syncUnsafeCSS(shadowRoot)
-    host.dataset.fileTreeVirtualized = 'true'
-    host.style.display = 'flex'
-    this.#applyDensityHostStyle(host)
-    this.#slotHost.setHost(host)
-    this.#fileTreeContainer = host
-    return host
-  }
-
-  // Mirrors the React wrapper: paint the
-  // resolved row height and density factor onto the host as CSS custom
-  // properties so the painted row height (`--trees-row-height`, derived from
-  // `--trees-item-height` in style.css) stays in sync with the itemHeight
-  // virtualization uses to position rows. Pre-existing inline values win —
-  // that covers SSR-supplied attributes during hydrate and any caller-set
-  // host overrides, matching the React wrapper's "caller style wins via
-  // spread order" semantic. Each branch records ownership so `#unmount()`
-  // can strip exactly what we wrote and host-reuse scenarios start from a
-  // clean slate on the next mount.
-  #applyDensityHostStyle(host: HTMLElement): void {
-    if (host.style.getPropertyValue('--trees-item-height') === '') {
-      host.style.setProperty('--trees-item-height', `${String(this.#density.itemHeight)}px`)
-      this.#wroteHostItemHeight = true
-    }
-    if (host.style.getPropertyValue('--trees-density-override') === '') {
-      host.style.setProperty('--trees-density-override', String(this.#density.factor))
-      this.#wroteHostDensityFactor = true
-    }
-  }
-
-  #refreshOwnedDensityHostStyle(host: HTMLElement): void {
-    if (this.#wroteHostItemHeight) {
-      host.style.setProperty('--trees-item-height', `${String(this.#density.itemHeight)}px`)
-    }
-    if (this.#wroteHostDensityFactor) {
-      host.style.setProperty('--trees-density-override', String(this.#density.factor))
-    }
-  }
-
-  // Strips just the density vars this instance wrote during `#prepareHost()`,
-  // leaving SSR-supplied or caller-set values untouched. Called from
-  // `#unmount()` so a subsequent `new FileTree({ density }).hydrate({
-  // fileTreeContainer: sameHost })` starts from a clean slate instead of
-  // hitting the empty-check guard above and inheriting stale model values.
-  #removeOwnedDensityHostStyle(host: HTMLElement): void {
-    if (this.#wroteHostItemHeight) {
-      host.style.removeProperty('--trees-item-height')
-      this.#wroteHostItemHeight = false
-    }
-    if (this.#wroteHostDensityFactor) {
-      host.style.removeProperty('--trees-density-override')
-      this.#wroteHostDensityFactor = false
-    }
   }
 }
