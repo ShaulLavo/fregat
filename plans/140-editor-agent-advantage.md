@@ -318,6 +318,7 @@ SubagentStop, Stop and Interrupt (`config/src/hook_config.rs`). There are two ha
    diffs the same way it does in VS Code. This is the one place `/ide` does work. Options:
    (a) a separate plan later, (b) not wanted. Recommendation: (a), at low priority. It writes
    into the user's shared `~/.claude` directory, and it helps terminal sessions only, not chat.
+   Decided 2026-09-26: owner — (a): its own plan, [Plan 183](183-claude-ide-in-terminals.md), low priority.
 
 ### Proposed phases (4 and 5; Phases 1–3 are in PR #33)
 

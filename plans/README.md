@@ -19,6 +19,7 @@ a bare root `bun run verify`.
 
 | Plan                                                                                    | State                                                                     |
 | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| [183 — Platform as Claude Code's IDE in its terminals](183-claude-ide-in-terminals.md)  | **PLACEHOLDER — LOW PRIORITY; SPLIT FROM 140 Q1**                         |
 | [177 — prefetch every press](177-prefetch-every-press.md)                               | **PROPOSED 2026-09-26 — RESEARCH FIRST**                                  |
 | [176 — one markdown parser](176-markdown-parser.md)                                     | **RESEARCH — AUTHORIZED 2026-09-26; REPLACES 108 D5**                     |
 | [175 — opening a very large folder](175-large-folder-open.md)                           | **DONE 2026-09-26 — DEPLOYED `plan-175`, PROD CHECKED**                   |

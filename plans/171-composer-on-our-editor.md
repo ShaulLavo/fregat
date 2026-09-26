@@ -2,12 +2,13 @@
 
 ## Status and authorization
 
-- Status: RESEARCH DONE (2026-09-25) — verified gap table, order and proposed phases below; the
-  open owner questions are Plan 111's three. Nothing here authorizes implementation.
+- Status: RESEARCH DONE (2026-09-25) — verified gap table, order and proposed phases below; Plan 111's three
+  owner questions are answered (2026-09-26). Nothing here authorizes implementation.
 - Priority: P2. The composer works today; this removes a second editor framework.
 - Planned at: Platform `9f343825`, Editor `e2fd299`, 2026-09-25. Origin: Plan 126
   [INTERACTION-11](126-t3code-alignment/interaction.md) owner ruling.
-- Depends on: [Plan 111](111-editor-decorations.md) (decorations, question 7) first.
+- Depends on: [Plan 111](111-editor-decorations.md) (decorations, question 7) first, and an Editor
+  spellcheck (owner, 2026-09-26; researched in round 2).
 
 ## Outcome
 
@@ -184,7 +185,7 @@ word-boundary wrap, so wrap work is on the path in every option.
 
 - Decided 2026-09-26: owner — Plan 111 question 1 (a): E052 plus word-boundary wrap are composer prerequisites.
 - Decided 2026-09-26: recommendation (owner deferred) — Plan 111 question 3 (a): a hand-typed `@path` becomes a chip once complete.
-- Plan 111 question 2 (native spellcheck) is still open.
+- Decided 2026-09-26: owner — Plan 111 question 2 (b): Lexical stays until the Editor has its own spellcheck. Editor spellcheck is a prerequisite of phase 3.
 
 ### Proposed phases
 

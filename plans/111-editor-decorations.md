@@ -153,6 +153,7 @@ onDidChangeContentHeight(listener: (height: number) => void): EditorDisposable
 1. **Composer font and wrap.** The composer sets prose in Inter with soft wrap; the Editor wraps by monospace columns until E052 lands (Proposed, P3, L). Options: (a) E052 becomes a prerequisite of the composer move and rises in priority; (b) the composer switches to the coding font; (c) move now and accept wrong wrap points. **Recommendation:** (a).
    Decided 2026-09-26: owner — (a): E052 (proportional-font wrap) plus word-boundary wrap are composer prerequisites.
 2. **Native spellcheck.** Lexical's contenteditable gets the browser's spellcheck and mobile autocorrect suggestions. The Editor paints text outside its input element, so native squiggles cannot appear; keyboard autocorrect can be turned back on for the composer's input. Options: (a) accept losing squiggles; (b) keep Lexical until the Editor has its own spellcheck. **Recommendation:** (a).
+   Decided 2026-09-26: owner — (b): Lexical stays until the Editor has its own spellcheck, which becomes a composer prerequisite.
 3. **Hand-typed mentions become chips.** With derived mentions, typing `@src/app.ts` and a space turns it into a chip immediately, as a reload does today. Options: (a) yes; (b) only menu-inserted mentions are chips, which needs tracked ranges and paste re-parsing, the Zed and Lexical model. **Recommendation:** (a).
    Decided 2026-09-26: recommendation (owner deferred) — (a): a hand-typed `@path` becomes a chip once complete, as on reload today and in T3.
 
