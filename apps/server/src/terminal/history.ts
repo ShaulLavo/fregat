@@ -1,7 +1,7 @@
 import type { SessionId } from '@workspace/contracts'
 import { and, asc, eq, like, lt } from 'drizzle-orm'
 import type { PlatformDatabase } from '../db/client'
-import { terminalHistoryChunks, terminalSessionCleanup } from '../db/schema'
+import { terminalHistoryChunks, terminalSessionCleanup, terminalSessionOffsets } from '../db/schema'
 
 const MAX_BYTES = 8 * 1024 * 1024
 const MAX_LINES = 5_000
@@ -12,6 +12,7 @@ type Chunk = { sequence: number; data: Buffer; lines: number }
 export class TerminalHistory {
   private chunks: Chunk[]
   private sequence: number
+  private cumulativeOffset: number
   private readonly database: PlatformDatabase
   private readonly owner: string
 
@@ -26,13 +27,24 @@ export class TerminalHistory {
       .all()
       .map(({ sequence, data }) => ({ sequence, data, lines: lineBreaks(data) }))
     this.sequence = this.chunks.at(-1)?.sequence ?? 0
+    this.cumulativeOffset =
+      database
+        .select({ offset: terminalSessionOffsets.offset })
+        .from(terminalSessionOffsets)
+        .where(eq(terminalSessionOffsets.owner, owner))
+        .get()?.offset ?? 0
+  }
+
+  /** Next byte in the host stream, independent of saved scrollback length. */
+  get offset() {
+    return this.cumulativeOffset
   }
 
   values(): readonly Uint8Array[] {
     return this.chunks.map((chunk) => chunk.data)
   }
 
-  append(bytes: Uint8Array) {
+  append(bytes: Uint8Array, nextOffset = this.cumulativeOffset + bytes.length) {
     if (bytes.length === 0) return
     const next = [...this.chunks]
     let sequence = this.sequence
@@ -50,20 +62,35 @@ export class TerminalHistory {
       next.push({ sequence: ++sequence, data, lines: lineBreaks(data) })
     }
     const retained = trimHistory(next)
-    this.persist(retained)
+    const offset = nextOffset
+    this.persist(retained, offset)
     this.chunks = retained
     this.sequence = sequence
+    this.cumulativeOffset = offset
   }
 
-  clear() {
-    this.database
-      .delete(terminalHistoryChunks)
-      .where(eq(terminalHistoryChunks.owner, this.owner))
-      .run()
+  setOffset(offset: number) {
+    this.persist(this.chunks, offset)
+    this.cumulativeOffset = offset
+  }
+
+  clear({ keepOffset = false } = {}) {
+    this.database.transaction((transaction) => {
+      transaction
+        .delete(terminalHistoryChunks)
+        .where(eq(terminalHistoryChunks.owner, this.owner))
+        .run()
+      if (keepOffset) return
+      transaction
+        .delete(terminalSessionOffsets)
+        .where(eq(terminalSessionOffsets.owner, this.owner))
+        .run()
+    })
     this.chunks = []
+    if (!keepOffset) this.cumulativeOffset = 0
   }
 
-  private persist(next: Chunk[]) {
+  private persist(next: Chunk[], offset: number) {
     const previous = new Map(this.chunks.map((chunk) => [chunk.sequence, chunk]))
     this.database.transaction((transaction) => {
       transaction
@@ -90,6 +117,14 @@ export class TerminalHistory {
           })
           .run()
       }
+      transaction
+        .insert(terminalSessionOffsets)
+        .values({ owner: this.owner, offset })
+        .onConflictDoUpdate({
+          target: terminalSessionOffsets.owner,
+          set: { offset },
+        })
+        .run()
     })
   }
 }
@@ -158,14 +193,15 @@ function trimContinuation(chunks: Chunk[]) {
   return chunks
 }
 
-/** Deletes every saved chunk of the agent terminals one session owned, in any worktree. */
+/** Deletes the saved chunks and stream offsets of one session's agent terminals, in any worktree. */
 export function deleteAgentHistory(database: PlatformDatabase, sessionId: SessionId) {
-  // Owners are JSON `[worktree, kind, id]`; `%` and `_` cannot occur in a session id.
-  const suffix = JSON.stringify(['agent', sessionId]).slice(1)
+  // Owners are JSON `[worktreeId, kind, id]`; `%` and `_` cannot occur in a session id.
+  const owners = `%,${JSON.stringify(['agent', sessionId]).slice(1)}`
   database.transaction((transaction) => {
+    transaction.delete(terminalHistoryChunks).where(like(terminalHistoryChunks.owner, owners)).run()
     transaction
-      .delete(terminalHistoryChunks)
-      .where(like(terminalHistoryChunks.owner, `%,${suffix}`))
+      .delete(terminalSessionOffsets)
+      .where(like(terminalSessionOffsets.owner, owners))
       .run()
     transaction.insert(terminalSessionCleanup).values({ sessionId }).onConflictDoNothing().run()
   })

@@ -1,6 +1,8 @@
+import type { Element } from 'hast'
 import { createContext, type ComponentType } from 'react'
 
 export type MarkdownCodeBlockProps = {
+  readonly position?: Element['position']
   readonly code: string
   /** The fence has not closed yet; its last line may still be mid-token. */
   readonly incomplete: boolean

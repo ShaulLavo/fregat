@@ -49,7 +49,11 @@ export type DiscoveryScanResult = {
 type DiscoveryOptions = {
   providerService: Pick<
     ProviderService,
-    'discoveryInstances' | 'discoverSessions' | 'readSessionHistory' | 'importSources'
+    | 'discoveryInstances'
+    | 'discoverSessions'
+    | 'importSessionUsage'
+    | 'importSources'
+    | 'readSessionHistory'
   >
   registration: RegistrationBoundary
   dispatch: (command: OrchestrationCommand) => Promise<unknown>
@@ -69,6 +73,7 @@ type CheckoutMatch = { project: OrchestrationProject; worktree: OrchestrationWor
 export class SessionDiscoveryReconciler {
   private readonly options: DiscoveryOptions
   private readonly gitWorktrees: GitWorktreeService
+  private readonly importedUsageVersions = new Map<string, string>()
   private interval: ReturnType<typeof setInterval> | null = null
   private pending: Promise<DiscoveryScanResult> | null = null
   private closed = false
@@ -259,7 +264,10 @@ export class SessionDiscoveryReconciler {
       (existing.origin !== 'discovered' || !this.options.canImportHistory(row.sessionId))
     )
       return skipped(result, 'continued-in-platform')
-    if (existing && !this.options.needsHistory(row.sessionId, row.sourceUpdatedAt)) return
+    if (existing && !this.options.needsHistory(row.sessionId, row.sourceUpdatedAt)) {
+      await this.importUsage(providerInstanceId, row, match.worktree.canonicalPath)
+      return
+    }
     const history = await this.options.providerService.readSessionHistory({
       providerInstanceId,
       sessionId: row.sessionId,
@@ -306,10 +314,32 @@ export class SessionDiscoveryReconciler {
       sourceUpdatedAt: row.sourceUpdatedAt,
     })
     const changed = await this.options.importHistory(row.sessionId, history, row.sourceUpdatedAt)
+    await this.importUsage(providerInstanceId, row, match.worktree.canonicalPath)
     if (!changed) return
     result.messages += history.length
     if (existing) result.refreshed += 1
     else result.imported += 1
+  }
+
+  /** Spent tokens follow the history; a transcript without them still imports its messages. */
+  private async importUsage(
+    providerInstanceId: ProviderInstanceId,
+    row: ProviderDiscoveredSession,
+    cwd: string,
+  ) {
+    const { sessionId, sourceUpdatedAt } = row
+    const key = `${providerInstanceId}:${sessionId}`
+    if (this.importedUsageVersions.get(key) === sourceUpdatedAt) return
+    try {
+      await this.options.providerService.importSessionUsage({ cwd, providerInstanceId, sessionId })
+      this.importedUsageVersions.set(key, sourceUpdatedAt)
+    } catch (error) {
+      recordChatPipelineWarning('chat.pipeline.session_discovery.usage_failed', {
+        error,
+        providerInstanceId,
+        sessionId,
+      })
+    }
   }
 
   private async resolveCheckout(

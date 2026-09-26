@@ -2,6 +2,7 @@ import { clientLogContext } from '@/lib/environments/state/log-context'
 import type {
   OrchestrationShellSnapshot,
   OrchestrationSessionDetailSnapshot,
+  OrchestrationSessionTranscript,
   SessionId,
 } from '@workspace/contracts'
 
@@ -88,6 +89,42 @@ export function fetchOrchestrationSessionDetailSnapshotHttp(
       messageCount: snapshot.session.messages.length,
       sessionStatus: snapshot.session.runtime?.status ?? null,
       snapshotSequence: snapshot.snapshotSequence,
+    }),
+  )
+}
+
+export function fetchOrchestrationSessionTranscriptHttp(
+  sessionId: SessionId,
+  client: Client,
+  signal?: AbortSignal,
+) {
+  return observeClientOperation(
+    {
+      ...clientLogContext(client),
+      action: 'chat.session_transcript.http',
+      area: 'chat',
+      sessionId,
+    },
+    async () => {
+      const response = await client.orchestration['session-transcript'].get({
+        fetch: {
+          signal: signal
+            ? AbortSignal.any([signal, snapshotTimeoutSignal()])
+            : snapshotTimeoutSignal(),
+        },
+        query: { sessionId },
+      })
+
+      signal?.throwIfAborted()
+      return unwrapEdenResponse<OrchestrationSessionTranscript>(response, {
+        emptyMessage: 'the session transcript response carried no data',
+        normalizeDates: true,
+        requireData: true,
+      })
+    },
+    (transcript) => ({
+      activityCount: transcript.session.activities.length,
+      messageCount: transcript.session.messages.length,
     }),
   )
 }

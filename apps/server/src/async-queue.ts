@@ -43,6 +43,17 @@ export class AsyncQueue<T> implements AsyncIterableIterator<T, undefined> {
     waiter({ done: false, value: this.items.shift() as T })
   }
 
+  /** Delivers `item` before everything already queued. */
+  unshift(item: T) {
+    if (this.ended) return
+
+    this.items.unshift(item)
+    const waiter = this.waiters.shift()
+    if (!waiter) return
+
+    waiter({ done: false, value: this.items.shift() as T })
+  }
+
   next(): Promise<IteratorResult<T, undefined>> {
     if (this.items.length > 0)
       return Promise.resolve({ done: false, value: this.items.shift() as T })

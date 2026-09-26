@@ -15,6 +15,7 @@ import {
   renameBodySchema,
   copyBodySchema,
   deleteBodySchema,
+  lookupWorkspaceAddressesBodySchema,
 } from '../../../../server/src/fs/contracts'
 import { DEMO_ADDRESS, DEMO_ENVIRONMENT, DEMO_ROOT, seedProviders } from '../seed'
 import { DemoWorkspace, demoError, type DemoChange } from '../state/workspace'
@@ -212,6 +213,7 @@ async function get(
   if (/^\/providers\/[^/]+\/commands$/u.test(url.pathname))
     return json({
       providerInstanceId: url.pathname.split('/')[2],
+      agents: [],
       commands: [],
       skills: [],
       supported: false,
@@ -239,6 +241,13 @@ async function post(
   switch (url.pathname) {
     case '/fs/workspace-address':
       return json(DEMO_ADDRESS)
+    case '/fs/workspace-addresses':
+      return json({
+        entries: v.parse(lookupWorkspaceAddressesBodySchema, body).paths.map((path) => ({
+          path,
+          address: path === DEMO_ROOT ? DEMO_ADDRESS : null,
+        })),
+      })
     case '/fs/workspace-root':
       return json({
         status: 'opened',

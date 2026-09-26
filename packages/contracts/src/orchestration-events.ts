@@ -27,6 +27,9 @@ import {
   sessionRuntimeStateSchema,
   repositoryIdentitySchema,
   repositoryKindSchema,
+  sessionAgentSchema,
+  sessionTurnKindSchema,
+  sessionForkSourceSchema,
   sessionOriginSchema,
   sessionDeletionStateSchema,
   worktreeRegistrationEntries,
@@ -108,6 +111,8 @@ export const sessionCreatedPayloadSchema = v.object({
   sessionId: sessionIdSchema,
   worktreeId: worktreeIdSchema,
   origin: sessionOriginSchema,
+  forkedFrom: v.optional(sessionForkSourceSchema),
+  agent: v.optional(sessionAgentSchema),
   title: trimmedNonEmptyStringSchema,
   modelSelection: modelSelectionSchema,
   runtimeMode: v.optional(runtimeModeSchema, DEFAULT_RUNTIME_MODE),
@@ -228,6 +233,7 @@ export const sessionTurnStartRequestedPayloadSchema = v.object({
   runtimeMode: v.optional(runtimeModeSchema, DEFAULT_RUNTIME_MODE),
   interactionMode: v.optional(interactionModeSchema, DEFAULT_INTERACTION_MODE),
   sourceProposedPlan: v.optional(sourceProposedPlanReferenceSchema),
+  kind: v.optional(sessionTurnKindSchema),
   createdAt: isoDateTimeSchema,
 })
 

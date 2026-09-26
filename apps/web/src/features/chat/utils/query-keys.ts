@@ -1,4 +1,4 @@
-import type { ProviderInstanceId } from '@workspace/contracts'
+import type { EnvironmentId, ProviderInstanceId, SessionId } from '@workspace/contracts'
 
 export const attachmentQueryKeys = {
   text: (url: string) => ['chat-attachment-text', url] as const,
@@ -16,6 +16,8 @@ export const providerAuthKeys = {
 
 export const providerUsageKeys = {
   all: ['providers', 'usage'] as const,
+  session: (environmentId: EnvironmentId, sessionId: SessionId) =>
+    ['providers', 'usage', 'session', environmentId, sessionId] as const,
 }
 
 export const providerCommandCatalogKeys = {
@@ -31,3 +33,20 @@ export const projectEntryQueryKeys = {
 }
 
 export const mermaidQueryKeys = { library: ['chat', 'mermaid'] as const }
+
+export const sessionTranscriptKeys = {
+  transcript: (environmentId: EnvironmentId, sessionId: SessionId) =>
+    ['chat', 'session-transcript', environmentId, sessionId] as const,
+}
+
+export const backgroundTaskKeys = {
+  roster: (environmentId: EnvironmentId, sessionId: SessionId) =>
+    ['chat', 'background-tasks', environmentId, sessionId] as const,
+}
+
+export const sessionToolKeys = {
+  mcp: (environmentId: EnvironmentId, sessionId: SessionId) =>
+    ['chat', 'session-mcp', environmentId, sessionId] as const,
+  hooks: (environmentId: EnvironmentId, sessionId: SessionId) =>
+    ['chat', 'session-hooks', environmentId, sessionId] as const,
+}

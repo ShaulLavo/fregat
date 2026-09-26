@@ -1,3 +1,4 @@
+import { markdownFence } from '@/lib/markdown-fence'
 import { createStackedProjection, type DiffFile, type DiffRenderRow } from '@singapore-editor/diff'
 
 type DiffLineRange = { readonly start: number; readonly end: number }
@@ -92,6 +93,31 @@ export function diffLineAddressLabel(address: DiffLineAddress): string {
   return sides.join(', ')
 }
 
+/** A selection as it was on screen: its quote and the objects the quote was read from. */
+export type SelectedDiffText = {
+  readonly text: string
+  readonly oldObjectId: DiffFile['oldObjectId']
+  readonly newObjectId: DiffFile['newObjectId']
+}
+
+/**
+ * Resolved against the stacked projection so the agent gets both sides of the change even
+ * when the range was dragged out in one split pane.
+ */
+export function selectedText(
+  file: DiffFile,
+  stackedRows: readonly DiffRenderRow[],
+  address: DiffLineAddress,
+): SelectedDiffText | null {
+  const rows = diffRowsForAddress(stackedRows, address)
+  if (rows.length === 0) return null
+  return {
+    newObjectId: file.newObjectId,
+    oldObjectId: file.oldObjectId,
+    text: diffLineSelectionText(file.path, address, rows),
+  }
+}
+
 /** What the agent receives: the file, the address, and the lines themselves. */
 export function diffLineSelectionText(
   path: string,
@@ -99,7 +125,7 @@ export function diffLineSelectionText(
   rows: readonly DiffRenderRow[],
 ): string {
   const body = rows.map(markedLine)
-  const fence = fenceFor(body)
+  const fence = markdownFence(body)
 
   return [
     `About \`${path}\`, ${diffLineAddressLabel(address)}:`,
@@ -169,11 +195,4 @@ function markedLine(row: DiffRenderRow): string {
   if (row.type === 'deletion') return `-${row.text}`
 
   return ` ${row.text}`
-}
-
-/** A selected line may itself contain a fence; the block has to outrun it. */
-function fenceFor(lines: readonly string[]): string {
-  const runs = lines.flatMap((line) => [...line.matchAll(/`+/g)].map((match) => match[0].length))
-
-  return '`'.repeat(Math.max(3, Math.max(0, ...runs) + 1))
 }

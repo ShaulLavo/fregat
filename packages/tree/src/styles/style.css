@@ -938,6 +938,24 @@
     white-space: nowrap;
   }
 
+  [data-item-decoration-action] {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    margin-inline-start: 4px;
+    padding: 1px;
+    border-radius: 4px;
+    color: var(--trees-fg-muted);
+    fill: currentColor;
+    cursor: pointer;
+    opacity: 0.7;
+  }
+
+  [data-item-decoration-action]:hover {
+    color: var(--trees-fg);
+    opacity: 1;
+  }
+
   [data-item-section='git'],
   [data-item-section='action'] {
     flex: 0 0 auto;

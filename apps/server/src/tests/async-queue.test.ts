@@ -20,6 +20,21 @@ describe('AsyncQueue', () => {
     expect(await queue.next()).toEqual({ done: false, value: 5 })
   })
 
+  it('unshift delivers ahead of queued items, or straight to a parked reader', async () => {
+    const queue = new AsyncQueue<string>()
+    queue.push('event')
+    queue.unshift('ready')
+
+    expect(await queue.next()).toEqual({ done: false, value: 'ready' })
+    expect(await queue.next()).toEqual({ done: false, value: 'event' })
+    const parked = queue.next()
+    queue.unshift('late')
+    expect(await parked).toEqual({ done: false, value: 'late' })
+    queue.close()
+    queue.unshift('closed')
+    expect(await queue.next()).toEqual(DONE)
+  })
+
   it('hands pushes to parked readers oldest first', async () => {
     const queue = new AsyncQueue<string>()
     const first = queue.next()

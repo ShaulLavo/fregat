@@ -18,6 +18,10 @@ export const RUNTIME_MANIFEST = 'runtime/package.json'
 export const RUNTIME_LOCK = 'runtime/bun.lock'
 /** Built by the `build` script from `remote-support.ts`. */
 export const REMOTE_SUPPORT = 'remote-support.js'
+/** Built by the `build` script from `terminal-host/main.ts`; the server launches it for shells. */
+export const PTY_HOST = 'pty-host.js'
+/** Built by the `build` script; the bundle starts it as its native watch worker. */
+export const WATCH_WORKER = 'watch-worker.ts'
 
 // bun.lock keys a workspace's own resolution `<workspace>/<package>`; it wins over the hoisted one.
 const SERVER_WORKSPACE = 'server'
@@ -52,7 +56,7 @@ export async function writeRuntimeManifest(serverDirectory: string, lockfilePath
 
 /** The release files a built server directory lacks, relative to it. */
 export async function missingReleaseFiles(serverDirectory: string) {
-  const files = [RUNTIME_MANIFEST, RUNTIME_LOCK, REMOTE_SUPPORT]
+  const files = [RUNTIME_MANIFEST, RUNTIME_LOCK, REMOTE_SUPPORT, PTY_HOST, WATCH_WORKER]
   const present = await Promise.all(
     files.map((file) =>
       access(path.join(serverDirectory, file)).then(

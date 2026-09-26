@@ -1,4 +1,4 @@
-export type WorkspaceIndexReadiness = 'cold' | 'building' | 'ready' | 'stale' | 'failed'
+export type WorkspaceIndexReadiness = 'cold' | 'building' | 'ready' | 'stale' | 'failed' | 'off'
 
 export type WorkspaceIndexStatus = {
   entryCount: number
@@ -28,5 +28,7 @@ export type ServerInfo = {
   nativeWatcherCount: number
   openFileWatcherCount: number
   shallowWatcherCount: number
+  watchedDirectoryCount: number
+  watchDirectoryLimit: number
   watchEnabled: boolean
 }

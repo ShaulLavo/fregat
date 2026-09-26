@@ -23,6 +23,7 @@ export function MarkdownPre({ children, node, ...props }: MarkdownPreProps) {
       incomplete={code.incomplete}
       language={code.language}
       meta={code.meta}
+      position={node?.position}
     />
   )
 }

@@ -218,7 +218,7 @@ function sanitizedErrorForLogger(error: Error) {
 }
 
 // Stays off the shared observability sanitizer, which keeps the quoted substrings this strips.
-function sanitizeErrorCause(cause: unknown, seen = new WeakSet<object>()): unknown {
+export function sanitizeErrorCause(cause: unknown, seen = new WeakSet<object>()): unknown {
   if (cause instanceof Error) return sanitizeErrorObject(cause, seen)
   if (Array.isArray(cause)) return cause.map((value) => sanitizeErrorCause(value, seen))
   if (!isRecord(cause)) return cause

@@ -839,10 +839,10 @@ async function sidebarUtilityHistory({ page, record }) {
     await expect(tab).toHaveAttribute('aria-pressed', 'true')
     expect(await historyPosition(page)).toEqual(initial)
   }
-  await palette(page, '> Toggle Files pane', 'Toggle Files pane')
+  await palette(page, '> Toggle sidebar', 'Toggle sidebar')
   await expect(sidebar).toHaveCount(0)
   expect(await historyPosition(page)).toEqual(initial)
-  await palette(page, '> Toggle Files pane', 'Toggle Files pane')
+  await palette(page, '> Toggle sidebar', 'Toggle sidebar')
   await expect(sidebar).toBeVisible()
   expect(await historyPosition(page)).toEqual(initial)
   await record('sidebar selection and visibility leave history untouched')

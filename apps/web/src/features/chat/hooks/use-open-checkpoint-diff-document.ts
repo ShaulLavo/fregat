@@ -19,7 +19,7 @@ import {
   checkpointTurnDocument,
   fetchCheckpointDiff,
   matchingCheckpointDiff,
-} from '@/features/chat/utils/checkpoint-diff-query'
+} from '@/lib/checkpoint-diff-query'
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 import { useNavigation } from '@/hooks/use-navigation'
 

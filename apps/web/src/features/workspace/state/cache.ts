@@ -319,6 +319,7 @@ const workbenchPanelsSchema = v.strictObject({
     worktree: true,
   })),
   sidebarOpen: v.boolean(),
+  sidebarRailOpen: v.optional(v.boolean(), true),
   terminalTabSequence: v.pipe(v.number(), v.integer(), v.minValue(0)),
   terminalTabs: v.pipe(v.array(terminalTabRecordSchema), v.readonly()),
 })

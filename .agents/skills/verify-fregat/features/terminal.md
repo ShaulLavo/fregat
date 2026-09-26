@@ -14,6 +14,8 @@ The bottom panel's Terminal tab. `address` parameter `bottom=terminal` opens it.
 
 `scenario terminal-background` opens the terminal in code mode, switches to chat mode, and checks that both terminals have the same computed ancestor background layers. Screenshots capture both modes. It does not type into either shell.
 
+`scenario terminal-renderer` right-clicks the terminal and reads the disabled "Renderer: …" row, the tier ghostty picked. `scenario terminal-renderer-webgl` deletes `navigator.gpu` before load, the CLI's stand-in for `--disable-features=WebGPU`, and expects "Renderer: WebGL2". Both reload first, so the scenario causes the mount it checks, then poll the throwaway server's log for that page's `terminal.mount` line (client and server each batch for 5 s) and require its `rendererBackend` to match the row. They need the throwaway server, so they refuse `--shared-dev`.
+
 ## Gotchas
 
 Registration is a query keyed by root path; the first tab per root pays it. Terminal input is binary WebSocket frames, not JSON.

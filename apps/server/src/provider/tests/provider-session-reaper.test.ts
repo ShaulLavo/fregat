@@ -134,6 +134,22 @@ describe('ProviderSessionReaper', () => {
     }
   })
 
+  it('never reaches the binding of a deleted session', async () => {
+    const fixture = createFixture()
+    try {
+      // Production state on 2026-09-25: deleted on 09-20, projection still `ready`, binding kept.
+      fixture.bind('6029a465-58c8-4441-a3db-3ff175831d18', 'ready')
+      fixture.deleteSession('6029a465-58c8-4441-a3db-3ff175831d18')
+      fixture.bind('14935d5c-7233-5fb5-b01c-b6c94e2b7b73', 'ready')
+      fixture.advanceTo(START_MS + DEADLINE_MS + 1)
+
+      expect(await fixture.reaper.sweep()).toEqual(['14935d5c-7233-5fb5-b01c-b6c94e2b7b73'])
+      expect(fixture.stopped).toEqual(['14935d5c-7233-5fb5-b01c-b6c94e2b7b73'])
+    } finally {
+      fixture.close()
+    }
+  })
+
   it('keeps sweeping after an adapter refuses to stop', async () => {
     const fixture = createFixture({
       stopRuntime: async ({ sessionId: id }) => {
@@ -237,6 +253,11 @@ function createFixture(
         runtimeEpoch: 'epoch-test',
         sessionId: sessionId(id),
       })
+    },
+    deleteSession: (id: string) => {
+      pipeline.applyEvents([
+        domainEvent('session.deleted', { sessionId: id, deletedAt: DOMAIN_AT }, ++sequence),
+      ])
     },
     close: () => sqlite.close(),
     directory,

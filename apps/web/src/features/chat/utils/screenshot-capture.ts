@@ -27,11 +27,35 @@ export async function captureScreenshot(mediaDevices: MediaDevices, now = new Da
 
 async function requestStream(mediaDevices: MediaDevices) {
   try {
-    return await mediaDevices.getDisplayMedia({ audio: false, video: true })
+    const options: DisplayMediaStreamOptions & { controller?: CaptureController } = {
+      audio: false,
+      video: true,
+      controller: keepFocus(),
+    }
+    return await mediaDevices.getDisplayMedia(options)
   } catch (error) {
     if (isCancel(error)) return null
     throw captureFailed('request', error)
   }
+}
+
+/** Chromium switches to a captured tab or window unless told to keep focus here. */
+function keepFocus() {
+  const Controller = (globalThis as { CaptureController?: new () => CaptureController })
+    .CaptureController
+  if (!Controller) return undefined
+  const controller = new Controller()
+  // Chromium before 124 throws when this runs ahead of getDisplayMedia; capture still works.
+  try {
+    controller.setFocusBehavior?.('focus-capturing-application')
+  } catch {
+    return undefined
+  }
+  return controller
+}
+
+type CaptureController = {
+  setFocusBehavior?: (behavior: 'focus-capturing-application' | 'no-focus-change') => void
 }
 
 async function firstFrame(stream: MediaStream) {

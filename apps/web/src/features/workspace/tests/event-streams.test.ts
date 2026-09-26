@@ -4,7 +4,7 @@ import type { WatchServerMessage } from '@workspace/contracts'
 import { startWorkspaceEventStreams } from '@/features/workspace/state/event-streams'
 import { streamWorkspaceEvents } from '@/features/workspace/state/event-stream'
 import { test, expect } from '../../../../test/fixtures'
-import { createCuttableEventsClient } from '../../../../test/client'
+import { createCuttableEventsClient, createObservedInProcessClient } from '../../../../test/client'
 import type { StreamInterruption } from '@/features/workspace/state/event-streams'
 
 test('keeps the project stream and retained file events alive across tab changes', async ({
@@ -167,3 +167,168 @@ test('replaces a stream whose watcher failed, since events may have been lost', 
     streams.close()
   }
 })
+
+test('a rejected file set is not retried until the set changes', async ({ server }) => {
+  await mkdir(path.join(server.root, 'project'))
+  const open = 'project/open.txt'
+  await writeFile(path.join(server.root, open), 'before')
+  const fileRequests: string[] = []
+  const client = createObservedInProcessClient(server, (request) => {
+    const url = new URL(request.url)
+    if (url.pathname !== '/fs/events' || url.searchParams.get('scope') !== 'files') return
+    fileRequests.push(url.searchParams.get('files') ?? '')
+  })
+  const readyFiles: (readonly string[])[] = []
+  const interruptions: StreamInterruption[] = []
+  const errors: unknown[] = []
+  const streams = startWorkspaceEventStreams({
+    client,
+    rootPath: 'project',
+    onMessage: () => undefined,
+    onFilesReady: (files) => readyFiles.push(files),
+    onError: (error) => errors.push(error),
+    onInterrupted: (interruption) => interruptions.push(interruption),
+  })
+  try {
+    // The server refuses an absolute path, and with it every other file in the request.
+    const rejected = [open, '/work/tmp/outside.log']
+    streams.setFiles(rejected)
+    await expect.poll(() => fileRequests).toHaveLength(1)
+    // Longer than the first two backoff steps, so a retry would have gone out.
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    expect(fileRequests).toHaveLength(1)
+    expect(interruptions).toEqual([])
+    expect(errors).toEqual([])
+
+    streams.setFiles([...rejected].reverse())
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(fileRequests).toHaveLength(1)
+
+    streams.setFiles([open])
+    await expect.poll(() => readyFiles).toEqual([[open]])
+    expect(fileRequests).toHaveLength(2)
+  } finally {
+    streams.close()
+  }
+})
+
+test('a files stream the server cannot serve yet is retried', async ({ server }) => {
+  await mkdir(path.join(server.root, 'project'))
+  const open = 'project/open.txt'
+  await writeFile(path.join(server.root, open), 'before')
+  const fileRequests: (readonly string[])[] = []
+  const { client } = createCuttableEventsClient(server, (request) => {
+    const files = filesRequest(request)
+    if (!files) return undefined
+    fileRequests.push(files)
+    if (fileRequests.length > 1) return undefined
+    return Response.json({ status: 503, message: 'Watcher unavailable' }, { status: 503 })
+  })
+  const readyFiles: (readonly string[])[] = []
+  const errors: unknown[] = []
+  const streams = startWorkspaceEventStreams({
+    client,
+    rootPath: 'project',
+    onMessage: () => undefined,
+    onFilesReady: (files) => readyFiles.push(files),
+    onError: (error) => errors.push(error),
+    onInterrupted: () => undefined,
+  })
+  try {
+    streams.setFiles([open])
+    await expect.poll(() => readyFiles).toEqual([[open]])
+    expect(fileRequests).toEqual([[open], [open]])
+    expect(errors).toEqual([expect.objectContaining({ status: 503 })])
+  } finally {
+    streams.close()
+  }
+})
+
+test('a rejected set leaves the running stream watching, and nothing reopens it', async ({
+  server,
+}) => {
+  // The project stream skips `dist`, so only the files stream can report this file.
+  await mkdir(path.join(server.root, 'project', 'dist'), { recursive: true })
+  const open = 'project/dist/open.txt'
+  await writeFile(path.join(server.root, open), 'before')
+  const fileRequests: (readonly string[])[] = []
+  const { client, endEventStreams } = createCuttableEventsClient(server, (request) => {
+    const files = filesRequest(request)
+    if (files) fileRequests.push(files)
+    return undefined
+  })
+  const messages: WatchServerMessage[] = []
+  const readyFiles: (readonly string[])[] = []
+  const streams = startWorkspaceEventStreams({
+    client,
+    rootPath: 'project',
+    onMessage: (message) => messages.push(message),
+    onFilesReady: (files) => readyFiles.push(files),
+    onError: (error) => {
+      throw error
+    },
+    onInterrupted: () => undefined,
+  })
+  try {
+    streams.setFiles([open])
+    await expect.poll(() => readyFiles).toEqual([[open]])
+    streams.setFiles([open, '/work/tmp/outside.log'])
+    await expect.poll(() => fileRequests).toHaveLength(2)
+    await sleep(100)
+
+    messages.length = 0
+    await writeFile(path.join(server.root, open), 'changed after the rejection')
+    await expect
+      .poll(() => messages)
+      .toContainEqual(expect.objectContaining({ type: 'changed', path: open }))
+
+    // Its files belong to a set the tabs replaced; the refused set is what they hold.
+    endEventStreams()
+    await sleep(700)
+    expect(fileRequests).toHaveLength(2)
+  } finally {
+    streams.close()
+  }
+})
+
+test('a retry scheduled for an earlier set is dropped when the set changes', async ({ server }) => {
+  await mkdir(path.join(server.root, 'project'))
+  const open = 'project/open.txt'
+  await writeFile(path.join(server.root, open), 'before')
+  const fileRequests: (readonly string[])[] = []
+  const { client } = createCuttableEventsClient(server, (request) => {
+    const files = filesRequest(request)
+    if (!files) return undefined
+    fileRequests.push(files)
+    return Response.json({ status: 503, message: 'Watcher unavailable' }, { status: 503 })
+  })
+  const interruptions: StreamInterruption[] = []
+  const streams = startWorkspaceEventStreams({
+    client,
+    rootPath: 'project',
+    onMessage: () => undefined,
+    onFilesReady: () => undefined,
+    onError: () => undefined,
+    onInterrupted: (interruption) => interruptions.push(interruption),
+  })
+  try {
+    streams.setFiles([open])
+    await expect.poll(() => interruptions.filter(({ scope }) => scope === 'files')).toHaveLength(1)
+    streams.setFiles([])
+    // Past the first backoff step, when the retry for the earlier set would have gone out.
+    await sleep(700)
+    expect(fileRequests).toEqual([[open]])
+  } finally {
+    streams.close()
+  }
+})
+
+function filesRequest(request: Request): readonly string[] | undefined {
+  const url = new URL(request.url)
+  if (url.pathname !== '/fs/events' || url.searchParams.get('scope') !== 'files') return undefined
+  return JSON.parse(url.searchParams.get('files') ?? '[]') as string[]
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}

@@ -34,6 +34,7 @@ import { MockProviderAdapter } from '../../provider/adapters/mock'
 import { ProviderAdapterRegistry } from '../../provider/provider-adapter-registry'
 import { requestGone } from '../../provider/structured-errors'
 import { checkpointRefForSessionTurn } from '../checkpoint-refs'
+import { attachmentFilePath } from '../../attachments/store'
 
 import { testSettingsOptions } from '../../settings/testing'
 import { runGit } from '../../testing/git'
@@ -54,6 +55,195 @@ afterEach(async () => {
 })
 
 describe('orchestration engine', () => {
+  it('keeps image-only prompts and their blobs when the source is deleted, including another fork', async () => {
+    const fixture = createFixture()
+    const attachmentsDir = await fixtureRoot()
+    const adapter = new MockProviderAdapter()
+    const engine = new OrchestrationEngine(fixture.database, {
+      attachmentsDir,
+      providerRuntime: { adapterRegistry: new ProviderAdapterRegistry({ adapters: [adapter] }) },
+    })
+    const sourceSessionId = '00000000-0000-4000-8000-000000000001'
+    const forkId = '00000000-0000-4000-8000-000000000004'
+    const nextForkId = '00000000-0000-4000-8000-000000000005'
+    const attachment = {
+      type: 'image',
+      id: 'source-image',
+      name: 'screenshot.png',
+      mimeType: 'image/png',
+      sizeBytes: 4,
+    } as const
+    const sourceFile = attachmentFilePath({ attachmentsDir, attachment })!
+    await writeFile(sourceFile, 'blob')
+    try {
+      await engine.dispatch(projectCreateCommand())
+      await engine.dispatch(sessionCreateCommand())
+      await engine.dispatch(
+        command({
+          ...sessionTurnStartCommand(),
+          message: { messageId: 'image-prompt', role: 'user', text: '', attachments: [attachment] },
+        }),
+      )
+      await engine.providerRuntimeIdle()
+      await engine.dispatchClientCommand({
+        type: 'session.fork',
+        commandId: 'fork-image',
+        sessionId: forkId,
+        sourceSessionId,
+        throughTurnId: 'turn-1',
+      })
+      const prompt = (await engine.sessionTranscript(forkId)).session.messages[0]!
+      expect(prompt).toMatchObject({
+        role: 'user',
+        text: '',
+        turnId: 'turn-1',
+        attachments: [
+          expect.objectContaining({ name: 'screenshot.png', mimeType: 'image/png', sizeBytes: 4 }),
+        ],
+      })
+      expect(prompt.attachments[0]!.id).not.toBe(attachment.id)
+      await engine.dispatchClientCommand({
+        type: 'session.fork',
+        commandId: 'fork-image-again',
+        sessionId: nextForkId,
+        sourceSessionId: forkId,
+        throughTurnId: 'turn-1',
+      })
+      await engine.dispatchClientCommand({
+        type: 'session.delete',
+        commandId: 'delete-image-source',
+        sessionId: sourceSessionId,
+      })
+      await engine.providerRuntimeIdle()
+      expect(await Bun.file(sourceFile).exists()).toBe(false)
+      expect(
+        await readFile(
+          attachmentFilePath({ attachmentsDir, attachment: prompt.attachments[0]! })!,
+          'utf8',
+        ),
+      ).toBe('blob')
+      const next = (await engine.sessionTranscript(nextForkId)).session.messages[0]!
+      expect(
+        await readFile(
+          attachmentFilePath({ attachmentsDir, attachment: next.attachments[0]! })!,
+          'utf8',
+        ),
+      ).toBe('blob')
+    } finally {
+      await engine.close()
+      fixture.close()
+    }
+  })
+
+  it.each(['steer', 'failed-start'] as const)(
+    'forks the selected native turn after an earlier %s',
+    async (earlier) => {
+      const fixture = createFixture()
+      const entered = Promise.withResolvers<void>()
+      const release = Promise.withResolvers<void>()
+      const adapter = Object.assign(
+        new MockProviderAdapter({
+          beforeComplete: async () => {
+            entered.resolve()
+            await release.promise
+          },
+        }),
+        { steerTurn: async () => {} },
+      )
+      const sendTurn = adapter.sendTurn.bind(adapter)
+      adapter.sendTurn = async (input) => {
+        if (earlier === 'failed-start' && input.turnId === 'turn-1')
+          throw new Error('native start rejected')
+        await sendTurn(input)
+      }
+      const engine = createRuntimeEngine(fixture, adapter)
+      const sourceSessionId = '00000000-0000-4000-8000-000000000001'
+      const forkId = '00000000-0000-4000-8000-000000000003'
+      try {
+        await dispatchFirstSession(engine)
+        if (earlier === 'steer') {
+          await entered.promise
+          await engine.dispatchClientCommand({
+            type: 'session.turn.steer',
+            commandId: 'steer-first',
+            sessionId: sourceSessionId,
+            turnId: 'turn-1',
+            message: { messageId: 'steer-message', role: 'user', text: 'Also check tests' },
+          })
+        }
+        release.resolve()
+        await engine.providerRuntimeIdle()
+        await engine.dispatch(
+          sessionTurnStartCommand({ commandId: 'second', messageId: 'second', turnId: 'turn-2' }),
+        )
+        await engine.providerRuntimeIdle()
+        await engine.dispatchClientCommand({
+          type: 'session.fork',
+          commandId: `fork-after-${earlier}`,
+          sessionId: forkId,
+          sourceSessionId,
+          throughTurnId: 'turn-2',
+        })
+        expect((await engine.sessionTranscript(forkId)).session.forkedFrom?.native.boundaryId).toBe(
+          'turn-2',
+        )
+      } finally {
+        release.resolve()
+        await engine.close()
+        fixture.close()
+      }
+    },
+  )
+
+  it('persists the native boundary at fork creation and starts there after the source advances', async () => {
+    const fixture = createFixture()
+    const adapter = new MockProviderAdapter()
+    const engine = createRuntimeEngine(fixture, adapter)
+    const sourceSessionId = '00000000-0000-4000-8000-000000000001'
+    const forkId = '00000000-0000-4000-8000-000000000002'
+    try {
+      await dispatchFirstSession(engine)
+      await engine.providerRuntimeIdle()
+      const command = {
+        type: 'session.fork',
+        commandId: 'fork-before-source-advances',
+        sessionId: forkId,
+        sourceSessionId,
+        throughTurnId: 'turn-1',
+      }
+      await engine.dispatchClientCommand(command)
+      const native = {
+        conversationId: `mock-conversation:${sourceSessionId}`,
+        boundaryId: 'turn-1',
+      }
+      expect((await engine.sessionTranscript(forkId)).session.forkedFrom?.native).toEqual(native)
+      await engine.dispatch(
+        sessionTurnStartCommand({
+          commandId: 'source-advances',
+          messageId: 'source-second',
+          turnId: 'turn-2',
+        }),
+      )
+      await engine.providerRuntimeIdle()
+      expect(await engine.dispatchClientCommand(command)).toMatchObject({ deduped: true })
+      await engine.dispatch(
+        sessionTurnStartCommand({
+          sessionId: forkId,
+          commandId: 'fork-starts',
+          messageId: 'fork-first',
+          turnId: 'fork-turn-1',
+        }),
+      )
+      await engine.providerRuntimeIdle()
+      expect(adapter.startedSessions.find((session) => session.sessionId === forkId)?.fork).toEqual(
+        native,
+      )
+    } finally {
+      await engine.close()
+      fixture.close()
+    }
+  })
+
   it('dedupes commands by command receipt', async () => {
     const fixture = createFixture()
     const engine = new OrchestrationEngine(fixture.database)

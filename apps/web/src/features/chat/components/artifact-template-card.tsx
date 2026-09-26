@@ -10,7 +10,8 @@ import {
 } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 
-import { useAttachToComposer } from '@/features/chat/hooks/use-attach-to-composer'
+import { useAttachToComposer } from '@/lib/composer-attach/hooks/use-attach-to-composer'
+import { useOpenFileReference } from '@/features/chat/hooks/use-open-file-reference'
 import {
   artifactTemplateLabel,
   artifactTemplateUsePrompt,
@@ -33,7 +34,8 @@ const ICON_BY_KIND: Record<ArtifactTemplateKind, Icon> = {
 
 /** A template the agent made, with one action: add its prompt to the composer. */
 export function ArtifactTemplateCard({ template }: { readonly template: ArtifactTemplate }) {
-  const { appendText } = useAttachToComposer()
+  const { workspacePath } = useOpenFileReference()
+  const { appendText } = useAttachToComposer(workspacePath ?? '')
   const KindIcon = ICON_BY_KIND[template.artifactKind]
   const label = artifactTemplateLabel(template.artifactKind)
 
@@ -49,6 +51,7 @@ export function ArtifactTemplateCard({ template }: { readonly template: Artifact
         <span className='text-muted-foreground truncate text-xs'>{label}</span>
       </div>
       <Button
+        disabled={workspacePath === null}
         size='sm'
         type='button'
         variant='outline'

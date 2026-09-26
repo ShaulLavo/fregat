@@ -99,7 +99,13 @@ describe('platform migration ledger', () => {
     expect(applied.map(({ version, name }) => ({ version, name }))).toEqual([
       { version: 29, name: 'turn_end_reason' },
       { version: 30, name: 'message_model_selection' },
+      { version: 31, name: 'session_fork_and_agent' },
+      { version: 32, name: 'provider_usage_source' },
+      { version: 33, name: 'terminal_lease_key' },
+      { version: 34, name: 'terminal_session_offsets' },
+      { version: 36, name: 'provider_usage_import_requests' },
       { version: 37, name: 'terminal_session_cleanup' },
+      { version: 38, name: 'provider_reset_credit_attempts' },
     ])
     expect(columnNames(handle, 'projection_turns')).toContain('end_reason')
     expect(columnNames(handle, 'projection_session_messages')).toContain('model_selection_json')
@@ -136,7 +142,13 @@ describe('platform migration ledger', () => {
       { version: 28, name: 'session_lifecycle_revision' },
       { version: 29, name: 'turn_end_reason' },
       { version: 30, name: 'message_model_selection' },
+      { version: 31, name: 'session_fork_and_agent' },
+      { version: 32, name: 'provider_usage_source' },
+      { version: 33, name: 'terminal_lease_key' },
+      { version: 34, name: 'terminal_session_offsets' },
+      { version: 36, name: 'provider_usage_import_requests' },
       { version: 37, name: 'terminal_session_cleanup' },
+      { version: 38, name: 'provider_reset_credit_attempts' },
     ])
     expect(columnNames(handle, 'push_devices')).toContain('revision')
     expect(columnNames(handle, 'projection_sessions')).toContain('lifecycle_revision')
@@ -158,7 +170,7 @@ describe('platform migration ledger', () => {
     expect(plan()).toEqual(expect.arrayContaining([expect.stringContaining('TEMP B-TREE')]))
 
     expect(migratePlatformDatabase(handle.db).map((migration) => migration.version)).toEqual([
-      15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 37,
+      15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 36, 37, 38,
     ])
 
     expect(plan()).toEqual(
@@ -196,7 +208,8 @@ describe('platform migration ledger', () => {
     )
     seedVersion11Worktrees(handle.db)
     expect(migratePlatformDatabase(handle.db).map((migration) => migration.version)).toEqual([
-      12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 37,
+      12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
+      36, 37, 38,
     ])
     const query = new OrchestrationSnapshotQuery(handle.db)
     const migrated = query.shellSnapshot()

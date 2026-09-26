@@ -6,6 +6,8 @@ import { waitFor } from '@testing-library/react'
 import { useProjectMenuEntries } from '@/features/workbench/hooks/use-project-menu-entries'
 import { ensureFolderPath } from '@/lib/file-server'
 import { expect, test } from '../../../../test/fixtures'
+import { createObservedInProcessClient } from '../../../../test/client'
+import { installTestClient } from '../../../../test/factories/client-binding'
 import { renderHookWithProviders } from '../../../../test/render'
 import { runGit } from '../../../../test/factories/git'
 
@@ -95,4 +97,37 @@ test('nests a linked worktree under its repository with its branch', async ({ cl
     { title: 'platform', rootPath: 'projects/platform', qualifier: null },
     { title: 't07', rootPath: 'worktrees/t07', qualifier: null, worktree: { branch: 'task/t07' } },
   ])
+})
+
+test('resolves every candidate in one request', async ({ client, server }) => {
+  void client
+  const names = ['one', 'two', 'three', 'four']
+  for (const name of names) await ensureFolderPath(filesystemPath(`projects/${name}`), getClient())
+  const lookups: string[] = []
+  const observed = createObservedInProcessClient(server, (request) => {
+    const pathname = new URL(request.url).pathname
+    if (pathname.startsWith('/fs/workspace-address')) lookups.push(pathname)
+  })
+  const restore = installTestClient(observed)
+  try {
+    const { result } = renderHookWithProviders(() =>
+      useProjectMenuEntries({
+        enabled: true,
+        activeRootPath: 'projects/one',
+        activeTitle: 'one',
+        recentFolders: names.map((name) => ({ name, path: `projects/${name}` })),
+        projects: [
+          { title: 'gone', updatedAt: '2026-09-08T00:00:00Z', workspaceRoot: 'worktrees/gone' },
+        ],
+      }),
+    )
+
+    await waitFor(() => expect(result.current.isPending).toBe(false))
+    expect(result.current.entries.map((entry) => entry.rootPath)).toEqual(
+      names.map((name) => `projects/${name}`),
+    )
+    expect(lookups).toEqual(['/fs/workspace-addresses'])
+  } finally {
+    restore()
+  }
 })

@@ -19,3 +19,14 @@ test('separate clients own their active origin and slow-request bookkeeping', ()
   second.getState().clearSlowRequest(primaryOrigin, 'same-request-id')
   expect(selectServerConnection(second.getState(), primaryOrigin).slowRequestCount).toBe(0)
 })
+
+test('a connection reset keeps the staged update the server last pushed', () => {
+  const primaryOrigin = 'http://localhost:3001'
+  const store = createEnvironmentsStore({ primaryOrigin })
+  const update = { phase: 'restarting', pending: null, liveCheck: null } as const
+
+  store.getState().recordServerUpdate(`${primaryOrigin}/`, update)
+  store.getState().resetConnections(primaryOrigin)
+
+  expect(store.getState().updateByOrigin[primaryOrigin]).toEqual(update)
+})

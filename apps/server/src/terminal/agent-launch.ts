@@ -31,6 +31,8 @@ export function terminalAgentLease(
       return lease.activate()
     },
     terminate: lease.terminate,
+    // Ownership is unproven, so the agent reservation stays until boot recovery settles it.
+    markUnknown: lease.markUnknown,
     async end() {
       if (started) await launch.reconcile()
       await lease.end()

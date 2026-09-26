@@ -34,13 +34,14 @@ function publish(path: string, diagnostics: Diagnostic[]) {
 
 afterEach(() => markerStore.clear())
 
-function renderPanel() {
+function renderPanel(disableBindings = false) {
   publish('src/a.ts', [diagnostic(1, 'First problem'), diagnostic(4, 'Second problem', 2)])
   publish('src/b.ts', [diagnostic(2, 'Third problem')])
   renderWithProviders(
     <TestEditorStateProvider>
       <DiagnosticsPanel />
     </TestEditorStateProvider>,
+    disableBindings ? { command: { bindings: [] } } : undefined,
   )
   return screen.getByRole('tree', { name: 'Problems' })
 }
@@ -124,4 +125,20 @@ test('a clean answer from one server does not hide another that failed', () => {
   expect(screen.getByText('Diagnostics unavailable')).toBeInTheDocument()
   expect(screen.getByText('Not answering: typescript')).toBeInTheDocument()
   expect(screen.queryByText('No problems reported')).not.toBeInTheDocument()
+})
+
+test('disabling keybindings disables Fix with AI on the active diagnostic', async () => {
+  const tree = renderPanel(true)
+  tree.focus()
+  await userEvent.keyboard('{Home}{ArrowDown}')
+  const event = new KeyboardEvent('keydown', {
+    key: '.',
+    ctrlKey: true,
+    bubbles: true,
+    cancelable: true,
+  })
+  act(() => {
+    tree.dispatchEvent(event)
+  })
+  expect(event.defaultPrevented).toBe(false)
 })

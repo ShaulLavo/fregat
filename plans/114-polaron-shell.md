@@ -1,21 +1,22 @@
 # Plan 114: Polaron, a desktop shell we own
 
 > **Executor instructions**: Read this plan completely, then read `AGENTS.md` and root `PLAN.md`.
-> Gate 0 is a measurement and decides the Linux renderer; do not skip it to start writing Rust.
-> Do not commit, push, create a branch, publish, or open a PR without explicit operator approval.
+> The gates are ordered so Electrobun keeps working until Gate 4; do not delete anything earlier.
+> Probes from the research rounds live in `/work/tmp/research2/114/` (disposable; described below).
 
 ## Status
 
-- **State**: Proposed — Gate 0 researched 2026-09-25 (see Research findings); go/no-go is the
-  owner's call
-- **Gate 0 verdict**: WebKitGTK is viable on Linux with three conditions; Chrome-first must be
-  retired for the desktop shell to take it
+- **State**: RESEARCH DONE 2026-09-26 — reworked around the owner's order (installed Chromium in
+  `--app` mode first, system webview second). Chromium path prototyped end to end on Linux; native
+  webview hosts prototyped in C (Linux) and Objective-C (macOS). No Rust. Ready to execute Gate 1.
 - **Priority**: P2 — the shell works today (plan 073), but every week on Electrobun is a week of
   someone else's toolchain
-- **Effort**: M — a few hundred lines of Rust for the first platform, then a long tail that is
-  mostly deletion
-- **Risk**: MEDIUM — the risk is the web engine on Linux, not the window
-- **Baseline**: `c0566d48` (Electrobun 2.0.1, plan 073 landed 2026-09-13)
+- **Effort**: M — about 500 lines of TypeScript in the launcher and ~150 lines of C or Objective-C
+  per webview host, then a long tail that is mostly deletion
+- **Risk**: LOW–MEDIUM — the common path is the engine `agent:browser` already drives; the risk
+  moved to the fallback window, which few machines take
+- **Baseline**: `c0566d48` (Electrobun 2.0.1, plan 073 landed 2026-09-13); researched on
+  `6561ca5a`
 
 ## Why
 
@@ -23,186 +24,325 @@ Plan 073 kept Electrobun for one property: the shell's `process.execPath` is Bun
 `apps/server` runs on the shell's own runtime. Platform ships one runtime. That property is
 still worth keeping. Electrobun is no longer the cheapest way to keep it.
 
-What the 2.x migration actually cost, all measured on 2026-09-13:
+What the 2.x migration cost, measured on 2026-09-13 and 2026-09-25:
 
 - The SDK lives in a Hutch devkit projected into `apps/desktop/.hutch`, not in `node_modules`.
-  TypeScript, Vitest, knip and CI each had to be told about it, and the devkit's own tsconfig
-  cannot be loaded by TypeScript 7.
-- Hutch builds only for the host. Three platforms means three runners and a 700 MB cache each.
-- `bun Helper` dumps a 2.5 MB SIGABRT core on every exit (stack canary rotated inside
-  `CefExecuteProcess`). Five cores in one two-minute run. Upstream, unfixed.
-- On Linux the wrapper ignores `defaultRenderer` and takes CEF whenever `libcef.so` is present
-  (`initWebview` in `nativeWrapper.cpp`), so one build cannot offer both engines.
+  TypeScript, Vitest, knip and CI each had to be told about it. `/work/cache/hutch` is 737 MB; the
+  Linux dev build is 687 MB, 409 MB of it `libcef.so`.
+- `bun Helper` dumps a 2.5 MB SIGABRT core on every exit: 141 cores in `coredumpctl` between
+  2026-09-05 and 2026-09-25, 4–28 a day. Upstream, unfixed.
 - The wrapper forces GTK onto X11 (`setenv("GDK_BACKEND", "x11")`). That is the root of three
-  bugs we papered over in `dd18c2d6`: no dark theme (no XSettings manager on Hyprland), file
-  dialogs at the screen origin (no parent window), and `GDK_SCALE` doubling everything.
-- Bun is now the "bridge" main process in Electrobun's own migration guide. Cottontail is the
-  default. The Bun path is where their attention is not.
+  workarounds in `dd18c2d6`: the `gdbus` colour-scheme read (`color-scheme.ts`), the libc
+  `setenv('GTK_USE_PORTAL')` FFI call (`gtk-portal.ts`), and the `GDK_SCALE` note.
+- Hutch builds only for the host, three runners and a 700 MB cache each.
 
-What the shell actually does for Platform is small: spawn the server and, in dev, Vite; open one
-window at a URL; inject a preload that installs `window.platformBridge`; answer one RPC
-(`pickEntry`); quit cleanly; and on macOS attach vibrancy behind a transparent window. That is
-the whole surface, and it is what Polaron has to reproduce.
+What the shell does for Platform is small: spawn the server and, in dev, Vite; open one window at
+a URL; install `window.platformBridge`; answer `pickEntry`; quit cleanly; and on macOS attach
+vibrancy behind a transparent window. That is the surface Polaron reproduces.
 
 ## The shape
 
-Two processes, one runtime for our code.
+The owner's order (2026-09-26, Q1): use the user's installed Chromium-family browser in app mode;
+when there is none, the system webview; when there is neither, the default browser in a tab.
 
 ```text
-polaron (Rust binary, the process root)        bun (child, spawned by polaron)
-  tao      window, event loop, main thread       apps/server/src/index.ts   (dev)
-  wry      system webview, preload, ipc          server/index.js            (packaged)
-  rfd      native file dialogs                   vite (dev only)
-  window-vibrancy (macOS)
-        │  JSON lines over the child's stdio, or a local socket
-        └──────────── control channel ───────────┘
+bun  apps/desktop/src/launcher/index.ts   (the process root, TypeScript)
+ ├─ server  bun apps/server/src/index.ts  (dev) | server/index.js (packaged)     unchanged
+ ├─ web     vite                          (dev only)                            unchanged
+ └─ window, one of:
+     1. chromium --app=<url> --user-data-dir=<home>/desktop/chromium --remote-debugging-pipe
+          CDP over fds 3/4: bridge injection, pickEntry, lifecycle, permissions
+     2. platform-webview <url> <preload>  (C + WebKitGTK 4.1 on Linux, Obj-C + WKWebView on macOS)
+          JSON lines over stdio: page messages out; eval, pick, drag, close in
+     3. xdg-open / open <url>             (a tab in whatever the system has; no bridge)
 ```
 
-- **Polaron owns the window and the main thread.** AppKit and GTK insist on the main thread, and
-  tao's event loop is built for that. Nothing in JS fights it.
-- **Bun stays the brain.** Polaron spawns Bun exactly the way `spawnServer` does today, just
-  from the other side. The bundled Bun binary ships in the app's resources. The single-runtime
-  property holds: `apps/server` runs on Bun, `bun:sqlite` and all.
-- **The page contract does not change.** `PlatformBridge` (`backdrop`, `platform`,
-  `colorScheme`, `pickEntry`) stays as is. wry's `with_initialization_script` installs the same
-  handoff prelude, and its `with_ipc_handler` carries `pickEntry` to Rust, which answers with
-  `rfd` and posts the result back with `evaluate_script`. `apps/desktop/src/shared` moves to
-  Polaron unchanged.
-- **No FFI.** The Bun-FFI-into-a-Rust-cdylib design was considered and rejected: it is a single
-  process where Bun's event loop and the GUI loop share a main thread, which is the exact problem
-  Electrobun's wrapper exists to manage. Two processes cost one JSON channel and buy crash
-  isolation for free.
-- **Not Tauri.** Tauri is tao plus wry plus a command system, a permission model, a bundler and
-  an updater. We need the first two. Its bundler is a separate crate (`tauri-bundler`) that can
-  be borrowed later without adopting the framework.
+- **Bun stays the brain and the root.** The launcher is today's `src/bun/index.ts` without
+  Electrobun: `spawnServer`, `spawnWeb`, the child lease, `requireFreePort`, the quit handler and
+  the wide events carry over. The single-runtime property holds.
+- **No Rust.** Rust paid for itself when it had to own every window. With Chromium as the common
+  path, only the fallback needs a native window, on two OSes (Windows ships Edge, a Chromium), and
+  each host is ~150 lines against the platform's own C API: measured below. tao/wry would add a
+  toolchain and archived gtk-rs 0.18 crates (RUSTSEC-2024-0411 and siblings) for that.
+- **The page contract barely changes.** `PlatformBridge` keeps `backdrop`, `platform`,
+  `colorScheme` and `pickEntry`, and gains `titlebar: 'overlay' | 'native'`: `isMacDesktop()`
+  reserves traffic-light room only under `overlay`, because a Chromium app window on macOS has its
+  own titlebar. `pickEntry` becomes optional; without it `use-pick-entry.tsx` already falls back
+  to the web `FilePickerDialog`. `window.platformBridge` and `__platformShell` are installed by the
+  launcher (Chromium) or the host's document-start script (webview).
+- **Not Tauri, not `Bun.WebView`.** Bun 1.4's `Bun.WebView` is headless only (its Chrome backend
+  always passes `--headless`; its WebKit backend owns an off-screen `WKWebView`). Its detection list
+  and `--remote-debugging-pipe` transport are the reference for ours.
 
-### Renderer per platform
+### Which browsers count, and how they are found
 
-| OS      | Engine    | Notes                                                                     |
-| ------- | --------- | ------------------------------------------------------------------------- |
-| macOS   | WKWebView | Same engine the native app already targets. Vibrancy via window-vibrancy. |
-| Windows | WebView2  | Chromium. Runtime is preinstalled on Windows 11.                          |
-| Linux   | WebKitGTK | Gate 0 decides. Fallback is the system Chromium in `--app` mode.          |
+A candidate must accept `--app`, `--user-data-dir` and `--remote-debugging-pipe`, and report
+`Chrome/<major>` ≥ 126 in `Browser.getVersion` (the app uses `URL.parse`, Chromium 126). Forks
+report the Chromium version there: Helium 0.15.7 reported `Chrome/151.0.7922.173`.
 
-## Gate 0 — The Linux engine, measured
+| Family         | Linux executables / flatpak ids                                               | macOS bundle id         |
+| -------------- | ----------------------------------------------------------------------------- | ----------------------- |
+| Google Chrome  | `google-chrome-stable`, `google-chrome`; `com.google.Chrome`                  | `com.google.Chrome`     |
+| Chromium       | `chromium`, `chromium-browser`, `/snap/bin/chromium`; `org.chromium.Chromium` | `org.chromium.Chromium` |
+| Brave          | `brave-browser`, `brave`; `com.brave.Browser`                                 | `com.brave.Browser`     |
+| Microsoft Edge | `microsoft-edge-stable`, `microsoft-edge`; `com.microsoft.Edge`               | `com.microsoft.edgemac` |
+| Vivaldi        | `vivaldi-stable`, `vivaldi`; `com.vivaldi.Vivaldi`                            | `com.vivaldi.Vivaldi`   |
+| Helium         | `helium-browser`                                                              | `net.imput.helium`      |
+| Thorium        | `thorium-browser`                                                             | —                       |
 
-Plan 073 rejected WebKitGTK because the editor is engine-sensitive. Nobody tested it. On
-2026-09-13 the app ran on WebKitGTK 2.52 for an afternoon: the workbench, the editor, the
-terminal and the logs pane all worked. The one failure, tree-sitter grammars not loading, was a
-Vite allow-list bug that failed identically in Chromium and is fixed in `c0566d48`.
+Excluded: Opera and Arc (`--app` behaviour differs and neither is verified), Firefox family (no
+app mode, no CDP pipe).
 
-1. Run the web browser suite against WebKit through the endpoint option that federated
-   environments added. Record pass/fail per file in this plan.
-2. Run it on Wayland, not XWayland. Polaron will not force X11, so the DMA-BUF failure seen today
-   on NVIDIA under XWayland (`Failed to create GBM buffer`, blank white window, worked around
-   with `WEBKIT_DISABLE_DMABUF_RENDERER=1`) needs a fresh reading on the native backend.
-3. Decide. Green: WebKitGTK is the Linux engine and Chrome-first is retired as a product
-   requirement. Red: Polaron launches the system Chromium with `--app=<url>` on Linux and owns
-   nothing but the process, and WebKitGTK is revisited when the failing tests are fixed.
+Order, per OS:
 
-**Exit**: a table of results in this plan and one sentence naming the Linux engine.
+1. **The setting.** `window.browser` (machine scope, it selects a binary): `auto` (default),
+   `webview`, or an absolute path to a Chromium-family executable.
+2. **The default browser, if it is in the table.** Linux: `x-scheme-handler/https` from the XDG
+   `mimeapps.list` search path (0 ms; `xdg-settings get default-web-browser` answers the same in
+   106 ms), then the `.desktop` file's `Exec` token. macOS: `LSHandlerRoleAll` for `https` in
+   `~/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist` (read
+   with `plutil -convert json`), then the app path by bundle id (`/Applications`, `~/Applications`,
+   `mdfind kMDItemCFBundleIdentifier`), executable from `Info.plist` `CFBundleExecutable`. This
+   machine resolves to Helium on both the PC and the Mac.
+3. **The table, top to bottom**, on `PATH`, then the flatpak export dirs
+   (`/var/lib/flatpak/exports/bin`, `~/.local/share/flatpak/exports/bin`), then the macOS bundles.
+4. **The webview host**, if its library loads (`libwebkit2gtk-4.1.so.0` on Linux; always on macOS).
+5. **The default browser in a tab** (`xdg-open` / `open`), with the reason in the log and a
+   `desktop.window.degraded` event. The web picker and the web wallpaper cover what the bridge would.
 
-## Gate 1 — A window that loads Platform
+`window.transparency: 'window'` needs a see-through window, which only the webview host can make,
+so under `auto` it selects the webview (Decided below).
 
-New crate at `apps/polaron`, host build only for now.
+Flatpak and snap run confined. Flatpak needs `flatpak run --filesystem=<profile dir>`; snap cannot
+write hidden directories in `$HOME`, so its profile goes under `~/snap/<name>/common/platform`.
+Whether fds 3/4 survive `flatpak run` is unverified (no flatpak here). If CDP does not answer within
+5 s, the launcher kills that candidate and moves down the list.
 
-1. `cargo run` opens a tao window titled Platform, sized like today's shell, with a wry webview at
-   the dev URL. `titleBarStyle: hiddenInset` and the traffic-light offset on macOS; plain window
-   elsewhere; no decorations on Linux beyond what the compositor draws.
-2. The initialization script installs `__platformShell` and the preload bundle, built by Vite
-   from `apps/desktop/src/preload` as it is today. The page reads `backdrop`, `platform` and
-   `colorScheme` and paints correctly in light and dark. On Linux `colorScheme` comes from the
-   portal as it does now; on macOS and Windows it is `null` and the webview is trusted.
-3. `pickEntry` round-trips through `with_ipc_handler` and `rfd`. On Linux `rfd` uses the desktop
-   portal, so the dialog is a centred Wayland window in the desktop theme with no env var.
-4. Closing the window quits the process. Ctrl-C in the terminal quits the process.
+### What each window can do
 
-**Exit**: the app opens, paints, picks a folder, and quits, on the developer's machine.
+Chromium measured on this machine (Chromium 151 and Helium 0.15.7, Hyprland 0.56 native Wayland,
+RTX 3060 Ti); macOS rows measured on `shaul-mac` (macOS 26.4, Chrome 153, Helium 0.16.3) where
+noted; Electrobun rows from today's code.
 
-## Gate 2 — Bun as a child
+| Capability                         | Electrobun today                                 | Chromium `--app` (path 1)                                                                                                                                          | Webview host (path 2)                                                                                                         |
+| ---------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Engine                             | CEF, 409 MB bundled                              | the user's Chromium, nothing bundled; WebGPU and EditContext present                                                                                               | WebKitGTK 2.52 / WKWebView; no EditContext                                                                                    |
+| Profile                            | CEF's own                                        | `--user-data-dir=<PLATFORM_HOME>/desktop/chromium`, `--profile-directory=Platform`; 12–28 MB fresh                                                                 | WebKit default data dir                                                                                                       |
+| Isolation from user's browsing     | yes                                              | yes: separate process, no shared cookies; `--disable-extensions` needed (below)                                                                                    | yes                                                                                                                           |
+| Bridge injection                   | preload string                                   | `Page.addScriptToEvaluateOnNewDocument` plus an immediate `Runtime.evaluate`                                                                                       | `WKUserScript` / `webkit_user_script` at document start                                                                       |
+| `pickEntry`                        | Electrobun GTK dialog, X11                       | `Runtime.addBinding` → launcher → `platform-webview pick` (portal / `NSOpenPanel`)                                                                                 | host's own dialog: portal on Linux, sheet on macOS                                                                            |
+| Titlebar                           | macOS `hiddenInset`, traffic lights over our bar | native frame; none on Hyprland; macOS draws Chrome's titlebar above ours                                                                                           | macOS `hiddenInset`; Linux native frame                                                                                       |
+| Window drag                        | `electrobun-webkit-app-region-drag`              | native frame does it                                                                                                                                               | macOS: `performWindowDragWithEvent` on a `drag` message                                                                       |
+| Dark mode                          | `gdbus` portal read (X11 workaround)             | native: `prefers-color-scheme: dark` true before first load                                                                                                        | native on Wayland (Gate 0) and macOS                                                                                          |
+| Transparent / vibrancy             | macOS vibrancy (CEF OSR, 5.5 MB/paint)           | no                                                                                                                                                                 | macOS `NSVisualEffectView`                                                                                                    |
+| Keyboard                           | CEF passes everything                            | every chord probed reaches the page first and is preventable: Ctrl+W, Ctrl+Shift+W, Ctrl+T, Ctrl+N, Ctrl+Tab, Ctrl+L, Ctrl+Shift+I/J/C, F5, F11, F12, Ctrl+Shift+Q | as the engine                                                                                                                 |
+| Clipboard, notifications           | CEF defaults                                     | `Browser.grantPermissions` pre-grants `clipboardReadWrite` and `notifications` for our origin (measured `prompt` → `granted`)                                      | WKWebView: `clipboard.readText` and `Notification` exist on `http://127.0.0.1`                                                |
+| Screen capture (Plan 163)          | `getDisplayMedia` in CEF                         | `getDisplayMedia` with the portal picker, as in a tab                                                                                                              | WKWebView: `getDisplayMedia` absent (feature reports unsupported). WebKitGTK: `captureStream` aborts the web process; hide it |
+| Devtools                           | CEF devtools                                     | Chrome DevTools (Ctrl+Shift+I when the page does not claim it)                                                                                                     | Web Inspector                                                                                                                 |
+| Close window                       | quits                                            | Linux: browser exits in 407 ms, code 0. macOS: Chrome keeps running (measured), so the launcher sends `Browser.close` on the last page's `Target.targetDestroyed`  | host exits, launcher quits                                                                                                    |
+| Second launch                      | port check fails                                 | Chromium's singleton hands off in 44 ms and opens a second window, which the first launcher's CDP session attaches to and bridges                                  | launcher lease decides                                                                                                        |
+| Launcher crash                     | —                                                | the pipe closes and the browser exits within 300 ms: no orphan window                                                                                              | stdin EOF ends the host                                                                                                       |
+| Tray, global shortcuts, deep links | available, unused                                | none                                                                                                                                                               | none                                                                                                                          |
+| Window identity                    | —                                                | Wayland `app_id` `chrome-127.0.0.1__platform_-Platform` (host + path + profile dir); `--class` is ignored on Wayland                                               | `app_id` of the host binary                                                                                                   |
+| Dock icon                          | ours                                             | Linux: ours through a `.desktop` with that `StartupWMClass`. macOS: the browser's icon                                                                             | ours once bundled                                                                                                             |
 
-1. Polaron spawns Bun with the same arguments, cwd and env `spawnServer` and `spawnWeb` use
-   today, waits for `/health` and the web URL, then opens the window. The dev entry stays
-   `bun run desktop:dev`; it now runs `cargo run` under the hood.
-2. Quit order: window closes, Bun children get SIGTERM, Polaron waits for them with a bounded
-   timeout, then exits. Today's `createQuitHandler` semantics, in Rust.
-3. Structured logs: Polaron writes the same wide events (`desktop.process.spawn`,
-   `desktop.window.backdrop`, `desktop.picker.*`) as JSON lines on stderr, and the server ingests
-   them the way it ingests the client's. Debugging the shell must not require a debugger.
-4. Idle measurement, the same three numbers as plan 073 Gate 2: main-process CPU over 12 s,
-   voluntary context switches rising, state `S`. Record them here.
+Nothing on the page needs the bridge at document start in the Chromium path: `backdrop` falls out
+of the user agent (`compositesOverDesktop`), `colorScheme` is `null` because Chromium reads the
+portal, and every `getPlatformBridge()` call runs at use time. So the race below costs nothing as
+long as the launcher also evaluates the bridge into the current document.
 
-**Exit**: `bun run desktop:dev` is Polaron end to end and the numbers are in this plan.
+### Supervision and quit
 
-## Gate 3 — macOS parity
+The launcher is the root and owns both halves. Chromium is a child on a pipe; the server and Vite
+are children in their own process groups under today's lease (`child-lease.ts`). Quit is one
+path whichever side starts it: the browser exits (window closed, Cmd-Q, Ctrl+Shift+Q, or the
+launcher's `Browser.close`), the launcher sends Plan 149's `shutdown` to the terminal host, SIGTERMs
+the groups, waits, clears the lease and exits. A server that exits on its own still quits the app,
+as today, but the launcher first navigates the window to a `data:` page naming the exit code, so
+the failure is on screen instead of a vanished window. Start failures before a window exists keep
+`showStartFailure`: `platform-webview message` on Linux and macOS, stderr and a log event elsewhere.
 
-1. Port `apps/desktop/native/vibrancy.m` to Rust with `window-vibrancy`, or keep the dylib and
-   load it from Rust. The transparent-window path is the macOS setting `window.transparency:
-'window'`; the opaque path needs nothing.
-2. Verify on a real Mac: traffic lights over our titlebar, vibrancy behind a transparent window,
-   Cmd-Q, dock icon, and that the bundled Bun is the one running the server.
+## Gates
 
-**Exit**: the same checklist as Gate 1 and 2, passed on macOS.
+Electrobun keeps working until Gate 4. The new launcher runs beside it as
+`bun run desktop:dev -- --shell=polaron` until then.
 
-## Gate 4 — Delete Electrobun
+### Gate 1 — Chromium launcher on Linux (M)
 
-1. Remove `apps/desktop`'s Electrobun config, package, tsconfig paths, vitest scoping, the
-   `.hutch` ignores in git, oxlint and oxfmt, and the CI cache and prepare steps from `15df2033`.
-   `apps/desktop/src/shared` and `src/preload` move to `apps/polaron`.
-2. Delete `/work/cache/hutch` and the `~/.hutch` symlink on the developer machine.
-3. Update `AGENTS.md`: the desktop shell section, the dev server note, and the mesh section's
-   claim that the shell is a convenience.
+Owner: `apps/desktop/src/launcher/*` (new), `scripts/desktop-dev.ts`,
+`packages/contracts/src/settings/keys.ts`, `apps/desktop/src/shared/bridge.ts`,
+`apps/web/src/lib/platform/bridge.ts`, `apps/web/src/components/use-pick-entry.tsx`.
+
+1. `launcher/browser.ts`: detection per the order above, Linux half. A pure resolver over
+   injected `readFile`/`exists` so each step has a unit test (default from `mimeapps.list`, table
+   order, flatpak export, setting path, setting `webview`). Wide event `desktop.browser.detect`
+   with `candidates`, `chosen`, `source` (`setting` | `default` | `scan`), `path`.
+2. `launcher/cdp.ts`: the pipe client. `Bun.spawn` with `stdio: ['ignore', 'ignore', 'pipe', 'pipe',
+'pipe']` hands back fds 3 and 4 as numbers. Write with `fs.writeSync(fd3, json + '\0')`; read
+   with `Bun.file(fd4).stream()`. `node:net` `Socket({ fd })` received nothing and
+   `fs.createReadStream({ fd })` threw `EAGAIN` on Bun 1.4.0. Requests by id, events by method,
+   `sessionId` for flat sessions.
+3. `launcher/chromium.ts`: flags `--app=<url> --user-data-dir=<PLATFORM_HOME>/desktop/chromium
+--profile-directory=Platform --remote-debugging-pipe --no-first-run --no-default-browser-check
+--disable-sync --disable-background-networking --disable-component-update --disable-default-apps
+--disable-extensions --window-size=1440,960`. `--disable-extensions` is required: Arch's
+   `/usr/bin/chromium` wrapper appends `~/.config/chromium-flags.conf`, which on this machine
+   carries `--load-extension=` for three Omarchy extensions, and they ran in our profile until the
+   flag was added. The wrapper's other flags (Wayland, password store) are the user's and stay.
+   On attach (`Target.setDiscoverTargets` then `setAutoAttach { flatten, waitForDebuggerOnStart }`,
+   handlers registered first): `addScriptToEvaluateOnNewDocument(bridge)`, `Runtime.addBinding
+('platformShellCall')`, `Runtime.evaluate(bridge)` for a document that already committed,
+   `Browser.grantPermissions` for the origin, then `runIfWaitingForDebugger`. Check
+   `Browser.getVersion` ≥ 126 or close and fall through.
+4. Bridge in the Chromium path: `{ backdrop, platform, colorScheme: null, titlebar: 'native' }`
+   and no `pickEntry` yet, so the web picker is used. `isMacDesktop()` becomes
+   `titlebar === 'overlay'`.
+5. Lifecycle: browser exit → quit path. A second `desktop:dev` while one runs finds the live lease
+   and execs the browser with the same `--user-data-dir`, which opens a second window in the
+   running instance, then exits 0.
+6. Settings: register `window.browser` (machine scope, `requiresRestart`) with its consumer here.
+   Regenerate `docs/settings-reference.md`.
+7. Frame counter: 2 s after `Page.loadEventFired`, count rAF for one second and put
+   `rafPerSecond`, `product` and `engine: 'chromium'` on `desktop.window.open`. A zero is the NVIDIA
+   signature from Gate 0 in any engine.
+8. Lease path: `childLeaseFile` uses `homedir()/.platform`; move it under `PLATFORM_HOME` so dev,
+   prod and agent homes stop sharing one lease directory (Plan 146).
+
+**Exit**: `bun run desktop:dev -- --shell=polaron` opens Platform in the default Chromium-family
+browser as an app window, picks a folder through the web picker, and quits on window close with
+no leftover process. Idle numbers in this plan (the prototype measured 2 CPU ticks in 12 s, 0.17%
+of one core, and 514 MB PSS for the whole Chromium group plus launcher, app on the welcome screen).
+
+### Gate 2 — Native host on Linux: webview fallback and the native picker (M)
+
+Owner: `apps/desktop/native/linux/platform-webview.c` (new), `apps/desktop/scripts/build-native.ts`,
+`apps/desktop/src/launcher/*`, `packages/contracts/src/settings/keys.ts`.
+
+1. Port the prototype `/work/tmp/research2/114/host/host.c` (150 lines): GTK3 window, WebKitGTK 4.1
+   view with a document-start user script, a `platformShell` script message handler, developer
+   extras, and the stdio protocol (`eval`, `pick`, `close` in; `ready`, `message`, `picked`,
+   `closed` out). Build with `cc $(pkg-config --cflags --libs webkit2gtk-4.1)`: 0.66 s, 24 KB.
+2. Keep the GL-context fix: realize a `GdkGLContext` on the window before `show_all`. Re-measured
+   2026-09-26 in the C host (3 runs each): with it, 61 rAF/s and a painted app; without it, GTK logs
+   `Error 71 (Protocol error) dispatching to Wayland display` and the host exits 1. Gate 0 saw a
+   silent 0 rAF/s instead; either way the window is unusable without it.
+3. `pick` subcommand (no webview): `GtkFileChooserNative` with `GTK_USE_PORTAL=1` set by the host
+   itself. Measured: the xdg-desktop-portal-gtk "Choose folder" dialog opened and a cancel returned
+   `{"event":"picked","paths":[]}`. The Chromium path's bridge now gets `pickEntry` through it.
+4. Wire the host into detection step 4 and the tab into step 5. No second setting: `window.browser:
+'webview'` already selects the host.
+5. Hide the screenshot attachment in the WebKitGTK window: the bridge reports
+   `capabilities.displayCapture: false`, and `screenshot-capture.ts` reads it with its existing
+   unsupported branch.
+
+**Exit**: with `window.browser: webview` the app opens in the C host with 60 rAF/s logged, picks a
+folder through the portal, and quits; with `auto` on this machine the Chromium window picks a folder
+through the same portal dialog.
+
+### Gate 3 — macOS (M)
+
+Owner: `apps/desktop/native/macos/platform-webview.m` (new, absorbs `vibrancy.m`),
+`apps/desktop/src/launcher/*`.
+
+1. Detection, macOS half: LaunchServices default, bundle table, `Info.plist` executable.
+2. Chromium lifecycle: on `Target.targetDestroyed` of the last page, `Browser.close` (measured on
+   Chrome 153: closing the last app window leaves the browser running).
+3. Port `/work/tmp/research2/114/host/host.m` (112 lines): `NSWindow` with full-size content,
+   transparent titlebar and hidden title (`hiddenInset`), `WKWebView` with a document-start
+   `WKUserScript` and a script message handler, `NSOpenPanel` sheet for `pick`, and
+   `performWindowDragWithEvent:` for `drag`. Measured on `shaul-mac`: builds with
+   `clang -fobjc-arc -framework Cocoa -framework WebKit` to 76 KB; bridge present at document
+   start, 61–62 rAF/s, `prefers-color-scheme: dark` native, WebGPU present on `http://127.0.0.1`,
+   `getDisplayMedia` absent; the `--vibrancy` variant (the `vibrancy.m` recipe) runs. Vibrancy
+   pixels were not captured.
+4. The page's titlebar drag: replace the Electrobun class names in `lib/platform/window-drag.ts`
+   with a `mousedown` listener on `[data-native-window-drag-region]` that the preload installs when
+   `titlebar === 'overlay'`, posting `drag`.
+5. Verify on `shaul-mac`: Chromium path (Helium, the default there, and Chrome), webview path with
+   `window.transparency: 'window'`, Cmd-Q, and that Bun from the app is the one running the server.
+
+**Exit**: the Gate 1 and 2 checklists pass on the Mac in both paths.
+
+### Gate 4 — Delete Electrobun (S–M)
+
+1. Remove `src/bun/index.ts`, `src/preload` (its Electroview transport), `src/shared/rpc.ts`,
+   `electrobun.config.ts`, the package, the tsconfig paths, vitest scoping, the `.hutch` ignores
+   in git, oxlint and oxfmt, and the CI cache and prepare steps from `15df2033`. Add the host
+   builds to CI (`pkg-config` + `cc` on the Linux runner, `clang` on macOS).
+2. Delete `color-scheme.ts` and `gtk-portal.ts`: both exist only because of the X11 forcing.
+3. Delete `/work/cache/hutch` and the `~/.hutch` symlink on the developer machine.
+4. `desktop:dev` runs the launcher without the flag. Update `AGENTS.md`: the desktop shell
+   section, the dev-server note, and the mesh section's claim that the shell is a convenience.
+5. Update the `window.transparency` description: it no longer mentions CEF's copy per paint, and
+   says the see-through window uses the system webview.
 
 **Exit**: `rg -i electrobun` across the repo returns only this plan and the git history.
 
 ## Later, deliberately
 
-- **Packaging and signing.** DMG, MSI, AppImage, notarization. `tauri-bundler` or
-  `cargo-bundle` when there is a release to make. Not before.
-- **Windows.** WebView2 is expected to work with no engine-specific code. Verify on a runner
-  when CI gets a desktop matrix.
+- **Packaging and signing.** A Bun binary, the launcher bundle, the server bundle, the web build
+  and one host binary per OS. No CEF. DMG, AppImage, notarization when there is a release to make.
+- **Windows.** Edge is preinstalled, so the Chromium path covers it. EEA users can uninstall Edge
+  since 2024; a WebView2 host would be the third host if that ever matters.
 - **Updater.** None exists today and none is planned by this plan.
+- **The app window on macOS without Chrome's titlebar.** Chromium's Window Controls Overlay is
+  only for installed PWAs (`navigator.windowControlsOverlay` exists in the `--app` window but is
+  inert). Revisit if Chromium exposes it to `--app`.
 
 ## Risks
 
-- **WebKitGTK is the wrong engine after all.** Gate 0 exists for this, and the Chromium
-  `--app` fallback costs a day, not a rewrite.
-- **wry's initialization script runs per navigation, not per page load like Electrobun's
-  preload.** Verify the handoff survives the workbench's client-side routing on Gate 1; it should,
-  since the router never reloads the document.
-- **Two-process debugging.** A crash in either side must show up in the logs with the other
-  side's state. Gate 2 step 3 is not optional.
-- **The Rust toolchain is new to the repo.** One crate, pinned toolchain file, no workspace
-  gymnastics. If it grows a second crate, stop and ask why.
+- **The user's browser is not ours.** Its version moves weekly and its wrapper can add flags. The
+  version floor, `--disable-extensions` and a separate profile contain it; the rAF counter and
+  `product` on `desktop.window.open` make a regression visible.
+- **The bridge race.** A warm profile commits the first navigation at 205–222 ms, the same moment
+  the launcher's script lands (205–228 ms in three runs). The evaluate-now step covers the lost
+  race; `--app=about:blank` is not an escape hatch (Chromium ignores it and opens a normal window
+  on `chrome://newtab`).
+- **Confined browsers.** Flatpak and snap are unverified; the 5 s CDP timeout keeps them from
+  blocking launch.
+- **Two C/Objective-C files.** Small and on the platforms' own APIs, but a crash there is a native
+  crash. The host has no state; the launcher logs its exit code and falls through to the tab.
 
-## Open questions for the operator
+## Research findings
 
-1. Gate 0's answer, before any Rust is written.
-2. Does the Linux `--app` Chromium fallback need to exist at all, or is WebKitGTK-or-nothing
-   acceptable on the one platform the operator uses daily?
-3. Keep the name Polaron, or name the crate after the app? The directory is `apps/polaron`
-   either way; the binary is what the user sees.
+### 2026-09-26 — the Chromium-first rework
 
-## Research findings (2026-09-25)
+Prototypes in `/work/tmp/research2/114/`: `launch.ts` (the Chromium launcher with a CDP pipe, a
+bridge, a binding and a control port for probing), `host/host.c` + `host/drive.ts` (Linux host and
+its driver), `host/host.m` + `host/drive-mac*.sh` (macOS host). The app under test was the
+production web build from `/work/platform-production/current` on a throwaway server (temp
+`PLATFORM_HOME`, port 33114) behind a `/platform` base-path proxy (`proxy.ts`). Both are stopped.
 
-Gate 0 only, no Rust. Plan text read from `origin/main` at `9f343825`; every open lane branch
-carries the same file. Probes, logs and screenshots are in `/work/tmp/research/114/` (disposable).
+- **Browsers here.** PC: Chromium 151.0.7922.173 (`/usr/bin/chromium`, a launcher that execs
+  `/usr/lib/chromium/chromium` with `~/.config/chromium-flags.conf`) and Helium 0.15.7.1, the
+  default browser. Mac: Google Chrome 153 and Helium 0.16.3.1, Helium the default.
+- **Chromium app window.** CDP ready 155–250 ms after spawn; page `display-mode: standalone`,
+  viewport equal to the window (no browser UI on Hyprland), native Wayland GPU process, 62 rAF/s,
+  WebGPU adapter `nvidia ampere`, EditContext present, `SharedArrayBuffer` absent (not
+  cross-origin isolated, same as the tab today). `pickEntry` through `Runtime.addBinding` opened
+  the fixture folder in the workbench. Helium behaves identically.
+- **Keyboard.** In an `--app` window every chord probed through Hyprland's `send_shortcut` reached
+  the page and `preventDefault` stopped the browser action. Browser-reserved chords are a non-issue
+  in app mode (in a tab they are not).
+- **Lifecycle.** Linux close → exit 0 in 407 ms. macOS close → Chrome keeps running. Launcher
+  SIGKILL → browser gone within 300 ms. Second launch on the same profile → hand-off in 44 ms and
+  a bridged second window.
+- **Identity.** `--class` is ignored on Wayland; `--profile-directory=Platform` makes the app id
+  `chrome-127.0.0.1__platform_-Platform` (dev: `chrome-127.0.0.1__-Platform`, port not included).
+- **Hosts.** Linux C host 150 lines, 24 KB, builds in 0.66 s; macOS Objective-C host 112 lines,
+  76 KB. Both carry the bridge from document start and hit 61–62 rAF/s. The Linux GL-context fix is
+  still required (above).
+- **Not measured.** Electrobun's footprint side by side (the shell was not running), the vibrancy
+  pixels, flatpak/snap, Brave/Edge/Vivaldi (same switches, not installed), GTK4 with WebKitGTK 6.0
+  (not installed; GTK4 always paints with GL and might not need the fix).
+
+### 2026-09-25 — Gate 0: WebKitGTK, which is now the Linux fallback
+
 Host: Arch, Hyprland 0.56.2 on native Wayland, RTX 3060 Ti on `nvidia-open` 610.57.04,
-`webkit2gtk-4.1` 2.52.6 (the library wry 0.57 binds), Playwright 1.63 (`webkit-2359`, WebKit 26.6).
+`webkit2gtk-4.1` 2.52.6, Playwright 1.63 (`webkit-2359`).
 
-### Gate 0 step 1 — the web browser suite in WebKit
-
-How it was run. The unchanged `apps/web/vitest.browser.config.ts`, imported by a wrapper config
-that swaps `instances` to `webkit`, with its own `VITEST_BROWSER_PORT` / `VITEST_BROWSER_FILE_SERVER_PORT`
-(the port option the file-server fixture reads) so it could not collide with other runs. A Chromium
-run through the same wrapper is the control. Playwright cannot drive system WebKitGTK and Arch's
-`webkit2gtk-4.1` ships no `WebKitWebDriver`, so this suite ran on Playwright's WebKit build (WPE
-port, headless, WebKit trunk as of 2026-09-01). The system engine is covered by step 2.
-
-Playwright's WebKit does start on this host, contrary to the `verify-fregat` skill note: it needs
-`libicu74`, `libxml2.so.2` and `libflite1` from Ubuntu noble copied into a private copy of
-`webkit-2359/minibrowser-*/sys/lib` (the bundle's wrapper overwrites `LD_LIBRARY_PATH`), then
-`PLAYWRIGHT_BROWSERS_PATH` pointed at that copy.
+The web browser suite on Playwright's WebKit (WPE, headless), through a wrapper config that swaps
+`instances` to `webkit` with its own ports; Chromium through the same wrapper as the control:
 
 | File (`apps/web/src/…`)                       | Chromium | WebKit | WebKit, Linux UA |
 | --------------------------------------------- | -------- | ------ | ---------------- |
@@ -223,29 +363,18 @@ Playwright's WebKit does start on this host, contrary to the `verify-fregat` ski
 | keymap/tests/command-focus                    | 11/11    | 5/11   | 11/11            |
 | **Total**                                     | 59/59    | 48/59  | 55/59            |
 
-- **command-focus is a harness artifact.** Playwright's Linux WebKit sends a Macintosh user agent;
-  `@tanstack/hotkeys` `detectPlatform()` reads the UA, resolves `Mod` to Meta, and Playwright's
-  `ControlOrMeta` presses Control. With the UA system WebKitGTK actually sends
-  (`X11; Linux x86_64`), all 11 pass.
-- **message-bubble "dispatches user-row checkpoint revert actions"**: the revert button is
-  `opacity-0` under `@media (hover: hover)` until the row is hovered or focused
-  (`message-bubble.tsx:195`). Both headless engines report `hover: hover`, so Chromium passing is
-  the surprise; likely a leftover pointer position from an earlier test. Not investigated further;
-  it is a test that does not hover before asserting visibility.
-- **screenshot-capture is a real engine failure.** The page dies (`Browser connection was closed`).
-  Reproduced on the system engine: `canvas.captureStream()` into a playing `<video>` kills
-  `WebKitWebProcess` 2.52.6 with SIGABRT (`web-process-terminated: crashed`, core in
-  `coredumpctl`), logging `GStreamer element autoaudiosink not found`. `gst-plugins-good` is not
-  installed here; with it the crash may become a working capture, but that is unverified.
-  `getDisplayMedia` itself is present with default settings.
-- Not run: `packages/tree` and `packages/ui` each carry one `*.browser.tsx` outside the web suite.
+- command-focus fails only under Playwright's Macintosh user agent; with the Linux UA WebKitGTK
+  sends, all 11 pass. The message-bubble failure is a test that asserts a hover-only button
+  without hovering.
+- screenshot-capture is a real engine failure: `canvas.captureStream()` into a playing `<video>`
+  kills `WebKitWebProcess` 2.52.6 with SIGABRT (`GStreamer element autoaudiosink not found`;
+  `gst-plugins-good` is not installed).
+- Playwright's WebKit needs `libicu74`, `libxml2.so.2` and `libflite1` from Ubuntu noble copied
+  into a private copy of its `sys/lib` on Arch; the `verify-fregat` note that it cannot start is
+  out of date.
 
-### Gate 0 step 2 — the system engine on native Wayland
-
-The production build (`ed96e9f1`) on a throwaway server (temp `PLATFORM_HOME`, fixture workspace),
-behind a base-path proxy, opened in a GTK3 window with `WebKit2 4.1` from Python GObject: the same
-library and toolkit wry and tao use. Each run records `webkit://gpu`, a feature matrix, app state,
-and a WebKit snapshot.
+The system engine on native Wayland (GTK3 + WebKit2 4.1 from Python GObject, the library the C host
+now uses):
 
 | Run (all `GDK_BACKEND=wayland` unless noted)                   | Renderer            | rAF / s | Terminal | Highlighting |
 | -------------------------------------------------------------- | ------------------- | ------- | -------- | ------------ |
@@ -258,127 +387,47 @@ and a WebKit snapshot.
 | **GL context realized before first frame**                     | DMABuf, GL          | **63**  | works    | works        |
 | `GDK_BACKEND=x11` (control)                                    | GL unavailable      | —       | stuck    | —            |
 
-- **The failure on native Wayland is not the GBM one.** DMA-BUF initialises with NVIDIA
-  block-linear modifiers and no errors, but `requestAnimationFrame` never fires, on a blank
-  `data:` page too. Everything frame-driven stalls: the ghostty terminal sits on its spinner
-  (its WebGL2 context exists and a WebGL readback works) and the editor's CSS highlights are
-  registered (`CSS.highlights.size === 9`) but never painted.
-- **The fix is known and small.** Realizing a `GdkGLContext` on the window before `show_all()`
-  gives 63 rAF/s with full hardware acceleration, and the app then matches Chromium: editor,
-  syntax colours, terminal prompt, workbench (`wk-app-quirk/app-snapshot.png` against
-  `chromium.png`). This is what `tauri-plugin-wayland-nvidia-quirk` does
-  (<https://github.com/arsalan-anwari/tauri-plugin-wayland-nvidia-quirk>): GTK picks GL or SHM per
-  frame by whether the window already has a paint GL context, and WebKit creates one too late.
-  Tauri documents the env-var workarounds (<https://v2.tauri.app/develop/debug/linux-graphics/>),
-  which here cost acceleration. Polaron must do this in its tao window setup, about ten lines.
-- **The X11 control reproduces today's bug**: `Failed to create GBM buffer of size 942x508:
-Invalid argument`, GL unavailable. Polaron not forcing X11 is what removes it.
-- **Dark mode works natively.** `prefers-color-scheme: dark` is true on Wayland and false on X11
-  in the same build, so the `gdbus` portal read in `color-scheme.ts` exists only because of the
-  X11 forcing.
-- **Idle is quiet.** Workbench open, file and terminal showing, 12 s window after settling: 0.2%
-  of one core across the UI, web and network processes with the GL fix (0.3% unaccelerated),
-  from `/proc/<pid>/stat` utime+stime deltas.
-- **Engine surface, system WebKitGTK 2.52.6**: WebGPU absent (terminal takes WebGL2), EditContext
-  absent (the editor keeps its textarea route, `keys.ts:496`), `requestIdleCallback` and
-  `scheduler.yield` absent (the prefetch scheduler already falls back,
-  `intent-prefetch-scheduler.ts:22`), `SharedArrayBuffer` absent (not cross-origin isolated).
-  Present: CSS highlights, anchor positioning, `field-sizing`, `:has`, container queries, view
-  transitions, popover, `Intl.Segmenter`, `OffscreenCanvas`, compression streams, iterator helpers,
-  `Set` methods, `URL.parse`. The Editor already tracks WebKit quirks
-  (`Editor/docs/display/browser-quirks.md`); the ghostty renderer ships a WebKit test config.
-- **Unresolved**: the machine-events stream logged `Load failed` in WebKit sessions and not in
-  Chromium, but it ran through my proxy, so it is confounded. Re-check without a proxy in Gate 1.
-  On-screen pixels were not captured: `grim` hangs on this compositor (two Hyprland "not
-  responding" dialogs it caused were closed). The WebKit snapshots are the web process's own paint.
+- The fix is what `tauri-plugin-wayland-nvidia-quirk` does: GTK picks GL or SHM per frame by
+  whether the window already has a paint GL context, and WebKit creates one too late.
+- Dark mode works natively on Wayland and not on X11 in the same build: the `gdbus` read in
+  `color-scheme.ts` exists only because of the X11 forcing.
+- Idle with the fix: 0.2% of one core across UI, web and network processes over 12 s.
+- Engine surface, WebKitGTK 2.52.6: no WebGPU (terminal takes WebGL2), no EditContext (textarea
+  route), no `requestIdleCallback`/`scheduler.yield` (the prefetch scheduler falls back), no
+  `SharedArrayBuffer`. CSS highlights, anchor positioning, `field-sizing`, `:has`, container
+  queries, view transitions, popover, `Intl.Segmenter`, `OffscreenCanvas` all present.
 
-### Gate 0 step 3 — decision
+## Owner questions
 
-WebKitGTK can be the Linux engine, on three conditions:
-
-1. Polaron realizes a GL context on its window before the first frame. Without it, the app is
-   broken on NVIDIA in a way the error log does not show.
-2. The screenshot attachment path either gains a system dependency on `gst-plugins-good` (verified
-   first) or is disabled where `captureStream` cannot play, because today it aborts the renderer.
-3. Chrome-first is retired as a desktop product requirement (plan 073 made it one). The editor
-   gives up EditContext on the desktop, and the desktop window is no longer the engine
-   `agent:browser trace` measures.
-
-The one sentence: **the Linux engine is WebKitGTK 2.52 on native Wayland with a pre-realized GL
-context, and the system Chromium in `--app` mode stays as a flag for any machine where it fails.**
-
-### What Polaron would give, cost and replace
-
-What it replaces, measured in this checkout:
-
-- `apps/desktop`: 1,511 lines of TypeScript and Objective-C, 466 of them in `src/bun/index.ts`,
-  plus `electrobun.config.ts`, the Hutch devkit projection, and the Electrobun touches in
-  `knip.json`, `.oxlintrc.json`, `.oxfmtrc.json`, `.gitignore`, `README.md` and the two Hutch
-  steps in `.github/workflows/ci.yml` (lines 108–118 and 178–182).
-- `/work/cache/hutch`: 737 MB. The Linux dev build under `apps/desktop/build`: 687 MB, 409 MB of
-  it `libcef.so`.
-- `bun Helper` SIGABRT cores: 141 in `coredumpctl` since 2026-09-05, 4–28 a day, 2.5 MB each. The
-  shell is in daily use, so this is daily noise.
-- Three X11 workarounds: the `gdbus` colour-scheme read, the libc `setenv('GTK_USE_PORTAL')` FFI
-  call in `gtk-portal.ts`, and the `GDK_SCALE` note in `dd18c2d6`.
-
-What it gives:
-
-- A shell whose main loop is ours and whose failure modes can be read in our logs.
-- Native Wayland on Linux: dark mode, centred portal dialogs (`rfd` uses the portal) and correct
-  scaling without workarounds.
-- One engine family for desktop and phone: WKWebView on macOS matches the native Mac app and every
-  iPhone reaching the mesh; WebKitGTK on Linux is the same WebCore and JavaScriptCore.
-- No bundled browser: the system webview ships with the OS, where CEF is a 409 MB library per
-  platform.
-
-What it costs:
-
-- **A Rust toolchain.** None is installed on this machine; CI needs Rust plus `webkit2gtk-4.1`
-  development headers, and a per-OS runner exactly as Hutch does (Rust does not cross-compile
-  AppKit or WebView2 either, so the three-runner cost stays).
-- **Unmaintained GTK3 bindings.** tao 0.37 and wry 0.57 sit on gtk-rs 0.18 and `webkit2gtk`
-  2.0.2, whose GTK3 crates were archived in March 2024 (RUSTSEC-2024-0411, -0415, -0420 and siblings;
-  <https://github.com/tauri-apps/tauri/issues/11928>). Tauri carries the same exposure, so it is
-  shared and visible, and it is still a dependency on crates nobody patches.
-- **Engine drift we do not control.** The Linux engine version is whatever Arch ships this week.
-  CEF is pinned.
-- **An engine change on macOS too.** Today every platform runs CEF (`electrobun.config.ts`).
-  Polaron moves macOS to WKWebView, a second switch on a machine that is a verification rig.
-- **Tooling.** The desktop window gets Web Inspector (`enable-developer-extras`) instead of Chrome
-  DevTools, and the verification CLI's `trace` stays Chromium-only.
-- **Surface the plan does not list.** Window dragging: the page uses Electrobun's
-  `electrobun-webkit-app-region-drag` class names (`apps/web/src/lib/platform/window-drag.ts`);
-  under tao that becomes an IPC call to `drag_window()` on mousedown. Also the start-failure
-  message box (`showStartFailure`), which `rfd` covers.
-
-The case for staying on Electrobun: it works today, idle is fixed (plan 073), upstream is active
-(`2.0.2-beta.31` published 2026-09-25), and the cost is friction and a core file per exit. None of
-it breaks the product. Polaron trades that for a toolchain and an engine change, and the engine
-change is the larger half.
-
-### Recommendation
-
-Go, staged, with WebKitGTK on Linux. Gate 1 is small and Electrobun keeps working until Gate 4,
-so the decision stays reversible until the deletion. Make Gate 1's first exit item the GL-context
-fix and a rAF counter in the `desktop.window` wide event, so an NVIDIA regression shows up as a
-number in the logs. Build the Chromium `--app` path as a flag in Gate 2: it is a day, and it is the
-escape hatch for any machine where condition 1 is not enough. If the owner holds Chrome-first as a
-requirement, the honest answer is to stay on Electrobun, because Polaron with Chromium on Linux is
-a Bun process launcher and does not need Rust there.
-
-### Owner questions
-
-1. **Retire Chrome-first for the desktop shell?** (a) Yes: WebKitGTK on Linux, WKWebView on
-   macOS. (b) No: stay on Electrobun and CEF. (c) Linux keeps Chromium `--app`, Polaron only on
-   macOS and Windows. Recommendation: (a). The suite and the live app say the engine holds, and
-   the phone already runs WebKit.
-2. **The Chromium `--app` fallback** (the plan's question 2): (a) build it as a flag in Gate 2;
-   (b) WebKitGTK or nothing. Recommendation: (a), because the NVIDIA stall shows a Linux webview
-   can fail silently on one driver.
-   Decided 2026-09-26: owner — (a): build the Chromium `--app` fallback as a flag in Gate 2.
-3. **The screenshot attachment on WebKitGTK**: (a) require `gst-plugins-good` and verify capture
-   works with it; (b) hide the feature where the engine cannot play a capture stream.
-   Recommendation: (a), verified before Gate 1 ends, with (b) as the fallback.
-4. **Rust in the repo and on this machine**: a pinned `rust-toolchain.toml`, rustup under
-   `/work/cache`. Recommendation: yes, one crate, as the plan says.
+1. **Chrome-first or not?** Decided 2026-09-26: owner — the shell uses the user's installed
+   Chromium (`--app`) when there is one and falls back to the system webview when there is none.
+   This plan is built around that order.
+2. **The Chromium `--app` fallback as a flag.** Superseded 2026-09-26 by question 1: Chromium is
+   the first choice, not a flag.
+3. **Screenshot attachment on WebKitGTK.** Decided 2026-09-26: research recommendation — hide it in
+   the WebKitGTK window (`displayCapture: false`). That window is now the fallback, so a system
+   dependency on `gst-plugins-good` for a few machines is not worth it; WKWebView lacks
+   `getDisplayMedia` anyway.
+4. **Rust in the repo.** Decided 2026-09-26: research recommendation — no Rust. The only native
+   window left is the fallback on Linux and macOS, and a C or Objective-C host against the
+   platform's own API is ~150 lines with the compiler the machine already has (macOS already builds
+   `vibrancy.m`).
+5. **Transparency picks the engine.** Decided 2026-09-26: research recommendation — under
+   `window.browser: auto`, `window.transparency: 'window'` selects the webview, because a Chromium
+   app window cannot be see-through and the user asked for see-through.
+6. **The browser profile.** Decided 2026-09-26: research recommendation — a separate
+   `--user-data-dir` under `PLATFORM_HOME`. Chrome refuses remote debugging on the default profile,
+   and a separate profile keeps the app's storage and permissions out of the user's browsing.
+7. **When nothing is installed.** Decided 2026-09-26: research recommendation — open the default
+   browser in a tab. It is "whatever the system has", and the web layer already works in a tab.
+8. **Name.** Decided 2026-09-26: research recommendation — the code stays in `apps/desktop`; the
+   host binary is `platform-webview`. "Polaron" stays the plan's name and appears nowhere a user
+   looks.
+9. **macOS default path.** The Chromium window on macOS draws the browser's titlebar above ours,
+   shows the browser's dock icon, and has no vibrancy; the webview window keeps `hiddenInset`,
+   vibrancy and our own icon once bundled, but loses EditContext and Chrome DevTools.
+   (a) Chromium first on macOS too, as on Linux. (b) Webview first on macOS, Chromium first on
+   Linux and Windows. **Recommendation: (a)**: one engine on every desktop keeps the editor's
+   EditContext route and `agent:browser trace` on the engine users run, and question 5 already
+   gives the native look to anyone who turns on see-through windows.
+   Decided 2026-09-26: owner — (a).

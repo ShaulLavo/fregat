@@ -1,4 +1,4 @@
-import type { SessionId } from '@workspace/contracts'
+import { errorMessage, errorStringField, type SessionId } from '@workspace/contracts'
 import { createStructuredError } from '../observability/structured-errors'
 import type { PlatformDatabase } from '../db/client'
 import { agentHistoryCleaned, deleteAgentHistory, TerminalHistory } from './history'
@@ -12,6 +12,7 @@ import { TerminalModes } from './modes'
 import * as v from 'valibot'
 import {
   terminalOpenInputSchema,
+  TERMINAL_MAX_COLS,
   type TerminalKillInput,
   type TerminalClearInput,
   type TerminalRestartInput,
@@ -19,7 +20,7 @@ import {
   type WorktreeId,
 } from '@workspace/contracts'
 import { realpathSync } from 'node:fs'
-import { spawnPty, type Pty } from '@workspace/pty'
+import type { Pty, SpawnPtyOptions } from '@workspace/pty'
 import {
   parseTerminalClientMessage,
   type TerminalClientMessage,
@@ -31,8 +32,16 @@ import { FsError, isFsError } from '../fs/errors'
 import type { WorkspacePaths } from '../fs/path'
 import { limitText, recordProcessInfo, recordProcessWarning } from '../observability'
 import { readForegroundProcessName, type ForegroundProcessReader } from './foreground'
+import { hostPtyFactory, TerminalHostClient } from './host-client'
+import { terminalHostErrors, type HostSessionInfo } from '../terminal-host/protocol'
+import { isTestProcess, platformHomePath } from '../home'
 
-export type TerminalPtyFactory = typeof spawnPty
+/** `key` names the shell in the terminal host, which a later server attaches to. */
+export type TerminalPtyOptions = Omit<SpawnPtyOptions, 'onData'> & {
+  readonly key: string
+  readonly onData: (bytes: Uint8Array, offset?: number) => void
+}
+export type TerminalPtyFactory = (options: TerminalPtyOptions) => Pty | Promise<Pty>
 
 export type TerminalServiceOptions = {
   database: PlatformDatabase
@@ -44,6 +53,10 @@ export type TerminalServiceOptions = {
   lifecycle: TerminalLeaseBoundary
   ptyFactory?: TerminalPtyFactory
   resolveAgentSession?: AgentTerminalResolver
+  /** A lease already adopted at boot for a host session key; null when there is none to adopt. */
+  resolveAdoptedLease?: (key: string) => Promise<TerminalExecutionLease | null>
+  /** Test-only seam: a real host client already pointed at a throwaway state root. */
+  hostClient?: TerminalHostClient
 }
 
 type TerminalConnection = {
@@ -63,6 +76,9 @@ async function rejectConnection(connection: TerminalConnection, error: unknown) 
 const DEFAULT_COLS = 80
 const DEFAULT_ROWS = 24
 const TERMINAL_PROCESS_POLL_MS = 1000
+const REPAINT_RESTORE_DELAY_MS = 50
+const REPAINT_COLUMN_DELTA = 1
+const GAP_MESSAGE = new TextEncoder().encode('\r\nOutput lost while the server was down.\r\n')
 
 export class TerminalService {
   private readonly database: PlatformDatabase
@@ -72,11 +88,15 @@ export class TerminalService {
   private readonly paths: WorkspacePaths
   private readonly resolveWorktree: TerminalServiceOptions['resolveWorktree']
   private readonly resolveAgentSession: AgentTerminalResolver | undefined
+  private readonly resolveAdoptedLease: TerminalServiceOptions['resolveAdoptedLease']
   private readonly lifecycle: TerminalLeaseBoundary
   private readonly opening = new WeakSet<object>()
   private readonly starts = new Map<string, Promise<void>>()
   private readonly persistentSessions = new Map<string, TerminalSession>()
   private readonly ptyFactory: TerminalPtyFactory
+  private readonly host: TerminalHostClient | null
+  private recovery: Promise<void> | null = null
+  private recoverySnapshot: Promise<readonly HostSessionInfo[] | null> | null = null
   private disposed = false
 
   constructor({
@@ -88,7 +108,9 @@ export class TerminalService {
     resolveWorktree,
     lifecycle,
     resolveAgentSession,
-    ptyFactory = spawnPty,
+    resolveAdoptedLease,
+    ptyFactory,
+    hostClient,
   }: TerminalServiceOptions) {
     this.database = database
     this.env = env
@@ -98,7 +120,148 @@ export class TerminalService {
     this.resolveWorktree = resolveWorktree
     this.lifecycle = lifecycle
     this.resolveAgentSession = resolveAgentSession
-    this.ptyFactory = ptyFactory
+    this.resolveAdoptedLease = resolveAdoptedLease
+    const pty = terminalPtyFactory(ptyFactory, hostClient)
+    this.host = pty.host
+    this.ptyFactory = pty.factory
+  }
+
+  hostInfo() {
+    return this.host?.info() ?? null
+  }
+
+  /** Lease adoption and stream recovery share one boot snapshot, including an unreachable host. */
+  listHostSessions(): Promise<readonly HostSessionInfo[] | null> {
+    if (!this.host) return Promise.resolve(null)
+    this.recoverySnapshot ??= this.host.list().catch((error: unknown) => {
+      recordProcessWarning('terminal.host.list_failed', { area: 'terminal', error })
+      return null
+    })
+    return this.recoverySnapshot
+  }
+
+  /**
+   * Brings back the byte stream for every shell the host kept alive while this process was
+   * down. Each host session is either reattached (a matching worktree and adopted lease exist)
+   * or killed as an orphan; either way it is handled once.
+   */
+  reattach() {
+    this.recovery ??= this.recoverHostSessions()
+    return this.recovery
+  }
+
+  private async recoverHostSessions() {
+    if (!this.host) return
+    const infos = await this.listHostSessions()
+    if (!infos) return
+    for (const info of infos) await this.recoverSession(info)
+  }
+
+  // A shell whose recovery failed has no owner left in this process, so it is killed.
+  private async recoverSession(info: HostSessionInfo) {
+    try {
+      await this.reattachSession(info)
+    } catch (error) {
+      recordProcessWarning('terminal.host.recovery_failed', {
+        area: 'terminal',
+        key: info.key,
+        session: info.session,
+        error,
+      })
+      await this.host?.killSession(info.session).catch(() => {})
+    }
+  }
+
+  private async reattachSession(info: HostSessionInfo) {
+    const decoded = decodeSessionKey(info.key)
+    if (!decoded) return this.orphan(info, 'unreadable-key')
+    const root = await this.resolveWorktree(decoded.worktreeId)
+      .then((path) => this.resolveRoot(path))
+      .catch(() => null)
+    if (!root) return this.orphan(info, 'worktree-missing')
+    const lease = (await this.resolveAdoptedLease?.(info.key)) ?? null
+    if (!lease) {
+      if (info.exited) return this.drainExited(info)
+      return this.orphan(info, 'lease-missing')
+    }
+    try {
+      if (await this.resumeSession(info, decoded, root, lease)) return
+    } catch (error) {
+      await this.discard(info, lease).catch((cleanupError: unknown) =>
+        recordProcessWarning('terminal.host.recovery_cleanup_failed', {
+          area: 'terminal',
+          key: info.key,
+          session: info.session,
+          error: cleanupError,
+        }),
+      )
+      throw error
+    }
+    await this.discard(info, lease)
+  }
+
+  private async resumeSession(
+    info: HostSessionInfo,
+    decoded: { worktreeId: WorktreeId; sessionId: string },
+    root: { absolutePath: string; relativePath: string },
+    lease: TerminalExecutionLease,
+  ) {
+    const history = new TerminalHistory(this.database, info.key)
+    const session = new TerminalSession({
+      history,
+      lease,
+      cwd: root.absolutePath,
+      cols: DEFAULT_COLS,
+      rows: DEFAULT_ROWS,
+      worktreeId: decoded.worktreeId,
+      env: this.env,
+      foregroundProcess: this.foregroundProcess,
+      processPollMs: this.processPollMs,
+      command: undefined,
+      key: info.key,
+      onDispose: () => this.persistentSessions.delete(info.key),
+      ptyFactory: this.ptyFactory,
+      rootPath: root.relativePath,
+      sessionId: decoded.sessionId,
+    })
+    if (!(await session.reattach(this.host as TerminalHostClient, history.offset, info.session)))
+      return false
+    this.persistentSessions.set(info.key, session)
+    return true
+  }
+
+  private async discard(info: HostSessionInfo, lease: TerminalExecutionLease) {
+    await this.host?.killSession(info.session)
+    await lease.end()
+  }
+
+  /** Saves the output a shell wrote before it exited unseen; attaching also lets the host forget it. */
+  private async drainExited(info: HostSessionInfo) {
+    if (!this.host) return
+    const history = new TerminalHistory(this.database, info.key)
+    const pty = await this.host.attach({
+      key: info.key,
+      session: info.session,
+      from: history.offset,
+      onData: (data, offset) => history.append(data, offset + data.byteLength),
+      onGap: (_from, to) => history.append(GAP_MESSAGE, to),
+    })
+    await pty.exited
+  }
+
+  private async orphan(info: HostSessionInfo, reason: string) {
+    await this.host?.killSession(info.session)
+    recordProcessWarning('terminal.host.orphan_killed', {
+      area: 'terminal',
+      operation: 'reattach',
+      hostPid: this.host?.info()?.pid,
+      cgroup: this.host?.info()?.cgroup,
+      protocol: this.host?.info()?.version,
+      keyCount: 1,
+      reason,
+      pid: info.pid,
+      key: info.key,
+    })
   }
 
   /** Ends a shell no panel is attached to; a mounted panel sends `dispose` over its own socket. */
@@ -124,7 +287,9 @@ export class TerminalService {
    */
   async closeSessionTerminals(sessionId: SessionId) {
     if (agentHistoryCleaned(this.database, sessionId)) return { closed: 0 }
-    let closed = 0
+    // Shells the host kept across a restart are resumed, or their final output saved, by recovery.
+    await this.reattach().catch(() => {})
+    let closed = await this.killUnrecoveredAgentShells(sessionId)
     // Rescan until empty: an open may register while a disposal awaits. The last scan and the
     // cleanup marker run without an await between them, and later opens refuse on the marker.
     for (let owned = this.agentSessions(sessionId); owned.length > 0;) {
@@ -139,6 +304,16 @@ export class TerminalService {
     }
     deleteAgentHistory(this.database, sessionId)
     return { closed }
+  }
+
+  // With no boot listing, recovery left every host shell alone; the deleted session's are killed here.
+  private async killUnrecoveredAgentShells(sessionId: SessionId) {
+    if (!this.host || (await this.listHostSessions())) return 0
+    const stray = (await this.host.list()).filter(
+      (info) => ownedByAgentSession(info.key, sessionId) && !this.persistentSessions.has(info.key),
+    )
+    for (const info of stray) await this.host.killSession(info.session)
+    return stray.length
   }
 
   private assertDisposed(key: string, session: TerminalSession) {
@@ -201,7 +376,7 @@ export class TerminalService {
     try {
       const history = new TerminalHistory(this.database, key)
       history.clear()
-      const execution = await this.sessionExecution(worktreeId, undefined)
+      const execution = await this.sessionExecution(worktreeId, key, undefined)
       const session = new TerminalSession({
         history,
         lease: execution.lease,
@@ -213,6 +388,7 @@ export class TerminalService {
         foregroundProcess: this.foregroundProcess,
         processPollMs: this.processPollMs,
         command: execution.command,
+        key,
         onDispose: () => this.persistentSessions.delete(key),
         ptyFactory: this.ptyFactory,
         rootPath: root.relativePath,
@@ -220,7 +396,7 @@ export class TerminalService {
       })
       this.persistentSessions.set(key, session)
       for (const connection of connections) socketSessions.set(connection.key, session)
-      if (!session.start(connections[0])) {
+      if (!(await session.start(connections[0]))) {
         await session.dispose({ kill: false })
         throw createStructuredError({
           code: 'terminal.RESTART_FAILED',
@@ -243,8 +419,10 @@ export class TerminalService {
   }
 
   private runExclusive(key: string, operation: () => Promise<void>) {
-    const next = Promise.resolve(this.starts.get(key))
+    const previous = this.starts.get(key)
+    const next = Promise.resolve(this.recovery)
       .catch(() => {})
+      .then(() => previous?.catch(() => {}))
       .then(operation)
     this.starts.set(key, next)
     return next.finally(() => {
@@ -260,10 +438,13 @@ export class TerminalService {
     }
   }
 
+  /** Detaches every session so its shell keeps running in the host; a user close still kills it. */
   async dispose() {
     this.disposed = true
-    await Promise.allSettled(this.starts.values())
-    await Promise.all([...this.persistentSessions.values()].map((session) => session.dispose()))
+    await Promise.allSettled([this.recovery, ...this.starts.values()])
+    for (const session of this.persistentSessions.values()) session.detachFromHost()
+    this.persistentSessions.clear()
+    this.host?.close()
   }
 
   hasWorktreeRuntime(worktreeId: WorktreeId) {
@@ -343,7 +524,9 @@ export class TerminalService {
       recordProcessWarning('terminal.session.rejected', {
         area: 'terminal',
         operation: 'open',
-        error,
+        outcome: 'start_failed',
+        errorCode: errorStringField(error, 'code') ?? null,
+        error: errorMessage(error),
       })
       socket.send(JSON.stringify({ type: 'error', message: terminalSpawnErrorMessage(error) }))
       socket.close(1008, 'worktree-unavailable')
@@ -377,7 +560,11 @@ export class TerminalService {
 
     if (this.disposed) return
     const history = new TerminalHistory(this.database, sessionKey)
-    const execution = await this.sessionExecution(worktreeId, socket.input?.agentSessionId)
+    const execution = await this.sessionExecution(
+      worktreeId,
+      sessionKey,
+      socket.input?.agentSessionId,
+    )
     const lease = execution.lease
     if (this.disposed || !this.opening.has(socket.key)) {
       await lease.end()
@@ -400,6 +587,7 @@ export class TerminalService {
       foregroundProcess: this.foregroundProcess,
       processPollMs: this.processPollMs,
       command: execution.command,
+      key: sessionKey,
       onDispose: () => this.persistentSessions.delete(sessionKey),
       ptyFactory: this.ptyFactory,
       rootPath: root.relativePath,
@@ -407,7 +595,7 @@ export class TerminalService {
     })
     this.persistentSessions.set(sessionKey, session)
     socketSessions.set(socket.key, session)
-    if (session.start(connection)) {
+    if (await session.start(connection)) {
       await this.activateSession(session, lease)
       return
     }
@@ -419,13 +607,14 @@ export class TerminalService {
 
   private async sessionExecution(
     worktreeId: WorktreeId,
+    key: string,
     sessionId: TerminalOpenInput['agentSessionId'],
   ): Promise<{
     lease: TerminalExecutionLease
     env: NodeJS.ProcessEnv
     command?: readonly [string, ...string[]]
   }> {
-    const lease = await this.lifecycle.begin(worktreeId)
+    const lease = await this.lifecycle.begin(worktreeId, key)
     if (!sessionId) return { lease, env: this.env }
     try {
       if (!this.resolveAgentSession)
@@ -502,6 +691,7 @@ export class TerminalSession {
   private readonly foregroundProcess: ForegroundProcessReader
   private readonly processPollMs: number
   private readonly command: readonly [string, ...string[]] | undefined
+  private readonly key: string
   private readonly onDispose: (session: TerminalSession) => void
   private readonly ptyFactory: TerminalPtyFactory
   private readonly rootPath: string
@@ -521,12 +711,16 @@ export class TerminalSession {
   private errorMessage: string | null = null
   private exitCode: number | null = null
   private exitSignal: NodeJS.Signals | null = null
+  // Our own teardown signal exits 129 (SIGHUP) or 137 (SIGKILL); that exit is a close.
+  private closeRequested = false
   private inputBytes = 0
   private inputMessageCount = 0
   private openedAt = performance.now()
   private outputBytes = 0
   private outputMessageCount = 0
   private pty: Pty | null = null
+  // Output that lands while the spawn is awaited waits until `ready` and the replay are sent.
+  private startupOutput: { data: Uint8Array; nextOffset: number | undefined }[] | null = null
   private resizeCount = 0
   private serverMessageCount = 0
   private shell: string | null = null
@@ -542,6 +736,7 @@ export class TerminalSession {
     foregroundProcess,
     processPollMs,
     command,
+    key,
     onDispose,
     ptyFactory,
     rootPath,
@@ -557,6 +752,7 @@ export class TerminalSession {
     foregroundProcess: ForegroundProcessReader
     processPollMs: number
     command?: readonly [string, ...string[]]
+    key: string
     onDispose: (session: TerminalSession) => void
     ptyFactory: TerminalPtyFactory
     rootPath: string
@@ -572,6 +768,7 @@ export class TerminalSession {
     this.foregroundProcess = foregroundProcess
     this.processPollMs = processPollMs
     this.command = command
+    this.key = key
     this.onDispose = onDispose
     this.ptyFactory = ptyFactory
     this.rootPath = rootPath
@@ -593,17 +790,34 @@ export class TerminalSession {
     return connections
   }
 
-  start(connection?: TerminalConnection) {
+  async start(connection?: TerminalConnection) {
     if (connection) this.setConnection(connection)
     const restoredHistory = this.history.values().length > 0
     if (connection)
       for (const data of this.history.values()) this.send(connection, { type: 'output', data })
-    const spawnResult = this.spawnPty()
+    this.history.setOffset(0)
+    this.startupOutput = []
+    const spawnResult = await this.spawnPty()
+    const startupOutput = this.startupOutput
+    this.startupOutput = null
     if (!spawnResult) return false
+    if (this.disposed || this.terminating) {
+      spawnResult.pty.kill()
+      return false
+    }
 
     this.pty = spawnResult.pty
     this.shell = spawnResult.shell
-    this.completion = this.pty.exited.then(
+    this.completion = this.watchExit(this.pty)
+    this.emitReady(restoredHistory)
+    if (connection) this.send(connection, { type: 'replay-complete' })
+    for (const { data, nextOffset } of startupOutput) this.handleOutput(data, nextOffset)
+    this.scheduleProcessPoll()
+    return true
+  }
+
+  private watchExit(pty: Pty) {
+    return pty.exited.then(
       ({ exitCode, signal }) => {
         this.exitCode = exitCode
         this.exitSignal = signal
@@ -612,10 +826,33 @@ export class TerminalSession {
       },
       (error: unknown) => this.handlePtyFailure(error),
     )
-    this.emitReady(restoredHistory)
-    if (connection) this.send(connection, { type: 'replay-complete' })
-    this.scheduleProcessPoll()
+  }
+
+  /** Resumes a shell the host kept running while the server was down; nobody is connected yet. */
+  async reattach(host: TerminalHostClient, from: number, session: number) {
+    const pty = await host
+      .attach({
+        key: this.key,
+        session,
+        from,
+        onData: (data, offset) =>
+          this.handleOutput(data, offset === undefined ? undefined : offset + data.byteLength),
+        onGap: (start, end) => this.handleGap(start, end),
+      })
+      .catch(() => null)
+    if (!pty) return false
+
+    this.pty = pty
+    this.shell = this.command?.[0] ?? terminalShellCandidates(this.env)[0] ?? 'shell'
+    this.completion = this.watchExit(pty)
     return true
+  }
+
+  /** Drops this server's connection to the host without touching the lease or the shell. */
+  detachFromHost() {
+    this.cancelProcessPoll()
+    this.cancelRepaint()
+    this.closeConnections()
   }
 
   attach(connection: TerminalConnection) {
@@ -681,7 +918,7 @@ export class TerminalSession {
   }
 
   clearHistory() {
-    this.history.clear()
+    this.history.clear({ keepOffset: true })
     this.emit({ type: 'cleared' })
     if (!this.pty || this.disposed || this.terminating) return
     this.pty.write('\f')
@@ -760,7 +997,10 @@ export class TerminalSession {
     this.disposal = this.lease
       .terminate()
       .then(() => {
-        if (this.exitCode === null) this.pty?.kill()
+        if (this.exitCode === null) {
+          this.closeRequested = true
+          this.pty?.kill()
+        }
         return this.completion
       })
       .catch((error: unknown) => {
@@ -784,8 +1024,33 @@ export class TerminalSession {
       pid: this.pty?.pid,
       error,
     })
+    if (errorStringField(error, 'code') === terminalHostErrors.HOST_UNREACHABLE.code)
+      return this.releaseUnknown(error)
     this.emit({ type: 'error', message: 'Terminal cleanup could not be confirmed.' })
     this.closeConnections()
+  }
+
+  /** The host is out of reach and the shell may live on: the lease records that, and a reopen starts fresh. */
+  private releaseUnknown(error: unknown) {
+    this.disposed = true
+    this.cancelProcessPoll()
+    this.cancelRepaint()
+    this.emit({ type: 'error', message: terminalSpawnErrorMessage(error) })
+    this.closeConnections()
+    this.disposal = this.lease
+      .markUnknown()
+      .catch((markError: unknown) =>
+        recordProcessWarning('terminal.session.end_failed', {
+          area: 'terminal',
+          worktreeId: this.worktreeId,
+          error: markError,
+        }),
+      )
+      .finally(() => {
+        this.recordSession()
+        this.onDispose(this)
+      })
+    return this.disposal
   }
 
   private emitReady(restoredHistory: boolean) {
@@ -799,10 +1064,14 @@ export class TerminalSession {
     this.viewerCount = Math.max(this.viewerCount, this.connections.size)
   }
 
-  private handleOutput(data: Uint8Array) {
+  private handleOutput(data: Uint8Array, nextOffset?: number) {
+    if (this.startupOutput) {
+      this.startupOutput.push({ data, nextOffset })
+      return
+    }
     this.modes.write(data)
     try {
-      this.history.append(data)
+      this.history.append(data, nextOffset)
     } catch (error) {
       recordProcessWarning('terminal.session.history_failed', {
         area: 'terminal',
@@ -816,6 +1085,19 @@ export class TerminalSession {
     this.finishRepaint()
   }
 
+  /** The host's ring already dropped bytes between `from` and `to`; the panel sees one line for it. */
+  private handleGap(from: number, to: number) {
+    recordProcessWarning('terminal.session.gap', {
+      area: 'terminal',
+      worktreeId: this.worktreeId,
+      sessionId: this.sessionId,
+      from,
+      to,
+      bytesLost: to - from,
+    })
+    this.handleOutput(GAP_MESSAGE, to)
+  }
+
   private closeConnections() {
     const connections = [...this.connections.values()]
     this.connections.clear()
@@ -826,9 +1108,10 @@ export class TerminalSession {
     if (!this.pty) return
     this.cancelRepaint()
     // Restore after output so a fullscreen program observes both sizes instead of coalescing SIGWINCH.
-    this.repaintTimer = setTimeout(() => this.finishRepaint(), 50)
+    this.repaintTimer = setTimeout(() => this.finishRepaint(), REPAINT_RESTORE_DELAY_MS)
     this.repaintTimer.unref?.()
-    this.resizeForRepaint(this.cols === 500 ? this.cols - 1 : this.cols + 1, this.rows)
+    const delta = this.cols >= TERMINAL_MAX_COLS ? -REPAINT_COLUMN_DELTA : REPAINT_COLUMN_DELTA
+    this.resizeForRepaint(this.cols + delta, this.rows)
   }
 
   private finishRepaint() {
@@ -860,14 +1143,14 @@ export class TerminalSession {
     this.repaintTimer = null
   }
 
-  private spawnPty() {
+  private async spawnPty() {
     const candidates: readonly (readonly [string, ...string[]])[] = this.command
       ? [this.command]
       : terminalShellCandidates(this.env).map((shell) => [shell])
     let lastError: unknown = null
 
     for (const command of candidates) {
-      const result = this.trySpawnPty(command)
+      const result = await this.trySpawnPty(command)
       if (result.pty) return result
 
       lastError = result.error
@@ -880,17 +1163,19 @@ export class TerminalSession {
     return null
   }
 
-  private trySpawnPty(command: readonly [string, ...string[]]) {
+  private async trySpawnPty(command: readonly [string, ...string[]]) {
     const shell = command[0]
     try {
       return {
-        pty: this.ptyFactory({
+        pty: await this.ptyFactory({
+          key: this.key,
           cols: this.cols,
           cwd: this.cwd,
           env: terminalEnv(this.env),
           rows: this.rows,
           command,
-          onData: (data) => this.handleOutput(data),
+          onData: (data, offset) =>
+            this.handleOutput(data, offset === undefined ? undefined : offset + data.byteLength),
         }),
         shell,
       }
@@ -951,7 +1236,7 @@ export class TerminalSession {
   }
 
   private recordSession() {
-    const outcome = terminalOutcome(this.exitCode, this.errorMessage)
+    const outcome = terminalOutcome(this.exitCode, this.errorMessage, this.closeRequested)
     const context = {
       area: 'terminal',
       durationMs: elapsedMs(this.openedAt),
@@ -983,6 +1268,29 @@ export class TerminalSession {
 }
 
 const socketSessions = new WeakMap<object, TerminalSession>()
+
+// Shells live in the state root's terminal host; tests inject a factory or a client instead.
+function terminalPtyFactory(
+  injected: TerminalPtyFactory | undefined,
+  hostClient: TerminalHostClient | undefined,
+) {
+  if (injected) return { host: null, factory: injected }
+  if (hostClient) return { host: hostClient, factory: hostPtyFactory(hostClient) }
+  // No host at all here: listing or spawning would launch one on the developer's real state home.
+  if (isTestProcess() && !process.env.PLATFORM_HOME) return { host: null, factory: refuseTestHost }
+  const host = new TerminalHostClient({ stateRoot: platformHomePath() })
+  return { host, factory: hostPtyFactory(host) }
+}
+
+const refuseTestHost: TerminalPtyFactory = () => {
+  throw createStructuredError({
+    code: 'terminal.TEST_HOST_NOT_INJECTED',
+    status: 500,
+    message: 'A test process reached the default terminal host.',
+    why: "The default host serves the developer's real state home and would run test shells beside theirs.",
+    fix: 'Inject `ptyFactory` in the test, or point PLATFORM_HOME at a temporary directory.',
+  })
+}
 
 type TerminalWebSocket = {
   close(code?: number, reason?: string): unknown
@@ -1017,17 +1325,37 @@ function optionalQueryNumber(data: unknown, key: string) {
   return value === null ? undefined : Number(value)
 }
 
-function ownedByAgentSession(key: string, sessionId: SessionId) {
-  const [, kind, owner] = JSON.parse(key) as [string, string, string]
-  return kind === 'agent' && owner === sessionId
-}
-
-function terminalSessionKey(
-  rootPath: string,
+/** Exported so the orchestration engine can rebuild an agent handoff's key at boot. */
+export function terminalSessionKey(
+  worktreeId: WorktreeId,
   sessionId: string,
   agentSessionId?: TerminalOpenInput['agentSessionId'],
 ) {
-  return JSON.stringify([rootPath, agentSessionId ? 'agent' : 'shell', agentSessionId ?? sessionId])
+  return JSON.stringify([
+    worktreeId,
+    agentSessionId ? 'agent' : 'shell',
+    agentSessionId ?? sessionId,
+  ])
+}
+
+function ownedByAgentSession(key: string, sessionId: SessionId) {
+  const decoded = decodeSessionKey(key)
+  return decoded?.kind === 'agent' && decoded.sessionId === sessionId
+}
+
+function decodeSessionKey(
+  key: string,
+): { worktreeId: WorktreeId; kind: 'shell' | 'agent'; sessionId: string } | null {
+  try {
+    const parsed: unknown = JSON.parse(key)
+    if (!Array.isArray(parsed) || parsed.length !== 3) return null
+    const [worktreeId, kind, id] = parsed as unknown[]
+    if (typeof worktreeId !== 'string' || typeof id !== 'string') return null
+    if (kind !== 'shell' && kind !== 'agent') return null
+    return { worktreeId: worktreeId as WorktreeId, kind, sessionId: id }
+  } catch {
+    return null
+  }
 }
 
 function handleTerminalClientMessage(ptyProcess: Pty, message: TerminalClientMessage) {
@@ -1068,8 +1396,13 @@ function terminalSpawnErrorMessage(error: unknown) {
   return 'failed to start terminal'
 }
 
-function terminalOutcome(exitCode: number | null, errorMessage: string | null) {
+function terminalOutcome(
+  exitCode: number | null,
+  errorMessage: string | null,
+  closeRequested: boolean,
+) {
   if (errorMessage) return 'error'
+  if (closeRequested) return 'closed'
   if (exitCode === 0) return 'exited'
   if (typeof exitCode === 'number') return 'failed'
 

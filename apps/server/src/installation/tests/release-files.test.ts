@@ -5,8 +5,10 @@ import path from 'node:path'
 import { expect, test } from 'vitest'
 import {
   missingReleaseFiles,
+  PTY_HOST,
   reachablePackages,
   REMOTE_SUPPORT,
+  WATCH_WORKER,
   RUNTIME_PACKAGES,
   runtimeManifest,
   writeRuntimeManifest,
@@ -51,6 +53,18 @@ test('the runtime packages cover every package the server resolves beside its bu
 test('the server build writes the remote support bundle from its entry', async () => {
   expect(await buildScript()).toContain(
     `bun build src/installation/remote-support.ts --target bun --outfile dist/${REMOTE_SUPPORT}`,
+  )
+})
+
+test('the server build writes the terminal host bundle from its entry', async () => {
+  expect(await buildScript()).toContain(
+    `bun build src/terminal-host/main.ts --target bun --outfile dist/${PTY_HOST}`,
+  )
+})
+
+test('the server build writes the watch worker beside the bundle', async () => {
+  expect(await buildScript()).toContain(
+    `bun build src/fs/watch-worker.ts --target bun --outfile dist/${WATCH_WORKER}`,
   )
 })
 
@@ -102,6 +116,8 @@ test('a built server directory reports the release files it lacks', async () => 
       'runtime/package.json',
       'runtime/bun.lock',
       REMOTE_SUPPORT,
+      PTY_HOST,
+      WATCH_WORKER,
     ])
     const lockfile = path.join(server, 'bun.lock')
     await writeFile(
@@ -110,6 +126,9 @@ test('a built server directory reports the release files it lacks', async () => 
     )
     await writeRuntimeManifest(server, lockfile)
     await writeFile(path.join(server, REMOTE_SUPPORT), '')
+    expect(await missingReleaseFiles(server)).toEqual([PTY_HOST, WATCH_WORKER])
+    await writeFile(path.join(server, PTY_HOST), '')
+    await writeFile(path.join(server, WATCH_WORKER), '')
     expect(await missingReleaseFiles(server)).toEqual([])
   } finally {
     await rm(server, { force: true, recursive: true })

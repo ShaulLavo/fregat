@@ -4,6 +4,7 @@ import {
   type QuestionAnswerRow,
 } from './question-answer-history'
 import { sameItems as stringListsEqual } from '@workspace/utils/collections'
+import { isRecord } from '@workspace/utils/objects'
 import { compactActivityLabel } from '@/features/chat/utils/activity-label'
 import type { OrchestrationLatestTurn, OrchestrationSessionActivity } from '@workspace/contracts'
 
@@ -36,6 +37,8 @@ export type ChatWorkLogPlan = {
 }
 
 export type ChatWorkLogEntry = {
+  /** Hooks this row stands for: one listed hook, or a turn's silent ones. */
+  hookCount?: number
   questionAnswers?: readonly QuestionAnswerRow[]
   changedFiles: readonly string[]
   command: string | null
@@ -80,6 +83,7 @@ const WORK_LOG_SCALAR_FIELDS = [
   'command',
   'createdAt',
   'detail',
+  'hookCount',
   'icon',
   'id',
   'input',
@@ -319,6 +323,7 @@ function derivedWorkLogEntry(activity: OrchestrationSessionActivity): DerivedCha
     ...(activity.kind === 'user-input.answer-submitted'
       ? { questionAnswers: questionAnswerHistory(activity.payload) }
       : {}),
+    ...hookCountField(activity),
     changedFiles: presentation.changedFiles,
     collapseKey: null,
     command: presentation.command,
@@ -525,4 +530,12 @@ function stringPayloadValue(payload: unknown, key: string) {
 
   const value = (payload as Record<string, unknown>)[key]
   return typeof value === 'string' && value.trim().length > 0 ? value : null
+}
+
+function hookCountField(activity: OrchestrationSessionActivity) {
+  if (activity.kind === 'hook.completed') return { hookCount: 1 }
+  if (activity.kind !== 'hook.summary') return {}
+
+  const count = isRecord(activity.payload) ? activity.payload.count : null
+  return typeof count === 'number' ? { hookCount: count } : {}
 }

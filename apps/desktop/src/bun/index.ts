@@ -44,6 +44,7 @@ import {
 } from './child-lease'
 import { requireFreePort } from './ports'
 import { groupAlive, signalGroup } from './processes'
+import { DesktopTerminalHost } from './terminal-host'
 
 type ChildProcess = ReturnType<typeof Bun.spawn>
 
@@ -68,6 +69,10 @@ const SERVER_ALLOWED_ORIGINS = allowedOriginsForWebPort(
   WEB_PORT,
 )
 const CHILD_LEASE = childLeaseFile(homedir(), ROOT_DIR)
+const DESKTOP_HOME =
+  Bun.env.PLATFORM_HOME ??
+  path.join(path.dirname(CHILD_LEASE), Bun.hash(ROOT_DIR).toString(36), 'home')
+const terminalHost = SHARED_DEV ? null : new DesktopTerminalHost(DESKTOP_HOME, CHILD_LEASE)
 const childProcesses = new Set<ChildProcess>()
 
 let stopping: Promise<void> | null = null
@@ -116,6 +121,7 @@ async function startStandaloneDesktop() {
   await stopLeftoverChildren(CHILD_LEASE)
   await requireFreePort(SERVER_HOST, SERVER_PORT, 'server')
   await requireFreePort(WEB_HOST, WEB_PORT, 'web')
+  await terminalHost?.start()
   await spawnServer()
   await spawnWeb()
   await waitForHttp(`${SERVER_URL}/health`)
@@ -131,6 +137,7 @@ function spawnServer() {
     {
       ...Bun.env,
       FS_HOST: SERVER_HOST,
+      PLATFORM_HOME: DESKTOP_HOME,
       PORT: String(SERVER_PORT),
       SERVER_ALLOWED_ORIGINS,
     },
@@ -353,9 +360,10 @@ function stopProcesses(): Promise<void> {
     signalGroup(child.pid, 'SIGTERM')
   }
 
-  stopping = Promise.allSettled(children.map((child) => child.exited)).then(() =>
-    clearLease(CHILD_LEASE),
-  )
+  stopping = Promise.allSettled(children.map((child) => child.exited)).then(async () => {
+    await terminalHost?.stop()
+    await clearLease(CHILD_LEASE)
+  })
   return stopping
 }
 

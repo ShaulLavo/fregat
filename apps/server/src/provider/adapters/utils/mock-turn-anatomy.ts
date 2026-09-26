@@ -47,6 +47,7 @@ export function mockTurnAnatomyModel(): ProviderModel {
             { id: 'high', label: 'High', isDefault: true },
             { id: 'xhigh', label: 'Extra high' },
             { id: 'max', label: 'Max' },
+            { id: 'ultra', label: 'Ultra' },
             { id: 'ultrathink', label: 'Ultrathink' },
           ],
           promptInjectedValues: ['ultrathink'],

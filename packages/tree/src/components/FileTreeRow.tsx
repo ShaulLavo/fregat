@@ -24,6 +24,7 @@ import type {
   FileTreeContextMenuOpenContext,
   FileTreeContextMenuTriggerMode,
   FileTreeRowDecoration,
+  FileTreeRowDecorationAction,
   FileTreeVisibleRow,
 } from '../utils/model/publicTypes'
 import type { GitStatus } from '../utils/publicTypes'
@@ -153,7 +154,12 @@ function renderRowDecoration(
   }
 
   if ('text' in decoration) {
-    return <span title={decoration.title}>{decoration.text}</span>
+    return (
+      <span title={decoration.title}>
+        {decoration.text}
+        {decoration.action ? <DecorationAction action={decoration.action} /> : null}
+      </span>
+    )
   }
 
   let icon: ReturnType<typeof resolveIcon>
@@ -171,6 +177,27 @@ function renderRowDecoration(
   return (
     <span title={decoration.title}>
       <Icon {...icon} />
+    </span>
+  )
+}
+
+// The row is itself a button, so the action is a span; it keeps its press from reaching the row.
+function DecorationAction({ action }: { action: FileTreeRowDecorationAction }): JSX.Element {
+  return (
+    <span
+      aria-label={action.label}
+      data-item-decoration-action=''
+      data-tooltip={action.label}
+      role='button'
+      onClick={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        action.onActivate()
+      }}
+      onMouseDown={(event) => event.stopPropagation()}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <Icon height={12} name='file-tree-icon-sparkle' viewBox='0 0 256 256' width={12} />
     </span>
   )
 }

@@ -1,7 +1,29 @@
 import { createHighlighterCore, type TokensResult } from 'shiki/core'
-import { expect, test, vi } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
 import { createShikiHighlighter, type ShikiHighlighterOptions } from '../shiki-highlighter'
 import type { CodeHighlighter } from '../../providers/code-highlighter-context'
+
+const engine = vi.hoisted(() => ({ failures: 0 }))
+
+vi.mock('shiki/engine/javascript', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('shiki/engine/javascript')>()
+  return {
+    ...actual,
+    createJavaScriptRegexEngine: (
+      ...args: Parameters<typeof actual.createJavaScriptRegexEngine>
+    ) => {
+      if (engine.failures > 0) {
+        engine.failures -= 1
+        throw new TypeError('chunk failed to load')
+      }
+      return actual.createJavaScriptRegexEngine(...args)
+    },
+  }
+})
+
+afterEach(() => {
+  engine.failures = 0
+})
 
 const input = { code: 'const value = 1', language: 'typescript' }
 function palette(foreground: string): ShikiHighlighterOptions['themes'] {
@@ -30,12 +52,13 @@ test('the same language retries after initialization failure', async () => {
   try {
     const first = vi.fn()
     expect(highlighter.highlight(input, first)).toBeNull()
+    await vi.waitFor(() => expect(createCore).toHaveBeenCalledTimes(1))
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(first).not.toHaveBeenCalled()
-    const result = highlight(highlighter)
+    const result = await highlight(highlighter)
     expect(createCore).toHaveBeenCalledTimes(2)
     expect(
-      (await result).tokens
+      result.tokens
         .flat()
         .map((token) => token.content)
         .join(''),
@@ -161,6 +184,19 @@ test('a failed grammar publishes plain tokens and stays plain for later chunks',
         .join('\n'),
     ).toBe(appended.code)
     expect(loadGrammar).toHaveBeenCalledTimes(1)
+  } finally {
+    highlighter.dispose()
+  }
+})
+
+test('an engine chunk that fails to load is retried by the next fence of the same language', async () => {
+  engine.failures = 1
+  const highlighter = createShikiHighlighter({ themes: palette('#123456'), themeKey: 'engine' })
+  try {
+    expect(highlighter.highlight(input, () => {})).toBeNull()
+    await vi.waitFor(() => expect(engine.failures).toBe(0))
+
+    await expect(highlight(highlighter)).resolves.toMatchObject({ tokens: expect.any(Array) })
   } finally {
     highlighter.dispose()
   }

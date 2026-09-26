@@ -55,11 +55,13 @@ export function syncTreePaneState({
   return model.paths
 }
 
+/** `refreshOnExpand`: a fresh expand reads a loaded folder again, for roots nothing watches below the top. */
 export function loadExpandedDirectories(
   tree: FileTreeModel,
   model: TreeModel,
   onLoadDirectory: (entry: TreeEntry, treePath: string, options?: DirectoryLoadOptions) => void,
   previousExpandedDirectoryPaths?: ReadonlySet<string>,
+  refreshOnExpand = false,
 ) {
   const expandedPaths = expandedDirectoryPathSet(model, tree)
 
@@ -70,9 +72,10 @@ export function loadExpandedDirectories(
     if (!expandedPaths.has(canonicalDirectoryPath)) continue
 
     const retry = previousExpandedDirectoryPaths?.has(canonicalDirectoryPath) === false
-    if (!shouldLoadDirectory(model, directoryTreePath, { retry })) continue
+    const options = { retry, refresh: retry && refreshOnExpand }
+    if (!shouldLoadDirectory(model, directoryTreePath, options)) continue
 
-    onLoadDirectory(entry, directoryTreePath, { retry })
+    onLoadDirectory(entry, directoryTreePath, options)
   }
 
   return expandedPaths

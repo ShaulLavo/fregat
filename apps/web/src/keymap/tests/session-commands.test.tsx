@@ -7,8 +7,9 @@ import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-sto
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
 import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 import {
-  SESSION_JUMP_POSITIONS,
-  sessionJumpCommandId,
+  ITEM_POSITIONS,
+  selectItemCommandId,
+  sidebarPanelCommandId,
   type PlatformCommandId,
 } from '@/keymap/types'
 import { createRailHarness } from '../../../test/factories/rail-harness'
@@ -24,27 +25,49 @@ import { currentRailEnvironments } from '@/features/chat-mode/state/rail-environ
 import { sessionRailModel } from '@workspace/client-core/chat/rail/model'
 import type { ProjectId } from '@workspace/contracts'
 import { runGit } from 'server/testing'
-test('every session command is reachable from the keyboard', () => {
-  const bound = boundCommands()
 
+test('Platform mode puts items on Mod+digits and sidebar panels on Mod+Alt+digits', () => {
+  const bound = boundCommands('linux', 'default')
+
+  expect(bound.get('workspace.toggleSidebarVisibility')).toEqual(['Mod+B'])
   expect(bound.get('workspace.newSession')).toEqual(['Mod+Alt+N'])
   expect(bound.get('workspace.toggleSessionRail')).toEqual(['Mod+Alt+B'])
-  expect(bound.get('workspace.previousSession')).toEqual(['Mod+Alt+['])
-  expect(bound.get('workspace.nextSession')).toEqual(['Mod+Alt+]'])
-  expect(
-    SESSION_JUMP_POSITIONS.map((position) => bound.get(sessionJumpCommandId(position))),
-  ).toEqual([
-    ['Mod+Alt+1'],
-    ['Mod+Alt+2'],
-    ['Mod+Alt+3'],
-    ['Mod+Alt+4'],
-    ['Mod+Alt+5'],
-    ['Mod+Alt+6'],
-    ['Mod+Alt+7'],
-    ['Mod+Alt+8'],
-    ['Mod+Alt+9'],
-  ])
+  expect(bound.get('workspace.previousItem')).toEqual(['Mod+Alt+['])
+  expect(bound.get('workspace.nextItem')).toEqual(['Mod+Alt+]'])
+  expect(ITEM_POSITIONS.map((position) => bound.get(selectItemCommandId(position)))).toEqual(
+    ITEM_POSITIONS.map((position) => [`Mod+${position}`]),
+  )
+  expect(ITEM_POSITIONS.map((position) => bound.get(sidebarPanelCommandId(position)))).toEqual(
+    ITEM_POSITIONS.map((position) => [`Mod+Alt+${position}`]),
+  )
+  expect(bound.get('workspace.focusFirstEditorGroup')).toBeUndefined()
 })
+
+test.each([
+  ['mac', 'Control', ['Mod+Alt+[', 'Mod+Alt+ArrowLeft'], ['Mod+Alt+]', 'Mod+Alt+ArrowRight']],
+  ['linux', 'Alt', ['Mod+Alt+[', 'Mod+PageUp'], ['Mod+Alt+]', 'Mod+PageDown']],
+] as const)(
+  'VS Code mode on %s keeps VS Code editor keys and the Mod+Alt item keys',
+  (platform, indexModifier, previous, next) => {
+    const bound = boundCommands(platform, 'vscode')
+
+    expect(bound.get('workspace.previousItem')).toEqual(previous)
+    expect(bound.get('workspace.nextItem')).toEqual(next)
+    expect(ITEM_POSITIONS.map((position) => bound.get(selectItemCommandId(position)))).toEqual(
+      ITEM_POSITIONS.map((position) => [`${indexModifier}+${position}`, `Mod+Alt+${position}`]),
+    )
+    expect(ITEM_POSITIONS.some((position) => bound.has(sidebarPanelCommandId(position)))).toBe(
+      false,
+    )
+    expect(
+      [
+        'workspace.focusFirstEditorGroup',
+        'workspace.focusSecondEditorGroup',
+        'workspace.focusThirdEditorGroup',
+      ].map((command) => bound.get(command as PlatformCommandId)),
+    ).toEqual([['Mod+1'], ['Mod+2'], ['Mod+3']])
+  },
+)
 
 test('jumping selects the requested scoped row only after its real root opens', async ({
   client,
@@ -201,9 +224,9 @@ function selectedSessionId() {
   const { selection } = useSessionSelectionStore.getState()
   return selection.kind === 'session' ? selection.sessionId : null
 }
-function boundCommands() {
+function boundCommands(platform: 'linux' | 'mac', preset: 'default' | 'vscode') {
   const commands = new Map<PlatformCommandId, string[]>()
-  for (const binding of defaultPlatformKeyBindings('mac')) {
+  for (const binding of defaultPlatformKeyBindings(platform, preset)) {
     if (!binding.command) continue
     const keys = commands.get(binding.command) ?? []
     keys.push(binding.keys)

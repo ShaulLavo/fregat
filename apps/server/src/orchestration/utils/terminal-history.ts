@@ -18,6 +18,8 @@ export function terminalHistoryMessages(
         id: v.parse(messageIdSchema, `terminal:${sessionId}:${historyRevision(message.sourceId)}`),
         role: message.role,
         text: message.text,
+        attachments: [],
+        turnId: null,
         createdAt: message.createdAt ?? new Date(Date.parse(startedAt) + index).toISOString(),
       },
     ]

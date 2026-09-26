@@ -2,8 +2,8 @@
 
 ## Status and authorization
 
-- Status: RESEARCH DONE (2026-09-25) — findings, model and phases below. Waiting on one owner
-  question. Nothing here authorizes implementation.
+- Status: RESEARCH DONE (2026-09-25) — findings, model and phases below. Owner question answered
+  2026-09-26. Nothing here authorizes implementation.
 - Priority: P2. It becomes a product question once [Plan 143](143-phone-layout.md) makes the
   phone a real client.
 - Planned at: Platform `9f343825`, 2026-09-25. Origin: CI work on 2026-09-25.
@@ -209,6 +209,7 @@ Rejected alternatives:
 1. **How long does an index nobody watches stay warm?** Options: retire at once; 5 minutes;
    15 minutes (T3 Code). Recommendation: 15 minutes, so a phone that sleeps between glances
    returns to a warm index. An idle index of this repo costs a few MB at most (see Q3).
+   Decided 2026-09-26: owner — 15 minutes; one index per root, capped at 4 (Plan 110 Q1).
 
 ## Proposed phases
 

@@ -7,12 +7,14 @@ import {
   orchestrationSearchSessionsInputSchema,
   clientOrchestrationCommandSchema,
   orchestrationReplayEventsInputSchema,
+  orchestrationRevertCheckpointHunkInputSchema,
   sessionIdSchema,
   modelSelectionSchema,
 } from '@workspace/contracts'
 
 import type { OrchestrationEngine } from './engine'
 import type { OrchestrationCheckpointDiffQuery } from './checkpoint-diff-query'
+import type { OrchestrationCheckpointHunks } from './checkpoint-hunks'
 import type { OrchestrationSessionSearchQuery } from './session-search-query'
 import { observeRequestOperation } from '../observability'
 import { chatOperationContext } from './orchestration-logging'
@@ -37,6 +39,11 @@ const turnDiffQuerySchema = v.object({
   toTurnCount: turnCountQueryValueSchema,
 })
 
+const checkpointHunksQuerySchema = v.object({
+  sessionId: sessionIdSchema,
+  turnCount: turnCountQueryValueSchema,
+})
+
 const fullSessionDiffQuerySchema = v.object({
   ignoreWhitespace: v.optional(booleanQueryValueSchema),
   sessionId: sessionIdSchema,
@@ -47,6 +54,7 @@ export function orchestrationRoutes(
   engine: OrchestrationEngine,
   checkpointDiff: OrchestrationCheckpointDiffQuery,
   sessionSearch: OrchestrationSessionSearchQuery,
+  checkpointHunks: OrchestrationCheckpointHunks,
 ) {
   return new Elysia({ name: 'orchestration-routes' }).group('/orchestration', (app) =>
     app
@@ -157,6 +165,24 @@ export function orchestrationRoutes(
           query: sessionDetailQuerySchema,
         },
       )
+      .get(
+        '/session-transcript',
+        ({ query }) =>
+          observeRequestOperation(
+            chatOperationContext('orchestration.session_transcript', {
+              sessionId: query.sessionId,
+            }),
+            async () => engine.sessionTranscript(query.sessionId),
+            (transcript) => ({
+              activityCount: transcript.session.activities.length,
+              messageCount: transcript.session.messages.length,
+              proposedPlanCount: transcript.proposedPlans.length,
+            }),
+          ),
+        {
+          query: sessionDetailQuerySchema,
+        },
+      )
       .post(
         '/session-search',
         ({ body }) =>
@@ -196,6 +222,44 @@ export function orchestrationRoutes(
         {
           query: turnDiffQuerySchema,
         },
+      )
+      .get(
+        '/checkpoint-hunks',
+        ({ query }) =>
+          observeRequestOperation(
+            chatOperationContext('orchestration.checkpoint_hunks', {
+              sessionId: query.sessionId,
+              turnCount: query.turnCount,
+            }),
+            async () => {
+              await engine.ready
+              return checkpointHunks.states(query)
+            },
+            (hunks) => ({
+              hunkCount: hunks.length,
+              revertedCount: hunks.filter((hunk) => hunk.state === 'reverted').length,
+              changedCount: hunks.filter((hunk) => hunk.state === 'changed').length,
+            }),
+          ),
+        { query: checkpointHunksQuerySchema },
+      )
+      .post(
+        '/checkpoint-hunks/revert',
+        ({ body }) =>
+          observeRequestOperation(
+            chatOperationContext('orchestration.checkpoint_hunk_revert', {
+              reapply: body.reapply ?? false,
+              sessionId: body.sessionId,
+              turnCount: body.turnCount,
+              whole: body.hunkId === null,
+            }),
+            async () => {
+              await engine.ready
+              return checkpointHunks.revert(body)
+            },
+            (status) => ({ changedFileCount: status.files.length }),
+          ),
+        { body: orchestrationRevertCheckpointHunkInputSchema },
       )
       .get(
         '/full-session-diff',

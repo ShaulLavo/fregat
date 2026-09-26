@@ -24,6 +24,15 @@ const historyTurnSchema = v.object({
   ),
 })
 
+/** Where the thread's rollout lives; null for an ephemeral thread. */
+export const codexRolloutPathSchema = v.object({
+  thread: v.object({
+    id: sessionIdSchema,
+    cwd: v.string(),
+    path: v.optional(v.nullable(v.string()), null),
+  }),
+})
+
 export const codexHistoryResponseSchema = v.object({
   thread: v.object({
     id: sessionIdSchema,

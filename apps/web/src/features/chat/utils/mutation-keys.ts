@@ -2,6 +2,7 @@ import type { ProviderInstanceId } from '@workspace/contracts'
 
 export const chatMutationKeys = {
   mermaidRender: ['chat', 'mermaid-render'] as const,
+  resetCredit: (accountKey: string) => ['chat', 'reset-credit', accountKey] as const,
   composer: (environmentId: string, sessionId: string | null) =>
     ['chat', 'composer', environmentId, sessionId] as const,
   stop: (environmentId: string, sessionId: string | null) =>
@@ -21,6 +22,16 @@ export const chatMutationKeys = {
     ['chat', 'rewind', environmentId, sessionId] as const,
   pendingRequestResponse: (environmentId: string, sessionId: string) =>
     ['chat', 'pending-request-response', environmentId, sessionId] as const,
+  reconnectMcpServer: (environmentId: string, sessionId: string) =>
+    ['chat', 'reconnect-mcp-server', environmentId, sessionId] as const,
+  signInMcpServer: (environmentId: string, sessionId: string) =>
+    ['chat', 'sign-in-mcp-server', environmentId, sessionId] as const,
+  stopBackgroundTask: (environmentId: string, sessionId: string) =>
+    ['chat', 'stop-background-task', environmentId, sessionId] as const,
+  compact: (environmentId: string, sessionId: string) =>
+    ['chat', 'compact', environmentId, sessionId] as const,
+  fork: (environmentId: string, sessionId: string) =>
+    ['chat', 'fork', environmentId, sessionId] as const,
   message: (id: string) => ['chat', 'message', id] as const,
   screenshot: (scope: string) => ['chat', 'screenshot', scope] as const,
   providerSignIn: (id: ProviderInstanceId) => ['chat', 'provider-sign-in', id] as const,

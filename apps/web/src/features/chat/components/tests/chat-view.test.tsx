@@ -41,7 +41,7 @@ import { renderCachedChatSelection } from '../../../../../test/factories/chat-vi
 import { unsupportedChatTransport } from '../../../../../test/factories/chat-transport'
 
 afterEach(() => {
-  expect(chatMessageIntents.getState().active).toHaveLength(0)
+  expect(chatMessageIntents.getState().active).toEqual([])
 })
 
 test('selecting a cached session keeps its transcript readable and resumes detail when a live transport returns', async () => {
@@ -411,7 +411,12 @@ test('correction retry consumes content while model and mode choices reach the n
       })
       useChatProjectionStore.getState().syncSessionDetailSnapshot(TEST_ENVIRONMENT_ID, snapshot)
     })
-    act(() => useComposerInboxStore.getState().queueText('Now implement it.'))
+    act(() =>
+      useComposerInboxStore.getState().queueText('Now implement it.', {
+        environmentId: target.environmentId,
+        rootPath: target.rootPath,
+      }),
+    )
     await waitFor(() =>
       expect(useChatInputDraftStore.getState().getDraft(target).prompt).toBe('Now implement it. '),
     )

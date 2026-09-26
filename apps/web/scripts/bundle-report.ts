@@ -71,6 +71,12 @@ type Report = {
 
 const webRoot = path.resolve(import.meta.dirname, '..')
 const repoRoot = path.resolve(webRoot, '..', '..')
+const linkedCheckouts = [
+  {
+    owner: 'Editor',
+    root: path.resolve(fs.realpathSync(path.join(repoRoot, 'packages/editor-core')), '..', '..'),
+  },
+]
 const NODE_MODULES_PACKAGE = /\/node_modules\/((?:@[^/]+\/)?[^/]+)\//gu
 
 main()
@@ -99,7 +105,7 @@ function parseOptions(args: readonly string[]): Options {
 }
 
 function runBuild(): void {
-  const result = Bun.spawnSync(['bun', '--env-file=../../.env', 'vite', 'build'], {
+  const result = Bun.spawnSync(['bun', '--bun', '--env-file=../../.env', 'vite', 'build'], {
     cwd: webRoot,
     stdout: 'inherit',
     stderr: 'inherit',
@@ -138,7 +144,7 @@ function buildReport(dir: string): Report {
       chunkBytes: sum(stats.chunks.map((chunk) => chunk.size)),
       chunkGzip: sum(stats.chunks.map((chunk) => chunk.gzipSize)),
     },
-    owners: attributeOwners(stats.chunks, firstLoadNames, repoRoot),
+    owners: attributeOwners(stats.chunks, firstLoadNames, repoRoot, linkedCheckouts),
     packages,
     duplicatePackages: packages
       .filter((row) => row.versions.length > 1)

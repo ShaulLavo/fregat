@@ -26,8 +26,9 @@ commands still produce evidence. Commands taking at least 500ms emit a warning w
 command duration before their final summary. Other command sources and asynchronous operations keep
 an eagerly captured scope. This preserves their original machine attribution and lifetime.
 
-Browser scopes publish a wide failure checkpoint immediately on warn/error, with a `scopeId` shared
-by the final summary. Counters keep their lifetime meaning; a successful start cannot discard a late
+A failed browser scope that ends within 5s is one line: its final summary. One still open after
+5s, or when the page hides, first writes a `checkpoint:"failure"` line with the `scopeId` its final
+summary shares. Counters keep their lifetime meaning; a successful start cannot discard a late
 failure. The browser drain stamps IDs on scope events as well as direct events so retries retain the
 same identity. Server validation, redaction, deduplication and existing sampling remain independent.
 The client adds no probabilistic sampling, avoiding a second random sampling stage.

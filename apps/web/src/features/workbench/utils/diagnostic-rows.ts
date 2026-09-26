@@ -5,6 +5,7 @@ import type {
 
 import { fileUriForPath } from '@workspace/contracts'
 import { diagnosticMessageText, diagnosticTarget } from '@/lib/diagnostic'
+import type { DiagnosticFixRequest } from '@/lib/diagnostic-ai/utils/prompt'
 import type { MarkerResource } from '@/lib/markers/store'
 
 type Diagnostic = LanguageServerDiagnosticSummary['diagnostics'][number]
@@ -100,4 +101,43 @@ export function survivingActiveId(
   if (rows.some((row) => row.id === active.id)) return active.id
 
   return rows[Math.min(active.index, rows.length - 1)]?.id ?? null
+}
+
+/** What Fix with AI sends for a Problems row. */
+export function diagnosticFixRequest(row: DiagnosticItemRow): DiagnosticFixRequest {
+  const { code, range, severity, source } = row.diagnostic
+  return {
+    code: code === undefined ? null : String(code),
+    message: row.label,
+    path: row.path,
+    range,
+    severity,
+    source: source ?? null,
+    surface: 'problems',
+  }
+}
+
+/** The row a pending Fix with AI came from, found by what it sent. */
+export function fixingRowId(
+  rows: readonly DiagnosticRow[],
+  request: DiagnosticFixRequest | undefined,
+): string | null {
+  if (!request) return null
+  const row = rows.find(
+    (candidate) =>
+      candidate.kind === 'diagnostic' &&
+      candidate.path === request.path &&
+      candidate.label === request.message &&
+      sameRange(candidate.diagnostic.range, request.range),
+  )
+  return row?.id ?? null
+}
+
+function sameRange(left: DiagnosticFixRequest['range'], right: DiagnosticFixRequest['range']) {
+  return (
+    left.start.line === right.start.line &&
+    left.start.character === right.start.character &&
+    left.end.line === right.end.line &&
+    left.end.character === right.end.character
+  )
 }

@@ -3,6 +3,7 @@ import { QueryClient } from '@tanstack/react-query'
 import { healthDescriptorSchema } from '@workspace/contracts'
 import { afterEach, beforeEach } from 'vitest'
 import * as v from 'valibot'
+import { retryUnlessClientError } from '@/lib/environments/utils/query-retry'
 
 import { activeServerOrigin, setActiveServerOrigin } from '@/lib/client'
 import {
@@ -44,7 +45,7 @@ test('uses separate caches with the existing query options and file eviction pol
   expect(second).not.toBe(first)
   expect(first.getDefaultOptions().queries).toEqual({
     gcTime: 300_000,
-    retry: 1,
+    retry: retryUnlessClientError,
     staleTime: 10_000,
   })
 

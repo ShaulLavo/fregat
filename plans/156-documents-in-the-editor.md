@@ -178,6 +178,8 @@ Shipped weight is esbuild-minified JS plus runtime wasm, gzip -9.
    (ONLYOFFICE) are AGPL. Platform is a public repo with no licence.
    - (a) Permissive dependencies only. **Recommended.**
    - (b) Allow AGPL for an optional document editor.
+   - Decided 2026-09-26: owner — (a) permissive only, and as few dependencies as possible. A licence
+     audit of what already ships runs first (`/work/reports/next-wave/dependency-licences.md`).
 2. **LibreOffice.**
    - (a) An optional per-machine capability with a browser fallback. **Recommended.**
    - (b) Required on every machine.
@@ -188,6 +190,9 @@ Shipped weight is esbuild-minified JS plus runtime wasm, gzip -9.
    - (b) XLSX cell editing after an IronCalc spike, once its XLSX wasm ships on npm.
    - (c) DOCX WYSIWYG, which today means AGPL or a 0.x package.
    - Decided 2026-09-26: owner — yes: XLSX cell editing (b), then DOCX later (c).
+   - Amended 2026-09-26: owner — DOCX editing is parked until the markdown work (Plans 176 and 108)
+     settles. The direction is DOCX converted to and from a markdown-like source edited in our own
+     editor; no WYSIWYG dependency.
 4. **PDF engine.**
    - (a) pdf.js, 493 KB. **Recommended.**
    - (b) EmbedPDF, 2.3 MB, for annotation, forms, redaction and signing, which nothing on the

@@ -1,12 +1,11 @@
 import { QueryClient } from '@tanstack/query-core'
 import { markdownResourceKeys } from '../state/query-keys'
-import {
+import type {
   createHighlighterCore,
-  type HighlighterCore,
-  type ThemeRegistrationAny,
-  type TokensResult,
+  HighlighterCore,
+  ThemeRegistrationAny,
+  TokensResult,
 } from 'shiki/core'
-import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
 import { bundledLanguages, bundledLanguagesInfo } from 'shiki/langs'
 
 import type { CodeHighlighter, HighlightInput } from '../providers/code-highlighter-context'
@@ -40,15 +39,16 @@ export function resolveLanguage(language: string): string {
 export function createShikiHighlighter({
   themes,
   themeKey,
-  createCore = createHighlighterCore,
+  createCore = loadHighlighterCore,
 }: ShikiHighlighterOptions): CodeHighlighter {
   const [light, dark] = [namedTheme(themes[0], 'light'), namedTheme(themes[1], 'dark')]
-  const engine = createJavaScriptRegexEngine({ forgiving: true })
   const resources = new QueryClient()
   let disposed = false
   const coreOptions = {
     queryKey: markdownResourceKeys.core,
     queryFn: async () => {
+      const { createJavaScriptRegexEngine } = await import('shiki/engine/javascript')
+      const engine = createJavaScriptRegexEngine({ forgiving: true })
       const core = await createCore({ engine, langs: [], themes: [light, dark] })
       if (disposed) core.dispose()
       return core
@@ -115,6 +115,14 @@ export function createShikiHighlighter({
 
     return tokens(highlighter, code, loaded)
   }
+}
+
+// Shiki loads with the first fence; a static import would put it in the entry chunk.
+async function loadHighlighterCore(
+  ...args: Parameters<typeof createHighlighterCore>
+): Promise<HighlighterCore> {
+  const { createHighlighterCore } = await import('shiki/core')
+  return createHighlighterCore(...args)
 }
 
 function namedTheme(

@@ -18,7 +18,7 @@ import { readTree } from './tree'
 import { getBlobFile, readTextFile } from './read'
 import { writeTextFile } from './write'
 import { textFileVersion } from './version'
-import { forgetAppSave, recordAppSave } from './app-save-marker'
+import { AppWrites } from './app-writes'
 import { createFile, createFolder } from './create'
 import { renamePath } from './rename'
 import { deletePath } from './delete'
@@ -34,13 +34,18 @@ import {
   recordProcessWarning,
   recordRequestContext,
   recordRequestError,
+  recordRequestWarning,
   recordStreamSummary,
 } from '../observability'
 import { findInWorkspaceStream, type FindOptions, type SearchStreamEvent } from './search'
-import { FsError } from './errors'
+import { FsError, isFsError } from './errors'
 import type { MetadataDatabaseHandle } from '../db/client'
 import { FsMetadataStore } from './metadata'
-import { registerWorkspaceAddress, resolveWorkspaceAddress } from './workspace-address'
+import {
+  lookupWorkspaceAddresses,
+  registerWorkspaceAddress,
+  resolveWorkspaceAddress,
+} from './workspace-address'
 import {
   WorkspaceIndex,
   inactiveWorkspaceIndexStatus,
@@ -130,6 +135,7 @@ export class FileSystemService {
   readonly systemRoot
   readonly defaultPath
   readonly metadata
+  private readonly appWrites = new AppWrites()
   private readonly maxSearchContentBytes
   private readonly maxTextFileBytes
   private readonly workspaceEditJournalRoot
@@ -177,6 +183,16 @@ export class FileSystemService {
 
   get workspaceIndex() {
     return this.workspaceIndexScope?.index
+  }
+
+  /** `files.watchDirectoryLimit`, read at each attach; the settings store is built after this service. */
+  set watchDirectoryLimit(read: () => number) {
+    this.changes.directoryLimit = read
+  }
+
+  /** After `files.watchDirectoryLimit` changes: watches over it shed, limited roots that now fit grow. */
+  rebalanceWatchLimit() {
+    this.changes.rebalance()
   }
 
   info(): ServerInfo {
@@ -243,6 +259,25 @@ export class FileSystemService {
     )
   }
 
+  async lookupWorkspaceAddresses(inputs: readonly string[]) {
+    const { entries, failures } = await observeRequestOperation(
+      { area: 'fs', operation: 'lookup_workspace_addresses', pathCount: inputs.length },
+      () => lookupWorkspaceAddresses(this.paths, this.metadata, inputs),
+      (result) => ({ failureCount: result.failures.length, prunedCount: result.prunedCount }),
+    )
+    // A missing folder is an answer; a candidate the server could not read is degraded.
+    const unreadable = failures.filter(
+      (failure) => failure.status >= 500 || failure.code === 'PERMISSION_DENIED',
+    )
+    if (unreadable.length > 0) {
+      recordRequestWarning('workspace address lookup could not read some candidates', {
+        failureCodes: [...new Set(unreadable.map((failure) => failure.code))],
+        unreadableCount: unreadable.length,
+      })
+    }
+    return { entries }
+  }
+
   resolveWorkspaceAddress(id: WorkspaceAddressId) {
     return observeRequestOperation(
       { area: 'fs', operation: 'resolve_workspace_address', workspaceAddressId: id },
@@ -299,12 +334,13 @@ export class FileSystemService {
   }
 
   private async writeObserved(target: MutationTarget<'content'>, body: WriteBody) {
+    const version = textFileVersion(body.content)
+    await this.appWrites.record(target.absolutePath, version)
     const write = this.beginWriteEvents(target, body)
-    recordAppSave(target.absolutePath)
     try {
       return await this.publishWrittenFile(target, body, write)
     } catch (error) {
-      forgetAppSave(target.absolutePath)
+      await this.appWrites.forget(target.absolutePath, version)
       throw error
     } finally {
       if (write) this.changes.finishWrite(write)
@@ -505,7 +541,7 @@ export class FileSystemService {
   }
 
   async recents(query: RecentsQuery) {
-    return observeRequestOperation(
+    const { entries } = await observeRequestOperation(
       {
         area: 'fs',
         limit: query.limit,
@@ -514,12 +550,14 @@ export class FileSystemService {
         showHidden: query.showHidden,
       },
       () => this.recentsObserved(query),
-      (result) => ({ entryCount: result.entries.length }),
+      (result) => ({ entryCount: result.entries.length, prunedCount: result.prunedCount }),
     )
+    return { entries }
   }
 
   private async recentsObserved(query: RecentsQuery) {
     const entries: TreeEntry[] = []
+    const missing: string[] = []
     let offset = 0
 
     while (entries.length < query.limit) {
@@ -530,7 +568,9 @@ export class FileSystemService {
       if (rows.length === 0) break
 
       offset += rows.length
-      const candidates = await Promise.all(rows.map((row) => this.refreshMetadataEntry(row.path)))
+      const candidates = await Promise.all(
+        rows.map((row) => this.refreshMetadataEntry(row.path, missing)),
+      )
       for (const candidate of candidates) {
         if (!candidate) continue
         if (!matchesRecentQuery(candidate, query)) continue
@@ -542,7 +582,8 @@ export class FileSystemService {
       if (rows.length < RECENT_CANDIDATE_BATCH_SIZE) break
     }
 
-    return { entries }
+    // Pruned after the scan: deleting mid-scan would shift the offset past unread rows.
+    return { entries, prunedCount: this.metadata.forgetPicked(missing) }
   }
 
   async recordRecent(path: string) {
@@ -559,6 +600,14 @@ export class FileSystemService {
 
     this.metadata.recordPicked(entry)
     return entry
+  }
+
+  isAppWrite(absolutePath: string, version: string) {
+    return observeRequestOperation(
+      { area: 'fs', operation: 'app_write', path: absolutePath },
+      async () => ({ appWrite: await this.appWrites.matches(absolutePath, version) }),
+      (result) => result,
+    )
   }
 
   async *events(
@@ -700,12 +749,13 @@ export class FileSystemService {
     this.retiringWorkspaceIndexScopes.add(retirement)
   }
 
-  private async refreshMetadataEntry(input: string) {
+  private async refreshMetadataEntry(input: string, missing: string[]) {
     try {
       const refreshed = await this.statEntry(input)
       if (!isPickableEntry(refreshed)) return null
       return refreshed
-    } catch {
+    } catch (error) {
+      if (isFsError(error) && error.code === 'NOT_FOUND') missing.push(input)
       return null
     }
   }
@@ -735,6 +785,10 @@ async function startWorkspaceIndex(
   try {
     await watcher.ready
     if (signal.aborted) return
+    if (watcher.coverage?.mode === 'limited') {
+      index.turnOff('watch-limit')
+      return
+    }
 
     await index.rebuild({ reason: 'workspace-root-opened', signal })
   } catch {

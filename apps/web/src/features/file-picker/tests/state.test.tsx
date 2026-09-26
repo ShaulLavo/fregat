@@ -120,6 +120,8 @@ function serverInfo(defaultPath: string): ServerInfo {
     nativeWatcherCount: 0,
     openFileWatcherCount: 0,
     shallowWatcherCount: 0,
+    watchedDirectoryCount: 0,
+    watchDirectoryLimit: 200_000,
     systemRoot: '',
     watchEnabled: false,
     workspaceIndex: {

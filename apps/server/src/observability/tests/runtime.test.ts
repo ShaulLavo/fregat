@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Elysia } from 'elysia'
-import { applyObservability } from '../elysia'
+import { applyObservability, httpStatusLevel } from '../elysia'
 import { captureRequestLogger, recordRequestError } from '../logging'
 import { createInternalError } from '../structured-errors'
 import { readFsLogs } from 'evlog/fs'
@@ -17,6 +17,7 @@ import { flushObservability, initializeObservability, resetObservabilityForTests
 import { settingsErrors } from '../../settings/structured-errors'
 import { testSettingsOptions, type TestSettingsOverrides } from '../../settings/testing'
 import { runGit } from '../../testing/git'
+import type { WebOptions } from '../../web/routes'
 
 const TRUSTED_ORIGIN = 'http://localhost:5173'
 const roots: string[] = []
@@ -200,11 +201,82 @@ describe('observability runtime', () => {
       error: {
         code: 'NOT_FOUND',
       },
+      level: 'info',
+      status: 404,
+    })
+    expect(event.error).not.toHaveProperty('stack')
+    expect(serialized).not.toContain(root)
+    expect(serialized).not.toContain(path.join(root, 'missing.txt'))
+  })
+
+  it('keeps other client errors at warn with their stack', async () => {
+    const root = await fixtureRoot()
+    const logDir = await fixtureRoot()
+    initializeObservability(testObservabilityEnv(logDir))
+    const app = testApp(root)
+
+    const response = await app.handle(
+      new Request('http://local/fs/read?path=../outside.txt', {
+        headers: trustedOriginHeaders(),
+      }),
+    )
+
+    expect(response.status).toBe(403)
+    await response.text()
+    const event = eventForPath(await flushedEvents(logDir), '/fs/read')
+
+    expect(event).toMatchObject({
+      error: { code: 'PATH_OUTSIDE_WORKSPACE', stack: expect.any(String) },
+      level: 'warn',
+      status: 403,
+    })
+  })
+
+  it('keeps route misses at warn with their stack', async () => {
+    const root = await fixtureRoot()
+    const logDir = await fixtureRoot()
+    initializeObservability(testObservabilityEnv(logDir))
+    const web = path.join(root, 'web')
+    await mkdir(web)
+    await writeFile(path.join(web, 'index.html'), '<html></html>')
+    const app = testApp(root, {}, { root: web })
+
+    const api = await app.handle(
+      new Request('http://local/nope', { headers: trustedOriginHeaders(), method: 'POST' }),
+    )
+    const asset = await app.handle(new Request('http://local/assets/missing.js'))
+
+    expect([api.status, asset.status]).toEqual([404, 404])
+    await Promise.all([api.text(), asset.text()])
+    const events = await flushedEvents(logDir)
+
+    expect(eventForRequest(events, 'POST', '/nope')).toMatchObject({
+      error: { stack: expect.any(String) },
+      errorCode: 'ROUTE_NOT_FOUND',
       level: 'warn',
       status: 404,
     })
-    expect(serialized).not.toContain(root)
-    expect(serialized).not.toContain(path.join(root, 'missing.txt'))
+    expect(eventForPath(events, '/assets/missing.js')).toMatchObject({
+      error: { code: 'ROUTE_NOT_FOUND', stack: expect.any(String) },
+      errorCode: 'ROUTE_NOT_FOUND',
+      level: 'warn',
+      status: 404,
+    })
+  })
+
+  it.each([
+    [undefined, false, 'info'],
+    [200, false, 'info'],
+    [304, false, 'info'],
+    [400, false, 'warn'],
+    [403, false, 'warn'],
+    [404, false, 'info'],
+    [404, true, 'warn'],
+    [409, false, 'warn'],
+    [500, false, 'error'],
+    [503, false, 'error'],
+  ] as const)('maps HTTP status %s (route miss %s) to %s', (status, routeMiss, level) => {
+    expect(httpStatusLevel(status, routeMiss)).toBe(level)
   })
 
   it('keeps successful requests at info when a nested operation fails', async () => {
@@ -720,13 +792,14 @@ describe('observability runtime', () => {
   })
 })
 
-function testApp(root: string, settings: TestSettingsOverrides = {}) {
+function testApp(root: string, settings: TestSettingsOverrides = {}, web?: WebOptions) {
   return createTestApp({
     auth: {
       allowedOrigins: [TRUSTED_ORIGIN],
     },
     settings: testSettingsOptions(root, settings),
     watch: false,
+    web,
     workspaceRoot: root,
   })
 }

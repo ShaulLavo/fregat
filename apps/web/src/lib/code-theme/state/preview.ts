@@ -1,5 +1,4 @@
-import { createHighlighterCore, type TokensResult } from 'shiki/core'
-import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
+import type { HighlighterCore, TokensResult } from 'shiki/core'
 import { queryOptions } from '@tanstack/react-query'
 import { CODE_THEME_PREVIEW_SAMPLE } from '@/lib/code-theme/utils/preview'
 import { codeThemeQueryKeys } from '@/lib/code-theme/utils/query-keys'
@@ -34,12 +33,7 @@ async function highlightPreview(themeId: string): Promise<TokensResult> {
   const [engine, registration] = await Promise.all([
     resourceQueryClient.query({
       queryKey: codeThemeQueryKeys.previewHighlighter,
-      queryFn: () =>
-        createHighlighterCore({
-          engine: createJavaScriptRegexEngine({ forgiving: true }),
-          langs: [import('@shikijs/langs/typescript')],
-          themes: [],
-        }),
+      queryFn: createPreviewHighlighter,
       staleTime: 'static',
       gcTime: Infinity,
       networkMode: 'always',
@@ -53,5 +47,18 @@ async function highlightPreview(themeId: string): Promise<TokensResult> {
     lang: 'typescript',
     theme: themeId,
     tokenizeTimeLimit: 0,
+  })
+}
+
+// Shiki loads with the first preview; a static import would put it in the entry chunk.
+async function createPreviewHighlighter(): Promise<HighlighterCore> {
+  const [{ createHighlighterCore }, { createJavaScriptRegexEngine }] = await Promise.all([
+    import('shiki/core'),
+    import('shiki/engine/javascript'),
+  ])
+  return createHighlighterCore({
+    engine: createJavaScriptRegexEngine({ forgiving: true }),
+    langs: [import('@shikijs/langs/typescript')],
+    themes: [],
   })
 }

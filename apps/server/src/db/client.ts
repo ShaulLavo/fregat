@@ -3,7 +3,7 @@ import path from 'node:path'
 import { Database } from 'bun:sqlite'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import * as schema from './schema'
-import { platformHomePath } from '../home'
+import { isTestProcess, platformHomePath } from '../home'
 import { createStructuredError } from '../observability/structured-errors'
 
 export type PlatformDatabase = ReturnType<typeof openPlatformDatabase>['db']
@@ -41,10 +41,6 @@ function resolveDefaultDatabasePath(): string {
   }
 
   return platformHomePath('fs-metadata.sqlite')
-}
-
-function isTestProcess(): boolean {
-  return Bun.env.VITEST === 'true' || Bun.env.NODE_ENV === 'test'
 }
 
 let defaultHandle: MetadataDatabaseHandle | null = null

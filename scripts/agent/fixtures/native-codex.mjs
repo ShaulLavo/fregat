@@ -343,6 +343,34 @@ function handle(message) {
     })
     return
   }
+  if (scenario === 'chat-markdown-fence' && message.method === 'turn/start') {
+    send({ id: message.id, result: { turn: { id: turnId, status: 'inProgress', items: [] } } })
+    send({
+      method: 'turn/started',
+      params: { threadId, turn: { id: turnId, status: 'inProgress', items: [] } },
+    })
+    const fence = [
+      '```ts',
+      'export async function fenceVerified(count: number): Promise<string> {',
+      "  const label = 'MARKDOWN_FENCE_VERIFIED'",
+      '  return count > 0 ? label : `${label}: ${count}`',
+      '}',
+      '```',
+    ].join('\n')
+    send({
+      method: 'item/completed',
+      params: {
+        threadId,
+        turnId,
+        item: { id: 'fence-answer', type: 'agentMessage', text: `Fence follows.\n\n${fence}` },
+      },
+    })
+    send({
+      method: 'turn/completed',
+      params: { threadId, turn: { id: turnId, status: 'completed', items: [] } },
+    })
+    return
+  }
   if (
     ['file-attachments', 'chat-stash-context'].includes(scenario) &&
     message.method === 'turn/start'

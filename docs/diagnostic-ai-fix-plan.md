@@ -1,6 +1,6 @@
 # Fix diagnostics with AI
 
-Status: proposed, not implemented. Cover every error and warning in diagnostic hover messages, the keyboard diagnostic popup, and the Problems list.
+Status: the shared handoff, the Problems list and the keyboard popup are implemented (Plan 140 P3, 2026-09-25); the hover entry is open and needs the Editor change below. Cover every error and warning in diagnostic hover messages, the keyboard diagnostic popup, and the Problems list.
 
 Clicking **Fix with AI** opens a chat draft containing the diagnostic and its source context. The user reviews and sends it through the existing agent workflow. Keep native language-server quick fixes alongside it. This action must work even when the server offers no code actions.
 

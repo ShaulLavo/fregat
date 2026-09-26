@@ -37,7 +37,8 @@ from the host's own tab list, so a bottom-panel tab cannot reach the sidebar.
 - **Select** shows a view and reveals a hidden pane. The pane header menu's view
   group and the bottom panel's tab strip use it.
 - **Toggle** is the rail gesture: the view already showing hides the pane, any
-  other view is selected.
+  other view is selected. The rail stays. Toggle sidebar (`Mod+B` or the titlebar
+  button) and a repeated panel number hide the workbench rail too (`sidebarRailOpen`).
 - **Hide** closes that host only. The last selected view is kept, so the rail
   icon reopens the pane on it. Both rails stay mounted for that reason.
 

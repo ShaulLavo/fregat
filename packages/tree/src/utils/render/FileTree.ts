@@ -97,7 +97,8 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
   readonly #controller: FileTreeController
   #id: string
   readonly #onSelectionChange: FileTreeSelectionChangeListener | undefined
-  readonly #renderRowDecoration: FileTreeRowDecorationRenderer | undefined
+  readonly #rowDecorationSource: FileTreeRowDecorationRenderer | undefined
+  #renderRowDecoration: FileTreeRowDecorationRenderer | undefined
   readonly #renamingEnabled: boolean
   readonly #searchBlurBehavior: FileTreeOptions['searchBlurBehavior']
   readonly #searchEnabled: boolean
@@ -167,6 +168,7 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
     this.#icons = icons
     this.#unsafeCSS = unsafeCSS
     this.#onSelectionChange = onSelectionChange
+    this.#rowDecorationSource = renderRowDecoration
     this.#renderRowDecoration = renderRowDecoration
     this.#renamingEnabled = renaming != null && renaming !== false
     this.#searchBlurBehavior = searchBlurBehavior
@@ -452,6 +454,21 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
     }
 
     this.#syncIconSurface(mountedTree.host, mountedTree.wrapper)
+    renderFileTreeRoot(mountedTree.wrapper, this.#getViewProps())
+  }
+
+  /**
+   * Asks every visible row for its decoration again. The renderer reads state the tree cannot see,
+   * so a new identity is what tells the rows their cached decoration is stale.
+   */
+  public refreshDecorations(): void {
+    const render = this.#rowDecorationSource
+    if (!render) return
+
+    this.#renderRowDecoration = (context) => render(context)
+    const mountedTree = this.#getMountedTreeElements()
+    if (!mountedTree) return
+
     renderFileTreeRoot(mountedTree.wrapper, this.#getViewProps())
   }
 

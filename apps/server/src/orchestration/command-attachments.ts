@@ -2,6 +2,8 @@ import * as v from 'valibot'
 import { chatAttachmentSchema, type OrchestrationCommand } from '@workspace/contracts'
 
 export function commandUploadClaim(command: OrchestrationCommand) {
+  if (command.type === 'session.fork')
+    return { sessionId: command.sessionId, attachments: Object.values(command.attachmentCopies) }
   if (command.type === 'session.turn.start' || command.type === 'session.turn.steer')
     return {
       sessionId: command.sessionId,

@@ -40,14 +40,20 @@ export function createObservedInProcessClient(
 
 /**
  * Ends every open `/fs/events` response on demand, as a server restart or dropped link would, or
- * sends each one the error a failed native watch reports.
+ * sends each one the error a failed native watch reports. `respond` answers a request in place of
+ * the server, for statuses the real routes cannot produce on demand.
  */
-export function createCuttableEventsClient(server: TestServer) {
+export function createCuttableEventsClient(
+  server: TestServer,
+  respond: (request: Request) => Response | undefined = () => undefined,
+) {
   const directFetch = directInProcessFetcher(server)
   const open = new Set<() => void>()
   const injectors = new Set<(chunk: Uint8Array) => void>()
   const fetcher = (async (input, init) => {
     const request = new Request(input, init)
+    const injected = respond(request)
+    if (injected) return injected
     const response = await directFetch(request)
     if (new URL(request.url).pathname !== '/fs/events' || !response.body) return response
     const reader = response.body.getReader()

@@ -94,6 +94,11 @@ This is a two-pass source audit and implementation plan. No app changes, tests, 
 - **Fix scope/dependencies:** Wire capability-aware explicit compaction through provider/orchestration and composer controls; preserve draft content and expose pending/failure status. Coordinate provider implementation rather than passing an unsupported `/compact` string blindly.
 - **Acceptance:** Compact idle supported session with unsent text/image/context; none are sent or cleared. Busy/offline/unsupported providers show the correct disabled reason. One completion produces one timeline compaction entry; failure leaves draft and usable controls intact.
 - **Verification:** V6; new `tests/manual-compaction.integration.test.tsx` plus `chat-manual-compaction` browser scenario.
+- **Delivered 2026-09-25 (lane L3):** Compact Conversation in the session menu's agent section. It is
+  absent before the first prompt and while a turn runs, like the menu's other conditional actions.
+  It dispatches the compact turn from RUNTIME-05 and never touches the composer. Scenarios
+  `claude-manual-compaction` and `codex-manual-compaction` check one "Context compacted" row and
+  an unsent draft that survives.
 
 ### [INTERACTION-07] Show provider quota limits separately from context occupancy
 

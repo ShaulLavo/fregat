@@ -9,6 +9,7 @@ import {
   providerDriverKindSchema,
   providerInstanceIdSchema,
   sessionIdSchema,
+  type EnvironmentId,
   type ProjectId,
   type SessionId,
   type WorktreeId,
@@ -63,9 +64,12 @@ export class MetadataProviderAdapter extends MockProviderAdapter {
   }
 }
 
-export async function makeSessionDomainFixture(options: { providerRuntime?: boolean } = {}) {
+export async function makeSessionDomainFixture(
+  options: { providerRuntime?: boolean; environmentId?: EnvironmentId } = {},
+) {
   const adapter = new MetadataProviderAdapter()
   const server = await makeTestServer({
+    environmentId: options.environmentId,
     filesystemWatch: false,
     persistentDatabase: true,
     providerAdapter: adapter,

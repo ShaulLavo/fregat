@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { LiveStreamBudget } from '../live-stream-budget'
+import { isLiveStreamAckTimeout, LiveStreamBudget } from '../live-stream-budget'
 
 test('replacement transfers accounting atomically and release is idempotent', () => {
   const budget = new LiveStreamBudget({ maxItems: 2, maxBytes: 100 })
@@ -24,4 +24,19 @@ test('UTF-8 bytes count against the budget and overflow releases retention', () 
   expect(budget.signal.aborted).toBe(true)
   expect(budget.signal.reason).toMatchObject({ code: 'orchestration.LIVE_STREAM_OVERFLOW' })
   expect(budget.usage).toEqual({ items: 0, bytes: 0 })
+})
+
+test('an ACK timeout aborts with its own code and records usage below the caps', () => {
+  const budget = new LiveStreamBudget({ maxItems: 2, maxBytes: 100 })
+  budget.retain({ text: 'one' })
+  const error = budget.ackTimeout({ deliveryId: 4, timeoutMs: 30_000 })
+  expect(budget.signal.reason).toBe(error)
+  expect(error).toMatchObject({ code: 'orchestration.LIVE_STREAM_ACK_TIMEOUT', status: 408 })
+  expect(error.internal).toEqual({ items: 1, bytes: 14, deliveryId: 4, timeoutMs: 30_000 })
+  expect(isLiveStreamAckTimeout(error)).toBe(true)
+  expect(budget.usage).toEqual({ items: 0, bytes: 0 })
+
+  const overflowing = new LiveStreamBudget({ maxItems: 0, maxBytes: 100 })
+  expect(() => overflowing.retain({ text: 'one' })).toThrow('subscription buffer')
+  expect(isLiveStreamAckTimeout(overflowing.signal.reason)).toBe(false)
 })

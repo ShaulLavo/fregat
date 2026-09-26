@@ -22,6 +22,8 @@ import {
   orchestrationSessionSchema,
   orchestrationSessionLifecycleEntries,
   sessionAttentionEntries,
+  sessionAgentSchema,
+  sessionForkSourceSchema,
   sessionOriginSchema,
   trimmedNonEmptyStringSchema,
 } from './chat-model'
@@ -59,6 +61,8 @@ export const orchestrationSessionShellSchema = v.object({
   id: sessionIdSchema,
   worktreeId: worktreeIdSchema,
   origin: sessionOriginSchema,
+  forkedFrom: v.optional(v.nullable(sessionForkSourceSchema)),
+  agent: v.optional(v.nullable(sessionAgentSchema)),
   ...sessionAttentionEntries,
   ...orchestrationSessionLifecycleEntries,
   title: trimmedNonEmptyStringSchema,
@@ -134,6 +138,15 @@ export const orchestrationSessionDetailPageInputSchema = v.object({
     ),
     ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE,
   ),
+})
+
+/**
+ * The whole session for an export, oldest first and never windowed. Read only on
+ * request: its size grows with the session.
+ */
+export const orchestrationSessionTranscriptSchema = v.object({
+  session: orchestrationSessionSchema,
+  proposedPlans: v.array(orchestrationProposedPlanSchema),
 })
 
 /** Rows are oldest-first, so a caller prepends the page as it arrives. */
@@ -220,6 +233,40 @@ export const orchestrationReplayEventsResultSchema = v.object({
   events: v.array(orchestrationEventSchema),
 })
 
+export const orchestrationCheckpointHunksInputSchema = v.object({
+  sessionId: sessionIdSchema,
+  /** The turn whose changes are listed: the diff from turn - 1 to turn, whitespace included. */
+  turnCount: v.pipe(nonNegativeIntegerSchema, v.minValue(1)),
+})
+export type OrchestrationCheckpointHunksInput = v.InferOutput<
+  typeof orchestrationCheckpointHunksInputSchema
+>
+
+/**
+ * Where one change of a turn stands in the worktree now: still `applied`, `reverted` (the
+ * old text is back), or `changed` since, so it can be neither undone nor reapplied alone.
+ */
+export type OrchestrationCheckpointHunkState = 'applied' | 'changed' | 'reverted'
+
+export type OrchestrationCheckpointHunk = {
+  readonly hunkId: string
+  readonly path: string
+  readonly state: OrchestrationCheckpointHunkState
+}
+
+export const orchestrationRevertCheckpointHunkInputSchema = v.object({
+  sessionId: sessionIdSchema,
+  turnCount: v.pipe(nonNegativeIntegerSchema, v.minValue(1)),
+  path: v.pipe(v.string(), v.minLength(1)),
+  /** One change; null takes back every change the turn made to the file. */
+  hunkId: v.nullable(v.pipe(v.string(), v.minLength(1))),
+  /** Put an undone change back instead of undoing it. */
+  reapply: v.optional(v.boolean()),
+})
+export type OrchestrationRevertCheckpointHunkInput = v.InferOutput<
+  typeof orchestrationRevertCheckpointHunkInputSchema
+>
+
 export const orchestrationGetTurnDiffInputSchema = v.object({
   sessionId: sessionIdSchema,
   fromTurnCount: nonNegativeIntegerSchema,
@@ -304,6 +351,9 @@ export type OrchestrationSessionDetailPageInput = v.InferInput<
 >
 export type OrchestrationSessionDetailPage = v.InferOutput<
   typeof orchestrationSessionDetailPageSchema
+>
+export type OrchestrationSessionTranscript = v.InferOutput<
+  typeof orchestrationSessionTranscriptSchema
 >
 export type OrchestrationProjectShell = v.InferOutput<typeof orchestrationProjectShellSchema>
 export type OrchestrationWorktreeShell = v.InferOutput<typeof orchestrationWorktreeShellSchema>

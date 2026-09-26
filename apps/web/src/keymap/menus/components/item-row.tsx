@@ -88,7 +88,7 @@ export function MenuItemRow({
       variant={item.destructive ? 'destructive' : 'default'}
     >
       {item.icon ? <item.icon /> : null}
-      <span>{item.label}</span>
+      <span className={item.mono ? 'font-mono' : undefined}>{item.label}</span>
       {item.trailing ? <ContextMenuShortcut>{item.trailing}</ContextMenuShortcut> : null}
     </ContextMenuItem>
   )

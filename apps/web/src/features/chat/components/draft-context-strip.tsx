@@ -1,5 +1,6 @@
 import { GitBranchIcon } from '@phosphor-icons/react'
 import type {
+  ProviderInstanceId,
   OrchestrationProjectShell,
   OrchestrationWorktreeShell,
   SessionWorktreeTarget,
@@ -19,6 +20,7 @@ import {
   type DraftMachine,
 } from '../utils/draft-workspace'
 import { newWorktreeTarget } from '../utils/worktree-target'
+import { DraftAgentMenu } from './draft-agent-menu'
 import { DraftBranchMenu } from './draft-branch-menu'
 import { DraftMachineMenu } from './draft-machine-menu'
 import { DraftWorkspaceMenu } from './draft-workspace-menu'
@@ -28,6 +30,9 @@ const MACHINE_LOCKED =
 
 /** Where the new session will run: machine, workspace and branch, under the composer. */
 export function DraftContextStrip({
+  agent,
+  providerInstanceId,
+  onAgent,
   draftTarget,
   project,
   base,
@@ -35,6 +40,10 @@ export function DraftContextStrip({
   machines,
   onTarget,
 }: {
+  readonly agent: string | null
+  /** Whose agent definitions the picker lists: the draft's selected model provider. */
+  readonly providerInstanceId: ProviderInstanceId | null
+  readonly onAgent: (agent: string | null) => void
   readonly draftTarget: ChatInputDraftTarget
   readonly project: OrchestrationProjectShell
   readonly base: OrchestrationWorktreeShell
@@ -106,6 +115,12 @@ export function DraftContextStrip({
           onWorktree={chooseWorktree}
         />
       ) : null}
+      <DraftAgentMenu
+        cwd={base.canonicalPath}
+        providerInstanceId={providerInstanceId}
+        value={agent}
+        onSelect={onAgent}
+      />
       {git ? (
         <div className='ml-auto flex min-w-0 justify-end'>
           {target.kind === 'new' ? (

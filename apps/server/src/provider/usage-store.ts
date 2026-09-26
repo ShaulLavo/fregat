@@ -33,6 +33,7 @@ type AccountUsage = {
   /** No plan limits apply (an API key); stays so until a probe says otherwise. */
   unsupported: boolean
   windows: ProviderUsageWindow[]
+  resetCredits: { available: number; accountKey: string; creditId: string | null } | null
 }
 
 type UsageAccounts = Pick<ProviderAdapterRegistry, 'adapter' | 'listInstances' | 'usageAccount'>
@@ -84,6 +85,17 @@ export class ProviderUsageStore {
     if (probes.length > 0) await settledWithin(probes, READ_WAIT_MS)
 
     return { accounts: targets.map((target) => this.snapshot(target)).filter(isPresent) }
+  }
+
+  async refreshAccount(accountKey: string): Promise<boolean> {
+    const target = this.targets().find((entry) => entry.accountKey === accountKey)
+    const readUsage = target?.adapter?.readUsage?.bind(target.adapter)
+    if (!target || !readUsage) return false
+    const pending = this.probes.get(accountKey)
+    if (pending) await pending
+    const result = await readUsage()
+    this.applyProbe(target, result)
+    return result.kind === 'reading'
   }
 
   private targets() {
@@ -156,6 +168,7 @@ export class ProviderUsageStore {
         probedAtMs,
         unsupported: true,
         windows: [],
+        resetCredits: null,
       })
       return
     }
@@ -167,6 +180,7 @@ export class ProviderUsageStore {
       probedAtMs,
       unsupported: false,
       windows: probedUsageWindows(result.update.windows),
+      resetCredits: result.resetCredits ?? null,
     })
   }
 
@@ -188,6 +202,7 @@ export class ProviderUsageStore {
       planType: usage.planType,
       providerInstanceIds: target.providerInstanceIds,
       windows,
+      resetCredits: target.adapter?.consumeResetCredit ? usage.resetCredits : null,
     }
   }
 
@@ -200,6 +215,7 @@ export class ProviderUsageStore {
         probedAtMs: null,
         unsupported: false,
         windows: [],
+        resetCredits: null,
       }
     )
   }

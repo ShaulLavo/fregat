@@ -77,6 +77,24 @@ structured error.
 
 ## Phase 2 — dev plumbing (items 3, 9, 10, 12)
 
+Landed 2026-09-25 (lane L4):
+
+- Item 3: the server keeps the content version of each app write in memory (`fs/app-writes.ts`) and
+  answers `GET /fs/app-write?path&version`. The Vite plugin (`apps/web/scripts/app-save-hmr-plugin.ts`)
+  asks with the version it read, so an outside edit after an app save still hot-updates.
+  `app-save-marker.ts` and its `~/.platform` file are deleted; `vite.config.ts` no longer imports
+  `apps/server/src`.
+- Item 9: already true in effect. `scripts/dev.ts` and the desktop app compute
+  `SERVER_ALLOWED_ORIGINS` from `runtime-network.ts` for the port they chose; the server's
+  hardcoded list is only the fallback for a bare `bun src/index.ts`. `serverUrlFromEnv` is now the
+  one place that derives the API URL (Vite plugin, TUI launcher).
+- Item 10, partly: the freshness walk no longer gives up silently; an overrun names the unverified
+  directories. Serving every typecheck from the generated source-mapped tsconfig is not done: it
+  typechecks the Editor's source under Platform's settings, which lane L7 owns.
+- Item 12: the forced reload stays, with a comment naming the missing `import.meta.hot.dispose` in
+  `@singapore-editor/react`'s controller and ghostty-webgpu's `Terminal`; both fixes live in those
+  repos.
+
 Save notifications over the server channel. Origins come from `SERVER_ALLOWED_ORIGINS` or options
 only, computed once in `runtime-network.ts`. One generated tsconfig, the one `dev-sources.ts` already
 writes, serves every typecheck path. HMR disposal in the editor and terminal packages, then delete
@@ -88,6 +106,24 @@ Ancestry through the ppid chain instead of executable names. A window handle fro
 into the FFI call. Terminal state restored by query or a documented reset, with each surviving mode
 commented. Name the repaint constants, or replay stored scrollback instead of poking the app. A
 supported terminal namespace parameter so the harness asks instead of intercepting.
+
+Status 2026-09-25 (lane L4):
+
+- Item 5: done. The TUI stops its job group only when it leads the group, or when the launcher
+  that named itself in `PLATFORM_TUI_LAUNCHER_PID` (set by `scripts/tui.ts`) leads it and is the
+  TUI's parent. Walking ancestry alone would stop a non-job-control shell that leads the group,
+  which the `shared-shell` job-control test pins.
+- Item 7: done. The detach reset is a list with one comment per mode (`DETACH_RESET` in
+  `apps/tui/src/host/attach.ts`).
+- Item 6: not done. `vibrancy.m` resolves the window by title because Electrobun's `createWindow`
+  pointer type is not a public contract, and messaging a non-Objective-C pointer would crash the
+  app. The change can only be verified on the Mac: owner check.
+- Item 8: done. Repaint uses named delay and column-delta constants and the shared terminal
+  column limit. The terminal service tests cover redraw and maximum-width behavior.
+- Item 11: deferred. The capture prefix is also how `chat-queue`, `terminal-history` and product
+  captures find and kill their own terminals, and a page URL parameter does not survive the app's
+  own URL rewriting across the reloads those scenarios do. Since Plan 146 a default run has its own
+  server, so the prefix matters only for `--shared-dev` captures.
 
 ## Phase 4 — one schema, no ledger (D4)
 

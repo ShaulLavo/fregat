@@ -218,6 +218,7 @@ Same two repositories, single-threaded, from `layers-probe.ts`, `index-probe.ts`
    - (c) One index for every root any client or session uses, uncapped.
 
    **Recommendation: (b), capped at 4, and reinstall a `failed` index when its root is reopened.**
+   Decided 2026-09-26: owner — (b), capped at 4, a `failed` index rebuilt on reopen; an unwatched index stays warm 15 minutes (Plan 173).
 
 ### Proposed follow-up plans
 

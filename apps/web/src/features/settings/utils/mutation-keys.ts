@@ -10,6 +10,8 @@ export const settingsMutationKeys = {
     update: ['themes', 'palettes', 'update'],
     delete: ['themes', 'palettes', 'delete'],
   },
+  providerUpdate: (providerInstanceId: ProviderInstanceId) =>
+    ['settings', 'provider-update', providerInstanceId] as const,
   rawSave: (key: DocumentKey) => ['settings', 'raw-save', key] as const,
   push: {
     subscribe: ['push', 'subscribe'] as const,

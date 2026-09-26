@@ -46,6 +46,22 @@ describe('FsError', () => {
     expect(JSON.stringify([error.cause, error.internal])).not.toContain('secret-token')
   })
 
+  it('says a permission error is one, with a fix the user can act on', () => {
+    for (const code of ['EACCES', 'EPERM']) {
+      const cause = Object.assign(new Error(`${code}: permission denied, scandir '/x'`), {
+        code,
+        path: '/x',
+        syscall: 'scandir',
+      })
+      const error = mapNodeError(cause)
+
+      expect(error.code).toBe('PERMISSION_DENIED')
+      expect(error.statusCode).toBe(403)
+      expect(error.why).toBeTruthy()
+      expect(error.fix).toBeTruthy()
+    }
+  })
+
   it('keeps public error payloads stable', () => {
     const error = new FsError('OPERATION_FAILED', 'failed internally', {
       detail: 'private',

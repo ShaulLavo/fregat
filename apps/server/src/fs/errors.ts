@@ -14,12 +14,14 @@ export type FsErrorCode =
   | 'GIT_COMMAND_FAILED'
   | 'GIT_REPOSITORY_NOT_FOUND'
   | 'NOT_FOUND'
+  | 'ROUTE_NOT_FOUND'
   | 'WORKSPACE_ADDRESS_NOT_FOUND'
   | 'ALREADY_EXISTS'
   | 'FILE_CHANGED'
   | 'INVALID_PATH'
   | 'NOT_A_FILE'
   | 'NOT_A_DIRECTORY'
+  | 'PERMISSION_DENIED'
   | 'FILE_TOO_LARGE'
   | 'FILE_IS_BINARY'
   | 'LOSSY_WRITE_BLOCKED'
@@ -41,12 +43,14 @@ const statusByCode: Record<FsErrorCode, number> = {
   GIT_COMMAND_FAILED: 500,
   GIT_REPOSITORY_NOT_FOUND: 404,
   NOT_FOUND: 404,
+  ROUTE_NOT_FOUND: 404,
   WORKSPACE_ADDRESS_NOT_FOUND: 404,
   ALREADY_EXISTS: 409,
   FILE_CHANGED: 409,
   INVALID_PATH: 400,
   NOT_A_FILE: 400,
   NOT_A_DIRECTORY: 400,
+  PERMISSION_DENIED: 403,
   FILE_TOO_LARGE: 413,
   FILE_IS_BINARY: 415,
   LOSSY_WRITE_BLOCKED: 409,
@@ -69,12 +73,14 @@ const messageByCode: Record<FsErrorCode, string> = {
   GIT_COMMAND_FAILED: 'git command failed',
   GIT_REPOSITORY_NOT_FOUND: 'git repository not found',
   NOT_FOUND: 'file not found',
+  ROUTE_NOT_FOUND: 'route not found',
   WORKSPACE_ADDRESS_NOT_FOUND: 'workspace address was not found',
   ALREADY_EXISTS: 'target already exists',
   FILE_CHANGED: 'file changed on disk',
   INVALID_PATH: 'invalid path',
   NOT_A_FILE: 'path is not a file',
   NOT_A_DIRECTORY: 'path is not a directory',
+  PERMISSION_DENIED: 'Permission denied',
   FILE_TOO_LARGE: 'file is too large',
   FILE_IS_BINARY: 'file seems to be binary and was not decoded as text',
   LOSSY_WRITE_BLOCKED: 'refusing to overwrite a file whose bytes do not round-trip as UTF-8 text',
@@ -130,6 +136,12 @@ export function mapNodeError(error: unknown): FsError {
   if (code === 'EEXIST') return new FsError('ALREADY_EXISTS', undefined, error)
   if (code === 'ENOTDIR') return new FsError('NOT_A_DIRECTORY', undefined, error)
   if (code === 'EISDIR') return new FsError('NOT_A_FILE', undefined, error)
+  if (code === 'EACCES' || code === 'EPERM') {
+    return new FsError('PERMISSION_DENIED', undefined, error, {
+      why: "The server's user cannot read or change this path.",
+      fix: "Change the path's permissions, or open a folder the server's user can read.",
+    })
+  }
 
   return new FsError('OPERATION_FAILED', undefined, error)
 }

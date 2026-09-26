@@ -118,6 +118,7 @@ export async function discoveryFixture() {
     providerHistory: {
       readSessionHistory: async () => discoveryHistory(),
       importSources: () => [],
+      importSessionUsage: async () => 0,
     },
     getReadModel: () => persistence.snapshots.fullReadModel(),
     register: async (workspaceRoot = main, commandId = `registration:${workspaceRoot}`) =>

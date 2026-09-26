@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { useAttachToComposer } from '@/features/chat/hooks/use-attach-to-composer'
+import { useAttachToComposer } from '@/lib/composer-attach/hooks/use-attach-to-composer'
 import { isClipboardReadBlocked } from '@/features/terminal/utils/clipboard'
 import {
   pasteFromClipboard,
@@ -11,12 +11,12 @@ import {
 import { terminalMenu } from '@/features/terminal/utils/menu'
 import { copyTextToClipboard } from '@/lib/clipboard'
 
-export function useTerminalMenu(target: TerminalMenuTarget) {
+export function useTerminalMenu(target: TerminalMenuTarget, rootPath: string) {
   // Asked per open rather than once per app: the user can grant or revoke
   // clipboard access from the omnibox at any time, and this hook only runs
   // while a menu is actually on screen.
   const [pasteBlocked, setPasteBlocked] = useState(false)
-  const { attachTerminalContext } = useAttachToComposer()
+  const { attachTerminalContext } = useAttachToComposer(rootPath)
 
   useEffect(() => {
     let active = true
@@ -45,6 +45,7 @@ export function useTerminalMenu(target: TerminalMenuTarget) {
     hasSelection: target.selection.length > 0,
     paste: () => void pasteFromClipboard(target.terminal),
     pasteBlocked,
+    rendererBackend: target.rendererBackend,
     reset: () => resetTerminal(target.terminal),
     scrollToBottom: () => target.terminal.scrollToBottom(),
     scrollToTop: () => target.terminal.scrollToTop(),
