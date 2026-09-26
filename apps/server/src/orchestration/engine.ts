@@ -24,6 +24,7 @@ import { WorktreeCleanupReactor } from './worktree-cleanup-reactor'
 import { autoSettlementAt, pendingPullRequest, type AutoSettleRules } from './utils/auto-settlement'
 import { WorktreeCommandPreparation } from './worktree-command-preparation'
 import { TerminalLeaseController } from './terminal-lease-controller'
+import { remoteHost, remoteRepositoryPath } from '../git/forges/detect'
 import { GitWorktreeService } from '../git/worktrees'
 import type { TerminalService } from '../terminal/service'
 import { worktreeRuntimeErrors } from './worktree-runtime-errors'
@@ -46,6 +47,7 @@ import {
   type OrchestrationCommandReceipt,
   type WorktreeSubmoduleMode,
   parsePullRequestReference,
+  pullRequestReferenceRepository,
 } from '@workspace/contracts'
 import * as v from 'valibot'
 
@@ -858,7 +860,7 @@ export class OrchestrationEngine {
       lookupIdentities: (worktree, remoteUrl, numbers) =>
         git.readPullRequestsByNumber(worktree.canonicalPath, remoteUrl, numbers),
       headName: async (worktree) =>
-        (await git.upstreamBranch(worktree.canonicalPath, worktree.branch ?? ''))?.branch ??
+        (await git.pushTarget(worktree.canonicalPath, worktree.branch ?? ''))?.branch ??
         worktree.branch ??
         '',
       dispatch: (command) => this.enqueue(command),
@@ -1229,6 +1231,7 @@ export class OrchestrationEngine {
     const git = this.registration.git
     const base = requireReadyWorktree(this.readModel, input.worktreeId)
     const { detail, remoteName, remoteUrl } = await git.resolvePullRequest(base.path, number)
+    requireSameRepository(input.reference, remoteUrl)
     const branch = `pr/${number}`
     await git.fetchPullRequestHead({
       path: base.path,
@@ -1561,5 +1564,22 @@ function previouslyRejectedCommandError(
     commandId: receipt.commandId,
     internal: { storedError: receipt.error },
     message: receipt.error ?? undefined,
+  })
+}
+
+/** A pasted URL names its repository; the same number in another one is another pull request. */
+function requireSameRepository(reference: string, remoteUrl: string) {
+  const named = pullRequestReferenceRepository(reference)
+  if (!named) return
+  const host = remoteHost(remoteUrl)
+  const path = remoteRepositoryPath(remoteUrl)?.toLowerCase()
+  if (named.host === host && named.path === path) return
+  throw sessionDomainErrors.PULL_REQUEST_OTHER_REPOSITORY({
+    repository: named.path,
+    internal: {
+      referenceHost: named.host,
+      remoteHost: host,
+      remotePathMatches: named.path === path,
+    },
   })
 }

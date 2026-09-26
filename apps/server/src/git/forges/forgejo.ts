@@ -59,23 +59,12 @@ export const forgejo: ForgeProvider = {
       )
       const entries = parseForgeJson(context, v.array(pullSchema), result.stdout, 'pulls')
       pulls.push(...entries)
-      if (
-        entries.length < PAGE_SIZE ||
-        branches.every((branch) => pulls.some((pull) => pull.head.ref === branch))
-      )
-        break
-      if (page >= MAX_PAGES)
-        throw gitPullRequestErrors.PULL_REQUEST_LOOKUP_LIMIT({
-          internal: { repository: context.repository, branches: branches.length, pages: page },
-        })
+      if (entries.length < PAGE_SIZE) return branchMatches(branches, pulls, true)
+      if (branches.every((branch) => pulls.some((pull) => pull.head.ref === branch))) break
+      // Past the bound, an unmatched branch is unknown, so it is left out of the answer.
+      if (page >= MAX_PAGES) return branchMatches(branches, pulls, false)
     }
-    // Newest first, so the first match per branch is its latest pull request.
-    return new Map(
-      [...new Set(branches)].map((branch) => {
-        const pull = pulls.find((entry) => entry.head.ref === branch)
-        return [branch, pull ? toPullRequest(pull) : null] as const
-      }),
-    )
+    return branchMatches(branches, pulls, true)
   },
   async createPullRequest(context, input) {
     const login = await requireLogin(context)
@@ -202,6 +191,21 @@ function hostOf(url: string) {
   } catch {
     return null
   }
+}
+
+/** Newest first, so the first match per branch is its latest pull request. */
+function branchMatches(
+  branches: readonly string[],
+  pulls: readonly v.InferOutput<typeof pullSchema>[],
+  complete: boolean,
+) {
+  const matches = new Map<string, GitPullRequest | null>()
+  for (const branch of new Set(branches)) {
+    const pull = pulls.find((entry) => entry.head.ref === branch)
+    if (pull) matches.set(branch, toPullRequest(pull))
+    else if (complete) matches.set(branch, null)
+  }
+  return matches
 }
 
 function toPullRequest(pull: v.InferOutput<typeof pullSchema>): GitPullRequest {

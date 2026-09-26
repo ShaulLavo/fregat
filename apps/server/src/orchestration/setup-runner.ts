@@ -1,8 +1,9 @@
-import type { WorktreeId } from '@workspace/contracts'
+import { errorMessage, type WorktreeId } from '@workspace/contracts'
 
 /** Dependency installs are slow and healthy; a setup that never exits is not. */
 export const SETUP_TIMEOUT_MS = 30 * 60_000
 const OUTPUT_LINES = 40
+const OUTPUT_DRAIN_MS = 1_000
 const LINE_LENGTH = 400
 const ANSI = new RegExp(String.raw`\u001b\[[0-9;?]*[ -/]*[@-~]`, 'g')
 
@@ -39,7 +40,8 @@ export class SetupRunner {
       .then(async (): Promise<SetupOutcome> => {
         await beforeSpawn()
         if (control.cancelled) return { state: 'cancelled', exitCode: null, output: [] }
-        const child = this.spawn(input)
+        const child = spawnOutcome(() => this.spawn(input))
+        if ('state' in child) return child
         entry.child = child
         return this.watch(child, control)
       })
@@ -90,14 +92,25 @@ export class SetupRunner {
     const output: string[] = []
     const timer = setTimeout(() => terminate(child, control), SETUP_TIMEOUT_MS)
     try {
-      await Promise.all([collect(child.stdout, output), collect(child.stderr, output)])
+      const drained = Promise.all([collect(child.stdout, output), collect(child.stderr, output)])
       const exitCode = await child.exited
-      if (control.cancelled) return { state: 'cancelled', exitCode: null, output }
-      return { state: exitCode === 0 ? 'done' : 'failed', exitCode, output }
+      // A process the script left running can hold the pipes open; the script itself is done.
+      await Promise.race([drained, Bun.sleep(OUTPUT_DRAIN_MS)])
+      if (control.cancelled) return { state: 'cancelled', exitCode: null, output: [...output] }
+      return { state: exitCode === 0 ? 'done' : 'failed', exitCode, output: [...output] }
     } finally {
       clearTimeout(timer)
       if (control.killTimer) clearTimeout(control.killTimer)
     }
+  }
+}
+
+/** A spawn that throws (a removed worktree directory) is a failed setup, never a stuck one. */
+function spawnOutcome<T>(spawn: () => T): T | SetupOutcome {
+  try {
+    return spawn()
+  } catch (error) {
+    return { state: 'failed', exitCode: null, output: [errorMessage(error)] }
   }
 }
 

@@ -87,7 +87,14 @@ export class WorktreeLifecycleReactor {
 
   private handleSetupRequest(worktreeId: WorktreeId, state: WorktreeSetup['state']) {
     if (state === 'queued') this.startSetup(worktreeId)
-    if (state === 'cancelling') void this.setups.cancel(worktreeId)
+    if (state === 'cancelling')
+      void this.setups.cancel(worktreeId).catch((error: unknown) =>
+        recordProcessWarning('worktree.setup.cancel-failed', {
+          area: 'worktree',
+          worktreeId,
+          error,
+        }),
+      )
   }
 
   private schedule(worktreeId: WorktreeId, operationId: CommandId) {
@@ -294,6 +301,17 @@ export class WorktreeLifecycleReactor {
   private async completeCreation(worktree: OrchestrationWorktree, state: Provisioning) {
     await this.initializeSubmodules(worktree)
     const script = worktree.setup?.state === 'skipped' ? null : this.setupScriptFor(worktree)
+    // Boot awaits recovery, so waiting on setup here would hold every request; retry reruns it.
+    if (script?.waitForSetup && this.recovering) {
+      await this.options.dispatch({
+        type: 'worktree.create.fail',
+        worktreeId: worktree.id,
+        operationId: state.operationId,
+        errorCode: SETUP_FAILED,
+        commandId: commandKey('setup-recovery-failed', worktree.id, state.operationId),
+      })
+      return
+    }
     if (script?.waitForSetup) {
       const outcome = await this.runSetup(worktree, script, true)
       if (outcome !== 'done') {

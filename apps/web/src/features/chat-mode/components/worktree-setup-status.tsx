@@ -19,7 +19,8 @@ export function WorktreeSetupStatus({
   readonly worktree: OrchestrationWorktreeShell
 }) {
   const setup = worktree.setup
-  const running = setup?.state === 'queued' || setup?.state === 'running'
+  const stopping = setup?.state === 'cancelling'
+  const running = setup?.state === 'queued' || setup?.state === 'running' || stopping
   const label = worktreeSetupLabel(setup)
   const failed = setup?.state === 'failed'
   if (!setup && !hasSetupScript) return null
@@ -45,7 +46,7 @@ export function WorktreeSetupStatus({
       ) : null}
       <div className='flex gap-1'>
         {running ? (
-          <Button size='sm' variant='outline' disabled={pending} onClick={onStop}>
+          <Button size='sm' variant='outline' disabled={pending || stopping} onClick={onStop}>
             Stop setup
           </Button>
         ) : null}

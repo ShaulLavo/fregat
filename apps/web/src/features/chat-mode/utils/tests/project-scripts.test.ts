@@ -99,3 +99,14 @@ test('t3.json suggestions offer exactly the scripts that Import can save', () =>
       .map(({ name, command }) => ({ name, command })),
   ).toEqual(importableScripts(file, saved))
 })
+
+test('a command both t3.json and the manifest offer is one row, from t3.json', () => {
+  const suggestions = projectScriptSuggestions({
+    saved: [],
+    projectFile: [{ name: 'Dev', command: 'bun run dev' }],
+    discovered: [{ name: 'dev', command: 'bun run dev' }],
+  })
+  expect(suggestions.map((script) => [script.command, script.origin])).toEqual([
+    ['bun run dev', 't3.json'],
+  ])
+})

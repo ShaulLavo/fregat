@@ -40,16 +40,26 @@ export async function readPullRequest(
   const supported = await supportedContext(input.cwd, boundaries)
   if (!supported.context)
     return { pullRequest: null, support: supported.support, forge: supported.forge }
-  const found = await forgeProvider(supported.forge.kind).pullRequests(supported.context, {
-    branches: [input.branch],
+  const found = await openPullRequest(supported.context, input.branch)
+  if (found === undefined)
+    throw gitPullRequestErrors.PULL_REQUEST_LOOKUP_LIMIT({
+      internal: { forge: supported.forge.kind, state: 'open' },
+    })
+  return { pullRequest: found, support: 'ready', forge: supported.forge }
+}
+
+/** The branch's open pull request, null when proven absent, undefined when unknown. */
+async function openPullRequest(context: ForgeContext, branch: string) {
+  const found = await forgeProvider(context.forge.kind).pullRequests(context, {
+    branches: [branch],
     state: 'open',
   })
-  return { pullRequest: found.get(input.branch) ?? null, support: 'ready', forge: supported.forge }
+  return found.has(branch) ? (found.get(branch) ?? null) : undefined
 }
 
 export type BranchPullRequests =
   | { kind: 'unsupported'; support: Exclude<GitPullRequestSupport, 'ready'> }
-  /** Every requested branch has an entry: its newest pull request in any state, or null. */
+  /** Per branch: its newest pull request in any state, null when proven absent, missing when unknown. */
   | { kind: 'ready'; pullRequests: ReadonlyMap<string, GitPullRequest | null> }
 
 /**
@@ -81,14 +91,13 @@ export async function createPullRequest(
   },
   boundaries: Boundaries = {},
 ): Promise<GitPullRequestCreateResult> {
-  const existing = await readPullRequest({ branch: input.branch, cwd: input.cwd }, boundaries)
-  if (existing.support !== 'ready') return { kind: 'unsupported', support: existing.support }
-  // A branch carries at most one open pull request, so the honest answer to a
-  // second request is the first one — not a second call the forge will reject.
-  if (existing.pullRequest) return { kind: 'exists', pullRequest: existing.pullRequest }
-
   const supported = await supportedContext(input.cwd, boundaries)
   if (!supported.context) return { kind: 'unsupported', support: supported.support }
+  // A branch carries at most one open pull request, so the honest answer to a
+  // second request is the first one — not a second call the forge will reject.
+  // An unknown answer still creates: the forge refuses a duplicate itself.
+  const existing = await openPullRequest(supported.context, input.branch)
+  if (existing) return { kind: 'exists', pullRequest: existing }
   await forgeProvider(supported.forge.kind).createPullRequest(supported.context, {
     branch: input.branch,
     title: input.title,
@@ -186,15 +195,7 @@ export async function resolvePullRequest(
   boundaries: Boundaries = {},
 ) {
   const supported = await supportedContext(input.cwd, boundaries, input.remoteUrl)
-  if (!supported.context)
-    throw gitPullRequestErrors.FORGE_NOT_READY({
-      forge: supported.forge?.name ?? 'This repository',
-      reason:
-        supported.support === 'no-forge'
-          ? 'no remote points at a known forge'
-          : SUPPORT_REASONS[supported.support],
-      internal: { support: supported.support },
-    })
+  if (!supported.context) throw forgeNotReady(supported)
   const detail = await forgeProvider(supported.forge.kind).getPullRequest(
     supported.context,
     input.number,
@@ -205,6 +206,17 @@ export async function resolvePullRequest(
     remoteName: supported.context.remoteName,
     remoteUrl: supported.context.remoteUrl,
   }
+}
+
+function forgeNotReady(supported: Extract<Supported, { context: null }>) {
+  return gitPullRequestErrors.FORGE_NOT_READY({
+    forge: supported.forge?.name ?? 'This repository',
+    reason:
+      supported.support === 'no-forge'
+        ? 'no remote points at a known forge'
+        : SUPPORT_REASONS[supported.support],
+    internal: { support: supported.support },
+  })
 }
 
 function publishForge(kind: GitForgeKind, host: string): GitForge {
@@ -224,12 +236,7 @@ export async function readPullRequestsByNumber(
   boundaries: Boundaries = {},
 ): Promise<ReadonlyMap<number, GitPullRequest>> {
   const supported = await supportedContext(input.cwd, boundaries, input.remoteUrl)
-  if (!supported.context)
-    throw gitPullRequestErrors.FORGE_NOT_READY({
-      forge: supported.forge?.name ?? 'This repository',
-      reason: supported.support,
-      internal: { support: supported.support },
-    })
+  if (!supported.context) throw forgeNotReady(supported)
   const context = supported.context
   const provider = forgeProvider(context.forge.kind)
   if (provider.pullRequestsByNumber) {

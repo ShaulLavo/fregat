@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { parsePullRequestReference } from '../pull-request-reference'
+import {
+  parsePullRequestReference,
+  pullRequestReferenceRepository,
+} from '../pull-request-reference'
 
 describe('pull request references', () => {
   it.each([
@@ -28,4 +31,23 @@ describe('pull request references', () => {
       expect(parsePullRequestReference(input)).toBeNull()
     },
   )
+
+  it.each([
+    ['https://github.com/Acme/App/pull/42/files', 'github.com', 'acme/app'],
+    ['https://gitlab.com/group/sub/app/-/merge_requests/9', 'gitlab.com', 'group/sub/app'],
+    ['https://codeberg.org/owner/repo/pulls/3', 'codeberg.org', 'owner/repo'],
+    [
+      'https://dev.azure.com/org/proj/_git/app/pullrequest/15',
+      'dev.azure.com',
+      'org/proj/_git/app',
+    ],
+    ['https://bitbucket.org/ws/app/pull-requests/5', 'bitbucket.org', 'ws/app'],
+    ['glab mr checkout https://gitlab.com/g/p/-/merge_requests/4', 'gitlab.com', 'g/p'],
+  ])('%s belongs to %s/%s', (input, host, path) => {
+    expect(pullRequestReferenceRepository(input)).toEqual({ host, path })
+  })
+
+  it.each(['#12', '12', 'gh pr checkout 12'])('%j names no repository', (input) => {
+    expect(pullRequestReferenceRepository(input)).toBeNull()
+  })
 })

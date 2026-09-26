@@ -926,4 +926,4 @@ export {
 export { fontRefSchema } from './fonts/schema'
 export { CURATED_FONTS, type CuratedFont } from './fonts/curated'
 export type { FontCatalogEntry } from './fonts/catalog'
-export { parsePullRequestReference } from './pull-request-reference'
+export { parsePullRequestReference, pullRequestReferenceRepository } from './pull-request-reference'

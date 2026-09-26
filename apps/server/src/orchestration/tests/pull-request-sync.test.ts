@@ -30,16 +30,22 @@ const openPullRequest: GitPullRequest = {
 /** A forge that answers from a table the test edits, and records every request. */
 function fakeForge() {
   const answers = new Map<string, GitPullRequest | null>()
+  const unknown = new Set<string>()
   const requests: string[][] = []
   let fail: Error | null = null
   const lookup: BranchPullRequestLookup = async ({ branches }) => {
     requests.push([...branches])
     if (fail) throw fail
-    const pullRequests = new Map(branches.map((branch) => [branch, answers.get(branch) ?? null]))
+    const pullRequests = new Map(
+      branches
+        .filter((branch) => !unknown.has(branch))
+        .map((branch) => [branch, answers.get(branch) ?? null]),
+    )
     return { kind: 'ready', pullRequests } satisfies BranchPullRequests
   }
   return {
     answers,
+    unknown,
     requests,
     lookup,
     failWith: (error: Error | null) => {
@@ -77,6 +83,18 @@ test("a dedicated worktree's pull request reaches the shell and follows its bran
   await fixture.engine.syncPullRequests()
   expect(forge.requests.at(-1)).toEqual(['renamed'])
   expect(await pullRequestOf(fixture)).toEqual({ status: 'none' })
+})
+
+test('a branch the forge left unanswered keeps its known pull request', async () => {
+  const forge = fakeForge()
+  const fixture = await worktreeLifecycleFixture({ pullRequestLookup: forge.lookup })
+  fixtures.push(fixture)
+  const worktree = await fixture.create()
+  forge.answers.set(worktree.branch ?? '', openPullRequest)
+  await fixture.engine.syncPullRequests()
+  forge.unknown.add(worktree.branch ?? '')
+  await fixture.engine.syncPullRequests()
+  expect(await pullRequestOf(fixture)).toEqual({ status: 'found', ...openPullRequest })
 })
 
 test('a failed lookup reads unknown, keeps a known answer and backs off', async () => {
