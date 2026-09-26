@@ -19,7 +19,7 @@ a bare root `bun run verify`.
 
 | Plan                                                                                    | State                                                                               |
 | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| [191 — file picker, resizable and in the app's icons](191-file-picker-polish.md)        | **APPROVED 2026-09-26 — WAVE 2; ALL RECOMMENDATIONS TAKEN**                         |
+| [191 — file picker, resizable and in the app's icons](191-file-picker-polish.md)        | **IMPLEMENTED 2026-09-26 — WAVE 2 LANE FP; DEPLOY PENDING**                         |
 | [190 — faster CI](190-faster-ci.md)                                                     | **PROPOSED 2026-09-26 — READY; FIRST IN WAVE 2**                                    |
 | [189 — keep improving tree-sitter-md](189-tree-sitter-md-improvement.md)                | **PROPOSED 2026-09-26 — AFTER PLAN 176; OPEN ITEMS, THEN CORRECTNESS, SIZE, SPEED** |
 | [188 — server TypeScript only](188-server-typescript-only.md)                           | **DONE 2026-09-26 ON LANE L7 (#37); OWNER RULING; CLOSES 153**                      |
@@ -35,7 +35,6 @@ a bare root `bun run verify`.
 | [172 — one shared undo/redo stack](172-shared-undo-stack.md)                            | **RESEARCH — LIFE-13 FIRST; NOTICE-ONLY MOD+Z FIX ORDERED**                         |
 | [171 — the chat composer runs on our own editor](171-composer-on-our-editor.md)         | **PHASE 1 IMPLEMENTED 2026-09-26; PROSE WRAP, E058 THEN PHASE 3 (WAVE 2 E2)**       |
 | [170 — language census for grammar and theme prefetch](170-language-census.md)          | **PROPOSED — SPLIT FROM 110 Q7; TREE-SITTER WARM-UP ADDED 2026-09-26**              |
-| [167 — settings defaults, setting details, and copy](167-settings-and-copy.md)          | **PROPOSED — READY; D1–D4 DECIDED**                                                 |
 | [166 — keyboard shortcuts, redone](166-shortcuts-editor.md)                             | **PROPOSED — RESEARCH FIRST; D1–D6 DECIDED**                                        |
 | [156 — documents in the editor](156-documents-in-the-editor.md)                         | **PLACEHOLDER — FAR FUTURE; RESEARCH FIRST**                                        |
 | [155 — site demo becomes an animated replica](155-site-demo-replica.md)                 | **PLACEHOLDER — RESEARCH NOT STARTED**                                              |
@@ -46,7 +45,7 @@ a bare root `bun run verify`.
 | [148 — server deploys restart when idle](148-restart-when-idle.md)                      | **PROPOSED — D3 REPLACED: RESTART ON CLICK (COMPLETION WAVE)**                      |
 | [147 — log hygiene and a noise gate](147-log-hygiene-and-noise-gate.md)                 | **PROPOSED — PHASE 1 READY; PHASE 3 CARRIES PLAN 125'S REST**                       |
 | [145 — harness controls](145-harness-controls.md)                                       | **IMPLEMENTED (L3); OWNER REVIEW FIXES COMPLETE, VALIDATION IN PROGRESS**           |
-| [144 — unattended agent work](144-unattended-agent-work.md)                             | **RESEARCH — Q1–Q3 DECIDED; AFTER PRS #32 AND #35**                                 |
+| [144 — unattended agent work](144-unattended-agent-work.md)                             | **IN PROGRESS — P2 DONE (LANE A); P1 LANE B; P3 NEXT**                              |
 | [143 — phone layout](143-phone-layout.md)                                               | **DISCUSSION — OWNER DIRECTION FIRST**                                              |
 | [142 — web push](142-web-push.md)                                                       | **PROPOSED — SPIKE FIRST**                                                          |
 | [141 — usage and rate limits](141-usage-and-rate-limits.md)                             | **PHASES 1–3 IMPLEMENTED; PHASE 4 OPEN; PHASE 5 NEEDS THE OWNER**                   |

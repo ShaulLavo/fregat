@@ -1,5 +1,6 @@
 import type { ProviderUsagePurpose } from '@workspace/contracts'
 import { BackgroundTaskRegistry } from './background-liveness'
+import { SessionScheduleRegistry } from './session-schedules'
 import { elapsedMs } from '@workspace/utils/timing'
 import path from 'node:path'
 import { tmpdir } from 'node:os'
@@ -12,6 +13,7 @@ import type {
   ModelSelection,
   ProviderBackgroundTask,
   ProviderBackgroundTasks,
+  ProviderSessionSchedules,
   ProviderInstanceId,
   ProviderSessionHooks,
   ProviderSessionMcp,
@@ -140,6 +142,7 @@ export class ProviderService {
   private readonly pendingLaunches = new Map<SessionId, PendingProviderLaunch>()
   private readonly backgroundTasks = new BackgroundTaskRegistry()
   private readonly taskRosters = new Map<SessionId, ProviderBackgroundTask[]>()
+  private readonly schedules = new SessionScheduleRegistry()
   private readonly reaperTimer: ReturnType<typeof setInterval>
   private readonly reaper: ProviderSessionReaper
   private readonly runtimeEventListeners = new Set<ProviderRuntimeEventListener>()
@@ -171,7 +174,8 @@ export class ProviderService {
       deadlineMs: options.idleSessionDeadlineMs,
       directory: this.sessionDirectory,
       isLaunching: (sessionId) => this.isLaunching(sessionId),
-      hasBackgroundWork: (sessionId) => this.backgroundTasks.get(sessionId) !== null,
+      hasBackgroundWork: (sessionId) => this.keepsProcess(sessionId),
+      sleepingCount: () => this.schedules.count(),
       stopRuntime: (input) => this.stopRuntime(input),
     })
     this.reaperTimer = setInterval(
@@ -194,6 +198,50 @@ export class ProviderService {
    */
   backgroundLiveness(sessionId: string) {
     return this.backgroundTasks.get(sessionId)
+  }
+
+  /** The next time a harness schedule wakes the session, or null when none is held. */
+  sleepingUntil(sessionId: string) {
+    return this.schedules.sleepingUntil(sessionId)
+  }
+
+  sessionSchedules(sessionId: SessionId): ProviderSessionSchedules {
+    return {
+      schedules: this.schedules.list(sessionId),
+      heldByBackgroundWork: this.backgroundTasks.get(sessionId) !== null,
+    }
+  }
+
+  /** Stamped with the new runtime's epoch, so the timeline keeps it. */
+  private warnSchedulesDropped(
+    adapter: ReturnType<ProviderAdapterRegistry['getByInstance']>,
+    input: ProviderEnsureRuntimeInput,
+    count: number,
+  ) {
+    const schedules = count === 1 ? 'its schedule' : `its ${count} schedules`
+    const event: ProviderRuntimeEvent = {
+      createdAt: new Date().toISOString(),
+      eventId: `schedules-dropped:${crypto.randomUUID()}`,
+      payload: { message: `The agent restarted with the new settings and ended ${schedules}.` },
+      provider: adapter.driverKind,
+      providerInstanceId: input.providerInstanceId,
+      runtimeEpoch: input.runtimeEpoch,
+      sessionId: input.sessionId,
+      type: 'runtime.warning',
+    }
+    void this.runtimeEvents
+      .enqueue({ adapter, event, providerInstanceId: input.providerInstanceId })
+      .catch((error) =>
+        recordChatPipelineWarning('chat.pipeline.provider_service.runtime_stream.failed', {
+          error,
+          providerInstanceId: input.providerInstanceId,
+        }),
+      )
+  }
+
+  /** Background work and schedules both live in the provider process; stopping it loses them. */
+  keepsProcess(sessionId: SessionId) {
+    return this.backgroundTasks.get(sessionId) !== null || this.schedules.has(sessionId)
   }
 
   /** A provider launch between claim and adopt; a restart would interrupt it. */
@@ -308,6 +356,8 @@ export class ProviderService {
       return { binding, reused: true }
     }
 
+    // A replaced process takes its schedules with it; count them before the new one starts.
+    const droppedSchedules = existing ? this.schedules.list(input.sessionId).length : 0
     await this.stopReplacedBinding(existing, input.providerInstanceId)
     // A parameter change (model, runtime mode, cwd) restarts the session but
     // must not restart the *conversation*: the cursor of the account we are
@@ -338,8 +388,10 @@ export class ProviderService {
 
     recordChatPipelineInfo('chat.pipeline.provider_service.ensure_session.complete', {
       ...providerBindingSummary(binding),
+      droppedSchedules,
       reused: false,
     })
+    if (droppedSchedules > 0) this.warnSchedulesDropped(adapter, input, droppedSchedules)
 
     return { binding, reused: false }
   }
@@ -544,7 +596,7 @@ export class ProviderService {
     await this.awaitPendingLaunch(input.sessionId)
     if (
       input.idleBefore &&
-      (this.backgroundTasks.get(input.sessionId) !== null ||
+      (this.keepsProcess(input.sessionId) ||
         !this.sessionDirectory
           .listIdleSince(input.idleBefore, 'ready')
           .some((binding) => binding.sessionId === input.sessionId))
@@ -972,6 +1024,7 @@ export class ProviderService {
    */
   private releaseUnroutedBinding(binding: ProviderRuntimeBindingWithMetadata) {
     this.backgroundTasks.clear(binding.sessionId)
+    this.schedules.clear(binding.sessionId)
     this.releaseWorktree(binding.sessionId)
     recordChatPipelineWarning(
       'chat.pipeline.provider_service.stop.instance_missing',
@@ -1085,6 +1138,7 @@ export class ProviderService {
     }
     this.backgroundTasks.clear(sessionId)
     this.taskRosters.delete(sessionId)
+    this.schedules.clear(sessionId)
     this.releaseWorktree(sessionId)
   }
 
@@ -1223,6 +1277,7 @@ export class ProviderService {
 
     this.backgroundTasks.accept(task.event)
     this.acceptTaskRoster(task.event)
+    this.acceptSchedules(task.event)
     this.recordRuntimeEvent(task.event, task.adapter)
     this.publishUsage(task.event, 'turn')
     await this.emitRuntimeEvent(task.event)
@@ -1235,6 +1290,18 @@ export class ProviderService {
     if (binding.providerInstanceId !== providerInstanceId) return
 
     await this.emitRuntimeEvent(event)
+  }
+
+  private acceptSchedules(event: ProviderRuntimeEvent) {
+    const before = this.schedules.list(event.sessionId).length
+    this.schedules.accept(event)
+    const after = this.schedules.list(event.sessionId).length
+    if (before === after) return
+    recordChatPipelineInfo('chat.pipeline.provider_service.schedules.changed', {
+      sessionId: event.sessionId,
+      scheduleCount: after,
+      sleepingSessionCount: this.schedules.count(),
+    })
   }
 
   private acceptTaskRoster(event: ProviderRuntimeEvent) {

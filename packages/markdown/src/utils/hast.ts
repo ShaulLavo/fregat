@@ -33,7 +33,10 @@ export function createHastProcessor(extensions: HastExtensions): HastProcessor {
 /** mdast → hast for one block. Sanitization is not a caller choice. */
 export function blockToHast(block: MarkdownBlock, processor: HastProcessor): HastRoot {
   const root: MdastRoot = { type: 'root', children: [...block.nodes] }
-  const tree = processor.runSync(toHast(root, { allowDangerousHtml: true }) as HastRoot)
+  // Ids leave this stage bare: the sanitizer prefixes raw HTML and footnotes alike, once.
+  const tree = processor.runSync(
+    toHast(root, { allowDangerousHtml: true, clobberPrefix: '' }) as HastRoot,
+  )
   // The hast root separates blocks with newline text nodes, which a
   // `whitespace-pre-wrap` consumer would paint as blank lines.
   tree.children = tree.children.filter(

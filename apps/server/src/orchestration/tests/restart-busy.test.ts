@@ -209,6 +209,31 @@ describe('the restart confirmation names every busy session', () => {
   })
 })
 
+describe('a sleeping session', () => {
+  test('is listed with its state, and a shell read says when it wakes', async () => {
+    const adapter = new MockProviderAdapter({ wakeupMinutes: 30 })
+    const fixture = await restartFixture(adapter)
+    await fixture.createSession(await fixture.register(), OTHER, 'Sleeping session')
+    await fixture.send(OTHER, 'schedule-a-wakeup')
+    await fixture.engine.providerRuntimeIdle()
+
+    expect((await fixture.restart([])).result).toEqual({
+      restarting: false,
+      busy: [
+        {
+          sessionId: OTHER,
+          title: 'Sleeping session',
+          projectTitle: 'Platform',
+          state: 'sleeping',
+        },
+      ],
+    })
+    const shell = await fixture.engine.shellSnapshot()
+    const sleepingUntil = shell.sessions.find((session) => session.id === OTHER)?.sleepingUntil
+    expect(Date.parse(sleepingUntil ?? '')).toBeGreaterThan(Date.now())
+  })
+})
+
 class HeldLaunchAdapter extends MockProviderAdapter {
   readonly entered = Promise.withResolvers<void>()
   private readonly held: Promise<void>

@@ -8,20 +8,17 @@ import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { EntryPreviewTile } from '@/features/file-picker/components/entry-preview-tile'
 import { FileThumbnail } from '@/lib/file-preview/components/file-thumbnail'
 import { previewImageUrl } from '@/lib/file-preview/utils/preview'
-import type { FilePickerIconMode } from '@/features/file-picker/utils/model'
 import { previewKind } from '@/features/file-picker/utils/preview'
 
 /** One entry in the icons grid: an image's own thumbnail, or the entry's icon tile. */
 export function FileTile({
   entry,
-  iconMode,
   isBusy,
   rowProps,
   selected,
   onDoubleClick,
 }: {
   entry: FsEntry
-  iconMode: FilePickerIconMode
   isBusy: boolean
   rowProps: ReturnType<ReturnType<typeof useListbox>['rowProps']>
   selected: boolean
@@ -45,13 +42,11 @@ export function FileTile({
         {previewKind(entry) === 'image' ? (
           <FileThumbnail
             className='h-20'
-            fallback={
-              <EntryPreviewTile entry={entry} iconMode={iconMode} selected={selected} size='lg' />
-            }
+            fallback={<EntryPreviewTile entry={entry} />}
             src={previewImageUrl(origin, entry.path)}
           />
         ) : (
-          <EntryPreviewTile entry={entry} iconMode={iconMode} selected={selected} size='lg' />
+          <EntryPreviewTile entry={entry} />
         )}
       </span>
       <span className='w-full truncate text-center text-xs'>{entry.name}</span>

@@ -6,6 +6,7 @@ import {
   query as claudeSdkQuery,
   type AccountInfo,
   type CanUseTool,
+  type HookCallback,
   type ModelInfo,
   type Options,
   type PermissionResult,
@@ -23,6 +24,7 @@ import {
   approvalRequestIdSchema,
   messageIdSchema,
   sessionIdSchema,
+  turnIdSchema,
   type ApprovalRequestId,
   type InteractionMode,
   type ProviderApprovalOption,
@@ -33,6 +35,7 @@ import {
   type ProviderSlashCommand,
   type ProviderMcpServer,
   type ProviderSnapshot,
+  type ProviderTurnOrigin,
   type RuntimeMode,
   type SessionId,
   type TurnEndReason,
@@ -189,6 +192,11 @@ type PendingClaudeApproval = {
 type PendingClaudeUserInput = {
   resolve: (result: PermissionResult) => void
   toolInput: Record<string, unknown>
+}
+
+type PendingClaudeTurn = {
+  providerTurnId: string
+  turn: ActiveProviderTurn
 }
 
 type InFlightClaudeTool = {
@@ -651,6 +659,18 @@ class ClaudeAgentSession extends SessionContext {
   private providerConversationMarker: string | null = null
   private activeProviderTurnId: string | null = null
   private activeTurn: ActiveProviderTurn | null = null
+  /** Set while the running turn is one the harness started; null for the owner's own turn. */
+  private activeOrigin: ProviderTurnOrigin | null = null
+  /** The owner's prompt, queued in the harness behind a harness turn until its lifecycle starts. */
+  private pendingTurn: PendingClaudeTurn | null = null
+  /** The owner's running turn, pushed and queued (`command_lifecycle`), but not yet started. */
+  private activeAwaitingStart = false
+  /** A harness turn ran ahead of the owner's queued prompt; its `result` is not the owner's. */
+  private foreignResultsBeforeStart = 0
+  /** What the next harness turn is about, learned before it starts. */
+  private nextHarnessOrigin: ProviderTurnOrigin | null = null
+  /** This CLI reports `command_lifecycle`, so an owner turn is running only once its own frame says so. */
+  private lifecycleReported = false
   private query: Query | null = null
   private pumpCompletion: Promise<void> | null = null
   private streamEnded = true
@@ -726,6 +746,7 @@ class ClaudeAgentSession extends SessionContext {
       abortController: session.abortController,
       canUseTool: session.canUseTool(),
       cwd: input.cwd,
+      ...(input.ephemeral ? {} : { hooks: { Stop: [{ hooks: [session.stopHook()] }] } }),
       env: input.env,
       executablePath: input.executablePath,
       ...(input.agent ? { agent: input.agent } : {}),
@@ -815,14 +836,13 @@ class ClaudeAgentSession extends SessionContext {
   }
 
   /**
-   * One turn at a time, enforced. `SDKResultMessage` carries no turn identifier
-   * — only `uuid` and `session_id` — so everything between "prompt pushed" and
-   * "result received" is attributed to the active turn. A second concurrent turn
-   * would silently steal the first one's deltas and completion, so it is
-   * rejected instead.
+   * One owner turn at a time, enforced. `SDKResultMessage` carries no turn identifier, so a
+   * result settles whichever turn is running; the prompt's uuid and its `command_lifecycle`
+   * frames say which one that is. A turn the harness starts on its own (a wakeup, a finished
+   * background task) runs as its own turn, and a prompt sent during it waits for its own start.
    */
   async sendTurn({ input, messageId }: { input: ProviderTurnInput; messageId: string }) {
-    if (this.activeTurn) {
+    if ((this.activeTurn && this.activeOrigin === null) || this.pendingTurn) {
       throw createInternalError(
         `Claude session for session ${this.sessionId} already has a turn in flight.`,
       )
@@ -837,14 +857,15 @@ class ClaudeAgentSession extends SessionContext {
       providerBindingHandle: this.providerBindingHandle(),
     })
     const turn = activeProviderTurn({ canonicalTurnId: input.turnId, messageId })
-    // Minted locally — unlike Codex there is no provider-assigned turn id to
-    // late-bind to, which is what deletes codex's whole pending-turn machinery.
+    // Minted locally and stamped on the prompt: `command_lifecycle` frames report
+    // it as queued, started and completed, which is how this turn is told apart
+    // from a turn the harness starts on its own (a wakeup, a finished task).
     const providerTurnId = crypto.randomUUID()
-    this.activeTurn = turn
-    this.activeProviderTurnId = providerTurnId
-    this.announcedLimitStops.clear()
     void turn.promise.catch(noop)
-    this.ingestSession('running', input.turnId)
+    // Behind a harness turn the prompt waits in the harness queue; it starts when its lifecycle does.
+    const queued = this.activeTurn !== null
+    if (queued) this.pendingTurn = { providerTurnId, turn }
+    if (!queued) this.beginOwnTurn(turn, providerTurnId)
 
     try {
       const resolved = await this.resolveAttachments(input)
@@ -852,13 +873,14 @@ class ClaudeAgentSession extends SessionContext {
       // keyword, and `claudeReasoning` already kept it out of `Options.effort`.
       const messageText = claudePromptText(input.messageText, this.reasoning)
       this.prompt.push({ ...claudeUserMessage({ messageText, resolved }), uuid: providerTurnId })
-      this.emitTurnStarted(providerTurnId)
+      if (!queued) this.emitTurnStarted(providerTurnId)
     } catch (error) {
       recordChatPipelineWarning('chat.pipeline.claude_session.send_turn.failed', {
         error,
         sessionId: this.sessionId,
         turnId: input.turnId,
       })
+      if (this.pendingTurn?.turn === turn) this.pendingTurn = null
       this.rejectTurn(turn, providerErrorMessage(error))
       throw error
     }
@@ -868,6 +890,102 @@ class ClaudeAgentSession extends SessionContext {
       sessionId: this.sessionId,
       turnId: input.turnId,
     })
+  }
+
+  private beginOwnTurn(turn: ActiveProviderTurn, providerTurnId: string) {
+    this.activeTurn = turn
+    this.activeOrigin = null
+    this.activeProviderTurnId = providerTurnId
+    // A wakeup can fire between this push and the CLI reading it; until the prompt's own
+    // `started`, any turn that runs is someone else's.
+    this.activeAwaitingStart = this.lifecycleReported
+    this.foreignResultsBeforeStart = 0
+    this.nextHarnessOrigin = null
+    this.announcedLimitStops.clear()
+    this.ingestSession('running', turn.canonicalTurnId)
+  }
+
+  /** The owner's queued prompt reached the front of the harness queue. */
+  private startPendingTurn() {
+    const pending = this.pendingTurn
+    if (!pending) return
+    this.pendingTurn = null
+    if (this.activeTurn) {
+      recordChatPipelineWarning('chat.pipeline.claude_session.pending_turn.started_over_active', {
+        activeTurnId: this.activeTurn.canonicalTurnId,
+        sessionId: this.sessionId,
+        turnId: pending.turn.canonicalTurnId,
+      })
+      this.clearActiveTurn(this.activeTurn)
+    }
+    this.beginOwnTurn(pending.turn, pending.providerTurnId)
+    this.emitTurnStarted(pending.providerTurnId)
+  }
+
+  /** A turn no prompt of ours asked for; it gets its own turn id so its reply and result land on it. */
+  private adoptHarnessTurn(origin: ProviderTurnOrigin, providerTurnId: string) {
+    const turnId = v.parse(turnIdSchema, `provider:${crypto.randomUUID()}`)
+    const turn = activeProviderTurn({
+      canonicalTurnId: turnId,
+      messageId: v.parse(messageIdSchema, `assistant:${turnId}`),
+    })
+    void turn.promise.catch(noop)
+    this.activeTurn = turn
+    this.activeOrigin = origin
+    this.activeProviderTurnId = providerTurnId
+    this.activeAwaitingStart = false
+    this.nextHarnessOrigin = null
+    this.announcedLimitStops.clear()
+    recordChatPipelineInfo('chat.pipeline.claude_session.harness_turn.adopted', {
+      origin,
+      sessionId: this.sessionId,
+      turnId,
+    })
+    this.emitTurnStarted(providerTurnId, origin)
+    this.ingestSession('running', turnId)
+  }
+
+  /**
+   * `command_lifecycle` is not in the SDK's message union, so it is read by shape.
+   * `started` with a uuid we never pushed is a wakeup or cron firing.
+   */
+  private handleCommandLifecycle(commandUuid: string, state: string) {
+    this.lifecycleReported = true
+    if (state === 'queued') {
+      if (this.activeProviderTurnId === commandUuid && this.activeOrigin === null) {
+        this.activeAwaitingStart = true
+      }
+      return
+    }
+    if (state === 'cancelled') {
+      this.cancelPendingTurn(commandUuid)
+      return
+    }
+    if (state !== 'started') return
+    if (this.pendingTurn?.providerTurnId === commandUuid) {
+      this.startPendingTurn()
+      return
+    }
+    if (this.activeProviderTurnId === commandUuid) {
+      this.activeAwaitingStart = false
+      return
+    }
+    if (!this.activeTurn) {
+      this.adoptHarnessTurn(this.nextHarnessOrigin ?? 'scheduled', commandUuid)
+      return
+    }
+    // The harness ran its own turn ahead of the owner's queued prompt: that turn's output
+    // lands on the owner's turn, and its result must not close it.
+    if (this.activeOrigin === null && this.activeAwaitingStart) this.foreignResultsBeforeStart += 1
+  }
+
+  private cancelPendingTurn(commandUuid: string) {
+    const pending = this.pendingTurn
+    if (pending?.providerTurnId !== commandUuid) return
+
+    this.pendingTurn = null
+    this.emitTurnCompleted(pending.turn, new Date().toISOString(), { state: 'interrupted' })
+    pending.turn.resolve()
   }
 
   async mcpServers(): Promise<ProviderMcpServer[] | null> {
@@ -954,6 +1072,32 @@ class ClaudeAgentSession extends SessionContext {
     return this.processes.some((process) => process.isAlive()) || !this.streamEnded
   }
 
+  /** Every Stop names the session's crons, wake-ups and loops, harness-started turns included. */
+  stopHook(): HookCallback {
+    return async (input) => {
+      if (input.hook_event_name !== 'Stop') return {}
+      const schedules = (input.session_crons ?? []).map((cron) => ({
+        id: cron.id,
+        prompt: cron.prompt,
+        recurring: cron.recurring,
+        schedule: cron.schedule,
+      }))
+      this.emit({
+        createdAt: new Date().toISOString(),
+        eventId: runtimeEventId('claude-schedules-updated'),
+        payload: { schedules },
+        provider: DEFAULT_CLAUDE_PROVIDER_SETTINGS.driverKind,
+        providerInstanceId: this.providerInstanceId,
+        providerBindingHandle: this.providerBindingHandle(),
+        runtimeMode: this.runtimeMode,
+        sessionId: this.sessionId,
+        ...(this.activeTurn ? { turnId: this.activeTurn.canonicalTurnId } : {}),
+        type: 'schedules.updated',
+      })
+      return {}
+    }
+  }
+
   async close() {
     recordChatPipelineInfo('chat.pipeline.claude_session.close', {
       providerBindingHandle: this.providerBindingHandle(),
@@ -1017,6 +1161,13 @@ class ClaudeAgentSession extends SessionContext {
   }
 
   private handleMessage(message: SDKMessage) {
+    const record = asRecord(message)
+    if (stringField(record, 'type') === 'command_lifecycle') {
+      const commandUuid = stringField(record, 'command_uuid')
+      const state = stringField(record, 'state')
+      if (commandUuid && state) this.handleCommandLifecycle(commandUuid, state)
+      return
+    }
     switch (message.type) {
       case 'system':
         this.handleSystemMessage(message)
@@ -1210,6 +1361,11 @@ class ClaudeAgentSession extends SessionContext {
         this.handleTaskUpdated(message)
         return
       case 'task_notification':
+        // With no turn running, the harness is about to start one to read this; with the owner's
+        // prompt still queued, that turn runs first and its result is not the owner's.
+        if (!this.activeTurn) this.nextHarnessOrigin = 'task'
+        if (this.activeOrigin === null && this.activeAwaitingStart)
+          this.foreignResultsBeforeStart += 1
         this.emitRuntimeNotification(
           'task.completed',
           {
@@ -1458,7 +1614,10 @@ class ClaudeAgentSession extends SessionContext {
    */
   private handleInitMessage(message: ClaudeSystemMessageOf<'init'>) {
     this.confirmSessionId(message.session_id)
-    if (!this.activeTurn) this.status = 'ready'
+    // Every turn opens with `init`. With nothing running it is the owner's queued prompt (a CLI
+    // without lifecycle frames) or a turn the harness started, such as a task notification.
+    if (!this.activeTurn && this.pendingTurn) this.startPendingTurn()
+    if (!this.activeTurn) this.adoptHarnessTurn(this.nextHarnessOrigin ?? 'provider', message.uuid)
 
     this.emitRuntimeNotification('runtime.configured', { config: asRecord(message) }, message)
   }
@@ -1659,6 +1818,14 @@ class ClaudeAgentSession extends SessionContext {
       })
       return
     }
+    if (this.activeAwaitingStart && this.foreignResultsBeforeStart > 0) {
+      this.foreignResultsBeforeStart -= 1
+      recordChatPipelineInfo('chat.pipeline.claude_session.result.harness_turn_before_prompt', {
+        sessionId: this.sessionId,
+        turnId: turn.canonicalTurnId,
+      })
+      return
+    }
     if (message.subtype === 'success') {
       this.completeTurn(turn, message.usage, claudeSuccessEndReason(message))
       return
@@ -1693,7 +1860,8 @@ class ClaudeAgentSession extends SessionContext {
       turnId: turn.canonicalTurnId,
       type: 'assistant.complete',
     })
-    this.ingestSession('ready', null)
+    // Bound to the turn that ended: a harness turn the log never took must not settle another.
+    this.ingestSession('ready', turn.canonicalTurnId)
     this.resolveTurn(turn)
   }
 
@@ -1703,7 +1871,7 @@ class ClaudeAgentSession extends SessionContext {
       turnId: turn.canonicalTurnId,
     })
     this.emitTurnCompleted(turn, new Date().toISOString(), { state: 'interrupted', usage })
-    this.ingestSession('ready', null)
+    this.ingestSession('ready', turn.canonicalTurnId)
     this.resolveTurn(turn)
   }
 
@@ -1743,11 +1911,17 @@ class ClaudeAgentSession extends SessionContext {
     if (this.activeTurn !== turn) return
 
     this.activeTurn = null
+    this.activeOrigin = null
     this.activeProviderTurnId = null
+    this.activeAwaitingStart = false
+    this.foreignResultsBeforeStart = 0
     this.inFlightTools.clear()
   }
 
   private rejectAllTurns(error: Error) {
+    const pending = this.pendingTurn
+    this.pendingTurn = null
+    pending?.turn.reject(error)
     const turn = this.activeTurn
     if (!turn) return
 
@@ -2092,11 +2266,11 @@ class ClaudeAgentSession extends SessionContext {
     })
   }
 
-  private emitTurnStarted(providerTurnId: string) {
+  private emitTurnStarted(providerTurnId: string, origin?: ProviderTurnOrigin) {
     this.emit({
       createdAt: new Date().toISOString(),
       eventId: runtimeEventId('claude-turn-started'),
-      payload: { model: this.model },
+      payload: { model: this.model, ...(origin ? { origin } : {}) },
       provider: DEFAULT_CLAUDE_PROVIDER_SETTINGS.driverKind,
       providerInstanceId: this.providerInstanceId,
       providerRefs: { providerTurnId },

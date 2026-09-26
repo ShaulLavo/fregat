@@ -396,7 +396,14 @@ function railProject(
 }
 
 function railStatus(sessions: readonly SessionRailItem[]): SessionRailStatus {
-  for (const status of ['approval', 'input', 'working', 'monitoring', 'failed'] as const) {
+  for (const status of [
+    'approval',
+    'input',
+    'working',
+    'monitoring',
+    'failed',
+    'sleeping',
+  ] as const) {
     if (sessions.some((session) => session.status === status)) return status
   }
   return 'ready'

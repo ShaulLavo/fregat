@@ -48,6 +48,7 @@ export class ProviderSessionReaper {
   private readonly now: () => number
   private readonly isLaunching: (sessionId: SessionId) => boolean
   private readonly hasBackgroundWork: (sessionId: SessionId) => boolean
+  private readonly sleepingCount: () => number
   private readonly stopRuntime: StopRuntime
   private pendingSweep: Promise<SessionId[]> | null = null
 
@@ -56,7 +57,9 @@ export class ProviderSessionReaper {
     directory: ProviderSessionDirectory
     now?: () => number
     isLaunching?: (sessionId: SessionId) => boolean
+    /** Background work or a schedule keeps the process alive past the deadline. */
     hasBackgroundWork?: (sessionId: SessionId) => boolean
+    sleepingCount?: () => number
     stopRuntime: StopRuntime
   }) {
     this.deadlineMs = options.deadlineMs ?? IDLE_PROVIDER_SESSION_DEADLINE_MS
@@ -64,6 +67,7 @@ export class ProviderSessionReaper {
     this.now = options.now ?? Date.now
     this.isLaunching = options.isLaunching ?? (() => false)
     this.hasBackgroundWork = options.hasBackgroundWork ?? (() => false)
+    this.sleepingCount = options.sleepingCount ?? (() => 0)
     this.stopRuntime = options.stopRuntime
   }
 
@@ -103,6 +107,7 @@ export class ProviderSessionReaper {
       idleCount: idle.length,
       reapedCount: reaped.length,
       sessionIds: reaped,
+      sleepingCount: this.sleepingCount(),
     })
 
     return reaped

@@ -17,8 +17,9 @@ export function ImportSection() {
           imported.
         </p>
         <p className='text-muted-foreground text-xs'>
-          Claude Code reads local CLI history, not Claude app or web chats. Codex reads CLI and
-          local app sessions stored in the same Codex home, not cloud-only sessions.
+          Claude Code reads local CLI history; Claude app and web chats are not imported. Codex
+          reads CLI and local app sessions stored in the same Codex home; cloud-only sessions are
+          not imported.
         </p>
       </div>
       {sources.isPending ? <ImportLoading /> : null}

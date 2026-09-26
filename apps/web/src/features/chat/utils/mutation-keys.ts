@@ -28,6 +28,8 @@ export const chatMutationKeys = {
     ['chat', 'sign-in-mcp-server', environmentId, sessionId] as const,
   stopBackgroundTask: (environmentId: string, sessionId: string) =>
     ['chat', 'stop-background-task', environmentId, sessionId] as const,
+  cancelSchedules: (environmentId: string, sessionId: string) =>
+    ['chat', 'cancel-schedules', environmentId, sessionId] as const,
   compact: (environmentId: string, sessionId: string) =>
     ['chat', 'compact', environmentId, sessionId] as const,
   fork: (environmentId: string, sessionId: string) =>

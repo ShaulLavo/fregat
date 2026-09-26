@@ -2,8 +2,11 @@
 
 ## Status and authorization
 
-- Status: RESEARCH DONE (2026-09-25) — findings, model and phases below. Owner question answered
-  2026-09-26. Nothing here authorizes implementation.
+- Status: DONE (2026-09-26, wave 2 lane W), phases 1–3. The server keeps one index per root,
+  held by each client's project event stream (`apps/server/src/fs/workspace-index-scopes.ts`),
+  capped by `files.searchIndexLimit` (4) and kept warm `files.searchIndexIdleMinutes` (15) after
+  the last holder leaves. The open generation, the server's `superseded` status and the browser
+  tests' open queue are deleted. Proof: scenario `workspace-two-roots`. Deploy needs `--server`.
 - Priority: P2. It becomes a product question once [Plan 143](143-phone-layout.md) makes the
   phone a real client.
 - Planned at: Platform `9f343825`, 2026-09-25. Origin: CI work on 2026-09-25.

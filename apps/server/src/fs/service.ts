@@ -3,6 +3,7 @@ import { elapsedMs } from '@workspace/utils/timing'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import {
+  DEFAULT_SETTING_VALUES,
   effectiveEntryType,
   isPickableEntry,
   type ServerInfo,
@@ -14,8 +15,9 @@ import { FileChangeHub } from './watch'
 import { entryFromStat } from './entry'
 import { DEFAULT_MAX_TEXT_FILE_BYTES, MAX_TEXT_FILE_BYTES_UPPER_BOUND } from './limits'
 import { statPath } from './stat'
+import { readUserPlaces } from './places'
 import { readTree } from './tree'
-import { getBlobFile, readTextFile } from './read'
+import { getBlobFile, readTextFile, readTextHead } from './read'
 import { writeTextFile } from './write'
 import { textFileVersion } from './version'
 import { AppWrites } from './app-writes'
@@ -46,12 +48,7 @@ import {
   registerWorkspaceAddress,
   resolveWorkspaceAddress,
 } from './workspace-address'
-import {
-  WorkspaceIndex,
-  inactiveWorkspaceIndexStatus,
-  watchWorkspaceIndex,
-  type WorkspaceIndexWatchSubscription,
-} from './workspace-index'
+import { WorkspaceIndexScopes } from './workspace-index-scopes'
 import type {
   CopyBody,
   CreateFileBody,
@@ -70,7 +67,6 @@ import type {
   WorkspaceEditHistoryQuery,
   WriteBody,
 } from './contracts'
-import type { WorkspacePaths } from './path'
 import { WorkspaceEditController, type WorkspaceEditControllerOptions } from './workspace-edit'
 import { driveJournalName } from './workspace-edit-journals'
 
@@ -80,6 +76,8 @@ export type FileSystemServiceOptions = {
   workspaceRoot?: string
   systemRoot?: string
   homeDirectory?: string
+  /** xdg-user-dirs' `user-dirs.dirs`; defaults to the one under the home's config directory. */
+  userDirsFile?: string
   watch?: boolean
   maxSearchContentBytes?: number
   maxTextFileBytes?: number
@@ -98,18 +96,14 @@ export type FileSystemServiceOptions = {
   workspaceEditClock?: WorkspaceEditControllerOptions['clock']
   /** Test seam for deterministic transaction filesystem failures. */
   workspaceEditDriver?: WorkspaceEditControllerOptions['driver']
+  /** Test seam: how long an index nobody holds stays warm, in milliseconds. */
+  workspaceIndexIdleMs?: () => number
 }
+
+type SearchIndexSettings = { readonly idleMinutes: number; readonly limit: number }
 
 const DEFAULT_TREE_CONCURRENCY = 32
 const RECENT_CANDIDATE_BATCH_SIZE = 50
-
-type WorkspaceIndexScope = {
-  abort: AbortController
-  index: WorkspaceIndex
-  paths: WorkspacePaths
-  startup: Promise<void>
-  watcher: WorkspaceIndexWatchSubscription
-}
 
 function resolveMaxTextFileBytes(env: NodeJS.ProcessEnv = process.env): number {
   const raw = env.MAX_TEXT_FILE_BYTES
@@ -135,15 +129,19 @@ export class FileSystemService {
   readonly systemRoot
   readonly defaultPath
   readonly metadata
+  private readonly homeDirectory
+  private readonly userDirsFile
   private readonly appWrites = new AppWrites()
   private readonly maxSearchContentBytes
   private readonly maxTextFileBytes
   private readonly workspaceEditJournalRoot
   private readonly workspaceEditReady
   private readonly workspaceEdits
-  private latestWorkspaceOpenGeneration = 0
-  private workspaceIndexScope: WorkspaceIndexScope | undefined
-  private readonly retiringWorkspaceIndexScopes = new Set<Promise<void>>()
+  private readonly workspaceIndexes: WorkspaceIndexScopes
+  private readSearchIndexSettings: () => SearchIndexSettings = () => ({
+    idleMinutes: DEFAULT_SETTING_VALUES['files.searchIndexIdleMinutes'],
+    limit: DEFAULT_SETTING_VALUES['files.searchIndexLimit'],
+  })
   private readonly treeConcurrency
 
   constructor(options: FileSystemServiceOptions = {}) {
@@ -158,6 +156,8 @@ export class FileSystemService {
       excludedNames: [driveJournalName(process.getuid?.() ?? 0)],
     })
     this.homePath = resolveHomePath(this.paths, homeDirectory)
+    this.homeDirectory = homeDirectory
+    this.userDirsFile = options.userDirsFile ?? defaultUserDirsFile(options.homeDirectory)
     this.defaultPath = this.homePath
     this.metadata = new FsMetadataStore({
       database: options.metadataDatabase,
@@ -179,10 +179,24 @@ export class FileSystemService {
       paths: this.paths,
     })
     this.workspaceEditReady = this.workspaceEdits.ready()
+    this.workspaceIndexes = new WorkspaceIndexScopes({
+      changes: this.changes,
+      excludedAbsolutePaths: [this.workspaceEditJournalRoot],
+      idleMs:
+        options.workspaceIndexIdleMs ?? (() => this.readSearchIndexSettings().idleMinutes * 60_000),
+      limit: () => this.readSearchIndexSettings().limit,
+      paths: this.paths,
+    })
   }
 
-  get workspaceIndex() {
-    return this.workspaceIndexScope?.index
+  /** The index whose root is exactly `root` (workspace-relative), while one is held or warm. */
+  workspaceIndex(root: string) {
+    return this.workspaceIndexes.get(this.paths.resolve(root).absolutePath)
+  }
+
+  /** `files.searchIndexLimit` and `files.searchIndexIdleMinutes`, read when they apply. */
+  set searchIndexSettings(read: () => SearchIndexSettings) {
+    this.readSearchIndexSettings = read
   }
 
   /** `files.watchDirectoryLimit`, read at each attach; the settings store is built after this service. */
@@ -203,9 +217,19 @@ export class FileSystemService {
       defaultPath: this.defaultPath,
       metadataDbPath: this.metadata.databasePath,
       maxTextFileBytes: this.maxTextFileBytes,
-      workspaceIndex: this.workspaceIndex?.status() ?? inactiveWorkspaceIndexStatus(),
+      workspaceIndexes: this.workspaceIndexes.statuses(),
       ...this.changes.info(),
     }
+  }
+
+  places() {
+    return observeRequestOperation(
+      { area: 'fs', operation: 'places' },
+      async () => ({
+        places: await readUserPlaces(this.paths, this.homeDirectory, this.userDirsFile),
+      }),
+      (result) => ({ placeCount: result.places.length }),
+    )
   }
 
   stat(path: string) {
@@ -218,36 +242,20 @@ export class FileSystemService {
 
   async openWorkspaceRoot(body: OpenWorkspaceRootBody) {
     return observeRequestOperation(
-      {
-        area: 'fs',
-        generation: body.generation,
-        operation: 'open_workspace_root',
-        path: body.path,
-      },
+      { area: 'fs', operation: 'open_workspace_root', path: body.path },
       () => this.openWorkspaceRootObserved(body),
       (result) => ({
-        canonicalPath: result.entry?.path,
-        entryType: result.entry?.type,
-        openStatus: result.status,
-        scanRoot: result.workspaceIndex.scanRoot,
-        workspaceAddressId: result.entry?.workspaceAddress.id,
+        canonicalPath: result.entry.path,
+        entryType: result.entry.type,
+        workspaceAddressId: result.entry.workspaceAddress.id,
       }),
     )
   }
 
+  /** Validates and registers the root. Its index belongs to the clients streaming its events. */
   private async openWorkspaceRootObserved(body: OpenWorkspaceRootBody) {
     await this.workspaceEditReady
-    if (!this.claimWorkspaceOpen(body.generation)) return this.supersededWorkspaceOpen()
-
-    const entry = await registerWorkspaceAddress(this.paths, this.metadata, body.path)
-    if (!this.isCurrentWorkspaceOpen(body.generation)) return this.supersededWorkspaceOpen()
-
-    this.installWorkspaceIndexScope(entry.path)
-    return {
-      entry,
-      status: 'opened' as const,
-      workspaceIndex: this.info().workspaceIndex,
-    }
+    return { entry: await registerWorkspaceAddress(this.paths, this.metadata, body.path) }
   }
 
   registerWorkspaceAddress(input: string) {
@@ -295,6 +303,14 @@ export class FileSystemService {
           concurrency: this.treeConcurrency,
         }),
       (result) => ({ entryCount: result.entries.length }),
+    )
+  }
+
+  head(path: string, maxBytes: number) {
+    return observeRequestOperation(
+      { area: 'fs', maxBytes, operation: 'head', path },
+      () => readTextHead(this.paths, path, maxBytes),
+      (result) => ({ size: result.size, truncated: result.truncated }),
     )
   }
 
@@ -534,7 +550,7 @@ export class FileSystemService {
           maxContentBytes: this.maxSearchContentBytes,
         },
         signal,
-        { workspaceIndex: workspaceIndexForSearch(options, this.workspaceIndex) },
+        { workspaceIndex: workspaceIndexForSearch(options, this.workspaceIndex(options.path)) },
       ),
       options,
     )
@@ -617,7 +633,23 @@ export class FileSystemService {
     onlyFiles = false,
   ): AsyncGenerator<WatchServerMessage> {
     await this.workspaceEditReady
-    yield* observedWatchEvents(this.changes.stream(paths, signal, { files, onlyFiles }), paths)
+    // A project stream on one root (none means the workspace root) holds that root's index.
+    const release =
+      !onlyFiles && paths.length <= 1 ? this.acquireWorkspaceIndex(paths[0] ?? '') : null
+    try {
+      yield* observedWatchEvents(this.changes.stream(paths, signal, { files, onlyFiles }), paths)
+    } finally {
+      release?.()
+    }
+  }
+
+  private acquireWorkspaceIndex(root: string) {
+    try {
+      return this.workspaceIndexes.acquire(root)
+    } catch {
+      // A root that does not resolve fails the stream itself, which reports it.
+      return null
+    }
   }
 
   workspaceEditPrepare(body: WorkspaceEditPrepareBody) {
@@ -669,9 +701,7 @@ export class FileSystemService {
   }
 
   async close() {
-    if (this.workspaceIndexScope) this.retireWorkspaceIndexScope(this.workspaceIndexScope)
-    this.workspaceIndexScope = undefined
-    await Promise.all(this.retiringWorkspaceIndexScopes)
+    await this.workspaceIndexes.close()
     await this.workspaceEditReady
     await this.workspaceEdits.close()
     await this.changes.close()
@@ -702,53 +732,6 @@ export class FileSystemService {
     )
   }
 
-  private claimWorkspaceOpen(generation: number) {
-    if (generation <= this.latestWorkspaceOpenGeneration) return false
-
-    this.latestWorkspaceOpenGeneration = generation
-    return true
-  }
-
-  private isCurrentWorkspaceOpen(generation: number) {
-    return generation === this.latestWorkspaceOpenGeneration
-  }
-
-  private supersededWorkspaceOpen() {
-    return {
-      entry: undefined,
-      status: 'superseded' as const,
-      workspaceIndex: this.info().workspaceIndex,
-    }
-  }
-
-  private installWorkspaceIndexScope(relativeRoot: string) {
-    const absoluteRoot = this.paths.resolve(relativeRoot).absolutePath
-    if (this.workspaceIndexScope?.paths.workspaceRoot === absoluteRoot) return
-
-    const previous = this.workspaceIndexScope
-    const paths = createWorkspacePaths(absoluteRoot, {
-      excludedAbsolutePaths: [this.workspaceEditJournalRoot],
-      excludedNames: this.paths.internalNames,
-    })
-    const index = new WorkspaceIndex(paths)
-    const abort = new AbortController()
-    const watcher = watchWorkspaceIndex(index, (signal) =>
-      scopedWorkspaceIndexEvents(this.changes, this.paths, paths, relativeRoot, signal),
-    )
-    const startup = startWorkspaceIndex(index, watcher, abort.signal)
-
-    this.workspaceIndexScope = { abort, index, paths, startup, watcher }
-    if (previous) this.retireWorkspaceIndexScope(previous)
-  }
-
-  private retireWorkspaceIndexScope(scope: WorkspaceIndexScope) {
-    scope.abort.abort()
-    const retirement = closeWorkspaceIndexScope(scope).finally(() => {
-      this.retiringWorkspaceIndexScopes.delete(retirement)
-    })
-    this.retiringWorkspaceIndexScopes.add(retirement)
-  }
-
   private async refreshMetadataEntry(input: string, missing: string[]) {
     try {
       const refreshed = await this.statEntry(input)
@@ -775,106 +758,6 @@ function matchesRecentQuery(entry: TreeEntry, query: RecentsQuery) {
 
 function hasHiddenPathSegment(input: string) {
   return input.split('/').some((segment) => segment.startsWith('.'))
-}
-
-async function startWorkspaceIndex(
-  index: WorkspaceIndex,
-  watcher: WorkspaceIndexWatchSubscription,
-  signal: AbortSignal,
-) {
-  try {
-    await watcher.ready
-    if (signal.aborted) return
-    if (watcher.coverage?.mode === 'limited') {
-      index.turnOff('watch-limit')
-      return
-    }
-
-    await index.rebuild({ reason: 'workspace-root-opened', signal })
-  } catch {
-    // The index keeps failed status internally; search can continue through fallback paths.
-  }
-}
-
-async function closeWorkspaceIndexScope(scope: WorkspaceIndexScope) {
-  await scope.watcher.close()
-  await scope.startup
-}
-
-async function* scopedWorkspaceIndexEvents(
-  changes: FileChangeHub,
-  servicePaths: WorkspacePaths,
-  indexPaths: WorkspacePaths,
-  relativeRoot: string,
-  signal: AbortSignal,
-): AsyncGenerator<WatchServerMessage> {
-  const events = changes.stream([relativeRoot], signal, { includeIgnored: true })
-
-  for await (const event of events) {
-    const scoped = scopeWorkspaceIndexEvent(event, servicePaths, indexPaths)
-    if (!scoped) continue
-
-    yield scoped
-  }
-}
-
-function scopeWorkspaceIndexEvent(
-  event: WatchServerMessage,
-  servicePaths: WorkspacePaths,
-  indexPaths: WorkspacePaths,
-): WatchServerMessage | null {
-  if (!isWorkspaceFilesystemEvent(event)) return scopeNonFilesystemEvent(event)
-  if (event.type === 'renamed')
-    return scopeRenamedWorkspaceIndexEvent(event, servicePaths, indexPaths)
-
-  const scopedPath = scopedIndexPath(event.path, servicePaths, indexPaths)
-  if (scopedPath === null) return null
-
-  return { ...event, path: scopedPath }
-}
-
-function scopeNonFilesystemEvent(event: WatchServerMessage): WatchServerMessage {
-  if (event.type !== 'ready') return event
-
-  return { ...event, root: '' }
-}
-
-function scopeRenamedWorkspaceIndexEvent(
-  event: Extract<WatchServerMessage, { type: 'renamed' }>,
-  servicePaths: WorkspacePaths,
-  indexPaths: WorkspacePaths,
-): WatchServerMessage | null {
-  const path = scopedIndexPath(event.path, servicePaths, indexPaths)
-  const oldPath = scopedIndexPath(event.oldPath, servicePaths, indexPaths)
-  if (path !== null && oldPath !== null) return { ...event, oldPath, path }
-  if (oldPath !== null) return { path: oldPath, sequence: event.sequence, type: 'deleted' }
-  if (path === null) return null
-
-  return { entry: event.entry, path, sequence: event.sequence, type: 'created' }
-}
-
-function scopedIndexPath(
-  relativePath: string,
-  servicePaths: WorkspacePaths,
-  indexPaths: WorkspacePaths,
-) {
-  const absolutePath = servicePaths.resolve(relativePath).absolutePath
-
-  try {
-    return indexPaths.toRelative(absolutePath)
-  } catch {
-    return null
-  }
-}
-
-function isWorkspaceFilesystemEvent(
-  event: WatchServerMessage,
-): event is Extract<WatchServerMessage, { type: 'changed' | 'created' | 'deleted' | 'renamed' }> {
-  if (event.type === 'changed') return true
-  if (event.type === 'created') return true
-  if (event.type === 'deleted') return true
-
-  return event.type === 'renamed'
 }
 
 type SearchStreamState = {
@@ -1055,6 +938,14 @@ function watchStreamSummary(
     status,
     subscribedRootCount: paths.length || 1,
   }
+}
+
+// An injected home (tests, a second owner) reads its own config, never the process's XDG_CONFIG_HOME.
+function defaultUserDirsFile(injectedHome: string | undefined) {
+  const configHome = injectedHome
+    ? path.join(injectedHome, '.config')
+    : process.env.XDG_CONFIG_HOME || path.join(homedir(), '.config')
+  return path.join(configHome, 'user-dirs.dirs')
 }
 
 function resolveHomePath(paths: ReturnType<typeof createWorkspacePaths>, homeDirectory: string) {

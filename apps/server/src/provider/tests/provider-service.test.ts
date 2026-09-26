@@ -125,6 +125,99 @@ describe('ProviderService', () => {
     }
   })
 
+  it('names the schedules a settings change ends, on the new runtime’s timeline', async () => {
+    const fixture = createFixture()
+    const adapter = new MockProviderAdapter({ wakeupMinutes: 30 })
+    const service = new ProviderService({
+      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      sessionDirectory: new ProviderSessionDirectory(fixture.database),
+    })
+    const events: ProviderRuntimeEvent[] = []
+    service.subscribeRuntimeEvents((event) => {
+      events.push(event)
+    })
+    const turn = providerTurnInput()
+    try {
+      await service.sendTurn(turn)
+      await service.drainRuntimeEvents()
+      expect(service.sleepingUntil(turn.sessionId)).not.toBeNull()
+
+      await service.ensureRuntime({
+        providerInstanceId: turn.providerInstanceId,
+        runtimeMode: turn.runtimeMode,
+        runtimeEpoch: 'runtime-epoch-2',
+        sessionId: turn.sessionId,
+        runtimePayload: {
+          ...providerSessionPayload(turn),
+          modelSelection: { ...turn.modelSelection, model: 'gpt-5.5' },
+        },
+      })
+      await service.drainRuntimeEvents()
+
+      expect(events.filter((event) => event.type === 'runtime.warning')).toMatchObject([
+        {
+          payload: { message: 'The agent restarted with the new settings and ended its schedule.' },
+          runtimeEpoch: 'runtime-epoch-2',
+        },
+      ])
+      expect(service.sleepingUntil(turn.sessionId)).toBeNull()
+    } finally {
+      await service.shutdown()
+      fixture.close()
+    }
+  })
+
+  it('keeps a sleeping runtime past the idle deadline, and reclaims it once its schedules end', async () => {
+    vi.useFakeTimers()
+    const fixture = createFixture()
+    const stream = new ProviderRuntimeEventStream()
+    const adapter = new MockProviderAdapter()
+    const subscribe = adapter.subscribeEvents.bind(adapter)
+    adapter.subscribeEvents = (subscriber) => {
+      const off = subscribe(subscriber)
+      const offSchedules = stream.subscribe(subscriber)
+      return () => {
+        off()
+        offSchedules()
+      }
+    }
+    const service = new ProviderService({
+      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      sessionDirectory: new ProviderSessionDirectory(fixture.database),
+    })
+    try {
+      const input = await startReadyRuntime(service, fixture.database)
+      const report = (schedules: { id: string; schedule: string }[]) =>
+        stream.publish({
+          type: 'schedules.updated',
+          eventId: crypto.randomUUID(),
+          createdAt: new Date().toISOString(),
+          sessionId: input.sessionId,
+          runtimeEpoch: input.runtimeEpoch,
+          payload: {
+            schedules: schedules.map((item) => ({ ...item, prompt: 'poll', recurring: true })),
+          },
+        })
+      report([{ id: 'hourly', schedule: '0 * * * *' }])
+      await service.drainRuntimeEvents()
+      expect(service.sleepingUntil(input.sessionId)).not.toBeNull()
+      expect(service.sessionSchedules(input.sessionId).schedules).toHaveLength(1)
+
+      await vi.advanceTimersByTimeAsync(40 * 60 * 1000)
+      expect(await adapter.hasRuntime({ sessionId: input.sessionId })).toBe(true)
+
+      report([])
+      await service.drainRuntimeEvents()
+      expect(service.sleepingUntil(input.sessionId)).toBeNull()
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000)
+      expect(await adapter.hasRuntime({ sessionId: input.sessionId })).toBe(false)
+    } finally {
+      await service.shutdown()
+      fixture.close()
+      vi.useRealTimers()
+    }
+  })
+
   it('closes a launch that resolves after the shutdown wait times out', async () => {
     const fixture = createFixture()
     const adapter = new MockProviderAdapter({ operationTimeoutMs: 5 })

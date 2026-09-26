@@ -58,6 +58,8 @@ export const orchestrationSessionPlanProgressSchema = v.object({
 export const orchestrationSessionShellSchema = v.object({
   ...sessionTitleEntries,
   backgroundLiveness: v.optional(v.nullable(v.picklist(['working', 'monitoring']))),
+  /** The next time a harness schedule wakes the session; null when nothing is scheduled. */
+  sleepingUntil: v.optional(v.nullable(isoDateTimeSchema)),
   id: sessionIdSchema,
   worktreeId: worktreeIdSchema,
   origin: sessionOriginSchema,

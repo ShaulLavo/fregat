@@ -56,6 +56,14 @@ export const readQuerySchema = v.object({
   acceptTextOnly: v.optional(booleanQueryValueSchema),
 })
 
+/** A preview's budget: at most 1 MiB of a file's head. */
+const HEAD_MAX_BYTES = 1024 * 1024
+
+export const headQuerySchema = v.object({
+  path: pathSchema,
+  maxBytes: integerQueryValueSchema('65536', HEAD_MAX_BYTES),
+})
+
 export const treeQuerySchema = v.object({
   path: v.optional(pathSchema, ''),
   depth: v.optional(depthQueryValueSchema, '1'),
@@ -185,10 +193,7 @@ export const recordRecentBodySchema = v.object({
   path: pathSchema,
 })
 
-export const openWorkspaceRootBodySchema = v.object({
-  generation: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
-  path: pathSchema,
-})
+export const openWorkspaceRootBodySchema = v.object({ path: pathSchema })
 
 export const registerWorkspaceAddressBodySchema = v.object({ path: pathSchema })
 export const lookupWorkspaceAddressesBodySchema = v.object({

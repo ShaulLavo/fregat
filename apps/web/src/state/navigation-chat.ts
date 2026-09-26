@@ -11,7 +11,6 @@ import {
   selectWorktreeAtPath,
 } from '@workspace/client-core/chat/selectors'
 import { workspaceToken } from '@workspace/client-core/address/workspace'
-import { registerWorkspaceAddress } from '@workspace/client-core/files/workspace-address'
 import { syncChatProjectionShellSnapshot } from '@workspace/client-core/chat/writers'
 import type { ChatProjectionSlice } from '@workspace/client-core/chat/types'
 import type {
@@ -31,7 +30,7 @@ import { clientForQueryClient, queryClientFor } from '@/lib/environments/state/q
 import { createClientInvariantError } from '@/lib/structured-errors'
 import type { ApplicationRuntime } from '@/state/application-runtime'
 import type { createNavigationCoordinator } from '@/state/navigation-coordinator'
-import { workspaceAddressFor } from '@/state/navigation-workspace'
+import { registeredWorkspaceAddress, workspaceAddressFor } from '@/state/navigation-workspace'
 import { fetchOrchestrationShellSnapshotHttp } from '@/features/chat/transport/orchestration-http-snapshots'
 
 export function createChatNavigation(coordinator: ReturnType<typeof createNavigationCoordinator>) {
@@ -118,11 +117,8 @@ export function createChatNavigation(coordinator: ReturnType<typeof createNaviga
         if (projectId && worktree.projectId !== projectId)
           throw createClientInvariantError('The conversation does not belong to this project.')
         const editorWorktree = availableEditorWorktree(slice, worktree)
-        const workspace = await registerWorkspaceAddress({
-          client: clientForQueryClient(queryClientFor(origin)),
-          path: editorWorktree.path,
-          signal,
-        })
+        const workspace = await registeredWorkspaceAddress(origin, editorWorktree.path)
+        signal.throwIfAborted()
         if (!isCurrent()) return { address, replace }
         const sameRoot =
           application.getSnapshot().origin === origin &&

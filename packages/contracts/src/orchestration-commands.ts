@@ -44,6 +44,7 @@ import {
   sessionTurnKindSchema,
   sessionForkSourceSchema,
   trimmedNonEmptyStringSchema,
+  providerTurnOriginSchema,
 } from './chat-model'
 import {
   DEFAULT_INTERACTION_MODE,
@@ -537,6 +538,17 @@ export const sessionProviderStartSettleCommandSchema = v.object({
   type: v.literal('session.provider-start.settle'),
 })
 
+/** A turn the harness started on its own; it runs already, so there is nothing to claim. */
+export const sessionTurnProviderStartCommandSchema = v.object({
+  ...commandBaseSchema,
+  type: v.literal('session.turn.provider-start'),
+  sessionId: sessionIdSchema,
+  turnId: turnIdSchema,
+  origin: providerTurnOriginSchema,
+  runtimeEpoch: trimmedNonEmptyStringSchema,
+  createdAt: isoDateTimeSchema,
+})
+
 export const sessionRuntimeRecoverCommandSchema = v.object({
   ...commandBaseSchema,
   type: v.literal('session.runtime.recover'),
@@ -621,6 +633,7 @@ export const internalOrchestrationCommandSchema = v.variant('type', [
   sessionProviderStartClaimCommandSchema,
   sessionProviderStartAdoptCommandSchema,
   sessionProviderStartSettleCommandSchema,
+  sessionTurnProviderStartCommandSchema,
   sessionRuntimeRecoverCommandSchema,
   sessionDeletionUpdateCommandSchema,
   sessionRuntimeSetCommandSchema,

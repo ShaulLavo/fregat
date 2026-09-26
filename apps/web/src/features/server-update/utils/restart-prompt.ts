@@ -6,6 +6,7 @@ const BUSY_STATE_LABELS: Record<BusySessionState, string> = {
   waiting: 'Waiting for your answer',
   rewinding: 'Rewinding',
   background: 'Running in the background',
+  sleeping: 'Sleeping; its wake-ups end',
 }
 
 export function busyStateLabel(state: BusySessionState): string {

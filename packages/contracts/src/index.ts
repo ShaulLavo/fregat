@@ -13,7 +13,12 @@ export {
   type FileTreeResult,
   type TreeEntry,
 } from './tree-entry'
-export type { ServerInfo, WorkspaceIndexReadiness, WorkspaceIndexStatus } from './fs-info'
+export type {
+  ServerInfo,
+  WorkspaceIndexReadiness,
+  WorkspaceIndexScopeStatus,
+  WorkspaceIndexStatus,
+} from './fs-info'
 export { decodedAsText } from './file-result'
 export type { FileResult, TextDecodeMetadata, TextEncodingLabel } from './file-result'
 export {
@@ -256,6 +261,8 @@ export {
   providerMcpSignInSchema,
   providerSessionHooksSchema,
   providerSessionMcpSchema,
+  providerSessionScheduleSchema,
+  providerSessionSchedulesSchema,
   providerBackgroundTasksSchema,
   providerCommandCatalogSchema,
   providerListResultSchema,
@@ -281,6 +288,8 @@ export {
   type ProviderMcpSignIn,
   type ProviderSessionHooks,
   type ProviderSessionMcp,
+  type ProviderSessionSchedule,
+  type ProviderSessionSchedules,
   type ProviderBackgroundTasks,
   type ProviderCommandCatalog,
   type ProviderInstanceSettings,
@@ -648,6 +657,10 @@ export {
   APPROVAL_ANSWER_SUBMITTED_KIND,
   TURN_END_REASONS,
   TURN_ENDED_ACTIVITY_KIND,
+  PROVIDER_TURN_ORIGINS,
+  PROVIDER_TURN_STARTED_ACTIVITY_KIND,
+  providerTurnOriginSchema,
+  type ProviderTurnOrigin,
   turnEndReasonSchema,
   turnEndedPayloadSchema,
   type TurnEndReason,
@@ -741,6 +754,7 @@ export {
   sessionDiscoveryMetadataUpdateCommandSchema,
   sessionProviderStartClaimCommandSchema,
   sessionProviderStartAdoptCommandSchema,
+  sessionTurnProviderStartCommandSchema,
   sessionProviderStartSettleCommandSchema,
   sessionRuntimeRecoverCommandSchema,
   sessionDeletionUpdateCommandSchema,
@@ -807,6 +821,7 @@ export {
   sessionApprovalResponseRequestedPayloadSchema,
   sessionUserInputResponseRequestedPayloadSchema,
   sessionProviderStartPayloadSchema,
+  sessionTurnProviderStartedPayloadSchema,
   sessionRuntimeRecoveredPayloadSchema,
   sessionDeletionUpdatedPayloadSchema,
   sessionDiscoveryMetadataUpdatedPayloadSchema,
