@@ -320,7 +320,8 @@ export async function writeFileContent(
       action: 'fs.write',
       area: 'fs',
       hasBaseVersion: writeOptions.baseVersion !== undefined && writeOptions.baseVersion !== null,
-      contentBytes: new Blob([content]).size,
+      // The server logs the byte count; a UTF-8 copy here would double a large save.
+      contentLength: content.length,
       hasExpectedMtime:
         writeOptions.expectedMtimeMs !== undefined && writeOptions.expectedMtimeMs !== null,
       method: 'POST',
@@ -384,7 +385,8 @@ export async function createFileContent(
       action: 'fs.create_file',
       ...identity,
       area: 'fs',
-      contentBytes: new Blob([content]).size,
+      // The server logs the byte count; a UTF-8 copy here would double a large save.
+      contentLength: content.length,
       method: 'POST',
       path,
       route: '/fs/create-file',

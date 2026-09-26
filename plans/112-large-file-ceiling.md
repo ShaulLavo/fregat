@@ -254,6 +254,12 @@ In the order a user meets them:
    `new Blob([content])` byte count from the write log (`file-server.ts:323,387`), stop the saved
    text outliving the save in the query cache, split the git-diff budget, and land the harness as
    `bench:large-file` with a 150 MiB save case.
+   Partly landed 2026-09-26 (wave 2 lane B): `createApp` sets Bun's `maxRequestBodySize` to six
+   times the open limit plus 1 MiB (a JSON character can take six bytes), so a 129–200 MiB file
+   saves (`fs/tests/large-save.test.ts` posts 130 MiB over the wire: 413 before, 200 after); the
+   client write log counts characters instead of copying the text into a `Blob`. Still open in
+   this phase: the saved text outliving the save in the query cache, the git-diff budget, and
+   `bench:large-file`.
 2. **Raw-bytes transport** for read and write: shared decoder with the decoded-length check,
    byte-hash `version`, metadata in headers.
 3. **Raise the thresholds.** Remove per-edit whole-document work, starting with the minimap

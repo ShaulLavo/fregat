@@ -182,6 +182,16 @@ export function updateForApp(app: object) {
 
 const appCleanups = new WeakMap<object, () => Promise<void>>()
 
+const MIB = 1024 * 1024
+
+/**
+ * Every file the server opens has to save. A save is JSON, where a character can take six bytes
+ * (a `\u` escape); Bun's own default is 128 MiB, which failed every save of a 129–200 MiB file.
+ */
+export function requestBodyLimit(maxTextFileBytes: number) {
+  return maxTextFileBytes * 6 + MIB
+}
+
 export function createApp(options: AppOptions) {
   const fs = new FileSystemService(options)
   const git = new GitService(fs.paths, {
@@ -439,7 +449,10 @@ export function createApp(options: AppOptions) {
     gate: orchestration,
   })
 
-  const app = new Elysia({ name: 'platform' })
+  const app = new Elysia({
+    name: 'platform',
+    serve: { maxRequestBodySize: requestBodyLimit(fs.info().maxTextFileBytes) },
+  })
   applyObservability(app)
 
   const configured = app
