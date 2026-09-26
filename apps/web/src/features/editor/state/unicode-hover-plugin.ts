@@ -25,6 +25,7 @@ export function createUnicodeHoverPlugin(openSettings: () => void): EditorPlugin
             { computeSync: (request) => partsAt(view, request.anchor, openSettings) },
           )
           return {
+            inputs: [],
             update: () => undefined,
             dispose: () => registration.dispose(),
           }
