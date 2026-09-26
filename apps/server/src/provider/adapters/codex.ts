@@ -2096,7 +2096,7 @@ class CodexAppServerSession extends SessionContext {
       turnId: turn.canonicalTurnId,
       type: 'turn.completed',
     })
-    this.ingestSession('ready', null)
+    this.ingestSession('ready', turn.canonicalTurnId)
     this.resolveTurn(providerTurnId, turn)
   }
 
@@ -2130,7 +2130,7 @@ class CodexAppServerSession extends SessionContext {
       turnId: turn.canonicalTurnId,
       type: 'assistant.complete',
     })
-    this.ingestSession('ready', null)
+    this.ingestSession('ready', turn.canonicalTurnId)
     this.resolveTurn(providerTurnId, turn)
   }
 

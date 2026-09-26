@@ -12,6 +12,7 @@ import {
   type OrchestrationCommand,
   type MessageId,
   type SessionRuntimeState,
+  type SessionRuntimeStatus,
   type OrchestrationSessionActivity,
   type SessionId,
   type TurnId,
@@ -880,11 +881,16 @@ function sessionFromLifecycleEvent(event: ProviderRuntimeEvent): SessionRuntimeS
   })
 }
 
+const ACTIVE_RUNTIME_STATES = new Set<SessionRuntimeStatus>(['running', 'waiting'])
+
 function lifecycleActiveTurnId(
   event: Extract<ProviderRuntimeEvent, { type: LifecycleSessionType }>,
 ) {
   if (event.type === 'turn.started') return event.turnId ?? null
   if (event.type === 'turn.completed' || event.type === 'runtime.exited') return null
+  // A turn's end carries its id so the lifecycle filter can drop it; the runtime it leaves is idle.
+  if (event.type === 'runtime.state.changed' && !ACTIVE_RUNTIME_STATES.has(event.payload.state))
+    return null
 
   return event.turnId ?? null
 }

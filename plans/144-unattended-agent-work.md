@@ -339,10 +339,15 @@ Proposed under Research findings. Phase 1 is in wave 2 lane B's queue (docs/next
   finished", "The agent started this turn"). The composer already queues a follow-up while a turn
   runs, so a prompt sent during a harness turn is delivered after it.
 - `MockProviderAdapter.startProviderTurn` fakes a harness turn for tests.
-- Not done here: a checkpoint for a harness turn (the checkpoint reactor keys on requested turns);
-  interrupting the owner's prompt while it waits behind a harness turn (the harness turn is what
-  Stop interrupts); a browser scenario, which needs a way to make the dev app's mock provider
-  start a harness turn.
+- Once the CLI has sent any `command_lifecycle` frame, an owner turn counts as started only at
+  its own `started`: a wakeup or task notification that runs between the push and that frame is
+  someone else's turn, and its `result` is skipped. Every turn's end reports `ready` with that
+  turn's id, so the end of a harness turn the log left out cannot settle a requested turn.
+- A harness turn gets a checkpoint like any other: the settle-time capture uses the latest turn.
+- Not done here: interrupting the owner's prompt while it waits behind a harness turn (Stop
+  interrupts the harness turn; the log refuses a requested turn while a harness turn runs, so this
+  is reachable only in a race); a browser scenario and a `look` of a turn with no user message,
+  which need a way to make the dev app's mock provider start a harness turn.
 
 ## Dependencies
 

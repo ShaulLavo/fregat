@@ -28,15 +28,19 @@ import * as v from 'valibot'
 import { writeAttachmentFromDataUrl } from '../../../attachments/store'
 import { ClaudeProviderAdapter } from '../claude'
 import type { ClaudeHistoryRunner } from '../../claude-discovery'
-import { ClaudeAuthRunner } from '../utils/claude-auth'
 import { resolveClaudeExecutable } from '../utils/claude-executable'
 import {
-  claudeModelRows,
   FAKE_CLAUDE_EXECUTABLE,
   resolveFakeClaudeExecutable,
   SYNTHETIC_HAIKU,
   SYNTHETIC_OPUS,
 } from '../../../../test/factories/claude-models'
+import {
+  assistantText,
+  commandLifecycle,
+  FakeClaudeQuery,
+  signedInClaudeAuth,
+} from '../../../../test/factories/fake-claude-query'
 import type {
   ProviderRuntimeEvent,
   ProviderRuntimeStartInput,
@@ -60,158 +64,6 @@ const SESSION_ID = 'ee84050b-1b17-5fe8-9f71-0983f1fceccc'
 const SECOND_SESSION_ID = '5d0c3a4e-8f1b-4c2d-9e7a-6b5c4d3e2f10'
 const SYSTEM_UUID = '44444444-4444-4444-8444-444444444444'
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
-
-/**
- * The real `initializationResult()` answers in ~0.5s with NO prompt pushed, and
- * its payload carries NO `session_id` — which is the whole reason the adapter
- * has to mint the id itself. Keep this faithful to that shape.
- */
-const INITIALIZE_RESPONSE = {
-  account: { email: 'dev@example.com', subscriptionType: 'max' },
-  agents: [
-    { description: ' Reviews a diff ', model: 'sonnet', name: 'reviewer' },
-    { description: 'Unnamed', name: ' ' },
-  ],
-  available_output_styles: ['default'],
-  commands: [],
-  models: claudeModelRows(),
-  output_style: 'default',
-}
-
-/** `get_usage` as the CLI answers it for a Max account: 0–100 percentages, ISO resets. */
-const GET_USAGE_RESPONSE = {
-  behaviors: null,
-  rate_limits: {
-    five_hour: { resets_at: '2026-09-24T12:00:00Z', utilization: 54 },
-    model_scoped: [{ display_name: 'Fable', resets_at: null, utilization: 73 }],
-    seven_day: { resets_at: null, utilization: 18.4 },
-  },
-  rate_limits_available: true,
-  session: {
-    model_usage: {},
-    total_api_duration_ms: 0,
-    total_cost_usd: 0,
-    total_duration_ms: 0,
-    total_lines_added: 0,
-    total_lines_removed: 0,
-  },
-  subscription_type: 'max',
-}
-
-type FakeWaiter = {
-  reject: (reason: unknown) => void
-  resolve: (value: IteratorResult<SDKMessage>) => void
-}
-
-/**
- * Ported from `references/t3code/.../ClaudeAdapter.test.ts` with the Effect
- * wrapper dropped: a hand-driven `AsyncIterable<SDKMessage>` with a queue, a
- * waiter list, and call recorders for the control requests the adapter uses.
- */
-class FakeClaudeQuery implements AsyncIterable<SDKMessage> {
-  readonly setModelCalls: Array<string | undefined> = []
-  readonly stoppedTasks: string[] = []
-  readonly getContextUsage = async () => ({
-    categories: [
-      { color: 'a', kind: 'used' as const, name: 'System tools', tokens: 9_000 },
-      { color: 'b', kind: 'used' as const, name: 'Messages', tokens: 3_000 },
-      { color: 'c', kind: 'deferred' as const, name: 'MCP tools (deferred)', tokens: 21_000 },
-      { color: 'd', kind: 'buffer' as const, name: 'Autocompact buffer', tokens: 13_000 },
-      { color: 'e', kind: 'free' as const, name: 'Free space', tokens: 175_000 },
-    ],
-    maxTokens: 200_000,
-    rawMaxTokens: 200_000,
-    totalTokens: 12_000,
-  })
-  readonly reconnected: string[] = []
-  readonly mcpServerStatus = async () => [
-    { name: 'linear', status: 'connected' as const },
-    { error: 'spawn ENOENT', name: 'broken', status: 'failed' as const },
-  ]
-  readonly reconnectMcpServer = async (name: string) => {
-    this.reconnected.push(name)
-  }
-  readonly stopTask = async (taskId: string) => {
-    this.stoppedTasks.push(taskId)
-  }
-  acknowledgeClose = true
-  closeCalls = 0
-  interruptCalls = 0
-  private readonly queue: SDKMessage[] = []
-  private readonly waiters: FakeWaiter[] = []
-  private done = false
-  private failure: unknown = undefined
-
-  emit(message: SDKMessage) {
-    if (this.done) return
-
-    const waiter = this.waiters.shift()
-    if (waiter) {
-      waiter.resolve({ done: false, value: message })
-      return
-    }
-
-    this.queue.push(message)
-  }
-
-  fail(cause: unknown) {
-    if (this.done) return
-
-    this.done = true
-    this.failure = cause
-    for (const waiter of this.waiters.splice(0)) {
-      waiter.reject(cause)
-    }
-  }
-
-  finish() {
-    if (this.done) return
-
-    this.done = true
-    for (const waiter of this.waiters.splice(0)) {
-      waiter.resolve({ done: true, value: undefined })
-    }
-  }
-
-  readonly interrupt = async () => {
-    this.interruptCalls += 1
-    return undefined
-  }
-
-  readonly initializationResult = async () => INITIALIZE_RESPONSE
-
-  readonly usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET = async () =>
-    GET_USAGE_RESPONSE
-
-  readonly setModel = async (model?: string) => {
-    this.setModelCalls.push(model)
-  }
-
-  readonly close = () => {
-    this.closeCalls += 1
-    if (this.acknowledgeClose) this.finish()
-  };
-
-  [Symbol.asyncIterator](): AsyncIterator<SDKMessage> {
-    return { next: () => this.next() }
-  }
-
-  private next(): Promise<IteratorResult<SDKMessage>> {
-    const value = this.queue.shift()
-    if (value) return Promise.resolve({ done: false, value })
-
-    if (this.failure !== undefined) {
-      const failure = this.failure
-      this.failure = undefined
-      return Promise.reject(failure)
-    }
-    if (this.done) return Promise.resolve({ done: true, value: undefined })
-
-    return new Promise<IteratorResult<SDKMessage>>((resolve, reject) => {
-      this.waiters.push({ reject, resolve })
-    })
-  }
-}
 
 type ClaudeHarness = {
   adapter: ClaudeProviderAdapter
@@ -1073,6 +925,60 @@ describe('ClaudeProviderAdapter', () => {
     await harness.adapter.stopAll()
   })
 
+  it('keeps a wakeup that fires before the prompt is queued off the owner turn', async () => {
+    const harness = claudeHarness()
+    await runOwnTurn(harness, providerTurnInput(), 'Scheduled.')
+    const second = providerTurnInput({ turnId: 'turn-2' })
+    let resolved = false
+    const pending = harness.adapter.sendTurn(second).then(() => {
+      resolved = true
+    })
+    await waitFor(() => harness.prompts.length === 2, 'the second prompt was never pushed')
+    const uuid = harness.prompts[1]?.uuid
+    assert(uuid, 'the second prompt carried no uuid')
+    const query = latestQuery(harness)
+
+    // The wakeup starts before the CLI has even queued the prompt.
+    query.emit(commandLifecycle('d1407b55-97f0-434a-899d-397d1a308eb4', 'started'))
+    query.emit(initMessage())
+    query.emit(commandLifecycle(uuid, 'queued'))
+    query.emit(assistantText('AWAKE'))
+    query.emit(successResult())
+    query.emit(commandLifecycle('d1407b55-97f0-434a-899d-397d1a308eb4', 'completed'))
+    query.emit(commandLifecycle(uuid, 'started'))
+    await waitFor(() => assistantReplies(harness).length === 2, 'the wakeup reply was lost')
+    expect(resolved).toBe(false)
+
+    query.emit(initMessage())
+    query.emit(assistantText('Hello'))
+    query.emit(successResult())
+    await pending
+    expect(turnsStarted(harness).map((event) => event.turnId)).toEqual(['turn-1', 'turn-2'])
+    expect(turnsCompleted(harness).map((event) => event.turnId)).toEqual(['turn-1', 'turn-2'])
+    expect(assistantReplies(harness).slice(1)).toEqual([
+      { text: 'AWAKE', turnId: second.turnId },
+      { text: 'Hello', turnId: second.turnId },
+    ])
+    await harness.adapter.stopAll()
+  })
+
+  it('ends a harness turn with a ready state bound to that turn', async () => {
+    const harness = claudeHarness()
+    await runOwnTurn(harness, providerTurnInput(), 'Scheduled.')
+    const query = latestQuery(harness)
+    query.emit(commandLifecycle('d1407b55-97f0-434a-899d-397d1a308eb4', 'started'))
+    query.emit(initMessage())
+    query.emit(successResult())
+    await waitFor(() => turnsCompleted(harness).length === 2, 'the wakeup turn never completed')
+
+    const wakeupTurnId = turnsStarted(harness)[1]?.turnId
+    const readies = harness.events.filter(
+      (event) => event.type === 'runtime.state.changed' && event.payload.state === 'ready',
+    )
+    expect(readies.map((event) => event.turnId)).toEqual(['turn-1', wakeupTurnId])
+    await harness.adapter.stopAll()
+  })
+
   it('rejects a second turn while one is still in flight', async () => {
     const harness = claudeHarness()
     const input = providerTurnInput()
@@ -1467,7 +1373,7 @@ describe('ClaudeProviderAdapter catalog', () => {
   it('reports a missing configured binary with its fix instead of falling back', async () => {
     const adapter = new ClaudeProviderAdapter({
       attachmentsDir,
-      auth: signedInAuth(),
+      auth: signedInClaudeAuth(),
       createQuery: () => expect.unreachable('No CLI may run without an executable.'),
       resolveExecutable: () =>
         resolveClaudeExecutable({
@@ -1484,15 +1390,6 @@ describe('ClaudeProviderAdapter catalog', () => {
   })
 })
 
-function signedInAuth() {
-  return new ClaudeAuthRunner({
-    spawn: () => ({
-      exited: Promise.resolve({ exitCode: 0, stderr: '', stdout: '{"loggedIn":true}' }),
-      kill: () => undefined,
-    }),
-  })
-}
-
 function claudeHarness(acknowledgeStop = true, historyRunner?: ClaudeHistoryRunner): ClaudeHarness {
   const events: ProviderRuntimeEvent[] = []
   const options: Options[] = []
@@ -1503,7 +1400,7 @@ function claudeHarness(acknowledgeStop = true, historyRunner?: ClaudeHistoryRunn
   const adapter = new ClaudeProviderAdapter({
     historyRunner,
     attachmentsDir,
-    auth: signedInAuth(),
+    auth: signedInClaudeAuth(),
     createQuery: (input) => {
       if (input.options.strictMcpConfig) {
         probes.push(input.options)
@@ -2121,27 +2018,6 @@ function assistantReplies(harness: ClaudeHarness) {
       ? [{ text: event.payload.detail, turnId: event.turnId }]
       : [],
   )
-}
-
-/** Not in the SDK's message union; the CLI sends it for every uuid-stamped prompt and each wakeup. */
-function commandLifecycle(commandUuid: string, state: string): SDKMessage {
-  return {
-    command_uuid: commandUuid,
-    session_id: SESSION_ID,
-    state,
-    type: 'command_lifecycle',
-    uuid: SYSTEM_UUID,
-  } as unknown as SDKMessage
-}
-
-function assistantText(text: string): SDKMessage {
-  return {
-    message: { content: [{ text, type: 'text' }], role: 'assistant' },
-    parent_tool_use_id: null,
-    session_id: SESSION_ID,
-    type: 'assistant',
-    uuid: '55555555-5555-4555-8555-555555555555',
-  } as unknown as SDKMessage
 }
 
 function taskNotification(): SDKMessage {

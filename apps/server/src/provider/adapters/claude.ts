@@ -668,6 +668,8 @@ class ClaudeAgentSession extends SessionContext {
   private foreignResultsBeforeStart = 0
   /** What the next harness turn is about, learned before it starts. */
   private nextHarnessOrigin: ProviderTurnOrigin | null = null
+  /** This CLI reports `command_lifecycle`, so an owner turn is running only once its own frame says so. */
+  private lifecycleReported = false
   private query: Query | null = null
   private pumpCompletion: Promise<void> | null = null
   private streamEnded = true
@@ -892,8 +894,11 @@ class ClaudeAgentSession extends SessionContext {
     this.activeTurn = turn
     this.activeOrigin = null
     this.activeProviderTurnId = providerTurnId
-    this.activeAwaitingStart = false
+    // A wakeup can fire between this push and the CLI reading it; until the prompt's own
+    // `started`, any turn that runs is someone else's.
+    this.activeAwaitingStart = this.lifecycleReported
     this.foreignResultsBeforeStart = 0
+    this.nextHarnessOrigin = null
     this.announcedLimitStops.clear()
     this.ingestSession('running', turn.canonicalTurnId)
   }
@@ -943,6 +948,7 @@ class ClaudeAgentSession extends SessionContext {
    * `started` with a uuid we never pushed is a wakeup or cron firing.
    */
   private handleCommandLifecycle(commandUuid: string, state: string) {
+    this.lifecycleReported = true
     if (state === 'queued') {
       if (this.activeProviderTurnId === commandUuid && this.activeOrigin === null) {
         this.activeAwaitingStart = true
@@ -963,7 +969,7 @@ class ClaudeAgentSession extends SessionContext {
       return
     }
     if (!this.activeTurn) {
-      this.adoptHarnessTurn('scheduled', commandUuid)
+      this.adoptHarnessTurn(this.nextHarnessOrigin ?? 'scheduled', commandUuid)
       return
     }
     // The harness ran its own turn ahead of the owner's queued prompt: that turn's output
@@ -1826,7 +1832,8 @@ class ClaudeAgentSession extends SessionContext {
       turnId: turn.canonicalTurnId,
       type: 'assistant.complete',
     })
-    this.ingestSession('ready', null)
+    // Bound to the turn that ended: a harness turn the log never took must not settle another.
+    this.ingestSession('ready', turn.canonicalTurnId)
     this.resolveTurn(turn)
   }
 
@@ -1836,7 +1843,7 @@ class ClaudeAgentSession extends SessionContext {
       turnId: turn.canonicalTurnId,
     })
     this.emitTurnCompleted(turn, new Date().toISOString(), { state: 'interrupted', usage })
-    this.ingestSession('ready', null)
+    this.ingestSession('ready', turn.canonicalTurnId)
     this.resolveTurn(turn)
   }
 
