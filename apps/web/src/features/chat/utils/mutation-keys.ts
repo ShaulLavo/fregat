@@ -32,6 +32,8 @@ export const chatMutationKeys = {
     ['chat', 'cancel-schedules', environmentId, sessionId] as const,
   controlGoal: (environmentId: string, sessionId: string) =>
     ['chat', 'control-goal', environmentId, sessionId] as const,
+  agentReview: (environmentId: string, rootPath: string) =>
+    ['chat', 'agent-review', environmentId, rootPath] as const,
   compact: (environmentId: string, sessionId: string) =>
     ['chat', 'compact', environmentId, sessionId] as const,
   fork: (environmentId: string, sessionId: string) =>

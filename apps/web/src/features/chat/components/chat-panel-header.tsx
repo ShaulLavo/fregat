@@ -11,12 +11,9 @@ import {
 import { ChatCircleIcon, ClockCounterClockwiseIcon, PlusIcon } from '@phosphor-icons/react'
 
 import { chatSessionPreview, formatChatDateLabel } from '@/features/chat/utils/formatters'
+import { SessionControls } from '@/features/chat/components/session-controls'
 import { ToolPaneHeader } from '@/components/tool-pane-header'
 import { SessionActionsButton } from '@/components/session-actions-button'
-import { BackgroundTasksButton } from '@/features/chat/components/background-tasks-button'
-import { SchedulesButton } from '@/features/chat/components/schedules-button'
-import { GoalButton } from '@/features/chat/components/goal-button'
-import { SessionToolsButton } from '@/features/chat/components/session-tools-button'
 import { SessionRename } from '@/components/session-rename'
 import { useSessionRenaming } from '@/hooks/use-session-renaming'
 import type { ChatSessionListProjection } from '@workspace/client-core/chat/selectors'
@@ -118,10 +115,9 @@ export function ChatPanelHeader({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          {session ? <BackgroundTasksButton sessionRef={session.ref} /> : null}
-          {session ? <GoalButton sessionRef={session.ref} /> : null}
-          {session ? <SchedulesButton sessionRef={session.ref} /> : null}
-          {session ? <SessionToolsButton sessionRef={session.ref} /> : null}
+          {session ? (
+            <SessionControls rootPath={session.worktreePath ?? null} sessionRef={session.ref} />
+          ) : null}
           {session ? <SessionActionsButton session={session} surface='sidebar' /> : null}
         </>
       }

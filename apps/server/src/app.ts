@@ -1,3 +1,5 @@
+import { AgentReviewService } from './review/agent-review'
+import { agentReviewRoutes } from './review/routes'
 import { sessionControlRoutes } from './provider/session-control-routes'
 import { createAttachmentOwnership } from './attachments/ownership'
 import { selectTitleModel } from './orchestration/title-generation'
@@ -379,6 +381,7 @@ export function createApp(options: AppOptions) {
   const serverConfig = orchestrationWsServerConfig(identity)
   const commitMessages = new CommitMessageGenerator(git, providerAdapterRegistry, providerService)
   const checkpointDiff = new OrchestrationCheckpointDiffQuery(database, git)
+  const agentReviews = new AgentReviewService({ checkpointDiff, git, providers: providerService })
   const checkpointHunks = new OrchestrationCheckpointHunks({
     runWorkspaceOperation: (sessionId, operation) =>
       orchestration.runWorkspaceOperation(sessionId, operation),
@@ -553,6 +556,7 @@ export function createApp(options: AppOptions) {
       ),
     )
     .use(sessionControlRoutes(providerService))
+    .use(agentReviewRoutes(agentReviews))
     .use(orchestrationRoutes(orchestration, checkpointDiff, sessionSearch, checkpointHunks))
     .use(
       attachmentRoutes({

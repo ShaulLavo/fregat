@@ -42,6 +42,9 @@ export function ReviewDraftBar({
           key={comment.id}
           title={`${comment.quote}\n\n${comment.body}`}
         >
+          {comment.author === 'agent' ? (
+            <span className='text-muted-foreground text-2xs shrink-0'>Agent</span>
+          ) : null}
           <span className='bg-muted text-foreground text-2xs shrink-0 rounded-md px-1.5 py-0.5 font-mono tabular-nums'>
             {reviewCommentLabel(comment.anchor)}
           </span>

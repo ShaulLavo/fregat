@@ -1,6 +1,7 @@
 import type { ProviderUsagePurpose } from '@workspace/contracts'
 import type {
   ChatAttachment,
+  InteractionMode,
   ModelSelection,
   ProviderInstanceId,
   SessionId,
@@ -12,14 +13,22 @@ import type { ProviderRuntimeEvent } from './types'
 export type ProviderTextGenerationInput = {
   attachments?: readonly ChatAttachment[]
   attachmentsDir?: string
+  /** Where the turn runs; absent means an empty directory of its own. */
+  cwd?: string
+  /** `plan` keeps the agent read-only, for a turn that runs in a real checkout. */
+  interactionMode?: InteractionMode
   messageText: string
   modelSelection: ModelSelection
+  /** A JSON schema the answer must match; the result carries it parsed when the provider does. */
+  outputSchema?: Record<string, unknown>
   /** What the generation is for; its usage is recorded under this. */
   purpose: Exclude<ProviderUsagePurpose, 'turn'>
   signal?: AbortSignal
 }
 
 export type ProviderTextGenerationResult = {
+  /** The provider's parsed answer to `outputSchema`; Codex answers in `text` only. */
+  structured: unknown
   text: string
 }
 
@@ -27,6 +36,7 @@ export type ProviderTextGenerationOutcome = {
   errorMessage: string | null
   interactionRequired: boolean
   state: 'cancelled' | 'completed' | 'failed' | 'interrupted' | null
+  structured: unknown
   text: string
 }
 
@@ -45,6 +55,7 @@ export class ProviderTextGenerationTask {
   private runtimeError: string | null = null
   private state: ProviderTextGenerationOutcome['state'] = null
   private streamedText = ''
+  private structured: unknown = undefined
 
   constructor(input: {
     interrupt: InterruptTextGeneration
@@ -70,6 +81,7 @@ export class ProviderTextGenerationTask {
     if (event.type === 'item.completed' && event.payload.itemType === 'assistant_message') {
       this.fallbackText = event.payload.detail ?? this.fallbackText
     }
+    if (event.type === 'turn.structured-output') this.structured = event.payload.value
     if (event.type === 'runtime.error') this.runtimeError = event.payload.message
     if (event.type === 'turn.completed') {
       this.state = event.payload.state
@@ -90,6 +102,7 @@ export class ProviderTextGenerationTask {
       errorMessage: this.runtimeError,
       interactionRequired: this.interactionRequired,
       state: this.state,
+      structured: this.structured,
       text: generatedText(this.canonicalText, this.streamedText, this.fallbackText),
     }
   }

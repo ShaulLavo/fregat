@@ -47,6 +47,8 @@ export type ProviderTurnInput = {
   kind?: SessionTurnKind
   messageText: string
   modelSelection: ModelSelection
+  /** A JSON schema the turn's final message must match; Codex takes it per turn. */
+  outputSchema?: Record<string, unknown>
   sessionId: SessionId
   runtimeEpoch: string
   providerInstanceId: ProviderInstanceId
@@ -74,6 +76,8 @@ export type ProviderRuntimeStartInput = {
   ephemeral?: boolean
   interactionMode?: InteractionMode
   modelSelection: ModelSelection
+  /** A JSON schema every final message must match; Claude takes it per session. */
+  outputSchema?: Record<string, unknown>
   providerInstanceId: ProviderInstanceId
   providerResumeCursor?: unknown | null
   runtimeMode: RuntimeMode
@@ -418,6 +422,11 @@ export type ProviderRuntimeEventPayload =
       /** Every schedule the harness process holds after a turn; replaces the previous set. */
       type: 'schedules.updated'
       payload: { schedules: ProviderHarnessSchedule[] }
+    })
+  | (ProviderRuntimeBaseEvent & {
+      /** The turn's answer in the shape its output schema asked for. */
+      type: 'turn.structured-output'
+      payload: { value: unknown }
     })
   | (ProviderRuntimeBaseEvent & {
       type: 'hook.started'
