@@ -8,6 +8,7 @@ import { scopedSessionKey } from '@workspace/contracts'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { WorktreeChip } from '@/features/chat-mode/components/worktree-chip'
+import { SessionPullRequestBadge } from '@/features/chat-mode/components/session-pull-request-badge'
 
 import { formatChatRelativeTime } from '@/features/chat/utils/formatters'
 import { useCoarseNow } from '@/features/chat/hooks/use-coarse-now'
@@ -99,6 +100,7 @@ export function SessionRow({ session }: { readonly session: SessionRailItem }) {
             >
               {session.title}
             </span>
+            <SessionPullRequestBadge pullRequest={session.worktree.pullRequest} />
             {session.unread ? (
               <span
                 aria-label='Unread'
@@ -114,7 +116,7 @@ export function SessionRow({ session }: { readonly session: SessionRailItem }) {
           {session.origin === 'discovered' ? (
             <span className='text-muted-foreground text-2xs pl-[14px]'>Imported chat</span>
           ) : null}
-          <span className='flex min-w-0 items-center gap-1.5 pl-[14px]'>
+          <span className='flex w-full min-w-0 items-center gap-1.5 pl-[14px]'>
             {session.machineLabel ? <MachineChip label={session.machineLabel} /> : null}
             <WorktreeChip worktree={session.worktree} repositoryKind={session.repositoryKind} />
           </span>

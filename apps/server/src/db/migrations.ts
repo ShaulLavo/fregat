@@ -29,9 +29,24 @@ export const platformMigrations: readonly Migration[] = [
   { version: 22, name: 'provider_usage_purpose', up: applyProviderUsagePurpose },
   { version: 23, name: 'provider_usage_prices', up: applyProviderUsagePrices },
   { version: 24, name: 'provider_usage_contributions', up: applyProviderUsageContributions },
+  { version: 25, name: 'worktree_pull_requests', up: applyWorktreePullRequests },
+  { version: 26, name: 'worktree_setup', up: applyWorktreeSetup },
+  { version: 27, name: 'push_devices', up: applyPushDevices },
+  { version: 28, name: 'session_lifecycle_revision', up: applySessionLifecycleRevision },
   { version: 29, name: 'turn_end_reason', up: applyTurnEndReason },
   { version: 30, name: 'message_model_selection', up: applyMessageModelSelection },
+  { version: 37, name: 'terminal_session_cleanup', up: applyTerminalSessionCleanup },
 ]
+
+function applyTerminalSessionCleanup(database: PlatformDatabase) {
+  database.run(sql`CREATE TABLE terminal_session_cleanup (session_id TEXT PRIMARY KEY NOT NULL)`)
+}
+
+function applySessionLifecycleRevision(database: PlatformDatabase) {
+  database.run(
+    sql`ALTER TABLE projection_sessions ADD COLUMN lifecycle_revision INTEGER NOT NULL DEFAULT 0`,
+  )
+}
 
 function applyMessageModelSelection(database: PlatformDatabase) {
   database.run(sql`ALTER TABLE projection_session_messages ADD COLUMN model_selection_json TEXT`)
@@ -39,6 +54,31 @@ function applyMessageModelSelection(database: PlatformDatabase) {
 
 function applyTurnEndReason(database: PlatformDatabase) {
   database.run(sql`ALTER TABLE projection_turns ADD COLUMN end_reason TEXT`)
+}
+
+function applyWorktreeSetup(database: PlatformDatabase) {
+  database.run(sql`ALTER TABLE projection_worktrees ADD COLUMN setup_json TEXT`)
+}
+
+function applyWorktreePullRequests(database: PlatformDatabase) {
+  database.run(sql`ALTER TABLE projection_worktrees ADD COLUMN pull_request_json TEXT`)
+}
+
+function applyPushDevices(database: PlatformDatabase) {
+  database.run(sql`
+    CREATE TABLE push_devices (
+      revision TEXT NOT NULL,
+      id TEXT PRIMARY KEY NOT NULL,
+      endpoint TEXT NOT NULL,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      label TEXT NOT NULL,
+      service TEXT NOT NULL,
+      origin TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `)
 }
 
 function applyProviderUsageContributions(database: PlatformDatabase) {

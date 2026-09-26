@@ -1,6 +1,11 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { clientOrchestrationCommandSchema, type SessionWorktreeTarget } from '@workspace/contracts'
+import {
+  clientOrchestrationCommandSchema,
+  commandIdSchema,
+  type SessionWorktreeTarget,
+  type WorktreePullRequest,
+} from '@workspace/contracts'
 import { orchestrationForApp } from 'server/testing'
 import * as v from 'valibot'
 import { createDraftSessionSubmission } from '@workspace/client-core/chat/commands'
@@ -62,6 +67,19 @@ export async function createWorktreeLifecycleHarness(
       })
       await dispatch(submission.command)
       return submission.command.sessionId
+    },
+    /** Records what the forge answered for a worktree's branch, as the server's sync does. */
+    async syncPullRequest(id: string, pullRequest: WorktreePullRequest) {
+      const worktree = (await rail.refresh()).worktrees.find((item) => item.id === id)
+      if (!worktree?.branch) throw new TypeError('Pull requests follow a worktree branch.')
+      await orchestrationForApp(server.app).dispatch({
+        type: 'worktree.pull-request.sync',
+        commandId: v.parse(commandIdSchema, `pull-request-${crypto.randomUUID()}`),
+        worktreeId: worktree.id,
+        branch: worktree.branch,
+        pullRequest,
+      })
+      await rail.refresh()
     },
     async worktree(id = worktreeId) {
       await orchestrationForApp(server.app).providerRuntimeIdle()

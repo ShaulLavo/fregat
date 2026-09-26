@@ -44,6 +44,26 @@ export async function restoreUserSettings(
   )
 }
 
+/** Sets one key in the user's settings document, the path a map setting without its own operation takes. */
+export async function writeRawSetting(page: Page, base: string, key: string, value: unknown) {
+  const headers = { Origin: new URL(page.url()).origin }
+  const layer = await page.request.get(`${base}/settings/raw?target=user`, { headers })
+  ok(layer.ok(), `Read the user settings document returned ${layer.status()}`)
+  const { text, revision } = (await layer.json()) as { text: string; revision: string }
+  const document = text.trim() ? (JSON.parse(text) as Record<string, unknown>) : {}
+  document[key] = value
+  const response = await page.request.post(`${base}/settings/raw`, {
+    headers,
+    data: {
+      writeId: crypto.randomUUID(),
+      target: 'user',
+      text: `${JSON.stringify(document, null, 2)}\n`,
+      baseRevision: revision,
+    },
+  })
+  ok(response.ok(), `Write the user settings document returned ${response.status()}`)
+}
+
 export async function writeSettings(page: Page, base: string, operations: readonly unknown[]) {
   const response = await page.request.post(`${base}/settings/write`, {
     headers: { Origin: new URL(page.url()).origin },
@@ -143,6 +163,17 @@ export async function registerFixtureProject(page: Page, orchestration: string, 
   ok(false, `The fixture checkout ${path} must be registered`)
 }
 
+async function readyWorktree(page: Page, orchestration: string, worktreeId: string) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const worktree = (await readShell(page, orchestration)).worktrees.find(
+      (item) => item.id === worktreeId,
+    )
+    if (worktree?.lifecycle.state === 'ready') return worktree
+    await Bun.sleep(100)
+  }
+  ok(false, `The new worktree ${worktreeId} must become ready`)
+}
+
 /** A cold server can reject the page's first workspace open; the page retries it. */
 async function firstWorktree(page: Page, orchestration: string) {
   for (let attempt = 0; attempt < 100; attempt += 1) {
@@ -159,6 +190,9 @@ export function isolatedNativeScenario(options: {
   fixture: URL
   /** Runs the session in this checkout; omitted, the first registered worktree is used. */
   prepareWorktree?: () => Promise<PreparedWorktree>
+  /** Starts the session in a new worktree forked from that checkout. */
+  newWorktree?: boolean
+  prepareServer?: Scenario['prepareServer']
   drive: (
     page: Page,
     context: {
@@ -177,6 +211,7 @@ export function isolatedNativeScenario(options: {
   return {
     name: options.name,
     description: options.description,
+    prepareServer: options.prepareServer,
     inspect: async (page) => evidence.get(page) ?? null,
     async run(page, { step }) {
       const orchestration = await openChat(page)
@@ -196,6 +231,7 @@ export function isolatedNativeScenario(options: {
       let created = false
       const prepared = await options.prepareWorktree?.()
       let fixtureProjectId: string | null = null
+      const newWorktreeId = options.newWorktree ? crypto.randomUUID() : null
       try {
         await writeSettings(page, base, [
           {
@@ -219,10 +255,15 @@ export function isolatedNativeScenario(options: {
           type: 'session.create',
           sessionId,
           title,
-          worktreeTarget: { kind: 'current', worktreeId: worktree.id },
+          worktreeTarget: newWorktreeId
+            ? { kind: 'new', worktreeId: newWorktreeId, baseWorktreeId: worktree.id }
+            : { kind: 'current', worktreeId: worktree.id },
           modelSelection: { providerInstanceId, model: 'gpt-5.5' },
         })
         created = true
+        const sessionWorktree = newWorktreeId
+          ? await readyWorktree(page, orchestration, newWorktreeId)
+          : worktree
         await selectors.sessionSearch(page).fill(title)
         await selectors.sessionByTitle(page, title).click()
         await page.waitForURL((url) => url.href.includes(sessionId))
@@ -245,8 +286,8 @@ export function isolatedNativeScenario(options: {
           sessionId,
           providerInstanceId,
           projectId: worktree.projectId,
-          worktreeId: worktree.id,
-          worktreePath: worktree.canonicalPath,
+          worktreeId: sessionWorktree.id,
+          worktreePath: sessionWorktree.canonicalPath,
         })
       } catch (error) {
         // Printed here: a cleanup failure below would otherwise replace this error.
@@ -254,7 +295,9 @@ export function isolatedNativeScenario(options: {
         await step('failed-before-cleanup')
         throw error
       } finally {
-        if (created) {
+        // A drive may have deleted the session and removed its worktree itself.
+        const shell = created ? await readShell(page, orchestration) : null
+        if (shell?.sessions.some((session) => session.id === sessionId)) {
           await dispatch(page, orchestration, {
             type: 'session.runtime.stop',
             sessionId,
@@ -264,6 +307,13 @@ export function isolatedNativeScenario(options: {
             sessionId,
           })
         }
+        // The fixture directory goes with the project; the project goes only once nothing owns a checkout.
+        const leftWorktree = shell?.worktrees.find((worktree) => worktree.id === newWorktreeId)
+        if (newWorktreeId && leftWorktree && leftWorktree.lifecycle.state !== 'removed')
+          await dispatch(page, orchestration, {
+            type: 'worktree.release',
+            worktreeId: newWorktreeId,
+          })
         if (fixtureProjectId)
           await dispatch(page, orchestration, {
             type: 'project.delete',

@@ -16,7 +16,7 @@ import {
   createDraftSessionSubmission,
   createProjectDefaultModelCommand,
 } from '@workspace/client-core/chat/commands'
-import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
+import { providerListQueryOptions } from '@/lib/provider-query'
 import { resolveChatModelSelection } from '@workspace/client-core/chat/providers/selection'
 import { dispatchChatCommand, replayAfterDispatch } from '@/features/chat/utils/command-dispatch'
 import { scheduleSessionProjectionSyncAfterDispatch } from '@/features/chat/utils/command-sync'

@@ -2006,7 +2006,7 @@ function lspTestApp(root: string, pool: LspSessionPool) {
     auth: { allowedOrigins: ['http://localhost:5173'] },
     lsp: { pool },
     metadataDatabase: database,
-    orchestration: { database: database.db },
+    orchestration: { database: database.db, pullRequestLookup: null },
     settings: testSettingsOptions(root),
     watch: false,
     workspaceEditJournalRoot: path.join(root, '.workspace-edit-journals'),

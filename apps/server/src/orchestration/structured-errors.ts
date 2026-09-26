@@ -61,6 +61,33 @@ export const checkpointErrors = defineErrorCatalog('checkpoint', {
 })
 
 export const sessionDomainErrors = defineErrorCatalog('orchestration', {
+  PULL_REQUEST_REFERENCE_INVALID: {
+    status: 400,
+    message: 'That does not name a pull request.',
+    why: 'A pull request is named by its URL, its number (#123), or a forge checkout command.',
+    fix: 'Paste the pull request URL or its number.',
+  },
+  PULL_REQUEST_OTHER_REPOSITORY: {
+    status: 400,
+    message: ({ repository }: { repository: string }) =>
+      `That pull request belongs to ${repository}, which this checkout does not track.`,
+    why: 'A pull request session starts from a checkout of the repository the pull request is in.',
+    fix: 'Open that repository as a project and start the session there.',
+  },
+  PULL_REQUEST_WORKTREE_FAILED: {
+    status: 409,
+    message: ({ number }: { number: number }) =>
+      `The worktree for pull request #${number} could not be created.`,
+    why: 'The session was started, but its worktree failed to provision; the session shows why.',
+    fix: 'Open the session and retry its worktree.',
+  },
+  AUTO_SETTLE_STALE: {
+    status: 409,
+    message: ({ sessionId }: { sessionId: string }) =>
+      `Session ${sessionId} changed before automatic settlement`,
+    why: 'The session received activity, a lifecycle choice or live background work after the settlement decision was made.',
+    fix: 'Nothing to do; the next settlement sweep decides again from the current state.',
+  },
   APPROVAL_REQUEST_UNKNOWN: {
     status: 404,
     message: 'This approval request is unavailable.',
@@ -78,6 +105,18 @@ export const sessionDomainErrors = defineErrorCatalog('orchestration', {
     message: 'This approval ended before your answer arrived.',
     why: 'The turn that asked finished, was stopped, or the server restarted, so the agent stopped waiting.',
     fix: 'Send a new message if the agent should try again.',
+  },
+  LIFECYCLE_RESTORE_UNAVAILABLE: {
+    status: 409,
+    message: 'The original session action is unavailable.',
+    why: 'Restore requires an accepted lifecycle action for this session.',
+    fix: 'Change the session from its current state.',
+  },
+  LIFECYCLE_CONFLICT: {
+    status: 409,
+    message: 'The session changed after this action.',
+    why: 'Undo and redo require the lifecycle revision produced by the original action.',
+    fix: 'Review the current session state before changing it.',
   },
   STEER_TURN_NOT_ACTIVE: {
     status: 409,

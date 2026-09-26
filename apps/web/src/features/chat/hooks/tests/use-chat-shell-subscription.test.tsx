@@ -23,7 +23,7 @@ test('a dropped shell stream reconnects instead of dying', async () => {
 
   await waitFor(() => expect(result.current.phase).toBe('reconnecting'))
   expect(result.current.attempt).toBe(1)
-  expect(result.current.error).toBe('Shell stream dropped.')
+  expect(result.current.error?.message).toBe('Shell stream dropped.')
 
   // Returning to the app probes immediately rather than serving the rest of the
   // rung: the deadline here is below the 250ms first rung on purpose.
@@ -42,7 +42,7 @@ test('a rejected shell socket parks instead of retrying forever', async () => {
   await new Promise((resolve) => setTimeout(resolve, 400))
 
   expect(transport.attempts()).toBe(1)
-  expect(result.current.error).toBe('Shell socket rejected.')
+  expect(result.current.error?.message).toBe('Shell socket rejected.')
 })
 
 test('an offline browser parks until the network comes back', async () => {

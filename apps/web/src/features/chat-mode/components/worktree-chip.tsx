@@ -2,7 +2,11 @@ import type { OrchestrationProjectShell, OrchestrationWorktreeShell } from '@wor
 import { GitBranchIcon } from '@phosphor-icons/react'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { cn } from '@workspace/ui/lib/utils'
-import { worktreeLabel, worktreeLifecycleLabel } from '@workspace/client-core/chat/worktrees/label'
+import {
+  worktreeLabel,
+  worktreeLifecycleLabel,
+  worktreeSetupLabel,
+} from '@workspace/client-core/chat/worktrees/label'
 
 export function WorktreeChip({
   worktree,
@@ -16,7 +20,12 @@ export function WorktreeChip({
   const lifecycle = worktreeLifecycleLabel(worktree.lifecycle)
   const shared = worktree.cleanupEligibility.nonDeletedSessionCount
   const pending = state === 'provisioning' || state === 'cleanup-requested'
-  const failed = state === 'creation-failed' || state === 'cleanup-failed' || state === 'missing'
+  const setupLabel = worktreeSetupLabel(worktree.setup)
+  const failed =
+    state === 'creation-failed' ||
+    state === 'cleanup-failed' ||
+    state === 'missing' ||
+    worktree.setup?.state === 'failed'
   return (
     <span
       data-worktree-id={worktree.id}
@@ -40,6 +49,7 @@ export function WorktreeChip({
       ) : null}
       {worktree.ownership === 'external' ? <span className='truncate'>External</span> : null}
       {shared > 1 ? <span className='truncate tabular-nums'>{shared} sessions</span> : null}
+      {setupLabel ? <span className='truncate'>{setupLabel}</span> : null}
       {worktree.lifecycle.state === 'cleanup-blocked' &&
       worktree.lifecycle.changedFileCount !== null ? (
         <span className='truncate tabular-nums'>

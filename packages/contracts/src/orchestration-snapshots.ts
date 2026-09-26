@@ -1,5 +1,6 @@
 import { sessionTitleEntries } from './session-titles'
 import * as v from 'valibot'
+import { sessionLifecycleResultSchema, isSessionLifecycleCommand } from './session-lifecycle'
 import {
   commandIdSchema,
   projectIdSchema,
@@ -283,6 +284,12 @@ export const projectRegistrationResultSchema = v.object({
   ]),
 })
 
+export const orchestrationCommandResultSchema = v.union([
+  projectRegistrationResultSchema,
+  sessionLifecycleResultSchema,
+])
+export type OrchestrationCommandResult = v.InferOutput<typeof orchestrationCommandResultSchema>
+
 const commandReceiptEntries = {
   commandId: commandIdSchema,
   commandType: trimmedNonEmptyStringSchema,
@@ -298,7 +305,7 @@ export const orchestrationCommandReceiptSchema = v.pipe(
       ...commandReceiptEntries,
       status: v.literal('accepted'),
       resultSequence: nonNegativeIntegerSchema,
-      result: v.nullable(projectRegistrationResultSchema),
+      result: v.nullable(orchestrationCommandResultSchema),
       error: v.null(),
     }),
     v.object({
@@ -313,8 +320,12 @@ export const orchestrationCommandReceiptSchema = v.pipe(
     if (receipt.status === 'rejected') return true
     const isRegistration =
       receipt.commandType === 'project.create' || receipt.commandType === 'project.revive'
-    return isRegistration === (receipt.result !== null)
-  }, 'Accepted registration receipts require their typed result; other commands have no result'),
+    if (isRegistration) return receipt.result !== null && 'projectId' in receipt.result
+    // Historical accepted receipts predate lifecycle results; new writes enforce them at insertion.
+    if (isSessionLifecycleCommand(receipt.commandType))
+      return receipt.result === null || 'kind' in receipt.result
+    return receipt.result === null
+  }, 'Accepted commands require the result declared for their kind'),
 )
 
 export type OrchestrationSessionDetailAnchor = v.InferOutput<

@@ -6,7 +6,7 @@ import type { createNavigation } from '@/state/navigation'
 import { primaryServerOrigin } from '@/lib/client'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { readEnvironmentDescriptor } from '@/lib/environments/utils/descriptor'
-import { errorMessage } from '@/lib/error-message'
+import { toConnectionError } from '@/lib/client-error-taxonomy'
 
 type BootstrapState = {
   readonly application: ApplicationRuntime | null
@@ -45,17 +45,17 @@ export function createBootstrap(navigation: ReturnType<typeof createNavigation>)
       })
       .catch((cause) => {
         if (controller.signal.aborted) return
-        const error = errorMessage(cause, 'Cannot connect to the local machine.')
+        const failure = toConnectionError(cause, 'Cannot connect to the local machine.')
         const phase = useEnvironmentsStore.getState().entries[primaryServerOrigin()]?.phase
         if (phase === 'identity-drift' || phase === 'blocked') {
           detach?.()
           detach = undefined
           store.getState().application?.dispose()
-          store.setState({ application: null, error })
+          store.setState({ application: null, error: failure.message })
           return
         }
-        useEnvironmentsStore.getState().setPhase(primaryServerOrigin(), 'offline', error)
-        if (!store.getState().application) store.setState({ error })
+        useEnvironmentsStore.getState().setPhase(primaryServerOrigin(), 'offline', failure)
+        if (!store.getState().application) store.setState({ error: failure.message })
       })
   }
 

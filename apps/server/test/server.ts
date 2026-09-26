@@ -34,7 +34,7 @@ export function createTestApp(options: AppOptions = {}): App {
   const app = createApp({
     ...options,
     metadataDatabase: options.metadataDatabase ?? database,
-    orchestration: { database: database.db, ...options.orchestration },
+    orchestration: { database: database.db, pullRequestLookup: null, ...options.orchestration },
     workspaceEditJournalRoot,
   })
   openApps.push(app)
