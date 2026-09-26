@@ -65,8 +65,13 @@ test('file type dropdown filters every view, clears hidden selection, and retain
   expect(screen.getByRole('textbox', { name: 'Search files' })).toHaveValue('picker')
   expect(screen.getByRole('dialog', { name: 'Choose file' })).toBeVisible()
   expect(onOpenChange).not.toHaveBeenCalled()
+  // Let the Escape finish closing the popup, so the click below opens it again.
+  await waitFor(() =>
+    expect(screen.queryByRole('option', { name: 'Supported files (.ts, .md)' })).toBeNull(),
+  )
   await page.getByRole('combobox', { name: 'File type' }).click()
-  const combined = screen.getByRole('option', { name: 'Supported files (.ts, .md)' })
+  // The popup renders after the click resolves.
+  const combined = await screen.findByRole('option', { name: 'Supported files (.ts, .md)' })
   const textRange = document.createRange()
   textRange.selectNodeContents(combined)
   const popup = combined.closest('[data-slot=select-content]')
