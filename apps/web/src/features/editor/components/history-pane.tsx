@@ -1,3 +1,4 @@
+import { useHeldUntilReady } from '@/hooks/use-held-until-ready'
 import { ToolPane } from '@workspace/ui/patterns/tool-pane'
 import { emptySubscription } from '@workspace/utils/subscriptions'
 import type { DocumentKey, FilesystemPath, TabId } from '@/lib/documents/utils/types'
@@ -65,13 +66,17 @@ export function HistoryPane({
   const snapshot = useHistoryViewer(buffer, path, tabId)
   const presentation = useTabPresentation(tabId)
   const viewer = snapshot?.viewer ?? null
-  const state = snapshot?.state ?? null
+  const nextState = snapshot?.state ?? null
   const restore = useMutation(historyRestoreMutationOptions(documentKey, buffer))
   const clear = useMutation(historyClearMutationOptions(documentKey, buffer))
   const restoring =
     useIsMutating({ mutationKey: editorMutationKeys.historyRestore(documentKey) }) > 0
   const [clearOpen, setClearOpen] = useState(false)
   const [barrierFocused, setBarrierFocusedState] = useState(presentation.history.barrierFocused)
+  const comparisonPending =
+    nextState?.selectedIds.length === 2 &&
+    (!nextState.comparison || nextState.comparison.status === 'pending')
+  const state = useHeldUntilReady(nextState, !comparisonPending || barrierFocused)
   const now = useClock()
   const workspaceEdits = useOptionalWorkspaceEditService()
   const barrierGroup = useSyncExternalStore(
@@ -206,6 +211,7 @@ export function HistoryPane({
               <span className='text-muted-foreground text-xs'>No state focused</span>
             )}
             <div className='flex shrink-0 items-center gap-(--density-control-gap)'>
+              {comparisonPending ? <Spinner size='xs' label='Comparing states' /> : null}
               <Button
                 disabled={!canRestore}
                 size='sm'
@@ -237,10 +243,9 @@ export function HistoryPane({
             undoing={undoingWorkspaceEdit}
             onUndo={workspaceEdits ? undoBarrierGroup : null}
           />
-        ) : twoSelected ? (
-          <ComparisonBody comparison={state.comparison} mode={mode} tabId={tabId} />
         ) : (
-          <FocusedBody
+          <HistoryComparisonBody
+            comparison={twoSelected ? state.comparison : undefined}
             diff={focusedDiff}
             focused={focused}
             lostIds={state.lostIds}
@@ -343,16 +348,22 @@ function barrierKeyAction(
   return event.key === 'ArrowLeft'
 }
 
-function ComparisonBody({
+function HistoryComparisonBody({
   comparison,
+  diff,
+  focused,
+  lostIds,
   mode,
   tabId,
 }: {
-  comparison: HistoryComparison<HistoryComparisonResult> | null
+  comparison: HistoryComparison<HistoryComparisonResult> | null | undefined
+  diff: HistoryComparisonResult | null
+  focused: EditorHistoryGraphNode | null
+  lostIds: readonly HistoryNodeId[]
   mode: 'split' | 'stacked'
   tabId: TabId
 }) {
-  if (!comparison || comparison.status === 'pending') {
+  if (comparison === null || comparison?.status === 'pending') {
     return (
       <LoadingState className='flex h-full flex-col gap-3 p-4' label='Comparing states'>
         <div className='skeleton-sweep h-4 w-3/4 rounded-md' />
@@ -361,32 +372,19 @@ function ComparisonBody({
       </LoadingState>
     )
   }
-  if (comparison.status === 'failed') {
+  if (comparison?.status === 'failed') {
     return <EmptyState className='h-full' title='Could not compare these states.' tone='error' />
   }
-  return (
-    <DiffBody
-      file={comparison.result}
-      mode={mode}
-      sameText='These states have the same text.'
-      tabId={tabId}
-    />
-  )
-}
-
-function FocusedBody({
-  diff,
-  focused,
-  lostIds,
-  mode,
-  tabId,
-}: {
-  diff: HistoryComparisonResult | null
-  focused: EditorHistoryGraphNode | null
-  lostIds: readonly HistoryNodeId[]
-  mode: 'split' | 'stacked'
-  tabId: TabId
-}) {
+  if (comparison?.status === 'ready') {
+    return (
+      <DiffBody
+        file={comparison.result}
+        mode={mode}
+        sameText='These states have the same text.'
+        tabId={tabId}
+      />
+    )
+  }
   if (lostIds.length > 0) {
     return (
       <EmptyState

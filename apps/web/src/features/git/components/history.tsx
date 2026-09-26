@@ -26,16 +26,24 @@ import { historyCountLabel, historyRefLabels } from '@/features/git/utils/histor
 import { HistoryToolbar } from '@/features/git/components/history-toolbar'
 import { HistoryList } from '@/features/git/components/history-list'
 import { CommitDetails } from '@/features/git/components/commit-details'
+import { useHeldUntilReady } from '@/hooks/use-held-until-ready'
 import { clientErrorMessage } from '@/lib/client-error-taxonomy'
 
-export function History({ rootPath }: { rootPath: string }) {
-  const { view, updateView } = useHistoryView()
-  const { refName, search, selected, expanded } = view
+export function History({ rootPath: nextRoot }: { rootPath: string }) {
+  const { view: nextView, updateView } = useHistoryView()
   const [revealRevision, setRevealRevision] = useState(0)
-  const [settledSearch] = useDebouncedValue(search.trim(), { wait: 200 })
-  const searching = settledSearch !== search.trim()
+  const [settledSearch] = useDebouncedValue(nextView.search.trim(), { wait: 200 })
+  const searching = settledSearch !== nextView.search.trim()
+  const requested = useHistory(nextRoot, nextView.refName, settledSearch, nextView.pageCount)
+  const ready = !requested.isPending && !requested.isPlaceholderData && !requested.isRestoring
+  const rootPath = useHeldUntilReady(nextRoot, ready)
+  const view = useHeldUntilReady(nextView, ready)
+  const shownSearch = useHeldUntilReady(settledSearch, ready)
+  const { refName, selected, expanded } = view
+  const switching =
+    rootPath !== nextRoot || refName !== nextView.refName || shownSearch !== settledSearch
   const queryClient = useQueryClient()
-  const history = useHistory(rootPath, refName, settledSearch, view.pageCount)
+  const history = useHistory(rootPath, refName, shownSearch, view.pageCount)
   const openDiff = useOpenHistoricalDiff()
   const commits = history.data?.pages.flatMap((page) => page.commits) ?? []
   const refs = history.data?.pages[0]?.refs ?? []
@@ -49,9 +57,9 @@ export function History({ rootPath }: { rootPath: string }) {
   const loadedPages = history.data?.pages.length ?? 0
 
   useEffect(() => {
-    if (searching || history.isPlaceholderData || loadedPages <= view.pageCount) return
+    if (switching || searching || history.isPlaceholderData || loadedPages <= view.pageCount) return
     void updateView({ pageCount: loadedPages })
-  }, [loadedPages, searching, history.isPlaceholderData, view.pageCount, updateView])
+  }, [loadedPages, switching, searching, history.isPlaceholderData, view.pageCount, updateView])
 
   function selectCommit(selected: string | null) {
     setRevealRevision((revision) => revision + 1)
@@ -88,15 +96,15 @@ export function History({ rootPath }: { rootPath: string }) {
       <HistoryToolbar
         refs={refs}
         refName={refName}
-        search={search}
-        busy={history.isFetching || searching}
+        search={nextView.search}
+        busy={requested.isFetching || history.isFetching || searching}
         expanded={expanded}
         onRefChange={changeRef}
         onSearchChange={changeSearch}
         onExpand={() => setExpanded(true)}
         onRefresh={() => {
           void queryClient.resetQueries({
-            queryKey: historyKeys.page(rootPath, refName, settledSearch),
+            queryKey: historyKeys.page(rootPath, refName, shownSearch),
             exact: true,
           })
         }}
@@ -153,8 +161,8 @@ export function History({ rootPath }: { rootPath: string }) {
           ) : null}
           {rows.length > 0 && !history.isRestoring ? (
             <HistoryList
-              key={`${refName}:${history.shownSearch}`}
-              revealRevision={revealRevision}
+              key={`${rootPath}:${refName}:${history.shownSearch}`}
+              revealRevision={switching ? 0 : revealRevision}
               rows={rows}
               refs={labels}
               selected={selected}
@@ -176,7 +184,7 @@ export function History({ rootPath }: { rootPath: string }) {
               <Button
                 size='sm'
                 variant='ghost'
-                disabled={history.isFetching || searching || history.isPlaceholderData}
+                disabled={switching || history.isFetching || searching || history.isPlaceholderData}
                 onClick={() => {
                   void history.fetchNextPage()
                 }}

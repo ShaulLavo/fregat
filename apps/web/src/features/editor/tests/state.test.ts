@@ -23,7 +23,10 @@ import {
 } from '@/features/editor/state/apply-actions'
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import { createEditorUiStore } from '@/features/editor/state/ui-state'
-import { createEditorWorkspaceStore } from '@/features/editor/state/workspace-state'
+import {
+  createEditorWorkspaceStore,
+  selectedTabContentForRoot,
+} from '@/features/editor/state/workspace-state'
 import { createSearchBufferStore } from '@/features/search/state/buffer-state'
 import {
   createDefaultWorkbenchPanels,
@@ -462,6 +465,12 @@ describe('editor workspace state', () => {
       editorHistory: testTabContents(['/repo/src/a.ts']),
     })
     commands.openFileSurface(filesystemPath('/other/src/b.ts'))
+    expect(selectedTabContentForRoot(workspaceStore.getState(), '/repo')).toEqual(
+      testTabContent('/repo/src/a.ts'),
+    )
+    expect(selectedTabContentForRoot(workspaceStore.getState(), '/other')).toEqual(
+      testTabContent('/other/src/b.ts'),
+    )
     commands.switchRootFolder(pickedDirectory('/repo'))
 
     expect(workspaceStore.getState()).toMatchObject({
@@ -469,6 +478,13 @@ describe('editor workspace state', () => {
       openTabContents: testTabContents(['/repo/src/a.ts']),
       selectedTabContent: testNullableTabContent('/repo/src/a.ts'),
     })
+    expect(selectedTabContentForRoot(workspaceStore.getState(), '/repo')).toEqual(
+      testTabContent('/repo/src/a.ts'),
+    )
+    expect(selectedTabContentForRoot(workspaceStore.getState(), '/other')).toEqual(
+      testTabContent('/other/src/b.ts'),
+    )
+    expect(selectedTabContentForRoot(workspaceStore.getState(), '/missing')).toBeNull()
     expect(workspaceStore.getState().parkedWorkspaces.get('/other')?.editorHistory).toEqual(
       testTabContents(['/other/src/b.ts']),
     )

@@ -1,4 +1,5 @@
-import { savedTree } from '@/features/workspace/state/tree-reload'
+import { isMissingTreeRoot } from '@/features/workspace/utils/is-missing-tree-root'
+import { confirmTreeRoot, forgetTree, savedTree } from '@/features/workspace/state/tree-reload'
 import { matchesWorkspaceRoot as isPathInWorkspace } from '@/lib/path-formatters'
 import { tabFileResource } from '@/lib/documents/utils/capabilities'
 import { filesystemPath } from '@/lib/documents/utils/identity'
@@ -9,7 +10,10 @@ import { clientErrorMessage } from '@/lib/client-error-taxonomy'
 import { fetchTree } from '@/lib/file-server'
 import type { TreeEntry, TreeResult } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
-import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
+import {
+  selectedTabContentForRoot,
+  useEditorWorkspaceStoreApi,
+} from '@/features/editor/state/workspace-state'
 import {
   FILE_TREE_PREFETCH_STALE_MS,
   treeDirectoryPrefetchKey,
@@ -176,15 +180,22 @@ function useWorkspaceTreeQuery(rootPath: string | null) {
     enabled: Boolean(rootPath),
     queryFn: async ({ signal, client }) => {
       const selectedFilePath =
-        tabFileResource(workspaceStore.getState().selectedTabContent)?.path ?? null
-      const result = await fetchInitialTree(
-        resolvedRootPath,
-        selectedFilePath,
-        signal,
-        clientForQueryClient(client),
-        saved?.record.loaded,
-      )
-      return treeModelWithDirectoryLoads(result.root, resolvedRootPath, result.directories)
+        tabFileResource(selectedTabContentForRoot(workspaceStore.getState(), resolvedRootPath))
+          ?.path ?? null
+      try {
+        const result = await fetchInitialTree(
+          resolvedRootPath,
+          selectedFilePath,
+          signal,
+          clientForQueryClient(client),
+          saved?.record.loaded,
+        )
+        if (!signal.aborted) confirmTreeRoot(client, resolvedRootPath)
+        return treeModelWithDirectoryLoads(result.root, resolvedRootPath, result.directories)
+      } catch (error) {
+        if (!signal.aborted && isMissingTreeRoot(error)) forgetTree(client, resolvedRootPath)
+        throw error
+      }
     },
     queryKey: rootTreeKey,
   })
@@ -197,7 +208,10 @@ function useWorkspaceTreeQuery(rootPath: string | null) {
     rootTreeKey,
     treeState: {
       ...treeState,
-      refreshError: saved && !data && isError ? clientErrorMessage(error) : null,
+      refreshError:
+        treeState.status === 'ready' && saved && !data && isError
+          ? clientErrorMessage(error)
+          : null,
     },
   }
 }
@@ -277,6 +291,8 @@ function treeLoadState(query: {
   isError: boolean
   isPending: boolean
 }): LoadState<TreeModel> {
+  if (query.isError && isMissingTreeRoot(query.error))
+    return { status: 'error', message: clientErrorMessage(query.error) }
   if (query.data) return { status: 'ready', data: query.data }
   if (query.isError) return { status: 'error', message: clientErrorMessage(query.error) }
   if (query.isPending) return { status: 'loading' }

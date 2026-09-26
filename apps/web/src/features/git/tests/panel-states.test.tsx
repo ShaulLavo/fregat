@@ -1,13 +1,19 @@
-import { mkdir } from 'node:fs/promises'
+import { gitKeys } from '@/lib/query-keys'
+import { GitChangesPanel } from '@/features/workbench/components/git-changes-panel'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-clients'
+import { activeServerOrigin } from '@/lib/client'
+import { createObservedInProcessClient } from '../../../../test/client'
+import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import { screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { Panel } from '@/features/git/components/panel'
 import { GitStoreProvider } from '@/features/git/providers/store-provider'
 import { expect, test } from '../../../../test/fixtures'
-import { renderWithProviders } from '../../../../test/render'
+import { renderWithProviders, createTestQueryClient } from '../../../../test/render'
 import { runGit } from '../../../../test/factories/git'
 
 // The machine-checkable form of "loading and empty are not the same picture".
@@ -40,4 +46,114 @@ test('the git panel loading state is not its empty state', async ({ client, serv
   expect(screen.getByRole('status')).toHaveTextContent('Working tree clean')
   // The tool row is the settled panel's own chrome; the identity row lives above it.
   expect(await screen.findByRole('textbox', { name: 'Commit message' })).toBeVisible()
+})
+
+test('root switches retain the branch header and changes until the target status settles', async ({
+  client,
+  server,
+}) => {
+  void client
+  for (const root of ['first', 'second']) {
+    const repo = path.join(server.root, root)
+    await mkdir(repo)
+    runGit(repo, ['init', '-b', root], { cwdMode: 'option' })
+    await writeFile(path.join(repo, `${root}.txt`), 'untracked\n')
+  }
+  const released = Promise.withResolvers<void>()
+  const observed = createObservedInProcessClient(server, async (request) => {
+    const url = new URL(request.url)
+    if (url.pathname === '/git/status' && url.searchParams.get('path') === 'second') {
+      await released.promise
+    }
+  })
+  const queryClient = createTestQueryClient()
+  registerEnvironmentQueryClient(queryClient, activeServerOrigin(), observed)
+  const view = (root: string) => (
+    <EditorStateProvider>
+      <GitStoreProvider rootPath={root}>
+        <GitChangesPanel rootPath={filesystemPath(root)} />
+      </GitStoreProvider>
+    </EditorStateProvider>
+  )
+  const rendered = renderWithProviders(view('first'), { queryClient })
+  try {
+    await screen.findByRole('textbox', { name: 'Commit message' })
+    expect(screen.getByText('first', { exact: true })).toBeVisible()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Commit message' }), {
+      target: { value: 'First root draft' },
+    })
+    rendered.rerender(view('second'))
+    expect(screen.getByRole('textbox', { name: 'Commit message' })).toHaveValue('First root draft')
+    expect(screen.getByText('first', { exact: true })).toBeVisible()
+    expect(screen.getByRole('status', { name: 'Loading Git' })).toBeVisible()
+    expect(screen.queryByText('second', { exact: true })).toBeNull()
+    rendered.rerender(view('first'))
+    expect(screen.queryByRole('status', { name: 'Loading Git' })).toBeNull()
+    expect(screen.getByRole('textbox', { name: 'Commit message' })).toHaveValue('First root draft')
+    rendered.rerender(view('second'))
+    released.resolve()
+    await screen.findByText('second', { exact: true })
+    expect(screen.getByText('second', { exact: true })).toBeVisible()
+    expect(screen.getByRole('textbox', { name: 'Commit message' })).toHaveValue('')
+    expect(screen.queryByText('first', { exact: true })).toBeNull()
+    expect(screen.queryByRole('status', { name: 'Loading Git' })).toBeNull()
+    rendered.rerender(view('missing'))
+    expect(screen.getByText('second', { exact: true })).toBeVisible()
+    await screen.findByText('Git is unavailable')
+    expect(screen.queryByRole('status', { name: 'Loading Git' })).toBeNull()
+  } finally {
+    released.resolve()
+    rendered.unmount()
+  }
+})
+
+test('graph root switches hold the branch header until the matching history is ready', async ({
+  client,
+  server,
+}) => {
+  void client
+  for (const root of ['alpha', 'beta']) {
+    const repo = path.join(server.root, root)
+    await mkdir(repo)
+    runGit(repo, ['init', '-b', root], { cwdMode: 'option' })
+    runGit(repo, ['commit', '--allow-empty', '-m', `${root} commit`], { cwdMode: 'option' })
+  }
+  const historyEntered = Promise.withResolvers<void>()
+  const historyReleased = Promise.withResolvers<void>()
+  const observed = createObservedInProcessClient(server, async (request) => {
+    if (new URL(request.url).pathname !== '/git/history') return
+    const body = await request.clone().json()
+    if (body.path !== 'beta') return
+    historyEntered.resolve()
+    await historyReleased.promise
+  })
+  const queryClient = createTestQueryClient()
+  registerEnvironmentQueryClient(queryClient, activeServerOrigin(), observed)
+  const view = (root: string) => (
+    <EditorStateProvider>
+      <GitChangesPanel rootPath={filesystemPath(root)} />
+    </EditorStateProvider>
+  )
+  const rendered = renderWithProviders(view('alpha'), { queryClient })
+  try {
+    await screen.findByRole('textbox', { name: 'Commit message' })
+    fireEvent.click(screen.getByRole('tab', { name: 'Graph' }))
+    await screen.findByText(/1 commit/)
+    rendered.rerender(view('beta'))
+    await historyEntered.promise
+    await waitFor(() => expect(queryClient.getQueryData(gitKeys.status('beta'))).toBeDefined())
+    expect(screen.getByText('alpha', { exact: true })).toBeVisible()
+    expect(screen.getByRole('listbox', { name: 'Commit history' })).toBeVisible()
+    expect(screen.queryByText('beta', { exact: true })).toBeNull()
+    expect(screen.getByRole('status', { name: 'Loading Git' })).toBeVisible()
+    historyReleased.resolve()
+    await screen.findByText('beta', { exact: true })
+    expect(screen.getByText('beta', { exact: true })).toBeVisible()
+    expect(screen.queryByText('alpha', { exact: true })).toBeNull()
+    expect(screen.queryByRole('status', { name: 'Loading Git' })).toBeNull()
+  } finally {
+    historyReleased.resolve()
+    rendered.unmount()
+    queryClient.clear()
+  }
 })

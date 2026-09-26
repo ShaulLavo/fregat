@@ -1,19 +1,19 @@
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { cn } from '@workspace/ui/lib/utils'
 
-import { useCodeThemePreview } from '@/lib/code-theme/hooks/use-preview'
+import type { useCodeThemePreview } from '@/lib/code-theme/hooks/use-preview'
 import { editorThemeColorMode } from '@/lib/code-theme/utils/catalog'
 import { previewTokenStyle } from '@/lib/code-theme/utils/preview'
 import { FixWithAgentButton } from '@/components/fix-with-agent-button'
 
 export function CodeThemePreview({
-  themeId,
+  preview,
   className,
 }: {
-  readonly themeId: string
+  readonly preview: ReturnType<typeof useCodeThemePreview>
   readonly className?: string
 }) {
-  const preview = useCodeThemePreview(themeId)
+  const { themeId } = preview
   const colorMode = editorThemeColorMode(themeId)
 
   return (
