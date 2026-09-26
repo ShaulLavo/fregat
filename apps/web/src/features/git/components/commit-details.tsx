@@ -1,3 +1,5 @@
+import { Spinner } from '@workspace/ui/components/spinner'
+import { blobDiffQueryOptions } from '@/features/git/utils/blob-diff-query'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { CaretDownIcon, CopyIcon, XIcon } from '@phosphor-icons/react'
 import {
@@ -35,6 +37,7 @@ export function CommitDetails({
   onOpen: (file: GitCommitFile) => void
 }) {
   const details = useCommitDetails(rootPath, commit)
+  const shownCommit = details.data?.id ?? commit
   const navigation = useNavigation()
   const panels = useEditorWorkspaceState((state) => state.workbenchPanels)
   const open = panels.gitCommitDetailsOpen
@@ -73,7 +76,7 @@ export function CommitDetails({
         <CollapsibleTrigger
           aria-label='Commit information'
           className='focus-ring flex min-w-0 flex-1 items-center gap-1.5 text-left font-mono text-xs outline-none'
-          title={commit}
+          title={shownCommit}
         >
           <CaretDownIcon
             className={cn(
@@ -81,12 +84,13 @@ export function CommitDetails({
               !open && '-rotate-90',
             )}
           />
-          {commit.slice(0, 10)}
+          {shownCommit.slice(0, 10)}
         </CollapsibleTrigger>
+        {details.isFetching ? <Spinner size='xs' /> : null}
         <ToolbarButton
           label='Copy commit hash'
           onClick={() => {
-            void copyTextToClipboard(commit, 'commit hash')
+            void copyTextToClipboard(shownCommit, 'commit hash')
           }}
         >
           <CopyIcon />
@@ -171,6 +175,7 @@ export function CommitDetails({
             {details.data.files.map((file) => (
               <GitFileRow
                 key={file.path}
+                prefetch={file.kind === 'submodule' ? null : blobDiffQueryOptions(file)}
                 rowProps={fileList.rowProps(file.path)}
                 path={file.path}
                 oldPath={file.oldPath}

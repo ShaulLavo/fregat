@@ -306,12 +306,12 @@ describe('collection intent', () => {
     await Promise.all([
       store.write({
         mutationId: 'keybinding-one',
-        operations: [{ command: 'command.one', keys: 'Mod+1', kind: 'keybinding.set' }],
+        operations: [{ command: 'command.one', keys: ['Mod+1'], kind: 'keybinding.set' }],
         target: 'user',
       }),
       store.write({
         mutationId: 'keybinding-two',
-        operations: [{ command: 'command.two', keys: 'Mod+2', kind: 'keybinding.set' }],
+        operations: [{ command: 'command.two', keys: ['Mod+2'], kind: 'keybinding.set' }],
         target: 'user',
       }),
       store.write({
@@ -352,8 +352,8 @@ describe('collection intent', () => {
 
     const values = store.snapshot().values
     expect(values['keybindings.overrides']).toMatchObject({
-      'command.one': 'Mod+1',
-      'command.two': 'Mod+2',
+      'command.one': ['Mod+1'],
+      'command.two': ['Mod+2'],
     })
     expect(values['models.hidden']).toEqual(expect.arrayContaining([alpha, beta]))
     expect(values['providers.instances']).toEqual(

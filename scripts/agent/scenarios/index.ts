@@ -1,3 +1,4 @@
+import { restNoFlicker } from './rest-no-flicker'
 import { deferredDialogs } from './deferred-dialogs'
 import { textFieldFkeys } from './text-field-fkeys'
 import { settingsRoutePreparation } from './settings-route-preparation'
@@ -104,6 +105,7 @@ import { chatSessionGoal } from './chat-session-goal'
 import { chatAgentReview } from './chat-agent-review'
 import { fileTreeHoverPrefetch } from './file-tree-hover-prefetch'
 import { prefetchChatSwitch } from './prefetch-chat-switch'
+import { prefetchDiffQueries } from './prefetch-diff-queries'
 import { prefetchFirstPaint } from './prefetch-first-paint'
 import { prefetchSettings } from './prefetch-settings'
 import {
@@ -380,6 +382,7 @@ export const scenarios: readonly Scenario[] = [
   chatModelPicker,
   chatUsageMeter,
   chatComposerNarrow,
+  restNoFlicker,
   settingsUsage,
   pushSubscribe,
   pushSessionNotice,
@@ -575,6 +578,7 @@ export const scenarios: readonly Scenario[] = [
   chatAgentReview,
   fileTreeHoverPrefetch,
   prefetchFirstPaint,
+  prefetchDiffQueries,
   prefetchChatSwitch,
   prefetchSettings,
   workspaceOpenLargeRoot,
