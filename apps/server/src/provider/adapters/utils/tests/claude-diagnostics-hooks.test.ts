@@ -9,14 +9,15 @@ const CWD = '/repo'
 const existing: AgentDiagnostic = { line: 3, message: 'Old problem.', code: '2304' }
 const introduced: AgentDiagnostic = { line: 7, message: 'New problem.', code: '2322' }
 
-function source(reads: readonly (readonly AgentDiagnostic[])[], enabled = true) {
+function source(reads: readonly (readonly AgentDiagnostic[] | null)[], enabled = true) {
   const calls: string[] = []
   const queue = [...reads]
   const reader: AgentDiagnosticsSource = {
     enabled: () => enabled,
     errors: async (filePath) => {
       calls.push(filePath)
-      return { mode: 'pull', errors: queue.shift() ?? [] }
+      const errors = queue.shift()
+      return errors === null ? null : { mode: 'pull', errors: errors ?? [] }
     },
   }
   return { calls, reader }
@@ -71,6 +72,13 @@ describe('diagnostics after an agent edit', () => {
         ].join('\n'),
       },
     })
+  })
+
+  it('reports nothing when a failed baseline is followed by pre-existing errors', async () => {
+    const { reader } = source([null, [existing]])
+    const hooks = claudeDiagnosticsHooks(reader)
+    await hook(hooks, 'PreToolUse')({ hook_event_name: 'PreToolUse' })
+    expect(await hook(hooks, 'PostToolUse')({ hook_event_name: 'PostToolUse' })).toEqual({})
   })
 
   it('says nothing when the edit added no error, or the setting is off', async () => {

@@ -25,7 +25,8 @@ export function claudeDiagnosticsHooks(
     const filePath = editedPath(input.tool_input, input.cwd)
     if (!filePath) return {}
     const baseline = await source.errors(filePath, input.cwd, BUDGET_MS / 2)
-    baselines.set(input.tool_use_id, baseline?.errors ?? [])
+    baselines.delete(input.tool_use_id)
+    if (baseline) baselines.set(input.tool_use_id, baseline.errors)
     return {}
   }
   const after: HookCallback = async (input) => {
