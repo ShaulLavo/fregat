@@ -42,6 +42,13 @@ release installs that carry every package the server loads at runtime.
 7. **Duplicates in the web bundle:** a `resolve.dedupe` list in `apps/web/vite.config.ts` for the
    markdown parser stack (~240 KB carried twice, Platform and Editor), `@tanstack/hotkeys` (three
    copies) and `evlog` (two). Measure with the bundle report before and after.
+   Implemented on `w2/cx-184-dedupe`. Bun's isolated install needs the markdown entry packages
+   resolved from `packages/markdown`; a dedupe list alone left those copies in the build.
+   The final module report has one physical copy of each parser package, hotkeys and evlog.
+   All emitted JS: 62,029,559 → 61,910,043 bytes, down 119,516. All JS gzip:
+   9,133,410 → 9,100,496 bytes. First-load JS gzip is essentially unchanged:
+   1,761,157 → 1,761,013. Shared package notices ship at `/licenses/markdown-runtime.txt`.
+   Evidence: `/work/tmp/w2-184-dedupe-evidence/`.
 8. **Notices:** generate a third-party notices file at build time and serve it; add Pierre's Apache
    notice to `packages/tree`; ship the two bundled fonts' OFL text.
 
