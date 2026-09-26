@@ -1284,30 +1284,6 @@
     "reason": "owner: the /dev gallery shows the settings shortcut rows and recorder over fixture overrides, so a phone check needs no settings state."
   },
   {
-    "from": "chat-mode",
-    "to": "chat",
-    "module": "features/chat/components/background-tasks-button.tsx",
-    "reason": "couple: the stage header shows the chat session's background tasks, like ContextUsageRing; merge their ownership in a later pass."
-  },
-  {
-    "from": "chat-mode",
-    "to": "chat",
-    "module": "features/chat/components/schedules-button.tsx",
-    "reason": "couple: the stage header shows the chat session's schedules beside its background tasks, like ContextUsageRing; merge their ownership in a later pass."
-  },
-  {
-    "from": "chat-mode",
-    "to": "chat",
-    "module": "features/chat/components/goal-button.tsx",
-    "reason": "couple: the stage header shows the chat session's goal beside its schedules, like ContextUsageRing; merge their ownership in a later pass."
-  },
-  {
-    "from": "chat-mode",
-    "to": "chat",
-    "module": "features/chat/components/session-tools-button.tsx",
-    "reason": "couple: the stage header shows the chat session's MCP servers and hooks, like ContextUsageRing; merge their ownership in a later pass."
-  },
-  {
     "from": "workbench",
     "to": "git",
     "module": "features/git/hooks/use-diff-document-diffs.ts",

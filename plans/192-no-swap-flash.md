@@ -225,3 +225,48 @@ After evidence, screenshots read back:
 - `/work/tmp/fregat-evidence/20260926T202812Z-scenario-diff-no-flicker/`
 - `/work/tmp/fregat-evidence/20260926T203038Z-scenario-saved-comparison-no-flicker/`
 - `/work/tmp/fregat-evidence/20260926T201804Z-scenario-history-comparison-no-flicker/`
+
+## Integration verification, 2026-09-27
+
+The integration branch merges #111, #112, #115, #126 and #128 in that order, including
+`f39d8dae3`, then main through `f9ed276d2`. The Git panel and header share a root held
+until status and visible history are ready. Commit/ref holds and the history search debounce
+remain. Main's pull-request retry uses the held root and successful lookup state. The branch
+scenario restores its fixture providers through the current raw-settings API.
+
+- Gates, including knip, and the full web typecheck pass.
+- Bundle gate passes: **1,736,922 gzip bytes**, limit **1,740,081**, headroom **3,159**.
+- Browser tests: **26/26** across 9 files.
+- DOM tests: **438 passed, 1 failed** across 117 files, including focused reruns of three
+  files whose imports coincided with shared Editor builds. The combined Git root test passes.
+- Editor workspace-state node tests: **27/27**.
+- All 9 row scenarios pass; all **14 blank-frame measurements are 0**. Both theme scenarios
+  also report 0 header/body mismatches. The pull-request lookup failure/retry scenario passes.
+- Screenshots were read back. Vite ran on 5256; all servers use throwaway state and fixture/mock
+  providers. No deployment or real model call was made.
+
+The remaining failure is `features/editor/components/tests/diff-layout.test.tsx`: switching
+tabs retains the old 40% pane layout instead of the next tab's saved 75%. #128 removed the
+resizable group's tab key. This integration preserves that reviewed behavior, so the coordinator
+must resolve this failure before treating the branch as fully green.
+
+Evidence directories under `/work/tmp/fregat-evidence/`:
+
+| Rows  | Scenario                        | Blank frames | Directory                                                 |
+| ----- | ------------------------------- | ------------ | --------------------------------------------------------- |
+| 3     | `palette-theme-no-flicker`      | 0            | `20260926T205636Z-scenario-palette-theme-no-flicker`      |
+| 4     | `studio-theme-no-flicker`       | 0            | `20260926T205732Z-scenario-studio-theme-no-flicker`       |
+| 5–7   | `git-history-no-flicker`        | 0, 0, 0      | `20260926T205747Z-scenario-git-history-no-flicker`        |
+| 8, 16 | `root-switch-no-flicker`        | 0, 0         | `20260926T205807Z-scenario-root-switch-no-flicker`        |
+| 17    | `turn-files-no-flicker`         | 0, 0         | `20260926T205830Z-scenario-turn-files-no-flicker`         |
+| 18    | `branch-actions-no-flicker`     | 0, 0         | `20260926T210140Z-scenario-branch-actions-no-flicker`     |
+| 13    | `diff-no-flicker`               | 0            | `20260926T205920Z-scenario-diff-no-flicker`               |
+| 14    | `saved-comparison-no-flicker`   | 0            | `20260926T205935Z-scenario-saved-comparison-no-flicker`   |
+| 15    | `history-comparison-no-flicker` | 0            | `20260926T205949Z-scenario-history-comparison-no-flicker` |
+
+The first Theme Studio attempt reloaded during Vite dependency optimization; the warmed rerun
+passed. Browser verification allowed the Bun font cache. Main's linked spellcheck package lacked
+a dependency installation, so verification used an identical source/dist copy with dependencies
+inside this worktree's ignored `node_modules/.verification`, leaving the shared Editor untouched.
+Root deletion and malformed forge replies intentionally produce 404/502 evidence. Turn switching
+records cancelled checkpoint reads. Commands and retained logs: `/work/tmp/w2-cx-192-integration/`.
