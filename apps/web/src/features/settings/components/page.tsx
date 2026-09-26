@@ -21,6 +21,8 @@ import { PageLoading } from '@/features/settings/components/page-loading'
 import { ScopeTabs } from '@/features/settings/components/scope-tabs'
 import { SettingsJsonView } from '@/features/settings/components/json-view'
 import { UsageSection } from '@/features/settings/components/usage-section'
+import { McpSection } from '@/features/settings/components/mcp-section'
+import { MCP_CATEGORY, matchesMcpSearch } from '@/features/settings/utils/mcp'
 import { matchesUsageSearch } from '@/features/settings/utils/usage'
 import { PushSection } from '@/features/settings/components/push-section'
 import { matchesPushSearch } from '@/features/settings/utils/push-device'
@@ -119,6 +121,7 @@ export function SettingsPage({
   // The push switch renders inside the push section, beside the devices it sends to.
   const categories = groupByCategory(visible.filter((id) => id !== 'chat.pushNotifications'))
   if (matchesUsageSearch(query)) categories.set('Usage', [])
+  if (matchesMcpSearch(query)) categories.set(MCP_CATEGORY, [])
   const showPush =
     matchesPushSearch(query) ||
     visible.includes('chat.notificationMode') ||
@@ -132,6 +135,7 @@ export function SettingsPage({
     : [...categories]
 
   const onlyUsage = shown.length === 1 && shown[0]?.[0] === 'Usage'
+  const onlyMcp = shown.length === 1 && shown[0]?.[0] === MCP_CATEGORY
 
   return (
     <ToolPane
@@ -183,7 +187,8 @@ export function SettingsPage({
                 <p className='text-muted-foreground text-xs tabular-nums'>
                   {project ? 'Project settings' : null}
                   {!project && onlyUsage ? 'Usage report' : null}
-                  {!project && !onlyUsage && (
+                  {!project && onlyMcp ? MCP_CATEGORY : null}
+                  {!project && !onlyUsage && !onlyMcp && (
                     <>
                       {selectedCategory ? `${shownCount(shown)} of ` : ''}
                       {visible.length} {visible.length === 1 ? 'setting' : 'settings'}
@@ -272,6 +277,7 @@ export function SettingsPage({
                 <section className='mb-6' key={category}>
                   <h2 className='text-foreground mb-1 text-sm font-semibold'>{category}</h2>
                   {category === 'Usage' ? <UsageSection /> : null}
+                  {category === MCP_CATEGORY ? <McpSection /> : null}
                   {ids.includes('chat.keepImportedSessionsUpdated') ? <ImportSection /> : null}
                   {category === 'Chat' && showPush ? <PushSection snapshot={projection} /> : null}
                   {ids.map((id, index) => (

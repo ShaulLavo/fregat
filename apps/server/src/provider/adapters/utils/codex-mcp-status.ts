@@ -75,7 +75,7 @@ function definitionTransport(definition: Record<string, unknown>): ProviderMcpTr
   return null
 }
 
-function originFor(origins: CodexConfigReadResponse['origins'], name: string) {
+export function originFor(origins: CodexConfigReadResponse['origins'], name: string) {
   const prefix = `mcp_servers.${name}.`
   for (const [key, origin] of Object.entries(origins)) {
     if (key.startsWith(prefix)) return origin

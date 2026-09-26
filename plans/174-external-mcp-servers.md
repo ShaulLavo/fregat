@@ -179,12 +179,30 @@ Each phase ships and deploys on its own; phases 1, 3, 5 and 6 change the server
    staleTime. Row actions: reconnect, sign in (Codex now, Claude after phase 6), remove. Files: new
    `apps/server/src/provider/mcp-config-routes.ts` and `provider-service.ts` methods,
    `features/settings/components/mcp-section.tsx` + rows, `utils/query-keys.ts`/`mutation-keys.ts`.
+   Landed 2026-09-26 (wave 2 lane M) with phase 4. Each adapter exposes `mcpConfig` (list, add,
+   remove, read) and `mcp-config-routes.ts` serves it; no `provider-service.ts` methods were needed.
+   The page reads one instance at a time, only when the owner picks it, because a read starts every
+   server once (and would reach a real account from a scenario). It reads from the home folder, or
+   from a folder the owner picks to see that folder's local and project servers. The Claude probe
+   keeps unapproved project servers off, exactly as a session does, and polls `mcpServerStatus()`
+   until nothing is `pending` (8 s cap): the CLI has no push stream. Reconnect became "Check
+   again" (a new probe): the probe process is gone once it answers. Sign-in lands with phase 6.
+   Command: `Open MCP servers` (settings search `mcp`).
 4. **Add and copy (M).** An add/edit dialog (stdio: command, arguments, environment; HTTP: URL,
    headers) with targets Claude user/local/project and Codex user. Writes go through
    `claude mcp add-json` and `config/batchWrite`, then running Codex sessions get
    `config/mcpServer/reload` and Claude rows say "Applies to new sessions". "Also add to Codex /
    Claude" on a row copies it through the same translation. Refuses `platform` and names already
    used in the target. Scenario: add in both, see both connected in a new session, remove.
+   Landed 2026-09-26 (wave 2 lane M). Environment and header values are typed into masked fields
+   and go straight to the harness writer; a copy reads the stored definition server-side, so the
+   page never holds a value. A copy lands in the same scope when the target keeps it, else in the
+   target's user config. Adding a Claude project server records the Platform approval for it, since
+   the owner wrote it. A Codex write reloads every live Codex session's servers.
+   Not run: the two-provider scenario, which needs real Claude and Codex sessions (a wave 2 hard
+   stop). Covered by `mcp-config-routes.test.ts` (Claude through a fake `claude mcp` over real
+   files), the Codex adapter test (`config/batchWrite` with `expectedVersion`) and the fixture-Codex
+   scenario `mcp-settings` (list, add with a masked header, delete).
 5. **Off for this session (M).** A popover switch per server. Stored on the session projection
    (migration) as a list of names, re-sent on every Codex start/resume/fork (the same `config`
    path as Plan 087's endpoint) and as Claude flag settings at CLI start. The switch's

@@ -8,6 +8,14 @@ export const settingsMutationKeys = {
   providerUpdate: (providerInstanceId: ProviderInstanceId) =>
     ['settings', 'provider-update', providerInstanceId] as const,
   rawSave: (key: DocumentKey) => ['settings', 'raw-save', key] as const,
+  mcp: {
+    add: (providerInstanceId: ProviderInstanceId) =>
+      ['settings', 'mcp', 'add', providerInstanceId] as const,
+    remove: (providerInstanceId: ProviderInstanceId, name: string) =>
+      ['settings', 'mcp', 'remove', providerInstanceId, name] as const,
+    copy: (providerInstanceId: ProviderInstanceId, name: string) =>
+      ['settings', 'mcp', 'copy', providerInstanceId, name] as const,
+  },
   push: {
     subscribe: ['push', 'subscribe'] as const,
     test: (deviceId: string) => ['push', 'test', deviceId] as const,

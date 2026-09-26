@@ -9,6 +9,16 @@ import {
   codexMcpServer,
   type CodexMcpDefinition,
 } from './utils/codex-mcp-status'
+import {
+  CODEX_MCP_SCOPES,
+  codexMcpConfigServers,
+  codexMcpDefinition,
+  codexMcpTable,
+  isCodexConfigConflict,
+  layerServers,
+  requireCodexScope,
+  userLayer,
+} from './utils/codex-mcp-config'
 import { offeredOptions, offeredResponse, type ApprovalOffer } from './utils/approval-offers'
 import { codexCommandApprovalOffers } from './utils/codex-command-approval'
 import { parseCodexElicitation } from './utils/codex-elicitation'
@@ -43,6 +53,8 @@ import {
 import * as v from 'valibot'
 import type {
   ProviderAdapter,
+  ProviderMcpConfigAccess,
+  ProviderMcpWrite,
   ProviderAdapterRuntime,
   ProviderApprovalResponseInput,
   ProviderCommandCatalogInput,
@@ -58,7 +70,12 @@ import type {
   ProviderSessionHistoryInput,
   ProviderForkInput,
 } from '../types'
-import { isNotInstalledError, requestGone, sessionIdentityErrors } from '../structured-errors'
+import {
+  isNotInstalledError,
+  mcpConfigErrors,
+  requestGone,
+  sessionIdentityErrors,
+} from '../structured-errors'
 import { RuntimeAdapter } from './state/runtime-adapter'
 import { SessionContext } from './state/session-context'
 import {
@@ -452,6 +469,92 @@ export class CodexProviderAdapter
 
   async signInMcpServer({ name, sessionId }: { name: string; sessionId: SessionId }) {
     return this.requireSession(sessionId, 'mcpServer/oauth/login').signInMcpServer(name)
+  }
+
+  readonly mcpConfig: ProviderMcpConfigAccess = {
+    scopes: CODEX_MCP_SCOPES,
+    list: ({ folder }) => this.listConfiguredMcpServers(folder),
+    add: ({ definition, ...input }) =>
+      this.writeMcpServer(input, (servers) => {
+        if (input.name in servers)
+          throw mcpConfigErrors.MCP_NAME_TAKEN({
+            internal: { name: input.name, scope: input.scope },
+          })
+        return codexMcpTable(definition)
+      }),
+    remove: (input) =>
+      this.writeMcpServer(input, (servers) => {
+        if (input.name in servers) return null
+        throw mcpConfigErrors.MCP_SERVER_NOT_FOUND({
+          internal: { name: input.name, scope: input.scope, defined: false },
+        })
+      }),
+    read: ({ folder, name, scope }) => {
+      requireCodexScope(scope)
+      return inspectCodexHistory(this.env, async (client) =>
+        codexMcpDefinition(await readCodexConfig(client, folder), name),
+      )
+    },
+  }
+
+  private async listConfiguredMcpServers(folder: string) {
+    try {
+      return await inspectCodexHistory(this.env, async (client) => {
+        const [statuses, config] = await Promise.all([
+          listCodexMcpStatus(client, null),
+          readCodexConfig(client, folder),
+        ])
+        return codexMcpConfigServers(statuses, config)
+      })
+    } catch (error) {
+      throw mcpConfigErrors.MCP_PROBE_FAILED({
+        cause: error instanceof Error ? error : undefined,
+        internal: { provider: 'codex' },
+      })
+    }
+  }
+
+  /** One `config/batchWrite` against the version just read, then every live session reloads. */
+  private async writeMcpServer(
+    input: ProviderMcpWrite,
+    table: (servers: Record<string, unknown>) => unknown,
+  ) {
+    requireCodexScope(input.scope)
+    await inspectCodexHistory(this.env, async (client) => {
+      const layer = userLayer(await readCodexConfig(client, input.folder))
+      const value = table(layerServers(layer))
+      await client
+        .request('config/batchWrite', {
+          edits: [{ keyPath: `mcp_servers.${input.name}`, mergeStrategy: 'replace', value }],
+          expectedVersion: layer?.version ?? null,
+          reloadUserConfig: true,
+        })
+        .catch((error: unknown) => {
+          if (isCodexConfigConflict(error))
+            throw mcpConfigErrors.MCP_CONFIG_CHANGED({
+              cause: error instanceof Error ? error : undefined,
+              internal: { name: input.name },
+            })
+          throw mcpConfigErrors.MCP_WRITE_FAILED({
+            cause: error instanceof Error ? error : undefined,
+            internal: { command: 'config/batchWrite', name: input.name },
+          })
+        })
+    })
+    await this.reloadLiveMcpServers()
+  }
+
+  /** Each session has its own app-server, which reads `config.toml` only on reload. */
+  private async reloadLiveMcpServers() {
+    for (const [sessionId, session] of this.sessions) {
+      if (!session.isActive()) continue
+      await session.reloadMcpServers().catch((error: unknown) => {
+        recordChatPipelineWarning('chat.pipeline.codex_adapter.mcp_reload.failed', {
+          error,
+          sessionId,
+        })
+      })
+    }
   }
 
   async controlGoal({ action, sessionId }: { action: ProviderGoalAction; sessionId: SessionId }) {
@@ -2794,6 +2897,10 @@ async function listCodexMcpStatus(client: CodexAppServerRpcClient, threadId: str
     cursor = page.nextCursor ?? null
   } while (cursor)
   return servers
+}
+
+function readCodexConfig(client: CodexAppServerRpcClient, cwd: string) {
+  return client.request('config/read', { cwd, includeLayers: true })
 }
 
 /** Sources and transports are extras: an app-server that cannot read its config still lists status. */

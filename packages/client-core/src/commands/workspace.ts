@@ -253,6 +253,16 @@ export const workspaceCommandMetadata = {
     when: [],
     title: 'Open usage',
   }),
+  'workspace.showMcpServers': defineMetadata({
+    category: 'Chat',
+    description: 'List, add, copy and delete the MCP servers Claude and Codex start.',
+    id: 'workspace.showMcpServers',
+    execution: 'async',
+    target: 'workspace',
+    undoCategory: 'view-only',
+    when: [],
+    title: 'Open MCP servers',
+  }),
   'workspace.exportTranscript': defineMetadata({
     category: 'Chat',
     description: 'Save the selected session as Markdown.',

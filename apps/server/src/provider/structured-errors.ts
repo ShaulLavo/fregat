@@ -173,6 +173,64 @@ export const sessionIdentityErrors = defineErrorCatalog('provider', {
   },
 })
 
+/** Managing MCP servers through each provider CLI’s own config writer. */
+export const mcpConfigErrors = defineErrorCatalog('provider', {
+  MCP_CONFIG_UNSUPPORTED: {
+    status: 409,
+    message: 'This provider has no MCP servers to manage.',
+    why: 'Only Claude and Codex instances keep MCP server definitions.',
+    fix: 'Choose a Claude or Codex provider.',
+  },
+  MCP_SCOPE_UNSUPPORTED: {
+    status: 400,
+    message: 'This provider does not keep servers in that place.',
+    why: 'Codex keeps its servers in the user config.toml; Claude keeps user, local and project servers.',
+    fix: 'Pick one of the places the dialog offers for this provider.',
+  },
+  MCP_FOLDER_REQUIRED: {
+    status: 400,
+    message: 'Choose the project folder for this server.',
+    why: 'Local and project servers belong to one folder.',
+    fix: 'Pick a project, or add the server for your user instead.',
+  },
+  MCP_FOLDER_MISSING: {
+    status: 404,
+    message: 'That project folder does not exist on this machine.',
+    why: 'Local and project servers are written into a folder the provider CLI can open.',
+    fix: 'Pick a project registered on this machine.',
+  },
+  MCP_NAME_TAKEN: {
+    status: 409,
+    message: 'A server with that name already exists there.',
+    why: 'The provider keeps one definition per name in each place.',
+    fix: 'Choose another name, or remove the existing server first.',
+  },
+  MCP_SERVER_NOT_FOUND: {
+    status: 404,
+    message: 'That MCP server is not defined there.',
+    why: 'The provider’s config has no server with this name in that place; it may have been removed.',
+    fix: 'Reload the MCP servers list.',
+  },
+  MCP_WRITE_FAILED: {
+    status: 502,
+    message: 'The provider CLI did not save the MCP server change.',
+    why: 'Its config writer exited with an error.',
+    fix: 'Check the provider’s CLI works from a terminal, then try again.',
+  },
+  MCP_CONFIG_CHANGED: {
+    status: 409,
+    message: 'The config changed while it was being saved.',
+    why: 'Another editor wrote the same config file after it was read.',
+    fix: 'Reload the MCP servers list and make the change again.',
+  },
+  MCP_PROBE_FAILED: {
+    status: 502,
+    message: 'The MCP servers could not be read.',
+    why: 'The provider’s CLI did not answer the status request.',
+    fix: 'Check the provider is installed and signed in, then reload.',
+  },
+})
+
 /** The provider has no callback for this request any more; the caller branches on the code. */
 export function requestGone(requestKind: 'approval' | 'user-input', requestId: string) {
   return sessionIdentityErrors.REQUEST_GONE({ internal: { requestId, requestKind } })

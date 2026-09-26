@@ -31,6 +31,7 @@ import { projectGrouping } from './project-grouping'
 import { sessionSearch, sessionSearchEnvironments } from './session-search'
 import { sessionUnread } from './session-unread'
 import { mcpApproval } from './mcp-approval'
+import { mcpSettings } from './mcp-settings'
 import { mcpStatus } from './mcp-status'
 import { chatScreenshot } from './chat-screenshot'
 import { chatMultipleModels } from './chat-multiple-models'
@@ -330,6 +331,7 @@ export const scenarios: readonly Scenario[] = [
   composerDefaults,
   mcpApproval,
   mcpStatus,
+  mcpSettings,
   chatScreenshot,
   chatMultipleModels,
   chatComposerEditing,

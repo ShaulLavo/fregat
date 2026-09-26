@@ -66,6 +66,7 @@ import {
 } from '../claude-discovery'
 import type {
   ProviderAdapter,
+  ProviderMcpConfigAccess,
   ProviderAdapterRuntime,
   ProviderApprovalResponseInput,
   ProviderCommandCatalogInput,
@@ -126,6 +127,11 @@ import {
   unapprovedProjectMcpServers,
 } from './utils/claude-project-mcp'
 import {
+  claudeMcpConfigAccess,
+  defaultClaudeMcpCli,
+  type ClaudeMcpCli,
+} from './utils/claude-mcp-config'
+import {
   ClaudeMcpStatusWatch,
   claudeMcpServer,
   gatedProjectMcpServer,
@@ -179,6 +185,8 @@ export type ClaudeAdapterOptions = {
   displayLabel?: string
   /** Where approved project MCP servers are recorded; the Platform state home by default. */
   projectMcpApprovalsFile?: string
+  /** Runs `claude mcp …`; replaced in tests so no real CLI edits a real config. */
+  mcpCli?: ClaudeMcpCli
   enabled?: boolean
   /**
    * Per-instance spawn env. Isolation rides on `CLAUDE_CONFIG_DIR`, never on
@@ -257,6 +265,7 @@ export class ClaudeProviderAdapter
   /** What each live session started from, so approving a project server can restart it. */
   private readonly startInputs = new Map<SessionId, ProviderRuntimeStartInput>()
   private readonly projectMcpApprovalsFile: string
+  readonly mcpConfig: ProviderMcpConfigAccess
 
   /**
    * `createQuery` is the seam every test depends on: without it each test spawns
@@ -281,6 +290,19 @@ export class ClaudeProviderAdapter
     this.createQuery = options.createQuery ?? defaultClaudeCreateQuery
     this.projectMcpApprovalsFile =
       options.projectMcpApprovalsFile ?? defaultProjectMcpApprovalsPath()
+    this.mcpConfig = claudeMcpConfigAccess({
+      approvalsFile: this.projectMcpApprovalsFile,
+      cli: options.mcpCli ?? defaultClaudeMcpCli(() => this.executablePath(), env),
+      env,
+      probe: async (folder, unapproved) =>
+        probeClaudeMcpStatus({
+          createQuery: this.createQuery,
+          env,
+          executablePath: await this.executablePath(),
+          folder,
+          unapproved,
+        }),
+    })
     this.discoveryRunner = options.discoveryRunner
     this.historyRunner = options.historyRunner
     this.settings = {
@@ -2666,6 +2688,58 @@ async function probeClaudeUsage(
       CLAUDE_USAGE_TIMEOUT_MS,
       'Claude usage read timed out.',
     )
+  } finally {
+    abortController.abort()
+  }
+}
+
+/** How long the settings probe waits for servers still starting before it reports them pending. */
+const CLAUDE_MCP_SETTLE_MS = 8_000
+const CLAUDE_MCP_POLL_MS = 250
+
+/**
+ * The never-yielding probe with MCP left on, run in `folder`: the servers a session started there
+ * would load, each started once to report status and tools. Unapproved project servers stay off.
+ */
+async function probeClaudeMcpStatus(input: {
+  createQuery: ClaudeCreateQuery
+  env: NodeJS.ProcessEnv
+  executablePath: string
+  folder: string
+  unapproved: readonly string[]
+}) {
+  const abortController = new AbortController()
+  const query = input.createQuery({
+    options: {
+      abortController,
+      allowedTools: [],
+      cwd: input.folder,
+      env: input.env,
+      pathToClaudeCodeExecutable: input.executablePath,
+      persistSession: false,
+      settingSources: ['user', 'project', 'local'],
+      stderr: noop,
+      ...(input.unapproved.length > 0
+        ? { settings: { disabledMcpjsonServers: [...input.unapproved] } }
+        : {}),
+    },
+    prompt: neverYieldingPrompt(abortController.signal),
+  })
+
+  try {
+    await withClaudeTimeout(
+      query.initializationResult(),
+      CLAUDE_INIT_TIMEOUT_MS,
+      'Claude MCP probe timed out starting.',
+    )
+    const deadline = Date.now() + CLAUDE_MCP_SETTLE_MS
+    for (;;) {
+      const statuses = await query.mcpServerStatus()
+      const starting = statuses.some((status) => status.status === 'pending')
+      if (!starting || Date.now() >= deadline) return statuses
+
+      await Bun.sleep(CLAUDE_MCP_POLL_MS)
+    }
   } finally {
     abortController.abort()
   }

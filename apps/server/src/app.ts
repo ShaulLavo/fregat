@@ -1,3 +1,4 @@
+import { mcpConfigRoutes } from './provider/mcp-config-routes'
 import { sessionControlRoutes } from './provider/session-control-routes'
 import { createAttachmentOwnership } from './attachments/ownership'
 import { selectTitleModel } from './orchestration/title-generation'
@@ -553,6 +554,7 @@ export function createApp(options: AppOptions) {
       ),
     )
     .use(sessionControlRoutes(providerService))
+    .use(mcpConfigRoutes(providerAdapterRegistry))
     .use(orchestrationRoutes(orchestration, checkpointDiff, sessionSearch, checkpointHunks))
     .use(
       attachmentRoutes({

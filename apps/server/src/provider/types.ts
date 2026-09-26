@@ -14,6 +14,9 @@ import type {
   ProviderGoalAction,
   ProviderSessionGoal,
   ProviderDriverKind,
+  ProviderMcpConfigServer,
+  ProviderMcpDefinition,
+  ProviderMcpScope,
   ProviderMcpServer,
   ProviderMcpSignIn,
   ProviderSessionHooks,
@@ -586,6 +589,25 @@ export type ProviderAdapterRuntime = {
   sessionId: SessionId
 }
 
+export type ProviderMcpWrite = {
+  folder: string
+  name: string
+  scope: ProviderMcpScope
+}
+
+/**
+ * An instance's MCP servers as its harness keeps them. The harness config is the only store:
+ * reads go through a probe, writes through the harness's own writer.
+ */
+export type ProviderMcpConfigAccess = {
+  readonly scopes: readonly ProviderMcpScope[]
+  list: (input: { folder: string }) => Promise<ProviderMcpConfigServer[]>
+  add: (input: ProviderMcpWrite & { definition: ProviderMcpDefinition }) => Promise<void>
+  remove: (input: ProviderMcpWrite) => Promise<void>
+  /** The stored definition, secrets included; used only to copy a server to another instance. */
+  read: (input: ProviderMcpWrite) => Promise<ProviderMcpDefinition>
+}
+
 export type ProviderAdapter = {
   operationTimeoutMs: number
   adapterKey: string
@@ -630,6 +652,8 @@ export type ProviderAdapter = {
   /** Approves a checkout's project server this session turned off, and restarts an idle session. */
   approveMcpServer?: (input: { name: string; sessionId: SessionId }) => Promise<void>
   signInMcpServer?: (input: { name: string; sessionId: SessionId }) => Promise<ProviderMcpSignIn>
+  /** The instance's configured MCP servers, outside any session. */
+  mcpConfig?: ProviderMcpConfigAccess
   /** Hooks configured for the checkout; null when the session has no live provider process. */
   configuredHooks?: (input: {
     cwd: string

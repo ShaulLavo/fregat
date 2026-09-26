@@ -37,7 +37,7 @@ export function mcpStatusClass(status: ProviderMcpServerStatus) {
 }
 
 /** Where the definition lives, in the harness's own words when Platform has no name for it. */
-function mcpSourceLabel(source: string | null) {
+export function mcpSourceLabel(source: string | null) {
   if (!source) return null
 
   return SOURCES[source] ?? source

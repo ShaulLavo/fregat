@@ -5,7 +5,7 @@ import { cn } from '@workspace/ui/lib/utils'
 import { buttonVariants } from '@workspace/ui/components/button'
 
 import { RowIconAction } from '@/features/chat/components/row-icon-action'
-import { mcpServerFacts, mcpStatusClass, mcpStatusLabel } from '@/features/chat/utils/mcp-status'
+import { mcpServerFacts, mcpStatusClass, mcpStatusLabel } from '@/lib/mcp-status'
 
 export function McpServerRow({
   authorizationUrl,

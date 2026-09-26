@@ -360,8 +360,23 @@ function handle(message) {
         broken: { command: 'broken-server', env: { TOKEN: 'secret' } },
       } },
       origins: { 'mcp_servers.linear.url': user, 'mcp_servers.github.url': user, 'mcp_servers.broken.command': project },
-      layers: null,
+      layers: message.params.includeLayers ? [
+        { ...user, disabledReason: null, config: { mcp_servers: {
+          linear: { url: 'https://mcp.linear.app/mcp', http_headers: { Authorization: 'Bearer lin' } },
+          github: { url: 'https://api.github.test/mcp' },
+        } } },
+        { ...project, disabledReason: null, config: { mcp_servers: { broken: { command: 'broken-server' } } } },
+      ] : null,
     } });
+    return;
+  }
+  if (message.method === 'config/batchWrite') {
+    record({ event: message.method, params: message.params });
+    if (message.params.expectedVersion !== 'v1') {
+      send({ id: message.id, error: { code: -32600, message: 'Configuration was modified since last read. Fetch latest version and retry.' } });
+      return;
+    }
+    send({ id: message.id, result: { status: 'ok', version: 'v2', filePath: '/home/dev/.codex/config.toml', overriddenMetadata: null } });
     return;
   }
   if (message.method === 'config/mcpServer/reload') {
@@ -880,6 +895,7 @@ type FakeCodexLogEntry = {
     | 'thread/revert'
     | 'thread/goal/set'
     | 'thread/goal/clear'
+    | 'config/batchWrite'
 }
 
 type EchoedModeParams = {
@@ -2869,6 +2885,75 @@ describe('CodexProviderAdapter', () => {
             (event) => event.type === 'turn.completed' && event.turnId === 'goal-clear',
           ),
         ).toHaveLength(1)
+      } finally {
+        await adapter.stopAll()
+      }
+    })
+  })
+
+  it('lists configured MCP servers with their files and writes through config/batchWrite', async () => {
+    await withFakeCodex(async ({ projectPath, spawnLogPath }) => {
+      const adapter = new CodexProviderAdapter()
+      const write = { folder: projectPath, scope: 'user' as const }
+      try {
+        const servers = await adapter.mcpConfig.list({ folder: projectPath })
+        expect(servers.map((server) => [server.name, server.scope, server.file])).toEqual([
+          ['linear', 'user', '/home/dev/.codex/config.toml'],
+          ['github', 'user', '/home/dev/.codex/config.toml'],
+          ['broken', null, '/repo/.codex/config.toml'],
+        ])
+        expect(JSON.stringify(servers)).not.toContain('Bearer')
+
+        await adapter.mcpConfig.add({
+          ...write,
+          definition: {
+            transport: 'http',
+            url: 'https://docs.example.test/mcp',
+            headers: { Authorization: 'Bearer docs' },
+          },
+          name: 'docs',
+        })
+        await expect(
+          adapter.mcpConfig.add({
+            ...write,
+            definition: { transport: 'stdio', command: 'linear', args: [], env: {} },
+            name: 'linear',
+          }),
+        ).rejects.toMatchObject({ code: 'provider.MCP_NAME_TAKEN' })
+        await expect(
+          adapter.mcpConfig.remove({ ...write, scope: 'project', name: 'broken' }),
+        ).rejects.toMatchObject({ code: 'provider.MCP_SCOPE_UNSUPPORTED' })
+        await adapter.mcpConfig.remove({ ...write, name: 'github' })
+        expect(await adapter.mcpConfig.read({ ...write, name: 'linear' })).toEqual({
+          transport: 'http',
+          url: 'https://mcp.linear.app/mcp',
+          headers: { Authorization: 'Bearer lin' },
+        })
+
+        const writes = (await readFakeCodexLog(spawnLogPath)).filter(
+          (entry) => entry.event === 'config/batchWrite',
+        )
+        expect(writes.map((entry) => entry.params)).toEqual([
+          {
+            edits: [
+              {
+                keyPath: 'mcp_servers.docs',
+                mergeStrategy: 'replace',
+                value: {
+                  url: 'https://docs.example.test/mcp',
+                  http_headers: { Authorization: 'Bearer docs' },
+                },
+              },
+            ],
+            expectedVersion: 'v1',
+            reloadUserConfig: true,
+          },
+          {
+            edits: [{ keyPath: 'mcp_servers.github', mergeStrategy: 'replace', value: null }],
+            expectedVersion: 'v1',
+            reloadUserConfig: true,
+          },
+        ])
       } finally {
         await adapter.stopAll()
       }

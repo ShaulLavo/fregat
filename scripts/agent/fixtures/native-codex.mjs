@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { appendFileSync, readFileSync } from 'node:fs'
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createInterface } from 'node:readline'
@@ -242,70 +242,126 @@ function historyPages(message) {
   })
 }
 
-/** Plan 174: what `mcpServerStatus/list` and `config/read` report for the MCP scenarios. */
+/** What `mcpServerStatus/list`, `config/read` and `config/batchWrite` report for the MCP scenarios. */
 const MCP_TOOL = (name) => ({ name, inputSchema: { type: 'object' } })
-const MCP_STATUS = [
-  {
-    name: 'linear',
-    authStatus: 'oAuth',
+// Every probe is its own app-server process, so the user config lives in a file, like config.toml.
+const mcpUserFile = join(root, 'mcp-user.json')
+function readMcpUser() {
+  try {
+    return JSON.parse(readFileSync(mcpUserFile, 'utf8'))
+  } catch {
+    return {
+      version: 1,
+      servers: {
+        linear: {
+          url: 'https://mcp.linear.app/mcp',
+          http_headers: { Authorization: 'Bearer fixture' },
+        },
+        sentry: { url: 'https://mcp.sentry.dev/mcp' },
+      },
+    }
+  }
+}
+const mcpProjectServers = { broken: { command: 'platform-fixture-missing-mcp-binary' } }
+function mcpStatusOf(name, table) {
+  const base = { name, tools: {}, resources: [], resourceTemplates: [] }
+  if (name === 'linear')
+    return {
+      ...base,
+      authStatus: 'oAuth',
+      runtimeStatus: 'connected',
+      httpOrigin: 'https://mcp.linear.app',
+      tools: { list_issues: MCP_TOOL('list_issues'), create_issue: MCP_TOOL('create_issue') },
+    }
+  if (name === 'sentry')
+    return {
+      ...base,
+      authStatus: 'notLoggedIn',
+      runtimeStatus: 'authenticationRequired',
+      httpOrigin: 'https://mcp.sentry.dev',
+    }
+  if (name === 'broken')
+    return {
+      ...base,
+      authStatus: 'unsupported',
+      runtimeStatus: 'failed',
+      toolsError: 'spawn platform-fixture-missing-mcp-binary ENOENT',
+    }
+  return {
+    ...base,
+    authStatus: table.url ? 'unknown' : 'unsupported',
     runtimeStatus: 'connected',
-    httpOrigin: 'https://mcp.linear.app',
-    tools: { list_issues: MCP_TOOL('list_issues'), create_issue: MCP_TOOL('create_issue') },
-    resources: [],
-    resourceTemplates: [],
-  },
-  {
-    name: 'sentry',
-    authStatus: 'notLoggedIn',
-    runtimeStatus: 'authenticationRequired',
-    httpOrigin: 'https://mcp.sentry.dev',
-    tools: {},
-    resources: [],
-    resourceTemplates: [],
-  },
-  {
-    name: 'broken',
-    authStatus: 'unsupported',
-    runtimeStatus: 'failed',
-    toolsError: 'spawn platform-fixture-missing-mcp-binary ENOENT',
-    tools: {},
-    resources: [],
-    resourceTemplates: [],
-  },
-]
-function mcpConfig() {
+    ...(table.url ? { httpOrigin: new URL(table.url).origin } : {}),
+  }
+}
+function mcpConfig(includeLayers) {
+  const { servers: mcpUserServers, version } = readMcpUser()
   const user = {
     name: { type: 'user', file: join(root, 'config.toml'), profile: null },
-    version: 'v1',
+    version: `v${version}`,
   }
   const project = {
     name: { type: 'project', dotCodexFolder: join(process.cwd(), '.codex') },
-    version: 'v1',
+    version: 'p1',
   }
+  const origins = {}
+  for (const [name, table] of Object.entries(mcpUserServers))
+    origins[`mcp_servers.${name}.${table.url ? 'url' : 'command'}`] = user
+  for (const name of Object.keys(mcpProjectServers))
+    origins[`mcp_servers.${name}.command`] = project
   return {
-    config: {
-      mcp_servers: {
-        linear: { url: 'https://mcp.linear.app/mcp' },
-        sentry: { url: 'https://mcp.sentry.dev/mcp' },
-        broken: { command: 'platform-fixture-missing-mcp-binary' },
-      },
-    },
-    origins: {
-      'mcp_servers.linear.url': user,
-      'mcp_servers.sentry.url': user,
-      'mcp_servers.broken.command': project,
-    },
-    layers: null,
+    config: { mcp_servers: { ...mcpUserServers, ...mcpProjectServers } },
+    origins,
+    layers: includeLayers
+      ? [
+          { ...user, disabledReason: null, config: { mcp_servers: mcpUserServers } },
+          { ...project, disabledReason: null, config: { mcp_servers: mcpProjectServers } },
+        ]
+      : null,
   }
 }
 function handleMcpStatus(message) {
   if (message.method === 'mcpServerStatus/list') {
     record({ event: message.method, threadId: message.params?.threadId ?? null })
-    send({ id: message.id, result: { data: MCP_STATUS, nextCursor: null } })
+    const servers = { ...readMcpUser().servers, ...mcpProjectServers }
+    const data = Object.entries(servers).map(([name, table]) => mcpStatusOf(name, table))
+    send({ id: message.id, result: { data, nextCursor: null } })
     return true
   }
   if (message.method === 'config/read') {
-    send({ id: message.id, result: mcpConfig() })
+    send({ id: message.id, result: mcpConfig(Boolean(message.params?.includeLayers)) })
+    return true
+  }
+  if (message.method === 'config/batchWrite') {
+    // Values stay out of the log: only the key paths and whether each edit sets or deletes.
+    record({
+      event: message.method,
+      edits: message.params.edits.map((edit) => ({
+        keyPath: edit.keyPath,
+        deletes: edit.value === null,
+      })),
+    })
+    const user = readMcpUser()
+    for (const edit of message.params.edits) {
+      const name = edit.keyPath.replace(/^mcp_servers\./, '')
+      if (edit.value === null) delete user.servers[name]
+      else user.servers[name] = edit.value
+    }
+    user.version += 1
+    writeFileSync(mcpUserFile, JSON.stringify(user))
+    send({
+      id: message.id,
+      result: {
+        status: 'ok',
+        version: `v${user.version}`,
+        filePath: join(root, 'config.toml'),
+        overriddenMetadata: null,
+      },
+    })
+    return true
+  }
+  if (message.method === 'config/mcpServer/reload') {
+    send({ id: message.id, result: {} })
     return true
   }
   if (message.method === 'hooks/list') {
@@ -332,7 +388,7 @@ function handleMcpStatus(message) {
 }
 
 function handle(message) {
-  if (scenario === 'mcp-status' && handleMcpStatus(message)) return
+  if (scenario.startsWith('mcp-') && scenario !== 'mcp-approval' && handleMcpStatus(message)) return
   if (scenario === 'chat-history-pages' && message.method === 'turn/start')
     return historyPages(message)
   if (scenario === 'chat-stream' && message.method === 'turn/start') return streamWorkLog(message)

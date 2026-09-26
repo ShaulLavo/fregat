@@ -1,8 +1,8 @@
 import { describe } from 'vitest'
-import { expect, test } from '../../../../../test/fixtures'
+import { expect, test } from '../../../test/fixtures'
 
-import { mcpServer } from '../../../../../test/factories/mcp-server'
-import { mcpServerFacts } from '@/features/chat/utils/mcp-status'
+import { mcpServer } from '../../../test/factories/mcp-server'
+import { mcpServerFacts } from '@/lib/mcp-status'
 
 describe('mcpServerFacts', () => {
   test('names the source, the HTTP origin over the transport, and the tool count', () => {
