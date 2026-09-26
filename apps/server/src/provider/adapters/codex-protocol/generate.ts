@@ -1,17 +1,27 @@
 import { isString } from '@workspace/utils/objects'
 import { isJsonObject, type JsonObject, type JsonValue } from '@workspace/utils/json'
 import { createInternalError } from '../../../observability/structured-errors'
+import upstreamManifest from './upstream/manifest.json'
 
-import { spawn } from 'node:child_process'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const CODEX_PROTOCOL_UPSTREAM_REF = '00c972ed5d6ff6499317fd41b7f23605b8e6850d'
+/** Pinned by `upstream/manifest.json`; bump it with `codex-protocol:update`, never by hand. */
+export const CODEX_PROTOCOL_UPSTREAM_REF = upstreamManifest.ref
+export const CODEX_PROTOCOL_UPSTREAM_SOURCE = upstreamManifest.source
 
-const GITHUB_RAW_BASE = `https://raw.githubusercontent.com/openai/codex/${CODEX_PROTOCOL_UPSTREAM_REF}/codex-rs/app-server-protocol`
-const USER_AGENT = 'platform-codex-protocol-generator'
-const GENERATED_DIR = path.join(fileURLToPath(new URL('.', import.meta.url)), 'generated')
+const ROOT_DIR = fileURLToPath(new URL('.', import.meta.url))
+const GENERATED_DIR = path.join(ROOT_DIR, 'generated')
+/**
+ * Vendored copies of the upstream files this generator reads, so `codex-protocol:check`
+ * regenerates offline and fails the same way on every runner. `codex-protocol:update` is
+ * the only thing that fetches them.
+ */
+export const UPSTREAM_DIR = path.join(ROOT_DIR, 'upstream')
+export const CLIENT_REQUEST_UPSTREAM_PATH = 'schema/typescript/ClientRequest.ts.txt'
+export const SERVER_NOTIFICATION_UPSTREAM_PATH = 'schema/typescript/ServerNotification.ts.txt'
 
 /**
  * Codex adds enum members (reasoning efforts, plan types, item kinds) in
@@ -144,10 +154,15 @@ type MethodEntry = {
   readonly paramsOptional?: boolean
 }
 
-type ProtocolSchemaFile = {
+export type ProtocolSchemaFile = {
   readonly namespace: ProtocolNamespace
   readonly schemaName: string
   readonly typeName: string
+}
+
+export type CodexProtocolMethodMaps = {
+  readonly clientRequests: readonly MethodEntry[]
+  readonly serverNotifications: readonly MethodEntry[]
 }
 
 export type GeneratedFile = {
@@ -161,11 +176,11 @@ type RenderContext = {
 }
 
 export async function generateCodexProtocolFiles(): Promise<GeneratedFile[]> {
-  const methodMaps = await fetchMethodMaps()
+  const methodMaps = await readUpstreamMethodMaps()
   const schemaFiles = schemaFilesForMethodMaps(methodMaps)
   const documents = await Promise.all(
     schemaFiles.map(async (file) => ({
-      document: await fetchSchemaFile(file),
+      document: await readUpstreamSchemaFile(file),
       file,
     })),
   )
@@ -247,11 +262,19 @@ function runFormatter(filePath: string, text: string) {
   })
 }
 
-async function fetchMethodMaps() {
+async function readUpstreamMethodMaps() {
   const [clientRequestRaw, serverNotificationRaw] = await Promise.all([
-    fetchText(`${GITHUB_RAW_BASE}/schema/typescript/ClientRequest.ts`),
-    fetchText(`${GITHUB_RAW_BASE}/schema/typescript/ServerNotification.ts`),
+    readUpstreamFile(CLIENT_REQUEST_UPSTREAM_PATH),
+    readUpstreamFile(SERVER_NOTIFICATION_UPSTREAM_PATH),
   ])
+  return parseCodexProtocolMethodMaps(clientRequestRaw, serverNotificationRaw)
+}
+
+/** Shared by the check/generate path (vendored text) and `update.ts` (freshly downloaded text). */
+export function parseCodexProtocolMethodMaps(
+  clientRequestRaw: string,
+  serverNotificationRaw: string,
+): CodexProtocolMethodMaps {
   const clientRequests = parseRequestEntries(clientRequestRaw).filter((entry) =>
     isClientRequestMethod(entry.method),
   )
@@ -265,10 +288,7 @@ async function fetchMethodMaps() {
   return { clientRequests, serverNotifications }
 }
 
-function schemaFilesForMethodMaps(methodMaps: {
-  readonly clientRequests: readonly MethodEntry[]
-  readonly serverNotifications: readonly MethodEntry[]
-}) {
+export function schemaFilesForMethodMaps(methodMaps: CodexProtocolMethodMaps) {
   const files = new Map<string, ProtocolSchemaFile>()
   for (const entry of methodMaps.clientRequests) {
     if (!isParameterless(entry))
@@ -292,19 +312,36 @@ function schemaFileForMethodType(method: string, schemaName: string): ProtocolSc
   return { namespace, schemaName, typeName }
 }
 
-async function fetchSchemaFile(file: ProtocolSchemaFile) {
-  const url = `${GITHUB_RAW_BASE}/schema/json/${file.namespace}/${file.schemaName}.json`
-  return asJsonObject(JSON.parse(await fetchText(url)), url)
+async function readUpstreamSchemaFile(file: ProtocolSchemaFile) {
+  const relativePath = schemaFileUpstreamPath(file)
+  return asJsonObject(JSON.parse(await readUpstreamFile(relativePath)), relativePath)
 }
 
-async function fetchText(url: string) {
-  const response = await fetch(url, { headers: { 'user-agent': USER_AGENT } })
-  if (!response.ok) {
-    const detail = await response.text().catch(() => '')
-    throw createInternalError(`Failed to download ${url}: ${response.status} ${detail}`)
-  }
+/** The path a vendored file has under `upstream/`, one to one with its path upstream. */
+export function schemaFileUpstreamPath(file: ProtocolSchemaFile) {
+  return `schema/json/${file.namespace}/${file.schemaName}.json`
+}
 
-  return response.text()
+/**
+ * Builds the raw.githubusercontent.com URL a vendored path was downloaded from, for
+ * `update.ts`. `.txt` is a local-only suffix (see `UPSTREAM_DIR`) so a TypeScript file
+ * vendored here is not picked up by the type checker or linter.
+ */
+export function upstreamRawUrl(ref: string, relativeUpstreamPath: string) {
+  const upstreamPath = relativeUpstreamPath.endsWith('.txt')
+    ? relativeUpstreamPath.slice(0, -'.txt'.length)
+    : relativeUpstreamPath
+  return `https://raw.githubusercontent.com/openai/codex/${ref}/codex-rs/app-server-protocol/${upstreamPath}`
+}
+
+async function readUpstreamFile(relativePath: string) {
+  const filePath = path.join(UPSTREAM_DIR, relativePath)
+  return readFile(filePath, 'utf8').catch((error: unknown) => {
+    throw createInternalError(
+      `Missing vendored Codex protocol input: ${relativePath}. Run \`bun run --cwd apps/server codex-protocol:update\` to refresh apps/server/src/provider/adapters/codex-protocol/upstream.`,
+      error,
+    )
+  })
 }
 
 function parseRequestEntries(fileContents: string): readonly MethodEntry[] {
