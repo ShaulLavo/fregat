@@ -31,7 +31,9 @@ export function useDirectoryLoad({
       showHidden,
     }),
     enabled,
-    placeholderData: () => {
+    placeholderData: (previous) => {
+      if (previous?.currentEntry?.path === currentPath) return previous
+
       if (!effectiveQuery) return undefined
 
       return queryClient.getQueryData(filePickerKeys.directory(currentPath, '', mode, showHidden))

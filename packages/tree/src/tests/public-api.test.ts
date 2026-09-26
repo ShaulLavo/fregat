@@ -107,7 +107,6 @@ test('exports the model and the helpers the app view renders with', () => {
     'arePathSetsEqual',
     'computeFileTreeLayout',
     'computeStickyRows',
-    'getBuiltInFileIconColor',
     'getBuiltInFileIconName',
     'getBuiltInSpriteSheet',
     'isColoredBuiltInIconSet',

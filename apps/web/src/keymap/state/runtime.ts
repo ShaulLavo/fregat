@@ -52,8 +52,12 @@ export function captureCommandSnapshot(runtime: WorkspaceCommandRuntime): Worksp
   const settings = runtime.settings.readSnapshot()
   const workspaceEdit = runtime.workspaceEdits.getSnapshot()
   const activeTabContent = activeEditorContentForWorkbenchPanels(state.workbenchPanels)
+  const activeTabId = activeEditorTabForWorkbenchPanels(state.workbenchPanels)?.id ?? null
   const activeDocument = activeTabContent
-    ? activeTabDocument(activeTabContent, settingsSelection())
+    ? activeTabDocument(
+        activeTabContent,
+        settingsSelection(runtime.documents.queryClient, activeTabId),
+      )
     : null
   const liveDocument = activeDocument
     ? runtime.documents.store.getState().getLiveEditorDocument(documentKey(activeDocument))
@@ -68,7 +72,7 @@ export function captureCommandSnapshot(runtime: WorkspaceCommandRuntime): Worksp
     activeDocumentSavable: liveDocument ? isSavableEditorDocument(liveDocument) : false,
     activeTabContent,
     activeDocument,
-    activeTabId: activeEditorTabForWorkbenchPanels(state.workbenchPanels)?.id ?? null,
+    activeTabId,
     chatMode: state.uiMode === 'chat',
     chatModePanels: state.chatModePanels,
     diffViewMode: settings.diffViewMode,

@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: RESEARCH DONE 2026-09-26 — no new glyphs upstream (our 93 are the whole pack, byte-identical);
+- Status: PHASES 1–4 DONE 2026-09-26 (wave 2, lane T); phase 5 next. Research done 2026-09-26 — no new glyphs upstream (our 93 are the whole pack, byte-identical);
   the gain is a generator, a hue-token file, two live colour bugs fixed, three two-hue icons, a
   stronger light palette and wider file coverage (5.6% → 2.1% generic). Provenance settled in round 2:
   the pack is Pierre's own drawing on its `@pierre/icons` library plus brand marks, not a recoloured
@@ -12,6 +12,37 @@
   Q1, where the tree's icon colours looked better than the app's in places.
 - Size: S–M in total. Phase 1 can land before Plan 178's [icons](178-tree-in-the-app/icons.md) sub-plan,
   which then consumes its tokens instead of writing its own.
+
+## Landed
+
+Phases 1–4, 2026-09-26 (wave 2, lane T):
+
+- `bun run icons:generate` (`scripts/icons/generate.ts` + `rules.ts`, `@pierre/vscode-icons@0.0.9`
+  pinned in the `scripts` workspace; `icons:generate:check` runs in `generated:check`). The outputs
+  go through the repo's formatter, so `--check` and `format:check` agree.
+- Outputs: `apps/web/src/lib/vscode-icon-glyphs.ts` (same 93 glyphs byte for byte except the 21
+  `bg` layers, which now paint `var(--file-icon-back, currentColor)`), `file-icon-rules.generated.ts`
+  (96 rules: the 93 glyphs plus `lang-cpp`, `lang-csharp`, `lang-objc` on the `lang-c` glyph; 134 file
+  names, 143 extensions), and `packages/ui/src/styles/file-icons.generated.css` (15 hues plus
+  `neutral`, light and dark, `--color-file-icon-*` in `@theme inline`). The 96
+  `--trees-file-icon-color-*` declarations left `globals.css`.
+- `FileTypeIcon` takes `text-file-icon-<hue>` (and the back-hue class) from the generated rule; no
+  inline colour. `colorForFileIcon`, `VSCODE_ICON_NAMES`, `VSCODE_ICON_RULES`, the stem rules and
+  the tree's `getBuiltInFileIconColor` are gone; `ICON_TOKENS` stays for the tree's remap.
+- Phase 2: stems dropped, the aliases above and the pack's maps for unclaimed names added.
+  Phase 3: Python, Astro and webpack paint their back layer in yellow, pink and cyan (Q1 b).
+  Phase 4: yellow, orange, mint, teal and cyan take the Pierre theme's 700 in light (Q2 b).
+- `NOTICE` names the Codicons `claude` glyph (CC-BY-4.0) and the pack and generator licences.
+- `/dev/icons` shows every rule with its hue and match count. Scenario `file-icon-hues` captures
+  tabs, quick open, git changes and that sheet in light and dark. The tree keeps its own colours
+  until 178 icons; `tree-parity` shows zero drift.
+- Phase 5 (Q3 c), 2026-09-26: 26 Catppuccin icons (`@iconify-json/catppuccin@1.2.17`, MIT) fill the
+  types the pack has no glyph for: audio, video, PDF, Java, Kotlin, Scala, Groovy, PHP, Lua, LaTeX,
+  Dart, R, Julia, Perl, Clojure, Elixir, Haskell, Erlang, F#, Makefile, CMake, proto, Bazel,
+  shaders, certificates, keys. `CATPPUCCIN_HUES` maps each Macchiato colour onto our hue tokens, so
+  they take the pack's light and dark values; Catppuccin's text colour (their outlines) maps to
+  `--file-icon-neutral`, now the pack's neutral line colour (gray 800 light, 400 dark) instead of an
+  alias of gray. Existing icons and hue values are unchanged.
 
 ## Question
 

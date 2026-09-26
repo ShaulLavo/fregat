@@ -27,7 +27,9 @@ test('the Defaults tab opens the generated document, and the form view leaves it
   // A form for values nobody set has nothing to do, so the tab is a document only.
   expect(settingsScope()).toBe('default')
   expect(settingsView()).toBe('json')
-  expect(screen.queryByRole('textbox', { name: 'Search settings' })).toBeNull()
+  expect(screen.getByLabelText('Search settings')).toBeVisible()
+  expect(screen.getByRole('status', { name: 'Loading settings view' })).toBeVisible()
+  expect(screen.getByRole('tab', { name: 'User' })).toHaveAttribute('aria-selected', 'true')
 
   await userEvent.click(await screen.findByRole('tab', { name: 'Settings' }))
 

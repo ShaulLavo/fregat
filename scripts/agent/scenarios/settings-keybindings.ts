@@ -19,6 +19,14 @@ async function waitForOverride(page: Page, command: string, expected: unknown) {
   equal(await override(page, command), expected, `${command} override`)
 }
 
+async function waitForList(page: Page, command: string, expected: readonly string[]) {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    if (JSON.stringify(await override(page, command)) === JSON.stringify(expected)) return
+    await page.waitForTimeout(100)
+  }
+  equal(JSON.stringify(await override(page, command)), JSON.stringify(expected), `${command} list`)
+}
+
 async function showOnly(page: Page, query: string) {
   await selectors.shortcutsSearch(page).fill(query)
 }
@@ -44,7 +52,7 @@ export const settingsKeybindings: Scenario = {
     await step('desktop-recording')
     equal(await override(page, 'workspace.goToLine'), undefined, 'Nothing is written before Enter')
     await selectors.shortcutRecorder(page, 'Go to line').press('Enter')
-    await waitForOverride(page, 'workspace.goToLine', 'Mod+Alt+K')
+    await waitForList(page, 'workspace.goToLine', ['Mod+Alt+K'])
 
     await showOnly(page, 'Save')
     await selectors.shortcutRow(page, 'workspace.saveFile').dblclick()
@@ -79,6 +87,67 @@ export const settingsKeybindings: Scenario = {
     await waitForOverride(page, 'workspace.goToLine', undefined)
     await selectors.shortcutFilter(page, 'All').click()
 
+    await writeUserOperations(page, [
+      { kind: 'keybinding.set', command: 'workspace.saveFile', keys: ['Mod+Alt+J'] },
+      { kind: 'keybinding.set', command: 'workspace.togglePanel', keys: ['Mod+Alt+K'] },
+    ])
+    await showOnly(page, 'Save')
+    await selectors.shortcutRow(page, 'workspace.saveFile').click({ button: 'right' })
+    await selectors.shortcutMenuItem(page, /^Change shortcut/).click()
+    await selectors.shortcutRecorder(page, 'Save').press('Control+Alt+K')
+    await page.getByText(/Taken by Toggle panel/).waitFor()
+    ok(await page.getByRole('button', { name: 'Save', exact: true }).isDisabled())
+    await selectors.shortcutRecorder(page, 'Save').press('Enter')
+    await waitForList(page, 'workspace.saveFile', ['Mod+Alt+J'])
+    await step('desktop-losing-override')
+    await selectors.shortcutRecorder(page, 'Save').press('Escape')
+    await selectors.shortcutRecorder(page, 'Save').press('Escape')
+    await writeUserOperations(page, [{ kind: 'reset', keys: ['keybindings.overrides'] }])
+
+    await showOnly(page, 'workspace.toggleCheckpointChange')
+    await selectors.shortcutRow(page, 'workspace.toggleCheckpointChange').dblclick()
+    const checkpointRecorder = selectors.shortcutRecorder(page, 'Undo or reapply turn change')
+    await checkpointRecorder.press('Control+Z')
+    await page.getByText('Used by 1 command', { exact: true }).waitFor()
+    await page.getByText('Undo session action', { exact: true }).waitFor()
+    await step('desktop-partial-pane-warning')
+    await checkpointRecorder.press('Enter')
+    await waitForList(page, 'workspace.toggleCheckpointChange', ['Mod+Z'])
+    await showOnly(page, 'Undo session action')
+    await selectors.shortcutFilter(page, 'Conflicts').click()
+    await selectors
+      .shortcutRow(page, 'workspace.undoSessionAction', 'Mod+Z')
+      .getByText('Taken in Git')
+      .waitFor()
+    await step('desktop-partial-pane-conflicts')
+    await writeUserOperations(page, [{ kind: 'reset', keys: ['keybindings.overrides'] }])
+    await selectors.shortcutFilter(page, 'All').click()
+
+    // Several shortcuts per command: add F7 beside the palette's defaults, run it by both, remove it.
+    await showOnly(page, 'Show command palette')
+    await selectors
+      .shortcutRow(page, 'workspace.showCommandPalette', 'F1')
+      .click({ button: 'right' })
+    await selectors.shortcutMenuItem(page, /^Add another shortcut/).click()
+    await selectors.shortcutRecorder(page, 'Show command palette').press('F7')
+    await selectors.shortcutRecorder(page, 'Show command palette').press('Enter')
+    await waitForList(page, 'workspace.showCommandPalette', ['Mod+Shift+P', 'F1', 'F7'])
+    await selectors.shortcutRow(page, 'workspace.showCommandPalette', 'F7').waitFor()
+    await step('desktop-second-shortcut')
+    for (const chord of ['F7', 'F1']) {
+      // Bare F-keys go to a focused text field, and Escape hands focus back to the page search.
+      await selectors.shortcutsList(page).focus()
+      await page.keyboard.press(chord)
+      await selectors.paletteInput(page).waitFor()
+      await page.keyboard.press('Escape')
+      await selectors.paletteInput(page).waitFor({ state: 'hidden' })
+    }
+    await selectors
+      .shortcutRow(page, 'workspace.showCommandPalette', 'F7')
+      .click({ button: 'right' })
+    await selectors.shortcutMenuItem(page, /^Remove shortcut/).click()
+    await waitForList(page, 'workspace.showCommandPalette', ['Mod+Shift+P', 'F1'])
+
     // A phone opens Settings as the full-screen dialog of a fresh window.
     await page.addInitScript(() => {
       localStorage.clear()
@@ -106,7 +175,7 @@ export const settingsKeybindings: Scenario = {
     await selectors.shortcutMenuItem(page, /^Remove shortcut/).waitFor()
     await step('narrow-row-menu')
     await selectors.shortcutMenuItem(page, /^Remove shortcut/).click()
-    await waitForOverride(page, 'workspace.saveFile', null)
+    await waitForList(page, 'workspace.saveFile', [])
     await step('narrow-removed')
 
     await writeUserOperations(page, [{ kind: 'reset', keys: ['keybindings.overrides'] }])
