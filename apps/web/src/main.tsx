@@ -43,12 +43,7 @@ import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/pe
 import { reportReactError } from '@/lib/react-error-reporting.ts'
 import { applicationHost } from '@/lib/application-host'
 import { configureIntentPrediction } from '@/lib/intent-prefetch-options'
-import { runMutation } from '@/lib/mutations/run'
-import { clientErrorDescription, toClientError } from '@/lib/client-error-taxonomy'
 import { takePairingCodeFromLocation } from '@/lib/pairing/state/link-claim'
-import { usePairingLinkStore } from '@/lib/pairing/state/link-outcome'
-import { claimPairingMutationOptions } from '@/lib/pairing/utils/api'
-import { deviceLabel } from '@/lib/pairing/utils/device-label'
 
 installEditorPerformanceTraceFromUrl()
 configureIntentPrediction()
@@ -105,14 +100,12 @@ const restoredWorkspace = bootstrap
   .getState()
   .application?.getSnapshot()
   .editor.workspaceStore.getState()
-// Paired before the bootstrap asks the machine anything, so its first request already carries the cookie.
+// Paired before the bootstrap asks the machine anything, so its first request carries the cookie.
+// Loaded only for a pairing link; if it fails to load, the pairing screen still takes the code.
 if (pairingCode)
-  await runMutation(primaryQueryClient(), claimPairingMutationOptions(), {
-    code: pairingCode,
-    label: deviceLabel(navigator.userAgent),
-  }).catch((cause: unknown) =>
-    usePairingLinkStore.setState({ failure: clientErrorDescription(toClientError(cause)) }),
-  )
+  await import('@/lib/pairing/state/claim-at-boot')
+    .then(({ claimAtBoot }) => claimAtBoot(pairingCode))
+    .catch(() => undefined)
 const warmViews: Promise<unknown>[] = []
 if (restoredWorkspace?.selectedTabContent?.kind === 'settings')
   warmViews.push(
