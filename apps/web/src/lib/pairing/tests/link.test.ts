@@ -1,7 +1,8 @@
 import { expect, test } from 'vitest'
 
 import { deviceLabel } from '@/lib/pairing/utils/device-label'
-import { normalizePairingCode, pairingCodeFromLink, pairingLink } from '@/lib/pairing/utils/link'
+import { normalizePairingCode } from '@/components/utils/pairing-code'
+import { pairingCodeFromLink, pairingLink } from '@/lib/pairing/utils/link'
 
 test('a pairing link carries its code in the fragment and reads back', () => {
   const link = pairingLink('https://omarchy.mesh.example/platform/', 'ABCDEFGHJKLM')

@@ -7,7 +7,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { HotkeysProvider } from '@tanstack/react-hotkeys'
 import { ActiveEnvironmentApplication } from '@/components/active-environment-application'
 import { StatusFrame } from '@workspace/ui/patterns/status-frame'
-import { PairDevice } from '@/components/pair-device'
+import { DeferredPairDevice } from '@/components/deferred-pair-device'
 import { Button } from '@workspace/ui/components/button'
 import { SettingsOwnerProvider } from '@/features/settings/providers/owner-provider'
 import { SimulatedLatencyBridge } from '@/features/settings/components/simulated-latency-bridge'
@@ -40,7 +40,7 @@ export function ApplicationBootstrap({
         ...report,
       })
   }, [application, error])
-  if (unpaired) return <PairDevice onPaired={bootstrap.retry} />
+  if (unpaired) return <DeferredPairDevice onPaired={bootstrap.retry} />
   if (error)
     return (
       <StatusFrame

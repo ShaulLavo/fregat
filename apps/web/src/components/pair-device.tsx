@@ -10,7 +10,7 @@ import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { usePairingLinkStore } from '@/lib/pairing/state/link-outcome'
 import { claimPairingMutationOptions } from '@/lib/pairing/utils/api'
 import { deviceLabel } from '@/lib/pairing/utils/device-label'
-import { normalizePairingCode } from '@/lib/pairing/utils/link'
+import { normalizePairingCode } from '@/components/utils/pairing-code'
 
 /**
  * What a device the machine does not know yet sees: how to pair it, and a field for the code when
