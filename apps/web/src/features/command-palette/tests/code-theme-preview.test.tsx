@@ -34,8 +34,11 @@ test('code theme sample follows highlighted rows and labels a retained sample af
   await user.hover(screen.getByRole('option', { name: 'Monokai' }))
   await waitFor(() => expect(within(sample).getByText('Monokai')).toBeInTheDocument())
   expect(within(sample).getByText('Preview')).toBeInTheDocument()
-  await waitFor(() =>
-    expect(sample.querySelector('pre[data-theme-id="monokai"]')).toBeInTheDocument(),
+  // The first sample loads Shiki's core, engine and grammar chunks, which a cold CI worker can
+  // take longer than waitFor's default second to import.
+  await waitFor(
+    () => expect(sample.querySelector('pre[data-theme-id="monokai"]')).toBeInTheDocument(),
+    { timeout: 5_000 },
   )
   expect(controlledClient.controller.settingsWriteCount).toBe(0)
 
