@@ -26,6 +26,8 @@ bun run dev
 
 open the url it prints, pick a folder
 
+with [mesh](https://github.com/ShaulLavo/mesh), `bun run dev:serve` registers one shared dev server instead: the first connection to `localhost:5173` starts it, and it stops once nothing has been connected for the idle window. `bun run dev:unserve` removes it
+
 `bun run dev:web` skips the desktop app. `bun run dev:tui` is the terminal client, see the [tui guide](apps/tui/README.md)
 
 ## what's in it

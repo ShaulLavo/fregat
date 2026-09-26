@@ -1,7 +1,6 @@
 import {
   flushObservability,
   initializeObservabilityRuntime,
-  observabilityConfig,
   recordObservabilityError,
   recordObservabilityInfo,
 } from '@workspace/observability'
@@ -21,11 +20,6 @@ export function recordDesktopInfo(action: string, context: Record<string, unknow
 
 export function recordDesktopError(action: string, context: Record<string, unknown> = {}) {
   recordObservabilityError(action, desktopContext(context))
-}
-
-export function shouldInheritChildOutput() {
-  const config = observabilityConfig()
-  return config.enabled && config.consoleEnabled
 }
 
 function desktopContext(context: Record<string, unknown>) {

@@ -4,8 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun run build:native && bun ../../scripts/run-with-env.ts PLATFORM_DESKTOP_SHARED_DEV=1 electrobun dev",
-    "dev:standalone": "bun run build:native && bun ../../scripts/run-with-env.ts electrobun dev",
+    "dev": "bun run build:native && bun ../../scripts/run-with-env.ts electrobun dev",
     "build": "bun run build:native && electrobun build",
     "build:native": "bun scripts/build-native.ts",
     "test": "bun --bun vitest run",

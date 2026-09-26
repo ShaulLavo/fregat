@@ -62,6 +62,7 @@
         "deploy/systemd/promote.ts",
         "desktop-dev.ts",
         "dev.ts",
+        "dev-serve.ts",
         "flake-summary.ts",
         "generate-settings-reference.ts",
         "generate-settings-schema.ts",

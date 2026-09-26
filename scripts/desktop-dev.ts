@@ -7,7 +7,7 @@ const root = path.resolve(import.meta.dirname, '..')
 const env = observabilityEnvFromFile(path.join(root, '.env'), Bun.env)
 const output = observabilityEnabledFromEnv(env) ? 'inherit' : 'ignore'
 const child = Bun.spawn({
-  cmd: [process.execPath, 'run', '--cwd', 'apps/desktop', 'dev:standalone'],
+  cmd: [process.execPath, 'run', '--cwd', 'apps/desktop', 'dev'],
   cwd: root,
   env,
   stderr: output,

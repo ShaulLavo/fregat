@@ -1,45 +1,45 @@
 import { installSignalHandlers } from './process-signals'
-import { errorMessage } from '../packages/contracts/src/error-fields'
 import path from 'node:path'
 import { observabilityEnvFromFile } from '../packages/observability/src/env-file'
-import {
-  allowedOriginsForWebPort,
-  isPortAvailable,
-  portFromEnv,
-  runtimeUrl,
-  selectAvailablePort,
-} from './runtime-network'
+import { requireFreeDevPorts } from './port-holders'
+import { allowedOriginsForWebPort, devPorts, runtimeUrl } from './runtime-network'
 import { devStateHome, seedDevStateHome } from './state-home'
+import { scriptFailureText } from './structured-errors'
 
 const root = path.resolve(import.meta.dirname, '..')
 const env = observabilityEnvFromFile(path.join(root, '.env'), Bun.env)
 const turbo = path.join(root, 'node_modules/.bin/turbo')
+// Mesh proxies only IPv4 loopback, and an upstream bound on `::1` alone would never read as ready.
+const UPSTREAM_HOST = '127.0.0.1'
+const UPSTREAM_FLAG = '--upstream'
 
 try {
   await runDev()
 } catch (error) {
-  console.error(errorMessage(error))
+  console.error(scriptFailureText(error))
   process.exit(1)
 }
 
+/**
+ * `bun run dev` binds the public ports itself. `--upstream` is the mesh route's recipe: the pair
+ * binds the upstream ports and mesh owns the public ones (`scripts/dev-serve.ts`).
+ */
 async function runDev() {
-  const webHost = env.WEB_HOST ?? '127.0.0.1'
-  const serverPort = portFromEnv(env, 'PORT', 3001)
-  const preferredWebPort = portFromEnv(env, 'WEB_PORT', 5173)
-  const webPort = await selectAvailablePort({
-    blockedPorts: [serverPort],
-    isAvailable: (port) => isPortAvailable(webHost, port),
-    preferredPort: preferredWebPort,
-  })
-  const args = Bun.argv.slice(2)
-  configureRuntime(webHost, webPort)
-  configureStateHome(isDryRun(args))
+  const upstream = Bun.argv.includes(UPSTREAM_FLAG)
+  const args = Bun.argv.slice(2).filter((arg) => arg !== UPSTREAM_FLAG)
+  const ports = devPorts(env)
+  const webHost = upstream ? UPSTREAM_HOST : (env.WEB_HOST ?? UPSTREAM_HOST)
+  const webPort = upstream ? ports.webUpstream : ports.web
+  const apiPort = upstream ? ports.apiUpstream : ports.api
+  const dryRun = isDryRun(args)
+  if (!dryRun) await requireFreeDevPorts(webHost, [webPort, apiPort], `:${ports.web}`)
 
-  const command = [turbo, 'dev', ...args]
+  configureRuntime({ webHost, webPort, apiPort, publicWebPort: ports.web, upstream })
+  configureStateHome(dryRun)
 
-  console.log(`[dev] Client: ${runtimeUrl(webHost, webPort)}`)
+  console.log(`[dev] Client: ${runtimeUrl(webHost, ports.web)}`)
   const child = Bun.spawn({
-    cmd: command,
+    cmd: [turbo, 'dev', ...args],
     cwd: root,
     env,
     stderr: 'inherit',
@@ -50,13 +50,29 @@ async function runDev() {
   process.exit(await child.exited)
 }
 
-function configureRuntime(webHost: string, webPort: number) {
-  env.WEB_HOST = webHost
-  env.WEB_PORT = String(webPort)
-  env.SERVER_ALLOWED_ORIGINS = allowedOriginsForWebPort(
+type Runtime = {
+  webHost: string
+  webPort: number
+  apiPort: number
+  publicWebPort: number
+  upstream: boolean
+}
+
+function configureRuntime(runtime: Runtime) {
+  env.WEB_HOST = runtime.webHost
+  env.WEB_PORT = String(runtime.webPort)
+  env.PORT = String(runtime.apiPort)
+  if (runtime.upstream) env.FS_HOST = UPSTREAM_HOST
+  // The page's origin is the public port; the upstream one is Vite's own origin for app saves.
+  const upstreamOrigins = allowedOriginsForWebPort(
     env.SERVER_ALLOWED_ORIGINS,
-    webHost,
-    webPort,
+    runtime.webHost,
+    runtime.webPort,
+  )
+  env.SERVER_ALLOWED_ORIGINS = allowedOriginsForWebPort(
+    upstreamOrigins,
+    runtime.webHost,
+    runtime.publicWebPort,
   )
 }
 

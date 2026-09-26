@@ -1,19 +1,14 @@
 import { isNonEmptyString as isString } from '@workspace/utils/objects'
 import { errorMessage } from '@workspace/contracts'
-import { createDesktopError } from './structured-errors'
+import { createDesktopError, desktopErrors } from './structured-errors'
 
-import { existsSync, readdirSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import Electrobun, { BrowserView, BrowserWindow, Utils } from 'electrobun/main'
 import { EvlogError } from 'evlog'
 import type { SettingsValues } from '@workspace/contracts'
 import { applyEnvFileOverrides } from '@workspace/observability/env-file'
-import {
-  allowedOriginsForWebPort,
-  portFromEnv,
-  runtimeUrl,
-} from '../../../../scripts/runtime-network'
+import { portFromEnv, runtimeUrl } from '../../../../scripts/runtime-network'
 import type { DesktopRPC } from '../shared/rpc'
 import type { PlatformPickOptions } from '../shared/bridge'
 import {
@@ -31,30 +26,15 @@ import {
   initializeDesktopObservability,
   recordDesktopError,
   recordDesktopInfo,
-  shouldInheritChildOutput,
 } from './observability'
 import { attachWindowVibrancy } from './vibrancy'
 import { createQuitHandler } from './quit'
-import {
-  childLeaseFile,
-  clearLease,
-  leaseChild,
-  releaseChild,
-  stopLeftoverChildren,
-} from './child-lease'
-import { requireFreePort } from './ports'
-import { groupAlive, signalGroup } from './processes'
-import { DesktopTerminalHost } from './terminal-host'
-
-type ChildProcess = ReturnType<typeof Bun.spawn>
 
 const ROOT_DIR = resolvePlatformRoot()
 applyEnvFileOverrides(path.join(ROOT_DIR, '.env'), Bun.env)
 initializeDesktopObservability()
-const WEB_DIR = path.join(ROOT_DIR, 'apps/web')
 const MAIN_WINDOW_TITLE = 'Platform'
 const TRANSPARENCY_KEY = 'window.transparency' satisfies keyof SettingsValues
-const SHARED_DEV = Bun.env.PLATFORM_DESKTOP_SHARED_DEV === '1'
 const PLATFORM = shellPlatform(process.platform)
 const WEB_HOST = Bun.env.WEB_HOST ?? '127.0.0.1'
 const WEB_PORT = portFromEnv(Bun.env, 'WEB_PORT', 5173)
@@ -63,27 +43,13 @@ const SERVER_HOST = Bun.env.FS_HOST ?? '127.0.0.1'
 const SERVER_PORT = portFromEnv(Bun.env, 'PORT', 3001)
 const SERVER_URL = runtimeUrl(SERVER_HOST, SERVER_PORT)
 const SERVER_PROBE_ORIGIN = WEB_URL
-const SERVER_ALLOWED_ORIGINS = allowedOriginsForWebPort(
-  Bun.env.SERVER_ALLOWED_ORIGINS,
-  WEB_HOST,
-  WEB_PORT,
-)
-const CHILD_LEASE = childLeaseFile(homedir(), ROOT_DIR)
-const DESKTOP_HOME =
-  Bun.env.PLATFORM_HOME ??
-  path.join(path.dirname(CHILD_LEASE), Bun.hash(ROOT_DIR).toString(36), 'home')
-const terminalHost = SHARED_DEV ? null : new DesktopTerminalHost(DESKTOP_HOME, CHILD_LEASE)
-const childProcesses = new Set<ChildProcess>()
-
-let stopping: Promise<void> | null = null
+// Covers mesh's one-minute ready timeout for a cold start of the shared dev server.
+const DEV_SERVER_WAIT_MS = 90_000
 
 Electrobun.events.on(
   'before-quit',
   createQuitHandler({
-    cleanup: async () => {
-      await stopProcesses()
-      await flushDesktopObservability()
-    },
+    cleanup: flushDesktopObservability,
     quit: Utils.quit,
     reportError: (error) =>
       recordDesktopError('desktop.stop_failed', { error: errorMessage(error) }),
@@ -94,75 +60,18 @@ try {
   await startDesktop()
 } catch (error) {
   recordDesktopError('desktop.start_failed', startFailureContext(error))
-  await stopProcesses()
   await flushDesktopObservability()
   await showStartFailure(error)
   Utils.quit()
 }
 
+/** The shared dev server: the first request starts it through mesh, like any browser. */
 async function startDesktop() {
   preferPortalDialogs(PLATFORM)
-  if (SHARED_DEV) {
-    await startSharedDesktop()
-    return
-  }
-
-  await startStandaloneDesktop()
-}
-
-async function startSharedDesktop() {
   recordDesktopInfo('desktop.shared_dev.wait')
   await waitForHttp(`${SERVER_URL}/health`)
   await waitForHttp(WEB_URL)
   await openMainWindow()
-}
-
-async function startStandaloneDesktop() {
-  await stopLeftoverChildren(CHILD_LEASE)
-  await requireFreePort(SERVER_HOST, SERVER_PORT, 'server')
-  await requireFreePort(WEB_HOST, WEB_PORT, 'web')
-  await terminalHost?.start()
-  await spawnServer()
-  await spawnWeb()
-  await waitForHttp(`${SERVER_URL}/health`)
-  await waitForHttp(WEB_URL)
-  await openMainWindow()
-}
-
-function spawnServer() {
-  return spawnProcess(
-    'server',
-    [process.execPath, '--env-file=.env', 'apps/server/src/index.ts'],
-    ROOT_DIR,
-    {
-      ...Bun.env,
-      FS_HOST: SERVER_HOST,
-      PLATFORM_HOME: DESKTOP_HOME,
-      PORT: String(SERVER_PORT),
-      SERVER_ALLOWED_ORIGINS,
-    },
-  )
-}
-
-function spawnWeb() {
-  return spawnProcess(
-    'web',
-    [
-      process.execPath,
-      '--env-file=../../.env',
-      'vite',
-      '--host',
-      WEB_HOST,
-      '--port',
-      String(WEB_PORT),
-      '--strictPort',
-    ],
-    WEB_DIR,
-    withNode22Path({
-      ...Bun.env,
-      VITE_SERVER_URL: SERVER_URL,
-    }),
-  )
 }
 
 async function openMainWindow() {
@@ -281,49 +190,8 @@ async function openFileDialog(options: PlatformPickOptions, startingFolder: stri
   }
 }
 
-async function spawnProcess(
-  name: string,
-  command: string[],
-  cwd: string,
-  env: Record<string, string | undefined>,
-) {
-  recordDesktopInfo('desktop.process.spawn', { command, cwd, name })
-  const output = shouldInheritChildOutput() ? 'inherit' : 'ignore'
-  // Its own process group, so one signal also reaches helpers such as Vite's node process.
-  const child = Bun.spawn({
-    cmd: command,
-    cwd,
-    detached: true,
-    env,
-    stderr: output,
-    stdout: output,
-  })
-
-  childProcesses.add(child)
-  void monitorProcess(name, child)
-  await leaseChild(CHILD_LEASE, name, child.pid)
-  return child
-}
-
-async function monitorProcess(name: string, child: ChildProcess) {
-  const exitCode = await child.exited
-  childProcesses.delete(child)
-  // Helpers such as Vite's node process outlive their leader. A group id is not
-  // reused while any member lives, so a live group here is still this child's.
-  if (groupAlive(child.pid)) signalGroup(child.pid, 'SIGTERM')
-  await releaseChild(CHILD_LEASE, child.pid).catch((error: unknown) =>
-    recordDesktopError('desktop.lease.release_failed', { error: errorMessage(error), name }),
-  )
-  if (stopping) return
-
-  recordDesktopError('desktop.process.exited', { exitCode, name })
-  await stopProcesses()
-  await flushDesktopObservability()
-  Utils.quit()
-}
-
 async function waitForHttp(url: string) {
-  const deadline = Date.now() + 30_000
+  const deadline = Date.now() + DEV_SERVER_WAIT_MS
 
   while (Date.now() < deadline) {
     if (await isHttpReady(url)) return
@@ -331,7 +199,7 @@ async function waitForHttp(url: string) {
     await Bun.sleep(250)
   }
 
-  throw createDesktopError(`Timed out waiting for ${url}`)
+  throw desktopErrors.DEV_SERVER_UNREACHABLE({ url, internal: { waitedMs: DEV_SERVER_WAIT_MS } })
 }
 
 async function isHttpReady(url: string) {
@@ -349,22 +217,6 @@ function requestHeadersForProbe(url: string) {
   if (!url.startsWith(SERVER_URL)) return undefined
 
   return { Origin: SERVER_PROBE_ORIGIN }
-}
-
-function stopProcesses(): Promise<void> {
-  if (stopping) return stopping
-  const children = [...childProcesses]
-  childProcesses.clear()
-
-  for (const child of children) {
-    signalGroup(child.pid, 'SIGTERM')
-  }
-
-  stopping = Promise.allSettled(children.map((child) => child.exited)).then(async () => {
-    await terminalHost?.stop()
-    await clearLease(CHILD_LEASE)
-  })
-  return stopping
 }
 
 function startFailureContext(error: unknown) {
@@ -401,38 +253,6 @@ function startingFolder(input: string | undefined) {
   if (path.isAbsolute(input)) return input
 
   return path.join(path.parse(ROOT_DIR).root, input)
-}
-
-function withNode22Path(env: Record<string, string | undefined>) {
-  const nodeBin = latestNode22Bin()
-  if (!nodeBin) return env
-
-  return {
-    ...env,
-    PATH: pathWithPrefix(nodeBin, env.PATH),
-  }
-}
-
-function latestNode22Bin() {
-  const home = Bun.env.HOME
-  if (!home) return null
-
-  const versionsDir = path.join(home, '.nvm/versions/node')
-  if (!existsSync(versionsDir)) return null
-
-  const bins = readdirSync(versionsDir)
-    .filter((entry) => entry.startsWith('v22.'))
-    .map((entry) => path.join(versionsDir, entry, 'bin'))
-    .filter((entry) => existsSync(entry))
-
-  return bins.toSorted().at(-1) ?? null
-}
-
-function pathWithPrefix(prefix: string, current: string | undefined) {
-  const entries = current?.split(path.delimiter).filter(Boolean) ?? []
-  if (entries.includes(prefix)) return current
-
-  return [prefix, ...entries].join(path.delimiter)
 }
 
 function resolvePlatformRoot() {

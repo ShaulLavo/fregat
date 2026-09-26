@@ -19,8 +19,9 @@ merge, and a day of rebasing. Wave 2 keeps the lanes and changes how work lands.
    no train at the end. A lane rebases before each new PR, not once at the end.
 2. **One merge queue.** Only the coordinator merges to `main`. Lanes never push to `main`. While a
    batch of PRs is merging, nobody else pushes to `main` either (owner rule, 2026-09-26).
-3. **No shared dev server.** Each lane starts its own Vite on its port when it needs one and stops
-   it after (owner rule, 2026-09-26).
+3. **Lanes run their own Vite.** The shared dev server (the mesh `:5173` route, Plan 185) serves the
+   main checkout, not a lane's worktree. A lane that needs the app starts its own Vite on its port
+   from its worktree, drives it with `WEB_PORT=<port> bun run agent:browser`, and stops it after.
 4. **Fixture providers only.** No scenario or test may fall back to a real Claude or Codex model.
    A run that would spend a real turn is a hard stop (research round 2 spent one by accident).
 5. **At most eight lanes at once.** The machine has 31 GB; the completion wave hit oomd. Tier 1

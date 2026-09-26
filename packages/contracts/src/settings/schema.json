@@ -227,6 +227,13 @@
       "required": ["model", "providerInstanceId"],
       "type": "object"
     },
+    "developer.devServerIdleMinutes": {
+      "default": 15,
+      "description": "Minutes the shared dev server keeps running after its last connection closes; mesh then stops it and starts it again on the next connection. Takes effect the next time `bun run dev:serve` runs.",
+      "maximum": 1440,
+      "minimum": 1,
+      "type": "integer"
+    },
     "developer.simulatedLatencyMs": {
       "default": 0,
       "description": "Milliseconds added before every request to the server, to see how the app behaves on a slow link. Zero disables it.",

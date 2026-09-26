@@ -24,7 +24,6 @@ a bare root `bun run verify`.
 | [188 — server TypeScript only](188-server-typescript-only.md)                           | **DONE 2026-09-26 ON LANE L7 (#37); OWNER RULING; CLOSES 153**                      |
 | [187 — setup scripts run in visible terminals](187-setup-scripts-in-terminals.md)       | **PROPOSED 2026-09-26 — READY; FOLLOW-UP TO 126 EXT-04**                            |
 | [186 — PR sync: an off switch and a smarter poll rate](186-pull-request-sync-rate.md)   | **PROPOSED 2026-09-26 — READY; FOLLOW-UP TO 126 LIFE-14**                           |
-| [185 — one shared dev server](185-shared-dev-server.md)                                 | **PROPOSED 2026-09-26 — BLOCKED ON MESH T28; DECISIONS MADE**                       |
 | [184 — dependency diet](184-dependency-diet.md)                                         | **PROPOSED 2026-09-26 — READY; SLICE 1 IS A LIVE BUG; WEB PUSH KEPT**               |
 | [183 — Platform as Claude Code's IDE in its terminals](183-claude-ide-in-terminals.md)  | **PLACEHOLDER — LOW PRIORITY; SPLIT FROM 140 Q1**                                   |
 | [177 — prefetch every press](177-prefetch-every-press.md)                               | **PROPOSED 2026-09-26 — RESEARCH FIRST**                                            |

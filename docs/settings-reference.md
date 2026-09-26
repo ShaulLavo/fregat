@@ -71,9 +71,10 @@ stays safe to read, share and export.
 
 ## Developer
 
-| Setting                        | Default | Scope       | What it does                                                                                                        |
-| ------------------------------ | ------- | ----------- | ------------------------------------------------------------------------------------------------------------------- |
-| `developer.simulatedLatencyMs` | `0`     | application | Milliseconds added before every request to the server, to see how the app behaves on a slow link. Zero disables it. |
+| Setting                          | Default | Scope       | What it does                                                                                                                                                                                      |
+| -------------------------------- | ------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `developer.simulatedLatencyMs`   | `0`     | application | Milliseconds added before every request to the server, to see how the app behaves on a slow link. Zero disables it.                                                                               |
+| `developer.devServerIdleMinutes` | `15`    | machine     | Minutes the shared dev server keeps running after its last connection closes; mesh then stops it and starts it again on the next connection. Takes effect the next time `bun run dev:serve` runs. |
 
 ## Editor
 
