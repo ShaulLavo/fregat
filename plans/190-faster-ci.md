@@ -17,7 +17,9 @@
   dominates.
 - **Longest steps after Setup:** server tests 175–182 s (one shard), web tests 138–193 s per shard
   (four shards), lint 100–107 s, feature boundaries 54–58 s, TUI tests 90–97 s, typecheck 27–36 s.
-- Superseded runs are already cancelled (`concurrency` with `cancel-in-progress`).
+- Superseded runs are cancelled (`concurrency` with `cancel-in-progress`), on main too. Main takes a push
+  every few minutes, so most main runs end `cancelled`. On 2026-09-26 the newest completed CI run
+  on main was over 30 minutes and many commits old, so a broken main goes unnoticed.
 
 ## Outcome
 
@@ -45,7 +47,15 @@ The targets are confirmed or revised by phase 0's measurements.
 4. **Lint and boundaries** (S). Profile the 100 s lint and the 55 s feature-boundaries check: find out
    whether the time is the tool, a type-aware rule, or a whole-repo walk that could run once and feed
    both. Run them in parallel inside one job if they are independent.
-5. **Fewer jobs per run** (S, after 1–4). With setup down to seconds, merge small jobs (packages,
+5. **Main always ends with a verdict** (S, independent; land it first). Keep `cancel-in-progress` for PR
+   branches, and turn it off for main: `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}`.
+   A running main run then finishes. GitHub keeps only the newest pending run per concurrency group,
+   so pushes during a run collapse into one follow-up run of the latest commit, never a queue of
+   ten. Main then takes at most two runs (one running, one pending), or 20 of the 20 runners at
+   today's 10 jobs, so it only fits once phase 6 cuts jobs per run. Until then, measure how often
+   PR runs wait behind main. A red main run names a commit range (previous verdict to this one),
+   and `flake-watch.yml` still covers the nightly full suite.
+6. **Fewer jobs per run** (S, after 1–4). With setup down to seconds, merge small jobs (packages,
    parity, typecheck) so one run takes fewer of the 20 runners, and wave 2's eight lanes queue less.
 
 Larger runners cost money, which is an owner decision; this plan does not buy them.
