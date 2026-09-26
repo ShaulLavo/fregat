@@ -17,7 +17,8 @@ type ShellState = {
   readonly phoneStartsAtSessions: boolean
 }
 
-const matches = (query: string) => window.matchMedia(query).matches
+// Node-environment tests import the store; with no window there is no phone.
+const matches = (query: string) => typeof window !== 'undefined' && window.matchMedia(query).matches
 
 export const useShellStore = create<ShellState>(() => ({
   kind: initialShellKind(matches),
