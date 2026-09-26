@@ -210,7 +210,19 @@ async function ultrathinkWord(page: Page, step: Step, evidence: Evidence) {
   await step('burst-ultra')
   await burst.waitFor({ state: 'detached', timeout: 5_000 })
 
-  // Ultra to Ultrathink is a new level, so it plays again.
+  // Ultrathink from the menu is a stored level: the prompt stays empty.
+  await trigger.click()
+  await page.getByRole('menuitemradio', { name: 'Ultrathink', exact: true }).click()
+  const storedBurst = await burstPlays()
+  await step('menu-ultrathink-stored')
+  const storedPrompt = await selectors.chatMessage(page).innerText()
+  const storedLabel = await selectors.effortRainbow(trigger).textContent()
+  await burst.waitFor({ state: 'detached', timeout: 5_000 })
+  await trigger.click()
+  await page.getByRole('menuitemradio', { name: 'Ultra', exact: true }).click()
+  await burst.waitFor({ state: 'detached', timeout: 5_000 })
+
+  // Ultra to a typed Ultrathink is a new level, so it plays again.
   await selectors.chatMessage(page).fill('Please ultrathink about the parser.')
   const wordBurst = await burstPlays()
   const burstStart = Date.now()
@@ -219,7 +231,6 @@ async function ultrathinkWord(page: Page, step: Step, evidence: Evidence) {
   await step('composer-ultrathink')
   await burst.waitFor({ state: 'detached', timeout: 5_000 })
   const burstMs = Date.now() - burstStart
-  const caret = await caretKeepsRainbow(page, word)
 
   const label = selectors.effortRainbow(trigger)
   const playState = (locator: Locator) =>
@@ -237,6 +248,8 @@ async function ultrathinkWord(page: Page, step: Step, evidence: Evidence) {
   // The word in the body locks the menu, so its rows are read, not hovered.
   await step('menu-ultra-rows')
   await page.keyboard.press('Escape')
+  const replayed = await burst.count()
+  const caret = await caretKeepsRainbow(page, word, step)
 
   evidence.ultra = {
     levelBurst,
@@ -253,7 +266,10 @@ async function ultrathinkWord(page: Page, step: Step, evidence: Evidence) {
   ok(levelBurst, 'Picking Ultra plays the ultra burst')
   ok(wordBurst, 'Ultra to Ultrathink plays it again')
   ok(burstMs < 2_500, `The ultra burst ends on its own: ${burstMs}ms`)
-  equal(await burst.count(), 0, 'Hovering and opening the menu do not replay it')
+  equal(replayed, 0, 'Hovering and opening the menu do not replay it')
+  ok(storedBurst, 'Ultrathink from the menu plays the burst')
+  equal(storedPrompt.trim(), '', 'Ultrathink from the menu leaves the prompt alone')
+  equal(storedLabel, 'Ultrathink', 'The trigger paints the stored Ultrathink')
   equal(evidence.ultra.word, 'ultrathink', 'The composer word is one rainbow span')
   equal(evidence.ultra.wordDrift, 'running', 'The composer word drifts')
   equal(evidence.ultra.triggerLabel, 'Ultrathink', 'The trigger paints the ultra effort')
@@ -266,11 +282,12 @@ async function ultrathinkWord(page: Page, step: Step, evidence: Evidence) {
 }
 
 /** A caret next to, inside, or typing beside the word must leave it painted. */
-async function caretKeepsRainbow(page: Page, word: Locator) {
+async function caretKeepsRainbow(page: Page, word: Locator, step: Step) {
   const composer = selectors.chatMessage(page)
   const probes: { label: string; painted: string | null; html: string }[] = []
   const probe = async (label: string) => {
     await page.waitForTimeout(200)
+    await step(`caret-${label.replaceAll(' ', '-')}`)
     probes.push({
       label,
       painted: await selectors
@@ -292,6 +309,13 @@ async function caretKeepsRainbow(page: Page, word: Locator) {
   await probe('typing at the end')
   await page.mouse.click(box.x + 1, box.y + box.height / 2)
   await probe('caret before the word')
+  await composer.fill('')
+  await composer.click()
+  await page.keyboard.type('Please ultrathink', { delay: 40 })
+  await probe('typed the word')
+  await page.keyboard.type(' about it', { delay: 40 })
+  await probe('typing after the word')
+  await composer.fill('Please ultrathink about the parser.')
   return probes
 }
 

@@ -182,30 +182,25 @@ const promptDescriptors: ProviderOptionDescriptor[] = [
   { id: 'fastMode', label: 'Fast mode', type: 'boolean' },
 ]
 
-test.each([
-  ['', 'Ultrathink:\n'],
-  ['  Explain the code  ', 'Ultrathink:\nExplain the code'],
-  ['/deploy.prod staging', '/deploy.prod staging'],
-  ['/home/theo/app.ts', 'Ultrathink:\n/home/theo/app.ts'],
-])(
-  'prompt-injected effort updates %j without persisting a native override',
-  async (prompt, expected) => {
-    renderMenu({
-      prompt,
-      options: { effort: 'max', fastMode: false },
-      capabilities: { optionDescriptors: promptDescriptors },
-    })
-    await userEvent.click(screen.getByRole('button', { name: 'Model options' }))
-    await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Ultrathink' }))
-
-    expect(useChatInputDraftStore.getState().getDraft(draftTarget).prompt).toBe(expected)
-    expect(draftModelSelection()?.options).toEqual({ effort: 'max', fastMode: false })
-  },
-)
-
-test('regular effort removes an injected prefix and restores its selected native value', async () => {
+test('Ultrathink is stored as the effort and leaves the prompt alone', async () => {
   renderMenu({
-    prompt: 'Ultrathink:\nExplain the code',
+    prompt: 'Explain the code',
+    options: { effort: 'max', fastMode: false },
+    capabilities: { optionDescriptors: promptDescriptors },
+  })
+  await userEvent.click(screen.getByRole('button', { name: 'Model options' }))
+  await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Ultrathink' }))
+
+  expect(useChatInputDraftStore.getState().getDraft(draftTarget).prompt).toBe('Explain the code')
+  expect(draftModelSelection()?.options).toEqual({ effort: 'ultrathink', fastMode: false })
+  const trigger = screen.getByRole('button', { name: 'Model options' })
+  expect(trigger.querySelector('.rainbow-text')?.textContent).toBe('Ultrathink')
+})
+
+test('another level replaces a stored Ultrathink', async () => {
+  renderMenu({
+    prompt: 'Explain the code',
+    options: { effort: 'ultrathink' },
     capabilities: { optionDescriptors: promptDescriptors },
   })
   await userEvent.click(screen.getByRole('button', { name: 'Model options' }))

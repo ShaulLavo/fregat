@@ -20,13 +20,7 @@ import {
   type ChatInputDraftTarget,
 } from '@/features/chat/state/chat-input-draft-store'
 
-import {
-  descriptorSummary,
-  effectiveOptionValue,
-  promptEffortState,
-  withUltrathinkPrefix,
-  withoutUltrathinkPrefix,
-} from '../utils/model-options'
+import { descriptorSummary, effectiveOptionValue, promptEffortState } from '../utils/model-options'
 import { composerEffortLevel, effortTier } from '@/features/chat/utils/effort-tier'
 import { ModelOptionsGroup } from './model-options-group'
 import { ModelOptionsSummary } from './model-options-summary'
@@ -63,17 +57,11 @@ export function ModelOptionsMenu({
   const switches = descriptors.filter((descriptor) => descriptor.type === 'boolean')
   const tooltip = summary.fast ? `${summary.label}, fast mode on` : summary.label
 
+  // Ultrathink is stored like any level; the server adds the word to the prompt it sends.
   function selectOption(descriptor: ProviderOptionDescriptor, value: string | boolean) {
-    const drafts = useChatInputDraftStore.getState()
-    const currentPrompt = drafts.getDraft(draftTarget).prompt
-    if (descriptor.type === 'select' && descriptor.promptInjectedValues?.includes(String(value))) {
-      drafts.setPrompt(draftTarget, withUltrathinkPrefix(currentPrompt))
-      return
-    }
+    const currentPrompt = useChatInputDraftStore.getState().getDraft(draftTarget).prompt
     const currentEffort = promptEffortState(descriptors, currentPrompt)
-    if (descriptor.id === currentEffort.descriptorId && currentEffort.inBody) return
-    if (descriptor.id === currentEffort.descriptorId && currentEffort.controlled)
-      drafts.setPrompt(draftTarget, withoutUltrathinkPrefix(currentPrompt))
+    if (descriptor.id === currentEffort.descriptorId && currentEffort.controlled) return
     setModelSelection(draftTarget, withModelOption(selection, descriptor, value))
   }
 
@@ -116,7 +104,7 @@ export function ModelOptionsMenu({
             key={descriptor.id}
             descriptor={descriptor}
             first={index === 0}
-            locked={effort.inBody && descriptor.id === effort.descriptorId}
+            locked={effort.controlled && descriptor.id === effort.descriptorId}
             value={
               effort.controlled && descriptor.id === effort.descriptorId
                 ? 'ultrathink'
