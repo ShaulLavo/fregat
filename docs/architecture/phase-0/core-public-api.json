@@ -6520,6 +6520,12 @@
         },
         {
           "kind": "unknown",
+          "name": "shikiLanguageForDocument",
+          "source": "packages/editor/src/shiki/plugin.ts",
+          "via": "packages/editor/src/shiki/index.ts"
+        },
+        {
+          "kind": "unknown",
           "name": "ShikiWorkerOwner",
           "source": "packages/editor/src/shiki/workerClient.ts",
           "via": "packages/editor/src/shiki/index.ts"
