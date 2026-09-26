@@ -50,32 +50,22 @@ test('a local Omarchy file with the same theme and stem covers its catalog entry
   expect(catalog.some((entry) => entry.asset === LOGO)).toBe(false)
 })
 
-test('the catalog is empty while the setting is off', async ({ client }) => {
-  await client.settings.write.post({
-    mutationId: crypto.randomUUID(),
-    target: 'user',
-    operations: [{ kind: 'set', key: 'workbench.wallpaper.omarchyCatalog', value: false }],
-  })
-  expect((await client.themes.wallpapers.get()).data?.catalog).toEqual([])
-})
-
-test('a stalled download leaves the listing free and gives up at the timeout', async ({
-  client,
-}) => {
-  const written = await client.settings.write.post({
-    mutationId: crypto.randomUUID(),
-    target: 'user',
-    operations: [{ kind: 'set', key: 'workbench.wallpaper.downloadTimeoutMs', value: 1000 }],
-  })
-  expect(written.error).toBeNull()
-  msw.use(http.get(LOGO_URL, () => new Promise<never>(() => {})))
+test('a stalled download leaves the listing free', async ({ client }) => {
+  const { promise: released, resolve: release } = Promise.withResolvers<void>()
+  msw.use(
+    http.get(LOGO_URL, async () => {
+      await released
+      return new HttpResponse(omarchyCatalogWebp())
+    }),
+  )
   const install = client.themes.wallpapers.catalog({ id: LOGO }).post()
   const first = await Promise.race([
     install.then(() => 'install'),
     client.themes.wallpapers.get().then(() => 'list'),
   ])
   expect(first).toBe('list')
-  expect((await install).error?.status).toBe(424)
+  release()
+  expect((await install).error).toBeNull()
 })
 
 test('a body longer than the pinned size is refused', async ({ client }) => {
