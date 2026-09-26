@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { pushDeviceId } from '@workspace/contracts'
 import { http, HttpResponse } from 'msw'
@@ -9,6 +9,7 @@ import { PushSection } from '@/features/settings/components/push-section'
 import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import { SettingsPage } from '@/features/settings/components/page'
 import { subscribeThisDevice } from '@/features/settings/utils/push-browser'
+import { pushDevicesQueryOptions } from '@/features/settings/utils/push-api'
 import { pushErrors } from '@/features/settings/utils/push-errors'
 import { settingsQueryKeys } from '@/features/settings/utils/query-keys'
 import type { Client } from '@/lib/client'
@@ -22,6 +23,10 @@ test('says why a browser without push cannot turn it on', async ({ client }) => 
   const rendered = renderWithProviders(<Section />)
 
   try {
+    // The unsupported state needs the devices query, including first-use server key generation.
+    await act(async () => {
+      await rendered.queryClient.query(pushDevicesQueryOptions())
+    })
     expect(await screen.findByText('This browser cannot receive push notifications')).toBeVisible()
     expect(await screen.findByText('No devices registered')).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Turn on for this device' })).toBeNull()

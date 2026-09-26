@@ -1,3 +1,4 @@
+// Modified for Platform from Pierre. Apache-2.0; see packages/tree/LICENSE-pierre and UPSTREAM.md.
 import { getBuiltInSpriteSheet, isColoredBuiltInIconSet } from '@workspace/tree'
 import { normalizeFileTreeIcons } from '@workspace/tree'
 import { type FileTreeDensityPreset, resolveFileTreeDensity } from '@workspace/tree'
