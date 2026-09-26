@@ -86,11 +86,12 @@ runs:
     # resolves to nothing and typecheck fails with TS2307. The build is a pure
     # function of the pinned ref and the Bun that ran it (turbo's outputs are
     # `dist/**`), so it is cached on exactly those; examples are never linked.
+    # `runner.workspace` is the sibling directory: the cache refuses `..` paths.
     - name: Restore editor build
       id: editor-dist
       uses: actions/cache@v4
       with:
-        path: ${{ github.workspace }}/../Editor/packages/*/dist
+        path: ${{ runner.workspace }}/Editor/packages/*/dist
         key: ${{ runner.os }}-editor-dist-${{ inputs.editor-ref }}-bun-${{ steps.bun.outputs.bun-version }}
 
     - name: Build editor packages
