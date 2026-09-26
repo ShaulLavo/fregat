@@ -40,6 +40,8 @@ import { documentBackdrop } from '@/lib/platform/backdrop'
 import { isDesktop } from '@/lib/platform/bridge'
 import type { EditorRenderDocument } from '@/features/editor/utils/render-document'
 import { useSettingsCategory } from '@/features/settings/state/category-store'
+import { ProjectSection } from '@/features/settings/components/project-section'
+import { selectSettingsProject, useSettingsProject } from '@/lib/project-settings/state/selection'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 
 /**
@@ -79,6 +81,7 @@ export function SettingsPage({
   const searchRef = useRef<HTMLInputElement>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const selectedCategory = useSettingsCategory()
+  const project = useSettingsProject()
   const { ref: focusTargetRef } = useFocusTarget<HTMLDivElement>(
     {
       area: 'settings',
@@ -178,8 +181,9 @@ export function SettingsPage({
                 {/* `visible` is already query-filtered, so "of N" only says something while a
               category narrows the list further; otherwise it printed the same number twice. */}
                 <p className='text-muted-foreground text-xs tabular-nums'>
-                  {onlyUsage ? 'Usage report' : null}
-                  {!onlyUsage && (
+                  {project ? 'Project settings' : null}
+                  {!project && onlyUsage ? 'Usage report' : null}
+                  {!project && !onlyUsage && (
                     <>
                       {selectedCategory ? `${shownCount(shown)} of ` : ''}
                       {visible.length} {visible.length === 1 ? 'setting' : 'settings'}
@@ -191,6 +195,17 @@ export function SettingsPage({
                     <Spinner size='xs' label='Saving settings' />
                     Saving
                   </span>
+                ) : null}
+                {project ? (
+                  <Button
+                    aria-label='Show all settings'
+                    onClick={() => selectSettingsProject(null)}
+                    size='sm'
+                    variant='secondary'
+                  >
+                    {project.title}
+                    <XIcon aria-hidden />
+                  </Button>
                 ) : null}
                 {/* Clear a category supplied by an incoming address. */}
                 {selectedCategory ? (
@@ -249,7 +264,8 @@ export function SettingsPage({
           <MalformedBanner layers={document.data.layers} />
           <DiagnosticsBanner diagnostics={projection.diagnostics} />
           <fieldset className='min-w-0'>
-            {shown.length === 0 ? (
+            {project ? <ProjectSection project={project} /> : null}
+            {project ? null : shown.length === 0 ? (
               <StatusMessage>{emptySettingsMessage(query, selectedCategory)}</StatusMessage>
             ) : (
               shown.map(([category, ids]) => (

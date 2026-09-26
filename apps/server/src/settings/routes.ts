@@ -135,6 +135,9 @@ function operationSettingIds(value: unknown): SettingId[] {
   if (value.kind === 'model.setFavorite') return ['models.favorites']
   if (value.kind === 'model.setOrder') return ['models.order']
   if (value.kind === 'provider.setEnabled') return ['providers.instances']
+  if (value.kind === 'project.set' && typeof value.key === 'string' && isSettingId(value.key)) {
+    return [value.key]
+  }
 
   return []
 }
@@ -150,6 +153,10 @@ function operationAffectedDomainIds(value: unknown): string[] {
   }
   if (value.kind === 'model.setOrder' && Array.isArray(value.order)) {
     return modelDomainIds(value.order)
+  }
+  if (value.kind === 'project.set') {
+    const project = safeDomainPart(value.projectId)
+    return project ? [`project:${project}`] : []
   }
   if (value.kind !== 'provider.setEnabled') return []
 

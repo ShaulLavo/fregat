@@ -364,6 +364,52 @@ describe('settings operation reducer', () => {
     expect(unstarred.raw['models.favorites']).toEqual([MODEL_B])
   })
 
+  it('sets one project override and removes it, leaving the others', () => {
+    const set = applyIdempotently(
+      { 'git.projectAutoPull': { other: false } },
+      { kind: 'project.set', key: 'git.projectAutoPull', projectId: 'project-a', value: true },
+    )
+    expect(set.raw['git.projectAutoPull']).toEqual({ other: false, 'project-a': true })
+    expect(set.touchedSettingIds).toEqual(['git.projectAutoPull'])
+
+    const removed = applyIdempotently(set.raw, {
+      kind: 'project.set',
+      key: 'git.projectAutoPull',
+      projectId: 'other',
+      value: null,
+    })
+    expect(removed.raw['git.projectAutoPull']).toEqual({ 'project-a': true })
+
+    // The last entry leaves the record at its default, which the file does not keep.
+    const empty = applyIdempotently(removed.raw, {
+      kind: 'project.set',
+      key: 'git.projectAutoPull',
+      projectId: 'project-a',
+      value: null,
+    })
+    expect(empty.raw).toEqual({})
+  })
+
+  it('refuses a project override that the record would not parse', () => {
+    const parse = (value: unknown) =>
+      v.safeParse(settingsOperationSchema, {
+        kind: 'project.set',
+        key: 'git.projectWorktreeSubmodules',
+        projectId: 'project-a',
+        value,
+      }).success
+    expect(parse('top-level')).toBe(true)
+    expect(parse('everything')).toBe(false)
+    expect(
+      v.safeParse(settingsOperationSchema, {
+        kind: 'project.set',
+        key: 'git.autoPull',
+        projectId: 'project-a',
+        value: true,
+      }).success,
+    ).toBe(false)
+  })
+
   it('replaces model order atomically and resets an empty order', () => {
     const ordered = applyIdempotently(
       { 'models.order': [MODEL_B], untouched: true },
