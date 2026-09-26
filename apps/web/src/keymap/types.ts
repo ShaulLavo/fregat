@@ -10,7 +10,7 @@ import type { WorkspaceCommandId } from '@/keymap/workspace-commands'
 import type { editorCommands } from '@/keymap/editor-commands'
 
 /** `user` bindings come from the settings document and stand in for a default. */
-export type KeyBindingSource = 'default' | 'user'
+type KeyBindingSource = 'default' | 'user'
 
 export {
   ITEM_POSITIONS,
@@ -58,13 +58,4 @@ export type PlatformKeyBinding = {
   readonly stopPropagation?: boolean
   readonly yieldsToTextEntry?: boolean
   readonly meta?: HotkeyMeta
-}
-
-/** One command's effective binding, as the settings editor lists it. */
-export type CommandKeyBinding = {
-  readonly command: PlatformCommandId
-  readonly defaultKeys: readonly string[]
-  /** The binding in force. `null` is an explicit unbind. */
-  readonly keys: string | null
-  readonly source: KeyBindingSource
 }
