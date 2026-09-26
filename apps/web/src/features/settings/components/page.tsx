@@ -202,7 +202,7 @@ export function SettingsPage({
                     {project ? 'Project settings' : null}
                     {!project && onlyUsage ? 'Usage report' : null}
                     {!project && onlyMcp ? MCP_CATEGORY : null}
-{!project && !onlyUsage && !onlyMcp && (
+                    {!project && !onlyUsage && !onlyMcp && (
                       <>
                         {selectedCategory ? `${shownCount(shown)} of ` : ''}
                         {visible.length} {visible.length === 1 ? 'setting' : 'settings'}
@@ -292,7 +292,7 @@ export function SettingsPage({
                     <section className='mb-6' key={category}>
                       <h2 className='text-foreground mb-1 text-sm font-semibold'>{category}</h2>
                       {category === 'Usage' ? <UsageSection /> : null}
-{category === MCP_CATEGORY ? <McpSection /> : null}
+                      {category === MCP_CATEGORY ? <McpSection /> : null}
                       {ids.includes('chat.keepImportedSessionsUpdated') ? <ImportSection /> : null}
                       {category === 'Chat' && showPush ? (
                         <PushSection snapshot={projection} />

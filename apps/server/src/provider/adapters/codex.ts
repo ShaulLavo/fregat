@@ -3017,18 +3017,6 @@ async function listCodexMcpStatus(client: CodexAppServerRpcClient, threadId: str
   return servers
 }
 
-/**
- * Per-thread config: it touches no user file and does not persist, so every start, resume and fork
- * carries it again. It merges into the user's definition of each name.
- */
-function codexSessionOffConfig(mcpOff: readonly string[]) {
-  if (mcpOff.length === 0) return {}
-
-  return {
-    config: Object.fromEntries(mcpOff.map((name) => [`mcp_servers.${name}.enabled`, false])),
-  }
-}
-
 /** An `enabled` key for a server no config defines any more would leave a half table behind. */
 async function configuredMcpOff(
   client: CodexAppServerRpcClient,
@@ -3385,8 +3373,7 @@ function threadStartParams(input: {
   return {
     approvalPolicy: runtime.approvalPolicy,
     approvalsReviewer: runtime.approvalsReviewer,
-    ...codexSessionOffConfig(input.mcpOff),
-    ...codexMcpConfig(input.platformMcp),
+    ...codexMcpConfig(input.platformMcp, input.mcpOff),
     cwd: input.cwd,
     ...(input.ephemeral ? { ephemeral: true } : {}),
     experimentalRawEvents: true,
@@ -3409,8 +3396,7 @@ function threadResumeParams(input: {
 
   return {
     approvalsReviewer: runtime.approvalsReviewer,
-    ...codexSessionOffConfig(input.mcpOff),
-    ...codexMcpConfig(input.platformMcp),
+    ...codexMcpConfig(input.platformMcp, input.mcpOff),
     cwd: input.cwd,
     model: input.model,
     sandbox: runtime.sandbox,
@@ -4083,14 +4069,19 @@ function codexResetCredits(response: CodexClientRequestResultByMethod['account/r
  * Per-thread config, so no user file is touched; it does not persist, so every start, resume and
  * fork carries it again. Codex speaks MCP 2026-07-28 only behind this feature flag.
  */
-function codexMcpConfig(binding: PlatformMcpBinding | undefined) {
-  if (!binding) return {}
+function codexMcpConfig(binding: PlatformMcpBinding | undefined, mcpOff: readonly string[]) {
+  if (!binding && mcpOff.length === 0) return {}
   return {
     config: {
-      'features.mcp_2026_07_28': true,
-      'mcp_servers.platform.http_headers': { Authorization: `Bearer ${binding.token}` },
-      'mcp_servers.platform.url': binding.url,
-      suppress_unstable_features_warning: true,
+      ...Object.fromEntries(mcpOff.map((name) => [`mcp_servers.${name}.enabled`, false])),
+      ...(binding
+        ? {
+            'features.mcp_2026_07_28': true,
+            'mcp_servers.platform.http_headers': { Authorization: `Bearer ${binding.token}` },
+            'mcp_servers.platform.url': binding.url,
+            suppress_unstable_features_warning: true,
+          }
+        : {}),
     },
   }
 }

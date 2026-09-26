@@ -66,7 +66,7 @@ export function McpConfigRow({
             <span className='text-muted-foreground text-2xs truncate'>{detail}</span>
           ) : null}
         </div>
-        {server.scope && targets.length > 0 ? (
+        {server.scope && server.status !== 'unapproved' && targets.length > 0 ? (
           <McpCopyMenu
             busy={copying}
             folder={folder}

@@ -3050,6 +3050,36 @@ describe('CodexProviderAdapter', () => {
     })
   })
 
+  it('keeps the Platform endpoint and session off list together on thread start and resume', async () => {
+    await withFakeCodex(async ({ spawnLogPath }) => {
+      const adapter = new CodexProviderAdapter()
+      const input = {
+        ...providerTurnInput(),
+        platformMcp: { token: 'grant-token', url: 'http://127.0.0.1:3301/mcp' },
+        mcpOff: ['ghost', 'linear'],
+      }
+      try {
+        await adapter.startRuntime(input)
+        await adapter.applyMcpSessionOff({ off: ['linear'], sessionId: input.sessionId })
+        const opened = (await readFakeCodexLog(spawnLogPath)).filter(
+          (entry) => entry.event === 'thread/start' || entry.event === 'thread/resume',
+        )
+        expect(opened.map((entry) => entry.event)).toEqual(['thread/start', 'thread/resume'])
+        for (const entry of opened) {
+          expect(entry.params?.config).toEqual({
+            'features.mcp_2026_07_28': true,
+            'mcp_servers.platform.http_headers': { Authorization: 'Bearer grant-token' },
+            'mcp_servers.platform.url': input.platformMcp.url,
+            suppress_unstable_features_warning: true,
+            'mcp_servers.linear.enabled': false,
+          })
+        }
+      } finally {
+        await adapter.stopAll()
+      }
+    })
+  })
+
   it('opens a thread without the servers turned off for the session, and reopens it when the list changes', async () => {
     await withFakeCodex(async ({ spawnLogPath }) => {
       const adapter = new CodexProviderAdapter()

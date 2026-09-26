@@ -12,7 +12,11 @@ import { isRecord } from '@workspace/utils/objects'
 import { mcpConfigErrors } from '../../structured-errors'
 import type { ProviderMcpConfigAccess } from '../../types'
 import { claudeMcpServer, gatedProjectMcpServer } from './claude-mcp-status'
-import { approveProjectMcpServer, unapprovedProjectMcpServers } from './claude-project-mcp'
+import {
+  approveProjectMcpServer,
+  projectMcpServers,
+  unapprovedProjectMcpServers,
+} from './claude-project-mcp'
 import { startClaudeMcpSignIn, type ClaudeMcpLoginSpawn } from './claude-mcp-sign-in'
 import { mcpDefinitionFrom } from './mcp-definition'
 
@@ -124,6 +128,9 @@ async function claudeMcpNameTaken(input: {
   name: string
   scope: ProviderMcpScope
 }) {
+  if (input.scope === 'project')
+    return (await projectMcpServers(input.folder)).some((server) => server.name === input.name)
+
   return input.name in (await scopeServers(input.env, input.scope, input.folder))
 }
 
@@ -234,7 +241,15 @@ export function claudeMcpConfigAccess(input: {
 
       await runClaudeMcpWrite(cli, ['mcp', 'remove', '-s', scope, name], folder)
     },
-    read: ({ folder, name, scope }) => readClaudeMcpDefinition({ env, folder, name, scope }),
+    async read({ folder, name, scope }) {
+      if (
+        scope === 'project' &&
+        (await unapprovedProjectMcpServers({ approvalsFile, cwd: folder })).includes(name)
+      )
+        throw mcpConfigErrors.MCP_APPROVAL_REQUIRED({ internal: { name, scope } })
+
+      return readClaudeMcpDefinition({ env, folder, name, scope })
+    },
     signIn: ({ folder, name }) => startClaudeMcpSignIn(input.loginSpawn, { folder, name }),
   }
 }

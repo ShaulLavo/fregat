@@ -175,6 +175,12 @@ export const sessionIdentityErrors = defineErrorCatalog('provider', {
 
 /** Managing MCP servers through each provider CLI’s own config writer. */
 export const mcpConfigErrors = defineErrorCatalog('provider', {
+  MCP_APPROVAL_REQUIRED: {
+    status: 409,
+    message: 'Approve this project MCP server before copying it.',
+    why: 'The repository defines this server and its current definition needs your approval.',
+    fix: 'Approve the server from a chat’s MCP list, then copy it.',
+  },
   MCP_CONFIG_UNSUPPORTED: {
     status: 409,
     message: 'This provider has no MCP servers to manage.',
