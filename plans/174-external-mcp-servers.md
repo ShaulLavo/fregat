@@ -195,3 +195,4 @@ Each phase ships and deploys on its own; phases 1, 3, 5 and 6 change the server
    (b) sign in only from a browser on the server machine, as today, with the row saying so.
    **Recommendation: (a).** The mesh is the daily surface, and today's Codex sign-in fails from
    any other device.
+   Decided 2026-09-26: owner — (a).
