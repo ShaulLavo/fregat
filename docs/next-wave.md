@@ -1,6 +1,7 @@
-# Next wave (wave 2) — DRAFT
+# Next wave (wave 2)
 
-Drafted 2026-09-26 by the next-wave coordinator; not started. Goal: with wave 3, finish every
+Planned 2026-09-26 by the next-wave coordinator. Approved by the owner the same day; starts once
+the completion-wave merge train is done (lanes branch from a `main` that has L1, L4, L6 and L7). Goal: with wave 3, finish every
 remaining plan in Platform and Editor. Wave 2 runs everything that research round 2 left ready;
 wave 3 runs what wave 2 unblocks.
 
@@ -183,8 +184,25 @@ I (PR review workspace); 177 P3 if it slipped.
 183 (Claude IDE lock file, low priority); DOCX editing (after the markdown work); project LICENSE;
 E011, E015/E016 until 112 says so; E023; 105 P4.
 
-## Open for the owner on this draft
+## Owner decisions on this plan (2026-09-26)
 
-1. Merge cadence: one PR per plan merged continuously (recommended), or one PR per lane at the end
-   as before.
-2. Lane count: eight at once, 13 lanes in two tiers (recommended), or fewer, larger lanes.
+- One PR per plan (or phase group), merged continuously by the coordinator.
+- At most eight lanes at once; 13 lanes in two tiers.
+
+## Running it
+
+Start conditions: the merge train is done (L6's 132 P4 and `query:check` rerun included), the
+coordinator has landed `coord/next-wave`, and `origin/main` is green.
+
+Each lane is one session in `/work/projects/platform`, started with:
+
+> You are lane `<X>` of wave 2. Read `docs/next-wave.md` (your lane, the protocol and the landing
+> rules) and `AGENTS.md`, then work through your queue. Every run starts by finding your place:
+> your worktree `/work/worktrees/platform/w2-<x>`, your branch log, and your open PRs
+> (`gh pr list --author @me --head w2/<x>`). One PR per plan or phase group; never push to `main`;
+> start your own Vite on your port only while you need it. Hard stops go under "Owner questions" in
+> the plan and the PR body; skip the item and continue.
+
+The coordinator merges PRs in arrival order (bug lane first, Editor PRs before their Platform
+halves), deploys after each merged batch with `bun run deploy` (`--server` when the server changed),
+and keeps `plans/README.md`, `PLAN.md` and the review page current.
