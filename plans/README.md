@@ -19,6 +19,7 @@ a bare root `bun run verify`.
 
 | Plan                                                                                    | State                                                                               |
 | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| [186 — faster CI](186-faster-ci.md)                                                     | **PROPOSED 2026-09-26 — READY; FIRST IN WAVE 2**                                    |
 | [185 — keep improving tree-sitter-md](185-tree-sitter-md-improvement.md)                | **PROPOSED 2026-09-26 — AFTER PLAN 176; OPEN ITEMS, THEN CORRECTNESS, SIZE, SPEED** |
 | [184 — dependency diet](184-dependency-diet.md)                                         | **PROPOSED 2026-09-26 — READY; SLICE 1 IS A LIVE BUG**                              |
 | [183 — Platform as Claude Code's IDE in its terminals](183-claude-ide-in-terminals.md)  | **PLACEHOLDER — LOW PRIORITY; SPLIT FROM 140 Q1**                                   |

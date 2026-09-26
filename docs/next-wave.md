@@ -70,7 +70,8 @@ commit named in the PR body.
 ### Tier 1 (start together)
 
 **B — bugs · port 5230 · first to merge.** Small PRs, one per bug, each with a failing-before test
-or scenario.
+or scenario. 0. Plan 186, faster CI, first: every PR in the wave waits on CI (4.5–5.8 min a run, 64–85 s of
+setup in each of 10 jobs, up to 71 s queued). Its phases land as the lane's first PRs.
 
 1. 174 P2: Claude sessions gate a repo's `.mcp.json` servers until approved (security).
 2. 179 P2 + P4: sanitizer `user-content-` prefix (raw HTML clobbers `document` globals); `/fs/blob`
