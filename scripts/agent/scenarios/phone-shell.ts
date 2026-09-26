@@ -45,6 +45,13 @@ async function walkTheStack(page: Page, step: (label: string) => Promise<void>) 
   await expectFits(page)
   await step('sessions')
 
+  await longPress(page, selectors.sessionByTitle(page, SESSIONS[1]!))
+  await page.getByRole('menu').waitFor()
+  await expectInsideViewport(page, page.getByRole('menu'))
+  await step('row-long-press')
+  await page.keyboard.press('Escape')
+  await page.getByRole('menu').waitFor({ state: 'hidden' })
+
   await selectors.sessionByTitle(page, SESSIONS[0]!).click()
   await selectors.phoneLevel(page, 'session').waitFor()
   await sendPrompt(page, 'Why did the upload give up?')
@@ -79,6 +86,16 @@ async function walkTheStack(page: Page, step: (label: string) => Promise<void>) 
   await selectors.phoneHeaderAction(page, 'Terminal').click()
   await selectors.phoneLevel(page, 'terminal').waitFor()
   await page.locator('[data-phone-level="terminal"] canvas').first().waitFor({ timeout: 20_000 })
+  const keys = await recordTerminalKeys(page)
+  await page
+    .getByRole('toolbar', { name: 'Terminal keys' })
+    .getByRole('button', { name: 'Up' })
+    .click()
+  await page
+    .getByRole('toolbar', { name: 'Terminal keys' })
+    .getByRole('button', { name: 'Esc' })
+    .click()
+  equal((await keys()).join(' '), 'ArrowUp Escape', 'The key row reaches the terminal input')
   await step('terminal')
 
   await selectors.phoneBack(page).click()
@@ -173,4 +190,28 @@ async function expectInsideViewport(page: Page, locator: Locator) {
     box.x >= 0 && box.y >= 0 && box.x + box.width <= viewport.width + 0.5,
     `The panel leaves the screen: ${JSON.stringify(box)}`,
   )
+}
+
+/** A held finger, as a touch screen sends it: no mouse events, 700ms between down and up. */
+async function longPress(page: Page, locator: Locator) {
+  const box = await locator.boundingBox()
+  ok(box, 'The pressed row must be laid out')
+  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
+  await page.waitForTimeout(700)
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  await cdp.detach()
+}
+
+/** Collects the codes of keydowns that reach the terminal's input, from here on. */
+async function recordTerminalKeys(page: Page) {
+  await page.evaluate(() => {
+    const input = document.querySelector('[data-phone-level="terminal"] textarea')
+    const seen: string[] = []
+    Object.assign(window, { phoneTerminalKeys: seen })
+    input?.addEventListener('keydown', (event) => seen.push((event as KeyboardEvent).code))
+  })
+  return () =>
+    page.evaluate(() => (window as unknown as { phoneTerminalKeys: string[] }).phoneTerminalKeys)
 }

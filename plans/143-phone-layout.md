@@ -2,8 +2,8 @@
 
 ## Status and authorization
 
-- Status: IN PROGRESS (wave 2, lane P). Phases 1–2 implemented 2026-09-26 (phone shell frame and
-  screens); Phase 3 (touch) and Phase 4 (sessions and pairing) follow in their own pull requests.
+- Status: IN PROGRESS (wave 2, lane P). Phases 1–3 implemented 2026-09-26 (phone shell frame,
+  screens, touch paths); Phase 4 (sessions and pairing) follows in its own pull request.
   Owner check pending: a real iPhone and Android phone (Phase 5). iPhone (WebKit) behaviour is
   unmeasured: Playwright WebKit does not start on this host.
 - Priority: P2. Large product question; Plan 142 (Web Push) delivers the first away-from-desk
@@ -463,8 +463,36 @@ See "Proposed phases" under Research findings. The owner answered its questions 
   never downloads the workbench") measured +11 KB to +70 KB on the desktop from chunk fragmentation,
   for a phone first load of 1.01 MB instead of 1.75 MB. Recorded as a follow-up, not done.
 
+### Phase 3: touch paths (implemented 2026-09-26)
+
+- **Long press opens every context menu.** `keymap/menus/state/long-press.ts`, installed once on a
+  touch device, dispatches `contextmenu` at the press point after 550ms, so every surface's
+  `onContextMenu` works on iOS, which fires none. It stands down for good once the platform shows
+  it fires its own (Android Chrome), and Base UI triggers keep their own 500ms long press. The
+  finger's lifting click is swallowed; the phone frame turns the iOS callout off.
+- **Hover-revealed controls show at rest** on `(hover: none)` through a new `touch:` variant: git
+  row actions, search match actions, prompt-stash delete, wallpaper actions, editor tab close.
+- **The phone's session list scrolls.** Rows were `touch-action: none` for the pointer drag; in the
+  phone shell they scroll, a press never starts a reorder (keyboard reordering stays), and the
+  list's keyboard cursor stays hidden until a key moves it.
+- **Palette:** a button on the session list's bar, and Command palette in the session menu, for the
+  chat commands that have chords and no control.
+- **Terminal key row:** Esc, Tab, Ctrl (held for the next letter typed) and the arrows, sent as the
+  keydowns a hardware keyboard produces, so the terminal encodes them for the program's modes.
+  Decided 2026-09-26: interactive with a key row (wave 2), as Owner answer 2 left open.
+- **Tooltips:** surveyed, and no tap-to-open added. Every `Tooltip` trigger is a control whose
+  `aria-label` names it; the one explanation that only hover showed (the usage meter) already
+  opens a popover on press.
+
 Owner check pending: the phone shell on a real iPhone (WebKit: focus zoom, keyboard inset, safe
-areas, Back swipe) and an Android phone (`interactive-widget`), through the mesh.
+areas, Back swipe, long press on a row and in a reply) and an Android phone (`interactive-widget`,
+the native long-press menu), through the mesh.
+
+### Owner questions (wave 2)
+
+- The phone still downloads the workbench (see First load above). Keep, or schedule a chunking
+  change that splits it without growing the desktop's first load?
+- The terminal shipped interactive with a key row. Say if it should be read-only on the phone.
 
 ## Follow-up items
 

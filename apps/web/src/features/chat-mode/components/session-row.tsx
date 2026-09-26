@@ -73,7 +73,7 @@ export function SessionRow({ session }: { readonly session: SessionRailItem }) {
           data-dragging={isDragging || undefined}
           marked={marked}
           className={cn(
-            'group/session relative h-auto w-full shrink-0 touch-none flex-col items-start justify-start gap-(--density-gap-tight) py-(--density-row-padding-y) text-left select-none',
+            'group/session relative h-auto w-full shrink-0 touch-none phone:touch-auto flex-col items-start justify-start gap-(--density-gap-tight) py-(--density-row-padding-y) text-left select-none',
             isDragging && 'relative z-10',
           )}
           ref={setNodeRef}

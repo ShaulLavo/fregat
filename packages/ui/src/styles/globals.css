@@ -10,6 +10,8 @@
 @custom-variant dark (&:is(.dark *));
 /* Inside the phone shell (data-shell on the root, set before the first paint). */
 @custom-variant phone (&:where([data-shell='phone'] *));
+/* A screen with no hover: controls a pointer reveals on hover show at rest. */
+@custom-variant touch (@media (hover: none));
 @source '../../../../apps/**/*.{ts,tsx}';
 @source '../../../components/**/*.{ts,tsx}';
 @source '../**/*.{ts,tsx}';

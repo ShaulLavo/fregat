@@ -42,6 +42,7 @@ import { reportReactError } from '@/lib/react-error-reporting.ts'
 import { applicationHost } from '@/lib/application-host'
 import { configureIntentPrediction } from '@/lib/intent-prefetch-options'
 import { useShellStore, watchShellKind } from '@/lib/shell/state/store'
+import { installLongPressContextMenu } from '@/keymap/menus/state/long-press'
 import { shellQueryOptions } from '@/features/workspace/utils/shell-query'
 
 installEditorPerformanceTraceFromUrl()
@@ -109,6 +110,7 @@ const warmViews: Promise<unknown>[] = [
     .catch(() => undefined),
 ]
 watchShellKind()
+if ('ontouchstart' in window) installLongPressContextMenu()
 if (restoredWorkspace?.selectedTabContent?.kind === 'settings')
   warmViews.push(
     resourceQueryClient

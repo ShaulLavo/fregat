@@ -34,7 +34,7 @@ export function SessionsScreen() {
       />
       <div className='min-h-0 flex-1'>
         <RenderErrorBoundary label='Sessions'>
-          <SessionRail showsActive={false} />
+          <SessionRail standalone />
         </RenderErrorBoundary>
       </div>
     </section>

@@ -67,14 +67,17 @@ const EMPTY_SEARCH_MATCHES = {}
 const RAIL_DND_MODIFIERS = [restrictToVerticalAxis]
 
 export function SessionRail({
-  showsActive = true,
+  standalone = false,
 }: {
-  /** False where the list is its own screen: no session is open beside it to mark. */
-  readonly showsActive?: boolean
+  /**
+   * The list is a screen of its own (the phone's first screen): no session is open beside it to
+   * mark, and a press on a row is a scroll or a menu, never a drag.
+   */
+  readonly standalone?: boolean
 }) {
   const { activeSession, addProject, project, ready, transport } = useChatModeSession()
   const { reorderProject, reorderSession } = useChatRailOrder()
-  const sensors = useRailDragSensors()
+  const sensors = useRailDragSensors(!standalone)
   const orderOverrides = useRailOrderOverrides()
   const groupingMode = useSettingValue('chat.projectGrouping')
   const groupingOverrides = useSettingValue('chat.projectGroupingOverrides')
@@ -100,7 +103,7 @@ export function SessionRail({
     (state) => state.matchedQuery === query.trim() && state.unavailable.length > 0,
   )
   const activeSessionKey =
-    showsActive && activeSession.sessionId
+    !standalone && activeSession.sessionId
       ? scopedSessionKey({
           environmentId: transport.environmentId,
           sessionId: activeSession.sessionId,
@@ -186,7 +189,10 @@ export function SessionRail({
   })
 
   const focusList = list.focus
-  useLayoutEffect(() => selection.setState(list.activeId, true), [list.activeId, selection])
+  // A standalone list is tapped, not arrowed through: its cursor shows once a key moves it.
+  const [keyed, setKeyed] = useState(!standalone)
+  const cursorId = keyed ? list.activeId : null
+  useLayoutEffect(() => selection.setState(cursorId, true), [cursorId, selection])
   const positions = new Map(
     visibleSessions
       .slice(0, ITEM_POSITIONS.length)
@@ -370,6 +376,7 @@ export function SessionRail({
         <div
           {...list.containerProps}
           onKeyDown={(event) => {
+            setKeyed(true)
             if (!draggingProjectId) list.containerProps.onKeyDown(event)
           }}
           aria-label='Sessions'

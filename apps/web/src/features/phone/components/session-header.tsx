@@ -11,7 +11,13 @@ import {
 import { cn } from '@workspace/ui/lib/utils'
 import { stageTitle } from '@/features/chat-mode/utils/stage-title'
 import { Header } from '@/features/phone/components/header'
+import { commandItem, section } from '@/keymap/menus/utils/model'
 import { HeaderButton } from '@/features/phone/components/header-button'
+
+// The long tail of chat commands has chords and no control; the palette reaches all of them.
+const PHONE_MORE = section('phone', [
+  commandItem('workspace.showCommandPalette', { takesFocus: true }),
+])
 
 /** The session screen's bar: Back, the title over its project and status, then what it pushes. */
 export function SessionHeader({ projectTitle, session }: StageHeaderProps) {
@@ -39,7 +45,7 @@ export function SessionHeader({ projectTitle, session }: StageHeaderProps) {
               label='Terminal'
               onClick={() => void navigation.showPhoneScreen('terminal')}
             />
-            <SessionActionsButton session={session} surface='header' />
+            <SessionActionsButton more={PHONE_MORE} session={session} surface='header' />
           </>
         ) : null
       }

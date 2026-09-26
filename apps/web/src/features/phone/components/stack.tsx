@@ -33,7 +33,8 @@ export function Stack({ rootPath }: { readonly rootPath: string }) {
       <div
         className={cn(
           surface.panel,
-          'flex h-full min-h-0 flex-col pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[max(env(safe-area-inset-bottom),var(--keyboard-inset,0px))] pl-[env(safe-area-inset-left)]',
+          // No iOS callout: a long press opens the app's own context menu.
+          'flex h-full min-h-0 flex-col [-webkit-touch-callout:none] pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[max(env(safe-area-inset-bottom),var(--keyboard-inset,0px))] pl-[env(safe-area-inset-left)]',
         )}
         data-phone-shell=''
         ref={frameRef}
