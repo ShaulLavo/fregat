@@ -25,7 +25,7 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      code: ${{ github.event_name != 'pull_request' || steps.filter.outputs.code == 'true' }}
+      code: ${{ github.event_name != 'pull_request' || steps.filter.outputs.code == 'true' || steps.filter.outputs.generated == 'true' }}
       web: ${{ github.event_name != 'pull_request' || steps.filter.outputs.web == 'true' }}
       server: ${{ github.event_name != 'pull_request' || steps.filter.outputs.server == 'true' }}
       tui: ${{ github.event_name != 'pull_request' || steps.filter.outputs.tui == 'true' }}
@@ -73,6 +73,10 @@ jobs:
               - '!plans/**'
               - '!docs/**'
               - '!*.md'
+            # Written by `generated:check`'s generators, so a hand edit is a code change.
+            generated:
+              - 'docs/settings-reference.md'
+              - 'docs/native-syntax-coverage.*'
             docs:
               - added|modified: 'plans/**'
               - added|modified: 'docs/**'

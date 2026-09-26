@@ -95,6 +95,15 @@ change can reach. The targets are confirmed or revised by phase 0's measurements
    PRs run format and the doc checks only; a change confined to one app skips the other app's test
    shards. Branch protection keeps one required status that summarises the rest, so skipped jobs
    never block a merge.
+   Done 2026-09-26 (wave 2 lane B): a `changes` job (dorny/paths-filter, pinned by SHA) classifies
+   a PR. Plans, docs and root Markdown are not code (the two generated docs files are); a
+   docs-only PR runs `Docs format` (oxfmt on the changed files) and nothing else. Web tests and
+   the browser job skip when only `apps/tui`, `apps/desktop`, `apps/mac` or `apps/site` changed;
+   server tests skip for `apps/web` or `apps/tui` alone; TUI tests skip for `apps/web` alone (web
+   and TUI tests drive the real server, so a server change runs both). Lint, typecheck and package
+   tests run for any code change. Pushes to main run everything. One job, `CI`, is red when any job
+   failed or was cancelled and green when the rest passed or were skipped: it is the status to
+   read. The repository has no branch protection, so nothing else changes.
 3. **Balance the test shards** (S–M). Split server tests across shards (175–182 s in one job today),
    re-balance web and TUI shards by recorded durations instead of file count, and look for the
    slowest files in each (cold process spawns, real timers) before adding shards: shards cost
