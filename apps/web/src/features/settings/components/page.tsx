@@ -1,3 +1,4 @@
+import { MCP_CATEGORY, matchesMcpSearch } from '@/features/settings/utils/mcp'
 import { McpSection } from '@/features/settings/components/mcp-section'
 import { SettingsDisplayProvider } from '@/features/settings/providers/display-provider'
 import { useReloadView } from '@/features/settings/hooks/use-reload-view'
