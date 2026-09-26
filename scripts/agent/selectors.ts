@@ -1,5 +1,11 @@
 import type { Locator, Page } from 'playwright'
 
+export const folderTreeShadowHost = 'file-tree-container[aria-label="Folder tree"]'
+export const rootSwitchRows = {
+  Git: '[aria-label="Git changes"] [role="treeitem"][aria-level="2"]',
+  Files: '[role="treeitem"]',
+} as const
+
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallpaper-layer="still"]'
 export const diffPaneSelector = '.editor-diff-pane'
@@ -888,6 +894,8 @@ export const selectors = {
       .getByRole('alert')
       .filter({ hasText: /not initialized/ })
       .getByRole('button', { name: 'Initialize', exact: true }),
+  folderTreeScroll: (page: Page) =>
+    page.locator(folderTreeShadowHost).locator('[data-file-tree-virtualized-scroll]'),
   folderTree: (page: Page) => page.getByLabel('Folder tree', { exact: true }),
   focusedTreeRow: (page: Page) =>
     page.getByLabel('Folder tree', { exact: true }).locator('[role="treeitem"][tabindex="0"]'),

@@ -58,6 +58,12 @@ test('reload preserves directory coverage and view state without admitting query
   expect(reloaded.getQueryData(fileSystemKeys.tree(root))).toBeUndefined()
   captureTree(owner, model, { ...saved.record, scrollTop: 86 })
   expect(savedTree(owner, root, null)?.record.scrollTop).toBe(86)
+  const otherRoot = filesystemPath('other')
+  const otherModel = treeModelWithDirectoryLoads({ path: otherRoot, entries: [] }, otherRoot, [])
+  captureTree(owner, otherModel, { ...saved.record, root: otherRoot, expanded: [], scrollTop: 12 })
+  expect(savedTree(owner, root, null)?.record.scrollTop).toBe(86)
+  expect(savedTree(owner, root, null)?.record.expanded).toEqual(['empty/'])
+  expect(savedTree(owner, otherRoot, null)?.record.scrollTop).toBe(12)
   captureTree(
     owner,
     { ...model, paths: Array.from({ length: 1501 }, (_, index) => String(index)) },

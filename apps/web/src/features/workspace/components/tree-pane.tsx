@@ -134,6 +134,7 @@ function ReadyTreePane({
   useFileOperationHistory(rootPath)
   const expandedDirectoryPathsRef = useRef<ReadonlySet<string> | undefined>(undefined)
   const modelRef = useRef(model)
+  const confirmedRef = useRef(confirmed)
   const selectedFilePathRef = useRef(selectedFilePath)
   const selectFileRef = useRef(selectFile)
   const pathsRef = useRef(model.paths)
@@ -297,6 +298,7 @@ function ReadyTreePane({
     completeRenameRef.current = fsActions.completeRename
     createEntryRef.current = fsActions.actions.createEntry
     modelRef.current = model
+    confirmedRef.current = confirmed
     revealActiveFileRef.current = () => focusTreeForCommand(true)
     selectedFilePathRef.current = selectedFilePath
     selectFileRef.current = selectFile
@@ -307,8 +309,8 @@ function ReadyTreePane({
     const capture = () => {
       const live = queryClient.getQueryData<TreeModel>(fileSystemKeys.tree(rootPath))
       const saved = savedTree(queryClient, rootPath, worktree)
-      const displayed = live ?? saved?.model
-      if (!displayed) return
+      // Root navigation can evict the query before the held tree unmounts.
+      const displayed = live ?? confirmedRef.current
       const expanded = displayed.paths.filter((path) => {
         const item = tree.getItem(path)
         return item !== null && 'isExpanded' in item && item.isExpanded()

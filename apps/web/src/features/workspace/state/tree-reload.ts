@@ -49,7 +49,10 @@ const schema = v.object({
 })
 type Record = v.InferOutput<typeof schema>
 type Observation = { readonly record: Record; readonly model: TreeModel }
-const owners = new WeakMap<QueryClient, { storage: ScopedStorage; saved: Observation | null }>()
+const owners = new WeakMap<
+  QueryClient,
+  { storage: ScopedStorage; saved: Map<string, Observation> }
+>()
 
 export function prepareTreeReload(owner: QueryClient, storage: ScopedStorage) {
   const record = readReloadCache<Record>(KEY, schema, storage, TREE_RELOAD_MAX_BYTES)
@@ -65,11 +68,11 @@ export function prepareTreeReload(owner: QueryClient, storage: ScopedStorage) {
         },
       }
     : null
-  owners.set(owner, { storage, saved })
+  owners.set(owner, { storage, saved: new Map(saved ? [[saved.record.root, saved]] : []) })
 }
 
 export function savedTree(owner: QueryClient, root: string, worktree: string | null) {
-  const saved = owners.get(owner)?.saved
+  const saved = owners.get(owner)?.saved.get(root)
   return saved?.record.root === root && saved.record.worktree === worktree ? saved : null
 }
 
@@ -90,7 +93,7 @@ export function captureTree(
     (view.git?.entries.length ?? 0) > MAX_ENTRIES
   ) {
     state.storage.removeItem(KEY)
-    state.saved = null
+    state.saved.delete(view.root)
     return
   }
   const record: Record = {
@@ -109,8 +112,8 @@ export function captureTree(
   })
   if (result.status === 'oversized') {
     state.storage.removeItem(KEY)
-    state.saved = null
+    state.saved.delete(view.root)
     return
   }
-  state.saved = { record, model }
+  state.saved.set(view.root, { record, model })
 }

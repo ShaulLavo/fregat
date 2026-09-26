@@ -1,3 +1,4 @@
+import { rootSwitchNoFlicker } from './root-switch-no-flicker'
 import { settingsRoutePreparation } from './settings-route-preparation'
 import { settingsModuleFailure } from './settings-module-failure'
 import { connectionRefusalRetention } from './connection-refusal-retention'
@@ -491,6 +492,7 @@ export const scenarios: readonly Scenario[] = [
   projectSettings,
   workspaceTwoRoots,
   quickOpenLinkedFile,
+  rootSwitchNoFlicker,
   quickOpenNoFlicker,
   gitHistorySearchNoFlicker,
   logsSearchNoFlicker,
