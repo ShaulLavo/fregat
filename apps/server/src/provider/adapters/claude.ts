@@ -1,3 +1,4 @@
+import { platformReadTools } from '../../mcp/tool-names'
 import { spawn } from 'node:child_process'
 import { ProviderProcessLifetime } from './process-lifetime'
 import { createInternalError, isEvlogError } from '../../observability/structured-errors'
@@ -80,6 +81,7 @@ import type {
   ProviderSessionHistoryInput,
   ProviderForkInput,
   ProviderSignInInput,
+  PlatformMcpBinding,
   ProviderTurnInput,
   ProviderUserInputResponseInput,
 } from '../types'
@@ -665,6 +667,7 @@ export class ClaudeProviderAdapter
     const session = await ClaudeAgentSession.start({
       ...(input.agent ? { agent: input.agent } : {}),
       fork,
+      ...(input.platformMcp ? { platformMcp: input.platformMcp } : {}),
       onCreated: (session) => this.sessions.set(input.sessionId, session),
       agentDiagnostics: this.agentDiagnostics,
       attachmentsDir: this.attachmentsDir,
@@ -726,6 +729,7 @@ class ClaudeAgentSession extends SessionContext {
   private nextHarnessOrigin: ProviderTurnOrigin | null = null
   /** This CLI reports `command_lifecycle`, so an owner turn is running only once its own frame says so. */
   private lifecycleReported = false
+  private platformMcpName: string | null = null
   private query: Query | null = null
   private pumpCompletion: Promise<void> | null = null
   private streamEnded = true
@@ -771,6 +775,7 @@ class ClaudeAgentSession extends SessionContext {
     agent?: string
     fork?: ClaudeForkOptions
     onCreated: (session: ClaudeAgentSession) => void
+    platformMcp?: PlatformMcpBinding
     agentDiagnostics: AgentDiagnosticsSource | null
     attachmentsDir: string
     createQuery: ClaudeCreateQuery
@@ -842,6 +847,33 @@ class ClaudeAgentSession extends SessionContext {
         CLAUDE_INIT_TIMEOUT_MS,
         'Claude session start timed out.',
       )
+      if (input.platformMcp) {
+        const name = `platform_${crypto.randomUUID().replaceAll('-', '')}`
+        // The SDK serializes initial mcpServers into argv and its spawn debug log.
+        await withClaudeTimeout(
+          query
+            .setMcpServers({
+              [name]: {
+                alwaysLoad: true,
+                headers: { Authorization: `Bearer ${input.platformMcp.token}` },
+                type: 'http',
+                url: input.platformMcp.url,
+              },
+            })
+            .then(
+              (result) => {
+                if (Object.keys(result.errors).length > 0 || !result.added.includes(name))
+                  throw createInternalError('Platform MCP connection failed.')
+              },
+              () => {
+                throw createInternalError('Platform MCP connection failed.')
+              },
+            ),
+          CLAUDE_INIT_TIMEOUT_MS,
+          'Platform MCP connection timed out.',
+        )
+        session.platformMcpName = name
+      }
       session.status = 'ready'
     } catch (error) {
       recordChatPipelineWarning('chat.pipeline.claude_session.start.failed', {
@@ -2133,6 +2165,17 @@ class ClaudeAgentSession extends SessionContext {
     if (this.runtimeMode === 'full-access') {
       return Promise.resolve({ behavior: 'allow', updatedInput: toolInput })
     }
+    // HTTP servers installed by setMcpServers report dynamic provenance; the name is per runtime.
+    if (
+      this.isActive() &&
+      this.platformMcpName !== null &&
+      options.mcpServer?.source === 'dynamic' &&
+      options.mcpServer.name === this.platformMcpName &&
+      Object.values(platformReadTools).some(
+        (tool) => toolName === `mcp__${this.platformMcpName}__${tool}`,
+      )
+    )
+      return Promise.resolve({ behavior: 'allow', updatedInput: toolInput })
 
     return this.requestApproval(toolName, toolInput, options)
   }

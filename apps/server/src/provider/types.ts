@@ -36,6 +36,9 @@ import type {
 import type { ProviderUsageAmounts, ProviderUsageTotals } from './utils/usage-totals'
 import type { ProviderUsageProbe, ProviderUsageUpdate } from './utils/usage-windows'
 
+/** Platform's MCP endpoint and the bearer token one provider runtime reaches it with. */
+export type PlatformMcpBinding = { readonly url: string; readonly token: string }
+
 export type ProviderTurnInput = {
   attachments: readonly ChatAttachment[]
   attachmentsDir?: string
@@ -47,6 +50,8 @@ export type ProviderTurnInput = {
   kind?: SessionTurnKind
   messageText: string
   modelSelection: ModelSelection
+  /** Absent for utility turns and when no endpoint is served. */
+  platformMcp?: PlatformMcpBinding
   /** A JSON schema the turn's final message must match; Codex takes it per turn. */
   outputSchema?: Record<string, unknown>
   sessionId: SessionId
@@ -76,6 +81,7 @@ export type ProviderRuntimeStartInput = {
   ephemeral?: boolean
   interactionMode?: InteractionMode
   modelSelection: ModelSelection
+  platformMcp?: PlatformMcpBinding
   /** A JSON schema every final message must match; Claude takes it per session. */
   outputSchema?: Record<string, unknown>
   providerInstanceId: ProviderInstanceId

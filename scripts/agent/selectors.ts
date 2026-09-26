@@ -624,6 +624,8 @@ export const selectors = {
     page.getByRole('button', { name: /^Select .+/ }).filter({ has: page.locator('img') }),
   wallpaperCard: (page: Page, name: string) =>
     page.getByRole('button', { name: `Select ${name}`, exact: true }),
+  wallpaperCatalogCard: (page: Page, theme: string, file: string) =>
+    page.getByRole('button', { name: `Download and select ${theme} ${file}`, exact: true }),
   wallpaperFilter: (page: Page) => page.getByRole('textbox', { name: 'Filter wallpapers' }),
   wallpaperUploadInput: (page: Page) => page.getByLabel('Upload wallpapers', { exact: true }),
   wallpaperActions: (page: Page, name: string) =>
