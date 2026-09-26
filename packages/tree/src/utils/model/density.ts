@@ -1,3 +1,4 @@
+// Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
 export type FileTreeDensityKeyword = 'compact' | 'default' | 'relaxed'
 
 export type FileTreeDensity = FileTreeDensityKeyword | number

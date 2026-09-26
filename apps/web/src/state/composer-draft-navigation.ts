@@ -1,4 +1,5 @@
 import { selectWorktreeAtPath } from '@workspace/client-core/chat/selectors'
+import { canonicalServerOrigin } from '@workspace/client-core/transport/client'
 
 import { useChatInputDraftStore } from '@/features/chat/state/chat-input-draft-store'
 import {
@@ -7,6 +8,7 @@ import {
 } from '@/features/chat/state/chat-projection-store'
 import type { ComposerDestination } from '@/lib/composer-attach/providers/context'
 import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
+import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import type { createChatNavigation } from '@/state/navigation-chat'
 import type { createNavigationCoordinator } from '@/state/navigation-coordinator'
 
@@ -14,7 +16,21 @@ export function createComposerDraftNavigation(
   coordinator: Pick<ReturnType<typeof createNavigationCoordinator>, 'getApplication'>,
   openChat: ReturnType<typeof createChatNavigation>,
 ) {
-  return async (destination: ComposerDestination, text: string) => {
+  /** The workspace on screen, when it has a worktree a draft can start from. */
+  const destinationHere = (): ComposerDestination | null => {
+    const active = coordinator.getApplication()?.getSnapshot()
+    if (!active) return null
+    const rootPath = active.editor.workspaceStore.getState().rootFolder?.path
+    // No confirmedEnvironmentId: its origin assertion throws exactly when Fix with AI is
+    // offered for a failing connection.
+    const environmentId =
+      useEnvironmentsStore.getState().entries[canonicalServerOrigin(active.origin)]?.environmentId
+    if (!rootPath || !environmentId) return null
+    const slice = selectChatProjectionSlice(useChatProjectionStore.getState(), environmentId)
+    return selectWorktreeAtPath(slice, rootPath) ? { environmentId, rootPath } : null
+  }
+
+  const startComposerDraft = async (destination: ComposerDestination, text: string) => {
     const application = coordinator.getApplication()
     if (!application) return false
     const slice = selectChatProjectionSlice(
@@ -59,5 +75,16 @@ export function createComposerDraftNavigation(
       useChatInputDraftStore.getState().clearDraft(target)
       throw error
     }
+  }
+
+  const startComposerDraftHere = async (text: string) => {
+    const destination = destinationHere()
+    return destination ? startComposerDraft(destination, text) : false
+  }
+
+  return {
+    canStartComposerDraftHere: () => destinationHere() !== null,
+    startComposerDraft,
+    startComposerDraftHere,
   }
 }

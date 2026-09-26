@@ -164,7 +164,7 @@ for (const status of ['superseded', 'unavailable', 'throw'] as const) {
       ).toBeDefined(),
     )
     const draftsBefore = Object.keys(useChatInputDraftStore.getState().draftsByKey)
-    const start = createComposerDraftNavigation(
+    const { startComposerDraft: start } = createComposerDraftNavigation(
       { getApplication: () => h.application },
       async () => {
         if (status === 'throw') throw new Error('Navigation failed')

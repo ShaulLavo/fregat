@@ -1,6 +1,7 @@
 import { ok } from 'node:assert/strict'
 import { ORCHESTRATION_WS_PROTOCOL_VERSION } from '../../../packages/contracts/src/orchestration-ws'
 import { selectors } from '../selectors'
+import { connectRemoteUrl } from './machine-connect-error'
 import type { Scenario } from './index'
 
 const running = ORCHESTRATION_WS_PROTOCOL_VERSION - 1
@@ -56,16 +57,7 @@ export const machineProtocolMismatch: Scenario = {
     const url = `http://127.0.0.1:${server.port}`
     try {
       await selectors.windowToolbar(page).waitFor({ timeout: 45_000 })
-      await selectors.projectMenu(page).click()
-      await selectors.connectMachineMenu(page).click()
-      const dialog = selectors.machineDialog(page)
-      await dialog.waitFor()
-      if (await selectors.machineAdd(page).isVisible()) await selectors.machineAdd(page).click()
-      await selectors.machineRemoteUrl(page).click()
-      await selectors.machineServerUrl(page).fill(url)
-      await selectors.machineConnect(page).click()
-      const formError = selectors.machineDialogError(dialog)
-      await formError.waitFor({ timeout: 30_000 })
+      const { dialog, error: formError } = await connectRemoteUrl(page, url)
       requireOutdated(await formError.innerText(), url, 'The form error')
       await step('form-error')
 

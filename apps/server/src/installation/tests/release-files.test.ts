@@ -9,6 +9,8 @@ import {
   reachablePackages,
   REMOTE_SUPPORT,
   WATCH_WORKER,
+  IMAGE_WORKER,
+  THIRD_PARTY_NOTICES,
   RUNTIME_PACKAGES,
   runtimeManifest,
   writeRuntimeManifest,
@@ -72,26 +74,30 @@ test('the server build writes the watch worker beside the bundle', async () => {
   )
 })
 
+test('the server build packages its isolated image decoder', async () => {
+  expect(await buildScript()).toContain(
+    `bun build src/themes/wallpapers/image-worker.ts --target bun --outfile dist/${IMAGE_WORKER}`,
+  )
+})
+
 test('manifest versions come from bun.lock, with the server workspace resolution first', () => {
   const lock = fixtureLock({
-    sharp: 'sharp@0.1.0',
-    'server/sharp': 'sharp@0.2.0',
+    'web-push': 'web-push@3.6.7',
     '@anthropic-ai/claude-agent-sdk': '@anthropic-ai/claude-agent-sdk@1.2.3',
     typescript: 'typescript@7.0.0',
+    'server/typescript': 'typescript@7.0.1',
     'site/typescript': 'typescript@5.0.0',
     'typescript-language-server': 'typescript-language-server@6.0.0',
-    jszip: 'jszip@3.10.1',
     'subset-font': 'subset-font@2.4.0',
   })
   expect(JSON.parse(runtimeManifest(lock))).toEqual({
     name: 'platform-server-runtime',
     private: true,
     dependencies: {
-      sharp: '0.2.0',
+      'web-push': '3.6.7',
       '@anthropic-ai/claude-agent-sdk': '1.2.3',
-      typescript: '7.0.0',
+      typescript: '7.0.1',
       'typescript-language-server': '6.0.0',
-      jszip: '3.10.1',
       'subset-font': '2.4.0',
     },
   })
@@ -112,7 +118,7 @@ test('a runtime package missing from bun.lock fails the manifest', () => {
     expect.objectContaining({
       code: 'installation.RUNTIME_PACKAGE_MISSING',
       message:
-        'bun.lock resolves no version for the server runtime packages @anthropic-ai/claude-agent-sdk, typescript-language-server, jszip, subset-font.',
+        'bun.lock resolves no version for the server runtime packages web-push, @anthropic-ai/claude-agent-sdk, typescript-language-server, subset-font.',
     }),
   )
 })
@@ -126,6 +132,8 @@ test('a built server directory reports the release files it lacks', async () => 
       REMOTE_SUPPORT,
       PTY_HOST,
       WATCH_WORKER,
+      IMAGE_WORKER,
+      THIRD_PARTY_NOTICES,
     ])
     const lockfile = path.join(server, 'bun.lock')
     await writeFile(
@@ -134,9 +142,16 @@ test('a built server directory reports the release files it lacks', async () => 
     )
     await writeRuntimeManifest(server, lockfile)
     await writeFile(path.join(server, REMOTE_SUPPORT), '')
-    expect(await missingReleaseFiles(server)).toEqual([PTY_HOST, WATCH_WORKER])
+    expect(await missingReleaseFiles(server)).toEqual([
+      PTY_HOST,
+      WATCH_WORKER,
+      IMAGE_WORKER,
+      THIRD_PARTY_NOTICES,
+    ])
     await writeFile(path.join(server, PTY_HOST), '')
     await writeFile(path.join(server, WATCH_WORKER), '')
+    await writeFile(path.join(server, IMAGE_WORKER), '')
+    await writeFile(path.join(server, THIRD_PARTY_NOTICES), 'fixture notices')
     expect(await missingReleaseFiles(server)).toEqual([])
   } finally {
     await rm(server, { force: true, recursive: true })
@@ -159,8 +174,8 @@ test('the standalone runtime lock preserves transitive resolutions and integrity
       schema,
       Bun.JSONC.parse(await readFile(path.join(server, 'runtime/bun.lock'), 'utf8')),
     )
-    expect(runtime.packages['detect-libc']).toEqual(original.packages['detect-libc'])
-    expect(runtime.packages['detect-libc']).toEqual([
+    expect(runtime.packages['subset-font']).toEqual(original.packages['subset-font'])
+    expect(runtime.packages['subset-font']).toEqual([
       expect.any(String),
       expect.any(String),
       expect.any(Object),
