@@ -18,7 +18,7 @@ import {
   PencilSimpleIcon,
 } from '@phosphor-icons/react'
 
-import { commandItem, section, type Menu } from '@/keymap/menus/utils/model'
+import { commandItem, section, type Menu, type MenuSection } from '@/keymap/menus/utils/model'
 
 /**
  * The menu for a right-click inside editor text.
@@ -32,11 +32,12 @@ import { commandItem, section, type Menu } from '@/keymap/menus/utils/model'
  * right-clicked — the editor ignores non-primary mouse buttons when it maps a
  * click to a text offset (`inputSelectionController.handleMouseDown` guards on
  * `event.button !== 0`), so a right-click never moves the caret. That makes the
- * menu a mirror of the keyboard shortcuts at that moment, which is why it
- * carries no item that names a specific line or token.
+ * menu a mirror of the keyboard shortcuts at that moment. The one exception is
+ * `spelling`, which the caller builds for the word under the pointer.
  */
-export function editorTextMenu(): Menu {
+export function editorTextMenu(spelling: MenuSection | null = null): Menu {
   return [
+    ...(spelling ? [spelling] : []),
     section('navigate', [
       commandItem('editor.goToDefinition', {
         icon: ArrowSquareOutIcon,

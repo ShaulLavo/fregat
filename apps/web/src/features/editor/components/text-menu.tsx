@@ -1,3 +1,5 @@
+import type { Editor } from '@singapore-editor/core/editor'
+
 import { useEditorTextMenu } from '@/features/editor/hooks/use-editor-text-menu'
 import { MenuSurface } from '@/keymap/menus/components/surface'
 import type { MenuAnchor } from '@/keymap/menus/utils/virtual-anchor'
@@ -9,12 +11,17 @@ import type { MenuAnchor } from '@/keymap/menus/utils/virtual-anchor'
  */
 export function EditorTextMenu({
   anchor,
+  editor,
+  offset,
   onOpenChange,
 }: {
   readonly anchor: MenuAnchor
+  readonly editor: Editor | null
+  /** The text offset the menu was opened for, for the spelling section. */
+  readonly offset: number | null
   readonly onOpenChange: (open: boolean) => void
 }) {
-  const menu = useEditorTextMenu()
+  const menu = useEditorTextMenu(editor, offset)
 
   return (
     <MenuSurface
