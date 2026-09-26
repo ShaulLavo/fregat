@@ -147,6 +147,8 @@ stays safe to read, share and export.
 | ------------------------------ | -------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `files.autoSave`               | `"off"`  | window      | Save edited files automatically, and when.                                                                                                                                           |
 | `files.autoSaveDelay`          | `1000`   | window      | Milliseconds of quiet before an automatic save, when saving after a delay.                                                                                                           |
+| `files.picker.pinnedLocations` | `[]`     | machine     | Folders pinned to the top of the file picker sidebar on this machine, as paths from the browsable root.                                                                              |
+| `files.picker.hiddenLocations` | `[]`     | machine     | Places, project folders and drives removed from the file picker sidebar on this machine, as paths from the browsable root.                                                           |
 | `files.picker.view`            | `"auto"` | application | How the file picker shows a folder: columns, a list, or icons. Auto uses columns when choosing a folder and a list when choosing a file.                                             |
 | `files.previewKilobytes`       | `64`     | application | Kilobytes of a text file the file picker and quick open read for their preview. A longer file shows its first part and says how much of it that is.                                  |
 | `files.showHidden`             | `false`  | window      | Show dot-prefixed files and folders in file pickers.                                                                                                                                 |
@@ -230,6 +232,13 @@ stays safe to read, share and export.
 ### Details
 
 - `models.hidden`: Only turned-off models are stored, so a model a provider adds later appears in the picker on its own.
+
+## Prefetch
+
+| Setting            | Default | Scope       | What it does                                                                                                                                                                                        |
+| ------------------ | ------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `prefetch.enabled` | `true`  | application | Start loading what a press will open while the pointer heads for it or a key moves to it, so it paints at once. Folder listings follow this switch; each other surface has its own switch under it. |
+| `prefetch.files`   | `true`  | application | Read a file and colour its syntax while the pointer heads for its tree row, tab or definition link. Applies while `prefetch.enabled` is on.                                                         |
 
 ## Providers
 

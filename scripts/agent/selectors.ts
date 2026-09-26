@@ -292,6 +292,16 @@ export const selectors = {
       exact: true,
     }),
   pickerPreviewPath: (page: Page, path: string) => page.locator(`[data-file-preview="${path}"]`),
+  pickerSidebarSection: (page: Page, name: string) =>
+    selectors.pickerDialog(page).getByRole('region', { name, exact: true }),
+  pickerPinFolder: (page: Page, pinned: boolean) =>
+    page.getByRole('button', {
+      name: pinned ? 'Unpin this folder' : 'Pin this folder',
+      exact: true,
+    }),
+  /** A preview showing content: code, a decoded image or a folder's children. */
+  pickerPreviewContentSelector:
+    '[data-file-preview] [data-file-preview-text], [data-file-preview] img, [data-file-preview] ul',
   paletteImportText: (page: Page) =>
     page.getByRole('textbox', { name: 'Palette JSON', exact: true }),
   pickerPreview: (page: Page) => page.locator('[data-file-preview]'),
@@ -304,6 +314,8 @@ export const selectors = {
     page.locator(`[data-studio-themes] [role="option"][data-theme-id="${id}"]`),
   titlebar: (page: Page) => page.locator('header[data-native-window-drag-region]').first(),
   themeStudioOpen: (page: Page) => page.getByRole('button', { name: 'Open studio', exact: true }),
+  quickOpenPreviewHeaderSelector: '[aria-label="File preview"] header',
+  quickOpenPreviewTextSelector: '[aria-label="File preview"] [data-file-preview-text]',
   quickOpenPreview: (page: Page) => page.getByRole('region', { name: 'File preview', exact: true }),
   pickerColumn: (page: Page, index: number) => page.locator(`[data-picker-column="${index}"]`),
   pickerColumnBox: (page: Page, index: number) =>

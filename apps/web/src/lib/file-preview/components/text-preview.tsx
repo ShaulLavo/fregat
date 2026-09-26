@@ -1,3 +1,4 @@
+import { LoadingState } from '@workspace/ui/components/loading-state'
 import { useQuery } from '@tanstack/react-query'
 import { HighlightedCode } from '@workspace/markdown/components/highlighted-code'
 import { CodeHighlighterContext } from '@workspace/markdown/providers/code-highlighter-context'
@@ -25,9 +26,19 @@ export function TextPreview({
   path: string
 }) {
   const maxBytes = useSettingValue('files.previewKilobytes') * 1024
-  const query = useQuery(previewQueryOptions(path, maxBytes))
+  const query = useQuery({
+    ...previewQueryOptions(path, maxBytes),
+    // Both preview owners load before swapping; observing their result must not restart a failed read.
+    enabled: false,
+  })
   const highlighter = useCodeHighlighter()
 
+  if (query.isPending)
+    return (
+      <LoadingState className='w-full p-2' label={`Loading ${name}`}>
+        <div className='bg-content-well skeleton-sweep h-40 w-full rounded-md' />
+      </LoadingState>
+    )
   if (query.isError)
     return (
       <div className='flex flex-col items-center gap-2'>

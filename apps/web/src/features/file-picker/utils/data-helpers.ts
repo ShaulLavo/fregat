@@ -63,7 +63,7 @@ export function fetchServerInfo(signal: AbortSignal, client: Client) {
   return fetchSharedServerInfo(signal, client)
 }
 
-/** The home's Desktop, Documents and Downloads that exist on the machine being browsed. */
+/** Places, project folders and drives on the machine being browsed. */
 export function fetchPlaces(signal: AbortSignal, client: Client) {
   return observeClientOperation(
     {
@@ -77,9 +77,13 @@ export function fetchPlaces(signal: AbortSignal, client: Client) {
     async () => {
       const response = await client.fs.places.get({ fetch: { signal } })
       if (response.error) throw createRpcError(response.error)
-      return response.data.places
+      return response.data
     },
-    (places) => ({ placeCount: places.length }),
+    (data) => ({
+      driveCount: data.drives.length,
+      placeCount: data.places.length,
+      projectFolderCount: data.projects.length,
+    }),
   )
 }
 

@@ -1,5 +1,5 @@
 import { directoryQueryOptions } from '@/features/file-picker/utils/directory-query'
-import { hasPrefetchRoom } from '@/lib/prefetch-room'
+import { hasPrefetchRoom } from '@/lib/intent-prefetch/state/scheduler'
 import { filePickerKeys } from '@/lib/query-keys'
 import { errorMessage } from '@/lib/error-message'
 import { useQueryClient } from '@tanstack/react-query'
@@ -49,7 +49,7 @@ export function useDirectoryTransition({
 
   /** A row's hover or scroll intent: a guess, so it waits when enough listings are already loading. */
   const guessDirectory = (path: string) => {
-    if (!hasPrefetchRoom(queryClient, filePickerKeys.directories())) return
+    if (!hasPrefetchRoom('folders', queryClient, { queryKey: filePickerKeys.directories() })) return
     return preloadDirectory(path)
   }
 

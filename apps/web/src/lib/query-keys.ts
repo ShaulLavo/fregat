@@ -34,6 +34,7 @@ export const filePickerKeys = {
 
 export const filePreviewKeys = {
   all: ['file-preview'] as const,
+  imageReady: (src: string) => [...filePreviewKeys.all, 'image-ready', src] as const,
   file: (path: string) => [...filePreviewKeys.all, path] as const,
   preview: (path: string, maxBytes: number) => [...filePreviewKeys.file(path), maxBytes] as const,
 }

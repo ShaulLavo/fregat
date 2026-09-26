@@ -208,6 +208,7 @@ export const filePickerPrefetchBound: Scenario = {
       await selectors.projectMenu(page).click()
       await selectors.openFolderMenu(page).click()
       await selectors.pickerDialog(page).waitFor()
+      await selectors.pickerView(page, 'List').click()
       await selectors.pickerGoToFolder(page).click()
       await selectors.pickerFolderPath(page).fill(many)
       await selectors.pickerFolderPath(page).press('Enter')

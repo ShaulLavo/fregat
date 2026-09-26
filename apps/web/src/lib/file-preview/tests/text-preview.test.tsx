@@ -24,7 +24,7 @@ test('a new preview never displays the previous file body under its name', () =>
   )
 
   expect(screen.queryByText('first_file_body')).not.toBeInTheDocument()
-  expect(screen.getByText('File preview')).toBeInTheDocument()
+  expect(screen.getByRole('status', { name: 'Loading second.json' })).toBeInTheDocument()
 })
 
 test('a file longer than the budget says how much of it the preview shows', () => {
