@@ -1,5 +1,6 @@
 import { ok, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
+import type { SettingsOperation } from '@workspace/contracts'
 
 /** The settings API behind the page: the mesh serves it under /platform, dev on the API port. */
 function settingsApi(page: Page) {
@@ -11,6 +12,7 @@ function settingsApi(page: Page) {
 }
 
 type SettingOperation =
+  | Extract<SettingsOperation, { readonly kind: 'keybinding.set' }>
   | { readonly kind: 'set'; readonly key: string; readonly value: unknown }
   | { readonly kind: 'reset'; readonly keys: readonly string[] }
   | { readonly kind: 'machine.set'; readonly name: string; readonly machine: unknown }
@@ -87,5 +89,6 @@ export async function preserveAppearance(page: Page, onlyKeys?: readonly string[
 function operationKeys(operation: SettingOperation): readonly string[] {
   if (operation.kind === 'set') return [operation.key]
   if (operation.kind === 'reset') return operation.keys
+  if (operation.kind === 'keybinding.set') return ['keybindings.overrides']
   return [`environments.machines.${operation.name}`]
 }
