@@ -11,6 +11,7 @@ import {
   LogReaderService,
   FontCatalogService,
   ProviderAdapterRegistry,
+  createTestTerminalHost,
   testSettingsOptions,
   type MetadataDatabaseHandle,
   type AppOptions,
@@ -20,6 +21,7 @@ const TEST_SERVER_ORIGIN = 'http://platform-tui.test'
 const TEST_CLIENT_ORIGIN = TUI_CLIENT_ORIGIN
 
 export type TestServer = Awaited<ReturnType<typeof makeTestServer>>
+type TestTerminalHost = Awaited<ReturnType<typeof createTestTerminalHost>>
 
 type TestServerOptions = Pick<AppOptions, 'terminal' | 'lsp' | 'workspaceEditDriver'> & {
   providerAdapter?: MockProviderAdapter
@@ -29,19 +31,30 @@ type TestServerOptions = Pick<AppOptions, 'terminal' | 'lsp' | 'workspaceEditDri
 export async function makeTestServer(options: TestServerOptions = {}) {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-tui-test-'))
   try {
-    return buildTestServer(root, options)
+    return await buildTestServer(root, options)
   } catch (error) {
     await rm(root, { force: true, recursive: true })
     throw error
   }
 }
 
-function buildTestServer(root: string, options: TestServerOptions) {
+async function buildTestServer(root: string, options: TestServerOptions) {
+  // Without an injected terminal the server refuses to reach the developer's real terminal host.
+  const host = options.terminal ? null : await createTestTerminalHost()
   const database = createMetadataDatabase({ databasePath: ':memory:' })
   try {
-    return createServerWithDatabase(root, database, options)
+    return createServerWithDatabase(
+      root,
+      database,
+      {
+        ...options,
+        terminal: options.terminal ?? { hostClient: host?.client },
+      },
+      host,
+    )
   } catch (error) {
     database.close()
+    await host?.close()
     throw error
   }
 }
@@ -50,6 +63,7 @@ function createServerWithDatabase(
   root: string,
   database: MetadataDatabaseHandle,
   options: TestServerOptions,
+  host: TestTerminalHost | null,
 ) {
   migratePlatformDatabase(database.db)
   const {
@@ -102,6 +116,7 @@ function createServerWithDatabase(
       try {
         await closeApp(app)
       } finally {
+        await host?.close()
         await closeDatabaseAndWorkspace(database, root)
       }
     },

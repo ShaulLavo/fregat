@@ -43,7 +43,7 @@ test('reset credit confirmation and pending state work in Chromium', async () =>
   try {
     await page.getByRole('button', { name: 'Use reset credit…' }).click()
     expect(requests).toEqual([])
-    await page.screenshot({ path: 'reset-credit-confirmation.png' })
+    await page.screenshot({ path: 'surface-reset-credit-confirmation.png' })
     await page.getByRole('button', { name: 'Cancel' }).click()
     expect(requests).toEqual([])
     await page.getByRole('button', { name: 'Use reset credit…' }).click()

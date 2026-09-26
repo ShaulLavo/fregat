@@ -3,13 +3,46 @@ import importlib
 import json
 import os
 import pathlib
+import select
 import shlex
 import struct
 import sys
+import tempfile
 import termios
+import time
 
 sys.dont_write_bytecode = True
 Terminal = importlib.import_module("job-control").Terminal
+
+
+def await_nvim_size(terminal, size):
+    # Neovim applies a SIGWINCH on its own loop, so a query typed beside the resize can read the
+    # old size. The answer goes to a file: Neovim repaints only changed cells, splitting on-screen text.
+    report = pathlib.Path(tempfile.mkdtemp(prefix="platform-tui-attach-")) / "size"
+    command = f':call writefile([&lines . "x" . &columns], "{report}")\r'.encode()
+    deadline = time.monotonic() + 12
+    reported = None
+    try:
+        while time.monotonic() < deadline:
+            report.unlink(missing_ok=True)
+            terminal.send(command)
+            reported = read_report(terminal, report, deadline)
+            if reported == size:
+                return
+        raise AssertionError(f"Neovim reported {reported!r}, expected {size!r}")
+    finally:
+        report.unlink(missing_ok=True)
+        report.parent.rmdir()
+
+
+def read_report(terminal, report, deadline):
+    while time.monotonic() < deadline:
+        if report.exists() and report.read_text():
+            return report.read_text().strip()
+        # Keep draining output so Neovim never blocks on a full terminal.
+        if select.select([terminal.fd], [], [], 0.05)[0]:
+            terminal.trace += os.read(terminal.fd, 65536)
+    return None
 
 
 def check_attach(bun, directory):
@@ -36,9 +69,7 @@ def check_attach(bun, directory):
         terminal.expect(b"RAW_ATTACH_NATIVE")
         terminal.buffer = b""
         fcntl.ioctl(terminal.fd, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
-        terminal.expect(b"[No Name]")
-        terminal.send(b':echo &lines . "x" . &columns\r')
-        terminal.expect(b"40x120")
+        await_nvim_size(terminal, "40x120")
         terminal.buffer = b""
         terminal.send(b"\x1dd")
         terminal.expect(b"PLATFORM")

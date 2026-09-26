@@ -3,7 +3,7 @@ import net from 'node:net'
 import path from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 
-import { createTestTerminalHost } from '../../../test/factories/terminal-host'
+import { createTestTerminalHost } from '../testing'
 import { RING_BYTES } from '../protocol'
 
 const hosts: Awaited<ReturnType<typeof createTestTerminalHost>>[] = []

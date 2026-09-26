@@ -34,6 +34,7 @@ export { LspSessionPool } from './lsp/proxy-session'
 export { spawnTypeScript } from './lsp/typescript/runtime'
 export type { LspProxyClientSession } from './lsp/proxy-session'
 export type { TerminalPtyFactory } from './terminal/service'
+export { createTestTerminalHost } from './terminal-host/testing'
 
 export { LogReaderService } from './observability/log-reader'
 export { releaseSource } from './machines/update'

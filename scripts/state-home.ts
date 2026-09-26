@@ -1,4 +1,13 @@
-import { cpSync, existsSync, linkSync, mkdirSync, readdirSync, realpathSync } from 'node:fs'
+import {
+  constants,
+  copyFileSync,
+  cpSync,
+  existsSync,
+  linkSync,
+  mkdirSync,
+  readdirSync,
+  realpathSync,
+} from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
 
@@ -25,11 +34,21 @@ export function seedDevStateHome(home: string, source = productionStateHome) {
 
 /**
  * Gives a home its own copy of the wallpaper library: a delete there unlinks only its
- * own entry. Hard links make it free on one volume and spare re-seeding the bundled art.
+ * own entry. Hard links make it free on one volume and spare re-seeding the bundled art;
+ * a home on another volume (a test under the system temp dir) gets copies.
  */
 export function linkWallpaperLibrary(home: string, source = productionStateHome) {
   const from = realpathSync(path.join(source, 'wallpapers'))
   const to = path.join(home, 'wallpapers')
   mkdirSync(to, { recursive: true })
-  for (const file of readdirSync(from)) linkSync(path.join(from, file), path.join(to, file))
+  for (const file of readdirSync(from)) linkOrCopy(path.join(from, file), path.join(to, file))
+}
+
+function linkOrCopy(from: string, to: string) {
+  try {
+    linkSync(from, to)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error
+    copyFileSync(from, to, constants.COPYFILE_FICLONE)
+  }
 }
