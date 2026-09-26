@@ -5,6 +5,9 @@
 - Status: RESEARCH DONE 2026-09-26 — recommendation: `@lezer/markdown` behind live preview on the
   main thread, tree-sitter keeps colours, folds and fence injections, remark stays in chat. Two
   owner questions below; Phase 0 is independent of both. Nothing here authorizes implementation.
+  Calibrated 2026-09-26 ([tree-sitter-calibration.md](../docs/markdown-parser/tree-sitter-calibration.md)):
+  the 42 ms tree-sitter keystroke was the first reparse of a freshly parsed tree. A careful
+  integration costs 2.4 ms at 1 MB (lezer 0.65 ms). Phase 0 grows to cover the worker.
 - Replaces [Plan 108](108-markdown-modes.md) D5. Plan 108 Phase 2 and the chat parser decision
   wait on this plan. [Plan 111](111-editor-decorations.md)'s decoration API does not.
 - Planned at: Platform `d42184dc`, Editor `74e76be`, 2026-09-26. Researched at Platform
@@ -100,14 +103,19 @@ reference links whose label has no definition, which neither tree-sitter nor lez
    | ms                                | 2 KB  | 45 KB | 1 MB |
    | --------------------------------- | ----- | ----- | ---- |
    | tree-sitter full (block + inline) | 1.05  | 18.9  | 419  |
-   | tree-sitter one-character edit    | 0.45  | 0.81  | 42.4 |
+   | tree-sitter keystroke, careful †  | —     | 0.30  | 2.4  |
    | lezer full                        | 0.17  | 2.76  | 40.9 |
    | lezer to the viewport (60 rows)   | 0.14  | 0.37  | 0.42 |
    | lezer one-character edit          | 0.086 | 0.086 | 0.82 |
+   | lezer keystroke, same run as †    | —     | 0.10  | 0.65 |
    | micromark full                    | 0.62  | 16.3  | 311  |
 
-   tree-sitter's block reparse scales with the document even when nothing changed (9.3 ms at
-   737 KB, 43 ms at 1 MB), at any edit position. Cold in Chromium: lezer loads in
+   † Block reparse of the evolving tree, plus the inline node holding the edit, plus uncached
+   visible inline nodes; p95 0.93 and 4.8 ms. The first reparse of a freshly parsed tree costs
+   43 ms at 1 MB wherever the edit lands, because of tree-sitter's first-leaf reuse rule and this
+   grammar's external scanner. One idle reparse after each full parse (41 ms at 1 MB) brings the
+   first keystroke to 4.8 ms. The earlier "0.81 / 42.4 ms edit" and "unchanged reparse scales with
+   size" figures measured that first reparse every time. Cold in Chromium: lezer loads in
    3.9 ms and first-parses `AGENTS.md` in 12.5 ms; tree-sitter needs 12.4 ms for the runtime and
    two grammars, 40.5 ms for the first parse, 20.1 ms warm. A worker round trip adds 0.1 ms to
    lezer and flattening adds 6 ms to tree-sitter. Memory per parsed `AGENTS.md`: lezer about
@@ -120,9 +128,10 @@ reference links whose label has no definition, which neither tree-sitter nor lez
 3. **First frame.** lezer can decorate the visible rows inside `setText`: 0.4 ms to parse to the
    viewport at any size, synchronously, then finish in idle slices, as CodeMirror does. tree-sitter
    in the worker cannot by construction. On the main thread (a second wasm instance, loaded ahead of
-   time) it could, but its block grammar has no stop position, so the first frame pays the
-   whole-document block parse: 7.4 ms at 45 KB, 133 ms at 1 MB, unless the host parses a prefix
-   first. Plan 177's frame-count scenario does not exist yet; Phase 2 adds it.
+   time) it can: its block grammar has no stop position, but a 60-row prefix parses in 1.0 ms at
+   any size, its visible inline nodes in 1.2 ms, and the rest arrives as an append edit (128 ms at
+   1 MB, same tree as a fresh parse). lezer's first frame is 0.48 ms. Plan 177's frame-count
+   scenario does not exist yet; Phase 2 adds it.
 4. **What each tree carries** against remark: see the feature table in the measurements doc. In
    short, neither carries list tightness (derivable from blank lines between items), neither checks
    references, neither has footnotes; tree-sitter has frontmatter and a `$x$` math node chat does
@@ -140,8 +149,10 @@ reference links whose label has no definition, which neither tree-sitter nor lez
    while resolving brackets, which a fork can take from the previous parse.
 6. **The split grammar.** Keep one inline parse per paragraph. A combined inline parse leaks
    constructs across blocks (a code span across two list items, strikethrough across paragraphs)
-   and is slower: 28 ms against 19 ms at 45 KB, 1.86 s against 0.42 s at 1 MB. Each paragraph parse
-   costs about 35 µs, so the cap buys nothing.
+   and is slower: 28 ms against 19 ms at 45 KB, 1.86 s against 0.42 s at 1 MB, because
+   tree-sitter's lexer scans the included-range list from the start at every token. Each paragraph
+   parse costs about 17 µs when its input is bounded to the paragraph (35 µs when each call copies
+   the next 10 KB of the document), so the cap buys nothing.
 7. **Streaming**, 24-character chunks, per chunk: remark session 0.23 ms mean on a real 8.6 KB
    message and 0.66 ms on 45 KB; lezer incremental 0.019 and 0.048 ms; tree-sitter incremental 0.26
    and 0.085 ms. Mid-stream all three follow CommonMark: an unterminated `**`, `*`, `` ` `` or `~~`
@@ -167,8 +178,9 @@ reference links whose label has no definition, which neither tree-sitter nor lez
   CJK emphasis stay open for both.
 - **tree-sitter, if the owner keeps it** (question 1 b or c): Phase 0 plus a purpose-named
   `markdown-preview.scm` whose matches keep their grouping, refcheck on the main thread, and a
-  grammar fork for the fixable 34. It stays at most ~96% and a keystroke at 1 MB costs ~42 ms in the
-  worker.
+  grammar fork for the fixable 34. It stays at most ~96%. With Phase 0's worker fixes a keystroke
+  at 1 MB costs about 2.4 ms and the first frame 2.2 ms; the worker today costs 12 ms per
+  keystroke at 45 KB and 34–77 ms at 1 MB.
 
 Decided 2026-09-26: research recommendation — the Rust parsers are closed (none incremental;
 comrak's AST crossing costs more than a JavaScript parse; no maintained wasm build exposes
@@ -178,11 +190,17 @@ grammar refresh.
 
 ## Proposed phases
 
-0. **tree-sitter repairs, any answer** (S; Editor `tree-sitter-languages/src/queries/markdown-injections.scm`,
-   `tree-sitter/src/treeSitter/treeSitter.worker.ts`). Inject `markdown_inline` into
-   `pipe_table_cell`; exempt `markdown_inline` layers from `MAX_INJECTION_LAYERS` (35 µs each) or
+0. **tree-sitter repairs, any answer** (M; Editor `tree-sitter-languages/src/queries/markdown-injections.scm`,
+   `tree-sitter/src/treeSitter/treeSitter.worker.ts`, `source.ts`). Inject `markdown_inline` into
+   `pipe_table_cell`; exempt `markdown_inline` layers from `MAX_INJECTION_LAYERS` (17 µs each) or
    count the cap per parent language; honour `injection.include-children` by excluding named
-   children from injection ranges. Test in `tree-sitter/test/` with a 300-paragraph document and a
+   children from injection ranges. The worker's markdown keystroke costs 12 ms at 45 KB, of which
+   the block reparse is 0.3 ms ([calibration](../docs/markdown-parser/tree-sitter-calibration.md) §4).
+   Fix the rest: discover injections and reparse layers only where the root tree's changed ranges
+   and the edit reach, carrying every other layer untouched, instead of passing the whole document
+   as the changed range; bound each input read to the injected range's end (halves an inline
+   parse); run one reparse in idle time after every full parse so the first keystroke at 1 MB
+   costs 4.8 ms, not 46 ms. Test in `tree-sitter/test/` with a 300-paragraph document and a
    table; a Platform scenario `editor-markdown-preview-long` (the research drive, re-created: a
    300-paragraph file and a table, screenshots at paragraph 145, paragraph 300 and the table) shows
    paragraph 300 and a table cell rendered.
@@ -218,10 +236,12 @@ Chat: no phase while question 2 stands at (a).
    operation; tree-sitter keeps colours, folds and fence injections. (b) tree-sitter in the worker
    with a preview query, grouped matches, refcheck and a C grammar fork. (c) tree-sitter on the
    main thread as a second wasm instance, with the same query and fork.
-   **Recommendation:** (a) — the only candidate that decorates the first frame at every size
-   (0.4 ms to the viewport against a 7–133 ms whole-document block parse), 97.9% against 93.3% on
-   the spec, 0.09–0.8 ms per edit against 0.8–42 ms, and its failures are TypeScript; the price is
-   20 KB gzip and a second markdown tree.
+   **Recommendation:** (a) — 97.9% against 93.3% on the spec, its failures are TypeScript where
+   11 of tree-sitter's are structural, it has the marker nodes live preview hides, and it stays
+   3–4× faster (first frame 0.48 against 2.2 ms, keystroke at 1 MB 0.65 against 2.4 ms); the price
+   is 20 KB gzip and a second markdown tree. Calibration changed the speed facts: with a careful
+   integration tree-sitter is fast enough for the main thread, so (c) is viable on speed and the
+   choice rests on correctness and tree shape.
    Owner, 2026-09-26: not decided yet. The owner reviews the measurements first; Phase 0 (the
    tree-sitter repairs every option needs) may proceed meanwhile.
 2. **Chat.** The rule says remark leaves only for a candidate close to micromark with remark's
