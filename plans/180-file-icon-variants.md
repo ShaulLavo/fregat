@@ -36,7 +36,13 @@ Phases 1–4, 2026-09-26 (wave 2, lane T):
 - `/dev/icons` shows every rule with its hue and match count. Scenario `file-icon-hues` captures
   tabs, quick open, git changes and that sheet in light and dark. The tree keeps its own colours
   until 178 icons; `tree-parity` shows zero drift.
-- Phase 5 follows as its own PR, with Catppuccin glyphs (Q3 c).
+- Phase 5 (Q3 c), 2026-09-26: 26 Catppuccin icons (`@iconify-json/catppuccin@1.2.17`, MIT) fill the
+  types the pack has no glyph for: audio, video, PDF, Java, Kotlin, Scala, Groovy, PHP, Lua, LaTeX,
+  Dart, R, Julia, Perl, Clojure, Elixir, Haskell, Erlang, F#, Makefile, CMake, proto, Bazel,
+  shaders, certificates, keys. `CATPPUCCIN_HUES` maps each Macchiato colour onto our hue tokens, so
+  they take the pack's light and dark values; Catppuccin's text colour (their outlines) maps to
+  `--file-icon-neutral`, now the pack's neutral line colour (gray 800 light, 400 dark) instead of an
+  alias of gray. Existing icons and hue values are unchanged.
 
 ## Question
 
