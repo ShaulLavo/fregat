@@ -1,0 +1,14 @@
+{
+  "engine": "bun",
+  "version": "1.4.0",
+  "oneByteMaxUnits": 2147483647,
+  "oneByteAtBound": true,
+  "oneByteMaxMiB": 2047.9999990463257,
+  "twoByteMaxUnits": 1073741824,
+  "twoByteAtBound": true,
+  "decodeAtCeilingOk": true,
+  "decodeOverCeilingOk": null,
+  "json": { "envelopeUnits": 187, "maxContentUnits": 2147483460 },
+  "heap": { "chunkMiB": 64, "heldMiB": 3072, "capMiB": 3072, "failure": null },
+  "ms": 3263
+}

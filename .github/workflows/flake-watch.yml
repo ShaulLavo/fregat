@@ -1,0 +1,108 @@
+name: Flake watch
+
+# PR CI runs each suite once with Vitest `retry` at 0, so a flaky test shows up as
+# a red run on whichever branch drew it. This runs the suites five times a night
+# on main and reports how often each test failed, so a flake is counted before it
+# spreads across branches. It never gates a PR.
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: flake-watch
+  cancel-in-progress: false
+
+jobs:
+  repeat:
+    name: Flake watch (${{ matrix.suite.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - {
+              name: web 1/4,
+              dir: apps/web,
+              run: 'bun --bun vitest run --project node --project dom --shard=1/4',
+            }
+          - {
+              name: web 2/4,
+              dir: apps/web,
+              run: 'bun --bun vitest run --project node --project dom --shard=2/4',
+            }
+          - {
+              name: web 3/4,
+              dir: apps/web,
+              run: 'bun --bun vitest run --project node --project dom --shard=3/4',
+            }
+          - {
+              name: web 4/4,
+              dir: apps/web,
+              run: 'bun --bun vitest run --project node --project dom --shard=4/4',
+            }
+          - { name: server, dir: apps/server, run: 'bun --bun vitest run' }
+          - { name: tui, dir: apps/tui, run: 'bun --bun vitest run' }
+          # Plain Node, not `--bun`: Vitest browser orchestration breaks under Bun.
+          - {
+              name: web browser,
+              dir: apps/web,
+              run: 'node_modules/.bin/vitest run --config vitest.browser.config.ts',
+              browser: true,
+            }
+          - {
+              name: tree browser,
+              dir: packages/tree,
+              run: 'node_modules/.bin/vitest run --project browser',
+              browser: true,
+            }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Checkout pinned alignment reference
+        uses: actions/checkout@v4
+        with:
+          repository: pingdotgg/t3code
+          ref: 7445aa733ada33e45289e5aa5055f79142556513
+          path: references/t3code
+          persist-credentials: false
+
+      - name: Cache Playwright browsers
+        if: ${{ matrix.suite.browser }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('bun.lock') }}
+
+      - name: Install Chromium
+        if: ${{ matrix.suite.browser }}
+        run: apps/web/node_modules/.bin/playwright install --with-deps chromium
+
+      # Every run is kept, pass or fail; the summary step turns them into counts.
+      # Below the job's limit, so a hung run still leaves time to count the finished ones.
+      - name: Run five times
+        timeout-minutes: 50
+        working-directory: ${{ matrix.suite.dir }}
+        env:
+          RUN: ${{ matrix.suite.run }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/flake"
+          for run in 1 2 3 4 5; do
+            echo "::group::Run $run"
+            $RUN --retry=0 --reporter=default --reporter=json \
+              --outputFile.json="$RUNNER_TEMP/flake/run-$run.json" || true
+            echo "::endgroup::"
+          done
+
+      - name: Summarize failures
+        if: ${{ !cancelled() }}
+        run: >-
+          bun scripts/flake-summary.ts "${{ matrix.suite.name }}"
+          "$RUNNER_TEMP"/flake/run-1.json "$RUNNER_TEMP"/flake/run-2.json
+          "$RUNNER_TEMP"/flake/run-3.json "$RUNNER_TEMP"/flake/run-4.json
+          "$RUNNER_TEMP"/flake/run-5.json

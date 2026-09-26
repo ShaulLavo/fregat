@@ -133,6 +133,7 @@ EXT-14–18 come from the [2026-09-24 upstream delta](delta-2026-09-24.md).
 
 ### EXT-06: Add input/completion notifications and sound behavior
 
+- **Closed 2026-09-25.** Decided 2026-09-25: owner — close on the existing `session-notifications` scenario; OS popup and sound, desktop bridges and badges carry on under EXT-09.
 - Priority P2; confidence HIGH; effort M; risk MED, duplicate or misrouted notifications.
 - Upstream `apps/web/src/components/ThreadNotificationCoordinator.tsx:125-193` suppresses initial
   snapshots and archived threads, distinguishes input/completion, respects focus, plays sound,
@@ -323,6 +324,7 @@ logsAfterDays|browserArtifactsAfterDays|worktreeOnDelete` across server/contract
 
 ### EXT-16: Balance new sessions across connected machines
 
+- Decided 2026-09-25: owner — settings scope `application`; the setting picks where execution happens, which the settings scope rule puts at `application` or `machine`.
 - Priority P3; confidence HIGH for the upstream feature; effort M; risk MED.
 - Missed at pin; see [delta record](delta-2026-09-24.md). Pinned `docs/user/remote-access.md:65`
   ("Balance new threads across machines"): off by default; per-machine Prefer, Normal, Less
