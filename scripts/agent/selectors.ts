@@ -995,6 +995,18 @@ export const selectors = {
   historyRowSelector: '[data-history-commit]',
   logRowSelector: '[data-log-row-summary]',
   /** Every rendered assistant answer in the chat timeline, for page-side frame samplers. */
+  conversationTitle: (page: Page, title: string) =>
+    page
+      .getByRole('navigation', { name: 'Session', exact: true })
+      .getByRole('heading', { name: title, exact: true }),
+  conversationHistory: (page: Page) =>
+    page.getByRole('button', { name: 'Conversation history', exact: true }),
+  conversationChoice: (page: Page, title: string) =>
+    page.getByRole('menuitem').filter({ hasText: title }),
+  conversationTitleSelector:
+    'nav[aria-label="Session"] h1, [data-workbench-tool-pane-header] > div[title] > .truncate',
+  conversationLoadingSelector:
+    '[data-slot="tool-pane-header"] [data-slot="spinner"][aria-label="Loading conversation"]',
   chatMarkdownSelector: '[role="log"][aria-label="Messages"] [data-chat-markdown]',
   chatCodeBlockSelector: '[data-markdown="code-block"]',
   logCopyButtons: (page: Page) => page.getByRole('button', { name: 'Copy log event', exact: true }),

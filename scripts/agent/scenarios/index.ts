@@ -1,3 +1,4 @@
+import { sessionNoFlicker } from './session-no-flicker'
 import { textFieldFkeys } from './text-field-fkeys'
 import { settingsRoutePreparation } from './settings-route-preparation'
 import { settingsModuleFailure } from './settings-module-failure'
@@ -346,6 +347,7 @@ export const scenarios: readonly Scenario[] = [
   chatStashContext,
   chatStream,
   chatHistoryPages,
+  sessionNoFlicker,
   chatQueue,
   providerModelOptions,
   draftRecovery,

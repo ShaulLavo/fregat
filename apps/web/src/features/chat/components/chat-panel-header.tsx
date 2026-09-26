@@ -1,3 +1,4 @@
+import { Spinner } from '@workspace/ui/components/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import type { SessionId } from '@workspace/contracts'
 import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
@@ -29,10 +30,12 @@ export function ChatPanelHeader({
   onSelectSession,
   session,
   sessions,
+  switching = false,
 }: {
   activeSessionId: SessionId | null
   /** The open conversation; null on a draft, which has no session to act on. */
   session: SessionRailItem | null
+  switching?: boolean
   creating: boolean
   disabled: boolean
   onNewChat: () => void
@@ -47,6 +50,7 @@ export function ChatPanelHeader({
     <ToolPaneHeader
       actions={
         <>
+          {switching ? <Spinner size='xs' label='Loading conversation' /> : null}
           <Tooltip>
             <TooltipTrigger
               render={
@@ -132,7 +136,7 @@ export function ChatPanelHeader({
             session={session}
           />
         ) : (
-          activeSession?.title
+          (session?.title ?? activeSession?.title)
         )
       }
       tab='chat'

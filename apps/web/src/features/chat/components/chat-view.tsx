@@ -40,10 +40,12 @@ import { carryOnPayload, tryAgainPayload } from '@/features/chat/utils/turn-retr
 
 export function ChatView({
   activeSessionId,
+  switching = false,
   transport,
   onSessionCreated,
   rootPath,
 }: {
+  switching?: boolean
   activeSessionId: SessionId | null
   transport: ChatTransport
   /**
@@ -74,16 +76,29 @@ export function ChatView({
       activeSessionId !== null && state.sessionDetailSequenceById[activeSessionId] !== undefined,
   )
   const optimisticMessages = useOptimisticMessages(transport.environmentId, activeSessionId)
-  const [sendError, setSendError] = useState<string | null>(null)
+  const sessionKey = `${transport.environmentId}:${activeSessionId}`
+  const [sendFailure, setSendFailure] = useState<{ sessionKey: string; message: string } | null>(
+    null,
+  )
+  const sendError = sendFailure?.sessionKey === sessionKey ? sendFailure.message : null
+  const setSendError = (message: string | null) =>
+    setSendFailure(message ? { sessionKey, message } : null)
   const rewind = useCheckpointRewind(transport, activeSessionId)
   const revertingCheckpoint = rewind.isPending
   const [pendingCheckpoint, setPendingCheckpoint] = useState<{
     turnCount: number
     messageId: string
   } | null>(null)
+  const [previousSessionKey, setPreviousSessionKey] = useState(sessionKey)
+  if (previousSessionKey !== sessionKey) {
+    setPreviousSessionKey(sessionKey)
+    setSendFailure(null)
+    setPendingCheckpoint(null)
+  }
   const busy = isChatSessionBusy(session)
   const connection = useComposerConnection(transport, activeSessionId)
-  const disabledReason = connection.kind === 'live' ? null : connection.label
+  let disabledReason = connection.kind === 'live' ? null : connection.label
+  if (switching) disabledReason = 'Opening conversation…'
   const composer = useSessionComposer({
     transport,
     session,
@@ -193,7 +208,7 @@ export function ChatView({
               revertToCheckpoint={handleRevertToCheckpoint}
             >
               <MessagesTimeline
-                checkpointRevertPending={revertingCheckpoint || !currentDetail}
+                checkpointRevertPending={switching || revertingCheckpoint || !currentDetail}
                 optimisticMessages={optimisticMessages}
                 session={session}
               />
@@ -248,6 +263,7 @@ export function ChatView({
               onRestore={composer.restore}
             />
             <ChatInput
+              key={sessionKey}
               busy={busy}
               correctionDisabledReason={correctionUnavailableReason(session)}
               disabledReason={disabledReason}
@@ -258,6 +274,7 @@ export function ChatView({
                 session,
               })}
               disabled={
+                switching ||
                 sending ||
                 interrupting ||
                 revertingCheckpoint ||
