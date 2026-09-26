@@ -14,7 +14,10 @@ state, channels, `uses`; occurrence highlight, bracket match and document links 
 [#55](https://github.com/ShaulLavo/singapore/pull/55) (E026 catalog, contributed commands under the plugin's
 name; client-core builds its editor table from the catalog). Phase 4 leaves Platform's runtime command
 segment for contributed commands (palette, keybinding table, recorder) to phase 6, when Platform first
-attaches a `createPlugin` plugin.
+attaches a `createPlugin` plugin. Phase 5 done the same day ([#56](https://github.com/ShaulLavo/singapore/pull/56)): key
+participant, text gate, cursor style and per-caret `applyEdits` on the scope; the E028 modal proof
+passes on both input routes with IME, readonly and two views; verdict go
+([findings](../../Editor/docs/architecture/modal-input-findings.md)).
 Requested: 2026-09-16. Owners: Fregat and Singapore.
 
 This is a cross-repository plan, not an implementation or a settled API signature.
@@ -288,7 +291,7 @@ carries its own evidence. Sizes: S about a day, M a lane of a few days, L a week
    `createPlugin`. Platform gains a runtime command segment: palette, keybinding table, recorder,
    enablement and focus target read plugin declarations
    (`packages/client-core/src/commands/`, `apps/web/src/keymap/`). Owner: Editor then Platform.
-5. **Modal input (M).** E028 on `createPlugin`: key participant, text gate, cursor style and the
+5. **Done (singapore#56).** **Modal input (M).** E028 on `createPlugin`: key participant, text gate, cursor style and the
    `applyEdits` selection list as scope methods, proved in a real browser on both input routes, two
    splits, readonly and IME. Applies owner question 2's key precedence. Owner: Editor.
 6. **Fregat attachment (M).** `editor.tsx` takes plugin values; the first-party set becomes one list of

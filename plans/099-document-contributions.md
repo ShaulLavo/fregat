@@ -570,9 +570,9 @@ common reader advances.
 
 Keep their separate workers. Delete the `shared-utf16` text payload, encode/decode helpers, source
 capability selection, and obsolete transport-only tests in this same unit. Decided 2026-09-25: owner — that deletion
-is queued ahead of this plan as Editor
-[E057](../../Editor/plans/e057-delete-sab-transport.md); if E057 has landed, this unit has no SAB
-work left. Carry forward exact
+landed as Editor E057 on 2026-09-26 ([singapore#52](https://github.com/ShaulLavo/singapore/pull/52),
+record in [sab-transport-2026-09-12.md](../../Editor/docs/performance/sab-transport-2026-09-12.md)),
+so this unit has no SAB work left. Carry forward exact
 UTF-16, chunk identity, and retention coverage against strings. Preserve atomic cancellation and
 packed-result transfer behavior; neither is shared document storage.
 

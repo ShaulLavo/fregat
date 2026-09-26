@@ -4,7 +4,7 @@ description: Installs the toolchain, provisions the sibling @singapore-editor ed
 inputs:
   editor-ref:
     description: Commit of the ShaulLavo/singapore checkout the @singapore-editor/* links resolve to. Pinned so an Editor merge cannot redden every Platform PR at once; a Platform change that needs newer Editor code bumps it in the same commit.
-    default: 2175f6aaec4439a47b78e9f807937414f831c880
+    default: b304a8da7760842c62cc68871f6663ed4e2a2720
   ghostty-ref:
     description: Git ref of the ShaulLavo/ghostty-webgpu checkout the ghostty-webgpu link resolves to.
     default: c490d8625b913853f062df9051a92295963abff5
