@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { expect, test } from '../../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../../test/render'
+import { createTestQueryClient, renderWithLoadedDialogs } from '../../../../test/render'
 import { createTestApplicationRuntime } from '../../../../test/factories/application-runtime'
 import { TestEditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { CommandPalette } from '@/components/command-palette'
@@ -16,7 +16,7 @@ test('code theme sample follows highlighted rows and labels a retained sample af
   const before = await fetchSettings(undefined, getClient())
   const queryClient = createTestQueryClient()
   queryClient.setQueryData(settingsKeys.document(), before)
-  renderWithProviders(
+  await renderWithLoadedDialogs(
     <TestEditorStateProvider>
       <CommandPalette />
     </TestEditorStateProvider>,

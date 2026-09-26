@@ -10,7 +10,7 @@ import { writeRootFolderCache } from '@/features/workspace/state/cache'
 import { useCommand } from '@/keymap/hooks/use-command'
 import { TestCommandProvider } from '../../../../test/factories/command-runtime'
 import { expect, test } from '../../../../test/fixtures'
-import { renderWithProviders } from '../../../../test/render'
+import { renderWithLoadedDialogs } from '../../../../test/render'
 
 test.beforeEach(() => {
   writeRootFolderCache(testScopedStorage, null)
@@ -22,7 +22,7 @@ test.afterEach(() => {
 
 test('a sub-picker opens on an empty input under its own scope chip', async () => {
   const user = userEvent.setup()
-  renderPalette()
+  await renderPalette()
 
   await openColorThemePicker(user)
 
@@ -32,7 +32,7 @@ test('a sub-picker opens on an empty input under its own scope chip', async () =
 
 test('typing filters the sub-picker, and deleting it back to empty stays inside', async () => {
   const user = userEvent.setup()
-  renderPalette()
+  await renderPalette()
 
   await openColorThemePicker(user)
   const input = await themeInput()
@@ -51,7 +51,7 @@ test('typing filters the sub-picker, and deleting it back to empty stays inside'
 
 test('backspace on the empty input pops back to the command list', async () => {
   const user = userEvent.setup()
-  renderPalette()
+  await renderPalette()
 
   await openColorThemePicker(user)
   await user.type(await themeInput(), '{Backspace}')
@@ -69,8 +69,8 @@ function themeInput() {
   return screen.findByPlaceholderText(/Select a code theme/)
 }
 
-function renderPalette() {
-  renderWithProviders(
+async function renderPalette() {
+  await renderWithLoadedDialogs(
     <EditorStateProvider>
       <PaletteRuntime />
     </EditorStateProvider>,
