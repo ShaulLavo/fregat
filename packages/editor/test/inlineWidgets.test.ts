@@ -241,6 +241,7 @@ describe('inline replacements that render their own DOM', () => {
     const mount = createMount()
     view = mountView(container, `${IMAGE_LINE}\nplain`)
     applyReplacements(view, `${IMAGE_LINE}\nplain`, [imageSpec(mount)])
+    view.focusInput()
     // Past the replacement rather than inside it, which would reveal the source text and unmount it.
     view.setSelection(IMAGE_LINE.length, IMAGE_LINE.length)
 

@@ -9,8 +9,26 @@ export type DisplayProjectionConfig = {
   readonly inlineMap: InlineMap | null
   readonly injectedTextRows: readonly InjectedTextRow[]
   readonly wrapColumn: number | null
+  /** Where a wrapped row may end. Defaults to `'character'`. */
+  readonly wrapBreak?: WrapBreak
+  /**
+   * Wrap by measured width instead of columns, for a proportional face. `wrapColumn` still says wrap
+   * is on, and bounds how much of a line one uniform row may hold.
+   */
+  readonly wrapAdvance?: WrapAdvance | null
   readonly tabSize: number
 }
+
+/** A row's width in CSS pixels, safety margin already taken off, and each code point's advance. */
+export type WrapAdvance = {
+  readonly width: number
+  readonly advance: (codePoint: number) => number
+  /** The table `advance` reads, so a face change is visible by identity. */
+  readonly glyphs?: object
+}
+
+/** `'character'` ends a row at the column that fills it; `'word'` at the last word boundary. */
+export type WrapBreak = 'character' | 'word'
 
 export type DisplayProjectionInput = DisplayProjectionConfig & {
   readonly textSnapshot: TextSnapshot
@@ -60,7 +78,8 @@ export type WrappedEntry = {
   readonly rows: number
   readonly prefixes: Uint32Array
   readonly width: number
-  readonly tabs: { readonly offsets: Uint32Array; readonly ends: Uint32Array } | null
+  /** Explicit row ends for the lines whose rows are not `width` apart: tabs, or word breaks. */
+  readonly breaks: { readonly offsets: Uint32Array; readonly ends: Uint32Array } | null
 }
 
 export type ProjectionEntry =

@@ -548,3 +548,15 @@
     var(--editor-selection-background, rgba(56, 189, 248, 0.35))
   );
 }
+
+/* A modal editor's caret: the block covers one cell, the underline sits under it. */
+.editor-virtualized[data-editor-cursor-style='block'] .editor-virtualized-caret {
+  opacity: 0.6;
+  width: 1ch;
+}
+
+.editor-virtualized[data-editor-cursor-style='underline'] .editor-virtualized-caret {
+  height: 2px !important;
+  margin-top: calc(var(--editor-row-height) - 2px);
+  width: 1ch;
+}

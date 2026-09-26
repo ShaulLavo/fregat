@@ -8,6 +8,9 @@
 - Dependencies: [E036](../docs/display/e036-monaco-geometry-comparison.md), [E001](../examples/stress/README.md)
 - Inspected baseline: `40d841583659d2889fc03f61979e607f56df4c86`, 2026-09-24.
 
+**Proportional part implemented 2026-09-26** (wave 2 lane E2, branch `w2/e2-e052`), see
+[As landed](#as-landed-2026-09-26). The compact blank lines absorbed from E022 remain proposed.
+
 Decided 2026-09-25: owner — E052 absorbs E022 (compact blank lines): both are variable row geometry, and they share
 the fixed-stride assumption in `virtualizedTextViewLayout.ts`. E022's plan is kept whole in
 [Compact blank lines](#compact-blank-lines-absorbed-from-e022) below; its baseline was
@@ -129,6 +132,52 @@ only DOM line breaking (VS Code's approach) is.
   The E036 face observer already signals it; wire both to the same signal.
 - **Stop condition:** if step 1 shows no margin under 2 px per line prevents overflow, record a
   no-go for the table and leave proportional wrap on DOM measurement of mounted rows only.
+
+## As landed (2026-09-26)
+
+Drift since the baseline: word-boundary wrap landed first (`wordWrapBreak: 'word'`, Plan 171 phase 2),
+so the "no word-boundary wrapping" limit is gone and the measured path serves both break modes.
+
+- **Step 1, accuracy gate** (`test/glyphAdvances.browser.test.ts`, Chromium, 13px, 2,000 real lines of
+  this repo's docs and source plus CJK and Hangul prose): layout ran wider than the summed table by at
+  most 0.53 px per line in Noto Sans, 0.02 px in Liberation Sans and 0.63 px in Noto Sans CJK JP, and
+  narrower by at most 6.2, 5.8 and 9.4 px. A constant 1 px margin (`PROPORTIONAL_WRAP_MARGIN_PX`) keeps
+  overflow at zero, well under the 2 px stop condition; the per-glyph margin was not needed.
+- **Step 2, cost gate** (`bun run bench:transforms`, 500k lines with folds, stand-in advance table,
+  shared machine at load 17–29): column wrap 82–118 ms, word wrap 161–165 ms, measured wrap
+  197–208 ms, under the 3× limit. No DOM line breaking was prototyped.
+- **Step 3, wrap path:** `glyphAdvances.ts` reads advances from a 2D canvas set to the scroll element's
+  face (BMP in a lazily filled `Float32Array`, astral in a `Map`), cached per face and dropped with the
+  metrics cache. The view holds them only while the face is not monospace (`view.glyphs`) and hands the
+  projection a `wrapAdvance` (row width in px minus the margin, plus the table). The projection
+  summaries and the block scan share one breaker (`wordWrap.ts`) for word breaks and measured widths;
+  plain monospace column wrap keeps its own loop. Rows that break are stored as explicit ends, the
+  `measured` shape the design proposed being the existing `indexed` one.
+- **Step 4, spacer and extent:** `proportionalRows.ts` keeps pixel prefixes every 512 code units per
+  long row. The left spacer, the window a scroll offset mounts (`proportionalChunkWindow`) and the
+  content-width scan read them when `view.glyphs` is set. Rows holding rendered widgets use the same
+  pixel window, adjusting both its bounds and the spacer for each measured widget width.
+- **Step 5, monospace control:** `bench:virtualization` A/B against the word-wrap branch, three
+  alternating rounds at load 17: wrap-enable 35.6–38.7 ms before, 35.4–39.4 after; wrap-resize
+  34.4–42.5 before, 35.5–40.6 after. The E002 input-latency gate and the first-paint matrix were
+  **not run**: they need a quiet machine, and eight lanes shared it. The monospace path is unchanged in
+  code: every new branch is behind `view.glyphs`, which is null for a monospace face.
+- **Tests:** `test/proportionalWrap.browser.test.ts` (character and word wrap fill each row to the edge
+  without passing it; a face swap rewraps), `test/proportionalRows.browser.test.ts` (extent reaches the
+  widest line within two advances; the text under the viewport after scrolling a 20,000-character row
+  is what a full-width layout puts there). Four of the five fail on the column path.
+- **Not done:** Firefox and WebKit runs of the new browser tests; kerning or ligature shaping beyond
+  the margin.
+
+### PR #46 review fixes (2026-09-26)
+
+- Widget rows now choose their horizontal window from measured text advances, with measured widget
+  widths replacing placeholder advances in both the window lookup and the left spacer.
+- Applying changed font metrics resets the grow-only content-width scan even with wrapping disabled.
+- `proportionalRows.browser.test.ts` reproduces the blank viewport on a 20,000-character proportional
+  row with 40px and 800px widgets, and the stale extent after a monospace-to-proportional face swap.
+  Both fail before these fixes and pass after. The reverse face swap is covered too. The face test
+  uses `VirtualizedTextView` directly because the full Editor can refresh projection state separately.
 
 ## Compact blank lines (absorbed from E022)
 

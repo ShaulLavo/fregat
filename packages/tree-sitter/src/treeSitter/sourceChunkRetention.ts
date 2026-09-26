@@ -54,7 +54,7 @@ export class TreeSitterSourceChunkRetention {
 
     const sent = this.sourceChunkLengthsForDocument(request.documentId)
     for (const chunk of request.source.chunks) {
-      sent.set(chunk.chunkId, chunk.kind === 'string' ? chunk.text.length : chunk.length)
+      sent.set(chunk.chunkId, chunk.text.length)
     }
   }
 

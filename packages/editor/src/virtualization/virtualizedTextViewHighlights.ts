@@ -13,6 +13,7 @@ import {
   editorPerformanceDiagnosticsEnabled,
   recordEditorPerformanceDiagnostic,
 } from '../editor/performanceDiagnostics'
+import { scheduleFrame } from '../editor/scheduleFrame'
 import { tokenProjectionLiveRangeStatus } from '../editor/tokenProjection'
 import { clamp, normalizeTokenStyle, serializeTokenStyle } from '../style-utils'
 import { lowerBound, upperBound } from './rowHeightIndex'
@@ -248,7 +249,7 @@ export function setRangeHighlight(
 ): void {
   validateRangeHighlightStyle(style)
   if (ranges.length === 0) {
-    clearRangeHighlight(view, name)
+    emptyRangeHighlight(view, name)
     return
   }
 
@@ -265,6 +266,23 @@ export function setRangeHighlight(
   group.style = style
   group.signature = staleRangeHighlightSignature()
   if (style.overlay || previousOverlay) {
+    refreshHighlightOverlayMask(view)
+    return
+  }
+  prepareRangeHighlightTwins(view, group)
+  renderRangeHighlight(view, name)
+  rebuildStyleRules(view)
+}
+
+// An emptied group keeps its rule, so only a style change rewrites the view's <style>. Occurrence
+// highlights empty and refill every few keys; dropping the rule restyled every mounted row each time.
+function emptyRangeHighlight(view: VirtualizedTextViewInternal, name: string): void {
+  const group = view.rangeHighlightGroups.get(name)
+  if (!group || group.ranges.length === 0) return
+
+  group.ranges = []
+  group.signature = staleRangeHighlightSignature()
+  if (group.style.overlay) {
     refreshHighlightOverlayMask(view)
     return
   }
@@ -317,6 +335,41 @@ export function clearRangeHighlight(view: VirtualizedTextViewInternal, name: str
 }
 
 function renderCaret(view: VirtualizedTextViewInternal): void {
+  if (view.selections.length > 0 && !viewHoldsFocus(view)) {
+    deferCaret(view)
+    return
+  }
+  cancelDeferredCaret(view)
+  renderCaretNow(view)
+}
+
+// Caret geometry reads row layout. An editor without focus positions its caret in the next frame,
+// after every write of the open or render that asked for it, so opening one forces no layout.
+function deferCaret(view: VirtualizedTextViewInternal): void {
+  if (view.deferredCaret) return
+  view.deferredCaret = scheduleFrame(() => {
+    view.deferredCaret = null
+    if (view.provisional) return
+    renderCaretNow(view)
+  })
+}
+
+export function cancelDeferredCaret(view: VirtualizedTextViewInternal): void {
+  view.deferredCaret?.cancel()
+  view.deferredCaret = null
+}
+
+export function flushDeferredCaret(view: VirtualizedTextViewInternal): void {
+  if (!view.deferredCaret) return
+  cancelDeferredCaret(view)
+  renderCaretNow(view)
+}
+
+function viewHoldsFocus(view: VirtualizedTextViewInternal): boolean {
+  return view.inputElement.matches(':focus')
+}
+
+function renderCaretNow(view: VirtualizedTextViewInternal): void {
   const selections = view.selections
   if (selections.length === 0) {
     hideCaretElement(view.caretElement)

@@ -188,6 +188,10 @@ export type InputSelectionControllerOptions = {
   getEditorTheme(): EditorTheme | null
   getTextSnapshot(): TextReadSnapshot
   canEditDocument(): boolean
+  /** False while a plugin's text gate refuses typed, composed, pasted or dropped text. */
+  acceptsText(): boolean
+  /** Offers a key to plugin key participants first; true when one took it. */
+  offerKey(event: KeyboardEvent): boolean
   beginPointerJump?(): void
   finishPointerJump?(): void
   cancelPointerJump?(): void
@@ -327,6 +331,7 @@ export class InputSelectionController {
     el.addEventListener('drop', this.handleDrop)
     el.addEventListener('paste', this.handlePaste)
     el.addEventListener('keydown', this.holdKeyForComposition, { capture: true })
+    el.addEventListener('keydown', this.offerKeyToParticipants, { capture: true })
     el.addEventListener('keydown', this.handleKeyDown)
     el.addEventListener('compositionstart', this.handleCompositionStart)
     el.addEventListener('compositionupdate', this.handleCompositionUpdate)
@@ -348,6 +353,7 @@ export class InputSelectionController {
     el.removeEventListener('drop', this.handleDrop)
     el.removeEventListener('paste', this.handlePaste)
     el.removeEventListener('keydown', this.holdKeyForComposition, { capture: true })
+    el.removeEventListener('keydown', this.offerKeyToParticipants, { capture: true })
     el.removeEventListener('keydown', this.handleKeyDown)
     el.removeEventListener('compositionstart', this.handleCompositionStart)
     el.removeEventListener('compositionupdate', this.handleCompositionUpdate)
@@ -1509,7 +1515,7 @@ export class InputSelectionController {
   applyFindEdits(
     edits: readonly TextEdit[],
     timingName: string,
-    selection?: EditorSelectionRange,
+    selection?: EditorSelectionRange | readonly EditorSelectionRange[],
   ): void {
     this.options.runInOperation(() => {
       const session = this.session
@@ -1518,7 +1524,10 @@ export class InputSelectionController {
       if (edits.length === 0) return
 
       const start = nowMs()
-      const change = session.applyEdits(edits, { selection })
+      const change = session.applyEdits(
+        edits,
+        isSelectionList(selection) ? { selections: selection } : { selection },
+      )
       this.syncSessionSelectionHighlight()
       this.markSessionSelectionForNextInput()
       this.applyChange(change, timingName, start, {
@@ -1545,7 +1554,7 @@ export class InputSelectionController {
     })
   }
 
-  syncDomSelection(): void {
+  syncDomSelection(options: { readonly notify?: boolean } = {}): void {
     const session = this.session
     if (!session) return
 
@@ -1559,19 +1568,19 @@ export class InputSelectionController {
 
     if (this.hasFocusedExternalElement()) {
       this.syncSessionSelectionHighlight()
-      this.options.notifyViewContributions('selection', null)
+      this.notifySelection(options.notify ?? true)
       return
     }
 
     if (this.isInputFocused()) {
       this.syncSessionSelectionHighlight()
-      this.options.notifyViewContributions('selection', null)
+      this.notifySelection(options.notify ?? true)
       return
     }
 
     if (this.options.selectionSyncMode === 'none') {
       this.syncSessionSelectionHighlight()
-      this.options.notifyViewContributions('selection', null)
+      this.notifySelection(options.notify ?? true)
       return
     }
 
@@ -1580,7 +1589,11 @@ export class InputSelectionController {
     domSelection?.removeAllRanges()
     if (range) domSelection?.addRange(range)
     this.syncSessionSelectionHighlight()
-    this.options.notifyViewContributions('selection', null)
+    this.notifySelection(options.notify ?? true)
+  }
+
+  private notifySelection(notify: boolean): void {
+    if (notify) this.options.notifyViewContributions('selection', null)
   }
 
   syncSessionSelectionHighlight(): void {
@@ -1789,7 +1802,7 @@ export class InputSelectionController {
     this.transitionInputState({ type: 'native-input-observed' })
     const session = this.session
     if (!session) return
-    if (!this.options.canEditDocument()) return
+    if (!this.canTypeText()) return
     if (this.inputState.compositionActive) {
       this.updateEditContextComposition(update)
       return
@@ -1868,7 +1881,7 @@ export class InputSelectionController {
     this.transitionInputState({ type: 'native-input-observed' })
     const session = this.session
     if (!session) return
-    if (!this.options.canEditDocument()) return
+    if (!this.canTypeText()) return
     // A composition writes each intermediate candidate into the input on its way to the text it
     // finally commits. Diffing those would type every candidate the reader passed through.
     if (this.inputState.compositionActive) return
@@ -2656,7 +2669,7 @@ export class InputSelectionController {
   private handleBeforeInput = this.traceInput('input.beforeinput', (event: InputEvent): void => {
     const session = this.session
     if (!session) return
-    if (!this.options.canEditDocument()) {
+    if (!this.canTypeText()) {
       event.preventDefault()
       return
     }
@@ -2684,7 +2697,7 @@ export class InputSelectionController {
   private handlePaste = this.traceInput('input.paste', (event: ClipboardEvent): void => {
     const session = this.session
     if (!session) return
-    if (!this.options.canEditDocument()) {
+    if (!this.canTypeText()) {
       event.preventDefault()
       return
     }
@@ -2805,7 +2818,7 @@ export class InputSelectionController {
    */
   private handleDragOver = (event: DragEvent): void => {
     if (!this.session) return
-    if (!this.options.canEditDocument()) return
+    if (!this.canTypeText()) return
 
     event.preventDefault()
     // Text arriving from outside brings no cursor of its own, so the editor lends it one: without a
@@ -2834,7 +2847,7 @@ export class InputSelectionController {
     if (!session) return
 
     event.preventDefault()
-    if (!this.options.canEditDocument()) return
+    if (!this.canTypeText()) return
 
     // Normalized for the same reason as the pasted payload above.
     const transfer = event.dataTransfer ?? null
@@ -3056,6 +3069,21 @@ export class InputSelectionController {
     event.stopPropagation()
   }
 
+  // Ahead of both keymaps: the editor's own on this element and a host's on the document. A key
+  // that is part of a composition belongs to the IME, never to a participant.
+  private offerKeyToParticipants = (event: KeyboardEvent): void => {
+    if (event.isComposing || this.inputState.compositionActive) return
+    if (!this.options.offerKey(event)) return
+
+    event.preventDefault()
+    event.stopPropagation()
+  }
+
+  /** Text may enter the document: it is writable and no text gate refuses. */
+  private canTypeText(): boolean {
+    return this.options.canEditDocument() && this.options.acceptsText()
+  }
+
   /**
    * A key pressed somewhere that will never produce an input event of its own.
    *
@@ -3067,7 +3095,7 @@ export class InputSelectionController {
   private handleKeyDown = this.traceInput('input.keydownFallback', (event: KeyboardEvent): void => {
     const session = this.session
     if (!session) return
-    if (!this.options.canEditDocument()) return
+    if (!this.canTypeText()) return
     if (event.target === this.options.view.inputElement) return
 
     const typedText = keyboardFallbackText(event)
@@ -3083,7 +3111,7 @@ export class InputSelectionController {
   private applyKeyboardText(text: string, start: number): void {
     const session = this.session
     if (!session) return
-    if (!this.options.canEditDocument()) return
+    if (!this.canTypeText()) return
 
     const selectionChange = measureEditorPerformance('input.selectionChangeBeforeEdit', () =>
       this.selectionChangeBeforeEdit(),
@@ -3193,7 +3221,7 @@ export class InputSelectionController {
 
     const session = this.session
     if (!session) return
-    if (!this.options.canEditDocument()) return
+    if (!this.canTypeText()) return
 
     this.transitionInputState({ text, type: 'composition-pending' })
     const selectionChange = this.selectionChangeBeforeEdit()
@@ -3206,7 +3234,7 @@ export class InputSelectionController {
   private applyCompositionText(text: string, start: number): void {
     const session = this.session
     if (!session) return
-    if (!this.options.canEditDocument()) return
+    if (!this.canTypeText()) return
     if (text.length === 0) return
 
     this.transitionInputState({ text, type: 'composition-pending' })
@@ -3807,4 +3835,10 @@ function beforeInputText(event: InputEvent): string | null {
   if (event.inputType === 'insertText') return event.data ?? ''
   if (event.inputType === 'insertFromComposition') return event.data ?? ''
   return null
+}
+
+function isSelectionList(
+  selection: EditorSelectionRange | readonly EditorSelectionRange[] | undefined,
+): selection is readonly EditorSelectionRange[] {
+  return Array.isArray(selection)
 }

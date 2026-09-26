@@ -355,6 +355,7 @@ describe.skipIf(typeof globalThis.Highlight === 'undefined')(
     })
 
     it('moves the caret with the columns the node pushed along', async () => {
+      view!.focusInput()
       view!.setSelection(WIDGET_LINE.length, WIDGET_LINE.length)
       const before = caretX(container)
 

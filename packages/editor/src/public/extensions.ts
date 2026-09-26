@@ -60,6 +60,28 @@ export type {
   EditorOnEnterRule,
 } from '../editor/languageConfiguration'
 export type { EditorSnippetMirror, EditorSnippetStop } from '../plugins'
+// Experimental: the one authoring model for plugins (Plan 122 phase 3).
+export {
+  createChannel,
+  createPlugin,
+  derive,
+  documentInput,
+  selectionInput,
+  textInput,
+  themeInput,
+  tokensInput,
+  viewportInput,
+  visibleRowsInput,
+} from '../createPlugin'
+export type { EditorCursorStyle, EditorKeyDecision, EditorKeyParticipant } from '../plugins'
+export type {
+  EditorChannel,
+  EditorChannelPolicy,
+  EditorInput,
+  EditorPluginDefinition,
+  EditorViewScope,
+  EditorViewState,
+} from '../createPlugin'
 export { reindentEditsForRanges } from '../editor/reindent'
 export type { EditorReindentOptions } from '../editor/reindent'
 export type {
@@ -129,6 +151,7 @@ export type {
   EditorPressParticipant,
   EditorViewContributionProvider,
   EditorViewContributionUpdateKind,
+  EditorViewContributionInput,
   EditorViewportSnapshot,
   EditorViewportSnapshotJSON,
   EditorViewSnapshot,

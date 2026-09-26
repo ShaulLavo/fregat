@@ -17,8 +17,12 @@ E009 evaluation. Production code was not changed.
 Decided 2026-09-25: owner — delete the SAB text transport. After the transport fixes it runs at the
 same speed as the string path and never got faster; the numbers below predate those fixes.
 
-- [E057](../../plans/e057-delete-sab-transport.md) deletes it, ahead of Platform
-  [Plan 099](../../../platform/plans/099-document-contributions.md).
+- E057 deleted it on 2026-09-26, ahead of Platform
+  [Plan 099](../../../platform/plans/099-document-contributions.md): source chunks reach the
+  worker as strings only, the `useSharedBuffers` option and the transport comparison benchmarks are
+  gone, and the atomic cancellation flag stays. `bench:syntax` (Bun, string path both times) was
+  unchanged: 100,000-line initial total 1,233 / 1,187 ms before and 1,188 / 1,181 ms after, the
+  200-fence edit 7.8 / 7.2 ms before and 9.3 / 6.8 ms after.
 - E010 (shared allocator and hash map), E012 (epoch reclamation) and E013 (shared document
   snapshots) are closed as no-go for this reason. Their plans are in git history before this
   commit.

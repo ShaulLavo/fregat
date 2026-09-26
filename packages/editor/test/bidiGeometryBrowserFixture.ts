@@ -66,6 +66,8 @@ export function mountBidiGeometryFixture(): BidiGeometryFixture {
     container,
     BIDI_CORPUS_NAMES.map((name) => BIDI_CORPUS[name]).join('\n'),
   )
+  // The oracle reads carets synchronously, which only a focused editor draws.
+  view.focusInput()
   const rows = Object.fromEntries(
     BIDI_CORPUS_NAMES.map((name, index) => [name, mountedRow(view, index)]),
   ) as Record<BidiCorpusName, MountedVirtualizedTextRow>

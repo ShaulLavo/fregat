@@ -4,13 +4,8 @@ import {
   type EditorDecorationTextSurface,
 } from './editor/decorationStore'
 import { occurrenceHighlightRanges, type OccurrenceHighlightRange } from './occurrenceHighlights'
-import type {
-  EditorPlugin,
-  EditorViewContribution,
-  EditorViewContributionContext,
-  EditorViewContributionUpdateKind,
-  EditorViewSnapshot,
-} from './plugins'
+import { createPlugin, derive, selectionInput, visibleRowsInput } from './createPlugin'
+import type { EditorPlugin } from './plugins'
 import type { VirtualizedTextHighlightStyle } from './virtualization'
 
 export const EDITOR_OCCURRENCE_HIGHLIGHT_PLUGIN_ID = 'editor.occurrenceHighlight'
@@ -18,15 +13,6 @@ export const EDITOR_OCCURRENCE_HIGHLIGHT_PLUGIN_ID = 'editor.occurrenceHighlight
 const DEFAULT_OCCURRENCE_STYLE: VirtualizedTextHighlightStyle = {
   backgroundColor: 'rgba(128, 128, 128, 0.18)',
 }
-
-/** Scrolling changes which rows are mounted, so the viewport is a recompute trigger here. */
-const RECOMPUTE_KINDS: ReadonlySet<EditorViewContributionUpdateKind> = new Set([
-  'content',
-  'document',
-  'selection',
-  'tokens',
-  'viewport',
-])
 
 /**
  * The whole feature paints through one highlight group, which carries the colour, so there is
@@ -49,65 +35,26 @@ export type EditorOccurrenceHighlightPluginOptions = {
 export function createOccurrenceHighlightPlugin(
   options: EditorOccurrenceHighlightPluginOptions = {},
 ): EditorPlugin {
-  return {
+  const style = options.style ?? DEFAULT_OCCURRENCE_STYLE
+  return createPlugin({
     name: EDITOR_OCCURRENCE_HIGHLIGHT_PLUGIN_ID,
-    activate(context) {
-      return context.registerViewContribution({
-        createContribution: (contributionContext) =>
-          new OccurrenceHighlightController(
-            contributionContext,
-            options.style ?? DEFAULT_OCCURRENCE_STYLE,
-          ),
+    view(scope) {
+      const name = `${scope.view.highlightPrefix}-occurrence-highlight`
+      const decorations = new EditorDecorationStore()
+      let registered = false
+      scope.watch(occurrencesInput, (ranges) => {
+        const specs = ranges.map(occurrenceDecorationSpec)
+        if (!decorations.replaceOwner(EDITOR_OCCURRENCE_HIGHLIGHT_PLUGIN_ID, specs)) return
+
+        // Empty, not cleared: the view keeps the group's rule for the next word.
+        registered = true
+        scope.view.setRangeHighlight(name, ranges, style)
+      })
+      scope.onDispose(() => {
+        if (registered) scope.view.clearRangeHighlight(name)
       })
     },
-  }
-}
-
-class OccurrenceHighlightController implements EditorViewContribution {
-  private readonly highlightName: string
-  private readonly decorations = new EditorDecorationStore()
-
-  constructor(
-    private readonly context: EditorViewContributionContext,
-    private readonly style: VirtualizedTextHighlightStyle,
-  ) {
-    this.highlightName = `${context.highlightPrefix}-occurrence-highlight`
-  }
-
-  update(snapshot: EditorViewSnapshot, kind: EditorViewContributionUpdateKind): void {
-    if (kind === 'clear') {
-      this.clear()
-      return
-    }
-    if (!RECOMPUTE_KINDS.has(kind)) return
-
-    this.apply(snapshot)
-  }
-
-  dispose(): void {
-    this.clear()
-  }
-
-  private apply(snapshot: EditorViewSnapshot): void {
-    const ranges = rangesForSnapshot(snapshot)
-    // A single occurrence is the word the caret is already in — painting it says nothing.
-    const painted = ranges.length > 1 ? ranges : []
-    const specs = painted.map(occurrenceDecorationSpec)
-    if (!this.decorations.replaceOwner(EDITOR_OCCURRENCE_HIGHLIGHT_PLUGIN_ID, specs)) return
-
-    if (painted.length === 0) {
-      this.context.clearRangeHighlight(this.highlightName)
-      return
-    }
-
-    this.context.setRangeHighlight(this.highlightName, painted, this.style)
-  }
-
-  private clear(): void {
-    if (!this.decorations.replaceOwner(EDITOR_OCCURRENCE_HIGHLIGHT_PLUGIN_ID, [])) return
-
-    this.context.clearRangeHighlight(this.highlightName)
-  }
+  })
 }
 
 /**
@@ -124,11 +71,17 @@ function occurrenceDecorationSpec(range: OccurrenceHighlightRange): EditorDecora
   }
 }
 
-function rangesForSnapshot(snapshot: EditorViewSnapshot): readonly OccurrenceHighlightRange[] {
-  const primary = snapshot.selections[0]
-  if (!primary) return []
-  // A dragged selection has its own meaning; only a resting caret asks "where else is this used".
-  if (primary.startOffset !== primary.endOffset) return []
+// Scrolling changes which rows are mounted, so the rows are an input as much as the caret.
+const occurrencesInput = derive(
+  [visibleRowsInput, selectionInput],
+  (rows, selections): readonly OccurrenceHighlightRange[] => {
+    const primary = selections[0]
+    if (!primary) return []
+    // A dragged selection has its own meaning; only a resting caret asks "where else is this used".
+    if (primary.startOffset !== primary.endOffset) return []
 
-  return occurrenceHighlightRanges(snapshot.visibleRows, primary.headOffset)
-}
+    const ranges = occurrenceHighlightRanges(rows, primary.headOffset)
+    // A single occurrence is the word the caret is already in — painting it says nothing.
+    return ranges.length > 1 ? ranges : []
+  },
+)

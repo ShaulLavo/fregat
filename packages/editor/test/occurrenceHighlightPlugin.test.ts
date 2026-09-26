@@ -44,7 +44,7 @@ describe('occurrence highlight contribution', () => {
     expect(calls).toHaveLength(1)
   })
 
-  it('clears once when the caret leaves a word, and stays quiet after', () => {
+  it('empties once when the caret leaves a word, and stays quiet after', () => {
     const calls: HighlightCall[] = []
     const contribution = createContribution(calls)
 
@@ -52,7 +52,22 @@ describe('occurrence highlight contribution', () => {
     contribution.update(snapshotWithCaret(5), 'selection')
     contribution.update(snapshotWithCaret(5), 'selection')
 
-    expect(calls.map((call) => call.kind)).toEqual(['set', 'clear'])
+    expect(calls).toEqual([expect.objectContaining({ kind: 'set' }), { kind: 'set', ranges: [] }])
+  })
+
+  it('empties on a cleared view and removes the highlight when the view goes', () => {
+    const calls: HighlightCall[] = []
+    const contribution = createContribution(calls)
+
+    contribution.update(snapshotWithCaret(8), 'selection')
+    contribution.update({ ...snapshotWithCaret(8), selections: [] }, 'clear')
+    contribution.dispose()
+
+    expect(calls).toEqual([
+      expect.objectContaining({ kind: 'set' }),
+      { kind: 'set', ranges: [] },
+      { kind: 'clear' },
+    ])
   })
 })
 
@@ -77,6 +92,8 @@ function createContribution(calls: HighlightCall[]): EditorViewContribution {
 function contributionContext(calls: HighlightCall[]): EditorViewContributionContext {
   return createTestViewContributionContext({
     highlightPrefix: 'editor',
+    // The editor opens with no caret yet.
+    getSnapshot: () => ({ ...snapshotWithCaret(0), selections: [] }),
     setRangeHighlight: (_name, ranges) => {
       calls.push({
         kind: 'set',

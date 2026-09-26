@@ -44,6 +44,30 @@
     },
     {
       "api": "requestAnimationFrame",
+      "file": "examples/stress/src/dispatch.ts",
+      "id": "examples/stress/src/dispatch.ts:requestAnimationFrame:58d943f6c1",
+      "justification": "Benchmark harness: one frame between batches keeps them apart.",
+      "line": 55,
+      "snippet": "await new Promise((resolve) => requestAnimationFrame(resolve))"
+    },
+    {
+      "api": "requestAnimationFrame",
+      "file": "examples/stress/src/dispatch.ts",
+      "id": "examples/stress/src/dispatch.ts:requestAnimationFrame:83948c1f17",
+      "justification": "Benchmark harness: two frames let the editor mount before any pass is timed.",
+      "line": 40,
+      "snippet": "await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))"
+    },
+    {
+      "api": "requestAnimationFrame",
+      "file": "examples/stress/src/dispatch.ts",
+      "id": "examples/stress/src/dispatch.ts:requestAnimationFrame:bd0106d51f",
+      "justification": "Benchmark harness: two frames let the editor mount before any pass is timed.",
+      "line": 40,
+      "snippet": "await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))"
+    },
+    {
+      "api": "requestAnimationFrame",
       "file": "examples/stress/src/firstPaint.ts",
       "id": "examples/stress/src/firstPaint.ts:requestAnimationFrame:eb626b3f90",
       "justification": "Measures the next input frame; each benchmark burst waits for it before disposal.",
@@ -167,7 +191,7 @@
       "file": "packages/editor/src/shiki/shiki.worker.ts",
       "id": "packages/editor/src/shiki/shiki.worker.ts:setTimeout:7613cb083b",
       "justification": "Runs once per highlighter after a one-second delay so background grammar preload stays behind latency-sensitive tokenization and its first paint. `backgroundLoaded` prevents duplicate schedules, and worker-task tracking keeps idle fences and teardown behind the preload.",
-      "line": 263,
+      "line": 244,
       "snippet": "setTimeout(() => {"
     },
     {
@@ -199,7 +223,7 @@
       "file": "packages/editor/src/virtualization/virtualizedTextView.ts",
       "id": "packages/editor/src/virtualization/virtualizedTextView.ts:requestIdleCallback:14458bc40c",
       "justification": "Measuring every row's width is the work the horizontal scroll extent needs and nothing on screen is waiting for, so it is deliberately given whatever the frame has left rather than a place in the queue. `cancelContentWidthMeasurement` withdraws it when the content it would measure has already changed.",
-      "line": 1637,
+      "line": 1670,
       "snippet": "const handle = win.requestIdleCallback(run)"
     },
     {
@@ -207,7 +231,7 @@
       "file": "packages/editor/src/virtualization/virtualizedTextView.ts",
       "id": "packages/editor/src/virtualization/virtualizedTextView.ts:setTimeout:25021385fc",
       "justification": "The same deferral for an engine with no idle callback. Zero rather than a delay, because the point is only to leave the current frame, and the same cancel withdraws it.",
-      "line": 1646,
+      "line": 1679,
       "snippet": "const handle = win.setTimeout(run, 0)"
     },
     {
@@ -215,7 +239,7 @@
       "file": "packages/editor/src/virtualization/virtualizedTextViewRows.ts",
       "id": "packages/editor/src/virtualization/virtualizedTextViewRows.ts:setTimeout:3bd76fd727",
       "justification": "Leaving the current frame is the entire content of this delay: it is what keeps the repaint out of the resize delivery and out of the row paint that ask for it. The one outstanding handle per view makes a second request in the same frame a no-op, and `cancelInlineWidgetRepaint` withdraws it when the view goes away.",
-      "line": 1550,
+      "line": 1572,
       "snippet": "const handle = win.setTimeout(() => {"
     },
     {
@@ -369,6 +393,14 @@
       "justification": "Defers delivery until the mount survives React's synchronous StrictMode replay; the incarnation guard cancels disposed mounts, and no editor work is scheduled.",
       "line": 493,
       "snippet": "queueMicrotask(() => {"
+    },
+    {
+      "api": "setTimeout",
+      "file": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts",
+      "id": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts:setTimeout:74252f76bf",
+      "justification": "Runs once after the parse answer is posted; it re-checks that the document is still cached and idle, so a late or stale callback does nothing.",
+      "line": 430,
+      "snippet": "setTimeout(() => reparseIdleDocument(runtimeSessionId, document, runtime), 0)"
     },
     {
       "api": "setTimeout",

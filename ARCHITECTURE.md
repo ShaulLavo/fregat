@@ -204,6 +204,11 @@ registries.
   and duplicate row-decoration source ownership are rejected.
 - Contribution factory, `update()`, and disposal failures are contained and logged so one extension
   does not break unrelated editor systems.
+- Each plugin has its own context; what a plugin or a contribution registers is released with it,
+  including registrations made after `activate` or after the contribution was created.
+
+Every hook, its scope, ordering and stability label (supported, experimental, internal) is in the
+[extension hook contract map](docs/architecture/extension-hooks.md).
 
 **Open:** migrate the remaining first-party feature bridge users to public domain/view APIs, then
 delete the broad internal feature contribution bridge.

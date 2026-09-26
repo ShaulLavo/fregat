@@ -36,3 +36,15 @@ export type {
   EditorCommandPack,
   EditorKeymapLayerSource,
 } from '../keymap/presets'
+export {
+  EDITOR_COMMANDS,
+  editorCommandDeclaration,
+  isEditorCommandId,
+} from '../editor/commandCatalog'
+export type {
+  EditorAnyCommandId,
+  EditorCommandCategory,
+  EditorCommandDeclaration,
+  EditorContributedCommandDeclaration,
+  EditorContributedCommandId,
+} from '../editor/commandCatalog'

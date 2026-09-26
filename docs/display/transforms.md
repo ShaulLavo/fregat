@@ -168,6 +168,16 @@ second validation layer instead of collapsing immediately to a monolithic mapper
 
 - Tab expansion uses configurable `tabSize` math shared with the renderer.
 - Wrapping uses indexed numeric summaries and materializes segments on demand with the existing tab-column math.
+- `wrapBreak: 'word'` (Editor option `wordWrapBreak`) ends a row at the last word boundary: after a
+  run of spaces, beside a CJK character, or at a replacement's edge, falling back to the filling
+  column for a word wider than the row. Spaces hang past the edge instead of starting a row, and a
+  replacement is never split. Every line that breaks, or is wider than a row, stores explicit row
+  ends (the `breaks` of a wrapped entry, shared with tabbed lines). Building the 500k-line
+  `bench:transforms` fixture costs 123 ms against 69 ms for character wrap; the character path is
+  unchanged.
+- A proportional face wraps by measured advances (E052): `wrapAdvance` carries the row width in pixels
+  and a per-face glyph table read from a canvas, and both break modes place ends where the running
+  advance would pass the width less a 1 px margin. Monospace faces never build the table.
 
 The removed block-row and block-surface APIs are not part of the transform architecture and are not
 compatibility targets.
@@ -303,8 +313,9 @@ spans, by adjacency for links and images.
 
 ### Still open
 
-- Wrapping may split a multi-character replacement across rows; the wrap pass does not yet treat
-  replacements as unbreakable units.
+- Character wrap (the default) may split a multi-character replacement across rows, which then
+  paints as the text it stands for. Word wrap (`wordWrapBreak: 'word'`) keeps every replacement on
+  one row; both count a replacement by its placeholder text, not the width its rendered node measures.
 - Carrying a syntax-derived map re-resolves every range on each refresh; with many replacements and
   an edit-triggered provider on one editor that is O(ranges) per keystroke until Phase 4's range set.
 

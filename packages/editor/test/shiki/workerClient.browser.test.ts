@@ -230,11 +230,17 @@ describe.skipIf(typeof Worker === 'undefined')('Shiki worker highlighter', () =>
     const caughtUp = await session.applyChange(skipped)
     const restored = await session.applyChange(changeWithoutFullRead(initial, []))
     const unchanged = await session.applyChange(changeWithoutFullRead(initial, []))
-    expect(requests.mock.calls.map(([payload]) => payload)).toMatchObject([
-      { type: 'edit', text: undefined, edits: [{ from: 6, to: 11, text: 'answerX' }] },
-      { type: 'edit', text: undefined, edits: [{ from: 6, to: 13, text: 'value' }] },
-      { type: 'edit', text: undefined, edits: [] },
+    const payloads = requests.mock.calls.map(([payload]) => payload)
+    expect(payloads).toMatchObject([
+      { type: 'edit', edits: [{ from: 6, to: 11, text: 'answerX' }] },
+      { type: 'edit', edits: [{ from: 6, to: 13, text: 'value' }] },
+      { type: 'edit', edits: [] },
     ])
+    for (const payload of payloads) {
+      expect(Object.keys(payload).toSorted()).toEqual(
+        ['documentId', 'edits', 'lang', 'runtimeSessionId', 'theme', 'type'].toSorted(),
+      )
+    }
     expect(caughtUp.tokens.toTokens()).toEqual(await fullTokens(changedText))
     expect(restored.tokens.toTokens()).toEqual(await fullTokens(original))
     expect(unchanged.tokens.toTokens()).toEqual(restored.tokens.toTokens())

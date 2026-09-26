@@ -1,3 +1,4 @@
+import { createModalEditingPlugin } from './modal/modalPlugin'
 import { createMergeConflictPlugin, Editor, type EditorPlugin } from '@singapore-editor/core/editor'
 import { createDiffPlugin } from '@singapore-editor/diff'
 import '@singapore-editor/core/style.css'
@@ -114,10 +115,15 @@ export function mountApp(): void {
     createSpellcheckPlugin({ service: new SpellcheckService(), scope: 'proseAndCode' }),
     typeScriptLsp,
   ]
+  // `?modal` turns on the E028 modal editing proof.
+  const modal = new URLSearchParams(location.search).has('modal')
+    ? [createModalEditingPlugin()]
+    : []
   const editPlugins: readonly EditorPlugin[] = languagePlugins.concat(
     lineGutter,
     liveDiff,
     sharedPlugins,
+    modal,
   )
   const diffPlugins: readonly EditorPlugin[] = languagePlugins.concat(liveDiff, sharedPlugins)
   const editor = new Editor(editorPane.editorHost, {

@@ -17,7 +17,11 @@ import type {
   VirtualizedTextViewScrollMode,
 } from '../virtualization/virtualizedTextViewTypes'
 import type { BrowserTextMetrics } from '../virtualization/browserMetrics'
-import type { EditorInputKind, EditorInputRoute } from '../virtualization/virtualizedTextViewTypes'
+import type {
+  EditorInputKind,
+  EditorInputRoute,
+  EditorWrapBreak,
+} from '../virtualization/virtualizedTextViewTypes'
 import type { EditorKeymapOptions } from './keymap'
 import type { EditorAutoClosingPair } from './languageConfiguration'
 import type { EditorSuspiciousCharactersOptions } from '../unicodeHighlight'
@@ -165,6 +169,11 @@ export type EditorOptions = {
   readonly scrollPastEnd?: boolean
   /** Soft-wraps long lines to the viewport width instead of scrolling horizontally. */
   readonly wordWrap?: boolean
+  /**
+   * Where a wrapped row ends: `'character'` (the default) at the column that fills it, `'word'` at
+   * the last word boundary, keeping every replacement on one row.
+   */
+  readonly wordWrapBreak?: EditorWrapBreak
   /** Replaces every language's auto-closing pairs; an empty list turns auto-close off. */
   readonly autoClosingPairs?: readonly EditorAutoClosingPair[]
   /** What typing an opener over a selection wraps it with. Unset, the auto-closing pairs. */

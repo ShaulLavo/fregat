@@ -14,7 +14,7 @@ import {
   type TextEdit,
   type TextReadSnapshot,
 } from '@singapore-editor/core/document'
-import type { EditorCommandId } from '@singapore-editor/core/editor'
+import type { EditorAnyCommandId } from '@singapore-editor/core/editor'
 import type {
   EditorCommandHandler,
   EditorEditContributionContext,
@@ -112,7 +112,7 @@ export type ConnectedEditor = {
   answerCodeActionResolve(action: lsp.CodeAction): void
   answerRename(edit: unknown): void
   publishDiagnostics(diagnostics: readonly lsp.Diagnostic[], version?: number): void
-  runCommand(commandId: EditorCommandId): boolean
+  runCommand(commandId: EditorAnyCommandId): boolean
   completionElement(): HTMLElement
   completionLabels(): readonly string[]
   focusedCompletionLabel(): string | null
@@ -150,7 +150,7 @@ export type ConnectedEditorOptions = {
   readonly onDefinitionLinkHover?: LanguageServerPluginOptions['onDefinitionLinkHover']
   readonly onConnectionCreated?: LanguageServerPluginOptions['onConnectionCreated']
   /** Commands another contribution would have registered, reachable through the same keymap. */
-  readonly commands?: ReadonlyMap<EditorCommandId, EditorCommandHandler>
+  readonly commands?: ReadonlyMap<EditorAnyCommandId, EditorCommandHandler>
 }
 
 /**
@@ -170,7 +170,7 @@ export async function connectedEditor(
   let snapshot = editorSnapshot(text, caretOffset, 1, options.affinity ?? 'after')
   let anchorRect = new DOMRect(10, 20, 40, 18)
 
-  const commands = new Map<EditorCommandId, EditorCommandHandler>(options.commands)
+  const commands = new Map<EditorAnyCommandId, EditorCommandHandler>(options.commands)
   const errors: unknown[] = []
   const workspaceEditRequests: ApplyWorkspaceEditRequest[] = []
   const snippetSessions: (readonly SnippetStopRange[])[] = []
@@ -408,7 +408,7 @@ export function singleLineRange(start: number, end: number): lsp.Range {
 function activateProvider(
   transport: LspManagedTransport,
   features: Map<unknown, unknown>,
-  commands: Map<EditorCommandId, EditorCommandHandler>,
+  commands: Map<EditorAnyCommandId, EditorCommandHandler>,
   applyEdits: EditorEditContributionContext['applyEdits'],
   errors: unknown[],
   options: ConnectedEditorOptions,
@@ -472,7 +472,7 @@ function activateProvider(
 }
 
 function activateHoverPlugin(
-  commands: Map<EditorCommandId, EditorCommandHandler>,
+  commands: Map<EditorAnyCommandId, EditorCommandHandler>,
 ): EditorViewContributionProvider {
   let provider: EditorViewContributionProvider | null = null
   const disposable = { dispose: () => undefined }

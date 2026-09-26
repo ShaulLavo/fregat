@@ -15,7 +15,7 @@ Decided 2026-09-25: owner — unparked. Rebase the plan on the [E050 host contra
 
 Publish an accurate extension inventory that tells a plugin author which behavior they can
 change, which context they receive, and when their resources disappear. Propose only the
-missing hooks needed to exercise modal input in [E028](e028-modal-input-prototype.md).
+missing hooks needed to exercise modal input in [E028](../docs/architecture/modal-input-findings.md).
 
 A developer implementing a custom paste handler or view decoration should find its existing
 public hook. A developer intercepting input should find an explicit ownership contract,

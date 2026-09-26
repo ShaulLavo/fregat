@@ -18,6 +18,7 @@ import { createEditorRuntimeSessionId } from '../syntax/session'
 import type { EditorTheme } from '../theme'
 import type {
   ShikiWorkerDocumentOptions,
+  ShikiWorkerEditRequest,
   ShikiWorkerLanguageRegistration,
   ShikiWorkerRequest,
   ShikiWorkerRequestPayload,
@@ -390,7 +391,7 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
       }
 
       const documentText = openPayloadText(textSnapshot)
-      const documentOptions = await this.documentOptions(documentText)
+      const documentOptions = await this.documentOptions()
       if (this.disposed) return emptyHighlightResult()
 
       const result = await this.owner.request({
@@ -515,13 +516,7 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
     nextTextSnapshot: DocumentTextSnapshot,
   ): Promise<ShikiWorkerRequestPayload> {
     const edits = incrementalEditsForChange(this.snapshot, change)
-    if (edits && this.opened && !this.disposed) {
-      return {
-        type: 'edit',
-        ...(await this.documentOptions()),
-        edits,
-      }
-    }
+    if (edits && this.opened && !this.disposed) return this.editRequest(edits)
 
     if (!this.opened) {
       return {
@@ -532,15 +527,21 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
     }
 
     const fallbackEdit = diffPieceTableSnapshots(this.snapshot, change.snapshot)
+    return this.editRequest(fallbackEdit ? [fallbackEdit] : [])
+  }
+
+  private editRequest(edits: readonly TextEdit[]): ShikiWorkerEditRequest {
     return {
       type: 'edit',
-      ...(await this.documentOptions()),
-      // Absent edits would send the worker's entire token store back for a no-op.
-      edits: fallbackEdit ? [fallbackEdit] : [],
+      documentId: this.documentId,
+      runtimeSessionId: this.runtimeSessionId,
+      lang: this.lang,
+      theme: this.theme,
+      edits,
     }
   }
 
-  private async documentOptions(text?: string): Promise<ShikiWorkerDocumentOptions> {
+  private async documentOptions(): Promise<ShikiWorkerDocumentOptions> {
     const registrations = await this.registrations
     return {
       documentId: this.documentId,
@@ -550,7 +551,6 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
       languageRegistrations: registrations.languageRegistrations,
       themeRegistration: registrations.themeRegistration,
       themeRegistrations: registrations.themeRegistrations,
-      text,
     }
   }
 

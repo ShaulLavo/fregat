@@ -5,7 +5,7 @@
 - Owner: Cross-repo
 - Priority: P2
 - Effort: L
-- Dependencies: [E026](e026-command-metadata.md), [E027](e027-extension-hooks.md), [E028](e028-modal-input-prototype.md)
+- Dependencies: [E026](e026-command-metadata.md), [E027](e027-extension-hooks.md), [E028](../docs/architecture/modal-input-findings.md)
 - Inspected baseline: Editor `9abb944f3a2b8d6516953fdec75e8df5e1a94811`, Platform `c8e05123d8f89f74bdca0e73cd43bb060c6f4e67`.
 
 ## Outcome

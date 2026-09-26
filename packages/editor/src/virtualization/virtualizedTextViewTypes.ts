@@ -13,6 +13,7 @@ import type { BrowserTextMetrics } from './browserMetrics'
 import type { RowInlineMapping } from './virtualizedTextViewInlineMapping'
 import type { FixedRowVisibleRange } from './fixedRowVirtualizer'
 import type { MeasuredText } from '../textMeasurements'
+import type { WrapBreak } from './displayProjectionTypes'
 
 type CaretPositionResult = {
   readonly offsetNode: Node
@@ -85,6 +86,8 @@ export type VirtualizedTextViewOptions = {
   readonly onViewportChange?: () => void
   readonly onViewportScroll?: () => void
   readonly wrap?: boolean
+  /** Where a wrapped row may end. Defaults to `'character'`. */
+  readonly wrapBreak?: WrapBreak
   readonly injectedTextRows?: readonly InjectedTextRow[]
   readonly gutterContributions?: readonly EditorGutterContribution[]
   readonly cursorLineHighlight?: EditorCursorLineHighlightOptions
@@ -105,6 +108,8 @@ export type VirtualizedTextViewOptions = {
  * turns both off.
  */
 export type EditorInputKind = 'code' | 'prose'
+
+export type EditorWrapBreak = WrapBreak
 
 /**
  * How typed text reaches the editor. EditContext hands over every edit with the range it replaced,

@@ -213,6 +213,36 @@ describe('createShikiHighlighterPlugin', () => {
     })
   })
 
+  it('sends a session its own grammar only, even after the preload set has loaded', async () => {
+    const provider = activateHighlighterProvider({ preloadLanguages: ['json', 'css'] })
+    const text = 'const value = 1'
+    const openSession = (documentId: string, languageId: string) => {
+      provider.createSession({
+        documentId,
+        languageId,
+        textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
+        snapshot: createPieceTableSnapshot(text),
+      })
+      const call = workerOwner.createSession.mock.calls.at(-1) as unknown as [
+        ShikiHighlighterSessionOptions,
+      ]
+      return call[0]
+    }
+
+    const first = openSession('first.ts', 'typescript')
+    const preload = first.preloadRegistrations
+    if (typeof preload !== 'function') throw new Error('expected a lazy preload')
+    await expect(preload()).resolves.toMatchObject({
+      languageRegistrations: [{ name: 'typescript' }, { name: 'json' }, { name: 'css' }],
+    })
+
+    const second = openSession('second.html', 'html')
+    const registrations = await second.registrations
+    expect(registrations.languageRegistrations.map((registration) => registration.name)).toEqual([
+      'html',
+    ])
+  })
+
   it('requires a non-empty name on resolved theme registrations', async () => {
     const provider = activateHighlighterProvider({
       resolveTheme: async () => ({ name: '' }),

@@ -1,4 +1,4 @@
-import { scrollElementPadding } from './virtualizedTextViewHelpers'
+import { invalidateScrollElementPadding, scrollElementPadding } from './virtualizedTextViewHelpers'
 
 type ScrollLayer = ReturnType<typeof createScrollLayer>
 
@@ -30,7 +30,8 @@ export class ScrollViewport {
     this.frame.append(text.clip, gutter.clip)
     this.extent.append(this.frame)
     scrollElement.append(this.extent)
-    this.synchronizeOrigin()
+    // The origin waits for the first viewport size: reading padding here would force a style pass
+    // on every editor built, before the open that lays it out anyway.
   }
 
   public reserveOverlayWidth(side: 'left' | 'right', width: number): boolean {
@@ -39,6 +40,7 @@ export class ScrollViewport {
     if (this.scrollElement.style[property] === value) return false
 
     this.scrollElement.style[property] = value
+    invalidateScrollElementPadding(this.scrollElement)
     this.synchronizeOrigin()
     this.onReservedOverlayWidthChange?.(side)
     return true
@@ -58,6 +60,8 @@ export class ScrollViewport {
     const nextWidth = `${width}px`
     const nextHeight = `${height}px`
 
+    // A host stylesheet that changes the padding also changes the content box, which lands here.
+    invalidateScrollElementPadding(this.scrollElement)
     this.synchronizeOrigin()
     this.frame.style.width = nextWidth
     this.frame.style.height = nextHeight

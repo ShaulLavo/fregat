@@ -1,4 +1,4 @@
-import type { EditorCommandId } from '@singapore-editor/core/editor'
+import type { EditorAnyCommandId } from '@singapore-editor/core/editor'
 import type { EditorCommandHandler } from '@singapore-editor/core/extensions'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -26,7 +26,7 @@ describe('keys for the completion list and the signature hint', () => {
   it('takes an Escape that closes the hint away from every other Escape binding', async () => {
     const clearSecondarySelections = vi.fn<EditorCommandHandler>(() => true)
     const editor = await connectedEditor('call', 4, {
-      commands: new Map<EditorCommandId, EditorCommandHandler>([
+      commands: new Map<EditorAnyCommandId, EditorCommandHandler>([
         ['clearSecondarySelections', clearSecondarySelections],
       ]),
     })

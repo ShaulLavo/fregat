@@ -1,0 +1,2741 @@
+{
+  "default:linux": [
+    { "chord": [{ "key": "Space", "ctrl": true }], "command": "editor.action.triggerSuggest" },
+    {
+      "chord": [{ "key": "ArrowDown" }],
+      "command": "selectNextSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp" }],
+      "command": "selectPrevSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "PageDown" }],
+      "command": "selectNextPageSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "PageUp" }],
+      "command": "selectPrevPageSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "Enter" }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Tab" }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Enter", "shift": true }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Tab", "shift": true }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Escape" }],
+      "command": "hideSuggestWidget",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "Escape" }],
+      "command": "closeParameterHints",
+      "when": ["parameterHintsVisible"]
+    },
+    {
+      "chord": [{ "key": "ArrowDown" }],
+      "command": "showNextParameterHint",
+      "when": ["parameterHintsVisible", "parameterHintsMultipleSignatures"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp" }],
+      "command": "showPrevParameterHint",
+      "when": ["parameterHintsVisible", "parameterHintsMultipleSignatures"]
+    },
+    {
+      "chord": [{ "key": ".", "alt": true, "shift": true }],
+      "command": "editor.action.autoFix",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "F2" }], "command": "editor.action.rename", "when": ["writable"] },
+    {
+      "chord": [{ "key": "F", "alt": true, "shift": true }],
+      "command": "editor.action.formatDocument",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "F", "mod": true, "shift": true }],
+      "command": "editor.action.formatDocument",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "F12" }], "command": "goToDefinition" },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "[", "mod": true }
+      ],
+      "command": "editor.fold"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "]", "mod": true }
+      ],
+      "command": "editor.unfold"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "[", "mod": true, "shift": true }
+      ],
+      "command": "editor.foldRecursively"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "]", "mod": true, "shift": true }
+      ],
+      "command": "editor.unfoldRecursively"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "0", "mod": true }
+      ],
+      "command": "editor.foldAll"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "J", "mod": true }
+      ],
+      "command": "editor.unfoldAll"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "1", "mod": true }
+      ],
+      "command": "editor.foldLevel1"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "2", "mod": true }
+      ],
+      "command": "editor.foldLevel2"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "3", "mod": true }
+      ],
+      "command": "editor.foldLevel3"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "4", "mod": true }
+      ],
+      "command": "editor.foldLevel4"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "5", "mod": true }
+      ],
+      "command": "editor.foldLevel5"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "6", "mod": true }
+      ],
+      "command": "editor.foldLevel6"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "7", "mod": true }
+      ],
+      "command": "editor.foldLevel7"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": ",", "mod": true }
+      ],
+      "command": "editor.createFoldingRangeFromSelection",
+      "when": ["hasSelection"]
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": ",", "mod": true, "shift": true }
+      ],
+      "command": "editor.removeManualFoldingRanges"
+    },
+    { "chord": [{ "key": "D", "mod": true }], "command": "addNextOccurrence" },
+    { "chord": [{ "key": "Enter", "alt": true }], "command": "selectAllMatches" },
+    {
+      "chord": [{ "key": "ArrowUp", "alt": true, "shift": true }],
+      "command": "editor.action.insertCursorAbove"
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "alt": true, "shift": true }],
+      "command": "editor.action.insertCursorBelow"
+    },
+    {
+      "chord": [{ "key": "ArrowUp", "mod": true, "shift": true }],
+      "command": "editor.action.insertCursorAbove"
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "mod": true, "shift": true }],
+      "command": "editor.action.insertCursorBelow"
+    },
+    {
+      "chord": [{ "key": "L", "mod": true, "shift": true }],
+      "command": "editor.action.selectHighlights"
+    },
+    { "chord": [{ "key": "F2", "mod": true }], "command": "editor.action.changeAll" },
+    {
+      "chord": [{ "key": "Backspace", "ctrl": true }],
+      "command": "deleteWordLeft",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Delete", "ctrl": true }],
+      "command": "deleteWordRight",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Backspace", "alt": true, "ctrl": true }],
+      "command": "deleteWordPartLeft",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Delete", "alt": true, "ctrl": true }],
+      "command": "deleteWordPartRight",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "K", "mod": true, "shift": true }],
+      "command": "editor.action.deleteLines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp", "mod": true, "alt": true, "shift": true }],
+      "command": "editor.action.copyLinesUpAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "mod": true, "alt": true, "shift": true }],
+      "command": "editor.action.copyLinesDownAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp", "alt": true }],
+      "command": "editor.action.moveLinesUpAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "alt": true }],
+      "command": "editor.action.moveLinesDownAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Enter", "mod": true, "shift": true }],
+      "command": "editor.action.insertLineBefore",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Enter", "mod": true }],
+      "command": "editor.action.insertLineAfter",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "/", "mod": true }],
+      "command": "editor.action.commentLine",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "A", "mod": true, "shift": true }],
+      "command": "editor.action.blockComment",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "]", "mod": true }],
+      "command": "editor.action.indentLines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "[", "mod": true }],
+      "command": "editor.action.outdentLines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "I", "alt": true, "shift": true }],
+      "command": "editor.action.reindentselectedlines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "I", "mod": true, "alt": true, "shift": true }],
+      "command": "editor.action.reindentlines",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "Backspace" }], "command": "deleteBackward", "when": ["writable"] },
+    { "chord": [{ "key": "Delete" }], "command": "deleteForward", "when": ["writable"] },
+    {
+      "chord": [{ "key": "Tab" }],
+      "command": "indentSelection",
+      "when": ["writable", "!tabFocusMode"]
+    },
+    {
+      "chord": [{ "key": "Tab", "shift": true }],
+      "command": "outdentSelection",
+      "when": ["writable", "!tabFocusMode"]
+    },
+    { "chord": [{ "key": "M", "ctrl": true }], "command": "editor.action.toggleTabFocusMode" },
+    { "chord": [{ "key": "H", "mod": true }], "command": "findReplace" },
+    {
+      "chord": [{ "key": "Enter", "mod": true, "alt": true }],
+      "command": "replaceAll",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "Z", "mod": true }], "command": "undo", "when": ["writable"] },
+    {
+      "chord": [{ "key": "Z", "mod": true, "shift": true }],
+      "command": "redo",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowLeft", "alt": true }],
+      "command": "jumpBack",
+      "preventDefault": true
+    },
+    {
+      "chord": [{ "key": "ArrowRight", "alt": true }],
+      "command": "jumpForward",
+      "preventDefault": true
+    },
+    { "chord": [{ "key": "U", "mod": true }], "command": "cursorUndo" },
+    { "chord": [{ "key": "U", "mod": true, "shift": true }], "command": "cursorRedo" },
+    { "chord": [{ "key": "Y", "ctrl": true }], "command": "redo", "when": ["writable"] },
+    { "chord": [{ "key": "Escape" }], "command": "closeFind", "when": ["findVisible"] },
+    {
+      "chord": [{ "key": "Escape" }],
+      "command": "clearSecondarySelections",
+      "when": ["!findVisible"]
+    },
+    { "chord": [{ "key": "F", "mod": true }], "command": "find" },
+    { "chord": [{ "key": "F3" }], "command": "findNext" },
+    { "chord": [{ "key": "F3", "shift": true }], "command": "findPrevious" },
+    {
+      "chord": [{ "key": "C", "alt": true }],
+      "command": "toggleFindCaseSensitive",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "W", "alt": true }],
+      "command": "toggleFindWholeWord",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "R", "alt": true }],
+      "command": "toggleFindRegex",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "L", "alt": true }],
+      "command": "toggleFindInSelection",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "P", "alt": true }],
+      "command": "togglePreserveCase",
+      "when": ["findVisible"]
+    },
+    { "chord": [{ "key": "A", "mod": true }], "command": "selectAll" },
+    {
+      "chord": [{ "key": "ArrowRight", "alt": true, "shift": true }],
+      "command": "editor.action.smartSelect.expand"
+    },
+    {
+      "chord": [{ "key": "ArrowLeft", "alt": true, "shift": true }],
+      "command": "editor.action.smartSelect.shrink"
+    },
+    { "chord": [{ "key": "ArrowLeft", "shift": true }], "command": "selectLeft" },
+    { "chord": [{ "key": "ArrowRight", "shift": true }], "command": "selectRight" },
+    { "chord": [{ "key": "ArrowLeft", "ctrl": true, "shift": true }], "command": "selectWordLeft" },
+    {
+      "chord": [{ "key": "ArrowRight", "ctrl": true, "shift": true }],
+      "command": "selectWordRight"
+    },
+    {
+      "chord": [{ "key": "ArrowLeft", "alt": true, "ctrl": true, "shift": true }],
+      "command": "cursorWordPartLeftSelect"
+    },
+    {
+      "chord": [{ "key": "ArrowRight", "alt": true, "ctrl": true, "shift": true }],
+      "command": "cursorWordPartRightSelect"
+    },
+    { "chord": [{ "key": "Home", "shift": true }], "command": "selectLineStart" },
+    { "chord": [{ "key": "End", "shift": true }], "command": "selectLineEnd" },
+    { "chord": [{ "key": "ArrowUp", "shift": true }], "command": "selectUp" },
+    { "chord": [{ "key": "ArrowDown", "shift": true }], "command": "selectDown" },
+    { "chord": [{ "key": "PageUp", "shift": true }], "command": "selectPageUp" },
+    { "chord": [{ "key": "PageDown", "shift": true }], "command": "selectPageDown" },
+    { "chord": [{ "key": "Home", "ctrl": true, "shift": true }], "command": "selectDocumentStart" },
+    { "chord": [{ "key": "End", "ctrl": true, "shift": true }], "command": "selectDocumentEnd" },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "ArrowLeft", "alt": true }
+      ],
+      "command": "cursorColumnSelectLeft"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "ArrowRight", "alt": true }
+      ],
+      "command": "cursorColumnSelectRight"
+    },
+    { "chord": [{ "key": "ArrowUp", "mod": true }], "command": "cursorColumnSelectUp" },
+    { "chord": [{ "key": "ArrowDown", "mod": true }], "command": "cursorColumnSelectDown" },
+    {
+      "chord": [{ "key": "PageUp", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectPageUp"
+    },
+    {
+      "chord": [{ "key": "PageDown", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectPageDown"
+    },
+    { "chord": [{ "key": "ArrowLeft" }], "command": "cursorLeft" },
+    { "chord": [{ "key": "ArrowRight" }], "command": "cursorRight" },
+    { "chord": [{ "key": "ArrowLeft", "ctrl": true }], "command": "cursorWordLeft" },
+    { "chord": [{ "key": "ArrowRight", "ctrl": true }], "command": "cursorWordRight" },
+    {
+      "chord": [{ "key": "ArrowLeft", "alt": true, "ctrl": true }],
+      "command": "cursorWordPartLeft"
+    },
+    {
+      "chord": [{ "key": "ArrowRight", "alt": true, "ctrl": true }],
+      "command": "cursorWordPartRight"
+    },
+    { "chord": [{ "key": "Home" }], "command": "cursorLineStart" },
+    { "chord": [{ "key": "End" }], "command": "cursorLineEnd" },
+    { "chord": [{ "key": "ArrowUp" }], "command": "cursorUp" },
+    { "chord": [{ "key": "ArrowDown" }], "command": "cursorDown" },
+    { "chord": [{ "key": "PageUp" }], "command": "cursorPageUp" },
+    { "chord": [{ "key": "PageDown" }], "command": "cursorPageDown" },
+    { "chord": [{ "key": "Home", "ctrl": true }], "command": "cursorDocumentStart" },
+    { "chord": [{ "key": "End", "ctrl": true }], "command": "cursorDocumentEnd" }
+  ],
+  "vscode:linux": [
+    { "chord": [{ "key": "Space", "ctrl": true }], "command": "editor.action.triggerSuggest" },
+    {
+      "chord": [{ "key": "ArrowDown" }],
+      "command": "selectNextSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp" }],
+      "command": "selectPrevSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "PageDown" }],
+      "command": "selectNextPageSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "PageUp" }],
+      "command": "selectPrevPageSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "Enter" }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Tab" }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Enter", "shift": true }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Tab", "shift": true }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Escape" }],
+      "command": "hideSuggestWidget",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "Escape" }],
+      "command": "closeParameterHints",
+      "when": ["parameterHintsVisible"]
+    },
+    {
+      "chord": [{ "key": "ArrowDown" }],
+      "command": "showNextParameterHint",
+      "when": ["parameterHintsVisible", "parameterHintsMultipleSignatures"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp" }],
+      "command": "showPrevParameterHint",
+      "when": ["parameterHintsVisible", "parameterHintsMultipleSignatures"]
+    },
+    { "chord": [{ "key": "[", "mod": true, "shift": true }], "command": "editor.fold" },
+    { "chord": [{ "key": "]", "mod": true, "shift": true }], "command": "editor.unfold" },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "[", "mod": true }
+      ],
+      "command": "editor.foldRecursively"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "]", "mod": true }
+      ],
+      "command": "editor.unfoldRecursively"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": ".", "mod": true }
+      ],
+      "command": "editor.removeManualFoldingRanges"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "I", "mod": true }
+      ],
+      "command": "editor.action.showHover"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "C", "mod": true }
+      ],
+      "command": "editor.action.commentLine",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "F12", "shift": true }], "command": "editor.action.goToReferences" },
+    { "chord": [{ "key": "F12", "alt": true }], "command": "editor.action.peekDefinition" },
+    { "chord": [{ "key": "F12", "mod": true }], "command": "editor.action.goToImplementation" },
+    {
+      "chord": [{ "key": "K", "mod": true }, { "key": "F12" }],
+      "command": "editor.action.revealDefinitionAside"
+    },
+    {
+      "chord": [{ "key": "F", "alt": true, "shift": true }],
+      "command": "editor.action.formatDocument",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "F8" }], "command": "editor.action.marker.next" },
+    { "chord": [{ "key": "F8", "shift": true }], "command": "editor.action.marker.prev" },
+    {
+      "chord": [{ "key": "\\", "mod": true, "shift": true }],
+      "command": "editor.action.jumpToBracket"
+    },
+    { "chord": [{ "key": "Z", "alt": true }], "command": "editor.action.toggleWordWrap" },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "X", "mod": true }
+      ],
+      "command": "editor.action.trimTrailingWhitespace",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Tab" }],
+      "command": "editor.action.inlineSuggest.commit",
+      "when": ["!tabFocusMode", "writable", "inlineSuggestionVisible"]
+    },
+    {
+      "chord": [{ "key": ".", "alt": true, "shift": true }],
+      "command": "editor.action.autoFix",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "F2" }], "command": "editor.action.rename", "when": ["writable"] },
+    { "chord": [{ "key": "F12" }], "command": "goToDefinition" },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "0", "mod": true }
+      ],
+      "command": "editor.foldAll"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "J", "mod": true }
+      ],
+      "command": "editor.unfoldAll"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "1", "mod": true }
+      ],
+      "command": "editor.foldLevel1"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "2", "mod": true }
+      ],
+      "command": "editor.foldLevel2"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "3", "mod": true }
+      ],
+      "command": "editor.foldLevel3"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "4", "mod": true }
+      ],
+      "command": "editor.foldLevel4"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "5", "mod": true }
+      ],
+      "command": "editor.foldLevel5"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "6", "mod": true }
+      ],
+      "command": "editor.foldLevel6"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "7", "mod": true }
+      ],
+      "command": "editor.foldLevel7"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": ",", "mod": true }
+      ],
+      "command": "editor.createFoldingRangeFromSelection",
+      "when": ["hasSelection"]
+    },
+    { "chord": [{ "key": "D", "mod": true }], "command": "addNextOccurrence" },
+    { "chord": [{ "key": "Enter", "alt": true }], "command": "selectAllMatches" },
+    {
+      "chord": [{ "key": "ArrowUp", "alt": true, "shift": true }],
+      "command": "editor.action.insertCursorAbove"
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "alt": true, "shift": true }],
+      "command": "editor.action.insertCursorBelow"
+    },
+    {
+      "chord": [{ "key": "ArrowUp", "mod": true, "shift": true }],
+      "command": "editor.action.insertCursorAbove"
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "mod": true, "shift": true }],
+      "command": "editor.action.insertCursorBelow"
+    },
+    {
+      "chord": [{ "key": "L", "mod": true, "shift": true }],
+      "command": "editor.action.selectHighlights"
+    },
+    { "chord": [{ "key": "F2", "mod": true }], "command": "editor.action.changeAll" },
+    {
+      "chord": [{ "key": "Backspace", "ctrl": true }],
+      "command": "deleteWordLeft",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Delete", "ctrl": true }],
+      "command": "deleteWordRight",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Backspace", "alt": true, "ctrl": true }],
+      "command": "deleteWordPartLeft",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Delete", "alt": true, "ctrl": true }],
+      "command": "deleteWordPartRight",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "K", "mod": true, "shift": true }],
+      "command": "editor.action.deleteLines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp", "mod": true, "alt": true, "shift": true }],
+      "command": "editor.action.copyLinesUpAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "mod": true, "alt": true, "shift": true }],
+      "command": "editor.action.copyLinesDownAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp", "alt": true }],
+      "command": "editor.action.moveLinesUpAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "alt": true }],
+      "command": "editor.action.moveLinesDownAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Enter", "mod": true, "shift": true }],
+      "command": "editor.action.insertLineBefore",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Enter", "mod": true }],
+      "command": "editor.action.insertLineAfter",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "/", "mod": true }],
+      "command": "editor.action.commentLine",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "A", "mod": true, "shift": true }],
+      "command": "editor.action.blockComment",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "]", "mod": true }],
+      "command": "editor.action.indentLines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "[", "mod": true }],
+      "command": "editor.action.outdentLines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "I", "alt": true, "shift": true }],
+      "command": "editor.action.reindentselectedlines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "I", "mod": true, "alt": true, "shift": true }],
+      "command": "editor.action.reindentlines",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "Backspace" }], "command": "deleteBackward", "when": ["writable"] },
+    { "chord": [{ "key": "Delete" }], "command": "deleteForward", "when": ["writable"] },
+    {
+      "chord": [{ "key": "Tab" }],
+      "command": "indentSelection",
+      "when": ["writable", "!tabFocusMode"]
+    },
+    {
+      "chord": [{ "key": "Tab", "shift": true }],
+      "command": "outdentSelection",
+      "when": ["writable", "!tabFocusMode"]
+    },
+    { "chord": [{ "key": "M", "ctrl": true }], "command": "editor.action.toggleTabFocusMode" },
+    { "chord": [{ "key": "H", "mod": true }], "command": "findReplace" },
+    {
+      "chord": [{ "key": "Enter", "mod": true, "alt": true }],
+      "command": "replaceAll",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "Z", "mod": true }], "command": "undo", "when": ["writable"] },
+    {
+      "chord": [{ "key": "Z", "mod": true, "shift": true }],
+      "command": "redo",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowLeft", "alt": true }],
+      "command": "jumpBack",
+      "preventDefault": true
+    },
+    {
+      "chord": [{ "key": "ArrowRight", "alt": true }],
+      "command": "jumpForward",
+      "preventDefault": true
+    },
+    { "chord": [{ "key": "U", "mod": true }], "command": "cursorUndo" },
+    { "chord": [{ "key": "U", "mod": true, "shift": true }], "command": "cursorRedo" },
+    { "chord": [{ "key": "Y", "ctrl": true }], "command": "redo", "when": ["writable"] },
+    { "chord": [{ "key": "Escape" }], "command": "closeFind", "when": ["findVisible"] },
+    {
+      "chord": [{ "key": "Escape" }],
+      "command": "clearSecondarySelections",
+      "when": ["!findVisible"]
+    },
+    { "chord": [{ "key": "F", "mod": true }], "command": "find" },
+    { "chord": [{ "key": "F3" }], "command": "findNext" },
+    { "chord": [{ "key": "F3", "shift": true }], "command": "findPrevious" },
+    {
+      "chord": [{ "key": "C", "alt": true }],
+      "command": "toggleFindCaseSensitive",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "W", "alt": true }],
+      "command": "toggleFindWholeWord",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "R", "alt": true }],
+      "command": "toggleFindRegex",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "L", "alt": true }],
+      "command": "toggleFindInSelection",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "P", "alt": true }],
+      "command": "togglePreserveCase",
+      "when": ["findVisible"]
+    },
+    { "chord": [{ "key": "A", "mod": true }], "command": "selectAll" },
+    {
+      "chord": [{ "key": "ArrowRight", "alt": true, "shift": true }],
+      "command": "editor.action.smartSelect.expand"
+    },
+    {
+      "chord": [{ "key": "ArrowLeft", "alt": true, "shift": true }],
+      "command": "editor.action.smartSelect.shrink"
+    },
+    { "chord": [{ "key": "ArrowLeft", "shift": true }], "command": "selectLeft" },
+    { "chord": [{ "key": "ArrowRight", "shift": true }], "command": "selectRight" },
+    { "chord": [{ "key": "ArrowLeft", "ctrl": true, "shift": true }], "command": "selectWordLeft" },
+    {
+      "chord": [{ "key": "ArrowRight", "ctrl": true, "shift": true }],
+      "command": "selectWordRight"
+    },
+    {
+      "chord": [{ "key": "ArrowLeft", "alt": true, "ctrl": true, "shift": true }],
+      "command": "cursorWordPartLeftSelect"
+    },
+    {
+      "chord": [{ "key": "ArrowRight", "alt": true, "ctrl": true, "shift": true }],
+      "command": "cursorWordPartRightSelect"
+    },
+    { "chord": [{ "key": "Home", "shift": true }], "command": "selectLineStart" },
+    { "chord": [{ "key": "End", "shift": true }], "command": "selectLineEnd" },
+    { "chord": [{ "key": "ArrowUp", "shift": true }], "command": "selectUp" },
+    { "chord": [{ "key": "ArrowDown", "shift": true }], "command": "selectDown" },
+    { "chord": [{ "key": "PageUp", "shift": true }], "command": "selectPageUp" },
+    { "chord": [{ "key": "PageDown", "shift": true }], "command": "selectPageDown" },
+    { "chord": [{ "key": "Home", "ctrl": true, "shift": true }], "command": "selectDocumentStart" },
+    { "chord": [{ "key": "End", "ctrl": true, "shift": true }], "command": "selectDocumentEnd" },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "ArrowLeft", "alt": true }
+      ],
+      "command": "cursorColumnSelectLeft"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "ArrowRight", "alt": true }
+      ],
+      "command": "cursorColumnSelectRight"
+    },
+    { "chord": [{ "key": "ArrowUp", "mod": true }], "command": "cursorColumnSelectUp" },
+    { "chord": [{ "key": "ArrowDown", "mod": true }], "command": "cursorColumnSelectDown" },
+    {
+      "chord": [{ "key": "PageUp", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectPageUp"
+    },
+    {
+      "chord": [{ "key": "PageDown", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectPageDown"
+    },
+    { "chord": [{ "key": "ArrowLeft" }], "command": "cursorLeft" },
+    { "chord": [{ "key": "ArrowRight" }], "command": "cursorRight" },
+    { "chord": [{ "key": "ArrowLeft", "ctrl": true }], "command": "cursorWordLeft" },
+    { "chord": [{ "key": "ArrowRight", "ctrl": true }], "command": "cursorWordRight" },
+    {
+      "chord": [{ "key": "ArrowLeft", "alt": true, "ctrl": true }],
+      "command": "cursorWordPartLeft"
+    },
+    {
+      "chord": [{ "key": "ArrowRight", "alt": true, "ctrl": true }],
+      "command": "cursorWordPartRight"
+    },
+    { "chord": [{ "key": "Home" }], "command": "cursorLineStart" },
+    { "chord": [{ "key": "End" }], "command": "cursorLineEnd" },
+    { "chord": [{ "key": "ArrowUp" }], "command": "cursorUp" },
+    { "chord": [{ "key": "ArrowDown" }], "command": "cursorDown" },
+    { "chord": [{ "key": "PageUp" }], "command": "cursorPageUp" },
+    { "chord": [{ "key": "PageDown" }], "command": "cursorPageDown" },
+    { "chord": [{ "key": "Home", "ctrl": true }], "command": "cursorDocumentStart" },
+    { "chord": [{ "key": "End", "ctrl": true }], "command": "cursorDocumentEnd" }
+  ],
+  "default:mac": [
+    { "chord": [{ "key": "Space", "ctrl": true }], "command": "editor.action.triggerSuggest" },
+    {
+      "chord": [{ "key": "ArrowDown" }],
+      "command": "selectNextSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp" }],
+      "command": "selectPrevSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "PageDown" }],
+      "command": "selectNextPageSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "PageUp" }],
+      "command": "selectPrevPageSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "Enter" }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Tab" }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Enter", "shift": true }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Tab", "shift": true }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Escape" }],
+      "command": "hideSuggestWidget",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "Escape" }],
+      "command": "closeParameterHints",
+      "when": ["parameterHintsVisible"]
+    },
+    {
+      "chord": [{ "key": "ArrowDown" }],
+      "command": "showNextParameterHint",
+      "when": ["parameterHintsVisible", "parameterHintsMultipleSignatures"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp" }],
+      "command": "showPrevParameterHint",
+      "when": ["parameterHintsVisible", "parameterHintsMultipleSignatures"]
+    },
+    {
+      "chord": [{ "key": "ArrowRight", "mod": true, "alt": true }],
+      "command": "editor.action.inlineSuggest.acceptNextWord",
+      "when": ["writable", "inlineSuggestionVisible"]
+    },
+    {
+      "chord": [{ "key": ".", "mod": true, "alt": true }],
+      "command": "editor.action.autoFix",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "F2" }], "command": "editor.action.rename", "when": ["writable"] },
+    {
+      "chord": [{ "key": "F", "alt": true, "shift": true }],
+      "command": "editor.action.formatDocument",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "F", "mod": true, "shift": true }],
+      "command": "editor.action.formatDocument",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "F12" }], "command": "goToDefinition" },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "[", "mod": true }
+      ],
+      "command": "editor.fold"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "]", "mod": true }
+      ],
+      "command": "editor.unfold"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "[", "mod": true, "shift": true }
+      ],
+      "command": "editor.foldRecursively"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "]", "mod": true, "shift": true }
+      ],
+      "command": "editor.unfoldRecursively"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "0", "mod": true }
+      ],
+      "command": "editor.foldAll"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "J", "mod": true }
+      ],
+      "command": "editor.unfoldAll"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "1", "mod": true }
+      ],
+      "command": "editor.foldLevel1"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "2", "mod": true }
+      ],
+      "command": "editor.foldLevel2"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "3", "mod": true }
+      ],
+      "command": "editor.foldLevel3"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "4", "mod": true }
+      ],
+      "command": "editor.foldLevel4"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "5", "mod": true }
+      ],
+      "command": "editor.foldLevel5"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "6", "mod": true }
+      ],
+      "command": "editor.foldLevel6"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "7", "mod": true }
+      ],
+      "command": "editor.foldLevel7"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": ",", "mod": true }
+      ],
+      "command": "editor.createFoldingRangeFromSelection",
+      "when": ["hasSelection"]
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": ",", "mod": true, "shift": true }
+      ],
+      "command": "editor.removeManualFoldingRanges"
+    },
+    { "chord": [{ "key": "D", "mod": true }], "command": "addNextOccurrence" },
+    { "chord": [{ "key": "Enter", "alt": true }], "command": "selectAllMatches" },
+    {
+      "chord": [{ "key": "ArrowUp", "mod": true, "alt": true }],
+      "command": "editor.action.insertCursorAbove"
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "mod": true, "alt": true }],
+      "command": "editor.action.insertCursorBelow"
+    },
+    {
+      "chord": [{ "key": "L", "mod": true, "shift": true }],
+      "command": "editor.action.selectHighlights"
+    },
+    { "chord": [{ "key": "F2", "mod": true }], "command": "editor.action.changeAll" },
+    {
+      "chord": [{ "key": "Backspace", "alt": true }],
+      "command": "deleteWordLeft",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Delete", "alt": true }],
+      "command": "deleteWordRight",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Backspace", "alt": true, "ctrl": true }],
+      "command": "deleteWordPartLeft",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Delete", "alt": true, "ctrl": true }],
+      "command": "deleteWordPartRight",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "K", "mod": true, "shift": true }],
+      "command": "editor.action.deleteLines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp", "alt": true, "shift": true }],
+      "command": "editor.action.copyLinesUpAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "alt": true, "shift": true }],
+      "command": "editor.action.copyLinesDownAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp", "alt": true }],
+      "command": "editor.action.moveLinesUpAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "alt": true }],
+      "command": "editor.action.moveLinesDownAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Enter", "mod": true, "shift": true }],
+      "command": "editor.action.insertLineBefore",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Enter", "mod": true }],
+      "command": "editor.action.insertLineAfter",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "/", "mod": true }],
+      "command": "editor.action.commentLine",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "A", "alt": true, "shift": true }],
+      "command": "editor.action.blockComment",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "]", "mod": true }],
+      "command": "editor.action.indentLines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "[", "mod": true }],
+      "command": "editor.action.outdentLines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "I", "alt": true, "shift": true }],
+      "command": "editor.action.reindentselectedlines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "I", "mod": true, "alt": true, "shift": true }],
+      "command": "editor.action.reindentlines",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "Backspace" }], "command": "deleteBackward", "when": ["writable"] },
+    { "chord": [{ "key": "Delete" }], "command": "deleteForward", "when": ["writable"] },
+    {
+      "chord": [{ "key": "Tab" }],
+      "command": "indentSelection",
+      "when": ["writable", "!tabFocusMode"]
+    },
+    {
+      "chord": [{ "key": "Tab", "shift": true }],
+      "command": "outdentSelection",
+      "when": ["writable", "!tabFocusMode"]
+    },
+    {
+      "chord": [{ "key": "M", "ctrl": true, "shift": true }],
+      "command": "editor.action.toggleTabFocusMode"
+    },
+    { "chord": [{ "key": "F", "mod": true, "alt": true }], "command": "findReplace" },
+    {
+      "chord": [{ "key": "Enter", "mod": true, "alt": true }],
+      "command": "replaceAll",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "Z", "mod": true }], "command": "undo", "when": ["writable"] },
+    {
+      "chord": [{ "key": "Z", "mod": true, "shift": true }],
+      "command": "redo",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "-", "ctrl": true }], "command": "jumpBack", "preventDefault": true },
+    {
+      "chord": [{ "key": "-", "ctrl": true, "shift": true }],
+      "command": "jumpForward",
+      "preventDefault": true
+    },
+    { "chord": [{ "key": "U", "mod": true }], "command": "cursorUndo" },
+    { "chord": [{ "key": "U", "mod": true, "shift": true }], "command": "cursorRedo" },
+    { "chord": [{ "key": "Escape" }], "command": "closeFind", "when": ["findVisible"] },
+    {
+      "chord": [{ "key": "Escape" }],
+      "command": "clearSecondarySelections",
+      "when": ["!findVisible"]
+    },
+    { "chord": [{ "key": "F", "mod": true }], "command": "find" },
+    { "chord": [{ "key": "G", "mod": true }], "command": "findNext" },
+    { "chord": [{ "key": "G", "mod": true, "shift": true }], "command": "findPrevious" },
+    {
+      "chord": [{ "key": "C", "alt": true }],
+      "command": "toggleFindCaseSensitive",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "W", "alt": true }],
+      "command": "toggleFindWholeWord",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "R", "alt": true }],
+      "command": "toggleFindRegex",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "L", "alt": true }],
+      "command": "toggleFindInSelection",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "P", "alt": true }],
+      "command": "togglePreserveCase",
+      "when": ["findVisible"]
+    },
+    { "chord": [{ "key": "A", "mod": true }], "command": "selectAll" },
+    {
+      "chord": [{ "key": "ArrowRight", "mod": true, "ctrl": true, "shift": true }],
+      "command": "editor.action.smartSelect.expand"
+    },
+    {
+      "chord": [{ "key": "ArrowLeft", "mod": true, "ctrl": true, "shift": true }],
+      "command": "editor.action.smartSelect.shrink"
+    },
+    { "chord": [{ "key": "ArrowLeft", "shift": true }], "command": "selectLeft" },
+    { "chord": [{ "key": "ArrowRight", "shift": true }], "command": "selectRight" },
+    { "chord": [{ "key": "ArrowLeft", "alt": true, "shift": true }], "command": "selectWordLeft" },
+    {
+      "chord": [{ "key": "ArrowRight", "alt": true, "shift": true }],
+      "command": "selectWordRight"
+    },
+    {
+      "chord": [{ "key": "ArrowLeft", "alt": true, "ctrl": true, "shift": true }],
+      "command": "cursorWordPartLeftSelect"
+    },
+    {
+      "chord": [{ "key": "ArrowRight", "alt": true, "ctrl": true, "shift": true }],
+      "command": "cursorWordPartRightSelect"
+    },
+    { "chord": [{ "key": "Home", "shift": true }], "command": "selectLineStart" },
+    { "chord": [{ "key": "End", "shift": true }], "command": "selectLineEnd" },
+    {
+      "chord": [{ "key": "ArrowLeft", "meta": true, "shift": true }],
+      "command": "selectLineStart"
+    },
+    { "chord": [{ "key": "ArrowRight", "meta": true, "shift": true }], "command": "selectLineEnd" },
+    { "chord": [{ "key": "ArrowUp", "shift": true }], "command": "selectUp" },
+    { "chord": [{ "key": "ArrowDown", "shift": true }], "command": "selectDown" },
+    { "chord": [{ "key": "PageUp", "shift": true }], "command": "selectPageUp" },
+    { "chord": [{ "key": "PageDown", "shift": true }], "command": "selectPageDown" },
+    {
+      "chord": [{ "key": "ArrowUp", "meta": true, "shift": true }],
+      "command": "selectDocumentStart"
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "meta": true, "shift": true }],
+      "command": "selectDocumentEnd"
+    },
+    {
+      "chord": [{ "key": "ArrowLeft", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectLeft"
+    },
+    {
+      "chord": [{ "key": "ArrowRight", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectRight"
+    },
+    {
+      "chord": [{ "key": "ArrowUp", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectUp"
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectDown"
+    },
+    {
+      "chord": [{ "key": "PageUp", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectPageUp"
+    },
+    {
+      "chord": [{ "key": "PageDown", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectPageDown"
+    },
+    { "chord": [{ "key": "ArrowLeft" }], "command": "cursorLeft" },
+    { "chord": [{ "key": "ArrowRight" }], "command": "cursorRight" },
+    { "chord": [{ "key": "ArrowLeft", "alt": true }], "command": "cursorWordLeft" },
+    { "chord": [{ "key": "ArrowRight", "alt": true }], "command": "cursorWordRight" },
+    {
+      "chord": [{ "key": "ArrowLeft", "alt": true, "ctrl": true }],
+      "command": "cursorWordPartLeft"
+    },
+    {
+      "chord": [{ "key": "ArrowRight", "alt": true, "ctrl": true }],
+      "command": "cursorWordPartRight"
+    },
+    { "chord": [{ "key": "Home" }], "command": "cursorLineStart" },
+    { "chord": [{ "key": "End" }], "command": "cursorLineEnd" },
+    { "chord": [{ "key": "ArrowLeft", "meta": true }], "command": "cursorLineStart" },
+    { "chord": [{ "key": "ArrowRight", "meta": true }], "command": "cursorLineEnd" },
+    { "chord": [{ "key": "ArrowUp" }], "command": "cursorUp" },
+    { "chord": [{ "key": "ArrowDown" }], "command": "cursorDown" },
+    { "chord": [{ "key": "PageUp" }], "command": "cursorPageUp" },
+    { "chord": [{ "key": "PageDown" }], "command": "cursorPageDown" },
+    { "chord": [{ "key": "ArrowUp", "meta": true }], "command": "cursorDocumentStart" },
+    { "chord": [{ "key": "ArrowDown", "meta": true }], "command": "cursorDocumentEnd" }
+  ],
+  "vscode:mac": [
+    { "chord": [{ "key": "Space", "ctrl": true }], "command": "editor.action.triggerSuggest" },
+    {
+      "chord": [{ "key": "ArrowDown" }],
+      "command": "selectNextSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp" }],
+      "command": "selectPrevSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "PageDown" }],
+      "command": "selectNextPageSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "PageUp" }],
+      "command": "selectPrevPageSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "Enter" }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Tab" }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Enter", "shift": true }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Tab", "shift": true }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Escape" }],
+      "command": "hideSuggestWidget",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "Escape" }],
+      "command": "closeParameterHints",
+      "when": ["parameterHintsVisible"]
+    },
+    {
+      "chord": [{ "key": "ArrowDown" }],
+      "command": "showNextParameterHint",
+      "when": ["parameterHintsVisible", "parameterHintsMultipleSignatures"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp" }],
+      "command": "showPrevParameterHint",
+      "when": ["parameterHintsVisible", "parameterHintsMultipleSignatures"]
+    },
+    { "chord": [{ "key": "[", "mod": true, "alt": true }], "command": "editor.fold" },
+    { "chord": [{ "key": "]", "mod": true, "alt": true }], "command": "editor.unfold" },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "[", "mod": true }
+      ],
+      "command": "editor.foldRecursively"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "]", "mod": true }
+      ],
+      "command": "editor.unfoldRecursively"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": ".", "mod": true }
+      ],
+      "command": "editor.removeManualFoldingRanges"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "I", "mod": true }
+      ],
+      "command": "editor.action.showHover"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "C", "mod": true }
+      ],
+      "command": "editor.action.commentLine",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "F12", "shift": true }], "command": "editor.action.goToReferences" },
+    { "chord": [{ "key": "F12", "alt": true }], "command": "editor.action.peekDefinition" },
+    { "chord": [{ "key": "F12", "mod": true }], "command": "editor.action.goToImplementation" },
+    {
+      "chord": [{ "key": "K", "mod": true }, { "key": "F12" }],
+      "command": "editor.action.revealDefinitionAside"
+    },
+    {
+      "chord": [{ "key": "F", "alt": true, "shift": true }],
+      "command": "editor.action.formatDocument",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "F8" }], "command": "editor.action.marker.next" },
+    { "chord": [{ "key": "F8", "shift": true }], "command": "editor.action.marker.prev" },
+    {
+      "chord": [{ "key": "\\", "mod": true, "shift": true }],
+      "command": "editor.action.jumpToBracket"
+    },
+    { "chord": [{ "key": "Z", "alt": true }], "command": "editor.action.toggleWordWrap" },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "X", "mod": true }
+      ],
+      "command": "editor.action.trimTrailingWhitespace",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Tab" }],
+      "command": "editor.action.inlineSuggest.commit",
+      "when": ["!tabFocusMode", "writable", "inlineSuggestionVisible"]
+    },
+    {
+      "chord": [{ "key": "ArrowRight", "mod": true, "alt": true }],
+      "command": "editor.action.inlineSuggest.acceptNextWord",
+      "when": ["writable", "inlineSuggestionVisible"]
+    },
+    {
+      "chord": [{ "key": ".", "mod": true, "alt": true }],
+      "command": "editor.action.autoFix",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "F2" }], "command": "editor.action.rename", "when": ["writable"] },
+    { "chord": [{ "key": "F12" }], "command": "goToDefinition" },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "0", "mod": true }
+      ],
+      "command": "editor.foldAll"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "J", "mod": true }
+      ],
+      "command": "editor.unfoldAll"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "1", "mod": true }
+      ],
+      "command": "editor.foldLevel1"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "2", "mod": true }
+      ],
+      "command": "editor.foldLevel2"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "3", "mod": true }
+      ],
+      "command": "editor.foldLevel3"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "4", "mod": true }
+      ],
+      "command": "editor.foldLevel4"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "5", "mod": true }
+      ],
+      "command": "editor.foldLevel5"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "6", "mod": true }
+      ],
+      "command": "editor.foldLevel6"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "7", "mod": true }
+      ],
+      "command": "editor.foldLevel7"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": ",", "mod": true }
+      ],
+      "command": "editor.createFoldingRangeFromSelection",
+      "when": ["hasSelection"]
+    },
+    { "chord": [{ "key": "D", "mod": true }], "command": "addNextOccurrence" },
+    { "chord": [{ "key": "Enter", "alt": true }], "command": "selectAllMatches" },
+    {
+      "chord": [{ "key": "ArrowUp", "mod": true, "alt": true }],
+      "command": "editor.action.insertCursorAbove"
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "mod": true, "alt": true }],
+      "command": "editor.action.insertCursorBelow"
+    },
+    {
+      "chord": [{ "key": "L", "mod": true, "shift": true }],
+      "command": "editor.action.selectHighlights"
+    },
+    { "chord": [{ "key": "F2", "mod": true }], "command": "editor.action.changeAll" },
+    {
+      "chord": [{ "key": "Backspace", "alt": true }],
+      "command": "deleteWordLeft",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Delete", "alt": true }],
+      "command": "deleteWordRight",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Backspace", "alt": true, "ctrl": true }],
+      "command": "deleteWordPartLeft",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Delete", "alt": true, "ctrl": true }],
+      "command": "deleteWordPartRight",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "K", "mod": true, "shift": true }],
+      "command": "editor.action.deleteLines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp", "alt": true, "shift": true }],
+      "command": "editor.action.copyLinesUpAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "alt": true, "shift": true }],
+      "command": "editor.action.copyLinesDownAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp", "alt": true }],
+      "command": "editor.action.moveLinesUpAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "alt": true }],
+      "command": "editor.action.moveLinesDownAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Enter", "mod": true, "shift": true }],
+      "command": "editor.action.insertLineBefore",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Enter", "mod": true }],
+      "command": "editor.action.insertLineAfter",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "/", "mod": true }],
+      "command": "editor.action.commentLine",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "A", "alt": true, "shift": true }],
+      "command": "editor.action.blockComment",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "]", "mod": true }],
+      "command": "editor.action.indentLines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "[", "mod": true }],
+      "command": "editor.action.outdentLines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "I", "alt": true, "shift": true }],
+      "command": "editor.action.reindentselectedlines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "I", "mod": true, "alt": true, "shift": true }],
+      "command": "editor.action.reindentlines",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "Backspace" }], "command": "deleteBackward", "when": ["writable"] },
+    { "chord": [{ "key": "Delete" }], "command": "deleteForward", "when": ["writable"] },
+    {
+      "chord": [{ "key": "Tab" }],
+      "command": "indentSelection",
+      "when": ["writable", "!tabFocusMode"]
+    },
+    {
+      "chord": [{ "key": "Tab", "shift": true }],
+      "command": "outdentSelection",
+      "when": ["writable", "!tabFocusMode"]
+    },
+    {
+      "chord": [{ "key": "M", "ctrl": true, "shift": true }],
+      "command": "editor.action.toggleTabFocusMode"
+    },
+    { "chord": [{ "key": "F", "mod": true, "alt": true }], "command": "findReplace" },
+    {
+      "chord": [{ "key": "Enter", "mod": true, "alt": true }],
+      "command": "replaceAll",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "Z", "mod": true }], "command": "undo", "when": ["writable"] },
+    {
+      "chord": [{ "key": "Z", "mod": true, "shift": true }],
+      "command": "redo",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "-", "ctrl": true }], "command": "jumpBack", "preventDefault": true },
+    {
+      "chord": [{ "key": "-", "ctrl": true, "shift": true }],
+      "command": "jumpForward",
+      "preventDefault": true
+    },
+    { "chord": [{ "key": "U", "mod": true }], "command": "cursorUndo" },
+    { "chord": [{ "key": "U", "mod": true, "shift": true }], "command": "cursorRedo" },
+    { "chord": [{ "key": "Escape" }], "command": "closeFind", "when": ["findVisible"] },
+    {
+      "chord": [{ "key": "Escape" }],
+      "command": "clearSecondarySelections",
+      "when": ["!findVisible"]
+    },
+    { "chord": [{ "key": "F", "mod": true }], "command": "find" },
+    { "chord": [{ "key": "G", "mod": true }], "command": "findNext" },
+    { "chord": [{ "key": "G", "mod": true, "shift": true }], "command": "findPrevious" },
+    {
+      "chord": [{ "key": "C", "alt": true }],
+      "command": "toggleFindCaseSensitive",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "W", "alt": true }],
+      "command": "toggleFindWholeWord",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "R", "alt": true }],
+      "command": "toggleFindRegex",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "L", "alt": true }],
+      "command": "toggleFindInSelection",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "P", "alt": true }],
+      "command": "togglePreserveCase",
+      "when": ["findVisible"]
+    },
+    { "chord": [{ "key": "A", "mod": true }], "command": "selectAll" },
+    {
+      "chord": [{ "key": "ArrowRight", "mod": true, "ctrl": true, "shift": true }],
+      "command": "editor.action.smartSelect.expand"
+    },
+    {
+      "chord": [{ "key": "ArrowLeft", "mod": true, "ctrl": true, "shift": true }],
+      "command": "editor.action.smartSelect.shrink"
+    },
+    { "chord": [{ "key": "ArrowLeft", "shift": true }], "command": "selectLeft" },
+    { "chord": [{ "key": "ArrowRight", "shift": true }], "command": "selectRight" },
+    { "chord": [{ "key": "ArrowLeft", "alt": true, "shift": true }], "command": "selectWordLeft" },
+    {
+      "chord": [{ "key": "ArrowRight", "alt": true, "shift": true }],
+      "command": "selectWordRight"
+    },
+    {
+      "chord": [{ "key": "ArrowLeft", "alt": true, "ctrl": true, "shift": true }],
+      "command": "cursorWordPartLeftSelect"
+    },
+    {
+      "chord": [{ "key": "ArrowRight", "alt": true, "ctrl": true, "shift": true }],
+      "command": "cursorWordPartRightSelect"
+    },
+    { "chord": [{ "key": "Home", "shift": true }], "command": "selectLineStart" },
+    { "chord": [{ "key": "End", "shift": true }], "command": "selectLineEnd" },
+    {
+      "chord": [{ "key": "ArrowLeft", "meta": true, "shift": true }],
+      "command": "selectLineStart"
+    },
+    { "chord": [{ "key": "ArrowRight", "meta": true, "shift": true }], "command": "selectLineEnd" },
+    { "chord": [{ "key": "ArrowUp", "shift": true }], "command": "selectUp" },
+    { "chord": [{ "key": "ArrowDown", "shift": true }], "command": "selectDown" },
+    { "chord": [{ "key": "PageUp", "shift": true }], "command": "selectPageUp" },
+    { "chord": [{ "key": "PageDown", "shift": true }], "command": "selectPageDown" },
+    {
+      "chord": [{ "key": "ArrowUp", "meta": true, "shift": true }],
+      "command": "selectDocumentStart"
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "meta": true, "shift": true }],
+      "command": "selectDocumentEnd"
+    },
+    {
+      "chord": [{ "key": "ArrowLeft", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectLeft"
+    },
+    {
+      "chord": [{ "key": "ArrowRight", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectRight"
+    },
+    {
+      "chord": [{ "key": "ArrowUp", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectUp"
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectDown"
+    },
+    {
+      "chord": [{ "key": "PageUp", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectPageUp"
+    },
+    {
+      "chord": [{ "key": "PageDown", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectPageDown"
+    },
+    { "chord": [{ "key": "ArrowLeft" }], "command": "cursorLeft" },
+    { "chord": [{ "key": "ArrowRight" }], "command": "cursorRight" },
+    { "chord": [{ "key": "ArrowLeft", "alt": true }], "command": "cursorWordLeft" },
+    { "chord": [{ "key": "ArrowRight", "alt": true }], "command": "cursorWordRight" },
+    {
+      "chord": [{ "key": "ArrowLeft", "alt": true, "ctrl": true }],
+      "command": "cursorWordPartLeft"
+    },
+    {
+      "chord": [{ "key": "ArrowRight", "alt": true, "ctrl": true }],
+      "command": "cursorWordPartRight"
+    },
+    { "chord": [{ "key": "Home" }], "command": "cursorLineStart" },
+    { "chord": [{ "key": "End" }], "command": "cursorLineEnd" },
+    { "chord": [{ "key": "ArrowLeft", "meta": true }], "command": "cursorLineStart" },
+    { "chord": [{ "key": "ArrowRight", "meta": true }], "command": "cursorLineEnd" },
+    { "chord": [{ "key": "ArrowUp" }], "command": "cursorUp" },
+    { "chord": [{ "key": "ArrowDown" }], "command": "cursorDown" },
+    { "chord": [{ "key": "PageUp" }], "command": "cursorPageUp" },
+    { "chord": [{ "key": "PageDown" }], "command": "cursorPageDown" },
+    { "chord": [{ "key": "ArrowUp", "meta": true }], "command": "cursorDocumentStart" },
+    { "chord": [{ "key": "ArrowDown", "meta": true }], "command": "cursorDocumentEnd" }
+  ],
+  "default:windows": [
+    { "chord": [{ "key": "Space", "ctrl": true }], "command": "editor.action.triggerSuggest" },
+    {
+      "chord": [{ "key": "ArrowDown" }],
+      "command": "selectNextSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp" }],
+      "command": "selectPrevSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "PageDown" }],
+      "command": "selectNextPageSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "PageUp" }],
+      "command": "selectPrevPageSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "Enter" }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Tab" }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Enter", "shift": true }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Tab", "shift": true }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Escape" }],
+      "command": "hideSuggestWidget",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "Escape" }],
+      "command": "closeParameterHints",
+      "when": ["parameterHintsVisible"]
+    },
+    {
+      "chord": [{ "key": "ArrowDown" }],
+      "command": "showNextParameterHint",
+      "when": ["parameterHintsVisible", "parameterHintsMultipleSignatures"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp" }],
+      "command": "showPrevParameterHint",
+      "when": ["parameterHintsVisible", "parameterHintsMultipleSignatures"]
+    },
+    {
+      "chord": [{ "key": ".", "alt": true, "shift": true }],
+      "command": "editor.action.autoFix",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "F2" }], "command": "editor.action.rename", "when": ["writable"] },
+    {
+      "chord": [{ "key": "F", "alt": true, "shift": true }],
+      "command": "editor.action.formatDocument",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "F", "mod": true, "shift": true }],
+      "command": "editor.action.formatDocument",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "F12" }], "command": "goToDefinition" },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "[", "mod": true }
+      ],
+      "command": "editor.fold"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "]", "mod": true }
+      ],
+      "command": "editor.unfold"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "[", "mod": true, "shift": true }
+      ],
+      "command": "editor.foldRecursively"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "]", "mod": true, "shift": true }
+      ],
+      "command": "editor.unfoldRecursively"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "0", "mod": true }
+      ],
+      "command": "editor.foldAll"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "J", "mod": true }
+      ],
+      "command": "editor.unfoldAll"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "1", "mod": true }
+      ],
+      "command": "editor.foldLevel1"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "2", "mod": true }
+      ],
+      "command": "editor.foldLevel2"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "3", "mod": true }
+      ],
+      "command": "editor.foldLevel3"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "4", "mod": true }
+      ],
+      "command": "editor.foldLevel4"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "5", "mod": true }
+      ],
+      "command": "editor.foldLevel5"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "6", "mod": true }
+      ],
+      "command": "editor.foldLevel6"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "7", "mod": true }
+      ],
+      "command": "editor.foldLevel7"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": ",", "mod": true }
+      ],
+      "command": "editor.createFoldingRangeFromSelection",
+      "when": ["hasSelection"]
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": ",", "mod": true, "shift": true }
+      ],
+      "command": "editor.removeManualFoldingRanges"
+    },
+    { "chord": [{ "key": "D", "mod": true }], "command": "addNextOccurrence" },
+    { "chord": [{ "key": "Enter", "alt": true }], "command": "selectAllMatches" },
+    {
+      "chord": [{ "key": "ArrowUp", "mod": true, "alt": true }],
+      "command": "editor.action.insertCursorAbove"
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "mod": true, "alt": true }],
+      "command": "editor.action.insertCursorBelow"
+    },
+    {
+      "chord": [{ "key": "L", "mod": true, "shift": true }],
+      "command": "editor.action.selectHighlights"
+    },
+    { "chord": [{ "key": "F2", "mod": true }], "command": "editor.action.changeAll" },
+    {
+      "chord": [{ "key": "Backspace", "ctrl": true }],
+      "command": "deleteWordLeft",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Delete", "ctrl": true }],
+      "command": "deleteWordRight",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Backspace", "alt": true, "ctrl": true }],
+      "command": "deleteWordPartLeft",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Delete", "alt": true, "ctrl": true }],
+      "command": "deleteWordPartRight",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "K", "mod": true, "shift": true }],
+      "command": "editor.action.deleteLines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp", "alt": true, "shift": true }],
+      "command": "editor.action.copyLinesUpAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "alt": true, "shift": true }],
+      "command": "editor.action.copyLinesDownAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp", "alt": true }],
+      "command": "editor.action.moveLinesUpAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "alt": true }],
+      "command": "editor.action.moveLinesDownAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Enter", "mod": true, "shift": true }],
+      "command": "editor.action.insertLineBefore",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Enter", "mod": true }],
+      "command": "editor.action.insertLineAfter",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "/", "mod": true }],
+      "command": "editor.action.commentLine",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "A", "alt": true, "shift": true }],
+      "command": "editor.action.blockComment",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "]", "mod": true }],
+      "command": "editor.action.indentLines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "[", "mod": true }],
+      "command": "editor.action.outdentLines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "I", "alt": true, "shift": true }],
+      "command": "editor.action.reindentselectedlines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "I", "mod": true, "alt": true, "shift": true }],
+      "command": "editor.action.reindentlines",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "Backspace" }], "command": "deleteBackward", "when": ["writable"] },
+    { "chord": [{ "key": "Delete" }], "command": "deleteForward", "when": ["writable"] },
+    {
+      "chord": [{ "key": "Tab" }],
+      "command": "indentSelection",
+      "when": ["writable", "!tabFocusMode"]
+    },
+    {
+      "chord": [{ "key": "Tab", "shift": true }],
+      "command": "outdentSelection",
+      "when": ["writable", "!tabFocusMode"]
+    },
+    { "chord": [{ "key": "M", "ctrl": true }], "command": "editor.action.toggleTabFocusMode" },
+    { "chord": [{ "key": "H", "mod": true }], "command": "findReplace" },
+    {
+      "chord": [{ "key": "Enter", "mod": true, "alt": true }],
+      "command": "replaceAll",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "Z", "mod": true }], "command": "undo", "when": ["writable"] },
+    {
+      "chord": [{ "key": "Z", "mod": true, "shift": true }],
+      "command": "redo",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowLeft", "alt": true }],
+      "command": "jumpBack",
+      "preventDefault": true
+    },
+    {
+      "chord": [{ "key": "ArrowRight", "alt": true }],
+      "command": "jumpForward",
+      "preventDefault": true
+    },
+    { "chord": [{ "key": "U", "mod": true }], "command": "cursorUndo" },
+    { "chord": [{ "key": "U", "mod": true, "shift": true }], "command": "cursorRedo" },
+    { "chord": [{ "key": "Y", "ctrl": true }], "command": "redo", "when": ["writable"] },
+    { "chord": [{ "key": "Escape" }], "command": "closeFind", "when": ["findVisible"] },
+    {
+      "chord": [{ "key": "Escape" }],
+      "command": "clearSecondarySelections",
+      "when": ["!findVisible"]
+    },
+    { "chord": [{ "key": "F", "mod": true }], "command": "find" },
+    { "chord": [{ "key": "F3" }], "command": "findNext" },
+    { "chord": [{ "key": "F3", "shift": true }], "command": "findPrevious" },
+    {
+      "chord": [{ "key": "C", "alt": true }],
+      "command": "toggleFindCaseSensitive",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "W", "alt": true }],
+      "command": "toggleFindWholeWord",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "R", "alt": true }],
+      "command": "toggleFindRegex",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "L", "alt": true }],
+      "command": "toggleFindInSelection",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "P", "alt": true }],
+      "command": "togglePreserveCase",
+      "when": ["findVisible"]
+    },
+    { "chord": [{ "key": "A", "mod": true }], "command": "selectAll" },
+    {
+      "chord": [{ "key": "ArrowRight", "alt": true, "shift": true }],
+      "command": "editor.action.smartSelect.expand"
+    },
+    {
+      "chord": [{ "key": "ArrowLeft", "alt": true, "shift": true }],
+      "command": "editor.action.smartSelect.shrink"
+    },
+    { "chord": [{ "key": "ArrowLeft", "shift": true }], "command": "selectLeft" },
+    { "chord": [{ "key": "ArrowRight", "shift": true }], "command": "selectRight" },
+    { "chord": [{ "key": "ArrowLeft", "ctrl": true, "shift": true }], "command": "selectWordLeft" },
+    {
+      "chord": [{ "key": "ArrowRight", "ctrl": true, "shift": true }],
+      "command": "selectWordRight"
+    },
+    {
+      "chord": [{ "key": "ArrowLeft", "alt": true, "ctrl": true, "shift": true }],
+      "command": "cursorWordPartLeftSelect"
+    },
+    {
+      "chord": [{ "key": "ArrowRight", "alt": true, "ctrl": true, "shift": true }],
+      "command": "cursorWordPartRightSelect"
+    },
+    { "chord": [{ "key": "Home", "shift": true }], "command": "selectLineStart" },
+    { "chord": [{ "key": "End", "shift": true }], "command": "selectLineEnd" },
+    { "chord": [{ "key": "ArrowUp", "shift": true }], "command": "selectUp" },
+    { "chord": [{ "key": "ArrowDown", "shift": true }], "command": "selectDown" },
+    { "chord": [{ "key": "PageUp", "shift": true }], "command": "selectPageUp" },
+    { "chord": [{ "key": "PageDown", "shift": true }], "command": "selectPageDown" },
+    { "chord": [{ "key": "Home", "ctrl": true, "shift": true }], "command": "selectDocumentStart" },
+    { "chord": [{ "key": "End", "ctrl": true, "shift": true }], "command": "selectDocumentEnd" },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "ArrowLeft", "alt": true }
+      ],
+      "command": "cursorColumnSelectLeft"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "ArrowRight", "alt": true }
+      ],
+      "command": "cursorColumnSelectRight"
+    },
+    {
+      "chord": [{ "key": "ArrowUp", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectUp"
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectDown"
+    },
+    {
+      "chord": [{ "key": "PageUp", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectPageUp"
+    },
+    {
+      "chord": [{ "key": "PageDown", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectPageDown"
+    },
+    { "chord": [{ "key": "ArrowLeft" }], "command": "cursorLeft" },
+    { "chord": [{ "key": "ArrowRight" }], "command": "cursorRight" },
+    { "chord": [{ "key": "ArrowLeft", "ctrl": true }], "command": "cursorWordLeft" },
+    { "chord": [{ "key": "ArrowRight", "ctrl": true }], "command": "cursorWordRight" },
+    {
+      "chord": [{ "key": "ArrowLeft", "alt": true, "ctrl": true }],
+      "command": "cursorWordPartLeft"
+    },
+    {
+      "chord": [{ "key": "ArrowRight", "alt": true, "ctrl": true }],
+      "command": "cursorWordPartRight"
+    },
+    { "chord": [{ "key": "Home" }], "command": "cursorLineStart" },
+    { "chord": [{ "key": "End" }], "command": "cursorLineEnd" },
+    { "chord": [{ "key": "ArrowUp" }], "command": "cursorUp" },
+    { "chord": [{ "key": "ArrowDown" }], "command": "cursorDown" },
+    { "chord": [{ "key": "PageUp" }], "command": "cursorPageUp" },
+    { "chord": [{ "key": "PageDown" }], "command": "cursorPageDown" },
+    { "chord": [{ "key": "Home", "ctrl": true }], "command": "cursorDocumentStart" },
+    { "chord": [{ "key": "End", "ctrl": true }], "command": "cursorDocumentEnd" }
+  ],
+  "vscode:windows": [
+    { "chord": [{ "key": "Space", "ctrl": true }], "command": "editor.action.triggerSuggest" },
+    {
+      "chord": [{ "key": "ArrowDown" }],
+      "command": "selectNextSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp" }],
+      "command": "selectPrevSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "PageDown" }],
+      "command": "selectNextPageSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "PageUp" }],
+      "command": "selectPrevPageSuggestion",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "Enter" }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Tab" }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Enter", "shift": true }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Tab", "shift": true }],
+      "command": "acceptSelectedSuggestion",
+      "when": ["suggestWidgetVisible", "writable"]
+    },
+    {
+      "chord": [{ "key": "Escape" }],
+      "command": "hideSuggestWidget",
+      "when": ["suggestWidgetVisible"]
+    },
+    {
+      "chord": [{ "key": "Escape" }],
+      "command": "closeParameterHints",
+      "when": ["parameterHintsVisible"]
+    },
+    {
+      "chord": [{ "key": "ArrowDown" }],
+      "command": "showNextParameterHint",
+      "when": ["parameterHintsVisible", "parameterHintsMultipleSignatures"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp" }],
+      "command": "showPrevParameterHint",
+      "when": ["parameterHintsVisible", "parameterHintsMultipleSignatures"]
+    },
+    { "chord": [{ "key": "[", "mod": true, "shift": true }], "command": "editor.fold" },
+    { "chord": [{ "key": "]", "mod": true, "shift": true }], "command": "editor.unfold" },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "[", "mod": true }
+      ],
+      "command": "editor.foldRecursively"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "]", "mod": true }
+      ],
+      "command": "editor.unfoldRecursively"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": ".", "mod": true }
+      ],
+      "command": "editor.removeManualFoldingRanges"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "I", "mod": true }
+      ],
+      "command": "editor.action.showHover"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "C", "mod": true }
+      ],
+      "command": "editor.action.commentLine",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "F12", "shift": true }], "command": "editor.action.goToReferences" },
+    { "chord": [{ "key": "F12", "alt": true }], "command": "editor.action.peekDefinition" },
+    { "chord": [{ "key": "F12", "mod": true }], "command": "editor.action.goToImplementation" },
+    {
+      "chord": [{ "key": "K", "mod": true }, { "key": "F12" }],
+      "command": "editor.action.revealDefinitionAside"
+    },
+    {
+      "chord": [{ "key": "F", "alt": true, "shift": true }],
+      "command": "editor.action.formatDocument",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "F8" }], "command": "editor.action.marker.next" },
+    { "chord": [{ "key": "F8", "shift": true }], "command": "editor.action.marker.prev" },
+    {
+      "chord": [{ "key": "\\", "mod": true, "shift": true }],
+      "command": "editor.action.jumpToBracket"
+    },
+    { "chord": [{ "key": "Z", "alt": true }], "command": "editor.action.toggleWordWrap" },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "X", "mod": true }
+      ],
+      "command": "editor.action.trimTrailingWhitespace",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Tab" }],
+      "command": "editor.action.inlineSuggest.commit",
+      "when": ["!tabFocusMode", "writable", "inlineSuggestionVisible"]
+    },
+    {
+      "chord": [{ "key": ".", "alt": true, "shift": true }],
+      "command": "editor.action.autoFix",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "F2" }], "command": "editor.action.rename", "when": ["writable"] },
+    { "chord": [{ "key": "F12" }], "command": "goToDefinition" },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "0", "mod": true }
+      ],
+      "command": "editor.foldAll"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "J", "mod": true }
+      ],
+      "command": "editor.unfoldAll"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "1", "mod": true }
+      ],
+      "command": "editor.foldLevel1"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "2", "mod": true }
+      ],
+      "command": "editor.foldLevel2"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "3", "mod": true }
+      ],
+      "command": "editor.foldLevel3"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "4", "mod": true }
+      ],
+      "command": "editor.foldLevel4"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "5", "mod": true }
+      ],
+      "command": "editor.foldLevel5"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "6", "mod": true }
+      ],
+      "command": "editor.foldLevel6"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "7", "mod": true }
+      ],
+      "command": "editor.foldLevel7"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": ",", "mod": true }
+      ],
+      "command": "editor.createFoldingRangeFromSelection",
+      "when": ["hasSelection"]
+    },
+    { "chord": [{ "key": "D", "mod": true }], "command": "addNextOccurrence" },
+    { "chord": [{ "key": "Enter", "alt": true }], "command": "selectAllMatches" },
+    {
+      "chord": [{ "key": "ArrowUp", "mod": true, "alt": true }],
+      "command": "editor.action.insertCursorAbove"
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "mod": true, "alt": true }],
+      "command": "editor.action.insertCursorBelow"
+    },
+    {
+      "chord": [{ "key": "L", "mod": true, "shift": true }],
+      "command": "editor.action.selectHighlights"
+    },
+    { "chord": [{ "key": "F2", "mod": true }], "command": "editor.action.changeAll" },
+    {
+      "chord": [{ "key": "Backspace", "ctrl": true }],
+      "command": "deleteWordLeft",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Delete", "ctrl": true }],
+      "command": "deleteWordRight",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Backspace", "alt": true, "ctrl": true }],
+      "command": "deleteWordPartLeft",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Delete", "alt": true, "ctrl": true }],
+      "command": "deleteWordPartRight",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "K", "mod": true, "shift": true }],
+      "command": "editor.action.deleteLines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp", "alt": true, "shift": true }],
+      "command": "editor.action.copyLinesUpAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "alt": true, "shift": true }],
+      "command": "editor.action.copyLinesDownAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowUp", "alt": true }],
+      "command": "editor.action.moveLinesUpAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "alt": true }],
+      "command": "editor.action.moveLinesDownAction",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Enter", "mod": true, "shift": true }],
+      "command": "editor.action.insertLineBefore",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "Enter", "mod": true }],
+      "command": "editor.action.insertLineAfter",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "/", "mod": true }],
+      "command": "editor.action.commentLine",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "A", "alt": true, "shift": true }],
+      "command": "editor.action.blockComment",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "]", "mod": true }],
+      "command": "editor.action.indentLines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "[", "mod": true }],
+      "command": "editor.action.outdentLines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "I", "alt": true, "shift": true }],
+      "command": "editor.action.reindentselectedlines",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "I", "mod": true, "alt": true, "shift": true }],
+      "command": "editor.action.reindentlines",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "Backspace" }], "command": "deleteBackward", "when": ["writable"] },
+    { "chord": [{ "key": "Delete" }], "command": "deleteForward", "when": ["writable"] },
+    {
+      "chord": [{ "key": "Tab" }],
+      "command": "indentSelection",
+      "when": ["writable", "!tabFocusMode"]
+    },
+    {
+      "chord": [{ "key": "Tab", "shift": true }],
+      "command": "outdentSelection",
+      "when": ["writable", "!tabFocusMode"]
+    },
+    { "chord": [{ "key": "M", "ctrl": true }], "command": "editor.action.toggleTabFocusMode" },
+    { "chord": [{ "key": "H", "mod": true }], "command": "findReplace" },
+    {
+      "chord": [{ "key": "Enter", "mod": true, "alt": true }],
+      "command": "replaceAll",
+      "when": ["writable"]
+    },
+    { "chord": [{ "key": "Z", "mod": true }], "command": "undo", "when": ["writable"] },
+    {
+      "chord": [{ "key": "Z", "mod": true, "shift": true }],
+      "command": "redo",
+      "when": ["writable"]
+    },
+    {
+      "chord": [{ "key": "ArrowLeft", "alt": true }],
+      "command": "jumpBack",
+      "preventDefault": true
+    },
+    {
+      "chord": [{ "key": "ArrowRight", "alt": true }],
+      "command": "jumpForward",
+      "preventDefault": true
+    },
+    { "chord": [{ "key": "U", "mod": true }], "command": "cursorUndo" },
+    { "chord": [{ "key": "U", "mod": true, "shift": true }], "command": "cursorRedo" },
+    { "chord": [{ "key": "Y", "ctrl": true }], "command": "redo", "when": ["writable"] },
+    { "chord": [{ "key": "Escape" }], "command": "closeFind", "when": ["findVisible"] },
+    {
+      "chord": [{ "key": "Escape" }],
+      "command": "clearSecondarySelections",
+      "when": ["!findVisible"]
+    },
+    { "chord": [{ "key": "F", "mod": true }], "command": "find" },
+    { "chord": [{ "key": "F3" }], "command": "findNext" },
+    { "chord": [{ "key": "F3", "shift": true }], "command": "findPrevious" },
+    {
+      "chord": [{ "key": "C", "alt": true }],
+      "command": "toggleFindCaseSensitive",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "W", "alt": true }],
+      "command": "toggleFindWholeWord",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "R", "alt": true }],
+      "command": "toggleFindRegex",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "L", "alt": true }],
+      "command": "toggleFindInSelection",
+      "when": ["findVisible"]
+    },
+    {
+      "chord": [{ "key": "P", "alt": true }],
+      "command": "togglePreserveCase",
+      "when": ["findVisible"]
+    },
+    { "chord": [{ "key": "A", "mod": true }], "command": "selectAll" },
+    {
+      "chord": [{ "key": "ArrowRight", "alt": true, "shift": true }],
+      "command": "editor.action.smartSelect.expand"
+    },
+    {
+      "chord": [{ "key": "ArrowLeft", "alt": true, "shift": true }],
+      "command": "editor.action.smartSelect.shrink"
+    },
+    { "chord": [{ "key": "ArrowLeft", "shift": true }], "command": "selectLeft" },
+    { "chord": [{ "key": "ArrowRight", "shift": true }], "command": "selectRight" },
+    { "chord": [{ "key": "ArrowLeft", "ctrl": true, "shift": true }], "command": "selectWordLeft" },
+    {
+      "chord": [{ "key": "ArrowRight", "ctrl": true, "shift": true }],
+      "command": "selectWordRight"
+    },
+    {
+      "chord": [{ "key": "ArrowLeft", "alt": true, "ctrl": true, "shift": true }],
+      "command": "cursorWordPartLeftSelect"
+    },
+    {
+      "chord": [{ "key": "ArrowRight", "alt": true, "ctrl": true, "shift": true }],
+      "command": "cursorWordPartRightSelect"
+    },
+    { "chord": [{ "key": "Home", "shift": true }], "command": "selectLineStart" },
+    { "chord": [{ "key": "End", "shift": true }], "command": "selectLineEnd" },
+    { "chord": [{ "key": "ArrowUp", "shift": true }], "command": "selectUp" },
+    { "chord": [{ "key": "ArrowDown", "shift": true }], "command": "selectDown" },
+    { "chord": [{ "key": "PageUp", "shift": true }], "command": "selectPageUp" },
+    { "chord": [{ "key": "PageDown", "shift": true }], "command": "selectPageDown" },
+    { "chord": [{ "key": "Home", "ctrl": true, "shift": true }], "command": "selectDocumentStart" },
+    { "chord": [{ "key": "End", "ctrl": true, "shift": true }], "command": "selectDocumentEnd" },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "ArrowLeft", "alt": true }
+      ],
+      "command": "cursorColumnSelectLeft"
+    },
+    {
+      "chord": [
+        { "key": "K", "mod": true },
+        { "key": "ArrowRight", "alt": true }
+      ],
+      "command": "cursorColumnSelectRight"
+    },
+    {
+      "chord": [{ "key": "ArrowUp", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectUp"
+    },
+    {
+      "chord": [{ "key": "ArrowDown", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectDown"
+    },
+    {
+      "chord": [{ "key": "PageUp", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectPageUp"
+    },
+    {
+      "chord": [{ "key": "PageDown", "mod": true, "alt": true, "shift": true }],
+      "command": "cursorColumnSelectPageDown"
+    },
+    { "chord": [{ "key": "ArrowLeft" }], "command": "cursorLeft" },
+    { "chord": [{ "key": "ArrowRight" }], "command": "cursorRight" },
+    { "chord": [{ "key": "ArrowLeft", "ctrl": true }], "command": "cursorWordLeft" },
+    { "chord": [{ "key": "ArrowRight", "ctrl": true }], "command": "cursorWordRight" },
+    {
+      "chord": [{ "key": "ArrowLeft", "alt": true, "ctrl": true }],
+      "command": "cursorWordPartLeft"
+    },
+    {
+      "chord": [{ "key": "ArrowRight", "alt": true, "ctrl": true }],
+      "command": "cursorWordPartRight"
+    },
+    { "chord": [{ "key": "Home" }], "command": "cursorLineStart" },
+    { "chord": [{ "key": "End" }], "command": "cursorLineEnd" },
+    { "chord": [{ "key": "ArrowUp" }], "command": "cursorUp" },
+    { "chord": [{ "key": "ArrowDown" }], "command": "cursorDown" },
+    { "chord": [{ "key": "PageUp" }], "command": "cursorPageUp" },
+    { "chord": [{ "key": "PageDown" }], "command": "cursorPageDown" },
+    { "chord": [{ "key": "Home", "ctrl": true }], "command": "cursorDocumentStart" },
+    { "chord": [{ "key": "End", "ctrl": true }], "command": "cursorDocumentEnd" }
+  ]
+}

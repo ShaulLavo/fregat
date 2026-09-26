@@ -1,6 +1,6 @@
 # E026: Declare Editor command metadata once
 
-- Status: Proposed
+- Status: In progress
 - Kind: Implementation
 - Owner: Cross-repo
 - Priority: P2
@@ -9,6 +9,17 @@
 - Inspected baseline: Editor `9abb944f3a2b8d6516953fdec75e8df5e1a94811`, Platform `c8e05123d8f89f74bdca0e73cd43bb060c6f4e67`.
 
 Decided 2026-09-25: owner — unparked. Rebase the plan on the [E050 host contracts](../docs/architecture/e050-host-obligations.md) first, then execute. Platform `ed96e9f16` hand-copied command metadata again, the duplication this plan removes.
+
+Progress 2026-09-26 (wave 2, lane E1, with Platform Plan 122 phase 4): steps 1–4 and 6 are done.
+`EDITOR_COMMANDS` (`packages/editor/src/editor/commandCatalog.ts`) declares every built-in's id, title,
+category, mutation policy and VS Code ids; the id union, `editorCommandMutates` and the command packs
+derive from it, and a captured fixture checks every preset binds the same keys. Contributed commands
+are `createPlugin({ commands })` declarations under the plugin's name; dispatch, readonly refusal,
+listing (`Editor.getCommandDeclarations`) and removal share one identity. `docs/commands.md` is
+generated (`bun run commands:reference`) and checked by `health`. Step 5: Platform's client-core
+builds its editor table from the catalog. Left: preset bindings declared in the catalog (they stay in
+`keymap/presets.ts`, organized by pack), typed command arguments, and Platform's runtime segment for
+contributed commands in the palette, keybinding table and recorder.
 
 ## Outcome
 

@@ -8,18 +8,10 @@ type TreeSitterSourcePieceSpan = {
   readonly length: number
 }
 
-type TreeSitterSourceChunkPayload =
-  | {
-      readonly kind: 'shared-utf16'
-      readonly chunkId: string
-      readonly buffer: SharedArrayBuffer
-      readonly length: number
-    }
-  | {
-      readonly kind: 'string'
-      readonly chunkId: string
-      readonly text: string
-    }
+type TreeSitterSourceChunkPayload = {
+  readonly chunkId: string
+  readonly text: string
+}
 
 export type TreeSitterSourceDescriptor = {
   readonly length: number
@@ -29,7 +21,6 @@ export type TreeSitterSourceDescriptor = {
 
 export type TreeSitterSourceDescriptorOptions = {
   readonly sentChunkLengths?: ReadonlyMap<string, number>
-  readonly useSharedBuffers?: boolean
 }
 
 type ResolvedTreeSitterSourceChunk = {
@@ -55,7 +46,6 @@ export type TreeSitterPieceTableInput = {
 const SOURCE_CHUNK_SIZE = 16 * 1024
 // web-tree-sitter copies parser callback text into a fixed 10KB UTF-16 buffer.
 const PARSER_READ_BATCH_CODE_UNITS = 4096
-const UTF16_READ_BATCH = 8192
 const sourceOwners = new WeakMap<object, number>()
 let nextSourceOwner = 1
 
@@ -66,7 +56,6 @@ export const createTreeSitterSourceDescriptor = (
   const pieces: TreeSitterSourcePieceSpan[] = []
   const chunks: TreeSitterSourceChunkPayload[] = []
   const emittedChunkIds = new Set<string>()
-  const useSharedBuffers = options.useSharedBuffers ?? supportsSharedTreeSitterSource()
 
   for (const piece of debugPieceTable(snapshot)) {
     if (!piece.visible) continue
@@ -75,7 +64,6 @@ export const createTreeSitterSourceDescriptor = (
       chunks,
       emittedChunkIds,
       sentChunkLengths: options.sentChunkLengths,
-      useSharedBuffers,
     })
   }
 
@@ -159,7 +147,6 @@ type PieceSpanBuilder = {
   readonly chunks: TreeSitterSourceChunkPayload[]
   readonly emittedChunkIds: Set<string>
   readonly sentChunkLengths?: ReadonlyMap<string, number>
-  readonly useSharedBuffers: boolean
 }
 
 const appendPieceSpans = (
@@ -207,30 +194,8 @@ const appendChunkPayload = (
   if (builder.sentChunkLengths?.get(chunkId) === chunkLength) return
   if (builder.emittedChunkIds.has(chunkId)) return
 
-  const chunkText = text.slice(chunkStart, chunkStart + chunkLength)
   builder.emittedChunkIds.add(chunkId)
-  builder.chunks.push(createChunkPayload(chunkId, chunkText, builder.useSharedBuffers))
-}
-
-const createChunkPayload = (
-  chunkId: string,
-  text: string,
-  useSharedBuffers: boolean,
-): TreeSitterSourceChunkPayload => {
-  if (!useSharedBuffers) return { kind: 'string', chunkId, text }
-  return {
-    kind: 'shared-utf16',
-    chunkId,
-    buffer: createSharedUtf16Buffer(text),
-    length: text.length,
-  }
-}
-
-const createSharedUtf16Buffer = (text: string): SharedArrayBuffer => {
-  const buffer = new SharedArrayBuffer(text.length * Uint16Array.BYTES_PER_ELEMENT)
-  const units = new Uint16Array(buffer)
-  for (let index = 0; index < text.length; index++) units[index] = text.charCodeAt(index)
-  return buffer
+  builder.chunks.push({ chunkId, text: text.slice(chunkStart, chunkStart + chunkLength) })
 }
 
 const sourceChunkId = (owner: object, chunkStart: number): string => {
@@ -240,11 +205,6 @@ const sourceChunkId = (owner: object, chunkStart: number): string => {
     sourceOwners.set(owner, id)
   }
   return `${id}:${chunkStart}`
-}
-
-const supportsSharedTreeSitterSource = (): boolean => {
-  if (typeof SharedArrayBuffer === 'undefined') return false
-  return Boolean((globalThis as { readonly crossOriginIsolated?: boolean }).crossOriginIsolated)
 }
 
 const ensureDocumentSourceCache = (
@@ -298,23 +258,8 @@ const cacheChunkPayloads = (
   cache: Map<string, ResolvedTreeSitterSourceChunk>,
   chunks: readonly TreeSitterSourceChunkPayload[],
 ): void => {
-  for (const chunk of chunks) cache.set(chunk.chunkId, resolveChunkPayload(chunk))
-}
-
-/**
- * Shared chunks decode once, here. The parser reads a chunk hundreds of times
- * in ≤4096-unit slices, and decoding per read cost ~18x the whole parse; the
- * buffer is filled once and never mutated, so one decode is safe. The
- * SharedArrayBuffer still earns its keep by keeping the copy off the main
- * thread at postMessage time.
- */
-const resolveChunkPayload = (
-  chunk: TreeSitterSourceChunkPayload,
-): ResolvedTreeSitterSourceChunk => {
-  if (chunk.kind === 'string') return { text: chunk.text, length: chunk.text.length }
-
-  const units = new Uint16Array(chunk.buffer, 0, chunk.length)
-  return { text: readUtf16Text(units, 0, chunk.length), length: chunk.length }
+  for (const chunk of chunks)
+    cache.set(chunk.chunkId, { text: chunk.text, length: chunk.text.length })
 }
 
 const readResolvedChunkText = (
@@ -340,39 +285,6 @@ const readResolvedChunkCodeUnit = (chunk: ResolvedTreeSitterSourceChunk, index: 
   chunk.text.charCodeAt(index)
 
 const isHighSurrogate = (codeUnit: number): boolean => codeUnit >= 0xd800 && codeUnit <= 0xdbff
-
-// Uint16Array is host-endian; the decoder is not. Every browser target is
-// little-endian, but check rather than assume — a wrong decode is silent.
-const HOST_IS_LITTLE_ENDIAN = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1
-const utf16Decoder =
-  HOST_IS_LITTLE_ENDIAN && typeof TextDecoder !== 'undefined'
-    ? new TextDecoder('utf-16le', { ignoreBOM: true })
-    : null
-
-const readUtf16Text = (units: Uint16Array, start: number, end: number): string => {
-  if (!utf16Decoder) return readUtf16TextExact(units, start, end)
-
-  // `slice`, not a subview: Chrome refuses to decode a shared view, and slicing
-  // yields an unshared copy. The copy is free next to the decode (~5x the
-  // fromCharCode loop, which spreads thousands of arguments per call).
-  const copy = units.slice(start, end)
-  const decoded = utf16Decoder.decode(new Uint8Array(copy.buffer, copy.byteOffset, copy.byteLength))
-
-  // TextDecoder rewrites an unpaired surrogate to U+FFFD, and chunks split on a
-  // fixed 16KB grid, so any pair straddling a boundary would corrupt silently.
-  // Pay for the exact path only when a replacement char is actually present.
-  if (!decoded.includes('�')) return decoded
-  return readUtf16TextExact(units, start, end)
-}
-
-const readUtf16TextExact = (units: Uint16Array, start: number, end: number): string => {
-  let text = ''
-  for (let index = start; index < end; index += UTF16_READ_BATCH) {
-    text += String.fromCharCode(...units.subarray(index, Math.min(index + UTF16_READ_BATCH, end)))
-  }
-
-  return text
-}
 
 const findChunkContaining = (
   chunks: readonly TreeSitterInputChunk[],

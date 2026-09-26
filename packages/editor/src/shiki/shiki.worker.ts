@@ -40,7 +40,7 @@ const documentTasks = new Map<string, Promise<ShikiWorkerTransportResult | undef
 const disposedRuntimeSessions = new Set<string>()
 const activeWorkerTasks = new Set<Promise<void>>()
 const highlighterPromises = new Map<string, Promise<HighlighterGeneric<string, string>>>()
-const backgroundLoaded = new WeakSet<HighlighterGeneric<string, string>>()
+const backgroundLanguages = new WeakMap<HighlighterGeneric<string, string>, Set<string>>()
 const MAX_DISPOSED_RUNTIME_SESSIONS = 1_024
 
 self.onmessage = (event: MessageEvent<ShikiWorkerRequest>): void => {
@@ -154,19 +154,9 @@ const editDocument = async (
   payload: ShikiWorkerEditRequest,
 ): Promise<ShikiWorkerTransportResult> => {
   const existing = documents.get(payload.runtimeSessionId)
-  if (!existing && payload.text !== undefined)
-    return openDocument(openRequestFromEdit(payload, payload.text))
   if (!existing) throw new Error('Unable to edit unopened Shiki document without text')
-  if (!documentMatches(existing, payload) && payload.text !== undefined) {
-    return openDocument(openRequestFromEdit(payload, payload.text))
-  }
   if (!documentMatches(existing, payload)) {
     throw new Error('Unable to reopen Shiki document without text')
-  }
-
-  if (!payload.edits) {
-    existing.tokenizer.update(payload.text ?? existing.tokenizer.getCode())
-    return resultFromState(existing)
   }
 
   const patches = existing.tokenizer.applyEdits(payload.edits)
@@ -198,18 +188,6 @@ const recolorDocument = async (
   state.themeRegistration = payload.themeRegistration
   return resultFromState(state)
 }
-
-const openRequestFromEdit = (payload: ShikiWorkerEditRequest, text: string) => ({
-  documentId: payload.documentId,
-  runtimeSessionId: payload.runtimeSessionId,
-  lang: payload.lang,
-  theme: payload.theme,
-  languageRegistrations: payload.languageRegistrations,
-  themeRegistration: payload.themeRegistration,
-  themeRegistrations: payload.themeRegistrations,
-  text,
-  type: 'open' as const,
-})
 
 /**
  * The highlighter for a document, with that document's grammar loaded and nothing else waited on.
@@ -244,25 +222,28 @@ const ensureLanguages = async (
 }
 
 /**
- * Once per highlighter, on a timer rather than a microtask.
+ * Once per language and highlighter, on a timer rather than a microtask.
  *
  * A microtask here runs *between* the tokenizer's awaits and competes with it for the one worker
  * thread — measured at 526 ms of tokenization becoming 1 187 ms. The delay puts the whole preload
  * set behind the paint that matters instead of inside it. A failure costs a stall on some later
- * language switch, never a paint.
+ * language switch, never a paint. A later preload with other languages (a workspace switch)
+ * schedules only the ones no earlier preload asked for.
  */
 const scheduleBackgroundLanguages = (
   highlighter: HighlighterGeneric<string, string>,
   registrations: readonly ShikiWorkerLanguageRegistration[],
 ): void => {
-  if (registrations.length === 0) return
-  if (backgroundLoaded.has(highlighter)) return
+  const scheduled = backgroundLanguages.get(highlighter) ?? new Set<string>()
+  backgroundLanguages.set(highlighter, scheduled)
+  const fresh = registrations.filter((registration) => !scheduled.has(registration.name))
+  if (fresh.length === 0) return
 
-  backgroundLoaded.add(highlighter)
+  for (const registration of fresh) scheduled.add(registration.name)
   const task = new Promise<void>((resolve) => {
     setTimeout(() => {
       const complete = () => resolve()
-      void ensureLanguages(highlighter, registrations).then(complete, complete)
+      void ensureLanguages(highlighter, fresh).then(complete, complete)
     }, 1_000)
   })
   trackWorkerTask(task)
@@ -312,7 +293,7 @@ const resultFromState = (state: DocumentState): ShikiWorkerTransportResult => ({
   theme: editorThemeFromHighlighter(state.highlighter, state.theme, state.themeRegistration),
 })
 
-const documentMatches = (state: DocumentState, payload: ShikiWorkerDocumentOptions): boolean =>
+const documentMatches = (state: DocumentState, payload: ShikiWorkerEditRequest): boolean =>
   state.lang === payload.lang && state.theme === payload.theme
 
 const disposeDocument = (runtimeSessionId: string): void => {

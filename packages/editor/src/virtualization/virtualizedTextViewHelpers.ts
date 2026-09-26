@@ -616,12 +616,31 @@ export function markRowRetired(row: MountedVirtualizedTextRow): void {
   clearRowGeometryCache(row)
 }
 
-export function scrollElementPadding(element: HTMLElement): {
+type ScrollElementPadding = {
   readonly left: number
   readonly right: number
   readonly top: number
   readonly bottom: number
-} {
+}
+
+const scrollElementPaddings = new WeakMap<HTMLElement, ScrollElementPadding>()
+
+// Reading computed style forces a style pass, once per editor open. The view sets the padding
+// itself (reserved overlay widths), so it drops the reading whenever it may have changed.
+export function scrollElementPadding(element: HTMLElement): ScrollElementPadding {
+  const cached = scrollElementPaddings.get(element)
+  if (cached) return cached
+
+  const padding = readScrollElementPadding(element)
+  scrollElementPaddings.set(element, padding)
+  return padding
+}
+
+export function invalidateScrollElementPadding(element: HTMLElement): void {
+  scrollElementPaddings.delete(element)
+}
+
+function readScrollElementPadding(element: HTMLElement): ScrollElementPadding {
   const style = element.ownerDocument.defaultView?.getComputedStyle(element)
   return {
     left: parseCssPixels(style?.paddingLeft) ?? 0,

@@ -164,9 +164,6 @@ const preloadLanguages = (
 ): readonly string[] => [lang, ...Array.from(options.preloadLanguages ?? [])]
 
 type ShikiRegistrationCache = {
-  readonly loadedLanguages: (
-    languages: readonly string[],
-  ) => readonly ShikiWorkerLanguageRegistration[]
   readonly loadedThemes: (themes: readonly string[]) => readonly ShikiWorkerThemeRegistration[]
   readonly resolveLanguage: ShikiLanguageRegistrationResolver
   readonly resolveTheme: ShikiThemeRegistrationResolver
@@ -177,7 +174,6 @@ const createRegistrationCache = (
 ): ShikiRegistrationCache => {
   const languagePromises = new Map<string, Promise<readonly ShikiWorkerLanguageRegistration[]>>()
   const themePromises = new Map<string, Promise<ShikiWorkerThemeRegistration>>()
-  const loadedLanguages = new Map<string, readonly ShikiWorkerLanguageRegistration[]>()
   const loadedThemes = new Map<string, ShikiWorkerThemeRegistration>()
 
   const resolveLanguage = (language: string) => {
@@ -186,7 +182,6 @@ const createRegistrationCache = (
 
     const pending = options.resolveLanguage(language).then((registrations) => {
       assertLanguageRegistrations(language, registrations)
-      loadedLanguages.set(language, registrations)
       return registrations
     })
     languagePromises.set(language, pending)
@@ -211,10 +206,6 @@ const createRegistrationCache = (
   }
 
   return {
-    loadedLanguages: (languages) =>
-      uniqueLanguageRegistrations(
-        languages.flatMap((language) => loadedLanguages.get(language) ?? []),
-      ),
     loadedThemes: (themes) =>
       uniqueThemeRegistrations(themes.flatMap((theme) => loadedThemes.get(theme) ?? [])),
     resolveLanguage,
@@ -228,16 +219,14 @@ const resolveDocumentRegistrations = async (
   options: ShikiHighlighterPluginOptions,
   cache: ShikiRegistrationCache,
 ): Promise<ShikiResolvedRegistrations> => {
+  // The session's own grammar only: the preload set reaches the worker through `preload`, and
+  // carrying it here made every open wait on grammars it does not use.
   const languageRegistrations = language ? await cache.resolveLanguage(language) : []
   const themeRegistration = await cache.resolveTheme(theme)
-  const preloadLanguageNames = language ? preloadLanguages(language, options) : []
   const preloadThemeNames = [theme, ...(preloadThemes(options) ?? [])]
 
   return {
-    languageRegistrations: uniqueLanguageRegistrations([
-      ...languageRegistrations,
-      ...cache.loadedLanguages(preloadLanguageNames),
-    ]),
+    languageRegistrations: uniqueLanguageRegistrations(languageRegistrations),
     themeRegistration,
     themeRegistrations: uniqueThemeRegistrations([
       themeRegistration,

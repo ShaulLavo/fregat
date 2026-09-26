@@ -10,7 +10,7 @@ import type {
 import type { LspManagedTransport, LspTransportHandler } from '@singapore-editor/lsp'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type * as lsp from 'vscode-languageserver-protocol'
-import type { EditorCommandId } from '@singapore-editor/core/editor'
+import type { EditorAnyCommandId } from '@singapore-editor/core/editor'
 
 import { LANGUAGE_SERVER_COMPLETION_EDIT_FEATURE } from '../src/completion'
 import { CompletionController } from '../src/completionController'
@@ -39,7 +39,7 @@ afterEach(() => {
 
 function testKeymap(
   root: HTMLElement,
-  commands: ReadonlyMap<EditorCommandId, EditorCommandHandler>,
+  commands: ReadonlyMap<EditorAnyCommandId, EditorCommandHandler>,
 ): TestKeymap {
   const keymap = createTestKeymap(root, commands)
   keymaps.push(keymap)
@@ -673,7 +673,7 @@ async function standaloneCompletion(
   const applyCompletion = vi.fn(() => true)
   const snapshot = editorSnapshot('const val', 9, 2)
   let active = openDocument('file:///src/index.ts', 'const val')
-  const commands = new Map<EditorCommandId, EditorCommandHandler>()
+  const commands = new Map<EditorAnyCommandId, EditorCommandHandler>()
   const keymap = testKeymap(element, commands)
 
   const controller = new CompletionController({
@@ -766,7 +766,7 @@ async function connectedEditor(
   let snapshot = editorSnapshot(text, caretOffset, 1)
   let anchorRect = new DOMRect(10, 20, 40, 18)
 
-  const commands = new Map<EditorCommandId, EditorCommandHandler>()
+  const commands = new Map<EditorAnyCommandId, EditorCommandHandler>()
   const provider = activateProvider(transport, features, applyEdits, commands)
   const keymap = testKeymap(element, commands)
   const contribution = provider.createContribution(
@@ -875,7 +875,7 @@ function activateProvider(
   transport: LspManagedTransport,
   features: Map<unknown, unknown>,
   applyEdits: EditorEditContributionContext['applyEdits'],
-  commands: Map<EditorCommandId, EditorCommandHandler>,
+  commands: Map<EditorAnyCommandId, EditorCommandHandler>,
 ): EditorViewContributionProvider {
   let provider: EditorViewContributionProvider | null = null
   const disposable = { dispose: () => undefined }

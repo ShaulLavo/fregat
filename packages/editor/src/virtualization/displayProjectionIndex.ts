@@ -176,7 +176,7 @@ function locate(
 
 function entryBytes(entry: ProjectionEntry): number {
   if (entry.kind === 'run') return 64
-  if (entry.kind === 'wrapped') return 88 + entry.prefixes.byteLength + wrappedTabBytes(entry)
+  if (entry.kind === 'wrapped') return 88 + entry.prefixes.byteLength + wrappedBreakBytes(entry)
   let bytes = 112 + wrapBytes(entry.wrap)
   for (const injected of [...entry.before, ...entry.after]) bytes += 32 + wrapBytes(injected.wrap)
   if (entry.inline)
@@ -191,7 +191,7 @@ function wrapBytes(wrap: import('./displayProjectionTypes').WrapSummary): number
 export function wrappedNode(
   prefixes: Uint32Array,
   width: number,
-  tabs: WrappedEntry['tabs'] = null,
+  breaks: WrappedEntry['breaks'] = null,
 ): ProjectionNode {
   return entryNode({
     kind: 'wrapped',
@@ -199,7 +199,7 @@ export function wrappedNode(
     rows: prefixes[prefixes.length - 1]! - prefixes[0]!,
     prefixes,
     width,
-    tabs,
+    breaks,
   })
 }
 
@@ -219,15 +219,15 @@ export function wrappedSourceLine(entry: WrappedEntry, row: number): number {
 }
 
 function sliceWrapped(entry: WrappedEntry, start: number, end: number): ProjectionNode {
-  const tabs = entry.tabs
-    ? { offsets: entry.tabs.offsets.subarray(start, end + 1), ends: entry.tabs.ends }
+  const breaks = entry.breaks
+    ? { offsets: entry.breaks.offsets.subarray(start, end + 1), ends: entry.breaks.ends }
     : null
-  return wrappedNode(entry.prefixes.subarray(start, end + 1), entry.width, tabs)
+  return wrappedNode(entry.prefixes.subarray(start, end + 1), entry.width, breaks)
 }
 
-function wrappedTabBytes(entry: WrappedEntry): number {
-  if (!entry.tabs) return 0
-  const { offsets } = entry.tabs
+function wrappedBreakBytes(entry: WrappedEntry): number {
+  if (!entry.breaks) return 0
+  const { offsets } = entry.breaks
   return offsets.byteLength + (offsets[offsets.length - 1]! - offsets[0]!) * 4
 }
 
@@ -237,11 +237,11 @@ export function wrappedLineSummary(
   length: number,
 ): WrapSummary {
   const rows = wrappedRowPrefix(entry, sourceLine + 1) - wrappedRowPrefix(entry, sourceLine)
-  if (entry.tabs) {
-    const from = entry.tabs.offsets[sourceLine]!
-    const to = entry.tabs.offsets[sourceLine + 1]!
+  if (entry.breaks) {
+    const from = entry.breaks.offsets[sourceLine]!
+    const to = entry.breaks.offsets[sourceLine + 1]!
     if (to > from)
-      return { kind: 'indexed', length, ends: entry.tabs.ends.subarray(from, to), rows }
+      return { kind: 'indexed', length, ends: entry.breaks.ends.subarray(from, to), rows }
   }
   return { kind: 'uniform', length, rows, width: entry.width }
 }

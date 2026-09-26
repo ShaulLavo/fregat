@@ -14,6 +14,7 @@ import type { FoldMap } from '../foldMap'
 import { nextGraphemeBoundary, previousGraphemeBoundary } from '../graphemes'
 import type { ResolvedSuspiciousCharactersOptions } from '../unicodeHighlight'
 import { type AtomicRanges, atomicRangesForInlineMap } from '../atomicRanges'
+import { glyphAdvancesFor, type GlyphAdvances } from './glyphAdvances'
 import { type InlineMap, revealInlineMap } from '../inlineMap'
 import type { TextOffsetRange } from '../textRanges'
 import { normalizeTabSize, type InjectedTextRow } from '../displayTransforms'
@@ -56,6 +57,7 @@ import {
   setFontVariable,
   setStyleValue,
   normalizeScrollMode,
+  invalidateScrollElementPadding,
   scrollElementPadding,
 } from './virtualizedTextViewHelpers'
 import {
@@ -65,9 +67,11 @@ import {
   clearRowTokenState,
   clearSelection,
   clearSelectionHighlight,
+  cancelDeferredCaret,
   clearTokenHighlights,
   clearTokenHighlightsFromRow,
   deleteTokenRangesForRow,
+  flushDeferredCaret,
   rebuildStyleRules,
   renderRangeHighlight,
   renderSelectionHighlight,
@@ -382,6 +386,7 @@ export class VirtualizedTextView {
       gutterWidthProvider,
       caretLayerElement,
       caretElement,
+      deferredCaret: null,
       secondaryCaretElements: [],
       styleEl,
       highlightScope,
@@ -418,6 +423,9 @@ export class VirtualizedTextView {
       foldMarkerByStartRow: new Map(),
       foldMarkerByKey: new Map(),
       wrapEnabled: options.wrap ?? false,
+      wrapBreak: options.wrapBreak ?? 'character',
+      wrapAdvance: null,
+      glyphs: measuredFace.monospace ? null : glyphAdvancesFor(scrollElement),
       tabSize,
       tokenGroups: new Map(),
       rowTokenSignatures: new Map(),
@@ -489,6 +497,7 @@ export class VirtualizedTextView {
     this.cancelContentWidthMeasurement?.()
     this.cancelContentWidthMeasurement = null
     this.disposeForegroundHighlightRestore()
+    cancelDeferredCaret(view)
     clearSelectionHighlight(view)
     for (const name of view.rangeHighlightGroups.keys()) clearRangeHighlight(view, name)
     clearTokenHighlights(view)
@@ -579,12 +588,15 @@ export class VirtualizedTextView {
 
   public measureInitialViewport(): void {
     if (this.view.virtualizer.hasMeasuredViewport()) return
+    // Layout first: the padding read after it finds style already clean.
+    const clientWidth = this.scrollElement.clientWidth
+    const clientHeight = this.scrollElement.clientHeight
     const padding = scrollElementPadding(this.scrollElement)
     this.view.virtualizer.setScrollMetrics({
       scrollTop: 0,
       scrollLeft: 0,
-      viewportWidth: Math.max(0, this.scrollElement.clientWidth - padding.left - padding.right),
-      viewportHeight: Math.max(0, this.scrollElement.clientHeight - padding.top - padding.bottom),
+      viewportWidth: Math.max(0, clientWidth - padding.left - padding.right),
+      viewportHeight: Math.max(0, clientHeight - padding.top - padding.bottom),
       borderBoxWidth: this.scrollElement.offsetWidth,
       borderBoxHeight: this.scrollElement.offsetHeight,
     })
@@ -814,8 +826,10 @@ export class VirtualizedTextView {
 
   public refreshMetrics(): BrowserTextMetrics {
     const view = this.view
+    invalidateScrollElementPadding(this.scrollElement)
     const face = measuredTextFace(this.scrollElement, view.textMetrics)
     view.monospace = face.monospace
+    view.glyphs = face.monospace ? null : glyphAdvancesFor(this.scrollElement)
     const rowHeightValue = normalizeRowHeight(view.lineHeightOverride ?? face.metrics.rowHeight)
     this.applyMetrics({ rowHeight: rowHeightValue, characterWidth: face.metrics.characterWidth })
     return view.metrics
@@ -824,15 +838,22 @@ export class VirtualizedTextView {
   /** Re-measures and applies a reading that differs from the one in use; null when none does. */
   public remeasureMetrics(): BrowserTextMetrics | null {
     const view = this.view
+    invalidateScrollElementPadding(this.scrollElement)
     const face = measuredTextFace(this.scrollElement, view.textMetrics)
     const rowHeight = normalizeRowHeight(view.lineHeightOverride ?? face.metrics.rowHeight)
+    const glyphs = face.monospace ? null : glyphAdvancesFor(this.scrollElement)
     const unchanged =
       rowHeight === view.metrics.rowHeight &&
       face.metrics.characterWidth === view.metrics.characterWidth &&
       face.monospace === view.monospace
-    if (unchanged) return null
+    if (unchanged) {
+      // A late face can keep the average width and still move single glyphs.
+      if (glyphs !== view.glyphs) this.applyGlyphs(glyphs)
+      return null
+    }
 
     view.monospace = face.monospace
+    view.glyphs = glyphs
     this.applyMetrics({ rowHeight, characterWidth: face.metrics.characterWidth })
     return view.metrics
   }
@@ -915,9 +936,20 @@ export class VirtualizedTextView {
     return true
   }
 
+  private applyGlyphs(glyphs: GlyphAdvances | null): void {
+    const view = this.view
+    view.glyphs = glyphs
+    clearRowGeometryCaches(view)
+    resetContentWidthScan(view)
+    view.lastRenderedRowsKey = ''
+    if (this.refreshWrapWidth()) return
+    updateVirtualizerRows(view)
+  }
+
   private applyMetrics(metrics: BrowserTextMetrics): void {
     const view = this.view
     view.metrics = metrics
+    resetContentWidthScan(view)
     clearRowGeometryCaches(view)
     const rowHeightValue = metrics.rowHeight
     applyRowHeight(view, rowHeightValue)
@@ -1020,6 +1052,7 @@ export class VirtualizedTextView {
     const snapshot = view.virtualizer.getSnapshot()
     const scrollTop = snapshot.scrollTop
     const scrollLeft = this.scrollElement.scrollLeft
+    flushDeferredCaret(view)
     positionInputAtCaret(view)
     // Focus and nothing more: the value and the caret inside it belong to whoever knows the
     // document, and are rewritten from it on every selection change. Emptying them here would take
@@ -1788,6 +1821,7 @@ export class VirtualizedTextView {
     const changed = refreshDisplayProjectionForWrapWidth(
       view,
       horizontalViewportColumns(view, viewportWidth),
+      viewportWidth,
     )
     if (!changed) return false
 

@@ -1318,6 +1318,12 @@
         },
         {
           "kind": "type",
+          "name": "EditorWrapBreak",
+          "source": "packages/editor/src/virtualization/index.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "type",
           "name": "FoldRange",
           "source": "packages/editor/src/public/syntax.ts",
           "via": "packages/editor/src/index.ts"
@@ -3502,6 +3508,12 @@
         },
         {
           "kind": "type",
+          "name": "EditorAnyCommandId",
+          "source": "packages/editor/src/editor/commandCatalog.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
           "name": "EditorBracketMatchPluginOptions",
           "source": "packages/editor/src/bracketMatchPlugin.ts",
           "via": "packages/editor/src/editor.ts"
@@ -4516,6 +4528,18 @@
         },
         {
           "kind": "type",
+          "name": "EditorChannel",
+          "source": "packages/editor/src/createPlugin.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorChannelPolicy",
+          "source": "packages/editor/src/createPlugin.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "type",
           "name": "EditorCommandContribution",
           "source": "packages/editor/src/plugins.ts",
           "via": "packages/editor/src/public/extensions.ts"
@@ -4547,6 +4571,12 @@
         {
           "kind": "type",
           "name": "EditorContributionChange",
+          "source": "packages/editor/src/plugins.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorCursorStyle",
           "source": "packages/editor/src/plugins.ts",
           "via": "packages/editor/src/public/extensions.ts"
         },
@@ -4738,6 +4768,24 @@
         },
         {
           "kind": "type",
+          "name": "EditorInput",
+          "source": "packages/editor/src/createPlugin.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorKeyDecision",
+          "source": "packages/editor/src/plugins.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorKeyParticipant",
+          "source": "packages/editor/src/plugins.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "type",
           "name": "EditorLanguageConfiguration",
           "source": "packages/editor/src/editor/languageConfiguration.ts",
           "via": "packages/editor/src/public/extensions.ts"
@@ -4882,6 +4930,12 @@
         },
         {
           "kind": "type",
+          "name": "EditorPluginDefinition",
+          "source": "packages/editor/src/createPlugin.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "type",
           "name": "EditorPluginLifecycleState",
           "source": "packages/editor/src/plugins.ts",
           "via": "packages/editor/src/public/extensions.ts"
@@ -5002,6 +5056,12 @@
         },
         {
           "kind": "type",
+          "name": "EditorViewContributionInput",
+          "source": "packages/editor/src/plugins.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "type",
           "name": "EditorViewContributionProvider",
           "source": "packages/editor/src/plugins.ts",
           "via": "packages/editor/src/public/extensions.ts"
@@ -5026,6 +5086,12 @@
         },
         {
           "kind": "type",
+          "name": "EditorViewScope",
+          "source": "packages/editor/src/createPlugin.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "type",
           "name": "EditorViewSnapshot",
           "source": "packages/editor/src/plugins.ts",
           "via": "packages/editor/src/public/extensions.ts"
@@ -5034,6 +5100,12 @@
           "kind": "type",
           "name": "EditorViewSnapshotJSON",
           "source": "packages/editor/src/plugins.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorViewState",
+          "source": "packages/editor/src/createPlugin.ts",
           "via": "packages/editor/src/public/extensions.ts"
         },
         {
@@ -5164,6 +5236,12 @@
         },
         {
           "kind": "unknown",
+          "name": "createChannel",
+          "source": "packages/editor/src/createPlugin.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "unknown",
           "name": "createEditorCapabilityToken",
           "source": "packages/editor/src/plugins.ts",
           "via": "packages/editor/src/public/extensions.ts"
@@ -5176,8 +5254,26 @@
         },
         {
           "kind": "unknown",
+          "name": "createPlugin",
+          "source": "packages/editor/src/createPlugin.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "unknown",
           "name": "createSemanticTokenLayer",
           "source": "packages/editor/src/semanticTokenLayer.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "derive",
+          "source": "packages/editor/src/createPlugin.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "documentInput",
+          "source": "packages/editor/src/createPlugin.ts",
           "via": "packages/editor/src/public/extensions.ts"
         },
         {
@@ -5278,6 +5374,12 @@
         },
         {
           "kind": "unknown",
+          "name": "selectionInput",
+          "source": "packages/editor/src/createPlugin.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "unknown",
           "name": "SEMANTIC_TOKEN_Z_INDEX",
           "source": "packages/editor/src/semanticTokenLayer.ts",
           "via": "packages/editor/src/public/extensions.ts"
@@ -5311,6 +5413,36 @@
           "name": "snippetInitialSelection",
           "source": "packages/editor/src/editor/snippet.ts",
           "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "textInput",
+          "source": "packages/editor/src/createPlugin.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "themeInput",
+          "source": "packages/editor/src/createPlugin.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "tokensInput",
+          "source": "packages/editor/src/createPlugin.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "viewportInput",
+          "source": "packages/editor/src/createPlugin.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "visibleRowsInput",
+          "source": "packages/editor/src/createPlugin.ts",
+          "via": "packages/editor/src/public/extensions.ts"
         }
       ],
       "source": "packages/editor/src/public/extensions.ts",
@@ -5326,8 +5458,38 @@
         },
         {
           "kind": "type",
+          "name": "EditorAnyCommandId",
+          "source": "packages/editor/src/editor/commandCatalog.ts",
+          "via": "packages/editor/src/public/keymap.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorCommandCategory",
+          "source": "packages/editor/src/editor/commandCatalog.ts",
+          "via": "packages/editor/src/public/keymap.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorCommandDeclaration",
+          "source": "packages/editor/src/editor/commandCatalog.ts",
+          "via": "packages/editor/src/public/keymap.ts"
+        },
+        {
+          "kind": "type",
           "name": "EditorCommandPack",
           "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/public/keymap.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorContributedCommandDeclaration",
+          "source": "packages/editor/src/editor/commandCatalog.ts",
+          "via": "packages/editor/src/public/keymap.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorContributedCommandId",
+          "source": "packages/editor/src/editor/commandCatalog.ts",
           "via": "packages/editor/src/public/keymap.ts"
         },
         {
@@ -5452,6 +5614,18 @@
         },
         {
           "kind": "unknown",
+          "name": "EDITOR_COMMANDS",
+          "source": "packages/editor/src/editor/commandCatalog.ts",
+          "via": "packages/editor/src/public/keymap.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "editorCommandDeclaration",
+          "source": "packages/editor/src/editor/commandCatalog.ts",
+          "via": "packages/editor/src/public/keymap.ts"
+        },
+        {
+          "kind": "unknown",
           "name": "editorCommandMutates",
           "source": "packages/editor/src/keymap/conditions.ts",
           "via": "packages/editor/src/public/keymap.ts"
@@ -5508,6 +5682,12 @@
           "kind": "unknown",
           "name": "filterEditorKeymapLayersByCommandPacks",
           "source": "packages/editor/src/keymap/presets.ts",
+          "via": "packages/editor/src/public/keymap.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "isEditorCommandId",
+          "source": "packages/editor/src/editor/commandCatalog.ts",
           "via": "packages/editor/src/public/keymap.ts"
         },
         {

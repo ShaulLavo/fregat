@@ -721,6 +721,172 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
     }
   })
 
+  it('matches a full parse after edits that move structure outside the edited range', async () => {
+    const text = [
+      '# Title',
+      '',
+      'Some *text* here.',
+      '',
+      '```html',
+      '<main><script>const a = 1;</script><p>after</p></main>',
+      '```',
+      '',
+      'Closing paragraph with `code`.',
+      '',
+      '```css',
+      '.x { color: red; }',
+      '```',
+    ].join('\n')
+    const closeScript = text.indexOf('</script>')
+    const firstFenceEnd = text.indexOf('```\n\nClosing')
+    const scenarios = [
+      { name: 'open-fence', edit: { from: 0, to: 0, text: '```\n' } },
+      {
+        name: 'drop-script-close',
+        edit: { from: closeScript, to: closeScript + '</script>'.length, text: '' },
+      },
+      {
+        name: 'drop-fence-close',
+        edit: { from: firstFenceEnd, to: firstFenceEnd + 3, text: '' },
+      },
+      {
+        name: 'retag-fence',
+        edit: { from: text.indexOf('```css') + 3, to: text.indexOf('```css') + 6, text: 'js' },
+      },
+    ] satisfies readonly { readonly name: string; readonly edit: TextEdit }[]
+
+    for (const scenario of scenarios) {
+      await compareIncrementalInjectionsWithFullParse(workerClient, {
+        documentId: `markdown-structure-${scenario.name}.md`,
+        languageId: 'markdown',
+        text,
+        edit: scenario.edit,
+      })
+    }
+  })
+
+  it('matches a full parse after every step of a chain of structural markdown edits', async () => {
+    let text = [
+      '# Chain',
+      '',
+      'A paragraph with *emphasis* and `code`.',
+      '',
+      '```html',
+      '<div><script>let x = 1;</script><style>.a{}</style></div>',
+      '```',
+      '',
+      '- item one',
+      '- item two with [link](x)',
+      '',
+      '```js',
+      'const y = `${x}`;',
+      '```',
+    ].join('\n')
+    const inserts = ['`', '```', '\n', '*', '<', '>', '</script>', '<script>', ' ', '# ', '- ']
+    let seed = 7
+    const random = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648
+    const documentId = 'markdown-chain.md'
+    const runtimeSessionId = `runtime-${documentId}`
+    let snapshot = createPieceTableSnapshot(text)
+    await workerClient.parse({
+      documentId,
+      runtimeSessionId,
+      snapshotVersion: 1,
+      languageId: 'markdown',
+      snapshot,
+    })
+
+    for (let step = 0; step < 30; step += 1) {
+      const from = Math.floor(random() * text.length)
+      const remove = random() < 0.3 ? Math.min(text.length - from, 1 + Math.floor(random() * 4)) : 0
+      const insert =
+        remove > 0 && random() < 0.5 ? '' : inserts[Math.floor(random() * inserts.length)]!
+      const edit = { from, to: from + remove, text: insert }
+      const nextSnapshot = applyBatchToPieceTable(snapshot, [edit])
+      const payload = createTreeSitterEditPayload({
+        documentId,
+        runtimeSessionId,
+        previousSnapshotVersion: step + 1,
+        snapshotVersion: step + 2,
+        languageId: 'markdown',
+        previousSnapshot: snapshot,
+        nextSnapshot,
+        edits: [edit],
+      })
+      const incremental = payload ? await workerClient.edit(payload) : undefined
+      text = text.slice(0, from) + insert + text.slice(from + remove)
+      const full = await workerClient.parse({
+        documentId: `${documentId}:full-${step}`,
+        runtimeSessionId: `${runtimeSessionId}:full-${step}`,
+        snapshotVersion: 1,
+        languageId: 'markdown',
+        snapshot: nextSnapshot,
+      })
+
+      expect(incremental?.injections, `step ${step}`).toEqual(full?.injections)
+      expect(incremental?.captures, `step ${step}`).toEqual(full?.captures)
+      workerClient.disposeDocument(`${runtimeSessionId}:full-${step}`)
+      snapshot = nextSnapshot
+    }
+  })
+
+  it('keeps the injection cap filled after deletes and joins inside the capped region', async () => {
+    // Headings split the document into sections, so an edit's changed range stays in its section.
+    let text = Array.from({ length: 300 }, (_, index) => {
+      const heading = index % 5 === 0 ? `## Part ${index}\n\n` : ''
+      return `${heading}Paragraph ${index} has *emphasis*.`
+    }).join('\n\n')
+    const documentId = 'markdown-over-cap.md'
+    const runtimeSessionId = `runtime-${documentId}`
+    let snapshot = createPieceTableSnapshot(text)
+    await workerClient.parse({
+      documentId,
+      runtimeSessionId,
+      snapshotVersion: 1,
+      languageId: 'markdown',
+      snapshot,
+    })
+    const deleteParagraph = (index: number): TextEdit => {
+      const from = text.indexOf(`Paragraph ${index} `)
+      return { from, to: text.indexOf('\n\n', from) + 2, text: '' }
+    }
+    const joinParagraph = (index: number): TextEdit => {
+      const from = text.indexOf('\n\n', text.indexOf(`Paragraph ${index} `))
+      return { from, to: from + 2, text: ' ' }
+    }
+    const edits = [() => deleteParagraph(10), () => joinParagraph(20), () => deleteParagraph(30)]
+
+    for (const [step, nextEdit] of edits.entries()) {
+      const edit = nextEdit()
+      const nextSnapshot = applyBatchToPieceTable(snapshot, [edit])
+      const payload = createTreeSitterEditPayload({
+        documentId,
+        runtimeSessionId,
+        previousSnapshotVersion: step + 1,
+        snapshotVersion: step + 2,
+        languageId: 'markdown',
+        previousSnapshot: snapshot,
+        nextSnapshot,
+        edits: [edit],
+      })
+      const incremental = payload ? await workerClient.edit(payload) : undefined
+      const full = await workerClient.parse({
+        documentId: `${documentId}:full-${step}`,
+        runtimeSessionId: `${runtimeSessionId}:full-${step}`,
+        snapshotVersion: 1,
+        languageId: 'markdown',
+        snapshot: nextSnapshot,
+      })
+
+      expect(incremental?.injections, `step ${step}`).toEqual(full?.injections)
+      expect(incremental?.captures, `step ${step}`).toEqual(full?.captures)
+      expect(incremental?.injections).toHaveLength(256)
+      workerClient.disposeDocument(`${runtimeSessionId}:full-${step}`)
+      text = text.slice(0, edit.from) + edit.text + text.slice(edit.to)
+      snapshot = nextSnapshot
+    }
+  })
+
   it('creates and destroys tagged-template injections incrementally', async () => {
     const incomplete = [
       'const first = html`<main>hello</main>`;',
