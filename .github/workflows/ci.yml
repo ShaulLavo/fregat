@@ -197,9 +197,9 @@ jobs:
       - name: First-load gate
         run: bun run --cwd apps/web bundle:gate
 
-  # Web is most of the time, so it is sharded by file. The `test` scripts in `apps/web` and
-  # `packages/tree` are scoped to `--project node --project dom`; their browser projects are
-  # the browser job.
+  # Web is most of the time, so it is sharded by file, balanced by recorded durations
+  # (`apps/web/test/shard-sequencer.ts`). The `test` scripts in `apps/web` and `packages/tree`
+  # are scoped to `--project node --project dom`; their browser projects are the browser job.
   test-web:
     name: Test (web ${{ matrix.shard }})
     needs: changes
@@ -220,12 +220,17 @@ jobs:
       - name: Test
         run: bun run --cwd apps/web test --shard=${{ matrix.shard }}
 
+  # By hash of the path: the recorded split was within 15% (207 s against 182 s of file time).
   test-server:
-    name: Test (server)
+    name: Test (server ${{ matrix.shard }})
     needs: changes
     if: ${{ needs.changes.outputs.server == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1/2, 2/2]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -234,7 +239,7 @@ jobs:
         uses: ./.github/actions/setup
 
       - name: Test
-        run: bun run --cwd apps/server test
+        run: bun run --cwd apps/server test --shard=${{ matrix.shard }}
 
   test-tui:
     name: Test (tui)
