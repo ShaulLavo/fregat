@@ -49,11 +49,17 @@ beforeEach(() => {
 })
 
 // Unmount anything React Testing Library rendered between tests so the happy-dom
-// document never leaks state across cases. A test that showed a toast also waits out
+// document never leaks state across cases. A test that showed a toast first closes every
+// toast (an open one would close itself later on its auto-close timer) and then waits out
 // sonner's removal timer: fired after the environment is torn down, its setState reads
 // `window` and fails the whole run.
 afterEach(async () => {
+  const showedToast = toast.getHistory().some((shown) => !toastsBefore.has(shown.id))
+  if (showedToast) {
+    toast.dismiss()
+    // sonner applies the dismissal on a zero-delay timer of its own.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  }
   cleanup()
-  if (!toast.getHistory().some((shown) => !toastsBefore.has(shown.id))) return
-  await new Promise((resolve) => setTimeout(resolve, TOAST_REMOVAL_MS + 20))
+  if (showedToast) await new Promise((resolve) => setTimeout(resolve, TOAST_REMOVAL_MS + 20))
 })

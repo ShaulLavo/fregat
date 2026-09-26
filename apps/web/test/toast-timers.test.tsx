@@ -46,3 +46,18 @@ test("a toast closed in a test starts sonner's removal timer", async () => {
 test('no removal timer outlives the test that started it', () => {
   expect(pendingRemovals.size).toBe(0)
 })
+
+test('a toast left open is closed with its test', async () => {
+  render(<Toaster />)
+  await act(async () => {
+    toast('Session restored', { duration: 60_000, id: 'toast-timers-open' })
+    await nextTask()
+  })
+
+  expect(document.querySelectorAll('[data-sonner-toast]')).toHaveLength(1)
+})
+
+test('the open toast neither stays nor leaves a removal timer behind', () => {
+  expect(toast.getToasts()).toHaveLength(0)
+  expect(pendingRemovals.size).toBe(0)
+})
