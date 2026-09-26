@@ -10,6 +10,7 @@ import { installationErrors } from './structured-errors'
  */
 export const RUNTIME_PACKAGES = [
   'sharp',
+  'web-push',
   '@anthropic-ai/claude-agent-sdk',
   'typescript',
   'typescript-language-server',

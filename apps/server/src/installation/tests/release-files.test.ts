@@ -75,6 +75,7 @@ test('the server build writes the watch worker beside the bundle', async () => {
 test('manifest versions come from bun.lock, with the server workspace resolution first', () => {
   const lock = fixtureLock({
     sharp: 'sharp@0.1.0',
+    'web-push': 'web-push@3.6.7',
     'server/sharp': 'sharp@0.2.0',
     '@anthropic-ai/claude-agent-sdk': '@anthropic-ai/claude-agent-sdk@1.2.3',
     typescript: 'typescript@7.0.0',
@@ -88,6 +89,7 @@ test('manifest versions come from bun.lock, with the server workspace resolution
     private: true,
     dependencies: {
       sharp: '0.2.0',
+      'web-push': '3.6.7',
       '@anthropic-ai/claude-agent-sdk': '1.2.3',
       typescript: '7.0.0',
       'typescript-language-server': '6.0.0',
@@ -112,7 +114,7 @@ test('a runtime package missing from bun.lock fails the manifest', () => {
     expect.objectContaining({
       code: 'installation.RUNTIME_PACKAGE_MISSING',
       message:
-        'bun.lock resolves no version for the server runtime packages @anthropic-ai/claude-agent-sdk, typescript-language-server, jszip, subset-font.',
+        'bun.lock resolves no version for the server runtime packages web-push, @anthropic-ai/claude-agent-sdk, typescript-language-server, jszip, subset-font.',
     }),
   )
 })

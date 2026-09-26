@@ -13,7 +13,8 @@
       "packages/tree",
       "packages/ui",
       "packages/utils",
-      "scripts"
+      "scripts",
+      "packages/push"
     ],
     "catalog": {
       "@opentui/core": "0.5.12",

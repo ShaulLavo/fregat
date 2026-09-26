@@ -34,6 +34,15 @@ release installs that carry every package the server loads at runtime.
    device registers, or a notice is sent with `chat.pushNotifications` on). The main server bundle
    then carries no MPL code; the push package ships unmodified with its notice (slice 8) and, if
    it stays outside the bundle, in `RUNTIME_PACKAGES` (slice 1). No WebCrypto rewrite.
+   Implemented on `w2/cx-184-runtime`: `@workspace/push` owns the external dependency;
+   both server call sites dynamically import it. The generated bundle awaits the external
+   import only at first use. `web-push` is in the frozen runtime manifest, and its full
+   MPL text and source link ship at `/licenses/web-push.txt`.
+   Server bundle: 5,139,799 → 4,930,017 bytes, down 209,782 bytes. Push/release tests:
+   29 passed, including independent payload decryption and VAPID verification. An isolated
+   frozen runtime install generated keys from `/`, with no eager transport load.
+   Device delivery on the mesh remains unverified: this lane does not deploy or send to the
+   owner's phone. Evidence: `/work/tmp/w2-184-runtime-evidence/`.
 5. **`sharp` → `Bun.Image`** (a 6001×4001 JPEG to WebP in 33 ms in the probe).
 6. **Dead and thin ones:** the second TypeScript (`typescript@6.0.3`, 24 MB, only unimported code uses
    it), `react-animated-counter` (pulls lodash), `@foresightjs/react` (keep `js.foresight`),
