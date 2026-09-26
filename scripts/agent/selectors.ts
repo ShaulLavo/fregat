@@ -989,6 +989,11 @@ export const selectors = {
     page
       .getByRole('tablist', { name: 'Diff scope' })
       .getByRole('tab', { name: scope, exact: true }),
+  turnHunkSelector: '[aria-label="Turn changed files"] [data-turn-hunk]',
+  turnFilesHeaderSelector: 'div:has(> [aria-label="Turn changed files"]) > p',
+  branchActionSelector: '[data-branch-actions] button',
+  branchPush: (page: Page, count: number) =>
+    page.getByRole('button', { name: `Push ${count}`, exact: true }),
   turnFiles: (page: Page) => page.getByRole('tree', { name: 'Turn changed files' }),
   worktreeFiles: (page: Page) => page.locator('[data-git-file]:not([data-history-file])'),
   historyList: (page: Page) => page.getByRole('listbox', { name: 'Commit history' }),
