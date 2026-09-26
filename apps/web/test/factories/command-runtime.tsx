@@ -399,7 +399,7 @@ function createTestEditor(
   const uiStore = createEditorUiStore()
   const apply = createEditorApplyActions({
     retainedTextBudget: () => Number.MAX_SAFE_INTEGER,
-    activation: { activate: () => undefined, setRoot: () => undefined },
+    activation: { activate: () => null, setRoot: () => undefined },
     documentStore,
     searchStore: createSearchBufferStore({ rootPath: workspaceStore.getState().rootFolder?.path }),
     uiStore,
