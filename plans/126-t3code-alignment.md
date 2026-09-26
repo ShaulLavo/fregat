@@ -1,15 +1,14 @@
 # Plan 126: Align Platform behavior with pinned T3 Code
 
-Status: **IN PROGRESS; FULL PARITY EXECUTION RESUMED 2026-09-23**. Two source-audit passes and independent
-cross-review completed on 2026-09-20. The audit found 48 implementation groups, and the 2026-09-24
-delta added nine: **57 groups**, including paired client/server work. This is not a count of
-independently reproduced bugs. On 2026-09-25 (`main` after lane L2), 26 groups are implemented and
-deployed, 9 partial and 22 not started; 10 of the 26 are closed as `verified` in the
-[ledger](126-t3code-alignment/ledger.json). LIFE-13 is additionally scenario-verified in PR #41.
-LIFE-03/04/05/08/10 close after PR #41 merges, when their scenarios move to its second-owner helper.
-In the completion wave a row closes when its `agent:browser` scenario proves the
+Status: **RESEARCH DONE 2026-09-26 — 24 of 57 groups verified by scenario, 13 implemented with one
+proof step left, 11 partial, 4 open, 5 parked** ([row-by-row audit](126-t3code-alignment/status-2026-09-26.md)).
+Counted on `origin/main` `c130dd35a`, after lanes L2, L3, L5, L8 and L9. Of the open lane PRs only
+#32 (Plan 149) touches a row, EXT-05. A row closes when its `agent:browser` scenario proves the
 behaviour; the paired run against upstream T3 Code is dropped
 ([owner decision](../docs/completion-wave.md#owner-decisions-for-this-wave-2026-09-25)).
+Most older scenarios fail on `main` today from seven harness defects, not product regressions;
+batch A below repairs them first. Upstream moved 114 commits past the 2026-09-24 delta; see
+[the 2026-09-26 delta](126-t3code-alignment/delta-2026-09-26.md).
 
 LIFE-01/02 shipped on 2026-09-20. Rewind/native permissions/PR lookup have an initial deployment and follow-up validation in [delivery evidence](126-t3code-alignment/rewind-permissions-delivery.md); bounded delivery and MCP approval implementation are recorded in [their delivery evidence](126-t3code-alignment/live-delivery-approvals-delivery.md). The active-list exceptions and automatic unarchive are removed; archive eligibility is separate from settlement. See [archive delivery evidence](126-t3code-alignment/archive-delivery.md). The source-derived archive fixture is the first focused conformance case, not completion of Wave 0 or proof of full upstream parity.
 
@@ -20,6 +19,51 @@ date estimate is possible before provider/platform prerequisites and live compar
 A 2026-09-24 upstream delta audit against `9383f4ad` added nine groups (57 in total) and reopened four stale non-parity rejections. The acceptance baseline stays pinned; see [the delta record](126-t3code-alignment/delta-2026-09-24.md).
 
 The user resumed all parity work on 2026-09-23, including providers, remote access, browser/device tools, mobile, desktop and distribution. The previous stop applied to the 2026-09-20 run only. See [the resumed execution record](126-t3code-alignment/resumed-execution.md) for the first batch and [the historical wrap-up](126-t3code-alignment/wrap-up.md) for completed deliveries and their limits.
+
+## Remaining work in lane batches (2026-09-26)
+
+Grouped by the files each batch touches, so two lanes rarely edit the same file. Row states and
+evidence are in the [status audit](126-t3code-alignment/status-2026-09-26.md). Batch A goes
+first; B, C and D need it.
+
+| Batch                                   | Rows                                                                                      | Files                                                                                                                                                                 | Size                               | Blockers                                                                                                                                    |
+| --------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| A. Scenario harness repair              | LIFE-01, LIFE-02; keeps RUNTIME-03, RUNTIME-09 and every Codex-fixture proof reproducible | `scripts/agent/fixtures/*.mjs`, `scripts/agent/selectors.ts`, `scenarios/chat-verification.ts`, `archive-lifecycle.ts`, `response-delivery.ts`, `terminal-history.ts` | S                                  | None. Start from `/work/tmp/research2/126/scenario-harness-fixes.patch` (H1–H4 tested; H6 needs a harness-owned second context)             |
+| B. Two-owner rail proofs                | LIFE-03, LIFE-04, LIFE-05, LIFE-08, LIFE-10                                               | `scenarios/session-{lifecycle,ordering,search,navigation}.ts`, `second-owner.ts`                                                                                      | S–M                                | A. Move `session-lifecycle` and `session-search` off the real provider onto native fixtures. Coordinate with Plan 172 if it moves rail Undo |
+| C. Server protocol proofs               | EXT-13, RUNTIME-04, RUNTIME-11, RUNTIME-07, RUNTIME-08                                    | `scripts/agent/fixtures/native-codex.mjs`, `fake-gh.mjs`, new scenarios; `provider/adapters/codex.ts` only if a proof fails                                           | M                                  | A. RUNTIME-07 rechecks the monitor-only signal on Codex 0.157 (decided). RUNTIME-08's live redemption stays the owner's check               |
+| D. Composer residues                    | INTERACTION-01, -02, -04, -08, -11 (Enter on touch)                                       | `features/chat/{state,components}` composer, follow-up store, question panel; `apps/server/src/auth.ts` or the download link                                          | M                                  | A. INTERACTION-11's rich composer stays parked on Plan 111                                                                                  |
+| E. Lifecycle and terminal delta         | EXT-05, LIFE-06 switch, LIFE-04 idle shells, LIFE-14 repo name, EXT-12 log retention      | `terminal/service.ts`, orchestration decider and settlement, rail row menu, log writer                                                                                | M                                  | #32 merged first (Plan 149 rewrites terminal and observability files)                                                                       |
+| F. Typed source context                 | INTERACTION-09, INTERACTION-03                                                            | composer draft model, `lib/use-attach-to-composer.ts`, review draft, message menu                                                                                     | L                                  | Plan 139 P3 and 140 are on `main`. Browser annotation waits on EXT-07                                                                       |
+| G. Four provider drivers                | RUNTIME-02                                                                                | `provider/adapters/*`, new ACP peer, contracts provider defaults                                                                                                      | XL (4 × L; two lanes after step 0) | Accounts only for smoke runs; untested drivers ship marked untested (owner, 2026-09-25). Status probes must never run a mise shim           |
+| H. Remote machines                      | EXT-08, EXT-16                                                                            | `apps/server/src/auth*`, `machines/**`, `features/environments`, composer machine picker                                                                              | L + M                              | EXT-08 is a security boundary; relay stays later (Plan 143 Q4)                                                                              |
+| I. Pull-request review and idle cleanup | EXT-02, EXT-12 rules                                                                      | `apps/server/src/git/**`, `features/git/**`, worktree lifecycle                                                                                                       | L                                  | Plan 169 for review; EXT-12 rules wait on owner question 3                                                                                  |
+| J. Owner-gated                          | LIFE-09, LIFE-12, EXT-17                                                                  | project registration; Settings; usage page                                                                                                                            | L, M, S                            | Owner questions 1, 2, 4                                                                                                                     |
+
+Parked: EXT-07 and EXT-09 (Plan 087 automation, Plan 143 research, per-OS matrix), EXT-10
+(needs pinned BackgroundPolicy semantics and a measurement), INTERACTION-12 (Plan 144).
+
+## Owner questions (2026-09-26)
+
+1. **LIFE-09: subprojects.** `repository_path` grouping only differs from `repository` when a
+   project is a subdirectory of its checkout, and registration canonicalizes every project to the
+   checkout root. (a) Allow registering a subdirectory as its own project, with scoped commands
+   so a destructive action stays inside it; (b) close LIFE-09 with subprojects unsupported.
+   **Recommendation: (a), after batches A–E.** It is the only way `repository_path` means
+   anything, and monorepo subprojects are a common layout. L.
+2. **LIFE-12: Project settings.** Eight per-project override keys (`chat.projectAutoSettle`,
+   `git.projectAutoPull`, `chat.projectTextGenerationModels`, …) exist with no UI. (a) A Project
+   page in Settings, opened from the row and project menus, editing those keys on the owning
+   machine; (b) keep editing them as JSON and close LIFE-12. **Recommendation: (a).** Upstream's
+   thread menu has it, and the keys are unusable without it. M.
+3. **EXT-12: idle worktree removal.** Upstream's age, merge and unchanged rules remove an idle
+   thread's checkout and recreate it from the branch when the thread resumes. (a) Build that
+   restore-on-resume step, off by default like upstream; (b) close EXT-12 with only
+   delete-time cleanup. **Recommendation: (b).** Every rule is off by default upstream, and
+   restore-on-resume adds a new failure path to every session start. L if (a).
+4. **EXT-17: prices.** Plan 141 replaced upstream's editable prices with automatic models.dev
+   pricing; a model with no price shows "Price unavailable". (a) Close EXT-17 on automatic
+   pricing; (b) add a manual price override for unpriced models. **Recommendation: (a).** Your
+   141 decision already chose automatic pricing, and unknown prices never show a wrong number. S if (b).
 
 ## Authority and completion rule
 
@@ -50,18 +94,20 @@ a local test intentionally enforces behavior that upstream does not have.
 
 ## Readable audit and machine-readable records
 
-| Artifact                                                     | Purpose                                                                                                                                                                                                                                 |
-| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Lifecycle](126-t3code-alignment/lifecycle.md)               | 14 groups: archive, shelf placement, settle/snooze/pins, ordering, unread, search, grouping, navigation, titles, cleanup UI, Undo and row PR state                                                                                      |
-| [Interaction](126-t3code-alignment/interaction.md)           | 14 groups: queued sends, files/drafts/stash, questions, rewind, compaction, quotas, model fan-out, context, artifacts, editing, workflows, background start and favorites                                                               |
-| [Runtime](126-t3code-alignment/runtime.md)                   | 11 groups: safe rewind, native approval replies, stream bounds, providers, capabilities, compaction, liveness, usage, delivery and maintenance                                                                                          |
-| [Adjacent product](126-t3code-alignment/adjacent.md)         | 18 groups: forges/PRs, clone/publish, setup, terminals, notifications, preview/devices, remote, clients/releases, background policy, cleanup, conformance, default-branch pull, submodules, load balancing, usage page and branch drift |
-| [Finding ledger](126-t3code-alignment/ledger.json)           | IDs, delivery wave, source evidence level, open status and execution-evidence slots                                                                                                                                                     |
-| [Contract coverage](126-t3code-alignment/coverage.json)      | Every one of 47 upstream contract modules assigned to work; assignment is not symbol-level verification                                                                                                                                 |
-| [Pinned census](126-t3code-alignment/inventory.json)         | 146 RPC names, orchestration discriminants, contract exports/content hashes and upstream app inventory                                                                                                                                  |
-| [Census/plan checker](126-t3code-alignment/inventory.py)     | Reproducible baseline and ledger validation; does not claim behavioral equivalence                                                                                                                                                      |
-| [Audit protocol](126-t3code-alignment/audit-protocol.md)     | Shared evidence and review method                                                                                                                                                                                                       |
-| [2026-09-24 delta](126-t3code-alignment/delta-2026-09-24.md) | Upstream `9383f4ad` delta: new groups, items folded into existing groups, reopened rejections                                                                                                                                           |
+| Artifact                                                       | Purpose                                                                                                                                                                                                                                 |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Lifecycle](126-t3code-alignment/lifecycle.md)                 | 14 groups: archive, shelf placement, settle/snooze/pins, ordering, unread, search, grouping, navigation, titles, cleanup UI, Undo and row PR state                                                                                      |
+| [Interaction](126-t3code-alignment/interaction.md)             | 14 groups: queued sends, files/drafts/stash, questions, rewind, compaction, quotas, model fan-out, context, artifacts, editing, workflows, background start and favorites                                                               |
+| [Runtime](126-t3code-alignment/runtime.md)                     | 11 groups: safe rewind, native approval replies, stream bounds, providers, capabilities, compaction, liveness, usage, delivery and maintenance                                                                                          |
+| [Adjacent product](126-t3code-alignment/adjacent.md)           | 18 groups: forges/PRs, clone/publish, setup, terminals, notifications, preview/devices, remote, clients/releases, background policy, cleanup, conformance, default-branch pull, submodules, load balancing, usage page and branch drift |
+| [Finding ledger](126-t3code-alignment/ledger.json)             | IDs, delivery wave, source evidence level, open status and execution-evidence slots                                                                                                                                                     |
+| [Contract coverage](126-t3code-alignment/coverage.json)        | Every one of 47 upstream contract modules assigned to work; assignment is not symbol-level verification                                                                                                                                 |
+| [Pinned census](126-t3code-alignment/inventory.json)           | 146 RPC names, orchestration discriminants, contract exports/content hashes and upstream app inventory                                                                                                                                  |
+| [Census/plan checker](126-t3code-alignment/inventory.py)       | Reproducible baseline and ledger validation; does not claim behavioral equivalence                                                                                                                                                      |
+| [Audit protocol](126-t3code-alignment/audit-protocol.md)       | Shared evidence and review method                                                                                                                                                                                                       |
+| [2026-09-24 delta](126-t3code-alignment/delta-2026-09-24.md)   | Upstream `9383f4ad` delta: new groups, items folded into existing groups, reopened rejections                                                                                                                                           |
+| [2026-09-26 delta](126-t3code-alignment/delta-2026-09-26.md)   | Upstream `295d7cba` delta: post-pin changes that touch a row, and the pin decision                                                                                                                                                      |
+| [2026-09-26 status](126-t3code-alignment/status-2026-09-26.md) | Every row on `main` with scenario evidence, the harness defects, and what finishes each row                                                                                                                                             |
 
 Each finding report contains the exact local/upstream source anchors, impact, confidence,
 effort/risk, change boundaries and acceptance cases. They are executable appendices to this

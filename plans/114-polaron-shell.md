@@ -373,6 +373,9 @@ a Bun process launcher and does not need Rust there.
    macOS. (b) No: stay on Electrobun and CEF. (c) Linux keeps Chromium `--app`, Polaron only on
    macOS and Windows. Recommendation: (a). The suite and the live app say the engine holds, and
    the phone already runs WebKit.
+   Decided 2026-09-26: owner — neither as written: the shell uses the user's installed Chromium
+   (`--app`) when there is one and falls back to the system webview when there is none. The plan
+   is being reworked around that order (research round 2).
 2. **The Chromium `--app` fallback** (the plan's question 2): (a) build it as a flag in Gate 2;
    (b) WebKitGTK or nothing. Recommendation: (a), because the NVIDIA stall shows a Linux webview
    can fail silently on one driver.

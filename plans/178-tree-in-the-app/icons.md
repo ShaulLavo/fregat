@@ -29,14 +29,13 @@ built-in sets and sprite injection are gone.
 
 1. **Sprite mode.** Mount the app glyph sprite once in the document; `FileTypeIcon` gains a `<use>`
    mode that rows use. Gradient ids are unique once, so the per-instance rewrite is not needed.
-2. **Hue tokens.** Thirteen hue tokens (light and dark) in `globals.css`, replacing the per-icon
-   hex. The colour table (`getBuiltInFileIconColor`) moves to `lib/file-icons.ts` and maps each icon
-   to a hue. The tree's hues win where the two differ (`bun` is mauve, Q1); per-mode colours or
-   other variants wait for [Plan 180](../180-file-icon-variants.md).
+2. **Hue tokens.** Use the `--file-icon-<hue>` tokens and the icon → hue map that
+   [Plan 180](../180-file-icon-variants.md) Phase 1 generates (tree hues, `bun` mauve per Q1). If
+   180 Phase 1 has not landed, land it here instead of hand-writing tokens.
 3. **Rows.** Tree rows call `iconForEntry` with the real stem logic. `FileLabel` gains a folder kind
    so it can render the chevron-only lead the tree uses today.
 4. **Delete** `builtInIcons.ts` (781 lines), `iconResolver.ts`, `Icon.tsx`, `iconConfig.ts`,
-   `sprite.ts`, `fileTreeIconsForPaths`, `vscodeIconSpriteSheet`, `treeIconReference`, and the
+   `sprite.ts`, `fileTreeIconsForPaths`, `vscodeIconSpriteSheet`, `treeIconReference`, `ICON_TOKENS`, and the
    `--trees-file-icon-color-*` variables. The sparkle comes from Phosphor like every other icon.
 
 ## Parity

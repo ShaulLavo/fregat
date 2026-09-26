@@ -183,13 +183,16 @@ Each phase ships and deploys on its own; phases 1, 3, 5 and 6 change the server
    (c) status only, phases 1–2, and users edit config with the CLIs.
    **Recommendation: (a).** Every listed capability exists in both harnesses, and a gateway would
    duplicate their approval, tool search and OAuth stores.
+   Decided 2026-09-26: owner — (a).
 2. **Claude project servers in untrusted checkouts.** Platform's Claude sessions run a
    repository's `.mcp.json` commands without the approval the CLI asks for. (a) Gate them:
    unapproved project servers stay off until approved in Platform (phase 2); (b) keep running
    them and show their source; (c) never load project servers in Claude sessions.
    **Recommendation: (a).** It matches the CLI's own rule and Codex's trusted-project rule, and
    costs one click per repository.
+   Decided 2026-09-26: owner — (a). A live security gap: phase 2 runs first in the next wave.
 3. **Sign-in from the phone.** (a) Build the paste-back sign-in for both harnesses (phase 6);
    (b) sign in only from a browser on the server machine, as today, with the row saying so.
    **Recommendation: (a).** The mesh is the daily surface, and today's Codex sign-in fails from
    any other device.
+   Decided 2026-09-26: owner — (a).
