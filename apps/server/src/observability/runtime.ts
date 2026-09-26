@@ -9,6 +9,7 @@ export {
   recordObservabilityInfo as recordProcessInfo,
   recordObservabilityWarning as recordProcessWarning,
   resetObservabilityForTests,
+  setLogRetentionDays,
 } from '@workspace/observability'
 
 export function initializeObservability(

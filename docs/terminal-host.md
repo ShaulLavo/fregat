@@ -24,6 +24,11 @@ The manifest lives beside the socket. Isolated browser runs stop their host befo
 their temporary home. Host launch, adoption, attach replay and orphan cleanup each log one
 structured event; command lines and terminal output stay out of those events.
 
+A worktree's shells outlive the sessions that use it, with one exception (Plan 126 LIFE-04,
+owner decision 2026-09-26): once the last live session on a worktree settles or archives, its
+shells whose foreground is the shell itself close, and their saved output stays. A shell running
+a program stays open.
+
 Plan 149's D1–D7 recommendations were accepted for the 2026-09-25 completion wave. The owner
 explicitly chose desktop-quit shutdown. The macOS fallback remains an owner check.
 

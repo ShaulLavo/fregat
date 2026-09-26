@@ -46,6 +46,7 @@ import {
   recordRequestContext,
   recordRequestError,
   runDetached,
+  setLogRetentionDays,
 } from './observability'
 import { OrchestrationEngine } from './orchestration/engine'
 import { requireWorktree } from './orchestration/read-model'
@@ -78,6 +79,7 @@ import { readBranchPullRequests, type ForgeBoundaries } from './git/pull-request
 import type { BranchPullRequestLookup } from './orchestration/pull-request-sync-reactor'
 import { TerminalService, type TerminalPtyFactory } from './terminal/service'
 import type { TerminalHostClient } from './terminal/host-client'
+import type { ShellCommandReader } from './terminal/foreground'
 import { wallpaperRoutes } from './wallpaper/routes'
 import { webRoutes, type WebOptions } from './web/routes'
 import { readReleaseInfoSync } from './web/release'
@@ -112,6 +114,8 @@ export type AppOptions = FileSystemServiceOptions & {
     env?: NodeJS.ProcessEnv
     ptyFactory?: TerminalPtyFactory
     hostClient?: TerminalHostClient
+    /** Test seam: whether a shell runs a command, which fake PTYs cannot answer. */
+    shellCommand?: ShellCommandReader
   }
   fonts?: FontCatalogService
   themes?: {
@@ -213,6 +217,7 @@ export function createApp(options: AppOptions) {
   // keeps a test run from writing into the developer's real settings.
   const settings = new SettingsStore({ ...options.settings, workspaceRoot: fs.paths.workspaceRoot })
   fs.watchDirectoryLimit = () => settings.snapshot().values['files.watchDirectoryLimit']
+  setLogRetentionDays(() => settings.snapshot().values['logs.retentionDays'])
   let watchDirectoryLimit = settings.snapshot().values['files.watchDirectoryLimit']
   settings.onChange(() => {
     const next = settings.snapshot().values['files.watchDirectoryLimit']

@@ -40,7 +40,8 @@ export function recordKey(
   }
   if (key.metaKey)
     return { ...state, error: 'Meta shortcuts are reserved by the desktop. Use Control.' }
-  const stroke = recordedStroke(key)
+  // The TUI binds Ctrl as Mod on every host, as its labels say.
+  const stroke = recordedStroke(key, 'linux')
   if (!stroke) return state
   if (state.strokes.length === MAX_CHORD_STROKES)
     return {
