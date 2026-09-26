@@ -23,6 +23,7 @@ export type MarkdownProps = {
   readonly remarkPlugins?: PluggableList
   /** Heals unfinished syntax and marks the tail as still being written. */
   readonly streaming?: boolean
+  readonly sourceLineOffset?: number
   readonly text: string
 }
 
@@ -40,6 +41,7 @@ export function Markdown({
   remarkPlugins,
   streaming = false,
   text,
+  sourceLineOffset = 0,
 }: MarkdownProps) {
   const blocks = useMarkdownBlocks(text, { heal: streaming, remarkPlugins })
   const extensions = useMarkdownExtensions(blocks)
@@ -60,7 +62,10 @@ export function Markdown({
 
   return (
     <MarkdownRenderContext value={renderState}>
-      <div className={joinClassNames(ROOT_CLASS_NAME, showCaret && CARET_CLASS_NAME, className)}>
+      <div
+        data-source-line-offset={sourceLineOffset}
+        className={joinClassNames(ROOT_CLASS_NAME, showCaret && CARET_CLASS_NAME, className)}
+      >
         {blocks.length === 0 && showCaret ? <span /> : null}
         {blocks.map((block, index) => (
           <Fragment key={block.key}>{elements[index]}</Fragment>

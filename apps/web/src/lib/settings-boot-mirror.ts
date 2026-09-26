@@ -38,6 +38,7 @@ const MIRRORED_KEYS = [
   'chat.projectGroupingOverrides',
   'editor.codeTheme.dark',
   'editor.codeTheme.light',
+  'editor.markdownView',
   'environments.machines',
   'editor.decode.mode',
   'editor.diff.viewMode',

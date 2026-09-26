@@ -94,8 +94,6 @@ function reconciledValue(value: unknown, descriptor: ProviderOptionDescriptor) {
   if (!trimmed) return fallback
   if (descriptor.options.length === 0) return trimmed
   if (!descriptor.options.some((choice) => choice.id === trimmed)) return fallback
-  if (descriptor.promptInjectedValues?.includes(trimmed))
-    return descriptor.options.find((choice) => choice.isDefault)?.id ?? null
   return trimmed
 }
 

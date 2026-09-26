@@ -125,7 +125,7 @@ test('an open select with no advertised choices retains an explicit provider val
   })
 })
 
-test('prompt-injected effort does not become a persistent native effort override', () => {
+test('a prompt-injected level carries over like any other when the next model offers it', () => {
   const injected: ProviderOptionDescriptor = { ...effort, promptInjectedValues: ['future-effort'] }
   expect(
     reconcileModelOptions({ ...model, options: { reasoningEffort: 'future-effort' } }, next, [
@@ -133,6 +133,6 @@ test('prompt-injected effort does not become a persistent native effort override
     ]),
   ).toEqual({
     ...next,
-    options: { reasoningEffort: 'medium' },
+    options: { reasoningEffort: 'future-effort' },
   })
 })

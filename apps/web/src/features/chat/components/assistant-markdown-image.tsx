@@ -2,7 +2,7 @@ import { useState, type ComponentProps } from 'react'
 import { Button } from '@workspace/ui/components/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { ChatImageLightbox } from '@/features/chat/components/chat-image-lightbox'
-import { chatImageCrossOrigin } from '@/features/chat/utils/attachment-image'
+import { fsBlobCrossOrigin } from '@/lib/fs-blob-image'
 
 export function AssistantMarkdownImage({ src, alt = '', title }: ComponentProps<'img'>) {
   const [failedSource, setFailedSource] = useState<string | null>(null)
@@ -35,7 +35,7 @@ export function AssistantMarkdownImage({ src, alt = '', title }: ComponentProps<
           <img
             alt={alt}
             className='max-h-[30rem] max-w-full object-contain'
-            crossOrigin={chatImageCrossOrigin(source)}
+            crossOrigin={fsBlobCrossOrigin(source)}
             loading='lazy'
             onError={() => setFailedSource(source)}
             src={source}
@@ -53,7 +53,7 @@ export function AssistantMarkdownImage({ src, alt = '', title }: ComponentProps<
             name,
             src: source,
             sizeBytes: null,
-            crossOrigin: chatImageCrossOrigin(source),
+            crossOrigin: fsBlobCrossOrigin(source),
           },
         ]}
         openIndex={openIndex}

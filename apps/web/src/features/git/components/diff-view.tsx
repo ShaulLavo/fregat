@@ -124,6 +124,7 @@ export function DiffView({
           hostRef={containerRef}
           key={file.path}
           regions={regions}
+          rootPath={rootPath}
         />
       ) : null}
     </div>

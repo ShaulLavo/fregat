@@ -48,6 +48,7 @@ import {
 } from './observability'
 import { OrchestrationEngine } from './orchestration/engine'
 import { requireWorktree } from './orchestration/read-model'
+import { OrchestrationCheckpointHunks } from './orchestration/checkpoint-hunks'
 import { OrchestrationCheckpointDiffQuery } from './orchestration/checkpoint-diff-query'
 import type { OrchestrationDatabase } from './orchestration/event-store'
 import { orchestrationRoutes } from './orchestration/routes'
@@ -189,6 +190,14 @@ export function createApp(options: AppOptions) {
   // app was given — in tests that is the in-memory database, which is what
   // keeps a test run from writing into the developer's real settings.
   const settings = new SettingsStore({ ...options.settings, workspaceRoot: fs.paths.workspaceRoot })
+  fs.watchDirectoryLimit = () => settings.snapshot().values['files.watchDirectoryLimit']
+  let watchDirectoryLimit = settings.snapshot().values['files.watchDirectoryLimit']
+  settings.onChange(() => {
+    const next = settings.snapshot().values['files.watchDirectoryLimit']
+    if (next === watchDirectoryLimit) return
+    watchDirectoryLimit = next
+    fs.rebalanceWatchLimit()
+  })
   const themesRoot = options.themes?.root ?? platformHomePath()
   const wallpapers = new WallpaperLibrary({
     directory: path.join(themesRoot, 'wallpapers'),
@@ -326,6 +335,14 @@ export function createApp(options: AppOptions) {
   const serverConfig = orchestrationWsServerConfig(identity)
   const commitMessages = new CommitMessageGenerator(git, providerAdapterRegistry, providerService)
   const checkpointDiff = new OrchestrationCheckpointDiffQuery(database, git)
+  const checkpointHunks = new OrchestrationCheckpointHunks({
+    runWorkspaceOperation: (sessionId, operation) =>
+      orchestration.runWorkspaceOperation(sessionId, operation),
+    activeRuntimes: () => providerService.listActiveRuntimes(),
+    diffs: checkpointDiff,
+    git,
+    readModel: () => orchestration.readModelSnapshot(),
+  })
   const sessionSearch = new OrchestrationSessionSearchQuery(database)
   const auth = createAuthConfig(options.auth)
   const push = new PushService({ database, settings, fetcher: options.push?.fetcher })
@@ -478,7 +495,7 @@ export function createApp(options: AppOptions) {
       ),
     )
     .use(sessionControlRoutes(providerService))
-    .use(orchestrationRoutes(orchestration, checkpointDiff, sessionSearch))
+    .use(orchestrationRoutes(orchestration, checkpointDiff, sessionSearch, checkpointHunks))
     .use(
       attachmentRoutes({
         attachmentsDir: options.orchestration?.attachmentsDir,

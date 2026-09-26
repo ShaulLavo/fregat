@@ -15,7 +15,8 @@
   `/work/tmp/fregat-evidence/20260925-keybindings-before/`.
 - Depends on: [Plan 102](102-scroll-and-keyboard-affordance.md) P3 (`Kbd` chip, lane L1),
   [Plan 157](157-base-components.md) (segmented control, scroll fades, typeahead refine, lane L1),
-  [Plan 080](080-platform-keybinding-modes.md) (preset display names Platform / VS Code, lane L8).
+  Plan 080 (preset display names Platform / VS Code, lane L8; done, see
+  [keyboard modes](../docs/keymap/modes.md)).
   Take whatever of those has landed on `main`; do not rebuild any of it here.
 - Work in the current checkout. Deploy with `bun run deploy` (web only).
 

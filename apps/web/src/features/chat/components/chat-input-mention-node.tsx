@@ -9,6 +9,8 @@ import {
 } from 'lexical'
 import type { ReactElement } from 'react'
 
+import { ChatInputUltrathinkNode } from '@/features/chat/utils/ultrathink-node'
+
 import { ChatInputMentionChip } from './chat-input-mention-chip'
 
 type SerializedChatInputMentionNode = Spread<
@@ -91,4 +93,4 @@ export function $isChatInputMentionNode(
 }
 
 /** Every node the chat composer's editor has to be configured with. */
-export const CHAT_INPUT_EDITOR_NODES = [ChatInputMentionNode]
+export const CHAT_INPUT_EDITOR_NODES = [ChatInputMentionNode, ChatInputUltrathinkNode]

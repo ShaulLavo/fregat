@@ -87,6 +87,12 @@ import { chatComposerInsert } from './chat-composer-insert'
 import { chatDisclosureSettle } from './chat-disclosure-settle'
 import { chatTurnAnatomy } from './chat-turn-anatomy'
 import { fileTreeHoverPrefetch } from './file-tree-hover-prefetch'
+import {
+  filePickerPrefetchBound,
+  workspaceOpenLargeRoot,
+  workspaceOpenUnreadableChild,
+  workspaceSwitchClickDuringOpen,
+} from './large-folder'
 import { wallpaperBootHandoff } from './wallpaper-boot-handoff'
 import { chatGitTabSwitch } from './chat-git-tab-switch'
 import { chatGitTurnRows } from './chat-git-turn-rows'
@@ -103,6 +109,11 @@ import { machineProtocolMismatch } from './machine-protocol-mismatch'
 import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalBackground } from './terminal-background'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
+import { sidebarToggle } from './sidebar-toggle'
+import { itemNavigation } from './item-navigation'
+import { shortcutHints } from './shortcut-hints'
+import { editorAddToChat } from './editor-add-to-chat'
+import { markdownSplitView } from './markdown-split-view'
 import { gitOpenAllDiffsSpam } from './git-open-all-diffs-spam'
 import { gitStageSettles } from './git-stage-settles'
 import { gitChangesScroll } from './git-changes-scroll'
@@ -361,6 +372,11 @@ export const scenarios: readonly Scenario[] = [
   editorOfflineResync,
   terminalBackground,
   bottomPanelPersistence,
+  sidebarToggle,
+  itemNavigation,
+  shortcutHints,
+  editorAddToChat,
+  markdownSplitView,
   gitOpenAllDiffsSpam,
   gitStageSettles,
   gitChangesScroll,
@@ -446,6 +462,10 @@ export const scenarios: readonly Scenario[] = [
   chatDisclosureSettle,
   chatTurnAnatomy,
   fileTreeHoverPrefetch,
+  workspaceOpenLargeRoot,
+  workspaceOpenUnreadableChild,
+  workspaceSwitchClickDuringOpen,
+  filePickerPrefetchBound,
   wallpaperBootHandoff,
   chatGitTabSwitch,
   chatGitTurnRows,

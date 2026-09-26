@@ -72,7 +72,7 @@ test('startup resolves a remote environment after the initial intent was parsed 
   }
 })
 
-test('a visible file click keeps its workspace while a different workspace is pending', async ({
+test('a file click in the workspace being left waits out a pending switch', async ({
   client,
   server,
 }) => {
@@ -110,13 +110,11 @@ test('a visible file click keeps its workspace while a different workspace is pe
     expect(
       await navigation.openFile({ owner: harness.workspace, path: filesystemPath('repo/a.ts') }),
     ).toEqual({
-      status: 'applied',
+      status: 'superseded',
     })
-    expect(await pending).toEqual({ status: 'superseded' })
-    expect(harness.workspace.getState().rootFolder?.path).toBe('repo')
-    expect(harness.workspace.getState().selectedTabContent).toEqual(
-      testNullableTabContent('repo/a.ts'),
-    )
+    released.resolve()
+    expect(await pending).toEqual({ status: 'applied' })
+    expect(harness.workspace.getState().rootFolder?.path).toBe('second')
   } finally {
     released.resolve()
     registerEnvironmentQueryClient(owner.queryClient, owner.origin, client)

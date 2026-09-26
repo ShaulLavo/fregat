@@ -6,8 +6,7 @@ import {
   DropdownMenuSeparator,
 } from '@workspace/ui/components/dropdown-menu'
 
-import { EffortSparkle } from '@/features/chat/components/effort-sparkle'
-import { effortSparkleLevel } from '@/features/chat/utils/effort-sparkle'
+import { effortTier } from '@/features/chat/utils/effort-tier'
 
 type SelectDescriptor = Extract<ProviderOptionDescriptor, { type: 'select' }>
 
@@ -43,13 +42,19 @@ export function ModelOptionsGroup({
           closeOnClick
           aria-label={choice.label}
           aria-description={choice.description}
+          className='group/choice'
           data-tooltip={choice.description}
           disabled={locked}
           value={choice.id}
           onClick={() => onSelect(choice.id)}
         >
-          <EffortSparkle level={effortSparkleLevel(choice.id)} />
-          {choice.label}
+          {effortTier(choice.id) === 'ultra' ? (
+            <span className='rainbow-text group-data-highlighted/choice:rainbow-live font-medium'>
+              {choice.label}
+            </span>
+          ) : (
+            choice.label
+          )}
           {choice.isDefault ? (
             <span className='text-muted-foreground text-2xs ml-auto'>Default</span>
           ) : null}

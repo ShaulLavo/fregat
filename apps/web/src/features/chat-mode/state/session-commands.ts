@@ -139,8 +139,9 @@ function openSessionAt(sessions: readonly SessionRailItem[], index: number) {
   useSessionMultiSelectStore.getState().markOnly(session.ref)
   return openSessionRow(session)
 }
+// The rail's displayed order: grouped by project, collapsed groups showing only the active row.
 function visibleSessions() {
-  return currentRailModel().sessions
+  return currentRailModel().groups.flatMap((group) => group.sessions)
 }
 function currentRailModel() {
   const rail = useSessionRailStore.getState()
@@ -150,6 +151,8 @@ function currentRailModel() {
       mode: settings['chat.projectGrouping'],
       overrides: settings['chat.projectGroupingOverrides'],
     },
+    activeSessionKey: selectedSessionKey(),
+    collapsedProjectIds: rail.collapsedProjectIds,
     environments: currentRailEnvironments(),
     orderOverrides: railOrderOverrides(),
     query: rail.query,

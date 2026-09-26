@@ -515,6 +515,88 @@ describe('workspace index', () => {
     }
   })
 
+  it.runIf(process.platform === 'linux')(
+    'builds no index for a root over the folder watch limit',
+    async () => {
+      const root = await fixtureRoot()
+      await mkdir(path.join(root, 'big/a/b'), { recursive: true })
+      await writeFile(path.join(root, 'big/a/b/deep.ts'), 'export {}\n')
+      const service = new FileSystemService({
+        metadataDatabasePath: ':memory:',
+        workspaceEditJournalRoot: path.join(root, '.workspace-edit-journals'),
+        workspaceRoot: root,
+      })
+      service.watchDirectoryLimit = () => 2
+
+      try {
+        await service.openWorkspaceRoot({ generation: 1, path: 'big' })
+        const status = await waitForStatus(activeServiceIndex(service), 'off')
+
+        expect(status).toMatchObject({ entryCount: 0, rebuildReason: 'watch-limit' })
+        expect(activeServiceIndex(service).get('a/b/deep.ts')).toBeUndefined()
+      } finally {
+        await service.close()
+      }
+    },
+  )
+
+  it.runIf(process.platform === 'linux')(
+    'builds the index once a raised limit lets a limited root be watched in full',
+    async () => {
+      const root = await fixtureRoot()
+      await mkdir(path.join(root, 'big/a/b'), { recursive: true })
+      await writeFile(path.join(root, 'big/a/b/deep.ts'), 'export {}\n')
+      const service = new FileSystemService({
+        metadataDatabasePath: ':memory:',
+        workspaceEditJournalRoot: path.join(root, '.workspace-edit-journals'),
+        workspaceRoot: root,
+      })
+      let limit = 2
+      service.watchDirectoryLimit = () => limit
+
+      try {
+        await service.openWorkspaceRoot({ generation: 1, path: 'big' })
+        await waitForStatus(activeServiceIndex(service), 'off')
+
+        limit = 10
+        service.rebalanceWatchLimit()
+
+        await waitForStatus(activeServiceIndex(service), 'ready')
+        expect(activeServiceIndex(service).get('a/b/deep.ts')).toMatchObject({ type: 'file' })
+        expect(activeServiceIndex(service).status().rebuildReason).toBe('watch-limit-freed')
+      } finally {
+        await service.close()
+      }
+    },
+  )
+
+  // Root reads every directory, so only an ordinary user can see an unreadable one.
+  it.skipIf(process.getuid?.() === 0)(
+    'answers a listing of an unreadable folder with 403',
+    async () => {
+      const root = await fixtureRoot()
+      const locked = path.join(root, 'locked')
+      await mkdir(locked)
+      await chmod(locked, 0o000)
+      const service = new FileSystemService({
+        metadataDatabasePath: ':memory:',
+        workspaceEditJournalRoot: path.join(root, '.workspace-edit-journals'),
+        workspaceRoot: root,
+        watch: false,
+      })
+
+      try {
+        await expect(service.tree('locked', 1)).rejects.toMatchObject({
+          code: 'PERMISSION_DENIED',
+          statusCode: 403,
+        })
+      } finally {
+        await service.close()
+        await chmod(locked, 0o755)
+      }
+    },
+  )
+
   it('lets the latest rapid valid open win and rejects stale generations', async () => {
     const root = await fixtureRoot()
     await mkdir(path.join(root, 'a'), { recursive: true })
@@ -589,10 +671,9 @@ describe('workspace index', () => {
     const index = new WorkspaceIndex(createWorkspacePaths(root), TEST_INDEX_OPTIONS)
 
     const startup = index.rebuild({ reason: 'startup' })
-    const failure = index.rebuildAndMarkFailed('watch-error', 'watch failed')
-    await Promise.all([startup, failure])
+    index.markFailed('watch-error', 'watch failed')
+    await startup
 
-    expect(index.get('indexed.ts')).toMatchObject({ type: 'file' })
     expect(index.status()).toMatchObject({
       errorMessage: 'watch failed',
       readiness: 'failed',
@@ -605,7 +686,7 @@ describe('workspace index', () => {
     await writeFile(path.join(root, 'indexed.ts'), 'export const indexed = true\n')
     const index = await buildWorkspaceIndex(createWorkspacePaths(root), TEST_INDEX_OPTIONS)
 
-    await index.rebuildAndMarkFailed('watch-error', 'watch failed')
+    index.markFailed('watch-error', 'watch failed')
     await writeFile(path.join(root, 'late.ts'), 'export const late = true\n')
     await index.applyWatchEvents([{ type: 'created', path: 'late.ts' }])
 
@@ -888,7 +969,49 @@ describe('workspace index', () => {
     }
   })
 
-  it('rebuilds and marks the live index failed after watcher errors', async () => {
+  it('builds the index once a limited root is watched in full', async () => {
+    const root = await fixtureRoot()
+    await writeFile(path.join(root, 'indexed.ts'), 'export const indexed = true\n')
+    const index = new WorkspaceIndex(createWorkspacePaths(root), TEST_INDEX_OPTIONS)
+    const events = controlledWatchEvents()
+    const subscription = watchWorkspaceIndex(index, events.stream, { coalesceMs: 1 })
+
+    try {
+      events.push({ type: 'ready', root: '', watch: { mode: 'limited', limit: 1 } })
+      await subscription.ready
+      index.turnOff('watch-limit')
+      expect(index.status().readiness).toBe('off')
+
+      events.push({ type: 'coverage', path: '', watch: { mode: 'recursive', limit: 10 } })
+
+      await waitForStatus(index, 'ready')
+      expect(index.get('indexed.ts')).toMatchObject({ type: 'file' })
+      expect(index.status().rebuildReason).toBe('watch-limit-freed')
+    } finally {
+      await subscription.close()
+    }
+  })
+
+  it('turns the index off when its root is shed to a limited watch', async () => {
+    const root = await fixtureRoot()
+    await writeFile(path.join(root, 'indexed.ts'), 'export const indexed = true\n')
+    const index = await buildWorkspaceIndex(createWorkspacePaths(root), TEST_INDEX_OPTIONS)
+    const events = controlledWatchEvents()
+    const subscription = watchWorkspaceIndex(index, events.stream, { coalesceMs: 1 })
+
+    try {
+      events.push({ type: 'ready', root: '', watch: { mode: 'recursive', limit: 10 } })
+      await subscription.ready
+      events.push({ type: 'coverage', path: '', watch: { mode: 'limited', limit: 1 } })
+
+      const status = await waitForStatus(index, 'off')
+      expect(status).toMatchObject({ entryCount: 0, rebuildReason: 'watch-limit' })
+    } finally {
+      await subscription.close()
+    }
+  })
+
+  it('marks the live index failed after watcher errors without rescanning', async () => {
     const root = await fixtureRoot()
     await writeFile(path.join(root, 'indexed.ts'), 'export const indexed = true\n')
     const index = await buildWorkspaceIndex(createWorkspacePaths(root), TEST_INDEX_OPTIONS)
@@ -906,7 +1029,7 @@ describe('workspace index', () => {
       const status = await waitForStatus(index, 'failed')
 
       expect(index.get('indexed.ts')).toMatchObject({ type: 'file' })
-      expect(index.get('late.ts')).toMatchObject({ type: 'file' })
+      expect(index.get('late.ts')).toBeUndefined()
       expect(status.errorMessage).toBe('watch failed')
       expect(index.status()).toMatchObject({
         readiness: 'failed',

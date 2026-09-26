@@ -68,7 +68,7 @@ export type {
   GitShipResult,
 } from './git'
 export { GIT_FORGE_KINDS, WORKTREE_SUBMODULE_MODES } from './git'
-export type { WatchClientMessage, WatchServerMessage } from './watch-events'
+export type { WatchClientMessage, WatchCoverage, WatchServerMessage } from './watch-events'
 export {
   parseTerminalClientMessage,
   parseTerminalServerMessage,
@@ -805,6 +805,12 @@ export {
   type OrchestrationWorktreeShell,
   type ProjectRegistrationResult,
   type OrchestrationSessionPlanProgress,
+  orchestrationCheckpointHunksInputSchema,
+  orchestrationRevertCheckpointHunkInputSchema,
+  type OrchestrationCheckpointHunk,
+  type OrchestrationCheckpointHunksInput,
+  type OrchestrationCheckpointHunkState,
+  type OrchestrationRevertCheckpointHunkInput,
 } from './orchestration-snapshots'
 
 export {

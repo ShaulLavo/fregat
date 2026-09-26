@@ -1,3 +1,4 @@
+import { useMarkdownView } from '@/lib/markdown-mode/hooks/use-markdown-view'
 import { useUnicodeHighlights } from '@/features/editor/hooks/use-unicode-highlights'
 import { HOSTED_EDITOR_KEYMAP } from '@/keymap/editor-keymap'
 import { useEditor } from '@singapore-editor/react'
@@ -158,6 +159,8 @@ export function Editor({
   )
   // Plugin identity controls native registration lifetime; the host keeps this callback stable
   // per conflict, so it rebuilds the plugins only when the conflict behind the tab changes.
+  const markdownView = useMarkdownView(key)
+  const markdownPreview = documentLanguageId === 'markdown' && markdownView === 'preview'
   const criticalEditorCorePlugins = useMemo(
     () =>
       createCriticalEditorCorePlugins(
@@ -166,9 +169,16 @@ export function Editor({
         minimapEnabled,
         {
           compareMergeConflict: onCompareMergeConflict,
+          markdownPreview,
         },
       ),
-    [documentLanguageId, indentationGuidesEnabled, minimapEnabled, onCompareMergeConflict],
+    [
+      documentLanguageId,
+      indentationGuidesEnabled,
+      markdownPreview,
+      minimapEnabled,
+      onCompareMergeConflict,
+    ],
   )
   const decodePlugin = useMemo(() => createDecodePluginLoader(decodeMode), [decodeMode])
   const unicodeHighlights = useUnicodeHighlights()

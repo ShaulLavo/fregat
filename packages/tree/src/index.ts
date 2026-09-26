@@ -40,6 +40,7 @@ export type {
   FileTreeRenamingConfig,
   FileTreeResetOptions,
   FileTreeRowDecoration,
+  FileTreeRowDecorationAction,
   FileTreeRowDecorationContext,
   FileTreeRowDecorationRenderer,
   FileTreeScrollToPathOptions,

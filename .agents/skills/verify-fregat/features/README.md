@@ -16,5 +16,6 @@ One file per user-facing surface. Each answers: what it is, how a user reaches i
 | Logs                            | [logs.md](logs.md)             |
 | Problems                        | [problems.md](problems.md)     |
 | Settings                        | [settings.md](settings.md)     |
+| Keyboard modes and navigation   | [keyboard.md](keyboard.md)     |
 | Address URL                     | [address.md](address.md)       |
 | Landing page and product assets | [landing.md](landing.md)       |

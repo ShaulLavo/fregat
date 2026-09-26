@@ -1,3 +1,4 @@
+import { ComposerRootsContext } from '@/lib/composer-attach/providers/roots-context'
 import { advanceBackgroundDraft } from '@/features/chat/state/advance-background-draft'
 import {
   type ModelSelection,
@@ -7,7 +8,7 @@ import {
   type SessionWorktreeTarget,
 } from '@workspace/contracts'
 import { useQuery } from '@tanstack/react-query'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { notifyChatCommandError } from '@/features/chat/notify-command-error'
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
@@ -53,6 +54,7 @@ export function ChatDraftView({
   /** The project's checkouts on every connected machine; null where a draft cannot move. */
   machines?: readonly DraftMachine[] | null
 }) {
+  const outerRoots = use(ComposerRootsContext)
   const navigation = useNavigation()
   // Submissions whose dispatch did not come back ok, kept so a retry resends the same command.
   const unsettledSubmissions = useRef(
@@ -280,52 +282,54 @@ export function ChatDraftView({
   }
 
   return (
-    <section className='flex min-h-0 flex-1 flex-col'>
-      <ChatWelcomeView />
-      {/* No session exists yet, so a mode pick only lands in the draft — the turn
+    <ComposerRootsContext value={worktree ? [...outerRoots, worktree.path] : outerRoots}>
+      <section className='flex min-h-0 flex-1 flex-col'>
+        <ChatWelcomeView />
+        {/* No session exists yet, so a mode pick only lands in the draft — the turn
           that creates the session carries it through `bootstrap.createSession`. */}
-      <ChatComposerModesProvider
-        dispatchCommand={transport.dispatchCommand}
-        draftTarget={draftTarget}
-        sessionId={null}
-      >
-        <ChatInput
-          busy={false}
-          disabled={disabled || !project || !targetReady}
-          draftKey={draftId}
-          footer={
-            project && worktree && target ? (
-              <DraftContextStrip
-                agent={selectedAgent?.name ?? null}
-                base={worktree}
-                providerInstanceId={selectedProvider}
-                onAgent={chooseAgent}
-                draftTarget={draftTarget}
-                machines={machines}
-                project={project}
-                target={target}
-                onTarget={chooseTarget}
-              />
-            ) : null
-          }
-          error={
-            sendError ??
-            (identity &&
-            (!worktree ||
-              identity.baseWorktreeId !== worktree.id ||
-              identity.rootPath !== worktree.path)
-              ? 'The draft worktree is unavailable. Restore it before sending.'
-              : null)
-          }
-          interactionMode={defaultInteractionMode}
-          modelSelection={modelSelection}
-          rootPath={rootPath}
-          runtimeMode={defaultRuntimeMode}
-          onPersistModelSelection={handlePersistModelSelection}
-          onStop={handleStop}
-          onSubmit={handleSend}
-        />
-      </ChatComposerModesProvider>
-    </section>
+        <ChatComposerModesProvider
+          dispatchCommand={transport.dispatchCommand}
+          draftTarget={draftTarget}
+          sessionId={null}
+        >
+          <ChatInput
+            busy={false}
+            disabled={disabled || !project || !targetReady}
+            draftKey={draftId}
+            footer={
+              project && worktree && target ? (
+                <DraftContextStrip
+                  agent={selectedAgent?.name ?? null}
+                  base={worktree}
+                  providerInstanceId={selectedProvider}
+                  onAgent={chooseAgent}
+                  draftTarget={draftTarget}
+                  machines={machines}
+                  project={project}
+                  target={target}
+                  onTarget={chooseTarget}
+                />
+              ) : null
+            }
+            error={
+              sendError ??
+              (identity &&
+              (!worktree ||
+                identity.baseWorktreeId !== worktree.id ||
+                identity.rootPath !== worktree.path)
+                ? 'The draft worktree is unavailable. Restore it before sending.'
+                : null)
+            }
+            interactionMode={defaultInteractionMode}
+            modelSelection={modelSelection}
+            rootPath={rootPath}
+            runtimeMode={defaultRuntimeMode}
+            onPersistModelSelection={handlePersistModelSelection}
+            onStop={handleStop}
+            onSubmit={handleSend}
+          />
+        </ChatComposerModesProvider>
+      </section>
+    </ComposerRootsContext>
   )
 }

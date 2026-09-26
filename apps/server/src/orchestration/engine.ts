@@ -85,6 +85,7 @@ import { SessionDiscoveryReconciler } from './session-discovery'
 import { sessionImportErrors } from './import-errors'
 import { importedHistoryMessages, historyRevision } from './utils/import-history'
 import type { ProviderHistoryMessage } from '../provider/types'
+import { checkpointErrors } from './structured-errors'
 import { resolveSessionOwner } from './session-owner'
 import {
   createDefaultProviderAdapterRegistry,
@@ -151,6 +152,7 @@ export class OrchestrationEngine {
   private unsubscribeGitMutations: (() => void) | null = null
   private reactorsStarted = false
   private queue = Promise.resolve()
+  private readonly workspaceOperations = new Set<string>()
   private readonly attachmentOwnership: AttachmentOwnership
   private readonly attachmentsDir: string
   private checkpointReactor: CheckpointReactor | null = null
@@ -368,6 +370,41 @@ export class OrchestrationEngine {
     return this.enqueueProviderCommand(command, source)
   }
 
+  async runWorkspaceOperation<T>(sessionId: SessionId, operation: () => Promise<T>): Promise<T> {
+    await this.ready
+    const path = await this.schedule(() => {
+      const { worktree } = resolveSessionOwner(this.readModel, sessionId)
+      this.requireWorkspaceAvailable(worktree.canonicalPath)
+      this.workspaceOperations.add(worktree.canonicalPath)
+      return worktree.canonicalPath
+    })
+    try {
+      return await operation()
+    } finally {
+      this.workspaceOperations.delete(path)
+    }
+  }
+
+  private requireWorkspaceAvailable(path: string | undefined) {
+    if (path && this.workspaceOperations.has(path))
+      throw checkpointErrors.WORKSPACE_BUSY({ internal: { path } })
+  }
+
+  private requireWorkspaceCommandAvailable(command: OrchestrationCommand) {
+    if (command.type !== 'session.turn.start' && command.type !== 'session.checkpoint.revert')
+      return
+    const bootstrap =
+      command.type === 'session.turn.start'
+        ? command.bootstrap?.createSession?.worktreeTarget
+        : undefined
+    const targetId =
+      bootstrap?.kind === 'current'
+        ? bootstrap.worktreeId
+        : this.readModel.sessions.get(command.sessionId)?.worktreeId
+    const worktree = targetId ? this.readModel.worktrees.get(targetId) : undefined
+    this.requireWorkspaceAvailable(worktree?.canonicalPath)
+  }
+
   private schedule<T>(operation: () => T | Promise<T>) {
     const task = this.queue.then(operation)
     this.queue = task.then(noop, noop)
@@ -548,6 +585,7 @@ export class OrchestrationEngine {
     const existing = this.receipts.find(command.commandId)
     if (existing) return this.dispatchFromReceipt(existing, command.type, fingerprint)
 
+    this.requireWorkspaceCommandAvailable(command)
     const committed = this.commitNewCommand(command, summary, fingerprint)
     recordChatPipelineInfo('chat.pipeline.command.complete', {
       ...summary,

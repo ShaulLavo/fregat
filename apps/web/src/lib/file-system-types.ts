@@ -68,7 +68,7 @@ type WorkspaceIndexStatus = {
   lastFullScanDurationMs?: number
   lastIncrementalUpdateAtMs?: number
   pendingCreatedPathCount: number
-  readiness: 'cold' | 'building' | 'ready' | 'stale' | 'failed'
+  readiness: 'cold' | 'building' | 'ready' | 'stale' | 'failed' | 'off'
   rebuildReason?: string
   scanRoot: string | null
   scanWarningCount: number

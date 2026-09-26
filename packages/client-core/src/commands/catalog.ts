@@ -4,15 +4,16 @@ import { editorCommandMetadata } from './editor'
 import { environmentCommandMetadata } from './environment'
 import { foundationCommandMetadata } from './foundation'
 import { workbenchCommandMetadata } from './workbench'
-import { SESSION_JUMP_POSITIONS } from './session-jump'
-import { sessionJumpMetadata, workspaceCommandMetadata } from './workspace'
+import { ITEM_POSITIONS } from './item-position'
+import { selectItemMetadata, sidebarPanelMetadata, workspaceCommandMetadata } from './workspace'
 import type { CommandMetadata } from './metadata'
 
 export const commandMetadata = [
   ...Object.values(workspaceCommandMetadata),
   ...Object.values(editorCommandMetadata),
   ...Object.values(environmentCommandMetadata),
-  ...SESSION_JUMP_POSITIONS.map(sessionJumpMetadata),
+  ...ITEM_POSITIONS.map(selectItemMetadata),
+  ...ITEM_POSITIONS.map(sidebarPanelMetadata),
   ...Object.values(foundationCommandMetadata),
   ...Object.values(settingsCommandMetadata),
   ...Object.values(workbenchCommandMetadata),

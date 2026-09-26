@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/component
 import { forwardActiveRowKey } from '@/lib/list-keyboard'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { SessionListContext } from '@/features/chat-mode/providers/list-context'
+import { ITEM_POSITIONS } from '@workspace/client-core/commands/item-position'
 import { activateSessionRow } from '@/features/chat-mode/state/session-commands'
 import { useNavigation } from '@/hooks/use-navigation'
 import { useWorktreeManagerStore } from '@/features/chat-mode/state/worktree-manager-store'
@@ -180,7 +181,12 @@ export function SessionRail() {
 
   const focusList = list.focus
   useLayoutEffect(() => selection.setState(list.activeId, true), [list.activeId, selection])
-  const listContext = { rowBindings: list.rowBindings, focusList, selection }
+  const positions = new Map(
+    visibleSessions
+      .slice(0, ITEM_POSITIONS.length)
+      .map((session, index) => [session.key, ITEM_POSITIONS[index]!]),
+  )
+  const listContext = { rowBindings: list.rowBindings, focusList, positions, selection }
 
   function toggleView() {
     void navigation.setRail(view === 'archived' ? 'active' : 'archived')
@@ -220,6 +226,7 @@ export function SessionRail() {
   return (
     <aside
       className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'
+      data-screen-sidebar=''
       onKeyDown={handleKeyDown}
     >
       <div className='flex shrink-0 items-center gap-1 px-2 pt-(--density-section-gap)'>

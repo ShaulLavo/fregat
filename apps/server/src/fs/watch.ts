@@ -1,13 +1,17 @@
 import { createHash } from 'node:crypto'
-import { createReadStream, watch } from 'node:fs'
+import { createReadStream } from 'node:fs'
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
+import { DEFAULT_SETTING_VALUES, type WatchCoverage } from '@workspace/contracts'
 import {
   errorSummary,
+  recordProcessWarning,
   recordRequestContext,
   recordRequestWarning,
   runDetached,
 } from '../observability'
+import { countDirectories } from './directory-count'
+import { NativeWatchHost, WATCH_WORKER_FAILED, type NativeWatchError } from './native-watch-host'
 import { OpenFileWatches } from './open-file-watches'
 import { FsError } from './errors'
 import {
@@ -25,9 +29,27 @@ import type { TreeEntry, WatchServerMessage } from './contracts'
 type Listener = (event: WatchServerMessage) => void
 type WatchRelease = () => void | Promise<void>
 type RenameWatchServerMessage = Extract<WatchServerMessage, { type: 'renamed' }>
+type WatchRootCoverage = Omit<WatchCoverage, 'mode'> & {
+  readonly mode: WatchCoverage['mode'] | 'failed' | 'disabled'
+  readonly root: string
+  readonly attachMs?: number
+  readonly unreadableCount: number
+  /** The first few, relative to the workspace. */
+  readonly unreadable: readonly string[]
+}
+type AttachedWatch = {
+  readonly close: WatchRelease
+  readonly coverage: WatchRootCoverage
+}
+type RetainedWatch = {
+  readonly release: WatchRelease
+  readonly coverage: WatchRootCoverage
+}
 type WatcherEntry = {
   refCount: number
-  release: Promise<WatchRelease>
+  attached: Promise<AttachedWatch>
+  /** Set once `attached` settles, so a limited root can be found without awaiting. */
+  resolved?: AttachedWatch
 }
 type WakeSlot = {
   current: (() => void) | null
@@ -73,8 +95,15 @@ const coarseClockToleranceMs = 10
 // first, and writeFile writes before it truncates: a stat taken at once can keep a half write.
 const nativeEventSettleMs = 20
 
+// The attach wide event names this many unreadable directories; the rest are only counted.
+const unreadableSampleSize = 5
+
 export type WatchOptions = {
   enabled: boolean
+  /** Directories every recursive watch may register together (`files.watchDirectoryLimit`). */
+  directoryLimit?: () => number
+  /** Test seam: a host whose worker can be made to fail. */
+  native?: NativeWatchHost
 }
 
 export type WatchStreamOptions = {
@@ -97,11 +126,19 @@ export class FileChangeHub {
   private readonly writes = new Set<WriteBarrier>()
   private readonly writeResultMarkers = new Map<string, WriteResultMarker>()
   private readonly watchEnabled: boolean
+  private readonly native: NativeWatchHost
   private nextSequence = 1
+  private reservedDirectories = 0
+  private upgrades = Promise.resolve()
+  private closing = false
+  directoryLimit: () => number
 
   constructor(paths: WorkspacePaths, options: WatchOptions) {
     this.paths = paths
     this.watchEnabled = options.enabled
+    this.directoryLimit =
+      options.directoryLimit ?? (() => DEFAULT_SETTING_VALUES['files.watchDirectoryLimit'])
+    this.native = options.native ?? new NativeWatchHost()
     this.openFiles = new OpenFileWatches(
       paths,
       (alias) =>
@@ -161,6 +198,8 @@ export class FileChangeHub {
       nativeWatcherCount: this.nativeWatchers.size,
       openFileWatcherCount: this.openFiles.size,
       shallowWatcherCount: this.shallowWatchers.size,
+      watchedDirectoryCount: this.reservedDirectories,
+      watchDirectoryLimit: this.directoryLimit(),
       watchEnabled: this.watchEnabled,
     }
   }
@@ -258,12 +297,16 @@ export class FileChangeHub {
   }
 
   async close() {
+    this.closing = true
     this.openFiles.close()
-    const releases = await Promise.all(
-      [...this.nativeWatchers.values(), ...this.shallowWatchers.values()].map(
-        (entry) => entry.release,
-      ),
-    )
+    const releases = (
+      await Promise.all(
+        [...this.nativeWatchers.values(), ...this.shallowWatchers.values()].map(
+          (entry) => entry.attached,
+        ),
+      )
+    ).map((attached) => attached.close)
+    this.native.close()
     this.nativeWatchers.clear()
     this.shallowWatchers.clear()
     this.listeners.clear()
@@ -341,74 +384,283 @@ export class FileChangeHub {
     }
   }
 
-  private async retainWatcher(relativeRoot: string): Promise<WatchRelease> {
-    if (!this.watchEnabled) {
-      return noop
-    }
+  private async retainWatcher(relativeRoot: string): Promise<RetainedWatch> {
+    if (!this.watchEnabled) return disabledWatch(relativeRoot)
 
     // A covered subtree is already watched; a second recursive watch would only crawl it again.
-    const root = coveringWatcherRoot(this.nativeWatchers, relativeRoot) ?? relativeRoot
-    const existing = this.nativeWatchers.get(root)
-    if (existing) {
-      existing.refCount += 1
-      await existing.release
-      return () => this.releaseWatcher(this.nativeWatchers, root)
-    }
+    const covering = coveringWatcherRoot(this.nativeWatchers, relativeRoot)
+    if (covering === null || covering === relativeRoot) return this.retainRecursive(relativeRoot)
+    const retained = await this.retainRecursive(covering)
+    if (retained.coverage.mode === 'recursive') return retained
 
-    // Bun's recursive watch cannot skip a subtree; `watcherIgnores` drops those events before any stat.
-    const release = Promise.resolve(this.createNodeWatcher(root))
-    this.nativeWatchers.set(root, { refCount: 1, release })
-    await release
-
-    return () => this.releaseWatcher(this.nativeWatchers, root)
+    // A limited ancestor watches its own entries only, so this root needs a watch of its own.
+    await retained.release()
+    return this.retainRecursive(relativeRoot)
   }
 
-  private async retainShallowWatcher(relativeDirectory: string): Promise<WatchRelease> {
-    if (!this.watchEnabled) return noop
-
-    const existing = this.shallowWatchers.get(relativeDirectory)
-    if (existing) {
-      existing.refCount += 1
-      await existing.release
-      return () => this.releaseWatcher(this.shallowWatchers, relativeDirectory)
-    }
-
-    const release = Promise.resolve(this.createNodeWatcher(relativeDirectory, false))
-    this.shallowWatchers.set(relativeDirectory, { refCount: 1, release })
-    await release
-
-    return () => this.releaseWatcher(this.shallowWatchers, relativeDirectory)
+  private retainRecursive(relativeRoot: string) {
+    return this.retainEntry(this.nativeWatchers, relativeRoot, () =>
+      this.attachRecursive(relativeRoot),
+    )
   }
 
-  private async releaseWatcher(watchers: Map<string, WatcherEntry>, relativeRoot: string) {
-    const entry = watchers.get(relativeRoot)
-    if (!entry) return
+  private async retainShallowWatcher(relativeDirectory: string): Promise<RetainedWatch> {
+    if (!this.watchEnabled) return disabledWatch(relativeDirectory)
+
+    return this.retainEntry(this.shallowWatchers, relativeDirectory, () =>
+      this.attachShallow(relativeDirectory, { mode: 'shallow' }),
+    )
+  }
+
+  private async retainEntry(
+    watchers: Map<string, WatcherEntry>,
+    root: string,
+    attach: () => Promise<AttachedWatch>,
+  ): Promise<RetainedWatch> {
+    let entry = watchers.get(root)
+    if (entry) entry.refCount += 1
+    else {
+      entry = { refCount: 1, attached: attach() }
+      watchers.set(root, entry)
+    }
+
+    const retainedEntry = entry
+    const attached = await retainedEntry.attached
+    retainedEntry.resolved ??= attached
+    return {
+      release: () => this.releaseEntry(watchers, root, retainedEntry),
+      coverage: attached.coverage,
+    }
+  }
+
+  // An evicted entry's holders release it late; they must never count down its replacement.
+  private async releaseEntry(
+    watchers: Map<string, WatcherEntry>,
+    relativeRoot: string,
+    entry: WatcherEntry,
+  ) {
+    if (watchers.get(relativeRoot) !== entry) return
 
     entry.refCount -= 1
     if (entry.refCount > 0) return
 
     watchers.delete(relativeRoot)
-    await releaseWatcher(await entry.release)
+    await releaseWatcher((await entry.attached).close)
   }
 
-  private createNodeWatcher(relativeRoot: string, recursive = true): WatchRelease {
+  /** The limit changed: shed recursive watches over a lowered limit, then offer room to limited roots. */
+  rebalance() {
+    if (this.closing) return
+    this.upgrades = this.upgrades.then(async () => {
+      await this.downgradeOverLimit()
+      await this.upgradeLimitedWatchersNow()
+    })
+  }
+
+  /**
+   * Bun's recursive watch registers every directory, `node_modules` included, so the count decides
+   * whether the root fits; `watcherIgnores` drops the hidden subtrees' events before any stat.
+   */
+  private async attachRecursive(relativeRoot: string): Promise<AttachedWatch> {
+    const target = this.resolveWatchTarget(relativeRoot)
+    if (!target) return failedWatch(relativeRoot)
+
+    const fitted = await this.attachIfItFits(relativeRoot, target)
+    if (fitted.attached) return fitted.attached
+    return this.attachShallow(relativeRoot, fitted.limited)
+  }
+
+  /** A recursive watch when the root's directories fit what the limit has free, else the numbers. */
+  private async attachIfItFits(relativeRoot: string, target: string) {
+    const limit = this.directoryLimit()
+    const counted = await countDirectories(target, limit - this.reservedDirectories)
+    const available = Math.max(0, limit - this.reservedDirectories)
+    if (!counted.complete || counted.count > available) {
+      const limited: WatchCoverage = {
+        mode: 'limited',
+        directoryCount: counted.count,
+        available,
+        limit,
+      }
+      return { attached: null, limited }
+    }
+
+    this.reservedDirectories += counted.count
+    const native = await this.attachNative(relativeRoot, target, true)
+    const release = async () => {
+      this.reservedDirectories -= counted.count
+      await native.close()
+      this.upgradeLimitedWatchers()
+    }
+    if (!native.coverage) {
+      await release()
+      return { attached: failedWatch(relativeRoot), limited: null }
+    }
+    const attached: AttachedWatch = {
+      close: release,
+      coverage: {
+        ...native.coverage,
+        mode: 'recursive',
+        directoryCount: counted.count,
+        available,
+        limit,
+      },
+    }
+    return { attached, limited: null }
+  }
+
+  // A root is limited by what else was watched when it attached, so freed room is offered back.
+  private upgradeLimitedWatchers() {
+    if (this.closing) return
+    this.upgrades = this.upgrades.then(() => this.upgradeLimitedWatchersNow())
+  }
+
+  private async upgradeLimitedWatchersNow() {
+    for (const [root, entry] of this.nativeWatchers) {
+      if (this.closing) return
+      const current = entry.resolved
+      if (current?.coverage.mode !== 'limited') continue
+      const target = this.resolveWatchTarget(root)
+      if (!target) continue
+      const fitted = await this.attachIfItFits(root, target)
+      if (!fitted.attached) continue
+      if (this.nativeWatchers.get(root) !== entry || entry.resolved !== current) {
+        await releaseWatcher(fitted.attached.close)
+        continue
+      }
+      entry.attached = Promise.resolve(fitted.attached)
+      entry.resolved = fitted.attached
+      await releaseWatcher(current.close)
+      const coverage = streamCoverage([fitted.attached.coverage])
+      if (coverage) this.emit({ type: 'coverage', path: root, watch: coverage })
+    }
+  }
+
+  // Largest first, so the fewest roots lose their live subtree; a shed root never fits again
+  // while the total is over the limit, so this cannot oscillate with the upgrade pass.
+  private async downgradeOverLimit() {
+    const limit = this.directoryLimit()
+    const recursive = [...this.nativeWatchers]
+      .filter(([, entry]) => entry.resolved?.coverage.mode === 'recursive')
+      .toSorted(([, a], [, b]) => directoryCountOf(b) - directoryCountOf(a))
+    for (const [root, entry] of recursive) {
+      if (this.closing || this.reservedDirectories <= limit) return
+      const current = entry.resolved
+      if (!current || this.nativeWatchers.get(root) !== entry) continue
+      const directoryCount = directoryCountOf(entry)
+      const available = Math.max(0, limit - (this.reservedDirectories - directoryCount))
+      const limited = await this.attachShallow(root, {
+        mode: 'limited',
+        directoryCount,
+        available,
+        limit,
+      })
+      if (limited.coverage.mode === 'failed' || this.nativeWatchers.get(root) !== entry) {
+        await releaseWatcher(limited.close)
+        continue
+      }
+      entry.attached = Promise.resolve(limited)
+      entry.resolved = limited
+      await releaseWatcher(current.close)
+      const coverage = streamCoverage([limited.coverage])
+      if (coverage) this.emit({ type: 'coverage', path: root, watch: coverage })
+    }
+  }
+
+  // The worker is gone and every watch in it with it; holders reattach through a fresh worker.
+  private evictNativeWatchers() {
+    const entries = [...this.nativeWatchers.values(), ...this.shallowWatchers.values()]
+    this.nativeWatchers.clear()
+    this.shallowWatchers.clear()
+    for (const entry of entries) {
+      if (entry.resolved) void releaseWatcher(entry.resolved.close)
+    }
+  }
+
+  private async attachShallow(
+    relativeRoot: string,
+    coverage: WatchCoverage,
+  ): Promise<AttachedWatch> {
+    const target = this.resolveWatchTarget(relativeRoot)
+    if (!target) return failedWatch(relativeRoot)
+
+    const attached = await this.attachNative(relativeRoot, target, false)
+    if (!attached.coverage) return failedWatch(relativeRoot)
+    return { close: attached.close, coverage: { ...attached.coverage, ...coverage } }
+  }
+
+  private resolveWatchTarget(relativeRoot: string) {
     try {
-      const target = this.paths.resolve(relativeRoot)
-      const attachedAtMs = wallClockMs()
-      const watcher = watch(target.absolutePath, { recursive }, (event, filename) => {
-        if (filename && watcherIgnores(normalizeWatchFilename(filename.toString()))) return
-        runDetached(
-          () => this.handleNodeEvent(relativeRoot, event, filename?.toString() ?? '', attachedAtMs),
-          { area: 'fs', backend: 'node', operation: 'watch_event' },
-        )
-      })
-      watcher.on('error', (error) => {
-        this.emit(watchError(error, relativeRoot))
-      })
-      return () => watcher.close()
+      return this.paths.resolve(relativeRoot).absolutePath
     } catch (error) {
       this.emit(watchError(error, relativeRoot))
-      return noop
+      return null
+    }
+  }
+
+  private async attachNative(relativeRoot: string, target: string, recursive: boolean) {
+    const attachedAtMs = wallClockMs()
+    const result = await this.native.watch(target, recursive, {
+      event: (event, filename) => this.onNativeEvent(relativeRoot, event, filename, attachedAtMs),
+      error: (error) => this.onNativeError(relativeRoot, error),
+    })
+    if (result.status === 'failed') {
+      this.emit(nativeWatchErrorMessage(result.error, relativeRoot))
+      return { close: noop, coverage: null }
+    }
+
+    const unreadable: string[] = []
+    for (const error of result.errors) {
+      if (isUnreadable(error)) unreadable.push(this.relativeErrorPath(error, relativeRoot))
+      else this.emit(nativeWatchErrorMessage(error, relativeRoot))
+    }
+    return {
+      close: result.close,
+      coverage: {
+        root: relativeRoot,
+        mode: recursive ? 'recursive' : 'shallow',
+        attachMs: Math.round(result.attachMs),
+        unreadableCount: unreadable.length,
+        unreadable: unreadable.slice(0, unreadableSampleSize),
+      } satisfies WatchRootCoverage,
+    }
+  }
+
+  private onNativeEvent(
+    relativeRoot: string,
+    event: string,
+    filename: string,
+    attachedAtMs: number,
+  ) {
+    if (filename && watcherIgnores(normalizeWatchFilename(filename))) return
+    runDetached(() => this.handleNodeEvent(relativeRoot, event, filename, attachedAtMs), {
+      area: 'fs',
+      backend: 'node',
+      operation: 'watch_event',
+    })
+  }
+
+  // Bun keeps watching the rest of the tree after an unreadable directory, so only a log line is owed.
+  private onNativeError(relativeRoot: string, error: NativeWatchError) {
+    if (error.code === WATCH_WORKER_FAILED) this.evictNativeWatchers()
+    if (!isUnreadable(error)) {
+      this.emit(nativeWatchErrorMessage(error, relativeRoot))
+      return
+    }
+    recordProcessWarning('fs.watch.unreadable', {
+      area: 'fs',
+      root: relativeRoot,
+      path: this.relativeErrorPath(error, relativeRoot),
+      code: error.code,
+    })
+  }
+
+  private relativeErrorPath(error: NativeWatchError, relativeRoot: string) {
+    if (!error.path) return relativeRoot
+    try {
+      return this.paths.toRelative(error.path)
+    } catch {
+      return relativeRoot
     }
   }
 
@@ -444,6 +696,7 @@ export class FileChangeHub {
 
     const abort = () => wake.current?.()
     let releases: WatchRelease[] = []
+    const coverages: WatchRootCoverage[] = []
     const startedAt = performance.now()
     // A files stream owns a watch per file, so its `ready` never waits on a project crawl.
     const roots = options.onlyFiles ? new Set<string>() : subscribed
@@ -452,18 +705,23 @@ export class FileChangeHub {
 
     try {
       for (const input of roots) {
-        releases.push(
-          await (options.shallow ? this.retainShallowWatcher(input) : this.retainWatcher(input)),
-        )
+        const retained = await (options.shallow
+          ? this.retainShallowWatcher(input)
+          : this.retainWatcher(input))
+        releases.push(retained.release)
+        coverages.push(retained.coverage)
       }
       if (this.watchEnabled) {
         for (const file of files) releases.push(await this.retainOpenFile(file, roots))
       }
+      const coverage = streamCoverage(coverages)
+      if (coverage) queue[0] = { type: 'ready', root: '', watch: coverage }
       recordRequestContext({
         watch: {
           scope: options.onlyFiles ? 'files' : 'project',
           openFiles: [...files],
           readyMs: Math.round(performance.now() - startedAt),
+          roots: coverages,
           ...this.info(),
         },
       })
@@ -667,6 +925,8 @@ function deliverWatchEvent(
   files: Set<string>,
   onlyFiles = false,
 ) {
+  if (event.type === 'error' || event.type === 'coverage')
+    return concernsStream(event.path, roots, files)
   if (!isFilesystemEvent(event)) return true
   if (files.has(event.path)) return true
   if (event.type === 'renamed' && files.has(event.oldPath)) return true
@@ -682,6 +942,15 @@ function streamEvent(event: WatchServerMessage, files: Set<string>, includeIgnor
   if (visible) return renamedCreateEvent(event)
   if (oldVisible) return renamedDeleteEvent(event)
   return null
+}
+
+// A watcher's failure or new coverage concerns its own root, every root below it, and its open file.
+function concernsStream(path: string | undefined, roots: Set<string>, files: Set<string>) {
+  if (path === undefined || files.has(path)) return true
+  for (const root of roots) {
+    if (path === root || !path || root.startsWith(`${path}/`)) return true
+  }
+  return false
 }
 
 function isSubscribedPath(relativePath: string, subscribed: Set<string>) {
@@ -823,11 +1092,59 @@ async function nativeContentVersion(paths: WorkspacePaths, relativePath: string)
   return `sha256:${hash.digest('hex')}`
 }
 
+function nativeWatchErrorMessage(
+  error: NativeWatchError,
+  relativeRoot: string,
+): WatchServerMessage {
+  const folder = `/${relativeRoot}`
+  if (error.code === 'ENOSPC') {
+    return {
+      type: 'error',
+      code: 'WATCH_LIMIT_REACHED',
+      message: `The system file-watch limit is reached, so ${folder} only partly updates live`,
+      why: 'Every watched folder takes one inotify watch, and the per-user pool is spent.',
+      fix: 'Lower files.watchDirectoryLimit, close a large folder, or raise fs.inotify.max_user_watches.',
+      path: relativeRoot,
+    }
+  }
+  return {
+    type: 'error',
+    code: 'WATCH_FAILED',
+    message: `Live updates stopped for ${folder}: ${error.message}`,
+    path: relativeRoot,
+  }
+}
+
+// Bun names an unreadable directory `EPERM` even when its message says `EACCES`.
+function isUnreadable(error: NativeWatchError) {
+  return error.code === 'EACCES' || error.code === 'EPERM'
+}
+
+function streamCoverage(coverages: readonly WatchRootCoverage[]): WatchCoverage | null {
+  const shown = coverages.find((coverage) => coverage.mode === 'limited') ?? coverages[0]
+  if (!shown || shown.mode === 'failed' || shown.mode === 'disabled') return null
+  const { mode, directoryCount, available, limit } = shown
+  return { mode, directoryCount, available, limit }
+}
+
+function directoryCountOf(entry: WatcherEntry) {
+  return entry.resolved?.coverage.directoryCount ?? 0
+}
+
+function disabledWatch(root: string): RetainedWatch {
+  return { release: noop, coverage: { root, mode: 'disabled', unreadableCount: 0, unreadable: [] } }
+}
+
+function failedWatch(root: string): AttachedWatch {
+  return { close: noop, coverage: { root, mode: 'failed', unreadableCount: 0, unreadable: [] } }
+}
+
 function watchError(error: unknown, path: string): WatchServerMessage {
   return {
     type: 'error',
     code: 'WATCH_FAILED',
-    message: `failed to watch ${path || '/'}: ${errorMessage(error)}`,
+    message: `Live updates stopped for /${path}: ${errorMessage(error)}`,
+    path,
   }
 }
 

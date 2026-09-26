@@ -13,6 +13,7 @@ import {
 import type { EditorTabConflictMap } from '@/features/workspace/utils/tab-types'
 
 import { BottomPanel } from '@/features/workbench/components/bottom-panel'
+import { ClosedSidebarHints } from '@/features/workbench/components/closed-sidebar-hints'
 import { CodePanel } from '@/features/workbench/components/code-panel'
 import { SidebarPanel } from '@/features/workbench/components/sidebar-panel'
 import {
@@ -62,9 +63,19 @@ export function WorkbenchLayout({
       data-workbench=''
       role='application'
     >
-      <PaneHostProvider kind='workbench-sidebar'>
-        <RailTabs className={cn('relative z-10', surface.panel)} label='Sidebar tabs' side='left' />
-      </PaneHostProvider>
+      {panels.sidebarRailOpen ? (
+        <div className='contents' data-screen-sidebar=''>
+          <PaneHostProvider kind='workbench-sidebar'>
+            <RailTabs
+              className={cn('relative z-10', surface.panel)}
+              label='Sidebar tabs'
+              side='left'
+            />
+          </PaneHostProvider>
+        </div>
+      ) : (
+        <ClosedSidebarHints />
+      )}
       <ResizablePanelGroup
         className='relative z-10 min-h-0 min-w-0 flex-1'
         defaultLayout={layout.outerLayout}

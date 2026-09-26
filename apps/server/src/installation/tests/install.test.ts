@@ -3,7 +3,7 @@ import path from 'node:path'
 import { expect } from 'vitest'
 import { test } from '../../../test/factories/installation'
 import { installServerLauncher } from '../install'
-import { REMOTE_SUPPORT } from '../release-files'
+import { REMOTE_SUPPORT, WATCH_WORKER } from '../release-files'
 import { parseInstallation, remoteFailure } from '../../machines/records'
 import { probeCommand, stopCommand } from '../../machines/remote-scripts'
 
@@ -123,6 +123,7 @@ test('a release launcher describes the release and starts its bundle from the se
     'console.log(JSON.stringify({ cwd: process.cwd(), args: process.argv.slice(2), env: process.env.NODE_ENV }))',
   )
   await writeFile(path.join(server, REMOTE_SUPPORT), '')
+  await writeFile(path.join(server, WATCH_WORKER), '')
   await symlink('releases/first', path.join(serverRoot, 'current'))
   const installation = {
     kind: 'release',

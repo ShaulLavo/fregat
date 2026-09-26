@@ -7,6 +7,7 @@ import { open, readdir } from 'node:fs/promises'
 import path from 'node:path'
 
 import type { EntryTypeFilter, WatchServerMessage } from './contracts'
+import type { WatchCoverage } from '@workspace/contracts'
 import { defaultIgnoredNames, isIgnoredPath, toPosix, type WorkspacePaths } from './path'
 import {
   workspaceGitIgnoreMatcher,
@@ -14,13 +15,14 @@ import {
   type GitIgnoreMatcherOptions,
 } from './search-gitignore'
 import { readEntryStats, type FsEntryStats } from './stat'
+import { recordProcessInfo } from '../observability'
 import { fileVersion } from './version'
 
 const SNIFF_BYTES = 512
 const DEFAULT_INDEX_UPDATE_COALESCE_MS = 25
 const DEFAULT_INDEX_REBUILD_EVENT_LIMIT = 500
 
-type WorkspaceIndexReadiness = 'cold' | 'building' | 'ready' | 'stale' | 'failed'
+type WorkspaceIndexReadiness = 'cold' | 'building' | 'ready' | 'stale' | 'failed' | 'off'
 type WorkspaceIndexContentKind = 'binary' | 'image' | 'text' | 'unknown'
 type WorkspaceIndexFileKind = 'binary' | 'config' | 'document' | 'image' | 'other' | 'source'
 type WorkspaceIndexSpecialKind = 'block-device' | 'character-device' | 'fifo' | 'socket' | 'unknown'
@@ -80,6 +82,8 @@ export type WorkspaceIndexWatchEvents = (signal: AbortSignal) => AsyncIterable<W
 
 export type WorkspaceIndexWatchSubscription = {
   ready: Promise<void>
+  /** How the root is watched, known once `ready` settles. */
+  readonly coverage: WatchCoverage | undefined
   close(): Promise<void>
 }
 
@@ -145,6 +149,7 @@ export class WorkspaceIndex {
   }
 
   async rebuild(options: WorkspaceIndexBuildOptions = {}) {
+    if (this.state.readiness === 'off') return this.status()
     const startedAt = performance.now()
     const reason = options.reason ?? 'manual'
     const rebuildId = this.nextRebuildId()
@@ -164,6 +169,7 @@ export class WorkspaceIndex {
       this.replaceEntries(result.entries)
       this.pendingCreatedPaths.clear()
       this.state = readyStatus(this.paths.workspaceRoot, this.counts(), result, startedAt, reason)
+      recordIndexBuild(this.state)
       return this.status()
     } catch (error) {
       if (!this.isCurrentRebuild(rebuildId)) return this.status()
@@ -171,15 +177,41 @@ export class WorkspaceIndex {
       this.clearEntries()
       this.pendingCreatedPaths.clear()
       this.state = failedStatus(this.paths.workspaceRoot, startedAt, reason, error)
+      recordIndexBuild(this.state)
       throw error
     }
+  }
+
+  /** A root that was too large to watch now fits; build the index it went without. */
+  async turnOn(reason: string) {
+    if (this.state.readiness !== 'off') return this.status()
+    this.state = { ...this.state, readiness: 'cold' }
+    try {
+      return await this.rebuild({ reason })
+    } catch {
+      return this.status()
+    }
+  }
+
+  /** For a root too large to watch: nothing would keep an index current, so none is built. */
+  turnOff(reason: string) {
+    this.nextRebuildId()
+    this.clearEntries()
+    this.pendingCreatedPaths.clear()
+    this.state = {
+      ...emptyStatus(this.paths.workspaceRoot),
+      readiness: 'off',
+      rebuildReason: reason,
+    }
+    recordIndexBuild(this.state)
   }
 
   async applyWatchEvents(events: readonly WatchServerMessage[]) {
     const queuedEvents = events.filter(shouldQueueIndexEvent)
     if (queuedEvents.length === 0) return this.status()
+    if (this.state.readiness === 'off') return this.status()
     const watchError = queuedEvents.find(isWatchErrorEvent)
-    if (watchError) return this.rebuildAndMarkFailed('watch-error', watchError.message)
+    if (watchError) return this.markFailed('watch-error', watchError.message)
     if (this.state.readiness === 'failed') return this.status()
     if (!canApplyIncrementalUpdates(this.state.readiness)) {
       return this.rebuild({ reason: 'watch-event-without-ready-index' })
@@ -198,7 +230,7 @@ export class WorkspaceIndex {
   }
 
   async refresh(relativePath: string) {
-    if (this.state.readiness === 'failed') return this.status()
+    if (this.state.readiness === 'failed' || this.state.readiness === 'off') return this.status()
     if (!canApplyIncrementalUpdates(this.state.readiness)) {
       return this.rebuild({ reason: 'incremental-refresh-without-ready-index' })
     }
@@ -263,21 +295,14 @@ export class WorkspaceIndex {
     this.state = staleLiveStatus(this.state, this.counts(), this.pendingCreatedPaths)
   }
 
+  // Search reads the entries only while `ready`, so a failure needs no fresh scan to record it.
   markFailed(reason: string, error: unknown) {
+    if (this.state.readiness === 'off') return this.status()
     this.nextRebuildId()
     this.pendingCreatedPaths.clear()
     this.state = failedLiveStatus(this.state, this.counts(), reason, error)
+    recordIndexBuild(this.state)
     return this.status()
-  }
-
-  async rebuildAndMarkFailed(reason: string, error: unknown) {
-    try {
-      await this.rebuild({ reason })
-    } catch {
-      // Keep going so live-readiness records the watcher failure, not just the scan failure.
-    }
-
-    return this.markFailed(reason, error)
   }
 
   private clearPendingCreatedPaths(events: readonly WatchServerMessage[]) {
@@ -514,6 +539,7 @@ class WorkspaceIndexEventWatcher implements WorkspaceIndexWatchSubscription {
   private readonly index: WorkspaceIndex
   private readonly rebuildEventLimit: number
   readonly ready: Promise<void>
+  coverage: WatchCoverage | undefined
   private closed = false
   private flushChain = Promise.resolve()
   private pending: WatchServerMessage[] = []
@@ -557,6 +583,8 @@ class WorkspaceIndexEventWatcher implements WorkspaceIndexWatchSubscription {
 
     try {
       for await (const event of this.events(this.abort.signal)) {
+        if (event.type === 'ready') this.coverage ??= event.watch
+        if (event.type === 'coverage') this.resumeWhenWatched(event.watch)
         this.resolveReady()
         this.enqueue(event)
       }
@@ -565,11 +593,22 @@ class WorkspaceIndexEventWatcher implements WorkspaceIndexWatchSubscription {
       if (this.closed) return
 
       streamFailed = true
-      await this.index.rebuildAndMarkFailed('watch-stream-error', error)
+      this.index.markFailed('watch-stream-error', error)
     } finally {
       this.resolveReady()
       await this.finishConsumingEvents(streamFailed)
     }
+  }
+
+  private resumeWhenWatched(coverage: WatchCoverage) {
+    this.coverage = coverage
+    if (coverage.mode === 'limited') {
+      this.flushChain = this.flushChain.then(() => this.index.turnOff('watch-limit'))
+      return
+    }
+    this.flushChain = this.flushChain.then(async () => {
+      await this.index.turnOn('watch-limit-freed')
+    })
   }
 
   private async finishConsumingEvents(streamFailed: boolean) {
@@ -1205,6 +1244,21 @@ function pathCharBag(relativePath: string) {
   }
 
   return Array.from(characters).sort().join('')
+}
+
+function recordIndexBuild(status: WorkspaceIndexStatus) {
+  recordProcessInfo('fs.workspace_index.build', {
+    area: 'fs',
+    root: status.scanRoot,
+    reason: status.rebuildReason,
+    readiness: status.readiness,
+    durationMs: status.lastFullScanDurationMs,
+    entryCount: status.entryCount,
+    fileCount: status.fileCount,
+    skippedEntryCount: status.skippedEntryCount,
+    scanWarningCount: status.scanWarningCount,
+    errorMessage: status.errorMessage,
+  })
 }
 
 function emptyStatus(scanRoot: string): WorkspaceIndexStatus {

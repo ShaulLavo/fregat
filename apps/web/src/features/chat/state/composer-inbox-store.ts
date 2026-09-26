@@ -4,6 +4,7 @@ import {
   normalizeTerminalContextSelection,
   type TerminalContextSelection,
 } from '@workspace/client-core/chat/terminal-context'
+import type { ComposerDestination } from '@/lib/composer-attach/providers/context'
 import type { ChatInputTerminalContext } from './chat-input-draft-store'
 
 /**
@@ -17,13 +18,20 @@ import type { ChatInputTerminalContext } from './chat-input-draft-store'
  * shape does not transfer — a ref to a component that is not mounted is null.
  *
  * Two entry kinds, because capture surfaces produce two different things: a
- * chip that rides beside the prompt, and text that belongs in it.
+ * chip that rides beside the prompt, and text that belongs in it. Each names the
+ * workspace it came from, so another workspace's composer never takes it.
  */
 export type ComposerInboxEntry =
-  | { readonly kind: 'terminal-context'; readonly context: ChatInputTerminalContext }
-  | { readonly kind: 'text'; readonly text: string }
-  /** Text for the end of the prompt, added once: a prompt already ending with it keeps as is. */
-  | { readonly kind: 'append'; readonly text: string }
+  | {
+      readonly kind: 'terminal-context'
+      readonly context: ChatInputTerminalContext
+      readonly destination: ComposerDestination
+    }
+  | {
+      readonly kind: 'text' | 'append'
+      readonly text: string
+      readonly destination: ComposerDestination
+    }
 
 type ComposerInboxState = {
   pending: readonly ComposerInboxEntry[]
@@ -39,9 +47,12 @@ type ComposerInboxActions = {
    */
   take: (accept: (entry: ComposerInboxEntry) => boolean) => readonly ComposerInboxEntry[]
   /** Text to splice in at the caret. Returns false for nothing worth inserting. */
-  queueText: (text: string) => boolean
-  queueAppend: (text: string) => boolean
-  queueTerminalContext: (selection: TerminalContextSelection) => ChatInputTerminalContext | null
+  queueText: (text: string, destination: ComposerDestination) => boolean
+  queueAppend: (text: string, destination: ComposerDestination) => boolean
+  queueTerminalContext: (
+    selection: TerminalContextSelection,
+    destination: ComposerDestination,
+  ) => ChatInputTerminalContext | null
 }
 
 export type ComposerInboxStore = ComposerInboxState & ComposerInboxActions
@@ -59,25 +70,29 @@ export const useComposerInboxStore = create<ComposerInboxStore>((set, get) => ({
 
     return taken
   },
-  queueText: (text) => {
+  queueText: (text, destination) => {
     const trimmed = text.trim()
     if (trimmed.length === 0) return false
 
-    set((state) => ({ pending: state.pending.concat({ kind: 'text', text: trimmed }) }))
+    set((state) => ({
+      pending: state.pending.concat({ destination, kind: 'text', text: trimmed }),
+    }))
 
     return true
   },
-  queueAppend: (text) => {
+  queueAppend: (text, destination) => {
     const trimmed = text.trim()
     if (trimmed.length === 0) return false
 
-    set((state) => ({ pending: state.pending.concat({ kind: 'append', text: trimmed }) }))
+    set((state) => ({
+      pending: state.pending.concat({ destination, kind: 'append', text: trimmed }),
+    }))
 
     return true
   },
   // Normalized on the way in so a drag that caught only padding never becomes a
   // chip; the null return is what lets the caller say "nothing was selected".
-  queueTerminalContext: (selection) => {
+  queueTerminalContext: (selection, destination) => {
     const normalized = normalizeTerminalContextSelection(selection)
     if (!normalized) return null
 
@@ -85,7 +100,9 @@ export const useComposerInboxStore = create<ComposerInboxStore>((set, get) => ({
       ...normalized,
       id: `terminal-context-${crypto.randomUUID()}`,
     }
-    set((state) => ({ pending: state.pending.concat({ context, kind: 'terminal-context' }) }))
+    set((state) => ({
+      pending: state.pending.concat({ context, destination, kind: 'terminal-context' }),
+    }))
 
     return context
   },

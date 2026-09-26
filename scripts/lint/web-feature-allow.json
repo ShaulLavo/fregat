@@ -607,18 +607,6 @@
   },
   {
     "from": "git",
-    "to": "chat",
-    "module": "features/chat/hooks/use-attach-to-composer.ts",
-    "reason": "shared \u2192 lib: useAttachToComposer is reused by git outside chat; move this shared behavior with its consumers."
-  },
-  {
-    "from": "git",
-    "to": "chat",
-    "module": "features/chat/utils/checkpoint-diff-query.ts",
-    "reason": "shared \u2192 lib: checkpointDiffRetry, checkpointDiffRetryDelay, fetchCheckpointDiff is reused by git outside chat; move this shared behavior with its consumers."
-  },
-  {
-    "from": "git",
     "to": "editor",
     "module": "features/editor/components/diff-editor.tsx",
     "reason": "shared \u2192 lib: DiffEditor is rendered by both git and editor; extract the shared presentation from its feature owner."
@@ -742,12 +730,6 @@
     "to": "editor",
     "module": "features/editor/utils/render-document.ts",
     "reason": "shared \u2192 lib: EditorRenderDocument is reused by settings outside editor; move this shared behavior with its consumers."
-  },
-  {
-    "from": "terminal",
-    "to": "chat",
-    "module": "features/chat/hooks/use-attach-to-composer.ts",
-    "reason": "shared \u2192 lib: useAttachToComposer is reused by terminal outside chat; move this shared behavior with its consumers."
   },
   {
     "from": "terminal",

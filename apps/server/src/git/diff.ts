@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { ensureTrailingNewline, joinPath, unquoteGitPath } from './path-utils'
 import type { GitDiffHunk, GitFileDiff, GitLineChange } from './types'
 
@@ -44,7 +45,7 @@ function applyDiffMetadata(current: MutableGitFileDiff, rootPath: string, line: 
 
 function finalizeDiff(diff: MutableGitFileDiff): GitFileDiff {
   return {
-    hunks: diff.hunks.map(finalizeHunk),
+    hunks: diff.hunks.map((hunk) => finalizeHunk(hunk, diff)),
     newFileMissing: diff.newFileMissing,
     oldFileMissing: diff.oldFileMissing,
     oldPath: diff.oldPath === diff.path ? undefined : diff.oldPath,
@@ -71,7 +72,7 @@ type MutableGitFileDiff = {
   hunks: MutableGitDiffHunk[]
 }
 
-type MutableGitDiffHunk = Omit<GitDiffHunk, 'patch'> & {
+type MutableGitDiffHunk = Omit<GitDiffHunk, 'id' | 'patch'> & {
   lines: string[]
   oldLine: number
   newLine: number
@@ -153,16 +154,26 @@ function applyDiffLine(hunk: MutableGitDiffHunk, line: string) {
   hunk.oldLine += 1
 }
 
-function finalizeHunk(hunk: MutableGitDiffHunk): GitDiffHunk {
+function finalizeHunk(hunk: MutableGitDiffHunk, diff: MutableGitFileDiff): GitDiffHunk {
+  const patch = ensureTrailingNewline(hunk.lines.join('\n'))
   return {
     changes: hunk.changes,
+    id: hunkId(diff.path, diff.oldPath, patch),
     header: hunk.header,
     newLines: hunk.newLines,
     newStart: hunk.newStart,
     oldLines: hunk.oldLines,
     oldStart: hunk.oldStart,
-    patch: ensureTrailingNewline(hunk.lines.join('\n')),
+    patch,
   }
+}
+
+// The same refs and flags print byte-identical hunks, so this survives a re-read of a turn.
+function hunkId(path: string, oldPath: string | undefined, patch: string) {
+  return createHash('sha256')
+    .update(`${path}\0${oldPath ?? path}\0${patch}`)
+    .digest('hex')
+    .slice(0, 16)
 }
 
 function diffLineType(line: string): GitLineChange['type'] {
