@@ -44,6 +44,7 @@ import { paletteIdFromItemValue } from '@/features/command-palette/utils/app-col
 import { themeBundleFromItemValue } from '@/features/command-palette/utils/theme-bundles'
 import { wallpaperSourceFromItemValue } from '@/features/command-palette/utils/wallpapers'
 import { useWallpaperPreviewStore } from '@/lib/wallpapers/state/preview-store'
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { useBundles } from '@/lib/appearance/hooks/use-bundles'
 import { usePalette } from '@/lib/appearance/hooks/use-palette'
 import { isCommandVisibleInPalette } from '@/keymap/utils/palette-visibility'
@@ -98,6 +99,7 @@ export function CommandPaletteContent() {
   const { catalog: bundles, clear: clearBundlePreview, preview: previewBundle } = useBundles()
   const previewWallpaper = useWallpaperPreviewStore((state) => state.preview)
   const clearWallpaperPreview = useWallpaperPreviewStore((state) => state.clear)
+  const filePreview = useSettingValue('search.quickOpenPreview')
   const hasWorkspace = useEditorWorkspaceState((state) => Boolean(state.rootFolder))
   const rootFolder = useEditorWorkspaceState((state) => state.rootFolder)
   const openTabContents = useEditorWorkspaceState((state) => state.openTabContents)
@@ -445,7 +447,7 @@ export function CommandPaletteContent() {
         </CommandPaletteActionsContext>
       </CommandList>
       {mode === 'colorTheme' && <CodeThemePreviewPanel query={query} />}
-      {mode === 'files' ? (
+      {mode === 'files' && filePreview ? (
         <FilePreviewPanel item={highlightedFileItem(visibleFileItems, selectedCommandValue)} />
       ) : null}
     </CommandDialog>

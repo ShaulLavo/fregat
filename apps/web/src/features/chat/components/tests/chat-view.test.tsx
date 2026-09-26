@@ -15,6 +15,8 @@ import {
 } from '@/features/chat/state/chat-message-intents'
 import {
   eventIdSchema,
+  sessionIdSchema,
+  orchestrationProposedPlanSchema,
   messageIdSchema,
   type ClientOrchestrationCommand,
   type OrchestrationSessionDetailSnapshot,
@@ -445,6 +447,77 @@ test('correction retry consumes content while model and mode choices reach the n
     height.mockRestore()
     resetChatInputDraftStore()
     resetChatMessageIntents()
+    useChatProjectionStore.setState(previousProjection, true)
+  }
+})
+
+test('switching sessions removes the previous plan banner and keeps one composer', () => {
+  const previousProjection = useChatProjectionStore.getState()
+  const consoleErrors = vi.spyOn(console, 'error')
+  initializePromptStashStore(environmentScopedStorage(TEST_ENVIRONMENT_ID))
+  const planned = session({ latestTurn: null, runtime: null })
+  const next = session({
+    id: v.parse(sessionIdSchema, '02000000-0000-4000-8000-000000000001'),
+    latestTurn: null,
+    runtime: null,
+  })
+  const projection = useChatProjectionStore.getState()
+  projection.syncShellSnapshot(
+    TEST_ENVIRONMENT_ID,
+    shellSnapshot({
+      projects: [planned.project],
+      worktrees: [planned.worktree],
+      sessions: [planned, next],
+    }),
+  )
+  for (const current of [planned, next]) {
+    projection.syncSessionDetailSnapshot(TEST_ENVIRONMENT_ID, {
+      checkpoints: [],
+      proposedPlans:
+        current === planned
+          ? [
+              v.parse(orchestrationProposedPlanSchema, {
+                id: 'pending-plan',
+                sessionId: planned.id,
+                turnId: null,
+                planMarkdown: '# Previous session plan',
+                createdAt: '2026-05-28T00:00:02.000Z',
+                updatedAt: '2026-05-28T00:00:02.000Z',
+              }),
+            ]
+          : [],
+      snapshotSequence: 1,
+      session: { ...current, deletedAt: null, deletion: null },
+    })
+  }
+  const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(600)
+  const closed = createChatTransport(activeServerOrigin(), {
+    createSocket: () => new FakeOrchestrationSocket(),
+  })
+  closed.close()
+  const disconnect = registerChatTransport(closed)
+  const view = renderCachedChatSelection(planned.id, next.id)
+  try {
+    fireEvent.click(view.getByRole('button', { name: 'Open cached session' }))
+    expect(view.getByRole('status', { name: 'Plan ready' })).toHaveTextContent(
+      'Previous session plan',
+    )
+    fireEvent.click(view.getByRole('button', { name: 'Open next session' }))
+    expect(view.queryByRole('status', { name: 'Plan ready' })).not.toBeInTheDocument()
+    expect(view.getAllByRole('textbox', { name: 'Message' })).toHaveLength(1)
+    fireEvent.click(view.getByRole('button', { name: 'Open cached session' }))
+    expect(view.getAllByRole('status', { name: 'Plan ready' })).toHaveLength(1)
+    expect(view.getAllByRole('textbox', { name: 'Message' })).toHaveLength(1)
+    expect(
+      consoleErrors.mock.calls.filter(([message]) =>
+        String(message).includes('Encountered two children with the same key'),
+      ),
+    ).toEqual([])
+  } finally {
+    view.unmount()
+    disconnect()
+    height.mockRestore()
+    consoleErrors.mockRestore()
     useChatProjectionStore.setState(previousProjection, true)
   }
 })
