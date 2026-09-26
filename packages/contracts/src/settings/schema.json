@@ -1617,6 +1617,25 @@
       },
       "required": ["enabled", "source"],
       "type": "object"
+    },
+    "workbench.wallpaper.downloadTimeoutMs": {
+      "default": 60000,
+      "description": "Milliseconds a picked Omarchy wallpaper may take to download from GitHub before the download stops.",
+      "maximum": 600000,
+      "minimum": 1000,
+      "type": "integer"
+    },
+    "workbench.wallpaper.omarchyCatalog": {
+      "default": true,
+      "description": "List every Omarchy theme wallpaper in the picker. Picking one downloads it from a pinned Omarchy commit on GitHub.",
+      "type": "boolean"
+    },
+    "workbench.wallpaper.previewCloud": {
+      "default": "",
+      "description": "Cloudinary cloud name that resizes Omarchy wallpaper previews through its fetch mode.",
+      "markdownDescription": "Cloudinary cloud name that resizes Omarchy wallpaper previews through its fetch mode.\n\nThe account needs fetched URLs allowed for raw.githubusercontent.com (Cloudinary Settings → Security). Empty loads full-size previews from GitHub.",
+      "pattern": "^[A-Za-z0-9_-]*$",
+      "type": "string"
     }
   },
   "type": "object"

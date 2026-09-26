@@ -38,6 +38,15 @@ export const wallpaperAssetSchema = v.object({
   ),
 })
 export type WallpaperAsset = v.InferOutput<typeof wallpaperAssetSchema>
+
+/** An Omarchy wallpaper the library can download; `source` is its raw GitHub URL at a pinned commit. */
+export type WallpaperCatalogEntry = {
+  readonly theme: string
+  readonly file: string
+  readonly asset: AssetId
+  readonly bytes: number
+  readonly source: string
+}
 export const wallpaperIndexSchema = v.array(wallpaperAssetSchema)
 
 const clusterColorSchema = v.object({

@@ -1,9 +1,10 @@
-import type { WallpaperAsset } from '@workspace/contracts'
+import type { WallpaperAsset, WallpaperCatalogEntry } from '@workspace/contracts'
 
 type WallpaperGroup = {
   readonly id: string
   readonly heading: string
   readonly assets: readonly WallpaperAsset[]
+  readonly catalog: readonly WallpaperCatalogEntry[]
 }
 
 export type WallpaperSections = {
@@ -36,12 +37,19 @@ function titleCase(slug: string) {
 export function wallpaperDisplayName(asset: WallpaperAsset) {
   const separator = asset.name.lastIndexOf(THEME_SEPARATOR)
   const base = separator < 0 ? asset.name : asset.name.slice(separator + THEME_SEPARATOR.length)
-  const stem = base
+  return fileLabel(base) || asset.name
+}
+
+export function catalogDisplayName(entry: WallpaperCatalogEntry) {
+  return fileLabel(entry.file) || entry.file
+}
+
+function fileLabel(base: string) {
+  return base
     .replace(/\.(jpe?g|png|webp)$/iu, '')
     .replace(/^\d+[-_\s]+/u, '')
     .replace(/[-_]+/gu, ' ')
     .trim()
-  return stem || asset.name
 }
 
 export function wallpaperTitle(asset: WallpaperAsset) {
@@ -56,10 +64,12 @@ function matches(asset: WallpaperAsset, heading: string, query: string) {
 export function wallpaperSections(
   assets: readonly WallpaperAsset[],
   search = '',
+  catalog: readonly WallpaperCatalogEntry[] = [],
 ): WallpaperSections {
   const query = search.trim().toLocaleLowerCase()
   const uploads: WallpaperAsset[] = []
   const themes = new Map<string, WallpaperAsset[]>()
+  const downloads = new Map<string, WallpaperCatalogEntry[]>()
   for (const asset of assets) {
     if (isUploadedWallpaper(asset)) {
       if (matches(asset, 'uploads', query)) uploads.push(asset)
@@ -71,8 +81,20 @@ export function wallpaperSections(
     if (grouped) grouped.push(asset)
     else themes.set(theme, [asset])
   }
+  for (const entry of catalog) {
+    if (query && !`${entry.theme} ${entry.file}`.toLocaleLowerCase().includes(query)) continue
+    const grouped = downloads.get(entry.theme)
+    if (grouped) grouped.push(entry)
+    else downloads.set(entry.theme, [entry])
+    if (!themes.has(entry.theme)) themes.set(entry.theme, [])
+  }
   return {
     uploads,
-    themes: [...themes].map(([id, grouped]) => ({ id, heading: titleCase(id), assets: grouped })),
+    themes: [...themes].map(([id, grouped]) => ({
+      id,
+      heading: titleCase(id),
+      assets: grouped,
+      catalog: downloads.get(id) ?? [],
+    })),
   }
 }
