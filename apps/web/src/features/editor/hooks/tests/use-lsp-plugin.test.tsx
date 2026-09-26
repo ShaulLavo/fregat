@@ -32,6 +32,9 @@ vi.mock('@/features/editor/providers/workspace-edit-context', () => ({
   useWorkspaceDocumentSyncController: () => dependencies.controller,
   useWorkspaceEditHost: () => dependencies.apply,
 }))
+vi.mock('@/lib/diagnostic-ai/hooks/use-diagnostic-fix', () => ({
+  useDiagnosticFix: () => ({ available: true, mutation: { mutateAsync: dependencies.apply } }),
+}))
 vi.mock('@/hooks/use-setting-value', () => ({
   useSettingValue: (key: string) =>
     key === 'lsp.typescript.backend' ? dependencies.backend : 12000,

@@ -5,6 +5,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import type { LanguageServerDocument } from '@/lib/language-server-document'
 import type {
   OnApplyWorkspaceEdit,
+  LanguageServerDiagnosticActions,
   LanguageServerDocumentSyncController,
   LanguageServerDefinitionTarget,
   LanguageServerReferencesResult,
@@ -34,6 +35,7 @@ type Options = {
   readonly maxBytes: number
   readonly status: EditorLanguageServerStatusSource
   readonly documentSyncController: LanguageServerDocumentSyncController
+  readonly getDiagnosticActions?: LanguageServerDiagnosticActions
   readonly onApplyWorkspaceEdit: OnApplyWorkspaceEdit
   readonly onOpenDefinition?: (target: LanguageServerDefinitionTarget) => void | boolean
   readonly onOpenReferences?: (result: LanguageServerReferencesResult) => void | boolean
@@ -110,6 +112,7 @@ class TypeScriptWorkerOwner {
       },
       onConnectionCreated: (connection) => project.registerConnection(connection),
       onApplyWorkspaceEdit: options.onApplyWorkspaceEdit,
+      getDiagnosticActions: options.getDiagnosticActions,
       onOpenDefinition: options.onOpenDefinition,
       onOpenReferences: options.onOpenReferences,
       onStatusChange: (status) => options.status.setServerStatus(SERVER_ID, status),

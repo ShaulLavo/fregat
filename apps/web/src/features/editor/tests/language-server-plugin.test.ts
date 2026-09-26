@@ -47,6 +47,22 @@ beforeEach(() => {
 })
 
 describe('createMatchedLanguageServerPlugin', () => {
+  test('forwards per-diagnostic hover actions to the server-set plugin', () => {
+    const getDiagnosticActions = vi.fn(() => [])
+    createMatchedLanguageServerPlugin({
+      origin: 'http://localhost:3001',
+      document,
+      documentSyncController,
+      enabled: true,
+      matches: [match('typescript', '/repo', 0)],
+      rootPath: '/repo',
+      statusSource: createEditorLanguageServerStatusSource(),
+      target: { matchPath: 'src/a.ts' },
+      onApplyWorkspaceEdit,
+      getDiagnosticActions,
+    }).activate({} as never)
+    expect(createdServerSets[0]?.getDiagnosticActions).toBe(getDiagnosticActions)
+  })
   test.each([
     {
       target: fileDocument(fileResource(filesystemPath('settings-json:app.tsx'))),

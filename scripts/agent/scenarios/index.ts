@@ -139,6 +139,7 @@ import { editorLspCompletion } from './editor-lsp-completion'
 import { editorExternalDeletion } from './editor-external-deletion'
 import { fileTreeUndo } from './file-tree-undo'
 import { editorDefinitionCrlf } from './editor-definition-crlf'
+import { editorDiagnosticHoverFix } from './editor-diagnostic-hover-fix'
 import { editorLspHover } from './editor-lsp-hover'
 import { editorLspDeprecated } from './editor-lsp-deprecated'
 import { editorLspUnnecessary } from './editor-lsp-unnecessary'
@@ -367,6 +368,7 @@ export const scenarios: readonly Scenario[] = [
   editorFormatChord,
   editorLspCompletion,
   editorLspHover,
+  editorDiagnosticHoverFix,
   editorLspDeprecated,
   editorLspUnnecessary,
   editorLspTabSwitch,

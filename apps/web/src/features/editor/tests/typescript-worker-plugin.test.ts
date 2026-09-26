@@ -20,6 +20,7 @@ const worker = vi.hoisted(() => ({
   clear: vi.fn(),
   activate: vi.fn(),
   dispose: vi.fn(),
+  actions: vi.fn(() => []),
 }))
 vi.mock('@singapore-editor/typescript-lsp', () => ({
   createTypeScriptLspPlugin: worker.create,
@@ -81,6 +82,7 @@ function mount(
     status,
     documentSyncController: {} as never,
     onApplyWorkspaceEdit: vi.fn(),
+    getDiagnosticActions: worker.actions,
   })
   const registration = plugin.activate({} as Parameters<EditorPlugin['activate']>[0]) as {
     dispose(): void
@@ -123,6 +125,11 @@ afterEach(() => {
   for (const dispose of cleanups.splice(0)) dispose()
 })
 describe('TypeScript worker lifecycle', () => {
+  it('forwards per-diagnostic hover actions to the worker plugin', async () => {
+    mount()
+    await vi.waitFor(() => expect(worker.activate).toHaveBeenCalled())
+    expect(worker.create.mock.calls[0]?.[0].getDiagnosticActions).toBe(worker.actions)
+  })
   it.each(['initial', 'rescan'])(
     'does not start reads after retirement during %s invalidation',
     async (phase) => {
