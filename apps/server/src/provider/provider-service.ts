@@ -838,9 +838,9 @@ export class ProviderService {
 
   /** Live background tasks of one session, as the provider last reported them. */
   backgroundTaskRoster(sessionId: SessionId): ProviderBackgroundTasks {
-    const routed = this.routeSession(sessionId)
+    const adapter = this.routeSession(sessionId)?.adapter
     return {
-      supported: Boolean(routed?.adapter.stopBackgroundTask),
+      supported: Boolean(adapter?.stopBackgroundTask),
       tasks: this.taskRosters.get(sessionId) ?? [],
     }
   }
@@ -848,12 +848,13 @@ export class ProviderService {
   async stopBackgroundTask(input: { sessionId: SessionId; taskId: string }) {
     this.requireRunning()
     const routed = this.routeSession(input.sessionId)
-    const stop = routed?.adapter.stopBackgroundTask
-    if (!stop)
+    const adapter = routed?.adapter
+    const stop = adapter?.stopBackgroundTask
+    if (!adapter || !stop)
       throw sessionIdentityErrors.TASK_STOP_UNSUPPORTED({
         internal: { routed: Boolean(routed), sessionId: input.sessionId },
       })
-    await stop.call(routed.adapter, input)
+    await stop.call(adapter, input)
     await this.drainRuntimeEvents()
     const tasks = this.taskRosters.get(input.sessionId) ?? []
     this.taskRosters.set(
@@ -890,11 +891,12 @@ export class ProviderService {
   async sessionHooks(sessionId: SessionId): Promise<ProviderSessionHooks> {
     const routed = this.routeSession(sessionId)
     const cwd = routed?.binding.runtimePayload?.cwd
-    const configured = routed?.adapter.configuredHooks
-    if (!configured || !cwd)
+    const adapter = routed?.adapter
+    const configured = adapter?.configuredHooks
+    if (!adapter || !configured || !cwd)
       return { errors: [], hooks: [], running: Boolean(routed), supported: Boolean(configured) }
 
-    const hooks = await configured.call(routed.adapter, { cwd, sessionId })
+    const hooks = await configured.call(adapter, { cwd, sessionId })
     return { errors: [], hooks: [], ...hooks, running: hooks !== null, supported: true }
   }
 

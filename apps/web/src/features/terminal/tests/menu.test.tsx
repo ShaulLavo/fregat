@@ -21,6 +21,7 @@ for (const [backend, label] of TIERS) {
       <TerminalMenu
         anchor={pointAnchor(10, 10)}
         onOpenChange={() => {}}
+        rootPath='/workspace'
         target={menuTarget(backend)}
       />,
     )
