@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { createRequire } from 'node:module'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
@@ -19,6 +20,9 @@ import { shellChunksPlugin } from './scripts/shell-chunks-plugin'
 import { staticGraphChunk } from './scripts/initial-chunk'
 
 const workspaceRoot = path.resolve(import.meta.dirname, '../..')
+const markdownRequire = createRequire(path.join(workspaceRoot, 'packages/markdown/package.json'))
+const sharedMarkdown = ['unified', 'remark-parse', 'remark-gfm', 'unist-util-visit']
+
 const devServerHost = process.env.WEB_HOST ?? '127.0.0.1'
 const devServerPort = portFromEnv(process.env, 'WEB_PORT', 5173)
 
@@ -92,10 +96,11 @@ export default defineConfig(({ command, isPreview, mode }) => {
     resolve: {
       alias: {
         '@': path.resolve(import.meta.dirname, './src'),
+        // Isolated installs resolve these from their owning workspace, where they are declared.
+        ...Object.fromEntries(sharedMarkdown.map((name) => [name, markdownRequire.resolve(name)])),
       },
-      // evlog resolves as two peer variants of one version (the root pins an older vite), and both
-      // copies ship; one is enough because its config lives on globalThis.
-      dedupe: ['react', 'react-dom', 'evlog'],
+      // Linked checkouts share the app's React, hotkey manager and evlog globals.
+      dedupe: ['react', 'react-dom', 'evlog', '@tanstack/hotkeys'],
     },
     server: {
       fs: {

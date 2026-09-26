@@ -22,7 +22,7 @@ const inputSchema = v.object({
 const marker = 'QUEUE_TERMINAL_CONTEXT'
 const fileContent = 'Queued file must survive Stop.\n'
 
-async function until(condition: () => Promise<boolean>, label: string) {
+export async function until(condition: () => Promise<boolean>, label: string) {
   for (let attempt = 0; attempt < 200; attempt++) {
     if (await condition()) return
     await Bun.sleep(50)
@@ -37,7 +37,7 @@ async function inputEntries(root: string) {
     .map((entry) => v.parse(inputSchema, entry))
 }
 
-async function waitForInputs(root: string, count: number) {
+export async function waitForInputs(root: string, count: number) {
   await until(
     async () => (await inputEntries(root)).length === count,
     `Expected ${count} native inputs`,
@@ -45,7 +45,7 @@ async function waitForInputs(root: string, count: number) {
   return inputEntries(root)
 }
 
-async function control(
+export async function control(
   root: string,
   action: 'boundary' | 'approval' | 'complete' | 'reject-interrupt',
 ) {
@@ -58,13 +58,13 @@ async function control(
   )
 }
 
-async function enqueue(page: Page, prompt: string) {
+export async function enqueue(page: Page, prompt: string) {
   await selectors.chatMessage(page).fill(prompt)
   await selectors.chatQueue(page).click()
   await selectors.chatQueuedEntry(page, prompt).waitFor()
 }
 
-async function expectQueued(page: Page, count: number) {
+export async function expectQueued(page: Page, count: number) {
   await until(
     async () => (await selectors.chatSendQueued(page).count()) === count,
     `${count} queued entries`,

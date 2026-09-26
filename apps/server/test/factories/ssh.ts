@@ -13,7 +13,13 @@ import { parseDescriptor, type RemoteRecord } from '../../src/machines/records'
 import { reserveForwardPort, type SshChild, type SshSpawner } from '../../src/machines/forward'
 import { MachineService } from '../../src/machines/service'
 import type { ReleaseInstallation, ServerInstallation } from '../../src/installation/descriptor'
-import { PTY_HOST, REMOTE_SUPPORT, WATCH_WORKER } from '../../src/installation/release-files'
+import {
+  IMAGE_WORKER,
+  PTY_HOST,
+  REMOTE_SUPPORT,
+  THIRD_PARTY_NOTICES,
+  WATCH_WORKER,
+} from '../../src/installation/release-files'
 
 /** A production primary with no release to ship, as tests run the server from source. */
 export const noRelease = releaseSource('/platform-test/no-release/server')
@@ -314,6 +320,8 @@ export async function writeRelease(
   await writeFile(path.join(server, 'index.js'), healthServerSource(protocolVersion, name))
   await writeFile(path.join(server, PTY_HOST), `// ${name} terminal host\n`)
   await writeFile(path.join(server, WATCH_WORKER), '')
+  await writeFile(path.join(server, IMAGE_WORKER), '')
+  await writeFile(path.join(server, THIRD_PARTY_NOTICES), 'fixture notices')
   if (supportProtocol === ORCHESTRATION_WS_PROTOCOL_VERSION) {
     await copyFile(await remoteSupportBundle(), path.join(server, REMOTE_SUPPORT))
     return
@@ -331,6 +339,8 @@ export async function writeCrashingRelease(serverRoot: string, name: string) {
   await mkdir(server, { recursive: true })
   await writeFile(path.join(server, 'index.js'), 'process.exit(3)')
   await writeFile(path.join(server, WATCH_WORKER), '')
+  await writeFile(path.join(server, IMAGE_WORKER), '')
+  await writeFile(path.join(server, THIRD_PARTY_NOTICES), 'fixture notices')
   await copyFile(await remoteSupportBundle(), path.join(server, REMOTE_SUPPORT))
 }
 

@@ -1,5 +1,5 @@
 import type { PushNotice, PushService } from '@workspace/contracts'
-import { generateRequestDetails, type RequestDetails, type Urgency } from 'web-push'
+import type { RequestDetails, Urgency } from '@workspace/push'
 import type { PushDeviceRow } from './device-store'
 import type { VapidKeys } from './vapid'
 
@@ -33,6 +33,7 @@ export async function deliverPush(
   notice: PushNotice,
   options: PushMessageOptions,
 ): Promise<PushDelivery> {
+  const { generateRequestDetails } = await import('@workspace/push')
   const request = generateRequestDetails(
     { endpoint: device.endpoint, keys: { p256dh: device.p256dh, auth: device.auth } },
     JSON.stringify(notice),

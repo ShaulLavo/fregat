@@ -1,3 +1,4 @@
+import { zipSync, strToU8 } from 'fflate'
 import type { Fetcher } from '../fetcher'
 
 type Route = (url: URL) => Response | Promise<Response>
@@ -72,4 +73,19 @@ export function fontsourceRoutes(): Record<string, Route> {
     [`${cdn}/geist@latest/latin-400-normal.woff2`]: () => new Response('geist-latin-400'),
     [`${cdn}/lobster@latest/latin-400-normal.woff2`]: () => new Response('lobster-latin-400'),
   }
+}
+
+export function nerdRelease(names: readonly string[]) {
+  return {
+    assets: names.map((name) => ({
+      browser_download_url: `https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/${name}.zip`,
+    })),
+  }
+}
+
+export function nerdArchive() {
+  return zipSync({
+    'JetBrainsMonoNerdFont-Bold.ttf': strToU8('bold-font'),
+    'JetBrainsMonoNerdFont-Regular.ttf': strToU8('regular-font'),
+  }).buffer
 }

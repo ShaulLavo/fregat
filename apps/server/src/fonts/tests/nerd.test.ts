@@ -1,5 +1,4 @@
 import { mkdtemp, rm } from 'node:fs/promises'
-import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -7,14 +6,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { Fetcher, FontSubsetter } from '../fetcher'
 import { NerdFontProvider, parseNerdFontLinks } from '../nerd'
 
-type TestZip = {
-  file(name: string, data: string | Buffer): TestZip
-  generateAsync(options: { type: 'arraybuffer' }): Promise<ArrayBuffer>
-}
-type JSZipConstructor = new () => TestZip
+import { nerdRelease, nerdArchive } from './fixtures'
 
-const require = createRequire(import.meta.url)
-const JSZip = require('jszip') as JSZipConstructor
 const roots: string[] = []
 
 afterEach(async () => {
@@ -22,26 +15,35 @@ afterEach(async () => {
 })
 
 describe('NerdFontProvider', () => {
-  it('parses Nerd Fonts download links from the downloads page', () => {
-    const links = parseNerdFontLinks(`
-      <a href="https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/JetBrainsMono.zip">Download</a>
-      <a href="/not-a-font.txt">Download</a>
-      <a href="https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/Bad%2FName.zip">Download</a>
-      <a href="https://example.com/Ignored.zip">Docs</a>
-      <a href="https://example.com/Elsewhere.zip">Download</a>
-    `)
-
-    expect(links).toEqual({
+  it('accepts only ZIP assets from Nerd Fonts releases', () => {
+    const release = nerdRelease(['JetBrainsMono', 'Bad%2FName'])
+    release.assets.push(
+      { browser_download_url: 'https://example.com/Elsewhere.zip' },
+      { browser_download_url: 'https://github.com/another/repo/releases/download/v1/Bad.zip' },
+      { browser_download_url: 'not-a-url' },
+      {
+        browser_download_url: 'http://github.com/ryanoasis/nerd-fonts/releases/download/v1/Bad.zip',
+      },
+      {
+        browser_download_url:
+          'https://github.com/ryanoasis/nerd-fonts/releases/download/v1/Bad.tar.xz',
+      },
+    )
+    expect(parseNerdFontLinks(release)).toEqual({
       JetBrainsMono:
         'https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/JetBrainsMono.zip',
     })
+  })
+
+  it('rejects malformed release metadata', () => {
+    expect(() => parseNerdFontLinks({ assets: [{ name: 'font.zip' }] })).toThrow()
   })
 
   it('reuses cached font links', async () => {
     const root = await fixtureRoot()
     const first = provider({
       cacheRoot: root,
-      fetcher: async () => new Response(downloadsHtml(['JetBrainsMono'])),
+      fetcher: async () => Response.json(nerdRelease(['JetBrainsMono'])),
     })
 
     await expect(first.links()).resolves.toHaveProperty('JetBrainsMono')
@@ -58,7 +60,7 @@ describe('NerdFontProvider', () => {
 
   it('extracts the regular font from a downloaded archive', async () => {
     const root = await fixtureRoot()
-    const archive = await fontArchive()
+    const archive = nerdArchive()
     const service = provider({
       cacheRoot: root,
       fetcher: async (input) => fontFetch(input, archive),
@@ -71,7 +73,7 @@ describe('NerdFontProvider', () => {
 
   it('downloads one archive for concurrent asks of a cold font', async () => {
     const root = await fixtureRoot()
-    const archive = await fontArchive()
+    const archive = nerdArchive()
     let downloads = 0
     const service = provider({
       cacheRoot: root,
@@ -92,7 +94,7 @@ describe('NerdFontProvider', () => {
       cacheRoot: await fixtureRoot(),
       fetcher: async () => {
         fetchCount += 1
-        return new Response(downloadsHtml(['JetBrainsMono']))
+        return Response.json(nerdRelease(['JetBrainsMono']))
       },
     })
 
@@ -104,7 +106,7 @@ describe('NerdFontProvider', () => {
     let subsetCount = 0
     const service = provider({
       cacheRoot: await fixtureRoot(),
-      fetcher: async (input) => fontFetch(input, await fontArchive()),
+      fetcher: async (input) => fontFetch(input, nerdArchive()),
       subsetter: async (font, text) => {
         subsetCount += 1
         return Buffer.from(`subset:${text}:${font.toString()}`)
@@ -134,27 +136,11 @@ async function fixtureRoot() {
   return root
 }
 
-async function fontArchive() {
-  const zip = new JSZip()
-  zip.file('JetBrainsMonoNerdFont-Bold.ttf', 'bold-font')
-  zip.file('JetBrainsMonoNerdFont-Regular.ttf', 'regular-font')
-  return zip.generateAsync({ type: 'arraybuffer' })
-}
-
 function fontFetch(input: string | URL | Request, archive: ArrayBuffer) {
   const url = String(input)
-  if (url.includes('font-downloads'))
-    return Promise.resolve(new Response(downloadsHtml(['JetBrainsMono'])))
+  if (url.endsWith('/releases/latest'))
+    return Promise.resolve(Response.json(nerdRelease(['JetBrainsMono'])))
   if (url.endsWith('/JetBrainsMono.zip')) return Promise.resolve(new Response(archive))
 
   throw new Error(`Unexpected fetch: ${url}`)
-}
-
-function downloadsHtml(names: readonly string[]) {
-  return names
-    .map(
-      (name) =>
-        `<a href="https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/${name}.zip">Download</a>`,
-    )
-    .join('\n')
 }

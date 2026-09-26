@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { gzipSync } from 'node:zlib'
 import type { Plugin } from 'vite'
+import { packageNotices } from '../../../scripts/licenses/notices'
 
 type BundleStatsModule = {
   readonly id: string
@@ -63,6 +64,40 @@ export function bundleStatsPlugin(): Plugin {
           gzipSize: gzipSize(output.source),
         })
       }
+
+      const modules = chunks.flatMap((chunk) => chunk.modules.map((module) => module.id))
+      const fontRoot = path.resolve(
+        import.meta.dirname,
+        '../../../packages/ui/node_modules/@fontsource-variable',
+      )
+      modules.push(
+        path.join(fontRoot, 'inter/package.json'),
+        path.join(fontRoot, 'jetbrains-mono/package.json'),
+      )
+      this.emitFile({
+        type: 'asset',
+        fileName: 'licenses/THIRD_PARTY_NOTICES.txt',
+        source: packageNotices(modules),
+      })
+
+      const grammars = path.resolve(
+        import.meta.dirname,
+        '../node_modules/@singapore-editor/tree-sitter-languages',
+      )
+      const grammarFiles = [
+        'NOTICE',
+        ...fs
+          .readdirSync(path.join(grammars, 'notices'))
+          .sort()
+          .map((name) => `notices/${name}`),
+      ]
+      this.emitFile({
+        type: 'asset',
+        fileName: 'licenses/editor-grammars.txt',
+        source: grammarFiles
+          .map((file) => fs.readFileSync(path.join(grammars, file), 'utf8'))
+          .join('\n\n'),
+      })
 
       const stats: BundleStats = {
         generatedAt: new Date().toISOString(),

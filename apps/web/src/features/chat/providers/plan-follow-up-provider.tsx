@@ -331,7 +331,7 @@ function planUnavailableReason(
   preparingImages: boolean,
 ) {
   if (disabledReason) return disabledReason
-  if (preparingImages) return 'Preparing images…'
+  if (preparingImages) return 'Preparing attachments…'
   if (session && session.worktree.lifecycle.state !== 'ready') return 'Workspace is not ready'
   if (session?.pendingApprovalCount || session?.pendingUserInputCount)
     return 'Answer the pending request first'

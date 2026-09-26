@@ -1,4 +1,4 @@
-import { useForesight } from '@foresightjs/react'
+import { useForesight } from '@/hooks/use-foresight'
 
 import {
   editorTabPrefetchRegistrationKey,
