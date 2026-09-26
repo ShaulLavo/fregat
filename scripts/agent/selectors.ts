@@ -3,6 +3,10 @@ import type { Locator, Page } from 'playwright'
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallpaper-layer="still"]'
 export const diffPaneSelector = '.editor-diff-pane'
+export const editorViewportSelector = '.editor-virtualized-viewport'
+/** Rows the markdown live preview has decorated (headings, lists, emphasis). */
+export const markdownPreviewRowSelector = '[class*="editor-inline-"]'
+export const chatMessagesLogSelector = '[role="log"][aria-label="Messages"]'
 export const editorRowSelector = '[data-editor-virtual-row]'
 export const sharedTokenHighlightPrefix = 'editor-shared-token-'
 /** The decode plugin's hidden-rows class, its diffusion overlay, and one overlay glyph. */
@@ -519,6 +523,8 @@ export const selectors = {
     page.getByRole('dialog', { name: 'Physical dialog', exact: true }),
   physicalRow: (page: Page) => page.getByRole('option', { name: 'Silent row', exact: true }),
   settingsHeader: (page: Page) => page.locator('[data-settings-header]'),
+  settingDetailsButton: (page: Page, title: string) =>
+    page.getByRole('button', { name: `About ${title}`, exact: true }),
   settingsSwitch: (page: Page, title: string) =>
     page.getByRole('switch', { name: title, exact: true }),
   settingsDependencyNote: (page: Page, parentTitle: string) =>
@@ -985,6 +991,7 @@ export const selectors = {
 export const chords = {
   commandPalette: 'Control+Shift+P',
   togglePanel: 'Control+J',
+  nextItem: 'Control+Alt+BracketRight',
   toggleSidebar: 'Control+B',
 }
 

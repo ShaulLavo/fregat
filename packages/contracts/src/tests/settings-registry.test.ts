@@ -227,6 +227,24 @@ describe('settings registry', () => {
     expect(DEFAULT_SETTING_VALUES['lsp.semanticTokens.delta']).toBe(false)
   })
 
+  it('rejects empty details', () => {
+    const problems = registryProblems({
+      'a.b': defineSetting({
+        schema: v.boolean(),
+        default: true,
+        scope: 'window',
+        widget: 'boolean',
+        category: 'X',
+        description: 'x',
+        details: '  ',
+      }),
+    })
+
+    expect(problems.map((problem) => problem.reason)).toEqual([
+      'details must be omitted when there is nothing to say',
+    ])
+  })
+
   it('rejects a dependsOn parent the page cannot place the child under', () => {
     const toggle = (overrides: { category?: string; dependsOn?: string } = {}) =>
       defineSetting({

@@ -141,3 +141,5 @@ Each surface lists the states it must survive and the scenario that drives each 
   `chat-draft-context-strip` also opens Manage worktrees, checks the shared release confirmation and cancels it while retaining the checkout.
 
 `trace chat-stream` uses the isolated native fixture to expand a running command and follow its completed output past the detail height cap. Command output is published on completion; reasoning renders separately. It records the running command, capped output and completed turn without contacting a provider.
+
+`scenario prefetch-chat-switch` makes four sessions on the mock provider, reloads, and times session-row presses to the first message and first rendered answer: first visits, revisits and one after a 1.5 s hover. `chat.session_detail_subscription.summary` carries `firstSnapshotMs` for each session it retained.

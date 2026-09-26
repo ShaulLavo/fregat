@@ -46,6 +46,7 @@ import {
   recordRequestContext,
   recordRequestError,
   runDetached,
+  setLogRetentionDays,
 } from './observability'
 import { OrchestrationEngine } from './orchestration/engine'
 import { requireWorktree } from './orchestration/read-model'
@@ -220,6 +221,7 @@ export function createApp(options: AppOptions) {
       limit: values['files.searchIndexLimit'],
     }
   }
+  setLogRetentionDays(() => settings.snapshot().values['logs.retentionDays'])
   let watchDirectoryLimit = settings.snapshot().values['files.watchDirectoryLimit']
   settings.onChange(() => {
     const next = settings.snapshot().values['files.watchDirectoryLimit']

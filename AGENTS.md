@@ -84,7 +84,7 @@
 
 ## Settings
 
-- Every knob is a registry entry in `packages/contracts/src/settings/keys.ts`, registered in the same pass as its consumer. No new `localStorage` keys, env vars or hardcoded tunables.
+- Every knob is a registry entry in `packages/contracts/src/settings/keys.ts`, registered in the same pass as its consumer. No new env vars or hardcoded tunables. Browser storage may hold per-browser view state, such as pane sizes.
 - A value that reaches execution (binary, env, flag, keybinding) is `application` or `machine` scope, never `window`: workspace files ship in cloned repos. Suppression-only values may be `window` and show the cross-scope indicator.
 - Read with `useSettingValue`, or `readSettingsMirror()` outside React. Secrets go to the secret store. Run `bun run settings:reference` after changing the registry.
 

@@ -21,6 +21,7 @@ import { DiffView } from '@/features/git/components/diff-view'
 import { useEditorSurfaceActions } from '@/features/workbench/hooks/use-editor-surface-actions'
 import { useEditorVisibleSnapshot } from '@/features/workbench/hooks/use-editor-visible-snapshot'
 import { useFileOpenIntent } from '@/lib/file-open-intent/providers/context'
+import { notePressPaint } from '@/lib/intent-prefetch/state/press-paint'
 import type { FileResult } from '@/lib/file-system-types'
 import type { LoadState } from '@/lib/load-state'
 import type { EditorInitialPaintEvent } from '@singapore-editor/core/extensions'
@@ -101,7 +102,10 @@ export function FileEditorBody({
   )
 
   function recordInitialPaint(event: EditorInitialPaintEvent) {
-    if (resource) fileOpenIntent.recordInitialPaint(resource.path, event)
+    if (!resource) return
+    fileOpenIntent.recordInitialPaint(resource.path, event)
+    if (event.phase === 'text') notePressPaint('files', resource.path, 'text')
+    else notePressPaint('files', resource.path, 'colour', { highlight: event.status })
   }
 
   if (comparison) {

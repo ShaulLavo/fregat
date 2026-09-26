@@ -17,6 +17,7 @@ import { ModelSection } from '@/features/settings/components/model-section'
 import { MachinesSection } from '@/features/settings/components/machines-section'
 import { ProviderSection } from '@/features/settings/components/provider-section'
 import { RowActions } from '@/features/settings/components/row-actions'
+import { SettingDetails } from '@/features/settings/components/setting-details'
 import { BooleanWidget } from '@/features/settings/components/widgets/boolean-widget'
 import { EnumWidget } from '@/features/settings/components/widgets/enum-widget'
 import { isFontSettingId } from '@/features/settings/utils/font-options'
@@ -71,6 +72,9 @@ export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: Settings
           <label className='text-foreground text-sm font-medium' htmlFor={id}>
             {settingRowTitle(id)}
           </label>
+          {descriptor.details ? (
+            <SettingDetails details={descriptor.details} title={settingRowTitle(id)} />
+          ) : null}
           {/* Every key the row writes, not just the one it is named after. The
               title is free to say "Models" only because the ids underneath it
               still say which lines of settings.json this row is editing. */}

@@ -59,7 +59,7 @@ export const SETTINGS_REGISTRY = {
     category: 'Chat',
     title: 'Follow-up behavior',
     description:
-      'Queue messages during a running turn or send them immediately as corrections. Ctrl/Cmd+Enter uses the other behavior.',
+      'Queue messages sent during a running turn, or send them at once as corrections. The alternate send key (Ctrl/Cmd+Enter, or Shift+Ctrl/Cmd+Enter where Ctrl/Cmd+Enter sends) takes the other behavior.',
   }),
   'chat.sendShortcut': defineSetting({
     schema: v.picklist(['enter', 'mod-enter-multiline', 'mod-enter']),
@@ -90,18 +90,22 @@ export const SETTINGS_REGISTRY = {
     widget: 'boolean',
     category: 'Chat',
     title: 'Active file in the composer',
+    details:
+      "The chip names the file relative to the workspace. Removing it lasts until the editor's active file changes.",
     description:
       'Show the file open in the editor as a chip in the composer. While the chip is there, sending mentions that file. Remove the chip to send without it.',
   }),
   'chat.contextWindowMeterEnabled': defineSetting({
     schema: v.boolean(),
-    default: false,
+    default: true,
     scope: 'application',
     widget: 'boolean',
     category: 'Chat',
     title: 'Context window meter',
+    details:
+      "Claude reports what fills the window: system prompt, tools, messages, and the reserve kept for compaction. Other providers show the turn's token counts. The meter's popover also shows the session's tokens and cost.",
     description:
-      'Show conversation context occupancy in the composer and session header. Provider quota information is independent.',
+      "Show how full the session's context window is, in the composer and the session header.",
   }),
   'chat.responseStreamingMode': defineSetting({
     schema: v.picklist(['paragraph', 'turn', 'token']),
@@ -110,6 +114,8 @@ export const SETTINGS_REGISTRY = {
     widget: 'enum',
     category: 'Chat',
     title: 'Response streaming',
+    details:
+      'Paragraph publishes text at blank lines, closed code fences and new list items: the first break at once, later ones at least 400 ms apart. The end of the turn, a question from the agent, or 24,000 buffered characters flushes the rest. Token mode still delivers reasoning by paragraph.',
     description: 'Publish assistant responses by paragraph, complete turn, or individual token.',
   }),
   'chat.projectResponseStreamingModes': defineSetting({
@@ -151,6 +157,8 @@ export const SETTINGS_REGISTRY = {
     widget: 'boolean',
     category: 'Chat',
     title: 'Push session notifications',
+    details:
+      'Only live changes push: replaying history, recovering after a restart and archived sessions never notify. A device the push service rejects with 404 or 410 is removed.',
     description:
       'Push to every device registered below when a session needs attention or completes. Held back while a window of this server is visible and focused.',
   }),
@@ -167,8 +175,9 @@ export const SETTINGS_REGISTRY = {
     visibility: 'internal',
     category: 'Chat',
     title: 'Title generation model',
-    description:
-      'Provider and model used to generate session titles, independently of the conversation model.',
+    details:
+      "Titles use gpt-5.6-luna at low effort through Codex. When Codex is disabled or missing, the server uses the first enabled provider in the order Codex, Claude, Cursor, Grok, OpenCode, Antigravity, with that provider's small model. A failed title request keeps the current title and logs a warning.",
+    description: 'Provider and model that write session titles.',
   }),
   'chat.projectTextGenerationModels': defineSetting({
     schema: v.record(v.string(), modelSelectionSchema),
@@ -189,7 +198,7 @@ export const SETTINGS_REGISTRY = {
     category: 'Chat',
     title: 'Session navigation order',
     description:
-      'Order palette sessions and choose the surviving project session after deletion by latest user activity or creation time. Shelf ordering remains independent.',
+      'Order sessions in the palette, and pick which session opens after a deletion, by latest user activity or by creation time.',
   }),
   'chat.confirmSessionDelete': defineSetting({
     schema: v.boolean(),
@@ -198,7 +207,7 @@ export const SETTINGS_REGISTRY = {
     widget: 'boolean',
     category: 'Chat',
     title: 'Confirm session deletion',
-    description: 'Ask before permanently deleting one or more conversations.',
+    description: 'Ask before permanently deleting one or more sessions.',
   }),
   'chat.projectGrouping': defineSetting({
     schema: v.picklist(['repository', 'repository_path', 'separate']),
@@ -207,6 +216,8 @@ export const SETTINGS_REGISTRY = {
     widget: 'enum',
     category: 'Chat',
     title: 'Project grouping',
+    details:
+      "Repository puts one repository's checkouts on this machine and on connected machines under one project row. Separate gives each machine's project its own row.",
     description:
       'Group projects by repository, repository-relative path, or owning machine. Git projects currently register at the repository root, so both repository modes are equivalent.',
   }),
@@ -217,6 +228,8 @@ export const SETTINGS_REGISTRY = {
     widget: 'number',
     category: 'Chat',
     title: 'Settle inactive sessions after days',
+    details:
+      'The server checks every 5 minutes. A session with an open pull request, a pending approval or question, a queued or running turn, or live background work stays unsettled.',
     description:
       'Move a session to Settled once it has had no activity for this many days, including existing sessions. 0 turns it off.',
     keywords: ['settle', 'inactive', 'days', 'automatic'],
@@ -228,6 +241,7 @@ export const SETTINGS_REGISTRY = {
     widget: 'boolean',
     category: 'Chat',
     title: 'Settle sessions when their pull request merges',
+    details: 'A merge or close counts when it happens after your last request in the session.',
     description:
       "Move a session to Settled when its worktree's pull request is merged. A closed pull request settles it whenever automatic settlement is on.",
     keywords: ['settle', 'merge', 'pull request', 'automatic'],
@@ -280,6 +294,8 @@ export const SETTINGS_REGISTRY = {
     widget: 'boolean',
     category: 'Git',
     title: 'Keep the default branch current',
+    details:
+      'Checked on each Git status read after the background fetch moves the upstream. After a failed pull the next try waits 60 seconds. The Git panel shows why a pull was skipped.',
     description:
       'Fast-forward a project checkout on its default branch when its upstream moves. A checkout with changes, local commits or another branch checked out is left alone.',
     keywords: ['pull', 'fast-forward', 'fetch', 'default branch', 'main'],
@@ -303,6 +319,8 @@ export const SETTINGS_REGISTRY = {
     widget: 'enum',
     category: 'Git',
     title: 'Submodules in new worktrees',
+    details:
+      'Runs git submodule update --init after the worktree is created, with --recursive in the recursive mode. Credential prompts are off and the step stops after 15 minutes. A failed step keeps the worktree, and the Git panel offers Initialize to retry.',
     description:
       'Initialize every nested submodule, only the ones this repository declares, or none when a session creates a worktree.',
     keywords: ['submodule', 'worktree', 'recursive'],
@@ -326,6 +344,8 @@ export const SETTINGS_REGISTRY = {
     widget: 'boolean',
     category: 'Git',
     title: 'Remove worktrees after their last session is deleted',
+    details:
+      'While this is off, the delete dialog offers removal for that one deletion. node_modules is allowed because a package install recreates it.',
     description:
       'Remove a session worktree once every session using it is deleted and has stopped, including earlier deletions. A worktree with uncommitted changes, ignored files other than node_modules, or another branch checked out stays.',
     keywords: ['worktree', 'cleanup', 'delete', 'remove', 'storage'],
@@ -359,6 +379,8 @@ export const SETTINGS_REGISTRY = {
     widget: 'theme',
     category: 'Appearance',
     title: 'Theme',
+    details:
+      'Picking a theme sets the app colors, code colors, wallpaper and surfaces at once. Changes you make afterwards are saved for that theme and come back when you pick it again. With no theme, the app uses Graphite colors, Dark+ and Light+ code colors and the desktop wallpaper.',
     description:
       'App colors, code colors, wallpaper and surfaces, in a light and a dark version. Try them in the theme studio.',
     keywords: ['theme', 'studio', 'light', 'dark', 'wallpaper', 'colors', 'palette'],
@@ -438,6 +460,8 @@ export const SETTINGS_REGISTRY = {
     widget: 'boolean',
     category: 'Appearance',
     title: 'Reduce terminal motion',
+    details:
+      "Applies to the terminal app: its spinners and loaders run at half speed. The web app follows the operating system's reduce-motion setting.",
     description: 'Slow terminal loading indicators while keeping progress visible.',
     keywords: ['tui', 'terminal', 'animation', 'accessibility', 'motion'],
   }),
@@ -448,6 +472,8 @@ export const SETTINGS_REGISTRY = {
     widget: 'font',
     category: 'Appearance',
     title: 'Interface font',
+    details:
+      "Bundled fonts ship with the app and load with no network. Installed fonts come from the server machine's fontconfig (fc-list), so a font installed there works on every device; a server without fontconfig lists none.",
     description: 'Font for the words the app writes: titles, labels, menus and prose.',
     keywords: ['font', 'typeface', 'interface', 'ui', 'sans', 'appearance'],
   }),
@@ -458,6 +484,8 @@ export const SETTINGS_REGISTRY = {
     widget: 'boolean',
     category: 'Sounds',
     title: 'Controls',
+    details:
+      'Only pointer presses click. Keyboard presses stay silent, and nothing sounds while the tab is hidden.',
     description: 'Play clicks when pressing controls and changing values with the pointer.',
     keywords: ['sound', 'audio', 'click', 'feedback'],
   }),
@@ -489,6 +517,7 @@ export const SETTINGS_REGISTRY = {
     widget: 'boolean',
     category: 'Sounds',
     title: 'Terminal bell',
+    details: 'At most one bell every 500 ms. Silent while the tab is hidden.',
     description: 'Play a click when a terminal program rings the bell.',
     keywords: ['sound', 'audio', 'terminal', 'bell', 'bel', 'feedback'],
   }),
@@ -499,6 +528,8 @@ export const SETTINGS_REGISTRY = {
     widget: 'number',
     category: 'Sounds',
     title: 'Volume',
+    details:
+      'Agent notification sounds (turn finished, input requested) play through this volume too. At 100 they play at their recorded level.',
     description: 'Loudness of every sound, agent notifications included.',
     keywords: ['sound', 'audio', 'volume', 'loudness'],
   }),
@@ -509,6 +540,8 @@ export const SETTINGS_REGISTRY = {
     widget: 'enum',
     category: 'Appearance',
     title: 'Feel',
+    details:
+      'Flat moves on fixed durations with flat controls. Seam, Brisk, Relaxed and Playful move on springs and give controls raised keys, sunken wells and squircle corners (squircles in Chromium only). Under reduced motion every feel uses fades.',
     description: 'Motion and control depth: Flat, Seam, Brisk, Relaxed or Playful.',
     keywords: ['motion', 'spring', 'physical', 'animation', 'depth'],
   }),
@@ -544,6 +577,8 @@ export const SETTINGS_REGISTRY = {
     visibility: 'internal',
     // Drives --content-opacity: the well is a second layer over a panel that
     // already painted one, so 50 over 80 composites to 90.
+    details:
+      "This layer sits over the panel's own surface, so 50 over a panel at 80 makes the ground behind code and terminal text 90% opaque: text stays readable and a trace of the wallpaper shows through.",
     description:
       'How opaque the extra layer under the editor, terminal and settings is. It sits on top of the panel, so 0 leaves them as see-through as a sidebar.',
     keywords: ['transparency', 'opacity', 'editor', 'terminal', 'content'],
@@ -558,6 +593,8 @@ export const SETTINGS_REGISTRY = {
     category: 'Appearance',
     // Chosen in the theme studio, which writes it as part of the theme.
     visibility: 'internal',
+    details:
+      "Capped at 40 px. A repository's settings file can set this, and a large backdrop blur costs GPU time on every frame.",
     description: 'Backdrop blur radius, in pixels, behind translucent surfaces.',
     keywords: ['blur', 'glass', 'material', 'vibrancy'],
   }),
@@ -583,7 +620,7 @@ export const SETTINGS_REGISTRY = {
     // resize handles between them show the wallpaper. On, the region around them
     // paints once, so the handles carry the same surface and the panels merge.
     description:
-      'Carry one background across panels and their resize handles, instead of showing the wallpaper in the gap between them.',
+      'Paint one background across panels and the resize handles between them, so the panels read as one surface. Off, the wallpaper shows in the gaps between panels.',
     keywords: ['seam', 'handle', 'divider', 'wallpaper', 'surface', 'glass'],
   }),
   'workbench.wallpaper': defineSetting({
@@ -594,6 +631,8 @@ export const SETTINGS_REGISTRY = {
     category: 'Appearance',
     // Chosen in the theme studio, which writes it as part of the theme.
     visibility: 'internal',
+    details:
+      "Desktop shows the server machine's current wallpaper: Omarchy's current background on Linux, the desktop picture on macOS. On a Linux screen the compositor already shows the desktop behind the window, so Desktop draws nothing there.",
     description: 'Choose a wallpaper and turn it on or off without losing the selection.',
     keywords: ['wallpaper', 'background', 'desktop'],
   }),
@@ -615,6 +654,8 @@ export const SETTINGS_REGISTRY = {
     widget: 'font',
     category: 'Editor',
     title: 'Code font',
+    details:
+      'Also the terminal font. A code font without Nerd Font icons borrows them from Nerd Fonts Symbols Only, so terminal prompts keep their glyphs. Installed fonts come from the server machine (fc-list).',
     description: 'Font for the editor, the terminal, and code and metadata across the app.',
     keywords: ['font', 'typeface', 'monospace', 'nerd font', 'editor', 'terminal', 'code'],
   }),
@@ -642,6 +683,7 @@ export const SETTINGS_REGISTRY = {
     scope: 'window',
     widget: 'number',
     category: 'Editor',
+    details: 'Diffs skip indentation detection, so tabs in a diff always use this width.',
     description:
       'Width of a tab character, in spaces. Also the indentation width for a file whose own cannot be detected.',
     keywords: ['tab', 'indent', 'width', 'spaces'],
@@ -652,6 +694,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'application',
     widget: 'number',
     category: 'Editor',
+    details:
+      "A state is a run of typing. Each retained state keeps its text snapshot in memory, and each edit copies a map of them: 1,000 commits with pruning took 4.55 ms under Bun in the Editor's undo-graph measurement.",
     description:
       'Earlier states kept per open file, across every undo branch. The least recently visited go first when the budget is exceeded.',
     keywords: ['undo', 'history', 'branches', 'retained', 'memory'],
@@ -684,6 +728,8 @@ export const SETTINGS_REGISTRY = {
     widget: 'number',
     category: 'Editor',
     dependsOn: 'editor.history.persist',
+    details:
+      'Same ceiling as the retained text budget, capped at 1 GiB because browser storage is shared with every other site. A single history larger than the budget is skipped.',
     description:
       'Total stored undo history across closed files, in UTF-16 code units. The least recently saved files go first when it is exceeded.',
     visibility: 'advanced',
@@ -696,6 +742,8 @@ export const SETTINGS_REGISTRY = {
     widget: 'enum',
     category: 'Editor',
     title: 'Markdown view',
+    details:
+      "Live preview draws markdown from tree-sitter's markdown captures, so with syntax highlighting off a file shows as source. Split view renders with the chat's markdown renderer.",
     description:
       'How markdown files open: source text, source beside a rendered view, or rendered in place while you edit. Cycle markdown view changes one file.',
     keywords: ['markdown', 'preview', 'split', 'render'],
@@ -716,8 +764,10 @@ export const SETTINGS_REGISTRY = {
     widget: 'enum',
     category: 'Editor',
     // EditContext exists only in Chromium; other engines keep the textarea whatever this says.
+    details:
+      'In the editor-edit-context-input scenario, an IME correction over the first word yields Hello日本 on EditContext and hello日本Hello on the textarea. EditContext is Chromium-only; Firefox and Safari use the textarea whatever this says.',
     description:
-      'How typed text reaches the editor. EditContext (Chromium) receives IME, autocorrect and dictation edits with their exact ranges instead of reading them back out of a hidden textarea; other browsers always use the textarea.',
+      'How typed text reaches the editor. EditContext (Chromium) hands IME, autocorrect and dictation edits to the editor with their exact ranges. Other browsers use a hidden textarea.',
     // Editors are reused across tabs and take the route only when they are built.
     requiresRestart: true,
     visibility: 'advanced',
@@ -760,6 +810,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'machine',
     widget: 'number',
     category: 'Editor',
+    details:
+      'Checked at a project switch and at a tab close, so opening two large projects can exceed it until the next switch or close. Counted in UTF-16 code units, which equals bytes for ASCII text. Parked documents over the budget are dropped and reload from disk when you switch back.',
     description:
       'Total text the editor keeps resident across the active and parked projects, in UTF-16 code units, re-checked at a project switch and a tab close. The active project is charged first and is never trimmed, so a large one leaves less room for parked projects.',
     visibility: 'advanced',
@@ -771,6 +823,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'window',
     widget: 'boolean',
     category: 'Editor',
+    details:
+      'A confusable character looks like an ASCII one, so the Cyrillic а in pаssword names a different identifier from the one you read. Typographic punctuation such as an en dash also counts; add it to Allowed characters to stop highlighting it.',
     description:
       'Highlight Unicode characters that resemble other characters. Hover a highlight for an explanation.',
     keywords: ['unicode', 'ambiguous', 'confusable', 'characters'],
@@ -781,6 +835,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'window',
     widget: 'boolean',
     category: 'Editor',
+    details:
+      'An invisible character draws nothing. A bidirectional override can reorder a line so the code the compiler reads differs from the line on screen.',
     description: 'Highlight invisible Unicode characters. Hover a highlight for its code point.',
     keywords: ['unicode', 'invisible', 'characters'],
   }),
@@ -833,6 +889,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'window',
     widget: 'enum',
     category: 'Editor',
+    details:
+      'Autoregressive types one character at a time, line after line. Parallel types every line at once, staggered. Token streams one token at a time, like a language model. Diffusion settles scrambled glyphs into the text.',
     description: 'Animate a file as it opens, as if it were being written.',
     requiresRestart: true,
     visibility: 'advanced',
@@ -877,6 +935,8 @@ export const SETTINGS_REGISTRY = {
     category: 'Search',
     // The route rejects rather than clamps, so the schema shares its cap or a legal-looking
     // setting produces a failed request.
+    details:
+      "20,000 is VS Code's default cap. Once a parallel ripgrep run is cut off, which matches it returns can change from run to run, so the cap sits high enough that this is rare. The server refuses larger values.",
     description: 'How many matches a workspace search returns.',
     keywords: ['search', 'results', 'limit'],
   }),
@@ -889,6 +949,8 @@ export const SETTINGS_REGISTRY = {
     // Separate from `search.maxResults`: one pathological file can hold every
     // match in the budget, so bounding matches alone still yields a one-file
     // result set. The route caps it at the same limit.
+    details:
+      'Every file in the results holds at least one match, so at the default the match limit always stops a search first. It takes effect when set below the match limit.',
     description: 'How many files a workspace search returns matches from.',
     visibility: 'advanced',
     keywords: ['search', 'results', 'files', 'limit'],
@@ -912,6 +974,8 @@ export const SETTINGS_REGISTRY = {
     widget: 'boolean',
     category: 'Chat',
     title: 'Keep imported chats updated',
+    details:
+      'The server rescans local Claude and Codex history every minute and brings imported chats up to date. A chat stops updating once it has a turn sent from Platform.',
     description:
       'Imported chats receive one-way updates from local history until you send their first message in Platform. New chats are only imported when you click Import.',
     keywords: ['chat', 'import', 'sync', 'history', 'claude', 'codex', 'cli', 'app', 'local'],
@@ -925,6 +989,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'application',
     widget: 'enum',
     category: 'Chat',
+    details:
+      'Full access suits a machine with one owner who trusts agents with its checkouts: Codex starts with approval policy never and sandbox danger-full-access, and Claude pre-approves every tool. This is an application setting, so a workspace file in a cloned repository cannot change it.',
     description: 'Permission posture a new session starts in.',
     keywords: ['chat', 'permission', 'approval', 'runtime', 'safety'],
   }),
@@ -936,6 +1002,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'application',
     widget: 'enum',
     category: 'Chat',
+    // Plan mode is off in the composer while its switch is off, so this has nothing to pick.
+    dependsOn: 'chat.planModeEnabled',
     description: 'Whether a new session starts in plan mode.',
     keywords: ['chat', 'plan', 'mode', 'interaction'],
   }),
@@ -948,6 +1016,19 @@ export const SETTINGS_REGISTRY = {
     description: 'Time range the logs view opens on.',
     visibility: 'advanced',
     keywords: ['logs', 'time', 'range', 'filter'],
+  }),
+  'logs.retentionDays': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(3650)),
+    default: 0,
+    // Machine scope: it deletes files on this machine, which no workspace file may ask for.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Logs',
+    title: 'Log retention',
+    description:
+      "Days of server log files this machine keeps, today included; older days are deleted once a day. 0 keeps every day, up to the writer's 60-file cap.",
+    visibility: 'advanced',
+    keywords: ['logs', 'retention', 'delete', 'days', 'disk', 'cleanup'],
   }),
   'logs.slowThresholdMs': defineSetting({
     schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(60_000)),
@@ -996,6 +1077,8 @@ export const SETTINGS_REGISTRY = {
     widget: 'number',
     category: 'Developer',
     title: 'Deploy restart wait',
+    details:
+      'Thirty minutes covers a typical agent turn. A session busy for longer is usually stuck or running background work, and deploy --interrupt ends it.',
     description:
       'Minutes `bun run deploy --restart` waits for running sessions to finish before it gives up. `--interrupt` restarts at once and ends those turns.',
     visibility: 'advanced',
@@ -1017,6 +1100,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'machine',
     widget: 'enum',
     category: 'Window',
+    details:
+      'A per-pixel transparent window switches the embedded Chromium renderer to off-screen rendering. On macOS a 1440×960 window then copies 5.5 MB through the CPU on every paint, where the opaque window produced no paint events at all. On Linux the window manager already blends an opaque window over the desktop.',
     description:
       'Where the see-through comes from: the window manager blending an opaque window, or a per-pixel transparent window (which costs a full-surface CPU copy per frame).',
     // The window is created once, from this value, before the page exists.
@@ -1073,6 +1158,8 @@ export const SETTINGS_REGISTRY = {
     widget: 'number',
     category: 'Files',
     title: 'Folder watch limit',
+    details:
+      "Each watched folder uses one inotify watch from a per-user pool that every watcher on the machine shares (524,288 on the owner's machine). Opening /work took 484,687 watches and other apps began failing with ENOSPC. 200,000 fits four roots the size of the Platform checkout (45,036 folders) and leaves 62% of the pool free.",
     description:
       'How many folders all open workspaces may watch for live changes together. A workspace that would pass it updates its top level and open files only.',
     visibility: 'advanced',
@@ -1117,7 +1204,7 @@ export const SETTINGS_REGISTRY = {
     // server already running for a folder is reused by key, so an open Python
     // file keeps whichever server it started with.
     description:
-      'Use ty instead of pyright for Python. Files already open keep their current server until reopened.',
+      'Run ty as the Python language server. Off runs pyright. Files already open keep their current server until reopened.',
     visibility: 'advanced',
     keywords: ['lsp', 'python', 'ty', 'pyright', 'experimental'],
   }),
@@ -1185,9 +1272,8 @@ export const SETTINGS_REGISTRY = {
   }),
   'lsp.semanticTokens.enabled': defineSetting({
     schema: v.boolean(),
-    // Off by default. The colour it adds is a refinement over the syntactic layer rather than a
-    // replacement, and a warm server routinely answers before the highlighter does, so a document
-    // can show identifier colour on otherwise-unpainted text for up to a second and a half.
+    // Off by default: see details. Turning it on needs the Editor to hold semantic paint until
+    // syntax has painted once.
     default: false,
     // Machine scope for the same reason as `lsp.idleTimeoutMs`: it governs how
     // much work a child process on this box does. It gates *requests* only —
@@ -1197,6 +1283,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'machine',
     widget: 'boolean',
     category: 'Language servers',
+    details:
+      "Server colour paints over the syntax highlighter's colour. On a first open with no saved paint, a warm server can answer before the highlighter has run, so identifiers take colour while the rest of the text is still plain, for up to about a second and a half. Reopening a file with a saved paint is unaffected.",
     description:
       'Ask language servers to colour identifiers they have actually resolved. Off means no token request is ever sent. Each server still has its own default under lsp.semanticTokens.servers.',
     visibility: 'advanced',
@@ -1204,8 +1292,6 @@ export const SETTINGS_REGISTRY = {
   }),
   'lsp.semanticTokens.delta': defineSetting({
     schema: v.boolean(),
-    // rust-analyzer on hashbrown's 197 KB map.rs, twelve keystrokes: whole files cost 1.60 MB,
-    // 14.1 ms of JSON.parse and 9.0 MB of heap; deltas cost 1.9 KB, 0.1 ms and 2.0 MB. Same latency.
     default: true,
     // Machine scope: it governs how much a child process on this box is asked to
     // serialize, and how much garbage this box's proxy makes per keystroke.
@@ -1213,6 +1299,8 @@ export const SETTINGS_REGISTRY = {
     widget: 'boolean',
     category: 'Language servers',
     dependsOn: 'lsp.semanticTokens.enabled',
+    details:
+      "Measured with rust-analyzer on hashbrown's map.rs (197 KB, 11,978 tokens) over twelve keystrokes: whole files cost 1.60 MB, 14.1 ms of JSON.parse and 9.0 MB of heap; deltas cost 1.9 KB, 0.1 ms and 2.0 MB, at the same latency. About 5 of 37 servers support delta.",
     description:
       'Ask delta-capable language servers for only the tokens an edit changed. Saves bandwidth, parse time and garbage on every keystroke.',
     visibility: 'advanced',
@@ -1228,8 +1316,10 @@ export const SETTINGS_REGISTRY = {
     widget: 'complex',
     visibility: 'internal',
     category: 'Language servers',
+    details:
+      'Six servers are measured and on by default: rust-analyzer 1.88.0, gopls v0.21.0, clangd, zls 0.16.0, terraform-ls and typescript-language-server. A server nobody has measured stays off until named here.',
     description:
-      'Server id to true or false, overriding the per-server default. Lets one misbehaving server be turned off without turning the feature off.',
+      "Server id to true or false, overriding the per-server default. Turns one server's semantic colour on or off while the feature stays on.",
     keywords: ['lsp', 'semantic', 'tokens', 'server', 'override'],
   }),
   'providers.instances': defineSetting({
@@ -1256,6 +1346,8 @@ export const SETTINGS_REGISTRY = {
     // have to materialise every other model the first time one was turned off,
     // and then go quiet about everything added afterwards.
     title: 'Models',
+    details:
+      'Only turned-off models are stored, so a model a provider adds later appears in the picker on its own.',
     description:
       'Which models the picker offers, and in what order. Turn one off to keep it out of the picker.',
     keywords: ['model', 'hide', 'show', 'visible', 'order', 'sort', 'picker'],

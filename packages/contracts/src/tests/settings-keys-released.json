@@ -73,6 +73,7 @@
     "keybindings.overrides",
     "keybindings.preset",
     "logs.defaultTimeRange",
+    "logs.retentionDays",
     "logs.slowThresholdMs",
     "lsp.downloadRuntimes",
     "lsp.experimental.tyForPython",
