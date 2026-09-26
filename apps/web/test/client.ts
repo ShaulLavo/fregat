@@ -1,6 +1,7 @@
 import { createEnvironmentClient, type Client } from '@workspace/client-core/transport/client'
 
 import type { TestServer } from './server'
+import { createLanguageServerSocket } from './factories/language-server-socket'
 
 type InjectedSettingsError = {
   readonly code: string
@@ -389,11 +390,43 @@ function normalizeInProcessSseHeaders(response: Response) {
 }
 
 function createClient(server: TestServer, fetcher: typeof fetch) {
-  return createEnvironmentClient({
+  const client = createEnvironmentClient({
     origin: server.origin,
     fetcher,
     headers: () => ({ origin: server.origin }),
   })
+  return withFakeLanguageServerSocket(client)
+}
+
+// Eden's `.lsp.subscribe` opens a real browser WebSocket to the page origin — there is
+// no `app.handle`-style bridge for a socket. A language server match (the settings
+// editor's json-ls schema association, for one) would otherwise reach a port no test
+// run listens on. The plugin only ever sees an idle, never-open connection, same as a
+// language server that has not answered yet.
+function withFakeLanguageServerSocket(client: Client): Client {
+  return new Proxy(client, {
+    get(target, property, receiver) {
+      const value: unknown = Reflect.get(target, property, receiver)
+      // `/lsp/match` and friends stay real; only the socket route is faked. Eden
+      // represents a route as a callable proxy (typeof "function"), not a plain object.
+      if (property !== 'lsp' || value === null || !['function', 'object'].includes(typeof value))
+        return value
+      return new Proxy(value as object, {
+        get(lspTarget, lspProperty, lspReceiver) {
+          if (lspProperty !== 'subscribe') return Reflect.get(lspTarget, lspProperty, lspReceiver)
+          return () => fakeEdenLanguageServerSocket()
+        },
+      })
+    },
+  })
+}
+
+function fakeEdenLanguageServerSocket() {
+  const { socket } = createLanguageServerSocket()
+  return {
+    ws: socket as unknown as WebSocket,
+    send: (data: unknown) => socket.send(typeof data === 'string' ? data : JSON.stringify(data)),
+  }
 }
 
 // happy-dom's Request drops `origin` (a browser-forbidden header), which the
