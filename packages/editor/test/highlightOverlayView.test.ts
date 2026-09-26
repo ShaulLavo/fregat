@@ -35,7 +35,7 @@ it('uses colored base and producer twins at their original priorities', () => {
     overlay: { dim: 0.5, textDecoration: 'line-through' },
   })
   expect(highlights.has('fade')).toBe(false)
-  expect([...highlights.values()].some((highlight) => highlight.priority === -1)).toBe(true)
+  expect([...highlights.values()].some((highlight) => highlight.priority === 0)).toBe(true)
   expect(
     [...highlights.entries()].some(
       ([name, highlight]) =>
@@ -118,6 +118,25 @@ it('rebuilds surrogate-safe mask edges when text changes under existing overlays
   const base = [...highlights.entries()].find(([name]) => name.includes('-overlay-base-'))?.[1]
   expect(base).toBeDefined()
   expect([...base!].map((range) => [range.startOffset, range.endOffset])).toEqual([[0, 2]])
+})
+
+it('repaints a plain-text overlay after an edit preserves its offsets', () => {
+  view.setRangeHighlight('spelling', [{ start: 2, end: 5 }], {
+    overlay: { textDecoration: 'underline wavy blue' },
+  })
+  const paintedText = () =>
+    [...highlights.entries()]
+      .filter(([name]) => name.includes('-overlay-base-'))
+      .flatMap(([, highlight]) => [...highlight].map((range) => range.toString()))
+  expect(paintedText()).toEqual(['cde'])
+
+  view.applyEdit({ from: 2, to: 5, text: 'xyz' }, 'abxyzfghij')
+
+  expect(paintedText()).toEqual(['xyz'])
+
+  view.setScrollMetrics(0, 0, 400)
+  view.setScrollMetrics(0, 100, 400)
+  expect(paintedText()).toEqual(['xyz'])
 })
 
 it('rebuilds the overlay after a same-line edit takes the token reconciliation path', () => {

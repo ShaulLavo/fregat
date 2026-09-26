@@ -201,3 +201,15 @@ churning acquire/release while the other recycles rows.
 Eagerly mounted background tabs tokenize and register highlight ranges without
 ever being activated. That multiplies shared-bucket churn (and wastes work);
 reducing it shrinks this bug's trigger surface.
+
+## WebKit omits decorations from negative-priority highlights
+
+A plain-text spelling overlay at priority -1 has the correct DOM range and foreground color,
+but WebKit draws no underline. Giving that same Highlight priority 0 makes it paint. Syntax
+token twins already use priority 0, which hid the failure in the original spelling paint test.
+
+Overlay bases now use priority 0 and register before syntax and semantic color producers.
+The `draws spelling marks without a language or syntax tokens` regression in
+`packages/spellcheck/test/paint.browser.test.ts` checks underline pixels in all three engines.
+The core paint tests verify that syntax and semantic colors still win over the base. No upstream
+issue has been filed yet.

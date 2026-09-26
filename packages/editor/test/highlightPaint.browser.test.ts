@@ -36,6 +36,26 @@ it('fades each token in its own hue', async () => {
   ).toBeGreaterThan(20)
 })
 
+it('keeps a plain-text overlay range after an atomic text update', async () => {
+  const { host, view } = mount()
+  view.setTokens([])
+  view.setRangeHighlight('spelling', [{ start: 4, end: 9 }], {
+    overlay: { textDecoration: 'underline wavy blue' },
+  })
+  await pixels(host.id)
+  view.runAtomicRender(() => {
+    view.setText('NMMMMMMMMMMM')
+    view.setRangeHighlight('spelling', [{ start: 4, end: 9 }], {
+      overlay: { textDecoration: 'underline wavy blue' },
+    })
+  })
+  await pixels(host.id)
+  const ranges = [...CSS.highlights]
+    .filter(([name]) => name.includes('-overlay-base-'))
+    .flatMap(([, highlight]) => [...highlight].map((range) => [range.startOffset, range.endOffset]))
+  expect(ranges).toEqual([[4, 9]])
+})
+
 it('strikes syntax with a line in the same explicit hue', async () => {
   const { host, view } = mount()
   const control = await pixels(host.id)

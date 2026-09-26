@@ -1,6 +1,14 @@
 # E058: Spellcheck for text the editor paints itself
 
 - Status: Proposed
+- PR preparation: plain-text paint regression fails before the fix in WebKit, with zero
+  spelling-colour pixels. The overlay base now uses priority zero and is ordered below syntax
+  and semantic producers. The regression checks range offsets before and after typing too.
+- The atomic-text-update browser regression reproduced the reported 0–0 range in all three
+  engines. Range signatures now include the mounted row revision and slot identity, so a
+  text-node rewrite or remount rebuilds live DOM ranges even at unchanged source offsets.
+- Remaining PR checklist: merge main, package and touched editor tests, Turbo input check,
+  typecheck, health baseline, Editor PR, Platform merge and pin, gates, scenario and Platform PR.
 - Kind: Implementation
 - Owner: Cross-repo
 - Priority: P2
