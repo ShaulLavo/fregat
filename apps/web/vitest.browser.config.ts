@@ -75,10 +75,10 @@ export default defineConfig({
     globalSetup: ['./test/env/browser-file-server.ts'],
     include: ['src/**/*.browser.tsx'],
     setupFiles: ['./test/env/browser.ts'],
+    // Pin the runner origin so the file server's allowed-origins
+    // list (built from this port) matches the real test origin.
+    api: { host: '127.0.0.1', port: Number(browserTestPort) },
     browser: {
-      // Pin the runner origin so the file server's allowed-origins
-      // list (built from this port) matches the real test origin.
-      api: { host: '127.0.0.1', port: Number(browserTestPort) },
       commands: {
         acquireWorkspaceOpen,
         diffMouseWheel,
