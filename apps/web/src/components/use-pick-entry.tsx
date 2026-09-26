@@ -4,7 +4,8 @@ import type { Client } from '@/lib/client'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { createClientInvariantError } from '@/lib/structured-errors'
 
-import { FilePickerDialog, type FilePickerMode } from '@/components/file-picker-dialog'
+import { DeferredFilePickerDialog } from '@/components/deferred-file-picker-dialog'
+import type { FilePickerMode } from '@/features/file-picker/utils/model'
 import { clientErrorMessage } from '@/lib/client-error-taxonomy'
 import { statPath } from '@/lib/file-server'
 import {
@@ -69,7 +70,7 @@ export function usePickEntry({
   if (bridge || !open) return null
 
   return (
-    <FilePickerDialog
+    <DeferredFilePickerDialog
       accept={accept}
       mode={mode}
       onOpenChange={onOpenChange}
