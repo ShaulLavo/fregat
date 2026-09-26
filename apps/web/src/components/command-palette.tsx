@@ -25,7 +25,8 @@ export function CommandPalette() {
   }
 
   return (
-    <CommandDialog open onOpenChange={setPaletteOpen}>
+    // The command provider restores the palette's origin, as it does for the loaded palette.
+    <CommandDialog finalFocus={false} open onOpenChange={setPaletteOpen}>
       <CommandInput
         autoFocus
         placeholder='Search…'

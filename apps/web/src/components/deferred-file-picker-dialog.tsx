@@ -32,7 +32,7 @@ export function DeferredFilePickerDialog(props: ComponentProps<typeof FilePicker
 
   return (
     <Dialog open onOpenChange={props.onOpenChange}>
-      <DialogContent>
+      <DialogContent finalFocus={returnFocusUnlessLoaded} showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>Open {props.mode === 'file' ? 'file' : 'folder'}</DialogTitle>
           <DialogDescription>Browse files and folders.</DialogDescription>
@@ -48,5 +48,12 @@ export function DeferredFilePickerDialog(props: ComponentProps<typeof FilePicker
         )}
       </DialogContent>
     </Dialog>
+  )
+}
+
+// Loading swaps this shell for the real dialog, whose input already holds focus by then.
+function returnFocusUnlessLoaded() {
+  return (
+    resourceQueryClient.getQueryState(filePickerDialogQueryOptions.queryKey)?.status !== 'success'
   )
 }

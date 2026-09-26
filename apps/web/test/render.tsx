@@ -2,7 +2,7 @@ import { paletteContentQueryOptions } from '@/features/command-palette/utils/con
 import { filePickerDialogQueryOptions } from '@/features/file-picker/utils/dialog-query'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import { ComposerAttachProvider } from '@/providers/composer-attach-provider'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, type QueryKey } from '@tanstack/react-query'
 import {
   render,
   renderHook,
@@ -186,11 +186,32 @@ export async function renderWithLoadedDialogs(
   ui: ReactElement,
   options: RenderWithProvidersOptions = {},
 ): Promise<RenderWithProvidersResult> {
+  await loadDeferredDialogs()
+  return renderWithProviders(ui, options)
+}
+
+export async function loadDeferredDialogs() {
   await Promise.all([
     resourceQueryClient.query(paletteContentQueryOptions),
     resourceQueryClient.query(filePickerDialogQueryOptions),
   ])
-  return renderWithProviders(ui, options)
+}
+
+// Keeps a deferred dialog on its loading shell until the returned release runs.
+export function holdDeferredDialog(queryKey: QueryKey, load: () => Promise<unknown>) {
+  let release!: () => void
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  resourceQueryClient.removeQueries({ exact: true, queryKey })
+  void resourceQueryClient.query({
+    queryKey,
+    queryFn: async () => {
+      await held
+      return load()
+    },
+  })
+  return release
 }
 
 export function renderHookWithProviders<Result, Props>(
