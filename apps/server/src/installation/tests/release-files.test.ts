@@ -9,6 +9,7 @@ import {
   reachablePackages,
   REMOTE_SUPPORT,
   WATCH_WORKER,
+  THIRD_PARTY_NOTICES,
   RUNTIME_PACKAGES,
   runtimeManifest,
   writeRuntimeManifest,
@@ -126,6 +127,7 @@ test('a built server directory reports the release files it lacks', async () => 
       REMOTE_SUPPORT,
       PTY_HOST,
       WATCH_WORKER,
+      THIRD_PARTY_NOTICES,
     ])
     const lockfile = path.join(server, 'bun.lock')
     await writeFile(
@@ -134,9 +136,10 @@ test('a built server directory reports the release files it lacks', async () => 
     )
     await writeRuntimeManifest(server, lockfile)
     await writeFile(path.join(server, REMOTE_SUPPORT), '')
-    expect(await missingReleaseFiles(server)).toEqual([PTY_HOST, WATCH_WORKER])
+    expect(await missingReleaseFiles(server)).toEqual([PTY_HOST, WATCH_WORKER, THIRD_PARTY_NOTICES])
     await writeFile(path.join(server, PTY_HOST), '')
     await writeFile(path.join(server, WATCH_WORKER), '')
+    await writeFile(path.join(server, THIRD_PARTY_NOTICES), 'fixture notices')
     expect(await missingReleaseFiles(server)).toEqual([])
   } finally {
     await rm(server, { force: true, recursive: true })

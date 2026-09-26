@@ -44,6 +44,18 @@ release installs that carry every package the server loads at runtime.
    copies) and `evlog` (two). Measure with the bundle report before and after.
 8. **Notices:** generate a third-party notices file at build time and serve it; add Pierre's Apache
    notice to `packages/tree`; ship the two bundled fonts' OFL text.
+   Implemented on `w2/cx-184-notices`. Web notices come from the emitted module graph and font
+   packages; server notices come from bundle module paths and installed runtime dependency
+   closure. The index at `/licenses/` links both generated texts, including `/licenses/server.txt`.
+   Release-file validation requires the server notice. Pierre's Apache text and 46 mapped-file
+   modification headers are present; fonts, linked Editor grammar notices, icons, t3code ports,
+   the shadcn stylesheet and Ghostty notices are shipped too.
+   Generated notice files: absent → 411,488 web bytes for 260 package/version entries and
+   448,297 server bytes for 192 entries on this Linux install. This adds attribution bytes,
+   with no new runtime dependency. Generator and route/release tests, gates, workspace
+   typechecks and both production builds passed. The built index's `look` screenshot was
+   read back with no browser problems. Evidence: `/work/tmp/w2-184-notices-evidence/` and
+   `/work/tmp/fregat-evidence/20260926T193035Z-look-fregat-1440x1000/`.
 
 `cmdk` (pulls Radix beside Base UI), `minimatch` and the full Shiki grammar import are larger
 decisions and stay with their own plans (the command palette, Plan 129, Plan 170).
