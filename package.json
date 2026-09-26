@@ -28,6 +28,7 @@
   "scripts": {
     "build": "bun scripts/prod.ts build",
     "deploy": "bun scripts/deploy/mesh.ts",
+    "pair": "bun scripts/pair.ts",
     "agent:browser": "bun scripts/agent/browser.ts",
     "logs": "bun scripts/agent/logs.ts",
     "logs:census": "bun scripts/lint/log-noise-census.ts --check",

@@ -56,6 +56,8 @@ initializeObservability(Bun.env, readReleaseInfoSync(webRoot ? releaseFileFor(we
 installCrashHandlers()
 
 export const app = createApp({
+  // Cookies ignore ports: two servers on one host would otherwise sign each other's devices out.
+  devices: { cookieName: `platform_device_${port}` },
   auth: { allowedOrigins },
   homeDirectory,
   maxTextFileBytes,

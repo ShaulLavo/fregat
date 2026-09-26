@@ -119,6 +119,7 @@ import { chatCardNarrow } from './chat-card-narrow'
 import { chatComposerInsert } from './chat-composer-insert'
 import { chatDisclosureSettle } from './chat-disclosure-settle'
 import { chatTurnAnatomy } from './chat-turn-anatomy'
+import { devicePairing } from './device-pairing'
 import { phoneShell } from './phone-shell'
 import { shellSwitch } from './shell-switch'
 import { chatSleepingSession } from './chat-sleeping-session'
@@ -617,6 +618,7 @@ export const scenarios: readonly Scenario[] = [
   chatComposerInsert,
   chatDisclosureSettle,
   chatTurnAnatomy,
+  devicePairing,
   phoneShell,
   shellSwitch,
   chatSleepingSession,

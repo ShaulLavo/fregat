@@ -23,7 +23,12 @@ import {
 import { Elysia } from 'elysia'
 
 import serverPackage from '../../package.json' with { type: 'json' }
-import { authenticateWebSocketData, type AuthConfig } from '../auth'
+import {
+  authenticateWebSocketData,
+  holdWebSocket,
+  releaseWebSocket,
+  type AuthConfig,
+} from '../auth'
 import type { EnvironmentIdentity } from '../db/environment-identity'
 import {
   orchestrationCommandSummary,
@@ -177,6 +182,7 @@ export function orchestrationWsRoutes(
       }
       states.set(socket.key, state)
       if (!sockets.add(socket, state)) return
+      holdWebSocket(socket.data, auth, () => socket.close(1008, 'device removed'))
       // The handshake is pushed rather than requested so the client reaches an
       // honest `connected` phase — and can compare protocol versions — without
       // paying a round trip before it may subscribe.
@@ -214,6 +220,7 @@ export function orchestrationWsRoutes(
 
       states.delete(socket.key)
       sockets.delete(socket)
+      releaseWebSocket(socket.data)
       presence.forget(socket.key)
       // A close the server chose logged its cause when it chose it.
       const abnormal = isAbnormalWebSocketClose(code) && !state?.serverCloseReason
