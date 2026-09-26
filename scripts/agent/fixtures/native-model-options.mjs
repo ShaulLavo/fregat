@@ -48,6 +48,8 @@ const models = [
 function optionsThread() {
   return {
     id: threadId,
+    sessionId: threadId,
+    projectId: null,
     cliVersion: 'verification',
     createdAt: 0,
     updatedAt: 0,

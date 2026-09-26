@@ -30,6 +30,8 @@ const send = (message) => process.stdout.write(`${JSON.stringify(message)}\n`)
 const control = () => JSON.parse(readFileSync(join(root, 'checkpoint-control.json'), 'utf8'))
 const thread = () => ({
   id: threadId,
+  sessionId: threadId,
+  projectId: null,
   cliVersion: 'verification',
   createdAt: 0,
   updatedAt: 0,

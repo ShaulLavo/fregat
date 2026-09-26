@@ -11,6 +11,8 @@ const record = (entry) => appendFileSync(join(root, 'native.jsonl'), `${JSON.str
 const send = (message) => process.stdout.write(`${JSON.stringify(message)}\n`)
 const thread = () => ({
   id: threadId,
+  sessionId: threadId,
+  projectId: null,
   cliVersion: 'verification',
   createdAt: 0,
   updatedAt: 0,
