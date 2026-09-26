@@ -1,6 +1,7 @@
 import { tabId } from '@/lib/documents/utils/identity'
 import { testDocumentRef } from '../../../../../test/factories/document-targets'
 import { editorTextMenu } from '@/features/editor/utils/text-menu'
+import { spellingMenuSection } from '@/features/editor/utils/spelling-menu'
 import type { MenuCommandItem } from '@/keymap/menus/utils/model'
 import { platformCommand } from '@/keymap/table'
 import type { PlatformCommandId } from '@/keymap/types'
@@ -28,6 +29,43 @@ test('sections run navigate, chat, edit, file, then palette', () => {
     'file',
     'palette',
   ])
+})
+
+test('a misspelled word leads the menu with its replacements and the dictionaries', () => {
+  const replaced: string[] = []
+  const accepted: string[] = []
+  const spelling = spellingMenuSection({
+    word: 'befor',
+    suggestions: ['before', 'befog'],
+    hasWorkspace: true,
+    replace: (word) => replaced.push(word),
+    accept: (target) => accepted.push(target),
+  })
+  const menu = editorTextMenu(spelling)
+  expect(menu[0]?.id).toBe('spelling')
+  const items = menu[0]?.items ?? []
+  expect(items.map((item) => ('label' in item ? item.label : null))).toEqual([
+    'before',
+    'befog',
+    'Add to Dictionary',
+    'Add to Workspace Dictionary',
+  ])
+  for (const item of items) if (item.kind === 'action') item.run()
+  expect(replaced).toEqual(['before', 'befog'])
+  expect(accepted).toEqual(['user', 'workspace'])
+})
+
+test('the spelling section says when suggestions are pending or there are none', () => {
+  const section = (suggestions: readonly string[] | null) =>
+    spellingMenuSection({
+      word: 'qqzx',
+      suggestions,
+      hasWorkspace: false,
+      replace: () => undefined,
+      accept: () => undefined,
+    }).items.map((item) => ('label' in item ? item.label : null))
+  expect(section(null)).toEqual(['Finding suggestions…', 'Add to Dictionary'])
+  expect(section([])).toEqual(['No suggestions for “qqzx”', 'Add to Dictionary'])
 })
 
 test('the chat section hands the selection or the file to the composer', () => {

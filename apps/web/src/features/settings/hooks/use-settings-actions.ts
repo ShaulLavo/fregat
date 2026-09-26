@@ -251,6 +251,9 @@ export function useSettingsActions() {
       submit(targetFor('models.hidden'), [{ hidden, kind: 'model.setHidden', ref }]),
     setModelFavorite: (ref: ModelRef, favorite: boolean) =>
       submit(targetFor('models.favorites'), [{ favorite, kind: 'model.setFavorite', ref }]),
+    /** Accepts a word in one layer's spellcheck dictionary, or marks it again with `false`. */
+    setSpellingWord: (word: string, accepted: boolean, target: SettingsWriteTarget) =>
+      submit(target, [{ kind: 'spellcheck.setWord', word, accepted }], 'editor.spelling.addWord'),
     setProviderEnabled: (instance: ProviderInstanceConfig, enabled: boolean) =>
       submit(targetFor('providers.instances'), [providerEnabledOperation(instance, enabled)]),
     setSetting,

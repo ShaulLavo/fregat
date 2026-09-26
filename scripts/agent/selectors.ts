@@ -1,4 +1,5 @@
 import type { Locator, Page } from 'playwright'
+import { createScriptError } from '../structured-errors'
 
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallpaper-layer="still"]'
@@ -1015,6 +1016,32 @@ export async function holdToConfirm(page: Page, button: Locator, done: () => Pro
 export async function focusEditor(page: Page) {
   await selectors.editorSurface(page).first().click()
   await selectors.editorInput(page).first().focus()
+}
+
+/** Right-clicks the middle of the first visible occurrence of `word` in any editor's text. */
+export async function rightClickEditorWord(page: Page, word: string) {
+  const point = await page.evaluate((target) => {
+    for (const surface of document.querySelectorAll('.editor-virtualized-viewport')) {
+      const walker = document.createTreeWalker(surface, NodeFilter.SHOW_TEXT)
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const index = node.textContent?.indexOf(target) ?? -1
+        if (index < 0) continue
+        const range = document.createRange()
+        range.setStart(node, index)
+        range.setEnd(node, index + target.length)
+        const rect = range.getBoundingClientRect()
+        if (rect.width === 0 || rect.height === 0) continue
+        const x = rect.left + rect.width / 2
+        const y = rect.top + rect.height / 2
+        // A kept-alive editor for another tab holds text too, under whatever is on top.
+        if (!surface.contains(document.elementFromPoint(x, y))) continue
+        return { x, y }
+      }
+    }
+    return null
+  }, word)
+  if (!point) throw createScriptError(`"${word}" is not on a visible editor row`)
+  await page.mouse.click(point.x, point.y, { button: 'right' })
 }
 
 /** Whether any language-server error is painted, read from the CSS highlight registry. */

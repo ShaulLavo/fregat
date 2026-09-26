@@ -40,6 +40,7 @@ import {
   SquaresFourIcon,
   SunIcon,
   TerminalIcon,
+  TextAaIcon,
   XIcon,
 } from '@phosphor-icons/react'
 import type { QueryClient } from '@tanstack/react-query'
@@ -1033,6 +1034,15 @@ export const workspaceCommands = [
     ...workspaceCommandMetadata['workspace.addSelectionToChat'],
     icon: ChatCircleIcon,
     run: addSelectionToChat,
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.showSpellingSuggestions'],
+    icon: TextAaIcon,
+    run: ({ runtime, snapshot }) => {
+      if (!snapshot.activeTabId) return declined
+      runtime.editorUi.getState().requestTextMenu(snapshot.activeTabId)
+      return handled
+    },
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.cycleMarkdownView'],

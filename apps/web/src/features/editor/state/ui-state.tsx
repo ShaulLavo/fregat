@@ -21,6 +21,8 @@ type EditorUiStoreState = {
   moveTabId: TabId | null
   tabPresentation: TabPresentations
   statusBarSource: EditorStatusBarSource | null
+  /** A command asking one tab's editor to open its text menu at the caret; the count re-arms it. */
+  textMenuRequest: { readonly tabId: TabId; readonly count: number } | null
 }
 
 type EditorUiStoreActions = {
@@ -39,6 +41,7 @@ type EditorUiStoreActions = {
   retainTabPresentation: (tabIds: ReadonlySet<TabId>) => void
   copyTabPresentation: (fromTabId: TabId, toTabId: TabId) => void
   setStatusBarSource: (source: EditorStatusBarSource | null) => void
+  requestTextMenu: (tabId: TabId) => void
 }
 
 export type EditorUiStore = EditorUiStoreState & EditorUiStoreActions
@@ -89,6 +92,11 @@ export function createEditorUiStore() {
     },
     copyTabPresentation: (fromTabId, toTabId) => tabPresentation.copy(fromTabId, toTabId),
     statusBarSource: null,
+    textMenuRequest: null,
+    requestTextMenu: (tabId) =>
+      set((state) => ({
+        textMenuRequest: { tabId, count: (state.textMenuRequest?.count ?? 0) + 1 },
+      })),
     clearDefinitionTargetForPath: (path) =>
       set((state) => {
         if (state.definitionTarget?.target.path !== path) return state

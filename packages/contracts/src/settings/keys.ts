@@ -700,6 +700,35 @@ export const SETTINGS_REGISTRY = {
       'How markdown files open: source text, source beside a rendered view, or rendered in place while you edit. Cycle markdown view changes one file.',
     keywords: ['markdown', 'preview', 'split', 'render'],
   }),
+  'editor.spellcheck': defineSetting({
+    schema: v.picklist(['off', 'prose', 'proseAndCode'] as const),
+    // Off for files until marks stop costing a keystroke several milliseconds (E058 question 3).
+    default: 'off',
+    // Suppression, not execution: it only decides which words are marked, so a docs repository may
+    // turn it on for itself.
+    scope: 'window',
+    widget: 'enum',
+    category: 'Editor',
+    title: 'Spellcheck',
+    description:
+      'Mark misspelled words: in plain text and Markdown prose, or also in code comments and strings. Right-click a marked word for suggestions.',
+    keywords: ['spelling', 'spellcheck', 'dictionary', 'typo', 'prose'],
+  }),
+  'spellcheck.words': defineSetting({
+    schema: v.record(v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)), v.boolean()),
+    default: {},
+    merge: 'record',
+    // Suppression only: a workspace dictionary lists the words its files use.
+    scope: 'window',
+    widget: 'complex',
+    // Words arrive from the editor menu; settings.json is where a list is edited by hand.
+    visibility: 'internal',
+    category: 'Editor',
+    title: 'Spellcheck dictionary',
+    description:
+      'Words spellcheck never marks. Set a word to false to mark it again where another scope accepts it.',
+    keywords: ['spelling', 'spellcheck', 'dictionary', 'words', 'ignore'],
+  }),
   'editor.diff.viewMode': defineSetting({
     schema: v.picklist(['split', 'stacked'] as const),
     default: 'stacked',

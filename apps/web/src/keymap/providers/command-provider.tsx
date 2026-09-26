@@ -218,6 +218,7 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
   const [runtime] = useState<WorkspaceCommandRuntime>(() => ({
     composer: createComposerAttach(bus),
     documents: { queryClient, store: documentStore, save: editorRuntime.saveService },
+    editorUi: editorRuntime.uiStore,
     editor: {
       closeTab: (...args) => adaptersRef.current.editor.closeTab(...args),
       closeTabs: (...args) => adaptersRef.current.editor.closeTabs(...args),

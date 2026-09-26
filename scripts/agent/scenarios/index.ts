@@ -121,6 +121,7 @@ import { sidebarToggle } from './sidebar-toggle'
 import { itemNavigation } from './item-navigation'
 import { shortcutHints } from './shortcut-hints'
 import { editorAddToChat } from './editor-add-to-chat'
+import { editorSpellcheck } from './editor-spellcheck'
 import { markdownSplitView } from './markdown-split-view'
 import { gitOpenAllDiffsSpam } from './git-open-all-diffs-spam'
 import { gitStageSettles } from './git-stage-settles'
@@ -414,6 +415,7 @@ export const scenarios: readonly Scenario[] = [
   itemNavigation,
   shortcutHints,
   editorAddToChat,
+  editorSpellcheck,
   markdownSplitView,
   gitOpenAllDiffsSpam,
   gitStageSettles,

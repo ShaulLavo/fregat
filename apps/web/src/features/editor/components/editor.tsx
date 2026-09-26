@@ -28,6 +28,8 @@ import {
 } from '@/features/editor/utils/scroll-position'
 import { useLanguageServerPlugin } from '@/features/editor/hooks/use-lsp-plugin'
 import { useDiagnosticPeek } from '@/features/editor/hooks/use-diagnostic-peek'
+import { useSpellcheckPlugin } from '@/features/editor/hooks/use-spellcheck-plugin'
+import { useEditorUiState } from '@/features/editor/state/ui-state'
 import type { LanguageServerDocumentTarget } from '@/features/editor/utils/language-server-plugin'
 import { editorPerformanceLayoutVariant } from '@/features/editor/state/performance-trace'
 import { documentKey } from '@/lib/documents/utils/identity'
@@ -182,9 +184,14 @@ export function Editor({
   )
   const decodePlugin = useMemo(() => createDecodePluginLoader(decodeMode), [decodeMode])
   const unicodeHighlights = useUnicodeHighlights()
+  const spellcheckPlugin = useSpellcheckPlugin()
+  const textMenuRequest = useEditorUiState((state) =>
+    state.textMenuRequest?.tabId === tabId ? state.textMenuRequest.count : null,
+  )
   const plugins = [
     ...criticalEditorCorePlugins,
     unicodeHighlights.plugin,
+    ...(spellcheckPlugin ? [spellcheckPlugin] : []),
     diagnosticPeek.plugin,
     languageServer,
     decodePlugin,
@@ -310,6 +317,7 @@ export function Editor({
       controller={controller}
       onRequestCloseOverlay={diagnosticPeek.snapshot ? diagnosticPeek.close : undefined}
       targetRef={focusTarget.ref}
+      textMenuRequest={textMenuRequest}
     >
       {provisional && liveDocument ? (
         <div className='bg-background text-muted-foreground absolute inset-x-0 bottom-0 flex items-center gap-2 px-3 py-2 text-xs'>

@@ -350,6 +350,12 @@
       "minimum": 0,
       "type": "integer"
     },
+    "editor.spellcheck": {
+      "default": "off",
+      "description": "Mark misspelled words: in plain text and Markdown prose, or also in code comments and strings. Right-click a marked word for suggestions.",
+      "enum": ["off", "prose", "proseAndCode"],
+      "type": "string"
+    },
     "editor.syntaxHighlighting.enabled": {
       "default": true,
       "description": "Colour code by syntax. Turning this off makes very large files faster.",
@@ -952,6 +958,19 @@
       "default": false,
       "description": "Match whole words by default.",
       "type": "boolean"
+    },
+    "spellcheck.words": {
+      "additionalProperties": {
+        "type": "boolean"
+      },
+      "default": {},
+      "description": "Words spellcheck never marks. Set a word to false to mark it again where another scope accepts it.",
+      "propertyNames": {
+        "maxLength": 100,
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "object"
     },
     "terminal.integrated.cursorBlinking": {
       "default": true,
