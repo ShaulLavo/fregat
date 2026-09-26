@@ -1,0 +1,56 @@
+import { serialize } from 'node:v8'
+import { wallpaperErrors } from './structured-errors'
+
+const options = { maxPixels: 40_000_000 }
+
+try {
+  const bytes = new Uint8Array(await Bun.stdin.arrayBuffer())
+  const result = await decode(bytes)
+  await Bun.write(Bun.stdout, serialize(result))
+} catch {
+  process.exitCode = 1
+}
+
+async function decode(bytes: Uint8Array) {
+  const { width, height, format } = await new Bun.Image(bytes, {
+    ...options,
+    autoOrient: false,
+  }).metadata()
+  if (!width || !height || width > 16384 || height > 16384 || width * height > options.maxPixels)
+    throw wallpaperErrors.INVALID({ internal: { reason: 'dimensions', width, height } })
+  if (format !== 'jpeg' && format !== 'png' && format !== 'webp')
+    throw wallpaperErrors.INVALID({ internal: { reason: 'format', format } })
+  if (hasAnimation(bytes, format))
+    throw wallpaperErrors.INVALID({ internal: { reason: 'animation', format } })
+  // Decode every source row before accepting it; a downsample alone can skip corrupt rows.
+  await new Bun.Image(bytes, options).png().bytes()
+  const [thumbnail, display] = await Promise.all([
+    new Bun.Image(bytes, options)
+      .resize(480, 300, { fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 75 })
+      .bytes(),
+    new Bun.Image(bytes, options)
+      .resize(2560, 2560, { fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 85 })
+      .bytes(),
+  ])
+  const extension = format === 'jpeg' ? 'jpg' : format
+  return { width, height, extension, contentType: `image/${format}`, thumbnail, display }
+}
+
+function hasAnimation(bytes: Uint8Array, format: string) {
+  const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  if (format === 'png') return hasChunk(buffer, 8, 'acTL', false)
+  if (format === 'webp') return hasChunk(buffer, 12, 'ANIM', true)
+  return false
+}
+
+function hasChunk(buffer: Buffer, start: number, name: string, littleEndian: boolean) {
+  for (let offset = start; offset + 8 <= buffer.length;) {
+    const typeOffset = offset + (littleEndian ? 0 : 4)
+    if (buffer.toString('ascii', typeOffset, typeOffset + 4) === name) return true
+    const length = littleEndian ? buffer.readUInt32LE(offset + 4) : buffer.readUInt32BE(offset)
+    offset += littleEndian ? 8 + length + (length % 2) : 12 + length
+  }
+  return false
+}

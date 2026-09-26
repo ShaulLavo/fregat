@@ -53,6 +53,17 @@ release installs that carry every package the server loads at runtime.
    Device delivery on the mesh remains unverified: this lane does not deploy or send to the
    owner's phone. Evidence: `/work/tmp/w2-184-runtime-evidence/`.
 5. **`sharp` → `Bun.Image`** (a 6001×4001 JPEG to WebP in 33 ms in the probe).
+   Implemented on `w2/cx-184-images`. Bun.Image decodes and derives images inside an isolated
+   process with a ten-second kill deadline. PNG and WebP animation, pixel and dimension limits,
+   complete source decoding and EXIF orientation are preserved. A second Sharp consumer now
+   exists: wallpaper color sampling. MIT `pngjs` reads its small generated PNG sample because
+   Bun.Image has no raw-pixel terminal. No native module is needed in the runtime install.
+   The worker is built beside the server and required by release-file validation.
+   Isolated Linux runtime dependency bytes, following links and counting unique files per tree:
+   588,395,127 → 546,336,319, down 42,058,808. The site build still has its own dev-only Sharp.
+   Passed decoder, color, release-file and wallpaper-library tests, including corrupt files,
+   animated PNG/WebP and EXIF orientation. Isolated bundled decoding passed from `/`.
+   Evidence: `/work/tmp/w2-184-images-evidence/`.
 6. **Dead and thin ones:** the second TypeScript (`typescript@6.0.3`, 24 MB, only unimported code uses
    it), `react-animated-counter` (pulls lodash), `@foresightjs/react` (keep `js.foresight`),
    `@tanstack/pacer` in the server (one throttle), `nanoid`, `html-void-elements`, `culori` if the

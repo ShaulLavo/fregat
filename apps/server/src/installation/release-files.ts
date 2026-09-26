@@ -9,7 +9,6 @@ import { installationErrors } from './structured-errors'
  * on each platform.
  */
 export const RUNTIME_PACKAGES = [
-  'sharp',
   'web-push',
   '@anthropic-ai/claude-agent-sdk',
   'typescript',
@@ -25,6 +24,7 @@ export const REMOTE_SUPPORT = 'remote-support.js'
 export const PTY_HOST = 'pty-host.js'
 /** Built by the `build` script; the bundle starts it as its native watch worker. */
 export const WATCH_WORKER = 'watch-worker.ts'
+export const IMAGE_WORKER = 'image-worker.ts'
 
 // bun.lock keys a workspace's own resolution `<workspace>/<package>`; it wins over the hoisted one.
 const SERVER_WORKSPACE = 'server'
@@ -59,7 +59,14 @@ export async function writeRuntimeManifest(serverDirectory: string, lockfilePath
 
 /** The release files a built server directory lacks, relative to it. */
 export async function missingReleaseFiles(serverDirectory: string) {
-  const files = [RUNTIME_MANIFEST, RUNTIME_LOCK, REMOTE_SUPPORT, PTY_HOST, WATCH_WORKER]
+  const files = [
+    RUNTIME_MANIFEST,
+    RUNTIME_LOCK,
+    REMOTE_SUPPORT,
+    PTY_HOST,
+    WATCH_WORKER,
+    IMAGE_WORKER,
+  ]
   const present = await Promise.all(
     files.map((file) =>
       access(path.join(serverDirectory, file)).then(
