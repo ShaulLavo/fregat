@@ -13,6 +13,8 @@ const threadId = `${basename(root)}-thread`
 const turnId = `${basename(root)}-turn`
 const thread = () => ({
   id: threadId,
+  sessionId: threadId,
+  projectId: null,
   cliVersion: 'verification',
   createdAt: 0,
   updatedAt: 0,

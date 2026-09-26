@@ -15,6 +15,8 @@ let heldInterrupt = null
 
 const thread = () => ({
   id: threadId,
+  sessionId: threadId,
+  projectId: null,
   cliVersion: 'verification',
   createdAt: 0,
   updatedAt: 0,
