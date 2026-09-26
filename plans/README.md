@@ -19,15 +19,17 @@ a bare root `bun run verify`.
 
 | Plan                                                                                    | State                                                                     |
 | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| [187 — setup scripts run in visible terminals](187-setup-scripts-in-terminals.md)       | **PROPOSED 2026-09-26 — READY; FOLLOW-UP TO 126 EXT-04**                  |
+| [186 — PR sync: an off switch and a smarter poll rate](186-pull-request-sync-rate.md)   | **PROPOSED 2026-09-26 — READY; FOLLOW-UP TO 126 LIFE-14**                 |
 | [185 — one shared dev server](185-shared-dev-server.md)                                 | **PROPOSED 2026-09-26 — BLOCKED ON MESH T28; Q1–Q3 FOR THE OWNER**        |
-| [184 — dependency diet](184-dependency-diet.md)                                         | **PROPOSED 2026-09-26 — READY; SLICE 1 IS A LIVE BUG**                    |
+| [184 — dependency diet](184-dependency-diet.md)                                         | **PROPOSED 2026-09-26 — READY; SLICE 1 IS A LIVE BUG; WEB PUSH KEPT**     |
 | [183 — Platform as Claude Code's IDE in its terminals](183-claude-ide-in-terminals.md)  | **PLACEHOLDER — LOW PRIORITY; SPLIT FROM 140 Q1**                         |
 | [177 — prefetch every press](177-prefetch-every-press.md)                               | **PROPOSED 2026-09-26 — RESEARCH FIRST**                                  |
 | [176 — one markdown parser](176-markdown-parser.md)                                     | **RESEARCH — AUTHORIZED 2026-09-26; REPLACES 108 D5**                     |
 | [175 — opening a very large folder](175-large-folder-open.md)                           | **DONE 2026-09-26 — DEPLOYED `plan-175`, PROD CHECKED**                   |
 | [174 — managed external MCP servers](174-external-mcp-servers.md)                       | **PLACEHOLDER — SPLIT FROM 087 M2/M3; UNSCHEDULED**                       |
 | [173 — two devices opening one workspace](173-two-devices-one-workspace.md)             | **RESEARCH — BEFORE PLAN 143'S PHONE SHELL**                              |
-| [172 — one shared undo/redo stack](172-shared-undo-stack.md)                            | **RESEARCH — LIFE-13 IS THE FIRST CONSUMER**                              |
+| [172 — one shared undo/redo stack](172-shared-undo-stack.md)                            | **RESEARCH — LIFE-13 FIRST; NOTICE-ONLY MOD+Z FIX ORDERED**               |
 | [171 — the chat composer runs on our own editor](171-composer-on-our-editor.md)         | **RESEARCH — AFTER PLAN 111**                                             |
 | [170 — language census for grammar and theme prefetch](170-language-census.md)          | **PROPOSED — SPLIT FROM 110 Q7; TREE-SITTER WARM-UP ADDED 2026-09-26**    |
 | [167 — settings defaults, setting details, and copy](167-settings-and-copy.md)          | **PROPOSED — READY; D1–D4 DECIDED**                                       |

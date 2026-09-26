@@ -179,17 +179,22 @@ LIFE-01/02 implementation shipped on 2026-09-20; [delivery evidence](archive-del
 > `session-rail-store.ts`, the Editor undo graph) but no shared stack. Extract one reusable stack and use it here. Lane L5's
 > latest-slot version (PR #38) is a first step; this row reopens.
 > The research is [Plan 172](../172-shared-undo-stack.md).
+>
+> **Owner ruling (2026-09-26), narrowing the correction above:** Mod+Z acts only while the Undo
+> notice is showing (a few seconds). Once the notice is gone, Mod+Z does nothing here. The shared
+> stack stays (Plan 172), but its session entries live only as long as the notice. Decided
+> 2026-09-26: owner (Plan 172 owner question 1, confirmed in the direction audit).
 
-- **Status/confidence:** Owner correction implemented 2026-09-25. Atomic server restore and shared web/TUI Undo/Redo are verified by the expanded `session-undo` scenario. See the [delivery record](lifecycle-undo-delivery.md).
-- **`mod+z` precedence (audit D11, shared with Plan 080):** Plan 080 has no `mod+z` rule, so the implementation note below is the recommendation: `mod+z` undoes the latest session action from any pane without its own undo, and yields to text entry, so the composer, editors, terminals and the file tree keep theirs. Decided 2026-09-25: recommendation (completion wave).
+- **Status/confidence:** Owner correction implemented 2026-09-25. Atomic server restore and shared web/TUI Undo/Redo are verified by the expanded `session-undo` scenario. See the [delivery record](lifecycle-undo-delivery.md). **Reopened 2026-09-26:** the shipped `session-undo.ts` keeps walking the history after the notice closes, which the 2026-09-26 ruling forbids; the fix is a work item in [Plan 172](../172-shared-undo-stack.md).
+- **`mod+z` precedence (audit D11, shared with Plan 080):** Plan 080 has no `mod+z` rule, so the implementation note below is the recommendation: `mod+z` undoes the latest session action from any pane without its own undo, and yields to text entry, so the composer, editors, terminals and the file tree keep theirs. Decided 2026-09-25: recommendation (completion wave). Narrowed 2026-09-26 by the owner: only while the Undo notice is showing.
 - **Evidence:** Upstream `docs/user/thread-sidebar.md:31–36` gives each of unpin, settle, snooze and archive a five-second Undo that restores the previous state, including pinned position, and reopens an archived thread the user was viewing. `mod+z` triggers the most recent Undo when no text field is focused. Code: `apps/web/src/hooks/useThreadActions.ts`, `showUndoToast.ts`, `components/sidebar/SidebarThreadUndoNotice.tsx`, `keybindings.ts`; tests in `useThreadActions.undo.test.ts`. Local `apps/web/src/features/chat-mode/hooks/use-session-actions.ts:74–86` offers Undo only after a successful snooze. A bounded search for `undo` under `apps/web/src/features/chat-mode` and `mod+z` in `apps/web/src/keymap/default-bindings.ts` found no other lifecycle undo or binding.
 - **Impact:** A mistaken settle, archive or unpin needs a manual reverse action and loses the pinned position. Bulk actions carry that risk across many rows.
 - **Effort/risk:** S–M / MED: exact restoration of pin order and archived navigation, and a `mod+z` that never steals undo from the editor, composer, terminal or file tree.
 - **Fix sketch:** Keep a reusable Undo/Redo stack of accepted server receipts. Restore all lifecycle fields atomically, guarded by the revision produced by the action.
 - **Implementation:** `history/undo-stack.ts` supplies the generic stack. The shared lifecycle history in client-core records server snapshots, rebases adjacent revision guards after successful restores, and drops conflicting rows. Web uses Mod+Z / Mod+Shift+Z with existing focus exclusions. TUI uses U / Shift+U in the rail. Undo reopens the viewed archived session; redo reconciles its removal.
 - **Dependencies:** LIFE-03/04/05 for the settle, pin and order state being restored. Extends LIFE-04's bulk-snooze Undo.
-- **Acceptance:** Several actions undo and redo in order after the notice expires. Restoration preserves pin position, active order, and the original lifecycle override. An expired snooze stays awake. Another client's changes cause a conflict without changing its state. Bulk history contains successful rows. Composer, editor, terminal, and tree retain their own Undo.
-- **Verification:** DOM tests over `use-session-actions` and the keymap when-context; a live scenario that settles, archives and unpins, then undoes each by button and by `mod+z`.
+- **Acceptance:** While the notice is showing, Mod+Z undoes and Mod+Shift+Z redoes, in order. After it closes, Mod+Z and Mod+Shift+Z do nothing to sessions. Restoration preserves pin position, active order, and the original lifecycle override. An expired snooze stays awake. Another client's changes cause a conflict without changing its state. Bulk history contains successful rows. Composer, editor, terminal, and tree retain their own Undo.
+- **Verification:** DOM tests over `use-session-actions` and the keymap when-context; a live scenario that settles, archives and unpins, then undoes each by button and by `mod+z` while the notice shows, and checks that `mod+z` after the notice has gone changes nothing.
 
 ### LIFE-14 — P2: Show linked pull-request state on sidebar rows with background sync
 

@@ -69,6 +69,30 @@ Parked: EXT-07 and EXT-09 (Plan 087 automation, Plan 143 research, per-OS matrix
    141 decision already chose automatic pricing, and unknown prices never show a wrong number. S if (b).
    Decided 2026-09-26: owner — (a); models.dev already prices every model it knows.
 
+## Kept by the owner (2026-09-26)
+
+The direction audit (`/work/reports/completion-wave/direction-audit.md`, outside the repo)
+flagged these shipped choices for owner eyes. The owner kept each as shipped; a future audit does
+not re-raise them. Decided 2026-09-26: owner.
+
+- **Auto-settle, on by default** (LIFE-06, lane L9): `chat.autoSettleAfterDays` 3 and
+  `chat.autoSettleOnMerge` on, applied to existing sessions. "Amazing."
+- **Multi-model send** (INTERACTION-08, lane L2): one draft to several models, one worktree each.
+  "Amazing."
+- **Five forges** (EXT-01/02/03, LIFE-14, lane L9): GitHub, GitLab, Forgejo, Azure DevOps and
+  Bitbucket.
+- **Terminal host design** (Plan 149, lane L4): the PTY host process, its scope, protocol, ring and
+  lease adoption. See [terminal host](../docs/terminal-host.md).
+- **Remote install model** (Plans 151 and 152, lane L5): npm package with `bun install`, update in
+  place, and channels, the same model as T3. See [remote server releases](../docs/remote-server-releases.md).
+- **Web push** (Plan 142, lane L5), with the `web-push` package; [Plan 184](184-dependency-diet.md)
+  slice 4 isolates it instead of dropping it.
+
+Changed by the same review, as follow-ups: the PR poller gets an off switch and a smarter rate
+([Plan 186](186-pull-request-sync-rate.md)); setup scripts run in visible terminals
+([Plan 187](187-setup-scripts-in-terminals.md)); session Mod+Z acts only while the Undo notice
+shows ([Plan 172](172-shared-undo-stack.md) work item 1, LIFE-13).
+
 ## Authority and completion rule
 
 The user's instruction is hard alignment with T3 Code. Earlier local product decisions do not
