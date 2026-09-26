@@ -3,10 +3,10 @@ import { vi } from 'vitest'
 
 import { expect, test } from '../../../test/fixtures'
 import {
-  clientErrorText,
   reportError,
   thrownErrorMessage,
   toClientError,
+  toConnectionError,
 } from '@/lib/client-error-taxonomy'
 import { createEnvironmentProtocolMismatchError } from '@workspace/client-core/environments/utils/structured-errors'
 import { log, observeClientOperation } from '@/lib/client-logging'
@@ -111,12 +111,19 @@ test('does not report aborted operations', () => {
   }
 })
 
-test('stored failure text keeps the catalog why and fix', () => {
+test('a connection failure keeps the catalog code, why and fix', () => {
   const error = createEnvironmentProtocolMismatchError('https://mac.example/platform', 7, 6)
-  expect(clientErrorText(error, 'fallback')).toBe(
-    'The server at https://mac.example/platform uses an incompatible protocol version. This client requires protocol 7, but the server reported 6. Run matching client and server versions before reconnecting.',
-  )
-  expect(clientErrorText(new Error('plain'), 'fallback')).toBe('plain')
+  expect(toConnectionError(error, 'fallback')).toEqual({
+    code: 'ENVIRONMENT_PROTOCOL_MISMATCH',
+    message:
+      'The server at https://mac.example/platform speaks protocol 6, and this client needs protocol 7.',
+    why: 'That server runs an older Platform version than this client.',
+    fix: 'Update the Platform server at https://mac.example/platform to this client’s version, then Retry.',
+  })
+  expect(toConnectionError(new Error('plain'), 'fallback')).toEqual({
+    code: 'CONNECTION_FAILED',
+    message: 'plain',
+  })
 })
 
 test('a thrown message keeps the words of an Error and never stringifies an Eden rejection', () => {

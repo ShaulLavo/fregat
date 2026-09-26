@@ -25,7 +25,7 @@ export const machineConnectError: Scenario = {
     const target = await rows.first().getAttribute('title')
     ok(target, 'The saved machine row names its machine')
     await rows.first().click()
-    const alert = dialog.getByRole('alert')
+    const alert = selectors.machineDialogError(dialog)
     await alert.waitFor({ timeout: 30_000 })
     await step('connect-error')
     const overflow = await dialog.evaluate((element) => element.scrollWidth - element.clientWidth)
@@ -53,7 +53,7 @@ export const machineConnectError: Scenario = {
     await selectors.machineAdd(page).click()
     await selectors.machineTarget(page).fill(target)
     await selectors.machineConnect(page).click()
-    const readd = selectors.machineDialog(page).getByRole('alert')
+    const readd = selectors.machineDialogError(selectors.machineDialog(page))
     await readd.waitFor({ timeout: 30_000 })
     const readdText = await readd.innerText()
     ok(

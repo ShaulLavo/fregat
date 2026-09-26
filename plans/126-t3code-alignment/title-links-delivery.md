@@ -9,3 +9,6 @@ Both selected lookups run concurrently. Each uses the existing bounded process r
 Sixteen focused link/lifecycle tests pass. These include 14 URL cases executed against the actual pinned provider resolver bodies and seven messages executed against the actual pinned scanner loop. Negative cases cover unsupported hosts, credentials, ports, invalid issue numbers, duplicate links, budget theft by unsupported links, timeout/error/malformed results, and reversed lookup completion order. Server typecheck and changed-file lint pass.
 
 These are local policy, injected process-boundary and existing reactor tests. They do not prove authenticated external GitHub/GitLab lookup in the live deployment. The new source is pending the next shared release. Custom title-policy settings and the full provider/source-control matrix remain outside this unit.
+
+Live check (2026-09-25, completion wave): `resolveSessionTitleLinks` run through the real,
+authenticated `gh` returned the title and body of `https://github.com/ShaulLavo/fregat/pull/38`.

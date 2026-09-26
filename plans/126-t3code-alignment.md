@@ -5,8 +5,9 @@ cross-review completed on 2026-09-20. The audit found 48 implementation groups, 
 delta added nine: **57 groups**, including paired client/server work. This is not a count of
 independently reproduced bugs. On 2026-09-25 (`main` after lane L2), 26 groups are implemented and
 deployed, 9 partial and 22 not started; 10 of the 26 are closed as `verified` in the
-[ledger](126-t3code-alignment/ledger.json). LIFE-03/04/05/08/10 close after PR #41 merges, when their
-scenarios move to its second-owner helper. In the completion wave a row closes when its `agent:browser` scenario proves the
+[ledger](126-t3code-alignment/ledger.json). LIFE-13 is additionally scenario-verified in PR #41.
+LIFE-03/04/05/08/10 close after PR #41 merges, when their scenarios move to its second-owner helper.
+In the completion wave a row closes when its `agent:browser` scenario proves the
 behaviour; the paired run against upstream T3 Code is dropped
 ([owner decision](../docs/completion-wave.md#owner-decisions-for-this-wave-2026-09-25)).
 
@@ -349,7 +350,7 @@ implementation or a Platform-specific extension. Implement once, then close both
 | [139 — acting on the agent's diff](139-acting-on-agent-diffs.md)     | INTERACTION-09, EXT-02                 | 139 owns hunk keep/undo and review; review sources stay here         |
 | [140 — the editor as agent advantage](140-editor-agent-advantage.md) | INTERACTION-09                         | 140 owns editor-to-agent context; assistant citation stays here      |
 | [141 — usage and rate limits](141-usage-and-rate-limits.md)          | RUNTIME-08, INTERACTION-07, EXT-17     | 141 implements quota surfaces and the usage page                     |
-| [142 — web push notifications](142-web-push.md)                      | EXT-06                                 | 142 owns delivery to a closed tab or phone; policy stays here        |
+| 142 — web push notifications                                         | EXT-06                                 | 142 owns delivery to a closed tab or phone; policy stays here        |
 | [143 — phone layout](143-phone-layout.md)                            | EXT-09, INTERACTION-11 mobile Enter    | 143 owns the responsive layout discussion; the mobile app is EXT-09  |
 | [144 — unattended agent work](144-unattended-agent-work.md)          | INTERACTION-12, EXT-10                 | 144 owns scheduling and loops; workflow inspection stays here        |
 | [145 — harness controls](145-harness-controls.md)                    | RUNTIME-05, INTERACTION-06, RUNTIME-03 | 145 owns surfacing native CLI controls; upstream semantics stay here |

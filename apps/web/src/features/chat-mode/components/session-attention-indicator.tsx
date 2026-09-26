@@ -1,4 +1,4 @@
-import type { SessionRailStatus } from '@workspace/client-core/chat/rail/status'
+import type { SessionRailStatus } from '@workspace/contracts'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { cn } from '@workspace/ui/lib/utils'
 import {

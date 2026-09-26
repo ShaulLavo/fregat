@@ -1,8 +1,11 @@
+import { MutationObserver, QueryClient } from '@tanstack/query-core'
 import { createObservableStore } from '@/host/state/observable-store'
 import {
   createProjectRegistrationCommand,
   projectRegistrationResult,
 } from '@workspace/client-core/chat/registration'
+import type { HistoryDirection } from '@workspace/client-core/history/undo-stack'
+import { railMutationKeys } from '@/agent-rail/utils/mutation-keys'
 import type { SessionSeenStamps } from '@workspace/client-core/chat/rail/unread'
 import { recordObservabilityWarning } from '@workspace/observability'
 import * as v from 'valibot'
@@ -16,6 +19,13 @@ import {
 } from '@workspace/contracts'
 import { sessionIdRange, toggledSessionIds } from '@workspace/client-core/chat/rail/multi-select'
 import type { SessionSearchMatches, SessionRailView } from '@workspace/client-core/chat/rail/model'
+import {
+  createSessionLifecycleHistory,
+  sessionLifecycleRestoreCommand,
+  sessionLifecycleUndoEntry,
+  type SessionLifecycleUndoEntry,
+  type SessionLifecycleUndoBatch,
+} from '@workspace/client-core/chat/rail/lifecycle-undo'
 import { readServerPaths } from '@workspace/client-core/files/read'
 import { absolutePickerPath } from '@workspace/client-core/files/path-input'
 import { requireEdenData } from '@workspace/client-core/transport/eden'
@@ -24,6 +34,11 @@ import { connectionFailure } from '@/connection/utils/failure'
 import { createTuiError } from '@/host/utils/structured-errors'
 import type { SettingsSession, SessionState } from '@/connection/state/session'
 import type { FileStorage } from '@/storage/files'
+
+export type RailUndoEntry = SessionLifecycleUndoEntry & {
+  /** The session was open, so its Undo selects it again. */
+  readonly selected: boolean
+}
 
 type State = {
   readonly query: string
@@ -37,6 +52,8 @@ type State = {
   readonly seen: SessionSeenStamps
   readonly busy: boolean
   readonly error: string | null
+  readonly undo: SessionLifecycleUndoBatch<RailUndoEntry> | null
+  readonly canRedo: boolean
 }
 
 export function createAgentRailState(
@@ -44,9 +61,10 @@ export function createAgentRailState(
   ready: Extract<SessionState, { kind: 'ready' }>,
 ) {
   const lifetime = new AbortController()
-
   let request = new AbortController()
   let timer: ReturnType<typeof setTimeout> | null = null
+  const history = createSessionLifecycleHistory<RailUndoEntry>()
+  const mutations = new QueryClient()
   const store = createObservableStore<State>(
     {
       query: '',
@@ -60,6 +78,8 @@ export function createAgentRailState(
       seen: readSeen(ready.storage),
       busy: false,
       error: null,
+      undo: null,
+      canRedo: false,
     },
     { signal: lifetime.signal },
   )
@@ -105,22 +125,37 @@ export function createAgentRailState(
         void search(trimmed, request.signal)
       }, 220)
   }
+  const unsubscribeHistory = history.subscribe(() =>
+    publish({
+      undo: history.getSnapshot().undo.at(-1) ?? null,
+      canRedo: history.getSnapshot().redo.length > 0,
+    }),
+  )
+  const unsubscribeMutations = mutations
+    .getMutationCache()
+    .subscribe(() => publish({ busy: mutations.isMutating() > 0 }))
   async function run<T>(action: () => Promise<T>): Promise<T | null> {
-    if (store.value.busy || lifetime.signal.aborted) return null
-    publish({ busy: true, error: null })
+    if (lifetime.signal.aborted) return null
+    const observer = new MutationObserver<T, unknown, void>(mutations, {
+      mutationKey: railMutationKeys.lifecycle(ready.descriptor.environmentId),
+      scope: { id: 'rail-lifecycle' },
+      mutationFn: async () => {
+        lifetime.signal.throwIfAborted()
+        const connection = session.getSnapshot()
+        if (connection.kind !== 'ready' || connection.connection.kind !== 'live')
+          throw createTuiError(
+            'The environment is disconnected.',
+            'Reconnect before changing projects or sessions.',
+          )
+        publish({ error: null })
+        return action()
+      },
+    })
     try {
-      const connection = session.getSnapshot()
-      if (connection.kind !== 'ready' || connection.connection.kind !== 'live')
-        throw createTuiError(
-          'The environment is disconnected.',
-          'Reconnect before changing projects or sessions.',
-        )
-      return await action()
+      return await observer.mutate()
     } catch (error) {
       publish({ error: connectionFailure(error).message })
       return null
-    } finally {
-      publish({ busy: false })
     }
   }
   return {
@@ -159,17 +194,38 @@ export function createAgentRailState(
       publish({ seen })
     },
     setError: (error: string) => publish({ error }),
-    async execute(commands: readonly ClientOrchestrationCommand[], clearCompletedMarks = false) {
-      return (
-        (await run(async () => {
-          for (const command of commands) {
-            await ready.chat.dispatch(command)
-            if (clearCompletedMarks && 'sessionId' in command)
-              publish({ marked: store.value.marked.filter((id) => id !== command.sessionId) })
+    offerUndo: history.record,
+    forgetUndo: history.forget,
+    stepHistory(direction: HistoryDirection, restored: (entry: RailUndoEntry) => void) {
+      return run(() =>
+        history.step(direction, async (entry) => {
+          try {
+            const result = await ready.chat.dispatch(sessionLifecycleRestoreCommand(entry))
+            const inverse = sessionLifecycleUndoEntry(entry.ref, result)
+            if (!inverse) return null
+            restored(entry)
+            return { ...inverse, selected: entry.selected }
+          } catch (error) {
+            publish({ error: connectionFailure(error).message })
+            return null
           }
-          return true
-        })) === true
+        }),
       )
+    },
+    execute(commands: readonly ClientOrchestrationCommand[], clearCompletedMarks = false) {
+      return run(async () => {
+        let result = null
+        for (const command of commands) {
+          result = await ready.chat.dispatch(command)
+          if (command.type === 'session.pin.reorder' || command.type === 'session.active.reorder')
+            history.forget([
+              { environmentId: ready.descriptor.environmentId, sessionId: command.sessionId },
+            ])
+          if (clearCompletedMarks && 'sessionId' in command)
+            publish({ marked: store.value.marked.filter((id) => id !== command.sessionId) })
+        }
+        return result
+      })
     },
     addProject(workspaceRoot: string) {
       return run(async () => {
@@ -188,6 +244,9 @@ export function createAgentRailState(
       lifetime.abort()
       request.abort()
       if (timer) clearTimeout(timer)
+      unsubscribeHistory()
+      unsubscribeMutations()
+      mutations.clear()
       store.dispose()
     },
   }

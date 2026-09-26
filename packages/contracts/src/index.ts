@@ -1,4 +1,5 @@
 export * from './worktree-lifecycle'
+export * from './session-lifecycle'
 export {
   effectiveEntryType,
   isDirectoryEntry,
@@ -308,6 +309,7 @@ export {
   type ProjectMetaUpdateCommand,
   type ProjectReorderCommand,
   type SessionArchiveCommand,
+  type SessionLifecycleRestoreCommand,
   type SessionApprovalRespondCommand,
   type SessionCheckpointRevertCommand,
   type SessionDeleteCommand,
@@ -334,6 +336,8 @@ export {
 export {
   ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE,
   orchestrationCommandReceiptSchema,
+  orchestrationCommandResultSchema,
+  type OrchestrationCommandResult,
   orchestrationGetFullSessionDiffInputSchema,
   orchestrationGetTurnDiffInputSchema,
   orchestrationProjectShellSchema,
@@ -395,10 +399,12 @@ export {
 } from './orchestration-ws'
 export { healthDescriptorSchema, type HealthDescriptor } from './health'
 export {
+  connectionErrorSchema,
   machineConnectionStateSchema,
   machineAuthPromptSchema,
   machineEventSchema,
   machineAuthResponseSchema,
+  type ConnectionError,
   type MachineConnectionState,
   type MachineAuthPrompt,
   type MachineEvent,
@@ -652,6 +658,7 @@ export {
   sessionMetaUpdateCommandSchema,
   sessionDeleteCommandSchema,
   sessionArchiveCommandSchema,
+  sessionLifecycleRestoreCommandSchema,
   sessionUnarchiveCommandSchema,
   sessionSettleCommandSchema,
   sessionUnsettleCommandSchema,
@@ -946,3 +953,32 @@ export { fontRefSchema } from './fonts/schema'
 export { CURATED_FONTS, type CuratedFont } from './fonts/curated'
 export type { FontCatalogEntry } from './fonts/catalog'
 export { parsePullRequestReference, pullRequestReferenceRepository } from './pull-request-reference'
+export {
+  pushDeviceId,
+  pushSessionPath,
+  pushDeviceRegistrationSchema,
+  pushDeviceSchema,
+  pushDevicesSchema,
+  pushServiceSchema,
+  pushSubscriptionSchema,
+  pushTestResultSchema,
+  type PushDevice,
+  type PushDeviceRegistration,
+  type PushDevices,
+  type PushNotice,
+  type PushService,
+  type PushSubscriptionInput,
+} from './push'
+export {
+  createSessionNotificationTracker,
+  hasNativeNotifications,
+  hasNotificationSound,
+  sessionNotice,
+  sessionNotificationTransition,
+  sessionRailStatus,
+  type NotificationCursor,
+  type NotificationMode,
+  type NotificationSession,
+  type SessionNotice,
+  type SessionRailStatus,
+} from './session-notices'

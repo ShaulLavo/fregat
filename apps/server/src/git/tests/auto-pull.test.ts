@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { GitAutoPullState } from '@workspace/contracts'
@@ -75,6 +75,18 @@ describe('automatic default-branch pull', () => {
     expect(await repo.read()).toEqual({ state: 'pulling' })
     expect(await repo.settle()).toEqual({ state: 'current' })
     expect(await repo.head()).toBe(target)
+  })
+
+  it('status polling never writes the index while repository mutations may run', async () => {
+    const repo = await fixture(false)
+    const index = path.join(repo.checkout, '.git', 'index')
+    const before = await readFile(index)
+    const changedStat = new Date(Date.now() + 60_000)
+    await utimes(path.join(repo.checkout, 'tracked.txt'), changedStat, changedStat)
+
+    expect(await repo.read()).toBeNull()
+
+    expect(await readFile(index)).toEqual(before)
   })
 
   it('reports null and never pulls when the policy is off', async () => {

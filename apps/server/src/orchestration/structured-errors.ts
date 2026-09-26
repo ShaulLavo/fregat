@@ -87,6 +87,18 @@ export const sessionDomainErrors = defineErrorCatalog('orchestration', {
     why: 'The turn that asked finished, was stopped, or the server restarted, so the agent stopped waiting.',
     fix: 'Send a new message if the agent should try again.',
   },
+  LIFECYCLE_RESTORE_UNAVAILABLE: {
+    status: 409,
+    message: 'The original session action is unavailable.',
+    why: 'Restore requires an accepted lifecycle action for this session.',
+    fix: 'Change the session from its current state.',
+  },
+  LIFECYCLE_CONFLICT: {
+    status: 409,
+    message: 'The session changed after this action.',
+    why: 'Undo and redo require the lifecycle revision produced by the original action.',
+    fix: 'Review the current session state before changing it.',
+  },
   STEER_TURN_NOT_ACTIVE: {
     status: 409,
     message: 'The turn has finished or is waiting for a response. Your message was not sent.',

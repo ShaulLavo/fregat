@@ -99,7 +99,9 @@ test('selecting a cached session keeps its transcript readable and resumes detai
       ),
     )
     expect(view.getByText('Cached question')).toBeInTheDocument()
-    const subscription = JSON.parse(socket.sent[0]!)
+    const subscription = socket.sent
+      .map((frame) => JSON.parse(frame))
+      .find((frame) => frame.kind === 'subscribe')
     act(() =>
       socket.deliver({
         kind: 'subscription.next',

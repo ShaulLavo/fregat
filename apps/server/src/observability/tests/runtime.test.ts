@@ -10,6 +10,9 @@ import { readFsLogs } from 'evlog/fs'
 import type { WideEvent } from 'evlog'
 
 import { closeTestApps, createTestApp } from '../../../test/server'
+import { createPushSubscriber } from '../../../test/factories/push-subscriber'
+import { createPushSessionFixture } from '../../../test/factories/push-sessions'
+import { createInProcessOrchestrationSocket } from '../../../test/orchestration-socket'
 import { flushObservability, initializeObservability, resetObservabilityForTests } from '../runtime'
 import { settingsErrors } from '../../settings/structured-errors'
 import { testSettingsOptions, type TestSettingsOverrides } from '../../settings/testing'
@@ -524,6 +527,141 @@ describe('observability runtime', () => {
       level: 'warn',
       source: 'client',
     })
+  })
+
+  it('records one push context per test send without endpoints, keys or payload', async () => {
+    const root = await fixtureRoot()
+    const logDir = await fixtureRoot()
+    initializeObservability(testObservabilityEnv(logDir))
+    const endpoint = 'https://fcm.googleapis.com/PUSH_ENDPOINT_MARKER'
+    let answer: (url: string) => Promise<Response> = async () => new Response(null, { status: 201 })
+    const app = createTestApp({
+      auth: { allowedOrigins: [TRUSTED_ORIGIN] },
+      push: { fetcher: (url) => answer(url) },
+      settings: testSettingsOptions(root),
+      watch: false,
+      workspaceRoot: root,
+    })
+    const subscriber = createPushSubscriber(endpoint)
+    const { auth, p256dh } = subscriber.subscription.keys
+    const post = (pathname: string, body?: unknown) =>
+      app.handle(
+        new Request(`http://local${pathname}`, {
+          body: body === undefined ? undefined : JSON.stringify(body),
+          headers: trustedOriginHeaders({ 'content-type': 'application/json' }),
+          method: 'POST',
+        }),
+      )
+
+    const registered = await post('/push/devices', {
+      label: 'Chrome on Linux',
+      subscription: subscriber.subscription,
+    })
+    const { device } = await registered.json()
+    const sent = await post(`/push/devices/${device.id}/test`)
+    answer = async (url) => {
+      throw new TypeError(`connect failed ${url}`)
+    }
+    const unreachable = await post(`/push/devices/${device.id}/test`)
+    // Last: a 410 removes the device.
+    answer = async () => new Response('gone', { status: 410 })
+    const expired = await post(`/push/devices/${device.id}/test`)
+    const rejected = await post('/push/devices', {
+      label: 'L'.repeat(81),
+      subscription: subscriber.subscription,
+    })
+
+    expect([sent.status, expired.status, unreachable.status, rejected.status]).toEqual([
+      200, 410, 502, 400,
+    ])
+    await Promise.all([sent.text(), expired.text(), unreachable.text(), rejected.text()])
+    const events = await flushedEvents(logDir)
+    const sendPath = `/push/devices/${device.id}/test`
+    const pushContext = (status: number) =>
+      (
+        events.find((event) => event.path === sendPath && event.status === status) as
+          | (WideEvent & Record<string, unknown>)
+          | undefined
+      )?.push
+    const secrets = JSON.parse(
+      await readFile(path.join(root, '.platform-test', 'secrets.json'), 'utf8'),
+    )
+
+    expect(pushContext(200)).toEqual({
+      deviceCount: 1,
+      failure: null,
+      kind: 'test',
+      outcome: 'sent',
+      service: 'google',
+      status: 201,
+    })
+    expect(pushContext(410)).toEqual({
+      deviceCount: 1,
+      failure: null,
+      kind: 'test',
+      outcome: 'expired',
+      service: 'google',
+      status: 410,
+    })
+    expect(pushContext(502)).toEqual({
+      deviceCount: 1,
+      failure: 'TypeError',
+      kind: 'test',
+      outcome: 'unreachable',
+      service: 'google',
+      status: null,
+    })
+    const serialized = JSON.stringify(events)
+    for (const secret of [
+      'PUSH_ENDPOINT_MARKER',
+      p256dh,
+      auth,
+      secrets['push.vapid.privateKey'],
+      'reach this device',
+    ])
+      expect(serialized).not.toContain(secret)
+  })
+
+  it('records one session notice event per delivery without endpoints, titles or payload', async () => {
+    const root = await fixtureRoot()
+    const logDir = await fixtureRoot()
+    initializeObservability(testObservabilityEnv(logDir))
+    const fixture = await createPushSessionFixture({ root, pushNotifications: true })
+    const subscriber = await fixture.register()
+    await fixture.createSession()
+    const socket = createInProcessOrchestrationSocket(fixture.app, TRUSTED_ORIGIN)
+    socket.receive({ kind: 'presence', focused: true })
+    await fixture.runTurn('turn-1')
+    await fixture.settle()
+    socket.disconnect()
+    await fixture.runTurn('turn-2')
+    await expect.poll(() => fixture.pushed.length).toBe(1)
+    await fixture.settle()
+
+    const events = (await flushedEvents(logDir)).filter(
+      (event) => event.action === 'push.session_notice',
+    )
+    expect(events).toEqual([
+      expect.objectContaining({
+        deviceCount: 1,
+        failed: false,
+        focusedWindows: 1,
+        kind: 'completion',
+        suppressed: true,
+      }),
+      expect.objectContaining({
+        deliveries: [{ failure: null, outcome: 'sent', service: 'google', status: 201 }],
+        deviceCount: 1,
+        focusedWindows: 0,
+        kind: 'completion',
+        link: 'session',
+        suppressed: false,
+      }),
+    ])
+    const serialized = JSON.stringify(events)
+    const { auth, p256dh } = subscriber.subscription.keys
+    for (const secret of ['fcm.googleapis.com', 'Fixture session', 'chat/t/', auth, p256dh])
+      expect(serialized).not.toContain(secret)
   })
 
   it('records git summaries and streamed search context without persisting payload contents', async () => {

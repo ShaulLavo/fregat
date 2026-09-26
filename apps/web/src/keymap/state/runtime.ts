@@ -6,6 +6,7 @@ import type { CommandTargetKind } from '@workspace/client-core/commands/metadata
 import type { WorkspaceEditHistoryResult } from '@workspace/contracts'
 import { fileSystemKeys } from '@/lib/query-keys'
 import { isSavableEditorDocument } from '@/features/editor/utils/save'
+import { sessionUndoAvailable, sessionRedoAvailable } from '@/features/chat-mode/state/session-undo'
 import { settingsSelection } from '@/features/settings/state/selection'
 import { documentKey } from '@/lib/documents/utils/identity'
 import { documentSourcePath } from '@/lib/documents/utils/capabilities'
@@ -75,6 +76,8 @@ export function captureCommandSnapshot(runtime: WorkspaceCommandRuntime): Worksp
     fileOperationRedoable: workspaceMutable && (fileHistory?.redo.length ?? 1) > 0,
     fileOperationUndoable: workspaceMutable && (fileHistory?.undo.length ?? 1) > 0,
     rootPath: state.rootFolder?.path ?? null,
+    sessionActionUndoable: sessionUndoAvailable(),
+    sessionActionRedoable: sessionRedoAvailable(),
     uiMode: state.uiMode,
     wallpaperEnabled: settings.wallpaperEnabled,
     workbenchPanels: state.workbenchPanels,

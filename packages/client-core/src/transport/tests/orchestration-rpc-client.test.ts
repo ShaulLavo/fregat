@@ -302,3 +302,54 @@ test('abort unsubscribes immediately even while the consumer holds a yielded fra
 function sentMessages(socket: FakeOrchestrationSocket) {
   return socket.sent.map((raw) => v.parse(orchestrationWsClientMessageSchema, JSON.parse(raw)))
 }
+
+test('reports window presence after the handshake and on each change until closed', async () => {
+  let focused = true
+  const listeners = new Set<() => void>()
+  const notify = () => {
+    for (const listener of listeners) listener()
+  }
+  const fixture = rpcClientFixture({
+    presence: {
+      focused: () => focused,
+      subscribe(listener) {
+        listeners.add(listener)
+        return () => listeners.delete(listener)
+      },
+    },
+  })
+  notify()
+  const ready = fixture.client.ready()
+  fixture.socket.open()
+  await ready
+  focused = false
+  notify()
+  notify()
+  fixture.client.close()
+  focused = true
+  notify()
+
+  expect(fixture.socket.sent.map((message) => JSON.parse(message))).toEqual([
+    { kind: 'presence', focused: true },
+    { kind: 'presence', focused: false },
+  ])
+  expect(listeners.size).toBe(0)
+})
+
+test('refreshes unchanged focused presence with the heartbeat', async () => {
+  vi.useFakeTimers()
+  const fixture = rpcClientFixture({ presence: { focused: () => true, subscribe: () => () => {} } })
+  try {
+    const ready = fixture.client.ready()
+    fixture.socket.open()
+    await ready
+    vi.advanceTimersByTime(30_000)
+    expect(sentMessages(fixture.socket).filter((message) => message.kind === 'presence')).toEqual([
+      { kind: 'presence', focused: true },
+      { kind: 'presence', focused: true },
+    ])
+  } finally {
+    fixture.client.close()
+    vi.useRealTimers()
+  }
+})

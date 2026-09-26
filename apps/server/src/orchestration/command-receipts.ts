@@ -2,10 +2,12 @@ import { errorMessage } from '@workspace/contracts'
 import { eq } from 'drizzle-orm'
 import * as v from 'valibot'
 import {
+  isSessionLifecycleCommand,
+  sessionLifecycleResultSchema,
   type OrchestrationCommand,
   type OrchestrationCommandReceipt,
   orchestrationCommandReceiptSchema,
-  type ProjectRegistrationResult,
+  type OrchestrationCommandResult,
   type ClientOrchestrationCommand,
 } from '@workspace/contracts'
 
@@ -46,9 +48,10 @@ export class OrchestrationCommandReceipts {
   recordAccepted(
     command: OrchestrationCommand,
     sequence: number,
-    result: ProjectRegistrationResult | null,
+    result: OrchestrationCommandResult | null,
     intentFingerprint = commandFingerprint(command),
   ) {
+    if (isSessionLifecycleCommand(command.type)) v.parse(sessionLifecycleResultSchema, result)
     const receipt = {
       ...receiptIdentity(command, intentFingerprint),
       error: null,
@@ -201,6 +204,7 @@ export function commandAggregate(command: ReceiptCommand) {
     case 'session.turn.interrupt':
     case 'session.turn.start':
     case 'session.turn.steer':
+    case 'session.lifecycle.restore':
     case 'session.unarchive':
     case 'session.unpin':
     case 'session.unsettle':

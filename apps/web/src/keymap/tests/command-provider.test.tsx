@@ -1,3 +1,5 @@
+import { settingsPageQueryOptions } from '@/features/settings/utils/page-query'
+import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { BUNDLED_THEMES, resolveThemeSettings } from '@workspace/contracts'
 import { wallpaperPng } from '../../../test/factories/wallpaper'
 import { getClient } from '@/lib/client'
@@ -56,6 +58,7 @@ test.each([
   ['workspace.showUsage', 'usage'],
   ['workspace.showTransparencySettings', 'workbench.surface'],
 ] as const)('%s opens the settings controls matching its search', async (command, query) => {
+  await primaryQueryClient().query(settingsPageQueryOptions)
   const queryClient = createTestQueryClient()
   queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, getClient()))
   selectSettingsCategory('Machines')

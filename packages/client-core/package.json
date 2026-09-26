@@ -92,11 +92,10 @@
     "./chat/rail/drop": "./src/chat/rail/drop.ts",
     "./chat/rail/reorder": "./src/chat/rail/reorder.ts",
     "./chat/composer-interaction": "./src/chat/composer-interaction.ts",
-    "./chat/notifications": "./src/chat/notifications.ts",
-    "./chat/rail/status": "./src/chat/rail/status.ts",
     "./chat/rail/snooze": "./src/chat/rail/snooze.ts",
     "./chat/rail/unread": "./src/chat/rail/unread.ts",
     "./chat/rail/multi-select": "./src/chat/rail/multi-select.ts",
+    "./chat/rail/lifecycle-undo": "./src/chat/rail/lifecycle-undo.ts",
     "./chat/providers/models": "./src/chat/providers/models.ts",
     "./chat/providers/auth": "./src/chat/providers/auth.ts",
     "./chat/providers/options": "./src/chat/providers/options.ts",
@@ -106,6 +105,7 @@
     "./chat/context-usage": "./src/chat/context-usage.ts",
     "./files/workspace-address": "./src/files/workspace-address.ts",
     "./chat/worktrees/label": "./src/chat/worktrees/label.ts",
+    "./chat/worktrees/pull-request": "./src/chat/worktrees/pull-request.ts",
     "./chat/worktrees/cleanup": "./src/chat/worktrees/cleanup.ts",
     "./chat/worktrees/commands": "./src/chat/worktrees/commands.ts",
     "./logs/api": "./src/logs/api.ts",
@@ -121,7 +121,8 @@
     "./commands/bindings": "./src/commands/bindings.ts",
     "./chat/worktrees/actions": "./src/chat/worktrees/actions.ts",
     "./chat/worktrees/confirmation": "./src/chat/worktrees/confirmation.ts",
-    "./chat/earlier-pages": "./src/chat/earlier-pages.ts"
+    "./chat/earlier-pages": "./src/chat/earlier-pages.ts",
+    "./history/undo-stack": "./src/history/undo-stack.ts"
   },
   "scripts": {
     "build": "tsgo --noEmit",

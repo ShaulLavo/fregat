@@ -78,6 +78,7 @@ type Options = CaptureSize & {
   readonly url: string
   readonly workspace: string
   readonly server?: IsolatedServer
+  readonly notifications?: boolean
 }
 
 async function main() {
@@ -246,7 +247,11 @@ async function look(options: Options) {
 
 async function runScenario(scenario: Scenario, options: Options) {
   const evidence = await createEvidence('scenario', scenario.name)
-  const capture = { ...options, site: Boolean(scenario.surface) }
+  const capture = {
+    ...options,
+    notifications: scenario.notifications,
+    site: Boolean(scenario.surface),
+  }
   return withPage(capture, evidence, async (page, observed) => {
     const ready =
       scenario.surface === 'site'
@@ -598,10 +603,10 @@ async function withPage(
     browser: Browser,
   ) => Promise<number>,
 ) {
-  const browser = await launch(options.engine, options.headed)
+  const browser = await launch(options.engine, options.headed, options.notifications)
   const context = await browser.newContext({
     // Only Chromium knows these permission names; Firefox and WebKit reject the context.
-    permissions: options.engine === 'chromium' ? ['clipboard-read', 'clipboard-write'] : [],
+    permissions: options.engine === 'chromium' ? chromiumPermissions(options) : [],
     viewport: { width: options.width, height: options.height },
     deviceScaleFactor: options.scale,
     ...(options.productWallpaper ? { userAgent: PRODUCT_USER_AGENT } : {}),
@@ -752,7 +757,12 @@ function isEngine(value: string): value is Engine {
   return (ENGINES as readonly string[]).includes(value)
 }
 
-async function launch(engine: Engine, headed: boolean): Promise<Browser> {
+function chromiumPermissions(options: Options) {
+  const clipboard = ['clipboard-read', 'clipboard-write']
+  return options.notifications ? [...clipboard, 'notifications'] : clipboard
+}
+
+async function launch(engine: Engine, headed: boolean, notifications = false): Promise<Browser> {
   const cache = '/work/cache/ms-playwright'
   if (!process.env.PLAYWRIGHT_BROWSERS_PATH && existsSync(cache)) {
     process.env.PLAYWRIGHT_BROWSERS_PATH = cache
@@ -764,7 +774,12 @@ async function launch(engine: Engine, headed: boolean): Promise<Browser> {
   if (engine !== 'chromium') return playwright[engine].launch({ headless: !headed })
   // Playwright hides scrollbars by default. Users have them, and a scrollbar that appears with
   // content changes every width the app measures.
-  return chromium.launch({ headless: !headed, ignoreDefaultArgs: ['--hide-scrollbars'] })
+  const ignoreDefaultArgs = ['--hide-scrollbars']
+  // The headless shell denies notification permission; full Chromium in headless mode grants it.
+  if (notifications)
+    return chromium.launch({ channel: 'chromium', headless: !headed, ignoreDefaultArgs })
+
+  return chromium.launch({ headless: !headed, ignoreDefaultArgs })
 }
 
 process.exitCode = await main()

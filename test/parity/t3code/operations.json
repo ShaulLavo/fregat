@@ -219,6 +219,7 @@
       "session.create",
       "session.delete",
       "session.interaction-mode.set",
+      "session.lifecycle.restore",
       "session.meta.update",
       "session.pin",
       "session.pin.reorder",

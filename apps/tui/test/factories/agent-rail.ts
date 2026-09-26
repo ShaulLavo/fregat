@@ -11,18 +11,27 @@ import * as v from 'valibot'
 import {
   commandIdSchema,
   sessionIdSchema,
+  worktreeIdSchema,
   DEFAULT_PROVIDER_INSTANCE_ID,
+  type SessionWorktreeTarget,
   type WorktreeId,
+  type WorktreePullRequest,
 } from '@workspace/contracts'
+import { orchestrationForApp } from 'server/testing'
 import type { ChatOwner } from '@workspace/client-core/chat/owner'
 
-export async function createRailSession(chat: ChatOwner, worktreeId: WorktreeId, title: string) {
+export async function createRailSession(
+  chat: ChatOwner,
+  worktreeId: WorktreeId,
+  title: string,
+  worktreeTarget: SessionWorktreeTarget = { kind: 'current', worktreeId },
+) {
   const sessionId = v.parse(sessionIdSchema, crypto.randomUUID())
   await chat.dispatch({
     type: 'session.create',
     commandId: v.parse(commandIdSchema, crypto.randomUUID()),
     sessionId,
-    worktreeTarget: { kind: 'current', worktreeId },
+    worktreeTarget,
     title,
     modelSelection: { providerInstanceId: DEFAULT_PROVIDER_INSTANCE_ID, model: 'gpt-5.5' },
     runtimeMode: 'full-access',
@@ -73,4 +82,33 @@ export async function focusRailSession(
   expect(
     (frame.renderer.currentFocusedRenderable as SelectRenderable).getSelectedOption()?.name,
   ).toContain(title)
+}
+
+/** A session in its own new worktree, with the pull request the forge answered for its branch. */
+export async function createPullRequestRailSession(
+  server: TestServer,
+  chat: ChatOwner,
+  baseWorktreeId: WorktreeId,
+  title: string,
+  pullRequest: WorktreePullRequest,
+) {
+  const worktreeId = v.parse(worktreeIdSchema, crypto.randomUUID())
+  await createRailSession(chat, baseWorktreeId, title, {
+    kind: 'new',
+    worktreeId,
+    baseWorktreeId,
+  })
+  const engine = orchestrationForApp(server.app)
+  await expect
+    .poll(async () => (await engine.readModelSnapshot()).worktrees.get(worktreeId)?.lifecycle.state)
+    .toBe('ready')
+  await engine.dispatch({
+    type: 'worktree.pull-request.sync',
+    commandId: v.parse(commandIdSchema, crypto.randomUUID()),
+    worktreeId,
+    branch: `worktree/${worktreeId}`,
+    pullRequest,
+  })
+  await chat.refresh()
+  return worktreeId
 }

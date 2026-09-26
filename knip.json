@@ -8,6 +8,7 @@
     "apps/server": {
       "entry": [
         "src/provider/claude-discovery-worker.ts",
+        "src/installation/remote-support.ts",
         "scripts/pty-benchmark.ts",
         "scripts/pty-smoke.ts",
         "scripts/workspace-search-benchmark.ts",
@@ -20,6 +21,7 @@
     "apps/web": {
       "entry": [
         "boot.css",
+        "public/sw.js",
         "src/demo-entry.ts",
         "src/dev-entry.tsx",
         "src/features/address/tests/navigation.types.ts",

@@ -502,6 +502,24 @@ describe('defaultPlatformKeyBindings', () => {
     )
   })
 
+  it('binds session Undo to Mod+Z only outside the surfaces that own an undo', () => {
+    const bindings = defaultPlatformKeyBindings('linux')
+    const undoIn = (pane: Parameters<typeof appKeyBindingsForPane>[1]) =>
+      commands(appKeyBindingsForPane(bindings, pane).filter((binding) => binding.keys === 'Mod+Z'))
+
+    const sessionUndo = bindings.filter(
+      (binding) => binding.command === 'workspace.undoSessionAction',
+    )
+    expect(new Set(sessionUndo.map((binding) => binding.keys))).toEqual(new Set(['Mod+Z']))
+    expect(sessionUndo.every((binding) => binding.yieldsToTextEntry)).toBe(true)
+    for (const pane of ['global', 'git', 'logs', 'problems', 'search', 'settings'] as const)
+      expect(undoIn(pane), pane).toEqual(['workspace.undoSessionAction'])
+    expect(undoIn('file-tree')).toEqual(['fileTree.undo'])
+    expect(undoIn('editor')).toContain('editor.undo')
+    for (const pane of ['chat', 'editor', 'terminal', 'file-tree', 'dialog'] as const)
+      expect(undoIn(pane)).not.toContain('workspace.undoSessionAction')
+  })
+
   it('binds file-tree focus globally and file filtering only inside the tree', () => {
     const bindings = defaultPlatformKeyBindings('linux')
 

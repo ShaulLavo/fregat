@@ -28,7 +28,7 @@ export function createBootRuntime(
     )
   if (!cached) useEnvironmentsStore.getState().recordDescriptor(primaryServerOrigin(), descriptor)
   if (cached) useEnvironmentsStore.getState().setPhase(primaryServerOrigin(), 'connecting')
-  primaryQueryClient().setQueryData(environmentQueryKeys.descriptor, descriptor)
+  if (!cached) primaryQueryClient().setQueryData(environmentQueryKeys.descriptor, descriptor)
   const address = intent.address
   const application = createApplicationRuntime({
     workspaceCache: addressedWorkspaceCache(

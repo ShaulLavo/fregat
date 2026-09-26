@@ -9,6 +9,7 @@ import {
 import { observeClientOperation } from '@/lib/client-logging'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { createRpcEventScope } from '@/features/chat/transport/rpc-event-scope'
+import { windowPresence } from '@/features/chat/transport/window-presence'
 
 export type WebOrchestrationRpcClientOptions = Omit<
   OrchestrationRpcClientOptions,
@@ -19,6 +20,7 @@ export function createOrchestrationRpcClient(options: WebOrchestrationRpcClientO
   return new OrchestrationRpcClient({
     ...options,
     beforeRequest: simulateLatency,
+    presence: windowPresence,
     createSocket: options.createSocket ?? ((address) => new WebSocket(address)),
     resolveEndpoint: serverEndpoint,
     environments: useEnvironmentsStore,

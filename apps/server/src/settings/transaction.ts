@@ -15,9 +15,9 @@ import { isRecord } from '@workspace/utils/objects'
 import { fsyncPath } from '../fs/fsync'
 import { textFileVersion } from '../fs/version'
 import { settingsErrors } from './structured-errors'
-import { withSettingsWriteCoordinator } from './write-coordinator'
+import { type SettingsWriteLease, withSettingsWriteCoordinator } from './write-coordinator'
 
-const SECRET_FILE_MODE = 0o600
+export const SECRET_FILE_MODE = 0o600
 const JOURNAL_VERSION = 1
 
 type SettingsTransactionPhase = 'prepared' | 'settings-committed' | 'secrets-committed'
@@ -84,7 +84,7 @@ type TransactionJournal = {
 
 export async function withSettingsSecretTransactionOwner<T>(
   secretsPath: string,
-  operation: () => Promise<T>,
+  operation: (lease: SettingsWriteLease) => Promise<T>,
 ): Promise<T> {
   return withSettingsWriteCoordinator(secretsPath, operation)
 }

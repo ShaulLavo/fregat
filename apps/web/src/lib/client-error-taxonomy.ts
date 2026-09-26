@@ -1,7 +1,7 @@
 import { isConnectivityError } from '@workspace/client-core/transport/connectivity-error'
 import { rpcErrorPayload } from '@workspace/client-core/transport/rpc-error'
 import { isObject } from '@workspace/utils/objects'
-import type { ErrorCategory } from '@workspace/contracts'
+import type { ConnectionError, ErrorCategory } from '@workspace/contracts'
 import { agentErrorReport } from './agent-error-report'
 import { copyTextToClipboard } from './clipboard'
 import { errorMessage } from './error-message'
@@ -117,7 +117,7 @@ function carriesEdenBody(error: Error): boolean {
  * alone names what broke; `fix` is the half that tells the reader what to do,
  * and it reaches the client only because the error envelope carries it.
  */
-export function clientErrorDescription(error: ClientError): string {
+export function clientErrorDescription(error: Pick<ClientError, 'message' | 'fix'>): string {
   if (!error.fix) return error.message
 
   // Catalog messages end without punctuation; a dash joiner collides with the
@@ -126,13 +126,12 @@ export function clientErrorDescription(error: ClientError): string {
   return `${message} ${error.fix}`
 }
 
-/** A failure kept as text: a catalog error keeps its why and fix, which name the cause and the remedy. */
-export function clientErrorText(input: unknown, fallback: string): string {
+/** A connection failure as a machine keeps it: a catalog error keeps its code, why and fix. */
+export function toConnectionError(input: unknown, fallback: string): ConnectionError {
   const error = toClientError(input)
-  if (!error.code) return errorMessage(input, fallback)
-
-  const parts = [error.message, error.why, error.fix].filter((part) => part !== undefined)
-  return parts.map((part) => (/[.!?]$/.test(part) ? part : `${part}.`)).join(' ')
+  if (!error.code)
+    return { code: 'CONNECTION_FAILED', message: errorMessage(input, fallback) || fallback }
+  return { code: error.code, message: error.message, why: error.why, fix: error.fix }
 }
 
 /** Hands the failure to an agent: the catalog's answer plus how to find the log. */
