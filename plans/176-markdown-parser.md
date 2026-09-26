@@ -8,8 +8,8 @@
   spec examples (lezer 662), has no real mismatch on our corpus (lezer about 20), and keystrokes at
   1 MB cost 0.49 ms median, 1.0 ms p95 (lezer 0.59 and 3.0 ms in the same runs). See
   [Custom grammar + Rust resolver spike](#custom-grammar--rust-resolver-spike). The lezer
-  findings below stand as the benchmark it was measured against. Nothing here authorizes
-  implementation.
+  findings below stand as the benchmark it was measured against. Adopted by the owner 2026-09-26
+  (question 1 (d)); the phases below are scheduled in the waves.
   Calibrated 2026-09-26 ([tree-sitter-calibration.md](../docs/markdown-parser/tree-sitter-calibration.md)):
   the 42 ms tree-sitter keystroke was the first reparse of a freshly parsed tree. A careful
   integration of today's grammar costs 2.4 ms at 1 MB.
@@ -262,8 +262,8 @@ an incremental block grammar, per leaf and cached, is the shape that works.
 0. **tree-sitter-md to a release** (M; repository `ShaulLavo/tree-sitter-md`). Vendor
    pulldown-cmark's inline pass with a one-leaf entry point and delete the virtual-indent
    workaround; fix the four spec failures and add a frontmatter switch; cargo tests, the spec floor
-   (672/676), the corpus check and the fuzz test in CI with a wasm build job; choose a license;
-   publish 0.1 to npm. Keep the MIT notices for tree-sitter-markdown, pulldown-cmark, markdown-rs
+   (672/676), the corpus check and the fuzz test in CI with a wasm build job; publish 0.1 to npm
+   (MIT, chosen 2026-09-26; publishing needs the owner's `npm login`). Keep the MIT notices for tree-sitter-markdown, pulldown-cmark, markdown-rs
    and tree-sitter.
 1. **Markdown document in `@singapore-editor/markdown`** (M; Editor `packages/markdown`). Depend
    on `tree-sitter-md`; one `MarkdownDocument` per open markdown file on the main thread, edited
@@ -300,7 +300,7 @@ Chat: no phase while question 2 stands at (a).
    lezer's 662, no real corpus mismatch against lezer's ~20, keystroke at 1 MB 0.49 / 1.0 ms
    (median / p95) against 0.59 / 3.0 ms, first frame 0.36 against 0.47 ms, and one markdown tree
    in the editor. The price is 193 KB gzip against 20 KB and a repository to maintain.
-   Owner, 2026-09-26: not decided yet. The owner reviews the measurements first.
+   Decided 2026-09-26: owner — (d), adopt `tree-sitter-md`. Licence MIT (committed `4214f0c`).
 2. **Chat.** The rule says remark leaves only for a candidate close to micromark with remark's
    features closed. (a) Keep remark in chat. (b) Move chat to lezer, with math and footnote
    extensions, a CJK fork and a lezer-to-mdast adapter. (c) Move chat to tree-sitter-md, with
