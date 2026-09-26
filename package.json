@@ -37,7 +37,7 @@
     "dev:unserve": "bun scripts/dev-serve.ts --remove",
     "dev:tui": "bun scripts/tui.ts",
     "desktop:dev": "bun --env-file=.env scripts/desktop-dev.ts",
-    "lint": "bun run dupes:functions && bun run dupes && bun run --parallel --filter '*' lint",
+    "lint": "bun run dupes:functions && bun run dupes && bun run --parallel --no-exit-on-error --filter '*' lint",
     "design:census": "node scripts/lint/web-design-census.mjs --check",
     "compiler:census": "node scripts/lint/react-compiler-census.mjs --check",
     "errors:census": "node scripts/lint/error-context-census.mjs --check",
