@@ -74,9 +74,9 @@ export function Panel({ className, rootPath }: ComponentProps<'section'> & { roo
         bodyClassName='flex flex-col'
         scroll={false}
         state={{
-          pending: status.isPending,
+          pending: view !== 'graph' && status.isPending,
           error: status.isError && !status.data,
-          empty: !repository,
+          empty: !status.isPending && !repository,
         }}
         loading={<PanelLoading />}
         errorState={
@@ -122,7 +122,7 @@ export function Panel({ className, rootPath }: ComponentProps<'section'> & { roo
         }
       >
         <Activity mode={view === 'graph' ? 'visible' : 'hidden'}>
-          <History key={rootPath} rootPath={rootPath} />
+          <History rootPath={rootPath} />
         </Activity>
         <Activity mode={view === 'changes' ? 'visible' : 'hidden'}>
           {repository ? (

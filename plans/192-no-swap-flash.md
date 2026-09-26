@@ -33,9 +33,9 @@ subjects and reads `blank-frames-0`, like `quick-open-no-flicker`.
 | 2   | `features/command-palette/components/file-preview-panel.tsx`, `lib/file-preview/components/text-preview.tsx` | quick-open highlight         | panel blanks and collapses               | **fixed**     |
 | 3   | `features/command-palette/components/code-theme-preview-panel.tsx`, `lib/code-theme/hooks/use-preview.ts`    | palette theme arrow          | new label over skeleton                  | **fixed**     |
 | 4   | `features/theme-studio/components/code-tab.tsx`                                                              | theme studio list            | skeleton                                 | **fixed**     |
-| 5   | `features/git/components/history.tsx` (`key={selected}`), `commit-details.tsx`, `utils/history-query.ts`     | commit selection             | new hash over skeleton                   | confirmed     |
-| 6   | `features/git/utils/history-query.ts`, `HistoryList key`                                                     | ref switch                   | skeleton, scroll lost (deliberate today) | confirmed     |
-| 7   | `features/git/components/panel.tsx` (`History key={rootPath}`)                                               | root switch                  | remount + skeleton                       | likely        |
+| 5   | `features/git/components/history.tsx` (`key={selected}`), `commit-details.tsx`, `utils/history-query.ts`     | commit selection             | new hash over skeleton                   | **fixed**     |
+| 6   | `features/git/utils/history-query.ts`, `HistoryList key`                                                     | ref switch                   | skeleton, scroll lost (deliberate today) | **fixed**     |
+| 7   | `features/git/components/panel.tsx` (`History key={rootPath}`)                                               | root switch                  | remount + skeleton                       | **fixed**     |
 | 8   | `features/git/components/panel.tsx`, `hooks/use-status.ts`                                                   | root / session worktree      | `PanelLoading`                           | likely        |
 | 9   | `features/chat-mode/components/stage-body.tsx` (`key={sessionId}`), `chat/components/timeline-viewport.tsx`  | session switch               | conversation skeleton under new title    | confirmed     |
 | 10  | `features/chat/components/side-panel-content.tsx`                                                            | side-panel session switch    | same as 9                                | confirmed     |
@@ -95,3 +95,25 @@ Evidence, screenshots read back, on the worker's Vite port 5248 with throwaway A
 
 The baseline's linked font files were blocked by the worktree Vite allow-list; the final runs
 allowed the dependency directory and had no failed requests or error logs. No model was invoked.
+
+## Rows 5–7 proof
+
+Commit details hold the displayed root and commit with `useHeldUntilReady`. History holds its
+root, view and settled search until the requested pages are ready. The status query no longer
+unmounts the graph, and neither History nor CommitDetails remounts on selection. The list resets
+scroll on a ref switch when the new rows arrive, preserving the deliberate behavior in row 6.
+
+`git-history-no-flicker` clicks through commits, refs and two fixture repositories with history
+reads delayed 450 ms. It asserts zero blank frames for each switch and checks every sampled
+commit frame for a matching header hash and message. No provider runs a turn.
+
+| Switch | Before | After |
+| ------ | -----: | ----: |
+| Commit |     60 |     0 |
+| Ref    |     16 |     0 |
+| Root   |     14 |     0 |
+
+- Before: `/work/tmp/fregat-evidence/20260926T184222Z-scenario-git-history-no-flicker/`
+- After: `/work/tmp/fregat-evidence/20260926T185111Z-scenario-git-history-no-flicker/`
+- Screenshots read back. DOM coverage gates a real in-process commit request and verifies the
+  held hash, files and header spinner. The existing first-load panel-state test also passes.

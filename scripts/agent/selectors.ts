@@ -1002,6 +1002,14 @@ export const selectors = {
   worktreeFiles: (page: Page) => page.locator('[data-git-file]:not([data-history-file])'),
   historyList: (page: Page) => page.getByRole('listbox', { name: 'Commit history' }),
   historyRowSelector: '[data-history-commit]',
+  historyFileSelector: '[data-history-file]',
+  historyDetailsFrameSampler: `() => {
+    const details = document.querySelector('[aria-label="Commit details"]')
+    return {
+      hash: details?.querySelector('[aria-label="Commit information"]')?.getAttribute('title'),
+      subject: details?.querySelector('p')?.textContent,
+    }
+  }`,
   logRowSelector: '[data-log-row-summary]',
   /** Every rendered assistant answer in the chat timeline, for page-side frame samplers. */
   chatMarkdownSelector: '[role="log"][aria-label="Messages"] [data-chat-markdown]',
@@ -1024,6 +1032,8 @@ export const selectors = {
   historyDetails: (page: Page) => page.getByRole('region', { name: 'Commit details' }),
   historyInformation: (page: Page) =>
     page.getByRole('button', { name: 'Commit information', exact: true }),
+  historyInformationFor: (page: Page, commit: string) =>
+    page.locator('[aria-label="Commit information"]').and(page.locator(`[title="${commit}"]`)),
   historyCopyMessage: (page: Page) =>
     page.getByRole('button', { name: 'Copy message', exact: true }),
   historySearch: (page: Page) => page.getByRole('textbox', { name: 'Search commit history' }),
