@@ -569,24 +569,26 @@ Requested 2026-09-25. A survey of 14 component libraries
 ([docs/ui-research](docs/ui-research/README.md)) listed what to take for the base components, chat
 surfaces, the file picker and the site. The owner is taking it one topic at a time.
 
-| Plan                                          | Owns                                                                                                                      |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| [157](plans/157-base-components.md)           | Tabs, scroll fades, hold-to-confirm, status dots, typeahead refine; queued next                                           |
-| [158](plans/158-app-polish.md)                | Tail following with "N new" in `VirtualList`, secrets display, checkpoint restore, branch lanes, boot frame               |
-| [159](plans/159-file-picker.md)               | File and folder picker rewrite: columns, real previews, thumbnails, history keys                                          |
-| 160 (done, lane L2)                           | Reasoning fold, turn receipts, live tail, model marker, tool details, plan steps, subagents, ultra sparkle                |
-| 161 (done, lane L2)                           | Approval lifecycle, stopped turns, streaming holds, folding rules, hostile-state scenarios                                |
-| ~~162~~                                       | Done 2026-09-25 (lane L3): context breakdown, usable window, session total, usage-page honesty                            |
-| 163 (done, lane L2)                           | Screenshot attachment in the composer (export shipped with Plan 145)                                                      |
-| [164](plans/164-what-feels-right-in-neon.md)  | First pass shipped (Inter, one mono, `section-label`, radius); a metadata font sweep is left                              |
-| 165 (done)                                    | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                                    |
-| [166](plans/166-shortcuts-editor.md)          | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, several per command                |
-| [154](plans/154-physical-mode.md)             | The seamui feel (springs, depth, motion in every primitive) and interface sounds                                          |
-| [155](plans/155-site-demo-replica.md)         | Placeholder: the site hero becomes an animated replica of the app, like cursor.com                                        |
-| [156](plans/156-documents-in-the-editor.md)   | Placeholder, far future: PDF, DOCX, XLSX, PPTX and CSV as editor documents agents can edit                                |
-| [178](plans/178-tree-in-the-app.md)           | Plan of plans: the file tree rebuilt on app primitives (VirtualList, useListbox, dnd-kit, icons, Tailwind) at full parity |
-| [179](plans/179-isolating-foreign-content.md) | Where a shadow root earns its place: mermaid, previews, an editor style-recalc experiment                                 |
-| [180](plans/180-file-icon-variants.md)        | Quick research: more glyphs, variants and per-mode colours from the icon pack we already use                              |
+| Plan                                            | Owns                                                                                                                      |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| [157](plans/157-base-components.md)             | Tabs, scroll fades, hold-to-confirm, status dots, typeahead refine; queued next                                           |
+| [158](plans/158-app-polish.md)                  | Tail following with "N new" in `VirtualList`, secrets display, checkpoint restore, branch lanes, boot frame               |
+| [159](plans/159-file-picker.md)                 | File and folder picker rewrite: columns, real previews, thumbnails, history keys                                          |
+| 160 (done, lane L2)                             | Reasoning fold, turn receipts, live tail, model marker, tool details, plan steps, subagents, ultra sparkle                |
+| 161 (done, lane L2)                             | Approval lifecycle, stopped turns, streaming holds, folding rules, hostile-state scenarios                                |
+| ~~162~~                                         | Done 2026-09-25 (lane L3): context breakdown, usable window, session total, usage-page honesty                            |
+| 163 (done, lane L2)                             | Screenshot attachment in the composer (export shipped with Plan 145)                                                      |
+| [164](plans/164-what-feels-right-in-neon.md)    | First pass shipped (Inter, one mono, `section-label`, radius); a metadata font sweep is left                              |
+| 165 (done)                                      | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                                    |
+| [166](plans/166-shortcuts-editor.md)            | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, several per command                |
+| [154](plans/154-physical-mode.md)               | The seamui feel (springs, depth, motion in every primitive) and interface sounds                                          |
+| [155](plans/155-site-demo-replica.md)           | Placeholder: the site hero becomes an animated replica of the app, like cursor.com                                        |
+| [156](plans/156-documents-in-the-editor.md)     | Placeholder, far future: PDF, DOCX, XLSX, PPTX and CSV as editor documents agents can edit                                |
+| [178](plans/178-tree-in-the-app.md)             | Plan of plans: the file tree rebuilt on app primitives (VirtualList, useListbox, dnd-kit, icons, Tailwind) at full parity |
+| [179](plans/179-isolating-foreign-content.md)   | Where a shadow root earns its place: mermaid, previews, an editor style-recalc experiment                                 |
+| [180](plans/180-file-icon-variants.md)          | Quick research: more glyphs, variants and per-mode colours from the icon pack we already use                              |
+| [181](plans/181-chat-timeline-end-anchoring.md) | The chat timeline on TanStack's end anchoring after a 3.14.13 upgrade; prerequisite to 178's virtualization               |
+| [182](plans/182-search-view-rendering.md)       | Quick research: why the full search view renders slowly, and what would fix it                                            |
 
 Suggested order:
 
@@ -604,6 +606,8 @@ Suggested order:
 8. Plan 178: the parity harness first, then out-of-the-root and app-owned state; Q1–Q5 before the
    sub-plans they gate. Plan 179's Phase 0 instruments (style recalc split out of `trace`) any time;
    its editor experiment reuses Plan 178's scroll baseline.
+9. Plan 181 before Plan 178's virtualization sub-plan: it upgrades TanStack Virtual and makes the
+   `VirtualList` key stable, which 178 builds on. Plan 182's research any time.
 
 ## Parked plans
 

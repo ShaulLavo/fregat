@@ -1,7 +1,9 @@
 # Plan 178: virtualization on VirtualList
 
-- Status: PROPOSED. Size L. After [app-owned-state](app-owned-state.md); before
-  [keyboard-and-selection](keyboard-and-selection.md) and [drag-and-drop](drag-and-drop.md).
+- Status: PROPOSED. Size L. After [app-owned-state](app-owned-state.md) and
+  [Plan 181](../181-chat-timeline-end-anchoring.md) (TanStack upgrade, stable key, chat on end
+  anchoring); before [keyboard-and-selection](keyboard-and-selection.md) and
+  [drag-and-drop](drag-and-drop.md).
 - Owns: teaching `VirtualList` what the tree's windowing does, then deleting the tree's windowing.
 
 ## Outcome
@@ -10,6 +12,18 @@ The tree windows through `VirtualList`. `VirtualList` gains sticky ancestor chai
 rows, a count-based mode for very large lists, scroll padding under sticky rows, and a reveal
 settlement signal. Search results, git changes, diagnostics and references can then pin their group
 headers with the same feature.
+
+## Owner direction
+
+2026-09-26: TanStack Virtual is the app's one virtualizer. The tree's windowing ideas move into
+`VirtualList`; no second, hand-rolled virtualizer is kept for fixed-height lists. The full search
+view keeps its own windowing ([Plan 182](../182-search-view-rendering.md)); the sidebar search list
+is already a `VirtualList` consumer. The chat fix runs first as Plan 181.
+
+Measured the same day (latest `virtual-core`, Bun, core only, 20px rows): a row-count change costs
+0.10 ms at 10k rows, 0.81 ms at 100k and 4.0 ms at 500k; a scroll step 3–5 µs at any size. The tree
+rebuilds its own visible projection on every expand anyway (`#rebuildVisibleProjection`, a full
+pass), so TanStack's pass adds under a millisecond at 100k. The browser `trace` below stays the proof.
 
 ## Today
 
@@ -31,8 +45,8 @@ center`, measured below the sticky rows; smooth falls back to `auto` under reduc
 
 **`VirtualList`** (`packages/ui/src/patterns/virtual-list.tsx`, TanStack Virtual 3.14.2):
 
-- Needs a full `items` array; passes a new `getItemKey` each render; `'use no memo'`. Each scroll
-  frame likely rebuilds every position (confirm with `trace` at 100k rows).
+- Needs a full `items` array; `'use no memo'`. It passed a new `getItemKey` each render, which
+  rebuilt every position per render (0.9 ms at 100k); Plan 181 makes the key stable.
 - Keeps one extra row mounted (`activeIndex`, `:94-104`).
 - No sticky rows; `rangeExtractor` is not exposed.
 - `scrollToIndex` with `auto | start | center | end`; no completion signal, no `scrollPaddingStart`.
@@ -40,9 +54,8 @@ center`, measured below the sticky rows; smooth falls back to `auto` under reduc
 
 ## Extensions
 
-1. **Count mode.** `count` + `getItem(index)` beside `items`, with a stable `getItemKey`. The tree
-   feeds it from `getVisibleRows` without materializing 100k rows. Logs and the chat timeline gain
-   cheaper renders from the stable key alone.
+1. **Count mode.** `count` + `getItem(index)` beside `items`, on the stable `getItemKey` from
+   Plan 181. The tree feeds it from `getVisibleRows` without materializing 100k rows.
 2. **Kept rows.** `keepMounted: number[]` replaces the single `activeIndex`. The tree keeps the
    cursor row and the dragged rows.
 3. **Sticky chain.** `getStickyChain(firstVisibleIndex) → indices` rendered as an overlay with
@@ -72,9 +85,10 @@ in `FileTreeView.tsx`, parked-row code in `focusHelpers.ts`, `scrollTarget.ts`, 
 ## Verification
 
 - `trace tree-sticky-scroll --compare` and `trace` on `workspace-open-large-root` against the
-  baseline. The count mode is expected to beat both today's `VirtualList` and the tree.
+  baseline. Count mode is expected to land within about a millisecond of the tree per expand at
+  100k rows, and to match it per scroll frame. `directDomUpdates` follows Plan 181's verdict.
 - `renders` per scroll frame.
 - Harness sticky states. Existing `VirtualList` consumers: `look` and their scenarios
   (`git-changes-scroll`, chat, logs, search).
-- A first adopter of the sticky chain outside the tree (search result file headers) proves the
+- A first adopter of the sticky chain outside the tree (the sidebar search results' file group rows) proves the
   feature is general.

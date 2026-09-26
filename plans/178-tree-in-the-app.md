@@ -8,6 +8,8 @@
   plan after the owner widened it (below).
 - Effort: thirteen sub-plans, S to L. Each ships and deploys on its own and leaves the tree working.
 - Companion: [Plan 179](179-isolating-foreign-content.md) looks at where a shadow root does help.
+- Prerequisite: [Plan 181](181-chat-timeline-end-anchoring.md) (TanStack upgrade, stable
+  `VirtualList` key, the chat on end anchoring) lands before the virtualization sub-plan.
 
 ## Outcome
 
@@ -41,6 +43,11 @@ sub-plan adopt it. Where the tree does something better than the app, the app al
   terminals included, so future integrations (anything into the chat, across machines) need no
   rework. **The other duplicates** — filter matching, path helpers, sort order, errors — are part
   of this plan too.
+- 2026-09-26, virtualization: **TanStack everywhere.** The tree's windowing ideas become
+  `VirtualList` features; no second virtualizer (measured: TanStack adds under 1 ms per expand at
+  100k rows). The full search view keeps its own windowing, which has its own problems
+  ([Plan 182](182-search-view-rendering.md)); the sidebar search list is already on `VirtualList`. The chat fix is a
+  prerequisite plan, [Plan 181](181-chat-timeline-end-anchoring.md).
 
 ## Why the tree is separate today
 
@@ -89,7 +96,7 @@ recovery, raw hex, and hand-written motion.
 | [icons](178-tree-in-the-app/icons.md)                                   | One icon path and sprite for every file row; icon hues as tokens                                                  | S–M  | app-owned-state      | every `FileTypeIcon` user                                                     |
 | [chrome](178-tree-in-the-app/chrome.md)                                 | `FilterField`, `InlineRenameInput`, shared scrollbar, real-row skeleton                                           | M    | app-owned-state      | five filter fields, session and terminal rename                               |
 | [context-menu](178-tree-in-the-app/context-menu.md)                     | `useListContextMenu` over `MenuSurface`                                                                           | S–M  | app-owned-state      | git changes, session rail, search results                                     |
-| [virtualization](178-tree-in-the-app/virtualization.md)                 | `VirtualList` gains count mode, kept rows, sticky chains, scroll padding, settlement                              | L    | app-owned-state      | search, git changes, diagnostics headers; logs, chat                          |
+| [virtualization](178-tree-in-the-app/virtualization.md)                 | `VirtualList` gains count mode, kept rows, sticky chains, scroll padding, settlement                              | L    | app-owned-state, 181 | git changes, diagnostics headers; logs, chat                                  |
 | [keyboard-and-selection](178-tree-in-the-app/keyboard-and-selection.md) | Shared selection model, multi-select `useListbox`, tree commands in the keymap                                    | L    | virtualization       | session rail                                                                  |
 | [drag-and-drop](178-tree-in-the-app/drag-and-drop.md)                   | Tree on dnd-kit through the one app-wide drag layer; typed drops on composer and editor                           | L    | virtualization, rows | editor tabs, session rail, terminal list, composer                            |
 | [helpers](178-tree-in-the-app/helpers.md)                               | One filter matcher, path helper set, file-order comparator and error catalog, shared with the app                 | M    | app-owned-state      | quick open, search, git, chat turn files, file picker, filter fields          |
