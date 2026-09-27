@@ -16,6 +16,7 @@ export type PressTiming = {
   readonly colourMs: number | null
   readonly previewMs: number | null
   readonly frames: number
+  readonly uncoloredTextFrames: number
 }
 
 // Page scripts are strings: the scripts project compiles without the DOM lib.
@@ -66,5 +67,6 @@ export async function measurePress(
     colourMs: firstMs((frame) => frame.text && frame.colour),
     previewMs: firstMs((frame) => frame.text && frame.preview),
     frames: after.length,
+    uncoloredTextFrames: after.filter((frame) => frame.text && !frame.colour).length,
   }
 }

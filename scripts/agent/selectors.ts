@@ -1330,6 +1330,8 @@ export async function settleAnimations(target: Locator) {
   })
 }
 
+export const provisionalTokenSelector = '[data-editor-provisional-row] span[style*="color"]'
+
 /** The colors the shared-token CSS highlights actually paint on an element. */
 export function paintedTokenColors(target: Locator): Promise<string[]> {
   return target.evaluate((element) =>
