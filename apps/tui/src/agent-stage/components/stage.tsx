@@ -1,6 +1,7 @@
+import { useStore } from 'zustand'
 import type { ProviderSnapshot } from '@workspace/contracts'
 import { writeFile } from 'node:fs/promises'
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRenderer, useTerminalDimensions } from '@opentui/react'
 import {
   createApprovalRespondCommand,
@@ -75,8 +76,10 @@ export function AgentStage({
   const state = useStage({ ready, target, onSelect })
   const navigation = useAgentNavigation()
   const { focus } = useCommands()
-  const focusSnapshot = useSyncExternalStore(focus.subscribe, focus.getSnapshot)
-  const overlayFocused = focusSnapshot.current?.capabilities.overlay === true
+  const overlayFocused = useStore(
+    focus.store,
+    (state) => state.current?.capabilities.overlay === true,
+  )
   const host = useHostActions()
   const renderer = useRenderer()
   const { width, height } = useTerminalDimensions()

@@ -1,6 +1,7 @@
+import { useStore } from 'zustand'
 import type { SettingsOwner } from '@workspace/client-core/settings/owner'
 import { useTerminalDimensions } from '@opentui/react'
-import { useLayoutEffect, useState, useSyncExternalStore } from 'react'
+import { useLayoutEffect, useState } from 'react'
 
 import { useCommands } from '@/commands/hooks/use-commands'
 import { useCommandFocus } from '@/commands/hooks/use-command-focus'
@@ -32,8 +33,10 @@ export function KeybindingEditor({
   const lifetime = useEditorLifetime(onClose)
   const { height } = useTerminalDimensions()
   const short = height < 20
-  const settings = useSyncExternalStore(owner.subscribe, owner.getSnapshot)
-  const overrides = settings.projection.values['keybindings.overrides']
+  const overrides = useStore(
+    owner.store,
+    (state) => state.projection.values['keybindings.overrides'],
+  )
   const [state, setState] = useState<KeybindingEditorState>({ kind: 'select' })
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState(0)

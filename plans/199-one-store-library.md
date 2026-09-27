@@ -3,7 +3,8 @@
 ## Status and authorization
 
 - Status: IN PROGRESS 2026-09-27. The rule landed in AGENTS.md ("React"). All of A that moves (A1, A2, A4–A6, A8 keep-alive),
-  B1–B4, D1 and D5 are done; A3, A7, D4 and the preview budget stay (reasons below). C is left.
+  B1–B4, D1 and D5 are done; A3, A7, D4 and the preview budget stay (reasons below).
+  TUI C2–C4 are done; C1, C5 and C6 are left.
 - Origin: owner, 2026-09-27: "we prob abuse useSyncExternalStore too hard". Afterwards the owner
   approved the survey: hand-built stores become zustand, zustand stores read without a selector
   get selectors, snapshots that derive per read are cut down, and the TUI is in scope.
@@ -107,6 +108,21 @@ whole snapshot. `apps/tui/src/host/state/observable-store.ts` is a hand-built va
 | C7  | `theme/hooks/use-theme.ts`, `use-system-color-mode.ts`                                                                                                                                                                                                                                                                                 | renderer events                                                                                              | keep (rule 3)                                                                                                                     |
 
 Order: C4 first (every settings reader), C2 (hottest path), C3, C5, then C1 and C6.
+
+Done: `SettingsOwner`, `ChatOwner` and `FocusRegistry` keep their state in an exposed zustand
+`store`; `getSnapshot`/`subscribe` stay for the 198 imperative reads and two non-React subscribers.
+C4: `useSettingValue` selects its key; `settings/tests/use-setting-value.test.tsx` failed before
+(another key's write re-rendered a reader twice) and passes after. C2: the workspace reads places
+through `files/hooks/use-places.ts`, which selects the four projection references session events
+leave alone; `files/tests/use-places.test.tsx` shows no re-render across streamed replies while a
+whole-snapshot reader re-renders, and fails when the hook selects the whole projection. The rail,
+agent screen and manager select their fields; the palette and stage read the whole store.
+C3: focus readers select their field, except `commands/hooks/use-pane-focus.ts`, which keeps the
+whole snapshot: `useCommandFocus` refreshes availability and re-activates in every render, and six
+approval tests in `agent-stage/tests/requests.test.tsx` fail without those renders. Moving that
+refresh into the registry would let it narrow too.
+TUI suite in this container: 400 pass; 4 fail identically on the base commit (Bun 1.3.11 against
+the pinned 1.4.2: a SQLite message, git worktree cleanup, two manager dialogs).
 `apps/tui/package.json` gains `zustand`, pinned to the version client-core already uses.
 
 ### D. Snapshots that derive per read

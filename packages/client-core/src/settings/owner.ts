@@ -1,4 +1,5 @@
 import { QueryClient, QueryObserver, notifyManager } from '@tanstack/query-core'
+import { createStore } from 'zustand/vanilla'
 import {
   errorNumberField,
   errorStringField,
@@ -48,7 +49,6 @@ export class SettingsOwner {
   private readonly queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   })
-  private readonly listeners = new Set<() => void>()
   private readonly controller = new AbortController()
   private readonly admission
   private readonly observer
@@ -56,7 +56,8 @@ export class SettingsOwner {
   private readonly unsubscribeIntents
   private readonly options
   private confirmed: SettingsSnapshot
-  private state
+  /** What the owner publishes; components select from it with `useStore`. */
+  readonly store
   private queue: Promise<void> = Promise.resolve()
   private streamStop: SettingsStreamStop | null = null
   private started = false
@@ -75,7 +76,7 @@ export class SettingsOwner {
       options.initialSnapshot,
     )
     this.queryClient.setQueryData(settingsKeys.document(), accepted)
-    this.state = this.project()
+    this.store = createStore(() => this.project())
     this.observer = new QueryObserver<SettingsSnapshot>(this.queryClient, {
       queryKey: settingsKeys.document(),
       staleTime: Infinity,
@@ -88,14 +89,11 @@ export class SettingsOwner {
     this.unsubscribeIntents = settingsIntentStore.subscribe(() => this.publish())
   }
 
-  getSnapshot = () => this.state
+  getSnapshot = () => this.store.getState()
 
   readSettingsMirror = () => this.confirmed.values
 
-  subscribe = (listener: () => void) => {
-    this.listeners.add(listener)
-    return () => this.listeners.delete(listener)
-  }
+  subscribe = (listener: () => void) => this.store.subscribe(() => listener())
 
   start() {
     if (this.started || this.controller.signal.aborted) return
@@ -165,7 +163,7 @@ export class SettingsOwner {
   retry = (mutationId: string) => {
     if (
       this.controller.signal.aborted ||
-      !this.state.failures.some((entry) => entry.intentId === mutationId)
+      !this.getSnapshot().failures.some((entry) => entry.intentId === mutationId)
     )
       return
     const entry = retrySettingsIntent(mutationId)
@@ -173,7 +171,7 @@ export class SettingsOwner {
   }
 
   discard = (mutationId: string) => {
-    if (!this.state.failures.some((entry) => entry.intentId === mutationId)) return
+    if (!this.getSnapshot().failures.some((entry) => entry.intentId === mutationId)) return
     discardFailedSettingsIntent(mutationId)
     if (this.controller.signal.aborted) this.publish()
   }
@@ -187,8 +185,7 @@ export class SettingsOwner {
     for (const entry of activeSettingsIntentsFor(this.queryClient)) {
       discardSettingsIntent(entry.intentId)
     }
-    this.state = this.project()
-    for (const listener of this.listeners) listener()
+    this.store.setState(this.project(), true)
   }
 
   dispose() {
@@ -196,8 +193,7 @@ export class SettingsOwner {
     this.disposed = true
     this.pause()
     this.admission.resetSettingsSnapshotAdmission(this.queryClient)
-    this.listeners.clear()
-    for (const entry of this.state.failures) discardFailedSettingsIntent(entry.intentId)
+    for (const entry of this.getSnapshot().failures) discardFailedSettingsIntent(entry.intentId)
     this.queryClient.clear()
   }
 
@@ -217,8 +213,7 @@ export class SettingsOwner {
 
   private publish() {
     if (this.disposed) return
-    this.state = this.project()
-    for (const listener of this.listeners) listener()
+    this.store.setState(this.project(), true)
   }
 
   private enqueue(entry: ActiveSettingsIntent) {

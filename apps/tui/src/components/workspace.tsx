@@ -5,7 +5,7 @@ import { toWorkspaceAbsolute, toWorkspaceRelative } from '@workspace/client-core
 import { AgentScreen } from '@/agent/components/screen'
 import { agentHome, type AgentLocation } from '@/agent/utils/target'
 import { rememberAgent, rememberedAgent } from '@/agent/utils/location'
-import { currentWorktree, selectedWorktree } from '@/agent/utils/selection'
+import { selectedWorktree } from '@/agent/utils/selection'
 import { parsePickerPathInput } from '@workspace/client-core/files/path-input'
 import { createTuiError } from '@/host/utils/structured-errors'
 import { connectionFailure } from '@/connection/utils/failure'
@@ -21,6 +21,7 @@ import { CommandPalette } from '@/commands/components/palette'
 import { ShortcutHelp } from '@/commands/components/help'
 import { SettingsBrowser } from '@/settings/components/browser'
 import { FileView } from '@/files/components/view'
+import { usePlaces } from '@/files/hooks/use-places'
 import { AddressDialog } from '@/navigation/components/address'
 import type { NavigationHistory } from '@/navigation/state/history'
 import type { DialogKind, Overlay } from '@/navigation/utils/overlay'
@@ -58,7 +59,7 @@ export function Workspace({
   const search = useRef(settingsQuery)
   const navigationRequest = useRef(0)
   const navigation = useSyncExternalStore(history.subscribe, history.getSnapshot)
-  const chat = useSyncExternalStore(state.chat.subscribe, state.chat.getSnapshot)
+  const places = usePlaces(state.chat)
   useLayoutEffect(() => {
     const remember = () => {
       const location = history.getSnapshot().current
@@ -449,11 +450,7 @@ export function Workspace({
             initialPath={location.path}
             initialQuery={location.query}
             onQueryChange={updateFileQuery}
-            places={chat.projection.projectIds.flatMap((id) => {
-              const project = chat.projection.projectById[id]
-              const worktree = currentWorktree(chat.projection, id)
-              return worktree ? [{ name: project.title, path: worktree.path }] : []
-            })}
+            places={places}
             onLocationChange={recordLocation}
             onOpenWorkbench={openWorkbench}
             onOpenFile={location.workbenchRoot === undefined ? undefined : openBrowserFile}

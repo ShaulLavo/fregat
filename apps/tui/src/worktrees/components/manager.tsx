@@ -1,4 +1,6 @@
-import { useState, useSyncExternalStore } from 'react'
+import { useStore } from 'zustand'
+import { useShallow } from 'zustand/react/shallow'
+import { useState } from 'react'
 import type { OrchestrationProjectShell, WorktreeId } from '@workspace/contracts'
 import type { ChatOwner } from '@workspace/client-core/chat/owner'
 import { useCommandFocus } from '@/commands/hooks/use-command-focus'
@@ -32,15 +34,23 @@ export function WorktreeManager({
   readonly onOpenWorkbench?: (path: string) => void | Promise<void>
 }) {
   const commands = useCommands()
-  const snapshot = useSyncExternalStore(chat.subscribe, chat.getSnapshot)
+  const snapshot = useStore(
+    chat.store,
+    useShallow(({ projection, status, error }) => ({
+      worktreeIds: projection.worktreeIds,
+      worktreeById: projection.worktreeById,
+      status,
+      error,
+    })),
+  )
   const [selected, setSelected] = useState(0)
   const [detailId, setDetailId] = useState<WorktreeId | null>(null)
-  const worktrees = snapshot.projection.worktreeIds.flatMap((id) => {
-    const worktree = snapshot.projection.worktreeById[id]
+  const worktrees = snapshot.worktreeIds.flatMap((id) => {
+    const worktree = snapshot.worktreeById[id]
     return worktree ? [worktree] : []
   })
   const options = worktreeChoices({ worktrees, project, value: currentWorktreeId, query: '' })
-  const detail = detailId ? snapshot.projection.worktreeById[detailId] : undefined
+  const detail = detailId ? snapshot.worktreeById[detailId] : undefined
   useCommandFocus(
     {
       ...commands.focus.getSnapshot().scope,

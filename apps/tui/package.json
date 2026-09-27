@@ -27,7 +27,8 @@
     "evlog": "catalog:",
     "react": "^19.3.0",
     "shiki": "4.4.3",
-    "valibot": "^1.5.0"
+    "valibot": "^1.5.0",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@types/bun": "1.4.2",

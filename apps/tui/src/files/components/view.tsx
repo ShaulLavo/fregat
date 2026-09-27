@@ -1,3 +1,4 @@
+import { useStore } from 'zustand'
 import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore } from 'react'
 import { isDirectoryEntry } from '@workspace/contracts'
 import { useKeyboard, useTerminalDimensions } from '@opentui/react'
@@ -77,13 +78,14 @@ export function FileView({
   }
   const commands = useCommands()
   const registry = commands.focus
-  const focusState = useSyncExternalStore(registry.subscribe, registry.getSnapshot)
-  const target = focusState.current?.capabilities.overlay
-    ? focusState.lastCommandTarget
-    : (focusState.requested?.target ?? focusState.current)
+  const targetWidgetId = useStore(registry.store, (state) =>
+    state.current?.capabilities.overlay
+      ? state.lastCommandTarget?.widgetId
+      : (state.requested?.target ?? state.current)?.widgetId,
+  )
   let focus: PickerFocus = 'filter'
-  if (target?.widgetId === 'file-picker-path') focus = 'path'
-  if (target?.widgetId === 'file-picker-places') focus = 'places'
+  if (targetWidgetId === 'file-picker-path') focus = 'path'
+  if (targetWidgetId === 'file-picker-places') focus = 'places'
   const filterFocused = usePaneFocus({
     id: 'file-picker-filter',
     area: 'file-tree',

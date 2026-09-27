@@ -1,3 +1,4 @@
+import { useStore } from 'zustand'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ClientOrchestrationCommand, SessionWorktreeTarget } from '@workspace/contracts'
 import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
@@ -31,7 +32,7 @@ export function useStage({
 }) {
   const [drafts] = useState(() => draftsForStorage(ready.storage))
   useSyncExternalStore(drafts.subscribe, drafts.getSnapshot)
-  const snapshot = useSyncExternalStore(ready.chat.subscribe, ready.chat.getSnapshot)
+  const snapshot = useStore(ready.chat.store)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const inFlight = useRef(false)

@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react'
+import { useStore } from 'zustand'
 import type { FocusArea } from '@workspace/client-core/commands/focus'
 import { useCommands } from '@/commands/hooks/use-commands'
 import { useCommandFocus } from '@/commands/hooks/use-command-focus'
@@ -15,7 +15,9 @@ export function usePaneFocus({
   readonly textEntry?: boolean
 }) {
   const { focus } = useCommands()
-  const snapshot = useSyncExternalStore(focus.subscribe, focus.getSnapshot)
+  // Whole snapshot on purpose: useCommandFocus refreshes availability and re-activates on every
+  // render, and approvals and overlays depend on that happening for each focus change.
+  const snapshot = useStore(focus.store)
   const target = snapshot.requested?.target ?? snapshot.current
   const focused = enabled && target?.widgetId === id
   useCommandFocus(

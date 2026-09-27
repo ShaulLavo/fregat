@@ -1,3 +1,4 @@
+import { useStore } from 'zustand'
 import { matchingSettingIds } from '@workspace/client-core/settings/search'
 import { useKeyboard, useTerminalDimensions } from '@opentui/react'
 import type { SettingsOwner } from '@workspace/client-core/settings/owner'
@@ -8,7 +9,7 @@ import {
   type SettingId,
   type SettingsWriteTarget,
 } from '@workspace/contracts'
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { Select } from '@/components/select'
 import { Details } from '@/settings/components/details'
@@ -49,7 +50,7 @@ export function SettingsBrowser({
   readonly onDialogChange?: (open: boolean) => void
   readonly onQueryChange?: (query: string) => void
 }) {
-  const state = useSyncExternalStore(owner.subscribe, owner.getSnapshot)
+  const state = useStore(owner.store)
   const snapshot = {
     ...state.snapshot,
     values: state.projection.values,
@@ -74,7 +75,7 @@ export function SettingsBrowser({
   const compact = width < 80
   const fields = selectedId ? settingRowIds(selectedId) : []
   const commands = useCommands()
-  const scope = useSyncExternalStore(commands.focus.subscribe, commands.focus.getSnapshot).scope
+  const scope = useStore(commands.focus.store, (state) => state.scope)
   const returnFocus = useRef<FocusToken | null>(null)
   const [restoreAfterClose, setRestoreAfterClose] = useState(false)
   useEffect(() => {

@@ -1,4 +1,6 @@
-import { useState, useSyncExternalStore } from 'react'
+import { useStore } from 'zustand'
+import { useShallow } from 'zustand/react/shallow'
+import { useState } from 'react'
 import { useTerminalDimensions } from '@opentui/react'
 import type { SessionId } from '@workspace/contracts'
 import { AgentRail } from '@/agent-rail/components/rail'
@@ -33,8 +35,13 @@ export function AgentScreen({
 }) {
   const { width, height } = useTerminalDimensions()
   const commands = useCommands()
-  const snapshot = useSyncExternalStore(ready.chat.subscribe, ready.chat.getSnapshot)
-  const focus = useSyncExternalStore(commands.focus.subscribe, commands.focus.getSnapshot)
+  const snapshot = useStore(
+    ready.chat.store,
+    useShallow(({ projection, status, error }) => ({ projection, status, error })),
+  )
+  const focusedTarget = useStore(commands.focus.store, (state) =>
+    state.current?.capabilities.overlay ? state.lastCommandTarget : state.current,
+  )
   const [railVisible, setRailVisible] = useState(true)
   const [terminal, setTerminal] = useState<{
     location: AgentLocation
@@ -56,9 +63,6 @@ export function AgentScreen({
     !!location.worktreeId &&
     !snapshot.projection.worktreeById[location.worktreeId]
   const narrow = width < 100
-  const focusedTarget = focus.current?.capabilities.overlay
-    ? focus.lastCommandTarget
-    : focus.current
   const railFocused = focusedTarget?.widgetId.startsWith('agent-rail') === true
   const showRail = railVisible && (!narrow || railFocused || !target)
   const showStage = !narrow || !showRail
