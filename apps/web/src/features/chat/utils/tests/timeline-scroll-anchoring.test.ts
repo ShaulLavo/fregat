@@ -192,9 +192,22 @@ test('a user scrolling up mid-stream stops the transcript following', () => {
   // Further stream chunks and their scroll events must not drag them back.
   const streamed = timelineScrollReducer(navigated, itemsChanged('message:u1'))
   expect(streamed).toBe(navigated)
-  expect(timelineScrollReducer(navigated, { atContentEnd: false, type: 'scrolled' })).toBe(
-    navigated,
-  )
+  const away = timelineScrollReducer(navigated, { atContentEnd: false, type: 'scrolled' })
+  expect(away.followMode).toBe('free-scrolling')
+})
+
+test('a scroll event at the end that lands after the gesture does not re-arm follow', () => {
+  // The event reports where the view was before the wheel moved it.
+  const navigated = timelineScrollReducer(afterInitialScroll(openedSession()), {
+    type: 'user-navigated',
+  })
+
+  const stale = timelineScrollReducer(navigated, { atContentEnd: true, type: 'scrolled' })
+  const away = timelineScrollReducer(stale, { atContentEnd: false, type: 'scrolled' })
+  const back = timelineScrollReducer(away, { atContentEnd: true, type: 'scrolled' })
+
+  expect(stale.followMode).toBe('free-scrolling')
+  expect(back.followMode).toBe('following-end')
 })
 
 test('a small scroll off the live edge is not re-armed back into follow', () => {
@@ -206,9 +219,9 @@ test('a small scroll off the live edge is not re-armed back into follow', () => 
   const nudgedOffTheEnd = viewport({ contentHeight: 2000, scrollTop: 1390 })
 
   expect(isTimelineAtContentEnd(nudgedOffTheEnd)).toBe(false)
-  expect(timelineScrollReducer(navigated, { atContentEnd: false, type: 'scrolled' })).toBe(
-    navigated,
-  )
+  expect(
+    timelineScrollReducer(navigated, { atContentEnd: false, type: 'scrolled' }).followMode,
+  ).toBe('free-scrolling')
 })
 
 test('scrolling back to the very end re-arms follow and releases the anchor', () => {
@@ -218,9 +231,10 @@ test('scrolling back to the very end re-arms follow and releases the anchor', ()
   )
   const measured = timelineScrollReducer(anchored, { endSpace: 240, type: 'anchor-measured' })
   const navigated = timelineScrollReducer(measured, { type: 'user-navigated' })
+  const away = timelineScrollReducer(navigated, { atContentEnd: false, type: 'scrolled' })
 
   expect(isTimelineAtContentEnd(viewport({ contentHeight: 2000, scrollTop: 1400 }))).toBe(true)
-  const rearmed = timelineScrollReducer(navigated, { atContentEnd: true, type: 'scrolled' })
+  const rearmed = timelineScrollReducer(away, { atContentEnd: true, type: 'scrolled' })
 
   expect(rearmed.followMode).toBe('following-end')
   expect(rearmed.anchorItemId).toBeNull()

@@ -6,7 +6,7 @@ import { createGitFixture, fixtureGit, releaseFixture } from '../fixture-workspa
 import { chatMessagesLogSelector, selectors } from '../selectors'
 import { sendPrompt, withUserSetting } from './native-provider-verification'
 import { isolatedNativeScenario } from './native-provider-verification'
-import { streamCompleted } from './stream-frames'
+import { fixtureEvent, streamCompleted } from './stream-frames'
 
 /**
  * Chat scroll behaviours: the transcript stays at its end while it follows, the park keeps the
@@ -35,12 +35,18 @@ type ScrollFrame = {
   readonly rows: number
   /** Which animation frame the sample belongs to; a painted sample shares its frame's number. */
   readonly frame: number
+  /** Which transcript element was sampled; a new number means the transcript remounted. */
+  readonly element: number
 }
 
 // Page scripts are strings: the scripts project compiles without the DOM lib.
 const startScrollRecorder = `(logSelector) => {
-  const recorder = { frames: [], running: true, reference: null, frame: 0 }
+  const recorder = { frames: [], running: true, reference: null, frame: 0, elements: new WeakMap(), mounts: 0 }
   window.__chatScrollRecorder = recorder
+  const mountOf = (element) => {
+    if (!recorder.elements.has(element)) recorder.elements.set(element, ++recorder.mounts)
+    return recorder.elements.get(element)
+  }
   const record = (phase) => {
     const log = document.querySelector(logSelector)
     if (log) {
@@ -61,6 +67,7 @@ const startScrollRecorder = `(logSelector) => {
         phase,
         rows: log.querySelectorAll('[data-index]').length,
         frame: recorder.frame,
+        element: mountOf(log),
       })
     }
   }
@@ -133,6 +140,11 @@ async function seedHistory(page: Page) {
 }
 
 /** Resolves once the streaming answer is taller than the part of the viewport below its prompt. */
+/** Resolves once the fixture has streamed every chunk and holds the turn open. */
+async function streamHeld(root: string) {
+  await fixtureEvent(root, 'stream-held', 'The fixture never held its streamed answer')
+}
+
 async function answerOverflows(page: Page) {
   await page.waitForFunction(
     `(() => {
@@ -157,7 +169,10 @@ async function wheelOverLog(page: Page, deltaY: number) {
 /** Every frame as `referenceTop@scrollTop/endHidden`, for a failure's log. */
 function series(frames: readonly ScrollFrame[]) {
   return frames
-    .map((frame) => `${frame.referenceTop}@${frame.scrollTop}/${frame.endHidden?.toFixed(0)}`)
+    .map(
+      (frame) =>
+        `${frame.referenceTop}@${frame.scrollTop}/${frame.endHidden?.toFixed(0)}${frame.pinned ? 'p' : ''}#${frame.element}`,
+    )
     .join(' ')
 }
 
@@ -287,8 +302,9 @@ async function readerHeld(
   label: string,
 ) {
   await seedHistory(page)
+  await writeFile(join(context.root, 'hold-turn'), 'yes')
   await withUserSetting(page, context.orchestration, TOKEN_STREAMING, async () => {
-    await sendPrompt(page, 'STREAM a long answer.')
+    await sendPrompt(page, 'TOOLS then a long answer.')
     await answerOverflows(page)
     await startRecording(page)
     await wheelOverLog(page, wheel)
@@ -298,26 +314,25 @@ async function readerHeld(
     await context.step(`${label}-scrolled-up`)
     await page.waitForTimeout(2_000)
     await context.step(`${label}-while-streaming`)
-    await streamCompleted(context.root)
+    await streamHeld(context.root)
     await page.waitForTimeout(500)
     const frames = await stopRecording(page)
     await context.step(`${label}-stream-done`)
-    // The settled turn trades its Working row above the answer for a status row below it, which
-    // moves an answer being read by one row; streaming may not.
-    const finalLength = Math.max(...frames.map((frame) => frame.textLength))
-    const streaming = frames.filter((frame) => frame.textLength < finalLength)
-    const tracked = streaming.filter((frame) => frame.referenceTop !== null)
+    // Settling folds the turn's work above the answer, which moves an answer being read by the
+    // work it hides; the recording ends before it.
+    await writeFile(join(context.root, 'settle-turn'), 'yes')
+    await streamCompleted(context.root)
+    const tracked = frames.filter((frame) => frame.referenceTop !== null)
     const first = tracked[0]?.referenceTop ?? 0
     const moved = tracked.filter((frame) => Math.abs((frame.referenceTop ?? 0) - first) > 1)
-    const settled = frames.at(-1)?.referenceTop
     console.log(
-      `chat-scroll ${label}: reference ${reference} top ${describe(tracked, (frame) => frame.referenceTop)} while streaming, ${settled} settled`,
+      `chat-scroll ${label}: reference ${reference} top ${describe(tracked, (frame) => frame.referenceTop)}`,
     )
     if (moved.length > 0) console.log(`chat-scroll ${label}: ${series(frames)}`)
     ok(tracked.length > 10, `The reference row stayed rendered (${tracked.length} frames)`)
     ok(
       moved.length === 0,
-      `${moved.length} of ${tracked.length} streaming frames moved the row under the reader (${describe(tracked, (frame) => frame.referenceTop)})`,
+      `${moved.length} of ${tracked.length} frames moved the row under the reader (${describe(tracked, (frame) => frame.referenceTop)})`,
     )
     const jump = selectors.timelineJumpToLatest(page)
     ok(
@@ -330,7 +345,7 @@ async function readerHeld(
 export const chatScrollReaderHeld = isolatedNativeScenario({
   name: 'chat-scroll-reader-held',
   description:
-    'Scroll up into history while an answer streams: the row under the reader does not move and the jump button is offered.',
+    'Scroll up into history while a tool turn streams its answer and the transcript follows it: the row under the reader does not move and the jump button is offered.',
   fixture,
   async drive(page, context) {
     await readerHeld(page, context, -900, 'history')
@@ -340,7 +355,7 @@ export const chatScrollReaderHeld = isolatedNativeScenario({
 export const chatScrollFoldHeld = isolatedNativeScenario({
   name: 'chat-scroll-fold-held',
   description:
-    'Scroll up a little while an answer streams, so the growing answer spans the fold: it grows downward without dragging the view.',
+    'Scroll up a little while a tool turn streams its answer and the transcript follows it, so the growing answer spans the fold: it grows downward without dragging the view.',
   fixture,
   async drive(page, context) {
     await readerHeld(page, context, -160, 'fold')
@@ -350,12 +365,12 @@ export const chatScrollFoldHeld = isolatedNativeScenario({
 export const chatScrollJump = isolatedNativeScenario({
   name: 'chat-scroll-jump',
   description:
-    'Scroll up while an answer streams, press the jump button: the view returns to the end and follows the rest of the stream.',
+    'Scroll up while a tool turn streams its answer, press the jump button: the view returns to the end and every painted frame follows the rest of the stream.',
   fixture,
   async drive(page, { step, orchestration, root }) {
     await seedHistory(page)
     await withUserSetting(page, orchestration, TOKEN_STREAMING, async () => {
-      await sendPrompt(page, 'STREAM a long answer.')
+      await sendPrompt(page, 'TOOLS then a long answer.')
       await answerOverflows(page)
       await wheelOverLog(page, -900)
       await page.waitForTimeout(400)
@@ -368,13 +383,19 @@ export const chatScrollJump = isolatedNativeScenario({
       await step('jumped')
       await streamCompleted(root)
       await page.waitForTimeout(500)
-      const frames = await stopRecording(page)
+      const painted = paintedFrames(await stopRecordingAll(page))
       await step('stream-done')
-      const hidden = frames.filter((frame) => (frame.endHidden ?? 0) > 2)
-      console.log(`chat-scroll-jump: end hidden ${describe(frames, (frame) => frame.endHidden)}`)
+      const offEnd = painted.filter((frame) => frame.distance > TIMELINE_END_SLACK_PX)
+      console.log(
+        `chat-scroll-jump: painted distance ${describe(painted, (frame) => frame.distance)}`,
+      )
       ok(
-        hidden.length === 0,
-        `${hidden.length} of ${frames.length} frames after the jump hid the growing end (${describe(frames, (frame) => frame.endHidden)})`,
+        painted.every((frame) => frame.pinned),
+        'The transcript follows its end after the jump',
+      )
+      ok(
+        offEnd.length === 0,
+        `${offEnd.length} of ${painted.length} painted frames after the jump sat off the end; worst ${Math.max(...offEnd.map((frame) => frame.distance))} px`,
       )
       ok((await jump.getAttribute('tabindex')) === '-1', 'The jump button hides at the end')
     })

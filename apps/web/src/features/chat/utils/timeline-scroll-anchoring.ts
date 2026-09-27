@@ -16,17 +16,14 @@ const TIMELINE_FOLLOW_REARM_BAND_PX = 40
 
 /**
  * Slack allowed when testing whether the viewport is parked on the scroll
- * bottom, here and as the virtualizer's `scrollEndThreshold`. Only
+ * bottom. Only
  * fractional-pixel noise, never a usable gesture distance — a band here would
  * swallow small scrolls whole (see `isTimelineAtContentEnd`).
  */
-export const TIMELINE_END_THRESHOLD_PX = 2
+const TIMELINE_END_THRESHOLD_PX = 2
 
-/**
- * The virtualizer's end threshold while the reader is away from the end: no distance is that
- * close, so it never pins a growing last row or follows an append.
- */
-export const TIMELINE_RELEASED_THRESHOLD_PX = -1
+/** The virtualizer's end threshold: no distance is that close, so it never pins the end itself. */
+export const TIMELINE_UNPINNED_THRESHOLD_PX = -1
 
 /**
  * Space reserved below the last row so the final line never sits flush against
@@ -85,6 +82,11 @@ export interface TimelineScrollState {
   readonly latestUserItemId: string | null
   readonly parkedAnchorItemId: string | null
   readonly pendingInitialScroll: boolean
+  /**
+   * A scroll event has shown the reader away from the end since they last navigated. Until one
+   * has, an event at the end is the move that preceded the gesture, which must not re-arm follow.
+   */
+  readonly readerLeftEnd: boolean
   readonly sessionId: string | null
 }
 
@@ -95,6 +97,8 @@ export type TimelineScrollEvent =
   | { readonly type: 'jump-to-end' }
   | { readonly type: 'user-navigated' }
   | { readonly type: 'scrolled'; readonly atContentEnd: boolean }
+  /** A settled disclosure's measured position: read after the gesture, so it may re-arm follow. */
+  | { readonly type: 'disclosure-settled'; readonly atContentEnd: boolean }
   | {
       readonly latestUserItemId: string | null
       readonly sessionId: string
@@ -109,6 +113,7 @@ export const initialTimelineScrollState: TimelineScrollState = {
   latestUserItemId: null,
   parkedAnchorItemId: null,
   pendingInitialScroll: false,
+  readerLeftEnd: false,
   sessionId: null,
 }
 
@@ -222,10 +227,13 @@ export function timelineScrollReducer(
       return { ...state, parkedAnchorItemId: state.anchorItemId }
     case 'scrolled':
       return reduceScrolled(state, event.atContentEnd)
+    case 'disclosure-settled':
+      if (state.followMode !== 'free-scrolling') return state
+      return reduceScrolled({ ...state, readerLeftEnd: true }, event.atContentEnd)
     case 'user-navigated':
       if (state.followMode === 'free-scrolling') return state
 
-      return { ...state, followMode: 'free-scrolling' }
+      return { ...state, followMode: 'free-scrolling', readerLeftEnd: false }
     case 'jump-to-end':
       return { ...state, ...releasedAnchor(), followMode: 'following-end' }
   }
@@ -270,8 +278,12 @@ function reduceScrolled(state: TimelineScrollState, atContentEnd: boolean): Time
   // do not re-arm either, or the first streamed chunk would repin to the bottom
   // and undo the anchor.
   if (state.followMode === 'anchoring-new-turn') return state
-  if (!atContentEnd) return state
+  if (!atContentEnd) {
+    if (state.followMode !== 'free-scrolling' || state.readerLeftEnd) return state
+    return { ...state, readerLeftEnd: true }
+  }
   if (state.followMode === 'following-end') return state
+  if (!state.readerLeftEnd) return state
 
   // Back at the live edge: release the anchor. Its reserved end space sits
   // entirely below the viewport at this point, so collapsing it moves nothing.

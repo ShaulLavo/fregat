@@ -163,6 +163,7 @@ export function timelineInitialView(
     sessionId: session.id,
     latestUserItemId: resolveTimelineAnchorItemId(items),
     followMode: saved.followEnd ? 'following-end' : 'free-scrolling',
+    readerLeftEnd: !saved.followEnd,
   }
   return { offset, measurements, rect: { width: saved.width, height: saved.height }, scrollState }
 }

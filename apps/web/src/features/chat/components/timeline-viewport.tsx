@@ -11,7 +11,7 @@ import { TailJumpButton } from '@workspace/ui/patterns/tail-jump-button'
 import { TickerNumber } from '@/components/ticker-number'
 import { useTimelineArrivals } from '@/features/chat/hooks/use-timeline-arrivals'
 import { useLiveEntrances } from '@/features/chat/hooks/use-live-entrances'
-import { useEffect, useEffectEvent, useLayoutEffect, type Dispatch } from 'react'
+import { useEffect, useLayoutEffect, useRef, type Dispatch } from 'react'
 import type { VirtualListLayout } from '@workspace/ui/patterns/virtual-list'
 import type { ChatSession } from '@workspace/client-core/chat/types'
 import type { ChatTimelineItem } from '@/features/chat/utils/timeline-items'
@@ -39,7 +39,7 @@ import {
 import {
   applyTimelineScroll,
   holdTimelineMeasurements,
-  releaseTimelineEnd,
+  scrollTimelineToEnd,
   type DisclosureSettle,
 } from '@/features/chat/state/timeline-scroll'
 import { ChatWelcomeView } from '@/features/chat/components/chat-welcome-view'
@@ -88,9 +88,10 @@ export function TimelineViewport({
       (viewportHeight > 0 && contentHeight <= viewportHeight)) &&
     virtualItems[0]?.index === 0
 
+  const following = scrollState.followMode === 'following-end'
   useLayoutEffect(
-    () => holdTimelineMeasurements(virtualizer, disclosureSettling),
-    [disclosureSettling, virtualizer],
+    () => holdTimelineMeasurements(virtualizer, disclosureSettling || following),
+    [disclosureSettling, following, virtualizer],
   )
   useTimelineReveal({ dispatch, items, sessionId: session.id, virtualizer })
 
@@ -132,18 +133,24 @@ export function TimelineViewport({
     virtualizer,
   ])
 
-  const holdEndOnResize = useEffectEvent((element: HTMLDivElement) => {
-    if (scrollState.followMode !== 'following-end') return
-    element.scrollTop = element.scrollHeight
-  })
+  // Set from the committed mode, and cleared by a gesture before the render that follows it: a
+  // resize landing in between would otherwise pull the reader back and swallow the gesture.
+  const holdingEnd = useRef(false)
+  useLayoutEffect(() => {
+    holdingEnd.current = following && !disclosureSettling
+  }, [disclosureSettling, following])
 
-  // A growing composer shortens the viewport; the virtualizer only hears of it on its next
-  // render, a frame late, so the end is held from the resize itself, before the frame paints.
+  // Following holds the end from the resize itself, before the frame paints: rows growing, rows
+  // arriving, and a composer growing under the transcript all land here.
   useEffect(() => {
     if (!scrollElement) return
 
-    const observer = new ResizeObserver(() => holdEndOnResize(scrollElement))
+    const holdEnd = () => {
+      if (holdingEnd.current) scrollTimelineToEnd(scrollElement)
+    }
+    const observer = new ResizeObserver(holdEnd)
     observer.observe(scrollElement)
+    if (scrollElement.firstElementChild) observer.observe(scrollElement.firstElementChild)
     return () => observer.disconnect()
   }, [scrollElement])
 
@@ -153,10 +160,13 @@ export function TimelineViewport({
     return attachTimelineNavigationListeners({
       element: scrollElement,
       dispatch: (event) => {
-        if (event.type === 'user-navigated') releaseTimelineEnd(virtualizer)
+        if (event.type === 'user-navigated') holdingEnd.current = false
         dispatch(event)
       },
-      suspendForDisclosure: (disclosure) => onDisclosureSettle({ disclosure, measured: false }),
+      suspendForDisclosure: (disclosure) => {
+        holdingEnd.current = false
+        onDisclosureSettle({ disclosure, measured: false })
+      },
       scrollToStart: () => virtualizer.scrollToOffset(0),
     })
   }, [dispatch, onDisclosureSettle, scrollElement, virtualizer])
@@ -183,19 +193,13 @@ export function TimelineViewport({
     onDisclosureSettle(null)
     dispatch({
       atContentEnd: isTimelineAtContentEnd(readTimelineViewport(scrollElement)),
-      type: 'scrolled',
+      type: 'disclosure-settled',
     })
   }, [disclosureSettle, dispatch, onDisclosureSettle, scrollElement])
 
   useEffect(() => {
     const capture = () =>
-      captureTimelineReload(
-        environmentId,
-        session,
-        items,
-        virtualizer,
-        scrollState.followMode === 'following-end',
-      )
+      captureTimelineReload(environmentId, session, items, virtualizer, following)
     const flush = () => {
       capture()
       flushTimelineReload(environmentId)
@@ -208,7 +212,7 @@ export function TimelineViewport({
       remove()
       scrollElement?.removeEventListener('scroll', capture)
     }
-  }, [environmentId, items, session, scrollElement, scrollState.followMode, virtualizer])
+  }, [environmentId, following, items, session, scrollElement, virtualizer])
 
   if (items.length === 0) {
     return session.detailSynced ? (
@@ -239,6 +243,7 @@ export function TimelineViewport({
       viewport: readTimelineViewport(scrollElement),
     })
     // Release follow before jumping so the next render cannot pull the reader back.
+    holdingEnd.current = false
     dispatch({ type: 'user-navigated' })
     virtualizer.scrollToOffset(scrollTop, { behavior: 'auto' })
   }
@@ -261,7 +266,7 @@ export function TimelineViewport({
       <div
         aria-label='Messages'
         className='focus-ring-inset scroll-fade scroll-gutter data-pinned:scroll-pinned h-full overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 outline-none sm:px-5'
-        data-pinned={scrollState.followMode === 'following-end' ? '' : undefined}
+        data-pinned={following ? '' : undefined}
         ref={scrollRef}
         role='log'
         tabIndex={0}

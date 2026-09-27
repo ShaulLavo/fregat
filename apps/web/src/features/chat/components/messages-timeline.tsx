@@ -11,8 +11,7 @@ import {
   initialTimelineScrollState,
   timelineScrollReducer,
   TIMELINE_COMPOSER_INSET_PX,
-  TIMELINE_END_THRESHOLD_PX,
-  TIMELINE_RELEASED_THRESHOLD_PX,
+  TIMELINE_UNPINNED_THRESHOLD_PX,
   TIMELINE_TOP_INSET_PX,
 } from '@/features/chat/utils/timeline-scroll-anchoring'
 import { TimelineRow } from '@/features/chat/components/timeline-row'
@@ -58,10 +57,10 @@ export function MessagesTimeline({
     setDisclosureSettle(null)
   }
   useReasoningAutoFold(items, scrollState.followMode !== 'free-scrolling')
-  // The park and a settling disclosure each hold a row still; end anchoring would pull the
-  // growing end into view instead.
-  const endAnchored = scrollState.followMode !== 'anchoring-new-turn' && disclosureSettle === null
-  const following = scrollState.followMode === 'following-end'
+  // End anchoring holds a reader in history when a page lands above them. Following is the
+  // viewport's own: in flow layout the rows grow before the virtualizer measures them, and its end
+  // pin would count that growth twice. A settling disclosure holds its own row still.
+  const readerAnchored = scrollState.followMode === 'free-scrolling' && disclosureSettle === null
 
   return (
     <VirtualList
@@ -75,9 +74,8 @@ export function MessagesTimeline({
       measureItems
       paddingStart={TIMELINE_TOP_INSET_PX}
       paddingEnd={TIMELINE_COMPOSER_INSET_PX + scrollState.anchoredEndSpace}
-      anchorTo={endAnchored ? 'end' : 'start'}
-      followOnAppend={following}
-      scrollEndThreshold={following ? TIMELINE_END_THRESHOLD_PX : TIMELINE_RELEASED_THRESHOLD_PX}
+      anchorTo={readerAnchored ? 'end' : 'start'}
+      scrollEndThreshold={TIMELINE_UNPINNED_THRESHOLD_PX}
       contentClassName='[overflow-anchor:none]'
       renderRow={(item) => (
         <TimelineRow

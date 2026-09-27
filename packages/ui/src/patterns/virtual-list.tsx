@@ -50,12 +50,10 @@ export type VirtualListProps<T> = Omit<ComponentProps<'div'>, 'children' | 'ref'
   scrollPaddingStart?: number
   /**
    * `end` holds the row under the reader when rows land above it (a prepended page) and keeps a
-   * list sitting at its end there while its last row grows. Needs keys that survive a prepend.
+   * list sitting within `scrollEndThreshold` of its end there while its last row grows. Needs keys
+   * that survive a prepend.
    */
   anchorTo?: 'start' | 'end'
-  /** With `anchorTo: 'end'`, scrolls to rows appended while the list sat at its end. */
-  followOnAppend?: boolean | 'smooth'
-  /** How close to the end, in pixels, counts as sitting at it. */
   scrollEndThreshold?: number
   scrollRef?: RefObject<HTMLDivElement | null>
   handleRef?: Ref<VirtualListHandle>
@@ -89,7 +87,6 @@ export function VirtualList<T>({
   scrollMargin = 0,
   scrollPaddingStart = 0,
   anchorTo,
-  followOnAppend,
   scrollEndThreshold,
   scrollRef,
   handleRef,
@@ -127,7 +124,6 @@ export function VirtualList<T>({
     scrollMargin,
     scrollPaddingStart,
     anchorTo,
-    followOnAppend,
     scrollEndThreshold,
     rangeExtractor: (range) => {
       const indices = defaultRangeExtractor(range)

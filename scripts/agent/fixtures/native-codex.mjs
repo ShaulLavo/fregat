@@ -88,6 +88,19 @@ const promptText = (message) =>
 /** Streams `chunks` as deltas `delayMs` apart, then settles the message and the turn. */
 function streamAnswer(turn, itemId, chunks, delayMs) {
   const next = (index) => {
+    // A scenario that writes `hold-turn` keeps the turn running until it writes `settle-turn`.
+    if (
+      index === chunks.length &&
+      existsSync(join(root, 'hold-turn')) &&
+      !existsSync(join(root, 'settle-turn'))
+    ) {
+      if (!existsSync(join(root, 'held'))) {
+        writeFileSync(join(root, 'held'), 'yes')
+        record({ event: 'stream-held', itemId })
+      }
+      setTimeout(() => next(index), 50)
+      return
+    }
     if (index === chunks.length) {
       agentMessage(turn, itemId, chunks.join(''))
       endTurn(turn, 'completed')
