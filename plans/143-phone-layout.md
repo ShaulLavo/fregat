@@ -770,4 +770,10 @@ choices opened a second sheet on top. Redesign:
 - [x] Verify Settings entry, tab switching, collapse and dirty discard at 1440/390/320px.
       WebKit `20260927T101546Z-scenario-theme-studio-settings` passes; screenshots read.
       Known isolated provider update 500s remain. Web typecheck, design/compiler census and lint pass.
-- [ ] Commit, push, deploy to Mesh and inspect the served phone UI.
+- [x] Chromium `20260927T101611Z-scenario-theme-studio-settings` also passes.
+- [x] Commit/push `d874e641a`; full pre-commit gates and repository typechecks pass.
+      Mesh `20260927T101704Z-d874e641-phone-theme-studio` serves that commit with zero dirty
+      files and a passed live check. Live touch WebKit at 390px opens Studio from Settings,
+      switches to Surfaces and closes. Read both production screenshots on the Mac:
+      `node_modules/.cache/studio-mobile/live-open.png` and `live-surfaces.png`.
+      Physical iPhone was not tested; no persisted appearance or provider state was changed.
