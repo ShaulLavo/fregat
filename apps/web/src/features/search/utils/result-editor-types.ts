@@ -1,4 +1,4 @@
-import type { SearchResultId } from '@/features/search/utils/result-items'
+import type { SearchResultFileEditorLineWindow } from '@/features/search/utils/result-editor'
 import type { SearchResultVirtualRow } from '@/features/search/utils/result-view-model'
 import type {
   SearchResultVirtualListMetrics,
@@ -23,16 +23,11 @@ export type SearchResultRenderedFileResultItem = SearchResultRenderedVirtualItem
   readonly row: Extract<SearchResultVirtualRow, { type: 'file-results' }>
 }
 
-export type SearchResultFileEditorPoolEntry = {
+export type SearchResultFileEditorSlot = {
+  readonly key: string
   readonly item: SearchResultRenderedFileResultItem
-  readonly key: SearchResultId
+  readonly lineWindow: SearchResultFileEditorLineWindow
   readonly visible: boolean
-}
-
-export type SearchResultFileEditorPoolState = {
-  readonly entries: readonly SearchResultFileEditorPoolEntry[]
-  readonly items: ReadonlyMap<SearchResultId, SearchResultRenderedFileResultItem>
-  readonly keys: readonly SearchResultId[]
 }
 
 export type SearchResultVirtualOverscanLevel = 0 | 1 | 2

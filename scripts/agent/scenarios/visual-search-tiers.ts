@@ -5,7 +5,13 @@ import { openFileByName, selectors } from '../selectors'
 import type { Scenario } from './index'
 import { paintVisualSearch, settledVisualSearch } from './visual-search-drive'
 
-type Tier = { readonly name: string; readonly query: string }
+type Tier = {
+  readonly name: string
+  readonly query: string
+  /** Keeps a dense tier under the backend's 20,000-match cap, so every run sees the same files. */
+  readonly include?: string
+  readonly opening: string
+}
 type PhaseCounters = {
   readonly tier: string
   readonly phase: string
@@ -16,21 +22,25 @@ type PhaseCounters = {
   readonly editorHostsMounted: number
   readonly editorHostsRemoved: number
   readonly editorHostsLive: number
+  readonly nodesAdded: number
+  readonly nodesRemoved: number
+  readonly highlightRanges: number
   readonly scrollHeight: number
   readonly summary: string | null
 }
 
 const TIERS: readonly Tier[] = [
-  { name: 'narrow', query: 'createError' },
-  { name: 'broad', query: 'useState' },
-  { name: 'pathological', query: 'a' },
+  { name: 'narrow', query: 'createError', opening: 'useSettingValue' },
+  { name: 'broad', query: 'useState', opening: 'useSettingValue' },
+  // About 17,000 matches in 32 files: few files, each with hundreds of matches.
+  { name: 'pathological', query: 'a', include: 'apps/server/src/fs/tests/**', opening: 'expect' },
 ]
 const EDITOR_HOST_CLASS = 'search-result-file-editor-host'
 const inspections = new WeakMap<Page, PhaseCounters[]>()
 
 // Page scripts are strings: the scripts project compiles without the DOM lib.
 const installProbe = `(() => {
-  const probe = { frames: 0, longTasks: [], mounted: 0, removed: 0, running: true }
+  const probe = { frames: 0, longTasks: [], mounted: 0, removed: 0, added: 0, dropped: 0, running: true }
   window.__searchViewProbe = probe
   const frame = () => {
     if (!probe.running) return
@@ -54,6 +64,8 @@ const installProbe = `(() => {
     for (const record of records) {
       probe.mounted += countHosts(record.addedNodes)
       probe.removed += countHosts(record.removedNodes)
+      probe.added += record.addedNodes.length
+      probe.dropped += record.removedNodes.length
     }
   }).observe(document.body, { childList: true, subtree: true })
 })()`
@@ -67,11 +79,16 @@ const readProbe = `(() => {
     mounted: probe.mounted,
     removed: probe.removed,
     live: document.getElementsByClassName('${EDITOR_HOST_CLASS}').length,
+    nodesAdded: probe.added,
+    nodesRemoved: probe.dropped,
+    highlightRanges: Array.from(CSS.highlights.values()).reduce((count, highlight) => count + highlight.size, 0),
   }
   probe.frames = 0
   probe.longTasks = []
   probe.mounted = 0
   probe.removed = 0
+  probe.added = 0
+  probe.dropped = 0
   return snapshot
 })()`
 
@@ -82,6 +99,9 @@ type ProbeSnapshot = {
   readonly mounted: number
   readonly removed: number
   readonly live: number
+  readonly nodesAdded: number
+  readonly nodesRemoved: number
+  readonly highlightRanges: number
 }
 
 /**
@@ -104,7 +124,11 @@ async function runTier(page: Page, tier: Tier, step: (label: string) => Promise<
   inspections.set(page, counters)
   await openFileByName(page, 'README.md')
   await selectors.sidebarTab(page, 'Search').click()
-  await selectors.workspaceSearch(page).fill('useSettingValue')
+  if (tier.include) {
+    await selectors.searchFilterToggle(page).click()
+    await selectors.searchInclude(page).fill(tier.include)
+  }
+  await selectors.workspaceSearch(page).fill(tier.opening)
   await settledVisualSearch(page)
   await selectors.openSearchEditor(page).click()
   await paintedRows(page)
@@ -130,6 +154,9 @@ async function runTier(page: Page, tier: Tier, step: (label: string) => Promise<
       editorHostsMounted: probe.mounted,
       editorHostsRemoved: probe.removed,
       editorHostsLive: probe.live,
+      nodesAdded: probe.nodesAdded,
+      nodesRemoved: probe.nodesRemoved,
+      highlightRanges: probe.highlightRanges,
       scrollHeight: await selectors.searchEditor(page).evaluate((element) => element.scrollHeight),
       summary: summary?.split(' · ')[0] ?? null,
     })
