@@ -93,8 +93,8 @@ export function ChatInputActions({
       ref={actionsRef}
     >
       <div className='flex min-w-0 items-center justify-between gap-2'>
-        {/* What the message is sent with on the left, readouts and Send on the right. On a
-            phone the 40px targets already space the glyphs, so the gap goes to the model name. */}
+        {/* Every control and readout in one run from the left; Send stands alone in the corner.
+            On a phone the 40px targets already space the glyphs, so the gap goes to the model name. */}
         <div className='phone:gap-0 flex min-w-0 flex-1 items-center gap-1'>
           <ModelPicker busy={busy} disabled={disabled} narrow={narrow} />
           <ComposerControlsMenu
@@ -115,16 +115,6 @@ export function ChatInputActions({
             disabled={disabled}
             onSelectFiles={onSelectImageFiles}
           />
-          {statusLabel && !compact ? (
-            <span
-              className='text-muted-foreground text-2xs min-w-0 flex-1 truncate pl-1'
-              title={statusLabel}
-            >
-              {statusLabel}
-            </span>
-          ) : null}
-        </div>
-        <div className='flex shrink-0 items-center gap-1'>
           {contextMeterEnabled && contextUsage && !tiny ? (
             <ContextUsageRing
               compact={compact}
@@ -139,6 +129,16 @@ export function ChatInputActions({
           {accountUsage && !tiny ? (
             <UsageLimitsMeter account={accountUsage} compact={compact} />
           ) : null}
+          {statusLabel && !compact ? (
+            <span
+              className='text-muted-foreground text-2xs min-w-0 flex-1 truncate pl-1'
+              title={statusLabel}
+            >
+              {statusLabel}
+            </span>
+          ) : null}
+        </div>
+        <div className='flex shrink-0 items-center gap-1'>
           <PromptStashBadge disabled={disabled} draftTarget={draftTarget} />
           <ChatInputSubmitButton
             correctionDisabledReason={correctionDisabledReason}

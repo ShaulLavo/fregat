@@ -21,7 +21,7 @@ const usageRoute = /\/providers\/usage(\?|$)/
 export const phoneComposer: Scenario = {
   name: 'phone-composer',
   description:
-    'At a touch phone viewport (320, 390, 430): the composer controls are one row of equal squares after the model name, Send sits evenly in the corner, the empty field is one line, and every control opens.',
+    'At a touch phone viewport (320, 390, 430): the composer controls and plan gauge are one even run of equal squares after the model name, Send sits alone and evenly in the corner, the empty field is one line, and every control opens (the gauge through to Settings › Usage).',
   capture: { width: 390, height: 844, scale: 2, touch: true },
   requiresIsolatedServer: true,
   async run(page, { step }) {
@@ -87,9 +87,7 @@ export const phoneComposer: Scenario = {
         selectors.popupMenu(page),
       )
       await opens(page, step, 'attach', selectors.chatAttach(page), () => selectors.popupMenu(page))
-      await opens(page, step, 'usage', selectors.usageMeter(page), () =>
-        selectors.usagePopover(page),
-      )
+      await exerciseUsage(page, step)
     } catch (error) {
       await step('failed')
       throw error
@@ -100,6 +98,21 @@ export const phoneComposer: Scenario = {
       await releaseFixture(fixture)
     }
   },
+}
+
+/** The plan gauge opens its windows, and View usage leads on to Settings › Usage. */
+async function exerciseUsage(page: Page, step: (label: string) => Promise<void>) {
+  await selectors.usageMeter(page).click()
+  await selectors.usagePopover(page).waitFor()
+  // The fixture's Codex account has two live windows; its expired one must not show.
+  const rows = await selectors.usageWindowRows(page).count()
+  ok(rows === 2, `The usage popover lists ${rows} windows`)
+  await page.waitForTimeout(250)
+  await step('usage-open')
+  await selectors.usageMeterViewUsage(page).click()
+  await selectors.usageSection(page).waitFor({ timeout: 20_000 })
+  await selectors.usagePopover(page).waitFor({ state: 'hidden' })
+  await step('usage-settings')
 }
 
 /** Taps a control, checks what it opens is on screen, and closes it with Escape. */
@@ -121,8 +134,8 @@ async function opens(
 }
 
 /**
- * Every icon control is the same square, spaced alike, on one line; Send is as far from the
- * surface's right edge as from its bottom; the model keeps its full name from 390px up.
+ * Every icon control is the same square, spaced alike in one run with the plan gauge after
+ * Attach; Send alone in the corner, as far from the right edge as from the bottom.
  */
 async function expectComposerRhythm(page: Page, width: number) {
   const layout = await selectors.composerActions(page).evaluate((row) => {
@@ -134,6 +147,7 @@ async function expectComposerRhythm(page: Page, width: number) {
       const box = button.getBoundingClientRect()
       return {
         name: button.getAttribute('aria-label') ?? '',
+        usage: button.hasAttribute('data-usage-meter'),
         left: box.left,
         right: box.right,
         top: box.top,
@@ -170,21 +184,21 @@ async function expectComposerRhythm(page: Page, width: number) {
   for (const box of layout.boxes)
     ok(Math.abs(middle(box) - middle(send)) <= 1, `${label}: "${box.name}" leaves the line`)
   const gaps = layout.boxes.slice(1).map((box, index) => box.left - layout.boxes[index]!.right)
-  // The left cluster runs from the model to Attach; the readouts and Send sit apart on the right.
-  const cluster = gaps.slice(
-    0,
-    layout.boxes.findIndex((box) => box.name.startsWith('Attach')),
-  )
+  // One run from the model through the readouts, evenly spaced; only Send stands apart.
+  const run = gaps.slice(0, -1)
   ok(
-    cluster.every((gap) => Math.abs(gap - cluster[0]!) <= 1),
-    `${label}: uneven gaps between the controls: ${cluster.join(', ')}`,
+    run.every((gap) => Math.abs(gap - run[0]!) <= 1),
+    `${label}: uneven gaps between the controls: ${run.join(', ')}`,
   )
+  if (width >= 390) {
+    const attach = layout.boxes.findIndex((box) => box.name.startsWith('Attach'))
+    ok(layout.boxes[attach + 1]?.usage, `${label}: the plan gauge follows Attach`)
+  }
   const right = layout.surface.right - send.right
   const bottom = layout.surface.bottom - send.bottom
   ok(Math.abs(right - bottom) <= 1, `${label}: Send inset ${right} beside, ${bottom} below`)
   // The model name is the one thing that gives way, and only once the row has no room left.
-  const attach = layout.boxes.findIndex((box) => box.name.startsWith('Attach'))
-  const slack = gaps[attach] ?? 0
+  const slack = gaps.at(-1) ?? 0
   ok(!layout.modelClipped || slack <= 9, `${label}: the model name is cut off beside ${slack}px`)
   return layout.field
 }
