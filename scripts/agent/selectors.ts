@@ -1229,7 +1229,12 @@ export async function openFileByName(page: Page, name: string) {
   const input = selectors.paletteInput(page)
   await input.waitFor({ timeout: 5_000 })
   await input.fill(name)
-  await page.waitForTimeout(400)
+  // Enter opens the selected row: a row of the previous query until this query's results land.
+  const basename = name.split('/').at(-1) ?? name
+  await selectors
+    .selectedPaletteOption(page)
+    .filter({ hasText: basename })
+    .waitFor({ timeout: 15_000 })
   await page.keyboard.press('Enter')
   await selectors.editorInput(page).first().waitFor({ timeout: 15_000 })
 }
