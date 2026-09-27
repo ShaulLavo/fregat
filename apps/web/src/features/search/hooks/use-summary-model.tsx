@@ -11,9 +11,8 @@ import {
   type SearchBufferSnapshot,
 } from '@/features/search/state/buffer-state'
 import {
-  expandedSearchResultItems,
-  searchResultActiveMatchPosition,
-  searchResultContentItems,
+  searchResultMatchCount,
+  searchResultMatchPosition,
 } from '@/features/search/utils/result-items'
 
 export type SearchSummaryModel = {
@@ -108,8 +107,7 @@ function summaryWithControls(
   options: { pendingText?: string } = {},
 ): SearchSummaryModel {
   const groups = searchGroupsForSnapshot(snapshot)
-  const expandedItems = expandedSearchResultItems(groups)
-  const active = searchResultActiveMatchPosition(expandedItems, snapshot.activeResultId)
+  const active = searchResultMatchPosition(groups, snapshot.activeResultId)
   const activeContent = active ? (
     <>
       {' '}
@@ -131,7 +129,7 @@ function summaryWithControls(
   return {
     canCollapse: groups.some((group) => group.count > 0 && !group.collapsed),
     canExpand: groups.some((group) => group.count > 0 && group.collapsed),
-    canNavigate: searchResultContentItems(expandedItems).length > 0,
+    canNavigate: searchResultMatchCount(groups) > 0,
     content: (
       <>
         {content}
