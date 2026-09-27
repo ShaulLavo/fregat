@@ -1,7 +1,27 @@
 # Plan 178: context menu
 
-- Status: PROPOSED. Size S–M. After [app-owned-state](app-owned-state.md).
+- Status: IN PROGRESS. Git/search and session rail share menu ownership; tree remains. Size S–M. After [app-owned-state](app-owned-state.md).
 - Owns: one list-level context menu pattern, adopted by the tree first.
+
+## Incremental delivery
+
+The first PR adds `keymap/menus/hooks/use-list-context-menu.ts` and adopts it in Git changes
+(file and group rows), compact search results, and the search editor. It owns pointer/keyboard
+anchors, touch and `data-scrolling` suppression, scroll/row-removal dismissal, and list focus
+return. Git no longer dispatches a synthetic keyboard event or mounts menus in each row.
+
+The session rail uses the same list owner for session and project rows. Menu keys open it directly;
+Space still forwards to the row for keyboard drag. Desktop touch menus remain suppressed, while the
+standalone phone rail opts into native long-press context menus to retain its session actions.
+`session-rail-menu`, `session-actions-surfaces` and `phone-context-menus` cover this adoption.
+
+Remaining work is the tree. The tree code now lives under
+`apps/web/src/features/workspace/`: `hooks/use-tree-context-menu.ts`,
+`hooks/use-tree-menu-trigger.ts`, `components/tree-menu-trigger.tsx`,
+`components/tree-context-menu-wash.tsx`, `state/tree-menu-trigger.ts`, and the corresponding
+`utils/tree-context-menu-anchor.ts` / `utils/tree-menu-trigger-style.ts`. Its sticky-row,
+viewport, keyboard and imperative composition integration must migrate together. The shared
+hook is ready for those adopters; their legacy stores, wash and trigger files still exist.
 
 ## Outcome
 

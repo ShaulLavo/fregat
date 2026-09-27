@@ -19,6 +19,7 @@ import {
 import { isContextMenuKey as isContextMenuOpenKey } from '@workspace/utils/keyboard'
 
 interface UseTreeKeyboardOptions {
+  readonly seedSearch: (character: string) => void
   readonly closeContextMenu: () => void
   readonly contextMenuEnabled: boolean
   readonly controller: FileTreeController
@@ -164,6 +165,7 @@ export function useTreeKeyboard(
     resolvedViewportHeight,
     searchBlurBehavior,
     searchEnabled,
+    seedSearch,
     startRenameFromPath,
     stickyOverlayHeight,
     stickyRowPathSet,
@@ -201,13 +203,6 @@ export function useTreeKeyboard(
 
     event.preventDefault()
     event.stopPropagation()
-  }
-
-  const handleRenameKey = (event: ReactKeyboardEvent<HTMLElement>): boolean => {
-    if (event.nativeEvent.isComposing || event.keyCode === 229) return false
-    if (event.key === 'Escape') renameView.cancel()
-    if (event.key === 'Enter') renameView.commit()
-    return event.key === 'Escape' || event.key === 'Enter'
   }
 
   const handleSearchKey = (event: ReactKeyboardEvent<HTMLElement>): boolean => {
@@ -291,16 +286,12 @@ export function useTreeKeyboard(
   }
 
   const handleTreeKeyDown: KeyboardEventHandler<HTMLElement> = (event): void => {
+    if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
     if (isContextMenuOpen) {
       handleOpenContextMenuKey(event)
       return
     }
-    if (renameView.isActive()) {
-      if (handleRenameKey(event)) {
-        finishHandledEvent(event, noteContextMenuInteraction, invalidateControllerView)
-      }
-      return
-    }
+    if (renameView.isActive()) return
     if (renamingEnabled && event.key === 'F2') {
       startRenameFromPath(focusedPath ?? undefined)
       event.preventDefault()
@@ -314,7 +305,7 @@ export function useTreeKeyboard(
       return
     }
     if (searchEnabled && isSearchOpenSeedKey(event)) {
-      controller.openSearch(event.key)
+      seedSearch(event.key)
       invalidateControllerView()
       event.preventDefault()
       event.stopPropagation()

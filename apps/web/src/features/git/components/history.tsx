@@ -1,6 +1,6 @@
 import { useDiffIntent } from '@/lib/intent-prefetch/hooks/use-diff-intent'
 import { commitDetailsQueryOptions } from '@/features/git/utils/history-query'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useDebouncedValue } from '@tanstack/react-pacer/debouncer'
 import { useHistoryView } from '@/features/git/hooks/use-history-view'
 import { useQueryClient } from '@tanstack/react-query'
@@ -30,6 +30,7 @@ import { useHeldUntilReady } from '@/hooks/use-held-until-ready'
 import { clientErrorMessage } from '@/lib/client-error-taxonomy'
 
 export function History({ rootPath: nextRoot }: { rootPath: string }) {
+  const historyList = useRef<HTMLDivElement>(null)
   const { view: nextView, updateView } = useHistoryView()
   const [revealRevision, setRevealRevision] = useState(0)
   const [settledSearch] = useDebouncedValue(nextView.search.trim(), { wait: 200 })
@@ -101,6 +102,7 @@ export function History({ rootPath: nextRoot }: { rootPath: string }) {
         expanded={expanded}
         onRefChange={changeRef}
         onSearchChange={changeSearch}
+        onFocusList={() => historyList.current?.focus()}
         onExpand={() => setExpanded(true)}
         onRefresh={() => {
           void queryClient.resetQueries({
@@ -161,6 +163,7 @@ export function History({ rootPath: nextRoot }: { rootPath: string }) {
           ) : null}
           {rows.length > 0 && !history.isRestoring ? (
             <HistoryList
+              containerRef={historyList}
               key={`${rootPath}:${refName}:${history.shownSearch}`}
               revealRevision={switching ? 0 : revealRevision}
               rows={rows}

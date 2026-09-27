@@ -5,7 +5,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { TerminalIcon } from '@phosphor-icons/react'
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 
-import { TerminalListRowEditor } from '@/features/workbench/components/terminal-list-row-editor'
+import { InlineRenameInput } from '@workspace/ui/patterns/inline-rename-input'
 import { terminalTabMenu } from '@/features/workbench/utils/terminal-tab-menu'
 import { terminalTabLabel, type TerminalTabRecord } from '@/features/workbench/utils/terminal-tabs'
 import { MenuSurface } from '@/keymap/menus/components/surface'
@@ -93,8 +93,10 @@ export function TerminalListRow({
     return (
       <div className={rowClassName} data-terminal-tab-id={tab.id} ref={setNodeRef}>
         <TerminalIcon className='size-(--icon-size-sm) shrink-0' />
-        <TerminalListRowEditor
-          initialTitle={tab.name ?? label}
+        <InlineRenameInput
+          aria-label='Terminal name'
+          className='min-w-0 flex-1'
+          initialValue={tab.name ?? label}
           onCancel={stopEditing}
           onCommit={commitRename}
         />

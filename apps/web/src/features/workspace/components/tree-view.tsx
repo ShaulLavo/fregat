@@ -2,6 +2,7 @@
 /** @jsxImportSource react */
 
 import { type JSX, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import type { FilterFieldHandle } from '@workspace/ui/patterns/filter-field'
 import type { FileTreeRowDecoration, FileTreeVisibleRow } from '@workspace/tree'
 import {
   FILE_TREE_DEFAULT_ITEM_HEIGHT,
@@ -64,6 +65,7 @@ export function TreeView({
   'use no memo'
   // The tree intentionally mutates its stable DOM-ref registry during layout and native events;
   // compiler freezing would break that imperative ownership contract.
+  const filterField = useRef<FilterFieldHandle>(null)
   const isScrollingRef = useRef(false)
   const contextMenuScrollActionsRef = useRef({
     clearHoverPath: (): void => {},
@@ -378,6 +380,7 @@ export function TreeView({
     contextMenuFocusInteractionRef.current = noteFocusInteraction
   }, [clearHoverPath, closeContextMenuRef, isContextMenuOpenNow, noteFocusInteraction])
   const onTreeKeyDown = useTreeKeyboard({
+    seedSearch: (character) => filterField.current?.seed(character),
     closeContextMenu,
     contextMenuEnabled,
     controller,
@@ -561,7 +564,8 @@ export function TreeView({
           controller={controller}
           fakeFocus={fakeSearchFocusActive}
           inputRef={searchInputRef}
-          isOpen={isSearchOpen}
+          fieldRef={filterField}
+          onArrowDown={() => controller.requestFocus()}
           onInteract={markSearchInputInteracted}
           placeholder={searchPlaceholder}
           searchBlurBehavior={searchBlurBehavior}

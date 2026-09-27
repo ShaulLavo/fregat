@@ -125,7 +125,6 @@ export function useTreeRenameHandoff({
           clearCanonicalStickyReveal()
           previousRenamingPathRef.current = renamingPath
           focusElement(input)
-          input.select()
         }
         return
     }

@@ -18,6 +18,7 @@ type LiveScroll = {
   readonly query: string | null
   readonly geometry: readonly SearchScrollRow[] | undefined
   height: number
+  top: number
   moved: boolean
 }
 
@@ -66,25 +67,27 @@ export class SearchResultScrollState {
 
   follow(live: LiveScroll) {
     this.live = live
-    this.record(live.query, { height: live.height, top: live.element.scrollTop }, live.geometry)
+    this.record(live.query, { height: live.height, top: live.top }, live.geometry)
     this.onRemember?.()
   }
 
-  /** A scroll event: the offset is read once, when someone asks, so scrolling forces no layout. */
+  /** Keep the offset before DOM removal; defer anchor lookup until settlement. */
   moved() {
     if (!this.live) return
+    this.live.top = this.live.element.scrollTop
     this.live.moved = true
     this.onRemember?.()
   }
 
-  /** A detached element reads as scrolled to 0, so it keeps the last settled position. */
+  /** A detached element reads as zero; settle its last observed offset instead. */
   release(live: LiveScroll) {
     if (this.live !== live) return
     if (live.element.isConnected) {
       live.height = live.element.clientHeight || live.height
+      live.top = live.element.scrollTop
       live.moved = true
-      this.settle()
     }
+    this.settle()
     this.live = null
   }
 
@@ -92,7 +95,7 @@ export class SearchResultScrollState {
     const live = this.live
     if (!live?.moved) return
     live.moved = false
-    this.record(live.query, { height: live.height, top: live.element.scrollTop }, live.geometry)
+    this.record(live.query, { height: live.height, top: live.top }, live.geometry)
   }
 
   private record(
@@ -165,6 +168,7 @@ export function attachSearchResultScroll({
     query,
     geometry,
     height: element.clientHeight || viewport.height,
+    top: element.scrollTop,
     moved: false,
   }
   state.follow(live)
