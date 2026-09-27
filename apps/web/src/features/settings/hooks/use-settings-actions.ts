@@ -2,18 +2,16 @@ import { assertEnvironmentWritable } from '@/lib/environments/state/availability
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { SETTINGS_MUTATION_KEY } from '@/features/settings/utils/mutation-keys'
 import { nowMs } from '@workspace/utils/timing'
-import * as v from 'valibot'
 import {
   shownColorMode,
   themePartPatch,
-  resolveThemeSettings,
+  themePartSlot,
   type ThemeBundle,
   type ThemeId,
 } from '@workspace/contracts'
 import { systemColorMode } from '@/features/settings/state/system-color-mode'
 import {
   SETTING_IDS,
-  settingsOperationSchema,
   deriveWriteTarget,
   descriptorFor,
   errorNumberField,
@@ -114,16 +112,22 @@ export function useSettingsActions(owner?: QueryClient) {
 
   const targetFor = (key: SettingId) => deriveWriteTarget(key, projection()?.layers ?? [])
 
-  // Under a theme a part write customizes the theme for one mode; the code themes name their own.
-  const themePartOperation = (operation: SettingsOperation): SettingsOperation | null => {
+  // Under a theme a part lives in the theme's customization for one mode.
+  const themeSlot = (key: SettingId) => {
     const current = projection()
     const theme = current?.values['workbench.theme']
-    const patch = operation.kind === 'set' ? themePartPatch(operation) : null
-    if (!current || !theme || !patch || operation.kind !== 'set') return null
-    let mode = shownColorMode(current.values['workbench.colorTheme'], systemColorMode())
-    if (operation.key === 'editor.codeTheme.light') mode = 'light'
-    if (operation.key === 'editor.codeTheme.dark') mode = 'dark'
-    return { kind: 'theme.customize', id: theme.id, mode, patch }
+    if (!current || !theme) return null
+    const shown = shownColorMode(current.values['workbench.colorTheme'], systemColorMode())
+    const slot = themePartSlot(key, shown)
+    return slot ? { ...slot, id: theme.id } : null
+  }
+
+  const themePartOperation = (operation: SettingsOperation): SettingsOperation | null => {
+    if (operation.kind !== 'set') return null
+    const slot = themeSlot(operation.key)
+    const patch = themePartPatch(operation)
+    if (!slot || !patch) return null
+    return { kind: 'theme.customize', id: slot.id, mode: slot.mode, patch }
   }
 
   const setSetting = <K extends ScalarSettingId>(
@@ -185,26 +189,14 @@ export function useSettingsActions(owner?: QueryClient) {
     resetKeybinding: (command: PlatformCommandId) =>
       submit(targetFor('keybindings.overrides'), [{ kind: 'keybinding.remove', command }]),
     resetSetting: (key: SettingId, target: SettingsWriteTarget = 'user') => {
-      const current = projection()
-      const theme = current?.values['workbench.theme']
-      if (!current || !theme || target !== 'user')
-        return submit(target, [{ kind: 'reset', keys: settingRowIds(key) }])
-      const defaults = resolveThemeSettings(
-        { ...current.values, 'workbench.theme.customizations': {} },
-        systemColorMode(),
-      )
-      const parsed = v.safeParse(settingsOperationSchema, {
-        kind: 'set',
-        key,
-        value: defaults[key],
-      })
-      const customize = parsed.success ? themePartOperation(parsed.output) : null
-      if (!customize) return submit(target, [{ kind: 'reset', keys: settingRowIds(key) }])
+      const slot = target === 'user' ? themeSlot(key) : null
+      if (!slot) return submit(target, [{ kind: 'reset', keys: settingRowIds(key) }])
+      const uncustomize: SettingsOperation = { kind: 'theme.uncustomize', ...slot }
       // A value written before the theme was picked is ignored under it; Reset clears it too.
-      const stray = current.layers.some(
+      const stray = projection()?.layers.some(
         (layer) => layer.id === 'user' && Object.hasOwn(layer.raw, key),
       )
-      return submit('user', stray ? [customize, { kind: 'reset', keys: [key] }] : [customize])
+      return submit('user', stray ? [uncustomize, { kind: 'reset', keys: [key] }] : [uncustomize])
     },
     setColorTheme,
     /** The command's complete list; an empty list or `null` unbinds it. */

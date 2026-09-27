@@ -122,14 +122,171 @@ test(
 
     await userEvent.click(await screen.findByRole('button', { name: `Actions for ${KEY}` }))
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Reset setting' }))
-    await waitFor(async () => {
-      const snapshot = await fetchSettings(undefined, getClient())
-      const dark = snapshot.values['workbench.theme.customizations'][THEME.id]?.dark
-      expect(dark?.material?.contentOpacity ?? themed).toBe(themed)
-    })
+    await waitFor(async () => expect((await userLayer()).halves).toBeUndefined())
     await waitFor(async () =>
       expect(await contentSlider()).toHaveAttribute('aria-valuenow', String(themed)),
     )
+  },
+  SLOW_RENDER_TIMEOUT_MS,
+)
+
+// A theme update: the same theme id with a new revision, as the bundle library writes it.
+function UpdateThemeButton({ contentOpacity }: { readonly contentOpacity: number }) {
+  const { selectBundle } = useSettingsActions()
+  const dark = THEME.variants.dark
+  const updated = {
+    ...THEME,
+    revision: `${THEME.revision}-next`,
+    variants: {
+      ...THEME.variants,
+      dark: { ...dark, material: { ...dark.material, contentOpacity } },
+    },
+  }
+  return (
+    <Button size='sm' onClick={() => selectBundle(updated)}>
+      Update theme
+    </Button>
+  )
+}
+
+async function resetFromMenu(key: string) {
+  await userEvent.click(await screen.findByRole('button', { name: `Actions for ${key}` }))
+  await userEvent.click(await screen.findByRole('menuitem', { name: 'Reset setting' }))
+}
+
+test(
+  'Reset removes the part override, so a later change to the theme reaches the row',
+  async ({ client }) => {
+    expect(client).toBeDefined()
+    await seed([
+      { kind: 'set', key: 'workbench.colorTheme', value: 'dark' },
+      { kind: 'set', key: 'workbench.theme', value: THEME },
+      {
+        kind: 'theme.customize',
+        id: THEME.id,
+        mode: 'dark',
+        patch: { material: { contentOpacity: 20 } },
+      },
+    ])
+    const next = (THEME.variants.dark.material.contentOpacity + 37) % 100
+    renderWithProviders(
+      <>
+        <SettingsPage />
+        <UpdateThemeButton contentOpacity={next} />
+      </>,
+    )
+    expect(await contentSlider()).toHaveAttribute('aria-valuenow', '20')
+
+    await resetFromMenu(KEY)
+    await waitFor(() => expect(modifiedMarker(KEY)).toBeNull())
+    await userEvent.click(screen.getByRole('button', { name: 'Update theme' }))
+
+    await waitFor(async () =>
+      expect(await contentSlider()).toHaveAttribute('aria-valuenow', String(next)),
+    )
+  },
+  SLOW_RENDER_TIMEOUT_MS,
+)
+
+test(
+  'Reset in dark mode removes the dark override and keeps the light one',
+  async ({ client }) => {
+    expect(client).toBeDefined()
+    await seed([
+      { kind: 'set', key: 'workbench.colorTheme', value: 'dark' },
+      { kind: 'set', key: 'workbench.theme', value: THEME },
+      {
+        kind: 'theme.customize',
+        id: THEME.id,
+        mode: 'dark',
+        patch: { material: { contentOpacity: 20 } },
+      },
+      {
+        kind: 'theme.customize',
+        id: THEME.id,
+        mode: 'light',
+        patch: { material: { contentOpacity: 30 } },
+      },
+    ])
+    renderWithProviders(<SettingsPage />)
+    expect(await contentSlider()).toHaveAttribute('aria-valuenow', '20')
+
+    await resetFromMenu(KEY)
+
+    await waitFor(async () =>
+      expect((await userLayer()).halves).toEqual({ light: { material: { contentOpacity: 30 } } }),
+    )
+  },
+  SLOW_RENDER_TIMEOUT_MS,
+)
+
+function ResetTwoPartsButton() {
+  const { resetSetting } = useSettingsActions()
+  const resetBoth = () => {
+    resetSetting(KEY)
+    resetSetting('workbench.surface.blur')
+  }
+  return (
+    <Button size='sm' onClick={resetBoth}>
+      Reset two
+    </Button>
+  )
+}
+
+test(
+  'two resets of different parts sent together both apply',
+  async ({ client }) => {
+    expect(client).toBeDefined()
+    await seed([
+      { kind: 'set', key: 'workbench.colorTheme', value: 'dark' },
+      { kind: 'set', key: 'workbench.theme', value: THEME },
+      {
+        kind: 'theme.customize',
+        id: THEME.id,
+        mode: 'dark',
+        patch: { palette: 'sage', material: { contentOpacity: 20, blur: 3 } },
+      },
+    ])
+    renderWithProviders(
+      <>
+        <SettingsPage />
+        <ResetTwoPartsButton />
+      </>,
+    )
+    expect(await contentSlider()).toHaveAttribute('aria-valuenow', '20')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Reset two' }))
+
+    await waitFor(async () =>
+      expect((await userLayer()).halves).toEqual({ dark: { palette: 'sage' } }),
+    )
+  },
+  SLOW_RENDER_TIMEOUT_MS,
+)
+
+test(
+  'a part set to the theme value still counts as modified, and Reset removes it',
+  async ({ client }) => {
+    expect(client).toBeDefined()
+    const themed = THEME.variants.dark.material.contentOpacity
+    await seed([
+      { kind: 'set', key: 'workbench.colorTheme', value: 'dark' },
+      { kind: 'set', key: 'workbench.theme', value: THEME },
+      {
+        kind: 'theme.customize',
+        id: THEME.id,
+        mode: 'dark',
+        patch: { material: { contentOpacity: themed } },
+      },
+    ])
+    renderWithProviders(<SettingsPage />)
+    expect(await contentSlider()).toHaveAttribute('aria-valuenow', String(themed))
+    await waitFor(() => expect(modifiedMarker(KEY)).not.toBeNull())
+
+    await resetFromMenu(KEY)
+
+    await waitFor(async () => expect((await userLayer()).halves).toBeUndefined())
+    await waitFor(() => expect(modifiedMarker(KEY)).toBeNull())
   },
   SLOW_RENDER_TIMEOUT_MS,
 )

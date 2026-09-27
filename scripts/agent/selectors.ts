@@ -623,6 +623,8 @@ export const selectors = {
     page.getByRole('slider', { name: title, exact: true }),
   settingsRowActions: (page: Page, id: string) =>
     page.getByRole('button', { name: `Actions for ${id}`, exact: true }),
+  settingsResetMenuItem: (page: Page) =>
+    page.getByRole('menuitem', { name: 'Reset setting', exact: true }),
   pushSection: (page: Page) =>
     page.getByRole('region', { name: 'Push notifications', exact: true }),
   pushTurnOn: (page: Page) =>

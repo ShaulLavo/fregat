@@ -108,7 +108,7 @@ async function dragTo(page: Page, slider: ReturnType<typeof selectors.settingsSl
 export const settingsAppearanceRows: Scenario = {
   name: 'settings-appearance-rows',
   description:
-    'With a theme selected, the Appearance rows sit under the Theme row and the per-mode parts name the mode on screen, following a light/dark switch. Settings search "content" finds the Content opacity row. Dragging its slider writes one settings mutation (a theme.customize for that mode), repaints --content-opacity and the editor well, and the studio Surfaces tab shows the same number. Writes only the throwaway server.',
+    'With a theme selected, the Appearance rows sit under the Theme row and the per-mode parts name the mode on screen, following a light/dark switch. Settings search "content" finds the Content opacity row. Dragging its slider writes one settings mutation (a theme.customize for that mode), repaints --content-opacity and the editor well, and the studio Surfaces tab shows the same number. Reset on the row writes one theme.uncustomize, removes the part from the theme customization and repaints the theme value. Writes only the throwaway server.',
   async run(page, { step }) {
     const theme = await chooseTheme(page)
     const mode = await shownMode(page)
@@ -187,5 +187,32 @@ export const settingsAppearanceRows: Scenario = {
     await dock.locator('[data-studio-themes]').or(dock).first().focus()
     await page.keyboard.press('Escape')
     await dock.waitFor({ state: 'detached' })
+
+    const writesBeforeReset = (await settingsMutations(page)).length
+    await selectors.settingsRowActions(page, 'workbench.surface.contentOpacity').click()
+    await selectors.settingsResetMenuItem(page).click()
+    await page.waitForFunction(
+      (themed) =>
+        getComputedStyle(document.documentElement).getPropertyValue('--content-opacity').trim() ===
+        themed,
+      before.opacity,
+    )
+    const resets = (await settingsMutations(page)).slice(writesBeforeReset)
+    strictEqual(resets.length, 1, `Reset is one settings mutation: ${resets.join('\n')}`)
+    ok(resets[0]!.includes('theme.uncustomize'), 'Reset removes the part from the theme')
+    let halves: Customizations[string] | undefined
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      halves = (
+        (await userSettings(page))['workbench.theme.customizations'] as Customizations | undefined
+      )?.[theme]
+      if (halves?.[mode]?.material?.contentOpacity === undefined) break
+      await page.waitForTimeout(100)
+    }
+    strictEqual(
+      halves?.[mode]?.material?.contentOpacity,
+      undefined,
+      'The theme customization no longer holds the part, so the theme value applies',
+    )
+    await step('reset')
   },
 }

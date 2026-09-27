@@ -490,6 +490,52 @@ describe('settings operation reducer', () => {
   })
 })
 
+describe('theme part removal', () => {
+  const customizations = {
+    graphite: {
+      dark: { palette: 'sage', material: { blur: 3 } },
+      light: { material: { blur: 5 } },
+    },
+  }
+
+  it('removes one part from one half and drops the halves it empties', () => {
+    const first = applyIdempotently(
+      { 'workbench.theme.customizations': customizations },
+      operation({ kind: 'theme.uncustomize', id: 'graphite', mode: 'dark', part: 'material.blur' }),
+    )
+    expect(first.raw['workbench.theme.customizations']).toEqual({
+      graphite: { dark: { palette: 'sage' }, light: { material: { blur: 5 } } },
+    })
+
+    const second = applyIdempotently(
+      { 'workbench.theme.customizations': customizations },
+      operation({
+        kind: 'theme.uncustomize',
+        id: 'graphite',
+        mode: 'light',
+        part: 'material.blur',
+      }),
+    )
+    expect(second.raw['workbench.theme.customizations']).toEqual({
+      graphite: { dark: { palette: 'sage', material: { blur: 3 } } },
+    })
+  })
+
+  it('shares a resource with a write of the same part and no other', () => {
+    const remove = settingsOperationResourceKeys(
+      operation({ kind: 'theme.uncustomize', id: 'graphite', mode: 'dark', part: 'material.blur' }),
+    )[0]!
+    const resource = (mode: string, material: Record<string, number>) =>
+      settingsOperationResourceKeys(
+        operation({ kind: 'theme.customize', id: 'graphite', mode, patch: { material } }),
+      )[0]!
+
+    expect(settingsMutationResourcesIntersect(remove, resource('dark', { blur: 4 }))).toBe(true)
+    expect(settingsMutationResourcesIntersect(remove, resource('dark', { opacity: 4 }))).toBe(false)
+    expect(settingsMutationResourcesIntersect(remove, resource('light', { blur: 4 }))).toBe(false)
+  })
+})
+
 describe('settings mutation resources', () => {
   it('distinguishes collection members but intersects a reset with any member', () => {
     const save = settingsOperationResourceKeys(
