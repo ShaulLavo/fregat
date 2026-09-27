@@ -1,4 +1,4 @@
-import { FileTreeModel } from '@workspace/tree'
+import { TreeViewModel } from '@/features/workspace/state/tree-model'
 
 import { preparedTreeInputForPaths } from '@/features/workspace/state/prepared-tree-input-cache'
 
@@ -15,7 +15,7 @@ test('reuses prepared input only for the exact path-array identity', () => {
 test('uses a matching prepared path set for construction and reset', () => {
   const initialPaths = ['src/', 'src/a.ts'] as const
   const initialPreparedInput = preparedTreeInputForPaths(initialPaths)
-  const tree = new FileTreeModel({ preparedInput: initialPreparedInput })
+  const tree = new TreeViewModel({ preparedInput: initialPreparedInput })
   const events: unknown[] = []
   const unsubscribe = tree.onMutation('reset', (event) => events.push(event))
 

@@ -8,7 +8,7 @@ import type {
   FileTreeMutationEvent,
   FileTreeRowDecorationContext,
 } from '@workspace/tree'
-import { FileTreeModel } from '@workspace/tree'
+import { TreeViewModel } from '@/features/workspace/state/tree-model'
 
 import {
   loadExpandedDirectories,
@@ -27,7 +27,7 @@ describe('syncTreePaneState', () => {
     const root = 'repo'
     const selectedFilePath = 'repo/src/components/Button.tsx'
     const initialModel = treeModel(tree(root, [directory('repo/src')]), root)
-    const fileTree = new FileTreeModel({
+    const fileTree = new TreeViewModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',
       paths: initialModel.paths,
@@ -72,7 +72,7 @@ describe('syncTreePaneState', () => {
   it('loads expanded symlink directory targets', () => {
     const root = 'repo'
     const model = treeModel(tree(root, [symlinkDirectory('repo/vendor')]), root)
-    const fileTree = new FileTreeModel({
+    const fileTree = new TreeViewModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',
       paths: model.paths,
@@ -102,7 +102,7 @@ describe('syncTreePaneState', () => {
   it('does not rewrite tree selection when the selected file is already selected', () => {
     const root = 'repo'
     const model = treeModel(tree(root, [file('repo/src/a.ts'), file('repo/src/b.ts')]), root)
-    const fileTree = new FileTreeModel({
+    const fileTree = new TreeViewModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',
       paths: model.paths,
@@ -130,7 +130,7 @@ describe('syncTreePaneState', () => {
   it('does not reselect the active editor file during tree-only syncs', () => {
     const root = 'repo'
     const model = treeModel(tree(root, [directory('repo/src'), file('repo/src/a.ts')]), root)
-    const fileTree = new FileTreeModel({
+    const fileTree = new TreeViewModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',
       paths: model.paths,
@@ -158,7 +158,7 @@ describe('syncTreePaneState', () => {
   it('skips stale removals that are already absent from the tree model', () => {
     const root = 'repo'
     const model = treeModel(tree(root, [directory('repo/packages/editor-find')]), root)
-    const fileTree = new FileTreeModel({
+    const fileTree = new TreeViewModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',
       paths: model.paths,
@@ -189,7 +189,7 @@ describe('syncTreePaneState', () => {
       ]),
       root,
     )
-    const fileTree = new FileTreeModel({
+    const fileTree = new TreeViewModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',
       paths: model.paths,
@@ -219,7 +219,7 @@ describe('syncTreePaneState', () => {
       tree('repo/src', [directory('repo/src/components'), file('repo/src/index.ts')]),
       'src',
     )
-    const fileTree = new FileTreeModel({
+    const fileTree = new TreeViewModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',
       paths: initialModel.paths,
@@ -261,7 +261,7 @@ describe('syncTreePaneState', () => {
       tree(root, [directory('repo/docs'), directory('repo/src')]),
       root,
     )
-    const fileTree = new FileTreeModel({
+    const fileTree = new TreeViewModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',
       paths: initialModel.paths,
@@ -298,7 +298,7 @@ describe('syncTreePaneState', () => {
   it('keeps a lazy directory expanded after its single child directory flattens into the visible row', () => {
     const root = 'repo'
     const initialModel = treeModel(tree(root, [directory('repo/src')]), root)
-    const fileTree = new FileTreeModel({
+    const fileTree = new TreeViewModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',
       paths: initialModel.paths,
@@ -338,7 +338,7 @@ describe('syncTreePaneState', () => {
       tree('repo/src', [directory('repo/src/components')]),
       'src',
     )
-    const fileTree = new FileTreeModel({
+    const fileTree = new TreeViewModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',
       paths: initialModel.paths,
@@ -400,7 +400,7 @@ describe('syncTreePaneState', () => {
       ]),
       root,
     )
-    const fileTree = new FileTreeModel({
+    const fileTree = new TreeViewModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',
       paths: initialModel.paths,
@@ -452,7 +452,7 @@ describe('syncTreePaneState', () => {
       ),
       root,
     )
-    const fileTree = new FileTreeModel({ paths: initialModel.paths })
+    const fileTree = new TreeViewModel({ paths: initialModel.paths })
     const events: FileTreeMutationEvent[] = []
     const unsubscribe = fileTree.onMutation('*', (event) => events.push(event))
 
@@ -527,7 +527,7 @@ describe('loadExpandedDirectories', () => {
     const root = 'repo'
     const model = treeModel(tree(root, [directory('repo/src')]), root)
     model.errorByDirectoryPath.set('src', { message: 'Could not load' })
-    const fileTree = new FileTreeModel({
+    const fileTree = new TreeViewModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',
       paths: model.paths,
@@ -548,7 +548,7 @@ describe('loadExpandedDirectories', () => {
     const root = 'repo'
     const model = treeModel(tree(root, [directory('repo/src')]), root)
     model.errorByDirectoryPath.set('src', { message: 'Could not load' })
-    const fileTree = new FileTreeModel({
+    const fileTree = new TreeViewModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',
       paths: model.paths,
@@ -578,7 +578,7 @@ describe('loadExpandedDirectories', () => {
       tree('repo/src', [file('repo/src/a.ts')]),
       'src',
     )
-    const fileTree = new FileTreeModel({
+    const fileTree = new TreeViewModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',
       paths: model.paths,
@@ -607,7 +607,7 @@ describe('loadExpandedDirectories', () => {
     const root = 'repo'
     const model = treeModel(tree(root, [directory('repo/src')]), root)
     model.errorByDirectoryPath.set('src', { message: 'Could not load' })
-    const fileTree = new FileTreeModel({
+    const fileTree = new TreeViewModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',
       paths: model.paths,
@@ -640,7 +640,7 @@ describe('visibleTreeItemCount', () => {
       tree('repo/src/components', [file('repo/src/components/Button.tsx')]),
       'src/components',
     )
-    const fileTree = new FileTreeModel({
+    const fileTree = new TreeViewModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',
       paths: model.paths,
@@ -673,7 +673,7 @@ describe('visibleTreeItemCount', () => {
       tree('repo/docs/guide', [file('repo/docs/guide/intro.md')]),
       'docs/guide',
     )
-    const fileTree = new FileTreeModel({
+    const fileTree = new TreeViewModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',
       paths: model.paths,
@@ -710,7 +710,7 @@ describe('selectedFileEntryForTreeSelection', () => {
   })
 })
 
-function focusChangesDuring(tree: FileTreeModel, action: () => void) {
+function focusChangesDuring(tree: TreeViewModel, action: () => void) {
   const paths: (string | null)[] = []
   const unsubscribe = tree.subscribe(() => {
     paths.push(tree.getFocusedPath())
@@ -725,7 +725,7 @@ function focusChangesDuring(tree: FileTreeModel, action: () => void) {
   return paths
 }
 
-function expandedDirectories(tree: FileTreeModel) {
+function expandedDirectories(tree: TreeViewModel) {
   return ['src/', 'src/components/', 'vendor/'].filter((path) => {
     const item = tree.getItem(path)
     if (!isDirectoryHandle(item)) return false
@@ -734,7 +734,7 @@ function expandedDirectories(tree: FileTreeModel) {
   })
 }
 
-function getDirectory(tree: FileTreeModel, path: string): FileTreeDirectoryHandle {
+function getDirectory(tree: TreeViewModel, path: string): FileTreeDirectoryHandle {
   const item = tree.getItem(path)
   if (!isDirectoryHandle(item)) {
     throw new Error(`Expected ${path} to be a directory`)
@@ -743,7 +743,7 @@ function getDirectory(tree: FileTreeModel, path: string): FileTreeDirectoryHandl
   return item
 }
 
-function getFile(tree: FileTreeModel, path: string): FileTreeFileHandle {
+function getFile(tree: TreeViewModel, path: string): FileTreeFileHandle {
   const item = tree.getItem(path)
   if (!isFileHandle(item)) {
     throw new Error(`Expected ${path} to be a file`)

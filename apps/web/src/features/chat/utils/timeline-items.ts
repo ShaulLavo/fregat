@@ -317,12 +317,12 @@ export function chatTimelineItems({
   if (latestTurn?.state === 'running' && latestTurn.completedAt === null) {
     appendActiveResponse(timelineItems, latestTurn, workLogEntries, activeResponseTurnIds)
   }
-  appendEmptyTurnStatus(timelineItems, latestTurn)
-  appendTurnRetry(timelineItems, latestTurn)
+  const settledItems = withTurnStatuses(timelineItems, latestTurn, turns, activeResponseTurnIds)
+  appendTurnRetry(settledItems, latestTurn)
 
   return shareTimelineItems(
     timelineCacheKey(messages, activities, proposedPlans, optimisticMessages),
-    timelineItems,
+    settledItems,
   )
 }
 
@@ -397,35 +397,83 @@ function trailingLiveActivities(
   return item.activities.slice(boundaryIndex + 1)
 }
 
-function appendEmptyTurnStatus(
+/**
+ * A settled turn with no fold reports its status in the slot its Working row held, under its
+ * prompt, and keeps it after later turns start: the rows below never move for it.
+ */
+function withTurnStatuses(
   items: ChatTimelineItem[],
   latestTurn: OrchestrationLatestTurn | null,
+  turns: Readonly<Record<string, OrchestrationLatestTurn>>,
+  activeResponseTurnIds: ReadonlySet<TurnId>,
 ) {
-  if (!latestTurn || latestTurn.state === 'running' || !latestTurn.completedAt) return
-  const hasFold = items.some(
-    (item) => item.type === 'turn-fold' && item.turnId === latestTurn.turnId,
-  )
-  const hasCompletion = items.some(
-    (item) =>
-      item.type === 'message' &&
-      item.message.turnId === latestTurn.turnId &&
-      item.showCompletionDivider,
-  )
-  if (hasFold || hasCompletion) return
+  const records = new Map(Object.entries(turns))
+  if (latestTurn) records.set(latestTurn.turnId, latestTurn)
+  const slots = turnStatusSlots(items, latestTurn)
+  const statusesAfter = new Map<number, ChatTimelineItem>()
+  for (const [turnId, slot] of slots) {
+    const turn = records.get(turnId)
+    if (!turn?.completedAt || turn.state === 'running') continue
+    if (activeResponseTurnIds.has(turn.turnId)) continue
 
-  const elapsed = formatChatElapsed(
-    latestTurn.startedAt ?? latestTurn.requestedAt,
-    latestTurn.completedAt,
-  )
+    statusesAfter.set(slot, turnStatusItem(turn, turn.completedAt))
+  }
+  if (statusesAfter.size === 0) return items
+
+  const result: ChatTimelineItem[] = []
+  const leading = statusesAfter.get(-1)
+  if (leading) result.push(leading)
+  for (const [index, item] of items.entries()) {
+    result.push(item)
+    const status = statusesAfter.get(index)
+    if (status) result.push(status)
+  }
+
+  return result
+}
+
+/**
+ * Where each turn's status goes: after the last prompt of that turn, where Working stood. The
+ * latest turn falls back to the last untagged prompt (-1 when there is none). A turn its fold or
+ * completion divider already reports gets no slot, nor does a prompt Working still stands under
+ * (a provider restart runs a new turn for the same prompt).
+ */
+function turnStatusSlots(
+  items: readonly ChatTimelineItem[],
+  latestTurn: OrchestrationLatestTurn | null,
+) {
+  const slots = new Map<TurnId, number>()
+  const reported = new Set<TurnId>()
+  let lastUntaggedPrompt = -1
+  let workingSlot: number | null = null
+  for (const [index, item] of items.entries()) {
+    if (item.type === 'turn-fold') reported.add(item.turnId)
+    if (item.type === 'working') workingSlot = index - 1
+    if (item.type !== 'message') continue
+    const { role, turnId } = item.message
+    if (item.showCompletionDivider && turnId) reported.add(turnId)
+    if (role !== 'user') continue
+    if (turnId) slots.set(turnId, index)
+    else lastUntaggedPrompt = index
+  }
+  if (latestTurn && !slots.has(latestTurn.turnId)) slots.set(latestTurn.turnId, lastUntaggedPrompt)
+  for (const turnId of reported) slots.delete(turnId)
+  for (const [turnId, slot] of slots) if (slot === workingSlot) slots.delete(turnId)
+
+  return slots
+}
+
+function turnStatusItem(turn: OrchestrationLatestTurn, completedAt: string): ChatTimelineItem {
+  const elapsed = formatChatElapsed(turn.startedAt ?? turn.requestedAt, completedAt)
   const label =
-    stoppedTurnLabel(latestTurn, elapsed) ??
-    (elapsed ? `Worked for ${elapsed}` : 'Response completed')
-  items.push({
-    id: `turn-status:${latestTurn.turnId}`,
-    timestamp: latestTurn.completedAt,
+    stoppedTurnLabel(turn, elapsed) ?? (elapsed ? `Worked for ${elapsed}` : 'Response completed')
+
+  return {
+    id: `turn-status:${turn.turnId}`,
+    timestamp: completedAt,
     type: 'turn-status',
     label,
-  })
+  }
 }
 
 /** Carry on and Try again sit under the latest turn once it stopped short. */
@@ -495,16 +543,15 @@ export function chatTimelineItemEstimate(item: ChatTimelineItem | undefined) {
   }
   if (item.type === 'reasoning') return item.streaming ? 96 : 32
   if (item.type === 'proposed-plan') return 160
-  if (item.type === 'turn-fold') return 34
-  if (item.type === 'working') return 36
+  // Working, the fold and the finished status share `--turn-status-height` (38px) plus pb-1.5.
+  if (item.type === 'turn-fold' || item.type === 'working' || item.type === 'turn-status') return 44
   if (item.type === 'live-activity') {
     return item.activity.tail.length > 0 ? 36 + LIVE_TAIL_ROWS * ESTIMATED_ROW_HEIGHT : 36
   }
-  if (item.type === 'turn-status') return 36
   if (item.type === 'turn-retry') return 36
   if (item.type === 'model-switch') return 24
 
-  const dividerHeight = item.showCompletionDivider ? 34 : 0
+  const dividerHeight = item.showCompletionDivider ? 38 : 0
   const changedFilesHeight =
     item.turnDiffSummary && item.turnDiffSummary.files.length > 0
       ? Math.min(220, 46 + item.turnDiffSummary.files.length * 24)

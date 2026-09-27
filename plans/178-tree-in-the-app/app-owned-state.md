@@ -1,6 +1,6 @@
 # Plan 178: app-owned state
 
-- Status: PROPOSED. Size L. After [out-of-the-root](out-of-the-root.md).
+- Status: IN PROGRESS (wave 2, lane T): steps 1–2 and the view half of step 3 landed 2026-09-26; the controller split next, then 4–9. Size L. After [out-of-the-root](out-of-the-root.md).
 - Owns: moving the view into the app and replacing the imperative facade with props and state.
 
 ## Outcome
@@ -112,3 +112,44 @@ No visual change. Behaviour tests from the harness stay green. The TUI tree stil
 - `renders` on `tree-sticky-scroll` and `file-tree-hover-prefetch` against the baseline: moving
   state into rows must not re-render every row on a git patch or a loading change.
 - TUI: `apps/tui` typecheck and its tree tests.
+
+## Progress
+
+### Steps 1–2, 2026-09-26
+
+- The view, its hooks, render utilities, stylesheet and tests moved from `packages/tree` into
+  `apps/web/src/features/workspace/` by kind, renamed kebab-case with a `tree-` qualifier:
+  `components/tree-view.tsx`, `tree-row.tsx`, `tree-host.tsx` (the `FileTree` wrapper, now
+  `TreeHost`), `tree-view.css`; `hooks/use-tree-*.ts` (`useFileTree` is `useTreeModel`, beside the
+  existing `use-tree.ts`); `state/tree-model.ts` (the facade, now `TreeViewModel`),
+  `state/tree-row-elements.ts`, `state/tree-menu-trigger.ts`; `utils/tree-*.ts`.
+- Local symbols dropped the `FileTree` prefix (`TreeView`, `TreeRow`, `useTreeDrag`, …); names from
+  the package keep theirs (`FileTreeController`, `FileTreeVisibleRow`, …). DOM attributes and
+  dataset keys (`data-file-tree-*`) stay until the rows sub-plan.
+- `packages/tree` holds the model only: no React, no CSS, node tests only. Its index exports the
+  controller, layout, git-status, density and icon helpers the view renders with, and
+  `public-api.test.ts` pins that list. `FileTreeViewProps` left `internalTypes.ts` for the view.
+- Tests: the view's browser and integration tests and the parity tests run in
+  `apps/web/vitest.tree-browser.config.ts` (one file at a time, as before), `test:tree-browser` in
+  CI and flake-watch. The integration tests moved from happy-dom to Chromium: under the app's
+  standards-mode happy-dom they loop, and the element-menu focus assertion was happy-dom-only.
+- The design census now sees the tree; its raw controls and truncation are allow-listed until
+  rows and chrome rebuild them.
+- Verification: `tree-parity` zero drift (one run had `focus-click/cozy-dark` lose row focus to
+  the editor it just opened; three reruns clean), `tree-parity-behaviour`, `files-tree`,
+  `tree-file-clicks`, `tree-sticky-scroll`, `file-tree-hover-prefetch`, `search-file-actions`
+  green; package 109, workspace node/dom, tree browser 80 and `tree-pane.browser` tests green.
+
+### Step 3, the view, 2026-09-26
+
+`tree-view.tsx` went from 1,494 to 623 lines by moving code out unchanged:
+`utils/tree-view-layout.ts` (layout snapshot, sticky rows, guide style), `utils/tree-window-frame.ts`
+(window geometry and parked rows), `hooks/use-tree-layout.ts` (layout state, density anchor, scrollbar
+lane), `hooks/use-tree-viewport-sync.ts` (scroll, wheel, touch, keys, resize and controller sync),
+`hooks/use-tree-active-item.ts` (DOM focus tracking), `hooks/use-tree-rename.ts` (start and focus
+handoff), `hooks/use-tree-sticky-reveal.ts`, `hooks/use-tree-row-click.ts`, and the components
+`tree-filter-input.tsx`, `tree-sticky-overlay.tsx`, `tree-row-window.tsx`, `tree-context-menu-wash.tsx`.
+Layout effects keep their order; refs a hook writes live in that hook (the React Compiler rejects
+writes to a hook argument), so `useTreeLayout` hands the viewport sync a setter for its updater.
+Harness: zero drift, except `menu-open`, whose baseline moved because main's menu lost the `F2`
+chip on Rename (reproduced on main); re-baselined.

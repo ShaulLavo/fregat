@@ -23,6 +23,7 @@ Start every reply with the line ${MARKER}, then answer in one short sentence. Us
 
 export const claudeCustomAgent: Scenario = {
   name: 'claude-custom-agent',
+  realProviders: true,
   description:
     "Real Claude (Haiku) in a fixture repository with a project agent `reviewer`: the new-session strip lists it, a session started as it follows the agent's prompt, and the header names the agent. Removes the fixture, session and project.",
   async run(page, { step }) {

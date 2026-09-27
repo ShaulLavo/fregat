@@ -924,6 +924,7 @@ export const selectors = {
       .filter({ hasText: / failed/ })
       .getByRole('button', { name: 'Fix with AI', exact: true }),
   dialog: (page: Page) => page.getByRole('dialog').last(),
+  dialogClose: (dialog: Locator) => dialog.getByRole('button', { name: 'Close', exact: true }),
   buttonNamed: (page: Page, label: string) =>
     page.getByRole('button', { name: label, exact: true }).first(),
   changeRequestLink: (page: Page, number: number) =>
@@ -982,8 +983,8 @@ export const selectors = {
   settingsNoModels: (page: Page) => page.getByText('No models are available yet.'),
   settingsProviderRow: (page: Page, providerInstanceId: string) =>
     page.locator(`[data-provider-instance="${providerInstanceId}"]`),
-  providerUpdateChecking: (page: Page) =>
-    page.getByRole('status', { name: 'Checking for updates' }),
+  providerUpdateChecking: (row: Locator) =>
+    row.getByRole('status', { name: 'Checking for updates' }),
   paletteScriptsLoading: (page: Page) => page.getByRole('status', { name: 'Loading scripts' }),
   paletteNoScripts: (page: Page) => page.getByText('No scripts in this project.'),
   paletteDialog: (page: Page) => page.getByRole('dialog', { name: 'Command Palette', exact: true }),
@@ -1259,6 +1260,8 @@ export async function settleAnimations(target: Locator) {
     await Promise.all(
       element
         .getAnimations({ subtree: true })
+        // Scroll-driven animations (`scroll-fade`) follow the scroll position and never finish.
+        .filter((animation) => animation.timeline instanceof DocumentTimeline)
         // A toast can be dismissed mid-animation; a cancelled one is settled, not a failure.
         .map((animation) => animation.finished.catch(() => undefined)),
     )

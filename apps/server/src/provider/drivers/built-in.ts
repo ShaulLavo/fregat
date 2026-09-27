@@ -1,8 +1,11 @@
+import { realpathSync } from 'node:fs'
+import path from 'node:path'
 import {
   DEFAULT_CLAUDE_PROVIDER_SETTINGS,
   DEFAULT_CODEX_PROVIDER_SETTINGS,
 } from '@workspace/contracts'
 import type { AnyProviderDriver, ProviderInstanceConfig } from '../driver'
+import { sessionIdentityErrors } from '../structured-errors'
 import { claudeDriver } from './claude'
 import { codexDriver } from './codex'
 import { mockDriver } from './mock'
@@ -19,11 +22,61 @@ const BUILT_IN_PROVIDER_DRIVERS: readonly AnyProviderDriver[] = [codexDriver, cl
 
 /** The agent browser harness sets this on its throwaway server to reach the mock driver. */
 const HARNESS_ENV = 'PLATFORM_AGENT_HARNESS'
+/** Set only by `agent:browser --real-providers`: the owner lets this run use real accounts. */
+export const HARNESS_REAL_PROVIDERS_ENV = 'PLATFORM_AGENT_REAL_PROVIDERS'
+/** The folder harness fixture binaries live under; a Codex or Claude instance runs nothing else. */
+export const HARNESS_FIXTURE_ROOT_ENV = 'PLATFORM_AGENT_FIXTURE_ROOT'
 
 export function productProviderDrivers(env: NodeJS.ProcessEnv = process.env) {
   if (env[HARNESS_ENV] !== '1') return BUILT_IN_PROVIDER_DRIVERS
+  if (env[HARNESS_REAL_PROVIDERS_ENV] === '1') return [...BUILT_IN_PROVIDER_DRIVERS, mockDriver]
 
-  return [...BUILT_IN_PROVIDER_DRIVERS, mockDriver]
+  const fixtureRoot = env[HARNESS_FIXTURE_ROOT_ENV]
+  return [
+    ...BUILT_IN_PROVIDER_DRIVERS.map((driver) => fixtureOnlyDriver(driver, fixtureRoot)),
+    mockDriver,
+  ]
+}
+
+/**
+ * A harness driver that refuses before its adapter exists, so neither a turn nor a status
+ * probe can start the machine's own CLI. A binary resolved from PATH or the SDK is refused.
+ */
+function fixtureOnlyDriver(
+  driver: AnyProviderDriver,
+  fixtureRoot: string | undefined,
+): AnyProviderDriver {
+  return {
+    ...driver,
+    create: async (input) => {
+      const binary =
+        driver.driverKind === codexDriver.driverKind
+          ? (input.env.PLATFORM_CODEX_BINARY ?? input.binaryPath)
+          : input.binaryPath
+      const refusal = fixtureRefusal(binary, fixtureRoot)
+      if (refusal)
+        throw sessionIdentityErrors.HARNESS_FIXTURES_ONLY({
+          internal: { driverKind: driver.driverKind, refusal },
+        })
+
+      return driver.create(input)
+    },
+  }
+}
+
+function fixtureRefusal(binary: string | undefined, fixtureRoot: string | undefined) {
+  if (!fixtureRoot) return 'no-fixture-root'
+  if (!binary || !path.isAbsolute(binary)) return 'binary-from-path'
+  try {
+    // A symlink inside the fixture folder may still point at the installed CLI.
+    const resolved = realpathSync(binary)
+    if (!resolved.startsWith(`${realpathSync(fixtureRoot)}${path.sep}`))
+      return 'binary-outside-fixture-root'
+  } catch {
+    return 'binary-unresolved'
+  }
+
+  return null
 }
 
 /**

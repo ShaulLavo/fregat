@@ -2,8 +2,7 @@ import type { Page } from 'playwright'
 
 export async function inspectTreeOcclusion(page: Page) {
   return page.evaluate(`(() => {
-    const host = document.querySelector('file-tree-container')
-    const root = host?.shadowRoot
+    const root = document.querySelector('[data-file-tree]')
     const overlay = root?.querySelector('[data-file-tree-sticky-overlay-content]')
     const flow = root?.querySelector('[data-file-tree-virtualized-sticky]')
     const scroll = root?.querySelector('[data-file-tree-virtualized-scroll]')

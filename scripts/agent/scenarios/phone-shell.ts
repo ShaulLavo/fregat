@@ -28,7 +28,7 @@ export const phoneShell: Scenario = {
     )
     try {
       const base = await openFixtureChat(page, fixture)
-      await createSessions(page, base, fixture)
+      await createSessions(page, base, fixture, 12)
       await walkTheStack(page, step)
     } catch (error) {
       await step('failed')
@@ -40,10 +40,26 @@ export const phoneShell: Scenario = {
 }
 
 async function walkTheStack(page: Page, step: (label: string) => Promise<void>) {
+  const terminalInput = recordTerminalInput(page)
   await selectors.phoneLevel(page, 'sessions').waitFor({ timeout: 20_000 })
   await selectors.sessionRows(page).first().waitFor({ timeout: 20_000 })
   await expectFits(page)
   await step('sessions')
+
+  await expectListScrollsUnderAFinger(page)
+
+  // A hold well past the menu: lifting the finger must not press the item now under it.
+  const held = selectors.sessionByTitle(page, SESSIONS[1]!)
+  await longPress(page, held, 1_600)
+  const menu = page.getByRole('menu')
+  await menu.waitFor()
+  await expectInsideViewport(page, menu)
+  await page.waitForTimeout(300)
+  ok(await menu.isVisible(), 'The menu is still open after the finger lifts')
+  equal(await held.count(), 1, 'Nothing under the finger ran: the session keeps its title')
+  await step('row-long-press')
+  await page.keyboard.press('Escape')
+  await menu.waitFor({ state: 'hidden' })
 
   await selectors.phoneHeaderAction(page, 'Settings').click()
   await selectors.phoneLevel(page, 'file').waitFor()
@@ -60,6 +76,14 @@ async function walkTheStack(page: Page, step: (label: string) => Promise<void>) 
   await expectFits(page)
   await step('session')
 
+  // The chat commands with no control of their own are one palette away.
+  await selectors.phoneHeaderAction(page, 'Session actions').click()
+  await page.getByRole('menuitem', { name: /command palette/i }).click()
+  await selectors.paletteInput(page).waitFor()
+  await step('palette-from-menu')
+  await page.keyboard.press('Escape')
+  await selectors.paletteInput(page).waitFor({ state: 'hidden' })
+
   await selectors.modelPickerTrigger(page).click()
   await selectors.modelPickerPanel(page).waitFor()
   await expectInsideViewport(page, selectors.modelPickerPanel(page))
@@ -73,6 +97,9 @@ async function walkTheStack(page: Page, step: (label: string) => Promise<void>) 
   await selectors.phoneLevel(page, 'changes').waitFor()
   await selectors.gitChangeRow(page, 'notes.md').waitFor({ timeout: 20_000 })
   await expectFits(page)
+  // No hover on a touch screen: the row's actions show at rest.
+  const stage = selectors.gitFileRowAction(page, 'notes.md', 'Stage file')
+  equal(await effectiveOpacity(stage), 1, 'The Stage button shows without a hover')
   await step('changes')
 
   await selectors.gitChangeRow(page, 'notes.md').click()
@@ -89,6 +116,20 @@ async function walkTheStack(page: Page, step: (label: string) => Promise<void>) 
   await selectors.phoneHeaderAction(page, 'Terminal').click()
   await selectors.phoneLevel(page, 'terminal').waitFor()
   await page.locator('[data-phone-level="terminal"] canvas').first().waitFor({ timeout: 20_000 })
+  const input = page.locator('[data-phone-level="terminal"] textarea').first()
+  // The pushed screen takes focus when it lands; the finger then lands on the terminal.
+  await page.waitForFunction(() => document.activeElement?.matches('[data-phone-level="terminal"]'))
+  // The terminal takes focus once its session is attached; until then a focus call is a no-op.
+  await expectFocusable(input)
+  const sentBefore = terminalInput().length
+  const keys = page.getByRole('toolbar', { name: 'Terminal keys' })
+  await keys.getByRole('button', { name: 'Up' }).tap()
+  await keys.getByRole('button', { name: 'Esc' }).tap()
+  await expectTerminalSent(terminalInput, sentBefore, '\x1b[A\x1b')
+  ok(
+    await input.evaluate((element) => element === document.activeElement),
+    'The terminal keeps focus, so the keyboard stays up',
+  )
   await step('terminal')
 
   await selectors.phoneBack(page).click()
@@ -122,4 +163,83 @@ async function expectInsideViewport(page: Page, locator: Locator) {
     box.x >= 0 && box.y >= 0 && box.x + box.width <= viewport.width + 0.5,
     `The panel leaves the screen: ${JSON.stringify(box)}`,
   )
+}
+
+/** A held finger, as a touch screen sends it: no mouse events between down and up. */
+async function longPress(page: Page, locator: Locator, holdMs: number) {
+  const box = await locator.boundingBox()
+  ok(box, 'The pressed row must be laid out')
+  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
+  await page.waitForTimeout(holdMs)
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  await cdp.detach()
+}
+
+/** A finger dragged up the list scrolls it, and reorders nothing. */
+async function expectListScrollsUnderAFinger(page: Page) {
+  const list = page.locator('[data-phone-shell] [role="listbox"][aria-label="Sessions"]')
+  const order = () => selectors.sessionRows(page).allInnerTexts()
+  const before = await order()
+  const box = await list.boundingBox()
+  ok(box, 'The session list must be laid out')
+  const x = box.x + box.width / 2
+  const from = box.y + box.height * 0.8
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: from }] })
+  for (let step = 1; step <= 10; step += 1)
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ x, y: from - step * 30 }],
+    })
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  await cdp.detach()
+  await page.waitForTimeout(300)
+  ok((await list.evaluate((element) => element.scrollTop)) > 0, 'The list scrolled')
+  equal((await order()).join('|'), before.join('|'), 'The drag reordered nothing')
+  await list.evaluate((element) => element.scrollTo({ top: 0 }))
+}
+
+/** The opacity the element is drawn at: its own times every ancestor's. */
+function effectiveOpacity(locator: Locator) {
+  return locator.evaluate((element) => {
+    let opacity = 1
+    for (let node: Element | null = element; node; node = node.parentElement)
+      opacity *= Number(getComputedStyle(node).opacity)
+    return opacity
+  })
+}
+
+/** Every byte the page sends to a terminal's shell connection, from here on, as text. */
+function recordTerminalInput(page: Page) {
+  let sent = ''
+  page.on('websocket', (socket) => {
+    if (!new URL(socket.url()).pathname.endsWith('/terminal')) return
+    socket.on('framesent', ({ payload }) => {
+      if (typeof payload !== 'string') sent += payload.toString('latin1')
+    })
+  })
+  return () => sent
+}
+
+async function expectTerminalSent(sent: () => string, from: number, expected: string) {
+  const deadline = Date.now() + 5_000
+  while (!sent().slice(from).includes(expected)) {
+    ok(
+      Date.now() < deadline,
+      `The shell connection did not receive the keys: ${JSON.stringify(sent().slice(from))}`,
+    )
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+}
+
+async function expectFocusable(input: Locator) {
+  const deadline = Date.now() + 15_000
+  for (;;) {
+    await input.focus()
+    if (await input.evaluate((element) => element === document.activeElement)) return
+    ok(Date.now() < deadline, 'The terminal input never took focus')
+    await new Promise((resolve) => setTimeout(resolve, 200))
+  }
 }
