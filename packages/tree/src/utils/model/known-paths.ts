@@ -1,7 +1,8 @@
 // Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
 import type { PathStore } from '../path-store/store'
 
-import { getAncestorDirectoryPaths, toLowerCaseSearchPath } from './path-helpers'
+import { ancestorDirectoryPaths } from '@workspace/utils/slash-paths'
+import { toLowerCaseSearchPath } from './path-helpers'
 
 // Listed and known paths, cached until the canonical tree changes.
 export class KnownPaths {
@@ -70,7 +71,7 @@ export class KnownPaths {
     const knownPaths = new Set<string>()
     for (const path of this.listed()) {
       knownPaths.add(path)
-      for (const ancestorPath of getAncestorDirectoryPaths(path)) {
+      for (const ancestorPath of ancestorDirectoryPaths(path)) {
         knownPaths.add(ancestorPath)
       }
     }

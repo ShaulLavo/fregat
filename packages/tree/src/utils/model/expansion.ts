@@ -2,7 +2,7 @@
 import type { PathStore } from '../path-store/store'
 
 import type { KnownPaths } from './known-paths'
-import { getAncestorDirectoryPaths } from './path-helpers'
+import { ancestorDirectoryPaths } from '@workspace/utils/slash-paths'
 
 export class Expansion {
   readonly #getStore: () => PathStore
@@ -26,7 +26,7 @@ export class Expansion {
 
   public expand(path: string): void {
     const store = this.#getStore()
-    for (const ancestorPath of getAncestorDirectoryPaths(path)) {
+    for (const ancestorPath of ancestorDirectoryPaths(path)) {
       if (store.isExpanded(ancestorPath)) {
         continue
       }

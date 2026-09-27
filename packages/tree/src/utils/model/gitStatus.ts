@@ -2,7 +2,7 @@
 import type { GitStatus, GitStatusEntry } from '../public-types'
 import { getGitStatusSignature } from '../git-status-signature'
 import { normalizeInputPath } from '../normalize-input-path'
-import { getAncestorDirectoryPaths } from './path-helpers'
+import { ancestorDirectoryPaths } from '@workspace/utils/slash-paths'
 import type { FileTreeGitStatusPatch } from './public-types'
 
 export interface FileTreeGitStatusState {
@@ -218,7 +218,7 @@ function incrementAncestorChangeCounts(
   directoriesWithChanges: Set<string>,
   path: string,
 ): void {
-  for (const ancestorPath of getAncestorDirectoryPaths(path)) {
+  for (const ancestorPath of ancestorDirectoryPaths(path)) {
     changeCountByDirectoryPath.set(
       ancestorPath,
       (changeCountByDirectoryPath.get(ancestorPath) ?? 0) + 1,
@@ -232,7 +232,7 @@ function decrementAncestorChangeCounts(
   directoriesWithChanges: Set<string>,
   path: string,
 ): void {
-  for (const ancestorPath of getAncestorDirectoryPaths(path)) {
+  for (const ancestorPath of ancestorDirectoryPaths(path)) {
     const nextCount = (changeCountByDirectoryPath.get(ancestorPath) ?? 0) - 1
     if (nextCount > 0) {
       changeCountByDirectoryPath.set(ancestorPath, nextCount)

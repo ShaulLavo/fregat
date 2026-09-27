@@ -4,7 +4,7 @@ import { renamePaths } from '../rename-paths'
 
 import type { StorePathMutationEvent } from './internal-types'
 import { remapPathThroughMutation } from './mutation-events'
-import { getAncestorDirectoryPaths, isCanonicalDirectoryPath } from './path-helpers'
+import { ancestorDirectoryPaths, isDirectoryPath } from '@workspace/utils/slash-paths'
 import type {
   FileTreeRemoveOptions,
   FileTreeRenameEvent,
@@ -67,7 +67,7 @@ export class Rename {
     }
 
     const canonicalPath = itemInfo.path
-    const isFolder = isCanonicalDirectoryPath(canonicalPath)
+    const isFolder = isDirectoryPath(canonicalPath)
     const publicPath = toRenameHelperPath(canonicalPath)
     if (this.#canRename?.({ isFolder, path: publicPath }) === false) {
       return false
@@ -77,7 +77,7 @@ export class Rename {
     // If the row stays hidden under a collapsed directory, the React
     // rename-handoff effect keeps asking the view to reveal a row that can
     // never render, spinning the component forever.
-    for (const ancestorPath of getAncestorDirectoryPaths(canonicalPath)) {
+    for (const ancestorPath of ancestorDirectoryPaths(canonicalPath)) {
       if (!store.isExpanded(ancestorPath)) {
         store.expand(ancestorPath)
       }
@@ -155,7 +155,7 @@ export class Rename {
       return
     }
 
-    const isFolder = isCanonicalDirectoryPath(renamingPath)
+    const isFolder = isDirectoryPath(renamingPath)
     const result = renamePaths({
       files: this.#host.store().list(),
       isFolder,
@@ -205,6 +205,6 @@ export class Rename {
   }
 
   #removePlaceholder(path: string): void {
-    this.#host.remove(path, isCanonicalDirectoryPath(path) ? { recursive: true } : undefined)
+    this.#host.remove(path, isDirectoryPath(path) ? { recursive: true } : undefined)
   }
 }

@@ -8,7 +8,7 @@ import type {
 import { createTreeError } from '../structured-errors'
 
 import type { FileTreeStickyRowCandidate } from './internal-types'
-import { getAncestorDirectoryPaths } from './path-helpers'
+import { ancestorDirectoryPaths } from '@workspace/utils/slash-paths'
 import type { FileTreeVisibleRow } from './public-types'
 import { createVisibleProjection, type ProjectionIndexBuffer } from './visible-projection-data'
 
@@ -137,7 +137,7 @@ export class VisibleProjection {
       return directIndex
     }
 
-    const ancestorPaths = getAncestorDirectoryPaths(path)
+    const ancestorPaths = ancestorDirectoryPaths(path)
     for (let index = ancestorPaths.length - 1; index >= 0; index -= 1) {
       const ancestorPath = ancestorPaths[index]
       if (ancestorPath == null) {

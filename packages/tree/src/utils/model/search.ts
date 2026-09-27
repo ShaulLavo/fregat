@@ -5,7 +5,7 @@ import type { Expansion } from './expansion'
 import type { StorePathMutationEvent } from './internal-types'
 import type { KnownPaths } from './known-paths'
 import { remapPathThroughMutation } from './mutation-events'
-import { getAncestorDirectoryPaths } from './path-helpers'
+import { ancestorDirectoryPaths } from '@workspace/utils/slash-paths'
 import type { FileTreeSearchMode } from './public-types'
 import { normalizeSearchQuery } from './search-helpers'
 
@@ -191,7 +191,7 @@ export class Search {
     const expandedPaths = new Set(this.#previousExpandedPaths ?? [])
     if (keepSelectedOpen) {
       for (const selectedPath of this.#host.selectedPaths()) {
-        for (const ancestorPath of getAncestorDirectoryPaths(selectedPath)) {
+        for (const ancestorPath of ancestorDirectoryPaths(selectedPath)) {
           expandedPaths.add(ancestorPath)
         }
       }
@@ -223,7 +223,7 @@ export class Search {
       if (matchingPath.endsWith('/')) {
         expandedPaths.add(matchingPath)
       }
-      for (const ancestorPath of getAncestorDirectoryPaths(matchingPath)) {
+      for (const ancestorPath of ancestorDirectoryPaths(matchingPath)) {
         expandedPaths.add(ancestorPath)
         visiblePathSet?.add(ancestorPath)
       }
@@ -288,7 +288,7 @@ export class Search {
     if (visiblePathSet == null) return
 
     visiblePathSet.add(collapsedPath)
-    for (const ancestorPath of getAncestorDirectoryPaths(collapsedPath)) {
+    for (const ancestorPath of ancestorDirectoryPaths(collapsedPath)) {
       visiblePathSet.add(ancestorPath)
     }
   }

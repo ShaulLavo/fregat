@@ -1,7 +1,7 @@
 // Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
 import type { PathStoreVisibleTreeProjectionData } from '../path-store/public-types'
 
-import { getAncestorDirectoryPaths } from './path-helpers'
+import { ancestorDirectoryPaths } from '@workspace/utils/slash-paths'
 
 export type ProjectionIndexBuffer = Int32Array<ArrayBufferLike>
 
@@ -60,7 +60,7 @@ function resolveFocusedIndexByLookup(
       return descendantIndex
     }
 
-    const ancestorPaths = getAncestorDirectoryPaths(candidatePath)
+    const ancestorPaths = ancestorDirectoryPaths(candidatePath)
     for (let index = ancestorPaths.length - 1; index >= 0; index -= 1) {
       const ancestorPath = ancestorPaths[index]
       if (ancestorPath == null) {

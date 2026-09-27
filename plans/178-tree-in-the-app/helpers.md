@@ -1,6 +1,6 @@
 # Plan 178: filter, path, sort and error helpers
 
-- Status: PROPOSED. Size M. After [app-owned-state](app-owned-state.md); beside the other sub-plans.
+- Status: IN PROGRESS 2026-09-27: path helpers and errors landed; file ordering and filter matching open. Size M. After [app-owned-state](app-owned-state.md); beside the other sub-plans.
 - Owns: the pure helpers the tree carries its own copy of — filter matching, path handling, file
   ordering, errors — merged with the app's copies into one implementation each.
 
@@ -83,3 +83,27 @@ comparators above once they call the shared ones.
 - `look` on quick open, search, git changes, chat turn files and the file picker: if their order
   changes, that is a recorded verdict here, not drift.
 - `trace workspace-open-large-root --compare`.
+
+## Progress
+
+### Path helpers and errors, 2026-09-27
+
+- `ancestorDirectoryPaths`, `parentDirectoryPath` and `isDirectoryPath` live in
+  `@workspace/utils/slash-paths`, with a table test (empty path, top level, a trailing slash, a
+  flattened chain, a leading and a doubled slash). The tree model imports them; its
+  `getAncestorDirectoryPaths`, `getImmediateParentPath` and `isCanonicalDirectoryPath` are gone, and
+  `tree-pane-state.ts`'s own `ancestorDirectoryPaths` copy with them (same output for tree paths,
+  which never carry a leading or doubled slash; `tree-pane.test.ts` covers both call sites).
+  `lib/path-formatters.ts` keeps `parentPath`, a different behaviour (clamped to the root, no
+  trailing slash); `treePathBasename` was already gone.
+- Errors: no view code uses the package's catalog any more; its message no longer names a renderer.
+
+### Open
+
+- **File ordering.** Not started. Unifying the comparators changes the order of quick open, search,
+  git, chat turn files and the picker, and each change needs its `look` verdict recorded here;
+  `agent:browser` could not open a workspace in the container this ran in.
+- **Filter matching.** Not started. The app's substring filters (`chat-draft-rail`, the SSH and
+  Tailnet host lists, `shortcut-rows`) match labels and host names, not paths: the tree's
+  normalizer maps `\` to `/`, which would change what they match. The shared matcher needs a
+  per-site decision, with a test at each site first.

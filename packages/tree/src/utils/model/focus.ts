@@ -2,7 +2,8 @@
 import type { PathStore } from '../path-store/store'
 
 import type { FileTreeScrollRequest } from './internal-types'
-import { getImmediateParentPath, getSiblingComparisonKey } from './path-helpers'
+import { parentDirectoryPath } from '@workspace/utils/slash-paths'
+import { getSiblingComparisonKey } from './path-helpers'
 import type {
   FileTreeScrollBehavior,
   FileTreeScrollOffset,
@@ -124,7 +125,7 @@ export class Focus {
       return
     }
 
-    const parentPath = getImmediateParentPath(this.#path)
+    const parentPath = parentDirectoryPath(this.#path)
     if (parentPath == null) {
       return
     }
@@ -263,13 +264,13 @@ export class Focus {
 
   #nearestVisibleSibling(path: string): string | null {
     this.#host.ensureFull()
-    const parentPath = getImmediateParentPath(path)
+    const parentPath = parentDirectoryPath(path)
     const candidateKey = getSiblingComparisonKey(path, parentPath)
     let previousSiblingPath: string | null = null
     let nextSiblingPath: string | null = null
 
     for (const siblingPath of this.#host.projection.paths()) {
-      if (getImmediateParentPath(siblingPath) !== parentPath) {
+      if (parentDirectoryPath(siblingPath) !== parentPath) {
         continue
       }
 

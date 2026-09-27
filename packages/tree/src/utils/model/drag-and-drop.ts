@@ -1,5 +1,5 @@
 // Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
-import { getAncestorDirectoryPaths, isCanonicalDirectoryPath } from './path-helpers'
+import { ancestorDirectoryPaths, isDirectoryPath } from '@workspace/utils/slash-paths'
 import type {
   FileTreeBatchOperation,
   FileTreeDropContext,
@@ -41,7 +41,7 @@ function normalizeDraggedPaths(paths: readonly string[]): readonly string[] {
 
     return left.localeCompare(right)
   })) {
-    if (getAncestorDirectoryPaths(path).some((ancestor) => keptPaths.has(ancestor))) {
+    if (ancestorDirectoryPaths(path).some((ancestor) => keptPaths.has(ancestor))) {
       continue
     }
 
@@ -97,7 +97,7 @@ export function isSelfOrDescendantDrop(
   }
 
   for (const draggedPath of draggedPaths) {
-    if (!isCanonicalDirectoryPath(draggedPath)) {
+    if (!isDirectoryPath(draggedPath)) {
       continue
     }
 
