@@ -9,11 +9,11 @@
 - Effort: M. Phases land on their own; 1 goes first because 2 and 4 read through it.
 - Progress:
   - [x] Phase 1: navigation is bound at boot
-  - [ ] Phase 2: the editor runtime owns its own active lifetime
-  - [ ] Phase 3: settings reach non-React consumers by subscription
-  - [ ] Phase 4: the command runtime reads settings at dispatch
-  - [ ] Phase 5: editor theme selection from settings
-  - [ ] Phase 6: the rule
+  - [x] Phase 2: the editor runtime owns its own active lifetime
+  - [x] Phase 3: settings reach non-React consumers by subscription (slot 9 kept, see Keep)
+  - [x] Phase 4: the command runtime reads settings at dispatch
+  - [x] Phase 5: editor theme selection from settings (decided: slot 11 kept, see Keep)
+  - [ ] Phase 6: the rule (text ready; AGENTS.md is the project CLAUDE.md, so it waits for the owner)
 
 ## The shape
 
@@ -32,19 +32,19 @@ lifecycle push it. React subscribes; it does not feed.
 Surveyed 2026-09-27 across `apps/web`, `apps/tui` and `packages/*`; only `apps/web` has the shape.
 Line numbers are from `7f22085c0`; reconcile before starting.
 
-| #   | Slot                                                                                             | Filled by                              | Verdict                 |
-| --- | ------------------------------------------------------------------------------------------------ | -------------------------------------- | ----------------------- |
-| 1   | `state/navigation-binding.ts:4`                                                                  | `NavigationProvider` effect            | remove (phase 1)        |
-| 2   | `features/editor/state/language-census.ts:12`                                                    | `useLanguageCensus` layout effect      | remove (phase 2)        |
-| 3   | `features/editor/state/performance-trace.ts:114`                                                 | `EditorStateProvider` effect           | remove (phase 2)        |
-| 4   | `useFileAvailability` watch                                                                      | `EditorStateProvider` layout effect    | remove (phase 2)        |
-| 5   | `useWorkspaceCachePersistence` flush registrant                                                  | `AppRuntimeContent` effect             | remove (phase 2)        |
-| 6   | `lib/simulated-latency.ts:7`                                                                     | `SimulatedLatencyBridge`               | remove (phase 3)        |
-| 7   | `connections.configureMachines`                                                                  | `EnvironmentTransportsProvider` effect | remove (phase 3)        |
-| 8   | `spellcheck.setAcceptedWords`                                                                    | `useSpellcheckDictionary`              | remove (phase 3)        |
-| 9   | `fileOpenIntentOwner.setEnvironment` / `setRelatedPrefetch`, `languageServerDocuments.configure` | `EditorStateProvider` layout effects   | mostly remove (phase 3) |
-| 10  | `keymap/state/runtime-binding.ts` settings refs                                                  | `CommandProvider` layout effect        | reduce (phase 4)        |
-| 11  | `features/editor/state/color-theme-store.ts:43-44`                                               | `EditorColorThemeProvider` effects     | reduce (phase 5)        |
+| #   | Slot                                                                                             | Filled by                              | Verdict          |
+| --- | ------------------------------------------------------------------------------------------------ | -------------------------------------- | ---------------- |
+| 1   | `state/navigation-binding.ts:4`                                                                  | `NavigationProvider` effect            | remove (phase 1) |
+| 2   | `features/editor/state/language-census.ts:12`                                                    | `useLanguageCensus` layout effect      | remove (phase 2) |
+| 3   | `features/editor/state/performance-trace.ts:114`                                                 | `EditorStateProvider` effect           | remove (phase 2) |
+| 4   | `useFileAvailability` watch                                                                      | `EditorStateProvider` layout effect    | remove (phase 2) |
+| 5   | `useWorkspaceCachePersistence` flush registrant                                                  | `AppRuntimeContent` effect             | remove (phase 2) |
+| 6   | `lib/simulated-latency.ts:7`                                                                     | `SimulatedLatencyBridge`               | remove (phase 3) |
+| 7   | `connections.configureMachines`                                                                  | `EnvironmentTransportsProvider` effect | remove (phase 3) |
+| 8   | `spellcheck.setAcceptedWords`                                                                    | `useSpellcheckDictionary`              | remove (phase 3) |
+| 9   | `fileOpenIntentOwner.setEnvironment` / `setRelatedPrefetch`, `languageServerDocuments.configure` | `EditorStateProvider` layout effects   | keep (see Keep)  |
+| 10  | `keymap/state/runtime-binding.ts` settings refs                                                  | `CommandProvider` layout effect        | reduce (phase 4) |
+| 11  | `features/editor/state/color-theme-store.ts:43-44`                                               | `EditorColorThemeProvider` effects     | keep (see Keep)  |
 
 Keep, with the reason on record:
 
@@ -59,10 +59,27 @@ Keep, with the reason on record:
 - `bindDiffPlugin` (`features/editor/state/diff-presentation.ts:59`): a per-pane plugin instance.
 - The command runtime binding itself: palette and dialog setters are React state (phase 4 only
   shrinks what it carries).
+- The LSP match configuration (`languageServerDocuments.configure`, `setRelatedPrefetch` in
+  `EditorStateProvider`): its generation is minted during render by `LanguageServerMatchProvider`
+  (React state over a per-query-client map), and context consumers key their queries on it.
+  Moving it out means turning that provider into a store first.
+- The file-open preparer environment (`fileOpenIntentOwner.setEnvironment` in
+  `EditorStateProvider`): the applied theme id and content hash are `EditorColorThemeProvider`'s
+  held state (the last loaded theme stays while the next loads). Syntax highlighting and tab size
+  could come from a settings subscription, but one preparer fed from two places is more complex than
+  today's single effect. Revisit if the applied theme moves into `color-theme-store`.
 - The editor's colour mode (`color-theme-store.ts:44`, pushed at `color-theme-provider.tsx:80-82`):
   it mirrors `useTransitionedColorMode`, which commits a dark/light switch inside the
   `color-mode` view transition (`globals.css:130`). Reading the setting directly would switch the
   editor's code colours before the page's cross-fade starts.
+- The editor's dark and light code theme ids (`color-theme-store.ts`, pushed by
+  `syncEditorThemeSelection` in `color-theme-provider.tsx`): they follow the Theme Studio preview.
+  A bundle theme sets both ids (`bundle-settings.ts`), and the command, card and draft bundle
+  previews are `AppearanceProvider` state whose hand-off to the confirmed setting is derived during
+  render from the projection's pending and acknowledged mutation ids. A store for the ids alone
+  would still be fed from that render, so the fix is the whole preview model (bundle, draft, mode,
+  palette and font previews with their hand-offs) moved out of `AppearanceProvider`. That is a
+  larger change than this plan, next to the colour-mode view transition; it needs its own plan.
 
 ## Phase 1: navigation is bound at boot
 
@@ -105,6 +122,23 @@ provider's effect (`state-provider.tsx:74`).
     `createEnvironment` and dispose with the environment instead.
 - "The active runtime" is read as `getNavigation().getSnapshot()` after phase 1, or passed in by
   `application-runtime.ts`. No new slot.
+- As landed: navigation exposes no application snapshot, so the census source and the benchmark
+  control are pushed by `EditorRuntime.resume()` (its non-React owner) and released by
+  `suspend()`; the last resumed runtime wins. Cache persistence lives for the environment
+  (`createEnvironment` to `dispose`) in `application-runtime.ts`, beside `prepareSearchReload`,
+  and moved to `features/workspace/state/cache-persistence.ts`. `createBootstrap` binds
+  navigation (phase 1 follow-up), so `cached-bootstrap.test.tsx` fails if the bind moves back
+  behind an effect. The application resumes its editor from `start()`, which `createBootstrap`
+  calls from `bootstrap.start()`, after `main.tsx` claims a pairing link, so recovery discovery
+  carries the pairing cookie. `ConnectionGate`'s refusal rule is also the runtime's: a machine
+  refused before this page's first handshake (identity drift or protocol mismatch at generation 0)
+  keeps its editor suspended until admitted. `activateEnvironment` throws for a machine already
+  refused (`confirmedEnvironmentId`); the hold covers one refused after activation.
+- Known edges, accepted: `activateEnvironment` resumes a re-activated editor before React's layout
+  effect refreshes its file-open preparer (theme, tab size), so prepares in that window use the
+  values from its last activation. The unscoped cache keys (`uiMode`, `workbenchLayout`,
+  `chatModePanels`) now have one writer per retained environment; a parked machine's write still
+  pending inside the 350 ms debounce can land after the active one's.
 - Verify: `features/editor` runtime tests for resume/suspend and a machine switch;
   `scenario editor-syntax-shiki-settled` (census preload); `apps/web/scripts/editor-open-benchmark.mjs`
   once; `scenario workspace-switch` and `scenario editor-reload-paint` (cache persistence and
@@ -134,6 +168,13 @@ configuration (`state-provider.tsx:44-71`).
   its comment about `lib/` not reading settings stays true.
 - Check first where `useLanguageServerMatchConfiguration`'s context value comes from; if its source
   is React-local, that one input stays pushed from React.
+- As landed: `subscribeLiveSettings` and `watchSettingValue` (the key's boot value until the
+  document lands, deduplicated by identity) live in `features/settings/state/live-projection.ts` and
+  read the primary query client, the settings owner. `application-runtime.ts` drives the latency
+  dial and `configureMachines` (only from a confirmed document: the settings authority forgets
+  machines it does not list) and, per retained environment, its editor's spellcheck words (the
+  editor feature may not import settings state). `connections.start()`/`stop()` stay in `EnvironmentTransportsProvider`: starting them in
+  the runtime would start the connections of every runtime a test creates. Slot 9 stays (see Keep).
 - Verify: a settings test that flips each key through `setSetting` and reads the consumer (the
   latency fetcher's delay, `spellcheck` accepted words, `connections` machines, the file-open
   preparer's tab size); `scenario editor-spellcheck`; `scenario machine-protocol-mismatch`.
@@ -146,6 +187,9 @@ into `snapshotSettingsRef` from a layout effect. Commands can read
 does for another value. `adaptersRef` (editor, settings and theme actions, `requestCloseTab`) and
 the palette refs stay: they are React-owned actions and state.
 
+- As landed: the live projection already won whenever the document existed; the ref was only the
+  fallback before it lands, so that fallback now reads the boot mirror. `CommandProvider` no
+  longer subscribes to the diff view or wallpaper settings.
 - Verify: `keymap/tests/command-provider.test.tsx`; toggling the diff view and wallpaper from the
   palette straight after a settings change.
 
@@ -157,6 +201,8 @@ the Shiki resolver reads. The colour mode it also pushes stays (see Keep).
 - The theme ids can come from the phase 3 subscription, except that `useSettingValue` also layers
   the Theme Studio preview (`AppearancePreviewContext`, React state). Move that preview into a
   store first, then subscribe.
+- Decided 2026-09-27: kept, not reduced (see Keep). The preview is not one value in a context;
+  it is `AppearanceProvider`'s preview model, and moving it is its own plan.
 - Verify: `scenario editor-theme-preview`, `scenario theme-studio-preview`,
   `scenario color-mode-preview`, each with `look`.
 
@@ -169,6 +215,8 @@ reliably, and review catches it.
 
 ## Found along the way
 
+- `scenario session-undo` fails about 1 run in 4 with a `waitForURL` timeout in the archive and
+  reopen steps, on `origin/main` as well (seen 2026-09-27 during phase 1). Needs its own owner.
 - The Connect machine picker shows a refused connection as `TypeError: Failed to fetch`,
   `code: unknown` (seen in `scenario machine-connect-error`, 2026-09-27). The connect path passes a
   raw fetch failure to the dialog instead of a structured error with `why` and `fix`. Not in this

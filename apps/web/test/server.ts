@@ -97,6 +97,16 @@ export async function makeTestServer({
         // read the developer's own machine, and answer differently per checkout.
         providerAdapterRegistry: new ProviderAdapterRegistry([providerAdapter]),
       },
+      // The defaults reach registry.npmjs.org and models.dev for real CLI versions
+      // and prices; every origin here is the in-process happy-dom window, whose
+      // fetch adds a CORS preflight against its own page origin for either call.
+      provider: {
+        maintenanceProbe: { fetcher: async () => Response.json({ version: '0.0.0' }) },
+        priceCatalogFetcher: async () =>
+          Response.json({
+            anthropic: { models: { claude: { cost: { input: 0, output: 0 } } } },
+          }),
+      },
       settings: testSettingsOptions(root, { watch: settingsWatch }),
       themes: { root: path.join(root, '.platform') },
       watch: filesystemWatch,

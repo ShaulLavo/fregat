@@ -1,27 +1,20 @@
 import { scrollPositionsEqual } from '@/lib/scroll-positions'
 import { captureEditorScrollPositions } from '@/features/editor/state/scroll-persistence'
-import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { Debouncer } from '@tanstack/react-pacer/debouncer'
-import { useEffect } from 'react'
 import { sameTabContent } from '@/lib/documents/utils/tabs'
 import type { ReopenScrollPosition } from '@/lib/documents/utils/types'
 
-import {
-  type EditorDocumentStoreApi,
-  useEditorDocumentStoreApi,
-} from '@/features/editor/state/document-state'
-import {
-  type EditorWorkspaceStore,
-  type EditorWorkspaceStoreApi,
-  useEditorWorkspaceStoreApi,
+import type { EditorDocumentStoreApi } from '@/features/editor/state/document-state'
+import type {
+  EditorWorkspaceStore,
+  EditorWorkspaceStoreApi,
 } from '@/features/editor/state/workspace-state'
 import {
   cachedSearchBufferState,
   type SearchBufferSnapshot,
   type SearchBufferStore,
   type SearchBufferStoreApi,
-  useSearchBufferStoreApi,
 } from '@/features/search/state/buffer-state'
 import {
   readWorkspaceCheckoutIds,
@@ -81,24 +74,6 @@ function workspaceCacheWriters(
     workspaceSlice: (root, slice) =>
       writeWorkspaceSliceCache(storage, root, slice, worktreeId(root)),
   }
-}
-
-export function useWorkspaceCachePersistence() {
-  const { storage } = useEditorRuntime()
-  const documentStore = useEditorDocumentStoreApi()
-  const workspaceStore = useEditorWorkspaceStoreApi()
-  const searchStore = useSearchBufferStoreApi()
-
-  useEffect(
-    () =>
-      subscribeWorkspaceCachePersistence({
-        storage,
-        documentStore,
-        searchStore,
-        workspaceStore,
-      }),
-    [documentStore, searchStore, storage, workspaceStore],
-  )
 }
 
 export function subscribeWorkspaceCachePersistence({

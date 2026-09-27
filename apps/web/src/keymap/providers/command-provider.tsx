@@ -30,6 +30,7 @@ import { useWorkspaceEditService } from '@/features/editor/providers/workspace-e
 import { useOpenFileAtRef } from '@/features/git/hooks/use-open-file-at-ref'
 import { SettingsDialog } from '@/features/settings/components/dialog'
 import { useSettingValue } from '@/hooks/use-setting-value'
+import { readSettingBootValue } from '@/lib/settings-boot-mirror'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 import { useSettingsStream } from '@/features/settings/hooks/use-settings-stream'
@@ -110,9 +111,6 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
   const { requestCloseTab } = useEditorTabActions()
   const settings = useSettingsActions()
   const theme = useTheme()
-  const diffViewMode = useSettingValue('editor.diff.viewMode')
-  const wallpaperSelection = useSettingValue('workbench.wallpaper')
-  const wallpaperEnabled = wallpaperSelection.enabled
   const overrides = useSettingValue('keybindings.overrides')
   const preset = useSettingValue('keybindings.preset')
   const [paletteOpen, setPaletteOpenState] = useState(false)
@@ -142,11 +140,6 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
       theme,
     }),
   )
-  const snapshotSettingsRef = useRef<SnapshotSettings>({
-    diffViewMode,
-    wallpaperEnabled,
-    wallpaperSelection,
-  })
   const paletteOpenRef = useRef(false)
   // The command runtime is built once and dispatches long after that render, so the
   // palette state it reads has to come from refs rather than a stale closure.
@@ -164,18 +157,7 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
       settings,
       theme,
     })
-    snapshotSettingsRef.current = { diffViewMode, wallpaperEnabled, wallpaperSelection }
-  }, [
-    diffViewMode,
-    editor,
-    openFileAtRef,
-    openWorkspaceRoot,
-    requestCloseTab,
-    settings,
-    theme,
-    wallpaperEnabled,
-    wallpaperSelection,
-  ])
+  }, [editor, openFileAtRef, openWorkspaceRoot, requestCloseTab, settings, theme])
 
   useSettingsStream()
 
@@ -249,17 +231,14 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
     },
     focus,
     settings: {
-      readSnapshot: () => readCommandSettingsSnapshot(settingsOwner, snapshotSettingsRef.current),
+      readSnapshot: () => readCommandSettingsSnapshot(settingsOwner),
       setDiffViewMode: (mode, initiator) =>
         adaptersRef.current.setDiffViewMode('editor.diff.viewMode', mode, undefined, initiator),
       setTheme: (value, initiator) => adaptersRef.current.setTheme(value, initiator),
       nextWallpaper: async () => {
         const library = await settingsOwner.query(wallpaperLibraryOptions())
         if (!library.assets.length) return false
-        const selection = readCommandSettingsSnapshot(
-          settingsOwner,
-          snapshotSettingsRef.current,
-        ).wallpaperSelection
+        const selection = readCommandSettingsSnapshot(settingsOwner).wallpaperSelection
         const current = selection.source
         const index =
           current.kind === 'library'
@@ -278,8 +257,7 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
         adaptersRef.current.setWallpaperEnabled(
           'workbench.wallpaper',
           {
-            ...readCommandSettingsSnapshot(settingsOwner, snapshotSettingsRef.current)
-              .wallpaperSelection,
+            ...readCommandSettingsSnapshot(settingsOwner).wallpaperSelection,
             enabled,
           },
           undefined,
@@ -454,21 +432,22 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
   )
 }
 
+// Read at dispatch, so a command sees a settings write the tree has not rendered yet.
 function readCommandSettingsSnapshot(
   queryClient: ReturnType<typeof useQueryClient>,
-  fallback: SnapshotSettings,
 ): SnapshotSettings {
-  const projection = readLiveSettingsProjection(queryClient, fallbackSettingsSnapshot(fallback))
-  if (!projection) return fallback
-
+  const { values } =
+    readLiveSettingsProjection(queryClient) ??
+    readLiveSettingsProjection(queryClient, bootSettingsSnapshot())
   return {
-    diffViewMode: projection.values['editor.diff.viewMode'],
-    wallpaperSelection: projection.values['workbench.wallpaper'],
-    wallpaperEnabled: projection.values['workbench.wallpaper'].enabled,
+    diffViewMode: values['editor.diff.viewMode'],
+    wallpaperSelection: values['workbench.wallpaper'],
+    wallpaperEnabled: values['workbench.wallpaper'].enabled,
   }
 }
 
-function fallbackSettingsSnapshot(fallback: SnapshotSettings): SettingsSnapshot {
+/** Only while the settings document has not landed; pending writes still project over it. */
+function bootSettingsSnapshot(): SettingsSnapshot {
   const file = { keyRanges: {}, parseErrors: [], revision: 'command-fallback', text: '{}\n' }
   return {
     diagnostics: [],
@@ -480,8 +459,8 @@ function fallbackSettingsSnapshot(fallback: SnapshotSettings): SettingsSnapshot 
     serverVersion: { epoch: 'command-fallback', sequence: 0 },
     values: {
       ...DEFAULT_SETTING_VALUES,
-      'editor.diff.viewMode': fallback.diffViewMode,
-      'workbench.wallpaper': fallback.wallpaperSelection,
+      'editor.diff.viewMode': readSettingBootValue('editor.diff.viewMode'),
+      'workbench.wallpaper': readSettingBootValue('workbench.wallpaper'),
     },
   }
 }

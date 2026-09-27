@@ -1,5 +1,5 @@
 /**
- * The developer's slow-link dial. Settings pushes the value in; the HTTP
+ * The developer's slow-link dial. The application runtime pushes the setting in; the HTTP
  * fetcher and the orchestration socket read it before every request. It lives
  * here rather than in the settings feature because `lib/` cannot read a
  * setting and both transports live below `features/`.
