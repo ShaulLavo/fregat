@@ -1,10 +1,7 @@
-import { useSyncExternalStore } from 'react'
+import { useStore } from 'zustand'
 
-import {
-  recentCommandIds,
-  subscribeRecentCommands,
-} from '@/features/command-palette/state/recent-commands-store'
+import { recentCommandsStore } from '@/features/command-palette/state/recent-commands-store'
 
 export function useRecentCommandIds() {
-  return useSyncExternalStore(subscribeRecentCommands, recentCommandIds, recentCommandIds)
+  return useStore(recentCommandsStore)
 }

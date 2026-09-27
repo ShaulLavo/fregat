@@ -1,5 +1,5 @@
 import { createRecentCommandsLedger } from '@workspace/client-core/commands/recent-commands'
-import { createSubscriptions } from '@workspace/utils/subscriptions'
+import { createStore } from 'zustand/vanilla'
 import type { PlatformCommandId } from '@/keymap/types'
 import { globalChromeStorage } from '@/lib/environments/state/scoped-storage'
 
@@ -17,30 +17,21 @@ const storage = {
   },
 }
 
-const subscriptions = createSubscriptions()
-export const subscribeRecentCommands = subscriptions.subscribe
-
-// Cached so repeat reads return the same reference: `useSyncExternalStore` treats
-// a fresh array each call as a fresh value and re-renders forever.
-let recentIds: readonly string[] | null = null
-
 /** Command ids the user has run from the palette, most recent first. */
-export function recentCommandIds(): readonly string[] {
-  recentIds ??= ledger.read(storage)
+export const recentCommandsStore = createStore<readonly string[]>(() => ledger.read(storage))
 
-  return recentIds
+export function recentCommandIds(): readonly string[] {
+  return recentCommandsStore.getState()
 }
 
 export function recordCommandUse(commandId: PlatformCommandId) {
-  const current = recentCommandIds()
+  const current = recentCommandsStore.getState()
   if (current[0] === commandId) return
 
-  recentIds = ledger.record(storage, commandId, current)
-  subscriptions.notify()
+  recentCommandsStore.setState(ledger.record(storage, commandId, current), true)
 }
 
-/** Test hook: drops in-memory state so the next read hits localStorage again. */
+/** Test hook: the next state is what a fresh page load would read from localStorage. */
 export function resetRecentCommandsStore() {
-  recentIds = null
-  subscriptions.clear()
+  recentCommandsStore.setState(ledger.read(storage), true)
 }

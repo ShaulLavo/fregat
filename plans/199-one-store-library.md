@@ -2,7 +2,8 @@
 
 ## Status and authorization
 
-- Status: PROPOSED 2026-09-27. The rule landed in AGENTS.md ("React"). The sites below are left.
+- Status: IN PROGRESS 2026-09-27. The rule landed in AGENTS.md ("React"). A1, A2, A4 and B1–B4
+  are done; the rest below is left.
 - Origin: owner, 2026-09-27: "we prob abuse useSyncExternalStore too hard". Afterwards the owner
   approved the survey: hand-built stores become zustand, zustand stores read without a selector
   get selectors, snapshots that derive per read are cut down, and the TUI is in scope.
@@ -17,7 +18,7 @@
 2. Selectors return a primitive, a held reference, or go through `useShallow`. A derived object is
    a selector memoized on its inputs.
 3. Raw `useSyncExternalStore` only for sources zustand cannot own (DOM, renderer events, mutable
-   objects), inside a `use-*` hook.
+   objects), and never over a whole store snapshot. It may live anywhere.
 
 ## Library: stay on zustand
 
@@ -41,10 +42,10 @@ No second library. If one ever replaces zustand, it replaces all of it.
 
 | #   | Where                                                                                | Today                                                                                                                      | Status    |
 | --- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- | --------- |
-| A1  | `features/command-palette/state/recent-commands-store.ts`                            | module `let` + `createSubscriptions` + identity cache comment                                                              | confirmed |
-| A2  | `features/logs/state/filter-store.ts`                                                | `let filters`, defaults cache kept only for identity, loop comment                                                         | confirmed |
+| A1  | `features/command-palette/state/recent-commands-store.ts`                            | module `let` + `createSubscriptions` + identity cache comment                                                              | **done**  |
+| A2  | `features/logs/state/filter-store.ts`                                                | `let filters`, defaults cache kept only for identity, loop comment                                                         | **done**  |
 | A3  | `features/git/state/reload.ts`, `features/settings/state/reload.ts`                  | `WeakMap<QueryClient,…>` + listener set, read by `use-reload-owner`                                                        | confirmed |
-| A4  | `features/workbench/utils/visible-tree-item-count-store.ts`, `tree-toolbar-store.ts` | factory with snapshot + listener set                                                                                       | confirmed |
+| A4  | `features/workbench/utils/visible-tree-item-count-store.ts`, `tree-toolbar-store.ts` | factory with snapshot + listener set                                                                                       | **done**  |
 | A5  | `features/chat/state/active-transports.ts`                                           | `Map` + `createSubscriptions`; `transport-provider.tsx`, `queued-follow-up-senders.tsx` read `transportFor(id)` per render | confirmed |
 | A6  | `features/editor/state/color-theme-store.ts` (363 lines)                             | three module `let`s + listener set; provider reads three lambdas                                                           | confirmed |
 | A7  | `lib/markers/store.ts`                                                               | factory with cached `resources`; `hooks/use-markers.ts`                                                                    | likely    |
@@ -55,6 +56,11 @@ A2: once the filters are `{ filters: LogsFilterState | null }` in a store, the h
 defaults cache goes. A3: the owner is a `QueryClient`, so key the store by environment and keep
 the generation symbol; decide at the row whether a `Map` in state or one store per owner reads
 better. A6 is the largest; do it last in this group.
+
+Done: A1 reads its list at module load (storage reads are safe there) and drops the lazy cache.
+A2's hook takes the defaults from `useSettingValue`, so they follow a settings change while the
+panel is open; `readLogsFilters()` still reads the mirror. A4 is one per-panel
+`state/navigator-header-store.ts`, covered by `components/tests/file-navigator-header.test.tsx`.
 
 ### B. zustand stores read through raw `useSyncExternalStore` (web)
 
@@ -67,6 +73,9 @@ better. A6 is the largest; do it last in this group.
 
 The intent queues in B3/B4 are zustand already (`client-core/optimistic/queue.ts`). The gain here
 is one reading idiom; the render count should not change. Say so in the commit.
+
+Done: all four. B3/B4's projection functions take the queue state as an optional argument, so they
+serve as `useStore` selectors and imperative reads alike.
 
 ### C. TUI
 
@@ -128,9 +137,8 @@ Services with a lifecycle (`workspace-edit-service`, `language-server-status-sou
 
 ## Gate
 
-After A–C, add `externalStore` to a census (`scripts/lint/`): `useSyncExternalStore` outside a
-`use-*.ts` file, or with a `getSnapshot` that returns `getState`/`getSnapshot` of a store, fails
-unless `scripts/lint/external-store-allow.json` names it with a reason. Add it to `gates`.
+After A–C, add `externalStore` to a census (`scripts/lint/`): a `useSyncExternalStore` whose
+`getSnapshot` returns a store's whole `getState`/`getSnapshot` fails unless `scripts/lint/external-store-allow.json` names it with a reason. Add it to `gates`.
 
 ## Proof per row
 

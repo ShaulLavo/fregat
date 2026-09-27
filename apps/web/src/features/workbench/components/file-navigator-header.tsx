@@ -3,12 +3,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/component
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { CrosshairIcon, FilePlusIcon, FolderPlusIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
-import { useSyncExternalStore } from 'react'
+import { useStore } from 'zustand'
 
 import { ToolPaneHeader } from '@/components/tool-pane-header'
 import { LiveUpdatesLimited } from '@/features/workbench/components/live-updates-limited'
-import type { TreeToolbarStore } from '@/features/workbench/utils/tree-toolbar-store'
-import type { VisibleTreeItemCountStore } from '@/features/workbench/utils/visible-tree-item-count-store'
+import type { NavigatorHeaderStore } from '@/features/workbench/state/navigator-header-store'
 import type { LoadState } from '@/lib/load-state'
 import type { TreeModel } from '@/lib/tree-model'
 
@@ -16,26 +15,17 @@ export function FileNavigatorHeader({
   loading,
   rootPath,
   treeState,
-  treeToolbarStore,
-  visibleTreeItemCountStore,
+  headerStore,
 }: {
   readonly loading: boolean
   readonly rootPath: FilesystemPath
   readonly treeState: LoadState<TreeModel>
-  readonly treeToolbarStore: TreeToolbarStore
-  readonly visibleTreeItemCountStore: VisibleTreeItemCountStore
+  readonly headerStore: NavigatorHeaderStore['store']
 }) {
-  const snapshot = useSyncExternalStore(
-    visibleTreeItemCountStore.subscribe,
-    visibleTreeItemCountStore.getSnapshot,
-    visibleTreeItemCountStore.getSnapshot,
+  const visibleTreeItemCount = useStore(headerStore, ({ visibleCount }) =>
+    visibleCount?.rootPath === rootPath ? visibleCount.count : null,
   )
-  const toolbar = useSyncExternalStore(
-    treeToolbarStore.subscribe,
-    treeToolbarStore.getSnapshot,
-    treeToolbarStore.getSnapshot,
-  )
-  const visibleTreeItemCount = snapshot.rootPath === rootPath ? snapshot.count : null
+  const toolbar = useStore(headerStore, (state) => state.toolbar)
   const mutationsEnabled = toolbar?.mutationsEnabled ?? false
 
   return (

@@ -4,8 +4,8 @@ import { expect, test } from '../../../../test/fixtures'
 import {
   recentCommandIds,
   recordCommandUse,
+  recentCommandsStore,
   resetRecentCommandsStore,
-  subscribeRecentCommands,
 } from '@/features/command-palette/state/recent-commands-store'
 
 const RECENT_COMMANDS_STORAGE_KEY = 'platform.command-palette.recent-commands.v1'
@@ -93,22 +93,16 @@ test('drops storage written under a different version', () => {
   expect(recentCommandIds()).toEqual([])
 })
 
-test('returns a stable reference until something changes', () => {
-  // useSyncExternalStore re-renders forever if every read is a new array.
-  recordCommandUse('workspace.toggleSidebarVisibility')
-
-  expect(recentCommandIds()).toBe(recentCommandIds())
-})
-
 test('notifies subscribers, and not for a repeat of the current head', () => {
   const listener = vi.fn()
-  subscribeRecentCommands(listener)
+  const unsubscribe = recentCommandsStore.subscribe(listener)
 
   recordCommandUse('workspace.toggleSidebarVisibility')
   expect(listener).toHaveBeenCalledTimes(1)
 
   recordCommandUse('workspace.toggleSidebarVisibility')
   expect(listener).toHaveBeenCalledTimes(1)
+  unsubscribe()
 })
 
 test('keeps multiple recent commands when browser storage is unavailable', () => {

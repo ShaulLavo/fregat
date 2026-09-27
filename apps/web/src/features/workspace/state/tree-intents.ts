@@ -39,8 +39,11 @@ let cachedRootPath = ''
 let cachedProjection: TreeModel | null = null
 
 /** The confirmed model with this root's pending patches replayed. Identity-stable while nothing changed. */
-export function projectedTreeModel(confirmed: TreeModel, rootPath: FilesystemPath): TreeModel {
-  const { active } = treeIntents.getState()
+export function projectedTreeModel(
+  confirmed: TreeModel,
+  rootPath: FilesystemPath,
+  { active } = treeIntents.getState(),
+): TreeModel {
   const cacheHit =
     cachedConfirmed === confirmed && cachedActive === active && cachedRootPath === rootPath
   if (cacheHit && cachedProjection) return cachedProjection
