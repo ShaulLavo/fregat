@@ -1,10 +1,18 @@
-import { GitBranchIcon } from '@phosphor-icons/react'
+import {
+  FolderIcon,
+  FoldersIcon,
+  GitBranchIcon,
+  GitForkIcon,
+  RobotIcon,
+} from '@phosphor-icons/react'
 import type {
   ProviderInstanceId,
   OrchestrationProjectShell,
   OrchestrationWorktreeShell,
   SessionWorktreeTarget,
 } from '@workspace/contracts'
+import { Spinner } from '@workspace/ui/components/spinner'
+import { usePresentation } from '@workspace/ui/patterns/sheet'
 import { selectChatWorktrees } from '@workspace/client-core/chat/selectors'
 import { worktreeLabel } from '@workspace/client-core/chat/worktrees/label'
 
@@ -12,22 +20,31 @@ import {
   selectChatProjectionSlice,
   useChatProjectionStore,
 } from '@/features/chat/state/chat-projection-store'
+import { Phase } from '@/lib/environments/components/phase'
+import { basename } from '@/lib/path-formatters'
 import { useMoveDraft } from '../hooks/use-move-draft'
 import { useChatInputDraftStore, type ChatInputDraftTarget } from '../state/chat-input-draft-store'
 import {
   draftCanChangeMachine,
   draftWorktreeChoices,
+  workspaceChoiceLabel,
   type DraftMachine,
 } from '../utils/draft-workspace'
 import { newWorktreeTarget } from '../utils/worktree-target'
+import { DraftAgentList } from './draft-agent-list'
 import { DraftAgentMenu } from './draft-agent-menu'
+import { DraftBranchList } from './draft-branch-list'
 import { DraftBranchMenu } from './draft-branch-menu'
+import { DraftMachineList } from './draft-machine-list'
 import { DraftMachineMenu } from './draft-machine-menu'
+import { DraftSetupSheet, type DraftSetupSection } from './draft-setup-sheet'
+import { DraftWorkspaceList } from './draft-workspace-list'
 import { DraftWorkspaceMenu } from './draft-workspace-menu'
-import { DraftContextLayout } from './draft-context-layout'
 
 const MACHINE_LOCKED =
   'Attachments and terminal captures stay on this machine. Remove them to move the draft.'
+const WORKSPACE_ICONS = { current: GitBranchIcon, linked: FoldersIcon, new: GitForkIcon } as const
+const ICON_CLASS = 'size-(--icon-size-sm) shrink-0'
 
 /** Where the new session will run: machine, workspace and branch, under the composer. */
 export function DraftContextStrip({
@@ -53,6 +70,7 @@ export function DraftContextStrip({
   readonly machines: readonly DraftMachine[] | null
   readonly onTarget: (target: SessionWorktreeTarget) => void
 }) {
+  const presentation = usePresentation()
   const worktrees = useChatProjectionStore((state) =>
     selectChatWorktrees(selectChatProjectionSlice(state, draftTarget.environmentId)),
   )
@@ -68,6 +86,9 @@ export function DraftContextStrip({
     ) ?? null
   // The sidebar chat cannot move, so it lists only the worktree it already sits on.
   const linked = draftWorktreeChoices(movable ? worktrees : [base], project.id)
+  const currentCheckout = movable || base.kind === 'current' ? checkout : null
+  const lockedReason = canChangeMachine ? null : MACHINE_LOCKED
+  const startBranch = target.kind === 'new' ? (target.baseBranch ?? base.branch ?? 'HEAD') : null
 
   function chooseWorktree(worktree: OrchestrationWorktreeShell) {
     if (worktree.id === base.id) {
@@ -90,70 +111,155 @@ export function DraftContextStrip({
     })
   }
 
-  return (
-    <DraftContextLayout
-      agent={agent}
-      branch={
-        target.kind === 'new'
-          ? (target.baseBranch ?? base.branch ?? 'HEAD')
-          : worktreeLabel(base, project.repositoryKind)
-      }
-      kind={target.kind === 'new' ? 'new' : project.repositoryKind}
-      path={base.path}
-    >
-      <div
-        aria-label='Session workspace'
-        className='phone:flex-col phone:items-stretch flex min-w-0 items-center gap-1 pt-1'
-        role='group'
-      >
-        {machines ? (
-          <DraftMachineMenu
+  function chooseStartBranch(branch: string) {
+    if (target.kind === 'new') onTarget({ ...target, baseBranch: branch })
+  }
+
+  if (presentation === 'sheet') {
+    const choice = workspaceChoiceLabel(base, target)
+    const WorkspaceIcon = git ? WORKSPACE_ICONS[choice.kind] : FolderIcon
+    // Like the desktop menu, the machine shows only when there is another to move to.
+    const machine =
+      machines && machines.length > 1
+        ? machines.find((entry) => entry.environmentId === draftTarget.environmentId)
+        : undefined
+    const where = git ? (startBranch ?? worktreeLabel(base, 'git')) : basename(base.path)
+    const sections: DraftSetupSection[] = []
+    if (machines && machine)
+      sections.push({
+        id: 'machine',
+        label: 'Runs on',
+        value: machine.label,
+        icon: move.isPending ? (
+          <Spinner size='xs' label='Moving draft' />
+        ) : (
+          <Phase phase={machine.phase} label={machine.label} />
+        ),
+        disabled: move.isPending,
+        choices: (
+          <DraftMachineList
             environmentId={draftTarget.environmentId}
-            lockedReason={canChangeMachine ? null : MACHINE_LOCKED}
+            lockedReason={lockedReason}
             machines={machines}
-            pending={move.isPending}
             onSelect={chooseMachine}
           />
-        ) : null}
-        {git ? (
-          <DraftWorkspaceMenu
+        ),
+      })
+    if (git)
+      sections.push({
+        id: 'workspace',
+        label: 'Workspace',
+        value: choice.label,
+        detail: startBranch === null ? worktreeLabel(base, 'git') : undefined,
+        icon: <WorkspaceIcon className={ICON_CLASS} />,
+        disabled: move.isPending,
+        choices: (
+          <DraftWorkspaceList
             base={base}
-            currentCheckout={movable || base.kind === 'current' ? checkout : null}
-            pending={move.isPending}
+            currentCheckout={currentCheckout}
             target={target}
             worktrees={linked}
             onNew={() => onTarget(newWorktreeTarget(base.id))}
             onWorktree={chooseWorktree}
           />
-        ) : null}
-        <DraftAgentMenu
+        ),
+      })
+    if (git && startBranch !== null)
+      sections.push({
+        id: 'branch',
+        label: 'Starts from',
+        value: startBranch,
+        mono: true,
+        icon: <GitBranchIcon className={ICON_CLASS} />,
+        choices: (
+          <DraftBranchList rootPath={base.path} value={startBranch} onSelect={chooseStartBranch} />
+        ),
+      })
+    sections.push({
+      id: 'agent',
+      label: 'Agent',
+      value: agent ?? 'Default agent',
+      icon: <RobotIcon className={ICON_CLASS} />,
+      choices: (
+        <DraftAgentList
           cwd={base.canonicalPath}
+          enabled
           providerInstanceId={providerInstanceId}
           value={agent}
           onSelect={onAgent}
         />
-        {git ? (
-          <div className='phone:ml-0 phone:justify-start ml-auto flex min-w-0 justify-end'>
-            {target.kind === 'new' ? (
-              <DraftBranchMenu
-                rootPath={base.path}
-                value={target.baseBranch ?? base.branch ?? 'HEAD'}
-                onSelect={(branch) => onTarget({ ...target, baseBranch: branch })}
-              />
-            ) : (
-              <span
-                className='text-muted-foreground flex min-w-0 items-center gap-1 px-2 text-xs'
-                title={`${worktreeLabel(base, 'git')} · ${base.path}`}
-              >
-                <GitBranchIcon className='size-(--icon-size-sm) shrink-0' />
-                <span className='phone:whitespace-normal phone:break-all truncate'>
-                  {worktreeLabel(base, 'git')}
-                </span>
-              </span>
-            )}
-          </div>
-        ) : null}
-      </div>
-    </DraftContextLayout>
+      ),
+    })
+
+    return (
+      <DraftSetupSheet
+        description={[machine?.label, git ? choice.label : null, where, agent ?? 'Default agent']
+          .filter(Boolean)
+          .join(' · ')}
+        icon={
+          move.isPending ? (
+            <Spinner size='xs' label='Moving draft' />
+          ) : (
+            <WorkspaceIcon className={ICON_CLASS} />
+          )
+        }
+        sections={sections}
+        summary={{ lead: startBranch === null ? null : 'New worktree from', where, agent }}
+      />
+    )
+  }
+
+  return (
+    <div
+      aria-label='Session workspace'
+      className='flex min-w-0 items-center gap-1 pt-1'
+      role='group'
+    >
+      {machines ? (
+        <DraftMachineMenu
+          environmentId={draftTarget.environmentId}
+          lockedReason={lockedReason}
+          machines={machines}
+          pending={move.isPending}
+          onSelect={chooseMachine}
+        />
+      ) : null}
+      {git ? (
+        <DraftWorkspaceMenu
+          base={base}
+          currentCheckout={currentCheckout}
+          pending={move.isPending}
+          target={target}
+          worktrees={linked}
+          onNew={() => onTarget(newWorktreeTarget(base.id))}
+          onWorktree={chooseWorktree}
+        />
+      ) : null}
+      <DraftAgentMenu
+        cwd={base.canonicalPath}
+        providerInstanceId={providerInstanceId}
+        value={agent}
+        onSelect={onAgent}
+      />
+      {git ? (
+        <div className='ml-auto flex min-w-0 justify-end'>
+          {startBranch === null ? (
+            <span
+              className='text-muted-foreground flex min-w-0 items-center gap-1 px-2 text-xs'
+              title={`${worktreeLabel(base, 'git')} · ${base.path}`}
+            >
+              <GitBranchIcon className={ICON_CLASS} />
+              <span className='truncate'>{worktreeLabel(base, 'git')}</span>
+            </span>
+          ) : (
+            <DraftBranchMenu
+              rootPath={base.path}
+              value={startBranch}
+              onSelect={chooseStartBranch}
+            />
+          )}
+        </div>
+      ) : null}
+    </div>
   )
 }

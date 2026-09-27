@@ -112,21 +112,21 @@ async function newSessionPalette(page: Page, step: (label: string) => Promise<vo
   await selectors.phoneLevel(page, 'sessions').waitFor()
 }
 
+/**
+ * The draft's setup is one control flush with the bottom edge. Its sheet lists every setting with
+ * the full value, and each setting's choices open inside that sheet, never as a second one.
+ */
 async function draftContext(page: Page, step: (label: string) => Promise<void>) {
-  const context = selectors.draftContext(page)
   const setup = selectors.draftSetup(page)
+  const sheet = selectors.draftSetupSheet(page)
+  const row = (label: string) => selectors.draftSetupRow(page, label)
   await setup.waitFor()
   for (const width of [320, 390, 430]) {
     await page.setViewportSize({ width, height: 844 })
-    const trigger = await setup.boundingBox()
-    ok(
-      trigger && trigger.height <= 44 && trigger.x + trigger.width <= width,
-      'One phone control fits',
-    )
-    ok(Math.abs(trigger.y + trigger.height - 844) <= 1, 'No extra space below the setup control')
+    await expectOneRowControl(page, width)
     await step(`draft-summary-${width}`)
     await setup.click()
-    const branch = context.getByText(BRANCH, { exact: true })
+    const branch = sheet.getByText(BRANCH, { exact: true })
     await branch.waitFor()
     const size = await branch.evaluate((element) => ({
       client: element.clientWidth,
@@ -135,31 +135,71 @@ async function draftContext(page: Page, step: (label: string) => Promise<void>) 
     }))
     ok(size.client > 0 && size.scroll <= size.client + 1, `Branch clipped: ${JSON.stringify(size)}`)
     ok(size.right <= width, 'The branch stays inside the phone')
-    await expectNoSidewaysScroll(page, '[aria-label="Session workspace"]')
-    await context.getByRole('button', { name: 'Workspace', exact: true }).click()
+    await expectNoSidewaysScroll(page, '[role="menu"][data-presentation="sheet"]')
+    await step(`draft-setup-${width}`)
+    await row('Workspace').click()
     await page.getByRole('menuitemradio', { name: 'Current checkout', exact: true }).waitFor()
-    await step(`workspace-sheet-${width}`)
+    await expectOneSheet(page)
+    await step(`workspace-choices-${width}`)
+    // Escape (the phone's Back gesture) steps back to the overview before it closes the sheet.
     await page.keyboard.press('Escape')
-    await step(`draft-context-${width}`)
+    await row('Agent').waitFor()
     await page.keyboard.press('Escape')
-    await context.waitFor({ state: 'hidden' })
+    await sheet.waitFor({ state: 'hidden' })
     ok(
       await setup.evaluate((element) => element === document.activeElement),
       'Focus returns to setup',
     )
   }
-  await setup.click()
-  await context.getByRole('button', { name: 'Run the session as an agent' }).click()
-  await page.getByRole('menuitemradio', { name: 'Default agent', exact: true }).click()
-  await context.getByRole('button', { name: 'Workspace', exact: true }).click()
-  await page.getByRole('menuitemradio', { name: 'New worktree', exact: true }).click()
-  await context.getByRole('button', { name: 'Start from branch', exact: true }).click()
-  await page.getByRole('menuitemradio', { name: BRANCH }).waitFor()
-  await step('draft-branch-sheet')
-  await page.keyboard.press('Escape')
-  await page.keyboard.press('Escape')
-  await context.waitFor({ state: 'hidden' })
   await page.setViewportSize({ width: 390, height: 844 })
+  await setup.click()
+  await row('Agent').click()
+  await page.getByRole('menuitemradio', { name: 'Default agent', exact: true }).click()
+  await row('Agent').waitFor()
+  await row('Workspace').click()
+  await page.getByRole('menuitemradio', { name: 'New worktree', exact: true }).click()
+  await row('Starts from').click()
+  const choice = page
+    .getByRole('menuitemradio', { name: BRANCH })
+    .getByText(BRANCH, { exact: true })
+  await choice.waitFor()
+  const clipped = await choice.evaluate((element) => element.scrollWidth > element.clientWidth + 1)
+  ok(!clipped, 'The branch choice shows its full name')
+  await expectOneSheet(page)
+  await step('draft-branch-choices')
+  await sheet.getByRole('menuitem', { name: 'Back to session setup', exact: true }).click()
+  await row('Starts from').waitFor()
+  await step('draft-setup-new-worktree')
+  await page.keyboard.press('Escape')
+  await sheet.waitFor({ state: 'hidden' })
+  ok(
+    (await setup.textContent())?.includes('New worktree from'),
+    'The summary names the new worktree',
+  )
+  await expectOneRowControl(page, 390)
+  await step('draft-summary-new-worktree')
+  // Back to the checkout: no worktree is made, since nothing is sent.
+  await setup.click()
+  await row('Workspace').click()
+  await page.getByRole('menuitemradio', { name: 'Current checkout', exact: true }).click()
+  await row('Workspace').waitFor()
+  await page.keyboard.press('Escape')
+  await sheet.waitFor({ state: 'hidden' })
+}
+
+/** The setup control is one row inside the phone, with no space between it and the bottom edge. */
+async function expectOneRowControl(page: Page, width: number) {
+  const trigger = await selectors.draftSetup(page).boundingBox()
+  ok(
+    trigger && trigger.height <= 44 && trigger.x + trigger.width <= width,
+    'One phone control fits',
+  )
+  ok(Math.abs(trigger.y + trigger.height - 844) <= 1, 'No extra space below the setup control')
+}
+
+async function expectOneSheet(page: Page) {
+  const open = await page.locator('[data-presentation="sheet"][data-open]').count()
+  ok(open === 1, `One sheet is open, not ${open}`)
 }
 
 async function settings(page: Page, step: (label: string) => Promise<void>) {

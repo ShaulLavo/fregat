@@ -38,9 +38,12 @@ export function DraftBranchRows({
           <BranchLane row={row} lanes={layout.lanes} selected={row.branch.name === value} />
         </span>
       ) : null}
-      <span className='truncate'>{row.branch.name}</span>
+      {/* A sheet row has room to show a long name in full; touch has no hover title. */}
+      <span className='phone:whitespace-normal phone:wrap-anywhere min-w-0 truncate'>
+        {row.branch.name}
+      </span>
       {row.branch.current ? (
-        <span className='text-muted-foreground text-2xs ml-auto'>Checked out</span>
+        <span className='text-muted-foreground text-2xs ml-auto shrink-0'>Checked out</span>
       ) : null}
     </DropdownMenuRadioItem>
   ))

@@ -721,3 +721,33 @@ remaining 4px composer bottom padding on phones. Desktop retains individual cont
       `setup-live-native.png` and `setup-live-metrics.json` show the deployed 40px control ending
       exactly at the viewport edge. Native Safari sheet screenshot: `setup-sheet-native.png`.
       Physical iPhone confirmation remains open.
+
+### Session setup redesign (2026-09-27)
+
+The owner found the compact control read as two buttons opening one sheet (branch on the left,
+robot and "Default" on the right), and the sheet as a stack of old dropdown triggers whose
+choices opened a second sheet on top. Redesign:
+
+- Collapsed: one left-aligned control sized to its content, like the model picker above it. It
+  has one icon, one run of text and one caret: the branch (or `New worktree from <branch>`, or
+  the folder), plus `· <agent>` only when the agent is not the default. It keeps zero bottom
+  padding.
+- Expanded: one sheet (`DraftSetupSheet`, a `DropdownMenu`) with a titled overview. Each
+  setting is a row with its label, its full value (branches wrap, no truncation) and a chevron:
+  Runs on (two or more machines), Workspace (with the checkout's branch), Starts from (new
+  worktree only) and Agent. A row opens its choices in the same sheet behind a `‹ Session setup`
+  back row, reusing the desktop lists (`DraftWorkspaceList` and `DraftMachineList`, extracted
+  from their menus, plus `DraftAgentList` and `DraftBranchList`). After a choice, the sheet
+  returns to the overview. Escape and the phone Back gesture step back before they close.
+- The sheet header no longer shows the path. The fixture's `base.path` has no leading `/`,
+  both here and in the owner's screenshot, and the phone header already names the project.
+- Desktop keeps its individual menus.
+
+- [x] Implement it and update `phone-surfaces` to check one-row geometry at 320/390/430px, zero
+      bottom gap, a single open sheet, full branch recovery in the overview and the branch list,
+      step-back on Escape, focus return, and a new-worktree round trip with no send.
+      `/work/tmp/fregat-evidence/20260927T083527Z-scenario-phone-surfaces/` passes; the known
+      fixture provider update-status 500s remain.
+- [x] Desktop `chat-draft-context-strip` passes (`20260927T083329Z`), and so do the
+      workspace/machine menu tests, `bun run gates` and the web typecheck.
+- [ ] Native Safari check on the Mac, then commit, push, deploy and verify live.
