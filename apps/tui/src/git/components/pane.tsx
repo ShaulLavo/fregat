@@ -1,4 +1,6 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useStore } from 'zustand'
+import { useReadySession } from '@/connection/hooks/use-ready-session'
+import { useEffect, useState } from 'react'
 import { useCommands } from '@/commands/hooks/use-commands'
 import { usePaneFocus } from '@/commands/hooks/use-pane-focus'
 import { useCommandFocus } from '@/commands/hooks/use-command-focus'
@@ -18,8 +20,8 @@ import { DiffView } from '@/git/components/diff'
 export function GitPane({ session, rootPath, theme, enabled, onOpenFile }: WorkbenchPaneProps) {
   const commands = useCommands()
   const [store] = useState(() => createGitWorkbench(session.client, rootPath))
-  const state = useSyncExternalStore(store.subscribe, store.getSnapshot)
-  const connection = useSyncExternalStore(session.subscribe, session.getSnapshot)
+  const state = useStore(store.store)
+  const { environmentId, owner } = useReadySession(session)
   const [selection, setSelected] = useState(0)
   const [dialog, setDialog] = useState<GitDialog | null>(null)
   const [message, setMessage] = useState('')
@@ -30,7 +32,7 @@ export function GitPane({ session, rootPath, theme, enabled, onOpenFile }: Workb
   const staged = row?.staged ?? false
   const scope = {
     screen: 'workbench',
-    environmentId: connection.kind === 'ready' ? connection.descriptor.environmentId : '',
+    environmentId,
     projectId: rootPath,
   }
   const focused = usePaneFocus({ id: 'workbench-git', area: 'git', enabled: enabled && !dialog })
@@ -187,14 +189,7 @@ export function GitPane({ session, rootPath, theme, enabled, onOpenFile }: Workb
           description='This file has no displayable text changes.'
         />
       )}
-      {file && (
-        <DiffView
-          file={file}
-          theme={theme}
-          enabled={enabled && !dialog}
-          owner={connection.kind === 'ready' ? connection.owner : null}
-        />
-      )}
+      {file && <DiffView file={file} theme={theme} enabled={enabled && !dialog} owner={owner} />}
       {state.busy && (
         <box flexDirection='row'>
           <OrbitLoader theme={theme} />

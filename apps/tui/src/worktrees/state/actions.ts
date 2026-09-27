@@ -109,6 +109,7 @@ export function createWorktreeActions({
   }
 
   return {
+    store: store.store,
     getSnapshot: store.getSnapshot,
     subscribe: store.subscribe,
     request,

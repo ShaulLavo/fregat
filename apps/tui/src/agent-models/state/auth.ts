@@ -122,6 +122,7 @@ export function createProviderAuth(
     start,
     cancel,
     signOut,
+    store: store.store,
     getSnapshot: store.getSnapshot,
     subscribe: store.subscribe,
     dispose() {

@@ -1,4 +1,5 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useStore } from 'zustand'
+import { useEffect, useState } from 'react'
 import { errorStringField } from '@workspace/contracts'
 import type {
   OrchestrationProjectShell,
@@ -47,7 +48,7 @@ export function WorktreeDetails({
   const [store] = useState(() =>
     createWorktreeActions({ session, chat, worktreeId: worktree.id, currentWorktreeId }),
   )
-  const actions = useSyncExternalStore(store.subscribe, store.getSnapshot)
+  const actions = useStore(store.store)
   const [selected, setSelected] = useState(0)
   const [opening, setOpening] = useState(false)
   const [openError, setOpenError] = useState<string | null>(null)

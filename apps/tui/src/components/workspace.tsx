@@ -1,3 +1,4 @@
+import { useStore } from 'zustand'
 import { AgentNavigationContext } from '@/navigation/providers/agent-context'
 import type { AgentNavigation } from '@/navigation/providers/agent-context'
 import { queuePrompt } from '@/agent-stage/state/inbox'
@@ -10,7 +11,7 @@ import { parsePickerPathInput } from '@workspace/client-core/files/path-input'
 import { createTuiError } from '@/host/utils/structured-errors'
 import { connectionFailure } from '@/connection/utils/failure'
 import { Toast } from '@/components/toast'
-import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { commandById, type CommandId } from '@workspace/client-core/commands/catalog'
 
 import { useCommands } from '@/commands/hooks/use-commands'
@@ -58,7 +59,7 @@ export function Workspace({
   const [fileFailure, setFileFailure] = useState<string | null>(null)
   const search = useRef(settingsQuery)
   const navigationRequest = useRef(0)
-  const navigation = useSyncExternalStore(history.subscribe, history.getSnapshot)
+  const navigation = useStore(history.store)
   const places = usePlaces(state.chat)
   useLayoutEffect(() => {
     const remember = () => {

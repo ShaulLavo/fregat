@@ -97,6 +97,7 @@ export function createLogsWorkbench(client: Client) {
     }
   }
   return {
+    store: store.store,
     getSnapshot: store.getSnapshot,
     subscribe: store.subscribe,
     refresh,

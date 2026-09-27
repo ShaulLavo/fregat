@@ -4,7 +4,7 @@
 
 - Status: IN PROGRESS 2026-09-27. The rule landed in AGENTS.md ("React"). All of A that moves (A1, A2, A4–A6, A8 keep-alive),
   B1–B4, D1 and D5 are done; A3, A7, D4 and the preview budget stay (reasons below).
-  TUI C2–C4 are done; C1, C5 and C6 are left.
+  TUI C1–C6 are done. The census gate is left.
 - Origin: owner, 2026-09-27: "we prob abuse useSyncExternalStore too hard". Afterwards the owner
   approved the survey: hand-built stores become zustand, zustand stores read without a selector
   get selectors, snapshots that derive per read are cut down, and the TUI is in scope.
@@ -62,7 +62,7 @@ Done: A1 reads its list at module load (storage reads are safe there) and drops 
 A2's hook takes the defaults from `useSettingValue`, so they follow a settings change while the
 panel is open; `readLogsFilters()` still reads the mirror. A4 is one per-panel
 `state/navigator-header-store.ts`, covered by `components/tests/file-navigator-header.test.tsx`.
-A5 exposes `activeTransports` and `hooks/use-active-transport.ts`; the disposer's old `notify()`
+A5 exposes `activeTransports`, read with `useStore` at its two call sites; the disposer's old `notify()`
 after `close()` changed nothing a reader saw (same reference), so it is gone. A8's keep-alive store
 exposes its `entries` store; the outlet reads it with `useStore`. A6 is `colorThemeStore`
 (`selection`, `activeColorMode`, `preview`, `loadedRevision`); a registration landing bumps
@@ -116,11 +116,19 @@ C4: `useSettingValue` selects its key; `settings/tests/use-setting-value.test.ts
 through `files/hooks/use-places.ts`, which selects the four projection references session events
 leave alone; `files/tests/use-places.test.tsx` shows no re-render across streamed replies while a
 whole-snapshot reader re-renders, and fails when the hook selects the whole projection. The rail,
-agent screen and manager select their fields; the palette and stage read the whole store.
+agent screen, manager, palette and stage display chat, so they read the whole store.
 C3: focus readers select their field, except `commands/hooks/use-pane-focus.ts`, which keeps the
 whole snapshot: `useCommandFocus` refreshes availability and re-activates in every render, and six
 approval tests in `agent-stage/tests/requests.test.tsx` fail without those renders. Moving that
 refresh into the registry would let it narrow too.
+C1: `createObservableStore` wraps a zustand store (it keeps the abort-signal dispose zustand lacks,
+and `value`/`patch` for 111 call sites) and every factory exposes `store`; panes read
+`useStore(x.store)`. Navigation history and the text editor request are zustand stores too.
+C5: the git and logs panes select `owner` and `environmentId`; the application shell and terminal
+pane pass the session state down whole. C6 stays: the tree controller and the drafts map are
+mutable objects publishing a revision (rule 3). `terminal/components/view.tsx` read its live connection by copying each change into `useState`
+from an effect; it now keeps the connection in state once per socket and reads its status with
+`useSyncExternalStore` (a live socket, rule 3). `viewer/state/lsp.ts` is an event emitter; untouched.
 TUI suite in this container: 400 pass; 4 fail identically on the base commit (Bun 1.3.11 against
 the pinned 1.4.2: a SQLite message, git worktree cleanup, two manager dialogs).
 `apps/tui/package.json` gains `zustand`, pinned to the version client-core already uses.
@@ -163,6 +171,12 @@ Services with a lifecycle (`workspace-edit-service`, `language-server-status-sou
   its timeline is parked, so `useQuery` would create a second observer with a different lifetime.
   Driving TanStack core directly is fine. Minor: the `observers` map grows by one per session
   opened until the transport is disposed; bounded, left.
+
+## What not to convert
+
+Owner, 2026-09-27: a conversion that adds more code than it removes, for no measured gain, gets
+reverted. Per-field selectors on readers that display the whole projection (rail, agent screen,
+worktree manager) were reverted to whole `useStore` reads for that reason.
 
 ## Gate
 

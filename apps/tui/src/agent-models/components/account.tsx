@@ -1,4 +1,5 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useStore } from 'zustand'
+import { useEffect, useState } from 'react'
 import type { ProviderSnapshot } from '@workspace/contracts'
 import {
   providerAuthMethodCopy,
@@ -29,7 +30,7 @@ export function ProviderAccount({
 }) {
   const commands = useCommands()
   const [store] = useState(() => createProviderAuth(client, provider.providerInstanceId, record))
-  const state = useSyncExternalStore(store.subscribe, store.getSnapshot)
+  const state = useStore(store.store)
   const [selected, setSelected] = useState(0)
   const [failure, setFailure] = useState('')
   const pending = state.attempt?.state === 'pending'

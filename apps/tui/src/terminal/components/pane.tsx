@@ -1,4 +1,5 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useStore } from 'zustand'
+import { useEffect, useState } from 'react'
 import type { WorktreeId } from '@workspace/contracts'
 import type { SettingsSession } from '@/connection/state/session'
 import { connectionFailure } from '@/connection/utils/failure'
@@ -17,7 +18,7 @@ export function TerminalPane({
   readonly theme: Theme
   readonly enabled: boolean
 }) {
-  const ready = useSyncExternalStore(session.subscribe, session.getSnapshot)
+  const ready = useStore(session.store)
   const [state, setState] = useState<
     | { readonly kind: 'loading' }
     | { readonly kind: 'ready'; readonly rootPath: string; readonly worktreeId: WorktreeId }

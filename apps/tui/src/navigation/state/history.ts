@@ -1,3 +1,4 @@
+import { createStore } from 'zustand/vanilla'
 import type { AgentLocation } from '@/agent/utils/target'
 import type { WorkbenchLocation } from '@/workbench/utils/location'
 
@@ -45,25 +46,19 @@ export type NavigationHistory = ReturnType<typeof createHistory>
 export function createHistory(initial: Location) {
   let entries: readonly Location[] = [initial]
   let index = 0
-  let snapshot = { current: initial, canGoBack: false, canGoForward: false }
-  const listeners = new Set<() => void>()
+  const store = createStore(() => ({ current: initial, canGoBack: false, canGoForward: false }))
   function publish() {
-    snapshot = {
-      current: entries[index],
-      canGoBack: index > 0,
-      canGoForward: index < entries.length - 1,
-    }
-    for (const listener of listeners) listener()
-    return snapshot.current
+    store.setState(
+      { current: entries[index], canGoBack: index > 0, canGoForward: index < entries.length - 1 },
+      true,
+    )
+    return entries[index]
   }
   return {
-    getSnapshot: () => snapshot,
-    subscribe(listener: () => void) {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
-    },
+    /** Components select from this with `useStore`. */
+    store,
+    getSnapshot: store.getState,
+    subscribe: (listener: () => void) => store.subscribe(() => listener()),
     visit(location: Location) {
       if (equal(entries[index], location)) return
       entries = [...entries.slice(0, index + 1), location]

@@ -1,6 +1,7 @@
+import { useStore } from 'zustand'
 import type { SettingsOwner } from '@workspace/client-core/settings/owner'
 import type { SettingsWriteTarget } from '@workspace/contracts'
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useState } from 'react'
 
 import { useCommands } from '@/commands/hooks/use-commands'
 import { useCommandFocus } from '@/commands/hooks/use-command-focus'
@@ -29,7 +30,7 @@ export function RawSettingsEditor({
   const [editor] = useState(() =>
     createRawSettingsEditor({ owner, target, editText, signal: lifetime.signal }),
   )
-  const state = useSyncExternalStore(editor.subscribe, editor.getSnapshot)
+  const state = useStore(editor.store)
   const commands = useCommands()
   useEffect(() => {
     void editor.edit()

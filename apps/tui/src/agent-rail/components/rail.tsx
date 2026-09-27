@@ -1,8 +1,7 @@
 import { useStore } from 'zustand'
-import { useShallow } from 'zustand/react/shallow'
 import type { HistoryDirection } from '@workspace/client-core/history/undo-stack'
 import { compareSessionsByActivity } from '@workspace/client-core/chat/rail/session-order'
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTerminalDimensions } from '@opentui/react'
 import {
   scopedSessionKey,
@@ -97,11 +96,8 @@ export function AgentRail({
   const { height } = useTerminalDimensions()
   const compact = height < 20
   const [store] = useState(() => createAgentRailState(session, ready))
-  const state = useSyncExternalStore(store.subscribe, store.getSnapshot)
-  const chat = useStore(
-    ready.chat.store,
-    useShallow(({ projection, status, error }) => ({ projection, status, error })),
-  )
+  const state = useStore(store.store)
+  const chat = useStore(ready.chat.store)
   const [selection, updateSelection] = useState<{ index: number; key: string | null }>({
     index: 0,
     key: null,

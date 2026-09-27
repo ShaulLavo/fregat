@@ -129,6 +129,7 @@ export function createViewerDocument({
     open: () => load(false),
     reload: () => load(true),
     edit,
+    store: store.store,
     getSnapshot: store.getSnapshot,
     subscribe: store.subscribe,
     dispose() {

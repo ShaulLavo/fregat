@@ -1,5 +1,4 @@
 import { useStore } from 'zustand'
-import { useShallow } from 'zustand/react/shallow'
 import { useState } from 'react'
 import type { OrchestrationProjectShell, WorktreeId } from '@workspace/contracts'
 import type { ChatOwner } from '@workspace/client-core/chat/owner'
@@ -34,23 +33,15 @@ export function WorktreeManager({
   readonly onOpenWorkbench?: (path: string) => void | Promise<void>
 }) {
   const commands = useCommands()
-  const snapshot = useStore(
-    chat.store,
-    useShallow(({ projection, status, error }) => ({
-      worktreeIds: projection.worktreeIds,
-      worktreeById: projection.worktreeById,
-      status,
-      error,
-    })),
-  )
+  const snapshot = useStore(chat.store)
   const [selected, setSelected] = useState(0)
   const [detailId, setDetailId] = useState<WorktreeId | null>(null)
-  const worktrees = snapshot.worktreeIds.flatMap((id) => {
-    const worktree = snapshot.worktreeById[id]
+  const worktrees = snapshot.projection.worktreeIds.flatMap((id) => {
+    const worktree = snapshot.projection.worktreeById[id]
     return worktree ? [worktree] : []
   })
   const options = worktreeChoices({ worktrees, project, value: currentWorktreeId, query: '' })
-  const detail = detailId ? snapshot.worktreeById[detailId] : undefined
+  const detail = detailId ? snapshot.projection.worktreeById[detailId] : undefined
   useCommandFocus(
     {
       ...commands.focus.getSnapshot().scope,

@@ -1,5 +1,4 @@
 import { useStore } from 'zustand'
-import { useShallow } from 'zustand/react/shallow'
 import { useState } from 'react'
 import { useTerminalDimensions } from '@opentui/react'
 import type { SessionId } from '@workspace/contracts'
@@ -35,10 +34,7 @@ export function AgentScreen({
 }) {
   const { width, height } = useTerminalDimensions()
   const commands = useCommands()
-  const snapshot = useStore(
-    ready.chat.store,
-    useShallow(({ projection, status, error }) => ({ projection, status, error })),
-  )
+  const snapshot = useStore(ready.chat.store)
   const focusedTarget = useStore(commands.focus.store, (state) =>
     state.current?.capabilities.overlay ? state.lastCommandTarget : state.current,
   )

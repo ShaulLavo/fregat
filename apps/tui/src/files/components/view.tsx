@@ -1,5 +1,5 @@
 import { useStore } from 'zustand'
-import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { isDirectoryEntry } from '@workspace/contracts'
 import { useKeyboard, useTerminalDimensions } from '@opentui/react'
 import type { KeyValueStorage } from '@workspace/client-core/storage'
@@ -59,7 +59,7 @@ export function FileView({
   readonly enabled?: boolean
 }) {
   const [browser] = useState(() => createFileBrowser(session.client, storage))
-  const state = useSyncExternalStore(browser.subscribe, browser.getSnapshot)
+  const state = useStore(browser.store)
   const lastReportedPath = useRef<string | null>(null)
   const [filter, setFilter] = useState({ initialQuery, value: initialQuery })
   if (filter.initialQuery !== initialQuery) setFilter({ initialQuery, value: initialQuery })
