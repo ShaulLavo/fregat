@@ -1,3 +1,9 @@
+import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
+import {
+  readSessionSelectionCache,
+  writeSessionSelectionCache,
+} from '@/features/workspace/state/cache'
+import { TEST_PROJECT_ID, TEST_SESSION_ID } from '../../../../test/factories/chat'
 import { environmentQueryKeys } from '@/features/environments/utils/query-keys'
 import { parseAddressIntent } from '@/features/address/utils/intent'
 import { healthDescriptorSchema, DEFAULT_SETTING_VALUES } from '@workspace/contracts'
@@ -102,7 +108,7 @@ test('cached bindings start primary and remote before sockets without painting s
     connectionByOrigin: {},
   })
   setActiveServerOrigin(primary)
-  const application = createBootRuntime(oldDescriptor, parseAddressIntent('/'), true)
+  const application = createBootRuntime(oldDescriptor, parseAddressIntent('/'), { cached: true })
   try {
     // Projections are server answers, never persisted: the rail waits for each socket.
     expect(currentRailEnvironments()).toEqual([])
@@ -111,7 +117,7 @@ test('cached bindings start primary and remote before sockets without painting s
     expect(application.connections.store.getState().machines[0]?.environmentId).toBe(
       descriptorB.environmentId,
     )
-    expect(() => createBootRuntime(descriptorB, parseAddressIntent('/'), true)).toThrow(
+    expect(() => createBootRuntime(descriptorB, parseAddressIntent('/'), { cached: true })).toThrow(
       'cached machine identity conflicts',
     )
     expect(primaryQueryClient().getQueryData(environmentQueryKeys.descriptor)).toBeUndefined()
@@ -136,5 +142,111 @@ test('cached bindings start primary and remote before sockets without painting s
     setActiveServerOrigin(previousOrigin)
     localStorage.clear()
     await second.cleanup()
+  }
+})
+
+for (const initialSession of ['restore', 'list'] as const) {
+  test(`boot resolves ${initialSession} selection before the first screen mounts`, async ({
+    client,
+  }) => {
+    const descriptor = v.parse(healthDescriptorSchema, (await client.health.get()).data)
+    const storage = environmentScopedStorage(descriptor.environmentId)
+    const previous = useEnvironmentsStore.getState()
+    const previousSelection = useSessionSelectionStore.getState()
+    const selection = {
+      kind: 'session' as const,
+      environmentId: descriptor.environmentId,
+      projectId: TEST_PROJECT_ID,
+      sessionId: TEST_SESSION_ID,
+    }
+    writeSessionSelectionCache(storage, selection)
+    const application = createBootRuntime(descriptor, parseAddressIntent('/'), { initialSession })
+    try {
+      const expected = initialSession === 'list' ? { kind: 'auto' } : selection
+      expect(useSessionSelectionStore.getState().selection).toEqual(expected)
+      expect(readSessionSelectionCache(storage)).toEqual(expected)
+    } finally {
+      application.dispose()
+      useEnvironmentsStore.setState(previous, true)
+      useSessionSelectionStore.setState(previousSelection, true)
+      localStorage.clear()
+    }
+  })
+}
+
+test('phone root clears unresolved remote selection once and preserves primary selection', async ({
+  client,
+}) => {
+  const second = await makeTestServer({ filesystemWatch: false })
+  const descriptor = v.parse(healthDescriptorSchema, (await client.health.get()).data)
+  const remoteDescriptor = v.parse(
+    healthDescriptorSchema,
+    (await createInProcessClient(second).health.get()).data,
+  )
+  const remote = 'http://localhost:37933'
+  const previous = useEnvironmentsStore.getState()
+  const previousSelection = useSessionSelectionStore.getState()
+  const previousOrigin = activeServerOrigin()
+  const primaryStorage = environmentScopedStorage(descriptor.environmentId)
+  const remoteStorage = environmentScopedStorage(remoteDescriptor.environmentId)
+  const selection = {
+    kind: 'session' as const,
+    environmentId: descriptor.environmentId,
+    projectId: TEST_PROJECT_ID,
+    sessionId: TEST_SESSION_ID,
+  }
+  const remoteSelection = { ...selection, environmentId: remoteDescriptor.environmentId }
+  writeSessionSelectionCache(primaryStorage, selection)
+  writeSessionSelectionCache(remoteStorage, remoteSelection)
+  useEnvironmentsStore.getState().restoreDescriptor(remote, remoteDescriptor)
+  const intent = parseAddressIntent(`/@${remoteDescriptor.environmentId}/chat`)
+  expect(intent.address.environmentId).toBeNull()
+  expect(intent.address.rejectedEnvironment).toBe(remoteDescriptor.environmentId)
+  const application = createBootRuntime(descriptor, intent, { initialSession: 'list' })
+  try {
+    expect(useSessionSelectionStore.getState().selection).toEqual(selection)
+    expect(readSessionSelectionCache(remoteStorage)).toEqual(remoteSelection)
+    application.activateEnvironment(remote)
+    expect(useSessionSelectionStore.getState().selection).toEqual({ kind: 'auto' })
+    expect(readSessionSelectionCache(primaryStorage)).toEqual(selection)
+    useSessionSelectionStore
+      .getState()
+      .selectSession(remoteDescriptor.environmentId, TEST_PROJECT_ID, TEST_SESSION_ID)
+    application.activateEnvironment(primaryServerOrigin())
+    application.activateEnvironment(remote)
+    expect(useSessionSelectionStore.getState().selection).toEqual(remoteSelection)
+  } finally {
+    application.dispose()
+    useEnvironmentsStore.setState(previous, true)
+    useSessionSelectionStore.setState(previousSelection, true)
+    setActiveServerOrigin(previousOrigin)
+    localStorage.clear()
+    await second.cleanup()
+  }
+})
+
+test('malformed remote phone root does not clear primary selection', async ({ client }) => {
+  const descriptor = v.parse(healthDescriptorSchema, (await client.health.get()).data)
+  const previous = useEnvironmentsStore.getState()
+  const previousSelection = useSessionSelectionStore.getState()
+  const storage = environmentScopedStorage(descriptor.environmentId)
+  const selection = {
+    kind: 'session' as const,
+    environmentId: descriptor.environmentId,
+    projectId: TEST_PROJECT_ID,
+    sessionId: TEST_SESSION_ID,
+  }
+  writeSessionSelectionCache(storage, selection)
+  const application = createBootRuntime(descriptor, parseAddressIntent('/@invalid!/chat'), {
+    initialSession: 'list',
+  })
+  try {
+    expect(useSessionSelectionStore.getState().selection).toEqual(selection)
+    expect(readSessionSelectionCache(storage)).toEqual(selection)
+  } finally {
+    application.dispose()
+    useEnvironmentsStore.setState(previous, true)
+    useSessionSelectionStore.setState(previousSelection, true)
+    localStorage.clear()
   }
 })

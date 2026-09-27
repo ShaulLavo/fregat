@@ -26,7 +26,9 @@ import {
   type BootWallpaperPreload,
 } from '@/lib/boot-keys'
 import { resolveBackdrop } from '@/lib/platform/backdrop'
-import { initialShellKind, type ShellKind } from '@/lib/shell/utils/kind'
+import { COARSE_POINTER_QUERY, initialShellKind } from '@/lib/shell/utils/kind'
+import { selectInitialAddress } from '@/features/address/state/storage'
+import { phoneStartAddress, phoneBaseScreen } from '@/features/address/utils/phone-start'
 
 // The pre-paint boot script. scripts/boot-appearance-plugin.ts bundles this into a classic
 // inline script in index.html, because a module script would run after first paint.
@@ -61,6 +63,14 @@ injectPaletteStylesheet(appearance.palette)
 const shell = initialShellKind((query) => window.matchMedia(query).matches)
 root.setAttribute('data-shell', shell)
 preloadShellChunks(shell)
+if (shell === 'phone') {
+  const href = phoneStartAddress(
+    selectInitialAddress(location.href),
+    selectInitialAddress(location.href, null),
+    window.matchMedia(COARSE_POINTER_QUERY).matches,
+  )
+  preloadShellChunks(phoneBaseScreen(href))
+}
 
 function readBootAppearance(): BootAppearance {
   const mirror = readStoredMirror()
@@ -220,7 +230,7 @@ function isPaletteBootCache(value: unknown): value is { ids: string[]; css: stri
 }
 
 // The build writes each shell's chunks and stylesheets into index.html (scripts/shell-chunks-plugin.ts); dev has none.
-function preloadShellChunks(kind: ShellKind) {
+function preloadShellChunks(kind: 'phone' | 'workbench' | 'sessions' | 'session') {
   const manifest = document.getElementById(SHELL_CHUNKS_ID)?.textContent
   if (!manifest) return
 

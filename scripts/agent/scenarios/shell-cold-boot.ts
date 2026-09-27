@@ -43,6 +43,9 @@ async function coldBoot(page: Page, { step }: Parameters<Scenario['run']>[1], ph
       requestAnimationFrame(() => {
         window.__coldBoot = {
           firstScreenMs: performance.now(),
+          document: performance.getEntriesByType('navigation').map(entry => ({
+            encoded: entry.encodedBodySize, transfer: entry.transferSize,
+          })),
           resources: performance.getEntriesByType('resource').map(entry => ({
             name: entry.name, start: entry.startTime, end: entry.responseEnd,
             encoded: entry.encodedBodySize, decoded: entry.decodedBodySize, transfer: entry.transferSize,
