@@ -1,5 +1,5 @@
 import { afterEach, vi } from 'vitest'
-import { act, fireEvent, screen, within } from '@testing-library/react'
+import { act, fireEvent, screen, within, waitFor } from '@testing-library/react'
 import { Toaster } from '@workspace/ui/components/sonner'
 import * as v from 'valibot'
 import { environmentIdSchema, sessionIdSchema, commandIdSchema } from '@workspace/contracts'
@@ -9,7 +9,10 @@ import {
   resetSessionUndo,
   sessionUndoAvailable,
 } from '@/features/chat-mode/state/session-undo'
-import { useSessionUndoStore } from '@/features/chat-mode/state/session-undo-history'
+import {
+  sessionUndoHistory,
+  useSessionUndoStore,
+} from '@/features/chat-mode/state/session-undo-history'
 import { renderWithProviders } from '../../../../../test/render'
 import { expect, test } from '../../../../../test/fixtures'
 
@@ -89,4 +92,32 @@ test('forgetting one row of a bulk action lowers the count its notice shows', ()
   expect(screen.getByText('2 archived')).toBeTruthy()
   act(() => forgetSessionUndo([entry('a').ref]))
   expect(screen.getByText('1 archived')).toBeTruthy()
+})
+
+test('evicting an old batch closes its notice', async () => {
+  renderWithProviders(<Toaster />)
+  act(() =>
+    offerSessionUndo({ kind: 'archive', entries: [entry('old')], detail: '', shortcut: null }),
+  )
+  await screen.findByText('1 archived')
+  act(() => {
+    for (let i = 0; i < 50; i++)
+      offerSessionUndo({ kind: 'settle', entries: [entry(String(i))], detail: '', shortcut: null })
+  })
+  await waitFor(() => expect(screen.queryByText('1 archived')).toBeNull())
+  expect(useSessionUndoStore.getState().undo).toHaveLength(50)
+})
+
+test('a failed restore closes notices for earlier receipts it invalidates', async () => {
+  renderWithProviders(<Toaster />)
+  act(() => {
+    offerSessionUndo({ kind: 'archive', entries: [entry('a')], detail: '', shortcut: null })
+    offerSessionUndo({ kind: 'settle', entries: [entry('a')], detail: '', shortcut: null })
+  })
+  await screen.findByText('1 archived')
+  await act(async () => {
+    await sessionUndoHistory.step('undo', async () => null)
+  })
+  await waitFor(() => expect(screen.queryByText('1 archived')).toBeNull())
+  await waitFor(() => expect(screen.queryByText('1 settled')).toBeNull())
 })

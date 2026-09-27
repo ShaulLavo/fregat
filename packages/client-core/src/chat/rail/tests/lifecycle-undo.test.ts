@@ -149,3 +149,28 @@ test('stepping a batch by id leaves the newer batches in place', async () => {
   expect(history.getSnapshot().redo.map((batch) => batch.kind)).toEqual(['archive'])
   expect(await history.step('undo', async () => null, older)).toMatchObject({ taken: null })
 })
+
+test('selective undo and redo reject overlapping later batches without consuming history', async () => {
+  const history = createSessionLifecycleHistory()
+  const older = history.record('snooze', [entry('a', 1)])!
+  history.record('settle', [entry('a', 2, 1), entry('b', 2)])
+  let revision = 2
+  let calls = 0
+  const restore = async (item: SessionLifecycleUndoEntry) => {
+    calls++
+    return inverse(item, ++revision)
+  }
+  const beforeUndo = history.getSnapshot()
+  expect(await history.step('undo', restore, older)).toMatchObject({ taken: null })
+  expect(history.getSnapshot()).toBe(beforeUndo)
+  expect(calls).toBe(0)
+  const first = await history.step('undo', restore)
+  await history.step('undo', restore, older)
+  const beforeRedo = history.getSnapshot()
+  expect(await history.step('redo', restore, first.inverse!.id)).toMatchObject({ taken: null })
+  expect(history.getSnapshot()).toBe(beforeRedo)
+  expect(calls).toBe(3)
+  await history.step('redo', restore)
+  await history.step('redo', restore, first.inverse!.id)
+  expect(calls).toBe(6)
+})

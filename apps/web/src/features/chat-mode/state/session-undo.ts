@@ -2,6 +2,7 @@ import { toast } from 'sonner'
 import { createElement } from 'react'
 import type { ScopedSessionRef } from '@workspace/contracts'
 import {
+  canStepSessionLifecycleBatch,
   sessionLifecycleUndoEntry,
   sessionLifecycleRestoreCommand,
   type SessionLifecycleUndoKind,
@@ -23,12 +24,20 @@ import {
   sessionUndoHistory as history,
   type SessionUndoEntry,
 } from '@/features/chat-mode/state/session-undo-history'
+import { SessionUndoNoticeAction } from '@/features/chat-mode/components/session-undo-notice-action'
 import { SessionUndoNoticeTitle } from '@/features/chat-mode/components/session-undo-notice-title'
 
 const NOTICE_DURATION_MS = 5_000
 // A step closes its notice at once but runs behind queued lifecycle mutations; the close must not expire it.
 const claimed = new Set<number>()
 const undoShortcuts = new Map<number, string | null>()
+
+history.subscribe(() => {
+  const retained = new Set(batchIds())
+  for (const id of undoShortcuts.keys()) {
+    if (!retained.has(id) && !claimed.has(id)) closeNotice(id)
+  }
+})
 
 export function sessionUndoAvailable() {
   return history.getSnapshot().undo.length > 0
@@ -55,10 +64,7 @@ export function offerSessionUndo({
   showNotice(id, 'undo', { kind, detail, count: entries.length })
 }
 export function forgetSessionUndo(refs: readonly ScopedSessionRef[]) {
-  const before = batchIds()
   history.forget(refs)
-  const after = new Set(batchIds())
-  for (const id of before) if (!after.has(id)) closeNotice(id)
 }
 export function resetSessionUndo() {
   const ids = batchIds()
@@ -97,10 +103,11 @@ function showNotice(
       id: noticeId(id),
       duration: NOTICE_DURATION_MS,
       ...(shortcut ? { description: `${shortcut} to undo` } : {}),
-      action: {
-        label: direction === 'undo' ? 'Undo' : 'Redo',
+      action: createElement(SessionUndoNoticeAction, {
+        batchId: id,
+        direction,
         onClick: () => void stepSessionHistory(direction, id),
-      },
+      }),
       onAutoClose: () => expireBatch(id),
       onDismiss: () => expireBatch(id),
     },
@@ -117,9 +124,13 @@ function expireBatch(id: number) {
 }
 
 async function stepSessionHistory(direction: HistoryDirection, id?: number) {
+  if (id !== undefined && !canStepSessionLifecycleBatch(history.getSnapshot()[direction], id))
+    return false
   const batch = history
     .getSnapshot()
-    [direction].findLast((candidate) => id === undefined || candidate.id === id)
+    [direction].findLast(
+      (candidate) => !claimed.has(candidate.id) && (id === undefined || candidate.id === id),
+    )
   if (!batch) return false
   claimed.add(batch.id)
   toast.dismiss(noticeId(batch.id))
@@ -137,6 +148,11 @@ async function stepSessionHistory(direction: HistoryDirection, id?: number) {
 async function stepBatch(direction: HistoryDirection, id: number) {
   const result = await history.step(direction, restoreSession, id).finally(() => claimed.delete(id))
   const shortcut = undoShortcuts.get(id) ?? null
+  const retained = history.getSnapshot()[direction].find((batch) => batch.id === id)
+  if (retained) {
+    showNotice(id, direction, { kind: retained.kind, detail: '', count: retained.entries.length })
+    return false
+  }
   undoShortcuts.delete(id)
   if (result.inverse) {
     const { inverse } = result

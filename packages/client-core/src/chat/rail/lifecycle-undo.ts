@@ -32,6 +32,20 @@ export type SessionLifecycleUndoBatch<Entry extends SessionLifecycleUndoEntry> =
   readonly entries: readonly Entry[]
 }
 
+/** A batch can restore only after later actions on the same sessions have been restored. */
+export function canStepSessionLifecycleBatch<Entry extends SessionLifecycleUndoEntry>(
+  batches: readonly SessionLifecycleUndoBatch<Entry>[],
+  id: number,
+) {
+  const index = batches.findIndex((batch) => batch.id === id)
+  const batch = batches[index]
+  if (!batch) return false
+  const keys = new Set(batch.entries.map((entry) => scopedSessionKey(entry.ref)))
+  return !batches
+    .slice(index + 1)
+    .some((later) => later.entries.some((entry) => keys.has(scopedSessionKey(entry.ref))))
+}
+
 const LIFECYCLE_VERBS: Record<SessionLifecycleChange['type'] | 'archive', string> = {
   archive: 'archived',
   settle: 'settled',
@@ -138,6 +152,8 @@ export function createSessionLifecycleHistory<Entry extends SessionLifecycleUndo
       restore: (entry: Entry) => Promise<Entry | null>,
       id?: number,
     ) {
+      if (id !== undefined && !canStepSessionLifecycleBatch(stack[direction], id))
+        return { applied: [], failed: 0, taken: null, inverse: null }
       const startedOnBranch = branch
       const taken = takeHistory(stack, direction, (batch) => id === undefined || batch.id === id)
       if (!taken.entry) return { applied: [], failed: 0, taken: null, inverse: null }

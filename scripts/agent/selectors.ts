@@ -114,11 +114,17 @@ export const selectors = {
       .getByRole('button', { name: 'Actions', exact: true }),
   toastUndo: (page: Page, text: string) =>
     page
-      .locator('[data-sonner-toast]')
-      .filter({ hasText: text })
+      .locator('[data-sonner-toast]:not([data-removed="true"])')
+      .filter({ has: page.getByText(text, { exact: true }) })
       .getByRole('button', { name: 'Undo', exact: true }),
   undoNotice: (page: Page, text: string) =>
-    page.locator('[data-sonner-toast]').filter({ hasText: text }),
+    page
+      .locator('[data-sonner-toast]:not([data-removed="true"])')
+      .filter({ has: page.getByText(text, { exact: true }) }),
+  sessionUndoNotices: (page: Page) =>
+    page
+      .locator('[data-sonner-toast]:not([data-removed="true"])')
+      .filter({ has: page.getByRole('button', { name: 'Undo', exact: true }) }),
   shelfRowTitles: (page: Page, shelf: string) =>
     page.getByRole('region', { name: shelf, exact: true }).locator('[title]'),
 
