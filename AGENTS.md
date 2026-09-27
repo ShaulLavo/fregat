@@ -114,6 +114,7 @@
 ## Dev, Gates, Verification
 
 - The dev server is a mesh route: the first connection to 5173 (Vite) or 3001 (API) starts it, and it stops after the idle window (`developer.devServerIdleMinutes`). Never start one by hand. `mesh serve ls` shows the `:5173` route, `mesh serve stop :5173` restarts it on the next connection, and `bun run dev:serve` registers it on a machine that lacks it. State homes: production `~/.platform`, dev `/work/platform-dev/home`, each `agent:browser` run a temp home. `/dev` (and `/platform/dev` on the mesh) is a component gallery; add a tab for anything worth eyeballing.
+- An agent's own dev server (not the shared mesh route) always takes an explicit free `--port`: a bare `vite`/host default resolves to `::1` and can shadow the shared `:5173`/`:3001` route instead of colliding with it (2026-09-27 incident).
 - `bun run gates` (`dupes:functions`, `dupes`, `design:census`, `compiler:census`, `errors:census`, `query:check`, `unused:check`) runs in pre-commit, `verify` and CI. `bun run hooks:pre-commit` is not a dry run: it stages what it fixes.
 - Prove changes with the `verify-fregat` skill (`bun run agent:browser look|scenario|trace|renders|caches`); evidence lands in `/work/tmp/fregat-evidence/<run>/`. Read the screenshot back and name the directory. Performance claims cite `trace --compare`, render claims `renders` before and after, settlement claims `caches`. Reproduce a bug on its surface before fixing it. A surface with no scenario gets one in `scripts/agent/scenarios/`, selectors in `scripts/agent/selectors.ts`.
 

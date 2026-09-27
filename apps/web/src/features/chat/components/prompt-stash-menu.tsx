@@ -45,7 +45,7 @@ export function PromptStashMenu({
                 render={
                   <Button
                     aria-label={`Delete stashed prompt: ${promptSnippet(stashMessageLabel(entry))}`}
-                    className='shrink-0 opacity-0 group-hover/stash:opacity-100 focus-visible:opacity-100'
+                    className='touch:opacity-100 shrink-0 opacity-0 group-hover/stash:opacity-100 focus-visible:opacity-100'
                     size='icon-sm'
                     type='button'
                     variant='ghost'

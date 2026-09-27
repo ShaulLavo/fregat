@@ -15,6 +15,8 @@ The throwaway server never starts the machine's Codex or Claude CLI: those drive
 
 When web changes depend on a server protocol change, deploy both with `bun run deploy --server`. A web-only deployment reuses the old server. Verify `/release` and exercise the changed protocol in the browser before calling the deployment done.
 
+Never hand-start a Vite or API dev server on `:5173`/`:3001`; if a task needs one outside `agent:browser`'s own throwaway server, give it an explicit free `--port` — a bare host default can resolve to `::1` and shadow the shared route instead of colliding with it.
+
 `--engine firefox` or `--engine webkit` runs `look`, `scenario`, `renders` or `caches` in another engine; `trace` needs Chromium. The desktop app is CEF, so other engines matter for the mesh (every iPhone browser is WebKit). Playwright's WebKit does not start on this Arch host (missing libicu74, libxml2, libflite).
 
 `look`, `trace`, `renders` and `caches` also accept `--url` for a different target, including the mesh build at `https://omarchy.mesh.shaulavo.dev/platform/` and any address URL the user pastes. An address URL puts you in the user's exact state (workspace, tabs, selection); one copied from the dev page needs `--shared-dev`, because a throwaway server has never seen that workspace. The mesh is the owner's real state, so `scenario`, `trace` and `renders` refuse a production URL unless the scenario declares `readOnly: true`.

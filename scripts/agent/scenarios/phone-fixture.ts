@@ -32,7 +32,7 @@ export async function openFixtureChat(page: Page, fixture: string) {
 }
 
 /** Sessions on a scripted mock provider, so a turn runs without reaching any real model. */
-export async function createSessions(page: Page, base: string, fixture: string) {
+export async function createSessions(page: Page, base: string, fixture: string, extra = 0) {
   const worktree = await fixtureWorktree(page, base, fixture)
   const providerInstanceId = `phone-shell-${crypto.randomUUID()}`
   await writeSettings(page, base.replace(/\/orchestration$/, ''), [
@@ -47,7 +47,12 @@ export async function createSessions(page: Page, base: string, fixture: string) 
       },
     },
   ])
-  for (const title of PHONE_SESSIONS)
+  // The extra sessions first, so the named ones are newest and top the list.
+  const titles = [
+    ...Array.from({ length: extra }, (_, index) => `Older task ${index + 1}`),
+    ...PHONE_SESSIONS,
+  ]
+  for (const title of titles)
     await dispatch(page, base, {
       type: 'session.create',
       sessionId: crypto.randomUUID(),

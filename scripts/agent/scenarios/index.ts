@@ -1,6 +1,7 @@
 import { sessionNoFlicker } from './session-no-flicker'
 import { restNoFlicker } from './rest-no-flicker'
 import { deferredDialogs } from './deferred-dialogs'
+import { dialogEscape } from './dialog-escape'
 import { rootSwitchNoFlicker } from './root-switch-no-flicker'
 import { turnFilesNoFlicker } from './turn-files-no-flicker'
 import { branchActionsNoFlicker } from './branch-actions-no-flicker'
@@ -119,6 +120,7 @@ import { chatCardNarrow } from './chat-card-narrow'
 import { chatComposerInsert } from './chat-composer-insert'
 import { chatDisclosureSettle } from './chat-disclosure-settle'
 import { chatTurnAnatomy } from './chat-turn-anatomy'
+import { chatTurnSettle } from './chat-turn-settle'
 import { devicePairing } from './device-pairing'
 import { phoneShell } from './phone-shell'
 import { shellSwitch } from './shell-switch'
@@ -586,6 +588,7 @@ export const scenarios: readonly Scenario[] = [
   textFieldFkeys,
   settingsModuleFailure,
   deferredDialogs,
+  dialogEscape,
   projectMenu,
   workspaceSwitch,
   serverRestart,
@@ -621,6 +624,7 @@ export const scenarios: readonly Scenario[] = [
   chatComposerInsert,
   chatDisclosureSettle,
   chatTurnAnatomy,
+  chatTurnSettle,
   devicePairing,
   phoneShell,
   shellSwitch,
