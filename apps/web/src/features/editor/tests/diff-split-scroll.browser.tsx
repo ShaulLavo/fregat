@@ -85,15 +85,22 @@ test('the panes are never seen at different offsets while a wheel is turning', a
   }
   requestAnimationFrame(sample)
 
+  // Waits count frames, not milliseconds: a loaded runner paints fewer frames per second, and a
+  // wall-clock wait there left too few samples to prove anything.
   await commands.diffMouseWheel({ deltaY: 120, selector: '.editor-diff-pane-old' })
-  await new Promise((resolve) => setTimeout(resolve, 120))
+  await animationFrames(8)
   await commands.diffMouseWheel({ deltaY: 120, selector: '.editor-diff-pane-old' })
-  await new Promise((resolve) => setTimeout(resolve, 400))
+  await animationFrames(24)
   sampling = false
 
   expect(samples.length).toBeGreaterThan(20)
   expect(samples.filter((pair) => pair.split('/')[0] !== pair.split('/')[1])).toEqual([])
 })
+
+async function animationFrames(count: number) {
+  for (let frame = 0; frame < count; frame += 1)
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+}
 
 function mountSplitDiff() {
   seedBootMirrorTheme('dark')
