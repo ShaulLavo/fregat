@@ -219,7 +219,7 @@ function isPaletteBootCache(value: unknown): value is { ids: string[]; css: stri
   return Array.isArray(ids) && typeof css === 'string'
 }
 
-// The build writes each shell's chunks into index.html (scripts/shell-chunks-plugin.ts); dev has none.
+// The build writes each shell's chunks and stylesheets into index.html (scripts/shell-chunks-plugin.ts); dev has none.
 function preloadShellChunks(kind: ShellKind) {
   const manifest = document.getElementById(SHELL_CHUNKS_ID)?.textContent
   if (!manifest) return
@@ -229,7 +229,10 @@ function preloadShellChunks(kind: ShellKind) {
   for (const href of chunks) {
     if (typeof href !== 'string') continue
     const link = document.createElement('link')
-    link.rel = 'modulepreload'
+    // A stylesheet is only fetched here: the shell's dynamic import applies it and waits for it.
+    const style = href.endsWith('.css')
+    link.rel = style ? 'preload' : 'modulepreload'
+    if (style) link.as = 'style'
     link.crossOrigin = ''
     link.href = href
     document.head.append(link)

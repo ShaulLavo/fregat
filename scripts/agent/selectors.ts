@@ -1015,6 +1015,8 @@ export const selectors = {
   bootstrapFailure: (page: Page) =>
     page.getByText('Cannot connect to the local machine', { exact: true }),
   windowToolbar: (page: Page) => page.getByLabel('Window toolbar', { exact: true }),
+  phoneFirstScreenSelector: '[data-phone-level="sessions"] section[aria-label="Sessions"]',
+  desktopFirstScreenSelector: '[aria-label="Window toolbar"]',
   phoneShell: (page: Page) => page.locator('[data-phone-shell]'),
   /** The phone shell showing `level`: sessions, session, changes, file or terminal. */
   phoneLevel: (page: Page, level: string) => page.locator(`[data-phone-level="${level}"]`),
@@ -1113,6 +1115,7 @@ export const selectors = {
   logCopyButtons: (page: Page) => page.getByRole('button', { name: 'Copy log event', exact: true }),
   logCleared: (page: Page) => page.getByText('Visible logs cleared.', { exact: true }),
   logRows: (page: Page) => page.locator('[data-log-row-summary]'),
+  logsModuleSpinnerSelector: '[aria-label="Opening logs"]',
   logsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search logs' }),
   logsTab: (page: Page) => page.getByRole('button', { name: 'Logs', exact: true }),
   renderErrorState: (page: Page) =>

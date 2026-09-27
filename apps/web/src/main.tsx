@@ -6,6 +6,7 @@ import { settingsPageQueryOptions } from '@/features/settings/utils/page-query'
 import { paletteContentQueryOptions } from '@/features/command-palette/utils/content-query'
 import { filePickerDialogQueryOptions } from '@/features/file-picker/utils/dialog-query'
 import { terminalPanelQueryOptions } from '@/features/terminal/utils/panel-query'
+import { logsPanelQueryOptions } from '@/features/logs/utils/panel-query'
 import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { systemColorMode } from '@/features/settings/state/system-color-mode'
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'
@@ -143,14 +144,15 @@ async function start() {
       .then(({ claimAtBoot }) => claimAtBoot(pairingCode))
       .catch(() => undefined)
   // The boot script already preloads the chosen shell's chunks; this evaluates them before the first render.
+  const kind = useShellStore.getState().kind
   const warmViews: Promise<unknown>[] = [
     resourceQueryClient
-      .query(shellQueryOptions(useShellStore.getState().kind))
+      .query(shellQueryOptions(kind))
       .then(() => undefined)
       .catch(() => undefined),
   ]
   watchShellKind()
-  if (restoredWorkspace?.selectedTabContent?.kind === 'settings')
+  if (kind === 'workbench' && restoredWorkspace?.selectedTabContent?.kind === 'settings')
     warmViews.push(
       resourceQueryClient
         .query(settingsPageQueryOptions)
@@ -158,12 +160,24 @@ async function start() {
         .catch(() => undefined),
     )
   if (
+    kind === 'workbench' &&
     restoredWorkspace?.workbenchPanels.bottomPanelOpen &&
     restoredWorkspace.workbenchPanels.activeBottomTab === 'terminal'
   )
     warmViews.push(
       resourceQueryClient
         .query(terminalPanelQueryOptions)
+        .then(() => undefined)
+        .catch(() => undefined),
+    )
+  if (
+    kind === 'workbench' &&
+    (restoredWorkspace?.workbenchPanels.activeSidebarTab === 'logs' ||
+      restoredWorkspace?.chatModePanels.activeToolTab === 'logs')
+  )
+    warmViews.push(
+      resourceQueryClient
+        .query(logsPanelQueryOptions)
         .then(() => undefined)
         .catch(() => undefined),
     )
@@ -203,6 +217,7 @@ async function start() {
 
 // Warm closed views on idle. A failed prefetch is silent: the query retries when opened.
 function prefetchDeferredChunks() {
+  if (useShellStore.getState().kind === 'phone') return
   void resourceQueryClient
     .query(paletteContentQueryOptions)
     .then(() => undefined)
@@ -217,6 +232,10 @@ function prefetchDeferredChunks() {
     .catch(() => undefined)
   void resourceQueryClient
     .query(settingsPageQueryOptions)
+    .then(() => undefined)
+    .catch(() => undefined)
+  void resourceQueryClient
+    .query(logsPanelQueryOptions)
     .then(() => undefined)
     .catch(() => undefined)
 }

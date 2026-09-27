@@ -137,7 +137,9 @@ import { chatTurnAnatomy } from './chat-turn-anatomy'
 import { chatTurnSettle } from './chat-turn-settle'
 import { devicePairing } from './device-pairing'
 import { phoneShell } from './phone-shell'
+import { logsRestored } from './logs-restored'
 import { shellSwitch } from './shell-switch'
+import { phoneColdBoot, desktopColdBoot } from './shell-cold-boot'
 import { chatSleepingSession } from './chat-sleeping-session'
 import { chatSessionGoal } from './chat-session-goal'
 import { chatAgentReview } from './chat-agent-review'
@@ -658,6 +660,9 @@ export const scenarios: readonly Scenario[] = [
   devicePairing,
   phoneShell,
   shellSwitch,
+  logsRestored,
+  phoneColdBoot,
+  desktopColdBoot,
   chatSleepingSession,
   chatSessionGoal,
   chatAgentReview,
