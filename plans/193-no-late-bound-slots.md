@@ -11,7 +11,7 @@
   - [x] Phase 1: navigation is bound at boot
   - [x] Phase 2: the editor runtime owns its own active lifetime
   - [x] Phase 3: settings reach non-React consumers by subscription (slot 9 kept, see Keep)
-  - [ ] Phase 4: the command runtime reads settings at dispatch
+  - [x] Phase 4: the command runtime reads settings at dispatch
   - [ ] Phase 5: editor theme selection from settings
   - [ ] Phase 6: the rule
 
@@ -179,6 +179,9 @@ into `snapshotSettingsRef` from a layout effect. Commands can read
 does for another value. `adaptersRef` (editor, settings and theme actions, `requestCloseTab`) and
 the palette refs stay: they are React-owned actions and state.
 
+- As landed: the live projection already won whenever the document existed; the ref was only the
+  fallback before it lands, so that fallback now reads the boot mirror. `CommandProvider` no
+  longer subscribes to the diff view or wallpaper settings.
 - Verify: `keymap/tests/command-provider.test.tsx`; toggling the diff view and wallpaper from the
   palette straight after a settings change.
 

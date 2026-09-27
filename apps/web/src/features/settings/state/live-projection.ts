@@ -14,12 +14,26 @@ import {
   type ActiveSettingsIntent,
 } from '@workspace/client-core/settings/intent-store'
 import { readSettingBootValue } from '@/lib/settings-boot-mirror'
-import { projectSettings } from '@workspace/client-core/settings/projection'
+import {
+  projectSettings,
+  type SettingsProjection,
+} from '@workspace/client-core/settings/projection'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 
 type ColorTheme = SettingsValues['workbench.colorTheme']
 
-export function readLiveSettingsProjection(queryClient: QueryClient, fallback?: SettingsSnapshot) {
+export function readLiveSettingsProjection(
+  queryClient: QueryClient,
+  fallback: SettingsSnapshot,
+): SettingsProjection
+export function readLiveSettingsProjection(
+  queryClient: QueryClient,
+  fallback?: SettingsSnapshot,
+): SettingsProjection | undefined
+export function readLiveSettingsProjection(
+  queryClient: QueryClient,
+  fallback?: SettingsSnapshot,
+): SettingsProjection | undefined {
   const confirmed = queryClient.getQueryData<SettingsSnapshot>(settingsKeys.document()) ?? fallback
   if (!confirmed) return undefined
 
