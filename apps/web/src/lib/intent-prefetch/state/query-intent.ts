@@ -5,6 +5,7 @@ import {
   type QueryKey,
   type QueryExecuteOptions,
 } from '@tanstack/react-query'
+import { prepareIntentDiffSyntax } from '@/lib/intent-prefetch/state/diff-syntax-preparer'
 import { hasPrefetchRoom, prefetchSurfaceEnabled } from '@/lib/intent-prefetch/state/scheduler'
 import { createWideEventScope } from '@/lib/wide-event-scope'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
@@ -76,8 +77,14 @@ export function startDiffIntent<T, K extends QueryKey>(
       event.set({
         prepareMs: performance.now() - started,
         bytes: new TextEncoder().encode(JSON.stringify(data)).byteLength,
-        workerMs: 0,
       })
+      // Parsed after the read lands and only while the row is still a guess: a press that
+      // already claimed it parses in its own view, and a row left behind is not worth a parse.
+      if (lease.claimed || owned.get(key) !== lease) return
+      void prepareIntentDiffSyntax(client, data).then(
+        (workerMs) => event.set({ workerMs }),
+        () => event.set({ workerMs: 0, syntax: 'failed' }),
+      )
     },
     () => {
       unsubscribe()

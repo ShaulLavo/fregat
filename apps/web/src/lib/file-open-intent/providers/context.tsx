@@ -7,7 +7,7 @@ export type FileOpenIntentContextValue = {
   readonly service: FileOpenIntentService
 }
 
-const FileOpenIntentContext = createContext<FileOpenIntentContextValue | null>(null)
+export const FileOpenIntentContext = createContext<FileOpenIntentContextValue | null>(null)
 
 export function FileOpenIntentProvider({
   children,

@@ -10,10 +10,16 @@ import {
 import {
   createDiffRegionStore,
   createTextDiff,
+  prepareDiffSyntax,
   type DiffSyntaxBackend,
 } from '@singapore-editor/diff'
 
 import { DiffPane } from '@/features/editor/components/diff-pane'
+import {
+  clearPreparedDiffSyntax,
+  hasPreparedDiffSyntax,
+  storePreparedDiffSyntax,
+} from '@/features/editor/state/prepared-diff-syntax'
 import { expect, test } from '../../../../../test/fixtures'
 import { stubHighlightApi } from '../../../../../test/env/highlight-api'
 import { renderWithProviders } from '../../../../../test/render'
@@ -48,25 +54,77 @@ test('the tokens the plugin projects are applied to the editor', async () => {
   }
 })
 
+test('a prepared diff paints coloured with its first text, and a revisit reuses its parse', async () => {
+  stubHighlightApi()
+  const setText = vi.spyOn(Editor.prototype, 'setText')
+  const sessions = { created: 0 }
+  const backend = tokenBackend(sessions)
+  const diff = () =>
+    createTextDiff({
+      newFile: { languageId: 'typescript', path: 'repo/a.ts', text: 'const b = 2\n' },
+      oldFile: { languageId: 'typescript', path: 'repo/a.ts', text: 'const a = 1\n' },
+    })
+  const pane = () => (
+    <StrictMode>
+      <DiffPane
+        file={diff()}
+        regions={createDiffRegionStore()}
+        side='stacked'
+        syntaxBackend={backend}
+        syntaxSource='tree-sitter'
+        theme={{}}
+      />
+    </StrictMode>
+  )
+  try {
+    const prepared = diff()
+    storePreparedDiffSyntax(prepared, 'tree-sitter', await prepareDiffSyntax(prepared, { backend }))
+    const parsedAhead = sessions.created
+
+    const first = renderWithProviders(pane())
+    await waitFor(() => expect(setText).toHaveBeenCalled())
+    expect(firstTextTokens(setText)).toHaveLength(2)
+    first.unmount()
+    expect(hasPreparedDiffSyntax(diff(), 'tree-sitter')).toBe(true)
+
+    setText.mockClear()
+    renderWithProviders(pane())
+    await waitFor(() => expect(setText).toHaveBeenCalled())
+    expect(firstTextTokens(setText)).toHaveLength(2)
+    expect(sessions.created).toBe(parsedAhead)
+  } finally {
+    setText.mockRestore()
+    clearPreparedDiffSyntax('tree-sitter')
+  }
+})
+
+function firstTextTokens(spy: { mock: { calls: readonly unknown[][] } }) {
+  const options = spy.mock.calls[0]?.[1] as { tokens?: readonly EditorToken[] } | undefined
+  return options?.tokens ?? []
+}
+
 function appliedTokens(spy: { mock: { calls: readonly unknown[][] } }) {
   return spy.mock.calls.flatMap((call) => call[0] as readonly EditorToken[])
 }
 
 /** A parse that colours the word `const` wherever it appears, so a token has to be anchored to
  *  reach the editor rather than merely counted. */
-function tokenBackend(): DiffSyntaxBackend {
+function tokenBackend(sessions = { created: 0 }): DiffSyntaxBackend {
   return {
     kind: 'tree-sitter',
     provider: {
-      createSession: (options: EditorSyntaxSessionOptions) => ({
-        foldingSupport: 'supported',
-        applyChange: async () => result(options),
-        dispose: () => undefined,
-        getResult: () => result(options),
-        getSnapshotVersion: () => 0,
-        getTokens: () => result(options).tokens,
-        refresh: async () => result(options),
-      }),
+      createSession: (options: EditorSyntaxSessionOptions) => {
+        sessions.created += 1
+        return {
+          foldingSupport: 'supported',
+          applyChange: async () => result(options),
+          dispose: () => undefined,
+          getResult: () => result(options),
+          getSnapshotVersion: () => 0,
+          getTokens: () => result(options).tokens,
+          refresh: async () => result(options),
+        }
+      },
     },
   } as DiffSyntaxBackend
 }

@@ -77,9 +77,16 @@ async function typeQuickOpen(page: Page, file: string) {
   await page.waitForTimeout(600)
 }
 
-async function dwellOn(page: Page, name: string, dwellMs: number) {
-  const box = await selectors.treeItem(page, name).boundingBox()
-  if (!box) throw new Error(`Tree row ${name} is not laid out`)
+async function dwellOn(
+  page: Page,
+  name: string,
+  dwellMs: number,
+  surface: 'tree' | 'git' = 'tree',
+) {
+  const target =
+    surface === 'tree' ? selectors.treeItem(page, name) : selectors.gitChangeRow(page, name).first()
+  const box = await target.boundingBox()
+  if (!box) throw new Error(`${surface} row ${name} is not laid out`)
   await page.mouse.move(box.x + 30, box.y + box.height / 2, { steps: 10 })
   await page.waitForTimeout(dwellMs)
 }
@@ -129,7 +136,7 @@ const diff = (name: string): Target => ({ needle: `MARKDIFF${name}`, kind: 'diff
 export const prefetchFirstPaint: Scenario = {
   name: 'prefetch-first-paint',
   description:
-    'Milliseconds from a press to the target’s first text, syntax colour and markdown preview, per open surface: quick open, keyboard tabs, tree rows with and without a hover, git diffs first and revisited.',
+    'Milliseconds from a press to the target’s first text, syntax colour and markdown preview, per open surface: quick open, keyboard tabs, tree rows with and without a hover, git diffs first, revisited and hovered.',
   inspect: async (page) => results.get(page) ?? null,
   async run(page, { step }) {
     results.set(page, [])
@@ -188,10 +195,13 @@ export const prefetchFirstPaint: Scenario = {
         ['doc.md', 'git diff md, revisit'],
         ['code.ts', 'git diff ts, revisit'],
         ['doc2.md', 'git diff md2, first'],
-        ['code2.ts', 'git diff ts2, first'],
       ] as const) {
         await measure(page, label, diff(name), row(name))
       }
+      // A hovered row reads its diff and parses both sides before the press.
+      await page.mouse.move(5, 5)
+      await dwellOn(page, 'code2.ts', 1500, 'git')
+      await measure(page, 'git diff ts2, 1.5 s hover', diff('code2.ts'), click)
       await step('diffs')
     } finally {
       await releaseFixture(fixture)

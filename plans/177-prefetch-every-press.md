@@ -2,9 +2,8 @@
 
 ## Status and authorization
 
-- Status: RESEARCH DONE 2026-09-26 — every async press inventoried and measured; one shared intent
-  scheduler with per-surface preparers; five phases; one owner question (settings shape). Nothing
-  here authorizes implementation.
+- Status: Phases 0–4 done (3 and 4 on 2026-09-27). Phase 5 is the address cache, which is done;
+  the chat detail lease waits on its production gate (see Phase 5). Research done 2026-09-26.
 - Planned at: Platform `d42184dc`, Editor `74e76be`, 2026-09-26. Researched at Platform
   `c130dd35a`. Origin: the investigation into markdown files and diffs painting without colours or
   decorations before their syntax lands.
@@ -236,6 +235,46 @@ is the measured diff press latency, not overall CPU use.
 
 ### Phase 3 — Prepared diff syntax (L, Editor and Platform)
 
+Done 2026-09-27. The Editor change is in singapore `199ba7e`, which is the pinned `editor-ref`.
+
+- **Editor API.**
+  - `prepareDiffSyntax(file, { backend, side, signal })` returns a `PreparedDiffSyntaxSource` per
+    side: the token stream plus the session that recolours it on a theme change.
+  - `DiffPlugin.setFile(file, prepared)` adopts sources that cover the pane's side synchronously.
+    A preparation that is still running is awaited in place of a second parse.
+  - `releasePreparedSyntax()` hands the current file's streams back to the host when the view
+    leaves it.
+- **Store.** Platform keeps prepared diff syntax in `features/editor/state/prepared-diff-syntax.ts`.
+  - It is keyed per source side by syntax source, language and an FNV-1a fingerprint of that side's
+    lines, with line count and length. Keying on the drawn text means a checkpoint's rewritten old
+    side can never match a blob's.
+  - It holds 16 sides (eight two-sided diffs); eviction disposes the entry.
+  - It is cleared when its syntax provider is disposed.
+- **Filling.**
+  - _On intent:_ when a git diff read settles while its row is still a guess (not claimed, not left,
+    not already on screen), the editor runtime's bound preparer parses both sides. That runs as the
+    `editor.diff-syntax.prepare` mutation, one at a time, with room for four. The `prefetch.intent`
+    event's `workerMs` records the time spent.
+  - _On leave:_ a diff view stores its parse when it leaves.
+- **Deletions.** The dead `presentationReady` wiring in `diff-pane.tsx` and the diff-paint row in
+  `docs/instant-reload-implementation.md` are gone.
+- **Found on the way.**
+  - Preparing a read that a press had already claimed parsed the same file twice beside the view,
+    and the unhovered first TypeScript diff took about 1,000 ms to colour. The claim check,
+    in-flight adoption and the on-screen check fixed it.
+  - Keyboard tab neighbours (Phase 4) competed with a new diff tab's parse; they now wait for it
+    (see Phase 4).
+- **Checkpoint turn rows** are not prepared on intent: their read is the whole turn. They reuse a
+  parse on revisit, since a view stores its parse when it leaves.
+- **Proof.** `scenario prefetch-first-paint` gained a "git diff ts2, 1.5 s hover" step. Medians of
+  four runs, baseline versus change, text / colour ms: TypeScript diff revisit 164/650 → 162/162,
+  hovered first TypeScript diff 194/552 → 190/190, markdown diff revisit 164/241 → 180/180.
+  Unhovered first opens are unchanged (TypeScript 174/656 → 169/638, markdown 237/434 → 262/429).
+  Tests: the Editor `preparedSyntax.test.ts` covers adoption, side mismatch, release, recolour,
+  in-flight and abort. Platform: `diff-tokens.test.tsx` shows the first `setText` carrying tokens
+  and a revisit that creates no sessions; `diff-intent.test.tsx` hands diffs to the bound preparer
+  and not commit details.
+
 - Editor (`packages/diff`): `prepareDiffSyntax(file, backend, configuration)` returning per-side
   token sources and their sessions; `DiffSyntaxController.setFile(file, rows, prepared)` adopts
   them and reprojects without a parse.
@@ -248,6 +287,37 @@ syntax configuration)`, filled on intent after Phase 2's queries land and on unm
   open does too.
 
 ### Phase 4 — Every other file press (M)
+
+Done 2026-09-27.
+
+- **Intent fields.** `FileOpenIntent` gains the sources `quick-open`, `search`, `problems`,
+  `references` and `chat-link`, and a `trigger`, which the `prefetch.intent` files event records.
+  `rootPath` is optional and defaults to the editor's current root.
+- **Hooks.** `useFileIntent(source)` and `useActiveRowFileIntent(path, source)`, both in
+  `lib/file-open-intent/hooks/`, feed:
+  - quick open's highlighted file and `edt `'s highlighted editor (through `HighlightReporter`);
+  - the sidebar search's and the search editor's active result;
+  - Problems and References, by active row and hover;
+  - chat file chips and stack frames on hover. A chat link resolves against the chat's own root,
+    so a link under another project's root is rejected, as the plan expected.
+- **Tree focus.** Arrow-key focus in the tree prefetches the focused row with trigger `focus`: a
+  file prepares, a folder lists.
+- **Tab neighbours.** The editor runtime watches the active tab (`watchAdjacentTabIntents`) and
+  prepares the next and previous tab and the previous editor. It waits 250 ms and then the syntax
+  workers' idle fence: preparing at once competed with the new tab's own parse and slowed a first
+  diff open by 50–90 ms.
+- **Queue limit.** The files preparer keeps only the four newest queued guesses, and a dropped one
+  logs `skipped-budget`, so a held arrow key cannot queue a read per row. Automatic triggers
+  (`active-row`, `adjacent-tab`, `focus`) log nothing for `already-active` or `already-mounted`.
+- **Proof** (the same four runs as Phase 3), text / colour ms:
+  - quick open TypeScript, first of its language: 500/1500 → 254/440;
+  - quick open TypeScript, warm: 247/398 → 174/174;
+  - quick open markdown, first: 314/434 → 236/236;
+  - quick open markdown, warm: 286/310 → 156/156;
+  - keyboard next tab to a markdown file: 176/294 → 185/185.
+    Other rows are within noise.
+- Service tests cover the queue limit (`skipped-budget`, newest four kept); the byte-budget test
+  now prepares sequentially.
 
 The files preparer gains sources, each feeding its already-tracked active target:
 
@@ -264,6 +334,17 @@ The files preparer gains sources, each feeding its already-tracked active target
 The cap keeps a held arrow key from flooding: a guess is skipped while four are in flight.
 
 ### Phase 5 — Chats (S)
+
+2026-09-27:
+
+- The address cache was already done by lane B: `registeredWorkspaceAddress` is a query that
+  `openChat` and `openWorkspace` both use.
+- `SIDEBAR_SESSION_DETAIL_PREWARM_LIMIT` is deleted.
+- **The lease is not shipped.** Its gate is production `firstSnapshotMs` p90 above 50 ms, and those
+  logs are on the owner's machine: `bun run logs --since 7d` filtered to
+  `chat.session_detail_subscription.summary`. The field lands only when a subscription ends (15
+  min idle or LRU), so read it over days. `prefetch.chats` is registered with the lease if the gate
+  passes.
 
 - Cache the workspace address as a query keyed by path (a read over POST, per AGENTS.md), used by
   `openChat` and the workspace switcher; this removes a round trip from every chat open.

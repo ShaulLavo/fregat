@@ -1,9 +1,11 @@
+import { waitFor } from '@testing-library/react'
 import { QueryObserver } from '@tanstack/react-query'
 import { DEFAULT_SETTING_VALUES } from '@workspace/contracts'
 import { expect, test } from '../../../../test/fixtures'
 import { createTestQueryClient } from '../../../../test/render'
 import { writeBootMirror } from '@/lib/settings-boot-mirror'
 import { claimDiffIntent, startDiffIntent } from '@/lib/intent-prefetch/state/query-intent'
+import { bindDiffSyntaxPreparer } from '@/lib/intent-prefetch/state/diff-syntax-preparer'
 
 for (const setting of ['prefetch.enabled', 'prefetch.diffs'] as const) {
   test(`${setting} suppresses speculative diff reads`, ({ client }) => {
@@ -78,4 +80,35 @@ test('leaving never cancels an earlier imperative open', async ({ client }) => {
   startDiffIntent(queryClient, options, 'hover')()
   expect(signal?.aborted).toBe(false)
   queryClient.clear()
+})
+
+test('a settled file-diff read hands its diffs to the bound syntax preparer', async ({
+  client,
+}) => {
+  void client
+  writeBootMirror(DEFAULT_SETTING_VALUES)
+  const queryClient = createTestQueryClient()
+  const prepared: unknown[] = []
+  const unbind = bindDiffSyntaxPreparer(async (_client, diffs) => {
+    prepared.push(diffs)
+    return 0
+  })
+  const diffs = [{ path: 'a.ts', patch: '', hunks: [], staged: false }]
+  try {
+    startDiffIntent(queryClient, { queryKey: ['git', 'diffs', 'a'], queryFn: () => diffs }, 'hover')
+    startDiffIntent(
+      queryClient,
+      { queryKey: ['git', 'history-commit', 'c'], queryFn: () => ({ id: 'c', files: [] }) },
+      'active-row',
+    )
+    await waitFor(() => expect(prepared).toEqual([diffs]))
+    await waitFor(() =>
+      expect(queryClient.getQueryData(['git', 'history-commit', 'c'])).toBeDefined(),
+    )
+    await Promise.resolve()
+    expect(prepared).toEqual([diffs])
+  } finally {
+    unbind()
+    queryClient.clear()
+  }
 })

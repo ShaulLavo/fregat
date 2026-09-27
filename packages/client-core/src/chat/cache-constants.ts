@@ -5,7 +5,6 @@ export const CHAT_ACTIVITY_CACHE_LIMIT = 500
 
 export const SESSION_DETAIL_SUBSCRIPTION_IDLE_EVICTION_MS = 15 * 60 * 1000
 export const MAX_CACHED_SESSION_DETAIL_SUBSCRIPTIONS = 32
-export const SIDEBAR_SESSION_DETAIL_PREWARM_LIMIT = 10
 
 /**
  * Ceilings for the projection snapshot that paints the shell before the socket

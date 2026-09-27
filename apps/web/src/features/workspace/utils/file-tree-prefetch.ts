@@ -1,7 +1,7 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { TreeEntry } from '@/lib/file-system-types'
 import { isFileEntry } from '@/lib/file-system-types'
-import type { FileOpenIntent } from '@/lib/file-open-intent/state/service'
+import type { FileOpenIntent, FileOpenIntentTrigger } from '@/lib/file-open-intent/state/service'
 import { canonicalTreePath } from '@/lib/path-formatters'
 import { fileSystemKeys } from '@/lib/query-keys'
 
@@ -16,7 +16,11 @@ export function treeDirectoryPrefetchKey(rootPath: string, treePath: string, ent
   return fileSystemKeys.treeDirectory(rootPath, canonicalTreePath(treePath), entry.path)
 }
 
-export function fileTreeFileOpenIntent(rootPath: string, entry: TreeEntry): FileOpenIntent | null {
+export function fileTreeFileOpenIntent(
+  rootPath: string,
+  entry: TreeEntry,
+  trigger: FileOpenIntentTrigger,
+): FileOpenIntent | null {
   if (!canPrefetchFileEntry(entry)) return null
 
   return {
@@ -24,5 +28,6 @@ export function fileTreeFileOpenIntent(rootPath: string, entry: TreeEntry): File
     path: entry.path,
     rootPath: filesystemPath(rootPath),
     source: 'file-tree',
+    trigger,
   }
 }

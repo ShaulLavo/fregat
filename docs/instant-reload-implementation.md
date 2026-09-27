@@ -28,8 +28,8 @@ there are no migrations.
   their existing owner. Write admission bypasses both client freshness and the server status TTL,
   rechecks the repository and intended affected paths, and rejects changes requiring another review.
 - **Diff:** historical data binds to exact object identities. Scroll, selections, expanded regions
-  and split ratios restore. Huge diffs use bounded native viewport paint without loading both files
-  synchronously. External diff syntax readiness participates in native takeover.
+  and split ratios restore. A diff keeps no paint snapshot: prefetch on intent covers presses
+  ([Plan 177](../plans/177-prefetch-every-press.md)).
 - **Search:** completed results preserve full query/options identity, coverage and truncation.
   Compact/full views have separate row anchors. Cached generation zero cannot authorize replacement.
 - **Chat:** the visible session and message window take priority. Plans and checkpoints around that
@@ -89,7 +89,6 @@ Small appearance-mirror reads precede this phase and are not included.
 | Settings, including JSON paint       |                                 512 KiB |
 | Git status and small exact diff data |                                 512 KiB |
 | Git list selection and scroll        |      16 KiB, separate from status/diffs |
-| Native diff paint, all visible panes |                                 320 KiB |
 | Completed search results             |                                 768 KiB |
 | Compact/full search view state       |                                  16 KiB |
 | Chat projection                      |                                   1 MiB |

@@ -50,13 +50,14 @@ export function AssistantMarkdown({
   text: string
 }) {
   const highlighter = useCodeHighlighter()
-  const { openFileReference, rootPath, workspacePath } = useOpenFileReference()
+  const { openFileReference, prepareFileReference, rootPath, workspacePath } =
+    useOpenFileReference()
   const owner = originForQueryClient(useQueryClient())
   const environment = useEnvironmentsStore((state) => state.entries[owner])
   const origin = serverEndpoint(environment?.origin ?? owner)
   const renderedText = normalizeAgentMarkdown(text)
   const mermaid = useMermaid(renderedText, streaming)
-  const fileLinkActions = { openFileReference, rootPath }
+  const fileLinkActions = { openFileReference, prepareFileReference, rootPath }
   // The plugin list is the parser's identity: a new list is a new parser and
   // an empty incremental cache, so it changes only with the workspace.
   const remarkPlugins: MarkdownProps['remarkPlugins'] = [

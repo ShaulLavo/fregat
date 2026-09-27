@@ -24,7 +24,7 @@ export function AssistantMarkdownFileLink({
 }) {
   const link = use(MarkdownFileLinkContext)
   requireContext(link, 'AssistantMarkdownFileLink must be used within MarkdownFileLinkContext')
-  const { openFileReference } = link
+  const { openFileReference, prepareFileReference } = link
 
   function handleClick(event: MouseEvent<HTMLAnchorElement>) {
     event.preventDefault()
@@ -43,6 +43,7 @@ export function AssistantMarkdownFileLink({
       href={reference.path}
       title={referenceTitle(reference)}
       onClick={handleClick}
+      onPointerEnter={() => prepareFileReference(reference)}
     >
       <FileCodeIcon aria-hidden='true' className='size-(--icon-size-sm) shrink-0 self-center' />
       <span className='truncate'>{label}</span>

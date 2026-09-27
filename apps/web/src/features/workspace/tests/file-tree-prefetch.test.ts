@@ -30,11 +30,12 @@ describe('file tree prefetch helpers', () => {
   })
 
   it('creates the structured file-tree intent passed to the shared service', () => {
-    expect(fileTreeFileOpenIntent('/repo', file('/repo/src/app.ts', 128))).toEqual({
+    expect(fileTreeFileOpenIntent('/repo', file('/repo/src/app.ts', 128), 'focus')).toEqual({
       knownSize: 128,
       path: '/repo/src/app.ts',
       rootPath: '/repo',
       source: 'file-tree',
+      trigger: 'focus',
     })
   })
 })

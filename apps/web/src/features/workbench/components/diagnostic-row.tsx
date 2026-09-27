@@ -13,6 +13,7 @@ export function DiagnosticRow({
   row,
   rowProps,
   onFix,
+  onHover,
   onOpen,
 }: {
   /** Absent where there is no chat to open. */
@@ -20,6 +21,7 @@ export function DiagnosticRow({
   readonly row: DiagnosticItemRow
   readonly rowProps: ReturnType<ReturnType<typeof useListbox>['rowProps']>
   readonly onFix: () => void
+  readonly onHover: () => void
   readonly onOpen: () => void
 }) {
   const line = row.target.range.start.line + 1
@@ -37,6 +39,7 @@ export function DiagnosticRow({
           rowProps.onClick(event)
           onOpen()
         }}
+        onPointerEnter={onHover}
       >
         <span className='text-muted-foreground'>
           {diagnosticSeverityLabel(row.diagnostic.severity)}

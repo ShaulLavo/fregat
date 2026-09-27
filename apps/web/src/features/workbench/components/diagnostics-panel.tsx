@@ -24,6 +24,9 @@ import {
 } from '@/features/workbench/utils/diagnostic-rows'
 import { useDiagnosticFix } from '@/lib/diagnostic-ai/hooks/use-diagnostic-fix'
 import { toggledSet } from '@/lib/toggled-set'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import { useActiveRowFileIntent } from '@/lib/file-open-intent/hooks/use-active-row-file-intent'
+import { useFileIntent } from '@/lib/file-open-intent/hooks/use-file-intent'
 import {
   diagnosticsEmptyState,
   type DiagnosticsEmptyState,
@@ -87,6 +90,13 @@ export function DiagnosticsPanel() {
     return true
   }
 
+  const activeRow = rows.find((row) => row.id === activeId)
+  const prepareFile = useFileIntent('problems')
+  useActiveRowFileIntent(
+    activeRow?.kind === 'diagnostic' ? filesystemPath(activeRow.target.path) : null,
+    'problems',
+  )
+
   const list = useListbox({
     role: 'tree',
     items: rows,
@@ -143,6 +153,7 @@ export function DiagnosticsPanel() {
               rowProps={list.rowProps(row.id)}
               onFix={() => fix.mutation.mutate(diagnosticFixRequest(row))}
               onOpen={() => openDiagnostic(row.target)}
+              onHover={() => prepareFile(filesystemPath(row.target.path), 'hover')}
             />
           ),
         )}

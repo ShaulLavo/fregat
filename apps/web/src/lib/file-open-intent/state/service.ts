@@ -34,6 +34,7 @@ const MAX_PREPARED_OPENS = 8
 const MAX_PREPARED_BYTES = 32 * 1024 * 1024
 const PREPARED_OPEN_TTL_MS = 30_000
 const MAX_PREPARED_FILE_BYTES = 1024 * 1024
+const QUEUED_INTENT_LIMIT = 4
 const PROMOTION_PAINT_TIMEOUT_MS = 10_000
 
 export type FileOpenIntentLiveDocument = {
@@ -49,12 +50,27 @@ export type FileOpenIntentStructuralRange = {
   readonly startIndex: number
 }
 
+export type FileOpenIntentSource =
+  | 'file-tree'
+  | 'tab'
+  | 'definition'
+  | 'quick-open'
+  | 'search'
+  | 'problems'
+  | 'references'
+  | 'chat-link'
+
+/** What raised the guess: a pointer path or hover, keyboard focus, a list's active row, a tab switch. */
+export type FileOpenIntentTrigger = 'trajectory' | 'hover' | 'focus' | 'active-row' | 'adjacent-tab'
+
 export type FileOpenIntent = {
   readonly knownSize?: number
   readonly path: FilesystemPath
-  readonly rootPath: FilesystemPath
-  readonly source: 'file-tree' | 'tab' | 'definition'
+  /** The root the guess was made in; omitted, the editor's current root. */
+  readonly rootPath?: FilesystemPath
+  readonly source: FileOpenIntentSource
   readonly tabId?: TabId
+  readonly trigger?: FileOpenIntentTrigger
 }
 
 type FileOpenIntentEnvironmentIdentity = {
@@ -647,7 +663,8 @@ class FileOpenIntentServiceState {
   }
 
   prepare(intent: FileOpenIntent): void {
-    const canonicalRoot = canonicalPath(intent.rootPath)
+    const canonicalRoot = intent.rootPath ? canonicalPath(intent.rootPath) : this.rootPath
+    if (!canonicalRoot) return
     const canonical = canonicalPath(intent.path)
     if (this.benchmarkScope?.quarantined) return
     if (!this.isEnabled()) return
@@ -665,16 +682,14 @@ class FileOpenIntentServiceState {
       this.noteDuplicateIntent(existingOperation, intent)
       this.noteBenchmarkIntent(canonical)
     }
+    // A cursor or tab switch raises these on its own; a line per move says nothing.
+    const quiet = existingOperation !== undefined || isAutomaticTrigger(intent.trigger)
     if (this.isActive(canonical)) {
-      if (!existingOperation) {
-        this.finishImmediateIntent(intent, canonicalRoot, canonical, 'already-active')
-      }
+      if (!quiet) this.finishImmediateIntent(intent, canonicalRoot, canonical, 'already-active')
       return
     }
     if (this.isMounted(canonical)) {
-      if (!existingOperation) {
-        this.finishImmediateIntent(intent, canonicalRoot, canonical, 'already-mounted')
-      }
+      if (!quiet) this.finishImmediateIntent(intent, canonicalRoot, canonical, 'already-mounted')
       return
     }
 
@@ -693,8 +708,18 @@ class FileOpenIntentServiceState {
       this.createIntentOperation(intent, canonicalRoot, canonical),
     )
     this.noteBenchmarkIntent(canonical)
+    this.dropOverflowingQueue()
     this.warmSnapshot(canonical)
     this.runNext()
+  }
+
+  // A held arrow key raises a guess per row; only the newest keep their place in the queue.
+  private dropOverflowingQueue(): void {
+    while (this.queuedPaths.length > QUEUED_INTENT_LIMIT) {
+      const dropped = this.queuedPaths.shift()!
+      this.queuedPathSet.delete(dropped)
+      this.finishIntent(dropped, 'skipped-budget')
+    }
   }
 
   /**
@@ -1558,6 +1583,7 @@ class FileOpenIntentServiceState {
         rootPath,
         intentSource: intent.source,
         intentSources: [intent.source],
+        trigger: intent.trigger ?? null,
       }),
       hasTab,
       knownSize: intent.knownSize ?? null,
@@ -2049,6 +2075,10 @@ function canonicalPath(path: FilesystemPath): FilesystemPath {
     segments.push(segment)
   }
   return filesystemPath(`${absolute ? '/' : ''}${segments.join('/')}` || (absolute ? '/' : '.'))
+}
+
+function isAutomaticTrigger(trigger: FileOpenIntentTrigger | undefined): boolean {
+  return trigger === 'active-row' || trigger === 'adjacent-tab' || trigger === 'focus'
 }
 
 const defaultFileOpenIntentRuntime: FileOpenIntentRuntime = {

@@ -88,6 +88,7 @@ export function DiffEditor({
           side='stacked'
           syntaxBackend={syntax.backend}
           syntaxHighlight={syntax.enabled}
+          syntaxSource={syntax.source}
           tabId={tabId}
           theme={editorTheme}
         />
@@ -115,6 +116,7 @@ export function DiffEditor({
             side='old'
             syntaxBackend={syntax.backend}
             syntaxHighlight={syntax.enabled}
+            syntaxSource={syntax.source}
             tabId={tabId}
             theme={editorTheme}
             onFocus={panes.handleFocus}
@@ -132,6 +134,7 @@ export function DiffEditor({
             side='new'
             syntaxBackend={syntax.backend}
             syntaxHighlight={syntax.enabled}
+            syntaxSource={syntax.source}
             tabId={tabId}
             theme={editorTheme}
             onFocus={panes.handleFocus}

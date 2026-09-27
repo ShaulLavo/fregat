@@ -4,6 +4,7 @@ import { CommandItem, CommandShortcut } from '@workspace/ui/components/command'
 import { iconForEntry } from '@/lib/file-icons'
 
 import type { EditorPaletteItem } from '@/features/command-palette/utils/types'
+import { editorItemValue } from '@/features/command-palette/utils/query'
 import { useActions } from '@/features/command-palette/hooks/use-actions'
 import { RowLabel } from '@/features/command-palette/components/row-label'
 import { tabTitle } from '@/lib/documents/utils/labels'
@@ -20,7 +21,7 @@ export function EditorPaletteRow({ item }: EditorPaletteRowProps) {
     <CommandItem
       keywords={[item.name, item.pathLabel]}
       title={tabTitle(item.content)}
-      value={`editor:${item.key}`}
+      value={editorItemValue(item)}
       onSelect={() => selectContent(item.content)}
     >
       <FileTypeIcon className='size-(--icon-size)' icon={icon} />

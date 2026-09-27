@@ -11,6 +11,8 @@ import {
 } from 'react'
 import { isContextMenuKey } from '@workspace/utils/keyboard'
 import { useListContextMenu } from '@/keymap/menus/hooks/use-list-context-menu'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import { useActiveRowFileIntent } from '@/lib/file-open-intent/hooks/use-active-row-file-intent'
 import { SearchFileMenu } from '@/features/search/components/file-menu'
 import { SearchFileMenuContext } from '@/features/search/providers/file-menu-context'
 
@@ -94,6 +96,7 @@ export const SearchResultEditorSurface = memo(
       () => searchResultVirtualRowScrollTarget(activeRow, activeResultId),
       [activeResultId, activeRow],
     )
+    useActiveRowFileIntent(activeRow ? filesystemPath(activeRow.file.path) : null, 'search')
     const suppressNextActiveRevealRef = useRef(false)
     const previousActiveResultIdRef = useRef(activeResultId)
     const activeIndexRef = useRef(activeIndex)

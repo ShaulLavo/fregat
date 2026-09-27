@@ -1,4 +1,4 @@
-import type { QueryClient, QueryFilters } from '@tanstack/react-query'
+import type { MutationFilters, QueryClient, QueryFilters } from '@tanstack/react-query'
 
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 
@@ -30,4 +30,9 @@ export function hasPrefetchRoom(
 ) {
   if (!enabled) return false
   return queryClient.isFetching(filters) < SPECULATIVE_PREFETCH_LIMIT
+}
+
+/** The same four-at-once room for guessed local work, such as parsing a prefetched diff. */
+export function hasPrefetchMutationRoom(queryClient: QueryClient, filters: MutationFilters) {
+  return queryClient.isMutating(filters) < SPECULATIVE_PREFETCH_LIMIT
 }

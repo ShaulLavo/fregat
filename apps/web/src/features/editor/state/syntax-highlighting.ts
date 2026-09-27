@@ -14,6 +14,7 @@ import {
 import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '@singapore-editor/tree-sitter-languages'
 
 import { workspacePreloadLanguages } from '@/features/editor/state/language-census'
+import { clearPreparedDiffSyntax } from '@/features/editor/state/prepared-diff-syntax'
 import {
   activeEditorThemeUsesShiki,
   activeShikiThemeId,
@@ -104,6 +105,7 @@ function editorShikiWorkerOwner(): ShikiWorkerOwner {
 }
 
 export async function disposeEditorShikiWorkerOwner() {
+  clearPreparedDiffSyntax('shiki')
   const owner = shikiWorkerOwner
   shikiHighlighterProvider = null
   shikiWorkerOwner = null
@@ -125,6 +127,7 @@ export function editorTreeSitterSyntaxProvider(): TreeSitterSyntaxProvider {
 }
 
 export async function disposeEditorTreeSitterSyntaxProvider() {
+  clearPreparedDiffSyntax('tree-sitter')
   const backend = treeSitterSyntaxBackend
   treeSitterSyntaxBackend = null
   treeSitterSyntaxProvider = null
