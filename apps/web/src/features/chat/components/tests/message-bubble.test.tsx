@@ -97,12 +97,12 @@ test('message metadata stays available to keyboard focus and touch while hiding 
 
   expect(actions).not.toBeNull()
   expect(actions?.querySelector('button')?.textContent).toBe('Copy Done.')
-  expect(metadata).toHaveClass('[@media(hover:hover)]:pointer-events-none')
-  expect(metadata).toHaveClass('[@media(hover:hover)]:opacity-0')
+  expect(metadata).toHaveClass('opacity-0')
+  expect(metadata).toHaveClass('touch:pointer-events-auto')
+  expect(metadata).toHaveClass('touch:opacity-100')
   expect(metadata).toHaveClass('group-focus-within/message:opacity-100')
   expect(metadata).toHaveClass('group-focus-within/message:pointer-events-auto')
   expect(metadata).toHaveClass('group-hover/message:pointer-events-auto')
-  expect(metadata).not.toHaveClass('opacity-0')
 
   await userEvent.tab()
 
@@ -113,10 +113,10 @@ test('user timestamps use the same hover and focus disclosure as assistant metad
   const { container } = renderBubble(chatMessage({ role: 'user', text: 'ship it' }))
   const metadata = container.querySelector<HTMLElement>('[data-user-message-meta]')
 
-  expect(metadata).toHaveClass('[@media(hover:hover)]:opacity-0')
+  expect(metadata).toHaveClass('opacity-0')
+  expect(metadata).toHaveClass('touch:opacity-100')
   expect(metadata).toHaveClass('group-focus-within/message:opacity-100')
   expect(metadata).toHaveClass('group-hover/message:opacity-100')
-  expect(metadata).not.toHaveClass('opacity-0')
 })
 
 test('a sent image renders as a thumbnail and opens in a lightbox', async () => {

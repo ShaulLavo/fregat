@@ -13,8 +13,17 @@ const NativeWebSocket = WebSocket as typeof WebSocket & {
   new (url: URL, options: Bun.WebSocketOptions): Bun.WebSocket
 }
 
-export function createMachineProxySocket(target: URL, headers: Headers, machineName: string) {
+/** Registers the relay's close with the device gate; returns the release for its own close. */
+type HoldDevice = (close: () => void) => () => void
+
+export function createMachineProxySocket(
+  target: URL,
+  headers: Headers,
+  machineName: string,
+  hold: HoldDevice,
+) {
   let upstream: Bun.WebSocket | null = null
+  let release = () => {}
   let pending: RelayFrame[] = []
   let pendingBytes = 0
   let closed = false
@@ -22,6 +31,7 @@ export function createMachineProxySocket(target: URL, headers: Headers, machineN
   function stop(client: RelayClient, code = 1000, reason = '') {
     if (closed) return
     closed = true
+    release()
     pending = []
     pendingBytes = 0
     client.close(code, reason)
@@ -29,6 +39,7 @@ export function createMachineProxySocket(target: URL, headers: Headers, machineN
   }
 
   function open(client: RelayClient) {
+    release = hold(() => stop(client, 1008, 'device removed'))
     const remote = new NativeWebSocket(target, { headers: Object.fromEntries(headers) })
     upstream = remote
     remote.binaryType = 'arraybuffer'

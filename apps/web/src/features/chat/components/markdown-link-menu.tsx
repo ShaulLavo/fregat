@@ -21,6 +21,7 @@ export function MarkdownLinkMenu({
   readonly onOpenChange: (open: boolean) => void
 }) {
   const menu = chatLinkMenu({
+    href,
     copyLink: () => void copyTextToClipboard(href, 'link'),
     openLink: () => void window.open(href, '_blank', 'noopener,noreferrer'),
   })

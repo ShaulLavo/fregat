@@ -221,9 +221,10 @@ stays safe to read, share and export.
 
 ## Machines
 
-| Setting                 | Default | Scope   | What it does                                                                                    |
-| ----------------------- | ------- | ------- | ----------------------------------------------------------------------------------------------- |
-| `environments.machines` | `{}`    | machine | SSH targets and direct origins available to this client. The local machine is always available. |
+| Setting                      | Default | Scope   | What it does                                                                                                                                                                                   |
+| ---------------------------- | ------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `environments.machines`      | `{}`    | machine | SSH targets and direct origins available to this client. The local machine is always available.                                                                                                |
+| `environments.devicePairing` | `true`  | machine | A browser on another device, such as a phone reaching this machine over the mesh, shows a pairing screen until a link from this machine pairs it. This machine’s own browser needs no pairing. |
 
 ## Models
 

@@ -1,6 +1,7 @@
 import { CaretRightIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
+import { TurnStatusFrame } from '@/features/chat/components/turn-status-frame'
 import { turnStatusLabel } from '@/features/chat/utils/turn-status-label'
 
 export function MessageCompletionDivider({
@@ -22,7 +23,7 @@ export function MessageCompletionDivider({
   })
 
   return (
-    <div className='text-muted-foreground pt-1 pb-2 text-xs tabular-nums'>
+    <TurnStatusFrame>
       {onToggle ? (
         <Button
           aria-expanded={expanded}
@@ -41,10 +42,10 @@ export function MessageCompletionDivider({
           <span className='truncate'>{label}</span>
         </Button>
       ) : (
-        <p className='px-1 py-1' role='status'>
+        <p className='px-1' role='status'>
           {label}
         </p>
       )}
-    </div>
+    </TurnStatusFrame>
   )
 }

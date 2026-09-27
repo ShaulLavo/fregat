@@ -104,10 +104,15 @@ function isDocumentNavigation(request: Request) {
   return request.headers.get('accept')?.includes('text/html') ?? false
 }
 
-// The frontend owns `/`, local workspaces under `/~` and remote ones under `/@`;
-// the dev gallery owns `/dev`, when the release carries it.
+// The frontend owns `/`, local workspaces under `/~`, remote ones under `/@` and the pairing link
+// `/pair` (its code rides in the fragment); the dev gallery owns `/dev`, when the release carries it.
 function documentFor(root: string, pathname: string) {
-  if (pathname === '/' || pathname.startsWith('/~') || pathname.startsWith('/@'))
+  if (
+    pathname === '/' ||
+    pathname === '/pair' ||
+    pathname.startsWith('/~') ||
+    pathname.startsWith('/@')
+  )
     return path.join(root, 'index.html')
   if (pathname === '/licenses/') return releaseFile(root, '/licenses/index.html')
   if (pathname === '/dev' || pathname.startsWith('/dev/')) return releaseFile(root, '/dev.html')

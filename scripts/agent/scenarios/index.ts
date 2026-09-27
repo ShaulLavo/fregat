@@ -1,6 +1,7 @@
 import { sessionNoFlicker } from './session-no-flicker'
 import { restNoFlicker } from './rest-no-flicker'
 import { deferredDialogs } from './deferred-dialogs'
+import { dialogEscape } from './dialog-escape'
 import { rootSwitchNoFlicker } from './root-switch-no-flicker'
 import { turnFilesNoFlicker } from './turn-files-no-flicker'
 import { branchActionsNoFlicker } from './branch-actions-no-flicker'
@@ -120,6 +121,8 @@ import { chatCardNarrow } from './chat-card-narrow'
 import { chatComposerInsert } from './chat-composer-insert'
 import { chatDisclosureSettle } from './chat-disclosure-settle'
 import { chatTurnAnatomy } from './chat-turn-anatomy'
+import { chatTurnSettle } from './chat-turn-settle'
+import { devicePairing } from './device-pairing'
 import { phoneShell } from './phone-shell'
 import { shellSwitch } from './shell-switch'
 import { chatSleepingSession } from './chat-sleeping-session'
@@ -285,6 +288,8 @@ export type Scenario = {
   readonly inspect?: (page: Page) => Promise<unknown>
   /** Fixture scenarios must reject shared servers before opening the first page. */
   readonly requiresIsolatedServer?: boolean
+  /** Spends turns on a real Codex or Claude account, so it runs only with `--real-providers`. */
+  readonly realProviders?: true
   /**
    * Runs before the throwaway server starts. A directory it returns goes first on the server's
    * PATH, which is how a scenario stands in for an outside CLI such as `gh`.
@@ -338,6 +343,7 @@ import { editorProduct } from './editor-product'
 import { editorTerminalSurface } from './editor-terminal-surface'
 import { treeFileClicks } from './tree-file-clicks'
 import { treeStickyScroll } from './tree-sticky-scroll'
+import { treeLargeScroll } from './tree-large-scroll'
 import { treeParity } from './tree-parity'
 import { fileIconHues } from './file-icon-hues'
 import { treeParityBehaviour } from './tree-parity-behaviour'
@@ -584,6 +590,7 @@ export const scenarios: readonly Scenario[] = [
   textFieldFkeys,
   settingsModuleFailure,
   deferredDialogs,
+  dialogEscape,
   projectMenu,
   workspaceSwitch,
   serverRestart,
@@ -619,6 +626,8 @@ export const scenarios: readonly Scenario[] = [
   chatComposerInsert,
   chatDisclosureSettle,
   chatTurnAnatomy,
+  chatTurnSettle,
+  devicePairing,
   phoneShell,
   shellSwitch,
   chatSleepingSession,
@@ -663,6 +672,7 @@ export const scenarios: readonly Scenario[] = [
   editorProduct,
   editorTerminalSurface,
   treeStickyScroll,
+  treeLargeScroll,
   treeParity,
   fileIconHues,
   treeParityBehaviour,

@@ -1,9 +1,11 @@
 import { ok } from 'node:assert/strict'
 import * as v from 'valibot'
 import { providerListResultSchema } from '../../../packages/contracts/src/index'
+import type { Page } from 'playwright'
 import type { Scenario } from './index'
 import { settleAnimations } from '../selectors'
 import { openChat, openModelPickerInNewSession } from './chat-verification'
+import { installMockProvider } from './mock-provider-session'
 import {
   restoreUserSettings,
   settingsSnapshot,
@@ -19,16 +21,15 @@ const MISSING_MODEL = 'retired-model-for-favorites'
 export const chatModelFavorites: Scenario = {
   name: 'chat-model-favorites',
   description:
-    'Star an offered model and one the provider no longer lists, then open the model picker: both show under Favorites, the missing one as No longer offered. Restores models.favorites.',
+    'Star a mock provider’s offered model and one it no longer lists, then open the model picker: both show under Favorites, the missing one as No longer offered. Restores models.favorites.',
   async run(page, { step }) {
     const base = (await openChat(page)).replace(/\/orchestration$/, '')
-    const providers = await page.request.get(`${base}/providers`, {
-      headers: { Origin: new URL(page.url()).origin },
+    const mock = await installMockProvider(page, base, {
+      name: 'chat-model-favorites',
+      displayLabel: 'Favorites mock',
+      config: {},
     })
-    const provider = v
-      .parse(providerListResultSchema, await providers.json())
-      .providers.find((entry) => entry.models.length > 0)
-    ok(provider, 'A provider offers at least one model')
+    const provider = await offeringProvider(page, base, mock.providerInstanceId)
     const offered = {
       providerInstanceId: provider.providerInstanceId,
       model: provider.models[0].slug,
@@ -49,6 +50,22 @@ export const chatModelFavorites: Scenario = {
       await page.keyboard.press('Escape')
     } finally {
       await restoreUserSettings(page, base, before, ['models.favorites'])
+      await mock.restore()
     }
   },
+}
+
+/** The mock instance once its snapshot lists a model; a new instance probes after it is written. */
+async function offeringProvider(page: Page, base: string, providerInstanceId: string) {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const providers = await page.request.get(`${base}/providers`, {
+      headers: { Origin: new URL(page.url()).origin },
+    })
+    const provider = v
+      .parse(providerListResultSchema, await providers.json())
+      .providers.find((entry) => entry.providerInstanceId === providerInstanceId)
+    if (provider && provider.models.length > 0) return provider
+    await page.waitForTimeout(100)
+  }
+  ok(false, 'The mock provider offers a model')
 }

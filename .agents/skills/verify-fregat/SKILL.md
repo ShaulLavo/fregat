@@ -11,7 +11,11 @@ The app is a Vite web client (`apps/web`) over a Bun server (`apps/server`). One
 
 Use the existing Vite dev server on `http://localhost:5173/`. Against it, every run starts its own throwaway API server from the current source, with a temp state home and log directory under `/work/tmp/fregat-agent-*`, and removes it when the run ends; the summary names its port and directory, and its full log is copied into the evidence. So a run never touches the owner's sessions or settings, and never sees a stale server. `--shared-dev` drives the running dev API on `http://localhost:3001/` instead (state in `/work/platform-dev/home`). This project, including the mesh deployment called production, is under development. Restart the existing service when needed to complete an authorized fix. Persisted sessions survive restarts; active processes and connections may be interrupted.
 
+The throwaway server never starts the machine's Codex or Claude CLI: those drivers run only a fixture binary under `/work/tmp`, so status probes, discovery and turns on real accounts are refused, and a chat scenario installs a mock (`installMockProvider`, `createMockProviderSession`) or a native fixture (`isolatedNativeScenario`). A scenario that needs a real account declares `realProviders: true`, and `agent:browser` refuses it, and any writing scenario under `--shared-dev` or a foreign `--url`, unless the owner passes `--real-providers`. Never pass that flag yourself.
+
 When web changes depend on a server protocol change, deploy both with `bun run deploy --server`. A web-only deployment reuses the old server. Verify `/release` and exercise the changed protocol in the browser before calling the deployment done.
+
+Never hand-start a Vite or API dev server on `:5173`/`:3001`; if a task needs one outside `agent:browser`'s own throwaway server, give it an explicit free `--port` — a bare host default can resolve to `::1` and shadow the shared route instead of colliding with it.
 
 `--engine firefox` or `--engine webkit` runs `look`, `scenario`, `renders` or `caches` in another engine; `trace` needs Chromium. The desktop app is CEF, so other engines matter for the mesh (every iPhone browser is WebKit). Playwright's WebKit does not start on this Arch host (missing libicu74, libxml2, libflite).
 
