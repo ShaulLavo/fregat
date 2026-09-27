@@ -197,6 +197,31 @@ const registerLanguage = (descriptor: TreeSitterLanguageDescriptor): void => {
   disposeCachedSnapshotsForLanguage(normalized.id)
 }
 
+/**
+ * Compiles grammars and queries ahead of their first document, one language per macrotask so a
+ * parse that arrives meanwhile waits for at most one compile.
+ */
+const warmLanguages = async (languageIds: readonly TreeSitterLanguageId[]): Promise<undefined> => {
+  for (const languageId of languageIds) {
+    if (runtimePromises.has(languageId) || !languageDescriptors.has(languageId)) continue
+    await yieldToMessages()
+    await warmLanguage(languageId).catch(() => undefined)
+  }
+  return undefined
+}
+
+// A failure stays in `runtimePromises`, so the language's first document reports it.
+const warmLanguage = async (languageId: TreeSitterLanguageId): Promise<void> => {
+  const runtime = await ensureRuntime(languageId)
+  ensureQuery(runtime, 'highlight')
+  ensureQuery(runtime, 'fold')
+  ensureQuery(runtime, 'injection')
+}
+
+// @justification Yields one macrotask between warm-up compiles so a parse or edit message queued
+// meanwhile runs before the next language; worker-task tracking keeps idle fences behind warm-up.
+const yieldToMessages = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
+
 const ensureRuntime = async (languageId: TreeSitterLanguageId): Promise<Runtime> => {
   const existing = runtimePromises.get(languageId)
   if (existing) return existing
@@ -2628,6 +2653,8 @@ const handleRequest = async (request: TreeSitterWorkerRequest): Promise<TreeSitt
     registerLanguages(payload.languages)
     return undefined
   }
+
+  if (payload.type === 'warmLanguages') return warmLanguages(payload.languageIds)
 
   if (payload.type === 'parse') return parseDocument(payload, resolveRequestSource(payload))
   if (payload.type === 'edit') return editDocument(payload, resolveRequestSource(payload))

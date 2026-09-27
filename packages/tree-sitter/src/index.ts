@@ -65,11 +65,13 @@ import type {
 import type {
   TreeSitterLanguageAssets,
   TreeSitterLanguageContribution,
+  TreeSitterLanguageDescriptor,
   TreeSitterLanguageDisposable,
+  TreeSitterLanguageId,
   TreeSitterLanguageRegistrationOptions,
   TreeSitterLanguageResolver,
 } from './treeSitter/registry'
-import { TreeSitterLanguageRegistry } from './treeSitter/registry'
+import { TreeSitterLanguageRegistry, resolveTreeSitterLanguageClosure } from './treeSitter/registry'
 import { TreeSitterSyntaxSession } from './session'
 import { treeSitterSelectionRanges } from './structuralSelection'
 import { createTreeSitterWorkerBackend, type TreeSitterBackend } from './treeSitter/workerClient'
@@ -84,6 +86,12 @@ export type TreeSitterSyntaxProvider = EditorSyntaxProvider &
       contribution: TreeSitterLanguageContribution,
       options?: TreeSitterLanguageRegistrationOptions,
     ): TreeSitterLanguageDisposable
+    /**
+     * Starts the worker and compiles each language with its injection closure, so the first
+     * document of a warmed language pays none of it. Never rejects: unknown ids and load or
+     * worker failures are skipped, and the language's first document reports them.
+     */
+    warmLanguages(languageIds: readonly TreeSitterLanguageId[]): Promise<void>
   }
 
 export type TreeSitterLanguagePluginOptions = TreeSitterLanguageRegistrationOptions & {
@@ -133,7 +141,29 @@ export const createTreeSitterSyntaxProvider = (
     registerLanguage: (contribution, registrationOptions) =>
       registry.registerLanguage(contribution, registrationOptions),
     resolveTreeSitterLanguage: (languageId) => registry.resolveTreeSitterLanguage(languageId),
+    warmLanguages: (languageIds) => warmTreeSitterLanguages(registry, backend, languageIds),
   }
+}
+
+const warmTreeSitterLanguages = async (
+  resolver: TreeSitterLanguageResolver,
+  backend: TreeSitterBackend,
+  languageIds: readonly TreeSitterLanguageId[],
+): Promise<void> => {
+  if (!backend.warmLanguages) return
+
+  const closures = await Promise.allSettled(
+    languageIds.map((languageId) => resolveTreeSitterLanguageClosure(resolver, languageId)),
+  )
+  const descriptors = new Map<TreeSitterLanguageId, TreeSitterLanguageDescriptor>()
+  for (const closure of closures) {
+    if (closure.status === 'rejected') continue
+    for (const descriptor of closure.value) {
+      if (!descriptors.has(descriptor.id)) descriptors.set(descriptor.id, descriptor)
+    }
+  }
+  // Best effort: a worker that cannot start fails the first document too, which reports it.
+  await backend.warmLanguages([...descriptors.values()]).catch(() => undefined)
 }
 
 export const createTreeSitterLanguagePlugin = (

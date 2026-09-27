@@ -4,6 +4,7 @@ import {
   createPieceTableSnapshot,
   createDocumentTextSnapshot,
 } from '@singapore-editor/core/document'
+import { createTreeSitterSyntaxProvider } from '../src/index.ts'
 import { TreeSitterSyntaxSession } from '../src/session.ts'
 import type { TreeSitterLanguageDescriptor } from '../src/treeSitter/registry.ts'
 import type { TreeSitterBackend } from '../src/treeSitter/workerClient.ts'
@@ -184,4 +185,56 @@ it('shares a delayed language load with the newer document version', async () =>
   expect(session.getResult().projection.snapshot.version).toBe(2)
   expect(registered).toEqual([['markdown', 'markdown_inline', 'html'], ['astro']])
   session.dispose()
+})
+
+describe('provider warm-up', () => {
+  it('warms each language with its injection closure, once per id', async () => {
+    const warmed: string[][] = []
+    const provider = createTreeSitterSyntaxProvider({
+      backend: {
+        ...recordingBackend([]),
+        warmLanguages: async (languages) => {
+          warmed.push(languages.map((language) => language.id))
+        },
+      },
+    })
+    for (const language of Object.values(DESCRIPTORS)) provider.registerLanguage(language)
+
+    await provider.warmLanguages(['markdown', 'html', 'unknown'])
+
+    expect(warmed).toEqual([['markdown', 'markdown_inline', 'html']])
+  })
+
+  it('skips a language whose grammar fails to load', async () => {
+    const warmed: string[][] = []
+    const provider = createTreeSitterSyntaxProvider({
+      backend: {
+        ...recordingBackend([]),
+        warmLanguages: async (languages) => {
+          warmed.push(languages.map((language) => language.id))
+        },
+      },
+    })
+    provider.registerLanguage(DESCRIPTORS.html!)
+    provider.registerLanguage({
+      id: 'broken',
+      load: () => Promise.reject(new Error('offline')),
+    })
+
+    await provider.warmLanguages(['broken', 'html'])
+
+    expect(warmed).toEqual([['html']])
+  })
+})
+
+it('warm-up never rejects when the worker cannot start', async () => {
+  const provider = createTreeSitterSyntaxProvider({
+    backend: {
+      ...recordingBackend([]),
+      warmLanguages: () => Promise.reject(new Error('worker failed')),
+    },
+  })
+  provider.registerLanguage(DESCRIPTORS.html!)
+
+  await expect(provider.warmLanguages(['html'])).resolves.toBeUndefined()
 })

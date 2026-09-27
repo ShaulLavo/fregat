@@ -28,9 +28,11 @@ import type {
   TreeSitterParseResult,
   TreeSitterRangeResult,
 } from './treeSitter/types'
-import type {
-  TreeSitterLanguageDescriptor,
-  TreeSitterLanguageResolver,
+import {
+  resolveTreeSitterLanguageClosure,
+  withInjectedLanguages,
+  type TreeSitterLanguageDescriptor,
+  type TreeSitterLanguageResolver,
 } from './treeSitter/registry'
 import {
   createTreeSitterWorkerBackend,
@@ -312,7 +314,11 @@ export class TreeSitterSyntaxSession implements EditorSyntaxSession {
     }
     this.currentFoldingSupport = descriptor.foldQuerySource?.trim() ? 'supported' : 'unsupported'
 
-    const descriptors = await this.withInjectedLanguages(descriptor)
+    const descriptors = await withInjectedLanguages(
+      this.languageResolver,
+      descriptor,
+      () => this.disposed,
+    )
     if (this.disposed) return false
     await this.backend.registerLanguages(descriptors)
     return true
@@ -342,26 +348,8 @@ export class TreeSitterSyntaxSession implements EditorSyntaxSession {
   private async resolveLanguageDependencies(
     id: string,
   ): Promise<readonly TreeSitterLanguageDescriptor[]> {
-    const descriptor = await this.languageResolver?.resolveTreeSitterLanguage(id)
-    if (!descriptor || this.disposed) return []
-    return this.withInjectedLanguages(descriptor)
-  }
-
-  private async withInjectedLanguages(
-    descriptor: TreeSitterLanguageDescriptor,
-  ): Promise<readonly TreeSitterLanguageDescriptor[]> {
-    const descriptors = [descriptor]
-    const seen = new Set([descriptor.id])
-    for (let index = 0; index < descriptors.length; index += 1) {
-      const dependencies = descriptors[index]?.injectionDependencies ?? []
-      for (const id of dependencies) {
-        if (seen.has(id) || this.disposed) continue
-        seen.add(id)
-        const injected = await this.languageResolver?.resolveTreeSitterLanguage(id)
-        if (injected) descriptors.push(injected)
-      }
-    }
-    return descriptors
+    if (!this.languageResolver) return []
+    return resolveTreeSitterLanguageClosure(this.languageResolver, id, () => this.disposed)
   }
 
   private updateFromUnavailableLanguage(

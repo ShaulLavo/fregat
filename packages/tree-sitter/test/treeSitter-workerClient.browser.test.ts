@@ -34,6 +34,26 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
     await workerClient.dispose()
   })
 
+  it('compiles warmed languages and skips a grammar that fails to load', async () => {
+    const typescript = await resolveTreeSitterLanguageContribution(
+      TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((contribution) => contribution.id === 'typescript')!,
+    )
+    const broken = { ...typescript, id: 'broken', wasmUrl: 'data:application/wasm;base64,AA==' }
+
+    await workerClient.warmLanguages([typescript, broken])
+    await workerClient.awaitIdleFence()
+    const parsed = await workerClient.parse({
+      documentId: 'warm.ts',
+      runtimeSessionId: 'runtime-warm.ts',
+      snapshotVersion: 1,
+      languageId: 'typescript',
+      snapshot: createPieceTableSnapshot('const warmed = true;\n'),
+    })
+
+    expect(parsed?.captures.length).toBeGreaterThan(0)
+    expect(workerClient.inspect().lifecycle).toBe('ready')
+  })
+
   it('parses and edits through the real browser Worker', async () => {
     const documentId = 'file.ts'
     const snapshot = createPieceTableSnapshot('const answer = 1;\n')

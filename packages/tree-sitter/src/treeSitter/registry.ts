@@ -163,6 +163,36 @@ export const resolveTreeSitterLanguageContribution = async (
   return createTreeSitterLanguageDescriptor(contribution, assets)
 }
 
+/** A language's descriptor followed by every language its injection queries name, transitively. */
+export const resolveTreeSitterLanguageClosure = async (
+  resolver: TreeSitterLanguageResolver,
+  languageId: TreeSitterLanguageId,
+  isCancelled: () => boolean = () => false,
+): Promise<readonly TreeSitterLanguageDescriptor[]> => {
+  const descriptor = await resolver.resolveTreeSitterLanguage(languageId)
+  if (!descriptor || isCancelled()) return []
+  return withInjectedLanguages(resolver, descriptor, isCancelled)
+}
+
+export const withInjectedLanguages = async (
+  resolver: TreeSitterLanguageResolver | undefined,
+  descriptor: TreeSitterLanguageDescriptor,
+  isCancelled: () => boolean,
+): Promise<readonly TreeSitterLanguageDescriptor[]> => {
+  const descriptors = [descriptor]
+  const seen = new Set([descriptor.id])
+  for (let index = 0; index < descriptors.length; index += 1) {
+    const dependencies = descriptors[index]?.injectionDependencies ?? []
+    for (const id of dependencies) {
+      if (seen.has(id) || isCancelled()) continue
+      seen.add(id)
+      const injected = await resolver?.resolveTreeSitterLanguage(id)
+      if (injected) descriptors.push(injected)
+    }
+  }
+  return descriptors
+}
+
 export const resolveTreeSitterLanguageAlias = (
   alias: string | null | undefined,
   registry?: TreeSitterLanguageRegistry,
