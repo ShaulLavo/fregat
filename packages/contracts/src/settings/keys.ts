@@ -404,7 +404,7 @@ export const SETTINGS_REGISTRY = {
     category: 'Appearance',
     title: 'Theme',
     details:
-      'Picking a theme sets the app colors, code colors, wallpaper and surfaces at once. Changes you make afterwards are saved for that theme and come back when you pick it again. With no theme, the app uses Graphite colors, Dark+ and Light+ code colors and the desktop wallpaper.',
+      'Picking a theme sets the rows below at once: app colors, code colors, wallpaper and surfaces. Changes you make afterwards, in these rows or in the theme studio, are saved for that theme and come back when you pick it again. With no theme, each of those rows holds one value for both modes.',
     description:
       'App colors, code colors, wallpaper and surfaces, in a light and a dark version. Try them in the theme studio.',
     keywords: ['theme', 'studio', 'light', 'dark', 'wallpaper', 'colors', 'palette'],

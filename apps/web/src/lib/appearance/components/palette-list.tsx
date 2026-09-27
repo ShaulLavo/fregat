@@ -8,18 +8,25 @@ import { usePalette } from '@/lib/appearance/hooks/use-palette'
 import { paletteSwatches } from '@/lib/appearance/utils/swatches'
 
 /**
- * The palette library as a list with each palette's swatches in `mode`. Arrows choose as they
- * move. `anyMode` lists palettes that lack a `mode` half too.
+ * The palette library as a list with each palette's swatches in `mode`. `anyMode` lists palettes
+ * that lack a `mode` half too; `live` chooses as the cursor moves. `maxRows` sizes the list to
+ * its rows, up to that many.
  */
 export function PaletteList({
   anyMode = false,
   className,
+  labelledBy,
+  live = false,
+  maxRows,
   mode,
   value,
   onChange,
 }: {
   anyMode?: boolean
   className?: string
+  labelledBy?: string
+  live?: boolean
+  maxRows?: number
   mode: ColorMode
   value: string | null
   onChange: (id: PaletteId) => void
@@ -28,16 +35,22 @@ export function PaletteList({
   const options = anyMode ? catalog : catalog.filter((entry) => paletteSupportsMode(entry, mode))
   const { containerRef, virtualRef, list } = useChoiceList({
     items: options.map((entry) => ({ id: entry.id, label: entry.name })),
-    activeId: options.some((entry) => entry.id === value) ? value : null,
-    onActiveChange: (id) => onChange(id as PaletteId),
+    live,
+    value: options.some((entry) => entry.id === value) ? value : null,
+    onChoose: (id) => onChange(id as PaletteId),
   })
+  const rows = maxRows === undefined ? undefined : Math.min(options.length, maxRows)
 
   return (
     <VirtualList
       {...list.containerProps}
       activeIndex={list.activeIndex}
-      aria-label='Palettes'
+      aria-label={labelledBy ? undefined : 'Palettes'}
+      aria-labelledby={labelledBy}
       className={cn('focus-ring-inset outline-none', className)}
+      style={
+        rows === undefined ? undefined : { height: `calc(var(--density-row-height) * ${rows})` }
+      }
       getKey={(entry) => entry.id}
       handleRef={virtualRef}
       items={options}

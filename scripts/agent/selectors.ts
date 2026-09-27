@@ -1253,6 +1253,26 @@ export async function chooseColorMode(page: Page, value: 'light' | 'dark' | 'sys
   await selectors.paletteInput(page).waitFor({ state: 'hidden' })
 }
 
+/**
+ * Waits for the page's running, finite animations (tab indicators, fades, view transitions),
+ * capped at a second. Looping spinners and paused animations are left alone.
+ */
+export async function settleRunningAnimations(page: Page, capMs = 1_000) {
+  await Promise.race([
+    page.evaluate(async () => {
+      const finite = document
+        .getAnimations()
+        .filter(
+          (animation) =>
+            animation.playState === 'running' &&
+            Number.isFinite(animation.effect?.getComputedTiming().endTime),
+        )
+      await Promise.all(finite.map((animation) => animation.finished.catch(() => undefined)))
+    }),
+    new Promise((resolve) => setTimeout(resolve, capMs)),
+  ])
+}
+
 /** Two frames, then every running animation under the target. Collapsed panels animate open. */
 export async function settleAnimations(target: Locator) {
   await target.evaluate(async (element) => {

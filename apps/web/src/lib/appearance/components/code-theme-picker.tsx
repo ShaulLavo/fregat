@@ -16,11 +16,16 @@ import { useChoiceList } from '@/lib/appearance/hooks/use-choice-list'
  */
 export function CodeThemePicker({
   className,
+  labelledBy,
+  live = false,
   mode,
   value,
   onChange,
 }: {
   className?: string
+  labelledBy?: string
+  /** Choose as the cursor moves; otherwise Enter, Space or a click chooses. */
+  live?: boolean
   mode: ColorMode
   value: string
   onChange: (id: string) => void
@@ -32,8 +37,9 @@ export function CodeThemePicker({
   )
   const { containerRef, virtualRef, list } = useChoiceList({
     items: options.map((option) => ({ id: option.id, label: option.label })),
-    activeId: value,
-    onActiveChange: onChange,
+    live,
+    value,
+    onChoose: onChange,
   })
 
   return (
@@ -41,7 +47,8 @@ export function CodeThemePicker({
       <VirtualList
         {...list.containerProps}
         activeIndex={list.activeIndex}
-        aria-label='Code colors'
+        aria-label={labelledBy ? undefined : 'Code colors'}
+        aria-labelledby={labelledBy}
         className='focus-ring-inset w-72 outline-none'
         getKey={(option) => option.id}
         handleRef={virtualRef}

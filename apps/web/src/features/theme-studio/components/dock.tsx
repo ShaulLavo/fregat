@@ -212,6 +212,7 @@ export function Dock() {
           {store.tab === 'code' && draft ? (
             <CodeThemePicker
               className={TAB_PADDING}
+              live
               mode={mode}
               value={draft.variants[mode].codeTheme}
               onChange={(codeTheme) => edit({ codeTheme })}

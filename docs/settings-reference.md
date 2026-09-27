@@ -44,7 +44,7 @@ stays safe to read, share and export.
 
 ### Details
 
-- `workbench.theme`: Picking a theme sets the app colors, code colors, wallpaper and surfaces at once. Changes you make afterwards are saved for that theme and come back when you pick it again. With no theme, the app uses Graphite colors, Dark+ and Light+ code colors and the desktop wallpaper.
+- `workbench.theme`: Picking a theme sets the rows below at once: app colors, code colors, wallpaper and surfaces. Changes you make afterwards, in these rows or in the theme studio, are saved for that theme and come back when you pick it again. With no theme, each of those rows holds one value for both modes.
 - `workbench.wallpaper`: Desktop shows the server machine's current wallpaper: Omarchy's current background on Linux, the desktop picture on macOS. On a Linux screen the compositor already shows the desktop behind the window, so Desktop draws nothing there.
 - `workbench.surface.contentOpacity`: This layer sits over the panel's own surface, so 50 over a panel at 80 makes the ground behind code and terminal text 90% opaque: text stays readable and a trace of the wallpaper shows through.
 - `workbench.surface.blur`: Capped at 40 px. A repository's settings file can set this, and a large backdrop blur costs GPU time on every frame.

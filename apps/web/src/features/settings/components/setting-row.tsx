@@ -68,11 +68,16 @@ export function SettingRow({
   const themed = scope === 'user' && snapshot.values['workbench.theme'] !== null
   const modeNote = themePartModeNote(id, themed, mode)
   // Full width, like the theme picker: a list of every command does not fit half a row.
-  const fullWidth = descriptor.widget === 'theme' || descriptor.widget === 'keybindings'
-  const hasCodePreview =
-    descriptor.widget === 'code-theme' ||
-    descriptor.widget === 'palette' ||
+  const fullWidth =
+    descriptor.widget === 'theme' ||
+    descriptor.widget === 'keybindings' ||
     descriptor.widget === 'wallpaper'
+  const hasCodePreview = descriptor.widget === 'code-theme' || descriptor.widget === 'palette'
+  // Lists, sliders and the wallpaper library are no form control a label can point at; they
+  // take their name from the title instead.
+  const namedByTitle =
+    hasCodePreview || descriptor.widget === 'wallpaper' || surfaceField(id) !== undefined
+  const titleId = `${id}:title`
 
   return (
     <div
@@ -95,9 +100,15 @@ export function SettingRow({
               title='Modified from the default'
             />
           ) : null}
-          <label className='text-foreground text-sm font-medium' htmlFor={id}>
-            {settingRowTitle(id)}
-          </label>
+          {namedByTitle ? (
+            <span className='text-foreground text-sm font-medium' id={titleId}>
+              {settingRowTitle(id)}
+            </span>
+          ) : (
+            <label className='text-foreground text-sm font-medium' htmlFor={id}>
+              {settingRowTitle(id)}
+            </label>
+          )}
           {descriptor.details ? (
             <SettingDetails details={descriptor.details} title={settingRowTitle(id)} />
           ) : null}
@@ -148,6 +159,7 @@ export function SettingRow({
           id={id}
           mode={mode}
           themed={themed}
+          titleId={titleId}
           onChange={(next) => {
             if (!SCALAR_SETTING_IDS.includes(id as ScalarSettingId)) return
             setSetting(id as ScalarSettingId, next as SettingsValues[ScalarSettingId], scope)
@@ -169,6 +181,7 @@ function SettingControl({
   mode,
   onChange,
   themed,
+  titleId,
   value,
 }: {
   disabled: boolean
@@ -176,6 +189,8 @@ function SettingControl({
   /** The mode on screen, which a theme part row edits. */
   mode: ColorMode
   themed: boolean
+  /** The row title's element, which names a list or library that no label can point at. */
+  titleId: string
   // Every registered value type, not `never`. A handler that accepts nothing is
   // assignable to no widget — which is what forced a cast at every branch —
   // where one that accepts all of them is assignable to each in turn.
@@ -233,13 +248,22 @@ function SettingControl({
   }
 
   if (control.widget === 'code-theme') {
-    return <CodeThemeWidget disabled={disabled} id={id} value={control.value} onChange={onChange} />
+    return (
+      <CodeThemeWidget
+        disabled={disabled}
+        id={id}
+        labelledBy={titleId}
+        value={control.value}
+        onChange={onChange}
+      />
+    )
   }
 
   if (control.widget === 'palette') {
     return (
       <PaletteWidget
         disabled={disabled}
+        labelledBy={titleId}
         mode={mode}
         themed={themed}
         value={control.value}
@@ -250,7 +274,13 @@ function SettingControl({
 
   if (control.widget === 'wallpaper') {
     return (
-      <WallpaperWidget disabled={disabled} mode={mode} value={control.value} onChange={onChange} />
+      <WallpaperWidget
+        disabled={disabled}
+        labelledBy={titleId}
+        mode={mode}
+        value={control.value}
+        onChange={onChange}
+      />
     )
   }
 

@@ -114,6 +114,18 @@ export function useSettingsActions(owner?: QueryClient) {
 
   const targetFor = (key: SettingId) => deriveWriteTarget(key, projection()?.layers ?? [])
 
+  // Under a theme a part write customizes the theme for one mode; the code themes name their own.
+  const themePartOperation = (operation: SettingsOperation): SettingsOperation | null => {
+    const current = projection()
+    const theme = current?.values['workbench.theme']
+    const patch = operation.kind === 'set' ? themePartPatch(operation) : null
+    if (!current || !theme || !patch || operation.kind !== 'set') return null
+    let mode = shownColorMode(current.values['workbench.colorTheme'], systemColorMode())
+    if (operation.key === 'editor.codeTheme.light') mode = 'light'
+    if (operation.key === 'editor.codeTheme.dark') mode = 'dark'
+    return { kind: 'theme.customize', id: theme.id, mode, patch }
+  }
+
   const setSetting = <K extends ScalarSettingId>(
     key: K,
     value: SettingsValues[K],
@@ -121,14 +133,8 @@ export function useSettingsActions(owner?: QueryClient) {
     initiator?: string,
   ): SettingsSubmission => {
     const operation = { kind: 'set', key, value } as SettingsOperation
-    const current = projection()
-    const theme = current?.values['workbench.theme']
-    const patch = operation.kind === 'set' ? themePartPatch(operation) : null
-    if (!theme || !patch || target !== 'user') return submit(target, [operation], initiator)
-    let mode = shownColorMode(current.values['workbench.colorTheme'], systemColorMode())
-    if (key === 'editor.codeTheme.light') mode = 'light'
-    if (key === 'editor.codeTheme.dark') mode = 'dark'
-    return submit('user', [{ kind: 'theme.customize', id: theme.id, mode, patch }], initiator)
+    const customize = target === 'user' ? themePartOperation(operation) : null
+    return submit(target, [customize ?? operation], initiator)
   }
 
   const setColorTheme = (
@@ -192,9 +198,13 @@ export function useSettingsActions(owner?: QueryClient) {
         key,
         value: defaults[key],
       })
-      if (!parsed.success || parsed.output.kind !== 'set' || !themePartPatch(parsed.output))
-        return submit(target, [{ kind: 'reset', keys: settingRowIds(key) }])
-      return setSetting(parsed.output.key, parsed.output.value, target)
+      const customize = parsed.success ? themePartOperation(parsed.output) : null
+      if (!customize) return submit(target, [{ kind: 'reset', keys: settingRowIds(key) }])
+      // A value written before the theme was picked is ignored under it; Reset clears it too.
+      const stray = current.layers.some(
+        (layer) => layer.id === 'user' && Object.hasOwn(layer.raw, key),
+      )
+      return submit('user', stray ? [customize, { kind: 'reset', keys: [key] }] : [customize])
     },
     setColorTheme,
     /** The command's complete list; an empty list or `null` unbinds it. */

@@ -8,11 +8,13 @@ import { selectWallpaper } from '@/lib/wallpapers/utils/selection'
 /** Matches sorts against the app colors on screen. */
 export function WallpaperWidget({
   disabled,
+  labelledBy,
   mode,
   value,
   onChange,
 }: {
   disabled: boolean
+  labelledBy: string
   mode: ColorMode
   value: WallpaperSelection
   onChange: (next: WallpaperSelection) => void
@@ -21,7 +23,12 @@ export function WallpaperWidget({
   const palette = catalog.find((entry) => entry.id === paletteId)
 
   return (
-    <div className={cn('h-80 w-full min-w-0', disabled && 'opacity-50')} inert={disabled}>
+    <div
+      aria-labelledby={labelledBy}
+      className={cn('h-96 w-full min-w-0', disabled && 'opacity-50')}
+      inert={disabled}
+      role='group'
+    >
       <WallpaperLibrary
         colors={palette ? paletteColorsFor(palette, mode) : null}
         value={value}

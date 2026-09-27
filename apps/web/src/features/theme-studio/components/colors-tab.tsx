@@ -38,6 +38,7 @@ export function ColorsTab({
     <div className='flex h-full min-h-0 gap-(--density-section-padding) px-(--bar-padding-x) py-(--density-section-gap)'>
       <PaletteList
         className='w-64 shrink-0'
+        live
         mode={mode}
         value={palette?.id ?? null}
         onChange={onChoose}

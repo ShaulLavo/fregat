@@ -153,3 +153,80 @@ test(
   },
   SLOW_RENDER_TIMEOUT_MS,
 )
+
+function PickThemeButton() {
+  const { selectBundle } = useSettingsActions()
+  return (
+    <Button size='sm' onClick={() => selectBundle(THEME)}>
+      Pick theme
+    </Button>
+  )
+}
+
+function modifiedMarker(key: string) {
+  return document.querySelector(`[data-setting-row="${key}"] [aria-label="Modified"]`)
+}
+
+test(
+  'Reset under a theme also clears a value written before the theme was picked',
+  async ({ client }) => {
+    expect(client).toBeDefined()
+    await seed([{ kind: 'set', key: 'workbench.colorTheme', value: 'dark' }])
+    renderWithProviders(
+      <>
+        <SettingsPage />
+        <PickThemeButton />
+      </>,
+    )
+
+    ;(await contentSlider()).focus()
+    await userEvent.keyboard('{ArrowLeft}')
+    await waitFor(async () => expect((await userLayer()).raw).toHaveProperty(KEY))
+    await userEvent.click(screen.getByRole('button', { name: 'Pick theme' }))
+    await screen.findByText(/Dark mode\.$/)
+    expect(modifiedMarker(KEY)).not.toBeNull()
+
+    await userEvent.click(await screen.findByRole('button', { name: `Actions for ${KEY}` }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Reset setting' }))
+
+    await waitFor(async () => {
+      const snapshot = await fetchSettings(undefined, getClient())
+      expect(snapshot.layers.find((layer) => layer.id === 'user')?.raw).not.toHaveProperty(KEY)
+      expect(snapshot.diagnostics.filter((entry) => entry.id === KEY)).toEqual([])
+    })
+    await waitFor(() => expect(modifiedMarker(KEY)).toBeNull())
+  },
+  SLOW_RENDER_TIMEOUT_MS,
+)
+
+test(
+  'a settings list moves its cursor freely and writes only on Enter, never on focus',
+  async ({ client }) => {
+    expect(client).toBeDefined()
+    // A value the list does not offer, so focus has no row to land on.
+    await seed([{ kind: 'set', key: 'editor.codeTheme.dark', value: 'no-such-theme' }])
+    selectSettingsSearch('code theme in dark')
+    const { queryClient } = renderWithProviders(<SettingsPage />)
+    const writes = () =>
+      queryClient.getMutationCache().findAll({ mutationKey: SETTINGS_MUTATION_KEY, exact: true })
+        .length
+
+    const list = await screen.findByRole('listbox', { name: 'Code theme in dark mode' })
+    list.focus()
+    const start = list.getAttribute('aria-activedescendant')
+    expect(writes()).toBe(0)
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}d')
+    expect(writes()).toBe(0)
+
+    const cursor = list.getAttribute('aria-activedescendant')
+    expect(cursor).not.toBe(start)
+    await userEvent.keyboard('{Enter}')
+    expect(writes()).toBe(1)
+    await waitFor(async () => {
+      const snapshot = await fetchSettings(undefined, getClient())
+      expect(snapshot.values['editor.codeTheme.dark']).not.toBe('no-such-theme')
+      expect(cursor).toContain(snapshot.values['editor.codeTheme.dark'])
+    })
+  },
+  SLOW_RENDER_TIMEOUT_MS,
+)

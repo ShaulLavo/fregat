@@ -6,22 +6,25 @@ import { PaletteList } from '@/lib/appearance/components/palette-list'
 /** With no theme the palette serves both modes, so every palette is listed. */
 export function PaletteWidget({
   disabled,
+  labelledBy,
   mode,
   themed,
   value,
   onChange,
 }: {
   disabled: boolean
+  labelledBy: string
   mode: ColorMode
   themed: boolean
   value: string
   onChange: (next: PaletteId) => void
 }) {
   return (
-    <div className={cn('h-56 w-full min-w-0', disabled && 'opacity-50')} inert={disabled}>
+    <div className={cn('w-full min-w-0', disabled && 'opacity-50')} inert={disabled}>
       <PaletteList
         anyMode={!themed}
-        className='h-full'
+        labelledBy={labelledBy}
+        maxRows={10}
         mode={mode}
         value={value}
         onChange={onChange}

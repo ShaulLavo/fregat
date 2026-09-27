@@ -144,7 +144,7 @@ function themePartDiagnostics(
 ): SettingsDiagnostic[] {
   const theme = values['workbench.theme']
   if (!isRecord(theme) || typeof theme.name !== 'string') return []
-  const detail = `${theme.name} is selected, so its value applies. Settings › Appearance edits the theme's value.`
+  const detail = `The ${theme.name} theme sets this. Delete this line, or change the theme's value in Settings › Appearance.`
 
   return THEME_PART_KEYS.flatMap((id) =>
     contributions.get(id)?.some((entry) => entry.layer === 'user')

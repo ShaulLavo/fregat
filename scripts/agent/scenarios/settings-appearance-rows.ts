@@ -1,6 +1,11 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
-import { chooseColorMode, runPaletteCommand, selectors } from '../selectors'
+import {
+  chooseColorMode,
+  runPaletteCommand,
+  selectors,
+  settleRunningAnimations,
+} from '../selectors'
 import { selectedThemeId, userSettings, type UserSettings } from '../server-api'
 import type { Scenario } from './index'
 
@@ -69,16 +74,11 @@ async function showAppearance(page: Page) {
   await theme.evaluate((element) => element.scrollIntoView({ block: 'start' }))
 }
 
-// The mode switch cross-fades; spinners and cursors loop forever, so only finite animations count.
-function settleColorMode(page: Page) {
-  return page.evaluate(() =>
-    Promise.all(
-      document
-        .getAnimations()
-        .filter((animation) => Number.isFinite(animation.effect?.getComputedTiming().endTime))
-        .map((animation) => animation.finished.catch(() => undefined)),
-    ).then(() => undefined),
-  )
+// Wallpaper down to Backdrop saturation, the last part row.
+async function showLowerRows(page: Page) {
+  const last = selectors.settingsRow(page, 'workbench.surface.saturation')
+  await last.waitFor()
+  await last.evaluate((element) => element.scrollIntoView({ block: 'end' }))
 }
 
 // Switching light and dark re-reads every per-mode part row.
@@ -87,7 +87,7 @@ async function modeNoted(page: Page, mode: 'light' | 'dark') {
     (dark) => document.documentElement.classList.contains('dark') === dark,
     mode === 'dark',
   )
-  await settleColorMode(page)
+  await settleRunningAnimations(page)
   const note = mode === 'dark' ? /Dark mode\.$/ : /Light mode\.$/
   for (const id of ['workbench.palette', 'workbench.wallpaper', 'workbench.surface.contentOpacity'])
     await selectors.settingsRow(page, id).getByText(note).waitFor({ timeout: 10_000 })
@@ -117,10 +117,14 @@ export const settingsAppearanceRows: Scenario = {
     await showAppearance(page)
     await modeNoted(page, mode)
     await step(`appearance-${mode}`)
+    await showLowerRows(page)
+    await step(`appearance-lower-${mode}`)
     await chooseColorMode(page, other)
     await modeNoted(page, other)
     await showAppearance(page)
     await step(`appearance-${other}`)
+    await showLowerRows(page)
+    await step(`appearance-lower-${other}`)
     await chooseColorMode(page, mode)
     await modeNoted(page, mode)
 

@@ -60,8 +60,8 @@ the selected theme and mode, `resetSetting` returns the part to the theme's valu
        Reset returns to the theme's value; with no theme it writes the key. Update the settings page
        test that pins the hidden keys.
 2. [x] **Mode label.** D3 as decided by Q1.
-3. [x] **Ignored values.** D5: the diagnostic, then the owner-approved cleanup of their settings file.
-4. [x] **Proof and ship.** Scenario `settings-appearance-rows`: open Settings, search "content", drag
+3. [ ] **Ignored values.** (Diagnostic done; the owner's cleanup is pending.) D5: the diagnostic, then the owner-approved cleanup of their settings file.
+4. [ ] **Proof and ship.** (Scenario and screenshots done; the deploy is pending.) Scenario `settings-appearance-rows`: open Settings, search "content", drag
        the slider, read `--content-opacity` and the painted editor background, confirm the studio's
        Surfaces tab shows the same number, and confirm `caches` holds one settings mutation. `look`
        screenshots of the Appearance section read back and published for the owner. Ship with
@@ -93,3 +93,6 @@ Before starting: `THEME_PART_KEYS` still lists the eight keys; `setSetting` stil
   workspace and policy values still apply over a theme.
 - The `Slider` primitive now names its thumb from `aria-label`; before, a slider outside a
   wrapping `<label>` had no accessible name.
+- Settings lists move a local cursor and write only on Enter, Space or a click; the studio's
+  lists choose as the cursor moves. Reset under a theme also removes a user-file value written
+  before the theme was picked, in the same write.
