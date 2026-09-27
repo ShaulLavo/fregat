@@ -1,6 +1,6 @@
 import type { ChatSession } from '@workspace/client-core/chat/types'
 
-import { CARRY_ON_PROMPT, carryOnPayload, tryAgainPayload } from '@/features/chat/utils/turn-retry'
+import { carryOnPayload, tryAgainPayload } from '@/features/chat/utils/turn-retry'
 import { expect, test } from '../../../../../test/fixtures'
 
 const attachment = {
@@ -28,7 +28,7 @@ test('Carry on sends the fixed continuation prompt with the session settings', (
     modelSelection: { model: 'gpt-5', providerInstanceId: 'codex' },
     runtimeMode: 'full-access',
     terminalContexts: [],
-    text: CARRY_ON_PROMPT,
+    text: 'Continue',
   })
 })
 
