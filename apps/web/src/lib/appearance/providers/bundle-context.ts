@@ -1,10 +1,13 @@
-import type { ColorMode, ThemeBundle, ThemeId, ThemeVariantPatch } from '@workspace/contracts'
+import type { ColorMode, ThemeBundle, ThemeVariantPatch } from '@workspace/contracts'
 import type { SettingsSubmission } from '@workspace/client-core/settings/intent-store'
 import { createContext } from 'react'
 
 export type BundleContextValue = {
-  /** The confirmed selection's id, or `null` when no bundle is selected. */
-  readonly bundleId: ThemeId | null
+  /**
+   * The confirmed selection as settings hold it, which is what the app paints; the catalog's entry
+   * under the same id can be a newer revision. `null` when no bundle is selected.
+   */
+  readonly theme: ThemeBundle | null
   /** Every bundle that can be selected: bundled first, then the user library. */
   readonly catalog: readonly ThemeBundle[]
   readonly preview: (bundle: ThemeBundle, mode?: ColorMode) => void
