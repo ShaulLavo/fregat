@@ -64,13 +64,9 @@ test('a shell preloads its chunks and stylesheets, minus what the entry already 
   } as unknown as Rolldown.OutputBundle
 
   expect(shellManifest('/web', '/platform/', bundle, entry)).toEqual({
-    phone: [
-      '/platform/assets/shell.js',
-      '/platform/assets/stack.js',
-      '/platform/assets/sessions-screen.js',
-      '/platform/assets/phone-shared.js',
-      '/platform/assets/session-screen.js',
-    ],
+    phone: ['/platform/assets/shell.js', '/platform/assets/stack.js'],
+    sessions: ['/platform/assets/sessions-screen.js', '/platform/assets/phone-shared.js'],
+    session: ['/platform/assets/session-screen.js', '/platform/assets/phone-shared.js'],
     workbench: [
       '/platform/assets/workbench-shell.js',
       '/platform/assets/workbench.js',
@@ -90,6 +86,7 @@ test('each shell’s first load gets a group, and the phone never shares the wor
     },
     '/file-screen.tsx': { imports: ['/editor.tsx'] },
     '/editor.tsx': { imports: [] },
+    '/sessions-screen.tsx': { imports: ['/session-hook.ts'] },
     '/session-screen.tsx': { imports: ['/chat.tsx'] },
     '/workbench.tsx': {
       imports: ['/session-hook.ts', '/chat.tsx', '/tree.tsx', '/button.tsx', '/editor.tsx'],
@@ -108,7 +105,7 @@ test('each shell’s first load gets a group, and the phone never shares the wor
   const groups = shellChunkGroups('/main.tsx', {
     phone: '/phone.tsx',
     workbench: '/workbench.tsx',
-    phoneScreens: ['/session-screen.tsx'],
+    phoneScreens: ['/sessions-screen.tsx', '/session-screen.tsx'],
   })
   const groupOf = (id: string) =>
     groups.map((group) => group.name(id, context)).find((name) => name !== null) ?? null
@@ -128,7 +125,7 @@ test('each shell’s first load gets a group, and the phone never shares the wor
     '/main.tsx': 'initial',
     '/button.tsx': 'initial',
     '/session-hook.ts': 'initial',
-    '/chat.tsx': 'initial',
+    '/chat.tsx': 'phone-session',
     '/tree.tsx': 'workbench',
     '/workbench.tsx': 'workbench',
   })

@@ -146,6 +146,7 @@ import { phoneComposer } from './phone-composer'
 import { logsRestored } from './logs-restored'
 import { shellSwitch } from './shell-switch'
 import { phoneColdBoot, desktopColdBoot } from './shell-cold-boot'
+import { phoneStartupNavigation } from './phone-startup-navigation'
 import { chatSleepingSession } from './chat-sleeping-session'
 import { chatSessionGoal } from './chat-session-goal'
 import { chatAgentReview } from './chat-agent-review'
@@ -683,6 +684,7 @@ export const scenarios: readonly Scenario[] = [
   shellSwitch,
   logsRestored,
   phoneColdBoot,
+  phoneStartupNavigation,
   desktopColdBoot,
   chatSleepingSession,
   chatSessionGoal,

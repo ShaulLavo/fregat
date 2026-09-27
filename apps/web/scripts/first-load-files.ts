@@ -15,7 +15,11 @@ type FirstLoadFile = {
 
 // HTML starts the entry and shell preloads. The phone also needs its boot screens and
 // every dependency their emitted import helpers fetch, including accidental desktop preloads.
-export function firstLoadFiles(dir: string, shell: 'phone' | 'workbench'): FirstLoadFile[] {
+export function firstLoadFiles(
+  dir: string,
+  shell: 'phone' | 'workbench',
+  phoneScreen: 'sessions' | 'session' = 'sessions',
+): FirstLoadFile[] {
   const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8')
   const files: FirstLoadFile[] = []
   const seen = new Set<string>()
@@ -39,17 +43,18 @@ export function firstLoadFiles(dir: string, shell: 'phone' | 'workbench'): First
     const href = attributeValue(attributes, tag === 'script' ? 'src' : 'href')
     if (href) add(href, kind)
   }
-  for (const href of shellChunks(html, shell))
-    add(href, href.endsWith('.css') ? 'stylesheet' : 'script')
-  if (shell === 'phone') followPhoneImports(dir, files, add)
+  const chunks = shellChunks(html, shell)
+  if (shell === 'phone') chunks.push(...shellChunks(html, phoneScreen))
+  for (const href of chunks) add(href, href.endsWith('.css') ? 'stylesheet' : 'script')
+  if (shell === 'phone') followPhoneImports(dir, files, add, phoneScreen)
   return files
 }
 
-function shellChunks(html: string, shell: 'phone' | 'workbench'): readonly string[] {
+function shellChunks(html: string, shell: string): string[] {
   const json = /<script type="application\/json" id="shell-chunks">([^<]*)<\/script>/u.exec(html)
   if (!json?.[1]) return []
   const manifest = JSON.parse(json[1]) as Partial<Record<string, readonly string[]>>
-  return manifest[shell] ?? []
+  return [...(manifest[shell] ?? [])]
 }
 
 function firstLoadKind(tag: string, attributes: string): FirstLoadFile['kind'] | null {
@@ -76,9 +81,11 @@ function followPhoneImports(
   dir: string,
   files: readonly FirstLoadFile[],
   add: (href: string, kind: FirstLoadFile['kind']) => void,
+  phoneScreen: 'sessions' | 'session',
 ) {
   const stats: BundleStats = JSON.parse(fs.readFileSync(bundleStatsFile(dir), 'utf8'))
-  const roots = [SHELL_ENTRIES.phone, ...PHONE_BOOT_SCREENS].map((entry) => {
+  const screen = PHONE_BOOT_SCREENS[phoneScreen === 'sessions' ? 0 : 1]
+  const roots = [SHELL_ENTRIES.phone, screen].map((entry) => {
     const chunk = stats.chunks.find((chunk) =>
       chunk.modules.some((module) => module.id.endsWith(`/${entry}`)),
     )

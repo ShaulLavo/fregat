@@ -24,7 +24,12 @@ import { createEditorRuntime, type EditorRuntime } from '@/features/editor/state
 import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import type { QueryClient } from '@tanstack/react-query'
 import type { EditorPreparedEnvironment } from '@/features/editor/utils/prepared-document'
-import { readWorkspaceCache, type CachedWorkspaceState } from '@/features/workspace/state/cache'
+import {
+  readWorkspaceCache,
+  writeSessionSelectionCache,
+  type CachedWorkspaceState,
+} from '@/features/workspace/state/cache'
+import type { ChatSelection } from '@/lib/chat-selection'
 import { subscribeWorkspaceCachePersistence } from '@/features/workspace/state/cache-persistence'
 import { activateWorkspaceRoot } from '@/features/workspace/state/active-project'
 import { createCommandRuntimeBinding } from '@/keymap/state/runtime-binding'
@@ -64,9 +69,14 @@ function prepareReloadOwners(
 export function createApplicationRuntime({
   workspaceCache,
   preparation,
+  initialSession,
 }: {
   readonly workspaceCache: CachedWorkspaceState
   readonly preparation: EditorPreparedEnvironment
+  readonly initialSession?: {
+    readonly environmentId: EnvironmentId
+    readonly selection: ChatSelection
+  }
 }) {
   const commandBinding = createCommandRuntimeBinding()
   const environments = new Map<EnvironmentId, RetainedEnvironment>()
@@ -124,8 +134,16 @@ export function createApplicationRuntime({
     }
   }
 
+  function restoreSessionSelection(environmentId: EnvironmentId) {
+    if (initialSession?.environmentId === environmentId) {
+      writeSessionSelectionCache(environmentScopedStorage(environmentId), initialSession.selection)
+      initialSession = undefined
+    }
+    restoreEnvironmentSessionSelection(environmentId)
+  }
+
   current = createEnvironment(activeServerOrigin(), workspaceCache)
-  restoreEnvironmentSessionSelection(confirmedEnvironmentId(current.origin))
+  restoreSessionSelection(confirmedEnvironmentId(current.origin))
   resumeEnvironmentActivity(current.origin)
   environments.set(confirmedEnvironmentId(current.origin), current)
   activateWorkspaceRoot(current.editor.workspaceStore.getState().rootFolder?.path ?? null)
@@ -183,7 +201,7 @@ export function createApplicationRuntime({
       current = next
       syncActiveEditor()
       activateWorkspaceRoot(current.editor.workspaceStore.getState().rootFolder?.path ?? null)
-      restoreEnvironmentSessionSelection(environmentId)
+      restoreSessionSelection(environmentId)
       useEnvironmentsStore.getState().activate(next.origin)
     },
     async openEnvironmentWorkspaceRoot(

@@ -1,6 +1,7 @@
 import { restoreSettingsView } from '@/features/settings/state/reload'
 import { environmentQueryKeys } from '@/features/environments/utils/query-keys'
-import type { HealthDescriptor } from '@workspace/contracts'
+import { environmentIdSchema, type HealthDescriptor } from '@workspace/contracts'
+import * as v from 'valibot'
 import { addressedWorkspaceCache, panelsForAddress } from '@/features/address/utils/cache'
 import type { AddressIntent } from '@/features/address/utils/intent'
 import { readWorkspaceCache } from '@/features/workspace/state/cache'
@@ -17,7 +18,13 @@ import { createClientInvariantError } from '@/lib/structured-errors'
 export function createBootRuntime(
   descriptor: HealthDescriptor,
   intent: AddressIntent,
-  cached = false,
+  {
+    cached = false,
+    initialSession = 'restore',
+  }: {
+    readonly cached?: boolean
+    readonly initialSession?: 'restore' | 'list'
+  } = {},
 ) {
   if (
     cached &&
@@ -30,7 +37,15 @@ export function createBootRuntime(
   if (cached) useEnvironmentsStore.getState().setPhase(primaryServerOrigin(), 'connecting')
   if (!cached) primaryQueryClient().setQueryData(environmentQueryKeys.descriptor, descriptor)
   const address = intent.address
+  const target = v.safeParse(
+    environmentIdSchema,
+    address.environmentId ?? address.rejectedEnvironment ?? descriptor.environmentId,
+  )
   const application = createApplicationRuntime({
+    initialSession:
+      target.success && initialSession === 'list'
+        ? { environmentId: target.output, selection: { kind: 'auto' } }
+        : undefined,
     workspaceCache: addressedWorkspaceCache(
       readWorkspaceCache(environmentScopedStorage(descriptor.environmentId)),
       address,
