@@ -1,4 +1,4 @@
-import { settingParentId, type SettingId } from '@workspace/contracts'
+import type { SettingId } from '@workspace/contracts'
 
 import { ImportSection } from '@/features/settings/components/import-section'
 import { McpSection } from '@/features/settings/components/mcp-section'
@@ -7,6 +7,7 @@ import { PushSection } from '@/features/settings/components/push-section'
 import { SettingRow } from '@/features/settings/components/setting-row'
 import { UsageSection } from '@/features/settings/components/usage-section'
 import type { SettingsProjection } from '@/features/settings/hooks/use-settings-projection'
+import { isUnderParent } from '@/features/settings/utils/form-categories'
 import { MCP_CATEGORY } from '@/features/settings/utils/mcp'
 
 /**
@@ -39,12 +40,4 @@ export function CategorySection({
       ))}
     </section>
   )
-}
-
-/** True when this row's parent is shown above it in the same section. */
-function isUnderParent(ids: readonly SettingId[], index: number): boolean {
-  const parent = settingParentId(ids[index]!)
-  if (parent === undefined) return false
-
-  return ids.slice(0, index).includes(parent)
 }

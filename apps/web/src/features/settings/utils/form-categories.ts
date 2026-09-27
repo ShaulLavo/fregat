@@ -132,3 +132,11 @@ function withChildrenUnderParents(ids: readonly SettingId[]): SettingId[] {
     return [id, ...(childrenOf.get(id) ?? [])]
   })
 }
+
+/** True when this row's parent is shown above it in the same section. */
+export function isUnderParent(ids: readonly SettingId[], index: number): boolean {
+  const parent = settingParentId(ids[index]!)
+  if (parent === undefined) return false
+
+  return ids.slice(0, index).includes(parent)
+}
