@@ -17,7 +17,7 @@ import { iconForEntry } from '@/lib/file-icons'
 import { TreeGlyphIcon } from '@/features/workspace/components/tree-glyph'
 import { MiddleTruncate } from '@/features/workspace/components/tree-middle-truncate'
 import { Truncate } from '@/features/workspace/components/tree-truncate'
-import { RenameInput } from '@/features/workspace/components/tree-rename-input'
+import { InlineRenameInput } from '@workspace/ui/patterns/inline-rename-input'
 import { GIT_STATUS_DESCENDANT_TITLE, GIT_STATUS_LABEL, GIT_STATUS_TITLE } from '@workspace/tree'
 import type { FileTreeController } from '@workspace/tree'
 import type {
@@ -379,17 +379,19 @@ export function TreeRow({ frame, options = {}, row }: TreeRowProps): JSX.Element
   const renamingValue = isRenamingRow ? renameView.getValue() : ''
   const renameInput =
     isSticky || !isRenamingRow ? null : (
-      <RenameInput
+      <InlineRenameInput
         ref={registerRenameInput}
-        ariaLabel={`Rename ${getTreeRowAriaLabel(row)}`}
-        isFlattened={row.isFlattened}
-        value={renamingValue}
-        onBlur={() => {
+        aria-label={`Rename ${getTreeRowAriaLabel(row)}`}
+        autoFocus={false}
+        data-item-rename-input
+        data-item-flattened-rename-input={row.isFlattened || undefined}
+        initialValue={renamingValue}
+        onCommit={(value) => {
+          renameView.setValue(value)
           renameView.commit()
         }}
-        onInput={(event) => {
-          renameView.setValue(event.currentTarget.value)
-        }}
+        onCancel={() => renameView.cancel()}
+        onValueChange={(value) => renameView.setValue(value)}
       />
     )
   // Built here, in the compiled component, so an unchanged row's lead and icon are reused.

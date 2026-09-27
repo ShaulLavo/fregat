@@ -278,6 +278,7 @@ export const terminalTabs: Scenario = {
     await step('terminal-last-tab')
     await page.keyboard.press('F2')
     await selectors.terminalName(page).waitFor()
+    await step('terminal-renaming')
     await selectors.terminalName(page).fill('Pattern verification')
     await page.keyboard.press('Enter')
     await list.focus()

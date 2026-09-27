@@ -203,13 +203,6 @@ export function useTreeKeyboard(
     event.stopPropagation()
   }
 
-  const handleRenameKey = (event: ReactKeyboardEvent<HTMLElement>): boolean => {
-    if (event.nativeEvent.isComposing || event.keyCode === 229) return false
-    if (event.key === 'Escape') renameView.cancel()
-    if (event.key === 'Enter') renameView.commit()
-    return event.key === 'Escape' || event.key === 'Enter'
-  }
-
   const handleSearchKey = (event: ReactKeyboardEvent<HTMLElement>): boolean => {
     if (event.key === 'Escape') {
       focus.cancelSearchCloseFocusRestore()
@@ -295,12 +288,7 @@ export function useTreeKeyboard(
       handleOpenContextMenuKey(event)
       return
     }
-    if (renameView.isActive()) {
-      if (handleRenameKey(event)) {
-        finishHandledEvent(event, noteContextMenuInteraction, invalidateControllerView)
-      }
-      return
-    }
+    if (renameView.isActive()) return
     if (renamingEnabled && event.key === 'F2') {
       startRenameFromPath(focusedPath ?? undefined)
       event.preventDefault()

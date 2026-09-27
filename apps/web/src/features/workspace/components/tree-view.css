@@ -4,9 +4,8 @@
 
 @layer file-tree {
   [data-file-tree] {
-    /* The inputs were drawn against browser defaults; the app's preflight must not resize them.
-     * Only inputs: a universal rule here is matched against every row element on each restyle. */
-    & input {
+    /* The legacy filter still depends on browser defaults. Shared inputs use app preflight. */
+    [data-file-tree-search-input] {
       box-sizing: revert;
       margin: revert;
       padding: revert;
@@ -662,22 +661,6 @@
 
     [data-item-action-affordance='decorative'] {
       opacity: 0.85;
-    }
-
-    [data-item-rename-input] {
-      appearance: none;
-      width: 100%;
-      min-width: 0;
-      height: calc(var(--trees-row-height) - 4px);
-      font-family: inherit;
-      font-size: inherit;
-      /* line-height: calc(var(--trees-row-height) - 8px); */
-      color: inherit;
-      background-color: transparent;
-      border: 0;
-      padding-inline: 6px;
-      outline: none;
-      box-sizing: border-box;
     }
 
     [data-item-section='content']:has([data-item-rename-input]) ~ [data-item-section='action'],
