@@ -13,6 +13,7 @@ import {
   encodeInput,
   ensureToken,
   FrameDecoder,
+  HOST_CONNECT_TIMEOUT_MS,
   hostControlSchema,
   hostPaths,
   hostSignalSchema,
@@ -28,7 +29,6 @@ import type { TerminalPtyFactory, TerminalPtyOptions } from './service'
 import { hostIdentityMatches, processStart, readHostIdentity } from '../terminal-host/identity'
 import { launchHost } from '../terminal-host/launch'
 
-const CONNECT_TIMEOUT_MS = 5_000
 const CONNECT_RETRY_MS = 25
 const REQUEST_TIMEOUT_MS = 10_000
 // The host never reports an exit it did not see; this matches its own unknown-exit convention.
@@ -162,7 +162,12 @@ export class TerminalHostClient {
       attempts += 1
       const socket = await connectSocket(paths.socket)
       const connected = socket
-        ? await this.handshake(socket, token, generation, CONNECT_TIMEOUT_MS - elapsedMs(startedAt))
+        ? await this.handshake(
+            socket,
+            token,
+            generation,
+            HOST_CONNECT_TIMEOUT_MS - elapsedMs(startedAt),
+          )
         : null
       if (connected) {
         const identity = readHostIdentity(paths.manifest)
@@ -200,9 +205,15 @@ export class TerminalHostClient {
         await this.launch(this.hostArgv(), this.env)
         launched = true
       }
-      if (elapsedMs(startedAt) > CONNECT_TIMEOUT_MS)
+      if (elapsedMs(startedAt) > HOST_CONNECT_TIMEOUT_MS)
         throw terminalHostErrors.HOST_UNREACHABLE({
-          internal: { attempts, elapsedMs: elapsedMs(startedAt), launched, socket: paths.socket },
+          internal: {
+            attempts,
+            elapsedMs: elapsedMs(startedAt),
+            launched,
+            socket: paths.socket,
+            socketExists: existsSync(paths.socket),
+          },
         })
       await Bun.sleep(CONNECT_RETRY_MS)
     }
