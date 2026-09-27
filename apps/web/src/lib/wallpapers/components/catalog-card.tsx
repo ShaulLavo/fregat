@@ -2,7 +2,7 @@ import { CloudArrowDownIcon } from '@phosphor-icons/react'
 import type { WallpaperCatalogEntry } from '@workspace/contracts'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { useState } from 'react'
-import { WallpaperChoice } from '@/features/theme-studio/components/wallpaper-choice'
+import { WallpaperChoice } from '@/lib/wallpapers/components/choice'
 import { catalogDisplayName } from '@/lib/wallpapers/utils/groups'
 
 /** An Omarchy wallpaper still on GitHub; picking it downloads it into the library. */

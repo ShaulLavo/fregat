@@ -1,4 +1,4 @@
-import { resolveThemeSettings, jsonEqual } from '@workspace/contracts'
+import { customizesThemePart, shownColorMode, themePartSlot } from '@workspace/contracts'
 import { systemColorMode } from '@/features/settings/state/system-color-mode'
 import {
   descriptorFor,
@@ -63,15 +63,7 @@ export function settingInspection(
     inspections.flatMap((inspection) => inspection.layers.map((layer) => layer.layer)),
   )
 
-  const defaults = resolveThemeSettings(
-    { ...snapshot.values, 'workbench.theme.customizations': {} },
-    systemColorMode(),
-    snapshot.layers,
-  )
-  const themeModified =
-    scope === 'user' &&
-    Boolean(snapshot.values['workbench.theme']) &&
-    !jsonEqual(snapshot.values[id], defaults[id])
+  const themeModified = scope === 'user' && themeCustomizes(id, snapshot)
 
   return {
     // Ordered by the layer table rather than by which key happened to be read
@@ -81,6 +73,16 @@ export function settingInspection(
     isModified: setLayers.has(scope) || themeModified,
     overriddenBy: overridingLayer(effectiveLayerAbove(inspections), scope),
   }
+}
+
+/** The selected theme's customization holds this row, even at the theme's own value. */
+function themeCustomizes(id: SettingId, snapshot: SettingsProjection): boolean {
+  const theme = snapshot.values['workbench.theme']
+  const shown = shownColorMode(snapshot.values['workbench.colorTheme'], systemColorMode())
+  const slot = themePartSlot(id, shown)
+  if (!theme || !slot) return false
+  const customization = snapshot.values['workbench.theme.customizations'][theme.id]
+  return customizesThemePart(customization, slot.mode, slot.part)
 }
 
 /**

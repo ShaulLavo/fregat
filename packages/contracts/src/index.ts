@@ -996,6 +996,7 @@ export {
 
 export * from './themes/bundle'
 export * from './themes/bundle-settings'
+export * from './themes/part-keys'
 export * from './themes/archive'
 export * from './themes/bundles'
 export * from './themes/bundle-wallpapers'

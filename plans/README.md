@@ -19,7 +19,7 @@ a bare root `bun run verify`.
 
 | Plan                                                                                    | State                                                                               |
 | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| [194 — appearance back in settings](194-appearance-back-in-settings.md)                 | **PROPOSED 2026-09-27 — READY; Q1 OPEN**                                            |
+| [194 — appearance back in settings](194-appearance-back-in-settings.md)                 | **IN PROGRESS 2026-09-27 — phases 1–4 in review; Q1 decided**                       |
 | [193 — no late-bound slots](193-no-late-bound-slots.md)                                 | **PROPOSED 2026-09-27 — READY; FIX WITH AI DONE (`7f22085c0`)**                     |
 | [192 — views switch subjects without flashing](192-no-swap-flash.md)                    | **PROPOSED 2026-09-26 — RULE LANDED; 21 SITES LEFT**                                |
 | [191 — file picker, resizable and in the app's icons](191-file-picker-polish.md)        | **IMPLEMENTED 2026-09-26 — WAVE 2 LANE FP; DEPLOY PENDING**                         |

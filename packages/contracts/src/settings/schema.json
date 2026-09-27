@@ -1145,7 +1145,7 @@
     },
     "workbench.palette": {
       "default": "graphite",
-      "description": "Colors for app backgrounds, text, borders, accents and the terminal. Pick a palette or make your own.",
+      "description": "Colors for app backgrounds, text, borders, accents and the terminal. Pick a palette here, or edit its colors in the theme studio.",
       "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
       "type": "string"
     },
@@ -1415,7 +1415,7 @@
       ],
       "default": null,
       "description": "App colors, code colors, wallpaper and surfaces, in a light and a dark version. Try them in the theme studio.",
-      "markdownDescription": "App colors, code colors, wallpaper and surfaces, in a light and a dark version. Try them in the theme studio.\n\nPicking a theme sets the app colors, code colors, wallpaper and surfaces at once. Changes you make afterwards are saved for that theme and come back when you pick it again. With no theme, the app uses Graphite colors, Dark+ and Light+ code colors and the desktop wallpaper."
+      "markdownDescription": "App colors, code colors, wallpaper and surfaces, in a light and a dark version. Try them in the theme studio.\n\nPicking a theme sets the rows below at once: app colors, code colors, wallpaper and surfaces. Changes you make afterwards, in these rows or in the theme studio, are saved for that theme and come back when you pick it again. With no theme, each of those rows holds one value for both modes."
     },
     "workbench.theme.customizations": {
       "additionalProperties": {
@@ -1598,8 +1598,8 @@
           "kind": "desktop"
         }
       },
-      "description": "Choose a wallpaper and turn it on or off without losing the selection.",
-      "markdownDescription": "Choose a wallpaper and turn it on or off without losing the selection.\n\nDesktop shows the server machine's current wallpaper: Omarchy's current background on Linux, the desktop picture on macOS. On a Linux screen the compositor already shows the desktop behind the window, so Desktop draws nothing there.",
+      "description": "The image behind the panes: one from the library, an upload, the desktop wallpaper, or none. None keeps the chosen image for later.",
+      "markdownDescription": "The image behind the panes: one from the library, an upload, the desktop wallpaper, or none. None keeps the chosen image for later.\n\nDesktop shows the server machine's current wallpaper: Omarchy's current background on Linux, the desktop picture on macOS. On a Linux screen the compositor already shows the desktop behind the window, so Desktop draws nothing there.",
       "properties": {
         "enabled": {
           "type": "boolean"

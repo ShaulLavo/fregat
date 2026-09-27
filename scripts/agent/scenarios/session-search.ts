@@ -2,7 +2,24 @@ import { ok } from 'node:assert/strict'
 import type { Page } from 'playwright'
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
-import { collectOrchestrationBases, dispatch, readShell } from './chat-verification'
+import { createGitFixture, fixtureGit, releaseFixture } from '../fixture-workspace'
+import { connectSecondOwner, type SecondOwner } from '../second-owner'
+import { collectOrchestrationBases, dispatch, readShell, typePrompt } from './chat-verification'
+import {
+  registerFixtureProject,
+  withConversationProvider,
+  type NativeProvider,
+} from './native-provider-verification'
+
+type SearchOwner = { readonly base: string; readonly worktreeId: string }
+
+async function platformWorktree(page: Page, base: string) {
+  const worktree = (await readShell(page, base)).worktrees.find((item) =>
+    item.path.endsWith('/projects/platform'),
+  )
+  ok(worktree, 'The primary owner needs the Platform worktree')
+  return worktree.id
+}
 
 async function searchConversation(
   page: Page,
@@ -20,62 +37,94 @@ async function searchConversation(
     .replace(/^ws/, 'http')
     .replace(/\/rpc$/, '')
   await selectors.sessionSearch(page).waitFor()
-  if (crossOwner) await page.waitForTimeout(2_000)
-  const remote = [...bases].find((base) => base !== primary)
-  ok(
-    !crossOwner || remote,
-    'Cross-owner scenario requires two connected environments already represented in the rail',
+  const primaryOwner = { base: primary, worktreeId: await platformWorktree(page, primary) }
+  if (!crossOwner) return searchOn(page, step, { primary: primaryOwner, searched: primaryOwner })
+
+  // A throwaway second owner, connected as a Remote URL machine, owns the searched session.
+  let second: SecondOwner | null = null
+  const fixture = await createGitFixture('session-search-environments')
+  let remote: SearchOwner | null = null
+  let remoteProject: string | null = null
+  try {
+    await fixtureGit(fixture, ['commit', '--quiet', '--allow-empty', '-m', 'initial'])
+    second = await connectSecondOwner(page, bases)
+    const base = [...bases].find((item) => item !== primary)
+    ok(base, 'The second owner must be represented in the rail')
+    const worktree = await registerFixtureProject(page, base, fixture)
+    remoteProject = worktree.projectId
+    remote = { base, worktreeId: worktree.id }
+    await searchOn(page, step, { primary: primaryOwner, searched: remote })
+  } finally {
+    if (remote && remoteProject)
+      await dispatch(page, remote.base, {
+        type: 'project.delete',
+        projectId: remoteProject,
+        force: true,
+      })
+    await releaseFixture(fixture)
+    await second?.stop()
+  }
+}
+
+/** Runs one fixture turn on the searched owner and finds its reply text from the shared rail. */
+async function searchOn(
+  page: Page,
+  step: (name: string) => Promise<void>,
+  owners: { readonly primary: SearchOwner; readonly searched: SearchOwner },
+) {
+  const crossOwner = owners.primary.base !== owners.searched.base
+  await withConversationProvider(page, owners.searched.base, 'session-search', (native) =>
+    findReply(page, step, { ...owners, crossOwner, native }),
   )
-  const base = crossOwner ? remote! : primary
-  const snapshot = await readShell(page, base)
-  const worktree =
-    snapshot.worktrees.find((item) => item.path.endsWith('/projects/platform')) ??
-    snapshot.worktrees[0]
-  ok(worktree, 'Search owner needs a registered worktree')
-  const project = snapshot.projects.find((item) => item.id === worktree.projectId)
-  ok(project?.defaultModelSelection, 'Search owner needs a default model')
+}
+
+async function findReply(
+  page: Page,
+  step: (name: string) => Promise<void>,
+  input: {
+    readonly primary: SearchOwner
+    readonly searched: SearchOwner
+    readonly crossOwner: boolean
+    readonly native: NativeProvider
+  },
+) {
+  const { primary, searched, crossOwner, native } = input
   const sessionId = crypto.randomUUID()
   const title = `Search verification ${sessionId.slice(0, 8)}`
   const needle = `hiddenneedle${sessionId.replaceAll('-', '')}`
-  await dispatch(page, base, {
+  await dispatch(page, searched.base, {
     type: 'session.create',
     sessionId,
     title,
-    modelSelection: project.defaultModelSelection,
-    worktreeTarget: { kind: 'current', worktreeId: worktree.id },
+    modelSelection: native.model,
+    worktreeTarget: { kind: 'current', worktreeId: searched.worktreeId },
   })
   let primaryFixture = false
   const primaryTitle = `Primary ${title}`
   try {
     if (crossOwner) {
-      const primarySnapshot = await readShell(page, primary)
-      const primaryWorktree = primarySnapshot.worktrees.find((item) =>
-        item.path.endsWith('/projects/platform'),
-      )
-      ok(primaryWorktree, 'Primary owner needs the Platform worktree')
-      const primaryProject = primarySnapshot.projects.find(
-        (item) => item.id === primaryWorktree.projectId,
-      )
-      ok(primaryProject?.defaultModelSelection, 'Primary owner needs a default model')
-      await dispatch(page, primary, {
+      // Same id on both owners: the cached query must keep each match with its own owner.
+      await dispatch(page, primary.base, {
         type: 'session.create',
         sessionId,
         title: primaryTitle,
-        modelSelection: primaryProject.defaultModelSelection,
-        worktreeTarget: { kind: 'current', worktreeId: primaryWorktree.id },
+        // No turn runs here, so any model will do.
+        modelSelection: native.model,
+        worktreeTarget: { kind: 'current', worktreeId: primary.worktreeId },
       })
       primaryFixture = true
     }
     await selectors.sessionSearch(page).fill(title)
     await selectors.sessionByTitle(page, title).click()
-    await selectors
-      .chatMessage(page)
-      .fill(`Reply with exactly ${needle}. Do not use tools, inspect files or change files.`)
+    await typePrompt(
+      page,
+      `Reply with exactly ${needle}. Do not use tools, inspect files or change files.`,
+    )
     await selectors.chatSend(page).click()
     await selectors
       .chatMessages(page)
       .getByText(needle, { exact: true })
-      .waitFor({ timeout: 90_000 })
+      .waitFor({ timeout: 30_000 })
     if (crossOwner) {
       await selectors.sessionSearch(page).fill(primaryTitle)
       await selectors.sessionByTitle(page, primaryTitle).click()
@@ -96,23 +145,24 @@ async function searchConversation(
     await selectors.sessionByTitle(page, title).waitFor()
     await step('cached-query-keeps-correct-owner')
   } finally {
-    await dispatch(page, base, { type: 'session.delete', sessionId })
-    if (primaryFixture) await dispatch(page, primary, { type: 'session.delete', sessionId })
+    await dispatch(page, searched.base, { type: 'session.runtime.stop', sessionId })
+    await dispatch(page, searched.base, { type: 'session.delete', sessionId })
+    if (primaryFixture) await dispatch(page, primary.base, { type: 'session.delete', sessionId })
   }
 }
 
 export const sessionSearch: Scenario = {
   name: 'session-search',
-  realProviders: true,
+  requiresIsolatedServer: true,
   description:
-    'Find hidden message text in one disposable real-provider session and reject stale matches after typing a new query.',
+    'Find hidden reply text in one disposable session on the Codex conversation fixture and reject stale matches after typing a new query.',
   run: (page, { step }) => searchConversation(page, step, false),
 }
 
 export const sessionSearchEnvironments: Scenario = {
   name: 'session-search-environments',
-  realProviders: true,
+  requiresIsolatedServer: true,
   description:
-    'Search hidden message text owned by another connected environment. Requires two existing live owners; uses one disposable real-provider session.',
+    'Search hidden reply text owned by a second throwaway server connected as a Remote URL machine, while a same-id session exists on the first; the fixture turn runs on the second owner.',
   run: (page, { step }) => searchConversation(page, step, true),
 }

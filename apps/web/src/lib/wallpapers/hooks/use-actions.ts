@@ -1,4 +1,4 @@
-import { wallpaperMutationKeys } from '@/features/theme-studio/utils/mutation-keys'
+import { wallpaperMutationKeys } from '@/lib/wallpapers/utils/mutation-keys'
 import { useMutation } from '@tanstack/react-query'
 import type { AssetId } from '@workspace/contracts'
 import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'

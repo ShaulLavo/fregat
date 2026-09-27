@@ -1,22 +1,8 @@
 import { notStrictEqual, ok, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
 import { openFileByName, runPaletteCommand, selectors, waitForApp } from '../selectors'
-import { serverApi } from '../server-api'
+import { selectedThemeId, userSettings } from '../server-api'
 import type { Scenario } from './index'
-
-type UserSettings = Readonly<Record<string, unknown>>
-
-async function userSettings(page: Page): Promise<UserSettings> {
-  const { base, headers } = serverApi(page)
-  const document = (await (await page.request.get(`${base}/settings`, { headers })).json()) as {
-    layers: { id: string; raw: UserSettings }[]
-  }
-  return document.layers.find((layer) => layer.id === 'user')?.raw ?? {}
-}
-
-function themeId(settings: UserSettings) {
-  return (settings['workbench.theme'] as { id?: string } | undefined)?.id ?? null
-}
 
 function cssToken(page: Page, name: string) {
   return page.evaluate(
@@ -62,7 +48,11 @@ export const themeStudio: Scenario = {
     await page.keyboard.press('ArrowRight')
     await repainted(page, saved)
     await step('previewing-next-theme')
-    strictEqual(themeId(await userSettings(page)), themeId(before), 'Browsing writes nothing')
+    strictEqual(
+      selectedThemeId(await userSettings(page)),
+      selectedThemeId(before),
+      'Browsing writes nothing',
+    )
     const previewing = await background(page)
     await openFileByName(page, 'README.md')
     await dock.waitFor()
@@ -95,7 +85,11 @@ export const themeStudio: Scenario = {
     await selectors.themeStudioTab(page, 'Colors').click()
     await setAccent(page, beforeAccent)
     await step('colors-forked')
-    strictEqual(themeId(await userSettings(page)), themeId(before), 'Editing colors writes nothing')
+    strictEqual(
+      selectedThemeId(await userSettings(page)),
+      selectedThemeId(before),
+      'Editing colors writes nothing',
+    )
 
     await selectors.themeStudioTab(page, 'Wallpaper').click()
     await dock.getByRole('tab', { name: 'Matches', exact: true }).click()
@@ -120,7 +114,11 @@ export const themeStudio: Scenario = {
         value,
       saved,
     )
-    strictEqual(themeId(await userSettings(page)), themeId(before), 'Discarding writes nothing')
+    strictEqual(
+      selectedThemeId(await userSettings(page)),
+      selectedThemeId(before),
+      'Discarding writes nothing',
+    )
     await step('discarded')
 
     await runPaletteCommand(page, 'Theme studio')
@@ -131,12 +129,12 @@ export const themeStudio: Scenario = {
     await setAccent(page, await cssToken(page, '--primary'))
     await dock.getByRole('button', { name: 'Apply', exact: true }).click()
     await dock.waitFor({ state: 'detached' })
-    let applied = themeId(await userSettings(page))
-    for (let attempt = 0; attempt < 20 && applied === themeId(before); attempt += 1) {
+    let applied = selectedThemeId(await userSettings(page))
+    for (let attempt = 0; attempt < 20 && applied === selectedThemeId(before); attempt += 1) {
       await page.waitForTimeout(100)
-      applied = themeId(await userSettings(page))
+      applied = selectedThemeId(await userSettings(page))
     }
-    notStrictEqual(applied, themeId(before), 'Apply writes the chosen theme')
+    notStrictEqual(applied, selectedThemeId(before), 'Apply writes the chosen theme')
     ok((await background(page)) !== saved, 'The applied theme stays on screen')
     const customization = (
       (await userSettings(page))['workbench.theme.customizations'] as

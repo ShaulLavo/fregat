@@ -2,8 +2,10 @@
 
 ## Status and authorization
 
-- Status: PROPOSED 2026-09-27. Owner direction, same day, on finding the surface opacity controls
-  gone from settings: "the studio never meant to replace any setting! it's just an extra feature on
+- Status: IN PROGRESS 2026-09-27. Phases 1–4 are in review on branch `w2/a-194`; the deploy and
+  the owner's settings-file cleanup (Phase 3) follow the merge. Q1 decided as recommended: one
+  row per part, editing the mode on screen. Owner direction, same day, on finding the surface
+  opacity controls gone from settings: "the studio never meant to replace any setting! it's just an extra feature on
   top! we need to integrate it back into the settings".
 - Effort: M. Phase 1 is the fix the owner asked for; 2 and 3 remove what made the regression
   invisible.
@@ -50,24 +52,25 @@ the selected theme and mode, `resetSetting` returns the part to the theme's valu
 
 ## Phases
 
-1. **Rows back.** D1, D2, D4, D6. Extract the four controls into `lib/appearance/components/`,
-   render them from `SettingControl` for widgets `palette`, `code-theme`, `wallpaper`, and
-   `number` on the four surface keys (a slider, since they are bounded percentages). Run
-   `bun run settings:reference`. `dom` tests over the real in-process server: each row renders the resolved
-   value; editing a part with a theme selected writes one `theme.customize` for the shown mode;
-   Reset returns to the theme's value; with no theme it writes the key. Update the settings page
-   test that pins the hidden keys.
-2. **Mode label.** D3 as decided by Q1.
-3. **Ignored values.** D5: the diagnostic, then the owner-approved cleanup of their settings file.
-4. **Proof and ship.** Scenario `settings-appearance-rows`: open Settings, search "content", drag
-   the slider, read `--content-opacity` and the painted editor background, confirm the studio's
-   Surfaces tab shows the same number, and confirm `caches` holds one settings mutation. `look`
-   screenshots of the Appearance section read back and published for the owner. Ship with
-   `bun run deploy --server --restart`.
+1. [x] **Rows back.** D1, D2, D4, D6. Extract the four controls into `lib/appearance/components/`,
+       render them from `SettingControl` for widgets `palette`, `code-theme`, `wallpaper`, and
+       `number` on the four surface keys (a slider, since they are bounded percentages). Run
+       `bun run settings:reference`. `dom` tests over the real in-process server: each row renders the resolved
+       value; editing a part with a theme selected writes one `theme.customize` for the shown mode;
+       Reset returns to the theme's value; with no theme it writes the key. Update the settings page
+       test that pins the hidden keys.
+2. [x] **Mode label.** D3 as decided by Q1.
+3. [ ] **Ignored values.** (Diagnostic done; the owner's cleanup is pending.) D5: the diagnostic, then the owner-approved cleanup of their settings file.
+4. [ ] **Proof and ship.** (Scenario and screenshots done; the deploy is pending.) Scenario `settings-appearance-rows`: open Settings, search "content", drag
+       the slider, read `--content-opacity` and the painted editor background, confirm the studio's
+       Surfaces tab shows the same number, and confirm `caches` holds one settings mutation. `look`
+       screenshots of the Appearance section read back and published for the owner. Ship with
+       `bun run deploy --server --restart`.
 
 ## Owner questions
 
-- **Q1 — per-mode rows.** Recommended: one row per part that edits the mode on screen and says
+- **Q1 — per-mode rows.** Decided 2026-09-27 as recommended. Recommended: one row per part that
+  edits the mode on screen and says
   which (D3), matching the studio's mode switch. The alternative is a light and a dark row for each
   part, like code themes today: nothing changes with the mode, but Appearance grows from 9 rows to 15.
 
@@ -76,3 +79,20 @@ the selected theme and mode, `resetSetting` returns the part to the theme's valu
 Before starting: `THEME_PART_KEYS` still lists the eight keys; `setSetting` still routes parts to
 `theme.customize`; the studio tabs still take `{ value, onEdit }`-shaped props
 (`features/theme-studio/components/*-tab.tsx`); `page.tsx:133` still filters `internal` rows.
+
+## Implementation notes
+
+- The controls: `lib/appearance/components/palette-list.tsx`, `code-theme-picker.tsx`,
+  `wallpaper-library.tsx` and `material-slider.tsx`. The wallpaper library's cards, hooks, upload
+  rules, match sort and mutation keys moved to `lib/wallpapers/`. Settings wraps each in a widget
+  under `features/settings/components/widgets/`; the surface slider writes once, on release.
+- The mode note shows only while a theme is selected: with no theme a part is one value for both
+  modes. The code theme rows keep their two keys and carry no note.
+- D5 is a resolver diagnostic, `set-by-theme` (`packages/contracts/src/settings/resolve.ts`), so
+  the JSON view, the settings banner and the TUI all report it. Only the user layer is flagged;
+  workspace and policy values still apply over a theme.
+- The `Slider` primitive now names its thumb from `aria-label`; before, a slider outside a
+  wrapping `<label>` had no accessible name.
+- Settings lists move a local cursor and write only on Enter, Space or a click; the studio's
+  lists choose as the cursor moves. Reset under a theme also removes a user-file value written
+  before the theme was picked, in the same write.

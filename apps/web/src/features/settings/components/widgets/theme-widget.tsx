@@ -6,8 +6,8 @@ import { useCommandBus } from '@/keymap/hooks/use-command-bus'
 import { themeWallpapers } from '@/features/settings/utils/theme-summary'
 
 /**
- * The theme in one row: its name, both halves' wallpapers, and the way into the studio, where
- * colors, code colors, wallpaper and surfaces are chosen on the live app.
+ * The theme in one row: its name, both halves' wallpapers, and the way into the studio, which
+ * previews edits to the rows below on the live app before applying them.
  */
 export function ThemeWidget({ disabled }: { disabled: boolean }) {
   const { bundleId, catalog } = useBundles()
