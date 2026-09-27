@@ -5,7 +5,7 @@ import { prepareGitReload } from '@/features/git/state/reload'
 import { prepareSettingsReload } from '@/features/settings/state/reload'
 import { environmentWindowStorage } from '@/lib/environments/state/window-storage'
 import { prepareTreeReload } from '@/features/workspace/state/tree-reload'
-import type { EnvironmentId } from '@workspace/contracts'
+import type { EnvironmentId, SettingsValues } from '@workspace/contracts'
 import { retainedTextBudgetFromSettings } from '@/features/editor/utils/retained-text-budget'
 import { confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
 import { openWorkspaceRootForOwner } from '@/features/workspace/state/open-root'
@@ -34,7 +34,9 @@ import {
   resumeEnvironmentActivity,
   suspendEnvironmentActivity,
 } from '@/lib/environments/state/activity'
-import { queryClientFor } from '@/lib/environments/state/query-clients'
+import { primaryQueryClient, queryClientFor } from '@/lib/environments/state/query-clients'
+import { subscribeLiveSettings, watchSettingValue } from '@/features/settings/state/live-projection'
+import { setSimulatedLatencyMs } from '@/lib/simulated-latency'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 
 type RetainedEnvironment = {
@@ -43,6 +45,7 @@ type RetainedEnvironment = {
   readonly editor: EditorRuntime
   readonly stopSearchReload: () => void
   readonly stopCachePersistence: () => void
+  readonly stopSpellcheckWords: () => void
   readonly unsubscribeRoot: () => void
 }
 
@@ -89,6 +92,12 @@ export function createApplicationRuntime({
       editor,
       stopSearchReload,
       // Before any recovery, so a recovered root recreates its erased cache entry.
+      // `false` entries un-accept a word the merged dictionary would otherwise accept.
+      stopSpellcheckWords: watchSettingValue(primaryQueryClient(), 'spellcheck.words', (words) =>
+        editor.spellcheck.setAcceptedWords(
+          Object.entries(words).flatMap(([word, accepted]) => (accepted ? [word] : [])),
+        ),
+      ),
       stopCachePersistence: subscribeWorkspaceCachePersistence({
         storage,
         documentStore: editor.documentStore,
@@ -113,6 +122,19 @@ export function createApplicationRuntime({
   activateWorkspaceRoot(current.editor.workspaceStore.getState().rootFolder?.path ?? null)
 
   const connections = createEnvironmentConnections()
+  const stopLatency = watchSettingValue(
+    primaryQueryClient(),
+    'developer.simulatedLatencyMs',
+    setSimulatedLatencyMs,
+  )
+  let machines: SettingsValues['environments.machines'] | undefined
+  // Only confirmed settings may configure machines: the settings authority forgets undesired ones.
+  const stopMachines = subscribeLiveSettings(primaryQueryClient(), (settings) => {
+    const next = settings?.values['environments.machines']
+    if (!next || next === machines) return
+    machines = next
+    connections.configureMachines(next)
+  })
 
   const application = {
     connections,
@@ -181,12 +203,16 @@ export function createApplicationRuntime({
       [...environments.values()].some(({ editor }) => editor.hasUnsavedDocuments()),
     dispose() {
       commandBinding.clear()
+      stopLatency()
+      setSimulatedLatencyMs(0)
+      stopMachines()
       connections.stop()
       for (const environment of environments.values()) {
         suspendEnvironmentActivity(environment.origin)
         environment.unsubscribeRoot()
         environment.stopSearchReload()
         environment.stopCachePersistence()
+        environment.stopSpellcheckWords()
         environment.editor.dispose()
         environment.queryClient.unmount()
       }

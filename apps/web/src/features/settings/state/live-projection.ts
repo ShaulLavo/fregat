@@ -1,12 +1,19 @@
 import { resolveThemeSettings } from '@workspace/contracts'
 import { systemColorMode } from '@/features/settings/state/system-color-mode'
-import type { QueryClient } from '@tanstack/react-query'
-import type { SettingsOperation, SettingsSnapshot, SettingsValues } from '@workspace/contracts'
+import { hashKey, type QueryClient } from '@tanstack/react-query'
+import type {
+  SettingId,
+  SettingsOperation,
+  SettingsSnapshot,
+  SettingsValues,
+} from '@workspace/contracts'
 
 import {
   activeSettingsIntentsFor,
+  settingsIntentStore,
   type ActiveSettingsIntent,
 } from '@workspace/client-core/settings/intent-store'
+import { readSettingBootValue } from '@/lib/settings-boot-mirror'
 import { projectSettings } from '@workspace/client-core/settings/projection'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 
@@ -23,6 +30,44 @@ export function readLiveSettingsProjection(queryClient: QueryClient, fallback?: 
     ...projected,
     values: resolveThemeSettings(projected.values, systemColorMode(), projected.layers),
   }
+}
+
+type LiveSettings = ReturnType<typeof readLiveSettingsProjection>
+
+/**
+ * Hands `listener` the live projection now and after every change to the confirmed document or
+ * to the settings intents, so optimistic writes reach it at once, as they reach `useSettingValue`.
+ */
+export function subscribeLiveSettings(
+  queryClient: QueryClient,
+  listener: (settings: LiveSettings) => void,
+): () => void {
+  const documentHash = hashKey(settingsKeys.document())
+  const notify = () => listener(readLiveSettingsProjection(queryClient))
+  const stopDocument = queryClient.getQueryCache().subscribe((event) => {
+    if (event.query.queryHash === documentHash) notify()
+  })
+  const stopIntents = settingsIntentStore.subscribe(notify)
+  notify()
+  return () => {
+    stopDocument()
+    stopIntents()
+  }
+}
+
+/** Applies one setting now and whenever it changes, with its boot value until the document lands. */
+export function watchSettingValue<K extends SettingId>(
+  queryClient: QueryClient,
+  key: K,
+  apply: (value: SettingsValues[K]) => void,
+): () => void {
+  let applied: { readonly value: SettingsValues[K] } | null = null
+  return subscribeLiveSettings(queryClient, (settings) => {
+    const value = settings?.values[key] ?? readSettingBootValue(key)
+    if (applied && Object.is(applied.value, value)) return
+    applied = { value }
+    apply(value)
+  })
 }
 
 export function readLiveColorTheme(queryClient: QueryClient, fallback?: ColorTheme) {
