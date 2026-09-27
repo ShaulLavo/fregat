@@ -25,6 +25,13 @@
   layout in that baseline. Each sidebar scroll event forces 4 layouts inside TanStack's own scroll
   handler (`virtual-core` `observeElementOffset`, 38–51 ms per event on the test machine); the search
   view's window store forces one. Probe: `visual-search-{narrow,broad,pathological}`.
+- Phase 3 done 2026-09-27: selection reads per-file id indexes (cached by each file's matches array,
+  reused across collapse and untouched streaming batches), so `selectResult`, F4 and the summary's
+  n/total no longer rebuild and re-hash the result set. 20 sidebar ArrowDown presses on the
+  pathological set, production build, three traces against two: busy 1,740–1,760 → 970–1,150 ms, long
+  tasks 17–20 → 2–6; sampled time in `result-items` 575–660 → 81–105 ms, `use-summary-model`
+  410–445 → 3–7 ms, `buffer-state` 108–122 → 3–8 ms. What remains per press is React and the sidebar's
+  `results-view` render (`useListbox` maps every row).
 - Planned at: Platform `d5a901726`, 2026-09-26. Researched at Platform `c130dd35a`, Editor `74e76be`;
   second pass at Platform `4c78266f8`, Editor `74e76be`, Zed `933d8d9`, VS Code `90da900128e`; third
   pass at Platform `e04c94271`, Editor `860f861`, Zed `933d8d9`.

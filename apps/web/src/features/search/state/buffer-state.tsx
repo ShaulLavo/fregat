@@ -18,12 +18,14 @@ import { compareSearchPaths } from '@/features/search/utils/sort'
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import {
   expandedSearchResultItems,
-  searchResultContentItems,
   searchResultIdIsName,
-  searchResultItemById,
+  searchResultLocation,
+  searchResultMatchAt,
+  searchResultMatchCount,
   firstSelectableSearchResultId,
   pickedSearchResultId,
   type SearchResultId,
+  type SearchResultLocation,
 } from '@/features/search/utils/result-items'
 
 const SEARCH_HISTORY_LIMIT = 50
@@ -1356,13 +1358,34 @@ function expandSearchGroups(snapshot: SearchBufferSnapshot | null) {
 function selectSearchResult(snapshot: SearchBufferSnapshot | null, id: SearchResultId | null) {
   if (!snapshot) return null
 
-  const groups = snapshot.groups
-  const selected = searchResultItemById(expandedSearchResultItems(groups), id)
+  const selected = searchResultLocation(snapshot.groups, id)
   if (!selected) return resolveActiveSearchResult(snapshot)
 
+  return selectSearchResultLocation(snapshot, selected)
+}
+
+function selectSearchMatch(snapshot: SearchBufferSnapshot | null, direction: 1 | -1) {
+  if (!snapshot) return null
+
+  const groups = snapshot.groups
+  const total = searchResultMatchCount(groups)
+  if (total === 0) return resolveActiveSearchResult(snapshot)
+
+  const active = searchResultLocation(groups, snapshot.activeResultId)
+  const index = active?.type === 'match' ? active.matchIndex : -1
+  const selected = searchResultMatchAt(groups, wrappedSearchMatchIndex(index, total, direction))
+  if (!selected) return resolveActiveSearchResult(snapshot)
+
+  return selectSearchResultLocation(snapshot, selected)
+}
+
+function selectSearchResultLocation(
+  snapshot: SearchBufferSnapshot,
+  selected: SearchResultLocation,
+) {
   const collapsedPaths =
     selected.type === 'match'
-      ? withoutPath(snapshot.collapsedPaths, selected.groupPath)
+      ? withoutPath(snapshot.collapsedPaths, selected.group.path)
       : snapshot.collapsedPaths
 
   return resolveActiveSearchResult({
@@ -1370,29 +1393,7 @@ function selectSearchResult(snapshot: SearchBufferSnapshot | null, id: SearchRes
     activeResultId: selected.id,
     activeResultPicked: true,
     collapsedPaths,
-    groups: searchGroupsWithCollapsedPaths(groups, collapsedPaths),
-  })
-}
-
-function selectSearchMatch(snapshot: SearchBufferSnapshot | null, direction: 1 | -1) {
-  if (!snapshot) return null
-
-  const groups = snapshot.groups
-  const matches = searchResultContentItems(expandedSearchResultItems(groups))
-  if (matches.length === 0) return resolveActiveSearchResult(snapshot)
-
-  const index = activeSearchMatchIndex(matches, snapshot.activeResultId)
-  const nextIndex = wrappedSearchMatchIndex(index, matches.length, direction)
-  const selected = matches[nextIndex]
-  if (!selected) return resolveActiveSearchResult(snapshot)
-
-  const collapsedPaths = withoutPath(snapshot.collapsedPaths, selected.groupPath)
-  return resolveActiveSearchResult({
-    ...snapshot,
-    activeResultId: selected.id,
-    activeResultPicked: true,
-    collapsedPaths,
-    groups: searchGroupsWithCollapsedPaths(groups, collapsedPaths),
+    groups: searchGroupsWithCollapsedPaths(snapshot.groups, collapsedPaths),
   })
 }
 
@@ -1440,15 +1441,6 @@ function canKeepActiveResult(
   if (!searchResultIdIsName(previous.activeResultId)) return true
 
   return !hasContentSearchMatch(options.incomingMatches)
-}
-
-function activeSearchMatchIndex(
-  matches: ReturnType<typeof searchResultContentItems>,
-  activeResultId: SearchResultId | null,
-) {
-  if (!activeResultId) return -1
-
-  return matches.findIndex((match) => match.id === activeResultId)
 }
 
 function wrappedSearchMatchIndex(index: number, length: number, direction: 1 | -1) {

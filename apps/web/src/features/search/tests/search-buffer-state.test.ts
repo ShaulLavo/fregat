@@ -14,8 +14,9 @@ import {
   firstSearchResultId,
   lastSearchResultId,
   parentSearchResultId,
-  searchResultActiveMatchPosition,
   searchResultItemById,
+  searchResultMatchPosition,
+  searchGroupResultIndex,
   searchResultIdByOffset,
   searchResultItems,
 } from '@/features/search/utils/result-items'
@@ -1323,6 +1324,61 @@ describe('search buffer store', () => {
     expect(store.getState().active?.activeResultId).toBe(hiddenMatch?.id)
   })
 
+  it('selects results through per-file indexes that survive selection and collapse', () => {
+    const store = createSearchBufferStore()
+    const runId = store.getState().startSearch(searchQuery('a'))
+    store.getState().appendEvents(runId, contentMatchEvents(['repo/src/a.ts', 'repo/src/b.ts'], 50))
+    store.getState().appendEvent(runId, doneEvent('a', 100))
+    const indexes = searchGroupsForSnapshot(store.getState().active).map(searchGroupResultIndex)
+    const visibleIds = searchResultItems(searchGroupsForSnapshot(store.getState().active))
+      .slice(0, 20)
+      .map((item) => item.id)
+
+    for (const id of visibleIds) store.getState().selectResult(id)
+    store.getState().collapseAllGroups()
+    store.getState().selectResult(indexes[1]?.matchIds[10] ?? null)
+
+    const groups = searchGroupsForSnapshot(store.getState().active)
+    groups.forEach((group, index) => expect(searchGroupResultIndex(group)).toBe(indexes[index]))
+    expect(groups.map((group) => group.collapsed)).toEqual([true, false])
+    expect(activeMatchPosition(store.getState().active)).toEqual({ index: 61, total: 100 })
+  })
+
+  it('steps into a collapsed file with next match and wraps across files', () => {
+    const store = createSearchBufferStore()
+    const runId = store.getState().startSearch(searchQuery('needle'))
+    store.getState().appendEvents(runId, contentMatchEvents(['repo/src/a.ts', 'repo/src/b.ts'], 2))
+    const lastInA = searchGroupResultIndex(searchGroupsForSnapshot(store.getState().active)[0]!)
+      .matchIds[1]
+    store.getState().selectResult(lastInA ?? null)
+    store.getState().toggleGroup('repo/src/b.ts')
+
+    store.getState().selectNextMatch()
+    expect(groupByPath(searchGroupsForSnapshot(store.getState().active), 'repo/src/b.ts')).toEqual(
+      expect.objectContaining({ collapsed: false }),
+    )
+    expect(activeMatchPosition(store.getState().active)).toEqual({ index: 3, total: 4 })
+
+    store.getState().selectNextMatch()
+    store.getState().selectNextMatch()
+    expect(activeMatchPosition(store.getState().active)).toEqual({ index: 1, total: 4 })
+  })
+
+  it('keeps the picked match and moves its position as earlier files stream in', () => {
+    const store = createSearchBufferStore()
+    const runId = store.getState().startSearch(searchQuery('needle'))
+    store.getState().appendEvents(runId, contentMatchEvents(['repo/src/b.ts'], 3))
+    const picked = searchGroupResultIndex(searchGroupsForSnapshot(store.getState().active)[0]!)
+      .matchIds[1]
+    store.getState().selectResult(picked ?? null)
+    expect(activeMatchPosition(store.getState().active)).toEqual({ index: 2, total: 3 })
+
+    store.getState().appendEvents(runId, contentMatchEvents(['repo/src/a.ts', 'repo/src/b.ts'], 2))
+
+    expect(store.getState().active?.activeResultId).toBe(picked)
+    expect(activeMatchPosition(store.getState().active)).toEqual({ index: 4, total: 7 })
+  })
+
   it('provides bounded row movement helpers for tree keyboard navigation', () => {
     const store = createSearchBufferStore()
     const runId = store.getState().startSearch(searchQuery('needle'))
@@ -1364,6 +1420,15 @@ function contentMatch(path: string, line: number, column: number): WorkspaceSear
   }
 }
 
+function contentMatchEvents(paths: readonly string[], linesPerPath: number) {
+  return paths.flatMap((path) =>
+    Array.from({ length: linesPerPath }, (_, index) => ({
+      match: contentMatch(path, index + 1, 1),
+      type: 'match' as const,
+    })),
+  )
+}
+
 function doneEvent(query: string, count: number) {
   return {
     count,
@@ -1375,8 +1440,8 @@ function doneEvent(query: string, count: number) {
 }
 
 function activeMatchPosition(snapshot: SearchBufferSnapshot | null) {
-  return searchResultActiveMatchPosition(
-    expandedSearchResultItems(searchGroupsForSnapshot(snapshot)),
+  return searchResultMatchPosition(
+    searchGroupsForSnapshot(snapshot),
     snapshot?.activeResultId ?? null,
   )
 }

@@ -36,10 +36,29 @@ export type SearchResultItemOptions = {
   pendingResultIds?: readonly SearchResultId[] | ReadonlySet<SearchResultId>
 }
 
+/** A file's result ids in list order, for lookups that must not rebuild the item list. */
+export type SearchGroupResultIndex = {
+  readonly groupId: SearchResultId | null
+  readonly matchIds: readonly SearchResultId[]
+  readonly matchIndexById: ReadonlyMap<SearchResultId, number>
+  readonly nameId: SearchResultId | null
+  readonly path: string
+}
+
+/** Where an id sits in the expanded list; `matchIndex` counts content matches across all files. */
+export type SearchResultLocation = {
+  readonly group: WorkspaceSearchFileGroup
+  readonly id: SearchResultId
+  readonly matchIndex: number
+  readonly type: SearchResultItem['type']
+}
+
 const STABLE_HASH_CACHE_LIMIT = 4096
 const STABLE_HASH_OFFSET = 0x811c9dc5
 const stableHashCache = new Map<string, string>()
 const searchMatchLocationHashCache = new WeakMap<WorkspaceSearchMatch, string>()
+// Keyed by the matches array: collapsing a file copies the group but keeps its matches.
+const groupResultIndexCache = new WeakMap<readonly WorkspaceSearchMatch[], SearchGroupResultIndex>()
 
 export function searchResultItems(
   groups: readonly WorkspaceSearchFileGroup[],
@@ -161,28 +180,120 @@ export function pickedSearchResultId(
   groups: readonly WorkspaceSearchFileGroup[],
   id: SearchResultId | null,
 ) {
+  const location = searchResultLocation(groups, id)
+  if (!location) return null
+  if (location.type !== 'match' || !location.group.collapsed) return location.id
+
+  return searchResultGroupId(location.group.path)
+}
+
+export function searchResultLocation(
+  groups: readonly WorkspaceSearchFileGroup[],
+  id: SearchResultId | null,
+): SearchResultLocation | null {
   if (!id) return null
-  if (searchResultIdIsVisible(groups, id)) return id
 
-  return hiddenSearchResultParentId(groups, id)
+  let offset = 0
+  for (const group of groups) {
+    const index = searchGroupResultIndex(group)
+    const location = groupResultLocation(group, index, id, offset)
+    if (location) return location
+
+    offset += index.matchIds.length
+  }
+
+  return null
 }
 
-export function searchResultContentItems(items: readonly SearchResultItem[]) {
-  return items.filter(isContentSearchResultItem)
+export function searchResultMatchCount(groups: readonly WorkspaceSearchFileGroup[]) {
+  let count = 0
+  for (const group of groups) {
+    count += searchGroupResultIndex(group).matchIds.length
+  }
+
+  return count
 }
 
-export function searchResultActiveMatchPosition(
-  items: readonly SearchResultItem[],
+/** The content match at `matchIndex` counting across all files, collapsed ones included. */
+export function searchResultMatchAt(
+  groups: readonly WorkspaceSearchFileGroup[],
+  matchIndex: number,
+): SearchResultLocation | null {
+  if (matchIndex < 0) return null
+
+  let offset = 0
+  for (const group of groups) {
+    const { matchIds } = searchGroupResultIndex(group)
+    const id = matchIds[matchIndex - offset]
+    if (id) return { group, id, matchIndex, type: 'match' }
+
+    offset += matchIds.length
+  }
+
+  return null
+}
+
+export function searchResultMatchPosition(
+  groups: readonly WorkspaceSearchFileGroup[],
   activeResultId: SearchResultId | null,
 ) {
-  const matches = searchResultContentItems(items)
-  const index = matches.findIndex((item) => item.id === activeResultId)
-  if (index < 0) return null
+  const location = searchResultLocation(groups, activeResultId)
+  if (location?.type !== 'match') return null
 
   return {
-    index: index + 1,
-    total: matches.length,
+    index: location.matchIndex + 1,
+    total: searchResultMatchCount(groups),
   }
+}
+
+export function searchGroupResultIndex(group: WorkspaceSearchFileGroup): SearchGroupResultIndex {
+  const cached = groupResultIndexCache.get(group.matches)
+  if (cached?.path === group.path) return cached
+
+  const index = buildGroupResultIndex(group)
+  groupResultIndexCache.set(group.matches, index)
+
+  return index
+}
+
+function buildGroupResultIndex(group: WorkspaceSearchFileGroup): SearchGroupResultIndex {
+  const matchIds: SearchResultId[] = []
+  const matchIndexById = new Map<SearchResultId, number>()
+  const duplicateCounts = new Map<string, number>()
+  for (const match of group.matches) {
+    if (match.kind !== 'content') continue
+
+    const locationHash = searchMatchLocationHash(match)
+    const duplicateIndex = nextDuplicateIndex(duplicateCounts, locationHash)
+    const id = searchResultMatchIdForIdentityHash(group.path, locationHash, duplicateIndex)
+    matchIndexById.set(id, matchIds.length)
+    matchIds.push(id)
+  }
+
+  const firstMatch = group.matches[0]
+  const hasContent = matchIds.length > 0
+  return {
+    groupId: hasContent ? searchResultGroupId(group.path) : null,
+    matchIds,
+    matchIndexById,
+    nameId: !hasContent && firstMatch ? searchResultNameId(group.path, firstMatch) : null,
+    path: group.path,
+  }
+}
+
+function groupResultLocation(
+  group: WorkspaceSearchFileGroup,
+  index: SearchGroupResultIndex,
+  id: SearchResultId,
+  offset: number,
+): SearchResultLocation | null {
+  if (id === index.groupId) return { group, id, matchIndex: -1, type: 'group' }
+  if (id === index.nameId) return { group, id, matchIndex: -1, type: 'name' }
+
+  const matchIndex = index.matchIndexById.get(id)
+  if (matchIndex === undefined) return null
+
+  return { group, id, matchIndex: offset + matchIndex, type: 'match' }
 }
 
 export function searchResultIdByOffset({
@@ -417,58 +528,6 @@ function firstNameResultId(group: WorkspaceSearchFileGroup): SearchResultId | nu
 
 function firstContentMatch(group: WorkspaceSearchFileGroup) {
   return group.matches.find((match) => match.kind === 'content') ?? null
-}
-
-function searchResultIdIsVisible(groups: readonly WorkspaceSearchFileGroup[], id: SearchResultId) {
-  for (const group of groups) {
-    if (groupResultIdIsVisible(group, id)) return true
-  }
-
-  return false
-}
-
-function groupResultIdIsVisible(group: WorkspaceSearchFileGroup, id: SearchResultId) {
-  const firstContent = firstContentMatch(group)
-  if (!firstContent) return nameResultIdIsVisible(group, id)
-  if (searchResultGroupId(group.path) === id) return true
-  if (group.collapsed) return false
-
-  return contentResultIdIsPresent(group, id)
-}
-
-function nameResultIdIsVisible(group: WorkspaceSearchFileGroup, id: SearchResultId) {
-  const match = group.matches[0]
-  if (!match) return false
-
-  return searchResultNameId(group.path, match) === id
-}
-
-function hiddenSearchResultParentId(
-  groups: readonly WorkspaceSearchFileGroup[],
-  id: SearchResultId,
-) {
-  for (const group of groups) {
-    if (!contentResultIdIsPresent(group, id)) continue
-
-    return searchResultGroupId(group.path)
-  }
-
-  return null
-}
-
-function contentResultIdIsPresent(group: WorkspaceSearchFileGroup, id: SearchResultId) {
-  const duplicateCounts = new Map<string, number>()
-
-  for (const match of group.matches) {
-    if (match.kind !== 'content') continue
-
-    const locationHash = searchMatchLocationHash(match)
-    const duplicateIndex = nextDuplicateIndex(duplicateCounts, locationHash)
-    const matchId = searchResultMatchIdForIdentityHash(group.path, locationHash, duplicateIndex)
-    if (matchId === id) return true
-  }
-
-  return false
 }
 
 function nextDuplicateIndex(duplicateCounts: Map<string, number>, identity: string) {
