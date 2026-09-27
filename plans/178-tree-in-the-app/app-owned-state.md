@@ -211,3 +211,13 @@ chip on Rename (reproduced on main); re-baselined.
   `tree-parity-scroll-menu` "holds row hover until the scroll settles" fails intermittently under a
   full run here; it fails the same way on the base commit `14eebe4` (the first hover never lands,
   line 221), so it predates this work.
+
+### Verification environment, 2026-09-27
+
+These landings ran in a cloud container without the mesh. The Chromium tests ran (Playwright 1.63
+against the installed Chromium build). `agent:browser` did not: opening the checkout as a workspace
+exhausts the container's 20,000-descriptor hard limit (`EMFILE` from the recursive watch), and with
+a small workspace `tree-parity` still stops at the unreadable folder, which stays "loading"; the
+base commit `14eebe4` stops at the same step. So `tree-parity` (pixels and styles),
+`tree-parity-behaviour` and the guarding scenarios have not run on steps 2–3, 8, 9 or the
+context-menu adoption. Run them on the mesh before building on these.
