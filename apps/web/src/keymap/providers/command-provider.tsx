@@ -436,27 +436,18 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
 function readCommandSettingsSnapshot(
   queryClient: ReturnType<typeof useQueryClient>,
 ): SnapshotSettings {
-  const fallback = bootSnapshotSettings()
-  const projection = readLiveSettingsProjection(queryClient, fallbackSettingsSnapshot(fallback))
-  if (!projection) return fallback
-
+  const { values } =
+    readLiveSettingsProjection(queryClient) ??
+    readLiveSettingsProjection(queryClient, bootSettingsSnapshot())
   return {
-    diffViewMode: projection.values['editor.diff.viewMode'],
-    wallpaperSelection: projection.values['workbench.wallpaper'],
-    wallpaperEnabled: projection.values['workbench.wallpaper'].enabled,
+    diffViewMode: values['editor.diff.viewMode'],
+    wallpaperSelection: values['workbench.wallpaper'],
+    wallpaperEnabled: values['workbench.wallpaper'].enabled,
   }
 }
 
-function bootSnapshotSettings(): SnapshotSettings {
-  const wallpaperSelection = readSettingBootValue('workbench.wallpaper')
-  return {
-    diffViewMode: readSettingBootValue('editor.diff.viewMode'),
-    wallpaperEnabled: wallpaperSelection.enabled,
-    wallpaperSelection,
-  }
-}
-
-function fallbackSettingsSnapshot(fallback: SnapshotSettings): SettingsSnapshot {
+/** Only while the settings document has not landed; pending writes still project over it. */
+function bootSettingsSnapshot(): SettingsSnapshot {
   const file = { keyRanges: {}, parseErrors: [], revision: 'command-fallback', text: '{}\n' }
   return {
     diagnostics: [],
@@ -468,8 +459,8 @@ function fallbackSettingsSnapshot(fallback: SnapshotSettings): SettingsSnapshot 
     serverVersion: { epoch: 'command-fallback', sequence: 0 },
     values: {
       ...DEFAULT_SETTING_VALUES,
-      'editor.diff.viewMode': fallback.diffViewMode,
-      'workbench.wallpaper': fallback.wallpaperSelection,
+      'editor.diff.viewMode': readSettingBootValue('editor.diff.viewMode'),
+      'workbench.wallpaper': readSettingBootValue('workbench.wallpaper'),
     },
   }
 }
