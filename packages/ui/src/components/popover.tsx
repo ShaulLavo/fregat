@@ -2,9 +2,28 @@ import * as React from 'react'
 import { Popover as PopoverPrimitive } from '@base-ui/react/popover'
 
 import { cn } from '@workspace/ui/lib/utils'
+import {
+  SHEET_BACKDROP_CLASS,
+  SHEET_FRAME_CLASS,
+  SHEET_POSITIONER_CLASS,
+  SHEET_SURFACE_CLASS,
+  playSheetOpen,
+  usePresentation,
+  type Presentation,
+} from '@workspace/ui/patterns/sheet'
 
-function Popover({ ...props }: PopoverPrimitive.Root.Props) {
-  return <PopoverPrimitive.Root data-slot='popover' {...props} />
+function Popover({ onOpenChange, ...props }: PopoverPrimitive.Root.Props) {
+  const presentation = usePresentation()
+  return (
+    <PopoverPrimitive.Root
+      data-slot='popover'
+      {...props}
+      onOpenChange={(open, details) => {
+        onOpenChange?.(open, details)
+        if (!details.isCanceled) playSheetOpen(presentation, open, details.event)
+      }}
+    />
+  )
 }
 
 function PopoverTrigger({ ...props }: PopoverPrimitive.Trigger.Props) {
@@ -16,6 +35,7 @@ function PopoverContent({
   align = 'center',
   alignOffset = 0,
   anchor,
+  presentation: requested,
   side = 'bottom',
   sideOffset = 4,
   ...props
@@ -23,23 +43,36 @@ function PopoverContent({
   Pick<
     PopoverPrimitive.Positioner.Props,
     'align' | 'alignOffset' | 'anchor' | 'side' | 'sideOffset'
-  >) {
+  > & {
+    /** `anchored` keeps a surface on its anchor in the phone shell too (a menu that follows a caret). */
+    readonly presentation?: Presentation
+  }) {
+  const presentation = usePresentation(requested)
+  const sheet = presentation === 'sheet'
   return (
     <PopoverPrimitive.Portal>
+      {sheet ? (
+        <PopoverPrimitive.Backdrop data-slot='sheet-backdrop' className={SHEET_BACKDROP_CLASS} />
+      ) : null}
       <PopoverPrimitive.Positioner
         align={align}
         alignOffset={alignOffset}
         anchor={anchor}
         side={side}
         sideOffset={sideOffset}
-        className='isolate z-50'
+        className={sheet ? SHEET_POSITIONER_CLASS : 'isolate z-50'}
       >
         <PopoverPrimitive.Popup
           data-slot='popover-content'
-          className={cn(
-            'z-50 flex w-72 origin-(--transform-origin) flex-col overscroll-contain gap-(--density-popover-gap) rounded-lg p-(--density-popover-padding) text-xs text-popover-foreground shadow-md ring-1 ring-foreground/10 bg-popover-solid outline-hidden ease-out-strong data-open:animation-duration-(--duration-enter) data-closed:animation-duration-(--duration-exit) data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
-            className,
-          )}
+          data-presentation={presentation}
+          className={
+            sheet
+              ? cn(SHEET_SURFACE_CLASS, 'gap-(--density-popover-gap)', className, SHEET_FRAME_CLASS)
+              : cn(
+                  'z-50 flex w-72 origin-(--transform-origin) flex-col overscroll-contain gap-(--density-popover-gap) rounded-lg p-(--density-popover-padding) text-xs text-popover-foreground shadow-md ring-1 ring-foreground/10 bg-popover-solid outline-hidden ease-out-strong data-open:animation-duration-(--duration-enter) data-closed:animation-duration-(--duration-exit) data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
+                  className,
+                )
+          }
           {...props}
         />
       </PopoverPrimitive.Positioner>

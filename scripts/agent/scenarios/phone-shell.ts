@@ -1,4 +1,6 @@
 import { equal, ok } from 'node:assert/strict'
+import { writeFile } from 'node:fs/promises'
+import path from 'node:path'
 import type { Locator, Page } from 'playwright'
 
 import { createModifiedFileFixture, releaseFixture } from '../fixture-workspace'
@@ -17,7 +19,7 @@ const REPLY = PHONE_REPLY
 export const phoneShell: Scenario = {
   name: 'phone-shell',
   description:
-    'At a touch phone viewport: session list, session, changes, a diff, the terminal, and Back through each, with no horizontal scroll.',
+    'At a touch phone viewport: session list, session, pickers as bottom sheets, changes, diffs that share one editor tab, the terminal, and Back through each, with no horizontal scroll.',
   capture: { width: 390, height: 844, scale: 2, touch: true },
   async run(page, { step }) {
     const fixture = await createModifiedFileFixture(
@@ -27,6 +29,8 @@ export const phoneShell: Scenario = {
       ['# Notes', '', 'The upload retries three times, then reports why.'],
     )
     try {
+      // A second changed file, so the phone opens two files from the changes screen.
+      await writeFile(path.join(fixture, 'todo.md'), '# Todo\n\nReport why the upload gave up.\n')
       const base = await openFixtureChat(page, fixture)
       await createSessions(page, base, fixture, 12)
       await walkTheStack(page, step)
@@ -86,12 +90,18 @@ async function walkTheStack(page: Page, step: (label: string) => Promise<void>) 
 
   await selectors.modelPickerTrigger(page).click()
   await selectors.modelPickerPanel(page).waitFor()
-  await expectInsideViewport(page, selectors.modelPickerPanel(page))
-  // Captured once the open animation has settled: floating UI is opaque at rest.
-  await page.waitForTimeout(400)
-  await step('model-picker')
-  await page.keyboard.press('Escape')
+  await expectSheet(page, selectors.modelPickerPanel(page))
+  await step('model-picker-sheet')
+  // A tap on the scrim puts the sheet away, as on any phone.
+  await page.touchscreen.tap(page.viewportSize()!.width / 2, 120)
   await selectors.modelPickerPanel(page).waitFor({ state: 'hidden' })
+
+  // A menu of choices is a sheet too.
+  await selectors.composerModes(page).click()
+  await expectSheet(page, selectors.popupMenu(page))
+  await step('choice-menu-sheet')
+  await page.touchscreen.tap(page.viewportSize()!.width / 2, 120)
+  await selectors.popupMenu(page).waitFor({ state: 'hidden' })
 
   await selectors.phoneHeaderAction(page, 'Changes').click()
   await selectors.phoneLevel(page, 'changes').waitFor()
@@ -106,7 +116,25 @@ async function walkTheStack(page: Page, step: (label: string) => Promise<void>) 
   await selectors.phoneLevel(page, 'file').waitFor()
   await selectors.editorSurface(page).first().waitFor({ timeout: 20_000 })
   await expectFits(page)
+  await expectGutterInset(page)
+  equal(addressTabs(page).length, 1, 'The diff opens one editor tab')
   await step('diff')
+
+  // The phone has no tab strip: the next file it opens takes the place of the last one.
+  await page.goBack()
+  await selectors.phoneLevel(page, 'changes').waitFor()
+  await selectors.gitChangeRow(page, 'todo.md').click()
+  await selectors.phoneLevel(page, 'file').waitFor()
+  await page.locator('[data-phone-shell] header h1').getByText('todo.md').waitFor()
+  equal(addressTabs(page).length, 1, 'The second file replaces the first one’s tab')
+  const previous = selectors.phoneHeaderAction(page, 'Previous file')
+  const sibling = (await previous.isEnabled())
+    ? previous
+    : selectors.phoneHeaderAction(page, 'Next file')
+  await sibling.click()
+  await page.locator('[data-phone-shell] header h1').getByText('notes.md').waitFor()
+  equal(addressTabs(page).length, 1, 'Stepping between files keeps one tab')
+  await step('one-phone-tab')
 
   await page.goBack()
   await selectors.phoneLevel(page, 'changes').waitFor()
@@ -163,6 +191,42 @@ async function expectInsideViewport(page: Page, locator: Locator) {
     box.x >= 0 && box.y >= 0 && box.x + box.width <= viewport.width + 0.5,
     `The panel leaves the screen: ${JSON.stringify(box)}`,
   )
+}
+
+/** A picker on the phone is a bottom sheet: the full width up to its cap, on the bottom edge, over a scrim. */
+async function expectSheet(page: Page, locator: Locator) {
+  await locator.waitFor()
+  // Measured once the rise has settled: floating UI is opaque at rest.
+  await page.waitForTimeout(400)
+  const box = await locator.boundingBox()
+  const viewport = page.viewportSize()
+  ok(box && viewport, 'The sheet must be laid out')
+  ok(
+    Math.abs(box.y + box.height - viewport.height) <= 1,
+    `The sheet sits on the bottom edge: ${JSON.stringify(box)}`,
+  )
+  ok(
+    box.x <= 0.5 && box.width >= viewport.width - 1,
+    `The sheet spans the phone: ${JSON.stringify(box)}`,
+  )
+  equal(await locator.getAttribute('data-presentation'), 'sheet')
+  ok(await selectors.sheetBackdrop(page).isVisible(), 'A scrim covers the screen behind the sheet')
+}
+
+/** The editor's line numbers keep the phone's gutter inset off the screen edge. */
+async function expectGutterInset(page: Page) {
+  const gutter = selectors.phoneEditorGutter(page).first()
+  await gutter.waitFor()
+  const box = await gutter.boundingBox()
+  ok(box, 'The gutter must be laid out')
+  ok(box.x >= 8, `The gutter sits against the screen edge: x=${box.x}`)
+}
+
+/** The editor tabs the address records: one token per open tab. */
+function addressTabs(page: Page) {
+  const tabs = new URL(page.url()).searchParams.get('tabs')
+  if (tabs === null || tabs === '-') return []
+  return tabs.split('~')
 }
 
 /** A held finger, as a touch screen sends it: no mouse events between down and up. */

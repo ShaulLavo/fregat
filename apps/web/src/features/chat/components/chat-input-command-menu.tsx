@@ -73,6 +73,8 @@ export function ChatInputCommandMenu({
         className={MENU_CLASS}
         finalFocus={false}
         initialFocus={false}
+        // Docked above the composer on the phone too: the list follows what is typed.
+        presentation='anchored'
         role='listbox'
         side='top'
       >

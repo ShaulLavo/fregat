@@ -11,9 +11,20 @@ import { useSessionSelectionStore } from '@/features/chat-mode/state/session-sel
 import { expect, test } from '../../../../test/fixtures'
 import { createChatNavigationFixture } from '../../../../test/factories/chat-navigation'
 import { DOMAIN_SESSION } from '../../../../test/factories/session-domain'
-import { pressBack } from '../../../../test/address'
+import { editorTabContents, pressBack } from '../../../../test/address'
+import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 
-afterEach(() => useShellStore.setState({ kind: 'workbench', phoneScreen: null, deskMode: null }))
+afterEach(() =>
+  useShellStore.setState({ kind: 'workbench', phoneScreen: null, deskMode: null, phoneTab: null }),
+)
+
+function openPaths(workspace: EditorWorkspaceStoreApi) {
+  return editorTabContents(workspace).map((content) =>
+    content.kind === 'document' && content.document.kind === 'file'
+      ? content.document.resource.path
+      : content.kind,
+  )
+}
 
 function shownLevel() {
   const selection = useSessionSelectionStore.getState().selection.kind
@@ -104,4 +115,26 @@ test('a window widened out of the phone shell gets its desk mode back in place',
   expect(editor.workspaceStore.getState().uiMode).toBe('workbench')
   expect(navigation.historyIndex()).toBe(index)
   expect(takeDeskMode()).toBeNull()
+})
+
+test('each file the phone opens replaces the last one it opened, and desk tabs stay open', async () => {
+  const { domain, editor, environmentId, navigation, registration, refresh } =
+    await createChatNavigationFixture()
+  await domain.createSession(registration.worktreeId, DOMAIN_SESSION)
+  for (const name of ['b.txt', 'c.txt', 'd.txt']) writeFileSync(path.join(domain.main, name), name)
+  await refresh()
+  const owner = editor.workspaceStore
+  await navigation.openChat({ environmentId, sessionId: DOMAIN_SESSION, surface: 'main' })
+  await navigation.openFile({ owner, path: filesystemPath('main/keep.txt') })
+
+  useShellStore.setState({ kind: 'phone' })
+  await navigation.openFile({ owner, path: filesystemPath('main/b.txt') })
+  await navigation.openFile({ owner, path: filesystemPath('main/c.txt') })
+  expect(openPaths(owner)).toEqual(['main/keep.txt', 'main/c.txt'])
+
+  // Showing a tab the desk opened closes the phone's own and leaves the desk's alone.
+  await navigation.openFile({ owner, path: filesystemPath('main/keep.txt') })
+  expect(openPaths(owner)).toEqual(['main/keep.txt'])
+  await navigation.openFile({ owner, path: filesystemPath('main/d.txt') })
+  expect(openPaths(owner)).toEqual(['main/keep.txt', 'main/d.txt'])
 })
