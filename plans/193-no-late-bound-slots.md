@@ -12,8 +12,8 @@
   - [x] Phase 2: the editor runtime owns its own active lifetime
   - [x] Phase 3: settings reach non-React consumers by subscription (slot 9 kept, see Keep)
   - [x] Phase 4: the command runtime reads settings at dispatch
-  - [ ] Phase 5: editor theme selection from settings
-  - [ ] Phase 6: the rule
+  - [x] Phase 5: editor theme selection from settings (decided: slot 11 kept, see Keep)
+  - [ ] Phase 6: the rule (text ready; AGENTS.md is the project CLAUDE.md, so it waits for the owner)
 
 ## The shape
 
@@ -44,7 +44,7 @@ Line numbers are from `7f22085c0`; reconcile before starting.
 | 8   | `spellcheck.setAcceptedWords`                                                                    | `useSpellcheckDictionary`              | remove (phase 3) |
 | 9   | `fileOpenIntentOwner.setEnvironment` / `setRelatedPrefetch`, `languageServerDocuments.configure` | `EditorStateProvider` layout effects   | keep (see Keep)  |
 | 10  | `keymap/state/runtime-binding.ts` settings refs                                                  | `CommandProvider` layout effect        | reduce (phase 4) |
-| 11  | `features/editor/state/color-theme-store.ts:43-44`                                               | `EditorColorThemeProvider` effects     | reduce (phase 5) |
+| 11  | `features/editor/state/color-theme-store.ts:43-44`                                               | `EditorColorThemeProvider` effects     | keep (see Keep)  |
 
 Keep, with the reason on record:
 
@@ -72,6 +72,14 @@ Keep, with the reason on record:
   it mirrors `useTransitionedColorMode`, which commits a dark/light switch inside the
   `color-mode` view transition (`globals.css:130`). Reading the setting directly would switch the
   editor's code colours before the page's cross-fade starts.
+- The editor's dark and light code theme ids (`color-theme-store.ts`, pushed by
+  `syncEditorThemeSelection` in `color-theme-provider.tsx`): they follow the Theme Studio preview.
+  A bundle theme sets both ids (`bundle-settings.ts`), and the command, card and draft bundle
+  previews are `AppearanceProvider` state whose hand-off to the confirmed setting is derived during
+  render from the projection's pending and acknowledged mutation ids. A store for the ids alone
+  would still be fed from that render, so the fix is the whole preview model (bundle, draft, mode,
+  palette and font previews with their hand-offs) moved out of `AppearanceProvider`. That is a
+  larger change than this plan, next to the colour-mode view transition; it needs its own plan.
 
 ## Phase 1: navigation is bound at boot
 
@@ -193,6 +201,8 @@ the Shiki resolver reads. The colour mode it also pushes stays (see Keep).
 - The theme ids can come from the phase 3 subscription, except that `useSettingValue` also layers
   the Theme Studio preview (`AppearancePreviewContext`, React state). Move that preview into a
   store first, then subscribe.
+- Decided 2026-09-27: kept, not reduced (see Keep). The preview is not one value in a context;
+  it is `AppearanceProvider`'s preview model, and moving it is its own plan.
 - Verify: `scenario editor-theme-preview`, `scenario theme-studio-preview`,
   `scenario color-mode-preview`, each with `look`.
 
