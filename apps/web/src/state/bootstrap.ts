@@ -47,7 +47,10 @@ export function createBootstrap(
     const controller = new AbortController()
     abort = controller
     const prepared = store.getState().application
-    if (prepared) detach = navigation.attach(prepared)
+    if (prepared) {
+      detach = navigation.attach(prepared)
+      prepared.start()
+    }
     useEnvironmentsStore.getState().setPhase(primaryServerOrigin(), 'connecting')
     void readEnvironmentDescriptor(
       primaryServerOrigin(),
@@ -58,6 +61,7 @@ export function createBootstrap(
         const application =
           store.getState().application ?? createBootRuntime(descriptor, navigation.initial)
         if (!detach) detach = navigation.attach(application)
+        application.start()
         store.setState({ application, error: null })
       })
       .catch((cause) => {

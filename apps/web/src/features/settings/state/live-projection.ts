@@ -44,8 +44,14 @@ export function subscribeLiveSettings(
 ): () => void {
   const documentHash = hashKey(settingsKeys.document())
   const notify = () => listener(readLiveSettingsProjection(queryClient))
+  // The cache also reports observer and fetch-state events; only a new document changes the values.
+  let document = queryClient.getQueryData(settingsKeys.document())
   const stopDocument = queryClient.getQueryCache().subscribe((event) => {
-    if (event.query.queryHash === documentHash) notify()
+    if (event.query.queryHash !== documentHash) return
+    const next = queryClient.getQueryData(settingsKeys.document())
+    if (next === document) return
+    document = next
+    notify()
   })
   const stopIntents = settingsIntentStore.subscribe(notify)
   notify()
