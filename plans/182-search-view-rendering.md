@@ -16,11 +16,13 @@
   first size. Broad wheel-fast on a production build, four interleaved traces each on a shared machine:
   busy 2,206 → 1,814 ms median, long tasks 20 → 8 median (range 1–18). What remains per open is the
   layout read in `measureInitialViewport`.
-- Phase 2 done 2026-09-27: the scroll recorder reads no layout in a scroll event; it reads the offset
-  once when asked (reload flush, `scrollend`, detach), and finds the anchor row by binary search. The
-  recorder was not what forced layout any more: on a production build of `0c8f470` its listener costs
-  0.09 ms per event (broad) and 0.26 ms (pathological, a linear scan of 20,000 rows), now 0.04 ms, and
-  the fling does not change. Each sidebar scroll event forces 4 layouts inside TanStack's own scroll
+- Phase 2 implementation 2026-09-27: the recorder retains the offset on each scroll event and
+  defers binary-search anchor lookup until reload flush, `scrollend`, or detach. Review found that
+  deferring the offset read itself lost a pending scroll when DOM removal preceded cleanup.
+  The original deferred-read prototype measured 0.04 ms per event against 0.09 ms (broad) and
+  0.26 ms (pathological, linear scan of 20,000 rows) on `0c8f470`; those timings do not describe the
+  corrected implementation and total fling time did not improve. The recorder was not forcing
+  layout in that baseline. Each sidebar scroll event forces 4 layouts inside TanStack's own scroll
   handler (`virtual-core` `observeElementOffset`, 38–51 ms per event on the test machine); the search
   view's window store forces one. Probe: `visual-search-{narrow,broad,pathological}`.
 - Planned at: Platform `d5a901726`, 2026-09-26. Researched at Platform `c130dd35a`, Editor `74e76be`;
