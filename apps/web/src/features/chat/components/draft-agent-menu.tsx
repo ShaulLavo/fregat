@@ -36,7 +36,14 @@ export function DraftAgentMenu({
             variant='ghost'
           >
             <RobotIcon className='size-(--icon-size-sm) shrink-0' />
-            <span className='truncate'>{value ?? 'Default agent'}</span>
+            <span className='truncate'>
+              {value ?? (
+                <>
+                  <span className='phone:hidden'>Default agent</span>
+                  <span className='phone:inline hidden'>Default</span>
+                </>
+              )}
+            </span>
             <CaretDownIcon className='size-(--icon-size-sm) shrink-0 opacity-60' />
           </Button>
         }

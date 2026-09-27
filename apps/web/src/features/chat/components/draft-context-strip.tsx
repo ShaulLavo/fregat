@@ -92,7 +92,7 @@ export function DraftContextStrip({
   return (
     <div
       aria-label='Session workspace'
-      className='flex min-w-0 items-center gap-1 pt-1'
+      className='phone:grid phone:grid-cols-2 flex min-w-0 items-center gap-1 pt-1'
       role='group'
     >
       {machines ? (
@@ -122,7 +122,7 @@ export function DraftContextStrip({
         onSelect={onAgent}
       />
       {git ? (
-        <div className='ml-auto flex min-w-0 justify-end'>
+        <div className='phone:col-span-full phone:ml-0 phone:justify-start ml-auto flex min-w-0 justify-end'>
           {target.kind === 'new' ? (
             <DraftBranchMenu
               rootPath={base.path}
@@ -135,7 +135,9 @@ export function DraftContextStrip({
               title={`${worktreeLabel(base, 'git')} · ${base.path}`}
             >
               <GitBranchIcon className='size-(--icon-size-sm) shrink-0' />
-              <span className='truncate'>{worktreeLabel(base, 'git')}</span>
+              <span className='phone:whitespace-normal phone:break-all truncate'>
+                {worktreeLabel(base, 'git')}
+              </span>
             </span>
           )}
         </div>

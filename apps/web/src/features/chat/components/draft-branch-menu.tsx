@@ -25,7 +25,7 @@ export function DraftBranchMenu({
         render={
           <Button
             aria-label='Start from branch'
-            className='text-muted-foreground min-w-0 gap-1 text-xs font-normal'
+            className='text-muted-foreground phone:max-w-full min-w-0 gap-1 text-xs font-normal'
             size='sm'
             title={`New worktree starts from ${value}`}
             type='button'

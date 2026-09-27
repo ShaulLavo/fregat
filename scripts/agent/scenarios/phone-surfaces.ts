@@ -3,10 +3,12 @@ import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import type { Page } from 'playwright'
 
-import { createModifiedFileFixture, releaseFixture } from '../fixture-workspace'
+import { createModifiedFileFixture, fixtureGit, releaseFixture } from '../fixture-workspace'
 import { selectors } from '../selectors'
 import { openFixtureChat } from './phone-fixture'
 import type { Scenario } from './index'
+
+const BRANCH = 'fix/phone-composer-controls-stay-readable-on-narrow-screens'
 
 /**
  * The phone's secondary surfaces: the folder picker as a full-screen sheet, the command palette
@@ -25,6 +27,7 @@ export const phoneSurfaces: Scenario = {
       ['# Notes', '', 'Changed.'],
     )
     try {
+      await fixtureGit(fixture, ['branch', '-m', BRANCH])
       await mkdir(path.join(fixture, 'alpha'))
       await folderPicker(page, step, fixture)
       await openFixtureChat(page, fixture)
@@ -99,6 +102,7 @@ async function newSessionPalette(page: Page, step: (label: string) => Promise<vo
     .first()
     .click()
   await selectors.phoneLevel(page, 'session').waitFor()
+  await draftContext(page, step)
   await step('new-session')
   await selectors.phoneHeaderAction(page, 'Command palette').click()
   await selectors.paletteInput(page).waitFor()
@@ -106,6 +110,38 @@ async function newSessionPalette(page: Page, step: (label: string) => Promise<vo
   await page.keyboard.press('Escape')
   await selectors.phoneBack(page).click()
   await selectors.phoneLevel(page, 'sessions').waitFor()
+}
+
+async function draftContext(page: Page, step: (label: string) => Promise<void>) {
+  const context = selectors.draftContext(page)
+  await context.waitFor()
+  for (const width of [320, 390, 430]) {
+    await page.setViewportSize({ width, height: 844 })
+    const branch = context.getByText(BRANCH, { exact: true })
+    await branch.waitFor()
+    const size = await branch.evaluate((element) => ({
+      client: element.clientWidth,
+      scroll: element.scrollWidth,
+      right: element.getBoundingClientRect().right,
+    }))
+    ok(size.client > 0 && size.scroll <= size.client + 1, `Branch clipped: ${JSON.stringify(size)}`)
+    ok(size.right <= width, 'The branch stays inside the phone')
+    await expectNoSidewaysScroll(page, '[aria-label="Session workspace"]')
+    await context.getByRole('button', { name: 'Workspace', exact: true }).click()
+    await page.getByRole('menuitemradio', { name: 'Current checkout', exact: true }).waitFor()
+    await step(`workspace-sheet-${width}`)
+    await page.keyboard.press('Escape')
+    await step(`draft-context-${width}`)
+  }
+  await context.getByRole('button', { name: 'Run the session as an agent' }).click()
+  await page.getByRole('menuitemradio', { name: 'Default agent', exact: true }).click()
+  await context.getByRole('button', { name: 'Workspace', exact: true }).click()
+  await page.getByRole('menuitemradio', { name: 'New worktree', exact: true }).click()
+  await context.getByRole('button', { name: 'Start from branch', exact: true }).click()
+  await page.getByRole('menuitemradio', { name: BRANCH }).waitFor()
+  await step('draft-branch-sheet')
+  await page.keyboard.press('Escape')
+  await page.setViewportSize({ width: 390, height: 844 })
 }
 
 async function settings(page: Page, step: (label: string) => Promise<void>) {

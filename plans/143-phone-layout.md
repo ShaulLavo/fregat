@@ -677,3 +677,21 @@ Native Safari evidence on the Mac is in
 `node_modules/.cache/iphone-wallpaper-investigation/`: `app-before.png`, `probe.png`,
 `outer-background.png`, `app-unified-probe.png`, `app-dev.png`, `app-live.png` and
 `live-metrics.json`. Physical iPhone confirmation remains open.
+
+### Composer controls follow-up (2026-09-27)
+
+- [x] Reproduce checkout/agent controls squeezing the branch out of the draft footer.
+      Baseline: `/work/tmp/fregat-evidence/20260927T075039Z-scenario-phone-surfaces/04-new-session.png`.
+- [x] Give phones two columns for selectors and a full-width line for the current branch.
+      Compact labels preserve room at 320px; a long current branch wraps.
+- [x] Measure Safari spacing. The native simulator has 8px of app padding below the footer,
+      zero safe-area/keyboard padding, and the rest belongs to Safari. Reduce app padding to 4px.
+- [x] Inspect drawers. Theme Studio wraps Base UI Drawer; phone menus use Base UI Menu with
+      shared sheet positioning. This follow-up changes their triggers, not their presentation.
+- [x] Verify narrow screens, long branches, menu access, desktop and native Safari screenshots.
+      Scenario `/work/tmp/fregat-evidence/20260927T075358Z-scenario-phone-surfaces/` passes at
+      320/390/430px, including workspace, agent and base-branch pickers. The known empty-provider
+      update-status 500s remain. Mac screenshots `composer-dev-native.png`, `composer-320.png`,
+      `workspace-sheet-320.png` and `composer-desktop-webkit.png` were inspected in
+      `node_modules/.cache/iphone-wallpaper-investigation/`. Desktop keeps its single row.
+- [ ] Commit, push, deploy and inspect the live release.

@@ -909,6 +909,7 @@ export const selectors = {
     page.locator(`[data-agent-tree-level="child"] [data-agent-thread-id="${threadId}"]`),
   modelSwitch: (page: Page) => page.locator('[data-model-switch]').first(),
   composerActions: (page: Page) => page.locator('[data-composer-actions]'),
+  draftContext: (page: Page) => page.getByRole('group', { name: 'Session workspace', exact: true }),
   usageMeter: (page: Page) => page.locator('[data-composer-actions] [data-usage-meter]'),
   usagePopover: (page: Page) => page.locator('[data-usage-popover]'),
   usageWindowRows: (page: Page) => page.locator('[data-usage-popover] [data-usage-window]'),
