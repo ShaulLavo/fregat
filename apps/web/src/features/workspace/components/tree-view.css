@@ -507,7 +507,8 @@
       --truncate-marker-background-overlay-color: transparent;
       --truncate-marker-block-inset: 0px;
 
-      [data-file-tree-virtualized-root='true']:not([data-is-scrolling]) &:hover:not([data-item-selected='true']),
+      [data-file-tree-virtualized-root='true']:not([data-is-scrolling])
+        &:hover:not([data-item-selected='true']),
       &[data-item-context-hover='true']:not([data-item-selected='true']) {
         --truncate-marker-background-overlay-color: var(--row-hover);
       }
