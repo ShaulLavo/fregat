@@ -1,6 +1,6 @@
 import { SYNTAX_THEME_MODES } from './syntax-modes'
 import * as v from 'valibot'
-import { paletteIdSchema } from './palette'
+import { paletteIdSchema, type ColorMode } from './palette'
 import { wallpaperSelectionSchema } from './wallpaper'
 
 export const themeIdSchema = v.pipe(
@@ -60,6 +60,23 @@ export const themeCustomizeOperationSchema = v.strictObject({
   mode: v.picklist(['light', 'dark']),
   patch: themeVariantPatchSchema,
 })
+/** A theme half's customizable parts, `material.*` naming one surface value. */
+export const THEME_PARTS = [
+  'palette',
+  'codeTheme',
+  'wallpaper',
+  'material.opacity',
+  'material.contentOpacity',
+  'material.blur',
+  'material.saturation',
+] as const
+// Removes one part from one half, so that part follows the theme again.
+export const themeUncustomizeOperationSchema = v.strictObject({
+  kind: v.literal('theme.uncustomize'),
+  id: themeIdSchema,
+  mode: v.picklist(['light', 'dark']),
+  part: v.picklist(THEME_PARTS),
+})
 export const themeResetOperationSchema = v.strictObject({
   kind: v.literal('theme.reset'),
   id: themeIdSchema,
@@ -75,10 +92,45 @@ export type ThemeCustomization = v.InferOutput<typeof themeCustomizationSchema>
 export type ThemeCustomizations = v.InferOutput<typeof themeCustomizationsSchema>
 export type ThemeCustomizeOperation = v.InferOutput<typeof themeCustomizeOperationSchema>
 export type ThemeResetOperation = v.InferOutput<typeof themeResetOperationSchema>
+export type ThemeUncustomizeOperation = v.InferOutput<typeof themeUncustomizeOperationSchema>
+export type ThemePart = (typeof THEME_PARTS)[number]
 
 export function customizeThemeVariant(
   variant: ThemeVariant,
   patch?: ThemeVariantPatch,
 ): ThemeVariant {
   return { ...variant, ...patch, material: { ...variant.material, ...patch?.material } }
+}
+
+/** Whether a customization holds `part` for `mode`; a held part ignores the theme's own value. */
+export function customizesThemePart(
+  customization: ThemeCustomization | undefined,
+  mode: ColorMode,
+  part: ThemePart,
+): boolean {
+  const half = customization?.[mode]
+  if (!half) return false
+  const [field, member] = part.split('.') as [keyof ThemeVariantPatch, string?]
+  if (!member) return Object.hasOwn(half, field)
+  return Object.hasOwn(half.material ?? {}, member)
+}
+
+/** The customization without `part` for `mode`, dropping a half or material left empty. */
+export function withoutThemePart(
+  customization: ThemeCustomization,
+  mode: ColorMode,
+  part: ThemePart,
+): ThemeCustomization {
+  const half = customization[mode]
+  if (!half) return customization
+  const [field, member] = part.split('.') as [keyof ThemeVariantPatch, string?]
+  const rest = withoutKey(half, field)
+  const material = member ? withoutKey(half.material ?? {}, member) : {}
+  const next = Object.keys(material).length > 0 ? { ...rest, material } : rest
+  const others = withoutKey(customization, mode)
+  return Object.keys(next).length > 0 ? { ...others, [mode]: next } : others
+}
+
+function withoutKey<T extends object>(value: T, key: string): Partial<T> {
+  return Object.fromEntries(Object.entries(value).filter(([entry]) => entry !== key)) as Partial<T>
 }

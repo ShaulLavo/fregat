@@ -625,6 +625,8 @@ export const selectors = {
     page.getByRole('slider', { name: title, exact: true }),
   settingsRowActions: (page: Page, id: string) =>
     page.getByRole('button', { name: `Actions for ${id}`, exact: true }),
+  settingsResetMenuItem: (page: Page) =>
+    page.getByRole('menuitem', { name: 'Reset setting', exact: true }),
   pushSection: (page: Page) =>
     page.getByRole('region', { name: 'Push notifications', exact: true }),
   pushTurnOn: (page: Page) =>
@@ -1016,6 +1018,11 @@ export const selectors = {
     page.locator('[data-phone-shell]').getByRole('button', { name: 'Back', exact: true }),
   phoneHeaderAction: (page: Page, name: string) =>
     page.locator('[data-phone-shell] header').getByRole('button', { name, exact: true }),
+  /** The scrim under a picker the phone presents as a bottom sheet. */
+  sheetBackdrop: (page: Page) => page.locator('[data-slot="sheet-backdrop"]'),
+  /** The line numbers of the editor on the phone's file screen. */
+  phoneEditorGutter: (page: Page) =>
+    page.locator('[data-phone-level="file"] .editor-virtualized-gutter'),
   editorTab: (page: Page, path: string) => page.locator(`[data-editor-tab-path="${path}"]`),
   createMissingFile: (page: Page) => page.getByRole('button', { name: 'Create File', exact: true }),
   editorTabs: (page: Page) => page.locator('[data-editor-tab-id]'),

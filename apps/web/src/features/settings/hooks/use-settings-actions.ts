@@ -2,18 +2,10 @@ import { assertEnvironmentWritable } from '@/lib/environments/state/availability
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { SETTINGS_MUTATION_KEY } from '@/features/settings/utils/mutation-keys'
 import { nowMs } from '@workspace/utils/timing'
-import * as v from 'valibot'
-import {
-  shownColorMode,
-  themePartPatch,
-  resolveThemeSettings,
-  type ThemeBundle,
-  type ThemeId,
-} from '@workspace/contracts'
+import { shownColorMode, type ThemeBundle, type ThemeId } from '@workspace/contracts'
 import { systemColorMode } from '@/features/settings/state/system-color-mode'
 import {
   SETTING_IDS,
-  settingsOperationSchema,
   deriveWriteTarget,
   descriptorFor,
   errorNumberField,
@@ -67,7 +59,9 @@ import { durationBetweenMs } from '@workspace/utils/timing'
 import { dismissSaveError, notifySaveError } from '@/features/settings/utils/notify-save-error'
 import {
   providerEnabledOperation,
+  resetSettingOperations,
   themeCustomization,
+  themePartWriteOperation,
 } from '@workspace/client-core/settings/operations'
 import { admitSettingsMutationResult } from '@/features/settings/state/snapshot-admission'
 import { annotateClientError, clientErrorMetadata } from '@/lib/client-error-context'
@@ -114,17 +108,8 @@ export function useSettingsActions(owner?: QueryClient) {
 
   const targetFor = (key: SettingId) => deriveWriteTarget(key, projection()?.layers ?? [])
 
-  // Under a theme a part write customizes the theme for one mode; the code themes name their own.
-  const themePartOperation = (operation: SettingsOperation): SettingsOperation | null => {
-    const current = projection()
-    const theme = current?.values['workbench.theme']
-    const patch = operation.kind === 'set' ? themePartPatch(operation) : null
-    if (!current || !theme || !patch || operation.kind !== 'set') return null
-    let mode = shownColorMode(current.values['workbench.colorTheme'], systemColorMode())
-    if (operation.key === 'editor.codeTheme.light') mode = 'light'
-    if (operation.key === 'editor.codeTheme.dark') mode = 'dark'
-    return { kind: 'theme.customize', id: theme.id, mode, patch }
-  }
+  const shownMode = (values: SettingsValues) =>
+    shownColorMode(values['workbench.colorTheme'], systemColorMode())
 
   const setSetting = <K extends ScalarSettingId>(
     key: K,
@@ -133,8 +118,12 @@ export function useSettingsActions(owner?: QueryClient) {
     initiator?: string,
   ): SettingsSubmission => {
     const operation = { kind: 'set', key, value } as SettingsOperation
-    const customize = target === 'user' ? themePartOperation(operation) : null
-    return submit(target, [customize ?? operation], initiator)
+    const current = projection()
+    const themed =
+      target === 'user' && current
+        ? themePartWriteOperation(operation, current.values, shownMode(current.values))
+        : null
+    return submit(target, [themed ?? operation], initiator)
   }
 
   const setColorTheme = (
@@ -186,25 +175,8 @@ export function useSettingsActions(owner?: QueryClient) {
       submit(targetFor('keybindings.overrides'), [{ kind: 'keybinding.remove', command }]),
     resetSetting: (key: SettingId, target: SettingsWriteTarget = 'user') => {
       const current = projection()
-      const theme = current?.values['workbench.theme']
-      if (!current || !theme || target !== 'user')
-        return submit(target, [{ kind: 'reset', keys: settingRowIds(key) }])
-      const defaults = resolveThemeSettings(
-        { ...current.values, 'workbench.theme.customizations': {} },
-        systemColorMode(),
-      )
-      const parsed = v.safeParse(settingsOperationSchema, {
-        kind: 'set',
-        key,
-        value: defaults[key],
-      })
-      const customize = parsed.success ? themePartOperation(parsed.output) : null
-      if (!customize) return submit(target, [{ kind: 'reset', keys: settingRowIds(key) }])
-      // A value written before the theme was picked is ignored under it; Reset clears it too.
-      const stray = current.layers.some(
-        (layer) => layer.id === 'user' && Object.hasOwn(layer.raw, key),
-      )
-      return submit('user', stray ? [customize, { kind: 'reset', keys: [key] }] : [customize])
+      if (!current) return submit(target, [{ kind: 'reset', keys: settingRowIds(key) }])
+      return submit(target, resetSettingOperations(key, current, target, shownMode(current.values)))
     },
     setColorTheme,
     /** The command's complete list; an empty list or `null` unbinds it. */

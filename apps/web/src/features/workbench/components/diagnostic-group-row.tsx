@@ -1,7 +1,6 @@
-import { CaretRightIcon } from '@phosphor-icons/react'
 import { ListRow } from '@workspace/ui/patterns/list-row'
+import { TreeRowLead } from '@workspace/ui/patterns/tree-row-lead'
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'
-import { cn } from '@workspace/ui/lib/utils'
 
 import { FileLabel } from '@/components/file-label'
 import type { DiagnosticGroupRow as Row } from '@/features/workbench/utils/diagnostic-rows'
@@ -30,12 +29,7 @@ export function DiagnosticGroupRow({
         onToggle()
       }}
     >
-      <CaretRightIcon
-        className={cn(
-          'text-muted-foreground size-(--icon-size-sm) transition-transform',
-          row.expanded && 'rotate-90',
-        )}
-      />
+      <TreeRowLead depth={0} expanded={row.expanded} />
       <FileLabel path={row.path} />
       <span className='bg-muted text-muted-foreground text-3xs rounded-md px-1 font-mono leading-4 tabular-nums'>
         {row.count}

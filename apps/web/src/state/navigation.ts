@@ -53,6 +53,7 @@ import {
 import { workspaceToken } from '@workspace/client-core/address/workspace'
 import type { PhoneScreen } from '@workspace/client-core/address/grammar'
 import { isPhoneShell } from '@/lib/shell/state/store'
+import { withPhoneTab } from '@/state/navigation-phone-tab'
 import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
 import { createNavigationCoordinator, type NavigationResult } from '@/state/navigation-coordinator'
 import type { ApplicationRouter } from '@/state/router'
@@ -259,11 +260,18 @@ export function createNavigation(
         application.getSnapshot().editor.workspaceStore.getState().rootFolder?.path ?? null
       const next = addressWithContent(address, content, root, focus)
       if (!next) throw createClientInvariantError('This document has no workspace address.')
+      const phone = withPhoneTab(application, address, next, root)
       return {
-        address: { ...next, settings: categoryForAddress(settingsCategory, next.settings) },
+        address: {
+          ...phone.address,
+          settings: categoryForAddress(settingsCategory, next.settings),
+        },
         replace: replace ?? editorDocumentToken(next) === editorDocumentToken(address),
         historyTarget: { kind: 'editor' },
-        beforeApply: () => revealEditor(application),
+        beforeApply: () => {
+          revealEditor(application)
+          phone.claim()
+        },
       }
     })
   }
@@ -720,18 +728,19 @@ export function createNavigation(
           listCached &&
           queryClient.getQueryData(diffDocumentQueryKey(document.source)) !== undefined
         notePressPrefetch('diffs', path, diffPrefetch(listCached, blobCached))
-        const next = addressWithContent(
-          address,
-          documentTab(document),
-          owner.getState().rootFolder?.path ?? null,
-        )
+        const root = owner.getState().rootFolder?.path ?? null
+        const next = addressWithContent(address, documentTab(document), root)
         if (!next)
           throw createClientInvariantError('The requested change has no workspace address.')
+        const phone = withPhoneTab(application, address, next, root)
         return {
-          address: next,
+          address: phone.address,
           historyTarget: { kind: 'editor' },
           replace: replace ?? editorDocumentToken(next) === editorDocumentToken(address),
-          beforeApply: () => revealEditor(application),
+          beforeApply: () => {
+            revealEditor(application)
+            phone.claim()
+          },
         }
       })
       void request.then(
@@ -774,18 +783,17 @@ export function createNavigation(
             fetchGitFile(path, ref, signal, clientForQueryClient(client)),
         })
         const document = { kind: 'git-ref', source: { path, ref } } as const
-        const next = addressWithContent(
-          address,
-          documentTab(document),
-          owner.getState().rootFolder?.path ?? null,
-        )
+        const root = owner.getState().rootFolder?.path ?? null
+        const next = addressWithContent(address, documentTab(document), root)
         if (!next) throw createClientInvariantError('The file reference has no workspace address.')
+        const phone = withPhoneTab(application, address, next, root)
         return {
-          address: next,
+          address: phone.address,
           replace: false,
           historyTarget: { kind: 'editor' },
           beforeApply: () => {
             revealEditor(application)
+            phone.claim()
             if (isCurrent())
               runtime.editor.documentStore
                 .getState()

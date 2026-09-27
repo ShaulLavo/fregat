@@ -1,8 +1,8 @@
 import { createClientError } from '@workspace/client-core/errors'
 import type { SettingsOwner } from '@workspace/client-core/settings/owner'
+import { themePartWriteOperation } from '@workspace/client-core/settings/operations'
 import {
   deriveWriteTarget,
-  themePartPatch,
   resolveThemeSettings,
   type ColorMode,
   type SettingsOperation,
@@ -25,12 +25,9 @@ export async function setThemePreference(
   )
     return true
   const target = deriveWriteTarget(operation.key, projection.layers)
-  const theme = projection.values['workbench.theme']
-  const patch = themePartPatch(operation)
-  let change: SettingsOperation = operation
-  if (theme && patch && target === 'user')
-    change = { kind: 'theme.customize', id: theme.id, mode, patch }
-  const submission = owner.submit(target, [change], 'tui.color-theme')
+  const themed =
+    target === 'user' ? themePartWriteOperation(operation, projection.values, mode) : null
+  const submission = owner.submit(target, [themed ?? operation], 'tui.color-theme')
   if (submission.kind === 'noop') return false
   const outcome = await submission.settled
   if (outcome === 'acknowledged') return true

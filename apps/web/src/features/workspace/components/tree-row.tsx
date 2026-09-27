@@ -10,6 +10,7 @@ import {
 } from 'react'
 
 import { SparkleIcon } from '@phosphor-icons/react'
+import { TreeRowLead } from '@workspace/ui/patterns/tree-row-lead'
 import { FileTypeIcon } from '@/components/file-type-icon'
 import { iconForEntry } from '@/lib/file-icons'
 import { TreeGlyphIcon } from '@/features/workspace/components/tree-glyph'
@@ -188,38 +189,23 @@ function renderTreeRowContent(
     decorationLaneEnabled = false,
     gitDecoration = null,
     gitLaneActive = false,
+    lead,
     renameInput = null,
     showDecorativeActionAffordance = false,
   }: {
     actionLaneEnabled?: boolean
+    lead: JSX.Element
     customDecoration?: FileTreeRowDecoration | null
     decorationLaneEnabled?: boolean
     gitDecoration?: TreeGitDecoration | null
     gitLaneActive?: boolean
     renameInput?: JSX.Element | null
     showDecorativeActionAffordance?: boolean
-  } = {},
+  },
 ): JSX.Element {
   return (
     <Fragment>
-      {row.depth > 0 ? (
-        <div data-item-section='spacing'>
-          {Array.from({ length: row.depth }).map((_, index) => (
-            <div
-              key={index}
-              data-item-section='spacing-item'
-              data-ancestor-path={row.ancestorPaths[index]}
-            />
-          ))}
-        </div>
-      ) : null}
-      <div data-item-section='icon'>
-        {row.kind === 'directory' ? (
-          <TreeGlyphIcon name='chevron' />
-        ) : (
-          <FileTypeIcon icon={iconForEntry({ name: row.name, type: 'file' })} sprite />
-        )}
-      </div>
+      {lead}
       <div data-item-section='content'>
         {row.isFlattened
           ? formatFlattenedSegments(row, renameInput)
@@ -261,6 +247,8 @@ export interface TreeRenderRowFrame {
   readonly renameView: ReturnType<FileTreeController['getRenameView']>
   readonly visualFocusPath: string | null
   readonly contextMenuOpenPath: string | null
+  /** The focused row's parent, whose guide stays lit under `onHover`. */
+  readonly guideFocusPath: string | null
   readonly draggedPathSet: ReadonlySet<string> | null
   readonly dragAndDropEnabled: boolean
   readonly shouldSuppressContextMenu: () => boolean
@@ -392,8 +380,22 @@ export function TreeRow({ frame, options = {}, row }: TreeRowProps): JSX.Element
         }}
       />
     )
+  // Built here, in the compiled component, so an unchanged row's lead and icon are reused.
+  const lead = (
+    <TreeRowLead
+      activeGuide={
+        frame.guideFocusPath == null ? undefined : row.ancestorPaths.indexOf(frame.guideFocusPath)
+      }
+      depth={row.depth}
+      expanded={row.kind === 'directory' ? row.isExpanded : undefined}
+      guides
+    >
+      <FileTypeIcon icon={iconForEntry({ name: row.name, type: 'file' })} sprite />
+    </TreeRowLead>
+  )
   const rowContent = renderTreeRowContent(row, {
     actionLaneEnabled,
+    lead,
     customDecoration,
     decorationLaneEnabled,
     gitDecoration,

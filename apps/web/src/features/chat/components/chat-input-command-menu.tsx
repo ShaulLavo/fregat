@@ -57,7 +57,9 @@ export function ChatInputCommandMenu({
   }
 
   return (
-    <Popover open onOpenChange={handleOpenChange}>
+    // Docked above the composer on the phone too: the list follows what is typed, and the caret
+    // never leaves the editor.
+    <Popover open onOpenChange={handleOpenChange} presentation='anchored'>
       {/* Anchor only. The composer has no button to hang the menu off, and the
           caret must never leave the editor, so the trigger is an inert strip
           across the top of the composer. */}

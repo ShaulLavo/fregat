@@ -155,7 +155,6 @@
     [data-slot='alert-dialog-content'],
     [data-slot='popover-content'],
     [data-slot='dropdown-menu-content'],
-    [data-slot='dropdown-menu-sub-content'],
     [data-slot='context-menu-content'],
     [data-slot='context-menu-sub-content'],
     [data-slot='select-content'],
@@ -208,6 +207,23 @@
   --icon-size: 1rem;
   --icon-size-sm: 0.875rem;
   --status-dot-size: 0.375rem;
+  /* A tree row's lead (`TreeRowLead`): one indent step per level, the chevron lane, and guides
+     centred on the lane. The file tree sets its own geometry; the guide tones come from the
+     editor theme where a tree draws guides. */
+  --tree-indent: 0.875rem;
+  --tree-lane: var(--icon-size-sm);
+  --tree-guide-offset: calc(var(--tree-lane) / 2 - 0.5px);
+  --tree-guide-shift: 0.25px;
+  --tree-guide: var(--border);
+  --tree-guide-1: var(--tree-guide);
+  --tree-guide-2: var(--tree-guide);
+  --tree-guide-3: var(--tree-guide);
+  --tree-guide-4: var(--tree-guide);
+  --tree-guide-5: var(--tree-guide);
+  --tree-guide-6: var(--tree-guide);
+  --tree-guide-opacity: 1;
+  --tree-guide-hover-opacity: 1;
+  --tree-guide-active-opacity: 1;
   /* One folder column in the file picker's columns view. */
   --picker-column-width: 15rem;
   /* One tile in the file picker's icons view; `TILE_WIDTH_PX` in the picker must match. */
@@ -244,6 +260,19 @@
   --density-dialog-padding: 1rem;
   --density-popover-gap: 0.625rem;
   --density-popover-padding: 0.625rem;
+  --density-sheet-padding: 0.5rem;
+  /* Room between the screen edge and an editor's line numbers; a desktop pane edge needs none. */
+  --density-editor-inset-x: 0px;
+  /* What an iOS on-screen keyboard covers; the phone shell measures it. */
+  --keyboard-inset: 0px;
+  /* A picker presented as a bottom sheet leaves a bar of the screen above it, and fits what the
+     keyboard leaves: iOS overlays the keyboard, so `dvh` alone never shrinks for it. */
+  --sheet-max-height: min(
+    85dvh,
+    calc(100dvh - var(--keyboard-inset) - env(safe-area-inset-top) - var(--bar-height))
+  );
+  /* A landscape phone keeps the sheet at reading width. */
+  --sheet-max-width: 36rem;
   --density-menu-item-padding-y: 0.5rem;
   --density-textarea-min-height: 4rem;
   --density-textarea-padding-y: 0.5rem;
@@ -428,6 +457,7 @@
   --density-section-gap: 0.5rem;
   --density-command-input-height: 3rem;
   --density-command-item-padding-y: 0.75rem;
+  --density-editor-inset-x: var(--density-row-padding-x);
 }
 
 /* Again graphite: the same warm near-greyscale, inverted. */
@@ -1060,28 +1090,32 @@
     @apply bg-background text-foreground;
     font-family: var(--font-ui);
   }
-  /* Reduced motion means fewer and gentler animations, not zero. Opacity still
-     carries the state change — what goes away is movement: the zoom, the slide,
-     and the transform transitions. tw-animate-css drives its enter/exit
-     keyframes entirely from these custom properties, so neutralizing scale and
-     translate leaves --tw-enter-opacity / --tw-exit-opacity untouched. */
-  @media (prefers-reduced-motion: reduce) {
+}
+
+/* Reduced motion means fewer and gentler animations, not zero. Opacity still carries the state
+   change; what goes away is movement: the zoom, the slide, and the transform transitions.
+   tw-animate-css drives its enter/exit keyframes entirely from these custom properties, so
+   neutralizing scale and translate leaves --tw-enter-opacity / --tw-exit-opacity untouched.
+   Unlayered: tw-animate's slide and zoom utilities live in the utilities layer, which outranks
+   any base-layer rule. */
+@media (prefers-reduced-motion: reduce) {
+  :is(
     [data-slot='dialog-content'],
     [data-slot='dialog-overlay'],
     [data-slot='popover-content'],
     [data-slot='dropdown-menu-content'],
-    [data-slot='dropdown-menu-sub-content'],
     [data-slot='context-menu-content'],
     [data-slot='context-menu-sub-content'],
     [data-slot='select-content'],
-    [data-slot='tooltip-content'] {
-      --tw-enter-scale: 1;
-      --tw-exit-scale: 1;
-      --tw-enter-translate-x: 0;
-      --tw-enter-translate-y: 0;
-      --tw-exit-translate-x: 0;
-      --tw-exit-translate-y: 0;
-    }
+    [data-slot='combobox-content'],
+    [data-slot='tooltip-content']
+  ) {
+    --tw-enter-scale: 1;
+    --tw-exit-scale: 1;
+    --tw-enter-translate-x: 0;
+    --tw-enter-translate-y: 0;
+    --tw-exit-translate-x: 0;
+    --tw-exit-translate-y: 0;
   }
 }
 
@@ -1093,6 +1127,8 @@
   min-width: 0;
   overflow: hidden;
   width: 100%;
+  /* Keeps the line numbers off the phone's screen edge; the frame adds the safe area. */
+  padding-left: var(--density-editor-inset-x);
 }
 
 /* The editor keeps its own always-visible 6px track: the minimap lane measures it. */
@@ -2539,7 +2575,6 @@
   :is(
     [data-slot='popover-content'],
     [data-slot='dropdown-menu-content'],
-    [data-slot='dropdown-menu-sub-content'],
     [data-slot='context-menu-content'],
     [data-slot='context-menu-sub-content'],
     [data-slot='select-content'],
@@ -2578,7 +2613,15 @@
       translate: 100% 0;
     }
   }
-  [data-slot='dialog-overlay'] {
+  /* A sheet rises from the bottom edge it is pinned to. */
+  [data-presentation='sheet'][data-presentation='sheet'] {
+    scale: 1;
+    &:is([data-starting-style], [data-ending-style]) {
+      scale: 1;
+      translate: 0 100%;
+    }
+  }
+  :is([data-slot='dialog-overlay'], [data-slot='sheet-backdrop']) {
     animation: none;
     transition: opacity var(--fade-normal) var(--ease-out-strong);
     &:is([data-starting-style], [data-ending-style]) {
@@ -2623,7 +2666,6 @@
     :is(
       [data-slot='popover-content'],
       [data-slot='dropdown-menu-content'],
-      [data-slot='dropdown-menu-sub-content'],
       [data-slot='context-menu-content'],
       [data-slot='context-menu-sub-content'],
       [data-slot='select-content'],
@@ -2643,7 +2685,11 @@
       ) {
       translate: -50% -50%;
     }
-    [data-slot='dialog-content'][data-side='right']:is([data-starting-style], [data-ending-style]) {
+    [data-slot='dialog-content'][data-side='right']:is([data-starting-style], [data-ending-style]),
+    [data-presentation='sheet'][data-presentation='sheet']:is(
+        [data-starting-style],
+        [data-ending-style]
+      ) {
       translate: none;
     }
     :is([data-slot='accordion-content'], [data-slot='collapsible-content']) {

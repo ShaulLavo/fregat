@@ -1,8 +1,7 @@
 import { ListRow } from '@workspace/ui/patterns/list-row'
+import { TreeRowLead } from '@workspace/ui/patterns/tree-row-lead'
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { FileTypeIcon } from '@/components/file-type-icon'
-import { CaretRightIcon } from '@phosphor-icons/react'
-import { cn } from '@workspace/ui/lib/utils'
 import { iconForEntry } from '@/lib/file-icons'
 import type { ReferenceGroup } from '@/features/editor/utils/language-server-references'
 
@@ -33,12 +32,7 @@ export function ReferenceGroupRow({
         onToggle(group.path)
       }}
     >
-      <CaretRightIcon
-        className={cn(
-          'size-(--icon-size-sm) text-muted-foreground transition-transform',
-          !collapsed && 'rotate-90',
-        )}
-      />
+      <TreeRowLead depth={0} expanded={!collapsed} />
       <FileTypeIcon className='size-(--icon-size-sm)' icon={icon} />
       <span className='flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap'>
         <span className='max-w-[55%] min-w-0 shrink-0 truncate font-medium'>{group.name}</span>

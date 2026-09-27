@@ -11,3 +11,4 @@ export const THEME_PART_KEYS = [
   'workbench.surface.blur',
   'workbench.surface.saturation',
 ] as const satisfies readonly SettingId[]
+export type ThemePartKey = (typeof THEME_PART_KEYS)[number]

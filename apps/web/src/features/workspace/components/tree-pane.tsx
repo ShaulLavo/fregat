@@ -581,7 +581,6 @@ const treeStyle = {
   '--trees-selected-bg-override': 'var(--row-selected)',
   '--trees-item-margin-x-override': '0px',
   '--trees-border-color-override': 'var(--border)',
-  '--trees-indent-guide-bg-override': 'var(--border)',
   '--trees-fg-override': 'var(--foreground)',
   // The tree defines its own font variables inside the shadow root, so host
   // inheritance alone cannot reach the rows.

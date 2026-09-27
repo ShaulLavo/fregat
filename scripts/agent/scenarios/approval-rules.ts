@@ -1,68 +1,43 @@
 import { ok, strictEqual } from 'node:assert/strict'
-import { access, readFile, rm, writeFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
+import { access, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Page } from 'playwright'
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
-import { createGitFixture, fixtureGit } from '../fixture-workspace'
-import {
-  dispatch,
-  openChat,
-  removeScenarioSessions,
-  typePrompt,
-  waitForReply,
-} from './chat-verification'
-import { registerFixtureProject } from './native-provider-verification'
+import { dispatch, typePrompt, waitForReply } from './chat-verification'
+import { runInFixtureRepository, type FixtureRepository } from './fixture-repository'
+import type { FixtureProviderKind } from './native-provider-verification'
 
 const MARKER = 'marker-145.txt'
 const DONE = 'APPROVAL_RULE_HELD'
 const ALWAYS_TOUCH = /^Always allow commands starting with touch/
-const CODEX_RULES = path.join(homedir(), '.codex', 'rules', 'default.rules')
 
 type ApprovalRulesProvider = {
   readonly name: string
   readonly description: string
-  readonly model: { providerInstanceId: string; model: string }
+  readonly kind: FixtureProviderKind
   readonly prompt: string
   /** The options the command approval must offer, in order. */
   readonly options: readonly (string | RegExp)[]
   readonly always: string | RegExp
   /** Checks the rule landed in the harness's own store. */
-  readonly ruleWritten: (fixture: string) => Promise<void>
-  /** Runs around the whole drive; puts back anything outside the fixture the run wrote. */
-  readonly preserve?: () => Promise<() => Promise<void>>
+  readonly ruleWritten: (repository: FixtureRepository) => Promise<void>
 }
 
 /**
- * Real provider runs in a disposable repository: the command approval offers the rule the
+ * A fixture provider in a disposable repository: the command approval offers the rule the
  * harness proposes, choosing it writes the harness's own rule store, and a second session
- * runs the same command without asking.
+ * runs the same command without asking. The fixture writes the rule only from the decision
+ * Platform sends, and reads it back the way the harness does.
  */
 function approvalRulesScenario(provider: ApprovalRulesProvider): Scenario {
   return {
     name: provider.name,
-    realProviders: true,
+    requiresIsolatedServer: true,
     description: provider.description,
-    async run(page, { step }) {
-      const orchestration = await openChat(page)
-      const fixture = await createGitFixture(provider.name)
-      const sessions: string[] = []
-      let projectId: string | null = null
-      let restore: (() => Promise<void>) | undefined
-      try {
-        restore = await provider.preserve?.()
-        // A project needs a root commit for its repository identity.
-        await fixtureGit(fixture, ['commit', '--quiet', '-m', 'initial'])
-        const worktree = await registerFixtureProject(page, orchestration, fixture)
-        projectId = worktree.projectId
-        const run = async (label: string) => {
-          const sessionId = crypto.randomUUID()
-          sessions.push(sessionId)
-          await startSession(page, provider, orchestration, worktree.id, sessionId, label)
-        }
-
-        await run('ask')
+    run: (page, { step }) =>
+      runInFixtureRepository(page, step, provider, async (repository) => {
+        await startSession(page, provider, repository, 'ask')
         await selectors.commandApproval(page).waitFor({ timeout: 90_000 })
         const labels = await selectors
           .commandApproval(page)
@@ -77,30 +52,23 @@ function approvalRulesScenario(provider: ApprovalRulesProvider): Scenario {
         await selectors.commandApprovalDecision(page, provider.always).click()
         await selectors.commandApproval(page).waitFor({ state: 'hidden', timeout: 30_000 })
         await waitForReply(page, DONE)
-        await access(path.join(fixture, MARKER))
-        await provider.ruleWritten(fixture)
+        await access(path.join(repository.fixture, MARKER))
+        await provider.ruleWritten(repository)
         await step('rule-written')
 
-        await run('remembered')
+        await startSession(page, provider, repository, 'remembered')
         await waitForReply(page, DONE)
         strictEqual(await selectors.commandApproval(page).count(), 0)
         await step('second-session-not-asked')
-      } catch (error) {
-        await step('failed-before-cleanup')
-        throw error
-      } finally {
-        await removeScenarioSessions(page, orchestration, { fixture, projectId, sessions })
-        await restore?.()
-      }
-    },
+      }),
   }
 }
 
 export const claudeApprovalRules = approvalRulesScenario({
   name: 'claude-approval-rules',
   description:
-    'Real Claude (Haiku) in approval-required mode: the command approval offers session and always rules, "Always allow in this project" writes settings.local.json, and a new session runs the same command without asking. Removes the fixture, sessions and project.',
-  model: { providerInstanceId: 'claude', model: 'claude-haiku-4-5' },
+    'The Claude fixture in approval-required mode: the command approval offers session and always rules from the permission suggestions, "Always allow in this project" writes settings.local.json, and a new session runs the same command without asking. Removes the fixture, sessions and project.',
+  kind: 'claude',
   prompt: `Use the Bash tool to run exactly \`touch ${MARKER}\`. Use no other tool. Then reply with exactly ${DONE}.`,
   options: [
     'Cancel',
@@ -111,7 +79,7 @@ export const claudeApprovalRules = approvalRulesScenario({
     'Allow',
   ],
   always: 'Always allow in this project',
-  async ruleWritten(fixture) {
+  async ruleWritten({ fixture }) {
     const settings = await readFile(path.join(fixture, '.claude', 'settings.local.json'), 'utf8')
     ok(settings.includes(`Bash(touch ${MARKER})`), 'settings.local.json must hold the Bash rule')
   },
@@ -120,34 +88,17 @@ export const claudeApprovalRules = approvalRulesScenario({
 export const codexApprovalRules = approvalRulesScenario({
   name: 'codex-approval-rules',
   description:
-    'Real Codex in approval-required mode: the command approval offers the proposed execpolicy amendment, choosing it writes ~/.codex/rules/default.rules, and a new session runs the same command without asking. Restores the rules file byte for byte and removes the fixture, sessions and project.',
-  model: { providerInstanceId: 'codex', model: 'gpt-5.5' },
+    "The Codex fixture in approval-required mode: the command approval offers the proposed execpolicy amendment, choosing it writes rules/default.rules in the fixture's own CODEX_HOME, and a new session runs the same command without asking. Removes the fixture, sessions, project and Codex home.",
+  kind: 'codex',
   prompt: `Run exactly \`touch ${MARKER}\` in the workspace, once, and run nothing else. Then reply with exactly ${DONE}.`,
   // What codex 0.156.1 lists in availableDecisions for a plain command.
   options: ['Cancel', ALWAYS_TOUCH, 'Allow'],
   always: ALWAYS_TOUCH,
-  async ruleWritten() {
-    const rules = await readFile(CODEX_RULES, 'utf8')
+  async ruleWritten({ native }) {
+    const rules = await readFile(path.join(native.root, 'rules', 'default.rules'), 'utf8')
     ok(/prefix_rule\(pattern=\["touch"/.test(rules), 'default.rules must hold the touch rule')
   },
-  async preserve() {
-    const before = await readFile(CODEX_RULES, 'utf8').catch(nullWhenMissing)
-    return async () => {
-      // A file the run created is removed, not left holding the rule.
-      if (before === null) {
-        await rm(CODEX_RULES, { force: true })
-        return
-      }
-      await writeFile(CODEX_RULES, before)
-      strictEqual(await readFile(CODEX_RULES, 'utf8'), before)
-    }
-  },
 })
-
-function nullWhenMissing(error: unknown) {
-  if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return null
-  throw error
-}
 
 function matches(label: string, expected: string | RegExp) {
   return typeof expected === 'string' ? label === expected : expected.test(label)
@@ -156,18 +107,18 @@ function matches(label: string, expected: string | RegExp) {
 async function startSession(
   page: Page,
   provider: ApprovalRulesProvider,
-  orchestration: string,
-  worktreeId: string,
-  sessionId: string,
+  repository: FixtureRepository,
   label: string,
 ) {
+  const sessionId = crypto.randomUUID()
+  repository.sessions.push(sessionId)
   const title = `${provider.name} ${label} ${sessionId.slice(0, 8)}`
-  await dispatch(page, orchestration, {
+  await dispatch(page, repository.orchestration, {
     type: 'session.create',
     sessionId,
     title,
-    worktreeTarget: { kind: 'current', worktreeId },
-    modelSelection: provider.model,
+    worktreeTarget: { kind: 'current', worktreeId: repository.worktreeId },
+    modelSelection: repository.native.model,
     runtimeMode: 'approval-required',
   })
   await selectors.sessionSearch(page).fill(title)

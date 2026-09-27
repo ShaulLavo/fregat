@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import net from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -38,6 +38,8 @@ const encoder = new TextEncoder()
 export async function createFakeTerminalHost() {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-fake-host-'))
   const stateRoot = path.join(root, 'home')
+  // The host side never creates its state root; the home's owner does.
+  await mkdir(stateRoot)
   const env = { ...process.env, XDG_RUNTIME_DIR: path.join(root, 'run') }
   const paths = hostPaths(stateRoot, env)
   ensureSocketDirectory(paths)
