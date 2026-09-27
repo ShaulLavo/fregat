@@ -1,4 +1,6 @@
 import { afterEach, vi } from 'vitest'
+import { act, fireEvent, screen, within } from '@testing-library/react'
+import { Toaster } from '@workspace/ui/components/sonner'
 import * as v from 'valibot'
 import { environmentIdSchema, sessionIdSchema, commandIdSchema } from '@workspace/contracts'
 import {
@@ -8,6 +10,7 @@ import {
   sessionUndoAvailable,
   useSessionUndoStore,
 } from '@/features/chat-mode/state/session-undo'
+import { renderWithProviders } from '../../../../../test/render'
 import { expect, test } from '../../../../../test/fixtures'
 
 afterEach(() => {
@@ -45,16 +48,28 @@ function entry(id: string) {
   }
 }
 
-test('history outlives the notice and keeps consecutive actions separate', () => {
+test('each action gets its own notice, and its Undo ends when that notice closes', () => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  renderWithProviders(<Toaster />)
+  act(() => {
+    offerSessionUndo({ kind: 'settle', entries: [entry('a')], detail: '', shortcut: null })
+    offerSessionUndo({ kind: 'archive', entries: [entry('b')], detail: '', shortcut: null })
+  })
+  // Sonner adds toasts on a timer.
+  act(() => vi.advanceTimersByTime(0))
+  const archived = screen.getByText('1 archived').closest('[data-sonner-toast]')!
+  expect(screen.getByText('1 settled')).toBeTruthy()
+  const kinds = () => useSessionUndoStore.getState().undo.map((batch) => batch.kind)
+  expect(kinds()).toEqual(['settle', 'archive'])
+  fireEvent.click(within(archived as HTMLElement).getByRole('button', { name: 'Close toast' }))
+  expect(kinds()).toEqual(['settle'])
+  act(() => vi.advanceTimersByTime(5_000))
+  expect(sessionUndoAvailable()).toBe(false)
+})
+
+test('forgetting every row of an action drops that action from the history', () => {
   offerSessionUndo({ kind: 'settle', entries: [entry('a')], detail: '', shortcut: null })
   offerSessionUndo({ kind: 'archive', entries: [entry('b')], detail: '', shortcut: null })
-  vi.advanceTimersByTime(60_000)
-  expect(sessionUndoAvailable()).toBe(true)
-  expect(useSessionUndoStore.getState().undo.map((batch) => batch.kind)).toEqual([
-    'settle',
-    'archive',
-  ])
   forgetSessionUndo([entry('b').ref])
-  expect(useSessionUndoStore.getState().undo).toHaveLength(1)
+  expect(useSessionUndoStore.getState().undo.map((batch) => batch.kind)).toEqual(['settle'])
 })

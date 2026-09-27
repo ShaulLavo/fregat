@@ -13,10 +13,17 @@ export function pushUndo<Entry>(
   return { undo: [...stack.undo, entry].slice(-limit), redo: [] }
 }
 
-export function takeHistory<Entry>(stack: UndoStack<Entry>, direction: HistoryDirection) {
+/** Takes the newest entry, or the newest one `pick` accepts. */
+export function takeHistory<Entry>(
+  stack: UndoStack<Entry>,
+  direction: HistoryDirection,
+  pick: (entry: Entry) => boolean = () => true,
+) {
+  const index = stack[direction].findLastIndex(pick)
+  if (index < 0) return { entry: undefined, stack }
   return {
-    entry: stack[direction].at(-1),
-    stack: { ...stack, [direction]: stack[direction].slice(0, -1) },
+    entry: stack[direction][index],
+    stack: { ...stack, [direction]: stack[direction].toSpliced(index, 1) },
   }
 }
 

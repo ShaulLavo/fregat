@@ -126,3 +126,26 @@ test('recording a new action while a restore settles keeps the new redo branch e
   expect(history.getSnapshot().redo).toHaveLength(0)
   expect(history.getSnapshot().undo.at(-1)?.kind).toBe('snooze')
 })
+
+test('an expired batch leaves either stack, and older batches stay steppable', async () => {
+  const history = createSessionLifecycleHistory()
+  const older = history.record('archive', [entry('a', 1)])!
+  const newer = history.record('archive', [entry('b', 2)])!
+  history.expire(newer)
+  expect(history.getSnapshot().undo.map((batch) => batch.id)).toEqual([older])
+  const undone = await history.step('undo', async (item) => inverse(item, 3))
+  expect(history.getSnapshot().redo.map((batch) => batch.id)).toEqual([undone.inverse!.id])
+  history.expire(undone.inverse!.id)
+  expect(history.getSnapshot()).toEqual({ undo: [], redo: [] })
+})
+
+test('stepping a batch by id leaves the newer batches in place', async () => {
+  const history = createSessionLifecycleHistory()
+  const older = history.record('archive', [entry('a', 1)])!
+  const newer = history.record('settle', [entry('b', 2)])!
+  const result = await history.step('undo', async (item) => inverse(item, 3), older)
+  expect(result.taken?.id).toBe(older)
+  expect(history.getSnapshot().undo.map((batch) => batch.id)).toEqual([newer])
+  expect(history.getSnapshot().redo.map((batch) => batch.kind)).toEqual(['archive'])
+  expect(await history.step('undo', async () => null, older)).toMatchObject({ taken: null })
+})
