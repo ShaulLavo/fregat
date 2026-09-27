@@ -126,6 +126,7 @@ export const serverUpdate: Scenario = {
   description: DESCRIPTION,
   async run(page, context) {
     const server = context.server
+    const initialUrl = page.url()
     ok(server, `${NAME} stages releases for the throwaway API server; drop --shared-dev`)
     await isolatedNativeScenario({
       name: NAME,
@@ -133,6 +134,7 @@ export const serverUpdate: Scenario = {
       fixture: new URL('../fixtures/native-queue.mjs', import.meta.url),
       drive: (driven, native) => drive(driven, native, server),
     }).run(page, context)
+    await page.goto(initialUrl)
     await verifyClientUpdate(page, {
       ...context,
       step: (name) => context.step(`desktop-${name}`),
