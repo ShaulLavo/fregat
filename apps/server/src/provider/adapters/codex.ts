@@ -108,7 +108,6 @@ import {
 import { errorMessage as providerErrorMessage } from '@workspace/contracts'
 import { codexTurnExists, prepareCodexRewind } from './utils/codex-rewind'
 import { activeProviderTurn, type ActiveProviderTurn } from './utils/active-turn'
-import { codexDeveloperInstructions } from './utils/codex-instructions'
 import { modelOptionValue, type ModelOptions } from './utils/model-options'
 import { codexModelCapabilities } from './utils/codex-models'
 import { asRecord, numberField, stringField } from './utils/records'
@@ -214,21 +213,9 @@ type CodexModelOptions = {
 
 type CodexReasoningEffort = NonNullable<CodexClientRequestParamsByMethod['turn/start']['effort']>
 
-/**
- * Absent from the pinned protocol schema — Codex ships collaboration modes as
- * experimental — but `turn/start` params parse as a loose object, so the field
- * survives validation and reaches the app-server. The snake_case keys inside
- * `settings` are the wire names Codex expects; the rest of the protocol is
- * camelCase.
- */
-type CodexCollaborationMode = {
-  mode: InteractionMode
-  settings: {
-    developer_instructions: string
-    model: string
-    reasoning_effort?: CodexReasoningEffort
-  }
-}
+type CodexCollaborationMode = NonNullable<
+  CodexClientRequestParamsByMethod['turn/start']['collaborationMode']
+>
 
 type CodexTurnInputItem = CodexClientRequestParamsByMethod['turn/start']['input'][number]
 
@@ -3432,12 +3419,7 @@ function turnStartParams(
   } as CodexClientRequestParamsByMethod['turn/start']
 }
 
-/**
- * Codex resolves the mode name to its built-in prompt and lets
- * `developer_instructions` replace it, so this object is the whole of what
- * makes a plan turn behave differently from a default one. It goes out on every
- * turn: a thread that switched modes must not keep running the old prompt.
- */
+/** Send the mode every turn so switching modes also replaces the active instructions. */
 function codexCollaborationMode(input: {
   effort?: CodexReasoningEffort
   interactionMode: InteractionMode
@@ -3446,10 +3428,8 @@ function codexCollaborationMode(input: {
   return {
     mode: input.interactionMode,
     settings: {
-      developer_instructions: codexDeveloperInstructions(input.interactionMode, {
-        model: input.model,
-        ...(input.effort ? { reasoningEffort: input.effort } : {}),
-      }),
+      // Null selects Codex's built-in mode instructions, including its proposed-plan format.
+      developer_instructions: null,
       model: input.model,
       // Omitted when unselected, so Codex keeps the model's own default effort
       // instead of being pinned to whatever this process would guess.

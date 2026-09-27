@@ -26,7 +26,7 @@ import {
 } from '@/features/chat/utils/timeline-items'
 
 describe('chat timeline items', () => {
-  it('keeps the stopped fold label after Carry on starts another turn', () => {
+  it('keeps the stopped fold label after Continue starts another turn', () => {
     const sessionId = parseSessionId('bc3e1c41-73bd-5eb7-824f-b1fd01bf336d')
     const turnId = parseTurnId('previous-turn')
     const previous = {

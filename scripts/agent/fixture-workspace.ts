@@ -139,6 +139,16 @@ export async function openFixtureWorkspace(page: Page, project: string) {
  * leaves them on the server under test.
  */
 export async function releaseFixture(fixture: string) {
-  for (const pid of await processesIn(fixture)) process.kill(pid, 'SIGKILL')
+  for (const pid of await processesIn(fixture)) killFixtureProcess(pid)
   await rm(fixture, { recursive: true, force: true })
+}
+
+function killFixtureProcess(pid: number) {
+  try {
+    process.kill(pid, 'SIGKILL')
+  } catch (error) {
+    // A fixture process can exit between discovery and the signal.
+    if (error instanceof Error && 'code' in error && error.code === 'ESRCH') return
+    throw error
+  }
 }

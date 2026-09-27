@@ -21,7 +21,7 @@ function session(messages: unknown[]) {
   } as unknown as ChatSession
 }
 
-test('Carry on sends the fixed continuation prompt with the session settings', () => {
+test('Continue sends the fixed continuation prompt with the session settings', () => {
   expect(carryOnPayload(session([]))).toEqual({
     attachments: [],
     interactionMode: 'default',
@@ -32,7 +32,7 @@ test('Carry on sends the fixed continuation prompt with the session settings', (
   })
 })
 
-test('Try again sends the stopped turn message and its attachments', () => {
+test('Resend message sends the stopped turn message and its attachments', () => {
   const payload = tryAgainPayload(
     session([
       { attachments: [], role: 'user', text: 'older', turnId: 'turn-1' },
@@ -44,6 +44,6 @@ test('Try again sends the stopped turn message and its attachments', () => {
   expect(payload).toMatchObject({ attachments: [attachment], text: 'Fix the build' })
 })
 
-test('Try again is unavailable when the stopped turn has no user message', () => {
+test('Resend message is unavailable when the stopped turn has no user message', () => {
   expect(tryAgainPayload(session([{ role: 'user', text: 'older', turnId: 'turn-1' }]))).toBeNull()
 })

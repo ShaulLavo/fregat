@@ -463,7 +463,7 @@ function turnStatusItem(turn: OrchestrationLatestTurn, completedAt: string): Cha
   }
 }
 
-/** Carry on and Try again sit under the latest turn once it stopped short. */
+/** Continue and Resend message sit under the latest turn once it stopped short. */
 function appendTurnRetry(items: ChatTimelineItem[], latestTurn: OrchestrationLatestTurn | null) {
   if (!latestTurn?.completedAt || !turnStoppedShort(latestTurn)) return
 

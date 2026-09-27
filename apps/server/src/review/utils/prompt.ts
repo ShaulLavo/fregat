@@ -3,7 +3,8 @@ import type { AgentReviewTarget } from '@workspace/contracts'
 const RUBRIC = [
   'Report only problems the author would want to fix before merging: incorrect behaviour, crashes,',
   'security holes, data loss, broken contracts, missing error handling that matters. Leave out style,',
-  'naming and formatting. Each finding gets a short title, a body that explains the problem and why it',
+  'naming and formatting. Report discrete, actionable bugs introduced by these changes; identify',
+  'the affected code and triggering conditions. Each finding gets a short title, a body that explains the problem and why it',
   'is one, a priority from 0 (must fix) to 3 (minor), a confidence from 0 to 1, and the smallest line',
   'range in the changed file that shows it, counted in the new version of the file.',
   'Set overall_correctness to "patch is correct" or "patch is incorrect" and explain it in',

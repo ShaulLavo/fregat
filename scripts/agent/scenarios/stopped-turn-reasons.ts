@@ -15,7 +15,7 @@ const STOP_PROMPT = 'STOP me after a partial answer.'
 export const stoppedTurnReasons = isolatedNativeScenario({
   name: 'stopped-turn-reasons',
   description:
-    'Stop a partial answer three ways — the Stop button, a runtime stop through the command API, a provider failure — and read each status line; Try again resends the same message while the reader, scrolled up, keeps their place.',
+    'Stop a partial answer three ways — the Stop button, a runtime stop through the command API, a provider failure — and read each status line; Resend message resends the same message while the reader, scrolled up, keeps their place.',
   fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
   async drive(page, { step, root, orchestration, sessionId }) {
     const setting = { key: 'chat.responseStreamingMode', value: 'token' }
@@ -138,7 +138,7 @@ async function retriedWithSameMessage(page: Page, root: string) {
     if (starts.length === 2) return
     await Bun.sleep(100)
   }
-  ok(false, 'Try again must start a second turn with the same message')
+  ok(false, 'Resend message must start a second turn with the same message')
 }
 
 async function readViewport(page: Page) {

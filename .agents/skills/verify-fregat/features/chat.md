@@ -124,7 +124,7 @@ Each surface lists the states it must survive and the scenario that drives each 
 - **Timeline stream**
   - The live tail pauses on `#`, `## `, an open backtick, a table header without its separator, or a bare list marker: no frame paints that syntax. `stream-ambiguous-tail`
   - A code fence streams in chunks: the coloured token count never drops between frames (Plan 161 3.2 did not reproduce). `stream-code-colour`
-- **Stopped turn**: the Stop button, a runtime stop through the command API and a provider failure each read their own status line; the partial answer fades as incomplete; Try again resends the same message; a reader scrolled up keeps their place while the retry answers. `stopped-turn-reasons`. The server-restart line is covered by `orchestration/tests/recovery.test.ts`.
+- **Stopped turn**: the Stop button, a runtime stop through the command API and a provider failure each read their own status line; the partial answer fades as incomplete; Resend message resends the same message; a reader scrolled up keeps their place while the retry answers. `stopped-turn-reasons`. The server-restart line is covered by `orchestration/tests/recovery.test.ts`.
 - **Queue**: held follow-ups, Send now and Restore across a pending approval. `chat-queue`
 - **Composer**: a dismissed screenshot picker stages nothing and raises no toast; a frame stages one PNG. `chat-screenshot`
 - **Changed files**: empty, failed and pending lists. `checkpoint-states` plus component tests.

@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { AGENT_REVIEW_OUTPUT_SCHEMA } from '@workspace/contracts'
@@ -71,6 +71,7 @@ describe('agent review', () => {
     const turn = adapter.startedTurns.at(-1)
     expect(turn?.outputSchema).toEqual(AGENT_REVIEW_OUTPUT_SCHEMA)
     expect(turn?.messageText).toContain('+  xs.slice(1)')
+    expect(turn?.messageText).toContain('bugs introduced by these changes')
     expect(turn?.cwd).not.toBe(root)
   })
 
@@ -169,7 +170,7 @@ function testApp(root: string, adapter: MockProviderAdapter) {
 }
 
 async function fixtureRepo() {
-  const root = await mkdtemp(path.join(tmpdir(), 'platform-review-'))
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), 'platform-review-')))
   roots.push(root)
   await runGit(root, ['init', '-b', 'main'])
   await writeFile(path.join(root, 'tracked.txt'), 'one\n')

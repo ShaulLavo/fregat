@@ -860,8 +860,8 @@ export const selectors = {
   cancelSchedules: (page: Page) =>
     page.getByRole('button', { name: 'Cancel schedules', exact: true }),
   sessionGoal: (page: Page) => page.getByRole('button', { name: /^Goal: / }).first(),
-  turnCarryOn: (page: Page) => page.getByRole('button', { name: 'Carry on', exact: true }),
-  turnTryAgain: (page: Page) => page.getByRole('button', { name: 'Try again', exact: true }),
+  turnCarryOn: (page: Page) => page.getByRole('button', { name: 'Continue', exact: true }),
+  turnTryAgain: (page: Page) => page.getByRole('button', { name: 'Resend message', exact: true }),
   incompleteAnswer: (page: Page) =>
     page.getByRole('group', { name: 'Incomplete answer', exact: true }),
   chatQueue: (page: Page) => page.getByRole('button', { name: 'Queue message', exact: true }),
@@ -886,6 +886,7 @@ export const selectors = {
     page.getByRole('menuitem', { name: 'Ask the Agent', exact: true }),
   terminalRendererRow: (page: Page) => page.getByRole('menuitem', { name: /^Renderer: / }),
   chatMessages: (page: Page) => page.getByRole('log', { name: 'Messages', exact: true }),
+  chatUserMessages: (page: Page) => page.locator('[data-user-message-body]'),
   chatCodeBlockBody: (page: Page, language: string) =>
     page
       .getByRole('log', { name: 'Messages', exact: true })
@@ -1167,10 +1168,10 @@ export const selectors = {
 }
 
 export const chords = {
-  commandPalette: 'Control+Shift+P',
-  togglePanel: 'Control+J',
-  nextItem: 'Control+Alt+BracketRight',
-  toggleSidebar: 'Control+B',
+  commandPalette: 'ControlOrMeta+Shift+P',
+  togglePanel: 'ControlOrMeta+J',
+  nextItem: 'ControlOrMeta+Alt+BracketRight',
+  toggleSidebar: 'ControlOrMeta+B',
 }
 
 export async function waitForApp(page: Page, timeoutMs = 45_000) {

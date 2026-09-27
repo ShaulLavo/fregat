@@ -1395,7 +1395,7 @@ describe('CodexProviderAdapter', () => {
     },
   )
 
-  it('switches a live session into plan mode without restarting the Codex thread', async () => {
+  it('selects built-in plan and default modes without restarting the Codex thread', async () => {
     await withFakeCodex(
       async ({ spawnLogPath }) => {
         const adapter = new CodexProviderAdapter()
@@ -1410,27 +1410,26 @@ describe('CodexProviderAdapter', () => {
         await settleRuntimeEvents()
         await adapter.sendTurn(planTurn)
         await settleRuntimeEvents()
+        await adapter.sendTurn({ ...defaultTurn, turnId: v.parse(turnIdSchema, 'turn-3') })
+        await settleRuntimeEvents()
         const sessions = await adapter.listActiveRuntimes()
         const spawns = await countFakeCodexSpawns(spawnLogPath)
         await adapter.stopAll()
 
-        const [first, second] = echoedModeParams(events)
+        const [first, second, third] = echoedModeParams(events)
         expect(first?.mode).toBe('default')
         expect(first?.settingsModel).toBe('codex')
-        expect(first?.developerInstructions).toContain('Collaboration Mode: Default')
+        expect(first?.developerInstructions).toBeNull()
         // No effort was selected, so Codex keeps the model's own default.
         expect(first?.reasoningEffort).toBeNull()
-        // Codex ignores a top-level `developerInstructions` on turn/start; the
-        // collaboration mode is the only channel that carries them.
         expect(first?.turnDeveloperInstructions).toBeNull()
         expect(second?.mode).toBe('plan')
-        expect(second?.developerInstructions).toContain('Collaboration Mode: Plan')
-        expect(second?.developerInstructions).toContain('Your output is a plan')
-        // One app-server process and one thread/start across both turns: the
-        // mode switch reconfigured the live session instead of replacing it and
-        // dropping the conversation Codex holds.
+        expect(second?.developerInstructions).toBeNull()
+        expect(third?.mode).toBe('default')
+        expect(third?.developerInstructions).toBeNull()
+        expect(third?.settingsModel).toBe('codex')
         expect(spawns).toBe(1)
-        expect(second?.threadStarts).toBe(1)
+        expect(third?.threadStarts).toBe(1)
         expect(sessions).toHaveLength(1)
       },
       { mode: 'echo-mode-params' },
