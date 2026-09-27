@@ -104,6 +104,7 @@ const CURSOR_LINE_ROW_CLASS = 'editor-virtualized-cursor-line-row'
 const CURSOR_LINE_GUTTER_CLASS = 'editor-virtualized-cursor-line-gutter'
 const CURSOR_LINE_GUTTER_BAND_CLASS = 'editor-virtualized-cursor-line-gutter-band'
 const gutterCursorLineStates = new WeakMap<HTMLElement, boolean>()
+const gutterCursorLineBandStates = new WeakMap<HTMLElement, boolean>()
 const MAX_ROW_TEXT_NODE_LENGTH = 50
 const MAX_SINGLE_NODE_ROW_LENGTH = 512
 /** Above this, the row shows a fixed endpoint-only placeholder instead of laying out unbounded text. */
@@ -2132,7 +2133,9 @@ function updateMountedGutterFacts(
   mutable.gutterNumberCursorLine = state.cursorLine && view.cursorLineHighlight.gutterNumber
   setCursorLineGutterBand(
     row.gutterElement,
-    state.cursorLine && view.cursorLineHighlight.gutterBackground === true,
+    state.cursorLine &&
+      view.currentGutterLeadingInset > 0 &&
+      view.cursorLineHighlight.gutterBackground === true,
   )
   if (!state.cursorLine) {
     mutable.gutterCursorLineBackgroundLaneIds = []
@@ -2282,9 +2285,9 @@ function updateCursorLineGutterCellClass(
   element.classList.toggle(CURSOR_LINE_GUTTER_CLASS, enabled)
 }
 
-// Read from the element, not cached: a provisional paint may have set it on this recycled row.
 function setCursorLineGutterBand(element: HTMLElement, enabled: boolean): void {
-  if (element.classList.contains(CURSOR_LINE_GUTTER_BAND_CLASS) === enabled) return
+  if ((gutterCursorLineBandStates.get(element) ?? false) === enabled) return
+  gutterCursorLineBandStates.set(element, enabled)
   element.classList.toggle(CURSOR_LINE_GUTTER_BAND_CLASS, enabled)
 }
 
@@ -2601,8 +2604,9 @@ export function updateGutterWidthIfNeeded(view: VirtualizedTextViewInternal): vo
 
 function applyGutterWidth(view: VirtualizedTextViewInternal): void {
   const widths = gutterContributionWidthMap(view)
-  const leadingInset = gutterHostEnabled(view) ? view.gutterLeadingInset : 0
-  const nextWidth = leadingInset + fixedGutterWidth(view) + totalGutterContributionWidth(widths)
+  const laneWidth = fixedGutterWidth(view) + totalGutterContributionWidth(widths)
+  const leadingInset = laneWidth > 0 ? view.gutterLeadingInset : 0
+  const nextWidth = leadingInset + laneWidth
   view.currentGutterLeadingInset = leadingInset
   if (view.provisional) {
     view.gutterContributionWidths = widths
@@ -3249,6 +3253,7 @@ function paintProvisionalRow(
 ): boolean {
   slot.element.className = 'editor-virtualized-row'
   slot.gutterElement.className = 'editor-virtualized-gutter-row'
+  gutterCursorLineBandStates.delete(slot.gutterElement)
   delete slot.element.dataset.editorVirtualWindowStart
   delete slot.element.dataset.editorVirtualWindowEnd
   slot.element.classList.toggle('editor-virtualized-cursor-line-row', row.cursor)
@@ -3322,7 +3327,9 @@ function paintProvisionalGutter(
   }
   setCursorLineGutterBand(
     slot.gutterElement,
-    view.cursorLineHighlight.gutterBackground === true && row.activeLanes.length > 0,
+    paint.gutterLayout.leadingInset > 0 &&
+      view.cursorLineHighlight.gutterBackground === true &&
+      row.activeLanes.length > 0,
   )
   slot.gutterElement.style.backgroundColor = row.gutterBackgroundColor
   view.gutterElement.appendChild(slot.gutterElement)
@@ -3352,6 +3359,7 @@ function releaseProvisionalSlot(
   slot.gutterElement.removeAttribute('style')
   slot.element.className = 'editor-virtualized-row'
   slot.gutterElement.className = 'editor-virtualized-gutter-row'
+  gutterCursorLineBandStates.delete(slot.gutterElement)
   delete slot.element.dataset.editorVirtualWindowStart
   delete slot.element.dataset.editorVirtualWindowEnd
   slot.textNode.data = ''

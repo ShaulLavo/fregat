@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Editor } from '../src/editor/Editor'
 import { decodePaintSnapshot } from '../src/editor/paintSnapshot'
 import type { EditorGutterContribution, EditorPlugin } from '../src/plugins'
+import { createEditorLoggingPlugin } from '../src/logging'
 import { setHighlightRegistry } from '../src/public/testing'
 import { VirtualizedTextView } from '../src/virtualization'
 
@@ -87,6 +88,47 @@ describe('gutter leading inset', () => {
     expect(view.getState().gutterLayout.leadingInset).toBe(0)
   })
 
+  it('logs the normalized inset applied to the view', () => {
+    const log = vi.fn()
+    const editor = mountEditor({ plugins: [lanePlugin('probe'), createEditorLoggingPlugin(log)] })
+    editor.setGutterLeadingInset(11.2)
+    expect(log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'editor.layout.gutter_leading_inset_changed',
+        layout: { gutterLeadingInset: 12 },
+      }),
+    )
+  })
+
+  it('removes the inset when the remaining lane has zero width', () => {
+    const view = mountView({
+      gutterContributions: [lane('probe')],
+      gutterLeadingInset: 12,
+    })
+    expect(view.getState().gutterWidth).toBe(36)
+    view.setGutterContributions([{ ...lane('probe'), width: () => 0 }])
+    expect(view.getState().gutterWidth).toBe(0)
+    expect(view.getState().gutterLayout.leadingInset).toBe(0)
+    expect(inlineInset(view)).toBe('')
+    view.setGutterContributions([lane('probe')])
+    expect(view.getState().gutterWidth).toBe(36)
+    expect(inlineInset(view)).toBe('12px')
+  })
+
+  it('only gives the cursor row an inset band while the inset has width', () => {
+    const view = mountView({
+      cursorLineHighlight: { gutterBackground: true },
+      gutterContributions: [lane('probe')],
+      gutterLeadingInset: 12,
+    })
+    view.setSelection(0, 0)
+    expect(bandRows(view)).toEqual(['0'])
+    view.setGutterLeadingInset(0)
+    expect(bandRows(view)).toEqual([])
+    view.setGutterLeadingInset(12)
+    expect(bandRows(view)).toEqual(['0'])
+  })
+
   it('narrows the wrap width by the inset', () => {
     const flush = mountView({ gutterContributions: [lane('probe')], wrap: true })
     const inset = mountView({
@@ -128,6 +170,66 @@ describe('gutter leading inset', () => {
     expect(bandRows(all)).toEqual(['1'])
   })
 
+  it.each([
+    [12, 0],
+    [0, 12],
+  ])('rejects paint saved at inset %i when the editor uses %i', (savedInset, liveInset) => {
+    const saved = mountEditor({ gutterLeadingInset: savedInset })
+    saved.openDocument({ documentId: 'file-a', text: 'inset paint' })
+    const snapshot = saved.captureSnapshot()
+    expect(snapshot).not.toBeNull()
+    const mark = vi.spyOn(window.performance, 'mark')
+
+    const restored = mountEditor({ gutterLeadingInset: liveInset, snapshot: snapshot!.paint })
+
+    expect(mark).toHaveBeenCalledWith('editor.snapshot.admission', {
+      detail: expect.objectContaining({ reason: 'appearance' }),
+    })
+    expect(restored.getPresentationState()).toBe('empty')
+    const scrollElement =
+      container.lastElementChild!.querySelector<HTMLElement>('.editor-virtualized')!
+    expect(scrollElement.style.getPropertyValue('--editor-gutter-inset')).toBe(
+      liveInset ? `${liveInset}px` : '',
+    )
+  })
+
+  it('refuses a mismatched inset before changing the view during a direct paint restore', () => {
+    const saved = mountEditor({ gutterLeadingInset: 12 })
+    saved.openDocument({ documentId: 'file-a', text: 'inset paint' })
+    const paint = decodePaintSnapshot(saved.captureSnapshot()!.paint)
+    expect(paint).not.toBeNull()
+    const view = mountView({ gutterContributions: [lane('probe')] })
+
+    expect(view.restorePaint(paint!)).toBe(false)
+    expect(view.isProvisional).toBe(false)
+    expect(inlineInset(view)).toBe('')
+    expect(view.scrollElement.style.getPropertyValue('--editor-gutter-width')).toBe('24px')
+  })
+
+  it('keeps the cursor band through repeated provisional paint and live takeover', () => {
+    const saved = mountEditor({
+      gutterLeadingInset: 12,
+      cursorLineHighlight: { gutterBackground: true },
+    })
+    saved.openDocument({ documentId: 'file-a', text: 'inset paint' })
+    const paint = decodePaintSnapshot(saved.captureSnapshot()!.paint)!
+    const view = mountView({
+      gutterContributions: [lane('probe')],
+      gutterLeadingInset: 12,
+      cursorLineHighlight: { gutterBackground: true },
+    })
+
+    view.setSelection(0, 0)
+    expect(view.restorePaint(paint)).toBe(true)
+    expect(bandRows(view)).toHaveLength(1)
+    expect(view.restorePaint(paint)).toBe(true)
+    expect(bandRows(view)).toHaveLength(1)
+    view.commitProvisionalPaint()
+    expect(bandRows(view)).toEqual(['0'])
+    view.setGutterLeadingInset(0)
+    expect(bandRows(view)).toEqual([])
+  })
+
   it('saves the inset with the paint and restores it before the live gutter lands', () => {
     const saved = mountEditor({ gutterLeadingInset: 12 })
     saved.openDocument({ documentId: 'file-a', text: 'inset paint' })
@@ -141,7 +243,11 @@ describe('gutter leading inset', () => {
     })
     expect(paint?.gutterWidth).toBe(36)
 
-    const restored = mountEditor({ documentKey: 'file-a', snapshot: snapshot!.paint })
+    const restored = mountEditor({
+      documentKey: 'file-a',
+      gutterLeadingInset: 12,
+      snapshot: snapshot!.paint,
+    })
     const scrollElement =
       container.lastElementChild!.querySelector<HTMLElement>('.editor-virtualized')!
     expect(restored.getPresentationState()).toBe('provisional')
@@ -149,8 +255,8 @@ describe('gutter leading inset', () => {
 
     restored.openDocument({ documentId: 'file-a', text: 'live paint' })
     expect(restored.getPresentationState()).toBe('live')
-    expect(scrollElement.style.getPropertyValue('--editor-gutter-inset')).toBe('')
-    expect(scrollElement.style.getPropertyValue('--editor-gutter-width')).toBe('24px')
+    expect(scrollElement.style.getPropertyValue('--editor-gutter-inset')).toBe('12px')
+    expect(scrollElement.style.getPropertyValue('--editor-gutter-width')).toBe('36px')
   })
 })
 

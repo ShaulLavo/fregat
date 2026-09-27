@@ -58,6 +58,13 @@ describe('gutter leading inset', () => {
     await expect.poll(() => numbers().length).toBeGreaterThan(0)
     for (const number of numbers()) {
       expect(number.scrollWidth).toBeLessThanOrEqual(number.clientWidth)
+      const cell = number.closest<HTMLElement>('.editor-virtualized-gutter-cell')!
+      const row = cell.closest<HTMLElement>('.editor-virtualized-gutter-row')!
+      expectLanesInsideGutter(host, row)
+      const numberBounds = number.getBoundingClientRect()
+      const cellBounds = cell.getBoundingClientRect()
+      expect(numberBounds.left).toBeGreaterThanOrEqual(cellBounds.left)
+      expect(numberBounds.right).toBeLessThanOrEqual(cellBounds.right)
     }
   })
 
@@ -101,7 +108,12 @@ describe('diff tint with a gutter leading inset', () => {
     ].filter((lane) => /^\d{3}$/.test(lane.textContent ?? ''))
 
     expect(lanes.length).toBeGreaterThan(0)
-    for (const lane of lanes) expect(lane.scrollWidth).toBeLessThanOrEqual(lane.clientWidth)
+    for (const lane of lanes) {
+      expect(lane.scrollWidth).toBeLessThanOrEqual(lane.clientWidth)
+      const row = lane.closest<HTMLElement>('.editor-virtualized-gutter-row')!
+      expectLanesInsideGutter(host, row)
+      expectDiffLanesInsideGutter(host, row)
+    }
   })
 
   it('paints the same gutter at zero as with no inset', () => {
@@ -188,4 +200,37 @@ function rowPair(
   const cell = gutter?.querySelector<HTMLElement>('.editor-diff-gutter')
   if (!gutter || !text || !cell) throw new TypeError(`No mounted ${type} row`)
   return { gutter, cell, text }
+}
+
+function expectLanesInsideGutter(host: HTMLElement, row: HTMLElement): void {
+  const gutter = row.getBoundingClientRect()
+  const text = rect(host, `[data-editor-virtual-row="${row.dataset.editorVirtualGutterRow}"]`)
+  const cells = [...row.querySelectorAll<HTMLElement>('.editor-virtualized-gutter-cell')]
+  expect(cells.length).toBeGreaterThan(0)
+  expect(gutter.right).toBe(text.left)
+  expect(cells[0]!.getBoundingClientRect().left).toBe(gutter.left + INSET)
+  for (const cell of cells) {
+    const bounds = cell.getBoundingClientRect()
+    expect(bounds.left).toBeGreaterThanOrEqual(gutter.left + INSET)
+    expect(bounds.right).toBeLessThanOrEqual(gutter.right)
+    expect(bounds.right).toBeLessThanOrEqual(text.left)
+  }
+  expect(cells.at(-1)!.getBoundingClientRect().right).toBe(text.left)
+}
+
+function expectDiffLanesInsideGutter(host: HTMLElement, row: HTMLElement): void {
+  const gutter = row.getBoundingClientRect()
+  const text = rect(host, `[data-editor-virtual-row="${row.dataset.editorVirtualGutterRow}"]`)
+  const cell = rect(row, '.editor-diff-gutter')
+  const lanes = [...row.querySelectorAll<HTMLElement>('.editor-diff-gutter-lane')]
+  expect(lanes).toHaveLength(3)
+  for (const lane of lanes) {
+    const bounds = lane.getBoundingClientRect()
+    expect(bounds.left).toBeGreaterThanOrEqual(gutter.left + INSET)
+    expect(bounds.left).toBeGreaterThanOrEqual(cell.left)
+    expect(bounds.right).toBeLessThanOrEqual(cell.right)
+    expect(bounds.right).toBeLessThanOrEqual(gutter.right)
+    expect(bounds.right).toBeLessThanOrEqual(text.left)
+  }
+  expect(lanes.at(-1)!.getBoundingClientRect().right).toBe(text.left)
 }

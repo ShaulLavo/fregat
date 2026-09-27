@@ -1,3 +1,4 @@
+import { normalizeGutterLeadingInset } from '../virtualization/virtualizedTextViewHelpers'
 import { captureJumpLocation, JumpHistory, type JumpLocation, type JumpCause } from './jumpHistory'
 import type { EditorPointHit, EditorMarkerHit } from '../pointQueries'
 import { decodePaintSnapshot, encodePaintSnapshot } from './paintSnapshot'
@@ -1957,7 +1958,7 @@ export class Editor {
     this.log({
       action: 'editor.layout.gutter_leading_inset_changed',
       level: 'info',
-      layout: { gutterLeadingInset: inset },
+      layout: { gutterLeadingInset: normalizeGutterLeadingInset(inset) },
     })
   }
 

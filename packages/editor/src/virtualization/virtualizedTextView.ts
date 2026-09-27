@@ -537,6 +537,7 @@ export class VirtualizedTextView {
     const view = this.view
     return JSON.stringify({
       rowGap: view.rowGap,
+      gutterLeadingInset: view.gutterLeadingInset,
       rowPositioning: view.rowPositioning,
       scrollMode: view.scrollMode,
       hiddenCharacters: view.hiddenCharacters,
@@ -616,6 +617,9 @@ export class VirtualizedTextView {
   }
 
   public restorePaint(paint: SavedPaint): boolean {
+    const inset = paint.gutterWidth > 0 ? this.view.gutterLeadingInset : 0
+    if (paint.gutterLayout.leadingInset !== inset) return false
+
     const liveWidths =
       this.pendingOverlayWidths ??
       new Map<'left' | 'right', number>([
@@ -639,7 +643,7 @@ export class VirtualizedTextView {
     this.view.viewport.setViewportSize(paint.viewportWidth, paint.viewportHeight)
     this.view.viewport.setScrollPosition(paint.scrollLeft, paint.scrollTop)
     this.scrollElement.style.setProperty('--editor-gutter-width', `${paint.gutterWidth}px`)
-    setGutterLeadingInsetProperty(this.view, paint.gutterLayout.leadingInset)
+    setGutterLeadingInsetProperty(this.view, inset)
     const release = paintProvisionalRows(this.view, paint)
     if (!release) {
       this.commitProvisionalPaint()
@@ -923,6 +927,7 @@ export class VirtualizedTextView {
     if (view.gutterLeadingInset === next) return false
 
     view.gutterLeadingInset = next
+    view.lastRenderedRowsKey = ''
     view.gutterWidthDirty = true
     this.renderSnapshot(view.virtualizer.getSnapshot())
     return true
