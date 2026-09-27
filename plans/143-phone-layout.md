@@ -644,8 +644,28 @@ The shipped Chromium scenario did not verify these Safari behaviors. A macOS Web
 with the iPhone 13 viewport reproduced Settings at 390px with 428px of scrollable content.
 The code-theme list occupied 288px and left its preview 10px wide; the preview title overflowed.
 Capping the list at half the available width restored a 390px scroll extent in the same page.
-The wallpaper gap remains open and requires Safari toolbar/device verification.
+The wallpaper gap was reproduced in iOS 26.5 Simulator Safari; see the follow-up below.
 
 At 320px, WebKit also exposed overflowing wallpaper search/order controls and shortcut filter
 tabs. Their control rows now wrap within their own width. DOM probes reduced Settings from
 371px to 320px of scrollable width. Physical iPhone confirmation remains pending.
+
+### Safari wallpaper follow-up (2026-09-27)
+
+- [x] Reproduce the black band in native iOS Simulator Safari, including the browser toolbar.
+      On iPhone 17 Pro, the dynamic viewport was 714px, the large viewport 754px and the browser
+      window 874px. A fixed wallpaper was clipped at 714px regardless of its height.
+- [x] Compare fixed and absolute layers in the same page. The absolute layer covered the
+      toolbar only when sized to the browser window. One continuous glass layer removed the seam.
+- [x] Keep controls in the dynamic viewport and extend only the decorative background.
+      Phone screens own scrolling; the document clips the extra background without scrolling.
+- [x] Run phone scenarios and desktop look; inspect the screenshots.
+      `/work/tmp/fregat-evidence/20260927T064159Z-scenario-phone-surfaces/` passed. Its empty
+      provider fixture still emits the known update-status 500s. Desktop look
+      `20260927T064137Z-look-1440x1000` had no problems. Native Safari dev screenshot `app-dev.png`
+      confirms the wallpaper continues behind the toolbar with the source change.
+- [ ] Commit, push, deploy and verify the unmodified release in iOS Simulator Safari.
+
+Native Safari evidence on the Mac is in
+`node_modules/.cache/iphone-wallpaper-investigation/`: `app-before.png`, `probe.png`,
+`outer-background.png` and `app-unified-probe.png`. Physical iPhone confirmation remains open.
