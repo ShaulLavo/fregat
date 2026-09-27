@@ -750,4 +750,13 @@ choices opened a second sheet on top. Redesign:
       fixture provider update-status 500s remain.
 - [x] Desktop `chat-draft-context-strip` passes (`20260927T083329Z`), and so do the
       workspace/machine menu tests, `bun run gates` and the web typecheck.
-- [ ] Native Safari check on the Mac, then commit, push, deploy and verify live.
+- [x] Native iPhone 17 Pro / iOS 26.5 Safari check on the Mac: browser Back returns from
+      Workspace choices to the overview, then closes the sheet without leaving the draft.
+      Read back the final collapsed and overview screenshots. Production has one 40px-high
+      trigger, a 0px bottom gap, and 402px document width in a 402px viewport.
+- [x] Committed and pushed `7dd0deaef`; full pre-commit gates and repository typechecks pass.
+      Deployed `20260927T084030Z-7dd0deae-opus-phone-setup`; `/platform/release` confirms that
+      commit, zero dirty files and a passed live check. Opened the deployed page in native
+      Simulator Safari and read both screenshots back. Evidence on the Mac:
+      `node_modules/.cache/opus-mobile-design/live-collapsed.png` and `live-sheet.png`.
+      Physical-device and software-keyboard checks were not performed.
