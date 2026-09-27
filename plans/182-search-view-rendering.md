@@ -23,6 +23,13 @@
   the fling does not change. Each sidebar scroll event forces 4 layouts inside TanStack's own scroll
   handler (`virtual-core` `observeElementOffset`, 38–51 ms per event on the test machine); the search
   view's window store forces one. Probe: `visual-search-{narrow,broad,pathological}`.
+- Phase 3 done 2026-09-27: selection reads per-file id indexes (cached by each file's matches array,
+  reused across collapse and untouched streaming batches), so `selectResult`, F4 and the summary's
+  n/total no longer rebuild and re-hash the result set. 20 sidebar ArrowDown presses on the
+  pathological set, production build, three traces against two: busy 1,740–1,760 → 970–1,150 ms, long
+  tasks 17–20 → 2–6; sampled time in `result-items` 575–660 → 81–105 ms, `use-summary-model`
+  410–445 → 3–7 ms, `buffer-state` 108–122 → 3–8 ms. What remains per press is React and the sidebar's
+  `results-view` render (`useListbox` maps every row).
 - Planned at: Platform `d5a901726`, 2026-09-26. Researched at Platform `c130dd35a`, Editor `74e76be`;
   second pass at Platform `4c78266f8`, Editor `74e76be`, Zed `933d8d9`, VS Code `90da900128e`; third
   pass at Platform `e04c94271`, Editor `860f861`, Zed `933d8d9`.
@@ -352,7 +359,7 @@ Phases 1, 1b, 2 and 3 stand on their own and can ship any time.
      `getBoundingClientRect` and `getComputedStyle`), and focusing it places the caret.
    - **Proof:** with Phase 1, today's broad fling went from 1,767 to 1,405 ms and from 15 long tasks to
      2 in the research build. `trace research-search-view` before and after.
-3. **Selection without a full rebuild** (M, shared search state: `state/buffer-state.tsx` `selectResult`,
+3. **Done 2026-09-27.** **Selection without a full rebuild** (M, shared search state: `state/buffer-state.tsx` `selectResult`,
    `utils/result-items.ts`). Keep an id → index map per result set and update only the active id.
    Proof: `trace` of 20 ArrowDown presses in the sidebar on the pathological set (175 ms in
    `result-items` today).
