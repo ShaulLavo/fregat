@@ -86,7 +86,7 @@ export function ChatInputActions({
 
   return (
     <div
-      className='flex min-w-0 flex-col gap-1 px-(--density-control-padding-x) pb-(--density-section-gap)'
+      className='phone:pl-[calc(var(--density-section-padding)-var(--density-control-padding-x)-1px)] flex min-w-0 flex-col gap-1 px-(--density-control-padding-x) pb-(--density-section-gap)'
       data-composer-actions
       data-compact={compact}
       ref={actionsRef}
