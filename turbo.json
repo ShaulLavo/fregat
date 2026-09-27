@@ -55,7 +55,8 @@
       "dependsOn": [
         "build",
         "@singapore-editor/tree-sitter-languages#build",
-        "@singapore-editor/diff#build"
+        "@singapore-editor/diff#build",
+        "@singapore-editor/gutters#build"
       ],
       "cache": false
     },
