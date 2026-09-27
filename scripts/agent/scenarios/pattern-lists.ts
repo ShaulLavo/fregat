@@ -32,8 +32,38 @@ export const gitChanges: Scenario = {
     await selectors.menuSurface(page, 'git.file').waitFor()
     await step('active-file-menu')
     await page.keyboard.press('Escape')
-    await tree.focus()
+    await selectors.menuSurface(page, 'git.file').waitFor({ state: 'hidden' })
+    strictEqual(
+      await tree.evaluate((element) => element === element.ownerDocument.activeElement),
+      true,
+      'Dismissing the file menu returns focus to the changes list',
+    )
+    const treeRect = await tree.boundingBox()
+    ok(treeRect)
+    await selectors.worktreeFiles(page).first().click({ button: 'right' })
+    await selectors.menuSurface(page, 'git.file').waitFor()
+    await step('pointer-file-menu')
+    await selectors.menuSurface(page, 'git.file').hover()
+    await page.mouse.wheel(0, 100)
+    strictEqual(await selectors.menuSurface(page, 'git.file').isVisible(), true)
+    await page.mouse.move(treeRect.x + 4, treeRect.y + 4)
+    await page.mouse.wheel(0, 100)
+    await selectors.menuSurface(page, 'git.file').waitFor({ state: 'hidden' })
+    strictEqual(
+      await tree.evaluate((element) => element === element.ownerDocument.activeElement),
+      true,
+      'Wheel dismissal returns focus to the changes list',
+    )
     await page.keyboard.press('Home')
+    await page.keyboard.press('ContextMenu')
+    await selectors.menuSurface(page, 'git.group').waitFor()
+    await step('keyboard-group-menu')
+    await page.keyboard.press('Escape')
+    await selectors.menuSurface(page, 'git.group').waitFor({ state: 'hidden' })
+    strictEqual(
+      await tree.evaluate((element) => element === element.ownerDocument.activeElement),
+      true,
+    )
     await page.keyboard.press('ArrowLeft')
     await step('collapsed-group')
     await page.keyboard.press('ArrowRight')
