@@ -1,16 +1,17 @@
 import type { ScalarSettingOperation } from '../settings/mutations'
-import { descriptorFor, type SettingsValues } from '../settings/keys'
+import { descriptorFor, type SettingId, type SettingsValues } from '../settings/keys'
 import { layerAllowsScope, type SettingsLayer } from '../settings/resolve'
 import * as v from 'valibot'
 import {
   customizeThemeVariant,
   type ThemeBundle,
   type ThemeCustomizations,
+  type ThemePart,
   type ThemeVariant,
   type ThemeVariantPatch,
 } from './bundle'
 import type { ColorMode } from './palette'
-import { THEME_PART_KEYS } from './part-keys'
+import { THEME_PART_KEYS, type ThemePartKey } from './part-keys'
 
 export function themeVariants(theme: ThemeBundle, customizations: ThemeCustomizations) {
   const patches = customizations[theme.id]
@@ -51,6 +52,29 @@ export function resolveThemeSettings<
     'workbench.surface.saturation': active.material.saturation,
   }
   return { ...resolved, ...appearanceLayerOverrides(layers) }
+}
+
+const THEME_PART_OF_KEY = {
+  'workbench.palette': 'palette',
+  'editor.codeTheme.light': 'codeTheme',
+  'editor.codeTheme.dark': 'codeTheme',
+  'workbench.wallpaper': 'wallpaper',
+  'workbench.surface.opacity': 'material.opacity',
+  'workbench.surface.contentOpacity': 'material.contentOpacity',
+  'workbench.surface.blur': 'material.blur',
+  'workbench.surface.saturation': 'material.saturation',
+} as const satisfies Record<ThemePartKey, ThemePart>
+
+/** Where a setting lives in a theme's customization: the half on screen, or the code theme's own. */
+export function themePartSlot(
+  key: SettingId,
+  shownMode: ColorMode,
+): { readonly mode: ColorMode; readonly part: ThemePart } | null {
+  if (!Object.hasOwn(THEME_PART_OF_KEY, key)) return null
+  const part = THEME_PART_OF_KEY[key as ThemePartKey]
+  if (key === 'editor.codeTheme.light') return { mode: 'light', part }
+  if (key === 'editor.codeTheme.dark') return { mode: 'dark', part }
+  return { mode: shownMode, part }
 }
 
 export function themePartPatch(operation: ScalarSettingOperation): ThemeVariantPatch | null {
