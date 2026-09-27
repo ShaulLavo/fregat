@@ -777,3 +777,25 @@ choices opened a second sheet on top. Redesign:
       switches to Surfaces and closes. Read both production screenshots on the Mac:
       `node_modules/.cache/studio-mobile/live-open.png` and `live-surfaces.png`.
       Physical iPhone was not tested; no persisted appearance or provider state was changed.
+
+### Scrolling into Wallpaper (2026-09-27, investigated; fix deferred)
+
+- [x] Add `settings-wallpaper-scroll`: a 390px touch viewport scrolls through Appearance
+      into Wallpaper without changing any settings. Scenario shipped in `972c05665`.
+- [x] Trace the reported path and inspect its screenshot. The arrival task is 90.2ms,
+      with 85.8ms attributed to `highlightPreview` in `lib/code-theme/state/preview.ts`.
+      The code-color preview immediately above Wallpaper starts syntax highlighting
+      as it becomes visible. Wallpaper decoding and staged row mounting are not the
+      dominant work in this capture.
+- [x] Try the existing Shiki Oniguruma/WASM engine. The same task still takes 79.2ms,
+      so the small engine swap does not remove the hitch. Removed that experiment;
+      the shipped highlighter is unchanged.
+- Deferred: move preview tokenization off the main thread in a separately scoped task.
+  No worker or highlighting architecture change was made here. Measurements are from
+  desktop Chromium at phone dimensions, not a physical iPhone; no production speed claim.
+
+Evidence under `/work/tmp/fregat-evidence/`: baseline
+`20260927T131817Z-trace-settings-wallpaper-scroll`, engine experiment
+`20260927T132146Z-trace-settings-wallpaper-scroll` (includes `--compare` output).
+The fixture provider-update 500s are unrelated to the traced preview task.
+No runtime deployment is needed for this note.
