@@ -1,5 +1,4 @@
-import { MCP_CATEGORY, matchesMcpSearch } from '@/features/settings/utils/mcp'
-import { McpSection } from '@/features/settings/components/mcp-section'
+import { MCP_CATEGORY } from '@/features/settings/utils/mcp'
 import { SettingsDisplayProvider } from '@/features/settings/providers/display-provider'
 import { useReloadView } from '@/features/settings/hooks/use-reload-view'
 import { ToolPane } from '@workspace/ui/patterns/tool-pane'
@@ -7,31 +6,29 @@ import { workspaceRoot } from '@/lib/documents/utils/identity'
 import type { TabId, WorkspaceRoot } from '@/lib/documents/utils/types'
 import { useNavigation } from '@/hooks/use-navigation'
 import { useSettingsSearch, selectSettingsSearch } from '@/features/settings/state/search-store'
-import { descriptorFor, settingParentId, type SettingId } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@workspace/ui/components/input-group'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { MagnifyingGlassIcon, XIcon } from '@phosphor-icons/react'
-import { useRef } from 'react'
+import { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { DiagnosticsBanner } from '@/features/settings/components/diagnostics-banner'
-import { ImportSection } from '@/features/settings/components/import-section'
 import { MalformedBanner } from '@/features/settings/components/malformed-banner'
 import { PageActions } from '@/features/settings/components/page-actions'
 import { PageHeader } from '@/features/settings/components/page-header'
 import { PageLoading } from '@/features/settings/components/page-loading'
 import { ScopeTabs } from '@/features/settings/components/scope-tabs'
 import { SettingsJsonView } from '@/features/settings/components/json-view'
-import { UsageSection } from '@/features/settings/components/usage-section'
-import { matchesUsageSearch } from '@/features/settings/utils/usage'
-import { PushSection } from '@/features/settings/components/push-section'
-import { PairingSection } from '@/features/settings/components/pairing-section'
-import { matchesPushSearch } from '@/features/settings/utils/push-device'
-import { SettingRow } from '@/features/settings/components/setting-row'
+import { CategorySection } from '@/features/settings/components/category-section'
+import {
+  formCategories,
+  mountCost,
+  mountedCategories,
+  type FormCategories,
+} from '@/features/settings/utils/form-categories'
 import { useShortcutRows } from '@/features/settings/hooks/use-shortcut-rows'
 import { SettingsScrollerContext } from '@/features/settings/providers/scroller-context'
-import { matchingShortcutRows } from '@/features/settings/utils/shortcut-rows'
 import { StatusMessage } from '@/components/status-message'
 import { ViewToggle } from '@/features/settings/components/view-toggle'
 import { useHasWorkspace } from '@/features/settings/hooks/use-has-workspace'
@@ -40,10 +37,6 @@ import { useHeldDisplay } from '@/features/settings/hooks/use-held-display'
 import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 import { SettingsOwnerProvider } from '@/features/settings/providers/owner-provider'
 import { writableSettingsScope } from '@/features/settings/state/scope-store'
-import { isSettingAvailable } from '@/features/settings/utils/availability'
-import { matchingSettingIds } from '@workspace/client-core/settings/search'
-import { documentBackdrop } from '@/lib/platform/backdrop'
-import { isDesktop } from '@/lib/platform/bridge'
 import type { EditorRenderDocument } from '@/features/editor/utils/render-document'
 import { useSettingsCategory } from '@/features/settings/state/category-store'
 import { ProjectSection } from '@/features/settings/components/project-section'
@@ -86,13 +79,33 @@ export function SettingsPage({
       ? editorHasWorkspace
       : Boolean(document.data?.layers.some((layer) => layer.id === 'workspace'))
   const query = useSettingsSearch()
-  const scrollRef = useReloadView(owner, Boolean(document.data))
+  // Defer the list so search keystrokes can paint before matching rows render.
+  // The old list stays whole until the new list commits.
+  const shownQuery = useDeferredValue(query)
+  const ready = Boolean(document.data && projection)
   const setQuery = selectSettingsSearch
   const searchRef = useRef<HTMLInputElement>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const selectedCategory = useSettingsCategory()
   const project = useSettingsProject()
   const shortcuts = useShortcutRows()
+
+  // compiler:memos: the compiler leaves this call unmemoized, and `CategorySection` skips its rows
+  // on each mounting pass only while its `ids` keep their identity.
+  const { shown, showPush, visible } = useMemo(
+    () => formCategories(shownQuery, selectedCategory, shortcuts),
+    [shownQuery, selectedCategory, shortcuts],
+  )
+
+  // The first screen of rows mounts with the page; the rest follow a pass at a time in
+  // transitions, which React time-slices and commits apart, so no one task lays out every row.
+  const [rowBudget, setRowBudget] = useState(FIRST_SCREEN_ROWS)
+  const complete = rowBudget >= mountCost(shown)
+  useEffect(() => {
+    if (!ready || complete) return
+    startTransition(() => setRowBudget((budget) => budget + ROWS_PER_PASS))
+  }, [ready, complete, rowBudget])
+  const scrollRef = useReloadView(owner, ready && complete)
   const { ref: focusTargetRef } = useFocusTarget<HTMLDivElement>(
     {
       area: 'settings',
@@ -119,38 +132,7 @@ export function SettingsPage({
     return <StatusMessage tone='destructive'>Settings could not be loaded.</StatusMessage>
   if (!document.data || !projection) return <PageLoading showJson={showJson} />
 
-  // `matchingSettingIds` already searches rows rather than keys, so a key edited
-  // from another row is folded into its owner here rather than dropped.
-  const environment = { backdrop: documentBackdrop(), isShell: isDesktop() }
-  // Settings search finds shortcuts too: a command that matches brings its list along.
-  const shortcutsMatch =
-    query.trim() !== '' &&
-    matchingShortcutRows(shortcuts.rows, query, shortcuts.platform).length > 0
-  const matched = matchingSettingIds(query)
-  if (shortcutsMatch && !matched.includes('keybindings.overrides'))
-    matched.push('keybindings.overrides')
-  const visible = matched.filter(
-    (id) =>
-      (descriptorFor(id).visibility ?? 'user') !== 'internal' &&
-      isSettingAvailable(id, environment),
-  )
-  // The push switch renders inside the push section, beside the devices it sends to.
-  const categories = groupByCategory(visible.filter((id) => id !== 'chat.pushNotifications'))
-  if (matchesUsageSearch(query)) categories.set('Usage', [])
-  if (matchesMcpSearch(query)) categories.set(MCP_CATEGORY, [])
-  moveCategoryLast(categories, SHORTCUTS_CATEGORY)
-  const showPush =
-    matchesPushSearch(query) ||
-    visible.includes('chat.notificationMode') ||
-    visible.includes('chat.pushNotifications')
-  if (showPush && !categories.has('Chat')) categories.set('Chat', [])
   const selectedFile = document.data.layers.find((layer) => layer.id === scope)?.file ?? null
-  // An address can narrow the page to one category. Unknown or absent means all of
-  // them, so a stale link degrades to the full page rather than to nothing.
-  const shown = selectedCategory
-    ? [...categories].filter(([category]) => category === selectedCategory)
-    : [...categories]
-
   const onlyMcp = shown.length === 1 && shown[0]?.[0] === MCP_CATEGORY
   const onlyUsage = shown.length === 1 && shown[0]?.[0] === 'Usage'
 
@@ -288,27 +270,19 @@ export function SettingsPage({
               <fieldset className='min-w-0' inert={pending}>
                 {project ? <ProjectSection project={project} /> : null}
                 {project ? null : shown.length === 0 ? (
-                  <StatusMessage>{emptySettingsMessage(query, selectedCategory)}</StatusMessage>
+                  <StatusMessage>
+                    {emptySettingsMessage(shownQuery, selectedCategory)}
+                  </StatusMessage>
                 ) : (
-                  shown.map(([category, ids]) => (
-                    <section className='mb-6' key={category}>
-                      <h2 className='text-foreground mb-1 text-sm font-semibold'>{category}</h2>
-                      {category === 'Usage' ? <UsageSection /> : null}
-                      {category === MCP_CATEGORY ? <McpSection /> : null}
-                      {category === 'Machines' ? <PairingSection /> : null}
-                      {ids.includes('chat.keepImportedSessionsUpdated') ? <ImportSection /> : null}
-                      {category === 'Chat' && showPush ? (
-                        <PushSection snapshot={projection} />
-                      ) : null}
-                      {ids.map((id, index) => (
-                        <SettingRow
-                          id={id}
-                          key={id}
-                          snapshot={projection}
-                          underParent={isUnderParent(ids, index)}
-                        />
-                      ))}
-                    </section>
+                  mountedCategories(shown, rowBudget).map(({ category, ids, limit }) => (
+                    <CategorySection
+                      category={category}
+                      ids={ids}
+                      key={category}
+                      limit={limit}
+                      showPush={showPush}
+                      snapshot={projection}
+                    />
                   ))
                 )}
               </fieldset>
@@ -320,16 +294,9 @@ export function SettingsPage({
   )
 }
 
-const SHORTCUTS_CATEGORY = 'Keyboard shortcuts'
-
-/** The shortcut list is hundreds of rows; anything after it would be out of reach. */
-function moveCategoryLast(categories: Map<string, SettingId[]>, category: string) {
-  const ids = categories.get(category)
-  if (!ids) return
-
-  categories.delete(category)
-  categories.set(category, ids)
-}
+/** Rows that fill a tall window. */
+const FIRST_SCREEN_ROWS = 6
+const ROWS_PER_PASS = 8
 
 /**
  * A category filter and a search query can disagree: the query matches settings that
@@ -343,59 +310,6 @@ function emptySettingsMessage(query: string, category: string | null) {
 }
 
 /** What the list is actually showing, which a pinned category makes smaller. */
-function shownCount(shown: readonly (readonly [string, SettingId[]])[]) {
+function shownCount(shown: FormCategories) {
   return shown.reduce((total, [, ids]) => total + ids.length, 0)
-}
-
-/**
- * Grouped by the descriptor's own `category`, not by key prefix. Deriving groups
- * from prefixes invents categories nobody chose and reshuffles the page whenever
- * a key is renamed.
- */
-function groupByCategory(ids: readonly SettingId[]): Map<string, SettingId[]> {
-  const categories = new Map<string, SettingId[]>()
-
-  for (const id of ids) {
-    const category = descriptorFor(id).category
-    const existing = categories.get(category)
-    if (existing) {
-      existing.push(id)
-      continue
-    }
-
-    categories.set(category, [id])
-  }
-
-  for (const [category, members] of categories) {
-    categories.set(category, withChildrenUnderParents(members))
-  }
-
-  return categories
-}
-
-/** True when this row's parent is shown above it in the same section. */
-function isUnderParent(ids: readonly SettingId[], index: number): boolean {
-  const parent = settingParentId(ids[index]!)
-  if (parent === undefined) return false
-
-  return ids.slice(0, index).includes(parent)
-}
-
-/** A `dependsOn` row follows its parent's row, so its indent reads as belonging to it. */
-function withChildrenUnderParents(ids: readonly SettingId[]): SettingId[] {
-  const present = new Set(ids)
-  const childrenOf = new Map<SettingId, SettingId[]>()
-  for (const id of ids) {
-    const parent = settingParentId(id)
-    if (parent === undefined || !present.has(parent)) continue
-
-    childrenOf.set(parent, [...(childrenOf.get(parent) ?? []), id])
-  }
-
-  return ids.flatMap((id) => {
-    const parent = settingParentId(id)
-    if (parent !== undefined && present.has(parent)) return []
-
-    return [id, ...(childrenOf.get(id) ?? [])]
-  })
 }

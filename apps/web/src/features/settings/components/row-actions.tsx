@@ -1,4 +1,3 @@
-import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { DotsThreeIcon } from '@phosphor-icons/react'
 import type { SettingId } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
@@ -37,20 +36,18 @@ export function RowActions({
 
   return (
     <DropdownMenu>
-      <Tooltip>
-        <DropdownMenuTrigger
-          render={
-            <TooltipTrigger
-              render={
-                <Button aria-label={`Actions for ${id}`} size='icon-sm' variant='ghost'>
-                  <DotsThreeIcon />
-                </Button>
-              }
-            />
-          }
-        />
-        <TooltipContent>{`Actions for ${id}`}</TooltipContent>
-      </Tooltip>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            aria-label={`Actions for ${id}`}
+            data-tooltip={`Actions for ${id}`}
+            size='icon-sm'
+            variant='ghost'
+          >
+            <DotsThreeIcon />
+          </Button>
+        }
+      />
       <DropdownMenuContent align='end' className='w-56'>
         <DropdownMenuItem disabled={!isModified} onClick={() => resetSetting(id, scope)}>
           Reset setting

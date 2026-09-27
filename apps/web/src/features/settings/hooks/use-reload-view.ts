@@ -19,11 +19,15 @@ export function useReloadView(owner: QueryClient, ready: boolean) {
     if (!ready) return
     const node = ref.current
     let scrollTop = settingsScrollTop(owner, scope, view, search, category)
-    if (node) node.scrollTop = scrollTop
     const rememberScroll = () => {
       scrollTop = node?.scrollTop ?? scrollTop
     }
-    node?.addEventListener('scroll', rememberScroll)
+    // Child virtualizers replay layout effects after a mounting pass. Restore once those
+    // effects settle, before the next frame, so they cannot reset the page to their initial offset.
+    const frame = requestAnimationFrame(() => {
+      if (node) node.scrollTop = scrollTop
+      node?.addEventListener('scroll', rememberScroll)
+    })
     const capture = () =>
       captureSettingsView(
         owner,
@@ -38,6 +42,7 @@ export function useReloadView(owner: QueryClient, ready: boolean) {
       )
     const remove = addLifecycleFlush(capture)
     return () => {
+      cancelAnimationFrame(frame)
       capture()
       node?.removeEventListener('scroll', rememberScroll)
       remove()
