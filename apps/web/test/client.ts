@@ -109,6 +109,7 @@ export function createControlledInProcessClient(server: TestServer) {
     if (injected) return injected
 
     const response = await directFetch(request)
+    if (new URL(request.url).pathname === '/settings') return controller.reshapeRead(response)
     if (new URL(request.url).pathname !== '/settings/events') return response
 
     return controller.wrap(response)
@@ -121,6 +122,8 @@ class SettingsStreamFetchController {
   private readonly activeAttempts = new Map<number, () => void>()
   private attemptCount = 0
   private nextSettingsReadResponse: Response | null = null
+  private failingSettingsReads: InjectedSettingsError | null = null
+  private readsFromNewerServer = false
   private nextSettingsRawWriteResponse: Response | null = null
   private nextSettingsWriteResponse: Promise<Response> | Response | null = null
   private readonly rawWriteObservations: Promise<void>[] = []
@@ -200,6 +203,26 @@ class SettingsStreamFetchController {
     this.nextSettingsReadResponse = Response.json({ code, message }, { status })
   }
 
+  /** Every read fails until called again with null, as an unreachable server's would. */
+  failSettingsReads(error: InjectedSettingsError | null) {
+    this.failingSettingsReads = error
+  }
+
+  /** Reads carry a diagnostic kind this build does not know, as a newer server's would. */
+  answerSettingsReadsAsNewerServer() {
+    this.readsFromNewerServer = true
+  }
+
+  async reshapeRead(response: Response): Promise<Response> {
+    if (!this.readsFromNewerServer || !response.ok) return response
+    const snapshot = (await response.json()) as { diagnostics: unknown[] }
+    const diagnostic = { kind: 'from-a-newer-server', id: 'editor.fontSize', layer: 'user' }
+    return Response.json(
+      { ...snapshot, diagnostics: [...snapshot.diagnostics, diagnostic] },
+      { status: response.status, headers: response.headers },
+    )
+  }
+
   rejectNextSettingsRawWrite({
     code,
     message,
@@ -233,7 +256,9 @@ class SettingsStreamFetchController {
     if (path === '/settings' && request.method === 'GET') {
       const response = this.nextSettingsReadResponse
       this.nextSettingsReadResponse = null
-      return response
+      if (response || !this.failingSettingsReads) return response
+      const { code, message, status } = this.failingSettingsReads
+      return Response.json({ code, message }, { status })
     }
     if (path === '/settings/raw' && request.method === 'POST') {
       const response = this.nextSettingsRawWriteResponse

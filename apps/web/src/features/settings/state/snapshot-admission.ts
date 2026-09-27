@@ -7,7 +7,7 @@ import { importSourcesQueryKey } from '@/features/settings/utils/query-keys'
 
 export const settingsSnapshotAdmission = createSettingsSnapshotAdmission({
   batch: unstable_batchedUpdates,
-  fetch: (owner, signal) => fetchSettings(signal, clientForQueryClient(owner)),
+  fetch: (owner, signal, options) => fetchSettings(signal, clientForQueryClient(owner), options),
   invalidateProviders: (owner) => {
     void owner.invalidateQueries({ queryKey: providerQueryKeys.all })
     void owner.invalidateQueries({ queryKey: importSourcesQueryKey })

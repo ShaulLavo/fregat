@@ -66,9 +66,16 @@ function inactiveAdmission(): AdmissionResult {
   return { acknowledgedIntent: null, admitted: false, recoveryPending: false, snapshot: undefined }
 }
 
+/** `quiet`: the caller logs a failed read itself, so the read's own failure line is debug. */
+export type SettingsReadOptions = { readonly quiet?: boolean }
+
 export type SettingsAdmissionHost = {
   readonly batch: (operation: () => void) => void
-  readonly fetch: (owner: QueryClient, signal?: AbortSignal) => Promise<SettingsSnapshot>
+  readonly fetch: (
+    owner: QueryClient,
+    signal?: AbortSignal,
+    options?: SettingsReadOptions,
+  ) => Promise<SettingsSnapshot>
   readonly invalidateProviders: (owner: QueryClient) => void
 }
 
@@ -150,8 +157,12 @@ export function createSettingsSnapshotAdmission(host: SettingsAdmissionHost) {
   }
 
   /** Refetches confirmed bytes after a stream break or raw compare-and-swap conflict. */
-  async function refreshConfirmedSettings(queryClient: QueryClient, signal?: AbortSignal) {
-    const refreshed = await refreshConfirmedSettingsWithEvidence(queryClient, signal)
+  async function refreshConfirmedSettings(
+    queryClient: QueryClient,
+    signal?: AbortSignal,
+    options?: SettingsReadOptions,
+  ) {
+    const refreshed = await refreshConfirmedSettingsWithEvidence(queryClient, signal, options)
     const state = admissionState(queryClient)
     invalidateProviderQueries(queryClient, claimProviderChange(state, refreshed))
 
@@ -161,9 +172,10 @@ export function createSettingsSnapshotAdmission(host: SettingsAdmissionHost) {
   async function refreshConfirmedSettingsWithEvidence(
     queryClient: QueryClient,
     signal?: AbortSignal,
+    options?: SettingsReadOptions,
   ): Promise<ConfirmedSettingsRefresh> {
     const token = beginSettingsSnapshotRead(queryClient)
-    const snapshot = await host.fetch(queryClient, signal)
+    const snapshot = await host.fetch(queryClient, signal, options)
     signal?.throwIfAborted()
     const state = admissionState(queryClient)
     const previous = confirmedSnapshot(queryClient) ?? state.lastConfirmed

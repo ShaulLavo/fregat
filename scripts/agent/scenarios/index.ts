@@ -13,6 +13,7 @@ import {
 import { textFieldFkeys } from './text-field-fkeys'
 import { settingsRoutePreparation } from './settings-route-preparation'
 import { settingsModuleFailure } from './settings-module-failure'
+import { settingsNewerServer, settingsStreamGiveUp } from './settings-newer-server'
 import { connectionRefusalRetention } from './connection-refusal-retention'
 import { cachedProtocolStartup } from './cached-protocol-startup'
 import { primaryIdentityReplacement } from './primary-identity-replacement'
@@ -591,6 +592,8 @@ export const scenarios: readonly Scenario[] = [
   settingsRoutePreparation,
   textFieldFkeys,
   settingsModuleFailure,
+  settingsNewerServer,
+  settingsStreamGiveUp,
   deferredDialogs,
   dialogEscape,
   projectMenu,

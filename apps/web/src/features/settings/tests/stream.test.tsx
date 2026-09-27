@@ -24,6 +24,11 @@ import {
 } from '@/features/settings/state/snapshot-admission'
 import { fetchSettings, saveSettings } from '@/features/settings/utils/api'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
+import {
+  SETTINGS_STREAM_MAX_FAILURES,
+  type SettingsStreamStop,
+} from '@workspace/client-core/settings/stream'
+import { recordClientLog } from '../../../../test/factories/client-log'
 
 function wrapper(queryClient: QueryClient) {
   return ({ children }: { children: ReactNode }) =>
@@ -362,4 +367,107 @@ test('restoring a suspended page reconnects settings and catches up with writes 
     resetSettingsSnapshotAdmission(queryClient)
     queryClient.clear()
   }
+})
+
+test('a snapshot from a newer server stops the stream at once and says to reload', async ({
+  controlledClient,
+}) => {
+  const { controller } = controlledClient
+  const warn = recordClientLog('warn')
+  const queryClient = createTestQueryClient()
+  queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, getClient()))
+  controller.answerSettingsReadsAsNewerServer()
+  const stops: SettingsStreamStop[] = []
+  let backoffCount = 0
+  await superviseSettingsStream(
+    queryClient,
+    new AbortController().signal,
+    {
+      wait: async () => {
+        backoffCount += 1
+        return true
+      },
+    },
+    (stop) => stops.push(stop),
+  )
+
+  expect(backoffCount).toBe(0)
+  expect(controller.settingsReadCount).toBe(2)
+  expect(stops).toEqual([
+    expect.objectContaining({
+      code: 'client.SETTINGS_SNAPSHOT_UNREADABLE',
+      failureCount: 1,
+      fix: 'Reload the tab to load the version the server runs.',
+      reason: 'unreadable',
+    }),
+  ])
+  // The read that failed logs at debug; the stream's one warn names the failure.
+  expect(warn.events('settings.read')).toEqual([])
+  expect(warn.events('settings.stream')).toEqual([
+    expect.objectContaining({
+      errorCode: 'client.SETTINGS_SNAPSHOT_UNREADABLE',
+      failureCount: 1,
+      outcome: 'gave-up',
+      reason: 'unreadable',
+    }),
+  ])
+  resetSettingsSnapshotAdmission(queryClient)
+  queryClient.clear()
+})
+
+test('a failing server logs one warn, then one info with the count when it recovers', async ({
+  controlledClient,
+}) => {
+  const { controller } = controlledClient
+  const warn = recordClientLog('warn')
+  const info = recordClientLog('info')
+  const queryClient = createTestQueryClient()
+  queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, getClient()))
+  controller.failSettingsReads({ code: 'settings.READ_FAILED', message: 'Down', status: 503 })
+  const abort = new AbortController()
+  let backoffCount = 0
+  const supervisor = superviseSettingsStream(queryClient, abort.signal, {
+    wait: async () => {
+      backoffCount += 1
+      if (backoffCount === 4) controller.failSettingsReads(null)
+      return true
+    },
+  })
+
+  // The stream counts as open once its request has not failed for a second.
+  await waitFor(() => expect(info.events('settings.stream')).toHaveLength(1), { timeout: 3_000 })
+  expect(info.events('settings.stream')[0]).toMatchObject({ failureCount: 4, outcome: 'recovered' })
+  expect(warn.events('settings.read')).toEqual([])
+  expect(warn.events('settings.stream')).toEqual([
+    expect.objectContaining({ errorStatus: 503, failureCount: 1, outcome: 'error' }),
+  ])
+
+  abort.abort()
+  await supervisor
+  resetSettingsSnapshotAdmission(queryClient)
+  queryClient.clear()
+})
+
+test('a server that never answers stops the stream after the retry budget', async ({
+  controlledClient,
+}) => {
+  const { controller } = controlledClient
+  const warn = recordClientLog('warn')
+  const queryClient = createTestQueryClient()
+  queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, getClient()))
+  controller.failSettingsReads({ code: 'settings.READ_FAILED', message: 'Down', status: 503 })
+  const stops: SettingsStreamStop[] = []
+  await superviseSettingsStream(
+    queryClient,
+    new AbortController().signal,
+    { wait: async () => true },
+    (stop) => stops.push(stop),
+  )
+
+  expect(stops).toEqual([
+    expect.objectContaining({ failureCount: SETTINGS_STREAM_MAX_FAILURES, reason: 'unreachable' }),
+  ])
+  expect(warn.events('settings.stream').map((event) => event.outcome)).toEqual(['error', 'gave-up'])
+  resetSettingsSnapshotAdmission(queryClient)
+  queryClient.clear()
 })
