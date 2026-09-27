@@ -1,6 +1,6 @@
 import { clearTimelineReload } from '@/features/chat/state/timeline-reload'
 import { TEST_ENVIRONMENT_ID as FIXTURE_ENVIRONMENT_ID } from '../../../../../test/factories/chat'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import {
   messageIdSchema,
   ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE,
@@ -24,6 +24,7 @@ import { stubResizeObserver } from '../../../../../test/env/resize-observer'
 
 const VIEWPORT_HEIGHT = 600
 const ROW_HEIGHT = 80
+const EXPANDED_ROW_HEIGHT = 400
 
 // happy-dom has no layout engine, so the handful of numbers the scroll decisions
 // read are stubbed. Everything else — the virtualizer, the listeners, the
@@ -55,7 +56,7 @@ beforeEach(() => {
   Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
     configurable: true,
     get(this: HTMLElement) {
-      return this.hasAttribute('data-index') ? ROW_HEIGHT : clientHeight
+      return this.hasAttribute('data-index') ? rowHeight(this) : clientHeight
     },
   })
   Object.defineProperty(Element.prototype, 'scrollHeight', {
@@ -75,7 +76,11 @@ beforeEach(() => {
     },
     set(this: Element, value: number) {
       const max = Math.max(0, this.scrollHeight - this.clientHeight)
+      const previous = originalScrollTop?.get?.call(this)
       originalScrollTop?.set?.call(this, Math.min(Math.max(value, 0), max))
+      // A browser reports every offset change with a scroll event; the virtualizer tracks it.
+      if (originalScrollTop?.get?.call(this) !== previous)
+        queueMicrotask(() => this.dispatchEvent(new Event('scroll')))
     },
   })
   Object.defineProperty(Element.prototype, 'getBoundingClientRect', {
@@ -83,7 +88,7 @@ beforeEach(() => {
     value(this: Element) {
       // Virtualized rows report a fixed height; everything else is viewport
       // sized, which is what the virtualizer measures its scroll box against.
-      return stubRect(this.hasAttribute('data-index') ? ROW_HEIGHT : clientHeight)
+      return stubRect(this.hasAttribute('data-index') ? rowHeight(this) : clientHeight)
     },
     writable: true,
   })
@@ -116,16 +121,27 @@ test('scrolling up mid-stream stops the transcript following', () => {
 })
 
 test('keyboard disclosure activation keeps the expanded message in place during new output', async () => {
-  const longMessage = userMessage('u1', 'Keep my reading position.\n'.repeat(20))
-  const { rerender } = renderTimeline([longMessage])
-  scrollHeightOverride = 4000
-  const disclosure = screen.getByRole('button', { name: 'Show full message' })
+  // A history the virtualizer itself measures as tall: end anchoring writes its own offsets.
+  const history = [
+    ...conversation(59),
+    userMessage('u60', 'Keep my reading position.\n'.repeat(20)),
+  ]
+  const { rerender } = renderTimeline(history)
+  const disclosure = await screen.findByRole('button', { name: 'Show full message' })
+  // The opening scroll to the end re-checks its target each frame until it lands.
+  await animationFrames(3)
   disclosure.focus()
 
   fireEvent.click(disclosure, { detail: 0 })
   await waitFor(() => expect(disclosure).toHaveAttribute('aria-expanded', 'true'))
+  await animationFrames(3)
   const scrollTop = transcript().scrollTop
-  rerender(timelineOf([longMessage, chatMessage({ text: 'The assistant continues responding.' })]))
+  expect(scrollTop).toBeGreaterThan(0)
+  const reply = chatMessage({
+    createdAt: new Date(Date.UTC(2026, 4, 28, 0, 2)).toISOString(),
+    text: 'The assistant continues responding.',
+  })
+  rerender(timelineOf([...history, reply]))
 
   expect(jumpToLatest()).not.toHaveClass('opacity-0')
   expect(transcript().scrollTop).toBe(scrollTop)
@@ -280,6 +296,11 @@ test('the rail is walkable by keyboard, one tab stop for the whole map', () => {
   expect(minimapMark(1, 13)).toHaveAttribute('tabindex', '-1')
 })
 
+async function animationFrames(count: number) {
+  for (let frame = 0; frame < count; frame += 1)
+    await act(() => new Promise((resolve) => requestAnimationFrame(resolve)))
+}
+
 function minimapMarks() {
   return screen.getAllByRole('button', { name: /^Jump to turn / })
 }
@@ -324,7 +345,7 @@ function rowOffsetInViewport(index: number) {
     if (!(sibling instanceof HTMLElement)) continue
     offset += Number.parseFloat(sibling.style.marginTop) || 0
     if (sibling === row) return offset - transcript().scrollTop
-    offset += ROW_HEIGHT
+    offset += rowHeight(sibling)
   }
   return null
 }
@@ -337,9 +358,14 @@ function virtualContentHeight(element: Element) {
     (Number.parseFloat(content.style.paddingBottom) || 0)
   for (const row of content.children) {
     if (!(row instanceof HTMLElement)) continue
-    height += ROW_HEIGHT + (Number.parseFloat(row.style.marginTop) || 0)
+    height += rowHeight(row) + (Number.parseFloat(row.style.marginTop) || 0)
   }
   return height
+}
+
+/** Virtualized rows report a fixed height, and an opened disclosure makes its row taller. */
+function rowHeight(row: Element) {
+  return row.querySelector('[aria-expanded="true"]') ? EXPANDED_ROW_HEIGHT : ROW_HEIGHT
 }
 
 function conversation(count: number) {

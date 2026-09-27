@@ -9,10 +9,12 @@ type PreviewState =
   | { readonly themeId: string; readonly kind: 'ready'; readonly result: TokensResult }
   | { readonly themeId: string; readonly kind: 'error' }
 
+/** While `enabled` is false it starts no highlight; a preview already in the cache still shows. */
 export function useCodeThemePreview(
   themeId: string,
+  enabled = true,
 ): PreviewState & { readonly isFetching: boolean } {
-  const next = useQuery(codeThemePreviewQueryOptions(themeId), resourceQueryClient)
+  const next = useQuery({ ...codeThemePreviewQueryOptions(themeId), enabled }, resourceQueryClient)
   const shownId = useHeldUntilReady(themeId, !next.isPending)
   // The held observer reads the cache; only the selected subject starts a load.
   const shown = useQuery(

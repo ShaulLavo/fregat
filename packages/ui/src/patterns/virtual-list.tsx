@@ -2,6 +2,7 @@ import { defaultRangeExtractor, useVirtualizer, type Virtualizer } from '@tansta
 import {
   useImperativeHandle,
   useLayoutEffect,
+  useMemo,
   useRef,
   type ComponentProps,
   type Key,
@@ -47,6 +48,13 @@ export type VirtualListProps<T> = Omit<ComponentProps<'div'>, 'children' | 'ref'
   scrollMargin?: number
   /** Space a sticky header covers, so a revealed row lands below it. */
   scrollPaddingStart?: number
+  /**
+   * `end` holds the row under the reader when rows land above it (a prepended page) and keeps a
+   * list sitting within `scrollEndThreshold` of its end there while its last row grows. Needs keys
+   * that survive a prepend.
+   */
+  anchorTo?: 'start' | 'end'
+  scrollEndThreshold?: number
   scrollRef?: RefObject<HTMLDivElement | null>
   handleRef?: Ref<VirtualListHandle>
   contentClassName?: string
@@ -78,6 +86,8 @@ export function VirtualList<T>({
   paddingEnd = 0,
   scrollMargin = 0,
   scrollPaddingStart = 0,
+  anchorTo,
+  scrollEndThreshold,
   scrollRef,
   handleRef,
   className,
@@ -93,6 +103,10 @@ export function VirtualList<T>({
   const ref = scrollRef ?? internalRef
   const rowHeight = useRowHeight(ref)
   const densitySized = estimateSize === undefined && !measureItems
+  // A new key function makes virtual-core rebuild every row position, so its identity follows
+  // the rows alone; `getKey` must be a pure function of the item. Passed to useVirtualizer.
+  // oxlint-disable-next-line react/exhaustive-deps
+  const getItemKey = useMemo(() => keyReader(items, getKey), [items])
   const virtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
     count: items.length,
     getScrollElement: () => ref.current,
@@ -100,10 +114,7 @@ export function VirtualList<T>({
       const item = items[index]
       return item === undefined ? rowHeight : (estimateSize?.(item, index, rowHeight) ?? rowHeight)
     },
-    getItemKey: (index) => {
-      const item = items[index]
-      return item === undefined ? index : getKey(item, index)
-    },
+    getItemKey,
     overscan,
     initialRect,
     initialMeasurementsCache,
@@ -112,6 +123,8 @@ export function VirtualList<T>({
     paddingEnd,
     scrollMargin,
     scrollPaddingStart,
+    anchorTo,
+    scrollEndThreshold,
     rangeExtractor: (range) => {
       const indices = defaultRangeExtractor(range)
       if (
@@ -139,6 +152,8 @@ export function VirtualList<T>({
   const rows = virtualizer.getVirtualItems()
   const previousHeight = useRef(rowHeight)
   const previousActiveIndex = useRef(activeIndex)
+  const estimated = estimateSize !== undefined
+  const previousEstimated = useRef(estimated)
   const startIndex = rows[0]?.index ?? -1
   const endIndex = rows.at(-1)?.index ?? -1
 
@@ -161,6 +176,13 @@ export function VirtualList<T>({
     const next = virtualizer.getOffsetForIndex(anchor.index, 'start')
     if (next) virtualizer.scrollToOffset(next[0] + fraction * rowHeight)
   }, [rowHeight, virtualizer, densitySized, measureItems])
+
+  // Measurements rebuild when the key function changes, and that follows the rows alone.
+  useLayoutEffect(() => {
+    if (previousEstimated.current === estimated) return
+    previousEstimated.current = estimated
+    virtualizer.measure()
+  }, [estimated, virtualizer])
 
   useLayoutEffect(() => {
     const changed = previousActiveIndex.current !== activeIndex
@@ -272,4 +294,11 @@ export function virtualRowInView(
   const box = row.getBoundingClientRect()
 
   return box.top >= view.top + paddingStart && box.bottom <= view.bottom
+}
+
+function keyReader<T>(items: readonly T[], getKey: (item: T, index: number) => Key) {
+  return (index: number): Key => {
+    const item = items[index]
+    return item === undefined ? index : getKey(item, index)
+  }
 }

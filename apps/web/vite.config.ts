@@ -88,6 +88,18 @@ export default defineConfig(({ command, isPreview, mode }) => {
     optimizeDeps: {
       // Theme subpaths are loaded after boot and must survive optimizer cache invalidation.
       exclude: ['@shikijs/themes', 'ghostty-webgpu', ...packages.map((pkg) => pkg.name)],
+      // The scanner skips excluded editor sources and their workers, so it never sees these
+      // imports; found on a cold server mid-session instead, each one reloads the page.
+      include: [
+        '@singapore-editor/core > @shikijs/engine-oniguruma',
+        '@singapore-editor/core > @shikijs/engine-oniguruma/wasm-inlined',
+        '@singapore-editor/core > shiki/core',
+        '@singapore-editor/core > shiki/textmate',
+        '@singapore-editor/diff > diff',
+        '@singapore-editor/plugin-ui > remark-stringify',
+        '@singapore-editor/spellcheck > cspell-trie-lib',
+        '@singapore-editor/tree-sitter > web-tree-sitter',
+      ],
     },
     plugins: [
       bootAppearancePlugin(import.meta.dirname),

@@ -1,7 +1,7 @@
-import { CaretRightIcon, FolderIcon, FolderOpenIcon } from '@phosphor-icons/react'
+import { FolderIcon, FolderOpenIcon } from '@phosphor-icons/react'
 import { ListRow } from '@workspace/ui/patterns/list-row'
+import { TreeRowLead } from '@workspace/ui/patterns/tree-row-lead'
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'
-import { cn } from '@workspace/ui/lib/utils'
 
 import { FileTypeIcon } from '@/components/file-type-icon'
 import { DiffStatLabel } from '@/components/diff-stat-label'
@@ -34,23 +34,12 @@ export function AssistantChangedFileRow({
       data-scroll-anchor-ignore
       disabled={disabled}
       title={node.kind === 'file' ? `${node.path} · ${node.change.title}` : node.path}
-      style={{ paddingLeft: `calc(var(--density-row-padding-x) + ${row.depth} * 0.875rem)` }}
       onClick={(event) => {
         rowProps.onClick(event)
         onActivate()
       }}
     >
-      <span className='size-(--icon-size-sm) shrink-0'>
-        {row.hasChildren ? (
-          <CaretRightIcon
-            aria-hidden='true'
-            className={cn(
-              'text-muted-foreground size-(--icon-size-sm) transition-transform',
-              row.expanded && 'rotate-90',
-            )}
-          />
-        ) : null}
-      </span>
+      <TreeRowLead depth={row.depth} expanded={row.hasChildren ? row.expanded : undefined} />
       {node.kind === 'file' ? (
         <FileTypeIcon
           className='size-(--icon-size-sm) shrink-0'

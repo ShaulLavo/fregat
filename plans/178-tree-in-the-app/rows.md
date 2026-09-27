@@ -1,6 +1,7 @@
 # Plan 178: rows on app primitives
 
-- Status: PROPOSED. Size L. After [app-owned-state](app-owned-state.md). Runs beside
+- Status: IN PROGRESS (wave 2, lane T). Size L, landing as four sequential PRs, each off main
+  after the previous one merges. After [app-owned-state](app-owned-state.md). Runs beside
   [icons](icons.md) and [chrome](chrome.md).
 - Owns: rebuilding the row in Tailwind on `ListRow` and a new shared tree-row lead, with the
   current look.
@@ -104,3 +105,85 @@ shimmer, `applyFileTreeIndentGuideVisibility` and its test.
 - `design:census` now scans the tree's files; the allow list holds only Q1 exceptions, each citing it.
 - `renders` on `tree-sticky-scroll`: `ListRow` + `TreeRowLead` must not add renders per scroll frame.
 - Each `TreeRowLead` adopter: `look` before and after on its surface.
+
+## Landing order
+
+The sub-plan is too big for one reviewable PR, so it lands in four, each off `main`:
+
+1. **Lead.** `TreeRowLead` in `packages/ui` (indent, guides, chevron lane) for the tree and its six
+   adopters: git change group headers, chat turn files, the folder picker, search result groups,
+   references and problems. The tree's injected guide stylesheet goes; the focused row's parent
+   guide is a prop.
+2. **Row box.** `ListRow` gains the cursor ring, the selected bar and the pressed-tint opt-out; tree
+   rows move onto it, with the git and decoration lanes and `Shimmer` in Tailwind.
+3. **Name.** `FileLabel` gains extension-preserving truncation and a chain mode; the tree's
+   truncation components go.
+4. **Attributes.** The private `data-file-tree-*` and `data-item-*` attributes and their readers go.
+
+Interim, until [keyboard-and-selection](keyboard-and-selection.md) moves the tree to one tab stop
+(Q3): tree rows keep their roving `tabIndex`.
+
+## Landed
+
+### 1. Lead
+
+- `packages/ui/src/patterns/tree-row-lead.tsx`: `TreeRowLead({ depth, expanded, guides,
+activeGuide, onChevronClick, children })`. The lead is padded by `depth × --tree-indent`, and
+  each guide is a `w-px` element at `--tree-guide-offset + level × --tree-indent`, shifted by
+  `--tree-guide-shift`. The `--tree-lane` wide lane holds the chevron, which is the tree's glyph
+  rotated −90° when closed, or `children`. Guides take `--tree-guide` at rest, light to
+  `--tree-guide-1…6` by level while the pointer is over the `group/tree` ancestor, and fade with
+  the motion defaults. Defaults live in `globals.css`: the indent is 0.875rem, the lane is
+  `--icon-size-sm`, and every guide opacity is 1.
+- The tree sets its own geometry: the indent is level gap + row gap + half the icon − 0.5px (14.3
+  and 18.7px), the lane is 16px, and the chevron keeps its x-height nudge. The editor-syntax guide
+  tones become `--tree-guide-1…6`, and the `workbench.tree.indentGuides` opacities become
+  `--tree-guide-opacity`, `--tree-guide-hover-opacity` and `--tree-guide-active-opacity`. The
+  focused row's parent guide is `activeGuide`. The document-level `<style>` that `TreeView`
+  rewrote on every focus move is gone.
+- Adopters:
+  - Chat turn files and the folder picker drop their inline `paddingLeft`, and the picker's indent
+    goes from 1rem to the shared 0.875rem.
+  - Git group headers, search groups, references and problems take the lead at depth 0.
+  - All six draw the tree's chevron in place of Phosphor's caret. It jumps between states as the
+    tree's always did, so the adopters lose their 150ms rotation; a mid-way rotation reads as a
+    third state.
+
+- `TreeRow` builds the lead itself, so the React Compiler reuses an unchanged row's lead and file
+  icon.
+
+#### Verification
+
+- `tree-parity` before the re-baseline showed zero pixel drift in all 60 captures
+  (`/work/tmp/fregat-evidence/20260927T024203Z-scenario-tree-parity/`). The style probe changed
+  only in these fields:
+  - The probe now reads the lane and guides by their new slots: a guide's `width` and
+    `background-color` replace its `border-left-*`.
+  - Guide transitions went from 150ms to the motion default of 100ms.
+  - The chevron's `fill` moved to its path, and its rotation moved to the `rotate` property, which
+    changes the reported `transform`.
+  - At depth 2 and deeper in cozy, positions differ by at most 0.03px of calc rounding.
+
+  After the re-baseline there is zero drift
+  (`/work/tmp/fregat-evidence/20260927T025856Z-scenario-tree-parity/`). `tree-parity-behaviour`,
+  `tree-sticky-scroll` and `tree-file-clicks` pass.
+
+- `renders tree-large-scroll` (base `167c3e944` → this branch, `…/20260927T025423Z-…` →
+  `…/20260927T025719Z-…`):
+  - `TreeRow` subtree: 410.7 → 203.2 ms.
+  - `TreeView` subtree: 703 → 468 ms.
+  - `FileTypeIcon`: 3,061 renders and 14 ms → 153 and 2.9 ms.
+  - `TreeRowLead`: 200 renders, 9.7 ms.
+- `trace` against the base, two alternating runs each on a loaded machine, before the lead moved
+  into `TreeRow` (median render per wheel step):
+  - `tree-large-scroll`: 15.2 and 14.7 ms on the base, 13.2 and 15.7 ms here.
+  - `tree-sticky-scroll`: 55.4 ms on the base, 45.2 and 42.2 ms here. The base's second run did
+    not complete.
+- Adopters, `look` before → after (`/work/tmp/fregat-evidence/`):
+  - `breadcrumb-picker`: `20260927T021042Z` → `20260927T024345Z`.
+  - `lsp-references`: `20260927T021158Z` → `20260927T024403Z`.
+  - `search-type-delete`: `20260927T021304Z` → `20260927T023901Z`.
+  - `problems-panel-rows`: `20260927T021418Z` → `20260927T023923Z`.
+  - `file-icon-hues` git changes: `20260927T024009Z` → `20260927T023940Z`.
+  - Chat turn files: the scenario that shows them needs a native provider fixture session and was
+    not run.
