@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, useState } from 'react'
 
 import { Tooltip, TooltipContent } from '@workspace/ui/components/tooltip'
 import {
@@ -26,12 +26,20 @@ const TONE_CLASS: Record<TooltipTone, string> = {
 export function TooltipLayer() {
   const id = useId()
   const target = useTooltipLayer(id)
-  const parts = target ? decodeTooltipParts(target.text) : []
+  // The popup remains mounted during its exit animation; keep its content and anchor together.
+  const [shown, setShown] = useState(target)
+  if (target && target !== shown) setShown(target)
+  const parts = shown ? decodeTooltipParts(shown.text) : []
 
   return (
-    <Tooltip open={target !== null}>
+    <Tooltip
+      open={target !== null}
+      onOpenChangeComplete={(open) => {
+        if (!open) setShown(null)
+      }}
+    >
       <TooltipContent
-        anchor={target?.element ?? null}
+        anchor={shown?.element ?? null}
         aria-label={tooltipPartsText(parts)}
         className='block max-w-[min(var(--container-sm),var(--available-width))] wrap-anywhere whitespace-pre-wrap'
         id={id}

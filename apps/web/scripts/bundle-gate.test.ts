@@ -4,6 +4,7 @@ import { checkFirstLoad, pinsFrom, type GateReport, type Pins } from './bundle-g
 
 const baseline: GateReport = {
   firstLoad: { scriptGzip: 1_000_000 },
+  phoneFirstLoad: { scriptGzip: 600_000 },
   owners: [
     { owner: 'features/chat', firstLoadGzip: 120_000 },
     { owner: 'node_modules/react-dom', firstLoadGzip: 60_000 },
@@ -19,6 +20,7 @@ test('the pinned build passes', () => {
 test('an owner that grew past its margin fails and is named', () => {
   const grown: GateReport = {
     firstLoad: { scriptGzip: 1_020_000 },
+    phoneFirstLoad: { scriptGzip: 600_000 },
     owners: [
       { owner: 'features/chat', firstLoadGzip: 140_000 },
       { owner: 'node_modules/react-dom', firstLoadGzip: 60_000 },
@@ -32,6 +34,7 @@ test('an owner that grew past its margin fails and is named', () => {
 test('a new owner in first load is named when it passes the floor', () => {
   const added: GateReport = {
     firstLoad: { scriptGzip: 1_030_000 },
+    phoneFirstLoad: { scriptGzip: 600_000 },
     owners: [...baseline.owners, { owner: 'node_modules/shiki', firstLoadGzip: 30_000 }],
   }
   expect(checkFirstLoad(added, pins).failures).toEqual([
@@ -42,6 +45,7 @@ test('a new owner in first load is named when it passes the floor', () => {
 test('small drift inside the margins passes, and a tiny owner has a floor', () => {
   const drift: GateReport = {
     firstLoad: { scriptGzip: 1_005_000 },
+    phoneFirstLoad: { scriptGzip: 600_000 },
     owners: [
       { owner: 'features/chat', firstLoadGzip: 124_000 },
       { owner: 'node_modules/react-dom', firstLoadGzip: 60_000 },
@@ -54,11 +58,19 @@ test('small drift inside the margins passes, and a tiny owner has a floor', () =
 test('total growth spread thin over owners still fails on the total', () => {
   const spread: GateReport = {
     firstLoad: { scriptGzip: 1_020_000 },
+    phoneFirstLoad: { scriptGzip: 600_000 },
     owners: baseline.owners,
   }
   const result = checkFirstLoad(spread, pins)
   expect(result.passed).toBe(false)
   expect(result.failures[0]?.owner).toBe('(total)')
+})
+
+test('a phone first load that grew past its margin fails on the phone total', () => {
+  const heavier: GateReport = { ...baseline, phoneFirstLoad: { scriptGzip: 620_000 } }
+  const result = checkFirstLoad(heavier, pins)
+  expect(result.passed).toBe(false)
+  expect(result.failures).toEqual([{ owner: '(phone total)', pinned: 600_000, now: 620_000 }])
 })
 
 test('re-pinning keeps the history with its reason', () => {

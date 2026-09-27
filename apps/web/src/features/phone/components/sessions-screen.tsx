@@ -1,4 +1,4 @@
-import { GearSixIcon, ListMagnifyingGlassIcon } from '@phosphor-icons/react'
+import { GearSixIcon } from '@phosphor-icons/react'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 
 import { SessionRail } from '@/features/chat-mode/components/session-rail'
@@ -18,12 +18,6 @@ export function SessionsScreen() {
         actions={
           <>
             <ServerUpdateStatus />
-            <HeaderButton
-              command='workspace.showCommandPalette'
-              icon={ListMagnifyingGlassIcon}
-              label='Command palette'
-              onClick={() => bus.dispatch('workspace.showCommandPalette', { source })}
-            />
             <HeaderButton
               command='workspace.showSettings'
               icon={GearSixIcon}

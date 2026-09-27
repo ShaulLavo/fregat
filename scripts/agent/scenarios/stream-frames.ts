@@ -34,11 +34,17 @@ export async function streamedFrames<T>(
   return frames.filter((frame): frame is T => frame !== null)
 }
 
-async function streamCompleted(root: string) {
+/** Resolves once the native fixture has sent the last chunk of its streamed answer. */
+export async function streamCompleted(root: string) {
+  await fixtureEvent(root, 'stream-complete', 'The fixture never finished streaming its answer')
+}
+
+/** Resolves once the native fixture's log records `event`. */
+export async function fixtureEvent(root: string, event: string, failure: string) {
   for (let attempt = 0; attempt < 300; attempt += 1) {
     const entries = await nativeLog(root)
-    if (entries.some((entry) => entry.event === 'stream-complete')) return
+    if (entries.some((entry) => entry.event === event)) return
     await Bun.sleep(100)
   }
-  ok(false, 'The fixture never finished streaming its answer')
+  ok(false, failure)
 }

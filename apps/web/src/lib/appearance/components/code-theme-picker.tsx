@@ -9,6 +9,7 @@ import { VirtualList } from '@workspace/ui/patterns/virtual-list'
 import { CodeThemePreview } from '@/lib/code-theme/components/preview'
 import { editorThemeColorMode, editorThemeOptions } from '@/lib/code-theme/utils/catalog'
 import { useChoiceList } from '@/lib/appearance/hooks/use-choice-list'
+import { useShown } from '@/lib/appearance/hooks/use-shown'
 
 /**
  * The code themes for one mode, with a sample beside the list: the editor and chat code blocks
@@ -31,7 +32,9 @@ export function CodeThemePicker({
   onChange: (id: string) => void
 }) {
   const options = editorThemeOptions(mode)
-  const preview = useCodeThemePreview(value)
+  // A settings page holds two pickers; each highlights once it is on screen.
+  const [shownRef, shown] = useShown<HTMLDivElement>()
+  const preview = useCodeThemePreview(value, shown)
   const theme = editorThemeOptions(editorThemeColorMode(preview.themeId) ?? mode).find(
     (option) => option.id === preview.themeId,
   )
@@ -43,13 +46,16 @@ export function CodeThemePicker({
   })
 
   return (
-    <div className={cn('flex h-full min-h-0 gap-(--density-section-padding)', className)}>
+    <div
+      ref={shownRef}
+      className={cn('flex h-full min-h-0 gap-(--density-section-padding)', className)}
+    >
       <VirtualList
         {...list.containerProps}
         activeIndex={list.activeIndex}
         aria-label={labelledBy ? undefined : 'Code colors'}
         aria-labelledby={labelledBy}
-        className='focus-ring-inset w-72 outline-none'
+        className='focus-ring-inset w-72 max-w-1/2 outline-none'
         getKey={(option) => option.id}
         handleRef={virtualRef}
         items={options}
@@ -73,7 +79,12 @@ export function CodeThemePicker({
         }
         className='min-w-0'
       >
-        <CodeThemePreview preview={preview} className='rounded-md' />
+        {shown ? (
+          <CodeThemePreview preview={preview} className='rounded-md' />
+        ) : (
+          // Off screen the slot holds still: a skeleton's sweep repaints every frame.
+          <div className='bg-card-solid h-51 rounded-md' />
+        )}
       </ToolPane>
     </div>
   )

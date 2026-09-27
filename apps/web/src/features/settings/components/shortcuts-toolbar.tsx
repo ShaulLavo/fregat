@@ -125,7 +125,11 @@ export function ShortcutsToolbar({
         <ShortcutActions customized={customized} report={report} />
       </div>
       <Tabs onValueChange={(value) => onFilter(value as ShortcutFilter)} value={filter}>
-        <TabsList aria-label='Filter shortcuts' variant='segmented'>
+        <TabsList
+          aria-label='Filter shortcuts'
+          className='max-w-full flex-wrap'
+          variant='segmented'
+        >
           {SHORTCUT_FILTERS.map((id) => (
             <TabsTab key={id} value={id}>
               {FILTER_LABELS[id]}

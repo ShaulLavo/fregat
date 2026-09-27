@@ -8,7 +8,6 @@ import { useSessionMenuActions } from '@/hooks/use-session-menu-actions'
 import type { SessionRenameSurface } from '@/features/chat-mode/state/session-rail-store'
 import { MenuSurface } from '@/keymap/menus/components/surface'
 import { sessionActionsMenu } from '@/keymap/menus/utils/session-actions-menu'
-import type { MenuSection } from '@/keymap/menus/utils/model'
 import { rectAnchor, type MenuAnchor } from '@/keymap/menus/utils/virtual-anchor'
 
 /**
@@ -17,17 +16,13 @@ import { rectAnchor, type MenuAnchor } from '@/keymap/menus/utils/virtual-anchor
  * to rename or archive what you are reading.
  */
 export function SessionActionsButton({
-  more,
   session,
   surface,
 }: {
-  /** A trailing section for what the host's own bar has no room for. */
-  readonly more?: MenuSection
   readonly session: SessionRailItem
   readonly surface: Exclude<SessionRenameSurface, 'rail'>
 }) {
-  const actions = sessionActionsMenu(useSessionMenuActions(session, surface))
-  const menu = more ? [...actions, more] : actions
+  const menu = sessionActionsMenu(useSessionMenuActions(session, surface))
   const [anchor, setAnchor] = useState<MenuAnchor | null>(null)
 
   return (

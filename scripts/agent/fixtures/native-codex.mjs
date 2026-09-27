@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -88,6 +88,19 @@ const promptText = (message) =>
 /** Streams `chunks` as deltas `delayMs` apart, then settles the message and the turn. */
 function streamAnswer(turn, itemId, chunks, delayMs) {
   const next = (index) => {
+    // A scenario that writes `hold-turn` keeps the turn running until it writes `settle-turn`.
+    if (
+      index === chunks.length &&
+      existsSync(join(root, 'hold-turn')) &&
+      !existsSync(join(root, 'settle-turn'))
+    ) {
+      if (!existsSync(join(root, 'held'))) {
+        writeFileSync(join(root, 'held'), 'yes')
+        record({ event: 'stream-held', itemId })
+      }
+      setTimeout(() => next(index), 50)
+      return
+    }
     if (index === chunks.length) {
       agentMessage(turn, itemId, chunks.join(''))
       endTurn(turn, 'completed')
@@ -644,7 +657,109 @@ function handleQuestionHistory(message) {
   return true
 }
 
+/** A transcript taller than the viewport: finished answers of uneven length. */
+function scrollHistory(message) {
+  const turn = startOwnTurn(message)
+  for (let index = 0; index < 24; index += 1) {
+    const paragraphs = Array.from(
+      { length: 2 + (index % 5) },
+      (_, line) => `SCROLL_HISTORY_${index} paragraph ${line + 1} of an earlier answer.`,
+    )
+    agentMessage(turn, `${turn}-history-${String(index).padStart(2, '0')}`, paragraphs.join('\n\n'))
+  }
+  endTurn(turn, 'completed')
+}
+
+/** A long answer streamed in small pieces, so the last row grows for several seconds. */
+const SCROLL_STREAM_CHUNKS = Array.from({ length: 180 }, (_, index) =>
+  index % 6 === 5 ? `sentence ${index}.\n\n` : `SCROLL_STREAM words ${index} `,
+)
+
+/**
+ * One turn of eleven messages: a detail window of 200 then holds about eighteen turns. Ids sort
+ * in emission order, because messages sent in one millisecond are ordered by id.
+ */
+function scrollPageTurn(message, text) {
+  const turn = startOwnTurn(message)
+  const page = text.split(' ')[1]
+  for (let index = 0; index < 10; index += 1)
+    agentMessage(
+      turn,
+      `${turn}-item-${String(index).padStart(2, '0')}`,
+      `PAGE_STEP_${page}_${index}`,
+    )
+  const answer = Array.from(
+    { length: 4 },
+    (_, line) => `PAGE_ANSWER_${page} paragraph ${line + 1} of this turn's answer.`,
+  )
+  agentMessage(turn, `${turn}-item-10`, answer.join('\n\n'))
+  endTurn(turn, 'completed')
+}
+
+/**
+ * Tool steps first, which release the send-time park, then the long streamed answer: the path a
+ * real agent turn takes while the transcript follows its end.
+ */
+function scrollToolTurn(message, chunks) {
+  const turn = startOwnTurn(message)
+  const step = (index) => {
+    if (index === 16) {
+      streamAnswer(turn, `${turn}-answer`, [...chunks, 'SCROLL_STREAM_DONE'], 45)
+      return
+    }
+    const item = { id: `${turn}-step-${String(index).padStart(2, '0')}`, type: 'commandExecution' }
+    const command = `echo SCROLL_TOOL_${index}`
+    if (index % 4 === 3) writeToolFile(index)
+    send({
+      method: 'item/started',
+      params: { threadId, turnId: turn, item: { ...item, command, status: 'inProgress' } },
+    })
+    send({
+      method: 'item/completed',
+      params: {
+        threadId,
+        turnId: turn,
+        item: {
+          ...item,
+          command,
+          status: 'completed',
+          exitCode: 0,
+          aggregatedOutput: `SCROLL_TOOL_${index}\n`,
+        },
+      },
+    })
+    setTimeout(() => step(index + 1), 80)
+  }
+  step(0)
+}
+
+/** Every fourth step edits a file in the checkout `tool-writes.json` names, so the turn has a diff. */
+function writeToolFile(index) {
+  const control = join(root, 'tool-writes.json')
+  if (!existsSync(control)) return
+  const { cwd } = JSON.parse(readFileSync(control, 'utf8'))
+  mkdirSync(join(cwd, 'scroll-tool', `part-${index % 2}`), { recursive: true })
+  writeFileSync(
+    join(cwd, 'scroll-tool', `part-${index % 2}`, `step-${index}.ts`),
+    `export const step = ${index}\n`,
+  )
+}
+
+function chatScroll(message) {
+  const text = promptText(message)
+  record({ event: 'turn/start', input: text })
+  if (text.startsWith('PAGE')) return scrollPageTurn(message, text)
+  if (text.startsWith('HISTORY')) return scrollHistory(message)
+  if (text.startsWith('TOOLS briefly'))
+    return scrollToolTurn(message, SCROLL_STREAM_CHUNKS.slice(0, 12))
+  if (text.startsWith('TOOLS')) return scrollToolTurn(message, SCROLL_STREAM_CHUNKS)
+  const turn = startOwnTurn(message)
+  streamAnswer(turn, `${turn}-answer`, [...SCROLL_STREAM_CHUNKS, 'SCROLL_STREAM_DONE'], 45)
+}
+
 function handle(message) {
+  if (scenario.startsWith('chat-scroll') && message.method === 'turn/start')
+    return chatScroll(message)
   if (scenario === 'question-history' && handleQuestionHistory(message)) return
   if (
     [

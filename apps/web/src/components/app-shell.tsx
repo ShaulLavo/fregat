@@ -18,10 +18,24 @@ export function AppShell({
 }) {
   const surface = usePanelSurface()
   const shell = useDisplayedShell().kind
+  const phone = shell === 'phone'
   const hasWorkspace = useEditorWorkspaceState((state) => state.rootFolder !== null)
   // The phone density step keys on this; the boot script sets it before the first paint.
   useLayoutEffect(() => {
-    document.documentElement.dataset.shell = shell
+    const root = document.documentElement
+    root.dataset.shell = shell
+    if (shell !== 'phone') return
+
+    // Safari's large viewport excludes its persistent toolbar; the wallpaper covers that too.
+    const resizeBackdrop = () => {
+      root.style.setProperty('--phone-backdrop-height', `${window.outerHeight}px`)
+    }
+    resizeBackdrop()
+    window.addEventListener('resize', resizeBackdrop)
+    return () => {
+      window.removeEventListener('resize', resizeBackdrop)
+      root.style.removeProperty('--phone-backdrop-height')
+    }
   }, [shell])
   const { ref: shellRef } = useFocusTarget<HTMLDivElement>({
     area: 'global',
@@ -37,17 +51,28 @@ export function AppShell({
   return (
     <div
       className={cn(
-        'bg-background text-foreground relative isolate flex flex-col overflow-hidden',
+        'bg-background text-foreground relative isolate flex flex-col',
         // The phone keyboard shrinks the dynamic viewport; the desktop window never does.
-        shell === 'phone' ? 'h-dvh' : 'h-svh',
+        phone ? 'h-dvh' : 'h-svh overflow-hidden',
       )}
       ref={shellRef}
       tabIndex={-1}
     >
-      <Wallpaper />
+      {phone ? (
+        <div
+          aria-hidden='true'
+          className='pointer-events-none absolute inset-x-0 top-0 h-[max(100lvh,var(--phone-backdrop-height,100lvh))]'
+        >
+          {/* Safari clips fixed layers above its toolbar, including oversized wallpapers. */}
+          <Wallpaper />
+          <div className={cn(surface.region, 'absolute inset-0')} />
+        </div>
+      ) : (
+        <Wallpaper />
+      )}
       {/* One blurred region for the bar and the panels, so they share a sample of the wallpaper. */}
       <div
-        className={cn(surface.region, 'relative z-10 flex min-h-0 flex-1 flex-col')}
+        className={cn(!phone && surface.region, 'relative z-10 flex min-h-0 flex-1 flex-col')}
         data-surface-region=''
       >
         {/* The phone shell's screens carry their own header; with no folder open there is none. */}

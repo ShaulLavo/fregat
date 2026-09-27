@@ -9,7 +9,7 @@ import { useSessionToolRoot } from '@/features/chat-mode/hooks/use-session-tool-
 import { useSessionCheckoutRefresh } from '@/features/chat-mode/hooks/use-session-checkout-refresh'
 import { useSessionDiffScope } from '@/features/chat/hooks/use-session-diff-scope'
 
-import { LogsPanel } from '@/features/logs/components/panel'
+import { DeferredLogsPanel } from '@/features/logs/components/deferred-panel'
 import { CodePanel } from '@/features/workbench/components/code-panel'
 import { DiagnosticsPanel } from '@/features/workbench/components/diagnostics-panel'
 import { FileNavigatorPanel } from '@/features/workbench/components/file-navigator-panel'
@@ -112,7 +112,7 @@ function toolBody({
         rootPath={toolRoot}
       />
     )
-  if (tab === 'logs') return <LogsPanel active />
+  if (tab === 'logs') return <DeferredLogsPanel active />
   if (tab === 'search') return <SearchPane rootPath={toolRoot} />
 
   return (

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createRoot, type Root } from 'react-dom/client'
 import { flushSync } from 'react-dom'
 
+import { settleLayout } from '../../../../test/env/settle-layout'
 import { TreeHost } from '@/features/workspace/components/tree-host'
 import type {
   FileTreeContextMenuItem,
@@ -47,7 +48,7 @@ describe('tree view browser behavior', () => {
         composition: { contextMenu: { enabled: true, triggerMode, render: renderMenu } },
         renderRowDecoration,
       })
-      await settleBrowserFrames()
+      await settleLayout(virtualScroll(tree))
       renderRowDecoration.mockClear()
 
       for (const path of ['src/features/a-0.ts', 'src/features/a-1.ts', 'src/features/a-2.ts']) {
@@ -458,10 +459,15 @@ describe('tree view browser behavior', () => {
     expect(currentModel.getFocusedPath()).toBe('src/features/')
     expect(activePath(tree)).toBe('src/features/')
 
+    // An outside control makes the no-focus-transfer check independent of row virtualization.
+    const outsideButton = document.createElement('button')
+    document.body.prepend(outsideButton)
+    outsideButton.focus()
+
     currentModel.scrollToPath('src/features/a-20.ts', { offset: 'nearest' })
     await vi.waitFor(() => {
       expect(currentModel.getFocusedPath()).toBe('src/features/a-20.ts')
-      expect(activePath(tree)).toBeNull()
+      expect(document.activeElement).toBe(outsideButton)
     })
 
     currentModel.cleanUp()

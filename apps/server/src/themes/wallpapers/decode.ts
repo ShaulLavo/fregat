@@ -53,13 +53,14 @@ async function runImageWorker(
     {
       stdin: bytes,
       stdout: 'pipe',
-      stderr: 'ignore',
+      stderr: 'pipe',
       timeout: 10_000,
       killSignal: 'SIGKILL',
     },
   )
-  const [output, exitCode] = await Promise.all([
+  const [output, failure, exitCode] = await Promise.all([
     new Response(child.stdout).arrayBuffer(),
+    new Response(child.stderr).text(),
     child.exited,
   ])
   if (exitCode !== 0)
@@ -68,6 +69,7 @@ async function runImageWorker(
         reason: 'decode',
         mode,
         exitCode,
+        workerReason: failure || null,
         signal: child.signalCode,
         bytes: bytes.byteLength,
       },
