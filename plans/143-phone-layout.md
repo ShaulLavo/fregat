@@ -699,3 +699,21 @@ Native Safari evidence on the Mac is in
       `composer-live-native.png` and `composer-live-metrics.json` confirm two selector columns,
       the full `main` label and 4px bottom padding. Required gates and repository typechecks pass.
       Physical phone confirmation remains pending; this run used iOS 26.5 Simulator Safari.
+
+### Compact session setup revision (2026-09-27)
+
+The owner rejected the extra footer row. Replace it with one phone-only setup trigger showing
+branch and agent, with the complete workspace/agent/branch controls inside a sheet. Two visual
+prototypes compared icon-only individual controls with this summary; the summary keeps the
+agent selection visible and gives long values their full space inside the sheet. Remove the
+remaining 4px composer bottom padding on phones. Desktop retains individual controls.
+
+- [x] Compare compact layouts and implement the single setup control.
+- [x] Verify one-row geometry at 320/390/430px, nested picker actions and focus return.
+      `/work/tmp/fregat-evidence/20260927T080353Z-scenario-phone-surfaces/` passes. The known
+      fixture provider update-status errors remain; no real provider turn ran.
+- [x] Inspect native Safari and desktop screenshots. `setup-dev-native.png` shows a 40px
+      trigger whose bottom equals the 714px viewport edge, with zero extra bottom space. Desktop
+      `composer-desktop-webkit.png` retains individual controls. Both are in the Mac evidence folder.
+- [ ] Pass required checks.
+- [ ] Commit, push, deploy and verify the live page.

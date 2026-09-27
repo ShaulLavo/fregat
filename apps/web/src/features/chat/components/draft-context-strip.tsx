@@ -24,6 +24,7 @@ import { DraftAgentMenu } from './draft-agent-menu'
 import { DraftBranchMenu } from './draft-branch-menu'
 import { DraftMachineMenu } from './draft-machine-menu'
 import { DraftWorkspaceMenu } from './draft-workspace-menu'
+import { DraftContextLayout } from './draft-context-layout'
 
 const MACHINE_LOCKED =
   'Attachments and terminal captures stay on this machine. Remove them to move the draft.'
@@ -90,58 +91,69 @@ export function DraftContextStrip({
   }
 
   return (
-    <div
-      aria-label='Session workspace'
-      className='phone:grid phone:grid-cols-2 flex min-w-0 items-center gap-1 pt-1'
-      role='group'
+    <DraftContextLayout
+      agent={agent}
+      branch={
+        target.kind === 'new'
+          ? (target.baseBranch ?? base.branch ?? 'HEAD')
+          : worktreeLabel(base, project.repositoryKind)
+      }
+      kind={target.kind === 'new' ? 'new' : project.repositoryKind}
+      path={base.path}
     >
-      {machines ? (
-        <DraftMachineMenu
-          environmentId={draftTarget.environmentId}
-          lockedReason={canChangeMachine ? null : MACHINE_LOCKED}
-          machines={machines}
-          pending={move.isPending}
-          onSelect={chooseMachine}
+      <div
+        aria-label='Session workspace'
+        className='phone:flex-col phone:items-stretch flex min-w-0 items-center gap-1 pt-1'
+        role='group'
+      >
+        {machines ? (
+          <DraftMachineMenu
+            environmentId={draftTarget.environmentId}
+            lockedReason={canChangeMachine ? null : MACHINE_LOCKED}
+            machines={machines}
+            pending={move.isPending}
+            onSelect={chooseMachine}
+          />
+        ) : null}
+        {git ? (
+          <DraftWorkspaceMenu
+            base={base}
+            currentCheckout={movable || base.kind === 'current' ? checkout : null}
+            pending={move.isPending}
+            target={target}
+            worktrees={linked}
+            onNew={() => onTarget(newWorktreeTarget(base.id))}
+            onWorktree={chooseWorktree}
+          />
+        ) : null}
+        <DraftAgentMenu
+          cwd={base.canonicalPath}
+          providerInstanceId={providerInstanceId}
+          value={agent}
+          onSelect={onAgent}
         />
-      ) : null}
-      {git ? (
-        <DraftWorkspaceMenu
-          base={base}
-          currentCheckout={movable || base.kind === 'current' ? checkout : null}
-          pending={move.isPending}
-          target={target}
-          worktrees={linked}
-          onNew={() => onTarget(newWorktreeTarget(base.id))}
-          onWorktree={chooseWorktree}
-        />
-      ) : null}
-      <DraftAgentMenu
-        cwd={base.canonicalPath}
-        providerInstanceId={providerInstanceId}
-        value={agent}
-        onSelect={onAgent}
-      />
-      {git ? (
-        <div className='phone:col-span-full phone:ml-0 phone:justify-start ml-auto flex min-w-0 justify-end'>
-          {target.kind === 'new' ? (
-            <DraftBranchMenu
-              rootPath={base.path}
-              value={target.baseBranch ?? base.branch ?? 'HEAD'}
-              onSelect={(branch) => onTarget({ ...target, baseBranch: branch })}
-            />
-          ) : (
-            <span
-              className='text-muted-foreground flex min-w-0 items-center gap-1 px-2 text-xs'
-              title={`${worktreeLabel(base, 'git')} · ${base.path}`}
-            >
-              <GitBranchIcon className='size-(--icon-size-sm) shrink-0' />
-              <span className='phone:whitespace-normal phone:break-all truncate'>
-                {worktreeLabel(base, 'git')}
+        {git ? (
+          <div className='phone:ml-0 phone:justify-start ml-auto flex min-w-0 justify-end'>
+            {target.kind === 'new' ? (
+              <DraftBranchMenu
+                rootPath={base.path}
+                value={target.baseBranch ?? base.branch ?? 'HEAD'}
+                onSelect={(branch) => onTarget({ ...target, baseBranch: branch })}
+              />
+            ) : (
+              <span
+                className='text-muted-foreground flex min-w-0 items-center gap-1 px-2 text-xs'
+                title={`${worktreeLabel(base, 'git')} · ${base.path}`}
+              >
+                <GitBranchIcon className='size-(--icon-size-sm) shrink-0' />
+                <span className='phone:whitespace-normal phone:break-all truncate'>
+                  {worktreeLabel(base, 'git')}
+                </span>
               </span>
-            </span>
-          )}
-        </div>
-      ) : null}
-    </div>
+            )}
+          </div>
+        ) : null}
+      </div>
+    </DraftContextLayout>
   )
 }

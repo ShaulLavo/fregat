@@ -424,7 +424,7 @@ export function ChatInput({
   }
 
   return (
-    <div className='phone:pb-(--density-gap-tight) shrink-0 px-(--density-control-padding-x) py-(--density-section-gap)'>
+    <div className='phone:pb-0 shrink-0 px-(--density-control-padding-x) py-(--density-section-gap)'>
       <ChatModelPickerProvider
         draftTarget={draftTarget}
         sessionProviderInstanceId={sessionProviderInstanceId}

@@ -62,12 +62,7 @@ export function DraftWorkspaceMenu({
             ) : (
               <Icon className='size-(--icon-size-sm) shrink-0' />
             )}
-            <span className='phone:hidden min-w-0'>
-              <WidestLabel labels={WORKSPACE_CHOICE_LABELS}>{choice.label}</WidestLabel>
-            </span>
-            <span className='phone:inline hidden min-w-0 truncate'>
-              {choice.kind === 'current' ? 'Checkout' : choice.label}
-            </span>
+            <WidestLabel labels={WORKSPACE_CHOICE_LABELS}>{choice.label}</WidestLabel>
             <CaretDownIcon className='size-(--icon-size-sm) shrink-0 opacity-60' />
           </Button>
         }

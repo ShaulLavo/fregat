@@ -114,9 +114,18 @@ async function newSessionPalette(page: Page, step: (label: string) => Promise<vo
 
 async function draftContext(page: Page, step: (label: string) => Promise<void>) {
   const context = selectors.draftContext(page)
-  await context.waitFor()
+  const setup = selectors.draftSetup(page)
+  await setup.waitFor()
   for (const width of [320, 390, 430]) {
     await page.setViewportSize({ width, height: 844 })
+    const trigger = await setup.boundingBox()
+    ok(
+      trigger && trigger.height <= 44 && trigger.x + trigger.width <= width,
+      'One phone control fits',
+    )
+    ok(Math.abs(trigger.y + trigger.height - 844) <= 1, 'No extra space below the setup control')
+    await step(`draft-summary-${width}`)
+    await setup.click()
     const branch = context.getByText(BRANCH, { exact: true })
     await branch.waitFor()
     const size = await branch.evaluate((element) => ({
@@ -132,7 +141,14 @@ async function draftContext(page: Page, step: (label: string) => Promise<void>) 
     await step(`workspace-sheet-${width}`)
     await page.keyboard.press('Escape')
     await step(`draft-context-${width}`)
+    await page.keyboard.press('Escape')
+    await context.waitFor({ state: 'hidden' })
+    ok(
+      await setup.evaluate((element) => element === document.activeElement),
+      'Focus returns to setup',
+    )
   }
+  await setup.click()
   await context.getByRole('button', { name: 'Run the session as an agent' }).click()
   await page.getByRole('menuitemradio', { name: 'Default agent', exact: true }).click()
   await context.getByRole('button', { name: 'Workspace', exact: true }).click()
@@ -141,6 +157,8 @@ async function draftContext(page: Page, step: (label: string) => Promise<void>) 
   await page.getByRole('menuitemradio', { name: BRANCH }).waitFor()
   await step('draft-branch-sheet')
   await page.keyboard.press('Escape')
+  await page.keyboard.press('Escape')
+  await context.waitFor({ state: 'hidden' })
   await page.setViewportSize({ width: 390, height: 844 })
 }
 
