@@ -12,10 +12,19 @@ export type ListRowProps = HTMLAttributes<RowElement> & {
   marked?: boolean
   disabled?: boolean
   interactive?: boolean
+  /** Draws the start-edge bar while the row is selected. */
+  selectedBar?: boolean
+  /** The list's keyboard cursor: ringed while focus is inside the `group/listbox` ancestor. */
+  cursor?: boolean
+  /** A roving tab stop for a list whose rows take DOM focus; rows of a `useListbox` list leave it -1. */
+  tabIndex?: number
   type?: ComponentProps<'button'>['type']
 }
 
-type RowStateProps = Pick<ListRowProps, 'selected' | 'marked' | 'disabled' | 'interactive'>
+type RowStateProps = Pick<
+  ListRowProps,
+  'selected' | 'marked' | 'disabled' | 'interactive' | 'selectedBar' | 'cursor'
+>
 
 export function ListRow(
   props: ComponentProps<'button'> & RowStateProps & { as: 'button' },
@@ -28,9 +37,12 @@ export function ListRow({
   marked = false,
   disabled = false,
   interactive = true,
+  selectedBar = false,
+  cursor = false,
   className,
   role,
   ref,
+  tabIndex = -1,
   type,
   onClick,
   ...props
@@ -44,13 +56,18 @@ export function ListRow({
       ref={(element: RowElement | null) => assignRef(ref, element)}
       role={role}
       type={Component === 'button' ? (type ?? 'button') : undefined}
-      tabIndex={-1}
+      tabIndex={tabIndex}
       data-slot='list-row'
       data-marked={marked || undefined}
       data-selected={acceptsSelected ? undefined : selected}
       aria-selected={acceptsSelected ? (selected ?? props['aria-selected']) : undefined}
       aria-disabled={disabled || props['aria-disabled'] || undefined}
-      className={listRowClassName({ interactive, className })}
+      className={listRowClassName({
+        interactive,
+        selectedBar: selectedBar && selected === true,
+        cursor,
+        className,
+      })}
       onClick={disabled ? undefined : onClick}
     />
   )

@@ -16,6 +16,8 @@
     "./patterns/use-tail-follow": "./src/patterns/use-tail-follow.ts",
     "./patterns/list-row": "./src/patterns/list-row.tsx",
     "./patterns/list-row-classes": "./src/patterns/list-row-classes.ts",
+    "./patterns/tree-chevron": "./src/patterns/tree-chevron.tsx",
+    "./patterns/tree-row-guides": "./src/patterns/tree-row-guides.tsx",
     "./patterns/tree-row-lead": "./src/patterns/tree-row-lead.tsx",
     "./patterns/listbox-keys": "./src/patterns/listbox-keys.ts",
     "./patterns/use-listbox": "./src/patterns/use-listbox.ts",

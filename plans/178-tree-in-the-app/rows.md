@@ -1,7 +1,7 @@
 # Plan 178: rows on app primitives
 
-- Status: IN PROGRESS (wave 2, lane T). Size L, landing as four sequential PRs, each off main
-  after the previous one merges. After [app-owned-state](app-owned-state.md). Runs beside
+- Status: PAUSED after PR 2 (wave 2, lane T; the wave wound down). PRs 3 and 4 are left for
+  later. Size L, landing as four sequential PRs, each off main after the previous one merges. After [app-owned-state](app-owned-state.md). Runs beside
   [icons](icons.md) and [chrome](chrome.md).
 - Owns: rebuilding the row in Tailwind on `ListRow` and a new shared tree-row lead, with the
   current look.
@@ -187,3 +187,113 @@ activeGuide, onChevronClick, children })`. The lead is padded by `depth × --tre
   - `file-icon-hues` git changes: `20260927T024009Z` → `20260927T023940Z`.
   - Chat turn files: the scenario that shows them needs a native provider fixture session and was
     not run.
+- Review follow-ups:
+  - `TreeRowLead` drops its unused `className`.
+  - The chat card header draws `TreeChevron`.
+  - The harness gains a `guides-on-hover-focus` state. Its baseline was captured on `main`
+    `9305b8062`, before this PR.
+  - The folder picker's lane follows `--icon-size-sm` (12px in compact, 14px in cozy), in place of
+    a fixed 14px. That moves its rows 2px in compact. The shift is intended: the chevron lines up
+    with the row icons below it at every density.
+
+### 2. Row box
+
+- `ListRow` gains three props:
+  - `selectedBar`: a 2px foreground bar at the start edge while the row is selected, inset 4px.
+  - `cursor`: the list's keyboard cursor, ringed with the new `focus-ring-inset-drawn` while focus
+    is inside the `group/listbox` ancestor.
+  - `tabIndex`, for a list whose rows take DOM focus.
+
+  The bar and ring classes go only on the rows that draw them. On every row, the pseudo-element
+  rules added a `::after` resolve to each restyle; putting them on the drawing rows alone cut the
+  elements restyled over the large scroll from 19.1k to 15.2k.
+
+- Tree rows render as `ListRow` (`interactive={false}`, so there is no pressed tint), with the
+  tree's geometry and fonts as Tailwind classes.
+  - Hover stays gated on the root's `data-is-scrolling` through an arbitrary variant keyed on the
+    row's class, so a scroll still restyles the rows alone.
+  - A selected row keeps its fill under the pointer. #130's hover gate had made hover outrank it.
+  - The row box rules in `tree-view.css` and `tree-pane.css` are gone: the box, hover, selected,
+    bar, ring and drag dim. What remains are the truncation markers' state colours, until the name
+    moves onto `FileLabel`.
+- Q1 alignments, the drift the harness shows before its re-baseline
+  (`/work/tmp/fregat-evidence/20260927T041353Z-scenario-tree-parity/`):
+  - The focus ring is the app's inset ring on a square row, in place of the tree's 1px rounded
+    outline.
+  - A row focused by a mouse press draws no ring until a key is pressed. `:focus-visible` cannot
+    tell, because rows take focus from script, so `TreeView` records the pressed row and any key
+    clears it. States: focus-keyboard, focus-click, multi-select, filter-match, filter-empty,
+    sticky, drag-over-folder, loading-file, loading-folder and guides-on-hover-focus.
+  - The rename row is square, and it still draws no bar.
+
+  Every other state has zero drift. After the re-baseline all 64 captures have zero drift
+  (`…/20260927T043014Z-scenario-tree-parity/`).
+
+- Tests: the tree's browser tests now load the app stylesheet, and their config runs Tailwind,
+  because rows are styled by utilities.
+
+#### Verification
+
+- `trace tree-large-scroll`, three alternating runs against `main` `9305b8062`:
+  - Style over the wheel steps: base 129.6, 132.7 and 120.9 ms; this branch 120.0, 131.7 and
+    111.6 ms.
+  - Render per step: base 11.0, 11.5 and 10.3 ms; this branch 10.0, 11.8 and 9.5 ms.
+  - Elements restyled: 18.3k on the base, 15.2k here.
+  - Traces: base `…/20260927T043250Z`, `…/043358Z` and `…/043505Z`; branch `…/043324Z`,
+    `…/043432Z` and `…/043538Z`.
+- `trace tree-sticky-scroll`: style 56.9 ms on the base (the other base run lost its marks);
+  56.9 and 117.9 ms here, on a loaded machine.
+- `renders tree-large-scroll`: `ListRow` adds 75–118 ms over the scenario, one render per row.
+  The `TreeView` subtree was 468 → 423 ms in one pair and 427 → 603 ms in another, so the render
+  cost is not settled.
+- Tests: tsc web and ui; `packages/ui` patterns 55; `row-states.browser` 4; web dom 458;
+  `test:tree-browser` 79. `tree-parity-behaviour`, `tree-sticky-scroll` and `tree-file-clicks`
+  pass. Gates pass, and the first-load gate is 1,681,783 against a pin of 1,735,134.
+
+#### Independent review, 2026-09-27
+
+The render-cost question is settled. `ListRow` adds a small, consistent React cost, while the
+scrolling frame results meet parity. No performance workaround or source correction was needed.
+
+Two alternating pairs of `renders` and `trace --compare` ran for each scenario with the other
+lanes' heavy work stopped. Baseline was main `5ccbda448`; the branch had merged that same main.
+Each used a warm Vite instance and its own fixture-only API home. Values below cover only the
+wheel actions, from `expanded` or `revealed` through the final scroll checkpoint. Startup and
+fixture teardown are excluded. React subtree durations overlap and must not be added together.
+
+| Action metric                           | Main, runs 1 / 2 | PR, runs 1 / 2  |
+| --------------------------------------- | ---------------- | --------------- |
+| Large: `TreeView` subtree ms            | 241.9 / 247.3    | 268.7 / 275.9   |
+| Large: `ListRow` subtree ms             | absent           | 25.3 / 29.3     |
+| Large: median worst task per wheel, ms  | 6.2 / 6.1        | 6.8 / 7.1       |
+| Large: tasks over 16 ms                 | 5 / 5            | 4 / 4           |
+| Large: dropped-frame events             | 20 / 21          | 19 / 17         |
+| Large: elements restyled                | 18,414 / 18,411  | 15,271 / 15,269 |
+| Sticky: `TreeView` subtree ms           | 46.2 / 48.7      | 55.7 / 59.7     |
+| Sticky: `ListRow` subtree ms            | absent           | 8.8 / 10.3      |
+| Sticky: median worst task per wheel, ms | 6.5 / 5.7        | 6.0 / 6.8       |
+| Sticky: tasks over 16 ms                | 0 / 0            | 0 / 0           |
+| Sticky: dropped-frame events            | 10 / 8           | 8 / 8           |
+
+Both versions have 48 `TreeView` and 2,375 `TreeRow` updates during large scrolling, and 16 / 872
+during sticky scrolling. `TreeRowLead` updates zero times. `ListRow` updates once per already
+updating tree row. There are no extra tree render passes and no wheel task over 50 ms. Accept the
+roughly 1.1 ms extra React work per wheel because frame drops and tasks crossing the frame budget
+do not increase. This is scroll parity, not a React CPU reduction.
+
+- Evidence manifest, extraction scripts and complete action metrics:
+  `/work/tmp/w3-tree-review/{measurements.json,frames.json,summarize.py,frames.py}`.
+  Large render pairs are `20260927T164634Z` / `164727Z` and `164823Z` / `164915Z`; trace pairs are
+  `164655Z` / `164748Z` and `164845Z` / `164937Z`, under `/work/tmp/fregat-evidence/`.
+  Sticky render pairs are `165011Z` / `165050Z` and `165131Z` / `165209Z`; trace pairs are
+  `165028Z` / `165106Z` and `165147Z` / `165226Z`.
+- All 64 parity captures have zero pixel and style drift:
+  `/work/tmp/fregat-evidence/20260927T165537Z-scenario-tree-parity/`. Keyboard focus and sticky
+  screenshots were read back. A separate live long-directory-chain fixture showed a continuous
+  focus ring; the removed marker inset does not hide it.
+- Current checks pass: gates, web and UI types, 79 tree browser tests, 15 listbox tests, and four
+  row-state browser tests. Main's CI vocabulary correction `3174a870c` is merged too.
+- Large-scroll fixture cleanup produces missing-workspace requests after its last checkpoint on
+  both branches. These do not enter the measurements. Parity's denied-folder and failed-folder
+  requests are deliberate fixtures. Sticky captures use the same visible rows and action counts;
+  generated files outside the viewport make the two worktrees' total file counts differ.
