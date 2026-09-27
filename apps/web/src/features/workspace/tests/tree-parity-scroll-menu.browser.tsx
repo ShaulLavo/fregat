@@ -213,6 +213,8 @@ describe('hover while scrolling', () => {
   it('holds row hover until the scroll settles', async () => {
     const { model } = await mountParityTree()
     await expandPaths(model, ['src/', 'src/lib/'])
+    // An earlier test can leave the pointer on this row; a move to the same spot re-tests nothing.
+    await mouse('move', belowTree())
     const point = center(row('src/lib/y.ts'))
     const rest = rowBackgroundAt(point)
     await mouse('move', point)
@@ -221,10 +223,17 @@ describe('hover while scrolling', () => {
     await commands.treeClock('pause')
     await wheel(ROW_HEIGHT)
     await commands.treeClock('advance', 16)
-    await mouse('move', point)
+    await mouse('move', { x: point.x + 1, y: point.y })
     expect(rowBackgroundAt(point)).toBe(rest)
     await commands.treeClock('advance', 80)
-    await mouse('move', point)
+    await mouse('move', { x: point.x + 2, y: point.y })
     expect(rowBackgroundAt(point)).toBe(hovered)
   })
 })
+
+function belowTree() {
+  const rect = scroller().getBoundingClientRect()
+  const point = { x: rect.left + 8, y: rect.bottom + 8 }
+  expect(document.elementFromPoint(point.x, point.y)?.closest('[data-type="item"]')).toBeNull()
+  return point
+}
