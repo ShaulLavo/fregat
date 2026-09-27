@@ -2,9 +2,9 @@
 
 ## Status and authorization
 
-- Status: IN PROGRESS 2026-09-27. The rule landed in AGENTS.md ("React"). All of A that moves (A1, A2, A4–A6, A8 keep-alive),
+- Status: DONE 2026-09-27. The rule landed in AGENTS.md ("React"). All of A that moves (A1, A2, A4–A6, A8 keep-alive),
   B1–B4, D1 and D5 are done; A3, A7, D4 and the preview budget stay (reasons below).
-  TUI C1–C6 are done. The census gate is left.
+  TUI C1–C6 are done. The census gate was dropped (below).
 - Origin: owner, 2026-09-27: "we prob abuse useSyncExternalStore too hard". Afterwards the owner
   approved the survey: hand-built stores become zustand, zustand stores read without a selector
   get selectors, snapshots that derive per read are cut down, and the TUI is in scope.
@@ -18,8 +18,8 @@
    `apps/web/src/state/environment-connections.ts`.
 2. Selectors return a primitive, a held reference, or go through `useShallow`. A derived object is
    a selector memoized on its inputs.
-3. Raw `useSyncExternalStore` only for sources zustand cannot own (DOM, renderer events, mutable
-   objects), and never over a whole store snapshot. It may live anywhere.
+3. Raw `useSyncExternalStore` for sources zustand does not own (DOM, renderer events, mutable
+   objects, live sockets, services with a lifecycle); a zustand store is read with `useStore`.
 
 ## Library: stay on zustand
 
@@ -180,8 +180,10 @@ worktree manager) were reverted to whole `useStore` reads for that reason.
 
 ## Gate
 
-After A–C, add `externalStore` to a census (`scripts/lint/`): a `useSyncExternalStore` whose
-`getSnapshot` returns a store's whole `getState`/`getSnapshot` fails unless `scripts/lint/external-store-allow.json` names it with a reason. Add it to `gates`.
+Dropped. A whole-snapshot check flags twelve service reads left on purpose (navigation, focus, LSP
+status, diagnostic peek, history viewer, application runtime), so it would ship with a twelve-row
+allow list. The pattern the plan removed, a zustand store read through `useSyncExternalStore`, has
+no remaining site; AGENTS.md states the rule.
 
 ## Proof per row
 
