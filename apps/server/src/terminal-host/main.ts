@@ -13,6 +13,7 @@ import {
   ensureToken,
   FrameDecoder,
   HOST_CAPABILITIES,
+  HOST_CONNECT_TIMEOUT_MS,
   hostPaths,
   PROTOCOL_VERSION,
   RING_BYTES,
@@ -50,6 +51,7 @@ class TerminalHost {
   private idleTimer: ReturnType<typeof setTimeout> | null = null
   private nextSession = 1
   private stopping = false
+  private greeted = false
 
   constructor(paths: HostPaths, token: string, idleMs: number) {
     this.paths = paths
@@ -84,6 +86,7 @@ class TerminalHost {
       return { type: 'refused', reason: 'token', version: PROTOCOL_VERSION }
     if (version !== PROTOCOL_VERSION)
       return { type: 'refused', reason: 'version', version: PROTOCOL_VERSION }
+    this.greeted = true
     this.clients.add(connection)
     this.checkIdle()
     return {
@@ -206,7 +209,9 @@ class TerminalHost {
       this.idleTimer = null
       return
     }
-    this.idleTimer ??= setTimeout(() => void this.shutdown(), this.idleMs)
+    // Before the first hello the launcher may still be polling; leaving sooner strands it.
+    const wait = this.greeted ? this.idleMs : Math.max(this.idleMs, HOST_CONNECT_TIMEOUT_MS)
+    this.idleTimer ??= setTimeout(() => void this.shutdown(), wait)
   }
 
   private tokenMatches(token: string) {
