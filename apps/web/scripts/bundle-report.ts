@@ -162,7 +162,7 @@ function scriptGzipOf(files: readonly FirstLoadFile[]) {
 
 // What `index.html` names is what a cold browser fetches before the first
 // frame: the entry script, every `modulepreload`, the stylesheet, and the
-// chunks the boot script preloads for the shell it picks.
+// chunks and stylesheets the boot script preloads for the shell it picks.
 function firstLoadFiles(dir: string, shell: 'phone' | 'workbench'): FirstLoadFile[] {
   const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8')
   const files: FirstLoadFile[] = []
@@ -184,7 +184,8 @@ function firstLoadFiles(dir: string, shell: 'phone' | 'workbench'): FirstLoadFil
     const href = attributeValue(attributes, tag === 'script' ? 'src' : 'href')
     if (href) add(href, kind)
   }
-  for (const href of shellChunks(html, shell)) add(href, 'script')
+  for (const href of shellChunks(html, shell))
+    add(href, href.endsWith('.css') ? 'stylesheet' : 'script')
   return files
 }
 

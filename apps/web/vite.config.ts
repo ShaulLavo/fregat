@@ -19,8 +19,8 @@ import { demoPreviewPlugin } from './scripts/demo-preview-plugin'
 import { devPagePlugin } from './scripts/dev-page-plugin'
 import { bootAppearancePlugin } from './scripts/boot-appearance-plugin'
 import { phosphorWeightPlugin } from './scripts/phosphor-weight-plugin'
-import { shellChunksPlugin } from './scripts/shell-chunks-plugin'
-import { staticGraphChunk } from './scripts/initial-chunk'
+import { SHELL_ENTRIES, shellChunksPlugin } from './scripts/shell-chunks-plugin'
+import { shellChunkGroups } from './scripts/shell-chunk-groups'
 
 const workspaceRoot = path.resolve(import.meta.dirname, '../..')
 const markdownRequire = createRequire(path.join(workspaceRoot, 'packages/markdown/package.json'))
@@ -56,18 +56,19 @@ export default defineConfig(({ command, isPreview, mode }) => {
   const linkedDist = command === 'build' ? readDevSources(import.meta.dirname) : []
   return {
     build: {
+      // Every browser the app runs in supports `modulepreload`; the polyfill is a first-load file.
+      modulePreload: { polyfill: false },
       rollupOptions: {
         output: {
-          // The app entry's initial modules ship as one chunk. Left to automatic splitting, every
-          // lazy chunk that shares a module with them cuts them into another file, and many small
-          // files gzip worse than one. Traced from main.tsx, so the dev gallery's modules stay out.
+          // The entry's initial modules and the lazy workbench each ship as whole chunks. Left to
+          // automatic splitting, every lazy chunk that shares a module with them cuts them into
+          // another file, and many small files gzip worse than one. Traced from main.tsx, so the
+          // dev gallery's modules stay out.
           codeSplitting: {
-            groups: [
-              {
-                name: staticGraphChunk(path.resolve(import.meta.dirname, 'src/main.tsx')),
-                tags: ['$initial'],
-              },
-            ],
+            groups: shellChunkGroups(path.resolve(import.meta.dirname, 'src/main.tsx'), {
+              phone: path.resolve(import.meta.dirname, SHELL_ENTRIES.phone),
+              workbench: path.resolve(import.meta.dirname, SHELL_ENTRIES.workbench),
+            }),
           },
         },
         input:
@@ -76,6 +77,8 @@ export default defineConfig(({ command, isPreview, mode }) => {
             : {
                 index: path.resolve(import.meta.dirname, 'index.html'),
                 dev: path.resolve(import.meta.dirname, 'dev.html'),
+                // An entry, so rolldown tags the modules it reaches `$initial` like the app's.
+                workbench: path.resolve(import.meta.dirname, SHELL_ENTRIES.workbench),
               },
       },
     },

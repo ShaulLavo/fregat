@@ -6,6 +6,7 @@ import { settingsPageQueryOptions } from '@/features/settings/utils/page-query'
 import { paletteContentQueryOptions } from '@/features/command-palette/utils/content-query'
 import { filePickerDialogQueryOptions } from '@/features/file-picker/utils/dialog-query'
 import { terminalPanelQueryOptions } from '@/features/terminal/utils/panel-query'
+import { logsPanelQueryOptions } from '@/features/logs/utils/panel-query'
 import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { systemColorMode } from '@/features/settings/state/system-color-mode'
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'
@@ -196,6 +197,10 @@ function prefetchDeferredChunks() {
     .catch(() => undefined)
   void resourceQueryClient
     .query(settingsPageQueryOptions)
+    .then(() => undefined)
+    .catch(() => undefined)
+  void resourceQueryClient
+    .query(logsPanelQueryOptions)
     .then(() => undefined)
     .catch(() => undefined)
 }

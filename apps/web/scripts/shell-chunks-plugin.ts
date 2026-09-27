@@ -1,19 +1,17 @@
 import path from 'node:path'
 import type { Plugin, ResolvedConfig, Rolldown } from 'vite'
 
-/**
- * Each lazy shell's root module, by the kind the boot script picks (src/lib/shell/utils/kind.ts).
- * The workbench ships in the entry script, so it has none.
- */
-const SHELL_ENTRIES = {
+/** Each lazy shell's root module, by the kind the boot script picks (src/lib/shell/utils/kind.ts). */
+export const SHELL_ENTRIES = {
   phone: 'src/features/phone/components/shell.tsx',
+  workbench: 'src/features/workspace/components/workbench-shell.tsx',
 } as const
 
 const PLACEHOLDER = '<!-- shell-chunks -->'
 
 /**
- * Names every chunk each shell needs beyond the entry script, in a JSON script the pre-paint boot
- * script reads to `modulepreload` the chosen shell. Dev serves modules unbundled and gets none.
+ * Names every chunk and stylesheet each shell needs beyond the entry, in a JSON script the
+ * pre-paint boot script reads to preload the chosen shell. Dev serves modules unbundled and gets none.
  */
 export function shellChunksPlugin(webRoot: string): Plugin {
   let config: ResolvedConfig
@@ -57,9 +55,13 @@ export function shellManifest(
     const facade = path.join(webRoot, relative)
     const root = chunks.find((chunk) => chunk.facadeModuleId === facade)
     if (!root) throw new Error(`shell-chunks: no chunk for ${relative}; is it still lazy?`)
-    manifest[kind] = [...staticClosure(root, byFile)]
-      .filter((fileName) => !loaded.has(fileName))
-      .map((fileName) => `${base}${fileName}`)
+    const files = [...staticClosure(root, byFile)].filter((fileName) => !loaded.has(fileName))
+    // The shell's stylesheets too: the dynamic import waits for them, so they would otherwise
+    // start only once the entry runs.
+    const styles = files.flatMap((fileName) => [
+      ...(byFile.get(fileName)?.viteMetadata?.importedCss ?? []),
+    ])
+    manifest[kind] = [...files, ...new Set(styles)].map((fileName) => `${base}${fileName}`)
   }
   return manifest
 }

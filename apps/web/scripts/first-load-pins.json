@@ -1,6 +1,7 @@
 {
   "reading": "disk",
   "scriptGzip": 1735134,
+  "phoneScriptGzip": 1071142,
   "owners": {
     "node_modules": 505079,
     "Editor": 350240,
@@ -95,6 +96,12 @@
       "at": "2026-09-26T22:35:40.666Z",
       "scriptGzip": 1735134,
       "reason": "Plan 178 app-owned-state: the tree view moved from packages/tree into apps/web/src/features/workspace. packages/tree: 73968 -> 35779 (model only); features/workspace: 37004 -> 64433 (the view); total first-load gzip 1735134, under the previous pin 1736796."
+    },
+    {
+      "at": "2026-09-27T03:05:00.000Z",
+      "scriptGzip": 1735134,
+      "phoneScriptGzip": 1071142,
+      "reason": "Phone first load pinned: each shell is a lazy chunk, so a phone skips the workbench (1684252 -> 1071142, against main d45f1c5ae). Desktop pins unchanged; desktop first load 1680766 -> 1678529 with the Logs pane deferred and the modulepreload polyfill dropped."
     }
   ]
 }
