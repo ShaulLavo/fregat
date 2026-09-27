@@ -1,6 +1,6 @@
 # Plan 178: app-owned state
 
-- Status: IN PROGRESS (wave 2, lane T): steps 1–2 and the view half of step 3 landed 2026-09-26; the controller split next, then 4–9. Size L. After [out-of-the-root](out-of-the-root.md).
+- Status: IN PROGRESS (wave 2, lane T): steps 1–3 landed 2026-09-26/27; 4–9 next. Size L. After [out-of-the-root](out-of-the-root.md).
 - Owns: moving the view into the app and replacing the imperative facade with props and state.
 
 ## Outcome
@@ -153,3 +153,23 @@ Layout effects keep their order; refs a hook writes live in that hook (the React
 writes to a hook argument), so `useTreeLayout` hands the viewport sync a setter for its updater.
 Harness: zero drift, except `menu-open`, whose baseline moved because main's menu lost the `F2`
 chip on Rename (reproduced on main); re-baselined.
+
+### Steps 2–3, the package, 2026-09-27
+
+- Package files renamed kebab-case in their own commit: `utils/model/controller.ts` (the `./model`
+  export), `public-types.ts`, `internal-types.ts`, `drag-and-drop.ts`, `input-resolution.ts`,
+  `mutation-events.ts`, `path-helpers.ts`, `rename-helpers.ts`, `search-helpers.ts`,
+  `utils/prepared-input.ts`, `git-status-signature.ts`, `git-status-presentation.ts`,
+  `normalize-input-path.ts`, `public-types.ts`, `rename-paths.ts` (`renameFileTreePaths` is
+  `renamePaths`).
+- The controller went from 2,116 lines to a coordinator over one class per concern, moved
+  unchanged: `visible-projection.ts` (rows, sticky candidates, the filtered subset) with its pure
+  helpers in `visible-projection-data.ts`, `focus.ts` (focus index, focus and scroll requests),
+  `selection.ts`, `search.ts` (the filter), `expansion.ts`, `rename.ts`, `drag-session.ts`,
+  `known-paths.ts`, `item-handles.ts`, `mutation-listeners.ts`. Each takes a small host interface
+  of closures back to the coordinator, which still orders the rebuild a store event triggers
+  (remap, filter refresh, projection, focus). The coordinator is 598 lines, nearly all one-line
+  delegators on the public surface; steps 6 and keyboard-and-selection remove most of them.
+- Verification: package 109 tests, TUI tree tests, web typecheck, tree browser 83 tests (parity
+  included), workspace node/dom tests (four failures are the container, not the tree: a
+  permission-denied fixture under root and three linked-file watch timeouts).

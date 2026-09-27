@@ -1,4 +1,6 @@
 // Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
+import type { PathStoreEvent } from '../path-store/public-types'
+
 import type {
   FileTreeScrollBehavior,
   FileTreeScrollOffset,
@@ -18,3 +20,8 @@ export interface FileTreeScrollRequest {
   offset: FileTreeScrollOffset
   visibleIndex: number
 }
+
+export type StorePathMutationEvent = Extract<
+  PathStoreEvent,
+  { operation: 'add' | 'remove' | 'move' | 'batch' }
+>
