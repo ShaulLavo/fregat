@@ -14,12 +14,26 @@ import {
   type ActiveSettingsIntent,
 } from '@workspace/client-core/settings/intent-store'
 import { readSettingBootValue } from '@/lib/settings-boot-mirror'
-import { projectSettings } from '@workspace/client-core/settings/projection'
+import {
+  projectSettings,
+  type SettingsProjection,
+} from '@workspace/client-core/settings/projection'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 
 type ColorTheme = SettingsValues['workbench.colorTheme']
 
-export function readLiveSettingsProjection(queryClient: QueryClient, fallback?: SettingsSnapshot) {
+export function readLiveSettingsProjection(
+  queryClient: QueryClient,
+  fallback: SettingsSnapshot,
+): SettingsProjection
+export function readLiveSettingsProjection(
+  queryClient: QueryClient,
+  fallback?: SettingsSnapshot,
+): SettingsProjection | undefined
+export function readLiveSettingsProjection(
+  queryClient: QueryClient,
+  fallback?: SettingsSnapshot,
+): SettingsProjection | undefined {
   const confirmed = queryClient.getQueryData<SettingsSnapshot>(settingsKeys.document()) ?? fallback
   if (!confirmed) return undefined
 
@@ -44,8 +58,14 @@ export function subscribeLiveSettings(
 ): () => void {
   const documentHash = hashKey(settingsKeys.document())
   const notify = () => listener(readLiveSettingsProjection(queryClient))
+  // The cache also reports observer and fetch-state events; only a new document changes the values.
+  let document = queryClient.getQueryData(settingsKeys.document())
   const stopDocument = queryClient.getQueryCache().subscribe((event) => {
-    if (event.query.queryHash === documentHash) notify()
+    if (event.query.queryHash !== documentHash) return
+    const next = queryClient.getQueryData(settingsKeys.document())
+    if (next === document) return
+    document = next
+    notify()
   })
   const stopIntents = settingsIntentStore.subscribe(notify)
   notify()

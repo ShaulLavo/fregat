@@ -17,6 +17,8 @@ import { transportFor, closeChatTransports } from '@/features/chat/state/active-
 import { writeBootMirror } from '@/lib/settings-boot-mirror'
 import { createBootRuntime } from '@/state/bootstrap-runtime'
 import { createBootstrap } from '@/state/bootstrap'
+import { WorkspaceEditService } from '@/features/editor/state/workspace-edit-service'
+import { vi } from 'vitest'
 import { getNavigation } from '@/state/navigation-binding'
 import { createTestNavigation } from '../../../../test/factories/navigation'
 import { currentRailEnvironments } from '@/features/chat-mode/state/rail-environments'
@@ -36,13 +38,17 @@ test('warm bootstrap exists before mount and effect replay retains the same runt
     descriptor,
   })
   const navigation = createTestNavigation()
+  const discovery = vi.spyOn(WorkspaceEditService.prototype, 'discoverRecovery')
   const boot = createBootstrap(navigation)
   const application = boot.getState().application
   try {
     expect(getNavigation()).toBe(navigation)
     expect(application).not.toBeNull()
     expect(() => assertEnvironmentWritable(origin)).toThrow()
+    // main.tsx claims a pairing link between these two calls, so nothing may reach the machine yet.
+    expect(discovery).not.toHaveBeenCalled()
     boot.start()
+    expect(discovery).toHaveBeenCalledTimes(1)
     boot.start()
     boot.stop()
     boot.start()
@@ -53,6 +59,7 @@ test('warm bootstrap exists before mount and effect replay retains the same runt
     await Promise.resolve()
     expect(application?.getEnvironment(descriptor.environmentId)).toBeUndefined()
   } finally {
+    discovery.mockRestore()
     boot.dispose()
     navigation.dispose()
     useEnvironmentsStore.setState(previous, true)
