@@ -1,3 +1,4 @@
+import { useStore } from 'zustand'
 import { agentHome } from '@/agent/utils/target'
 import { rememberedAgent } from '@/agent/utils/location'
 import type { Location } from '@/navigation/state/history'
@@ -9,7 +10,7 @@ import { recentCommands } from '@/storage/recent-commands-policy'
 import type { Theme } from '@/theme/utils/theme'
 import { useSettingValue } from '@/settings/hooks/use-setting-value'
 import { useRenderer } from '@opentui/react'
-import { useState, useSyncExternalStore } from 'react'
+import { useState } from 'react'
 import { createHistory } from '@/navigation/state/history'
 import { rememberedWorkbench } from '@/workbench/utils/location'
 import { Toast } from '@/components/toast'
@@ -39,7 +40,7 @@ export function Foundation({
         agentHome,
     ),
   )
-  const { current } = useSyncExternalStore(history.subscribe, history.getSnapshot)
+  const current = useStore(history.store, (state) => state.current)
   return (
     <CommandProvider
       signal={session.signal}

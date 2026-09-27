@@ -2,7 +2,10 @@ import type { ProjectId } from '@workspace/contracts'
 import type { ChatProjectionSlice } from '@workspace/client-core/chat/types'
 import type { AgentLocation, StageTarget } from '@/agent/utils/target'
 
-export function currentWorktree(projection: ChatProjectionSlice, projectId: ProjectId | null) {
+export function currentWorktree(
+  projection: Pick<ChatProjectionSlice, 'worktreeIds' | 'worktreeById'>,
+  projectId: ProjectId | null,
+) {
   const candidates = projection.worktreeIds
     .map((id) => projection.worktreeById[id])
     .filter((worktree) => worktree.projectId === projectId && worktree.lifecycle.state === 'ready')

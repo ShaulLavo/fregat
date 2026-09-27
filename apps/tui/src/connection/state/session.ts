@@ -200,6 +200,7 @@ export function createSettingsSession(options: SessionOptions) {
     },
     record: (event: Record<string, unknown>) => options.record?.(event),
     refresh,
+    store: store.store,
     getSnapshot: store.getSnapshot,
     subscribe: store.subscribe,
     dispose() {

@@ -1,6 +1,6 @@
+import { useStore } from 'zustand'
 import type { Location } from '@/navigation/state/history'
 import { useKeyboard, useTerminalDimensions } from '@opentui/react'
-import { useSyncExternalStore } from 'react'
 
 import { LoadingState } from '@/components/loading-state'
 import { Failure } from '@/connection/components/failure'
@@ -34,7 +34,7 @@ export function Application({
 }: ApplicationProps) {
   const { height } = useTerminalDimensions()
   const short = height < 20
-  const state = useSyncExternalStore(session.subscribe, session.getSnapshot)
+  const state = useStore(session.store)
   const owner = state.kind === 'ready' ? state.owner : null
   const mode = useSettingValue(owner, 'workbench.colorTheme')
   const paletteId = useSettingValue(owner, 'workbench.palette')

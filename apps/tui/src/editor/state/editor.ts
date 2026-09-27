@@ -1,30 +1,23 @@
+import { createStore } from 'zustand/vanilla'
 import type { EditTextRequest } from '@/host/providers/actions-context'
 import { createTuiError } from '@/host/utils/structured-errors'
 
 export function createTextEditor() {
-  const listeners = new Set<() => void>()
-  let current: EditTextRequest | null = null
+  /** The open edit request; components select from this with `useStore`. */
+  const store = createStore<EditTextRequest | null>(() => null)
   let finish: ((text: string | null) => void) | null = null
-  const publish = () => {
-    for (const listener of listeners) listener()
-  }
   return {
-    getSnapshot: () => current,
-    subscribe(listener: () => void) {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
-    },
+    store,
+    getSnapshot: store.getState,
     editText(request: EditTextRequest): Promise<string | null> {
       request.signal.throwIfAborted()
-      if (current) throw createTuiError('An editor is already open.', 'Finish editing first.')
+      if (store.getState())
+        throw createTuiError('An editor is already open.', 'Finish editing first.')
       const result = Promise.withResolvers<string | null>()
       const clear = () => {
         request.signal.removeEventListener('abort', abort)
-        current = null
         finish = null
-        publish()
+        store.setState(null, true)
       }
       const abort = () => {
         clear()
@@ -34,9 +27,8 @@ export function createTextEditor() {
         clear()
         result.resolve(text)
       }
-      current = request
       request.signal.addEventListener('abort', abort, { once: true })
-      publish()
+      store.setState(request, true)
       return result.promise
     },
     complete(text: string | null) {
@@ -44,7 +36,6 @@ export function createTextEditor() {
     },
     dispose() {
       finish?.(null)
-      listeners.clear()
     },
   }
 }

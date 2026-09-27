@@ -1,11 +1,12 @@
-import { useLayoutEffect, useRef, useSyncExternalStore } from 'react'
+import { useLayoutEffect, useRef } from 'react'
+import { useStore } from 'zustand'
 import { createPortal } from 'react-dom'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 
 import type { KeepAliveStore } from '@/lib/keep-alive/state/store'
 
 export function KeepAliveOutlet({ store }: { readonly store: KeepAliveStore }) {
-  const entries = useSyncExternalStore(store.subscribe, store.getEntries)
+  const entries = useStore(store.entries)
   const parkingRef = useRef<HTMLDivElement>(null)
 
   useLayoutEffect(() => {

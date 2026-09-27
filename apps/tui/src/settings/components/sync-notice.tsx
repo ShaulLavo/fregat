@@ -1,10 +1,10 @@
-import { useSyncExternalStore } from 'react'
+import { useStore } from 'zustand'
 import type { SettingsOwner } from '@workspace/client-core/settings/owner'
 import { useCommands } from '@/commands/hooks/use-commands'
 import type { Theme } from '@/theme/utils/theme'
 
 export function SyncNotice({ owner, theme }: { owner: SettingsOwner; theme: Theme }) {
-  const { streamStop } = useSyncExternalStore(owner.subscribe, owner.getSnapshot)
+  const streamStop = useStore(owner.store, (state) => state.streamStop)
   const { bindings } = useCommands()
   if (!streamStop) return null
   const reconnect = bindings.find((binding) => binding.command === 'workspace.reconnect')?.keys

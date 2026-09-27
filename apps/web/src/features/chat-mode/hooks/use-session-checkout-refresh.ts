@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { selectSessionOwnership } from '@workspace/client-core/chat/selectors'
 
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
@@ -14,21 +15,23 @@ import { invalidateCheckout } from '@/lib/invalidate-checkout'
 export function useSessionCheckoutRefresh() {
   const { activeSession } = useChatModeSession()
   const queryClient = useQueryClient()
-  const head = useActiveChatProjection((slice) => {
-    if (!activeSession.sessionId) return null
-    const worktree = selectSessionOwnership(slice, activeSession.sessionId)?.worktree
-    return worktree
-      ? `${worktree.id}\0${worktree.branch ?? ''}\0${worktree.headCommit ?? ''}\0${worktree.path}`
-      : null
-  })
+  const head = useActiveChatProjection(
+    useShallow((slice) => {
+      if (!activeSession.sessionId) return null
+      const worktree = selectSessionOwnership(slice, activeSession.sessionId)?.worktree
+      if (!worktree) return null
+      const { id, branch, headCommit, path } = worktree
+      return { id, branch, headCommit, path }
+    }),
+  )
   const seen = useRef(head)
 
   useEffect(() => {
     if (head === seen.current) return
-    const sameWorktree = head?.split('\0')[0] === seen.current?.split('\0')[0]
+    const sameWorktree = head?.id === seen.current?.id
     seen.current = head
     // Switching sessions reads fresh state anyway; only a change in place is news.
     if (!head || !sameWorktree) return
-    void invalidateCheckout(queryClient, head.split('\0')[3] ?? '')
+    void invalidateCheckout(queryClient, head.path)
   }, [head, queryClient])
 }

@@ -1,6 +1,6 @@
+import { useStore } from 'zustand'
 import { useCommands } from '@/commands/hooks/use-commands'
 import { useTerminalDimensions } from '@opentui/react'
-import { useSyncExternalStore } from 'react'
 import type { SessionState } from '@/connection/state/session'
 import type { Theme } from '@/theme/utils/theme'
 
@@ -12,8 +12,7 @@ export function Status({
   theme: Theme
 }) {
   const { bindings, focus } = useCommands()
-  const focused = useSyncExternalStore(focus.subscribe, focus.getSnapshot)
-  const terminal = focused.current?.area === 'terminal'
+  const terminal = useStore(focus.store, (state) => state.current?.area === 'terminal')
   const { width, height } = useTerminalDimensions()
   const compact = width < 70 || height < 20
   const offline = state.connection.kind === 'offline'

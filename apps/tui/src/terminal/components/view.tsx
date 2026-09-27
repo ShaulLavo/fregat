@@ -1,7 +1,15 @@
 import '@/terminal/state/renderable'
 import { createHostClipboard, type EmbeddedTerminalRenderable } from '@opentui/core'
 import { useRenderer } from '@opentui/react'
-import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import {
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
+import { emptySubscription } from '@workspace/utils/subscriptions'
 import type { SessionId, WorktreeId } from '@workspace/contracts'
 import { usePaneFocus } from '@/commands/hooks/use-pane-focus'
 import { useCommands } from '@/commands/hooks/use-commands'
@@ -51,7 +59,11 @@ export function TerminalView({
   const connection = useRef<TerminalConnection | null>(null)
   const attached = useRef(false)
   const selectedText = useRef('')
-  const [state, setState] = useState<TerminalState>({ kind: 'connecting' })
+  const [live, setLive] = useState<TerminalConnection | null>(null)
+  const state = useSyncExternalStore(
+    live?.subscribe ?? emptySubscription,
+    live?.getSnapshot ?? connecting,
+  )
   const [attempt, setAttempt] = useState(0)
   const [clipboard] = useState(() => createHostClipboard())
   const scrollback = useSettingValue(ready.owner, 'terminal.integrated.scrollback')
@@ -61,7 +73,6 @@ export function TerminalView({
     if (enabled) focus.request({ kind: 'match', matches: (target) => target.widgetId === id })
   }, [focus, id, enabled])
   useEffect(() => {
-    setState({ kind: 'connecting' })
     selectedText.current = ''
     terminal.current?.write('\x1b[2J\x1b[3J\x1b[H')
     const current = openTerminalConnection(session, {
@@ -72,10 +83,9 @@ export function TerminalView({
       rows: terminal.current?.height || 24,
     })
     connection.current = current
-    const unsubscribe = current.subscribe(() => setState(current.getSnapshot()))
+    setLive(current)
     const output = current.observeOutput((bytes) => terminal.current?.write(bytes))
     return () => {
-      unsubscribe()
       output()
       current.close()
       connection.current = null
@@ -225,4 +235,10 @@ export function TerminalView({
       </text>
     </box>
   )
+}
+
+const CONNECTING: TerminalState = { kind: 'connecting' }
+
+function connecting() {
+  return CONNECTING
 }

@@ -34,6 +34,7 @@ export function createProviderCatalog(client: Client) {
   }
   return {
     refresh,
+    store: store.store,
     getSnapshot: store.getSnapshot,
     subscribe: store.subscribe,
     dispose() {

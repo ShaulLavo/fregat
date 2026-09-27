@@ -6,6 +6,7 @@ import {
   type VscodeThemeRegistration,
 } from '@singapore-editor/core/shiki'
 import type { ShikiWorkerThemeRegistration } from '@singapore-editor/core/shiki'
+import { createStore } from 'zustand/vanilla'
 
 import {
   builtinEditorTheme,
@@ -38,21 +39,37 @@ const DEFAULT_DEFINITION_BY_COLOR_MODE = {
 } satisfies Record<EditorColorMode, VscodeThemeDefinition>
 
 const vscodeThemeDefinitionById = new Map(VSCODE_THEMES.map((theme) => [theme.id, theme]))
-const editorColorThemeListeners = new Set<() => void>()
 
-let selectionByColorMode: Record<EditorColorMode, string> | null = null
-let activeEditorColorMode: EditorColorMode = 'dark'
-// Preview overlays settings until selection or palette close.
-let previewTheme: { readonly colorMode: EditorColorMode; readonly themeId: string } | null = null
+type ColorThemeState = {
+  /** `null` until a selection is synced; reads fall back to the settings mirror until then. */
+  readonly selection: Readonly<Record<EditorColorMode, string>> | null
+  readonly activeColorMode: EditorColorMode
+  /** Overlays the selection until it is committed or the palette closes. */
+  readonly preview: { readonly colorMode: EditorColorMode; readonly themeId: string } | null
+  /** Bumps when a selected theme's registration lands, so content-hash readers re-read. */
+  readonly loadedRevision: number
+}
+
+const INITIAL_STATE: ColorThemeState = {
+  selection: null,
+  activeColorMode: 'dark',
+  preview: null,
+  loadedRevision: 0,
+}
+
+export const colorThemeStore = createStore<ColorThemeState>(() => INITIAL_STATE)
 
 /**
  * The theme id the editor/highlighter should render right now — the hover-preview
  * when one is active, otherwise the committed selection. Used by the shiki
  * plugin's theme resolver and by surfaces that follow live preview.
  */
-export function getSelectedEditorThemeId(colorMode: EditorColorMode): string {
-  if (previewTheme?.colorMode === colorMode) return previewTheme.themeId
-  return readSelectionByColorMode()[colorMode]
+export function getSelectedEditorThemeId(
+  colorMode: EditorColorMode,
+  { preview, selection } = colorThemeStore.getState(),
+): string {
+  if (preview?.colorMode === colorMode) return preview.themeId
+  return (selection ?? persistedSelection())[colorMode]
 }
 
 /**
@@ -60,40 +77,41 @@ export function getSelectedEditorThemeId(colorMode: EditorColorMode): string {
  * palette's "active" badge so it tracks what the user committed, not the row
  * currently under the pointer.
  */
-export function getCommittedEditorThemeId(colorMode: EditorColorMode): string {
-  return readSelectionByColorMode()[colorMode]
+export function getCommittedEditorThemeId(
+  colorMode: EditorColorMode,
+  { selection } = colorThemeStore.getState(),
+): string {
+  return (selection ?? persistedSelection())[colorMode]
 }
 
 export function syncEditorThemeSelection(colorMode: EditorColorMode, themeId: string) {
-  const selection = readSelectionByColorMode()
+  const { preview, selection } = colorThemeStore.getState()
+  const current = selection ?? persistedSelection()
   themeId = validThemeIdForColorMode(colorMode, themeId)
-  if (selection[colorMode] === themeId) return
+  if (current[colorMode] === themeId) return
 
-  // A commit supersedes the pending preview in its own mode.
-  if (previewTheme?.colorMode === colorMode) {
-    previewTheme = null
-  }
-
-  selectionByColorMode = { ...selection, [colorMode]: themeId }
-  notifyEditorColorThemeListeners()
+  colorThemeStore.setState({
+    selection: { ...current, [colorMode]: themeId },
+    // A commit supersedes the pending preview in its own mode.
+    preview: preview?.colorMode === colorMode ? null : preview,
+  })
   void ensureRegistrationLoaded(themeId)
 }
 
 export function previewEditorTheme(colorMode: EditorColorMode, themeId: string) {
+  const { preview } = colorThemeStore.getState()
   if (editorThemeColorMode(themeId) !== colorMode) return
-  if (previewTheme?.colorMode === colorMode && previewTheme.themeId === themeId) return
-  if (previewTheme === null && readSelectionByColorMode()[colorMode] === themeId) return
+  if (preview?.colorMode === colorMode && preview.themeId === themeId) return
+  if (preview === null && getCommittedEditorThemeId(colorMode) === themeId) return
 
-  previewTheme = { colorMode, themeId }
-  notifyEditorColorThemeListeners()
+  colorThemeStore.setState({ preview: { colorMode, themeId } })
   void ensureRegistrationLoaded(themeId)
 }
 
 export function clearEditorThemePreview() {
-  if (previewTheme === null) return
+  if (colorThemeStore.getState().preview === null) return
 
-  previewTheme = null
-  notifyEditorColorThemeListeners()
+  colorThemeStore.setState({ preview: null })
 }
 
 /**
@@ -103,7 +121,7 @@ export function clearEditorThemePreview() {
  * highlighter is registered at all.
  */
 export function activeEditorThemeUsesShiki(): boolean {
-  return !isBuiltinEditorThemeId(getSelectedEditorThemeId(activeEditorColorMode))
+  return !isBuiltinEditorThemeId(getSelectedEditorThemeId(getActiveEditorColorMode()))
 }
 
 /**
@@ -113,10 +131,11 @@ export function activeEditorThemeUsesShiki(): boolean {
  * resolve.
  */
 export function activeShikiThemeId(): string {
-  const themeId = getSelectedEditorThemeId(activeEditorColorMode)
+  const colorMode = getActiveEditorColorMode()
+  const themeId = getSelectedEditorThemeId(colorMode)
   if (vscodeThemeDefinitionById.has(themeId)) return themeId
 
-  return DEFAULT_DEFINITION_BY_COLOR_MODE[activeEditorColorMode].id
+  return DEFAULT_DEFINITION_BY_COLOR_MODE[colorMode].id
 }
 
 /**
@@ -151,11 +170,7 @@ export function getResolvedShikiThemeContentHash(themeId: string): string {
 }
 
 export function subscribeEditorColorTheme(listener: () => void): () => void {
-  editorColorThemeListeners.add(listener)
-
-  return () => {
-    editorColorThemeListeners.delete(listener)
-  }
+  return colorThemeStore.subscribe(() => listener())
 }
 
 /** Notifies highlighters only when their effective worker configuration changes. */
@@ -172,14 +187,13 @@ export function subscribeActiveShikiTheme(listener: () => void): () => void {
 }
 
 export function getActiveEditorColorMode(): EditorColorMode {
-  return activeEditorColorMode
+  return colorThemeStore.getState().activeColorMode
 }
 
 export function setActiveEditorColorMode(colorMode: EditorColorMode) {
-  if (activeEditorColorMode === colorMode) return
+  if (getActiveEditorColorMode() === colorMode) return
 
-  activeEditorColorMode = colorMode
-  notifyEditorColorThemeListeners()
+  colorThemeStore.setState({ activeColorMode: colorMode })
 }
 
 export function loadEditorThemeForSelection(
@@ -230,12 +244,9 @@ export function preloadVscodeThemeRegistrations(): Promise<void> {
 
 /** Test hook: drops in-memory state so the next read uses the settings mirror. */
 export function resetEditorColorThemeStore() {
-  selectionByColorMode = null
-  activeEditorColorMode = 'dark'
-  previewTheme = null
+  colorThemeStore.setState(INITIAL_STATE, true)
   resourceQueryClient.removeQueries({ queryKey: editorQueryKeys.themes })
   resourceQueryClient.removeQueries({ queryKey: codeThemeQueryKeys.registrations })
-  editorColorThemeListeners.clear()
 }
 
 function loadBuiltinEditorTheme(
@@ -267,7 +278,7 @@ async function loadEditorTheme(
         const { registration } = await resourceQueryClient.query(
           themeRegistrationQueryOptions(definition),
         )
-        if (themeIdIsCurrentlySelected(definition.id)) notifyEditorColorThemeListeners()
+        if (themeIdIsCurrentlySelected(definition.id)) noteRegistrationLoaded()
         return {
           definition,
           registration,
@@ -305,20 +316,17 @@ async function ensureRegistrationLoaded(
   if (resourceQueryClient.getQueryData(options.queryKey)) return
   try {
     await resourceQueryClient.query(options)
-    if (!silent && themeIdIsCurrentlySelected(themeId)) notifyEditorColorThemeListeners()
+    if (!silent && themeIdIsCurrentlySelected(themeId)) noteRegistrationLoaded()
   } catch (error) {
     log.error({ action: 'editor.color-theme.preview_load_failed', area: 'editor', themeId, error })
   }
 }
 
-function readSelectionByColorMode(): Record<EditorColorMode, string> {
-  if (selectionByColorMode) return selectionByColorMode
-
-  selectionByColorMode = {
+function persistedSelection(): Record<EditorColorMode, string> {
+  return {
     dark: persistedThemeIdForColorMode('dark'),
     light: persistedThemeIdForColorMode('light'),
   }
-  return selectionByColorMode
 }
 
 function persistedThemeIdForColorMode(colorMode: EditorColorMode): string {
@@ -331,8 +339,8 @@ function validThemeIdForColorMode(colorMode: EditorColorMode, themeId: string): 
   return DEFAULT_DEFINITION_BY_COLOR_MODE[colorMode].id
 }
 
-function notifyEditorColorThemeListeners() {
-  for (const listener of editorColorThemeListeners) listener()
+function noteRegistrationLoaded() {
+  colorThemeStore.setState((state) => ({ loadedRevision: state.loadedRevision + 1 }))
 }
 
 function activeShikiThemeSubscriptionSnapshot(): string {

@@ -1,12 +1,13 @@
+import { useStore } from 'zustand'
 import { QueryClientProvider, useIsMutating } from '@tanstack/react-query'
-import { useEffect, useMemo, useSyncExternalStore } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { scopedSessionKey, type ScopedSessionRef } from '@workspace/contracts'
 import { createChatSessionSelector } from '@workspace/client-core/chat/selectors'
 
 import { useComposerConnection } from '@/features/chat/hooks/use-composer-connection'
 import { useSessionComposer } from '@/features/chat/hooks/use-session-composer'
-import { subscribeTransports, transportFor } from '@/features/chat/state/active-transports'
+import { activeTransports } from '@/features/chat/state/active-transports'
 import {
   selectChatProjectionSlice,
   useChatProjectionStore,
@@ -30,8 +31,9 @@ export function QueuedFollowUpSenders() {
 
 /** Under the session machine's query client: settings, providers and availability are its own. */
 function QueuedFollowUpSender({ sessionRef }: { readonly sessionRef: ScopedSessionRef }) {
-  const transport = useSyncExternalStore(subscribeTransports, () =>
-    transportFor(sessionRef.environmentId),
+  const transport = useStore(
+    activeTransports,
+    (transports) => transports.get(sessionRef.environmentId) ?? null,
   )
   const origin = useEnvironmentsStore(
     (state) =>

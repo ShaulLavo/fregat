@@ -1,4 +1,5 @@
-import { useLayoutEffect, useState, useSyncExternalStore } from 'react'
+import { useStore } from 'zustand'
+import { useLayoutEffect, useState } from 'react'
 import { useTerminalDimensions } from '@opentui/react'
 import { useCommands } from '@/commands/hooks/use-commands'
 import { useCommandHandlers } from '@/commands/hooks/use-command-handlers'
@@ -39,7 +40,8 @@ export function Workbench({
 }) {
   const { width, height } = useTerminalDimensions()
   const commands = useCommands()
-  const focusState = useSyncExternalStore(commands.focus.subscribe, commands.focus.getSnapshot)
+  const focusScreen = useStore(commands.focus.store, (state) => state.scope.screen)
+  const focusProjectId = useStore(commands.focus.store, (state) => state.scope.projectId)
   const { rootPath, pane } = location
   const [sidebar, setSidebar] = useState(
     () => state.storage.getItem(`workbench:sidebar:${rootPath}`) !== 'hidden',
@@ -59,7 +61,7 @@ export function Workbench({
     commands.focus.request({ kind: 'match', matches: (target) => primaryPaneTarget(target, area) })
   }
   useLayoutEffect(() => {
-    if (!interactive || focusState.scope.screen !== 'workbench') return
+    if (!interactive || focusScreen !== 'workbench') return
     const snapshot = commands.focus.getSnapshot()
     if (snapshot.current?.capabilities.overlay || snapshot.requested?.target?.capabilities.overlay)
       return
@@ -72,8 +74,8 @@ export function Workbench({
     location.path,
     location.tree,
     interactive,
-    focusState.scope.screen,
-    focusState.scope.projectId,
+    focusScreen,
+    focusProjectId,
     wide,
     treeShown,
   ])

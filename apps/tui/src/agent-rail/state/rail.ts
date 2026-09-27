@@ -159,6 +159,7 @@ export function createAgentRailState(
     }
   }
   return {
+    store: store.store,
     getSnapshot: store.getSnapshot,
     subscribe: store.subscribe,
     setQuery,

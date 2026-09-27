@@ -1,10 +1,11 @@
-import { use, useSyncExternalStore } from 'react'
+import { use } from 'react'
+import { useStore } from 'zustand'
 import { EnvironmentConnectionsContext } from '@/providers/environment-connections-context'
 import { requireContext } from '@/lib/require-context'
 
 export function useEnvironmentConnections() {
   const connections = use(EnvironmentConnectionsContext)
   requireContext(connections, 'Machines require EnvironmentTransportsProvider.')
-  const snapshot = useSyncExternalStore(connections.store.subscribe, connections.store.getState)
-  return { ...connections, machines: snapshot.machines }
+  const machines = useStore(connections.store, (state) => state.machines)
+  return { ...connections, machines }
 }

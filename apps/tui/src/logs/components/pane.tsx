@@ -1,5 +1,7 @@
+import { useStore } from 'zustand'
+import { useReadySession } from '@/connection/hooks/use-ready-session'
 import type { LogEventDetail } from '@workspace/contracts'
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSettingValue } from '@/settings/hooks/use-setting-value'
 import { logFilters } from '@/logs/utils/filters'
 import { LogDetail } from '@/logs/components/detail'
@@ -30,9 +32,8 @@ export function LogsPane({
 }) {
   const commands = useCommands()
   const [store] = useState(() => createLogsWorkbench(session.client))
-  const state = useSyncExternalStore(store.subscribe, store.getSnapshot)
-  const connection = useSyncExternalStore(session.subscribe, session.getSnapshot)
-  const owner = connection.kind === 'ready' ? connection.owner : null
+  const state = useStore(store.store)
+  const { environmentId, owner } = useReadySession(session)
   const timeRange = useSettingValue(owner, 'logs.defaultTimeRange')
   const slowMs = useSettingValue(owner, 'logs.slowThresholdMs')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -69,7 +70,7 @@ export function LogsPane({
   useCommandFocus(
     {
       screen: 'workbench',
-      environmentId: connection.kind === 'ready' ? connection.descriptor.environmentId : '',
+      environmentId,
       projectId: rootPath,
       id: 'logs-json',
       area: 'dialog',

@@ -154,6 +154,7 @@ export function createGitWorkbench(client: Client, rootPath: string) {
   }
   return {
     subscribe: store.subscribe,
+    store: store.store,
     getSnapshot: store.getSnapshot,
     refresh,
     openDiff,
