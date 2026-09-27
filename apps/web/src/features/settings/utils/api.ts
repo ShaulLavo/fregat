@@ -1,6 +1,7 @@
 import { writeSettings, writeSettingsText } from '@workspace/client-core/settings/write'
 import { clientLogContext } from '@/lib/environments/state/log-context'
 import { readSettings } from '@workspace/client-core/settings/read'
+import type { SettingsReadOptions } from '@workspace/client-core/settings/snapshot-admission'
 import {
   errorNumberField,
   errorStringField,
@@ -18,9 +19,16 @@ import { createRpcError } from '@/lib/structured-errors'
 export async function fetchSettings(
   signal: AbortSignal | undefined,
   client: Client,
+  options: SettingsReadOptions = {},
 ): Promise<SettingsSnapshot> {
   return observeClientOperation(
-    { ...clientLogContext(client), action: 'settings.read', area: 'settings', signal },
+    {
+      ...clientLogContext(client),
+      action: 'settings.read',
+      area: 'settings',
+      signal,
+      ...(options.quiet ? { level: 'debug' as const } : {}),
+    },
     () =>
       readSettings({ client, signal }).catch((error: unknown) => {
         throw createRpcError(error)

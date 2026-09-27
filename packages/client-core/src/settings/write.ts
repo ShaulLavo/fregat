@@ -68,7 +68,7 @@ function retryRawTransport(error: unknown) {
 
 export async function* parseSettingsStream(
   stream: unknown,
-): AsyncGenerator<{ readonly data: unknown }> {
+): AsyncGenerator<{ readonly event: string; readonly data: unknown }> {
   if (!stream || typeof stream !== 'object' || !(Symbol.asyncIterator in stream)) {
     throw settingsInvariantError('The settings event stream is missing')
   }
@@ -77,6 +77,9 @@ export async function* parseSettingsStream(
   }
   for await (const event of stream as AsyncIterable<unknown>) {
     if (!event || typeof event !== 'object' || !('data' in event)) continue
-    yield { data: normalizeEdenDates(event.data) }
+    yield {
+      event: 'event' in event && typeof event.event === 'string' ? event.event : 'message',
+      data: normalizeEdenDates(event.data),
+    }
   }
 }

@@ -1,3 +1,4 @@
+import { failingSettingsStream } from '../../../test/factories/settings-stream'
 import { BUNDLED_THEMES } from '@workspace/contracts'
 import { settingDraft } from '@/settings/utils/edit'
 import { createEnvironmentClient } from '@workspace/client-core/transport/client'
@@ -306,6 +307,32 @@ test('saving a theme part at the theme value removes its override for that half'
     expect(owner.readSettingsMirror()['workbench.theme.customizations'][bundle.id]).toEqual({
       light: { material: { opacity: 41 } },
     })
+  } finally {
+    owner.dispose()
+  }
+})
+
+test('refresh after stopped supervision restarts the stream and receives later writes', async ({
+  server,
+  client,
+}) => {
+  const transport = failingSettingsStream(server, 'unreadable')
+  const owner = await makeSettingsOwner(transport.client)
+  try {
+    owner.start()
+    await expect.poll(() => owner.getSnapshot().streamStop?.reason).toBe('unreadable')
+    transport.recover()
+    await owner.refresh()
+    expect(owner.getSnapshot().streamStop).toBeNull()
+    await writeSettings({
+      client,
+      request: {
+        mutationId: 'after-owner-refresh',
+        target: 'user',
+        operations: [{ kind: 'set', key: 'editor.fontSize', value: 30 }],
+      },
+    })
+    await expect.poll(() => owner.readSettingsMirror()['editor.fontSize']).toBe(30)
   } finally {
     owner.dispose()
   }

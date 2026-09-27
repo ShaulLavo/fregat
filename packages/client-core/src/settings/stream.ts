@@ -8,18 +8,39 @@ import type { Client } from '../transport/client'
 
 import { parseSettingsStream } from './write'
 import type { createSettingsSnapshotAdmission } from './snapshot-admission'
+import { SETTINGS_SNAPSHOT_UNREADABLE, settingsSnapshotUnreadableError } from './structured-errors'
 
 export type SettingsStreamDependencies = {
   readonly connect: (signal: AbortSignal) => Promise<unknown>
   readonly wait: (delayMs: number, signal: AbortSignal) => Promise<boolean>
 }
 
+export type SettingsStreamLogLevel = 'debug' | 'info' | 'warn'
+
+/** Why the stream stopped retrying, with the last failure's catalog fields. */
+export type SettingsStreamStop = {
+  readonly reason: 'unreadable' | 'unreachable'
+  readonly failureCount: number
+  readonly code?: string
+  readonly message?: string
+  readonly why?: string
+  readonly fix?: string
+}
+
 export type SettingsStreamHost = {
   readonly client: Client
   readonly admission: ReturnType<typeof createSettingsSnapshotAdmission>
-  readonly record: (event: Readonly<Record<string, unknown>>) => void
+  readonly record: (
+    event: Readonly<Record<string, unknown>> & { readonly level: SettingsStreamLogLevel },
+  ) => void
+  /** Called once when the stream stops retrying; the page tells the person settings stopped syncing. */
+  readonly stopped?: (stop: SettingsStreamStop) => void
 }
 
+// About five minutes of failures at the 5 s backoff cap.
+export const SETTINGS_STREAM_MAX_FAILURES = 60
+
+// Streaming transport owns reconnects; snapshot admission settles the query cache.
 export async function superviseSettingsStream(
   queryClient: QueryClient,
   signal: AbortSignal,
@@ -33,44 +54,101 @@ export async function superviseSettingsStream(
     ...overrides,
   }
   let attempt = 0
-  let consecutiveFailures = 0
+  // Paces reconnects: only a stream that delivered events resets it.
+  let quietAttempts = 0
+  // The current failure series ends only when a stream delivers a healthy frame.
+  let failureCount = 0
+  let failingSince = 0
+  const connected = () => {
+    if (failureCount === 0) return
+    host.record({
+      action: 'settings.stream',
+      area: 'settings',
+      attempt,
+      failureCount,
+      level: 'info',
+      outageMs: elapsedMs(failingSince),
+      outcome: 'recovered',
+    })
+    failureCount = 0
+  }
   while (!signal.aborted) {
     attempt += 1
-    const result = await runStreamAttempt(queryClient, signal, dependencies.connect, host)
-    if (result.outcome === 'aborted') {
-      host.record({
-        action: 'settings.stream',
-        admittedEventCount: result.admittedEventCount,
-        area: 'settings',
-        attempt,
-        durationMs: result.durationMs,
-        invalidEventCount: result.invalidEventCount,
-        outcome: result.outcome,
-        receivedEventCount: result.receivedEventCount,
-        refetchOutcome: result.refetchOutcome,
-      })
-      return
-    }
-
-    consecutiveFailures = result.receivedEventCount > 0 ? 0 : consecutiveFailures + 1
-    const backoffMs = reconnectDelay(consecutiveFailures)
-    host.record({
+    const result = await runStreamAttempt(
+      queryClient,
+      signal,
+      dependencies.connect,
+      host,
+      connected,
+    )
+    const event = {
       action: 'settings.stream',
       admittedEventCount: result.admittedEventCount,
       area: 'settings',
       attempt,
-      backoffMs,
       durationMs: result.durationMs,
-      errorCode: result.errorCode,
-      errorStatus: result.errorStatus,
       invalidEventCount: result.invalidEventCount,
-      outcome: result.outcome,
       receivedEventCount: result.receivedEventCount,
       refetchOutcome: result.refetchOutcome,
-    })
+    }
+    if (result.outcome === 'aborted') {
+      host.record({ ...event, level: 'debug', outcome: result.outcome })
+      return
+    }
+
+    quietAttempts = result.receivedEventCount > 0 ? 0 : quietAttempts + 1
+    const backoffMs = reconnectDelay(quietAttempts)
+    if (result.outcome === 'disconnected' && result.receivedEventCount > 0) {
+      host.record({ ...event, backoffMs, level: 'debug', outcome: result.outcome })
+    } else {
+      failureCount += 1
+      if (failureCount === 1) failingSince = nowMs()
+      const stop = stopFor(result.error, failureCount)
+      const failure = { ...event, ...errorFields(result.error), failureCount }
+      if (stop) {
+        host.record({ ...failure, level: 'warn', outcome: 'gave-up', reason: stop.reason })
+        host.stopped?.(stop)
+        return
+      }
+      // One warn opens the series; the rest are debug until it recovers or gives up.
+      host.record({
+        ...failure,
+        backoffMs,
+        level: failureCount === 1 ? 'warn' : 'debug',
+        outcome: result.outcome,
+      })
+    }
 
     if (signal.aborted) return
     if (!(await dependencies.wait(backoffMs, signal))) return
+  }
+}
+
+function stopFor(error: unknown, failureCount: number): SettingsStreamStop | null {
+  const reason = stopReason(error, failureCount)
+  if (!reason) return null
+  return {
+    reason,
+    failureCount,
+    code: errorStringField(error, 'code'),
+    message: errorStringField(error, 'message'),
+    why: errorStringField(error, 'why'),
+    fix: errorStringField(error, 'fix'),
+  }
+}
+
+// Reading the same document again cannot parse it any better, so an unreadable one stops at once.
+function stopReason(error: unknown, failureCount: number): SettingsStreamStop['reason'] | null {
+  if (errorStringField(error, 'code') === SETTINGS_SNAPSHOT_UNREADABLE) return 'unreadable'
+  if (failureCount >= SETTINGS_STREAM_MAX_FAILURES) return 'unreachable'
+  return null
+}
+
+function errorFields(error: unknown) {
+  return {
+    errorCode: errorStringField(error, 'code'),
+    errorMessage: errorStringField(error, 'message'),
+    errorStatus: errorNumberField(error, 'status') ?? errorNumberField(error, 'statusCode'),
   }
 }
 
@@ -79,6 +157,7 @@ async function runStreamAttempt(
   signal: AbortSignal,
   connect: SettingsStreamDependencies['connect'],
   host: SettingsStreamHost,
+  connected: () => void,
 ) {
   const attemptController = new AbortController()
   const abortAttempt = () => attemptController.abort()
@@ -92,8 +171,9 @@ async function runStreamAttempt(
 
   try {
     const connection = settleConnection(connect(attemptController.signal))
-    refetchOutcome = await recoverConfirmedDocument(queryClient, attemptController.signal, host)
-    if (refetchOutcome !== 'ok') {
+    const refetch = await recoverConfirmedDocument(queryClient, attemptController.signal, host)
+    refetchOutcome = refetch.outcome
+    if (refetch.outcome !== 'ok') {
       abortAttempt()
       return streamAttemptResult(
         signal.aborted ? 'aborted' : 'error',
@@ -102,23 +182,28 @@ async function runStreamAttempt(
         invalidEventCount,
         receivedEventCount,
         refetchOutcome,
+        refetch.error,
       )
     }
 
-    const connected = await connection
-    if (connected.kind === 'error') throw connected.error
+    const opened = await connection
+    if (opened.kind === 'error') throw opened.error
 
-    const stream = connected.stream
-    for await (const event of parseSettingsStream(stream)) {
+    for await (const event of parseSettingsStream(opened.stream)) {
       receivedEventCount += 1
+      if (event.event !== 'settings') {
+        connected()
+        continue
+      }
       const parsed = v.safeParse(settingsEventSchema, event.data)
       if (!parsed.success) {
         invalidEventCount += 1
-        continue
+        throw settingsSnapshotUnreadableError(parsed.issues)
       }
 
       const admission = await host.admission.admitSettingsEvent(queryClient, parsed.output)
       if (admission.admitted) admittedEventCount += 1
+      connected()
     }
 
     return streamAttemptResult(
@@ -140,6 +225,7 @@ async function runStreamAttempt(
       error,
     )
   } finally {
+    abortAttempt()
     signal.removeEventListener('abort', abortAttempt)
   }
 }
@@ -156,8 +242,7 @@ function streamAttemptResult(
   return {
     admittedEventCount,
     durationMs: elapsedMs(startedAt),
-    errorCode: errorStringField(error, 'code'),
-    errorStatus: errorNumberField(error, 'status') ?? errorNumberField(error, 'statusCode'),
+    error,
     invalidEventCount,
     outcome,
     receivedEventCount,
@@ -180,10 +265,11 @@ async function recoverConfirmedDocument(
   host: SettingsStreamHost,
 ) {
   try {
-    await host.admission.refreshConfirmedSettings(queryClient, signal)
-    return 'ok' as const
-  } catch {
-    return signal.aborted ? ('aborted' as const) : ('error' as const)
+    // The stream logs the failure series itself, so each read's own failure stays at debug.
+    await host.admission.refreshConfirmedSettings(queryClient, signal, { quiet: true })
+    return { outcome: 'ok' as const }
+  } catch (error) {
+    return { error, outcome: signal.aborted ? ('aborted' as const) : ('error' as const) }
   }
 }
 
@@ -193,8 +279,8 @@ async function connectSettingsStream(signal: AbortSignal, client: Client) {
   return response.data
 }
 
-function reconnectDelay(failureCount: number) {
-  return Math.min(250 * 2 ** Math.max(0, failureCount - 1), 5_000)
+function reconnectDelay(quietAttempts: number) {
+  return Math.min(250 * 2 ** Math.max(0, quietAttempts - 1), 5_000)
 }
 
 function waitForReconnect(delayMs: number, signal: AbortSignal): Promise<boolean> {

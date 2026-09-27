@@ -29,7 +29,7 @@ import { projectSettings } from './projection'
 import { settingsKeys } from './query-keys'
 import { readSettings } from './read'
 import { createSettingsSnapshotAdmission } from './snapshot-admission'
-import { superviseSettingsStream } from './stream'
+import { superviseSettingsStream, type SettingsStreamStop } from './stream'
 import { settingsInvariantError } from './structured-errors'
 import { writeSettings, writeSettingsText } from './write'
 
@@ -58,6 +58,7 @@ export class SettingsOwner {
   private confirmed: SettingsSnapshot
   private state
   private queue: Promise<void> = Promise.resolve()
+  private streamStop: SettingsStreamStop | null = null
   private started = false
   private disposed = false
 
@@ -99,17 +100,31 @@ export class SettingsOwner {
   start() {
     if (this.started || this.controller.signal.aborted) return
     this.started = true
+    if (this.streamStop) {
+      this.streamStop = null
+      this.publish()
+    }
     void superviseSettingsStream(this.queryClient, this.controller.signal, {
       client: this.options.client,
       admission: this.admission,
       record: (event) => this.options.record?.({ ...event, instanceId: this.options.instanceId }),
+      stopped: (stop) => {
+        this.started = false
+        this.streamStop = stop
+        this.publish()
+      },
     })
   }
 
-  refresh = (signal?: AbortSignal) => {
+  refresh = async (signal?: AbortSignal) => {
     const signals = [this.controller.signal]
     if (signal) signals.push(signal)
-    return this.admission.refreshConfirmedSettings(this.queryClient, AbortSignal.any(signals))
+    const snapshot = await this.admission.refreshConfirmedSettings(
+      this.queryClient,
+      AbortSignal.any(signals),
+    )
+    if (this.streamStop) this.start()
+    return snapshot
   }
 
   submit = (
@@ -189,6 +204,7 @@ export class SettingsOwner {
   private project() {
     return {
       snapshot: this.confirmed,
+      streamStop: this.streamStop,
       projection: projectSettings(this.confirmed, activeSettingsIntentsFor(this.queryClient)),
       pendingCount: activeSettingsIntentsFor(this.queryClient).filter(
         (entry) => entry.status === 'pending',
