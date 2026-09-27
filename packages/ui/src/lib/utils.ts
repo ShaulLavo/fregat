@@ -18,7 +18,7 @@ import { extendTailwindMerge } from 'tailwind-merge'
 const twMerge = extendTailwindMerge<'focus-ring'>({
   extend: {
     classGroups: {
-      'focus-ring': ['focus-ring', 'focus-ring-within', 'focus-ring-inset'],
+      'focus-ring': ['focus-ring', 'focus-ring-within', 'focus-ring-inset', 'focus-ring-inset-drawn'],
     },
   },
 })

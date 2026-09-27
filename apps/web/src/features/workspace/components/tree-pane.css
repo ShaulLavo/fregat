@@ -9,27 +9,6 @@
     font-family: var(--workbench-tree-font-family);
     font-size: var(--workbench-tree-font-size);
 
-    button[data-type='item'] {
-      border-radius: 0;
-    }
-
-    button[data-type='item'][data-item-selected='true']::after {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 4px;
-      bottom: 4px;
-      width: 2px;
-      background: var(--foreground);
-      pointer-events: none;
-    }
-
-    /* The tree's focus ring only while the tree has focus: it paints one for its remembered row
-     * even when the editor owns the keyboard, which reads as a second selection. */
-    &:not(:focus-within) button[data-type='item'][data-item-focused='true']::before {
-      outline-color: transparent;
-    }
-
     [data-file-tree-search-container] {
       align-items: center;
       height: var(--bar-height);

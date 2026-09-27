@@ -445,6 +445,9 @@ export function TreeView({
       ? getTreeFocusedRowDomId(instanceId, focusedPath, !focusedRowIsMounted)
       : undefined
   const visualFocusPath = contextMenuOpenPath ?? (isSearchOpen ? focusedPath : activeItemPath)
+  // The row a mouse press focused draws no ring until the keyboard moves; `:focus-visible` cannot
+  // tell, because the row takes focus from script.
+  const [pointerFocusPath, setPointerFocusPath] = useState<string | null>(null)
   const handleRowClick = useTreeRowClick({
     claimDomFocus,
     controller,
@@ -463,6 +466,7 @@ export function TreeView({
   // for where each ref is registered, which is the invariant sticky reuse
   // depends on.
   const flowRowFrame: TreeRenderRowFrame = {
+    pointerFocusPath,
     guideFocusPath: focusedVisibleRow?.ancestorPaths.at(-1) ?? null,
     contextMenuOpenPath,
     contextMenuButtonTriggerEnabled,
@@ -485,6 +489,7 @@ export function TreeView({
     itemHeight,
     loadingPaths,
     markPointerFocusPath: (path) => {
+      setPointerFocusPath(path)
       if (controller.getFocusedPath() === path) return
 
       suppressNextPointerFocusScroll(path)
@@ -531,6 +536,7 @@ export function TreeView({
       onDragOver={dragAndDropEnabled ? handleTreeDragOver : undefined}
       onDrop={dragAndDropEnabled ? handleTreeDrop : undefined}
       onKeyDown={onTreeKeyDown}
+      onKeyDownCapture={() => setPointerFocusPath(null)}
       onPointerLeave={
         contextMenuEnabled && contextMenuButtonTriggerEnabled ? handleTreePointerLeave : undefined
       }

@@ -1,4 +1,5 @@
 import type { Locator, Page, Route } from 'playwright'
+import { writeUserSetting } from '../preserve-settings'
 import { selectors } from '../selectors'
 import { LONG_FILE_NAME } from './fixture'
 
@@ -105,6 +106,19 @@ export const PARITY_STATES: readonly ParityState[] = [
       await treeRow(page, 'src/app.ts').waitFor()
       await page.keyboard.press('ArrowDown')
       await pointerAway(page)
+    },
+  },
+  {
+    // Guides shown only on hover: the focused row's parent guide is the one that stays lit.
+    name: 'guides-on-hover-focus',
+    async enter({ page }) {
+      await writeUserSetting(page, 'workbench.tree.indentGuides', 'onHover')
+      await page.keyboard.press('ControlOrMeta+Shift+E')
+      await treeRow(page, 'src/app.ts').waitFor()
+      await pointerAway(page)
+    },
+    async leave({ page }) {
+      await writeUserSetting(page, 'workbench.tree.indentGuides', 'always')
     },
   },
   {
