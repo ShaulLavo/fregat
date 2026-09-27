@@ -1,7 +1,7 @@
 {
   "reading": "disk",
   "scriptGzip": 1735134,
-  "phoneScriptGzip": 1071142,
+  "phoneScriptGzip": 1421202,
   "owners": {
     "node_modules": 505079,
     "Editor": 350240,
@@ -102,6 +102,12 @@
       "scriptGzip": 1735134,
       "phoneScriptGzip": 1071142,
       "reason": "Phone first load pinned: each shell is a lazy chunk, so a phone skips the workbench (1684252 -> 1071142, against main d45f1c5ae). Desktop pins unchanged; desktop first load 1680766 -> 1678529 with the Logs pane deferred and the modulepreload polyfill dropped."
+    },
+    {
+      "at": "2026-09-27T04:25:00.000Z",
+      "scriptGzip": 1735134,
+      "phoneScriptGzip": 1421202,
+      "reason": "Count the emitted phone boot-screen graph and Vite preload calls. Real before-fix graph was 1687420, previously undercounted as 1070900; split shell/screen loaders and move boot-screen dependencies into initial. Desktop total and owner pins unchanged."
     }
   ]
 }

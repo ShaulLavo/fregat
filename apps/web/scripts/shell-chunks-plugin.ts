@@ -1,5 +1,6 @@
 import path from 'node:path'
 import type { Plugin, ResolvedConfig, Rolldown } from 'vite'
+import { createScriptError } from '../../../scripts/structured-errors'
 
 /** Each lazy shell's root module, by the kind the boot script picks (src/lib/shell/utils/kind.ts). */
 export const SHELL_ENTRIES = {
@@ -55,6 +56,7 @@ export function shellManifest(
   )
   const byFile = new Map(chunks.map((chunk) => [chunk.fileName, chunk]))
   const loaded = staticClosure(entry, byFile)
+  const lazyRoots = dynamicRoots(entry, byFile)
   const manifest: Record<string, string[]> = {}
   for (const [kind, relative] of Object.entries(SHELL_ENTRIES)) {
     const entries = kind === 'phone' ? [relative, ...PHONE_BOOT_SCREENS] : [relative]
@@ -63,9 +65,9 @@ export function shellManifest(
         entries.flatMap((relative) => {
           const facade = path.join(webRoot, relative)
           const root = chunks.find((chunk) => chunk.facadeModuleId === facade)
-          if (!root) throw new Error(`shell-chunks: no chunk for ${relative}`)
-          const lazy = chunks.some((chunk) => chunk.dynamicImports.includes(root.fileName))
-          if (!lazy) throw new Error(`shell-chunks: ${relative} must remain dynamically imported`)
+          if (!root) throw createScriptError(`shell-chunks: no chunk for ${relative}`)
+          if (!lazyRoots.has(root.fileName))
+            throw createScriptError(`shell-chunks: ${relative} must remain dynamically imported`)
           return [...staticClosure(root, byFile)].filter((fileName) => !loaded.has(fileName))
         }),
       ),
@@ -92,4 +94,19 @@ function staticClosure(
     pending.push(...(byFile.get(fileName)?.imports ?? []))
   }
   return seen
+}
+
+function dynamicRoots(
+  entry: Rolldown.OutputChunk,
+  byFile: ReadonlyMap<string, Rolldown.OutputChunk>,
+) {
+  const pending = new Set([entry.fileName])
+  const lazy = new Set<string>()
+  for (const file of pending) {
+    const chunk = byFile.get(file)
+    if (!chunk) continue
+    for (const target of chunk.dynamicImports) lazy.add(target)
+    for (const target of [...chunk.imports, ...chunk.dynamicImports]) pending.add(target)
+  }
+  return lazy
 }

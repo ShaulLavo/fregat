@@ -1,5 +1,11 @@
 import path from 'node:path'
-import { parseSync, Visitor, type CallExpression, type Expression } from 'oxc-parser'
+import {
+  parseSync,
+  Visitor,
+  type CallExpression,
+  type Expression,
+  type ArrayExpression,
+} from 'oxc-parser'
 import { createScriptError } from './structured-errors'
 
 /** Read emitted imports, including deps Vite preloads even when a different branch is chosen. */
@@ -49,10 +55,9 @@ export function bundleImports(fileName: string, source: string) {
   return { imports, dynamic }
 }
 
-function literalString(node: Expression | { type: string } | null | undefined): string {
-  if (node?.type === 'Literal' && 'value' in node && typeof node.value === 'string')
-    return node.value
-  if (node?.type === 'TemplateLiteral' && 'expressions' in node && node.expressions.length === 0)
+function literalString(node: Expression | ArrayExpression['elements'][number] | undefined): string {
+  if (node?.type === 'Literal' && typeof node.value === 'string') return node.value
+  if (node?.type === 'TemplateLiteral' && node.expressions.length === 0)
     return node.quasis[0]?.value.cooked ?? ''
   return ''
 }

@@ -9,26 +9,31 @@ function chunk(
   imports: readonly string[],
   facadeModuleId: string | null,
   importedCss: readonly string[] = [],
+  dynamicImports: readonly string[] = [],
 ) {
   return {
     type: 'chunk',
     fileName,
     imports,
-    dynamicImports: [
-      'assets/shell.js',
-      'assets/workbench-shell.js',
-      'assets/sessions-screen.js',
-      'assets/session-screen.js',
-    ],
+    dynamicImports,
     facadeModuleId,
     viteMetadata: { importedCss: new Set(importedCss), importedAssets: new Set() },
   } as unknown as Rolldown.OutputChunk
 }
 
 test('a shell preloads its chunks and stylesheets, minus what the entry already loads', () => {
-  const entry = chunk('assets/initial.js', ['assets/react.js'], '/web/src/main.tsx', [
-    'assets/initial.css',
-  ])
+  const entry = chunk(
+    'assets/initial.js',
+    ['assets/react.js'],
+    '/web/src/main.tsx',
+    ['assets/initial.css'],
+    [
+      'assets/shell.js',
+      'assets/workbench-shell.js',
+      'assets/sessions-screen.js',
+      'assets/session-screen.js',
+    ],
+  )
   const bundle = {
     initial: entry,
     react: chunk('assets/react.js', [], null),
@@ -127,6 +132,15 @@ test('each shell’s first load gets a group, and the phone never shares the wor
     '/tree.tsx': 'workbench',
     '/workbench.tsx': 'workbench',
   })
+  expect(groupOf('/editor.tsx')).toBe('workbench-shared')
   expect(groupOf('/gallery.tsx')).toBeNull()
   expect(groupOf('/session-screen.tsx')).toBeNull()
+})
+
+test('a facade imported only statically cannot masquerade as a lazy shell', () => {
+  const entry = chunk('assets/initial.js', ['assets/shell.js'], '/web/src/main.tsx')
+  const shell = chunk('assets/shell.js', [], '/web/src/features/phone/components/shell.tsx')
+  expect(() => shellManifest('/web', '/', { entry, shell }, entry)).toThrow(
+    'must remain dynamically imported',
+  )
 })

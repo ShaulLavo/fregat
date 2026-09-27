@@ -7,7 +7,7 @@
  *   bun scripts/bundle-report.ts --dir=<web dir> report an existing build
  *
  * `--dir` skips the build. Without `bundle-stats.json` beside that directory
- * the report has file totals but no per-package attribution.
+ * the desktop report has file totals but no per-package attribution. The phone graph requires stats.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -43,7 +43,7 @@ type PackageIdentity = {
 type Report = {
   readonly dir: string
   /** Includes boot screens and the emitted preload helpers the phone executes. */
-  readonly phoneFirstLoad: { readonly scriptGzip: number }
+  readonly phoneFirstLoad: { readonly scriptGzip: number; readonly files: readonly FirstLoadFile[] }
   readonly firstLoad: {
     readonly scriptGzip: number
     readonly stylesheetGzip: number
@@ -114,7 +114,8 @@ function buildReport(dir: string): Report {
   const files = firstLoadFiles(dir, 'workbench')
   const stats = readStats(dir)
   const scriptGzip = scriptGzipOf(files)
-  const phoneFirstLoad = { scriptGzip: scriptGzipOf(firstLoadFiles(dir, 'phone')) }
+  const phoneFiles = firstLoadFiles(dir, 'phone')
+  const phoneFirstLoad = { scriptGzip: scriptGzipOf(phoneFiles), files: phoneFiles }
   const stylesheetGzip = sum(
     files.filter((file) => file.kind === 'stylesheet').map((file) => file.gzipSize),
   )

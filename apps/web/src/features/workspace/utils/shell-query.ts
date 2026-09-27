@@ -5,7 +5,7 @@ import type { FilesystemPath } from '@/lib/documents/utils/types'
 import type { ShellKind } from '@/lib/shell/utils/kind'
 import { workspaceQueryKeys } from '@/features/workspace/utils/query-keys'
 
-export type ShellView = ComponentType<{ readonly rootPath: FilesystemPath }>
+type ShellView = ComponentType<{ readonly rootPath: FilesystemPath }>
 
 /**
  * Each shell is its own chunk, so a desktop never downloads the phone shell and a phone never

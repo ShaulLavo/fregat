@@ -1115,6 +1115,7 @@ export const selectors = {
   logCopyButtons: (page: Page) => page.getByRole('button', { name: 'Copy log event', exact: true }),
   logCleared: (page: Page) => page.getByText('Visible logs cleared.', { exact: true }),
   logRows: (page: Page) => page.locator('[data-log-row-summary]'),
+  logsModuleSpinnerSelector: '[aria-label="Opening logs"]',
   logsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search logs' }),
   logsTab: (page: Page) => page.getByRole('button', { name: 'Logs', exact: true }),
   renderErrorState: (page: Page) =>

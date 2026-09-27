@@ -10,6 +10,7 @@ export const logsRestored: Scenario = {
     await selectors.logsTab(page).click()
     await checkReload(page)
     await step('sidebar-restored')
+    await selectors.sidebarTab(page, 'Files').click()
     await selectors.workspaceMode(page, 'Chat').click()
     await selectors.chatToolTab(page, 'Logs').click()
     await checkReload(page)
@@ -29,7 +30,7 @@ async function checkReload(page: Page) {
   await page.addInitScript(`(() => {
     window.__bareLogsFrames = 0
     const sample = () => {
-      if (document.querySelector('[aria-label="Opening logs"]')) window.__bareLogsFrames++
+      if (document.querySelector(${JSON.stringify(selectors.logsModuleSpinnerSelector)})) window.__bareLogsFrames++
       requestAnimationFrame(sample)
     }
     requestAnimationFrame(sample)

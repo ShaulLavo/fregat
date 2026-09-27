@@ -13,9 +13,8 @@ type FirstLoadFile = {
   readonly gzipSize: number
 }
 
-// What `index.html` names is what a cold browser fetches before the first
-// frame: the entry script, every `modulepreload`, the stylesheet, and the
-// chunks and stylesheets the boot script preloads for the shell it picks.
+// HTML starts the entry and shell preloads. The phone also needs its boot screens and
+// every dependency their emitted import helpers fetch, including accidental desktop preloads.
 export function firstLoadFiles(dir: string, shell: 'phone' | 'workbench'): FirstLoadFile[] {
   const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8')
   const files: FirstLoadFile[] = []
