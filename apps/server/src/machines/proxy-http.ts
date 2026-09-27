@@ -21,11 +21,26 @@ export function machineProxyTarget(origin: string, request: Request, path: strin
   return target
 }
 
+/**
+ * This server's gate already admitted the caller, so the machine sees this server's own hop: no
+ * credentials, and no forwarding metadata naming a device the machine never paired.
+ */
+const FORWARDING_HEADERS = [
+  'forwarded',
+  'x-forwarded-for',
+  'x-forwarded-host',
+  'x-forwarded-port',
+  'x-forwarded-prefix',
+  'x-forwarded-proto',
+  'x-real-ip',
+]
+
 export function machineProxyHeaders(request: Request, webOrigin: string) {
   const headers = endToEndHeaders(request.headers)
   for (const name of ['host', 'cookie', 'authorization', 'referer', 'content-length']) {
     headers.delete(name)
   }
+  for (const name of FORWARDING_HEADERS) headers.delete(name)
   for (const name of headers.keys()) {
     if (name.startsWith('sec-websocket-')) headers.delete(name)
   }

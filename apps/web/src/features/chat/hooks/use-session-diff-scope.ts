@@ -71,10 +71,10 @@ export function useSessionDiffScope() {
     selectTurnScope: (turnId: TurnId) => selectScope({ filePath: null, kind: 'turn', turnId }),
     selectWorkingTreeScope: () => selectScope({ kind: 'working-tree' }),
     /** Opens one file of the scoped turn; the open records the pick on its own. */
-    openTurnFile: (path: string) => {
+    openTurnFile: (path: string, replace?: boolean) => {
       if (!turnSummary) return
 
-      void openCheckpointDiff(turnSummary, path)
+      void openCheckpointDiff(turnSummary, path, replace)
     },
     turnSummary,
   }

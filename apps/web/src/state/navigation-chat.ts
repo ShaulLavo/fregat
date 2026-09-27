@@ -135,6 +135,8 @@ export function createChatNavigation(coordinator: ReturnType<typeof createNaviga
             mode: 'chat',
             editor: editorDocumentToken(next),
             document: token,
+            // A phone screen belongs to the session it was pushed over.
+            screen: token === address.document ? next.screen : null,
             rail: newDraft ? null : next.rail,
           },
           replace,

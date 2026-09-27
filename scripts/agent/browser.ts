@@ -24,6 +24,7 @@ import { createScriptError } from '../structured-errors'
 import { isolateProductTerminals } from './product-terminal'
 import { captureBrowserRenderer } from './browser-renderer'
 import { startIsolatedServer, type IsolatedServer } from './isolated-server'
+import { providerAccessRefusal } from './provider-access'
 import { devStateHome } from '../state-home'
 
 const PRODUCT_USER_AGENT =
@@ -56,11 +57,16 @@ Options
   --width      viewport width, 320–4096 CSS pixels (look/scenario)
   --height     viewport height, 240–4096 CSS pixels (look/scenario)
   --scale      device pixel ratio, 1–3 (look/scenario)
+  --touch      emulate a touch phone: coarse pointer and touch events (look/scenario)
   --product-wallpaper image override for a real product scenario capture
   --shared-dev drive the running dev API server instead of a throwaway one
+  --real-providers  owner only: let this run start the machine's real Codex and Claude accounts
 
 Against the dev page, every run starts its own API server with temp state and removes it after.
 scenario, trace and renders refuse a production URL unless the scenario is declared readOnly.
+The throwaway server runs Codex and Claude only from fixture binaries. Without --real-providers,
+a scenario declared realProviders refuses to start, and so does any writing scenario on a server
+the run does not own.
 Evidence lands under /work/tmp/fregat-evidence/<stamp>-<verb>-<label>/.`
 
 type Options = CaptureSize & {
@@ -93,11 +99,13 @@ async function main() {
       width: { type: 'string' },
       height: { type: 'string' },
       scale: { type: 'string' },
+      touch: { type: 'boolean', default: false },
       doctor: { type: 'boolean', default: false },
       engine: { type: 'string', default: 'chromium' },
       file: { type: 'string' },
       headed: { type: 'boolean', default: false },
       'shared-dev': { type: 'boolean', default: false },
+      'real-providers': { type: 'boolean', default: false },
       selector: { type: 'string' },
       url: { type: 'string', default: DEFAULT_URL },
       workspace: { type: 'string', default: DEFAULT_WORKSPACE },
@@ -110,10 +118,16 @@ async function main() {
     throw createScriptError('--static-dir is only supported by look without --doctor.')
   if (values['product-wallpaper'] && verb !== 'scenario')
     throw createScriptError('--product-wallpaper is only supported by scenario.')
-  if ((values.width || values.height || values.scale) && verb !== 'look' && verb !== 'scenario')
+  if (
+    (values.width || values.height || values.scale || values.touch) &&
+    verb !== 'look' &&
+    verb !== 'scenario'
+  )
     throw createScriptError(
-      '--width, --height and --scale are only supported by look and scenario.',
+      '--width, --height, --scale and --touch are only supported by look and scenario.',
     )
+  if (values.touch && values.engine === 'firefox')
+    throw createScriptError('--touch needs --engine chromium or webkit.')
   if (!isEngine(values.engine))
     throw createScriptError(`--engine must be one of ${ENGINES.join(', ')}.`)
   if (values.engine !== 'chromium' && verb === 'trace')
@@ -124,6 +138,7 @@ async function main() {
       width: values.width ?? scenario?.capture?.width?.toString(),
       height: values.height ?? scenario?.capture?.height?.toString(),
       scale: values.scale ?? scenario?.capture?.scale?.toString(),
+      touch: values.touch || scenario?.capture?.touch,
     }),
     consoleCapture: !values['no-console'],
     site: values.site || Boolean(values['static-dir']),
@@ -153,7 +168,14 @@ async function main() {
     throw createScriptError(
       `Scenario ${scenario.name} writes state, so it does not run against production (${options.url}). Drop --url to run it against the dev page with a throwaway server.`,
     )
-  if (!needsIsolatedServer(verb, scenario, options, values['shared-dev'])) {
+  const isolatedServer = needsIsolatedServer(verb, scenario, options, values['shared-dev'])
+  const refusal = providerAccessRefusal({
+    scenario,
+    isolatedServer,
+    realProviders: values['real-providers'],
+  })
+  if (refusal) throw createScriptError(refusal)
+  if (!isolatedServer) {
     if (scenario?.requiresIsolatedServer)
       throw createScriptError(
         `Scenario ${scenario.name} requires a throwaway server with fixture-only providers.`,
@@ -163,6 +185,7 @@ async function main() {
   const prepared = await scenario?.prepareServer?.()
   const server = await startIsolatedServer(new URL(options.url), {
     pathPrefix: prepared?.pathPrefix,
+    realProviders: values['real-providers'],
   })
   process.env.PORT = String(server.port)
   process.env.OBSERVABILITY_DIR = server.logs
@@ -624,6 +647,7 @@ async function withPage(
     permissions: options.engine === 'chromium' ? chromiumPermissions(options) : [],
     viewport: { width: options.width, height: options.height },
     deviceScaleFactor: options.scale,
+    ...(options.touch ? { hasTouch: true, isMobile: true } : {}),
     ...(options.productWallpaper ? { userAgent: PRODUCT_USER_AGENT } : {}),
   })
   if (options.server)
@@ -649,6 +673,7 @@ async function withPage(
       consoleCapture: options.consoleCapture,
       viewport: { width: options.width, height: options.height },
       deviceScaleFactor: options.scale,
+      touch: options.touch,
       screenshotPixels: {
         width: options.width * options.scale,
         height: options.height * options.scale,

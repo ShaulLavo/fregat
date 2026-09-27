@@ -4,6 +4,16 @@ import { createGitFixture, fixtureGit, releaseFixture } from '../fixture-workspa
 import { selectors } from '../selectors'
 import { dispatch, readShell } from './chat-verification'
 
+/**
+ * A vacated main chat is a draft: `t/new` until the composer claims an id, then `t/draft-<uuid>`
+ * (`chatReferenceForToken` maps both to `{ kind: 'draft' }`), so a wait or assertion for the draft
+ * URL accepts either form.
+ */
+export function isDraftChatUrl(url: URL) {
+  const path = decodeURIComponent(url.href)
+  return /\/t\/new(?:[/?]|$)/.test(path) || /\/t\/draft-[^/?]+/.test(path)
+}
+
 /** A committed fixture repository with the given extra branches, for new-worktree drafts. */
 export async function draftFixture(name: string, branches: readonly string[] = []) {
   const fixture = await createGitFixture(name)

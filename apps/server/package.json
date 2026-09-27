@@ -27,6 +27,7 @@
     "prices:update": "bun scripts/update-model-prices.ts",
     "codex-protocol:check": "bun src/provider/adapters/codex-protocol/generate.ts --check",
     "codex-protocol:generate": "bun src/provider/adapters/codex-protocol/generate.ts",
+    "codex-protocol:update": "bun src/provider/adapters/codex-protocol/update.ts",
     "test": "bun --bun vitest run",
     "lint": "oxlint .",
     "format": "oxfmt --write .",

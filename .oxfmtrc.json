@@ -19,6 +19,7 @@
     "bun.lock",
     "*.tsbuildinfo",
     "*.patch",
-    "references/**"
+    "references/**",
+    "apps/server/src/provider/adapters/codex-protocol/upstream/**"
   ]
 }

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
 import { FileTreeController } from '../model/FileTreeController'
-import { computeFileTreeRowClickPlan } from '../render/rowClickPlan'
 
 const SEARCH_PATHS = [
   'README.md',
@@ -9,38 +8,6 @@ const SEARCH_PATHS = [
   'src/utils/worker-a.ts',
   'src/utils/worker-b.ts',
 ] as const
-
-describe('search interaction policy', () => {
-  it.each([
-    { closeSearch: true, searchBlurBehavior: 'close' as const },
-    { closeSearch: false, searchBlurBehavior: 'retain' as const },
-  ])(
-    '$searchBlurBehavior row clicks resolve closeSearch=$closeSearch',
-    ({ closeSearch, searchBlurBehavior }) => {
-      const plan = computeFileTreeRowClickPlan({
-        event: { ctrlKey: false, metaKey: false, shiftKey: false },
-        isDirectory: false,
-        isSearchOpen: true,
-        mode: 'flow',
-        searchBlurBehavior,
-      })
-
-      expect(plan.closeSearch).toBe(closeSearch)
-    },
-  )
-
-  it('never asks to close a search that is not open', () => {
-    const plan = computeFileTreeRowClickPlan({
-      event: { ctrlKey: false, metaKey: false, shiftKey: false },
-      isDirectory: false,
-      isSearchOpen: false,
-      mode: 'flow',
-      searchBlurBehavior: 'close',
-    })
-
-    expect(plan.closeSearch).toBe(false)
-  })
-})
 
 describe('search manual collapse overrides', () => {
   it('persists a collapse across query changes and clears it with the session', () => {

@@ -36,6 +36,8 @@ export function createTestApp(options: AppOptions = {}): App {
     metadataDatabase: options.metadataDatabase ?? database,
     orchestration: { database: database.db, pullRequestLookup: null, ...options.orchestration },
     workspaceEditJournalRoot,
+    // Never the real state home: a pairing test writes the device file.
+    devices: { filePath: path.join(createTestJournalRoot(), 'devices.json'), ...options.devices },
   })
   openApps.push(app)
 

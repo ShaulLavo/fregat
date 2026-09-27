@@ -47,6 +47,8 @@ type PackageIdentity = {
 
 type Report = {
   readonly dir: string
+  /** The phone shell's first load, reported beside the desktop's; the gate reads the desktop's. */
+  readonly phoneFirstLoad: { readonly scriptGzip: number }
   readonly firstLoad: {
     readonly scriptGzip: number
     readonly stylesheetGzip: number
@@ -114,17 +116,17 @@ function runBuild(): void {
 }
 
 function buildReport(dir: string): Report {
-  const files = firstLoadFiles(dir)
+  const files = firstLoadFiles(dir, 'workbench')
   const stats = readStats(dir)
-  const scriptGzip = sum(
-    files.filter((file) => file.kind === 'script').map((file) => file.gzipSize),
-  )
+  const scriptGzip = scriptGzipOf(files)
+  const phoneFirstLoad = { scriptGzip: scriptGzipOf(firstLoadFiles(dir, 'phone')) }
   const stylesheetGzip = sum(
     files.filter((file) => file.kind === 'stylesheet').map((file) => file.gzipSize),
   )
   if (!stats) {
     return {
       dir,
+      phoneFirstLoad,
       firstLoad: { scriptGzip, stylesheetGzip, files },
       build: null,
       owners: [],
@@ -138,6 +140,7 @@ function buildReport(dir: string): Report {
   const packages = attributePackages(stats.chunks, firstLoadNames)
   return {
     dir,
+    phoneFirstLoad,
     firstLoad: { scriptGzip, stylesheetGzip, files },
     build: {
       chunkCount: stats.chunks.length,
@@ -153,18 +156,17 @@ function buildReport(dir: string): Report {
   }
 }
 
+function scriptGzipOf(files: readonly FirstLoadFile[]) {
+  return sum(files.filter((file) => file.kind === 'script').map((file) => file.gzipSize))
+}
+
 // What `index.html` names is what a cold browser fetches before the first
-// frame: the entry script, every `modulepreload`, and the stylesheet.
-function firstLoadFiles(dir: string): FirstLoadFile[] {
+// frame: the entry script, every `modulepreload`, the stylesheet, and the
+// chunks the boot script preloads for the shell it picks.
+function firstLoadFiles(dir: string, shell: 'phone' | 'workbench'): FirstLoadFile[] {
   const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8')
   const files: FirstLoadFile[] = []
-  for (const match of html.matchAll(/<(script|link)\b([^>]*)>/gu)) {
-    const tag = match[1]
-    const attributes = match[2] ?? ''
-    const kind = firstLoadKind(tag ?? '', attributes)
-    if (!kind) continue
-    const href = attributeValue(attributes, tag === 'script' ? 'src' : 'href')
-    if (!href) continue
+  const add = (href: string, kind: FirstLoadFile['kind']) => {
     const fileName = assetPath(href)
     const bytes = fs.readFileSync(path.join(dir, fileName))
     files.push({
@@ -174,7 +176,23 @@ function firstLoadFiles(dir: string): FirstLoadFile[] {
       gzipSize: gzipSync(bytes, { level: GZIP_LEVEL }).byteLength,
     })
   }
+  for (const match of html.matchAll(/<(script|link)\b([^>]*)>/gu)) {
+    const tag = match[1]
+    const attributes = match[2] ?? ''
+    const kind = firstLoadKind(tag ?? '', attributes)
+    if (!kind) continue
+    const href = attributeValue(attributes, tag === 'script' ? 'src' : 'href')
+    if (href) add(href, kind)
+  }
+  for (const href of shellChunks(html, shell)) add(href, 'script')
   return files
+}
+
+function shellChunks(html: string, shell: 'phone' | 'workbench'): readonly string[] {
+  const json = /<script type="application\/json" id="shell-chunks">([^<]*)<\/script>/u.exec(html)
+  if (!json?.[1]) return []
+  const manifest = JSON.parse(json[1]) as Partial<Record<string, readonly string[]>>
+  return manifest[shell] ?? []
 }
 
 function firstLoadKind(tag: string, attributes: string): FirstLoadFile['kind'] | null {
@@ -324,6 +342,7 @@ function printReport(report: Report): void {
     `First-load JS: ${kb(firstLoad.scriptGzip)} gz across ${countOf(firstLoad.files, 'script')} files`,
   )
   console.log(`First-load CSS: ${kb(firstLoad.stylesheetGzip)} gz`)
+  console.log(`Phone first-load JS: ${kb(report.phoneFirstLoad.scriptGzip)} gz`)
   if (!build) {
     console.log('No bundle-stats.json beside this build; per-package attribution skipped.')
     return

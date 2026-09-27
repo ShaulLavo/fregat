@@ -233,7 +233,6 @@ type FileTreeOptionSurface = FileTreeRenderOptions & {
   composition?: FileTreeCompositionOptions
   density?: FileTreeDensity
   gitStatus?: readonly GitStatusEntry[]
-  id?: string
   icons?: FileTreeIcons
   onSelectionChange?: FileTreeSelectionChangeListener
   renderRowDecoration?: FileTreeRowDecorationRenderer
@@ -247,15 +246,9 @@ type FileTreeOptionSurface = FileTreeRenderOptions & {
   searchFakeFocus?: boolean
   searchBlurBehavior?: FileTreeSearchBlurBehavior
   searchPlaceholder?: string
-  unsafeCSS?: string
 }
 
 export type FileTreeOptions = FileTreeControllerOptions & FileTreeOptionSurface
-
-export interface FileTreeRenderProps {
-  containerWrapper?: HTMLElement
-  fileTreeContainer?: HTMLElement
-}
 
 interface FileTreeMutationEventInvalidation {
   canonicalChanged: boolean
@@ -350,11 +343,6 @@ export interface FileTreeContextMenuOpenContext {
   restoreFocus: () => void
 }
 
-interface FileTreeHeaderCompositionOptions {
-  html?: string
-  render?: () => HTMLElement | null
-}
-
 export type FileTreeContextMenuTriggerMode = 'both' | 'button' | 'right-click'
 export type FileTreeContextMenuButtonVisibility = 'always' | 'when-needed'
 
@@ -364,12 +352,7 @@ interface FileTreeContextMenuCompositionOptions {
   buttonVisibility?: FileTreeContextMenuButtonVisibility
   onOpen?: (item: FileTreeContextMenuItem, context: FileTreeContextMenuOpenContext) => void
   onClose?: () => void
-  /**
-   * If the interactive menu surface renders through a portal instead of inside
-   * the returned element, mark that portaled root with
-   * `data-file-tree-context-menu-root="true"` so internal clicks are not
-   * treated as outside clicks.
-   */
+  /** The menu element, mounted inside the row's menu anchor. */
   render?: (
     item: FileTreeContextMenuItem,
     context: FileTreeContextMenuOpenContext,
@@ -378,7 +361,6 @@ interface FileTreeContextMenuCompositionOptions {
 
 export interface FileTreeCompositionOptions {
   contextMenu?: FileTreeContextMenuCompositionOptions
-  header?: FileTreeHeaderCompositionOptions
 }
 
 /** A small button after the decoration text, such as "Fix with AI" beside an error. */

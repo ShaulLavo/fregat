@@ -51,8 +51,10 @@ import * as v from 'valibot'
 import { workspacePathLeaf } from '@workspace/client-core/files/path'
 
 import { appendTerminalContextsToPrompt, type TerminalContextSelection } from './terminal-context'
+import { prependReviewComments, type SentReviewComment } from './review-comments'
 
 const NO_TERMINAL_CONTEXTS: readonly TerminalContextSelection[] = []
+const NO_REVIEW_COMMENTS: readonly SentReviewComment[] = []
 const SESSION_TITLE_MAX_LENGTH = 48
 const SENSITIVE_SESSION_TITLE_WORDS = new Set([
   'apikey',
@@ -100,11 +102,28 @@ export function createWorkspaceProjectCommand({
   })
 }
 
+/**
+ * The text the provider receives: review comments ahead of the typed text, captured terminal
+ * output after it. Composed here, never in the composer, so the typed text stays separate from
+ * the records until the message leaves, and the title keeps reading only what was typed.
+ */
+export function messagePrompt(
+  text: string,
+  terminalContexts: readonly TerminalContextSelection[] = NO_TERMINAL_CONTEXTS,
+  reviewComments: readonly SentReviewComment[] = NO_REVIEW_COMMENTS,
+) {
+  return appendTerminalContextsToPrompt(
+    prependReviewComments(text, reviewComments),
+    terminalContexts,
+  )
+}
+
 export function createTurnSubmission({
   attachments = [],
   createdAt,
   interactionMode,
   modelSelection,
+  reviewComments = NO_REVIEW_COMMENTS,
   runtimeMode,
   sourceProposedPlan,
   terminalContexts = NO_TERMINAL_CONTEXTS,
@@ -115,6 +134,7 @@ export function createTurnSubmission({
   createdAt: string
   interactionMode: InteractionMode
   modelSelection: ModelSelection
+  reviewComments?: readonly SentReviewComment[]
   runtimeMode: RuntimeMode
   sourceProposedPlan?: SourceProposedPlanReference
   terminalContexts?: readonly TerminalContextSelection[]
@@ -124,10 +144,7 @@ export function createTurnSubmission({
   const commandId = createCommandId()
   const messageId = createMessageId()
   const turnId = createTurnId()
-  // The serialized block is appended here rather than in the composer so the
-  // title keeps reading the typed text: a send that is nothing but captured
-  // output would otherwise name the session `<terminal_context>`.
-  const prompt = appendTerminalContextsToPrompt(text, terminalContexts)
+  const prompt = messagePrompt(text, terminalContexts, reviewComments)
 
   return {
     command: {
@@ -190,6 +207,7 @@ export function createDraftSessionSubmission({
   interactionMode = DEFAULT_INTERACTION_MODE,
   modelSelection,
   worktreeTarget,
+  reviewComments = NO_REVIEW_COMMENTS,
   runtimeMode = DEFAULT_RUNTIME_MODE,
   sourceProposedPlan,
   terminalContexts = NO_TERMINAL_CONTEXTS,
@@ -203,6 +221,7 @@ export function createDraftSessionSubmission({
   interactionMode?: InteractionMode
   modelSelection: ModelSelection
   worktreeTarget: SessionWorktreeTarget
+  reviewComments?: readonly SentReviewComment[]
   runtimeMode?: RuntimeMode
   sourceProposedPlan?: SourceProposedPlanReference
   terminalContexts?: readonly TerminalContextSelection[]
@@ -221,6 +240,7 @@ export function createDraftSessionSubmission({
     createdAt,
     interactionMode,
     modelSelection,
+    reviewComments,
     runtimeMode,
     sourceProposedPlan,
     terminalContexts,

@@ -14,10 +14,18 @@ import {
 import { cloneStashAttachments, releaseStashAttachments } from './stash-attachments'
 import { composedMessageEmpty, stashMessage } from '../utils/stash-message'
 import { useFollowUpStore } from './follow-up-store'
+import {
+  addReviewComment,
+  inDestination,
+  removeReviewComments,
+  useReviewDraftStore,
+} from '@/lib/review-draft/state/store'
 
 export async function transferStash(
   target: ChatInputDraftTarget,
   action: { kind: 'stash' } | { kind: 'restore' | 'remove'; entry: PromptStashEntry },
+  /** Other roots this composer's review comments may name, such as a worktree's checkout. */
+  aliasRoots: readonly string[] = [],
 ) {
   const store = promptStashStoreFor(target.environmentId)
   const entries = store.getState().entries
@@ -31,9 +39,11 @@ export async function transferStash(
   if (chatInputAttachmentsPreparing(drafts, target))
     throw createClientInvariantError('Wait for attachments to finish preparing before stashing.')
   const expected = drafts.getDraft(target)
+  // Read as the transfer runs: the outgoing message, stashed or swapped out, takes its review.
+  const reviewComments = composerReviewComments(target, aliasRoots)
   if (expected.attachments.some((item) => item.upload && item.upload.status !== 'ready'))
     throw createClientInvariantError('Retry or remove unfinished attachments before stashing.')
-  if (action.kind === 'stash' && composedMessageEmpty(expected)) return null
+  if (action.kind === 'stash' && composedMessageEmpty(expected, reviewComments)) return null
   const incoming =
     action.kind === 'restore' ? entries.find((item) => item.id === action.entry.id) : null
   if (action.kind === 'restore' && !incoming) return null
@@ -49,8 +59,10 @@ export async function transferStash(
       incoming?.attachments ?? [],
     )
     const nextEntries = entries.filter((item) => item.id !== incoming?.id)
-    if (!composedMessageEmpty(expected))
-      nextEntries.unshift(stashMessage({ ...expected, attachments: outgoingAttachments }))
+    if (!composedMessageEmpty(expected, reviewComments))
+      nextEntries.unshift(
+        stashMessage({ ...expected, attachments: outgoingAttachments }, reviewComments),
+      )
     const evicted = nextEntries.splice(MAX_PROMPT_STASH_ENTRIES)
     const content = {
       prompt: incoming?.prompt ?? '',
@@ -65,6 +77,13 @@ export async function transferStash(
         'The draft changed or storage is unavailable. Your draft and stash were kept.',
       )
     committed = true
+    // The review moves with the message: out of the composer on stash, back on restore.
+    removeReviewComments(reviewComments.map((comment) => comment.id))
+    for (const comment of incoming?.reviewComments ?? [])
+      addReviewComment({
+        ...comment,
+        destination: { environmentId: target.environmentId, rootPath: target.rootPath },
+      })
     await releaseUnusedDraftAttachments(target.environmentId, [
       ...expected.attachments,
       ...(incoming?.attachments ?? []),
@@ -78,6 +97,16 @@ export async function transferStash(
         ...incomingAttachments,
       ])
   }
+}
+
+function composerReviewComments(target: ChatInputDraftTarget, aliasRoots: readonly string[]) {
+  const composer = {
+    environmentId: target.environmentId,
+    rootPaths: [target.rootPath, ...aliasRoots],
+  }
+  return useReviewDraftStore
+    .getState()
+    .comments.filter((comment) => inDestination(comment, composer))
 }
 
 export async function releaseUnusedDraftAttachments(

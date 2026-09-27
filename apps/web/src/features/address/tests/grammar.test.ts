@@ -510,3 +510,11 @@ test('writes a push notice session path the way the address grammar does', () =>
     document: `t/${sessionId}`,
   })
 })
+
+test('carries the phone screen and drops one it does not know', () => {
+  const session = `/~${testWorkspaceToken('p')}/chat/t/new`
+
+  expect(parseAddress(`${session}?screen=changes`).screen).toBe('changes')
+  expect(parseAddress(`${session}?screen=tree`).screen).toBeNull()
+  expect(fixedPoint(`${session}?screen=terminal`)).toContain('screen=terminal')
+})
