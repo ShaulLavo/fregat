@@ -9,8 +9,7 @@ import { fontRoutes } from '../routes'
 import { fontsourceRoutes, routedFetcher, nerdArchive, nerdRelease } from './fixtures'
 
 const roots: string[] = []
-const NERD_ZIP =
-  'https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/JetBrainsMono.zip'
+const NERD_LATEST = 'https://github.com/ryanoasis/nerd-fonts/releases/latest/download'
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
@@ -189,7 +188,8 @@ async function testApp({ fontsource = true, nerd = true } = {}) {
       ? {
           'https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest': () =>
             Response.json(nerdRelease(['JetBrainsMono'])),
-          [NERD_ZIP]: () => new Response(archive),
+          [`${NERD_LATEST}/JetBrainsMono.zip`]: () => new Response(archive),
+          [`${NERD_LATEST}/MissingFont.zip`]: () => new Response('Not Found', { status: 404 }),
         }
       : {}),
     ...(fontsource ? fontsourceRoutes() : {}),

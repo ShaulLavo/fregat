@@ -76,6 +76,8 @@ import {
   type FilePickerMode,
 } from '@/features/file-picker/utils/model'
 import { NewFolderPopover } from '@/features/file-picker/components/new-folder-popover'
+import { CompactHeader } from '@/features/file-picker/components/compact-header'
+import { CompactMenu } from '@/features/file-picker/components/compact-menu'
 import { LocationBar } from '@/features/file-picker/components/location-bar'
 import { MobileLocations } from '@/features/file-picker/components/mobile-locations'
 import { PlacesSidebar } from '@/features/file-picker/components/places-sidebar'
@@ -648,14 +650,22 @@ export function FilePickerDialog({
           }}
         />
       ) : (
-        <div className='grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]'>
-          <ListHeader
-            isLoading={loadState.status === 'loading' || listInteractionPending}
-            isSearching={isSearching}
-            mode={mode}
-            onSort={handleSort}
-            sort={effectiveSort}
-          />
+        <div
+          className={cn(
+            'grid h-full min-h-0',
+            compact ? 'grid-rows-[minmax(0,1fr)]' : 'grid-rows-[auto_minmax(0,1fr)]',
+          )}
+        >
+          {/* On a phone the sort lives in the bar's menu; a one-column header would only say Name. */}
+          {compact ? null : (
+            <ListHeader
+              isLoading={loadState.status === 'loading' || listInteractionPending}
+              isSearching={isSearching}
+              mode={mode}
+              onSort={handleSort}
+              sort={effectiveSort}
+            />
+          )}
           <FileList
             accept={activeAccept}
             entries={entries}
@@ -671,7 +681,7 @@ export function FilePickerDialog({
               if (session.canGoUp) navigateTo(pickerParentPath(session.currentPath))
             }}
             onRetry={refresh}
-            openOnTap={compact}
+            touch={compact}
             selectedPath={selectedEntry?.path ?? null}
           />
         </div>
@@ -696,27 +706,72 @@ export function FilePickerDialog({
               <DialogDescription>{`Browsing ${displayPath(session.currentPath)}.`}</DialogDescription>
             </DialogHeader>
 
-            <PaneBar>
-              <div
-                aria-label='Folder history'
-                className='flex shrink-0 items-center gap-0.5'
-                role='group'
-              >
-                <IconTooltip label='Back' shortcut='Mod+['>
-                  <Button
-                    aria-keyshortcuts='Meta+['
-                    aria-label='Back'
-                    disabled={!session.canGoBack}
-                    focusableWhenDisabled
-                    onClick={goBack}
-                    size='icon-sm'
-                    type='button'
-                    variant='ghost'
-                  >
-                    <ArrowLeftIcon />
-                  </Button>
-                </IconTooltip>
-                {compact ? null : (
+            {compact ? (
+              <>
+                <CompactHeader
+                  actions={
+                    <>
+                      <NewFolderPopover
+                        currentPath={session.currentPath}
+                        onCreated={handleFolderCreated}
+                      />
+                      <CompactMenu
+                        currentPath={session.currentPath}
+                        hiddenDisabled={hiddenSettingDisabled}
+                        onGoToFolder={pathInput.open}
+                        onRefresh={refresh}
+                        onSort={setSort}
+                        onToggleHidden={toggleHiddenFiles}
+                        showHidden={showHidden}
+                        sort={effectiveSort}
+                      />
+                    </>
+                  }
+                  canGoUp={session.canGoUp}
+                  currentPath={session.currentPath}
+                  editor={
+                    pathInput.isEditing ? (
+                      <LocationBar
+                        className='flex-1'
+                        currentPath={session.currentPath}
+                        draft={pathInput.draft}
+                        error={pathInput.error}
+                        inputRef={pathInput.inputRef}
+                        isEditing
+                        isPending={pathInput.isPending || isDirectoryFetching}
+                        onCancel={pathInput.close}
+                        onChange={pathInput.change}
+                        onEdit={pathInput.open}
+                        onSubmit={pathInput.submit}
+                      />
+                    ) : null
+                  }
+                  onEditPath={pathInput.open}
+                  onUp={() => navigateTo(pickerParentPath(session.currentPath))}
+                />
+                <div className='flex px-(--bar-padding-x)'>{searchField}</div>
+              </>
+            ) : (
+              <PaneBar>
+                <div
+                  aria-label='Folder history'
+                  className='flex shrink-0 items-center gap-0.5'
+                  role='group'
+                >
+                  <IconTooltip label='Back' shortcut='Mod+['>
+                    <Button
+                      aria-keyshortcuts='Meta+['
+                      aria-label='Back'
+                      disabled={!session.canGoBack}
+                      focusableWhenDisabled
+                      onClick={goBack}
+                      size='icon-sm'
+                      type='button'
+                      variant='ghost'
+                    >
+                      <ArrowLeftIcon />
+                    </Button>
+                  </IconTooltip>
                   <IconTooltip label='Forward' shortcut='Mod+]'>
                     <Button
                       aria-keyshortcuts='Meta+]'
@@ -731,89 +786,76 @@ export function FilePickerDialog({
                       <ArrowRightIcon />
                     </Button>
                   </IconTooltip>
-                )}
-                <IconTooltip label='Up one folder' shortcut='Mod+ArrowUp'>
-                  <Button
-                    aria-keyshortcuts='Meta+ArrowUp'
-                    aria-label='Up one folder'
-                    disabled={!session.canGoUp}
-                    focusableWhenDisabled
-                    onClick={() => navigateTo(pickerParentPath(session.currentPath))}
-                    size='icon-sm'
-                    type='button'
-                    variant='ghost'
-                  >
-                    <ArrowUpIcon />
-                  </Button>
-                </IconTooltip>
-              </div>
-              {compact ? null : <Separator className='h-4' orientation='vertical' />}
-              <LocationBar
-                className={compact ? 'flex-1' : undefined}
-                currentPath={session.currentPath}
-                draft={pathInput.draft}
-                error={pathInput.error}
-                inputRef={pathInput.inputRef}
-                isEditing={pathInput.isEditing}
-                isPending={pathInput.isPending || isDirectoryFetching}
-                onCancel={pathInput.close}
-                onChange={pathInput.change}
-                onEdit={pathInput.open}
-                onSubmit={pathInput.submit}
-              />
-              {compact ? null : (
-                <>
-                  {searchField}
-                  <Tabs value={chosenView} onValueChange={(next: PickerView) => chooseView(next)}>
-                    <TabsList aria-label='View' variant='segmented'>
-                      <IconTooltip label='Columns'>
-                        <TabsTab
-                          aria-label='Columns'
-                          className='w-(--density-control-height-sm) px-0'
-                          value='columns'
-                        >
-                          <ColumnsIcon />
-                        </TabsTab>
-                      </IconTooltip>
-                      <IconTooltip label='List'>
-                        <TabsTab
-                          aria-label='List'
-                          className='w-(--density-control-height-sm) px-0'
-                          value='list'
-                        >
-                          <ListIcon />
-                        </TabsTab>
-                      </IconTooltip>
-                      <IconTooltip label='Icons'>
-                        <TabsTab
-                          aria-label='Icons'
-                          className='w-(--density-control-height-sm) px-0'
-                          value='icons'
-                        >
-                          <GridFourIcon />
-                        </TabsTab>
-                      </IconTooltip>
-                    </TabsList>
-                  </Tabs>
-                  <Separator className='h-4' orientation='vertical' />
-                  {folderActions}
-                </>
-              )}
-            </PaneBar>
-            {compact ? (
-              <PaneBar>
+                  <IconTooltip label='Up one folder' shortcut='Mod+ArrowUp'>
+                    <Button
+                      aria-keyshortcuts='Meta+ArrowUp'
+                      aria-label='Up one folder'
+                      disabled={!session.canGoUp}
+                      focusableWhenDisabled
+                      onClick={() => navigateTo(pickerParentPath(session.currentPath))}
+                      size='icon-sm'
+                      type='button'
+                      variant='ghost'
+                    >
+                      <ArrowUpIcon />
+                    </Button>
+                  </IconTooltip>
+                </div>
+                <Separator className='h-4' orientation='vertical' />
+                <LocationBar
+                  currentPath={session.currentPath}
+                  draft={pathInput.draft}
+                  error={pathInput.error}
+                  inputRef={pathInput.inputRef}
+                  isEditing={pathInput.isEditing}
+                  isPending={pathInput.isPending || isDirectoryFetching}
+                  onCancel={pathInput.close}
+                  onChange={pathInput.change}
+                  onEdit={pathInput.open}
+                  onSubmit={pathInput.submit}
+                />
                 {searchField}
+                <Tabs value={chosenView} onValueChange={(next: PickerView) => chooseView(next)}>
+                  <TabsList aria-label='View' variant='segmented'>
+                    <IconTooltip label='Columns'>
+                      <TabsTab
+                        aria-label='Columns'
+                        className='w-(--density-control-height-sm) px-0'
+                        value='columns'
+                      >
+                        <ColumnsIcon />
+                      </TabsTab>
+                    </IconTooltip>
+                    <IconTooltip label='List'>
+                      <TabsTab
+                        aria-label='List'
+                        className='w-(--density-control-height-sm) px-0'
+                        value='list'
+                      >
+                        <ListIcon />
+                      </TabsTab>
+                    </IconTooltip>
+                    <IconTooltip label='Icons'>
+                      <TabsTab
+                        aria-label='Icons'
+                        className='w-(--density-control-height-sm) px-0'
+                        value='icons'
+                      >
+                        <GridFourIcon />
+                      </TabsTab>
+                    </IconTooltip>
+                  </TabsList>
+                </Tabs>
+                <Separator className='h-4' orientation='vertical' />
                 {folderActions}
               </PaneBar>
-            ) : null}
+            )}
 
-            <div className='px-(--bar-padding-x) lg:hidden'>
-              <MobileLocations
-                currentPath={session.currentPath}
-                recentState={recentState}
-                sections={sections}
-              />
-            </div>
+            <MobileLocations
+              currentPath={session.currentPath}
+              recentState={recentState}
+              sections={sections}
+            />
 
             {wide ? (
               <PersistedResizablePanelGroup
@@ -877,30 +919,54 @@ export function FilePickerDialog({
                 />
               </PaneBar>
             ) : null}
-            <DialogFooter className='flex h-(--bar-height) shrink-0 flex-row items-center justify-between gap-(--density-control-gap) px-(--bar-padding-x) sm:justify-between'>
-              <SelectedSummary entry={selectedPickable} mode={mode} />
-              <span
-                className='text-muted-foreground text-2xs ml-auto shrink-0 font-mono tabular-nums'
-                role='status'
-              >
-                {loadState.status === 'loading'
-                  ? null
-                  : listCountLabel(entries.length, isSearching)}
-              </span>
-              <div className='flex shrink-0 gap-1.5'>
-                <Button onClick={() => onOpenChange(false)} size='sm' type='button' variant='ghost'>
+            {compact ? (
+              <DialogFooter className='flex shrink-0 flex-row items-center gap-(--density-control-gap) px-(--bar-padding-x) py-(--density-gap-tight)'>
+                <Button onClick={() => onOpenChange(false)} type='button' variant='ghost'>
                   Cancel
                 </Button>
                 <Button
+                  className='min-w-0 flex-1'
                   disabled={!selectedPickable}
                   onClick={chooseSelected}
-                  size='sm'
+                  title={selectedPickable ? displayPath(selectedPickable.path) : undefined}
                   type='button'
                 >
-                  {copy.chooseLabel}
+                  <span className='truncate'>
+                    {selectedPickable ? `Choose ${selectedPickable.name}` : copy.noSelectionLabel}
+                  </span>
                 </Button>
-              </div>
-            </DialogFooter>
+              </DialogFooter>
+            ) : (
+              <DialogFooter className='flex h-(--bar-height) shrink-0 flex-row items-center justify-between gap-(--density-control-gap) px-(--bar-padding-x) sm:justify-between'>
+                <SelectedSummary entry={selectedPickable} mode={mode} />
+                <span
+                  className='text-muted-foreground text-2xs ml-auto shrink-0 font-mono tabular-nums'
+                  role='status'
+                >
+                  {loadState.status === 'loading'
+                    ? null
+                    : listCountLabel(entries.length, isSearching)}
+                </span>
+                <div className='flex shrink-0 gap-1.5'>
+                  <Button
+                    onClick={() => onOpenChange(false)}
+                    size='sm'
+                    type='button'
+                    variant='ghost'
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    disabled={!selectedPickable}
+                    onClick={chooseSelected}
+                    size='sm'
+                    type='button'
+                  >
+                    {copy.chooseLabel}
+                  </Button>
+                </div>
+              </DialogFooter>
+            )}
           </PickerLocationActionsContext>
         </FilePickerSessionActionsContext>
       </DialogContent>

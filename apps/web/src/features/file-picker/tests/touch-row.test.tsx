@@ -2,15 +2,14 @@ import { fireEvent, screen } from '@testing-library/react'
 
 import { expect, test } from '../../../../test/fixtures'
 import { renderWithProviders } from '../../../../test/render'
-import { FileRow } from '@/features/file-picker/components/file-row'
+import { TouchRow } from '@/features/file-picker/components/touch-row'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FsEntry } from '@/lib/file-system-types'
 
 test.each([
-  [true, 'directory', ['src']],
-  [false, 'directory', []],
-  [true, 'file', []],
-] as const)('openOnTap %s: one tap on a %s opens %j', (openOnTap, type, expected) => {
+  ['directory', ['src']],
+  ['file', []],
+] as const)('one tap on a %s row opens %j', (type, expected) => {
   const opened: string[] = []
   let selections = 0
   const entry: FsEntry = {
@@ -24,13 +23,11 @@ test.each([
   }
   renderWithProviders(
     <div role='listbox'>
-      <FileRow
+      <TouchRow
         entry={entry}
         isBusy={false}
         mode='folder'
-        onDirectoryIntent={() => undefined}
-        onDoubleClick={(tapped) => opened.push(tapped.name)}
-        openOnTap={openOnTap}
+        onOpen={(tapped) => opened.push(tapped.name)}
         position={1}
         rowProps={{
           id: 'row-src',

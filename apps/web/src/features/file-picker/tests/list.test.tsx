@@ -74,7 +74,7 @@ function pickerList(
         onCommitEntry={() => undefined}
         onGoParent={options.onGoParent ?? (() => undefined)}
         onRetry={() => undefined}
-        openOnTap={false}
+        touch={false}
         selectedPath={options.selectedPath ?? null}
       />
     </FilePickerSessionActionsContext>

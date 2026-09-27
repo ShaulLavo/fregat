@@ -51,7 +51,8 @@ async function folderPicker(page: Page, step: (label: string) => Promise<void>) 
   const dialog = page.locator('[data-slot="dialog-content"]')
   await dialog.waitFor()
   // Opened on a small folder: this machine's root and home listings are not under test.
-  await page.getByRole('button', { name: 'Go to folder', exact: true }).click()
+  // The folder name in the bar is where a path is typed, as a phone's Files app does.
+  await page.getByRole('button', { name: /^Go to folder/ }).click()
   await page.getByRole('textbox', { name: 'Folder path', exact: true }).fill('/work/tmp/phone-ws')
   await page.keyboard.press('Enter')
   const list = page.getByRole('listbox')
@@ -64,24 +65,23 @@ async function folderPicker(page: Page, step: (label: string) => Promise<void>) 
     box.x <= 0.5 && box.width >= viewport.width - 0.5 && box.height >= viewport.height - 0.5,
     `The picker fills the phone screen: ${JSON.stringify(box)}`,
   )
-  await expectNoSidewaysScroll(page, '[data-slot="dialog-content"]', '[aria-label="Places"] *')
+  await expectNoSidewaysScroll(page, '[data-slot="dialog-content"]', '[aria-label="Places"]')
   await step('picker')
 
-  const folder = list.getByRole('option').first()
-  const name = (await folder.innerText()).trim()
+  // Folders show a trailing chevron: a tap drills in, and the bar's title follows.
+  const folder = list.getByRole('option', { name: /^alpha/ })
   await folder.tap()
   await page
-    .locator('[data-slot="dialog-content"] [aria-label="Folder history"]')
-    .waitFor({ timeout: 5_000 })
-  await page.waitForFunction(
-    (folderName) =>
-      Array.from(document.querySelectorAll('[data-slot="dialog-content"] button')).some(
-        (button) => button.textContent?.trim() === folderName,
-      ),
-    name,
-    { timeout: 10_000 },
-  )
+    .getByRole('button', { name: /^Go to folder, now \/work\/tmp\/phone-ws\/alpha/ })
+    .waitFor({ timeout: 10_000 })
+  await page.getByRole('button', { name: 'Choose alpha', exact: true }).waitFor()
   await step('picker-tapped-folder')
+  await page.getByRole('button', { name: 'More folder actions', exact: true }).click()
+  await page.getByRole('menuitemradio', { name: 'Newest first' }).waitFor()
+  await step('picker-menu')
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Up one folder', exact: true }).click()
+  await page.getByRole('button', { name: 'Choose phone-ws', exact: true }).waitFor()
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   await dialog.waitFor({ state: 'hidden' })
 }

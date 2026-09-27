@@ -8,6 +8,7 @@ import type { FsEntry } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 import { ListLoading } from '@/features/file-picker/components/list-loading'
 import { FileRow } from '@/features/file-picker/components/file-row'
+import { TouchRow } from '@/features/file-picker/components/touch-row'
 import { useFilePickerSessionActions } from '@/features/file-picker/hooks/use-file-picker-session-actions'
 import { fileListRows } from '@/features/file-picker/utils/rows'
 import { SCROLL_INTENT_SETTLE_MS } from '@/features/file-picker/utils/intent'
@@ -31,8 +32,8 @@ export function FileList({
   onCommitEntry,
   onGoParent,
   onRetry,
-  openOnTap,
   selectedPath,
+  touch,
 }: {
   accept?: readonly string[]
   entries: FsEntry[]
@@ -46,8 +47,9 @@ export function FileList({
   onCommitEntry: (entry: FsEntry) => void
   onGoParent: () => void
   onRetry: () => void
-  openOnTap: boolean
   selectedPath: string | null
+  /** Finger-sized rows where one tap opens a folder. */
+  touch: boolean
 }) {
   const internalRef = useRef<HTMLDivElement>(null)
   const containerRef = listRef ?? internalRef
@@ -133,6 +135,19 @@ export function FileList({
             >
               {row.label}
             </div>
+          ) : touch ? (
+            <TouchRow
+              accept={accept}
+              entry={row.entry}
+              isBusy={isBusy}
+              mode={mode}
+              onOpen={onEntryDoubleClick}
+              position={row.position}
+              rowProps={list.rowProps(row.key)}
+              selected={row.entry.path === selectedPath}
+              setSize={entries.length}
+              showPath={row.showPath}
+            />
           ) : (
             <FileRow
               accept={accept}
@@ -142,7 +157,6 @@ export function FileList({
               mode={mode}
               onDirectoryIntent={signalDirectoryIntent}
               onDoubleClick={onEntryDoubleClick}
-              openOnTap={openOnTap}
               position={row.position}
               selected={row.entry.path === selectedPath}
               setSize={entries.length}

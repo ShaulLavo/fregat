@@ -10,7 +10,12 @@ try {
   // Large renditions exceed the pipe buffer; drain the stream before exiting.
   process.stdout.end(serialize(result))
   await finished(process.stdout)
-} catch {
+} catch (cause) {
+  // The parent logs this line: without it a missing codec reads the same as a corrupt image.
+  const reason =
+    (cause as { internal?: { reason?: unknown } }).internal?.reason ??
+    (cause instanceof Error ? `${cause.name}: ${cause.message}` : 'unknown')
+  process.stderr.write(String(reason).slice(0, 300))
   process.exitCode = 1
 }
 

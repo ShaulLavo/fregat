@@ -17,6 +17,10 @@ type NerdFontProviderOptions = {
 }
 
 const nerdFontsDownloadUrl = 'https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest'
+// A face downloads by name from the latest release: the release API is rate-limited to 60 an
+// hour per address, and every window asks for the symbols font before the catalog.
+const latestArchiveUrl = (name: string) =>
+  `https://github.com/ryanoasis/nerd-fonts/releases/latest/download/${name}.zip`
 const releaseSchema = v.object({
   assets: v.array(v.object({ browser_download_url: v.string() })),
 })
@@ -79,11 +83,7 @@ export class NerdFontProvider {
     const cachedFont = await readBinaryFile(cachedFontPath)
     if (cachedFont) return cachedFont
 
-    const links = await this.links()
-    const zipUrl = links[fontName]
-    if (!zipUrl) return null
-
-    const zipBuffer = await this.downloadFontZip(zipUrl)
+    const zipBuffer = await this.downloadFontZip(latestArchiveUrl(fontName))
     if (!zipBuffer) return null
 
     const fontBuffer = await extractRegularFont(zipBuffer)
@@ -112,10 +112,8 @@ export class NerdFontProvider {
   }
 
   private async downloadFontZip(zipUrl: string) {
-    // The links file is a cache on disk; it never widens where the server fetches from.
-    if (!parsedFontLink(zipUrl)) return null
-
     const response = await this.fetcher(zipUrl, { signal: AbortSignal.timeout(ARCHIVE_TIMEOUT_MS) })
+    if (response.status === 404) return null
     if (!response.ok) throw fontOperationFailed('failed to download font archive', response)
 
     return Buffer.from(await response.arrayBuffer())
