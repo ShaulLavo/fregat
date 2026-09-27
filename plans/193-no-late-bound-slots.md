@@ -120,9 +120,17 @@ provider's effect (`state-provider.tsx:74`).
   (`createEnvironment` to `dispose`) in `application-runtime.ts`, beside `prepareSearchReload`,
   and moved to `features/workspace/state/cache-persistence.ts`. `createBootstrap` binds
   navigation (phase 1 follow-up), so `cached-bootstrap.test.tsx` fails if the bind moves back
-  behind an effect. The gate (`ConnectionGate`) no longer suspends the editor: a machine that
-  drifts or mismatches after activation keeps its editor resumed while the gate shows the refusal.
-  Such a machine cannot be activated in the first place (`confirmedEnvironmentId`).
+  behind an effect. The application resumes its editor from `start()`, which `createBootstrap`
+  calls from `bootstrap.start()`, after `main.tsx` claims a pairing link, so recovery discovery
+  carries the pairing cookie. `ConnectionGate`'s refusal rule is also the runtime's: a machine
+  refused before this page's first handshake (identity drift or protocol mismatch at generation 0)
+  keeps its editor suspended until admitted. `activateEnvironment` throws for a machine already
+  refused (`confirmedEnvironmentId`); the hold covers one refused after activation.
+- Known edges, accepted: `activateEnvironment` resumes a re-activated editor before React's layout
+  effect refreshes its file-open preparer (theme, tab size), so prepares in that window use the
+  values from its last activation. The unscoped cache keys (`uiMode`, `workbenchLayout`,
+  `chatModePanels`) now have one writer per retained environment; a parked machine's write still
+  pending inside the 350 ms debounce can land after the active one's.
 - Verify: `features/editor` runtime tests for resume/suspend and a machine switch;
   `scenario editor-syntax-shiki-settled` (census preload); `apps/web/scripts/editor-open-benchmark.mjs`
   once; `scenario workspace-switch` and `scenario editor-reload-paint` (cache persistence and

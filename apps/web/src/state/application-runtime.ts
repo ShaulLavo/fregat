@@ -38,6 +38,7 @@ import { primaryQueryClient, queryClientFor } from '@/lib/environments/state/que
 import { subscribeLiveSettings, watchSettingValue } from '@/features/settings/state/live-projection'
 import { setSimulatedLatencyMs } from '@/lib/simulated-latency'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
+import { selectServerConnection } from '@workspace/client-core/environments/state/store'
 
 type RetainedEnvironment = {
   readonly origin: string
@@ -70,6 +71,15 @@ export function createApplicationRuntime({
   const commandBinding = createCommandRuntimeBinding()
   const environments = new Map<EnvironmentId, RetainedEnvironment>()
   let current: RetainedEnvironment
+  let started = false
+  let disposed = false
+
+  // Only the active machine's editor runs, and not while ConnectionGate withholds its workbench.
+  function syncActiveEditor() {
+    if (!started || disposed) return
+    if (refusedBeforeHandshake(current.origin)) current.editor.suspend()
+    else current.editor.resume()
+  }
 
   function createEnvironment(origin: string, seed: CachedWorkspaceState): RetainedEnvironment {
     const storage = environmentScopedStorage(confirmedEnvironmentId(origin))
@@ -117,7 +127,6 @@ export function createApplicationRuntime({
   current = createEnvironment(activeServerOrigin(), workspaceCache)
   restoreEnvironmentSessionSelection(confirmedEnvironmentId(current.origin))
   resumeEnvironmentActivity(current.origin)
-  current.editor.resume()
   environments.set(confirmedEnvironmentId(current.origin), current)
   activateWorkspaceRoot(current.editor.workspaceStore.getState().rootFolder?.path ?? null)
 
@@ -135,6 +144,7 @@ export function createApplicationRuntime({
     machines = next
     connections.configureMachines(next)
   })
+  const stopAdmissionWatch = useEnvironmentsStore.subscribe(syncActiveEditor)
 
   const application = {
     connections,
@@ -148,9 +158,14 @@ export function createApplicationRuntime({
       return null
     },
     subscribe: (listener: () => void) => useEnvironmentsStore.subscribe(listener),
+    /** Resumes the active editor; the boot calls it after pairing, so the first request is paired. */
+    start() {
+      started = true
+      syncActiveEditor()
+    },
     activateEnvironment(origin: string) {
       origin = canonicalServerOrigin(origin)
-      if (current.origin === origin) return
+      if (disposed || current.origin === origin) return
       const environmentId = confirmedEnvironmentId(origin)
       const next =
         environments.get(environmentId) ??
@@ -165,7 +180,7 @@ export function createApplicationRuntime({
       void current.queryClient.cancelQueries()
       resumeEnvironmentActivity(next.origin)
       current = next
-      current.editor.resume()
+      syncActiveEditor()
       activateWorkspaceRoot(current.editor.workspaceStore.getState().rootFolder?.path ?? null)
       restoreEnvironmentSessionSelection(environmentId)
       useEnvironmentsStore.getState().activate(next.origin)
@@ -202,6 +217,8 @@ export function createApplicationRuntime({
     hasUnsavedDocuments: () =>
       [...environments.values()].some(({ editor }) => editor.hasUnsavedDocuments()),
     dispose() {
+      disposed = true
+      stopAdmissionWatch()
       commandBinding.clear()
       stopLatency()
       setSimulatedLatencyMs(0)
@@ -225,3 +242,10 @@ export function createApplicationRuntime({
 }
 
 export type ApplicationRuntime = ReturnType<typeof createApplicationRuntime>
+
+/** ConnectionGate's rule: a refusal before this page's first handshake keeps the workbench out. */
+function refusedBeforeHandshake(origin: string) {
+  const connection = selectServerConnection(useEnvironmentsStore.getState(), origin)
+  const refused = connection.phase === 'identity-drift' || connection.phase === 'protocol-mismatch'
+  return refused && connection.generation === 0
+}
