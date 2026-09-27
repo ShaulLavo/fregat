@@ -1,4 +1,6 @@
 import { ok } from 'node:assert/strict'
+import { mkdir } from 'node:fs/promises'
+import path from 'node:path'
 import type { Page } from 'playwright'
 
 import { createModifiedFileFixture, releaseFixture } from '../fixture-workspace'
@@ -16,7 +18,6 @@ export const phoneSurfaces: Scenario = {
     'At a touch phone viewport: the folder picker fills the screen and opens folders on tap, a new session reaches the command palette, and Settings never scrolls sideways.',
   capture: { width: 390, height: 844, scale: 2, touch: true },
   async run(page, { step }) {
-    await folderPicker(page, step)
     const fixture = await createModifiedFileFixture(
       'phone-surfaces',
       'notes.md',
@@ -24,6 +25,8 @@ export const phoneSurfaces: Scenario = {
       ['# Notes', '', 'Changed.'],
     )
     try {
+      await mkdir(path.join(fixture, 'alpha'))
+      await folderPicker(page, step, fixture)
       await openFixtureChat(page, fixture)
       await newSessionPalette(page, step)
       await settings(page, step)
@@ -36,7 +39,7 @@ export const phoneSurfaces: Scenario = {
   },
 }
 
-async function folderPicker(page: Page, step: (label: string) => Promise<void>) {
+async function folderPicker(page: Page, step: (label: string) => Promise<void>, fixture: string) {
   const home = new URL(page.url())
   home.pathname = `${home.pathname.split('/~')[0]}/`
   home.search = ''
@@ -48,14 +51,14 @@ async function folderPicker(page: Page, step: (label: string) => Promise<void>) 
   })
   await page.goto(home.href, { waitUntil: 'domcontentloaded' })
   await selectors.chooseFolder(page).click()
-  const dialog = page.locator('[data-slot="dialog-content"]')
+  const dialog = selectors.pickerDialog(page)
   await dialog.waitFor()
   // Opened on a small folder: this machine's root and home listings are not under test.
   // The folder name in the bar is where a path is typed, as a phone's Files app does.
   await page.getByRole('button', { name: /^Go to folder/ }).click()
-  await page.getByRole('textbox', { name: 'Folder path', exact: true }).fill('/work/tmp/phone-ws')
+  await selectors.pickerFolderPath(page).fill(fixture)
   await page.keyboard.press('Enter')
-  const list = page.getByRole('listbox')
+  const list = selectors.pickerList(page)
   await list.getByRole('option').first().waitFor({ timeout: 20_000 })
   await page.waitForTimeout(400)
   const box = await dialog.boundingBox()
@@ -72,7 +75,7 @@ async function folderPicker(page: Page, step: (label: string) => Promise<void>) 
   const folder = list.getByRole('option', { name: /^alpha/ })
   await folder.tap()
   await page
-    .getByRole('button', { name: /^Go to folder, now \/work\/tmp\/phone-ws\/alpha/ })
+    .getByRole('button', { name: `Go to folder, now ${fixture}/alpha`, exact: true })
     .waitFor({ timeout: 10_000 })
   await page.getByRole('button', { name: 'Choose alpha', exact: true }).waitFor()
   await step('picker-tapped-folder')
@@ -81,15 +84,17 @@ async function folderPicker(page: Page, step: (label: string) => Promise<void>) 
   await step('picker-menu')
   await page.keyboard.press('Escape')
   await page.getByRole('button', { name: 'Up one folder', exact: true }).click()
-  await page.getByRole('button', { name: 'Choose phone-ws', exact: true }).waitFor()
+  await page
+    .getByRole('button', { name: `Choose ${path.basename(fixture)}`, exact: true })
+    .waitFor()
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   await dialog.waitFor({ state: 'hidden' })
 }
 
 async function newSessionPalette(page: Page, step: (label: string) => Promise<void>) {
   await selectors.phoneLevel(page, 'sessions').waitFor({ timeout: 20_000 })
-  await page
-    .locator('[data-phone-shell]')
+  await selectors
+    .phoneShell(page)
     .getByRole('button', { name: /new session/i })
     .first()
     .click()
@@ -122,6 +127,7 @@ async function expectNothingPastTheEdge(page: Page) {
       const style = getComputedStyle(element)
       return (
         (style.overflowY === 'auto' || style.overflowY === 'scroll') &&
+        element.clientHeight > 0 &&
         element.scrollHeight > element.clientHeight
       )
     })

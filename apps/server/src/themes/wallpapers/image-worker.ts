@@ -12,9 +12,16 @@ try {
   await finished(process.stdout)
 } catch (cause) {
   // The parent logs this line: without it a missing codec reads the same as a corrupt image.
-  const reason =
-    (cause as { internal?: { reason?: unknown } }).internal?.reason ??
-    (cause instanceof Error ? `${cause.name}: ${cause.message}` : 'unknown')
+  let reason = cause instanceof Error ? cause.name : 'unknown'
+  if (
+    cause instanceof Error &&
+    'internal' in cause &&
+    typeof cause.internal === 'object' &&
+    cause.internal !== null &&
+    'reason' in cause.internal &&
+    typeof cause.internal.reason === 'string'
+  )
+    reason = cause.internal.reason
   process.stderr.write(String(reason).slice(0, 300))
   process.exitCode = 1
 }

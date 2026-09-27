@@ -75,7 +75,7 @@ export function CompactMenu({
           <DropdownMenuItem
             onClick={() => (pinned ? locations.unpin(currentPath) : locations.pin(currentPath))}
           >
-            <PushPinIcon weight={pinned ? 'fill' : 'regular'} />
+            {pinned ? <PushPinIcon weight='fill' /> : <PushPinIcon weight='regular' />}
             {pinned ? 'Unpin this folder' : 'Pin this folder'}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onRefresh}>

@@ -63,6 +63,7 @@ test('rejects oversized bytes and dimensions', async () => {
   })
   await expect(decodeWallpaper(still(16385, 1))).rejects.toMatchObject({
     code: 'wallpapers.INVALID',
+    internal: { workerReason: 'dimensions' },
   })
 })
 

@@ -2,10 +2,12 @@
 
 ## Status and authorization
 
-- Status: IN PROGRESS (wave 2, lane P). Phases 1–3 implemented 2026-09-26 (phone shell frame,
-  screens, touch paths); Phase 4 (sessions and pairing) follows in its own pull request.
-  Owner check pending: a real iPhone and Android phone (Phase 5). iPhone (WebKit) behaviour is
-  unmeasured: Playwright WebKit does not start on this host.
+- Status: IN PROGRESS. Phases 1–4 landed, including sessions and pairing in PR #143.
+  Phone sheets and single-tab navigation landed in #168; the first-load split landed in #172.
+  Those changes shipped in deployment batch 27. PR #179 adds the phone folder picker,
+  palette access across screens and iOS layout fixes; reviewed follow-up deployment is pending.
+  Phase 5 still needs real iPhone and Android checks, including the Safari toolbar, keyboard
+  movement, focus zoom and safe areas. The Platform half of full-bleed diff tinting remains open.
 - Priority: P2. Large product question; Plan 142 (Web Push) delivers the first away-from-desk
   value without it.
 - Effort: XL overall, unknown until the direction is set. The discussion itself is S.
@@ -611,3 +613,21 @@ Carried in from other plans. They wait for the phone shell and join its split pl
   reaches the phone.
 - A third-party push service (Expo push): Plan 142 uses standard Web Push.
 - An offline outbox (T3 mobile) before the phone surface exists.
+
+### PR #179 review follow-up (2026-09-27)
+
+- Corrected the compact menu's dynamic icon weight, which broke both production bundle and
+  landing-page builds. Both icon variants now have literal weights that the build can retain.
+- Made `phone-surfaces` create and release its own folder tree. It previously depended on
+  `/work/tmp/phone-ws`, a folder outside the scenario's lifecycle.
+- Removed the unsafe wallpaper-worker error cast and arbitrary exception-message logging.
+  The parent receives a structured reason or the exception type.
+- Phone evidence: `/work/tmp/fregat-evidence/20260927T053733Z-scenario-phone-surfaces/`.
+  Picker, folder navigation, menu, new-session palette and Settings completed; screenshots read
+  back. The fixture's absent Codex/Claude instances returned 500 from their update-status reads
+  in Settings. No real provider ran. Those unrelated responses remain visible in the evidence.
+- Desktop evidence: `/work/tmp/fregat-evidence/20260927T053903Z-scenario-file-picker-browse/`.
+  Column navigation, previews, history keys and icon view completed with no server warnings.
+- Focused checks: picker row/list tests, Nerd Font and route tests, wallpaper decode tests,
+  web/server typechecks, required gates and first-load bundle gate. Real-device checks remain
+  pending; desktop Chromium does not reproduce Safari's browser toolbar or on-screen keyboard.
