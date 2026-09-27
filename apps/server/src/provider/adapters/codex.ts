@@ -1385,7 +1385,7 @@ class CodexAppServerSession extends SessionContext {
 
   private handleMessage(message: JsonRpcMessage) {
     if (!message.method) return
-    this.attachNotificationTurn(message.params)
+    this.attachNotificationTurn(message.method, message.params)
     const previousDropped = this.childAgents.pendingStats().droppedEvents
     const handling =
       message.id === undefined
@@ -1521,7 +1521,9 @@ class CodexAppServerSession extends SessionContext {
     return true
   }
 
-  private attachNotificationTurn(params: unknown) {
+  private attachNotificationTurn(method: string, params: unknown) {
+    // Thread snapshots can carry an older turn's id while a new prompt is starting.
+    if (method.startsWith('thread/')) return
     if (notificationThreadId(params) !== this.providerConversationMarker) return
     const providerTurnId = notificationTurnId(params)
     if (!providerTurnId) return

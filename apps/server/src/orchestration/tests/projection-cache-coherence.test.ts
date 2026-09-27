@@ -38,6 +38,25 @@ afterEach(() => {
 })
 
 describe('orchestration read-model cache coherence', () => {
+  it.each([
+    { status: 'interrupted', state: 'interrupted' },
+    { status: 'error', state: 'error' },
+    { status: 'ready', state: 'completed' },
+  ] as const)(
+    'keeps a turn $state when its file checkpoint finishes later',
+    ({ status, state }) => {
+      const projected = project([
+        ...sessionBootstrapEvents(),
+        turnStartEvent('turn-1', requestedAt),
+        runtimeSetEvent({ activeTurnId: 'turn-1', status: 'running', updatedAt: startedAt }),
+        runtimeSetEvent({ status, updatedAt: settledAt }),
+        turnDiffCompletedEvent({ turnId: 'turn-1', checkpointTurnCount: 1, status: 'ready' }),
+      ])
+      for (const session of [projected.shell, projected.memory, projected.sqlSession])
+        expect(session?.latestTurn).toMatchObject({ state, completedAt: settledAt })
+    },
+  )
+
   it.each(['failure', 'interruption'] as const)(
     'acknowledges a prior %s when the user continues and retains later failures',
     (kind) => {

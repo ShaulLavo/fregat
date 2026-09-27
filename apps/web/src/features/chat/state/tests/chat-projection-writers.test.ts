@@ -39,6 +39,28 @@ import {
 } from '@workspace/client-core/chat/writers'
 import { expect, test } from '../../../../../test/fixtures'
 
+test.each(['completed', 'interrupted', 'error'] as const)(
+  'a late checkpoint preserves the %s turn outcome',
+  (outcome) => {
+    const session = makeSessionDetail()
+    const turnId = parseTurnId('finished-turn')
+    const latestTurn: NonNullable<OrchestrationSession['latestTurn']> = {
+      ...runningLatestTurn(turnId),
+      providerStartState: outcome === 'interrupted' ? 'interrupted' : 'settled',
+      state: outcome,
+      startedAt: timestamp(1),
+      completedAt: timestamp(2),
+    }
+    const state = syncChatProjectionSessionDetailSnapshot(
+      createInitialChatProjectionSlice(),
+      makeDetailSnapshot({ session: { ...session, latestTurn }, snapshotSequence: 2 }),
+    )
+    const next = applyChatProjectionEvent(state, turnDiffCompletedEvent(session.id, turnId, 3))
+    expect(next.sessionById[session.id]?.liveTurn).toEqual(latestTurn)
+    expect(next.turnDiffSummaryBySessionId[session.id]?.[turnId]?.status).toBe('ready')
+  },
+)
+
 test('preserves existing detail for sessions still present in a shell snapshot', () => {
   const sessionId = parseSessionId('ad686244-5b2e-59be-805f-ef86eac80feb')
   const message = makeMessage(1, sessionId)

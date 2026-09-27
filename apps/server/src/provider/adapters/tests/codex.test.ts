@@ -29,6 +29,7 @@ import { CodexProviderAdapter } from '../codex'
 import { McpSignInAttempts } from '../../mcp-sign-in'
 import { createNativeSessionProjection } from '../../../orchestration/tests/factories/native-session'
 import { SESSION_ID } from '../../../orchestration/tests/factories/projection'
+import { runtimeInterruptedByRestart } from '../../../orchestration/utils/restart-interruption'
 import { codexHistoryResponseSchema } from '../utils/codex-history'
 import type { ProviderRuntimeEvent, ProviderTurnInput } from '../../types'
 import {
@@ -516,6 +517,13 @@ function handle(message) {
     record({ event: 'turn/start', params: message.params });
     if (mode !== 'echo-mode-params' && !assertTurnParams(message)) return;
     if (mode === 'hold-turn-start') return;
+    if (mode === 'historical-usage-before-start') {
+      const usage = { totalTokens: 123, inputTokens: 100, outputTokens: 23, cachedInputTokens: 0, reasoningOutputTokens: 0 };
+      send({ method: 'thread/tokenUsage/updated', params: {
+        threadId: 'provider-thread-1', turnId: 'historical-turn',
+        tokenUsage: { last: usage, total: usage },
+      } });
+    }
     process.stderr.write('2026-05-28T00:00:00Z INFO codex: harmless diagnostic\\n');
     if (mode === 'hook-blocked') {
       const run = { id: 'hook-run-1', displayOrder: 0, entries: [], eventName: 'preToolUse', executionMode: 'sync', handlerType: 'command', scope: 'turn', sourcePath: '/repo/.codex/hooks/guard.sh', startedAt: 1, status: 'running' };
@@ -533,6 +541,9 @@ function handle(message) {
       method: 'turn/started',
       params: { threadId: 'provider-thread-1', turn: fakeTurn('inProgress') },
     });
+    if (mode === 'historical-usage-before-start') {
+      send({ id: message.id, result: { turn: fakeTurn('inProgress') } });
+    }
     if (mode === 'child-agents' || mode === 'child-input-response' || nativeProjection) sendChildEvents();
     if (mode === 'permission-invalid') {
       send({ id: 901, method: 'item/permissions/requestApproval', params: { threadId: 'provider-thread-1', turnId: fakeTurn().id, itemId: 'permission-invalid', permissions: null } });
@@ -740,7 +751,7 @@ function handle(message) {
       method: 'turn/completed',
       params: { threadId: 'provider-thread-1', turn: fakeTurn('completed') },
     });
-    send({ id: message.id, result: { turn: fakeTurn('completed') } });
+    if (mode !== 'historical-usage-before-start') send({ id: message.id, result: { turn: fakeTurn('completed') } });
     return;
   }
   if (message.method === 'turn/steer') {
@@ -939,6 +950,42 @@ type EchoedModeParams = {
 }
 
 describe('CodexProviderAdapter', () => {
+  it('keeps a historical usage update from claiming a new prompt and blocking restart', async ({
+    onTestFinished,
+  }) => {
+    await withFakeCodex(
+      async () => {
+        const adapter = new CodexProviderAdapter()
+        const input = { ...providerTurnInput(), sessionId: v.parse(sessionIdSchema, SESSION_ID) }
+        const projection = createNativeSessionProjection(input, 'token')
+        onTestFinished(projection.close)
+        onTestFinished(() => adapter.stopAll())
+        const events: ProviderRuntimeEvent[] = []
+        const failures: unknown[] = []
+        adapter.subscribeEvents((event) => {
+          events.push(event)
+          void projection.ingestion.ingest(event).catch((error) => failures.push(error))
+        })
+        const running = adapter.sendTurn(input)
+        void running.catch(() => {})
+        await expect
+          .poll(() => events.filter((event) => event.type === 'turn.completed'))
+          .toMatchObject([{ turnId: input.turnId, payload: { state: 'completed' } }])
+        await running
+        await projection.ingestion.drain()
+        expect(failures).toEqual([])
+        const session = projection.snapshot().session
+        expect(session.latestTurn).toMatchObject({ turnId: input.turnId, state: 'completed' })
+        expect(session.runtime?.status).toBe('ready')
+        expect(runtimeInterruptedByRestart(session)).toBeNull()
+        expect(
+          events.filter((event) => event.type === 'conversation.token-usage.updated'),
+        ).toHaveLength(1)
+      },
+      { mode: 'historical-usage-before-start' },
+    )
+  })
+
   it('passes the stable reset-credit key through the native boundary fixture', async () => {
     await withFakeCodex(
       async ({ spawnLogPath }) => {

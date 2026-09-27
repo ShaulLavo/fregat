@@ -1053,6 +1053,8 @@ export class OrchestrationProjectionPipeline {
     // Recording a checkpoint is not a turn ending: a placeholder arrives while
     // the session is still streaming the very turn it describes.
     if (this.isSessionRunningTurn(sessionId, turnId)) return
+    const turn = this.selectTurn(sessionId, turnId)
+    if (turn && turn.state !== 'running') return
 
     this.completeTurn(
       sessionId,

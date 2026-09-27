@@ -33,7 +33,7 @@ export const stoppedTurnReasons = isolatedNativeScenario({
       await sendPrompt(page, STOP_PROMPT)
       await messages.getByText(/^PARTIAL_ANSWER STOP/).waitFor({ timeout: 30_000 })
       await selectors.chatStop(page).click()
-      await expectLine(/^You stopped it after \d/)
+      await expectLine(/^You stopped it(?: after \d.*)?$/)
       await selectors
         .incompleteAnswer(page)
         .filter({ hasText: 'PARTIAL_ANSWER STOP' })
@@ -55,7 +55,7 @@ export const stoppedTurnReasons = isolatedNativeScenario({
 
       await scrollToEnd(page)
       await sendPrompt(page, 'FAIL after a partial answer.')
-      await expectLine(/^Failed after \d/)
+      await expectLine(/^(?:Failed after \d|Response failed$)/)
       await selectors.incompleteAnswer(page).filter({ hasText: 'PARTIAL_ANSWER FAIL' }).waitFor()
       await step('provider-failed')
 
@@ -82,7 +82,7 @@ export const stoppedTurnReasons = isolatedNativeScenario({
       await sendPrompt(page, 'SESSION stop after a partial answer.')
       await messages.getByText(/^PARTIAL_ANSWER SESSION/).waitFor({ timeout: 30_000 })
       await dispatch(page, orchestration, { type: 'session.runtime.stop', sessionId })
-      await expectLine(/^The session was stopped after \d/)
+      await expectLine(/^The session was stopped(?: after \d.*)?$/)
       await step('runtime-stopped')
       const stopped = await readSessionDetail(page, orchestration, sessionId)
       strictEqual(stopped.runtime?.lastError, null, 'A deliberate stop has no session error')

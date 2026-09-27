@@ -1141,6 +1141,8 @@ function applySessionTurnDiffCompletedEvent(
       [sessionId]: recordById(summaries, (entry) => entry.turnId),
     },
   }
+  const currentTurn = state.sessionById[sessionId]?.liveTurn
+  if (currentTurn?.turnId === summary.turnId && currentTurn.state !== 'running') return nextState
 
   return writeSessionTurn(nextState, sessionId, {
     liveTurn: {
