@@ -664,8 +664,16 @@ tabs. Their control rows now wrap within their own width. DOM probes reduced Set
       provider fixture still emits the known update-status 500s. Desktop look
       `20260927T064137Z-look-1440x1000` had no problems. Native Safari dev screenshot `app-dev.png`
       confirms the wallpaper continues behind the toolbar with the source change.
-- [ ] Commit, push, deploy and verify the unmodified release in iOS Simulator Safari.
+- [x] Commit, push, deploy and verify the unmodified release in iOS Simulator Safari.
+      Code commit `035df7af2`, release `20260927T064439Z-035df7af-iphone-wallpaper`; live check
+      passed. `app-live.png` shows continuous wallpaper beneath the toolbar after fresh navigation.
+      `live-metrics.json` records 874px of wallpaper and 714px of interactive content, with no
+      document offset. Required gates, formatting, lint and repository typechecks passed.
+      Existing settings/orchestration/reaper log noise remains in the deployment live check.
+- [ ] Physical iPhone and software-keyboard checks. SafariDriver did not produce a software
+      keyboard during the input test, so this run cannot confirm keyboard movement.
 
 Native Safari evidence on the Mac is in
 `node_modules/.cache/iphone-wallpaper-investigation/`: `app-before.png`, `probe.png`,
-`outer-background.png` and `app-unified-probe.png`. Physical iPhone confirmation remains open.
+`outer-background.png`, `app-unified-probe.png`, `app-dev.png`, `app-live.png` and
+`live-metrics.json`. Physical iPhone confirmation remains open.
