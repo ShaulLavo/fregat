@@ -1,6 +1,4 @@
 // Modified for Platform from Pierre. Apache-2.0; see packages/tree/LICENSE-pierre and UPSTREAM.md.
-import { getBuiltInSpriteSheet, isColoredBuiltInIconSet } from '@workspace/tree'
-import { normalizeFileTreeIcons } from '@workspace/tree'
 import { type FileTreeDensityPreset, resolveFileTreeDensity } from '@workspace/tree'
 import { FileTreeController } from '@workspace/tree'
 import { arePathSetsEqual } from '@workspace/tree'
@@ -43,13 +41,6 @@ function resolveInitialViewportHeight({
     : Math.max(0, initialVisibleRowCount) * (itemHeight ?? FILE_TREE_DEFAULT_ITEM_HEIGHT)
 }
 
-/** The sprite sheets a mounted tree renders: the built-in glyphs, then the caller's. */
-export interface TreeSpriteSheets {
-  readonly builtIn: string
-  readonly coloredIcons: boolean
-  readonly custom: string | null
-}
-
 /** What the view renders from the model; its identity changes with every view-visible setter. */
 export type TreeViewModelProps = Omit<TreeViewProps, 'instanceId'>
 
@@ -76,7 +67,6 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
     | 'onScrollTopChange'
   >
   #gitStatusState: FileTreeGitStatusState | null
-  #icons: FileTreeOptions['icons']
   #loadingPaths: ReadonlySet<string> = new Set()
   readonly #densityListeners = new Set<FileTreeListener>()
   #densityVersion = 0
@@ -93,7 +83,6 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
       fileTreeSearchMode,
       gitStatus,
       initialSearchQuery,
-      icons,
       itemHeight,
       onSearchChange,
       onSelectionChange,
@@ -112,7 +101,6 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
     } = options
     this.#composition = composition
     this.#gitStatusState = resolveFileTreeGitStatusState(gitStatus)
-    this.#icons = icons
     this.#onSelectionChange = onSelectionChange
     this.#rowDecorationSource = renderRowDecoration
     this.#renderRowDecoration = renderRowDecoration
@@ -244,16 +232,6 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
     return this.#viewProps
   }
 
-  public getSpriteSheets(): TreeSpriteSheets {
-    const icons = normalizeFileTreeIcons(this.#icons)
-    const custom = icons.spriteSheet?.trim() ?? ''
-    return {
-      builtIn: getBuiltInSpriteSheet(icons.set),
-      coloredIcons: icons.colored && isColoredBuiltInIconSet(icons.set),
-      custom: custom.length > 0 ? custom : null,
-    }
-  }
-
   public subscribe(listener: FileTreeListener): () => void {
     let hasSeenInitialSnapshot = false
 
@@ -377,11 +355,6 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
     this.#invalidateView()
   }
 
-  public setIcons(icons?: FileTreeOptions['icons']): void {
-    this.#icons = icons
-    this.#invalidateView()
-  }
-
   /**
    * Asks every visible row for its decoration again. The renderer reads state the tree cannot see,
    * so a new identity is what tells the rows their cached decoration is stale.
@@ -414,7 +387,6 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
       gitStatusByPath: this.#gitStatusState?.statusByPath,
       ignoredGitDirectories: this.#gitStatusState?.ignoredDirectoryPaths,
       directoriesWithGitChanges: this.#gitStatusState?.directoriesWithChanges,
-      icons: this.#icons,
       loadingPaths: this.#loadingPaths,
       renamingEnabled: this.#renamingEnabled,
       renderRowDecoration: this.#renderRowDecoration,

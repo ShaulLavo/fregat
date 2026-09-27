@@ -5,23 +5,12 @@ import { useState } from 'react'
 
 import { TreeHost } from '@/features/workspace/components/tree-host'
 import { useTreeModel } from '@/features/workspace/hooks/use-tree-model'
-import type { FileTreeIcons } from '@workspace/tree'
 import type { GitStatusEntry } from '@workspace/tree'
 import type { FileTreeContextMenuItem, FileTreeContextMenuOpenContext } from '@workspace/tree'
 import { TreeViewModel } from '@/features/workspace/state/tree-model'
+import { fileIconRule, iconForEntry } from '@/lib/file-icons'
 
 let root: Root | null = null
-
-const ICON_FALLBACK_CASES = [
-  {
-    expectedTypeScriptIcon: '#file-tree-builtin-typescript',
-    set: 'standard',
-  },
-  {
-    expectedTypeScriptIcon: '#test-generic-file',
-    set: 'minimal',
-  },
-] as const
 
 afterEach(() => {
   flushSync(() => root?.unmount())
@@ -113,44 +102,6 @@ describe('tree view React integration', () => {
     })
   })
 
-  it('syncs icon option changes into the stable model', async () => {
-    const container = document.createElement('main')
-    document.body.append(container)
-    root = createRoot(container)
-
-    function Harness() {
-      const [icons, setIcons] = useState<FileTreeIcons>(() => fileIconRemap('first-file-icon'))
-      const { model } = useTreeModel({
-        icons,
-        initialExpansion: 'open',
-        paths: ['src/', 'src/a.ts'],
-      })
-
-      return (
-        <>
-          <TreeHost aria-label='Files' model={model} />
-          <button
-            data-testid='set-icons'
-            type='button'
-            onClick={() => setIcons(fileIconRemap('second-file-icon'))}
-          >
-            Set Icons
-          </button>
-        </>
-      )
-    }
-
-    flushSync(() => root?.render(<Harness />))
-    const tree = await waitForTree()
-    expect(fileIconHref(tree, 'src/a.ts')).toBe('#first-file-icon')
-
-    clickButton('set-icons')
-
-    await vi.waitFor(() => {
-      expect(fileIconHref(tree, 'src/a.ts')).toBe('#second-file-icon')
-    })
-  })
-
   it('syncs density changes into the stable model and virtualized geometry', async () => {
     const container = document.createElement('main')
     document.body.append(container)
@@ -234,29 +185,26 @@ describe('tree view React integration', () => {
     })
   })
 
-  it.each(ICON_FALLBACK_CASES)(
-    'uses the generic file remap as the $set fallback',
-    async ({ expectedTypeScriptIcon, set }) => {
-      const container = document.createElement('main')
-      document.body.append(container)
-      root = createRoot(container)
-      const treeModel = new TreeViewModel({
-        icons: {
-          remap: { 'file-tree-icon-file': 'test-generic-file' },
-          set,
-        },
-        initialExpansion: 'open',
-        paths: ['unknown.xyz', 'src/index.ts'],
-      })
+  it('draws each file row with its glyph from the document sprite, in its hue', async () => {
+    const container = document.createElement('main')
+    document.body.append(container)
+    root = createRoot(container)
+    const treeModel = new TreeViewModel({
+      initialExpansion: 'open',
+      paths: ['unknown.xyz', 'src/index.ts'],
+    })
 
-      flushSync(() => root?.render(<TreeHost aria-label='Files' model={treeModel} />))
-      const tree = await waitForTree()
+    flushSync(() => root?.render(<TreeHost aria-label='Files' model={treeModel} />))
+    const tree = await waitForTree()
 
-      expect(fileIconHref(tree, 'unknown.xyz')).toBe('#test-generic-file')
-      expect(fileIconHref(tree, 'src/index.ts')).toBe(expectedTypeScriptIcon)
-      treeModel.cleanUp()
-    },
-  )
+    for (const name of ['unknown.xyz', 'src/index.ts']) {
+      const rule = fileIconRule(iconForEntry({ name: name.split('/').at(-1)!, type: 'file' }))
+      const icon = fileIcon(tree, name)
+      expect(icon.querySelector('use')?.getAttribute('href')).toBe(`#app-vscode-icon-${rule.glyph}`)
+      expect(icon.getAttribute('class')).toContain(rule.className.split(' ')[0])
+    }
+    treeModel.cleanUp()
+  })
 
   it('mounts and cleans up through the public React wrapper without runtime warnings', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -478,15 +426,6 @@ describe('tree view React integration', () => {
   })
 })
 
-function fileIconRemap(iconName: string): FileTreeIcons {
-  return {
-    remap: {
-      'file-tree-icon-file': iconName,
-    },
-    set: 'none',
-  }
-}
-
 async function waitForTree() {
   await vi.waitFor(() => {
     expect(document.querySelector('[data-file-tree] [role="tree"]')).toBeTruthy()
@@ -505,13 +444,11 @@ function rowButton(tree: ParentNode, path: string) {
   return button
 }
 
-function fileIconHref(tree: ParentNode, path: string) {
-  const iconUse = rowButton(tree, path).querySelector<SVGUseElement>(
-    '[data-item-section="icon"] use',
-  )
-  if (!iconUse) throw new Error(`missing file icon ${path}`)
+function fileIcon(tree: ParentNode, path: string) {
+  const icon = rowButton(tree, path).querySelector<SVGSVGElement>('[data-item-section="icon"] svg')
+  if (!icon) throw new Error(`missing file icon ${path}`)
 
-  return iconUse.getAttribute('href')
+  return icon
 }
 
 function clickButton(testId: string) {

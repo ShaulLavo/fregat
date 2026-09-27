@@ -3,7 +3,6 @@ import { expect, test } from 'vitest'
 import * as treePackage from '@workspace/tree'
 import type {
   FileTreeBatchOperation,
-  FileTreeBuiltInIconSet,
   FileTreeCompositionOptions,
   FileTreeContextMenuItem,
   FileTreeContextMenuOpenContext,
@@ -14,8 +13,6 @@ import type {
   FileTreeDropTarget,
   FileTreeFileHandle,
   FileTreeGitStatusPatch,
-  FileTreeIconConfig,
-  FileTreeIcons,
   FileTreeInitialExpansion,
   FileTreeItemHandle,
   FileTreeMoveOptions,
@@ -42,7 +39,6 @@ import type {
   FileTreeSortComparator,
   GitStatus,
   GitStatusEntry,
-  RemappedIcon,
 } from '@workspace/tree'
 
 type PublicTypeAllowlist = readonly [
@@ -81,10 +77,6 @@ type PublicTypeAllowlist = readonly [
   FileTreeSelectionChangeListener,
   FileTreeSortComparator,
   FileTreeInitialExpansion,
-  FileTreeIcons,
-  FileTreeBuiltInIconSet,
-  FileTreeIconConfig,
-  RemappedIcon,
   GitStatus,
   GitStatusEntry,
 ]
@@ -107,13 +99,8 @@ test('exports the model and the helpers the app view renders with', () => {
     'arePathSetsEqual',
     'computeFileTreeLayout',
     'computeStickyRows',
-    'getBuiltInFileIconName',
-    'getBuiltInSpriteSheet',
-    'isColoredBuiltInIconSet',
-    'normalizeFileTreeIcons',
     'prepareFileTreeInput',
     'preparePresortedFileTreeInput',
-    'resolveBuiltInFileIconToken',
     'resolveFileTreeDensity',
     'resolveFileTreeGitStatusState',
   ])

@@ -11,6 +11,7 @@ import { EditorStateProvider } from '@/features/editor/providers/state-provider'
 import { AppearanceProvider } from '@/features/settings/providers/appearance-provider'
 import { useApplicationRuntime } from '@/hooks/use-application-runtime'
 import { FeedbackLayer } from '@/components/feedback-layer'
+import { FileIconSprite } from '@/components/file-icon-sprite'
 import { ErrorActionProvider } from '@/providers/error-action-provider'
 
 export function ActiveEnvironmentApplication({ children }: { readonly children: ReactNode }) {
@@ -29,6 +30,7 @@ export function ActiveEnvironmentApplication({ children }: { readonly children: 
                   <Toaster />
                   <TooltipLayer />
                   <FeedbackLayer />
+                  <FileIconSprite />
                 </TooltipProvider>
               </EditorColorThemeProvider>
             </AppearanceProvider>

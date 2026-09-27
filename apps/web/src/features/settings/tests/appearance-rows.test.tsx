@@ -19,7 +19,8 @@ import { SettingsPage } from '../components/page'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 import { Button } from '@workspace/ui/components/button'
 
-// The whole settings page renders here; a shared CI runner takes about 6x a workstation.
+// The whole settings page renders here, and the code theme previews start a highlighter that
+// holds the thread for about a second; a shared CI runner takes about 6x a workstation.
 const SLOW_RENDER_TIMEOUT_MS = 60_000
 const THEME = BUNDLED_THEMES[0]!
 const KEY = 'workbench.surface.contentOpacity'
@@ -122,7 +123,9 @@ test(
 
     await userEvent.click(await screen.findByRole('button', { name: `Actions for ${KEY}` }))
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Reset setting' }))
-    await waitFor(async () => expect((await userLayer()).halves).toBeUndefined())
+    await waitFor(async () => expect((await userLayer()).halves).toBeUndefined(), {
+      timeout: SLOW_RENDER_TIMEOUT_MS,
+    })
     await waitFor(async () =>
       expect(await contentSlider()).toHaveAttribute('aria-valuenow', String(themed)),
     )
@@ -208,11 +211,15 @@ test(
     const slider = await contentSlider()
     slider.focus()
     await userEvent.keyboard('{ArrowRight}')
-    await waitFor(async () =>
-      expect((await userLayer()).halves?.dark?.material?.contentOpacity).toBe(themed + 1),
+    await waitFor(
+      async () =>
+        expect((await userLayer()).halves?.dark?.material?.contentOpacity).toBe(themed + 1),
+      { timeout: SLOW_RENDER_TIMEOUT_MS },
     )
     await userEvent.keyboard('{ArrowLeft}')
-    await waitFor(async () => expect((await userLayer()).halves).toBeUndefined())
+    await waitFor(async () => expect((await userLayer()).halves).toBeUndefined(), {
+      timeout: SLOW_RENDER_TIMEOUT_MS,
+    })
     await waitFor(() => expect(modifiedMarker(KEY)).toBeNull())
 
     await userEvent.click(screen.getByRole('button', { name: 'Update theme' }))
@@ -248,8 +255,10 @@ test(
 
     await resetFromMenu(KEY)
 
-    await waitFor(async () =>
-      expect((await userLayer()).halves).toEqual({ light: { material: { contentOpacity: 30 } } }),
+    await waitFor(
+      async () =>
+        expect((await userLayer()).halves).toEqual({ light: { material: { contentOpacity: 30 } } }),
+      { timeout: SLOW_RENDER_TIMEOUT_MS },
     )
   },
   SLOW_RENDER_TIMEOUT_MS,
@@ -292,8 +301,9 @@ test(
 
     await userEvent.click(screen.getByRole('button', { name: 'Reset two' }))
 
-    await waitFor(async () =>
-      expect((await userLayer()).halves).toEqual({ dark: { palette: 'sage' } }),
+    await waitFor(
+      async () => expect((await userLayer()).halves).toEqual({ dark: { palette: 'sage' } }),
+      { timeout: SLOW_RENDER_TIMEOUT_MS },
     )
   },
   SLOW_RENDER_TIMEOUT_MS,
@@ -320,7 +330,9 @@ test(
 
     await resetFromMenu(KEY)
 
-    await waitFor(async () => expect((await userLayer()).halves).toBeUndefined())
+    await waitFor(async () => expect((await userLayer()).halves).toBeUndefined(), {
+      timeout: SLOW_RENDER_TIMEOUT_MS,
+    })
     await waitFor(() => expect(modifiedMarker(KEY)).toBeNull())
   },
   SLOW_RENDER_TIMEOUT_MS,
@@ -381,11 +393,14 @@ test(
     await userEvent.click(await screen.findByRole('button', { name: `Actions for ${KEY}` }))
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Reset setting' }))
 
-    await waitFor(async () => {
-      const snapshot = await fetchSettings(undefined, getClient())
-      expect(snapshot.layers.find((layer) => layer.id === 'user')?.raw).not.toHaveProperty(KEY)
-      expect(snapshot.diagnostics.filter((entry) => entry.id === KEY)).toEqual([])
-    })
+    await waitFor(
+      async () => {
+        const snapshot = await fetchSettings(undefined, getClient())
+        expect(snapshot.layers.find((layer) => layer.id === 'user')?.raw).not.toHaveProperty(KEY)
+        expect(snapshot.diagnostics.filter((entry) => entry.id === KEY)).toEqual([])
+      },
+      { timeout: SLOW_RENDER_TIMEOUT_MS },
+    )
     await waitFor(() => expect(modifiedMarker(KEY)).toBeNull())
   },
   SLOW_RENDER_TIMEOUT_MS,
@@ -414,11 +429,14 @@ test(
     expect(cursor).not.toBe(start)
     await userEvent.keyboard('{Enter}')
     expect(writes()).toBe(1)
-    await waitFor(async () => {
-      const snapshot = await fetchSettings(undefined, getClient())
-      expect(snapshot.values['editor.codeTheme.dark']).not.toBe('no-such-theme')
-      expect(cursor).toContain(snapshot.values['editor.codeTheme.dark'])
-    })
+    await waitFor(
+      async () => {
+        const snapshot = await fetchSettings(undefined, getClient())
+        expect(snapshot.values['editor.codeTheme.dark']).not.toBe('no-such-theme')
+        expect(cursor).toContain(snapshot.values['editor.codeTheme.dark'])
+      },
+      { timeout: SLOW_RENDER_TIMEOUT_MS },
+    )
   },
   SLOW_RENDER_TIMEOUT_MS,
 )

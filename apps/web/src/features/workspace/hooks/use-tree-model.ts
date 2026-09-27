@@ -18,7 +18,6 @@ export interface UseTreeModelResult {
 export function useTreeModel(options: FileTreeOptions): UseTreeModelResult {
   const [model] = useState(() => new TreeViewModel(options))
   const cleanUpRef = useRef<CleanUpRef>({ timeout: null, model })
-  const iconsRef = useRef(options.icons)
   const gitStatusRef = useRef(options.gitStatus)
   const densityRef = useRef(options.density)
   const itemHeightRef = useRef(options.itemHeight)
@@ -32,15 +31,6 @@ export function useTreeModel(options: FileTreeOptions): UseTreeModelResult {
     itemHeightRef.current = options.itemHeight
     model.setDensity(options.density, options.itemHeight)
   }, [model, options.density, options.itemHeight])
-
-  useLayoutEffect(() => {
-    if (iconsRef.current === options.icons) {
-      return
-    }
-
-    iconsRef.current = options.icons
-    model.setIcons(options.icons)
-  }, [model, options.icons])
 
   useLayoutEffect(() => {
     if (gitStatusRef.current === options.gitStatus) {
