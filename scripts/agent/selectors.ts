@@ -982,8 +982,8 @@ export const selectors = {
   settingsNoModels: (page: Page) => page.getByText('No models are available yet.'),
   settingsProviderRow: (page: Page, providerInstanceId: string) =>
     page.locator(`[data-provider-instance="${providerInstanceId}"]`),
-  providerUpdateChecking: (page: Page) =>
-    page.getByRole('status', { name: 'Checking for updates' }),
+  providerUpdateChecking: (row: Locator) =>
+    row.getByRole('status', { name: 'Checking for updates' }),
   paletteScriptsLoading: (page: Page) => page.getByRole('status', { name: 'Loading scripts' }),
   paletteNoScripts: (page: Page) => page.getByText('No scripts in this project.'),
   paletteDialog: (page: Page) => page.getByRole('dialog', { name: 'Command Palette', exact: true }),
@@ -1003,6 +1003,13 @@ export const selectors = {
   bootstrapFailure: (page: Page) =>
     page.getByText('Cannot connect to the local machine', { exact: true }),
   windowToolbar: (page: Page) => page.getByLabel('Window toolbar', { exact: true }),
+  phoneShell: (page: Page) => page.locator('[data-phone-shell]'),
+  /** The phone shell showing `level`: sessions, session, changes, file or terminal. */
+  phoneLevel: (page: Page, level: string) => page.locator(`[data-phone-level="${level}"]`),
+  phoneBack: (page: Page) =>
+    page.locator('[data-phone-shell]').getByRole('button', { name: 'Back', exact: true }),
+  phoneHeaderAction: (page: Page, name: string) =>
+    page.locator('[data-phone-shell] header').getByRole('button', { name, exact: true }),
   editorTab: (page: Page, path: string) => page.locator(`[data-editor-tab-path="${path}"]`),
   createMissingFile: (page: Page) => page.getByRole('button', { name: 'Create File', exact: true }),
   editorTabs: (page: Page) => page.locator('[data-editor-tab-id]'),
@@ -1130,7 +1137,12 @@ export const chords = {
 }
 
 export async function waitForApp(page: Page, timeoutMs = 45_000) {
-  await selectors.windowToolbar(page).waitFor({ timeout: timeoutMs })
+  // The phone shell carries no window toolbar; its stack frame is its first paint.
+  await selectors
+    .windowToolbar(page)
+    .or(selectors.phoneShell(page))
+    .first()
+    .waitFor({ timeout: timeoutMs })
 }
 
 export async function openGitPanel(page: Page) {
@@ -1247,6 +1259,8 @@ export async function settleAnimations(target: Locator) {
     await Promise.all(
       element
         .getAnimations({ subtree: true })
+        // Scroll-driven animations (`scroll-fade`) follow the scroll position and never finish.
+        .filter((animation) => animation.timeline instanceof DocumentTimeline)
         // A toast can be dismissed mid-animation; a cancelled one is settled, not a failure.
         .map((animation) => animation.finished.catch(() => undefined)),
     )

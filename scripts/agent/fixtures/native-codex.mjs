@@ -223,6 +223,46 @@ function streamWorkLog(message) {
   }, 35)
 }
 
+/**
+ * `chat-turn-settle`: the answer streams whole while the turn still runs; the answer and the
+ * turn complete only once the scenario writes `settle-N`, so it can measure both sides. A
+ * prompt asking for a tool runs one command first.
+ */
+function settleTurn(message) {
+  const turn = startOwnTurn(message)
+  const index = turnCount
+  if (promptText(message).includes('with a tool'))
+    for (const phase of ['started', 'completed'])
+      send({
+        method: `item/${phase}`,
+        params: {
+          threadId,
+          turnId: turn,
+          item: {
+            id: `${turn}-command`,
+            type: 'commandExecution',
+            command: 'echo SETTLE_TOOL',
+            status: phase === 'started' ? 'inProgress' : 'completed',
+            exitCode: phase === 'started' ? null : 0,
+            aggregatedOutput: 'SETTLE_TOOL\n',
+          },
+        },
+      })
+  const text = `SETTLE_ANSWER_${index} The whole answer streams before the turn ends.\n\n`
+  // Later than the work, so the answer sorts after it.
+  setTimeout(() => {
+    agentDelta(turn, `${turn}-answer`, text)
+    record({ event: 'settle-answered', index })
+  }, 1_000)
+  const timer = setInterval(() => {
+    if (!fixtureStepReady(`settle-${index}`)) return
+    clearInterval(timer)
+    agentMessage(turn, `${turn}-answer`, text)
+    endTurn(turn, 'completed')
+    record({ event: 'settle-ended', index })
+  }, 50)
+}
+
 function historyPages(message) {
   const running = { id: turnId, status: 'inProgress', items: [] }
   send({ id: message.id, result: { turn: running } })
@@ -502,6 +542,108 @@ function resetCreditAccount(message) {
   })
 }
 
+const FIXTURE_REVIEW = {
+  findings: [
+    {
+      title: 'Lost value',
+      body: 'The second line drops the first value.',
+      confidence_score: 0.8,
+      priority: 1,
+      code_location: { absolute_file_path: 'a.txt', line_range: { start: 1, end: 2 } },
+    },
+  ],
+  overall_correctness: 'patch is incorrect',
+  overall_explanation: 'One value is lost.',
+  overall_confidence_score: 0.7,
+}
+
+/** A plain reply per turn, several lines long, for the review-context and citation scenarios. */
+function handleContextReply(message) {
+  if (message.method !== 'turn/start') return false
+
+  const turn = startOwnTurn(message)
+  const input = promptText(message)
+  record({ event: 'turn/start', input })
+  // A review asks for structured output: one finding on the first two lines of a.txt.
+  if (message.params.outputSchema) {
+    agentMessage(turn, `${turn}-review`, JSON.stringify(FIXTURE_REVIEW))
+    endTurn(turn, 'completed')
+    return true
+  }
+  // Working notes, then a command: once the turn settles they fold behind its summary row.
+  if (input.includes('Walk me through it.')) {
+    agentMessage(
+      turn,
+      `${turn}-note`,
+      ['CONTEXT_NOTE', '', 'Reading the cache module.', 'Checking the expiry timer.'].join('\n'),
+    )
+    send({
+      method: 'item/completed',
+      params: {
+        threadId,
+        turnId: turn,
+        item: {
+          id: `${turn}-read`,
+          type: 'commandExecution',
+          command: 'cat cache.ts',
+          status: 'completed',
+          exitCode: 0,
+          aggregatedOutput: 'export const cache = new Map()\n',
+        },
+      },
+    })
+  }
+  agentMessage(
+    turn,
+    `${turn}-answer`,
+    [
+      `CONTEXT_REPLY ${turnCount}`,
+      '',
+      'The cache keeps one entry per key.',
+      'Entries expire after ten minutes.',
+      'A miss reads through to the store.',
+    ].join('\n'),
+  )
+  endTurn(turn, 'completed')
+  return true
+}
+
+/** A blocking `item/tool/requestUserInput` question whose answer the work log keeps. */
+function handleQuestionHistory(message) {
+  if (message.id === 992 && !message.method) {
+    record({ event: 'user-input-response', result: message.result })
+    agentMessage(activeTurnId, `${activeTurnId}-answer`, 'QUESTION_HISTORY_VERIFIED')
+    endTurn(activeTurnId, 'completed')
+    return true
+  }
+  if (message.method !== 'turn/start') return false
+
+  const turn = startOwnTurn(message)
+  send({
+    id: 992,
+    method: 'item/tool/requestUserInput',
+    params: {
+      threadId,
+      turnId: turn,
+      itemId: `${turn}-ask`,
+      questions: [
+        {
+          id: 'language',
+          header: 'Language',
+          question: 'Which language should the fixture use?',
+          isOther: true,
+          isSecret: false,
+          options: [
+            { label: 'Rust', description: 'Systems' },
+            { label: 'Go', description: 'Services' },
+          ],
+        },
+      ],
+    },
+  })
+  return true
+}
+
 /** A transcript taller than the viewport: finished answers of uneven length. */
 function scrollHistory(message) {
   const turn = startOwnTurn(message)
@@ -602,44 +744,20 @@ function chatScroll(message) {
   streamAnswer(turn, `${turn}-answer`, [...SCROLL_STREAM_CHUNKS, 'SCROLL_STREAM_DONE'], 45)
 }
 
-/** A blocking `item/tool/requestUserInput` question whose answer the work log keeps. */
-function handleQuestionHistory(message) {
-  if (message.id === 992 && !message.method) {
-    record({ event: 'user-input-response', result: message.result })
-    agentMessage(activeTurnId, `${activeTurnId}-answer`, 'QUESTION_HISTORY_VERIFIED')
-    endTurn(activeTurnId, 'completed')
-    return true
-  }
-  if (message.method !== 'turn/start') return false
-
-  const turn = startOwnTurn(message)
-  send({
-    id: 992,
-    method: 'item/tool/requestUserInput',
-    params: {
-      threadId,
-      turnId: turn,
-      itemId: `${turn}-ask`,
-      questions: [
-        {
-          id: 'language',
-          header: 'Language',
-          question: 'Which language should the fixture use?',
-          isOther: true,
-          isSecret: false,
-          options: [
-            { label: 'Rust', description: 'Systems' },
-            { label: 'Go', description: 'Services' },
-          ],
-        },
-      ],
-    },
-  })
-  return true
-}
-
 function handle(message) {
+  if (scenario.startsWith('chat-scroll') && message.method === 'turn/start')
+    return chatScroll(message)
   if (scenario === 'question-history' && handleQuestionHistory(message)) return
+  if (
+    [
+      'chat-review-context',
+      'chat-assistant-citation',
+      'chat-citation-elsewhere',
+      'chat-finding-source',
+    ].includes(scenario) &&
+    handleContextReply(message)
+  )
+    return
   if (scenario === 'session-no-flicker' && message.method === 'turn/start') {
     const turn = startOwnTurn(message)
     const text = promptText(message)
@@ -652,8 +770,6 @@ function handle(message) {
     return
   }
   if (scenario.startsWith('mcp-') && scenario !== 'mcp-approval' && handleMcpStatus(message)) return
-  if (scenario.startsWith('chat-scroll') && message.method === 'turn/start')
-    return chatScroll(message)
   if (scenario === 'chat-history-pages' && message.method === 'turn/start')
     return historyPages(message)
   if (scenario === 'chat-stream' && message.method === 'turn/start') return streamWorkLog(message)
@@ -739,6 +855,7 @@ function handle(message) {
     endTurn(activeTurnId, 'completed')
     return
   }
+  if (scenario === 'chat-turn-settle' && message.method === 'turn/start') return settleTurn(message)
   if (scenario === 'stream-ambiguous-tail' && message.method === 'turn/start') {
     const turn = startOwnTurn(message)
     streamAnswer(turn, `${turn}-answer`, AMBIGUOUS_TAIL_CHUNKS, 250)

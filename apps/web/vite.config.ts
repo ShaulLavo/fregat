@@ -1,3 +1,4 @@
+import os from 'node:os'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import tailwindcss from '@tailwindcss/vite'
@@ -16,6 +17,8 @@ import { demoPreviewPlugin } from './scripts/demo-preview-plugin'
 import { devPagePlugin } from './scripts/dev-page-plugin'
 import { bootAppearancePlugin } from './scripts/boot-appearance-plugin'
 import { phosphorWeightPlugin } from './scripts/phosphor-weight-plugin'
+import { shellChunksPlugin } from './scripts/shell-chunks-plugin'
+import { staticGraphChunk } from './scripts/initial-chunk'
 
 const workspaceRoot = path.resolve(import.meta.dirname, '../..')
 const markdownRequire = createRequire(path.join(workspaceRoot, 'packages/markdown/package.json'))
@@ -24,6 +27,15 @@ const sharedMarkdown = ['unified', 'remark-parse', 'remark-gfm', 'unist-util-vis
 const devServerHost = process.env.WEB_HOST ?? '127.0.0.1'
 const devServerPort = portFromEnv(process.env, 'WEB_PORT', 5173)
 
+/**
+ * Bun's isolated linker can symlink a dependency (`@fontsource-variable/*`, at least under
+ * install contention) straight into the shared cache instead of copying it into the
+ * workspace; a real path there is otherwise outside every `fs.allow` root and Vite 403s it.
+ */
+export function bunInstallCacheRoot(env: NodeJS.ProcessEnv = process.env): string {
+  return env.BUN_INSTALL_CACHE_DIR ?? path.join(os.homedir(), '.bun', 'install', 'cache')
+}
+
 export default defineConfig(({ command, isPreview, mode }) => {
   const packages = command === 'serve' && !isPreview ? readDevSources(import.meta.dirname) : []
   // A build compiles the linked checkouts' pre-built `dist`; none of it is ours to memoize.
@@ -31,6 +43,19 @@ export default defineConfig(({ command, isPreview, mode }) => {
   return {
     build: {
       rollupOptions: {
+        output: {
+          // The app entry's initial modules ship as one chunk. Left to automatic splitting, every
+          // lazy chunk that shares a module with them cuts them into another file, and many small
+          // files gzip worse than one. Traced from main.tsx, so the dev gallery's modules stay out.
+          codeSplitting: {
+            groups: [
+              {
+                name: staticGraphChunk(path.resolve(import.meta.dirname, 'src/main.tsx')),
+                tags: ['$initial'],
+              },
+            ],
+          },
+        },
         input:
           mode === 'demo'
             ? path.resolve(import.meta.dirname, 'demo.html')
@@ -52,6 +77,7 @@ export default defineConfig(({ command, isPreview, mode }) => {
     },
     plugins: [
       bootAppearancePlugin(import.meta.dirname),
+      shellChunksPlugin(import.meta.dirname),
       demoPreviewPlugin(import.meta.dirname),
       devPagePlugin(),
       devSourcePlugin(packages),
@@ -88,7 +114,7 @@ export default defineConfig(({ command, isPreview, mode }) => {
     },
     server: {
       fs: {
-        allow: [workspaceRoot, ...packages.map((pkg) => pkg.checkout)],
+        allow: [workspaceRoot, bunInstallCacheRoot(), ...packages.map((pkg) => pkg.checkout)],
       },
       host: devServerHost,
       port: devServerPort,

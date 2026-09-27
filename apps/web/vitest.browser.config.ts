@@ -74,6 +74,11 @@ export default defineConfig({
     name: 'browser',
     globalSetup: ['./test/env/browser-file-server.ts'],
     include: ['src/**/*.browser.tsx'],
+    // The tree's own browser tests run alone, in vitest.tree-browser.config.ts.
+    exclude: [
+      'src/features/workspace/tests/tree-view*.browser.tsx',
+      'src/features/workspace/tests/tree-parity-*.browser.tsx',
+    ],
     setupFiles: ['./test/env/browser.ts'],
     // Pin the runner origin so the file server's allowed-origins
     // list (built from this port) matches the real test origin.

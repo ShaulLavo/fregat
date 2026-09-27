@@ -13,10 +13,12 @@ export function PlanCommentBar({
   planId,
   planMarkdown,
   selection,
+  sessionId,
   onDone,
 }: {
   readonly planId: string
   readonly planMarkdown: string
+  readonly sessionId: string
   readonly selection: PlanSelectionLines
   readonly onDone: () => void
 }) {
@@ -29,7 +31,7 @@ export function PlanCommentBar({
   function save(body: string) {
     if (!lines || !root || !body.trim()) return
     addReviewComment({
-      anchor: { kind: 'plan', lines, planId },
+      anchor: { kind: 'plan', lines, planId, sessionId },
       author: 'user',
       body,
       destination: { environmentId, rootPath: root.path },

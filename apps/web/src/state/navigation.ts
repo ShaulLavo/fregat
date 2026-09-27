@@ -51,6 +51,8 @@ import {
   type Address,
 } from '@workspace/client-core/address/grammar'
 import { workspaceToken } from '@workspace/client-core/address/workspace'
+import type { PhoneScreen } from '@workspace/client-core/address/grammar'
+import { isPhoneShell } from '@/lib/shell/state/store'
 import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
 import { createNavigationCoordinator, type NavigationResult } from '@/state/navigation-coordinator'
 import type { ApplicationRouter } from '@/state/router'
@@ -217,7 +219,9 @@ export function createNavigation(
       : [...(address.tabs ?? []), token.token]
     const selected =
       address.mode === 'chat' ? { editor: token.token, tool: 'editor' } : { document: token.token }
-    return { ...address, ...selected, tabs, focus }
+    // On the phone, opening a document pushes its screen, in either mode.
+    const screen = isPhoneShell() ? ('file' as const) : address.screen
+    return { ...address, ...selected, screen, tabs, focus }
   }
 
   function openContent({
@@ -286,7 +290,7 @@ export function createNavigation(
     if (selected) {
       const next = addressWithContent(address, selected.content, rootPath, focus)
       // A panel change records the selected document; only opening one reveals the editor tool.
-      return next ? { ...next, tool: address.tool } : address
+      return next ? { ...next, tool: address.tool, screen: address.screen } : address
     }
     return {
       ...address,
@@ -542,7 +546,8 @@ export function createNavigation(
   function editorCommands(owner: EditorWorkspaceStoreApi) {
     return {
       openTabContent: (content: TabContent) => openContent({ owner, content }),
-      selectContent: (content: TabContent) => openContent({ owner, content }),
+      selectContent: (content: TabContent, replace?: boolean) =>
+        openContent({ owner, content, replace }),
       openFileSurface: (path: FilesystemPath) => openFile({ owner, path }),
       selectFile: (path: FilesystemPath | null) =>
         path
@@ -684,7 +689,16 @@ export function createNavigation(
     openChat,
     ...createComposerDraftNavigation(coordinator, openChat),
     openWorkspace,
-    openDiff({ owner, row }: { readonly owner: EditorWorkspaceStoreApi; readonly row: ChangeRow }) {
+    openDiff({
+      owner,
+      row,
+      replace,
+    }: {
+      readonly owner: EditorWorkspaceStoreApi
+      readonly row: ChangeRow
+      /** Replaces the history entry: stepping between files is one place, not a trail. */
+      readonly replace?: boolean
+    }) {
       const staged = row.section === 'staged'
       const path = row.file.path
       beginPressPaint(
@@ -716,7 +730,7 @@ export function createNavigation(
         return {
           address: next,
           historyTarget: { kind: 'editor' },
-          replace: editorDocumentToken(next) === editorDocumentToken(address),
+          replace: replace ?? editorDocumentToken(next) === editorDocumentToken(address),
           beforeApply: () => revealEditor(application),
         }
       })
@@ -780,7 +794,7 @@ export function createNavigation(
         }
       })
     },
-    setMode(mode: 'workbench' | 'chat', owner?: EditorWorkspaceStoreApi) {
+    setMode(mode: 'workbench' | 'chat', owner?: EditorWorkspaceStoreApi, replace = false) {
       const current = coordinator.getApplication()?.getSnapshot()
       if (!current || (owner && current.editor.workspaceStore !== owner))
         return supersededNavigation()
@@ -794,6 +808,7 @@ export function createNavigation(
             ...remembered,
             sessionId: remembered.kind === 'session' ? remembered.sessionId : null,
             surface: 'main',
+            replace,
           })
       }
       return ownedRequest(owner, ({ address }) => {
@@ -805,7 +820,7 @@ export function createNavigation(
             document: mode === 'chat' ? null : address.editor,
             editor: mode === 'chat' ? address.document : null,
           },
-          replace: false,
+          replace,
         }
       })
     },
@@ -1015,6 +1030,27 @@ export function createNavigation(
     },
     startDraft: (ref: ScopedProjectRef, worktreeId?: WorktreeId) =>
       openChat({ ...ref, sessionId: null, surface: 'main', worktreeId, newDraft: true }),
+    /** Pushes a phone screen above the session, or pops back to the session with `null`. */
+    showPhoneScreen: (screen: PhoneScreen | null, replace = false) =>
+      coordinator.request(({ address }) => ({
+        address: { ...address, screen },
+        replace,
+        preserveTransient: true,
+      })),
+    /** The phone's session list: chat mode with no session on the stage. */
+    showPhoneSessions: (replace = false) =>
+      coordinator.request(({ address }) => ({
+        address: {
+          ...address,
+          mode: 'chat',
+          document: null,
+          editor: address.mode === 'chat' ? address.editor : address.document,
+          screen: null,
+        },
+        replace,
+        preserveTransient: true,
+      })),
+    historyIndex: () => router.history.location.state.__TSR_index,
     back: () => router.history.back(),
     forward: () => router.history.forward(),
     copyAddress(origin = window.location.origin) {

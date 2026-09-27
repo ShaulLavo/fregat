@@ -46,6 +46,7 @@ import { ChatWelcomeView } from '@/features/chat/components/chat-welcome-view'
 import { TimelineLoadEarlier } from '@/features/chat/components/timeline-load-earlier'
 import { TimelineMinimap } from '@/features/chat/components/timeline-minimap'
 import { AgentsPanel } from '@/features/chat/components/agents-panel'
+import { useTimelineReveal } from '@/features/chat/hooks/use-timeline-reveal'
 
 export function TimelineViewport({
   content,
@@ -91,6 +92,7 @@ export function TimelineViewport({
     () => holdTimelineMeasurements(virtualizer, disclosureSettling),
     [disclosureSettling, virtualizer],
   )
+  useTimelineReveal({ dispatch, items, sessionId: session.id, virtualizer })
 
   useLayoutEffect(() => {
     dispatch({

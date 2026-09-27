@@ -21,6 +21,7 @@ import { isPinnedWorkLogEntry } from '@/features/chat/utils/activity-visibility'
 import {
   chatTimelineItemEstimate,
   chatTimelineItems,
+  timelineRowPath,
   type ChatTimelineItem,
 } from '@/features/chat/utils/timeline-items'
 
@@ -483,6 +484,13 @@ describe('chat timeline items', () => {
       turnId,
     })
     expect(foldedItemIds(items[1])).toEqual(['message:message-2', 'activity-group:tool-1'])
+    // A reply inside the fold is found through it; the closing reply is a row of its own.
+    expect(timelineRowPath(items, 'message:message-2')).toEqual({
+      index: 1,
+      folds: ['turn-fold:turn-1'],
+    })
+    expect(timelineRowPath(items, 'message:message-3')).toEqual({ index: 2, folds: [] })
+    expect(timelineRowPath(items, 'message:gone')).toBeNull()
   })
 
   it('leaves the turn in flight unfolded', () => {
@@ -500,6 +508,101 @@ describe('chat timeline items', () => {
     })
 
     expect(items.some((item) => item.type === 'turn-fold')).toBe(false)
+  })
+
+  it('puts a finished turn with no tool steps in the slot Working held', () => {
+    const sessionId = parseSessionId('5d0c3f7e-8a4b-5c61-9e2f-0b7a1d3c4e58')
+    const turnId = parseTurnId('turn-1')
+    const prompt = message('message-1', sessionId, timestamp(1), 'user', { turnId })
+    const answer = message('message-2', sessionId, timestamp(2), 'assistant', { turnId })
+    const input = { activities: [], optimisticMessages: [], proposedPlans: [] }
+    const running = chatTimelineItems({
+      ...input,
+      latestTurn: runningTurn(turnId, timestamp(1)),
+      messages: [prompt, { ...answer, streaming: true }],
+    })
+    const settled = chatTimelineItems({
+      ...input,
+      latestTurn: settledTurn(turnId, 'completed', timestamp(4)),
+      messages: [prompt, answer],
+    })
+
+    expect(running.slice(0, 3).map((item) => item.id)).toEqual([
+      'message:message-1',
+      'working:turn-1',
+      'message:message-2',
+    ])
+    expect(settled.map((item) => item.id)).toEqual([
+      'message:message-1',
+      'turn-status:turn-1',
+      'message:message-2',
+    ])
+    expect(settled[1]).toMatchObject({ label: 'Worked for 3.0s' })
+    expect(chatTimelineItemEstimate(settled[1])).toBe(chatTimelineItemEstimate(running[1]))
+  })
+
+  it('keeps an earlier no-tool turn status under its own prompt through the next send', () => {
+    const sessionId = parseSessionId('0f5c8a41-6d2e-5b93-8c17-4e9a2b0d7f36')
+    const firstId = parseTurnId('turn-1')
+    const nextId = parseTurnId('turn-2')
+    const first = { ...settledTurn(firstId, 'completed', timestamp(4)), startedAt: timestamp(1) }
+    const earlier = [
+      message('prompt-1', sessionId, timestamp(1), 'user', { turnId: firstId }),
+      message('answer-1', sessionId, timestamp(2), 'assistant', { turnId: firstId }),
+    ]
+    const input = { activities: [], proposedPlans: [], turns: { [firstId]: first } }
+    const earlierIds = ['message:prompt-1', 'turn-status:turn-1', 'message:answer-1']
+    // The send is on screen before the server starts the next turn.
+    const sending = chatTimelineItems({
+      ...input,
+      latestTurn: first,
+      messages: earlier,
+      optimisticMessages: [optimisticMessage('prompt-2', sessionId, timestamp(5), nextId)],
+    })
+    const running = chatTimelineItems({
+      ...input,
+      latestTurn: runningTurn(nextId, timestamp(5)),
+      messages: [
+        ...earlier,
+        message('prompt-2', sessionId, timestamp(5), 'user', { turnId: nextId }),
+      ],
+      optimisticMessages: [],
+    })
+
+    expect(sending.map((item) => item.id)).toEqual([...earlierIds, 'message:prompt-2'])
+    expect(running.slice(0, 5).map((item) => item.id)).toEqual([
+      ...earlierIds,
+      'message:prompt-2',
+      'working:turn-2',
+    ])
+    expect(running[1]).toMatchObject({ label: 'Worked for 3.0s' })
+  })
+
+  it('keeps a stopped earlier turn named by why it stopped', () => {
+    const sessionId = parseSessionId('7a2d4e19-3c8b-5f60-9d14-2b6e8c0a5f73')
+    const firstId = parseTurnId('turn-1')
+    const nextId = parseTurnId('turn-2')
+    const first = {
+      ...settledTurn(firstId, 'interrupted', timestamp(3)),
+      endReason: 'user-stop' as const,
+    }
+    const items = chatTimelineItems({
+      activities: [],
+      latestTurn: runningTurn(nextId, timestamp(4)),
+      turns: { [firstId]: first },
+      messages: [
+        message('prompt-1', sessionId, timestamp(1), 'user', { turnId: firstId }),
+        message('carry-on', sessionId, timestamp(4), 'user', { turnId: nextId }),
+      ],
+      optimisticMessages: [],
+      proposedPlans: [],
+    })
+
+    expect(items[1]).toMatchObject({
+      id: 'turn-status:turn-1',
+      label: 'You stopped it after 2.0s',
+    })
+    expect(items.some((item) => item.id === 'turn-retry:turn-1')).toBe(false)
   })
 
   it.for([

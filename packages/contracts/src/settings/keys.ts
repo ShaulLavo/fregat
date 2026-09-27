@@ -298,6 +298,18 @@ export const SETTINGS_REGISTRY = {
       'SSH targets and direct origins available to this client. The local machine is always available.',
     keywords: ['remote', 'ssh', 'environment', 'server', 'connect'],
   }),
+  'environments.devicePairing': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    // Machine scope: it decides who reaches this machine's files, terminals and agents.
+    scope: 'machine',
+    widget: 'boolean',
+    category: 'Machines',
+    title: 'Require pairing for other devices',
+    description:
+      'A browser on another device, such as a phone reaching this machine over the mesh, shows a pairing screen until a link from this machine pairs it. This machine’s own browser needs no pairing.',
+    keywords: ['pair', 'phone', 'device', 'security', 'mesh', 'tailnet'],
+  }),
   'git.autoPull': defineSetting({
     schema: v.boolean(),
     default: false,

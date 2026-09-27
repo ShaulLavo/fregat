@@ -1,7 +1,7 @@
 import { fileDocument, fileResource, filesystemPath } from '@/lib/documents/utils/identity'
 import { documentTab, settingsTab } from '@/lib/documents/utils/tabs'
 import { snapshotDocument } from '@/lib/documents/utils/comparisons'
-import { blobDiffQueryKey } from '@/features/git/utils/blob-diff-query'
+import { blobDiffQueryKey } from '@/lib/blob-diff-query'
 import { editorInputQueryKey } from '@/features/workbench/hooks/use-editor-input-pending'
 import { fileSystemKeys } from '@/lib/query-keys'
 import { gitFileDiff } from '../../../../test/factories/git-diff'

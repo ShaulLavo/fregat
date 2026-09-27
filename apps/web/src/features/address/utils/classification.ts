@@ -143,6 +143,10 @@ export const STATE_CLASSIFICATIONS: Readonly<Record<string, ClassifiedState>> = 
     classification: 'ephemeral',
     why: 'a ProjectId — a one-way hash of an absolute path — so it cannot go in a URL at all',
   },
+  phoneScreen: {
+    classification: 'address',
+    why: '?screen=changes — the phone stack’s pushed screen, so Back pops it',
+  },
   railView: {
     classification: 'address',
     why: '?rail=archived — a moment, not a preference',

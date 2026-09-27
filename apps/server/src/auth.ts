@@ -1,5 +1,7 @@
 import { isRecord } from '@workspace/utils/objects'
 
+import type { DevicePairing } from './devices/service'
+import { headersReader, type HeaderReader } from './devices/trust'
 import { errorPayload, FsError } from './fs/errors'
 import { recordRequestContext, recordRequestWarning } from './observability'
 
@@ -17,6 +19,8 @@ export type AuthOptions = {
 export type AuthConfig = {
   allowedOrigins: readonly string[]
   principal: AuthPrincipal
+  /** Which other devices may reach this machine; null lets every allowed origin in. */
+  devices: DevicePairing | null
 }
 
 export const DEFAULT_ALLOWED_ORIGINS = [
@@ -33,17 +37,33 @@ const localAuthPrincipal: AuthPrincipal = {
   capabilities: ['filesystem:read', 'filesystem:write'],
 }
 
-export function createAuthConfig(options: AuthOptions = {}): AuthConfig {
+export function createAuthConfig(
+  options: AuthOptions = {},
+  devices: DevicePairing | null = null,
+): AuthConfig {
   return {
     allowedOrigins: options.allowedOrigins ?? DEFAULT_ALLOWED_ORIGINS,
     principal: localAuthPrincipal,
+    devices,
   }
 }
 
+/** The origin allowlist alone: for the routes an unpaired device must reach to pair. */
+export function originGuard(auth: AuthConfig) {
+  return guard(auth, false)
+}
+
+/** The origin allowlist, then pairing for any device other than this machine. */
 export function authGuard(auth: AuthConfig) {
+  return guard(auth, true)
+}
+
+function guard(auth: AuthConfig, pairing: boolean) {
   return ({ request, set }: { request: Request; set: { status?: number | string } }) => {
     const origin = browserRequestOrigin(request, auth)
-    const error = localBrowserOriginError(auth, origin)
+    const error =
+      localBrowserOriginError(auth, origin) ??
+      (pairing ? unpairedDeviceError(auth, headersReader(request.headers)) : null)
     if (!error) {
       recordRequestContext({ auth: { outcome: 'success' } })
       return undefined
@@ -66,7 +86,35 @@ export function authGuard(auth: AuthConfig) {
 }
 
 export function authenticateWebSocketData(data: unknown, auth: AuthConfig): FsError | null {
-  return localBrowserOriginError(auth, originFromWebSocketData(data))
+  const headers = isRecord(data) && isRecord(data.headers) ? headersReader(data.headers) : null
+  return (
+    localBrowserOriginError(auth, originFromWebSocketData(data)) ??
+    (headers ? unpairedDeviceError(auth, headers) : null)
+  )
+}
+
+const heldSockets = new WeakMap<object, () => void>()
+
+/** Ties an admitted socket to its device, so removing the device closes it. Call once it opens. */
+export function holdWebSocket(data: unknown, auth: AuthConfig, close: () => void) {
+  if (!auth.devices || !isRecord(data) || !isRecord(data.headers)) return
+  heldSockets.set(data, auth.devices.hold(headersReader(data.headers), close))
+}
+
+/** Call from the socket's close: it no longer needs closing. */
+export function releaseWebSocket(data: unknown) {
+  if (!isRecord(data)) return
+  heldSockets.get(data)?.()
+  heldSockets.delete(data)
+}
+
+function unpairedDeviceError(auth: AuthConfig, header: HeaderReader) {
+  if (!auth.devices || auth.devices.allows(header)) return null
+
+  return new FsError('DEVICE_NOT_PAIRED', undefined, undefined, {
+    why: 'This machine lets another device in once a pairing link from this machine has paired it.',
+    fix: 'On this machine, open Settings › Machines, make a pairing link, and open it on this device.',
+  })
 }
 
 export function isCorsOriginAllowed(auth: AuthConfig, origin: string | null) {
@@ -109,11 +157,8 @@ function originFromWebSocketData(data: unknown) {
   return typeof origin === 'string' ? origin : null
 }
 
-// This guard is the origin allowlist and nothing else, and it is exact. The
-// launcher owes the server every origin the app can be reached at
-// (`allowedOriginsForWebPort` in scripts/runtime-network.ts), and
-// `assertLoopbackHost` (index.ts) keeps the socket on loopback — those two
-// facts are what make an origin-only guard adequate for a local dev tool.
-// There is no token mode: the previous env-var one could not be satisfied by
-// any shipping client and was deleted. Real, revocable sessions are milestone
-// M4 in docs/environments-and-remote-plan.md.
+// Two checks. The origin allowlist is exact: the launcher owes the server every origin the app can
+// be reached at (`allowedOriginsForWebPort` in scripts/runtime-network.ts), and `assertLoopbackHost`
+// (index.ts) keeps the socket on loopback. A request a proxy forwarded from another device then
+// needs that device's pairing cookie (devices/service.ts): the proxy's origin is allowed for
+// every device behind it, so the origin alone says nothing about who is asking.

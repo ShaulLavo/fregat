@@ -10,7 +10,7 @@ import { createAttachmentOwnership } from './attachments/ownership'
 import { selectTitleModel } from './orchestration/title-generation'
 import { errorMessage } from '@workspace/contracts'
 import { BundleLibrary } from './themes/bundle-library'
-import { platformHomePath } from './home'
+import { isTestProcess, platformHomePath } from './home'
 import { bundleRoutes } from './themes/bundle-routes'
 import { WallpaperLibrary } from './themes/wallpapers/library'
 import { wallpaperLibraryRoutes } from './themes/wallpapers/routes'
@@ -22,7 +22,7 @@ import {
   terminalKillInputSchema,
   type HealthDescriptor,
 } from '@workspace/contracts'
-import { homedir, hostname } from 'node:os'
+import { homedir, hostname, tmpdir } from 'node:os'
 import path from 'node:path'
 import { Elysia } from 'elysia'
 import { attachmentRoutes } from './attachments/routes'
@@ -106,6 +106,9 @@ import type { TailnetStatusCommand } from './machines/tailnet-hosts'
 import { createMachineProxyRoutes } from './machines/proxy'
 import type { PushFetcher } from './push/delivery'
 import { pushRoutes } from './push/routes'
+import { DeviceStore } from './devices/device-store'
+import { pairingRoutes } from './devices/routes'
+import { DevicePairing } from './devices/service'
 import { PushService } from './push/service'
 import { sessionLink } from './push/session-link'
 import { SessionNoticePush } from './push/session-notices'
@@ -166,6 +169,12 @@ export type AppOptions = FileSystemServiceOptions & {
   /** Staged releases and Restart. Absent leaves both inert, as in dev and tests. */
   update?: UpdateOptions
   push?: { fetcher?: PushFetcher }
+  /** Paired devices: where they are kept, the cookie naming one, and this machine's addresses. */
+  devices?: {
+    readonly filePath?: string
+    readonly cookieName?: string
+    readonly ownAddresses?: () => ReadonlySet<string>
+  }
 }
 
 const appOrchestration = new WeakMap<object, OrchestrationEngine>()
@@ -418,7 +427,14 @@ export function createApp(options: AppOptions) {
     readModel: () => orchestration.readModelSnapshot(),
   })
   const sessionSearch = new OrchestrationSessionSearchQuery(database)
-  const auth = createAuthConfig(options.auth)
+  const devices = new DevicePairing({
+    store: new DeviceStore(options.devices?.filePath ?? defaultDeviceFile()),
+    required: () => settings.snapshot().values['environments.devicePairing'],
+    cookieName: options.devices?.cookieName ?? 'platform_device',
+    ownAddresses: options.devices?.ownAddresses,
+  })
+  const auth = createAuthConfig(options.auth, devices)
+  const stopDeviceSweep = devices.startSweeping()
   const push = new PushService({ database, settings, fetcher: options.push?.fetcher })
   const presence = new ClientPresence()
   const sessionPush = new SessionNoticePush({
@@ -479,6 +495,7 @@ export function createApp(options: AppOptions) {
     providerResetCredits,
     sessionPush,
     mcpSignIns,
+    stopDeviceSweep,
   )
   const update = new ServerUpdate({
     root: options.update?.root ?? null,
@@ -527,6 +544,8 @@ export function createApp(options: AppOptions) {
     .onBeforeHandle(({ request }) => {
       recordClientInstance(request)
     })
+    // Before the pairing guard: an unpaired device must reach these to pair.
+    .use(pairingRoutes(devices, auth))
     // Auth runs after the WS upgrade so the browser receives the explicit 1008 refusal.
     .use(
       orchestrationWsRoutes(orchestration, auth, identity, orchestrationSockets, update, presence),
@@ -682,6 +701,7 @@ function appCleanup(
   providerResetCredits: ProviderResetCredits,
   sessionPush: SessionNoticePush,
   mcpSignIns: McpSignInAttempts,
+  stopDeviceSweep: () => void,
 ) {
   let closed = false
 
@@ -689,6 +709,7 @@ function appCleanup(
     if (closed) return
 
     closed = true
+    stopDeviceSweep()
     // A signal stop admits no provider start while the runtime shuts down.
     orchestration.holdProviderStarts()
     orchestrationSockets.closeAll()
@@ -768,3 +789,9 @@ function definedOnly(values: Record<string, string | undefined>) {
 }
 
 function noop() {}
+
+/** A test that names no file must never write the real state home's paired devices. */
+function defaultDeviceFile() {
+  if (!isTestProcess()) return platformHomePath('devices.json')
+  return path.join(tmpdir(), `platform-test-devices-${process.pid}.json`)
+}
