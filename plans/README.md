@@ -19,6 +19,7 @@ a bare root `bun run verify`.
 
 | Plan                                                                                    | State                                                                               |
 | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| [196 — shared control polish](196-shared-control-polish.md)                             | **PROPOSED 2026-09-27 — PLAN ONLY; IMPLEMENTATION NOT STARTED**                     |
 | [195 — browse Settings defaults in UI and JSON](195-settings-defaults-browser.md)       | **PROPOSED 2026-09-27 — PLAN APPROVED; IMPLEMENTATION NOT STARTED**                 |
 | [194 — appearance back in settings](194-appearance-back-in-settings.md)                 | **DONE 2026-09-27 — phases 1–4 and PR #178 follow-up shipped**                      |
 | [193 — no late-bound slots](193-no-late-bound-slots.md)                                 | **DONE 2026-09-27 — phases 1–6 complete**                                           |
