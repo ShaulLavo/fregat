@@ -8,7 +8,6 @@ import { TestEditorStateProvider as EditorStateProvider } from '../../../../test
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import type { EditorRuntime } from '@/features/editor/state/runtime'
 import { useRestoreRecentWorkspaceRoot } from '@/features/workspace/hooks/use-restore-recent-root'
-import { useWorkspaceCachePersistence } from '@/features/workspace/hooks/use-cache-persistence'
 import { ensureFolderPath, recordRecentEntry } from '@/lib/file-server'
 import { WORKSPACE_CACHE_STORAGE_KEYS, readWorkspaceCache } from '@/features/workspace/state/cache'
 import { expect, test } from '../../../../test/fixtures'
@@ -77,7 +76,6 @@ test('finishes restoring when the server has no recent folders', async ({ client
 
 function RecentWorkspaceRecovery({ expose }: { readonly expose: (editor: EditorRuntime) => void }) {
   const editor = useEditorRuntime()
-  useWorkspaceCachePersistence()
   const restoring = useRestoreRecentWorkspaceRoot()
 
   useEffect(() => expose(editor), [editor, expose])

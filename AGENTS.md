@@ -39,6 +39,7 @@
 ## React
 
 - One component per file, one hook per file; pure helpers go to `utils/`.
+- A module variable filled from an effect so non-React code can reach it is a last resort, for DOM nodes, live sockets and held component state. Anything else is read where it lives or pushed by its non-React owner.
 - No prop-drilling of app commands or setters: a prop that is only forwarded, or a command crossing more than two components, gets a narrow provider/hook. Providers expose small domain actions (`selectTab`), not state blobs.
 - The React Compiler memoizes the app. Do not add `memo`, `useMemo` or `useCallback` by hand, except where identity is load-bearing: a value in a dependency array, a value passed to a hook (store selector, `useSyncExternalStore` pair), or a ref callback. The compiler's cache may recompute; those keep their manual memo with a comment naming the dependent hook.
 - Read what the compiler did; do not infer it. `bun run compiler:explain <file> [--component Name]` prints memo blocks as `[keys] → value`. `bun run compiler:memos [paths…]` classifies each manual memo: `redundant` (delete), `needed`, or `differs` (a missing key is a stale-value bug). Rows are not independent: remove memos one at a time.
@@ -130,7 +131,7 @@
 - Run only a test that could catch a specific plausible failure, and the narrowest one.
 - Vitest. Apps run `bun --bun vitest` (Bun APIs need `--bun`); runtime-neutral `packages/*` run plain `vitest`. Projects: `node`, `dom` (happy-dom, never jsdom), `browser` (`*.browser.tsx`, Playwright, plain Node, own `vitest.browser.config.ts` because `define` leaks across projects in one config).
 - Firefox and WebKit runs on this Arch machine need `scripts/playwright-webkit-arch.sh` after any `playwright install` that downloads a new WebKit (Editor and ghostty-webgpu too).
-- App tests import `{ test, expect }` from `apps/web/test/fixtures.ts` and drive the real in-process Elysia server (`server`, `client` fixtures) over real state (temp git repos, real files). Never mock our own modules. `setClient` in tests restores the previous client, not a default. No test opens a socket to our server; MSW uses `onUnhandledRequest: 'error'`.
+- App tests import `{ test, expect }` from `apps/web/test/fixtures.ts` and drive the real in-process Elysia server (`server`, `client` fixtures) over real state (temp git repos, real files). Never mock our own modules. `setClient` in tests restores the previous client, not a default. No test opens a socket to our server; MSW's `onUnhandledRequest` records every unhandled frame and fails in `afterEach`, so a request an app swallows still fails the test that made it.
 - Mock only the outside world: MSW or injected fetchers for third-party HTTP, injectable factories for PTY and LSP processes, Eden `Date` normalization. Prefer `MockProviderAdapter` over the real Codex adapter. Browser tests spawn the real server via `apps/web/test/env/browser-file-server.ts`.
 - Shared helpers: `test/fixtures.ts`, `test/render.tsx` (`renderWithProviders`), `test/factories/`, `test/env/`, `test/msw/`. No per-file factories or provider trees, no module-scope randomness.
 - `packages/ui` and `packages/tree` tests run through the React Compiler.
