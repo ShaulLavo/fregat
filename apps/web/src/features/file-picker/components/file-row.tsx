@@ -1,3 +1,4 @@
+import type { MouseEvent } from 'react'
 import { useForesight } from '@/hooks/use-foresight'
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'
@@ -30,6 +31,7 @@ export function FileRow({
   mode,
   onDirectoryIntent,
   onDoubleClick,
+  openOnTap,
   position,
   selected,
   setSize,
@@ -42,6 +44,8 @@ export function FileRow({
   mode: FilePickerMode
   onDirectoryIntent: (path: string) => void
   onDoubleClick: (entry: FsEntry) => void
+  /** A touch list has no double tap: one tap opens a folder. */
+  openOnTap: boolean
   position: number
   selected: boolean
   setSize: number
@@ -71,9 +75,15 @@ export function FileRow({
     onDoubleClick(entry)
   }
 
+  function handleClick(event: MouseEvent<HTMLElement>) {
+    rowProps.onClick(event)
+    if (openOnTap && directory) handleDoubleClick()
+  }
+
   return (
     <ListRow
       {...rowProps}
+      onClick={handleClick}
       ref={directory ? elementRef : undefined}
       disabled={isBusy}
       aria-posinset={position}

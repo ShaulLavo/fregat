@@ -7,12 +7,14 @@ import {
   InputGroupInput,
 } from '@workspace/ui/components/input-group'
 import { Spinner } from '@workspace/ui/components/spinner'
+import { cn } from '@workspace/ui/lib/utils'
 import type { FormEvent, KeyboardEvent, RefObject } from 'react'
 
 import { IconTooltip } from '@/components/icon-tooltip'
 import { Breadcrumbs } from '@/features/file-picker/components/breadcrumbs'
 
 export function LocationBar({
+  className,
   currentPath,
   draft,
   error,
@@ -24,6 +26,7 @@ export function LocationBar({
   onEdit,
   onSubmit,
 }: {
+  className?: string
   currentPath: string
   draft: string
   error: string | null
@@ -49,7 +52,12 @@ export function LocationBar({
 
   if (!isEditing) {
     return (
-      <div className='bg-background flex min-w-0 items-center gap-1 rounded-md px-1 py-0.5'>
+      <div
+        className={cn(
+          'bg-background flex min-w-0 items-center gap-1 rounded-md px-1 py-0.5',
+          className,
+        )}
+      >
         <Breadcrumbs currentPath={currentPath} />
         <IconTooltip label='Go to folder' shortcut='Mod+Shift+G'>
           <Button
@@ -68,7 +76,7 @@ export function LocationBar({
   }
 
   return (
-    <form className='min-w-0' onSubmit={handleSubmit}>
+    <form className={cn('min-w-0', className)} onSubmit={handleSubmit}>
       <InputGroup>
         <InputGroupInput
           ref={inputRef}

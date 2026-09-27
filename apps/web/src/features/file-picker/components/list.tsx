@@ -31,6 +31,7 @@ export function FileList({
   onCommitEntry,
   onGoParent,
   onRetry,
+  openOnTap,
   selectedPath,
 }: {
   accept?: readonly string[]
@@ -45,6 +46,7 @@ export function FileList({
   onCommitEntry: (entry: FsEntry) => void
   onGoParent: () => void
   onRetry: () => void
+  openOnTap: boolean
   selectedPath: string | null
 }) {
   const internalRef = useRef<HTMLDivElement>(null)
@@ -140,6 +142,7 @@ export function FileList({
               mode={mode}
               onDirectoryIntent={signalDirectoryIntent}
               onDoubleClick={onEntryDoubleClick}
+              openOnTap={openOnTap}
               position={row.position}
               selected={row.entry.path === selectedPath}
               setSize={entries.length}

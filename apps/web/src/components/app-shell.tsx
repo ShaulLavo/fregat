@@ -18,6 +18,7 @@ export function AppShell({
 }) {
   const surface = usePanelSurface()
   const shell = useDisplayedShell().kind
+  const phone = shell === 'phone'
   const hasWorkspace = useEditorWorkspaceState((state) => state.rootFolder !== null)
   // The phone density step keys on this; the boot script sets it before the first paint.
   useLayoutEffect(() => {
@@ -39,12 +40,28 @@ export function AppShell({
       className={cn(
         'bg-background text-foreground relative isolate flex flex-col overflow-hidden',
         // The phone keyboard shrinks the dynamic viewport; the desktop window never does.
-        shell === 'phone' ? 'h-dvh' : 'h-svh',
+        phone ? 'h-dvh' : 'h-svh',
       )}
       ref={shellRef}
       tabIndex={-1}
     >
-      <Wallpaper />
+      {phone ? (
+        <>
+          {/* iOS draws its toolbar over the page: the backdrop runs under it to the large viewport,
+            while the layout stops at the dynamic one so nothing interactive hides behind it. */}
+          <Wallpaper className='fixed h-lvh' />
+          <div
+            aria-hidden='true'
+            className={cn(
+              surface.region,
+              surface.panel,
+              'pointer-events-none fixed inset-x-0 top-[100dvh] h-[calc(100lvh-100dvh)]',
+            )}
+          />
+        </>
+      ) : (
+        <Wallpaper />
+      )}
       {/* One blurred region for the bar and the panels, so they share a sample of the wallpaper. */}
       <div
         className={cn(surface.region, 'relative z-10 flex min-h-0 flex-1 flex-col')}

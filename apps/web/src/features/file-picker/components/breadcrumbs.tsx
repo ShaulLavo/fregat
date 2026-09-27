@@ -18,9 +18,10 @@ export function Breadcrumbs({ currentPath }: { currentPath: string }) {
             <CaretRightIcon className='text-muted-foreground size-(--icon-size-sm) shrink-0' />
           )}
           <Button
+            // Parents give up their width first, so the folder you are in keeps its name.
             className={cn(
-              'text-muted-foreground min-w-0 shrink truncate',
-              crumb.path === currentPath && 'text-foreground',
+              'text-muted-foreground min-w-0 shrink-[8] truncate',
+              crumb.path === currentPath && 'text-foreground shrink',
             )}
             onClick={() => navigateTo(crumb.path)}
             size='sm'

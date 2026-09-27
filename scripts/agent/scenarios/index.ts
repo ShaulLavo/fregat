@@ -137,6 +137,7 @@ import { chatTurnAnatomy } from './chat-turn-anatomy'
 import { chatTurnSettle } from './chat-turn-settle'
 import { devicePairing } from './device-pairing'
 import { phoneShell } from './phone-shell'
+import { phoneSurfaces } from './phone-surfaces'
 import { shellSwitch } from './shell-switch'
 import { chatSleepingSession } from './chat-sleeping-session'
 import { chatSessionGoal } from './chat-session-goal'
@@ -657,6 +658,7 @@ export const scenarios: readonly Scenario[] = [
   chatTurnSettle,
   devicePairing,
   phoneShell,
+  phoneSurfaces,
   shellSwitch,
   chatSleepingSession,
   chatSessionGoal,

@@ -14,6 +14,7 @@ import {
   MagnifyingGlassIcon,
 } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
+import { cn } from '@workspace/ui/lib/utils'
 import {
   Dialog,
   DialogContent,
@@ -52,8 +53,14 @@ import {
   type PickerView,
 } from '@/features/file-picker/utils/columns'
 import { useElementWidth } from '@/hooks/use-element-width'
-import { useWideLayout } from '@/features/file-picker/hooks/use-wide-layout'
-import { BROWSE_MIN_PX, PLACES_PANE, PREVIEW_PANE } from '@/features/file-picker/utils/panes'
+import { useMediaQuery } from '@/features/file-picker/hooks/use-media-query'
+import {
+  BROWSE_MIN_PX,
+  COMPACT_QUERY,
+  PLACES_PANE,
+  PREVIEW_PANE,
+  WIDE_QUERY,
+} from '@/features/file-picker/utils/panes'
 import { Tabs, TabsList, TabsTab } from '@workspace/ui/components/tabs'
 import { ListHeader } from '@/features/file-picker/components/list-header'
 import {
@@ -226,8 +233,10 @@ export function FilePickerDialog({
   const viewSetting = useSettingValue('files.picker.view')
   const chosenView = pickerView(viewSetting, mode)
   const [middleRef, middleWidth] = useElementWidth<HTMLDivElement>()
-  const wide = useWideLayout()
-  const view = shownPickerView(chosenView, isSearching, middleWidth)
+  const wide = useMediaQuery(WIDE_QUERY, true)
+  const compact = useMediaQuery(COMPACT_QUERY, false)
+  // A phone has room for one column of names, and no hover or double click to drive the others.
+  const view = compact ? 'list' : shownPickerView(chosenView, isSearching, middleWidth)
   const [trailState, setTrailState] = useState<{ path: string; trail: ColumnTrail } | null>(null)
   const heldTrail =
     trailState?.path === session.currentPath
@@ -540,6 +549,68 @@ export function FilePickerDialog({
     session.setSelectedEntry(entry)
   }
 
+  const searchField = (
+    <InputGroup
+      className={cn(
+        'h-(--density-control-height-sm)',
+        compact ? 'min-w-0 flex-1' : 'w-52 shrink-0',
+      )}
+    >
+      <InputGroupAddon align='inline-start'>
+        <MagnifyingGlassIcon aria-hidden='true' className='size-(--icon-size-sm)' />
+      </InputGroupAddon>
+      <InputGroupInput
+        ref={searchInputRef}
+        aria-label={copy.searchLabel}
+        autoCapitalize='off'
+        autoComplete='off'
+        autoCorrect='off'
+        // On a phone focus would raise the keyboard over the list before anything was asked.
+        autoFocus={!compact}
+        className='h-full text-xs'
+        onChange={handleSearchChange}
+        onKeyDown={handleSearchKeyDown}
+        placeholder={copy.searchPlaceholder}
+        spellCheck={false}
+        value={session.query}
+      />
+    </InputGroup>
+  )
+
+  const folderActions = (
+    <div
+      aria-label='Folder display actions'
+      className='flex shrink-0 items-center gap-0.5'
+      role='group'
+    >
+      <IconTooltip label='Refresh'>
+        <Button aria-label='Refresh' onClick={refresh} size='icon-sm' type='button' variant='ghost'>
+          <ArrowClockwiseIcon />
+        </Button>
+      </IconTooltip>
+      <NewFolderPopover currentPath={session.currentPath} onCreated={handleFolderCreated} />
+      <PinFolderButton currentPath={session.currentPath} />
+      <IconTooltip
+        label={showHidden ? 'Hide hidden files' : 'Show hidden files'}
+        shortcut='Mod+Shift+.'
+      >
+        <Button
+          aria-keyshortcuts='Meta+Shift+.'
+          aria-label={showHidden ? 'Hide hidden files' : 'Show hidden files'}
+          aria-pressed={showHidden}
+          disabled={hiddenSettingDisabled}
+          focusableWhenDisabled
+          onClick={toggleHiddenFiles}
+          size='icon-sm'
+          type='button'
+          variant='ghost'
+        >
+          {showHidden ? <EyeIcon /> : <EyeSlashIcon />}
+        </Button>
+      </IconTooltip>
+    </div>
+  )
+
   const browsing = (
     <div className='bg-background h-full min-h-0' ref={middleRef}>
       {view === 'columns' ? (
@@ -600,6 +671,7 @@ export function FilePickerDialog({
               if (session.canGoUp) navigateTo(pickerParentPath(session.currentPath))
             }}
             onRetry={refresh}
+            openOnTap={compact}
             selectedPath={selectedEntry?.path ?? null}
           />
         </div>
@@ -610,7 +682,7 @@ export function FilePickerDialog({
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent
-        className='bg-popover-solid flex h-[min(760px,calc(100svh-2rem))] w-[min(1080px,calc(100vw-1.5rem))] max-w-none flex-col gap-0 overflow-hidden p-0 text-sm sm:max-w-none'
+        className='bg-popover-solid flex h-[min(760px,calc(100svh-2rem))] w-[min(1080px,calc(100vw-1.5rem))] max-w-none flex-col gap-0 overflow-hidden p-0 text-sm max-sm:h-dvh max-sm:w-full max-sm:pt-[env(safe-area-inset-top)] max-sm:pb-[max(env(safe-area-inset-bottom),var(--keyboard-inset,0px))] sm:max-w-none'
         onKeyDownCapture={handleDialogKeyDownCapture}
         showCloseButton={false}
       >
@@ -644,20 +716,22 @@ export function FilePickerDialog({
                     <ArrowLeftIcon />
                   </Button>
                 </IconTooltip>
-                <IconTooltip label='Forward' shortcut='Mod+]'>
-                  <Button
-                    aria-keyshortcuts='Meta+]'
-                    aria-label='Forward'
-                    disabled={!session.canGoForward}
-                    focusableWhenDisabled
-                    onClick={goForward}
-                    size='icon-sm'
-                    type='button'
-                    variant='ghost'
-                  >
-                    <ArrowRightIcon />
-                  </Button>
-                </IconTooltip>
+                {compact ? null : (
+                  <IconTooltip label='Forward' shortcut='Mod+]'>
+                    <Button
+                      aria-keyshortcuts='Meta+]'
+                      aria-label='Forward'
+                      disabled={!session.canGoForward}
+                      focusableWhenDisabled
+                      onClick={goForward}
+                      size='icon-sm'
+                      type='button'
+                      variant='ghost'
+                    >
+                      <ArrowRightIcon />
+                    </Button>
+                  </IconTooltip>
+                )}
                 <IconTooltip label='Up one folder' shortcut='Mod+ArrowUp'>
                   <Button
                     aria-keyshortcuts='Meta+ArrowUp'
@@ -673,8 +747,9 @@ export function FilePickerDialog({
                   </Button>
                 </IconTooltip>
               </div>
-              <Separator className='h-4' orientation='vertical' />
+              {compact ? null : <Separator className='h-4' orientation='vertical' />}
               <LocationBar
+                className={compact ? 'flex-1' : undefined}
                 currentPath={session.currentPath}
                 draft={pathInput.draft}
                 error={pathInput.error}
@@ -686,98 +761,51 @@ export function FilePickerDialog({
                 onEdit={pathInput.open}
                 onSubmit={pathInput.submit}
               />
-              <InputGroup className='h-(--density-control-height-sm) w-52 shrink-0 max-sm:w-32'>
-                <InputGroupAddon align='inline-start'>
-                  <MagnifyingGlassIcon aria-hidden='true' className='size-(--icon-size-sm)' />
-                </InputGroupAddon>
-                <InputGroupInput
-                  ref={searchInputRef}
-                  aria-label={copy.searchLabel}
-                  autoCapitalize='off'
-                  autoComplete='off'
-                  autoCorrect='off'
-                  autoFocus
-                  className='h-full text-xs'
-                  onChange={handleSearchChange}
-                  onKeyDown={handleSearchKeyDown}
-                  placeholder={copy.searchPlaceholder}
-                  spellCheck={false}
-                  value={session.query}
-                />
-              </InputGroup>
-              <Tabs value={chosenView} onValueChange={(next: PickerView) => chooseView(next)}>
-                <TabsList aria-label='View' variant='segmented'>
-                  <IconTooltip label='Columns'>
-                    <TabsTab
-                      aria-label='Columns'
-                      className='w-(--density-control-height-sm) px-0'
-                      value='columns'
-                    >
-                      <ColumnsIcon />
-                    </TabsTab>
-                  </IconTooltip>
-                  <IconTooltip label='List'>
-                    <TabsTab
-                      aria-label='List'
-                      className='w-(--density-control-height-sm) px-0'
-                      value='list'
-                    >
-                      <ListIcon />
-                    </TabsTab>
-                  </IconTooltip>
-                  <IconTooltip label='Icons'>
-                    <TabsTab
-                      aria-label='Icons'
-                      className='w-(--density-control-height-sm) px-0'
-                      value='icons'
-                    >
-                      <GridFourIcon />
-                    </TabsTab>
-                  </IconTooltip>
-                </TabsList>
-              </Tabs>
-              <Separator className='h-4' orientation='vertical' />
-              <div
-                aria-label='Folder display actions'
-                className='flex shrink-0 items-center gap-0.5'
-                role='group'
-              >
-                <IconTooltip label='Refresh'>
-                  <Button
-                    aria-label='Refresh'
-                    onClick={refresh}
-                    size='icon-sm'
-                    type='button'
-                    variant='ghost'
-                  >
-                    <ArrowClockwiseIcon />
-                  </Button>
-                </IconTooltip>
-                <NewFolderPopover
-                  currentPath={session.currentPath}
-                  onCreated={handleFolderCreated}
-                />
-                <PinFolderButton currentPath={session.currentPath} />
-                <IconTooltip
-                  label={showHidden ? 'Hide hidden files' : 'Show hidden files'}
-                  shortcut='Mod+Shift+.'
-                >
-                  <Button
-                    aria-keyshortcuts='Meta+Shift+.'
-                    aria-label={showHidden ? 'Hide hidden files' : 'Show hidden files'}
-                    aria-pressed={showHidden}
-                    disabled={hiddenSettingDisabled}
-                    focusableWhenDisabled
-                    onClick={toggleHiddenFiles}
-                    size='icon-sm'
-                    type='button'
-                    variant='ghost'
-                  >
-                    {showHidden ? <EyeIcon /> : <EyeSlashIcon />}
-                  </Button>
-                </IconTooltip>
-              </div>
+              {compact ? null : (
+                <>
+                  {searchField}
+                  <Tabs value={chosenView} onValueChange={(next: PickerView) => chooseView(next)}>
+                    <TabsList aria-label='View' variant='segmented'>
+                      <IconTooltip label='Columns'>
+                        <TabsTab
+                          aria-label='Columns'
+                          className='w-(--density-control-height-sm) px-0'
+                          value='columns'
+                        >
+                          <ColumnsIcon />
+                        </TabsTab>
+                      </IconTooltip>
+                      <IconTooltip label='List'>
+                        <TabsTab
+                          aria-label='List'
+                          className='w-(--density-control-height-sm) px-0'
+                          value='list'
+                        >
+                          <ListIcon />
+                        </TabsTab>
+                      </IconTooltip>
+                      <IconTooltip label='Icons'>
+                        <TabsTab
+                          aria-label='Icons'
+                          className='w-(--density-control-height-sm) px-0'
+                          value='icons'
+                        >
+                          <GridFourIcon />
+                        </TabsTab>
+                      </IconTooltip>
+                    </TabsList>
+                  </Tabs>
+                  <Separator className='h-4' orientation='vertical' />
+                  {folderActions}
+                </>
+              )}
             </PaneBar>
+            {compact ? (
+              <PaneBar>
+                {searchField}
+                {folderActions}
+              </PaneBar>
+            ) : null}
 
             <div className='px-(--bar-padding-x) lg:hidden'>
               <MobileLocations
