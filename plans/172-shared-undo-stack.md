@@ -10,6 +10,9 @@
   other pane, `chat` included on the desktop platforms (the TUI chat pane keeps U / Shift+U).
   `keymap.test.ts` pins every `FocusArea`. One stack per domain (owner question 3): only the
   session history takes the app-level key.
+- Work item 1 DONE for the web 2026-09-27: each session action gets its own notice, notices
+  stack, and an action leaves the history when its notice closes. The TUI half is deferred to the
+  TUI redesign (owner, 2026-09-27): the TUI designs its own UX and does not copy the web's notices.
 - Priority: P2.
 - Planned at: Platform `9f343825`, 2026-09-25. Origin: Plan 126
   [LIFE-13](126-t3code-alignment/lifecycle.md) owner correction.
@@ -222,7 +225,14 @@ same order from pane-scoped bindings, with no second dispatch mechanism.
 
 ### Work items
 
-1. **Fix the shipped session undo (ordered 2026-09-26).** Lane L5 shipped LIFE-13 with
+1. **DONE for the web 2026-09-27; TUI deferred to its redesign.** Each batch carries an id and its
+   own Sonner notice (`chat-mode/state/session-undo.ts`); the notice's `onAutoClose`/`onDismiss`
+   expire that batch (`history.expire`), a notice's own Undo/Redo steps its batch, Mod+Z the
+   newest living one, and an undo shows a Redo notice with the same lifetime. The title reads the
+   batch from the store, so a forgotten row lowers the count in place. The Toaster shows every
+   toast when expanded. The TUI rail's U / Shift+U still walk the full history; the owner defers
+   that to the TUI redesign (see "TUI" in `AGENTS.md`). Original order:
+   **Fix the shipped session undo (ordered 2026-09-26).** Lane L5 shipped LIFE-13 with
    `apps/web/src/features/chat-mode/state/session-undo.ts` keeping its 50-step history live after
    the 5 s notice closes, so Mod+Z / Mod+Shift+Z still walk it. Change it so session history
    entries expire with the notice: once no session Undo notice is showing, the session undo and

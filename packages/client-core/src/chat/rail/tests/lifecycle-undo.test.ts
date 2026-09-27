@@ -126,3 +126,51 @@ test('recording a new action while a restore settles keeps the new redo branch e
   expect(history.getSnapshot().redo).toHaveLength(0)
   expect(history.getSnapshot().undo.at(-1)?.kind).toBe('snooze')
 })
+
+test('an expired batch leaves either stack, and older batches stay steppable', async () => {
+  const history = createSessionLifecycleHistory()
+  const older = history.record('archive', [entry('a', 1)])!
+  const newer = history.record('archive', [entry('b', 2)])!
+  history.expire(newer)
+  expect(history.getSnapshot().undo.map((batch) => batch.id)).toEqual([older])
+  const undone = await history.step('undo', async (item) => inverse(item, 3))
+  expect(history.getSnapshot().redo.map((batch) => batch.id)).toEqual([undone.inverse!.id])
+  history.expire(undone.inverse!.id)
+  expect(history.getSnapshot()).toEqual({ undo: [], redo: [] })
+})
+
+test('stepping a batch by id leaves the newer batches in place', async () => {
+  const history = createSessionLifecycleHistory()
+  const older = history.record('archive', [entry('a', 1)])!
+  const newer = history.record('settle', [entry('b', 2)])!
+  const result = await history.step('undo', async (item) => inverse(item, 3), older)
+  expect(result.taken?.id).toBe(older)
+  expect(history.getSnapshot().undo.map((batch) => batch.id)).toEqual([newer])
+  expect(history.getSnapshot().redo.map((batch) => batch.kind)).toEqual(['archive'])
+  expect(await history.step('undo', async () => null, older)).toMatchObject({ taken: null })
+})
+
+test('selective undo and redo reject overlapping later batches without consuming history', async () => {
+  const history = createSessionLifecycleHistory()
+  const older = history.record('snooze', [entry('a', 1)])!
+  history.record('settle', [entry('a', 2, 1), entry('b', 2)])
+  let revision = 2
+  let calls = 0
+  const restore = async (item: SessionLifecycleUndoEntry) => {
+    calls++
+    return inverse(item, ++revision)
+  }
+  const beforeUndo = history.getSnapshot()
+  expect(await history.step('undo', restore, older)).toMatchObject({ taken: null })
+  expect(history.getSnapshot()).toBe(beforeUndo)
+  expect(calls).toBe(0)
+  const first = await history.step('undo', restore)
+  await history.step('undo', restore, older)
+  const beforeRedo = history.getSnapshot()
+  expect(await history.step('redo', restore, first.inverse!.id)).toMatchObject({ taken: null })
+  expect(history.getSnapshot()).toBe(beforeRedo)
+  expect(calls).toBe(3)
+  await history.step('redo', restore)
+  await history.step('redo', restore, first.inverse!.id)
+  expect(calls).toBe(6)
+})

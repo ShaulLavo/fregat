@@ -1,12 +1,10 @@
 import { toast } from 'sonner'
-import { create } from 'zustand'
-import type { ProjectId, ScopedSessionRef } from '@workspace/contracts'
+import { createElement } from 'react'
+import type { ScopedSessionRef } from '@workspace/contracts'
 import {
-  createSessionLifecycleHistory,
+  canStepSessionLifecycleBatch,
   sessionLifecycleUndoEntry,
   sessionLifecycleRestoreCommand,
-  sessionLifecycleVerb,
-  type SessionLifecycleUndoEntry,
   type SessionLifecycleUndoKind,
 } from '@workspace/client-core/chat/rail/lifecycle-undo'
 import type { HistoryDirection } from '@workspace/client-core/history/undo-stack'
@@ -21,14 +19,25 @@ import { toastError } from '@/lib/toast-error'
 import { errorMessage } from '@/lib/error-message'
 import { getNavigation } from '@/state/navigation-binding'
 import { sessionArchive } from '@/features/chat-mode/state/removal'
+import { batchDetail } from '@/features/chat-mode/utils/session-undo'
+import {
+  sessionUndoHistory as history,
+  type SessionUndoEntry,
+} from '@/features/chat-mode/state/session-undo-history'
+import { SessionUndoNoticeAction } from '@/features/chat-mode/components/session-undo-notice-action'
+import { SessionUndoNoticeTitle } from '@/features/chat-mode/components/session-undo-notice-title'
 
-export type SessionUndoEntry = SessionLifecycleUndoEntry & {
-  readonly reopen: { readonly surface: 'main' | 'sidebar'; readonly projectId: ProjectId } | null
-}
-const history = createSessionLifecycleHistory<SessionUndoEntry>()
-const UNDO_TOAST_ID = 'session-lifecycle-undo'
-export const useSessionUndoStore = create(() => history.getSnapshot())
-history.subscribe(() => useSessionUndoStore.setState(history.getSnapshot()))
+const NOTICE_DURATION_MS = 5_000
+// A step closes its notice at once but runs behind queued lifecycle mutations; the close must not expire it.
+const claimed = new Set<number>()
+const undoShortcuts = new Map<number, string | null>()
+
+history.subscribe(() => {
+  const retained = new Set(batchIds())
+  for (const id of undoShortcuts.keys()) {
+    if (!retained.has(id) && !claimed.has(id)) closeNotice(id)
+  }
+})
 
 export function sessionUndoAvailable() {
   return history.getSnapshot().undo.length > 0
@@ -37,6 +46,7 @@ export function sessionRedoAvailable() {
   return history.getSnapshot().redo.length > 0
 }
 
+/** Records the action and gives it its own notice; the action stays undoable while the notice shows. */
 export function offerSessionUndo({
   kind,
   entries,
@@ -48,23 +58,19 @@ export function offerSessionUndo({
   readonly detail: string
   readonly shortcut: string | null
 }) {
-  if (!entries.length) return
-  history.record(kind, entries)
-  toast(`${entries.length} ${sessionLifecycleVerb(kind)}${detail}`, {
-    id: UNDO_TOAST_ID,
-    duration: 5_000,
-    ...(shortcut ? { description: `${shortcut} to undo` } : {}),
-    action: { label: 'Undo', onClick: () => void undoLatestSessionAction() },
-  })
+  const id = history.record(kind, entries)
+  if (id === null) return
+  undoShortcuts.set(id, shortcut)
+  showNotice(id, 'undo', { kind, detail, count: entries.length })
 }
 export function forgetSessionUndo(refs: readonly ScopedSessionRef[]) {
-  const previous = history.getSnapshot().undo.at(-1)
   history.forget(refs)
-  if (previous !== history.getSnapshot().undo.at(-1)) toast.dismiss(UNDO_TOAST_ID)
 }
 export function resetSessionUndo() {
+  const ids = batchIds()
   history.clear()
-  toast.dismiss(UNDO_TOAST_ID)
+  claimed.clear()
+  for (const id of ids) closeNotice(id)
 }
 export function undoLatestSessionAction() {
   return stepSessionHistory('undo')
@@ -73,21 +79,91 @@ export function redoLatestSessionAction() {
   return stepSessionHistory('redo')
 }
 
-async function stepSessionHistory(direction: HistoryDirection) {
-  if (!history.getSnapshot()[direction].length) return false
+function batchIds() {
+  const { undo, redo } = history.getSnapshot()
+  return [...undo, ...redo].map((batch) => batch.id)
+}
+function noticeId(id: number) {
+  return `session-lifecycle-undo-${id}`
+}
+function showNotice(
+  id: number,
+  direction: HistoryDirection,
+  title: {
+    readonly kind: SessionLifecycleUndoKind
+    readonly detail: string
+    readonly count: number
+  },
+) {
+  const shortcut = direction === 'undo' ? undoShortcuts.get(id) : null
+  // The title reads the batch, so a row forgotten later lowers its count in place.
+  toast(
+    createElement(SessionUndoNoticeTitle, { batchId: id, undone: direction === 'redo', ...title }),
+    {
+      id: noticeId(id),
+      duration: NOTICE_DURATION_MS,
+      ...(shortcut ? { description: `${shortcut} to undo` } : {}),
+      action: createElement(SessionUndoNoticeAction, {
+        batchId: id,
+        direction,
+        onClick: () => void stepSessionHistory(direction, id),
+      }),
+      onAutoClose: () => expireBatch(id),
+      onDismiss: () => expireBatch(id),
+    },
+  )
+}
+function closeNotice(id: number) {
+  undoShortcuts.delete(id)
+  toast.dismiss(noticeId(id))
+}
+function expireBatch(id: number) {
+  if (claimed.has(id)) return
+  undoShortcuts.delete(id)
+  history.expire(id)
+}
+
+async function stepSessionHistory(direction: HistoryDirection, id?: number) {
+  if (id !== undefined && !canStepSessionLifecycleBatch(history.getSnapshot()[direction], id))
+    return false
+  const batch = history
+    .getSnapshot()
+    [direction].findLast(
+      (candidate) => !claimed.has(candidate.id) && (id === undefined || candidate.id === id),
+    )
+  if (!batch) return false
+  claimed.add(batch.id)
+  toast.dismiss(noticeId(batch.id))
   return runMutation(
     primaryQueryClient(),
     {
       mutationKey: chatModeMutationKeys.lifecycleUndo(),
       scope: { id: CHAT_SESSION_SCOPE },
-      mutationFn: async () => {
-        toast.dismiss(UNDO_TOAST_ID)
-        const result = await history.step(direction, restoreSession)
-        return result.applied.length > 0 && result.failed === 0
-      },
+      mutationFn: () => stepBatch(direction, batch.id),
     },
     undefined,
   )
+}
+
+async function stepBatch(direction: HistoryDirection, id: number) {
+  const result = await history.step(direction, restoreSession, id).finally(() => claimed.delete(id))
+  const shortcut = undoShortcuts.get(id) ?? null
+  const retained = history.getSnapshot()[direction].find((batch) => batch.id === id)
+  if (retained) {
+    showNotice(id, direction, { kind: retained.kind, detail: '', count: retained.entries.length })
+    return false
+  }
+  undoShortcuts.delete(id)
+  if (result.inverse) {
+    const { inverse } = result
+    undoShortcuts.set(inverse.id, shortcut)
+    showNotice(inverse.id, direction === 'undo' ? 'redo' : 'undo', {
+      kind: inverse.kind,
+      detail: batchDetail({ failed: result.failed }),
+      count: inverse.entries.length,
+    })
+  }
+  return result.applied.length > 0 && result.failed === 0
 }
 
 async function restoreSession(entry: SessionUndoEntry): Promise<SessionUndoEntry | null> {

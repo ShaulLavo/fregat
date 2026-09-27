@@ -27,8 +27,23 @@ export type SessionLifecycleUndoEntry = {
   readonly restoreRevision: number
 }
 export type SessionLifecycleUndoBatch<Entry extends SessionLifecycleUndoEntry> = {
+  readonly id: number
   readonly kind: SessionLifecycleUndoKind
   readonly entries: readonly Entry[]
+}
+
+/** A batch can restore only after later actions on the same sessions have been restored. */
+export function canStepSessionLifecycleBatch<Entry extends SessionLifecycleUndoEntry>(
+  batches: readonly SessionLifecycleUndoBatch<Entry>[],
+  id: number,
+) {
+  const index = batches.findIndex((batch) => batch.id === id)
+  const batch = batches[index]
+  if (!batch) return false
+  const keys = new Set(batch.entries.map((entry) => scopedSessionKey(entry.ref)))
+  return !batches
+    .slice(index + 1)
+    .some((later) => later.entries.some((entry) => keys.has(scopedSessionKey(entry.ref))))
 }
 
 const LIFECYCLE_VERBS: Record<SessionLifecycleChange['type'] | 'archive', string> = {
@@ -74,6 +89,7 @@ export function createSessionLifecycleHistory<Entry extends SessionLifecycleUndo
   type Batch = SessionLifecycleUndoBatch<Entry>
   let stack = emptyUndoStack<Batch>()
   let branch = 0
+  let lastId = 0
   const listeners = new Set<() => void>()
   function publish(next: UndoStack<Batch>) {
     stack = next
@@ -114,17 +130,33 @@ export function createSessionLifecycleHistory<Entry extends SessionLifecycleUndo
       branch++
       publish(emptyUndoStack<Batch>())
     },
+    /** Returns the batch id, which `step` and `expire` take to address this batch. */
     record(kind: SessionLifecycleUndoKind, entries: readonly Entry[]) {
-      if (!entries.length) return
+      if (!entries.length) return null
       branch++
-      publish(pushUndo(stack, { kind, entries }))
+      const id = ++lastId
+      publish(pushUndo(stack, { id, kind, entries }))
+      return id
     },
     forget,
+    /** Drops one batch from either direction; hosts call this when its notice goes away. */
+    expire(id: number) {
+      const keep = (batch: Batch) => batch.id !== id
+      if (![...stack.undo, ...stack.redo].some((batch) => !keep(batch))) return
+      publish({ undo: stack.undo.filter(keep), redo: stack.redo.filter(keep) })
+    },
     // Hosts serialize steps with lifecycle mutations; each successful row supplies its inverse receipt.
-    async step(direction: HistoryDirection, restore: (entry: Entry) => Promise<Entry | null>) {
+    // `id` steps that batch (its notice's own button); without it, the newest batch.
+    async step(
+      direction: HistoryDirection,
+      restore: (entry: Entry) => Promise<Entry | null>,
+      id?: number,
+    ) {
+      if (id !== undefined && !canStepSessionLifecycleBatch(stack[direction], id))
+        return { applied: [], failed: 0, taken: null, inverse: null }
       const startedOnBranch = branch
-      const taken = takeHistory(stack, direction)
-      if (!taken.entry) return { applied: [], failed: 0 }
+      const taken = takeHistory(stack, direction, (batch) => id === undefined || batch.id === id)
+      if (!taken.entry) return { applied: [], failed: 0, taken: null, inverse: null }
       publish(taken.stack)
       const applied: Entry[] = []
       let failed = 0
@@ -138,9 +170,11 @@ export function createSessionLifecycleHistory<Entry extends SessionLifecycleUndo
         rebase(entry, inverse.expectedRevision)
         applied.push(inverse)
       }
-      if (applied.length && branch === startedOnBranch)
-        publish(finishHistory(stack, direction, { kind: taken.entry.kind, entries: applied }))
-      return { applied, failed }
+      if (!applied.length || branch !== startedOnBranch)
+        return { applied, failed, taken: taken.entry, inverse: null }
+      const inverse: Batch = { id: ++lastId, kind: taken.entry.kind, entries: applied }
+      publish(finishHistory(stack, direction, inverse))
+      return { applied, failed, taken: taken.entry, inverse }
     },
   }
 }
