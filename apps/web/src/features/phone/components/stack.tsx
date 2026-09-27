@@ -11,7 +11,6 @@ import { useBackClosesSheet } from '@/features/phone/hooks/use-back-closes-sheet
 import { useKeyboardInset } from '@/features/phone/hooks/use-keyboard-inset'
 import { useLongPressMenus } from '@/features/phone/hooks/use-long-press-menus'
 import { useStart } from '@/features/phone/hooks/use-start'
-import { useWarmScreens } from '@/features/phone/hooks/use-warm-screens'
 import { BackContext } from '@/features/phone/providers/back-context'
 import { phoneLevel } from '@/features/phone/utils/level'
 
@@ -30,7 +29,6 @@ export function Stack({ rootPath }: { readonly rootPath: string }) {
   useBackClosesSheet()
   useStart()
   useLongPressMenus()
-  useWarmScreens()
 
   return (
     <BackContext value={back}>

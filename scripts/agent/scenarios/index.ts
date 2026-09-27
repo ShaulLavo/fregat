@@ -146,6 +146,7 @@ import { phoneComposer } from './phone-composer'
 import { logsRestored } from './logs-restored'
 import { shellSwitch } from './shell-switch'
 import { phoneColdBoot, desktopColdBoot } from './shell-cold-boot'
+import { phoneStartupNavigation, phoneStartupTiming } from './phone-startup-navigation'
 import { chatSleepingSession } from './chat-sleeping-session'
 import { chatSessionGoal } from './chat-session-goal'
 import { chatAgentReview } from './chat-agent-review'
@@ -153,6 +154,7 @@ import { fileTreeHoverPrefetch } from './file-tree-hover-prefetch'
 import { prefetchChatSwitch } from './prefetch-chat-switch'
 import { prefetchDiffQueries } from './prefetch-diff-queries'
 import { prefetchFirstPaint } from './prefetch-first-paint'
+import { editorTabHoverHighlights, editorTabHoverLive } from './editor-tab-hover-highlights'
 import { prefetchSettings } from './prefetch-settings'
 import {
   filePickerPrefetchBound,
@@ -683,12 +685,16 @@ export const scenarios: readonly Scenario[] = [
   shellSwitch,
   logsRestored,
   phoneColdBoot,
+  phoneStartupNavigation,
+  phoneStartupTiming,
   desktopColdBoot,
   chatSleepingSession,
   chatSessionGoal,
   chatAgentReview,
   fileTreeHoverPrefetch,
   prefetchFirstPaint,
+  editorTabHoverHighlights,
+  editorTabHoverLive,
   prefetchDiffQueries,
   prefetchChatSwitch,
   prefetchSettings,

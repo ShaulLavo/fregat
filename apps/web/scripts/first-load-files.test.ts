@@ -46,7 +46,7 @@ function buildFixture(shellLoader: string, screenImport: string) {
   return dir
 }
 
-test('counts the first screens even when omitted from the boot manifest, and deduplicates files', () => {
+test('counts the selected first screen even when omitted from the boot manifest, and deduplicates files', () => {
   const dir = buildFixture(`const load = () => import('./shell.js')`, 'workbench-shared.js')
   expect(
     firstLoadFiles(dir, 'phone')
@@ -55,7 +55,6 @@ test('counts the first screens even when omitted from the boot manifest, and ded
   ).toEqual([
     'assets/common.js',
     'assets/initial.js',
-    'assets/session.js',
     'assets/sessions.js',
     'assets/shell.js',
     'assets/workbench-shared.js',
@@ -73,4 +72,11 @@ test('counts desktop JS and CSS accidentally preloaded by the phone import', () 
   const files = firstLoadFiles(dir, 'phone')
   expect(files.map((file) => file.fileName)).toContain('assets/workbench.js')
   expect(files.find((file) => file.fileName === 'assets/workbench.css')?.kind).toBe('stylesheet')
+})
+
+test('counts a direct conversation independently from the sessions list', () => {
+  const dir = buildFixture(`const load = () => import('./shell.js')`, 'phone-shared.js')
+  const files = firstLoadFiles(dir, 'phone', 'session').map((file) => file.fileName)
+  expect(files).toContain('assets/session.js')
+  expect(files).not.toContain('assets/sessions.js')
 })

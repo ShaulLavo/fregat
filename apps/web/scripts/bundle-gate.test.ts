@@ -5,6 +5,7 @@ import { checkFirstLoad, pinsFrom, type GateReport, type Pins } from './bundle-g
 const baseline: GateReport = {
   firstLoad: { scriptGzip: 1_000_000 },
   phoneFirstLoad: { scriptGzip: 600_000 },
+  phoneSessionFirstLoad: { scriptGzip: 600_000 },
   owners: [
     { owner: 'features/chat', firstLoadGzip: 120_000 },
     { owner: 'node_modules/react-dom', firstLoadGzip: 60_000 },
@@ -21,6 +22,7 @@ test('an owner that grew past its margin fails and is named', () => {
   const grown: GateReport = {
     firstLoad: { scriptGzip: 1_020_000 },
     phoneFirstLoad: { scriptGzip: 600_000 },
+    phoneSessionFirstLoad: { scriptGzip: 600_000 },
     owners: [
       { owner: 'features/chat', firstLoadGzip: 140_000 },
       { owner: 'node_modules/react-dom', firstLoadGzip: 60_000 },
@@ -35,6 +37,7 @@ test('a new owner in first load is named when it passes the floor', () => {
   const added: GateReport = {
     firstLoad: { scriptGzip: 1_030_000 },
     phoneFirstLoad: { scriptGzip: 600_000 },
+    phoneSessionFirstLoad: { scriptGzip: 600_000 },
     owners: [...baseline.owners, { owner: 'node_modules/shiki', firstLoadGzip: 30_000 }],
   }
   expect(checkFirstLoad(added, pins).failures).toEqual([
@@ -46,6 +49,7 @@ test('small drift inside the margins passes, and a tiny owner has a floor', () =
   const drift: GateReport = {
     firstLoad: { scriptGzip: 1_005_000 },
     phoneFirstLoad: { scriptGzip: 600_000 },
+    phoneSessionFirstLoad: { scriptGzip: 600_000 },
     owners: [
       { owner: 'features/chat', firstLoadGzip: 124_000 },
       { owner: 'node_modules/react-dom', firstLoadGzip: 60_000 },
@@ -59,6 +63,7 @@ test('total growth spread thin over owners still fails on the total', () => {
   const spread: GateReport = {
     firstLoad: { scriptGzip: 1_020_000 },
     phoneFirstLoad: { scriptGzip: 600_000 },
+    phoneSessionFirstLoad: { scriptGzip: 600_000 },
     owners: baseline.owners,
   }
   const result = checkFirstLoad(spread, pins)
@@ -76,4 +81,11 @@ test('a phone first load that grew past its margin fails on the phone total', ()
 test('re-pinning keeps the history with its reason', () => {
   const next = pinsFrom(baseline, pins, 'Plan 108 landed', '2026-09-26T00:00:00.000Z')
   expect(next.history.map((entry) => entry.reason)).toEqual(['first pin', 'Plan 108 landed'])
+})
+
+test('a direct conversation boot is gated even when the sessions list is smaller', () => {
+  const heavier = { ...baseline, phoneSessionFirstLoad: { scriptGzip: 620_000 } }
+  expect(checkFirstLoad(heavier, pins).failures).toEqual([
+    { owner: '(phone total)', pinned: 600_000, now: 620_000 },
+  ])
 })

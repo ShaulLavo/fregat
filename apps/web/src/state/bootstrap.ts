@@ -21,11 +21,17 @@ type BootstrapState = {
 // Prepared before createRoot. React's effect replay must never destroy retained documents.
 export function createBootstrap(
   navigation: ReturnType<typeof createNavigation>,
-  { reload }: { readonly reload?: () => void } = {},
+  {
+    reload,
+    initialSession = 'restore',
+  }: {
+    readonly reload?: () => void
+    readonly initialSession?: 'restore' | 'list'
+  } = {},
 ) {
   const unbindNavigation = bindNavigation(navigation)
   const store = createStore<BootstrapState>(() => ({
-    application: prepareCachedRuntime(navigation),
+    application: prepareCachedRuntime(navigation, initialSession),
     error: null,
     unpaired: false,
   }))
@@ -59,7 +65,8 @@ export function createBootstrap(
       .then((descriptor) => {
         if (controller.signal.aborted) return
         const application =
-          store.getState().application ?? createBootRuntime(descriptor, navigation.initial)
+          store.getState().application ??
+          createBootRuntime(descriptor, navigation.initial, { initialSession })
         if (!detach) detach = navigation.attach(application)
         application.start()
         store.setState({ application, error: null })
@@ -125,13 +132,19 @@ export function createBootstrap(
   }
 }
 
-function prepareCachedRuntime(navigation: ReturnType<typeof createNavigation>) {
+function prepareCachedRuntime(
+  navigation: ReturnType<typeof createNavigation>,
+  initialSession: 'restore' | 'list',
+) {
   const cached = readCachedEnvironmentBindings(['local']).find(
     (binding) => binding.origin === primaryServerOrigin(),
   )
   if (!cached) return null
   try {
-    return createBootRuntime(cached.descriptor, navigation.initial, true)
+    return createBootRuntime(cached.descriptor, navigation.initial, {
+      cached: true,
+      initialSession,
+    })
   } catch {
     return null
   }

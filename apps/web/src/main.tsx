@@ -25,6 +25,7 @@ import '@singapore-editor/find/style.css'
 import '@workspace/ui/globals.css'
 import { App } from '@/App'
 import { selectInitialAddress } from '@/features/address/state/storage'
+import { phoneStartAddress } from '@/features/address/utils/phone-start'
 import { parseAddressIntent } from '@/features/address/utils/intent'
 import { browserAddressHref } from '@/features/address/utils/browser-url'
 import { createBrowserHistory } from '@tanstack/react-router'
@@ -93,14 +94,11 @@ const pairingCode = takePairingCodeFromLocation(
   new URL(import.meta.env.BASE_URL, location.href).href,
 )
 // Preserve explicit fields before Router normalizes defaults; boot merges them with the cache.
-const initialHref = applicationHost()?.initialAddress ?? selectInitialAddress(window.location.href)
+const restoredHref = applicationHost()?.initialAddress ?? selectInitialAddress(window.location.href)
+const liveHref = selectInitialAddress(window.location.href, null)
+const coarsePointer = window.matchMedia(COARSE_POINTER_QUERY).matches
+const initialHref = phoneStartAddress(restoredHref, liveHref, coarsePointer)
 const initialIntent = parseAddressIntent(initialHref)
-// Only a touch phone booting from the bare app URL: a narrow desk window keeps its session.
-useShellStore.setState({
-  phoneStartsAtSessions:
-    window.matchMedia(COARSE_POINTER_QUERY).matches &&
-    initialHref !== selectInitialAddress(window.location.href, null),
-})
 const routerHistory = applicationHost()?.history ?? createBrowserHistory()
 const initialBrowserHref = browserAddressHref(initialHref)
 if (routerHistory.location.href !== initialBrowserHref) routerHistory.replace(initialBrowserHref)
@@ -109,7 +107,11 @@ const router = createApplicationRouter({ history: routerHistory, resources: reso
 const navigation = createNavigation(router, initialIntent, { canPlaceTab: canPlaceEditorTab })
 
 beginReloadBudget()
-const bootstrap = prepareWithinReloadBudget(() => createBootstrap(navigation))
+const bootstrap = prepareWithinReloadBudget(() =>
+  createBootstrap(navigation, {
+    initialSession: coarsePointer && restoredHref !== liveHref ? 'list' : 'restore',
+  }),
+)
 const restoredWorkspace = bootstrap
   .getState()
   .application?.getSnapshot()

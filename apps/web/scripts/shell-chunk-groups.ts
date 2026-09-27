@@ -11,7 +11,13 @@ type ShellRoots = {
   readonly phoneScreens: readonly string[]
 }
 
-const GROUPS = ['initial', 'workbench-shared', 'workbench'] as const
+const GROUPS = [
+  'initial',
+  'phone-sessions',
+  'phone-session',
+  'workbench-shared',
+  'workbench',
+] as const
 type GroupName = (typeof GROUPS)[number]
 
 /**
@@ -39,16 +45,22 @@ export function shellChunkGroups(entry: string, shells: ShellRoots) {
 function groupModules(entry: string, shells: ShellRoots, context: ChunkingContext) {
   const workbench = reachable(shells.workbench, context, { dynamic: false })
   const initial = reachable(entry, context, { dynamic: false })
-  for (const root of [shells.phone, ...shells.phoneScreens]) {
-    for (const id of reachable(root, context, { dynamic: false }))
-      if (workbench.has(id)) initial.add(id)
-  }
+  const screens = shells.phoneScreens.map((root) => reachable(root, context, { dynamic: false }))
+  for (const id of reachable(shells.phone, context, { dynamic: false }))
+    if (workbench.has(id)) initial.add(id)
+  for (const id of screens[0] ?? [])
+    if (workbench.has(id) && screens.every((screen) => screen.has(id))) initial.add(id)
   // Everything a phone could ever load: every import from the entry except the workbench's.
   const phone = reachable(entry, context, { dynamic: true, skip: shells.workbench })
   const groups = new Map<string, GroupName>()
   for (const id of initial) groups.set(id, 'initial')
   for (const id of workbench) {
     if (initial.has(id)) continue
+    const screen = screens.findIndex((modules) => modules.has(id))
+    if (screen !== -1) {
+      groups.set(id, screen === 0 ? 'phone-sessions' : 'phone-session')
+      continue
+    }
     groups.set(id, phone.has(id) ? 'workbench-shared' : 'workbench')
   }
   return groups

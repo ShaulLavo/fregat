@@ -14,8 +14,6 @@ type ShellState = {
   readonly kind: ShellKind
   /** The phone shell's pushed screen; the address carries it so Back pops it. */
   readonly phoneScreen: PhoneScreen | null
-  /** A cold start from the bare app URL restored a stored address; the phone opens on its session list instead. */
-  readonly phoneStartsAtSessions: boolean
   /** The desk's mode when the phone shell took over, put back when the workbench returns. */
   readonly deskMode: AddressMode | null
   /** The tab the phone's next file replaces; forgotten when the workbench returns. */
@@ -28,7 +26,6 @@ const matches = (query: string) => typeof window !== 'undefined' && window.match
 export const useShellStore = create<ShellState>(() => ({
   kind: initialShellKind(matches),
   phoneScreen: null,
-  phoneStartsAtSessions: false,
   deskMode: null,
   phoneTab: null,
 }))
@@ -42,13 +39,6 @@ export function takeDeskMode() {
   const { deskMode } = useShellStore.getState()
   if (deskMode !== null) useShellStore.setState({ deskMode: null })
   return deskMode
-}
-
-/** True once, for the first phone shell after a cold start from the bare app URL. */
-export function takePhoneStartAtSessions() {
-  const starts = useShellStore.getState().phoneStartsAtSessions
-  if (starts) useShellStore.setState({ phoneStartsAtSessions: false })
-  return starts
 }
 
 export function setPhoneScreen(phoneScreen: PhoneScreen | null) {

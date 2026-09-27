@@ -4,6 +4,7 @@ import {
   readWorkspaceCacheEntry,
   removeWorkspaceCacheEntry,
   workspaceCacheStorageKey,
+  workspaceCacheSerializedBytes,
   writeWorkspaceCacheEntry,
   type WorkspaceCacheWriteResult,
 } from '@/lib/workspace-cache-storage'
@@ -50,12 +51,9 @@ export function readEditorVisibleSnapshotCache(
   storage: ScopedStorage,
   key: EditorVisibleSnapshotCacheKey,
 ): CachedEditorVisibleSnapshot | null {
-  const cached = readStoredEditorVisibleSnapshot(storage)
-  if (!cached) return null
-  if (cached.rootPath !== key.rootPath) return null
-  if (cached.path !== key.path) return null
-  if (cached.themeId !== key.themeId) return null
-  return cached
+  return (
+    readStoredEditorVisibleSnapshots(storage).find((cached) => sameSnapshotKey(cached, key)) ?? null
+  )
 }
 
 export function writeEditorVisibleSnapshotCache(
@@ -73,14 +71,20 @@ export function writeEditorVisibleSnapshotCache(
     return { serializedBytes: null, status: 'invalid' }
   }
 
-  const result = writeWorkspaceCacheEntry(
-    EDITOR_VISIBLE_SNAPSHOT_CACHE_STORAGE_KEY,
-    parsed.output,
-    {
-      storage,
-      maxSerializedBytes: EDITOR_VISIBLE_SNAPSHOT_CACHE_MAX_BYTES,
-    },
+  const records = readStoredEditorVisibleSnapshots(storage).filter(
+    (cached) => !sameSnapshotKey(cached, record),
   )
+  records.push(parsed.output)
+  while (
+    records.length > 1 &&
+    workspaceCacheSerializedBytes(JSON.stringify(records)) > EDITOR_VISIBLE_SNAPSHOT_CACHE_MAX_BYTES
+  )
+    records.shift()
+
+  const result = writeWorkspaceCacheEntry(EDITOR_VISIBLE_SNAPSHOT_CACHE_STORAGE_KEY, records, {
+    storage,
+    maxSerializedBytes: EDITOR_VISIBLE_SNAPSHOT_CACHE_MAX_BYTES,
+  })
   if (result.status === 'written' || result.status === 'unavailable') return result
 
   log.warn({
@@ -98,29 +102,43 @@ export function removeEditorVisibleSnapshotCacheForPath(
   storage: ScopedStorage,
   { rootPath, path }: Pick<EditorVisibleSnapshotCacheKey, 'rootPath' | 'path'>,
 ) {
-  const cached = readStoredEditorVisibleSnapshot(storage)
-  if (!cached) return
-  if (cached.rootPath !== rootPath || cached.path !== path) return
-
-  removeEditorVisibleSnapshotCache(storage)
+  removeMatchingSnapshots(storage, (cached) => cached.rootPath === rootPath && cached.path === path)
 }
 
 export function removeEditorVisibleSnapshotCacheForRoot(storage: ScopedStorage, rootPath: string) {
-  const cached = readStoredEditorVisibleSnapshot(storage)
-  if (!cached || cached.rootPath !== rootPath) return
-
-  removeEditorVisibleSnapshotCache(storage)
+  removeMatchingSnapshots(storage, (cached) => cached.rootPath === rootPath)
 }
 
-function removeEditorVisibleSnapshotCache(storage: ScopedStorage) {
-  removeWorkspaceCacheEntry(EDITOR_VISIBLE_SNAPSHOT_CACHE_STORAGE_KEY, storage)
+function removeMatchingSnapshots(
+  storage: ScopedStorage,
+  matches: (record: CachedEditorVisibleSnapshot) => boolean,
+) {
+  const records = readStoredEditorVisibleSnapshots(storage)
+  const remaining = records.filter((record) => !matches(record))
+  if (remaining.length === records.length) return
+  if (remaining.length === 0) {
+    removeWorkspaceCacheEntry(EDITOR_VISIBLE_SNAPSHOT_CACHE_STORAGE_KEY, storage)
+    return
+  }
+  writeWorkspaceCacheEntry(EDITOR_VISIBLE_SNAPSHOT_CACHE_STORAGE_KEY, remaining, { storage })
 }
 
-function readStoredEditorVisibleSnapshot(storage: ScopedStorage) {
-  return readWorkspaceCacheEntry<CachedEditorVisibleSnapshot | null>(
+function sameSnapshotKey(
+  left: EditorVisibleSnapshotCacheKey,
+  right: EditorVisibleSnapshotCacheKey,
+) {
+  return (
+    left.rootPath === right.rootPath && left.path === right.path && left.themeId === right.themeId
+  )
+}
+
+const cachedEditorVisibleSnapshotsSchema = v.array(cachedEditorVisibleSnapshotSchema)
+
+function readStoredEditorVisibleSnapshots(storage: ScopedStorage) {
+  return readWorkspaceCacheEntry<CachedEditorVisibleSnapshot[]>(
     EDITOR_VISIBLE_SNAPSHOT_CACHE_STORAGE_KEY,
-    cachedEditorVisibleSnapshotSchema,
-    null,
+    cachedEditorVisibleSnapshotsSchema,
+    [],
     { storage, maxSerializedBytes: EDITOR_VISIBLE_SNAPSHOT_CACHE_MAX_BYTES },
   )
 }

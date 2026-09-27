@@ -43,6 +43,10 @@ type PackageIdentity = {
 type Report = {
   readonly dir: string
   /** Includes boot screens and the emitted preload helpers the phone executes. */
+  readonly phoneSessionFirstLoad: {
+    readonly scriptGzip: number
+    readonly files: readonly FirstLoadFile[]
+  }
   readonly phoneFirstLoad: { readonly scriptGzip: number; readonly files: readonly FirstLoadFile[] }
   readonly firstLoad: {
     readonly scriptGzip: number
@@ -116,6 +120,11 @@ function buildReport(dir: string): Report {
   const scriptGzip = scriptGzipOf(files)
   const phoneFiles = firstLoadFiles(dir, 'phone')
   const phoneFirstLoad = { scriptGzip: scriptGzipOf(phoneFiles), files: phoneFiles }
+  const phoneSessionFiles = firstLoadFiles(dir, 'phone', 'session')
+  const phoneSessionFirstLoad = {
+    scriptGzip: scriptGzipOf(phoneSessionFiles),
+    files: phoneSessionFiles,
+  }
   const stylesheetGzip = sum(
     files.filter((file) => file.kind === 'stylesheet').map((file) => file.gzipSize),
   )
@@ -123,6 +132,7 @@ function buildReport(dir: string): Report {
     return {
       dir,
       phoneFirstLoad,
+      phoneSessionFirstLoad,
       firstLoad: { scriptGzip, stylesheetGzip, files },
       build: null,
       owners: [],
@@ -137,6 +147,7 @@ function buildReport(dir: string): Report {
   return {
     dir,
     phoneFirstLoad,
+    phoneSessionFirstLoad,
     firstLoad: { scriptGzip, stylesheetGzip, files },
     build: {
       chunkCount: stats.chunks.length,
@@ -283,7 +294,8 @@ function printReport(report: Report): void {
     `First-load JS: ${kb(firstLoad.scriptGzip)} gz across ${countOf(firstLoad.files, 'script')} files`,
   )
   console.log(`First-load CSS: ${kb(firstLoad.stylesheetGzip)} gz`)
-  console.log(`Phone first-load JS: ${kb(report.phoneFirstLoad.scriptGzip)} gz`)
+  console.log(`Phone sessions-list first-load JS: ${kb(report.phoneFirstLoad.scriptGzip)} gz`)
+  console.log(`Phone conversation first-load JS: ${kb(report.phoneSessionFirstLoad.scriptGzip)} gz`)
   if (!build) {
     console.log('No bundle-stats.json beside this build; per-package attribution skipped.')
     return
