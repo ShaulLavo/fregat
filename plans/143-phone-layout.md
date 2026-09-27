@@ -715,5 +715,9 @@ remaining 4px composer bottom padding on phones. Desktop retains individual cont
 - [x] Inspect native Safari and desktop screenshots. `setup-dev-native.png` shows a 40px
       trigger whose bottom equals the 714px viewport edge, with zero extra bottom space. Desktop
       `composer-desktop-webkit.png` retains individual controls. Both are in the Mac evidence folder.
-- [ ] Pass required checks.
-- [ ] Commit, push, deploy and verify the live page.
+- [x] Pass required gates, formatting, lint and repository typechecks.
+- [x] Commit, push, deploy and verify the live page. Code `6e0dfa808`, release
+      `20260927T080511Z-6e0dfa80-phone-session-setup`; live check passed.
+      `setup-live-native.png` and `setup-live-metrics.json` show the deployed 40px control ending
+      exactly at the viewport edge. Native Safari sheet screenshot: `setup-sheet-native.png`.
+      Physical iPhone confirmation remains open.
