@@ -7,6 +7,7 @@ import { useSessionCheckoutRefresh } from '@/features/chat-mode/hooks/use-sessio
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
 import { Screen } from '@/features/phone/components/screen'
 import { useBackAction } from '@/features/phone/hooks/use-back-action'
+import { useBackClosesSheet } from '@/features/phone/hooks/use-back-closes-sheet'
 import { useKeyboardInset } from '@/features/phone/hooks/use-keyboard-inset'
 import { useLongPressMenus } from '@/features/phone/hooks/use-long-press-menus'
 import { useStart } from '@/features/phone/hooks/use-start'
@@ -21,11 +22,12 @@ export function Stack({ rootPath }: { readonly rootPath: string }) {
   const level = phoneLevel(selection, screen)
   const back = useBackAction(level, selection)
   const surface = usePanelSurface()
-  const frameRef = useKeyboardInset<HTMLDivElement>()
   // Mounted at every level, as the chat tool pane mounts them for every tab: the diff pick must
   // leave a turn a revert deleted even while the changes screen is closed.
   const diffScope = useSessionDiffScope()
   useSessionCheckoutRefresh()
+  useKeyboardInset()
+  useBackClosesSheet()
   useStart()
   useLongPressMenus()
   useWarmScreens()
@@ -35,10 +37,9 @@ export function Stack({ rootPath }: { readonly rootPath: string }) {
       <div
         className={cn(
           surface.panel,
-          'flex h-full min-h-0 flex-col pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[max(env(safe-area-inset-bottom),var(--keyboard-inset,0px))] pl-[env(safe-area-inset-left)]',
+          'flex h-full min-h-0 flex-col pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[max(env(safe-area-inset-bottom),var(--keyboard-inset))] pl-[env(safe-area-inset-left)]',
         )}
         data-phone-shell=''
-        ref={frameRef}
       >
         <Screen diffScope={diffScope} level={level} rootPath={rootPath} />
       </div>

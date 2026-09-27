@@ -1,6 +1,7 @@
 import type { AddressMode, PhoneScreen } from '@workspace/client-core/address/grammar'
 import { create } from 'zustand'
 
+import type { PhoneTab } from '@/lib/shell/utils/phone-tab'
 import {
   SHELL_QUERIES,
   initialShellKind,
@@ -17,6 +18,8 @@ type ShellState = {
   readonly phoneStartsAtSessions: boolean
   /** The desk's mode when the phone shell took over, put back when the workbench returns. */
   readonly deskMode: AddressMode | null
+  /** The tab the phone's next file replaces; forgotten when the workbench returns. */
+  readonly phoneTab: PhoneTab | null
 }
 
 // Node-environment tests import the store; with no window there is no phone.
@@ -27,6 +30,7 @@ export const useShellStore = create<ShellState>(() => ({
   phoneScreen: null,
   phoneStartsAtSessions: false,
   deskMode: null,
+  phoneTab: null,
 }))
 
 /** Opening a session on the phone moves it to chat mode; the desk gets its own mode back. */
@@ -58,6 +62,11 @@ export function addressedPhoneScreen() {
   return state.kind === 'phone' ? state.phoneScreen : null
 }
 
+export function setPhoneTab(phoneTab: PhoneTab | null) {
+  if (useShellStore.getState().phoneTab === phoneTab) return
+  useShellStore.setState({ phoneTab })
+}
+
 export function isPhoneShell() {
   return useShellStore.getState().kind === 'phone'
 }
@@ -67,7 +76,9 @@ export function watchShellKind() {
   const lists = SHELL_QUERIES.map((query) => window.matchMedia(query))
   const update = () => {
     const kind = nextShellKind(useShellStore.getState().kind, matches)
-    if (kind !== useShellStore.getState().kind) useShellStore.setState({ kind })
+    if (kind === useShellStore.getState().kind) return
+    // Back at the desk, the phone's tab is an ordinary tab: the next phone file adds its own.
+    useShellStore.setState(kind === 'workbench' ? { kind, phoneTab: null } : { kind })
   }
   for (const list of lists) list.addEventListener('change', update)
   return () => {
