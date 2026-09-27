@@ -14,6 +14,12 @@ function chunk(
     type: 'chunk',
     fileName,
     imports,
+    dynamicImports: [
+      'assets/shell.js',
+      'assets/workbench-shell.js',
+      'assets/sessions-screen.js',
+      'assets/session-screen.js',
+    ],
     facadeModuleId,
     viteMetadata: { importedCss: new Set(importedCss), importedAssets: new Set() },
   } as unknown as Rolldown.OutputChunk
@@ -32,6 +38,17 @@ test('a shell preloads its chunks and stylesheets, minus what the entry already 
       '/web/src/features/phone/components/shell.tsx',
     ),
     stack: chunk('assets/stack.js', [], null),
+    sessions: chunk(
+      'assets/sessions-screen.js',
+      ['assets/phone-shared.js'],
+      '/web/src/features/phone/components/sessions-screen.tsx',
+    ),
+    session: chunk(
+      'assets/session-screen.js',
+      ['assets/phone-shared.js'],
+      '/web/src/features/phone/components/session-screen.tsx',
+    ),
+    shared: chunk('assets/phone-shared.js', [], null),
     lazy: chunk('assets/file-screen.js', [], '/web/src/features/phone/components/file-screen.tsx'),
     workbenchShell: chunk(
       'assets/workbench-shell.js',
@@ -42,7 +59,13 @@ test('a shell preloads its chunks and stylesheets, minus what the entry already 
   } as unknown as Rolldown.OutputBundle
 
   expect(shellManifest('/web', '/platform/', bundle, entry)).toEqual({
-    phone: ['/platform/assets/shell.js', '/platform/assets/stack.js'],
+    phone: [
+      '/platform/assets/shell.js',
+      '/platform/assets/stack.js',
+      '/platform/assets/sessions-screen.js',
+      '/platform/assets/phone-shared.js',
+      '/platform/assets/session-screen.js',
+    ],
     workbench: [
       '/platform/assets/workbench-shell.js',
       '/platform/assets/workbench.js',
@@ -56,9 +79,16 @@ test('each shell’s first load gets a group, and the phone never shares the wor
     '/main.tsx': { imports: ['/app.tsx'] },
     '/app.tsx': { imports: ['/button.tsx'], lazy: ['/phone.tsx', '/workbench.tsx'] },
     '/button.tsx': { imports: [] },
-    '/phone.tsx': { imports: ['/session-hook.ts'], lazy: ['/session-screen.tsx'] },
+    '/phone.tsx': {
+      imports: ['/session-hook.ts'],
+      lazy: ['/session-screen.tsx', '/file-screen.tsx'],
+    },
+    '/file-screen.tsx': { imports: ['/editor.tsx'] },
+    '/editor.tsx': { imports: [] },
     '/session-screen.tsx': { imports: ['/chat.tsx'] },
-    '/workbench.tsx': { imports: ['/session-hook.ts', '/chat.tsx', '/tree.tsx', '/button.tsx'] },
+    '/workbench.tsx': {
+      imports: ['/session-hook.ts', '/chat.tsx', '/tree.tsx', '/button.tsx', '/editor.tsx'],
+    },
     '/chat.tsx': { imports: [] },
     '/session-hook.ts': { imports: [] },
     '/tree.tsx': { imports: [] },
@@ -70,7 +100,11 @@ test('each shell’s first load gets a group, and the phone never shares the wor
       dynamicallyImportedIds: graph[id]?.lazy ?? [],
     }),
   }
-  const groups = shellChunkGroups('/main.tsx', { phone: '/phone.tsx', workbench: '/workbench.tsx' })
+  const groups = shellChunkGroups('/main.tsx', {
+    phone: '/phone.tsx',
+    workbench: '/workbench.tsx',
+    phoneScreens: ['/session-screen.tsx'],
+  })
   const groupOf = (id: string) =>
     groups.map((group) => group.name(id, context)).find((name) => name !== null) ?? null
 
@@ -89,7 +123,7 @@ test('each shell’s first load gets a group, and the phone never shares the wor
     '/main.tsx': 'initial',
     '/button.tsx': 'initial',
     '/session-hook.ts': 'initial',
-    '/chat.tsx': 'workbench-shared',
+    '/chat.tsx': 'initial',
     '/tree.tsx': 'workbench',
     '/workbench.tsx': 'workbench',
   })

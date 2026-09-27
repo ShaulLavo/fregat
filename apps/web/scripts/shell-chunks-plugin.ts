@@ -7,6 +7,11 @@ export const SHELL_ENTRIES = {
   workbench: 'src/features/workspace/components/workbench-shell.tsx',
 } as const
 
+export const PHONE_BOOT_SCREENS = [
+  'src/features/phone/components/sessions-screen.tsx',
+  'src/features/phone/components/session-screen.tsx',
+] as const
+
 const PLACEHOLDER = '<!-- shell-chunks -->'
 
 /**
@@ -52,10 +57,19 @@ export function shellManifest(
   const loaded = staticClosure(entry, byFile)
   const manifest: Record<string, string[]> = {}
   for (const [kind, relative] of Object.entries(SHELL_ENTRIES)) {
-    const facade = path.join(webRoot, relative)
-    const root = chunks.find((chunk) => chunk.facadeModuleId === facade)
-    if (!root) throw new Error(`shell-chunks: no chunk for ${relative}; is it still lazy?`)
-    const files = [...staticClosure(root, byFile)].filter((fileName) => !loaded.has(fileName))
+    const entries = kind === 'phone' ? [relative, ...PHONE_BOOT_SCREENS] : [relative]
+    const files = [
+      ...new Set(
+        entries.flatMap((relative) => {
+          const facade = path.join(webRoot, relative)
+          const root = chunks.find((chunk) => chunk.facadeModuleId === facade)
+          if (!root) throw new Error(`shell-chunks: no chunk for ${relative}`)
+          const lazy = chunks.some((chunk) => chunk.dynamicImports.includes(root.fileName))
+          if (!lazy) throw new Error(`shell-chunks: ${relative} must remain dynamically imported`)
+          return [...staticClosure(root, byFile)].filter((fileName) => !loaded.has(fileName))
+        }),
+      ),
+    ]
     // The shell's stylesheets too: the dynamic import waits for them, so they would otherwise
     // start only once the entry runs.
     const styles = files.flatMap((fileName) => [

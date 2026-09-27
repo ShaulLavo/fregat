@@ -22,6 +22,14 @@ export const phoneShell: Scenario = {
     'At a touch phone viewport: session list, session, pickers as bottom sheets, changes, diffs that share one editor tab, the terminal, and Back through each, with no horizontal scroll.',
   capture: { width: 390, height: 844, scale: 2, touch: true },
   async run(page, { step }) {
+    await selectors.phoneLevel(page, 'sessions').waitFor()
+    const desktopRequests = await page.evaluate<string[]>(`performance.getEntriesByType('resource')
+      .map(entry => entry.name).filter(name => /workbench-[^/]+[.](js|css)$/.test(name))`)
+    equal(
+      desktopRequests.length,
+      0,
+      `Phone boot fetched desktop chunks: ${desktopRequests.join(', ')}`,
+    )
     const fixture = await createModifiedFileFixture(
       'phone-shell',
       'notes.md',

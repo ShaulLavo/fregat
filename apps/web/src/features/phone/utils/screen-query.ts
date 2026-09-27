@@ -16,7 +16,7 @@ type ScreenView = ComponentType<ScreenProps>
 export function screenQueryOptions(level: PhoneLevel) {
   return queryOptions({
     queryKey: phoneQueryKeys.screenModule(level),
-    queryFn: () => loadScreen(level),
+    queryFn: loaders[level],
     staleTime: 'static',
     structuralSharing: false,
     gcTime: Infinity,
@@ -25,14 +25,13 @@ export function screenQueryOptions(level: PhoneLevel) {
   })
 }
 
-function loadScreen(level: PhoneLevel): Promise<ScreenView> {
-  if (level === 'sessions')
-    return import('@/features/phone/components/sessions-screen').then((m) => m.SessionsScreen)
-  if (level === 'session')
-    return import('@/features/phone/components/session-screen').then((m) => m.SessionScreen)
-  if (level === 'changes')
-    return import('@/features/phone/components/changes-screen').then((m) => m.ChangesScreen)
-  if (level === 'file')
-    return import('@/features/phone/components/file-screen').then((m) => m.FileScreen)
-  return import('@/features/phone/components/terminal-screen').then((m) => m.TerminalScreen)
+// A loader per level gives every import its own Vite preload call site.
+const loaders: Record<PhoneLevel, () => Promise<ScreenView>> = {
+  sessions: () =>
+    import('@/features/phone/components/sessions-screen').then((m) => m.SessionsScreen),
+  session: () => import('@/features/phone/components/session-screen').then((m) => m.SessionScreen),
+  changes: () => import('@/features/phone/components/changes-screen').then((m) => m.ChangesScreen),
+  file: () => import('@/features/phone/components/file-screen').then((m) => m.FileScreen),
+  terminal: () =>
+    import('@/features/phone/components/terminal-screen').then((m) => m.TerminalScreen),
 }

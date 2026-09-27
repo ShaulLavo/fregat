@@ -19,7 +19,7 @@ import { demoPreviewPlugin } from './scripts/demo-preview-plugin'
 import { devPagePlugin } from './scripts/dev-page-plugin'
 import { bootAppearancePlugin } from './scripts/boot-appearance-plugin'
 import { phosphorWeightPlugin } from './scripts/phosphor-weight-plugin'
-import { SHELL_ENTRIES, shellChunksPlugin } from './scripts/shell-chunks-plugin'
+import { SHELL_ENTRIES, PHONE_BOOT_SCREENS, shellChunksPlugin } from './scripts/shell-chunks-plugin'
 import { shellChunkGroups } from './scripts/shell-chunk-groups'
 
 const workspaceRoot = path.resolve(import.meta.dirname, '../..')
@@ -68,6 +68,9 @@ export default defineConfig(({ command, isPreview, mode }) => {
             groups: shellChunkGroups(path.resolve(import.meta.dirname, 'src/main.tsx'), {
               phone: path.resolve(import.meta.dirname, SHELL_ENTRIES.phone),
               workbench: path.resolve(import.meta.dirname, SHELL_ENTRIES.workbench),
+              phoneScreens: PHONE_BOOT_SCREENS.map((entry) =>
+                path.resolve(import.meta.dirname, entry),
+              ),
             }),
           },
         },

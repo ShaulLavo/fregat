@@ -5,14 +5,18 @@ type ChunkingContext = {
   } | null
 }
 
-type ShellRoots = { readonly phone: string; readonly workbench: string }
+type ShellRoots = {
+  readonly phone: string
+  readonly workbench: string
+  readonly phoneScreens: readonly string[]
+}
 
 const GROUPS = ['initial', 'workbench-shared', 'workbench'] as const
 type GroupName = (typeof GROUPS)[number]
 
 /**
  * Code-splitting groups for each shell's first load:
- * - `initial`: the entry's static graph, plus the phone shell's static modules the workbench
+ * - `initial`: the entry's static graph, plus the phone shell and boot screens' static modules the workbench
  *   also needs, since both shells load this chunk;
  * - `workbench-shared`: the rest of the lazy workbench's static graph that a phone can reach;
  * - `workbench`: the rest, which only a desktop ever loads.
@@ -35,8 +39,10 @@ export function shellChunkGroups(entry: string, shells: ShellRoots) {
 function groupModules(entry: string, shells: ShellRoots, context: ChunkingContext) {
   const workbench = reachable(shells.workbench, context, { dynamic: false })
   const initial = reachable(entry, context, { dynamic: false })
-  for (const id of reachable(shells.phone, context, { dynamic: false }))
-    if (workbench.has(id)) initial.add(id)
+  for (const root of [shells.phone, ...shells.phoneScreens]) {
+    for (const id of reachable(root, context, { dynamic: false }))
+      if (workbench.has(id)) initial.add(id)
+  }
   // Everything a phone could ever load: every import from the entry except the workbench's.
   const phone = reachable(entry, context, { dynamic: true, skip: shells.workbench })
   const groups = new Map<string, GroupName>()

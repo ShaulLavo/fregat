@@ -11,14 +11,9 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import { gzipSync } from 'node:zlib'
+import { firstLoadFiles } from './first-load-files'
 import { attributeOwners, type OwnerRow } from './bundle-owners'
-import {
-  bundleStatsFile,
-  GZIP_LEVEL,
-  type BundleStats,
-  type BundleStatsChunk,
-} from './bundle-stats-plugin'
+import { bundleStatsFile, type BundleStats, type BundleStatsChunk } from './bundle-stats-plugin'
 
 type Options = {
   readonly dir: string
@@ -47,7 +42,7 @@ type PackageIdentity = {
 
 type Report = {
   readonly dir: string
-  /** The phone shell's first load, reported beside the desktop's; the gate reads the desktop's. */
+  /** Includes boot screens and the emitted preload helpers the phone executes. */
   readonly phoneFirstLoad: { readonly scriptGzip: number }
   readonly firstLoad: {
     readonly scriptGzip: number
@@ -81,7 +76,7 @@ const linkedCheckouts = [
 ]
 const NODE_MODULES_PACKAGE = /\/node_modules\/((?:@[^/]+\/)?[^/]+)\//gu
 
-main()
+if (import.meta.main) main()
 
 function main(): void {
   const options = parseOptions(process.argv.slice(2))
@@ -158,62 +153,6 @@ function buildReport(dir: string): Report {
 
 function scriptGzipOf(files: readonly FirstLoadFile[]) {
   return sum(files.filter((file) => file.kind === 'script').map((file) => file.gzipSize))
-}
-
-// What `index.html` names is what a cold browser fetches before the first
-// frame: the entry script, every `modulepreload`, the stylesheet, and the
-// chunks and stylesheets the boot script preloads for the shell it picks.
-function firstLoadFiles(dir: string, shell: 'phone' | 'workbench'): FirstLoadFile[] {
-  const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8')
-  const files: FirstLoadFile[] = []
-  const add = (href: string, kind: FirstLoadFile['kind']) => {
-    const fileName = assetPath(href)
-    const bytes = fs.readFileSync(path.join(dir, fileName))
-    files.push({
-      fileName,
-      kind,
-      size: bytes.byteLength,
-      gzipSize: gzipSync(bytes, { level: GZIP_LEVEL }).byteLength,
-    })
-  }
-  for (const match of html.matchAll(/<(script|link)\b([^>]*)>/gu)) {
-    const tag = match[1]
-    const attributes = match[2] ?? ''
-    const kind = firstLoadKind(tag ?? '', attributes)
-    if (!kind) continue
-    const href = attributeValue(attributes, tag === 'script' ? 'src' : 'href')
-    if (href) add(href, kind)
-  }
-  for (const href of shellChunks(html, shell))
-    add(href, href.endsWith('.css') ? 'stylesheet' : 'script')
-  return files
-}
-
-function shellChunks(html: string, shell: 'phone' | 'workbench'): readonly string[] {
-  const json = /<script type="application\/json" id="shell-chunks">([^<]*)<\/script>/u.exec(html)
-  if (!json?.[1]) return []
-  const manifest = JSON.parse(json[1]) as Partial<Record<string, readonly string[]>>
-  return manifest[shell] ?? []
-}
-
-function firstLoadKind(tag: string, attributes: string): FirstLoadFile['kind'] | null {
-  if (tag === 'script') return attributeValue(attributes, 'src') ? 'script' : null
-  const rel = attributeValue(attributes, 'rel')
-  if (rel === 'modulepreload') return 'script'
-  if (rel === 'stylesheet') return 'stylesheet'
-  return null
-}
-
-function attributeValue(attributes: string, name: string): string | null {
-  const match = new RegExp(`\\b${name}=["']([^"']+)["']`, 'u').exec(attributes)
-  return match?.[1] ?? null
-}
-
-// Hrefs carry the deploy base (`/platform/assets/…`); the file lives at
-// `<dir>/assets/…` regardless of base.
-function assetPath(href: string): string {
-  const index = href.indexOf('assets/')
-  return index === -1 ? href.replace(/^\/+/u, '') : href.slice(index)
 }
 
 function readStats(dir: string): BundleStats | null {

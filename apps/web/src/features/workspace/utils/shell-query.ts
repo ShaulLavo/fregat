@@ -14,16 +14,22 @@ export type ShellView = ComponentType<{ readonly rootPath: FilesystemPath }>
 export function shellQueryOptions(kind: ShellKind) {
   return queryOptions({
     queryKey: workspaceQueryKeys.shellModule(kind),
-    queryFn: (): Promise<ShellView> =>
-      kind === 'phone'
-        ? import('@/features/phone/components/shell').then((module) => module.PhoneShell)
-        : import('@/features/workspace/components/workbench-shell').then(
-            (module) => module.WorkbenchShell,
-          ),
+    queryFn: kind === 'phone' ? loadPhone : loadWorkbench,
     staleTime: 'static',
     structuralSharing: false,
     gcTime: Infinity,
     // The browser may already have the chunk while offline.
     networkMode: 'always',
   })
+}
+
+// Separate functions keep Vite from merging both imports into one preload dependency list.
+function loadPhone(): Promise<ShellView> {
+  return import('@/features/phone/components/shell').then((module) => module.PhoneShell)
+}
+
+function loadWorkbench(): Promise<ShellView> {
+  return import('@/features/workspace/components/workbench-shell').then(
+    (module) => module.WorkbenchShell,
+  )
 }
