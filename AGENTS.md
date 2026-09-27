@@ -128,6 +128,7 @@
 
 ## Testing
 
+- Live-agent testing in the running app is allowed without asking: use the cheapest available model and only a few ad hoc prompts. Never automate these runs or add them to loops, CI, or deploy checks.
 - Run only a test that could catch a specific plausible failure, and the narrowest one.
 - Vitest. Apps run `bun --bun vitest` (Bun APIs need `--bun`); runtime-neutral `packages/*` run plain `vitest`. Projects: `node`, `dom` (happy-dom, never jsdom), `browser` (`*.browser.tsx`, Playwright, plain Node, own `vitest.browser.config.ts` because `define` leaks across projects in one config).
 - Firefox and WebKit runs on this Arch machine need `scripts/playwright-webkit-arch.sh` after any `playwright install` that downloads a new WebKit (Editor and ghostty-webgpu too).
