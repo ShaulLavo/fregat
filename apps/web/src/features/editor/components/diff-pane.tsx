@@ -16,6 +16,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 import { useDiffLanguage } from '@/features/editor/hooks/use-diff-language'
 import { useDiffRows } from '@/features/editor/hooks/use-diff-rows'
 import { useEditorTypography } from '@/features/editor/hooks/use-editor-typography'
+import { useGutterInset } from '@/features/editor/hooks/use-gutter-inset'
 import type { DiffLanguageServerContext } from '@/features/editor/utils/diff-language-context'
 import { HOSTED_EDITOR_KEYMAP } from '@/keymap/editor-keymap'
 import { log } from '@/lib/client-logging'
@@ -98,6 +99,8 @@ export function DiffPane({
     persistence?.plugin,
   ].filter((entry) => entry !== null && entry !== undefined)
   const typography = useEditorTypography()
+  // The new side of a split sits beside the old one, away from the screen edge.
+  const gutterInset = useGutterInset()
   const controller = useEditor({
     ...createDiffEditorOptions(),
     presentationReady: false,
@@ -107,6 +110,7 @@ export function DiffPane({
     // keystroke behind a compare-saved diff, would throw the reader's place away. `setText` is the
     // one that carries the scroll position across, and it is what the package's own contract names.
     ...typography,
+    gutterLeadingInset: side === 'new' ? 0 : gutterInset,
     keymap: HOSTED_EDITOR_KEYMAP,
     // Only the diff plugin: the critical core set would bring line and fold gutters, find, merge
     // conflicts, shiki and LSP, none of which a diff had — and a fold gutter would break the

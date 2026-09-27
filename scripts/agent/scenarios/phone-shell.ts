@@ -25,8 +25,8 @@ export const phoneShell: Scenario = {
     const fixture = await createModifiedFileFixture(
       'phone-shell',
       'notes.md',
-      ['# Notes', '', 'The upload retries twice.'],
-      ['# Notes', '', 'The upload retries three times, then reports why.'],
+      notesWith('The upload retries twice.'),
+      notesWith('The upload retries three times, then reports why.'),
     )
     try {
       // A second changed file, so the phone opens two files from the changes screen.
@@ -130,7 +130,7 @@ async function walkTheStack(page: Page, step: (label: string) => Promise<void>) 
   await selectors.phoneLevel(page, 'file').waitFor()
   await selectors.editorSurface(page).first().waitFor({ timeout: 20_000 })
   await expectFits(page)
-  await expectGutterInset(page)
+  await expectDiffTintAtScreenEdge(page)
   equal(addressTabs(page).length, 1, 'The diff opens one editor tab')
   await step('diff')
 
@@ -338,13 +338,50 @@ async function expectSelectSheet(page: Page, step: (label: string) => Promise<vo
   await selectors.settingsSearch(page).fill('')
 }
 
-/** The editor's line numbers keep the phone's gutter inset off the screen edge. */
-async function expectGutterInset(page: Page) {
-  const gutter = selectors.phoneEditorGutter(page).first()
-  await gutter.waitFor()
-  const box = await gutter.boundingBox()
-  ok(box, 'The gutter must be laid out')
-  ok(box.x >= 8, `The gutter sits against the screen edge: x=${box.x}`)
+/**
+ * A changed row's tint runs from the screen edge to its text, while the line numbers keep the
+ * phone's gutter inset and show all three digits.
+ */
+async function expectDiffTintAtScreenEdge(page: Page) {
+  const band = selectors.phoneDiffBand(page, 'addition').first()
+  await band.waitFor({ timeout: 20_000 })
+  const row = await band.evaluate((gutterRow) => {
+    const index = gutterRow.getAttribute('data-editor-virtual-gutter-row')
+    const scroller = gutterRow.closest('.editor-virtualized')
+    const text = scroller?.querySelector(`[data-editor-virtual-row="${index}"]`)
+    const lane = gutterRow.querySelector('.editor-diff-gutter-lane')
+    return {
+      left: gutterRow.getBoundingClientRect().left,
+      right: gutterRow.getBoundingClientRect().right,
+      tint: getComputedStyle(gutterRow).backgroundColor,
+      textLeft: text?.getBoundingClientRect().left ?? null,
+      textTint: text ? getComputedStyle(text).backgroundColor : null,
+      laneLeft: lane?.getBoundingClientRect().left ?? null,
+    }
+  })
+  ok(row.left <= 0.5, `The tint starts at the screen edge: x=${row.left}`)
+  equal(row.right, row.textLeft, 'The gutter tint meets the text row’s tint')
+  ok(row.tint !== 'rgba(0, 0, 0, 0)', 'The gutter row carries the tint')
+  equal(row.tint, row.textTint, 'The gutter and the text share one tint')
+  ok(row.laneLeft !== null && row.laneLeft >= 8, `Line numbers keep the inset: x=${row.laneLeft}`)
+
+  const numbers = await selectors
+    .phoneDiffNumberLanes(page)
+    .evaluateAll((lanes) =>
+      lanes.map((lane) => ({ text: lane.textContent ?? '', clipped: lane.scrollWidth > lane.clientWidth })),
+    )
+  ok(
+    numbers.some((lane) => /^\d{3}$/.test(lane.text)),
+    `The diff shows three-digit line numbers: ${JSON.stringify(numbers)}`,
+  )
+  const clipped = numbers.filter((lane) => lane.clipped)
+  equal(clipped.length, 0, `No line number is clipped: ${JSON.stringify(clipped)}`)
+}
+
+/** The notes file, long enough that its change sits on a three-digit line. */
+function notesWith(line: string) {
+  const filler = Array.from({ length: 118 }, (_, index) => `Note ${index + 1}.`)
+  return ['# Notes', ...filler.slice(0, 108), line, ...filler.slice(108)]
 }
 
 /** The editor tabs the address records: one token per open tab. */
