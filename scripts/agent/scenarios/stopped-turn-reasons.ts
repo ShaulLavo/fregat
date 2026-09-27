@@ -59,6 +59,26 @@ export const stoppedTurnReasons = isolatedNativeScenario({
       await selectors.incompleteAnswer(page).filter({ hasText: 'PARTIAL_ANSWER FAIL' }).waitFor()
       await step('provider-failed')
 
+      const title = (await readSessionDetail(page, orchestration, sessionId)).title
+      const errorLabel = selectors.sessionByTitle(page, title).getByText('Error', { exact: true })
+      await selectors.sessionStatus(page, title, 'Failed').waitFor()
+      await errorLabel.waitFor()
+      await selectors.turnTryAgain(page).last().click()
+      await selectors.sessionStatus(page, title, 'Working').waitFor()
+      await errorLabel.waitFor({ state: 'hidden' })
+      await settled(page, root, 3)
+      await step('successful-retry-sidebar')
+      await selectors.sessionStatus(page, title, 'Ready').waitFor({ timeout: 5_000 })
+      strictEqual(await errorLabel.count(), 0)
+      strictEqual(
+        (await readSessionDetail(page, orchestration, sessionId)).runtime?.lastError,
+        null,
+      )
+      await page.reload()
+      await selectors.sessionStatus(page, title, 'Ready').waitFor()
+      strictEqual(await errorLabel.count(), 0)
+      await step('successful-retry-after-reload')
+
       await sendPrompt(page, 'SESSION stop after a partial answer.')
       await messages.getByText(/^PARTIAL_ANSWER SESSION/).waitFor({ timeout: 30_000 })
       await dispatch(page, orchestration, { type: 'session.runtime.stop', sessionId })

@@ -597,6 +597,10 @@ export class OrchestrationProjectionPipeline {
       return
     }
     if (event.aggregateKind !== 'session') return
+    if (event.type === 'session.turn-start-requested')
+      this.updateSession(event.aggregateId, {
+        acknowledgedFailureThroughSequence: event.sequence,
+      })
     const failure = failureKind(event)
     if (failure === 'failure')
       this.updateSession(event.aggregateId, { latestFailureSequence: event.sequence })

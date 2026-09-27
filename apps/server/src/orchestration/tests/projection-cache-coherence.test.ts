@@ -38,6 +38,36 @@ afterEach(() => {
 })
 
 describe('orchestration read-model cache coherence', () => {
+  it.each(['failure', 'interruption'] as const)(
+    'acknowledges a prior %s when the user continues and retains later failures',
+    (kind) => {
+      const failure =
+        kind === 'failure'
+          ? runtimeSetEvent({ status: 'error', lastError: 'Provider failed' })
+          : pendingEvent('session.runtime-recovered', {
+              sessionId: SESSION_ID,
+              turnId: 'turn-1',
+              observedSequence: 0,
+              runtimeEpoch: 'epoch-fixture',
+              message: 'The server restarted',
+              createdAt: startedAt,
+            })
+      const events = [...sessionBootstrapEvents(), turnStartEvent('turn-1', requestedAt), failure]
+      expect(project(events).shell?.hasError).toBe(true)
+
+      events.push(turnStartEvent('turn-2', revisedAt))
+      expect(project(events).shell).toMatchObject({ hasError: false, attentionState: 'working' })
+
+      events.push(runtimeSetEvent({ status: 'ready', updatedAt: settledAt }))
+      const completed = project(events)
+      for (const session of [completed.shell, completed.memory, completed.sqlSession])
+        expect(session).toMatchObject({ hasError: false, attentionState: 'settled' })
+
+      events.push(runtimeSetEvent({ status: 'error', lastError: 'New failure' }))
+      expect(project(events).shell).toMatchObject({ hasError: true, attentionReason: 'failure' })
+    },
+  )
+
   it.each([
     { settledState: 'completed', status: 'idle' },
     { settledState: 'completed', status: 'ready' },
