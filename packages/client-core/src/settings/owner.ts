@@ -100,8 +100,10 @@ export class SettingsOwner {
   start() {
     if (this.started || this.controller.signal.aborted) return
     this.started = true
-    this.streamStop = null
-    this.publish()
+    if (this.streamStop) {
+      this.streamStop = null
+      this.publish()
+    }
     void superviseSettingsStream(this.queryClient, this.controller.signal, {
       client: this.options.client,
       admission: this.admission,
