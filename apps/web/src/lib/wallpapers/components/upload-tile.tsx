@@ -41,7 +41,8 @@ export function WallpaperUploadTile({
         multiple
         accept={ACCEPTED_WALLPAPER_TYPES.join(',')}
         aria-label='Upload wallpapers'
-        className='sr-only'
+        // Not sr-only: the primitive's width wins, and the clipped box widens the scroller on iOS.
+        className='hidden'
         tabIndex={-1}
         onChange={(event) => {
           onFiles([...(event.currentTarget.files ?? [])])

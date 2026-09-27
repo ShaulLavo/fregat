@@ -13,14 +13,16 @@ export function Breadcrumbs({ currentPath }: { currentPath: string }) {
   return (
     <div className='flex min-w-0 flex-1 items-center gap-1 overflow-hidden text-xs'>
       {crumbs.map((crumb, index) => (
-        <Fragment key={crumb.path || 'root'}>
+        // Paths are root-relative, so '/' cannot collide with a folder named "root".
+        <Fragment key={crumb.path || '/'}>
           {index > 0 && (
             <CaretRightIcon className='text-muted-foreground size-(--icon-size-sm) shrink-0' />
           )}
           <Button
+            // Parents give up their width first, so the folder you are in keeps its name.
             className={cn(
-              'text-muted-foreground min-w-0 shrink truncate',
-              crumb.path === currentPath && 'text-foreground',
+              'text-muted-foreground min-w-0 shrink-[8] truncate',
+              crumb.path === currentPath && 'text-foreground shrink',
             )}
             onClick={() => navigateTo(crumb.path)}
             size='sm'

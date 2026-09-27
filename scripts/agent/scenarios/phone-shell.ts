@@ -94,10 +94,9 @@ async function walkTheStack(page: Page, step: (label: string) => Promise<void>) 
   await step('session')
 
   // The chat commands with no control of their own are one palette away.
-  await selectors.phoneHeaderAction(page, 'Session actions').click()
-  await page.getByRole('menuitem', { name: /command palette/i }).click()
+  await selectors.phoneHeaderAction(page, 'Command palette').click()
   await selectors.paletteInput(page).waitFor()
-  await step('palette-from-menu')
+  await step('palette-from-header')
   await page.keyboard.press('Escape')
   await selectors.paletteInput(page).waitFor({ state: 'hidden' })
 

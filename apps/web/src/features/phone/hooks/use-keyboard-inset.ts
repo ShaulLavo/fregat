@@ -12,6 +12,9 @@ export function useKeyboardInset() {
     if (!viewport) return
     const root = document.documentElement
     const update = () => {
+      // iOS also scrolls the page to reveal the focused field; with the padding that lifts it
+      // twice, and it overshoots until the next resize. The shell never scrolls, so undo it.
+      if (window.scrollY !== 0) window.scrollTo(0, 0)
       const covered = window.innerHeight - viewport.height - viewport.offsetTop
       root.style.setProperty('--keyboard-inset', `${Math.max(0, Math.round(covered))}px`)
     }
