@@ -249,3 +249,51 @@ activeGuide, onChevronClick, children })`. The lead is padded by `depth × --tre
 - Tests: tsc web and ui; `packages/ui` patterns 55; `row-states.browser` 4; web dom 458;
   `test:tree-browser` 79. `tree-parity-behaviour`, `tree-sticky-scroll` and `tree-file-clicks`
   pass. Gates pass, and the first-load gate is 1,681,783 against a pin of 1,735,134.
+
+#### Independent review, 2026-09-27
+
+The render-cost question is settled. `ListRow` adds a small, consistent React cost, while the
+scrolling frame results meet parity. No performance workaround or source correction was needed.
+
+Two alternating pairs of `renders` and `trace --compare` ran for each scenario with the other
+lanes' heavy work stopped. Baseline was main `5ccbda448`; the branch had merged that same main.
+Each used a warm Vite instance and its own fixture-only API home. Values below cover only the
+wheel actions, from `expanded` or `revealed` through the final scroll checkpoint. Startup and
+fixture teardown are excluded. React subtree durations overlap and must not be added together.
+
+| Action metric                           | Main, runs 1 / 2 | PR, runs 1 / 2  |
+| --------------------------------------- | ---------------- | --------------- |
+| Large: `TreeView` subtree ms            | 241.9 / 247.3    | 268.7 / 275.9   |
+| Large: `ListRow` subtree ms             | absent           | 25.3 / 29.3     |
+| Large: median worst task per wheel, ms  | 6.2 / 6.1        | 6.8 / 7.1       |
+| Large: tasks over 16 ms                 | 5 / 5            | 4 / 4           |
+| Large: dropped-frame events             | 20 / 21          | 19 / 17         |
+| Large: elements restyled                | 18,414 / 18,411  | 15,271 / 15,269 |
+| Sticky: `TreeView` subtree ms           | 46.2 / 48.7      | 55.7 / 59.7     |
+| Sticky: `ListRow` subtree ms            | absent           | 8.8 / 10.3      |
+| Sticky: median worst task per wheel, ms | 6.5 / 5.7        | 6.0 / 6.8       |
+| Sticky: tasks over 16 ms                | 0 / 0            | 0 / 0           |
+| Sticky: dropped-frame events            | 10 / 8           | 8 / 8           |
+
+Both versions have 48 `TreeView` and 2,375 `TreeRow` updates during large scrolling, and 16 / 872
+during sticky scrolling. `TreeRowLead` updates zero times. `ListRow` updates once per already
+updating tree row. There are no extra tree render passes and no wheel task over 50 ms. Accept the
+roughly 1.1 ms extra React work per wheel because frame drops and tasks crossing the frame budget
+do not increase. This is scroll parity, not a React CPU reduction.
+
+- Evidence manifest, extraction scripts and complete action metrics:
+  `/work/tmp/w3-tree-review/{measurements.json,frames.json,summarize.py,frames.py}`.
+  Large render pairs are `20260927T164634Z` / `164727Z` and `164823Z` / `164915Z`; trace pairs are
+  `164655Z` / `164748Z` and `164845Z` / `164937Z`, under `/work/tmp/fregat-evidence/`.
+  Sticky render pairs are `165011Z` / `165050Z` and `165131Z` / `165209Z`; trace pairs are
+  `165028Z` / `165106Z` and `165147Z` / `165226Z`.
+- All 64 parity captures have zero pixel and style drift:
+  `/work/tmp/fregat-evidence/20260927T165537Z-scenario-tree-parity/`. Keyboard focus and sticky
+  screenshots were read back. A separate live long-directory-chain fixture showed a continuous
+  focus ring; the removed marker inset does not hide it.
+- Current checks pass: gates, web and UI types, 79 tree browser tests, 15 listbox tests, and four
+  row-state browser tests. Main's CI vocabulary correction `3174a870c` is merged too.
+- Large-scroll fixture cleanup produces missing-workspace requests after its last checkpoint on
+  both branches. These do not enter the measurements. Parity's denied-folder and failed-folder
+  requests are deliberate fixtures. Sticky captures use the same visible rows and action counts;
+  generated files outside the viewport make the two worktrees' total file counts differ.
