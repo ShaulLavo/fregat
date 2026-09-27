@@ -214,6 +214,9 @@ export function ChatDraftView({
       setSendError('Workspace chat is still preparing.')
       return 'rejected'
     }
+    // Read before the send's only await, so it matches what ChatInput itself
+    // captured before calling this handler.
+    const draftBeforeSend = useChatInputDraftStore.getState().getDraft(draftTarget)
     const operation = navigation.getSnapshot()
     const additional = useChatInputDraftStore
       .getState()
@@ -246,7 +249,13 @@ export function ChatDraftView({
       return 'started'
     }
 
-    useChatInputDraftStore.getState().setIdentity(draftTarget, null)
+    // The identity's worktree target is claimed by the new session either way, but
+    // wiping the whole draft would blank text typed while the send was in flight —
+    // ChatInput's own guarded clear already handles that case once identity alone
+    // changes the reference it compares against.
+    if (useChatInputDraftStore.getState().getDraft(draftTarget) === draftBeforeSend)
+      useChatInputDraftStore.getState().clearDraft(draftTarget)
+    else useChatInputDraftStore.getState().setIdentity(draftTarget, null)
     if (navigation.getSnapshot() === operation) onSessionCreated(outcome.sessionId)
 
     return 'sent'

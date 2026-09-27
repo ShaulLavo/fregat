@@ -1,5 +1,5 @@
 import '@workspace/ui/globals.css'
-import { cleanup, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { page, userEvent } from 'vitest/browser'
 import { FilePickerDialog } from '@/components/file-picker-dialog'
@@ -58,9 +58,8 @@ test('file type dropdown filters every view, clears hidden selection, and retain
   const trigger = screen.getByRole('combobox', { name: 'File type' })
   trigger.focus()
   await userEvent.keyboard('{ArrowDown}')
-  await waitFor(() =>
-    expect(screen.getByRole('option', { name: 'Supported files (.ts, .md)' })).toBeVisible(),
-  )
+  // The popup becomes visible before keyboard focus reaches its selected option.
+  await waitFor(() => expect(screen.getByRole('option', { name: '.md' })).toHaveFocus())
   await userEvent.keyboard('{Escape}')
   expect(screen.getByRole('textbox', { name: 'Search files' })).toHaveValue('picker')
   expect(screen.getByRole('dialog', { name: 'Choose file' })).toBeVisible()
@@ -83,3 +82,42 @@ test('file type dropdown filters every view, clears hidden selection, and retain
   view.unmount()
   view.queryClient.clear()
 }, 30_000)
+
+test('escape while the file type popup is opening keeps the typed search', async () => {
+  const onOpenChange = vi.fn()
+  await page.viewport(1440, 1000)
+  const view = renderWithProviders(
+    <FilePickerDialog
+      open
+      mode='file'
+      accept={['.ts', '.md']}
+      value={{
+        name: 'editor-tab-a.ts',
+        path: filesystemPath('picker/editor-tab-a.ts'),
+        type: 'file',
+        size: 0,
+        mtimeMs: 0,
+        birthtimeMs: 0,
+        version: 'test',
+      }}
+      onOpenChange={onOpenChange}
+      onPick={() => {}}
+    />,
+  )
+  await waitFor(() => expect(screen.getByRole('option', { name: /picker-notes.md/ })).toBeVisible())
+  await page.getByRole('textbox', { name: 'Search files' }).fill('picker')
+  const trigger = screen.getByRole('combobox', { name: 'File type' })
+  trigger.focus()
+  // Fired back to back with no await between them, so Escape lands before the popup's
+  // positioning pass (`alignItemWithTrigger`) can move focus off the trigger — the same
+  // gap that let a real Escape keydown reach the dialog and wipe the search in production.
+  fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+  expect(trigger).toHaveAttribute('aria-expanded', 'true')
+  expect(trigger).toHaveFocus()
+  fireEvent.keyDown(trigger, { key: 'Escape' })
+  expect(screen.getByRole('textbox', { name: 'Search files' })).toHaveValue('picker')
+  expect(screen.getByRole('dialog', { name: 'Choose file' })).toBeVisible()
+  expect(onOpenChange).not.toHaveBeenCalled()
+  view.unmount()
+  view.queryClient.clear()
+})

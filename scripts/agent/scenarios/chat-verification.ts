@@ -171,6 +171,15 @@ export async function typePrompt(page: Page, prompt: string) {
   ok(false, 'The composer never accepted the prompt')
 }
 
+/** Stops and deletes every session but one — a second session a drive opened for itself. */
+export async function removeOtherSessions(page: Page, orchestration: string, keep: string) {
+  const shell = await readShell(page, orchestration)
+  for (const other of shell.sessions.filter((entry) => entry.id !== keep)) {
+    await dispatch(page, orchestration, { type: 'session.runtime.stop', sessionId: other.id })
+    await dispatch(page, orchestration, { type: 'session.delete', sessionId: other.id })
+  }
+}
+
 /** Stops and deletes a real-provider scenario's sessions, then its project and fixture. */
 export async function removeScenarioSessions(
   page: Page,
