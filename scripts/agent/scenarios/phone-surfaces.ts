@@ -10,7 +10,7 @@ import type { Scenario } from './index'
 
 /**
  * The phone's secondary surfaces: the folder picker as a full-screen sheet, the command palette
- * from a new session, and Settings with nothing that scrolls sideways.
+ * from a new session, and Settings contained within the phone viewport.
  */
 export const phoneSurfaces: Scenario = {
   name: 'phone-surfaces',
@@ -114,7 +114,7 @@ async function settings(page: Page, step: (label: string) => Promise<void>) {
   await page.locator('[data-phone-shell] header h1').getByText('Settings').waitFor()
   await page.waitForTimeout(800)
   await step('settings')
-  await expectNoSidewaysScroll(page, '[data-phone-shell]')
+  await expectNoSidewaysScroll(page, '[data-phone-shell]', '.no-scrollbar')
   await expectNothingPastTheEdge(page)
 }
 
@@ -165,11 +165,21 @@ async function expectNoSidewaysScroll(page: Page, root: string, strips = '') {
     ([selector, stripSelector]) => {
       const scope = document.querySelector(selector!)
       if (!scope) return ['missing root']
-      return [scope, ...scope.querySelectorAll('*')]
+      const rootBox = scope.getBoundingClientRect()
+      return [document.documentElement, document.body, scope, ...scope.querySelectorAll('*')]
         .filter((element) => {
+          if (
+            element === scope ||
+            element === document.documentElement ||
+            element === document.body
+          )
+            return element.scrollWidth > element.clientWidth + 1
           const style = getComputedStyle(element)
           if (style.overflowX !== 'auto' && style.overflowX !== 'scroll') return false
-          if (stripSelector && element.matches(stripSelector)) return false
+          if (stripSelector && element.matches(stripSelector)) {
+            const box = element.getBoundingClientRect()
+            return box.left < rootBox.left - 1 || box.right > rootBox.right + 1
+          }
           return element.scrollWidth > element.clientWidth + 1
         })
         .map(
