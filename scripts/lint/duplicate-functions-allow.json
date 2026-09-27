@@ -3,10 +3,20 @@
     "name": "send",
     "files": [
       "scripts/agent/fixtures/native-checkpoint.mjs",
+      "scripts/agent/fixtures/native-claude.mjs",
       "scripts/agent/fixtures/native-codex.mjs",
+      "scripts/agent/fixtures/native-conversation.mjs",
       "scripts/agent/fixtures/native-model-options.mjs",
       "scripts/agent/fixtures/native-queue.mjs",
       "scripts/agent/fixtures/native-titles.mjs"
+    ],
+    "reason": "Each fixture is copied on its own into an isolated temp directory and spawned as a standalone mock binary, so none can import a shared module."
+  },
+  {
+    "name": "marker",
+    "files": [
+      "scripts/agent/fixtures/native-claude.mjs",
+      "scripts/agent/fixtures/native-conversation.mjs"
     ],
     "reason": "Each fixture is copied on its own into an isolated temp directory and spawned as a standalone mock binary, so none can import a shared module."
   },

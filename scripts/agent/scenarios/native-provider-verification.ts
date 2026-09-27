@@ -1,5 +1,5 @@
 import { ok } from 'node:assert/strict'
-import { chmod, copyFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Page } from 'playwright'
 import * as v from 'valibot'
@@ -166,6 +166,134 @@ async function waitForNativeExit(root: string) {
   ok(false, 'Isolated native fixture processes must exit before removing their directory')
 }
 
+export type NativeProvider = Awaited<ReturnType<typeof installNativeProvider>>
+
+/**
+ * A Codex instance that runs `fixture` from its own folder under /work/tmp, which is also its
+ * Codex home. `remove` drops the instance, waits for every fixture process to exit, deletes the
+ * folder and returns what the fixture recorded.
+ */
+async function installNativeProvider(
+  page: Page,
+  base: string,
+  input: {
+    readonly name: string
+    readonly fixture: URL
+    readonly displayLabel: string
+    readonly kind?: FixtureProviderKind
+  },
+) {
+  const kind = input.kind ?? 'codex'
+  const root = await mkdtemp(`/work/tmp/fregat-${input.name}-native-`)
+  // Claude's SDK runs a path without a script extension directly, as it runs the real CLI.
+  const binary = join(root, kind === 'codex' ? 'codex.mjs' : 'claude')
+  await copyFile(input.fixture, binary)
+  await chmod(binary, 0o700)
+  await writeFile(join(root, 'scenario'), input.name)
+  const providerInstanceId = `verify-${crypto.randomUUID()}`
+  const configDir = join(root, 'config')
+  if (kind === 'claude') await mkdir(configDir)
+  await writeSettings(page, base, [
+    {
+      kind: 'provider.setEnabled',
+      providerInstanceId,
+      enabled: true,
+      createIfMissing: {
+        driverKind: kind,
+        displayLabel: input.displayLabel,
+        binaryPath: binary,
+        config: kind === 'codex' ? { home: root } : { configDir },
+      },
+    },
+  ])
+  await assertFixtureProviders(page, base, binary)
+  const remove = async () => {
+    const current = await settingsSnapshot(page, base)
+    const remaining = current.values['providers.instances'].filter(
+      (item) => item.providerInstanceId !== providerInstanceId,
+    )
+    await writeRawSetting(page, base, 'providers.instances', remaining)
+    const entries = await waitForNativeExit(root)
+    await rm(root, { recursive: true, force: true })
+    return entries
+  }
+  return {
+    binary,
+    /** Claude's config folder; Codex keeps its home in `root`. */
+    configDir,
+    model: { providerInstanceId, model: kind === 'codex' ? 'gpt-5.5' : CLAUDE_FIXTURE_MODEL },
+    providerInstanceId,
+    remove,
+    root,
+  }
+}
+
+/** The Codex stand-in whose threads persist, fork, rewind and compact; see the fixture's header. */
+const CONVERSATION_FIXTURE = new URL('../fixtures/native-conversation.mjs', import.meta.url)
+
+/** The Claude Code stand-in speaking the SDK's stream-json protocol; see the fixture's header. */
+const CLAUDE_FIXTURE = new URL('../fixtures/native-claude.mjs', import.meta.url)
+const CLAUDE_FIXTURE_MODEL = 'claude-haiku-4-5'
+
+async function withClaudeProvider<T>(
+  page: Page,
+  orchestration: string,
+  name: string,
+  body: (native: NativeProvider) => Promise<T>,
+) {
+  const native = await installNativeProvider(page, orchestration.replace(/\/orchestration$/, ''), {
+    name,
+    fixture: CLAUDE_FIXTURE,
+    displayLabel: `${name} fixture`,
+    kind: 'claude',
+  })
+  try {
+    return await body(native)
+  } finally {
+    await native.remove()
+  }
+}
+
+/** Runs `body` with a conversation fixture instance on the owner at `orchestration`, then removes it. */
+export async function withConversationProvider<T>(
+  page: Page,
+  orchestration: string,
+  name: string,
+  body: (native: NativeProvider) => Promise<T>,
+) {
+  const native = await installNativeProvider(page, orchestration.replace(/\/orchestration$/, ''), {
+    name,
+    fixture: CONVERSATION_FIXTURE,
+    displayLabel: `${name} fixture`,
+  })
+  try {
+    return await body(native)
+  } finally {
+    await native.remove()
+  }
+}
+
+export type FixtureProviderKind = 'codex' | 'claude'
+
+/** Runs `body` with a fixture instance of `kind` on the owner at `orchestration`, then removes it. */
+export async function withFixtureProvider<T>(
+  page: Page,
+  orchestration: string,
+  provider: { readonly kind: FixtureProviderKind; readonly name: string },
+  body: (native: NativeProvider) => Promise<T>,
+) {
+  if (provider.kind === 'codex')
+    return withConversationProvider(page, orchestration, provider.name, body)
+  return withClaudeProvider(page, orchestration, provider.name, body)
+}
+
+/** Keeps the conversation fixture's turns running until `release` removes the hold. */
+export async function holdTurns(native: NativeProvider) {
+  const file = join(native.root, 'hold')
+  await writeFile(file, '')
+  return { release: () => rm(file, { force: true }) }
+}
+
 /** A disposable checkout the session runs in, instead of whichever worktree is registered first. */
 type PreparedWorktree = {
   readonly path: string
@@ -244,34 +372,20 @@ export function isolatedNativeScenario(options: {
       const orchestration = await openChat(page)
       const base = orchestration.replace(/\/orchestration$/, '')
       await assertFixtureProviders(page, base)
-      const root = await mkdtemp(`/work/tmp/fregat-${options.name}-native-`)
-      const binary = join(root, 'codex.mjs')
-      await copyFile(options.fixture, binary)
-      await chmod(binary, 0o700)
-      await writeFile(join(root, 'scenario'), options.name)
-      const providerInstanceId = `verify-${crypto.randomUUID()}`
       const sessionId = crypto.randomUUID()
       const title = `${options.name} verification ${sessionId.slice(0, 8)}`
+      const native = await installNativeProvider(page, base, {
+        name: options.name,
+        fixture: options.fixture,
+        displayLabel: title,
+      })
+      const { binary, providerInstanceId, root } = native
       let created = false
       let driveEvidence: unknown
       const prepared = await options.prepareWorktree?.()
       let fixtureProjectId: string | null = null
       const newWorktreeId = options.newWorktree ? crypto.randomUUID() : null
       try {
-        await writeSettings(page, base, [
-          {
-            kind: 'provider.setEnabled',
-            providerInstanceId,
-            enabled: true,
-            createIfMissing: {
-              driverKind: 'codex',
-              displayLabel: title,
-              binaryPath: binary,
-              config: { home: root },
-            },
-          },
-        ])
-        await assertFixtureProviders(page, base, binary)
         const worktree = prepared
           ? await registerFixtureProject(page, orchestration, prepared.path)
           : await firstWorktree(page, orchestration)
@@ -353,12 +467,7 @@ export function isolatedNativeScenario(options: {
             projectId: fixtureProjectId,
             force: true,
           })
-        const current = await settingsSnapshot(page, base)
-        const remaining = current.values['providers.instances'].filter(
-          (item) => item.providerInstanceId !== providerInstanceId,
-        )
-        await writeRawSetting(page, base, 'providers.instances', remaining)
-        const entries = await waitForNativeExit(root)
+        const entries = await native.remove()
         evidence.set(page, {
           driveEvidence,
           nativeReplies: entries.filter(
@@ -371,7 +480,6 @@ export function isolatedNativeScenario(options: {
             (entry) => entry.event === 'spawn' || entry.event === 'exit',
           ),
         })
-        await rm(root, { recursive: true, force: true })
         await prepared?.release()
       }
     },
