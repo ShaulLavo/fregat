@@ -70,6 +70,7 @@ async function walkTheStack(page: Page, step: (label: string) => Promise<void>) 
   await page.locator('[data-phone-shell] header h1').getByText('Settings').waitFor()
   await expectFits(page)
   await step('settings')
+  await expectSelectSheet(page, step)
   await selectors.phoneBack(page).click()
   await selectors.phoneLevel(page, 'sessions').waitFor()
 
@@ -91,10 +92,23 @@ async function walkTheStack(page: Page, step: (label: string) => Promise<void>) 
   await selectors.modelPickerTrigger(page).click()
   await selectors.modelPickerPanel(page).waitFor()
   await expectSheet(page, selectors.modelPickerPanel(page))
+  await expectFocusStaysInSheet(page)
   await step('model-picker-sheet')
   // A tap on the scrim puts the sheet away, as on any phone.
   await page.touchscreen.tap(page.viewportSize()!.width / 2, 120)
   await selectors.modelPickerPanel(page).waitFor({ state: 'hidden' })
+
+  // The system Back gesture closes the sheet and leaves the screen under it.
+  await selectors.modelPickerTrigger(page).click()
+  await selectors.modelPickerPanel(page).waitFor()
+  await page.goBack()
+  await selectors.modelPickerPanel(page).waitFor({ state: 'hidden' })
+  await page.waitForTimeout(300)
+  ok(await selectors.phoneLevel(page, 'session').isVisible(), 'Back closed only the sheet')
+
+  await expectSheetStillMovesNot(page)
+  await step('reduced-motion-sheet')
+  await expectSheetAboveKeyboard(page, step)
 
   // A menu of choices is a sheet too.
   await selectors.composerModes(page).click()
@@ -211,6 +225,117 @@ async function expectSheet(page: Page, locator: Locator) {
   )
   equal(await locator.getAttribute('data-presentation'), 'sheet')
   ok(await selectors.sheetBackdrop(page).isVisible(), 'A scrim covers the screen behind the sheet')
+}
+
+/** Tab walks the sheet's own controls and never reaches the page behind the scrim. */
+async function expectFocusStaysInSheet(page: Page) {
+  for (let press = 0; press < 12; press += 1) {
+    await page.keyboard.press('Tab')
+    // Tabbing past the last control lands on a focus guard, which hands focus back a frame later.
+    const inside = await page.evaluate(async () => {
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+      const active = document.activeElement
+      if (active?.closest('[data-presentation="sheet"]')) return null
+      return active ? active.outerHTML.slice(0, 200) : 'nothing'
+    })
+    ok(inside === null, `Focus left the sheet after ${press + 1} Tab presses: ${inside}`)
+  }
+}
+
+/** Under Reduce Motion the sheet only fades: no frame of its rise moves it. */
+async function expectSheetStillMovesNot(page: Page) {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  try {
+    await selectors.modelPickerTrigger(page).click()
+    const offsets = await page.evaluate(
+      () =>
+        new Promise<number[]>((resolve) => {
+          const seen: number[] = []
+          const sample = () => {
+            const sheet = document.querySelector('[data-presentation="sheet"]')
+            if (sheet) {
+              const style = getComputedStyle(sheet)
+              // The flat feel moves by keyframed transform, the physical feel by `translate`.
+              const translateY =
+                style.translate === 'none' ? 0 : parseFloat(style.translate.split(' ')[1] ?? '0')
+              seen.push(new DOMMatrix(style.transform).m42 + translateY)
+            }
+            if (seen.length >= 8) return resolve(seen)
+            requestAnimationFrame(sample)
+          }
+          requestAnimationFrame(sample)
+        }),
+    )
+    ok(
+      offsets.every((offset) => Math.abs(offset) < 0.5),
+      `The sheet moved under reduced motion: ${offsets.join(', ')}`,
+    )
+  } finally {
+    await page.emulateMedia({ reducedMotion: null })
+  }
+}
+
+/**
+ * With the iOS keyboard up (its height stands in as the inset the shell measures), the sheet fits
+ * what is left and its search field stays on screen: an iPhone SE upright, then any phone on its side.
+ */
+async function expectSheetAboveKeyboard(page: Page, step: (label: string) => Promise<void>) {
+  const original = page.viewportSize()!
+  const cases = [
+    { label: 'keyboard-se', width: 375, height: 667, keyboard: 300 },
+    { label: 'keyboard-landscape', width: 667, height: 375, keyboard: 200 },
+  ]
+  try {
+    for (const { label, width, height, keyboard } of cases) {
+      if (await selectors.modelPickerPanel(page).isVisible()) {
+        await page.keyboard.press('Escape')
+        await selectors.modelPickerPanel(page).waitFor({ state: 'hidden' })
+      }
+      await page.setViewportSize({ width, height })
+      // The shell measures the keyboard on every visual-viewport resize; let this one land first.
+      await page.waitForFunction((wide) => window.innerWidth === wide, width)
+      await page.waitForTimeout(300)
+      await page.evaluate(
+        (inset) => document.documentElement.style.setProperty('--keyboard-inset', `${inset}px`),
+        keyboard,
+      )
+      await selectors.modelPickerTrigger(page).click()
+      await selectors.modelPickerPanel(page).waitFor()
+      await page.waitForTimeout(400)
+      const search = await selectors.modelPickerSearch(page).boundingBox()
+      const sheet = await selectors.modelPickerPanel(page).boundingBox()
+      ok(search && sheet, 'The sheet and its search field must be laid out')
+      ok(search.y >= 0, `The search field is above the screen: ${JSON.stringify(search)}`)
+      ok(
+        sheet.y + sheet.height <= height - keyboard + 1 &&
+          search.y + search.height <= height - keyboard,
+        `The sheet reaches under the keyboard: ${JSON.stringify({ sheet, search })}`,
+      )
+      await step(label)
+    }
+  } finally {
+    await page.keyboard.press('Escape')
+    await selectors.modelPickerPanel(page).waitFor({ state: 'hidden' })
+    await page.evaluate(() => document.documentElement.style.setProperty('--keyboard-inset', '0px'))
+    await page.setViewportSize(original)
+  }
+}
+
+/** A Select on the settings screen opens as a sheet; Escape closes it and gives focus back. */
+async function expectSelectSheet(page: Page, step: (label: string) => Promise<void>) {
+  await selectors.settingsSearch(page).fill('Session notifications')
+  const trigger = page.locator('[data-phone-shell] [data-slot="select-trigger"]').first()
+  await trigger.click()
+  const list = page.locator('[data-slot="select-content"]')
+  await expectSheet(page, list)
+  await step('select-sheet')
+  await page.keyboard.press('Escape')
+  await list.waitFor({ state: 'hidden' })
+  ok(
+    await trigger.evaluate((element) => element === document.activeElement),
+    'Escape gives focus back to the Select',
+  )
+  await selectors.settingsSearch(page).fill('')
 }
 
 /** The editor's line numbers keep the phone's gutter inset off the screen edge. */

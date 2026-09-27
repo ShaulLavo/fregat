@@ -532,28 +532,49 @@ composing keyboard such as Gboard may type the letter), through the mesh.
 ### Follow-up: sheets, one phone tab, diff gutter (2026-09-27)
 
 - **Pickers are bottom sheets.** `@workspace/ui/patterns/sheet` holds the presentation: a
-  `PresentationContext` the app shell sets to `sheet` in the phone shell, and the sheet's classes
-  (pinned to the bottom edge above an iOS keyboard, full width up to `--sheet-max-width`, at most
-  `--sheet-max-height`, `lg` top corners, `shadow-xl`, opaque with `ring-1 ring-foreground/10`, a
-  scrim, safe-area bottom padding). `Popover`, `DropdownMenu` and `Select` read it, so the model
-  picker, effort and access menus, the branch, workspace and machine menus, and every other
-  picker change with no call-site edits. The sheet rises from the bottom in both feels, fades only
-  under reduced motion, and opens with the dialog's `open` voice. A tap on the scrim closes it.
+  `PresentationContext` that `AppRuntimeContent` sets to `sheet` while the phone shell is up (above
+  `CommandProvider`, so Settings, the palette and the pickers it renders get it too), and the
+  sheet's classes: pinned to the bottom edge above an iOS keyboard, full width up to
+  `--sheet-max-width`, `lg` top corners, `shadow-xl`, opaque with `ring-1 ring-foreground/10`, a
+  scrim, and a bottom pad that clears the home indicator. `Popover`, `DropdownMenu` and `Select`
+  read it, so the model picker, effort and access menus, the branch, workspace and machine menus,
+  and the settings Selects change with no call-site edits.
+- **Modal.** A sheet is modal: scroll locked, focus kept inside, the page behind inert. `Popover`
+  decides its presentation once at the root and re-provides it, defaults `modal` to the sheet, and
+  renders a visually hidden Close, which Base UI needs before it traps focus. Menus and Selects are
+  modal already.
+- **Height.** `--sheet-max-height` is `min(85dvh, 100dvh − keyboard − top safe area − one bar)`:
+  iOS lays its keyboard over the page, so `dvh` alone never shrinks for it. A call site's fixed
+  height yields to the cap and its list scrolls.
+- **Motion.** The sheet rises from the bottom in both feels and only fades under Reduce Motion.
+  The reduced-motion rule for every floating surface is unlayered now: tw-animate's slide and
+  zoom utilities sit in the utilities layer, which beat it from `@layer base`. The sheet opens with
+  the dialog's `open` voice; a tap on the scrim closes it.
+- **Back.** The system Back gesture closes the top sheet first (`dismissTopSheet`, as Escape does,
+  focus return included), through a history blocker the phone stack installs; the next Back pops
+  the screen.
 - **Stays anchored:** context menus (a long press opens its menu at the finger, as iOS and Android
   do; the session menu from `…` is the same surface), the combobox (its list follows the field
-  being typed in) and the composer's `@` and `/` menu, which opts out with
-  `presentation='anchored'` because it is already docked above the composer at its width.
+  being typed in) and the composer's `@` and `/` menu, whose `Popover` opts out with
+  `presentation='anchored'` because it is already docked above the composer at its width. The
+  unused dropdown submenu parts are deleted rather than stacking a second sheet.
 - **One phone tab.** The phone keeps preview-tab semantics: the tab it opened is its own, and the
   next file it opens takes that tab's place (`lib/shell/utils/phone-tab.ts`,
   `state/navigation-phone-tab.ts`). A tab that was already open when the phone showed it is never
-  closed, and a tab with unsaved edits stops being the phone's (typing pins it, as in VS Code). The
-  claim is dropped when the window returns to the workbench. Not kept across a reload: after one,
-  the tab the phone had open stays as an ordinary tab.
+  closed. The first edit pins the phone's tab, as typing pins a preview tab: saving it later never
+  frees it. The claim is dropped when the window returns to the workbench. Not kept across a
+  reload: after one, the tab the phone had open stays as an ordinary tab.
 - **Diff gutter.** `.app-editor-host` pads its left edge by `--density-editor-inset-x`, zero on the
   desktop and the row padding on the phone, so line numbers sit off the screen edge; the stack
   frame adds the safe area. `--keyboard-inset` now lives on the root, so a portaled sheet can sit
   above the keyboard too.
-- Evidence: scenario `phone-shell` steps `model-picker-sheet`, `choice-menu-sheet`, `diff` (gutter
+- **Open:** diff row tints stop at that inset instead of reaching the screen edge. The editor sizes
+  its gutter lanes in JavaScript and tints the diff gutter cell, so a full-bleed tint needs a
+  leading gutter inset in the Editor (`editor-diff` and `editor-gutters`), with an `editor-ref`
+  bump.
+- Evidence: scenario `phone-shell` steps `select-sheet`, `model-picker-sheet` (focus stays in the
+  sheet under Tab), Back closing a sheet, `reduced-motion-sheet`, `keyboard-se` and
+  `keyboard-landscape` (search field above the keyboard), `choice-menu-sheet`, `diff` (gutter
   inset) and `one-phone-tab`, at 390 and 430px with `--touch`.
 
 ### Owner questions (wave 2)

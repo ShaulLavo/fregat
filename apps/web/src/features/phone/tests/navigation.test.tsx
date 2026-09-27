@@ -3,7 +3,7 @@ import { afterEach } from 'vitest'
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { filesystemPath } from '@/lib/documents/utils/identity'
+import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import { settingsTab } from '@/lib/documents/utils/tabs'
 import { rememberDeskMode, takeDeskMode, useShellStore } from '@/lib/shell/state/store'
 import { phoneLevel } from '@/features/phone/utils/level'
@@ -137,4 +137,23 @@ test('each file the phone opens replaces the last one it opened, and desk tabs s
   expect(openPaths(owner)).toEqual(['main/keep.txt'])
   await navigation.openFile({ owner, path: filesystemPath('main/d.txt') })
   expect(openPaths(owner)).toEqual(['main/keep.txt', 'main/d.txt'])
+})
+
+test('an edit pins the phone’s tab, so saving it never lets the next file replace it', async () => {
+  const { domain, editor, environmentId, navigation, registration, refresh } =
+    await createChatNavigationFixture()
+  await domain.createSession(registration.worktreeId, DOMAIN_SESSION)
+  for (const name of ['b.txt', 'c.txt']) writeFileSync(path.join(domain.main, name), name)
+  await refresh()
+  const owner = editor.workspaceStore
+  await navigation.openChat({ environmentId, sessionId: DOMAIN_SESSION, surface: 'main' })
+
+  useShellStore.setState({ kind: 'phone' })
+  await navigation.openFile({ owner, path: filesystemPath('main/b.txt') })
+  const edited = fileDocumentKey(filesystemPath('main/b.txt'))
+  editor.documentStore.setState({ dirtyDocumentKeys: new Set([edited]) })
+  // Saved: clean again, and still pinned.
+  editor.documentStore.setState({ dirtyDocumentKeys: new Set() })
+  await navigation.openFile({ owner, path: filesystemPath('main/c.txt') })
+  expect(openPaths(owner)).toEqual(['main/b.txt', 'main/c.txt'])
 })

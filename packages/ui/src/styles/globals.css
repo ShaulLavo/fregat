@@ -155,7 +155,6 @@
     [data-slot='alert-dialog-content'],
     [data-slot='popover-content'],
     [data-slot='dropdown-menu-content'],
-    [data-slot='dropdown-menu-sub-content'],
     [data-slot='context-menu-content'],
     [data-slot='context-menu-sub-content'],
     [data-slot='select-content'],
@@ -247,12 +246,16 @@
   --density-sheet-padding: 0.5rem;
   /* Room between the screen edge and an editor's line numbers; a desktop pane edge needs none. */
   --density-editor-inset-x: 0px;
-  /* A picker presented as a bottom sheet: it never covers the whole screen, and a landscape
-     phone keeps it reading width. */
-  --sheet-max-height: 85dvh;
-  --sheet-max-width: 36rem;
   /* What an iOS on-screen keyboard covers; the phone shell measures it. */
   --keyboard-inset: 0px;
+  /* A picker presented as a bottom sheet leaves a bar of the screen above it, and fits what the
+     keyboard leaves: iOS overlays the keyboard, so `dvh` alone never shrinks for it. */
+  --sheet-max-height: min(
+    85dvh,
+    calc(100dvh - var(--keyboard-inset) - env(safe-area-inset-top) - var(--bar-height))
+  );
+  /* A landscape phone keeps the sheet at reading width. */
+  --sheet-max-width: 36rem;
   --density-menu-item-padding-y: 0.5rem;
   --density-textarea-min-height: 4rem;
   --density-textarea-padding-y: 0.5rem;
@@ -1070,28 +1073,32 @@
     @apply bg-background text-foreground;
     font-family: var(--font-ui);
   }
-  /* Reduced motion means fewer and gentler animations, not zero. Opacity still
-     carries the state change — what goes away is movement: the zoom, the slide,
-     and the transform transitions. tw-animate-css drives its enter/exit
-     keyframes entirely from these custom properties, so neutralizing scale and
-     translate leaves --tw-enter-opacity / --tw-exit-opacity untouched. */
-  @media (prefers-reduced-motion: reduce) {
+}
+
+/* Reduced motion means fewer and gentler animations, not zero. Opacity still carries the state
+   change; what goes away is movement: the zoom, the slide, and the transform transitions.
+   tw-animate-css drives its enter/exit keyframes entirely from these custom properties, so
+   neutralizing scale and translate leaves --tw-enter-opacity / --tw-exit-opacity untouched.
+   Unlayered: tw-animate's slide and zoom utilities live in the utilities layer, which outranks
+   any base-layer rule. */
+@media (prefers-reduced-motion: reduce) {
+  :is(
     [data-slot='dialog-content'],
     [data-slot='dialog-overlay'],
     [data-slot='popover-content'],
     [data-slot='dropdown-menu-content'],
-    [data-slot='dropdown-menu-sub-content'],
     [data-slot='context-menu-content'],
     [data-slot='context-menu-sub-content'],
     [data-slot='select-content'],
-    [data-slot='tooltip-content'] {
-      --tw-enter-scale: 1;
-      --tw-exit-scale: 1;
-      --tw-enter-translate-x: 0;
-      --tw-enter-translate-y: 0;
-      --tw-exit-translate-x: 0;
-      --tw-exit-translate-y: 0;
-    }
+    [data-slot='combobox-content'],
+    [data-slot='tooltip-content']
+  ) {
+    --tw-enter-scale: 1;
+    --tw-exit-scale: 1;
+    --tw-enter-translate-x: 0;
+    --tw-enter-translate-y: 0;
+    --tw-exit-translate-x: 0;
+    --tw-exit-translate-y: 0;
   }
 }
 
@@ -2551,7 +2558,6 @@
   :is(
     [data-slot='popover-content'],
     [data-slot='dropdown-menu-content'],
-    [data-slot='dropdown-menu-sub-content'],
     [data-slot='context-menu-content'],
     [data-slot='context-menu-sub-content'],
     [data-slot='select-content'],
@@ -2643,7 +2649,6 @@
     :is(
       [data-slot='popover-content'],
       [data-slot='dropdown-menu-content'],
-      [data-slot='dropdown-menu-sub-content'],
       [data-slot='context-menu-content'],
       [data-slot='context-menu-sub-content'],
       [data-slot='select-content'],

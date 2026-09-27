@@ -7,22 +7,36 @@ import {
   SHEET_FRAME_CLASS,
   SHEET_POSITIONER_CLASS,
   SHEET_SURFACE_CLASS,
+  PresentationContext,
   playSheetOpen,
   usePresentation,
   type Presentation,
 } from '@workspace/ui/patterns/sheet'
 
-function Popover({ onOpenChange, ...props }: PopoverPrimitive.Root.Props) {
-  const presentation = usePresentation()
+function Popover({
+  modal,
+  onOpenChange,
+  presentation: requested,
+  ...props
+}: PopoverPrimitive.Root.Props & {
+  /** `anchored` keeps a surface on its anchor in the phone shell too (a menu that follows a caret). */
+  readonly presentation?: Presentation
+}) {
+  const presentation = usePresentation(requested)
   return (
-    <PopoverPrimitive.Root
-      data-slot='popover'
-      {...props}
-      onOpenChange={(open, details) => {
-        onOpenChange?.(open, details)
-        if (!details.isCanceled) playSheetOpen(presentation, open, details.event)
-      }}
-    />
+    // Decided once here, so the content, the modality and the voice agree.
+    <PresentationContext value={presentation}>
+      <PopoverPrimitive.Root
+        data-slot='popover'
+        // A sheet over a scrim is modal: scroll locked, focus kept inside, the page behind inert.
+        modal={modal ?? presentation === 'sheet'}
+        {...props}
+        onOpenChange={(open, details) => {
+          onOpenChange?.(open, details)
+          if (!details.isCanceled) playSheetOpen(presentation, open, details.event)
+        }}
+      />
+    </PresentationContext>
   )
 }
 
@@ -32,10 +46,10 @@ function PopoverTrigger({ ...props }: PopoverPrimitive.Trigger.Props) {
 
 function PopoverContent({
   className,
+  children,
   align = 'center',
   alignOffset = 0,
   anchor,
-  presentation: requested,
   side = 'bottom',
   sideOffset = 4,
   ...props
@@ -43,11 +57,8 @@ function PopoverContent({
   Pick<
     PopoverPrimitive.Positioner.Props,
     'align' | 'alignOffset' | 'anchor' | 'side' | 'sideOffset'
-  > & {
-    /** `anchored` keeps a surface on its anchor in the phone shell too (a menu that follows a caret). */
-    readonly presentation?: Presentation
-  }) {
-  const presentation = usePresentation(requested)
+  >) {
+  const presentation = usePresentation()
   const sheet = presentation === 'sheet'
   return (
     <PopoverPrimitive.Portal>
@@ -74,7 +85,14 @@ function PopoverContent({
                 )
           }
           {...props}
-        />
+        >
+          {children}
+          {/* Base UI keeps focus inside a modal popover only while it holds a Close; a screen
+              reader also uses it to leave the sheet. */}
+          {sheet ? (
+            <PopoverPrimitive.Close className='sr-only'>Close</PopoverPrimitive.Close>
+          ) : null}
+        </PopoverPrimitive.Popup>
       </PopoverPrimitive.Positioner>
     </PopoverPrimitive.Portal>
   )

@@ -3,8 +3,10 @@ import { editorDocumentToken, type Address } from '@workspace/client-core/addres
 import { contentForDocumentToken } from '@/features/address/utils/document-token'
 import { isEditorTabDirty } from '@/features/workspace/utils/tab-dirty'
 import { isPhoneShell, setPhoneTab, useShellStore } from '@/lib/shell/state/store'
-import { tabsForPhoneOpen } from '@/lib/shell/utils/phone-tab'
+import { tabsForPhoneOpen, type PhoneTab } from '@/lib/shell/utils/phone-tab'
 import type { ApplicationRuntime } from '@/state/application-runtime'
+
+let stopWatchingEdits: (() => void) | null = null
 
 /**
  * The phone has no tab strip, so a file it opens replaces the last one it opened. `claim` records
@@ -18,19 +20,36 @@ export function withPhoneTab(
 ): { readonly address: Address; readonly claim: () => void } {
   const token = editorDocumentToken(next)
   if (!isPhoneShell() || token === null) return { address: next, claim: () => {} }
-  const opened = tabsForPhoneOpen(previous.tabs ?? [], token, ownTab(application, rootPath))
+  const opened = tabsForPhoneOpen(previous.tabs ?? [], token, ownTab(rootPath))
   return {
     address: { ...next, tabs: opened.tabs },
-    claim: () => setPhoneTab(opened.own === null ? null : { rootPath, token: opened.own }),
+    claim: () =>
+      claimPhoneTab(application, opened.own === null ? null : { rootPath, token: opened.own }),
   }
 }
 
-function ownTab(application: ApplicationRuntime, rootPath: string | null) {
+function ownTab(rootPath: string | null) {
   const tab = useShellStore.getState().phoneTab
-  if (!tab || tab.rootPath !== rootPath) return null
-  const parsed = contentForDocumentToken(rootPath, tab.token)
-  if (parsed.kind !== 'content') return null
-  const dirty = application.getSnapshot().editor.documentStore.getState().dirtyDocumentKeys
-  // Unsaved edits keep the tab open, as typing pins a preview tab.
-  return isEditorTabDirty(parsed.content, dirty) ? null : tab.token
+  return tab && tab.rootPath === rootPath ? tab.token : null
+}
+
+/** The first edit pins the tab, as typing pins a preview tab: saving it later never frees it. */
+function claimPhoneTab(application: ApplicationRuntime, tab: PhoneTab | null) {
+  const current = useShellStore.getState().phoneTab
+  if (tab && current?.token === tab.token && current.rootPath === tab.rootPath) return
+  stopWatchingEdits?.()
+  stopWatchingEdits = null
+  setPhoneTab(tab)
+  if (tab === null) return
+  const parsed = contentForDocumentToken(tab.rootPath, tab.token)
+  if (parsed.kind !== 'content') return
+  const stop = application.getSnapshot().editor.documentStore.subscribe(
+    (state) => state.dirtyDocumentKeys,
+    (dirty) => {
+      if (!isEditorTabDirty(parsed.content, dirty)) return
+      if (useShellStore.getState().phoneTab === tab) setPhoneTab(null)
+      stop()
+    },
+  )
+  stopWatchingEdits = stop
 }
