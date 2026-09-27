@@ -18,6 +18,7 @@ export default defineConfig({
     include: [
       '@base-ui/react/tooltip',
       '@base-ui/react/dialog',
+      '@base-ui/react/drawer',
       '@base-ui/react/button',
       '@base-ui/react/switch',
       'class-variance-authority',
@@ -37,6 +38,20 @@ export default defineConfig({
         async rowKey(context, selector: string, key: string) {
           const frame = await context.frame()
           await frame.locator(selector).press(key)
+        },
+        async dragBy(context, selector: string, deltaY: number, stepDelayMs = 0) {
+          const frame = await context.frame()
+          const box = await frame.locator(selector).boundingBox()
+          if (!box) return
+          const x = box.x + box.width / 2
+          const y = box.y + box.height / 2
+          await context.page.mouse.move(x, y)
+          await context.page.mouse.down()
+          for (let step = 1; step <= 10; step += 1) {
+            await context.page.mouse.move(x, y + (deltaY * step) / 10)
+            if (stepDelayMs > 0) await context.page.waitForTimeout(stepDelayMs)
+          }
+          await context.page.mouse.up()
         },
         async rowPointer(context, selector: string, pressed: boolean) {
           const frame = await context.frame()

@@ -14,7 +14,7 @@ import { LoadingState } from '@workspace/ui/components/loading-state'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { Tabs, TabsList, TabsTab } from '@workspace/ui/components/tabs'
 import { cn } from '@workspace/ui/lib/utils'
-import { useState, type ClipboardEvent, type DragEvent } from 'react'
+import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from 'react'
 
 import { errorMessage } from '@/lib/error-message'
 import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
@@ -34,6 +34,19 @@ import { sortByMatch } from '@/lib/wallpapers/utils/matches'
 
 type Order = 'library' | 'matches'
 
+/** Centers the chosen card in whichever scrollers inside `body` hold it; `body`'s host stays put. */
+function revealSelected(body: HTMLElement) {
+  const selected = body.querySelector<HTMLElement>('[aria-pressed="true"]')
+  if (!selected) return
+  const target = selected.getBoundingClientRect()
+  for (let node = selected.parentElement; node; node = node.parentElement) {
+    const box = node.getBoundingClientRect()
+    node.scrollLeft += target.left - box.left - (box.width - target.width) / 2
+    node.scrollTop += target.top - box.top - (box.height - target.height) / 2
+    if (node === body) return
+  }
+}
+
 /**
  * The wallpaper library: sources, uploads (drop or paste), and each theme's images. Matches sorts
  * by closeness to `colors`; with `onColorsFromImage`, the reverse is one action away.
@@ -41,12 +54,18 @@ type Order = 'library' | 'matches'
 export function WallpaperLibrary({
   className,
   colors,
+  strips = false,
   value,
   onChange,
   onColorsFromImage,
 }: {
   className?: string
   colors: PaletteColors | null
+  /**
+   * Each section a sideways row at its natural height, for a host that already scrolls: a nested
+   * vertical scroller would swallow the host's wheel until every wallpaper had gone by.
+   */
+  strips?: boolean
   value: WallpaperSelection
   onChange: (source: WallpaperSource) => void
   onColorsFromImage?: (asset: AssetId) => void
@@ -58,6 +77,7 @@ export function WallpaperLibrary({
   const [search, setSearch] = useState('')
   const [order, setOrder] = useState<Order>('library')
   const [dragging, setDragging] = useState(false)
+  const bodyRef = useRef<HTMLDivElement>(null)
   const selection = visibleWallpaper(value)
   const select = onChange
   const uploadFiles = useWallpaperUpload((asset) => select({ kind: 'library', asset: asset.id }))
@@ -75,6 +95,11 @@ export function WallpaperLibrary({
     matching && colors
       ? sortByMatch(assets, colorsById, colors.app.background, colors.app.primary)
       : []
+
+  // Once, when the cards first exist: the chosen one is often far past the fold.
+  useEffect(() => {
+    if (library.isSuccess && bodyRef.current) revealSelected(bodyRef.current)
+  }, [library.isSuccess])
 
   function card(asset: WallpaperAsset, deletable: boolean) {
     return (
@@ -134,7 +159,7 @@ export function WallpaperLibrary({
 
   return (
     <div
-      className={cn('flex h-full min-h-0 flex-col gap-2', className)}
+      className={cn('flex flex-col gap-2', !strips && 'h-full min-h-0', className)}
       onDragLeave={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false)
       }}
@@ -183,20 +208,26 @@ export function WallpaperLibrary({
           </Button>
         ) : null}
       </div>
-      <div className='flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain'>
+      <div
+        className={cn(
+          'flex flex-col gap-3',
+          !strips && 'min-h-0 flex-1 overflow-y-auto overscroll-contain',
+        )}
+        ref={bodyRef}
+      >
         {library.isPending ? (
           <LoadingState label='Loading wallpapers'>
             <div className='bg-muted h-20 w-full rounded-md' />
           </LoadingState>
         ) : null}
         {matching ? (
-          <WallpaperSection heading='Closest to these colors' count={matches.length}>
+          <WallpaperSection heading='Closest to these colors' count={matches.length} strip={strips}>
             {matches.map((asset) => card(asset, false))}
           </WallpaperSection>
         ) : (
           <>
             {search.trim() ? null : (
-              <WallpaperSection heading='Sources'>
+              <WallpaperSection heading='Sources' strip={strips}>
                 <WallpaperSourceCard
                   label='None'
                   description='A plain background with no image'
@@ -216,7 +247,11 @@ export function WallpaperLibrary({
               </WallpaperSection>
             )}
             {library.data ? (
-              <WallpaperSection heading='Your uploads' count={sections.uploads.length}>
+              <WallpaperSection
+                heading='Your uploads'
+                count={sections.uploads.length}
+                strip={strips}
+              >
                 <WallpaperUploadTile
                   disabled={false}
                   uploading={uploading}
@@ -231,6 +266,7 @@ export function WallpaperLibrary({
                 key={group.id}
                 heading={group.heading}
                 count={group.assets.length + group.catalog.length}
+                strip={strips}
               >
                 {group.assets.map((asset) => card(asset, false))}
                 {group.catalog.map(catalogCard)}

@@ -8,9 +8,11 @@ export function useStudioDraft() {
   const bundles = useBundles()
   const customizations = useSettingValue('workbench.theme.customizations')
   const stored = useStudioStore((state) => state.draft)
+  // The applied copy, not the catalog's: the draft must start from what the app is painting.
   // With no theme chosen the app wears Graphite's colors, so that is where the studio starts.
   const theme =
-    bundles.catalog.find((entry) => entry.id === (bundles.bundleId ?? DEFAULT_THEME_ID)) ??
+    bundles.theme ??
+    bundles.catalog.find((entry) => entry.id === DEFAULT_THEME_ID) ??
     bundles.catalog[0]
   const saved = theme ? savedDraft(theme, customizations) : null
   const draft = stored ?? saved
