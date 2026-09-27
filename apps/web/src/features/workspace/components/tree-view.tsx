@@ -31,7 +31,6 @@ import { useTreeStickyReveal } from '@/features/workspace/hooks/use-tree-sticky-
 import { useTreeViewportSync } from '@/features/workspace/hooks/use-tree-viewport-sync'
 import { createContextMenuItem } from '@/features/workspace/utils/tree-context-menu-anchor'
 import { focusElement } from '@/features/workspace/utils/tree-focus'
-import { createTreeIconResolver } from '@/features/workspace/utils/tree-icon-resolver'
 import {
   getTreeFocusedRowDomId,
   getTreeRowPath,
@@ -49,7 +48,6 @@ export function TreeView({
   gitStatusByPath,
   ignoredGitDirectories,
   directoriesWithGitChanges,
-  icons,
   instanceId,
   loadingPaths,
   itemHeight = FILE_TREE_DEFAULT_ITEM_HEIGHT,
@@ -171,7 +169,6 @@ export function TreeView({
 
   const gitLaneActive =
     gitStatusByPath != null || ignoredGitDirectories != null || directoriesWithGitChanges != null
-  const { resolveIcon } = useMemo(() => createTreeIconResolver(icons), [icons])
   const renameView = controller.getRenameView()
   const renamingPath = renameView.getPath()
   const isRenaming = renamingPath != null
@@ -505,7 +502,6 @@ export function TreeView({
     registerRenameInput,
     renameView,
     renderDecorationForRow,
-    resolveIcon,
     shouldSuppressContextMenu,
     visualFocusPath,
   }
@@ -611,7 +607,6 @@ export function TreeView({
           isRenaming={isRenaming}
           isScrolling={isScrollingRef}
           buttonEnabled={contextMenuButtonTriggerEnabled}
-          icon={resolveIcon('file-tree-icon-ellipsis')}
           closeMenu={closeContextMenu}
           openMenu={openMenuFromTrigger}
         />

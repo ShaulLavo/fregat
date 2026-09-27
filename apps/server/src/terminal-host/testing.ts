@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
@@ -14,6 +14,8 @@ const HOST_EXIT_MS = 5_000
 export async function createTestTerminalHost({ idleMs = 5_000 }: { idleMs?: number } = {}) {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-pty-host-'))
   const stateRoot = path.join(root, 'home')
+  // The host never creates its state root; the home's owner does.
+  await mkdir(stateRoot)
   const env = { ...process.env, XDG_RUNTIME_DIR: path.join(root, 'run') }
   const hosts: Bun.Subprocess[] = []
   const clients: TerminalHostClient[] = []

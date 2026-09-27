@@ -22,6 +22,7 @@ const SEVERITIES = {
   'invalid-value': WARNING,
   'scope-not-allowed': WARNING,
   'unknown-key': WARNING,
+  'set-by-theme': WARNING,
   migrated: INFORMATION,
   'removed-key': INFORMATION,
   // `satisfies`, not an annotation: a `Record<…, number>` widens these to

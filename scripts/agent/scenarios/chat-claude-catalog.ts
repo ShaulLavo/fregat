@@ -15,6 +15,7 @@ import {
  */
 export const chatClaudeCatalog: Scenario = {
   name: 'chat-claude-catalog',
+  // Asserts the live CLI's own model list (Opus 5.5, Fable 5.1, Legacy); a fixture would assert itself.
   realProviders: true,
   description:
     'Open the Claude models in the picker, expand Legacy, and read the options of Opus 5.5 and Fable 5.1. Restores the project default model.',

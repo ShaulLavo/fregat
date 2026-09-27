@@ -2,17 +2,10 @@ import { assertEnvironmentWritable } from '@/lib/environments/state/availability
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { SETTINGS_MUTATION_KEY } from '@/features/settings/utils/mutation-keys'
 import { nowMs } from '@workspace/utils/timing'
-import * as v from 'valibot'
-import {
-  themePartPatch,
-  resolveThemeSettings,
-  type ThemeBundle,
-  type ThemeId,
-} from '@workspace/contracts'
+import { shownColorMode, type ThemeBundle, type ThemeId } from '@workspace/contracts'
 import { systemColorMode } from '@/features/settings/state/system-color-mode'
 import {
   SETTING_IDS,
-  settingsOperationSchema,
   deriveWriteTarget,
   descriptorFor,
   errorNumberField,
@@ -66,7 +59,9 @@ import { durationBetweenMs } from '@workspace/utils/timing'
 import { dismissSaveError, notifySaveError } from '@/features/settings/utils/notify-save-error'
 import {
   providerEnabledOperation,
+  resetSettingOperations,
   themeCustomization,
+  themePartWriteOperation,
 } from '@workspace/client-core/settings/operations'
 import { admitSettingsMutationResult } from '@/features/settings/state/snapshot-admission'
 import { annotateClientError, clientErrorMetadata } from '@/lib/client-error-context'
@@ -113,6 +108,9 @@ export function useSettingsActions(owner?: QueryClient) {
 
   const targetFor = (key: SettingId) => deriveWriteTarget(key, projection()?.layers ?? [])
 
+  const shownMode = (values: SettingsValues) =>
+    shownColorMode(values['workbench.colorTheme'], systemColorMode())
+
   const setSetting = <K extends ScalarSettingId>(
     key: K,
     value: SettingsValues[K],
@@ -121,14 +119,11 @@ export function useSettingsActions(owner?: QueryClient) {
   ): SettingsSubmission => {
     const operation = { kind: 'set', key, value } as SettingsOperation
     const current = projection()
-    const theme = current?.values['workbench.theme']
-    const patch = operation.kind === 'set' ? themePartPatch(operation) : null
-    if (!theme || !patch || target !== 'user') return submit(target, [operation], initiator)
-    const preference = current.values['workbench.colorTheme']
-    let mode = preference === 'system' ? systemColorMode() : preference
-    if (key === 'editor.codeTheme.light') mode = 'light'
-    if (key === 'editor.codeTheme.dark') mode = 'dark'
-    return submit('user', [{ kind: 'theme.customize', id: theme.id, mode, patch }], initiator)
+    const themed =
+      target === 'user' && current
+        ? themePartWriteOperation(operation, current.values, shownMode(current.values))
+        : null
+    return submit(target, [themed ?? operation], initiator)
   }
 
   const setColorTheme = (
@@ -180,21 +175,8 @@ export function useSettingsActions(owner?: QueryClient) {
       submit(targetFor('keybindings.overrides'), [{ kind: 'keybinding.remove', command }]),
     resetSetting: (key: SettingId, target: SettingsWriteTarget = 'user') => {
       const current = projection()
-      const theme = current?.values['workbench.theme']
-      if (!current || !theme || target !== 'user')
-        return submit(target, [{ kind: 'reset', keys: settingRowIds(key) }])
-      const defaults = resolveThemeSettings(
-        { ...current.values, 'workbench.theme.customizations': {} },
-        systemColorMode(),
-      )
-      const parsed = v.safeParse(settingsOperationSchema, {
-        kind: 'set',
-        key,
-        value: defaults[key],
-      })
-      if (!parsed.success || parsed.output.kind !== 'set' || !themePartPatch(parsed.output))
-        return submit(target, [{ kind: 'reset', keys: settingRowIds(key) }])
-      return setSetting(parsed.output.key, parsed.output.value, target)
+      if (!current) return submit(target, [{ kind: 'reset', keys: settingRowIds(key) }])
+      return submit(target, resetSettingOperations(key, current, target, shownMode(current.values)))
     },
     setColorTheme,
     /** The command's complete list; an empty list or `null` unbinds it. */

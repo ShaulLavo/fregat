@@ -8,6 +8,7 @@ import {
   resolveSettings,
   type SettingsLayer,
 } from '../settings/resolve'
+import { BUNDLED_THEMES } from '../themes/bundles'
 
 /**
  * A fixture registry rather than the shipping one.
@@ -361,5 +362,32 @@ describe('dependsOn', () => {
     expect(inspectSetting('files.watchHidden', layers, resolution, dependent).effectiveLayer).toBe(
       'user',
     )
+  })
+})
+
+describe('theme parts', () => {
+  const theme = BUNDLED_THEMES[0]!
+
+  it('reports a user value for a part the selected theme sets, naming the theme', () => {
+    const { diagnostics } = resolveSettings([
+      layer('user', {
+        'workbench.theme': theme,
+        'editor.codeTheme.dark': 'everforest-dark',
+        'workbench.surface.blur': 0,
+      }),
+      layer('workspace', { 'workbench.surface.opacity': 60 }),
+    ])
+
+    expect(diagnostics.map(({ id, kind, layer: at }) => ({ id, kind, at }))).toEqual([
+      { id: 'editor.codeTheme.dark', kind: 'set-by-theme', at: 'user' },
+      { id: 'workbench.surface.blur', kind: 'set-by-theme', at: 'user' },
+    ])
+    expect(diagnostics[0]!.detail).toContain(theme.name)
+  })
+
+  it('reports nothing while no theme is selected', () => {
+    const { diagnostics } = resolveSettings([layer('user', { 'workbench.surface.blur': 0 })])
+
+    expect(diagnostics).toEqual([])
   })
 })

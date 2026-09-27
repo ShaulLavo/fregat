@@ -1,16 +1,9 @@
-export {
-  getBuiltInFileIconName,
-  getBuiltInSpriteSheet,
-  isColoredBuiltInIconSet,
-  resolveBuiltInFileIconToken,
-} from './utils/builtInIcons'
 export { CONTEXT_MENU_TRIGGER_TYPE } from './utils/constants'
 export {
   GIT_STATUS_DESCENDANT_TITLE,
   GIT_STATUS_LABEL,
   GIT_STATUS_TITLE,
 } from './utils/gitStatusPresentation'
-export { normalizeFileTreeIcons } from './utils/iconConfig'
 export { resolveFileTreeDensity } from './utils/model/density'
 export { FileTreeController } from './utils/model/FileTreeController'
 export { applyFileTreeGitStatusPatch, resolveFileTreeGitStatusState } from './utils/model/gitStatus'
@@ -23,12 +16,6 @@ export {
 } from './utils/model/virtualization'
 export { prepareFileTreeInput, preparePresortedFileTreeInput } from './utils/preparedInput'
 
-export type {
-  FileTreeBuiltInIconSet,
-  FileTreeIconConfig,
-  FileTreeIcons,
-  RemappedIcon,
-} from './utils/iconConfig'
 export type { FileTreeDensityPreset } from './utils/model/density'
 export type { FileTreeGitStatusState } from './utils/model/gitStatus'
 export type { FileTreeStickyRowCandidate } from './utils/model/internalTypes'
@@ -79,4 +66,3 @@ export type {
 } from './utils/model/publicTypes'
 export type { FileTreePreparedInput } from './utils/preparedInput'
 export type { GitStatus, GitStatusEntry } from './utils/publicTypes'
-export type { SVGSpriteNames } from './utils/sprite'
