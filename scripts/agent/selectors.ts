@@ -333,6 +333,8 @@ export const selectors = {
     page
       .getByRole('region', { name: 'Theme studio', exact: true })
       .getByRole('tab', { name, exact: true }),
+  themeStudioMode: (page: Page, mode: 'dark' | 'light') =>
+    page.getByRole('button', { name: `Preview the ${mode} half`, exact: true }),
   themeStudioCard: (page: Page, id: string) =>
     page.locator(`[data-studio-themes] [role="option"][data-theme-id="${id}"]`),
   titlebar: (page: Page) => page.locator('header[data-native-window-drag-region]').first(),

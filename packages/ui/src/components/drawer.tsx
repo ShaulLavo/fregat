@@ -26,12 +26,12 @@ function DrawerContent({ className, children, ...props }: DrawerPrimitive.Popup.
     <DrawerPrimitive.Portal data-slot='drawer-portal'>
       <DrawerPrimitive.Viewport
         data-slot='drawer-viewport'
-        className='fixed inset-x-0 bottom-0 z-40'
+        className='pointer-events-none fixed inset-x-0 bottom-0 z-40'
       >
         <DrawerPrimitive.Popup
           data-slot='drawer-content'
           className={cn(
-            'flex w-full flex-col bg-popover-solid text-popover-foreground shadow-xl ring-1 ring-foreground/10 outline-none',
+            'pointer-events-auto flex w-full flex-col bg-popover-solid text-popover-foreground shadow-xl ring-1 ring-foreground/10 outline-none',
             'translate-y-[calc(var(--drawer-snap-point-offset,0px)+var(--drawer-swipe-movement-y,0px))] transition-[translate] duration-(--duration-enter) ease-out-strong',
             'data-starting-style:translate-y-full data-ending-style:translate-y-full data-ending-style:duration-(--duration-exit) data-swiping:duration-0 motion-reduce:transition-none',
             className,

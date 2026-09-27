@@ -40,7 +40,9 @@ export const themeStudioAsync: Scenario = {
   async run(page, { step }) {
     await runPaletteCommand(page, 'Theme studio')
     const studio = selectors.themeStudio(page)
-    await selectors.themeStudioTab(page, 'Dark').click()
+    await studio.waitFor()
+    if (await selectors.themeStudioMode(page, 'dark').isVisible())
+      await selectors.themeStudioMode(page, 'dark').click()
     await editAccent(page)
     await selectors.themeStudioTab(page, 'Wallpaper').click()
     const upload = await holdPost(page, /\/themes\/wallpapers$/)
@@ -60,7 +62,7 @@ export const themeStudioAsync: Scenario = {
       await upload.arrived
       await selectors.themeStudioTab(page, 'Surfaces').click()
       await studio.getByRole('button', { name: 'Clear', exact: true }).click()
-      await selectors.themeStudioTab(page, 'Light').click()
+      await selectors.themeStudioMode(page, 'light').click()
       upload.release()
       await (await uploaded).finished()
     } finally {
@@ -72,7 +74,7 @@ export const themeStudioAsync: Scenario = {
     await wallpaper.waitFor()
     await step('upload-completed-in-current-half')
     const currentModeUploaded = (await wallpaper.getAttribute('aria-pressed')) === 'true'
-    await selectors.themeStudioTab(page, 'Dark').click()
+    await selectors.themeStudioMode(page, 'dark').click()
     await selectors.themeStudioTab(page, 'Surfaces').click()
     const surfacesRetained =
       (await page.evaluate(() =>

@@ -60,6 +60,11 @@ it('collapses to its header and expands to its full height', async () => {
   cleanups.push(mount(<Example initial={HEADER} />).unmount)
   await expect.element(page.getByText('Body')).toBeInTheDocument()
   expect(await shownHeight()).toBe(40)
+  expect(
+    document
+      .elementFromPoint(window.innerWidth / 2, window.innerHeight - 100)
+      ?.closest('[data-slot="drawer-viewport"]'),
+  ).toBeNull()
 
   await page.getByRole('button', { name: 'Toggle' }).click()
   expect(await shownHeight()).toBe(200)

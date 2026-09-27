@@ -2,8 +2,9 @@
 
 ## Status and authorization
 
-- Status: IN PROGRESS 2026-09-27. Phases 1–4 are in review on branch `w2/a-194`; the deploy and
-  the owner's settings-file cleanup (Phase 3) follow the merge. Q1 decided as recommended: one
+- Status: COMPLETE 2026-09-27. PRs #160 and #169 shipped in deploy batch 24. The owner's
+  settings cleanup completed with backup `/work/backups/platform/settings.json.20260927T072835.bak`.
+  PR #178 adds a reviewed follow-up; its merge and deployment are pending. Q1 decided as recommended: one
   row per part, editing the mode on screen. Owner direction, same day, on finding the surface
   opacity controls gone from settings: "the studio never meant to replace any setting! it's just an extra feature on
   top! we need to integrate it back into the settings".
@@ -46,7 +47,7 @@ the selected theme and mode, `resetSetting` returns the part to the theme's valu
 | D1 — settings own them      | Every theme part is a visible settings row again, in Appearance, directly under the Theme row. The studio is a preview-and-apply layer over the same values; it hides nothing and owns no key. Delete the eight `visibility: 'internal'` lines and their comments.                                                                                                                                                                          |
 | D2 — one control each       | The rows reuse the studio's controls, not the deleted widgets: `CodeTab`, `ColorsTab`'s palette list, `WallpaperTab`, and one `Slider` per `SurfacesTab` field. Each becomes a component taking a value and an `onChange`; the studio passes its draft, settings passes the resolved value and `setSetting`. With two consumers they move to `lib/appearance/components/` (AGENTS.md `lib/` rule).                                          |
 | D3 — which mode a row edits | Palette, wallpaper and the four surface values are one key each but two values in a theme. A row edits the mode the app is showing and its description ends with that mode ("Dark mode."). Switching light/dark re-reads the row. Code theme keeps its two keys. Owner question Q1 below.                                                                                                                                                   |
-| D4 — Theme row              | Stays a full-width row: name, both wallpapers, `Open studio`. Picking a theme still sets every part; parts changed afterwards show the modified marker and Reset returns them to the theme's value (already implemented).                                                                                                                                                                                                                   |
+| D4 — Theme row              | Stays a full-width row: name, the shown wallpaper, `Open studio`. Picking a theme still sets every part; parts changed afterwards show the modified marker and Reset returns them to the theme's value (already implemented).                                                                                                                                                                                                               |
 | D5 — no ignored values      | With a theme selected, `resolveThemeSettings` ignores user-layer values for part keys, so `settings.json` can hold a value that does nothing (the owner's holds `editor.codeTheme.dark: everforest-dark` while rose-pine shows). The settings JSON view gets a diagnostic on such a key naming the theme that sets it. Stray values in the owner's `~/.platform/settings.json` are deleted by hand with the owner's OK, not healed in code. |
 | D6 — search                 | The rows carry the keywords the studio labels use ("panes", "content", "glass", "transparency", "wallpaper", "syntax"), so settings search finds each control by the word on the studio slider.                                                                                                                                                                                                                                             |
 
@@ -60,8 +61,8 @@ the selected theme and mode, `resetSetting` returns the part to the theme's valu
        Reset returns to the theme's value; with no theme it writes the key. Update the settings page
        test that pins the hidden keys.
 2. [x] **Mode label.** D3 as decided by Q1.
-3. [ ] **Ignored values.** (Diagnostic done; the owner's cleanup is pending.) D5: the diagnostic, then the owner-approved cleanup of their settings file.
-4. [ ] **Proof and ship.** (Scenario and screenshots done; the deploy is pending.) Scenario `settings-appearance-rows`: open Settings, search "content", drag
+3. [x] **Ignored values.** (Diagnostic and owner-approved cleanup complete.) D5: the diagnostic, then the owner-approved cleanup of their settings file.
+4. [x] **Proof and ship.** (Shipped in batch 24.) Scenario `settings-appearance-rows`: open Settings, search "content", drag
        the slider, read `--content-opacity` and the painted editor background, confirm the studio's
        Surfaces tab shows the same number, and confirm `caches` holds one settings mutation. `look`
        screenshots of the Appearance section read back and published for the owner. Ship with
@@ -96,3 +97,21 @@ Before starting: `THEME_PART_KEYS` still lists the eight keys; `setSetting` stil
 - Settings lists move a local cursor and write only on Enter, Space or a click; the studio's
   lists choose as the cursor moves. Reset under a theme also removes a user-file value written
   before the theme was picked, in the same write.
+
+## PR #178 review follow-up
+
+- Settings wallpaper sections scroll horizontally; the theme thumbnail follows the resolved
+  wallpaper, and studio drafts begin from the saved theme snapshot. The studio uses a non-modal
+  drawer with collapse and swipe dismissal.
+- Review reproduced a collapsed drawer blocking workspace clicks above its visible header.
+  The viewport now passes pointer events through while the drawer content accepts them.
+  The Chromium browser test failed before the fix and passes after it, including slow drag,
+  button collapse and flick dismissal. Settings strips use the shared hidden-scrollbar utility.
+- Updated the preview and async scenarios to use the mode toggle. Added a real-app hit test
+  above the collapsed drawer. Appearance DOM tests pass (10), drawer browser tests pass (3),
+  web typecheck and repository gates pass.
+- App evidence: `/work/tmp/fregat-evidence/20260927T054013Z-scenario-theme-studio-preview/`,
+  `/work/tmp/fregat-evidence/20260927T054047Z-scenario-theme-studio-async/`, and
+  `/work/tmp/fregat-evidence/20260927T053901Z-scenario-settings-appearance-rows/`.
+  The settings scenario completed but recorded existing missing-provider update requests in
+  its isolated server; studio runs had no failed requests. Screenshots are retained for review.

@@ -25,7 +25,7 @@ export function WallpaperSection({
         className={cn(
           'gap-2',
           strip
-            ? 'flex overflow-x-auto *:w-40 *:shrink-0'
+            ? 'no-scrollbar flex overflow-x-auto *:w-40 *:shrink-0'
             : 'grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))]',
         )}
       >
