@@ -7,13 +7,16 @@ import { useListContextMenu } from '../use-list-context-menu'
 function ListMenu({
   items = ['first', 'second'],
   scrolling = false,
+  touchPolicy = 'suppress',
 }: {
   readonly items?: readonly string[]
   readonly scrolling?: boolean
+  readonly touchPolicy?: 'suppress' | 'context-menu'
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const menu = useListContextMenu<string>({
     containerRef,
+    touchPolicy,
     isTargetPresent: (target) => items.includes(target),
   })
   return (
@@ -85,6 +88,17 @@ test('scrolling and touch suppress pointer menus, while a later mouse click open
   fireEvent.pointerDown(row, { pointerType: 'mouse' })
   fireEvent.contextMenu(row)
   expect(screen.getByTestId('menu')).toBeVisible()
+})
+
+test('a phone list can retain native long-press menus while suppressing them during scroll', () => {
+  const view = render(<ListMenu touchPolicy='context-menu' scrolling />)
+  const row = screen.getByRole('option', { name: 'second' })
+  fireEvent.touchStart(row)
+  fireEvent.contextMenu(row)
+  expect(screen.queryByTestId('menu')).toBeNull()
+  view.rerender(<ListMenu touchPolicy='context-menu' />)
+  fireEvent.contextMenu(row)
+  expect(JSON.parse(screen.getByTestId('menu').textContent ?? '').target).toBe('second')
 })
 
 test.each(['scroll', 'wheel'])('list %s closes the menu and restores list focus', (type) => {

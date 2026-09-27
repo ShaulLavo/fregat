@@ -113,6 +113,7 @@ import { copyFeedback } from './copy-feedback'
 import { fileLabelCohesion } from './file-label-cohesion'
 import { checkpointStates } from './checkpoint-states'
 import { checkpointDiffTokens } from './checkpoint-diff-tokens'
+import { sessionRailMenu } from './session-rail-menu'
 import { sessionActionsSurfaces } from './session-actions-surfaces'
 import { exportTranscript } from './export-transcript'
 import { claudeHookRows } from './hook-rows'
@@ -501,6 +502,7 @@ export const scenarios: readonly Scenario[] = [
   checkpointStates,
   checkpointDiffTokens,
   sessionActionsSurfaces,
+  sessionRailMenu,
   exportTranscript,
   claudeHookRows,
   claudeBackgroundTasks,
