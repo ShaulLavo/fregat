@@ -632,6 +632,14 @@
   }
 }
 
+/* A length, so its computed value is in pixels: an editor takes it as its gutter's leading inset
+   (`useEditorGutterInset`), which keeps line numbers off the phone's screen edge while row tints reach it. */
+@property --density-editor-inset-x {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
+
 /* A scroller's edge fades only while content lies past it, so the list is crisp at rest.
    A scroll timeline drives both depths, so there is no script and no scroll listener; an
    engine without scroll timelines keeps both edges crisp. */
@@ -1134,8 +1142,6 @@
   min-width: 0;
   overflow: hidden;
   width: 100%;
-  /* Keeps the line numbers off the phone's screen edge; the frame adds the safe area. */
-  padding-left: var(--density-editor-inset-x);
 }
 
 /* The editor keeps its own always-visible 6px track: the minimap lane measures it. */

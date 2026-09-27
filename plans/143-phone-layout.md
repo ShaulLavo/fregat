@@ -8,7 +8,8 @@
   palette access across screens and iOS layout fixes, shipped in release
   `20260927T055046Z-850f2d88-review-178-179`; the live check passed.
   Phase 5 still needs real iPhone and Android checks, including the Safari toolbar, keyboard
-  movement, focus zoom and safe areas. The Platform half of full-bleed diff tinting remains open.
+  movement, focus zoom and safe areas. Full-bleed diff tinting and WebKit terminal key taps
+  are implemented in the wave 3 follow-up below; review and deployment are pending.
 - Priority: P2. Large product question; Plan 142 (Web Push) delivers the first away-from-desk
   value without it.
 - Effort: XL overall, unknown until the direction is set. The discussion itself is S.
@@ -799,3 +800,35 @@ Evidence under `/work/tmp/fregat-evidence/`: baseline
 `20260927T132146Z-trace-settings-wallpaper-scroll` (includes `--compare` output).
 The fixture provider-update 500s are unrelated to the traced preview task.
 No runtime deployment is needed for this note.
+
+### Wave 3 phone completion (2026-09-27)
+
+- [x] Reproduce the diff's unpainted left strip. The changed row starts at x=12 in
+      `/tmp/fregat-evidence/20260927T165309Z-scenario-phone-shell/15-failed.png`.
+- [x] Move the phone spacing inside the Editor gutter. Regular editors, diffs and Search's
+      excerpt editor share the CSS-token hook. The inner side of a split keeps zero inset.
+      Pin Editor to `f97fdad99e1eab98dabb8bd0d3bf979b7f456e16`; the snapshot fixture already
+      contains `leadingInset`. Both addition and deletion bands now meet the pane edge,
+      preserve three-digit line numbers and match the text-row tint in light and dark.
+- [x] Fix terminal key taps in WebKit. Cancelling pointerdown preserves input focus but
+      suppresses WebKit's click. A touch release inside the key now sends it; a subsequent
+      touch click is ignored. Mouse, Enter and Space activation keep their existing path.
+- [x] Pass seven browser tests covering shell/density updates on mounted split diffs,
+      synchronized scrolling, terminal touch duplication, drag-off/cancel and mouse/keyboard.
+      Repository typecheck, gates, changed-file lint and formatting pass.
+- [x] Read Chromium and WebKit phone-shell screenshots. The runs check sheets over simulated
+      keyboard heights, long press, history Back, light/dark diffs and exact terminal bytes.
+      Chromium also verifies native touch scrolling and emulated portrait/landscape safe areas.
+      WebKit's driver skips those two Chromium-only checks; its long press uses DOM touch events.
+      Evidence: `/work/tmp/fregat-evidence/20260927T170228Z-scenario-phone-shell/` (Chromium),
+      `20260927T170227Z-scenario-phone-shell/` (WebKit), `20260927T165555Z-scenario-search-result-line-pick/`,
+      `20260927T165556Z-scenario-phone-surfaces/` (Chromium), and `20260927T165623Z-look-390x844/`.
+- [ ] Physical iPhone and Android checks: software keyboard movement, Safari toolbar,
+      safe areas, native long press/Back swipe, and Android composing-keyboard Ctrl+letter.
+- [ ] Review, merge and deploy this follow-up.
+
+The successful WebKit run records its unsupported `interactive-widget` viewport warning and
+cancelled event streams during navigation. Isolated provider-discovery warnings remain;
+phone-surfaces records the known fixture-provider update 500s. Earlier WebKit runs crashed in
+WPEWebProcess's compositor with SIGSEGV (coredump PIDs 1075651 and 1077432), with memory available.
+The WebKit phone-surfaces run is incomplete after that host-browser crash. No real provider ran.

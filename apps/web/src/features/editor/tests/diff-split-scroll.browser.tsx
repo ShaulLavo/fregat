@@ -37,6 +37,8 @@ afterEach(() => {
   if (root) flushSync(() => root?.unmount())
   root = null
   document.body.replaceChildren()
+  delete document.documentElement.dataset.shell
+  delete document.documentElement.dataset.density
 })
 
 test('a real wheel over one split pane carries the other with it', async () => {
@@ -96,6 +98,36 @@ test('the panes are never seen at different offsets while a wheel is turning', a
   expect(new Set(samples).size).toBeGreaterThan(1)
   expect(samples.filter((pair) => pair.split('/')[0] !== pair.split('/')[1])).toEqual([])
 })
+
+test('switching shells updates the leading split gutter without padding the following pane', async () => {
+  document.documentElement.dataset.shell = 'workbench'
+  mountSplitDiff()
+  await paneScroller('old')
+  await expect.poll(() => gutterInset('old')).toBe(0)
+  await expect.poll(() => gutterInset('new')).toBe(0)
+
+  document.documentElement.dataset.shell = 'phone'
+  await expect.poll(() => gutterInset('old')).toBe(12)
+  await expect.poll(() => gutterInset('new')).toBe(0)
+  document.documentElement.dataset.density = 'compact'
+  await expect.poll(() => gutterInset('old')).toBe(12)
+  document.documentElement.dataset.density = 'cozy'
+  await expect.poll(() => gutterInset('old')).toBe(12)
+
+  document.documentElement.dataset.shell = 'workbench'
+  await expect.poll(() => gutterInset('old')).toBe(0)
+  await expect.poll(() => gutterInset('new')).toBe(0)
+  document.documentElement.dataset.density = 'compact'
+  await expect.poll(() => gutterInset('old')).toBe(0)
+})
+
+function gutterInset(side: 'new' | 'old') {
+  const pane = document.querySelector(`.editor-diff-pane-${side}`)
+  const cell = pane?.querySelector('.editor-diff-gutter:not([hidden])')
+  const row = cell?.closest('.editor-virtualized-gutter-row')
+  if (!row || !cell) return null
+  return cell.getBoundingClientRect().left - row.getBoundingClientRect().left
+}
 
 async function animationFrames(count: number) {
   for (let frame = 0; frame < count; frame += 1)

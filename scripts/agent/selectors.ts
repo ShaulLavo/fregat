@@ -1047,8 +1047,12 @@ export const selectors = {
   /** The scrim under a picker the phone presents as a bottom sheet. */
   sheetBackdrop: (page: Page) => page.locator('[data-slot="sheet-backdrop"]'),
   /** The line numbers of the editor on the phone's file screen. */
-  phoneEditorGutter: (page: Page) =>
-    page.locator('[data-phone-level="file"] .editor-virtualized-gutter'),
+  phoneDiffBand: (page: Page, type: 'addition' | 'deletion') =>
+    page.locator(`[data-phone-level="file"] .editor-diff-gutter-band-${type}`),
+  phoneDiffNumberLanes: (page: Page) =>
+    page.locator(
+      '[data-phone-level="file"] .editor-diff-gutter:not([hidden]) :is(.editor-diff-gutter-lane-old, .editor-diff-gutter-lane-new)',
+    ),
   editorTab: (page: Page, path: string) => page.locator(`[data-editor-tab-path="${path}"]`),
   createMissingFile: (page: Page) => page.getByRole('button', { name: 'Create File', exact: true }),
   editorTabs: (page: Page) => page.locator('[data-editor-tab-id]'),

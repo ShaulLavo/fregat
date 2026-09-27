@@ -26,7 +26,18 @@ export function KeyButton({
       size={Glyph ? 'icon-sm' : 'sm'}
       type='button'
       variant='ghost'
-      onClick={onPress}
+      onClick={(event) => {
+        if ('pointerType' in event.nativeEvent && event.nativeEvent.pointerType === 'touch') return
+        onPress()
+      }}
+      onPointerUp={(event) => {
+        if (event.pointerType !== 'touch' || !event.isPrimary) return
+        const box = event.currentTarget.getBoundingClientRect()
+        if (event.clientX < box.left || event.clientX > box.right) return
+        if (event.clientY < box.top || event.clientY > box.bottom) return
+        onPress()
+      }}
+      // WebKit suppresses click after a cancelled touch pointerdown; release sends the key.
       // A touch keeps focus when its pointerdown is cancelled, a mouse when its mousedown is.
       onMouseDown={(event) => event.preventDefault()}
       onPointerDown={(event) => event.preventDefault()}

@@ -21,6 +21,7 @@ import { useCommitMessageEditorFocus } from '@/features/editor/hooks/use-commit-
 import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { useScrollPersistencePlugin } from '@/features/editor/hooks/use-scroll-persistence-plugin'
+import { useEditorGutterInset } from '@/hooks/use-editor-gutter-inset'
 import { useEditorTypography } from '@/features/editor/hooks/use-editor-typography'
 import {
   capOverscrollTop,
@@ -210,6 +211,7 @@ export function Editor({
       }
     : null
   const typography = useEditorTypography()
+  const gutterInset = useEditorGutterInset()
   const rowPositioning = editorPerformanceLayoutVariant() === 'absolute-rows' ? 'top' : 'transform'
   const controller = useEditor({
     cursorLineHighlight: {
@@ -222,6 +224,7 @@ export function Editor({
     snapshot: decodeMode ? null : snapshot,
     editability,
     ...typography,
+    gutterLeadingInset: gutterInset,
     inputRoute,
     keymap: HOSTED_EDITOR_KEYMAP,
     onChange: (_state, change) => {
