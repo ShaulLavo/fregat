@@ -93,7 +93,8 @@ export const gitChangesScroll: Scenario = {
       const row = selectors.worktreeFiles(page).nth(5)
       await row.hover()
       await row.getByRole('button', { name: 'Stage file' }).hover()
-      const popup = selectors.tooltipPopup(page)
+      // The previous row tooltip can still be fading out while this control waits to open.
+      const popup = selectors.openTooltipPopup(page)
       await popup.waitFor({ timeout: 5_000 })
       strictEqual(await popup.count(), 1, 'Exactly one tooltip may be mounted')
       strictEqual((await popup.textContent())?.trim(), 'Stage file')

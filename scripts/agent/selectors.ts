@@ -234,6 +234,7 @@ export const selectors = {
   changedFilesSections: (page: Page) => page.locator('[data-changed-files-state]'),
   chatToolsHandle: (page: Page) => page.locator('[data-slot="resizable-handle"]').last(),
   tooltipPopup: (page: Page) => page.locator('[data-slot="tooltip-content"]'),
+  openTooltipPopup: (page: Page) => page.locator('[data-slot="tooltip-content"][data-open]'),
   sidebarHandle: (page: Page) => page.locator('[data-slot="resizable-handle"]').first(),
   changedFilesCard: (page: Page) => page.locator('[data-changed-files-state]').first(),
   changedFileName: (page: Page) =>
