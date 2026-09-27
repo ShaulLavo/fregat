@@ -694,4 +694,8 @@ Native Safari evidence on the Mac is in
       update-status 500s remain. Mac screenshots `composer-dev-native.png`, `composer-320.png`,
       `workspace-sheet-320.png` and `composer-desktop-webkit.png` were inspected in
       `node_modules/.cache/iphone-wallpaper-investigation/`. Desktop keeps its single row.
-- [ ] Commit, push, deploy and inspect the live release.
+- [x] Commit, push, deploy and inspect the live release. Code `e62f7bd15`, release
+      `20260927T075516Z-e62f7bd1-phone-composer`; live check passed. Native Safari screenshot
+      `composer-live-native.png` and `composer-live-metrics.json` confirm two selector columns,
+      the full `main` label and 4px bottom padding. Required gates and repository typechecks pass.
+      Physical phone confirmation remains pending; this run used iOS 26.5 Simulator Safari.
