@@ -28,6 +28,7 @@ import { ActiveEnvironmentApplication } from '@/components/active-environment-ap
 import { ApplicationRuntimeProvider } from '@/providers/application-runtime-provider'
 import { createApplicationRuntime, type ApplicationRuntime } from '@/state/application-runtime'
 import { NavigationProvider } from '@/providers/navigation-provider'
+import { bindNavigation } from '@/state/navigation-binding'
 import type { Navigation } from '@/state/navigation'
 import { createTestNavigation } from './factories/navigation'
 import { readWorkspaceCache } from '@/features/workspace/state/cache'
@@ -101,10 +102,12 @@ export function AppProviders({
       })
     const activeNavigation = navigation ?? createTestNavigation({ application: navigationOwner })
     const detach = activeNavigation.attach(navigationOwner)
+    const unbind = bindNavigation(activeNavigation)
     // Runtime subscriptions belong to this effect's lifetime, including StrictMode replay.
     // oxlint-disable-next-line oxc-react-compiler/set-state-in-effect
     setRuntime({ application: navigationOwner, navigation: activeNavigation })
     return () => {
+      unbind()
       detach()
       if (!navigation) activeNavigation.dispose()
       if (!application) navigationOwner.dispose()
@@ -259,6 +262,7 @@ export function renderApplication(
 ) {
   seedBootMirrorTheme('dark')
   const detach = navigation.attach(application)
+  const unbind = bindNavigation(navigation)
   const rendered = render(
     <StrictMode>
       <NavigationProvider navigation={navigation}>
@@ -281,6 +285,7 @@ export function renderApplication(
     navigation,
     unmount() {
       rendered.unmount()
+      unbind()
       detach()
       navigation.dispose()
     },

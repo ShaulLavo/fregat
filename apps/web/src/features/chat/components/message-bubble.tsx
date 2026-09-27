@@ -6,7 +6,7 @@ import { cn } from '@workspace/ui/lib/utils'
 import { Shimmer } from '@workspace/ui/components/shimmer'
 import { StatusDot } from '@workspace/ui/components/status-dot'
 import type { CheckpointRestoreRole } from '@/features/chat/utils/checkpoint-restore'
-import type { MouseEvent, ReactNode } from 'react'
+import { useState, type MouseEvent, type ReactNode } from 'react'
 
 import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
 
@@ -24,6 +24,10 @@ import { AssistantMarkdown } from './assistant-markdown'
 import { MessageCompletionDivider } from './message-completion-divider'
 import { MessageMenu } from './message-menu'
 import { TerminalContextChip } from './terminal-context-chip'
+import { SentReviewComments } from './sent-review-comments'
+import { ReplyQuoteBar } from './reply-quote-bar'
+import { planSelectionLines, type PlanSelectionLines } from '@/features/chat/utils/plan-comment'
+import { extractReviewComments } from '@workspace/client-core/chat/review-comments'
 import { UserMessageBody } from './user-message-body'
 
 export function MessageBubble({
@@ -71,9 +75,14 @@ export function MessageBubble({
   // The composer appends captured terminal output as an XML block after the
   // prompt. Split it back off so the reader sees the words they typed plus the
   // same chip the composer showed, never the markup the agent received.
-  const userMessage = user
+  const terminalSplit = user
     ? extractTerminalContexts(message.text)
     : { contexts: [], text: message.text }
+  // Review comments ride in front of the typed text; they come back as chips that lead home.
+  const reviewSplit = user
+    ? extractReviewComments(terminalSplit.text)
+    : { comments: [], text: terminalSplit.text }
+  const userMessage = { contexts: terminalSplit.contexts, text: reviewSplit.text }
   const attachmentList = (
     <ChatAttachmentThumbnails
       attachments={attachments}
@@ -89,8 +98,19 @@ export function MessageBubble({
   const canRevertCheckpoint =
     user && typeof revertTurnCount === 'number' && restoreRole === undefined
   const restoring = restoreRole === 'target'
+  const [quoteLines, setQuoteLines] = useState<PlanSelectionLines | null>(null)
+  const quotable = assistant && !effectiveAssistantStreaming && !optimistic && message.text !== ''
   const assistantMarkdown = (
-    <AssistantMarkdown text={assistantText} streaming={effectiveAssistantStreaming} />
+    <div
+      onKeyUp={(event) => {
+        if (quotable) setQuoteLines(planSelectionLines(event.currentTarget))
+      }}
+      onMouseUp={(event) => {
+        if (quotable) setQuoteLines(planSelectionLines(event.currentTarget))
+      }}
+    >
+      <AssistantMarkdown text={assistantText} streaming={effectiveAssistantStreaming} />
+    </div>
   )
 
   function handleRevertClick() {
@@ -130,6 +150,7 @@ export function MessageBubble({
         >
           {user ? (
             <>
+              <SentReviewComments comments={reviewSplit.comments} sessionId={message.sessionId} />
               {attachmentList}
               {userMessage.text.trim().length > 0 ? (
                 <UserMessageBody text={userMessage.text} />
@@ -159,6 +180,13 @@ export function MessageBubble({
               ) : (
                 assistantMarkdown
               )}
+              {quotable && quoteLines ? (
+                <ReplyQuoteBar
+                  message={message}
+                  onDone={() => setQuoteLines(null)}
+                  selection={quoteLines}
+                />
+              ) : null}
               {turnDiffSummary ? <AssistantChangedFilesSection summary={turnDiffSummary} /> : null}
               {attachmentList}
             </>
@@ -169,7 +197,7 @@ export function MessageBubble({
                 'text-muted-foreground text-3xs mt-1 flex items-center justify-end gap-1.5 tabular-nums transition-opacity',
                 restoring
                   ? 'opacity-100'
-                  : 'group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:opacity-0',
+                  : 'pointer-events-none opacity-0 group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 touch:pointer-events-auto touch:opacity-100',
               )}
               data-user-message-meta='true'
             >
@@ -179,7 +207,7 @@ export function MessageBubble({
                   <Shimmer>Restoring…</Shimmer>
                 </span>
               ) : null}
-              <span className='size-5 shrink-0 transition-transform group-focus-within/message:translate-x-0 group-hover/message:translate-x-0 [@media(hover:hover)]:-translate-x-2'>
+              <span className='touch:translate-x-0 size-5 shrink-0 -translate-x-2 transition-transform group-focus-within/message:translate-x-0 group-hover/message:translate-x-0'>
                 {canRevertCheckpoint ? (
                   <Tooltip>
                     <TooltipTrigger
@@ -211,7 +239,7 @@ export function MessageBubble({
           ) : null}
           {!user && assistantChrome.metaVisible ? (
             <div
-              className='mt-1.5 flex items-center gap-2 transition-opacity group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:opacity-0'
+              className='touch:pointer-events-auto touch:opacity-100 pointer-events-none mt-1.5 flex items-center gap-2 opacity-0 transition-opacity group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100'
               data-assistant-message-meta='true'
             >
               <p className='text-muted-foreground text-3xs tabular-nums'>

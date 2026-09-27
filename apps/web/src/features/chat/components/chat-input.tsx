@@ -1,7 +1,6 @@
 import { ReviewDraftBar } from '@/features/chat/components/review-draft-bar'
 import { useReviewDraft } from '@/lib/review-draft/hooks/use-review-draft'
 import { removeReviewComments } from '@/lib/review-draft/state/store'
-import { withReviewComments } from '@/lib/review-draft/utils/prompt'
 import { ActiveFileChip } from '@/features/chat/components/active-file-chip'
 import { useActiveFileChip } from '@/features/chat/hooks/use-active-file-chip'
 import { withActiveFileMention } from '@/features/chat/utils/active-file-mention'
@@ -266,14 +265,26 @@ export function ChatInput({
     if (busy && !queuesFollowUp && steerDisabledReason !== null) return false
 
     const editor = editorRef.current
-    const typed = editor ? readChatInputText(editor).trim() : ''
-    const text = withReviewComments(typed, reviewComments)
+    const text = editor ? readChatInputText(editor).trim() : ''
+    // Records only: the typed text and the review stay apart until the message is composed.
+    const sentComments = reviewComments.map(({ anchor, author, body, quote }) => ({
+      anchor,
+      author,
+      body,
+      quote,
+    }))
     const draft = useChatInputDraftStore.getState().getDraft(draftTarget)
-    const validation = chatSubmissionValidation(text, draft.terminalContexts)
+    const validation = chatSubmissionValidation(text, draft.terminalContexts, sentComments)
     setValidationError(validation)
     if (validation) return false
     const attachments = chatInputUploadAttachments(draft.attachments)
-    if (!text && attachments.length === 0 && draft.terminalContexts.length === 0) return false
+    if (
+      !text &&
+      sentComments.length === 0 &&
+      attachments.length === 0 &&
+      draft.terminalContexts.length === 0
+    )
+      return false
 
     // No ready provider offers a model, so there is nothing legitimate to send.
     const selected = draft.modelSelection ?? modelSelection
@@ -293,6 +304,7 @@ export function ChatInput({
             interactionMode: draft.interactionMode ?? interactionMode,
           }).interactionMode,
           modelSelection: selected,
+          reviewComments: sentComments,
           runtimeMode: draft.runtimeMode ?? runtimeMode,
           terminalContexts: draft.terminalContexts,
           text: withActiveFileMention(text, activeFile.path),

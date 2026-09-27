@@ -2,11 +2,18 @@
 
 ## Status and authorization
 
-- Status: PROPOSED 2026-09-27, ready. Owner direction, same day, on `lib/fix-with-agent.ts`'s
+- Status: IN PROGRESS 2026-09-27. Owner direction, same day, on `lib/fix-with-agent.ts`'s
   bound callback: "i hate it … it feel like a workaround", then "write a plan for all your other
   findings where we can fix the workaround".
 - Done as the first instance: `7f22085c0` (Fix with AI opens its draft through navigation).
 - Effort: M. Phases land on their own; 1 goes first because 2 and 4 read through it.
+- Progress:
+  - [x] Phase 1: navigation is bound at boot
+  - [ ] Phase 2: the editor runtime owns its own active lifetime
+  - [ ] Phase 3: settings reach non-React consumers by subscription
+  - [ ] Phase 4: the command runtime reads settings at dispatch
+  - [ ] Phase 5: editor theme selection from settings
+  - [ ] Phase 6: the rule
 
 ## The shape
 

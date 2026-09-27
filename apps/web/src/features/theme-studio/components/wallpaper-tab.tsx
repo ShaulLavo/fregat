@@ -26,7 +26,6 @@ import { wallpaperSections } from '@/lib/wallpapers/utils/groups'
 import { visibleWallpaper } from '@/lib/wallpapers/utils/selection'
 import { WallpaperCard } from '@/features/theme-studio/components/wallpaper-card'
 import { WallpaperCatalogCard } from '@/features/theme-studio/components/wallpaper-catalog-card'
-import { useSettingValue } from '@/hooks/use-setting-value'
 import { WallpaperSection } from '@/features/theme-studio/components/wallpaper-section'
 import { WallpaperSourceCard } from '@/features/theme-studio/components/wallpaper-source-card'
 import { WallpaperUploadTile } from '@/features/theme-studio/components/wallpaper-upload-tile'
@@ -66,7 +65,6 @@ export function WallpaperTab({
     { queries: (matching ? assets : []).map((asset) => wallpaperColorsOptions(asset.id)) },
     owner,
   )
-  const previewCloud = useSettingValue('workbench.wallpaper.previewCloud')
   const sections = wallpaperSections(assets, search, library.data?.catalog)
   const colorsById = new Map(
     colorQueries.flatMap((query, index) => (query.data ? [[assets[index]!.id, query.data]] : [])),
@@ -105,7 +103,6 @@ export function WallpaperTab({
       <WallpaperCatalogCard
         key={entry.asset}
         entry={entry}
-        cloud={previewCloud}
         installing={actions.install.isPending && actions.install.variables === entry.asset}
         onSelect={() =>
           actions.install.mutate(entry.asset, {

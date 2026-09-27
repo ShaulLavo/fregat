@@ -2,17 +2,16 @@
 
 ## Status and authorization
 
-- Status: DIRECTION APPROVED (owner, 2026-09-25); research done and owner questions answered 2026-09-25
-  (see "Research findings"). Next: the split into executable plans.
-  iPhone (WebKit) behaviour is unmeasured: Playwright WebKit does not start on this host.
+- Status: IN PROGRESS (wave 2, lane P). Phases 1–3 implemented 2026-09-26 (phone shell frame,
+  screens, touch paths); Phase 4 (sessions and pairing) follows in its own pull request.
+  Owner check pending: a real iPhone and Android phone (Phase 5). iPhone (WebKit) behaviour is
+  unmeasured: Playwright WebKit does not start on this host.
 - Priority: P2. Large product question; Plan 142 (Web Push) delivers the first away-from-desk
   value without it.
 - Effort: XL overall, unknown until the direction is set. The discussion itself is S.
 - Risk: HIGH. The wrong scope turns a workbench into two half-products.
 - Planned at: Platform `c2af88b4`, 2026-09-24. Origin: the 2026-09-24 reference survey (Paseo,
   Orca, T3 Code).
-- Work in the current checkout; no branches, worktrees, commits, pushes or PRs unless
-  separately requested.
 
 ## Outcome
 
@@ -369,6 +368,40 @@ the whole guard.
 Decided (Owner answer 3): pairing is required and is part of the phone work, after the M4
 session model.
 
+#### Phase 4, implemented 2026-09-26 (wave 2, lane P)
+
+- **Who is asked.** A request that reached the server directly, or through the mesh proxy from one
+  of this machine's own addresses (loopback, its tailnet address), is this machine: it passes as
+  before. Any other forwarded request (`X-Forwarded-For` naming another device) needs a paired
+  device's cookie; without one it gets `401 DEVICE_NOT_PAIRED`, over HTTP and on every socket.
+  The origin allowlist still runs first. One trust level: a paired device has full access, and
+  both pairing surfaces say so.
+- **Pairing.** Settings › Machines › Paired devices, in this machine's own browser: Pair a device
+  makes a one-time code (12 characters, no 0/1/I/O, 5 minutes, consumed atomically, 10 wrong
+  codes a minute stop all claims) and shows it as a QR code and a link, `…/pair#token=CODE`. The
+  device opens the link; the boot strips it from the address before anything reads the location,
+  then trades the code for an `HttpOnly; SameSite=Strict; Secure` cookie. A device that cannot
+  open the link types the code on the pairing screen it gets instead of the app. `bun run pair`
+  prints a link from this machine's shell, for when no browser here is at hand.
+- **Revocation reaches live connections.** Every socket a paired device opens (orchestration,
+  terminal, language server, machine relay) is held against that device; removing it, or its
+  going idle (swept hourly), closes them with 1008 `device removed`.
+- **Machine relay.** `/machines/:name/proxy` drops forwarding headers along with the cookie: this
+  server's gate admitted the device, so the machine behind it sees this server's own hop.
+- **Devices.** Kept in `devices.json` in the state home (mode 0600, secrets stored as SHA-256
+  hashes), not in the database: a table would bump the schema version and reset every session.
+  The list shows label, paired and last-seen times; any trusted browser removes a device except
+  itself; a device unseen for 30 days drops off. Codes live in memory only.
+- **Switch.** `environments.devicePairing` (machine scope, on by default) turns the requirement
+  off without a deploy.
+- **Not done:** socket tickets and bearer tokens for a native app (the cookie serves the browser);
+  renaming a device; a log-hygiene unit test (the wide events carry the outcome only, checked in
+  the scenario's server log).
+- Evidence: scenario `device-pairing` (Settings link and QR, the phone's pairing screen at 390px
+  through a forwarded address, the phone's browser opening the generated link, which strips it and
+  pairs, the phone in the list, a second claim refused). The production server serves `/pair`.
+- Owner check pending: pairing a real phone through the mesh, and the MacBook once after deploy.
+
 ### Q6: native app technology
 
 |      | SwiftUI (beside `apps/mac`)                                                                                                                                                                                                                                                                                                                | Expo / React Native                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
@@ -428,6 +461,78 @@ The split this plan promised:
 ## Phases
 
 See "Proposed phases" under Research findings. The owner answered its questions on 2026-09-25.
+
+### Phases 1–2: shell frame and screens (implemented 2026-09-26)
+
+- **Boot switch.** `lib/shell` picks the shell from one synchronous check (`(pointer: coarse)` or a
+  window under 720px) in the pre-paint boot script, which sets `data-shell` on the root and
+  `modulepreload`s the phone shell's chunks (named by `scripts/shell-chunks-plugin.ts`). At runtime
+  three media queries follow the breakpoints with hysteresis (enter under 720px, leave at 800px, a
+  coarse pointer never leaves), and the workspace view keeps the current shell until the other's
+  chunk has loaded (`useDisplayedShell`). State stays above both shells (`KeepAliveProvider`, the
+  stores, the query cache), so a switch loses no draft and parks terminals.
+- **Stack.** `features/phone`: sessions → session → changes, file or terminal. The level is the
+  address: chat mode with no session is the list, and a new `screen` field
+  (`?screen=changes|file|terminal`) names the pushed screen, so the browser's Back gesture walks the
+  stack. Opening a document on the phone pushes `screen=file`, whichever surface opened it. The
+  header's Back pops history this shell pushed and otherwise replaces the entry with the parent. A
+  cold start from the bare app URL lands on the list; a link or notification keeps its session.
+- **Screens.** Each is its own lazy chunk behind `useHeldUntilReady` (the list and a session warm in
+  idle time). Sessions reuses the rail; Session reuses `ChatStage` with a phone header (Back, title
+  over project or status, Changes, Terminal, the session menu); Changes reuses the chat Git tool
+  (`GitToolPane`); File reuses one `EditorGroup` with the phone bar in place of its tab strip,
+  the editor's title actions, and previous/next file within the diff's scope ("2 of 5"); Terminal
+  reuses the session's kept PTY (`SessionTerminal`).
+- **Frame.** `viewport-fit=cover` and `interactive-widget=resizes-content`; safe-area padding; a
+  `visualViewport` keyboard inset for iOS; `h-dvh`. A phone density step in `globals.css`
+  (`:root[data-shell='phone']`: 48px bars, 44px controls and rows, text-xs 13px and text-sm 15px),
+  16px fields so iOS never zooms, a `phone:` variant, and no shortcut chips in menus and the
+  palette on a touch screen (the shortcuts editor still shows its bindings).
+- **Tooling.** `agent:browser --touch` (and `capture.touch` on a scenario) emulates a touch phone;
+  `waitForApp` accepts the phone shell. Scenario `phone-shell` walks the whole stack on a fixture
+  repository with a scripted mock turn and checks nothing scrolls sideways.
+- **First load.** Measured on the same machine state, the app entry's initial graph now ships as one
+  chunk (`scripts/initial-chunk.ts`, a `codeSplitting` group traced from `main.tsx`): desktop
+  first load fell by 30 KB gzip against `origin/main`, and the phone shell adds nothing to it. The
+  workbench stays in the entry: splitting it out as its own lazy chunk (the Direction's "a phone
+  never downloads the workbench") measured +11 KB to +70 KB on the desktop from chunk fragmentation,
+  for a phone first load of 1.01 MB instead of 1.75 MB. Recorded as a follow-up, not done.
+
+### Phase 3: touch paths (implemented 2026-09-26)
+
+- **Long press opens every context menu** (`keymap/menus/state/long-press.ts`, installed by the
+  phone shell). iOS fires no `contextmenu`, so after 550ms it dispatches one at the press point.
+  The finger's lift is cancelled (a non-passive `touchend`), so however long the hold, nothing under
+  the finger is pressed. A press on selectable text, or one that grows a selection, is the
+  platform's text selection. A native `contextmenu` during the press or just after the lift (Android,
+  a Windows touchscreen) turns the dispatcher off, and a native one that follows ours is swallowed.
+  `-webkit-touch-callout: none` sits on the phone root in `globals.css`, so portaled menus, dialogs
+  and the palette carry it too.
+- **Hover-revealed controls show at rest** on `(hover: none)`, through one `touch:` variant: git
+  row actions, search match and result-line actions, prompt-stash delete, wallpaper actions,
+  message metadata and copy actions (formerly `[@media(hover:hover)]:opacity-0`).
+- **The phone's session list scrolls.** In the standalone list (`data-standalone` on the rail) rows
+  take touch scrolling, a press never starts a reorder (keyboard reordering stays), and the
+  keyboard cursor stays hidden until the first arrow key shows it where it is.
+- **Palette:** a button on the session list's bar, and Command palette in the session menu.
+- **Terminal key row:** Esc, Tab, Ctrl (held for the next letter) and the arrows, one `KeyButton`
+  that never takes focus from the terminal. Decided 2026-09-26: owner — interactive.
+- **Tooltips:** icon-only controls keep their `aria-label`; a chat link's destination, shown only
+  in its hover tooltip, now heads its context menu.
+- Scenario `phone-shell` asserts each: the list scrolls under a CDP touch drag without reordering,
+  a 1.6s hold leaves the menu open and the session untouched, the Stage action draws at opacity 1
+  with no hover, the session menu opens the palette, and the key row's Up and Esc reach the
+  terminal's shell connection (`\x1b[A\x1b` sent) while the terminal keeps focus.
+
+Owner check pending: the phone shell on a real iPhone (WebKit: focus zoom, keyboard inset, safe
+areas, Back swipe, long press on a row, text selection in a reply) and an Android phone
+(`interactive-widget`, the native long-press menu, and Ctrl then a letter in the terminal: a
+composing keyboard such as Gboard may type the letter), through the mesh.
+
+### Owner questions (wave 2)
+
+- The phone still downloads the workbench (see First load above). Keep, or schedule a chunking
+  change that splits it without growing the desktop's first load?
 
 ## Follow-up items
 

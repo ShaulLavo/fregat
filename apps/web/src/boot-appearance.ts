@@ -21,10 +21,12 @@ import {
   BOOT_MIRROR_KEY,
   PALETTE_BOOT_KEY,
   PALETTE_STYLE_ID,
+  SHELL_CHUNKS_ID,
   developmentServerUrl,
   type BootWallpaperPreload,
 } from '@/lib/boot-keys'
 import { resolveBackdrop } from '@/lib/platform/backdrop'
+import { initialShellKind, type ShellKind } from '@/lib/shell/utils/kind'
 
 // The pre-paint boot script. scripts/boot-appearance-plugin.ts bundles this into a classic
 // inline script in index.html, because a module script would run after first paint.
@@ -55,6 +57,10 @@ startFont(appearance.uiFont)
 startFont(appearance.codeFont)
 if (parseFontRef(appearance.codeFont)?.source !== 'nerd') startFont(NERD_SYMBOLS_FONT)
 injectPaletteStylesheet(appearance.palette)
+// The shell is chosen before the first paint, so its chunks download beside the entry script.
+const shell = initialShellKind((query) => window.matchMedia(query).matches)
+root.setAttribute('data-shell', shell)
+preloadShellChunks(shell)
 
 function readBootAppearance(): BootAppearance {
   const mirror = readStoredMirror()
@@ -211,4 +217,21 @@ function isPaletteBootCache(value: unknown): value is { ids: string[]; css: stri
 
   const { ids, css } = value as { ids?: unknown; css?: unknown }
   return Array.isArray(ids) && typeof css === 'string'
+}
+
+// The build writes each shell's chunks into index.html (scripts/shell-chunks-plugin.ts); dev has none.
+function preloadShellChunks(kind: ShellKind) {
+  const manifest = document.getElementById(SHELL_CHUNKS_ID)?.textContent
+  if (!manifest) return
+
+  const chunks: unknown = (JSON.parse(manifest) as Record<string, unknown>)[kind]
+  if (!Array.isArray(chunks)) return
+  for (const href of chunks) {
+    if (typeof href !== 'string') continue
+    const link = document.createElement('link')
+    link.rel = 'modulepreload'
+    link.crossOrigin = ''
+    link.href = href
+    document.head.append(link)
+  }
 }

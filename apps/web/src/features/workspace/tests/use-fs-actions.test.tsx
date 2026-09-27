@@ -4,7 +4,7 @@ import { testDocumentKey, testTabContent } from '../../../../test/factories/docu
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { matchMutation } from '@tanstack/react-query'
-import { FileTreeModel } from '@workspace/tree'
+import { TreeViewModel } from '@/features/workspace/state/tree-model'
 import { open } from 'node:fs/promises'
 import path from 'node:path'
 import type { ReactNode } from 'react'
@@ -432,7 +432,7 @@ async function renderFsActions(rootPath: string) {
     await fetchTree(filesystemPath(rootPath), signal(), getClient()),
     rootPath,
   )
-  const tree = new FileTreeModel({ paths: model.paths, renaming: true })
+  const tree = new TreeViewModel({ paths: model.paths, renaming: true })
   const queryClient = createTestQueryClient()
   queryClient.setQueryData(fileSystemKeys.tree(rootPath), model)
 

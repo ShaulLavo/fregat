@@ -81,6 +81,7 @@ export async function createAgentTerminalFixture(
       metadataDatabase: handle,
       settings: testSettingsOptions(root),
       workspaceEditJournalRoot: path.join(root, 'journals'),
+      devices: { filePath: path.join(root, 'devices.json') },
       terminal: {
         ...(options.hostClient ? { hostClient: options.hostClient } : { ptyFactory: pty.factory }),
         ...(options.shellCommand ? { shellCommand: options.shellCommand } : {}),

@@ -1,5 +1,5 @@
 import { ok, strictEqual } from 'node:assert/strict'
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import * as v from 'valibot'
 import { selectors } from '../selectors'
@@ -88,13 +88,22 @@ export const claudeUsageImport: Scenario = {
       await mkdir(project, { recursive: true })
       const sessionId = crypto.randomUUID()
       await writeFile(join(project, `${sessionId}.jsonl`), transcript(sessionId, fixture))
+      // Import reads transcripts from the config folder; the instance never runs a CLI.
+      const binary = join(configDir, 'claude')
+      await writeFile(binary, '#!/bin/sh\nexit 1\n')
+      await chmod(binary, 0o755)
       // This server's state is thrown away after the run.
       await writeSettings(page, base, [
         {
           kind: 'provider.setEnabled',
           providerInstanceId: 'claude-import-fixture',
           enabled: true,
-          createIfMissing: { config: { configDir }, displayLabel: LABEL, driverKind: 'claude' },
+          createIfMissing: {
+            binaryPath: binary,
+            config: { configDir },
+            displayLabel: LABEL,
+            driverKind: 'claude',
+          },
         },
       ])
       await fixtureGit(fixture, ['commit', '--quiet', '-m', 'initial'])

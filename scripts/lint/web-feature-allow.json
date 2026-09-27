@@ -636,6 +636,138 @@
     "reason": "shared → lib: DiffLanguageHost is reused by git outside editor; move this shared behavior with its consumers."
   },
   {
+    "from": "phone",
+    "to": "chat",
+    "module": "features/chat/hooks/use-session-diff-scope.ts",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
+    "from": "phone",
+    "to": "chat-mode",
+    "module": "features/chat-mode/components/chat-stage.tsx",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
+    "from": "phone",
+    "to": "chat-mode",
+    "module": "features/chat-mode/components/git-tool-pane.tsx",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
+    "from": "phone",
+    "to": "chat-mode",
+    "module": "features/chat-mode/components/session-attention-indicator.tsx",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
+    "from": "phone",
+    "to": "chat-mode",
+    "module": "features/chat-mode/components/session-rail.tsx",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
+    "from": "phone",
+    "to": "chat-mode",
+    "module": "features/chat-mode/components/session-terminal.tsx",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
+    "from": "phone",
+    "to": "chat-mode",
+    "module": "features/chat-mode/components/stage-header.tsx",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
+    "from": "phone",
+    "to": "chat-mode",
+    "module": "features/chat-mode/hooks/use-session-checkout-refresh.ts",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
+    "from": "phone",
+    "to": "chat-mode",
+    "module": "features/chat-mode/hooks/use-session-tool-root.ts",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
+    "from": "phone",
+    "to": "chat-mode",
+    "module": "features/chat-mode/providers/session-provider.tsx",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
+    "from": "phone",
+    "to": "chat-mode",
+    "module": "features/chat-mode/state/session-selection-store.ts",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
+    "from": "phone",
+    "to": "chat-mode",
+    "module": "features/chat-mode/utils/attention-state.ts",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
+    "from": "phone",
+    "to": "chat-mode",
+    "module": "features/chat-mode/utils/stage-title.ts",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
+    "from": "phone",
+    "to": "editor",
+    "module": "features/editor/state/conflict-state.tsx",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
+    "from": "phone",
+    "to": "editor",
+    "module": "features/editor/state/workspace-state.tsx",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
+    "from": "phone",
+    "to": "git",
+    "module": "features/git/components/branch-chip.tsx",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
+    "from": "phone",
+    "to": "git",
+    "module": "features/git/components/remote-actions.tsx",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
+    "from": "phone",
+    "to": "git",
+    "module": "features/git/hooks/use-status.ts",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
+    "from": "phone",
+    "to": "git",
+    "module": "features/git/utils/change-rows.ts",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
+    "from": "phone",
+    "to": "workbench",
+    "module": "features/workbench/components/editor-group.tsx",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
+    "from": "phone",
+    "to": "workbench",
+    "module": "features/workbench/providers/editor-groups-drag-provider.tsx",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
+    "from": "phone",
+    "to": "server-update",
+    "module": "features/server-update/components/status.tsx",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
     "from": "search",
     "to": "editor",
     "module": "features/editor/state/document-state.tsx",
@@ -1132,6 +1264,12 @@
     "to": "git",
     "module": "features/git/utils/status-entries-for-tree.ts",
     "reason": "shared → lib: statusEntriesForTree is reused by workspace outside git; move this shared behavior with its consumers."
+  },
+  {
+    "from": "workspace",
+    "to": "phone",
+    "module": "features/phone/components/shell.tsx",
+    "reason": "owner: the workspace view loads one shell per device, and the phone shell is one of the two."
   },
   {
     "from": "workspace",

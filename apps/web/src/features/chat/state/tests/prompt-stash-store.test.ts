@@ -15,6 +15,11 @@ import {
 } from '../chat-input-draft-store'
 import { transferStash } from '../stash-transfer'
 import { readPersistedChatInputDrafts } from '../../utils/draft-storage'
+import {
+  addReviewComment,
+  resetReviewDraftStore,
+  useReviewDraftStore,
+} from '@/lib/review-draft/state/store'
 
 const target = {
   environmentId: testScopedStorage.environmentId,
@@ -29,6 +34,7 @@ beforeEach(() => {
   hydrateChatInputDraftStoreFromStorage(testScopedStorage)
   initializePromptStashStore(testScopedStorage)
   resetPromptStashStore()
+  resetReviewDraftStore()
 })
 afterEach(() => {
   vi.restoreAllMocks()
@@ -90,4 +96,80 @@ test('stash writes preserve unrelated composed drafts', async () => {
   await transferStash(target, { kind: 'stash' })
   const stored = readPersistedChatInputDrafts(testScopedStorage)
   expect(Object.values(stored.draftsByKey).map((item) => item.prompt)).toEqual(['untouched'])
+})
+
+test('a stashed message takes its review comments and quoted replies, and restoring returns them', async () => {
+  drafts().setPrompt(target, 'fix both')
+  const comment = addReviewComment({
+    anchor: { kind: 'message', lines: { end: 2, start: 1 }, messageId: 'm-1', sessionId: 's-1' },
+    author: 'user',
+    body: 'this part',
+    destination: { environmentId: target.environmentId, rootPath: '/repo' },
+    quote: 'About your earlier reply, lines 1–2:\n\n> one\n> two',
+  })
+  await transferStash(target, { kind: 'stash' })
+  expect(useReviewDraftStore.getState().comments).toEqual([])
+  const entry = stash().entries[0]!
+  expect(entry.reviewComments).toEqual([
+    { anchor: comment.anchor, author: 'user', body: 'this part', quote: comment.quote },
+  ])
+  expect(readPersistedChatInputDrafts(testScopedStorage).stashEntries[0]?.reviewComments).toEqual(
+    entry.reviewComments,
+  )
+
+  await transferStash(target, { kind: 'restore', entry })
+  expect(useReviewDraftStore.getState().comments).toMatchObject([
+    {
+      anchor: comment.anchor,
+      body: 'this part',
+      destination: { environmentId: target.environmentId, rootPath: '/repo' },
+    },
+  ])
+})
+
+test('a draft holding only review comments can be stashed', async () => {
+  addReviewComment({
+    anchor: { kind: 'plan', lines: { end: 1, start: 1 }, planId: 'plan-1', sessionId: 's-1' },
+    author: 'user',
+    body: 'rename',
+    destination: { environmentId: target.environmentId, rootPath: '/repo' },
+    quote: 'About the proposed plan, line 1:\n\n> Step',
+  })
+  expect(await transferStash(target, { kind: 'stash' })).not.toBeNull()
+  expect(stash().entries).toHaveLength(1)
+})
+
+test('restoring over a commented draft swaps both drafts with their own review comments', async () => {
+  const destination = { environmentId: target.environmentId, rootPath: '/repo' }
+  const commentOn = (sessionId: string, body: string) =>
+    addReviewComment({
+      anchor: { kind: 'message', lines: { end: 1, start: 1 }, messageId: 'm', sessionId },
+      author: 'user',
+      body,
+      destination,
+      quote: '> line',
+    })
+  const bodies = () => useReviewDraftStore.getState().comments.map((comment) => comment.body)
+
+  drafts().setPrompt(target, 'draft A')
+  commentOn('s-a', 'comment A')
+  await transferStash(target, { kind: 'stash' })
+  drafts().setPrompt(target, 'draft B')
+  commentOn('s-b', 'comment B')
+
+  await transferStash(target, { kind: 'restore', entry: stash().entries[0]! })
+  expect(drafts().getDraft(target).prompt).toBe('draft A')
+  expect(bodies()).toEqual(['comment A'])
+  const saved = stash().entries[0]!
+  expect(saved.prompt).toBe('draft B')
+  expect(saved.reviewComments?.map((comment) => comment.body)).toEqual(['comment B'])
+
+  // A draft holding only a comment is swapped out whole as well.
+  drafts().setPrompt(target, '')
+  resetReviewDraftStore()
+  commentOn('s-c', 'comment C')
+  await transferStash(target, { kind: 'restore', entry: saved })
+  expect(drafts().getDraft(target).prompt).toBe('draft B')
+  expect(bodies()).toEqual(['comment B'])
+  expect(stash().entries[0]?.reviewComments?.map((comment) => comment.body)).toEqual(['comment C'])
 })

@@ -53,8 +53,8 @@ jobs:
             }
           - {
               name: tree browser,
-              dir: packages/tree,
-              run: 'node_modules/.bin/vitest run --project browser',
+              dir: apps/web,
+              run: 'node_modules/.bin/vitest run --config vitest.tree-browser.config.ts',
               browser: true,
             }
     steps:

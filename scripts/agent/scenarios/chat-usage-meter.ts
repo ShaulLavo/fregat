@@ -2,17 +2,19 @@ import type { Page } from 'playwright'
 import { strictEqual } from 'node:assert/strict'
 import { selectors, settleAnimations } from '../selectors'
 import type { Scenario } from './index'
+import { openChat } from './chat-verification'
+import { installMockProvider } from './mock-provider-session'
 
 const usageRoute = /\/providers\/usage(\?|$)/
 const HOUR_MS = 3_600_000
 
 /**
  * Serves fixed plan windows so the warning and spent states are reachable without
- * spending a real allowance. The default instances share neither account, so each
- * gets its own entry, and whichever the new session picks carries a warning. The
- * Codex reading is twenty minutes old, so its popover says it may be out of date.
+ * spending a real allowance. The new session picks the scenario's mock instance, which
+ * reads the Codex account. That reading is twenty minutes old, so its popover says it
+ * may be out of date.
  */
-function usageFixture(nowMs: number) {
+function usageFixture(nowMs: number, providerInstanceId: string) {
   const resetsIn = (hours: number) => new Date(nowMs + hours * HOUR_MS).toISOString()
 
   return {
@@ -33,7 +35,7 @@ function usageFixture(nowMs: number) {
         accountKey: 'fixture-codex',
         driverKind: 'codex',
         planType: 'pro',
-        providerInstanceIds: ['codex'],
+        providerInstanceIds: ['codex', providerInstanceId],
         checkedAt: new Date(nowMs - 20 * 60_000).toISOString(),
         windows: [
           window('primary', 'session', 'Session', 100, resetsIn(1.2), 'rejected'),
@@ -58,15 +60,30 @@ function window(
   return { id, kind, label, resetsAt, status, usedPercent, windowMinutes }
 }
 
-/** Serves the fixed windows and reloads so the page reads them; call the result to stop. */
+/**
+ * Installs a mock provider for new sessions to pick, serves the fixed windows for it and
+ * reloads so the page reads them; call the result to stop and remove the mock.
+ */
 export async function reloadWithUsageFixture(page: Page) {
+  const base = (await openChat(page)).replace(/\/orchestration$/, '')
+  const mock = await installMockProvider(page, base, {
+    name: 'usage-meter',
+    displayLabel: 'Usage mock',
+    config: {},
+  })
   await page.route(usageRoute, (route) =>
-    route.fulfill({ contentType: 'application/json', json: usageFixture(Date.now()) }),
+    route.fulfill({
+      contentType: 'application/json',
+      json: usageFixture(Date.now(), mock.providerInstanceId),
+    }),
   )
   await page.reload()
   await selectors.windowToolbar(page).waitFor({ timeout: 45_000 })
 
-  return () => page.unroute(usageRoute)
+  return async () => {
+    await page.unroute(usageRoute)
+    await mock.restore()
+  }
 }
 
 export const chatUsageMeter: Scenario = {

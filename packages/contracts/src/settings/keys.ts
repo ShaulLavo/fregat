@@ -298,6 +298,18 @@ export const SETTINGS_REGISTRY = {
       'SSH targets and direct origins available to this client. The local machine is always available.',
     keywords: ['remote', 'ssh', 'environment', 'server', 'connect'],
   }),
+  'environments.devicePairing': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    // Machine scope: it decides who reaches this machine's files, terminals and agents.
+    scope: 'machine',
+    widget: 'boolean',
+    category: 'Machines',
+    title: 'Require pairing for other devices',
+    description:
+      'A browser on another device, such as a phone reaching this machine over the mesh, shows a pairing screen until a link from this machine pairs it. This machine’s own browser needs no pairing.',
+    keywords: ['pair', 'phone', 'device', 'security', 'mesh', 'tailnet'],
+  }),
   'git.autoPull': defineSetting({
     schema: v.boolean(),
     default: false,
@@ -647,43 +659,6 @@ export const SETTINGS_REGISTRY = {
       "Desktop shows the server machine's current wallpaper: Omarchy's current background on Linux, the desktop picture on macOS. On a Linux screen the compositor already shows the desktop behind the window, so Desktop draws nothing there.",
     description: 'Choose a wallpaper and turn it on or off without losing the selection.',
     keywords: ['wallpaper', 'background', 'desktop'],
-  }),
-  'workbench.wallpaper.omarchyCatalog': defineSetting({
-    schema: v.boolean(),
-    default: true,
-    scope: 'application',
-    widget: 'boolean',
-    category: 'Appearance',
-    title: 'Omarchy wallpapers from GitHub',
-    description:
-      'List every Omarchy theme wallpaper in the picker. Picking one downloads it from a pinned Omarchy commit on GitHub.',
-    keywords: ['wallpaper', 'omarchy', 'github', 'download'],
-  }),
-  'workbench.wallpaper.previewCloud': defineSetting({
-    schema: v.pipe(v.string(), v.regex(/^[A-Za-z0-9_-]*$/)),
-    default: '',
-    scope: 'application',
-    widget: 'string',
-    category: 'Appearance',
-    title: 'Wallpaper preview cloud',
-    details:
-      'The account needs fetched URLs allowed for raw.githubusercontent.com (Cloudinary Settings → Security). Empty loads full-size previews from GitHub.',
-    description:
-      'Cloudinary cloud name that resizes Omarchy wallpaper previews through its fetch mode.',
-    keywords: ['wallpaper', 'cloudinary', 'preview', 'thumbnail'],
-  }),
-  'workbench.wallpaper.downloadTimeoutMs': defineSetting({
-    schema: v.pipe(v.number(), v.integer(), v.minValue(1000), v.maxValue(600_000)),
-    default: 60_000,
-    // Machine scope: the right wait depends on this box's network.
-    scope: 'machine',
-    widget: 'number',
-    category: 'Appearance',
-    title: 'Wallpaper download timeout',
-    description:
-      'Milliseconds a picked Omarchy wallpaper may take to download from GitHub before the download stops.',
-    visibility: 'advanced',
-    keywords: ['wallpaper', 'omarchy', 'github', 'download', 'timeout'],
   }),
   'workbench.tree.indentGuides': defineSetting({
     schema: v.picklist(['none', 'onHover', 'always'] as const),

@@ -15,6 +15,7 @@ import {
  */
 export const chatClaudeCatalog: Scenario = {
   name: 'chat-claude-catalog',
+  realProviders: true,
   description:
     'Open the Claude models in the picker, expand Legacy, and read the options of Opus 5.5 and Fable 5.1. Restores the project default model.',
   async run(page, { step }) {

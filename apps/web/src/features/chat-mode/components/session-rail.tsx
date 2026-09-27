@@ -66,10 +66,18 @@ import { cn } from '@workspace/ui/lib/utils'
 const EMPTY_SEARCH_MATCHES = {}
 const RAIL_DND_MODIFIERS = [restrictToVerticalAxis]
 
-export function SessionRail() {
+export function SessionRail({
+  standalone = false,
+}: {
+  /**
+   * The list is a screen of its own (the phone's first screen): no session is open beside it to
+   * mark, and a press on a row is a scroll or a menu, never a drag.
+   */
+  readonly standalone?: boolean
+}) {
   const { activeSession, addProject, project, ready, transport } = useChatModeSession()
   const { reorderProject, reorderSession } = useChatRailOrder()
-  const sensors = useRailDragSensors()
+  const sensors = useRailDragSensors(!standalone)
   const orderOverrides = useRailOrderOverrides()
   const groupingMode = useSettingValue('chat.projectGrouping')
   const groupingOverrides = useSettingValue('chat.projectGroupingOverrides')
@@ -94,12 +102,13 @@ export function SessionRail() {
   const incompleteSearch = useSessionSearchStore(
     (state) => state.matchedQuery === query.trim() && state.unavailable.length > 0,
   )
-  const activeSessionKey = activeSession.sessionId
-    ? scopedSessionKey({
-        environmentId: transport.environmentId,
-        sessionId: activeSession.sessionId,
-      })
-    : null
+  const activeSessionKey =
+    !standalone && activeSession.sessionId
+      ? scopedSessionKey({
+          environmentId: transport.environmentId,
+          sessionId: activeSession.sessionId,
+        })
+      : null
   const activeProjectId = project?.id ?? null
   // Keep model items stable across cursor updates; rebuilding them wakes every row.
   const model = useMemo(
@@ -180,7 +189,10 @@ export function SessionRail() {
   })
 
   const focusList = list.focus
-  useLayoutEffect(() => selection.setState(list.activeId, true), [list.activeId, selection])
+  // A standalone list is tapped, not arrowed through: its cursor shows once a key moves it.
+  const [keyed, setKeyed] = useState(!standalone)
+  const cursorId = keyed ? list.activeId : null
+  useLayoutEffect(() => selection.setState(cursorId, true), [cursorId, selection])
   const positions = new Map(
     visibleSessions
       .slice(0, ITEM_POSITIONS.length)
@@ -225,8 +237,10 @@ export function SessionRail() {
 
   return (
     <aside
-      className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'
+      className='group/rail flex h-full min-h-0 min-w-0 flex-col overflow-hidden'
       data-screen-sidebar=''
+      // Rows read this: a list that is its own screen scrolls under a finger, and never drags.
+      data-standalone={standalone || undefined}
       onKeyDown={handleKeyDown}
     >
       <div className='flex shrink-0 items-center gap-1 px-2 pt-(--density-section-gap)'>
@@ -364,6 +378,13 @@ export function SessionRail() {
         <div
           {...list.containerProps}
           onKeyDown={(event) => {
+            if (!keyed && isArrowKey(event.key)) {
+              // The first arrow shows the cursor where it is; the next one moves it.
+              event.preventDefault()
+              setKeyed(true)
+              return
+            }
+            setKeyed(true)
             if (!draggingProjectId) list.containerProps.onKeyDown(event)
           }}
           aria-label='Sessions'
@@ -383,7 +404,11 @@ export function SessionRail() {
                 items={model.groups.map((group) => group.key)}
                 strategy={verticalListSortingStrategy}
               >
-                {model.sections.map((section) => (
+                {/* Nothing is dragged into an empty shelf where the list is its own screen. */}
+                {(standalone
+                  ? model.sections.filter((section) => section.groups.length > 0)
+                  : model.sections
+                ).map((section) => (
                   <SessionShelf key={section.state} shelf={section.state} title={section.title}>
                     {section.groups.map((group) => (
                       <SessionGroup group={group} key={group.key} />
@@ -418,4 +443,8 @@ export function SessionRail() {
       {isSessionBulkSelection(markedSessionIds) ? <SessionBulkBar /> : null}
     </aside>
   )
+}
+
+function isArrowKey(key: string) {
+  return key === 'ArrowDown' || key === 'ArrowUp'
 }

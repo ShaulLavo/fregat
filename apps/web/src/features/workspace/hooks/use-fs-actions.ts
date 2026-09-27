@@ -2,7 +2,7 @@ import { useUnavailableEnvironment } from '@/lib/environments/hooks/use-unavaila
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import type { FileTreeRenameEvent } from '@workspace/tree'
-import type { FileTreeModel } from '@workspace/tree'
+import type { TreeViewModel } from '@/features/workspace/state/tree-model'
 import { useIsMutating, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState, type RefObject } from 'react'
 
@@ -76,7 +76,7 @@ export function useFsActions({
 }: {
   modelRef: RefObject<TreeModel>
   rootPath: FilesystemPath
-  treeRef: RefObject<FileTreeModel | null>
+  treeRef: RefObject<TreeViewModel | null>
 }) {
   const queryClient = useQueryClient()
   const unavailable = useUnavailableEnvironment()
@@ -146,7 +146,7 @@ export function useFsActions({
     startInlineCreate(tree, request.containerPath, request.isFolder)
   }
 
-  function startInlineCreate(tree: FileTreeModel, containerPath: string, isFolder: boolean) {
+  function startInlineCreate(tree: TreeViewModel, containerPath: string, isFolder: boolean) {
     const placeholderPath = newEntryTreePath({
       containerPath,
       existingPaths: modelRef.current.entriesByTreePath,
