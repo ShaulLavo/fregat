@@ -2,7 +2,7 @@ import { ok } from 'node:assert/strict'
 
 import { selectors } from '../selectors'
 import { until } from './chat-queue'
-import { dispatch, readShell } from './chat-verification'
+import { removeOtherSessions } from './chat-verification'
 import { selectReplyLines } from './chat-assistant-citation'
 import { isolatedNativeScenario, sendPrompt } from './native-provider-verification'
 
@@ -73,11 +73,7 @@ export const chatCitationElsewhere = isolatedNativeScenario({
       await step('chip-opened-the-first-session-and-unfolded-the-notes')
     } finally {
       // The second session runs its own fixture process; the harness stops only the first.
-      const shell = await readShell(page, orchestration)
-      for (const other of shell.sessions.filter((entry) => entry.id !== sessionId)) {
-        await dispatch(page, orchestration, { type: 'session.runtime.stop', sessionId: other.id })
-        await dispatch(page, orchestration, { type: 'session.delete', sessionId: other.id })
-      }
+      await removeOtherSessions(page, orchestration, sessionId)
     }
   },
 })
