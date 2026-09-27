@@ -8,7 +8,6 @@ import {
   SEARCH_RESULT_FILE_EDITOR_FULL_RENDER_LINE_LIMIT,
   SEARCH_RESULT_FILE_EDITOR_LINE_OVERSCAN,
   SEARCH_RESULT_FILE_EDITOR_ROW_GAP,
-  SEARCH_RESULT_STATIC_EDITOR_LINE_LIMIT,
   SEARCH_RESULT_VIRTUAL_ROW_OFFSET,
 } from '@/features/search/utils/result-editor-constants'
 import {
@@ -17,10 +16,7 @@ import {
   searchResultFileEditorLineWindow,
   searchResultFileEditorHeight,
   searchResultFileEditorRowHeight,
-  searchResultFileEditorScrollMode,
   searchResultFileEditorStyle,
-  searchResultFileEditorVisibleLineCount,
-  searchResultFileDocumentVisibleLines,
   searchResultVirtualRowInputs,
   searchResultVirtualRowScrollTarget,
 } from '@/features/search/utils/result-editor'
@@ -32,22 +28,24 @@ import type {
 } from '@/features/search/utils/result-view-model'
 
 describe('search result editor utils', () => {
-  it('uses static editor mode for normal file result groups', () => {
-    expect(searchResultFileEditorScrollMode(SEARCH_RESULT_STATIC_EDITOR_LINE_LIMIT)).toBe('static')
+  it('sizes a file block for every one of its matches', () => {
+    const lineCount = 5_000
+
+    expect(searchResultFileEditorHeight(lineCount)).toBe(editorHeightForLineCount(lineCount))
+    expect(searchResultFileEditorRowHeight(fileWithExcerptCount(lineCount))).toBe(
+      editorHeightForLineCount(lineCount) + FILE_RESULTS_ROW_VERTICAL_PADDING,
+    )
   })
 
-  it('uses capped virtualized editor mode for long file result groups', () => {
-    const cappedHeight = editorHeightForLineCount(SEARCH_RESULT_STATIC_EDITOR_LINE_LIMIT)
-    const longLineCount = SEARCH_RESULT_STATIC_EDITOR_LINE_LIMIT + 1
+  it('reveals a match past the 200th at its own line', () => {
+    const rowStride = EXCERPT_EDITOR_LINE_HEIGHT + SEARCH_RESULT_FILE_EDITOR_ROW_GAP
+    const file = fileWithExcerptCount(1_000)
+    const target = file.excerpts[900]?.id ?? null
 
-    expect(searchResultFileEditorScrollMode(longLineCount)).toBe('virtualized')
-    expect(searchResultFileEditorVisibleLineCount(longLineCount)).toBe(
-      SEARCH_RESULT_STATIC_EDITOR_LINE_LIMIT,
-    )
-    expect(searchResultFileEditorHeight(longLineCount)).toBe(cappedHeight)
-    expect(searchResultFileEditorRowHeight(fileWithExcerptCount(longLineCount))).toBe(
-      cappedHeight + FILE_RESULTS_ROW_VERTICAL_PADDING,
-    )
+    expect(searchResultVirtualRowScrollTarget({ type: 'file-results', file }, target)).toEqual({
+      offset: FILE_RESULTS_ROW_VERTICAL_PADDING / 2 + 900 * rowStride,
+      size: EXCERPT_EDITOR_LINE_HEIGHT,
+    })
   })
 
   it('keeps normal row estimates aligned with rendered editor height', () => {
@@ -84,14 +82,6 @@ describe('search result editor utils', () => {
     const file = fileWithExcerptCount(3)
 
     expect(searchResultVirtualRowScrollTarget({ type: 'file', file }, file.id)).toBeNull()
-  })
-
-  it('caps sidecar rows to the same visible line count as the editor body', () => {
-    const lineCount = SEARCH_RESULT_STATIC_EDITOR_LINE_LIMIT + 10
-
-    expect(searchResultFileDocumentVisibleLines(documentWithLineCount(lineCount))).toHaveLength(
-      SEARCH_RESULT_STATIC_EDITOR_LINE_LIMIT,
-    )
   })
 
   it('computes the visible line window from the outer virtual viewport', () => {
@@ -175,24 +165,30 @@ describe('search result editor utils', () => {
     ).toEqual({ end: 2, offsetY: 0, start: 0 })
   })
 
-  it('keeps line windows inside the static preview line cap', () => {
+  it('windows the last lines of a file block with thousands of matches', () => {
     const rowStride = EXCERPT_EDITOR_LINE_HEIGHT + SEARCH_RESULT_FILE_EDITOR_ROW_GAP
     const contentTop = SEARCH_RESULT_VIRTUAL_ROW_OFFSET + FILE_RESULTS_ROW_VERTICAL_PADDING / 2
+    const lineCount = 5_000
     const window = searchResultFileEditorLineWindow({
-      lineCount: SEARCH_RESULT_STATIC_EDITOR_LINE_LIMIT + 50,
+      lineCount,
       viewport: {
         height: rowStride * 4,
-        top: contentTop + rowStride * (SEARCH_RESULT_STATIC_EDITOR_LINE_LIMIT - 2),
+        top: contentTop + rowStride * (lineCount - 2),
       },
       virtualItem: {
         index: 0,
         key: 'file-results',
-        size: 10_000,
+        size: searchResultFileEditorRowHeight(fileWithExcerptCount(lineCount)),
         start: 0,
       },
     })
 
-    expect(window.end).toBe(SEARCH_RESULT_STATIC_EDITOR_LINE_LIMIT)
+    expect(window.end).toBe(lineCount)
+    expect(window.start).toBe(
+      Math.floor(
+        (rowStride * (lineCount - 2) - SEARCH_RESULT_FILE_EDITOR_LINE_OVERSCAN) / rowStride,
+      ),
+    )
   })
 
   it('slices file documents and remaps editor offsets for the visible window', () => {

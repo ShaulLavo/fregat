@@ -1,9 +1,6 @@
 import { memo } from 'react'
 
-import {
-  searchResultFileDocumentVisibleLines,
-  searchResultSourceLineGutterStyle,
-} from '@/features/search/utils/result-editor'
+import { searchResultSourceLineGutterStyle } from '@/features/search/utils/result-editor'
 import type { SearchResultFileDocument } from '@/features/search/utils/result-view-model'
 
 type SearchResultSourceLineGutterProps = {
@@ -13,7 +10,7 @@ type SearchResultSourceLineGutterProps = {
 
 export const SearchResultSourceLineGutter = memo(
   ({ document, minDigits }: SearchResultSourceLineGutterProps) => {
-    const lines = searchResultFileDocumentVisibleLines(document)
+    const lines = document.lines
 
     return (
       <div

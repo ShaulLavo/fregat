@@ -35,7 +35,6 @@ import {
   searchResultFileDocumentId,
   searchResultFileDocumentRevision,
   searchResultFileDocumentWindow,
-  searchResultFileEditorScrollMode,
   searchResultFileEditorStyle,
   searchResultFileLineIdAtClientY,
   searchResultFileRangeDecorations,
@@ -100,7 +99,6 @@ export const SearchResultFileEditor = memo(
     ]
     const plugins = createFileResultEditorPlugins(syntaxPlugins)
     const editorStyle = searchResultFileEditorStyle(visibleDocument)
-    const editorScrollMode = searchResultFileEditorScrollMode(visibleDocument.lines.length)
     const controller = useEditor({
       cursorLineHighlight: SEARCH_RESULT_CURSOR_LINE_HIGHLIGHT,
       document,
@@ -113,7 +111,8 @@ export const SearchResultFileEditor = memo(
       plugins,
       rangeDecorations,
       rowGap: SEARCH_RESULT_FILE_EDITOR_ROW_GAP,
-      scrollMode: editorScrollMode,
+      // The editor holds the block's line window, which the viewport bounds.
+      scrollMode: 'static',
       selectionSyncMode: 'none',
       storeSync: 'none',
       tabSize,
