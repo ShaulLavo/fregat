@@ -459,10 +459,15 @@ describe('tree view browser behavior', () => {
     expect(currentModel.getFocusedPath()).toBe('src/features/')
     expect(activePath(tree)).toBe('src/features/')
 
+    // An outside control makes the no-focus-transfer check independent of row virtualization.
+    const outsideButton = document.createElement('button')
+    document.body.prepend(outsideButton)
+    outsideButton.focus()
+
     currentModel.scrollToPath('src/features/a-20.ts', { offset: 'nearest' })
     await vi.waitFor(() => {
       expect(currentModel.getFocusedPath()).toBe('src/features/a-20.ts')
-      expect(activePath(tree)).toBeNull()
+      expect(document.activeElement).toBe(outsideButton)
     })
 
     currentModel.cleanUp()
