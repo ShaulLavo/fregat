@@ -36,7 +36,7 @@ export const approvalTurnEnded = isolatedNativeScenario({
     await step('ended-receipt-after-reload')
 
     await selectors.turnCarryOn(page).click()
-    await messages.getByText('Continue from where you stopped.', { exact: true }).waitFor()
+    await messages.getByText('Continue', { exact: true }).waitFor()
     await selectors.appApproval(page).waitFor({ timeout: 30_000 })
     const responses = (await nativeLog(root)).filter((entry) => entry.event === 'approval-response')
     equal(responses.length, 0, 'No answer reached the agent for the ended approval')
