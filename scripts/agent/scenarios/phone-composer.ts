@@ -21,7 +21,7 @@ const usageRoute = /\/providers\/usage(\?|$)/
 export const phoneComposer: Scenario = {
   name: 'phone-composer',
   description:
-    'At a touch phone viewport (320, 390, 430): the composer controls and plan gauge are one even run of equal squares after the model name, Send sits alone and evenly in the corner, the empty field is one line, and every control opens (the gauge through to Settings › Usage).',
+    'At a touch phone viewport (320, 390, 430): the composer controls and plan gauge are one even run of equal squares after the model name, Send sits alone and evenly in the corner, the empty field is one line, every control opens, and a long draft stays clear of welcome text with the keyboard open.',
   capture: { width: 390, height: 844, scale: 2, touch: true },
   requiresIsolatedServer: true,
   async run(page, { step }) {
@@ -77,6 +77,14 @@ export const phoneComposer: Scenario = {
       await expectComposerRhythm(page, 390)
       await step('composer-typed')
 
+      await keyboardDraft(page, step)
+      await selectors.phoneBack(page).click()
+      await selectors.chatNewSession(page).first().click()
+      await selectors.chatMessage(page).waitFor()
+      await keyboardDraft(page, step)
+      await selectors.phoneBack(page).click()
+      await selectors.sessionByTitle(page, TITLE).click()
+
       await opens(page, step, 'model-picker', selectors.modelPickerTrigger(page), () =>
         selectors.modelPickerPanel(page),
       )
@@ -98,6 +106,73 @@ export const phoneComposer: Scenario = {
       await releaseFixture(fixture)
     }
   },
+}
+
+async function keyboardDraft(page: Page, step: (label: string) => Promise<void>) {
+  const field = selectors.chatMessage(page)
+  await field.fill(
+    'This is a long draft that needs to stay readable while the keyboard is open. '.repeat(30),
+  )
+  await expectWelcomeContained(page)
+  try {
+    for (const width of WIDTHS) {
+      await page.setViewportSize({ width, height: 844 })
+      await field.focus()
+      await page.waitForTimeout(250)
+      // Stand in for the inset measured from iOS's visual viewport when its keyboard opens.
+      await page.evaluate(() =>
+        document.documentElement.style.setProperty('--keyboard-inset', '470px'),
+      )
+      await field.evaluate((element) => {
+        element.scrollTop = element.scrollHeight
+      })
+      await step(`keyboard-long-draft-${width}`)
+      await expectWelcomeContained(page)
+      const bounds = await field.boundingBox()
+      const send = await selectors.chatSend(page).boundingBox()
+      ok(
+        bounds && send && bounds.y >= 0 && send.y + send.height <= 374,
+        'The draft and Send stay above the keyboard',
+      )
+      await field.evaluate((element) => {
+        element.scrollTop = 0
+      })
+      await step(`keyboard-draft-start-${width}`)
+      await expectWelcomeContained(page)
+    }
+  } finally {
+    await page.evaluate(() => document.documentElement.style.removeProperty('--keyboard-inset'))
+    await page.setViewportSize({ width: 390, height: 844 })
+    await field.fill('Make the controls feel even')
+  }
+}
+
+async function expectWelcomeContained(page: Page) {
+  const visible = await selectors.chatWelcome(page).evaluate(async (welcome) => {
+    const region = welcome.getBoundingClientRect()
+    const entries = await new Promise<IntersectionObserverEntry[]>((resolve) => {
+      const observer = new IntersectionObserver((entries) => {
+        observer.disconnect()
+        resolve(entries)
+      })
+      for (const child of welcome.children) observer.observe(child)
+    })
+    return entries.map(({ intersectionRect: rect }) => ({
+      top: rect.top,
+      bottom: rect.bottom,
+      height: rect.height,
+      regionTop: region.top,
+      regionBottom: region.bottom,
+    }))
+  })
+  ok(
+    visible.every(
+      (rect) =>
+        rect.height === 0 ||
+        (rect.top >= rect.regionTop - 1 && rect.bottom <= rect.regionBottom + 1),
+    ),
+    `Welcome content paints outside its region: ${JSON.stringify(visible)}`,
+  )
 }
 
 /** The plan gauge opens its windows, and View usage leads on to Settings › Usage. */
