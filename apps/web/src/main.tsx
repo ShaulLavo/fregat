@@ -109,70 +109,79 @@ const restoredWorkspace = bootstrap
   .getState()
   .application?.getSnapshot()
   .editor.workspaceStore.getState()
-// Paired before the bootstrap asks the machine anything, so its first request carries the cookie.
-// Loaded only for a pairing link; if it fails to load, the pairing screen still takes the code.
-if (pairingCode)
-  await import('@/lib/pairing/state/claim-at-boot')
-    .then(({ claimAtBoot }) => claimAtBoot(pairingCode))
-    .catch(() => undefined)
-// The boot script already preloads the chosen shell's chunks; this evaluates them before the first render.
-const warmViews: Promise<unknown>[] = [
-  resourceQueryClient
-    .query(shellQueryOptions(useShellStore.getState().kind))
-    .then(() => undefined)
-    .catch(() => undefined),
-]
-watchShellKind()
-if (restoredWorkspace?.selectedTabContent?.kind === 'settings')
-  warmViews.push(
-    resourceQueryClient
-      .query(settingsPageQueryOptions)
-      .then(() => undefined)
-      .catch(() => undefined),
-  )
-if (
-  restoredWorkspace?.workbenchPanels.bottomPanelOpen &&
-  restoredWorkspace.workbenchPanels.activeBottomTab === 'terminal'
-)
-  warmViews.push(
-    resourceQueryClient
-      .query(terminalPanelQueryOptions)
-      .then(() => undefined)
-      .catch(() => undefined),
-  )
-if (restoredWorkspace)
-  warmViews.push(
-    loadEditorThemeForSelection(
-      document.documentElement.classList.contains('dark') ? 'dark' : 'light',
-    ).catch(() => null),
-  )
-await Promise.all(warmViews)
 if (import.meta.hot) import.meta.hot.dispose(() => bootstrap.dispose())
+// Not a top-level await: the lazy chunks the boot waits on import this module's chunk, and would
+// wait on its evaluation forever.
+void start()
 
-createRoot(document.getElementById('root')!, {
-  onCaughtError: (error, errorInfo) => {
-    reportReactError({ error, errorInfo, kind: 'caught' })
-  },
-  onRecoverableError: (error, errorInfo) => {
-    reportReactError({ error, errorInfo, kind: 'recoverable' })
-  },
-  onUncaughtError: (error, errorInfo) => {
-    reportReactError({ error, errorInfo, kind: 'uncaught' })
-  },
-}).render(
-  <StrictMode>
-    <LoggingErrorBoundary>
-      <NavigationProvider navigation={navigation}>
-        <ApplicationBootstrap bootstrap={bootstrap}>
-          <App />
-        </ApplicationBootstrap>
-      </NavigationProvider>
-    </LoggingErrorBoundary>
-  </StrictMode>,
-)
+async function start() {
+  // Paired before the bootstrap asks the machine anything, so its first request carries the cookie.
+  // Loaded only for a pairing link; if it fails to load, the pairing screen still takes the code.
+  if (pairingCode)
+    await import('@/lib/pairing/state/claim-at-boot')
+      .then(({ claimAtBoot }) => claimAtBoot(pairingCode))
+      .catch(() => undefined)
+  // The boot script already preloads the chosen shell's chunks; this evaluates them before the first render.
+  const warmViews: Promise<unknown>[] = [
+    resourceQueryClient
+      .query(shellQueryOptions(useShellStore.getState().kind))
+      .then(() => undefined)
+      .catch(() => undefined),
+  ]
+  watchShellKind()
+  if (restoredWorkspace?.selectedTabContent?.kind === 'settings')
+    warmViews.push(
+      resourceQueryClient
+        .query(settingsPageQueryOptions)
+        .then(() => undefined)
+        .catch(() => undefined),
+    )
+  if (
+    restoredWorkspace?.workbenchPanels.bottomPanelOpen &&
+    restoredWorkspace.workbenchPanels.activeBottomTab === 'terminal'
+  )
+    warmViews.push(
+      resourceQueryClient
+        .query(terminalPanelQueryOptions)
+        .then(() => undefined)
+        .catch(() => undefined),
+    )
+  if (restoredWorkspace)
+    warmViews.push(
+      loadEditorThemeForSelection(
+        document.documentElement.classList.contains('dark') ? 'dark' : 'light',
+      ).catch(() => null),
+    )
+  await Promise.all(warmViews)
+
+  createRoot(document.getElementById('root')!, {
+    onCaughtError: (error, errorInfo) => {
+      reportReactError({ error, errorInfo, kind: 'caught' })
+    },
+    onRecoverableError: (error, errorInfo) => {
+      reportReactError({ error, errorInfo, kind: 'recoverable' })
+    },
+    onUncaughtError: (error, errorInfo) => {
+      reportReactError({ error, errorInfo, kind: 'uncaught' })
+    },
+  }).render(
+    <StrictMode>
+      <LoggingErrorBoundary>
+        <NavigationProvider navigation={navigation}>
+          <ApplicationBootstrap bootstrap={bootstrap}>
+            <App />
+          </ApplicationBootstrap>
+        </NavigationProvider>
+      </LoggingErrorBoundary>
+    </StrictMode>,
+  )
+
+  if ('requestIdleCallback' in window) window.requestIdleCallback(prefetchDeferredChunks)
+  else setTimeout(prefetchDeferredChunks, 2000)
+}
 
 // Warm closed views on idle. A failed prefetch is silent: the query retries when opened.
-const prefetchDeferredChunks = () => {
+function prefetchDeferredChunks() {
   void resourceQueryClient
     .query(paletteContentQueryOptions)
     .then(() => undefined)
@@ -190,5 +199,3 @@ const prefetchDeferredChunks = () => {
     .then(() => undefined)
     .catch(() => undefined)
 }
-if ('requestIdleCallback' in window) window.requestIdleCallback(prefetchDeferredChunks)
-else setTimeout(prefetchDeferredChunks, 2000)
