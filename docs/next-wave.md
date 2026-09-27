@@ -185,6 +185,10 @@ checks are owner checks.
 
 ## Wave 3 (what wave 2 unblocks)
 
+The owner scheduled [Plan 198, keep editor analysis with the document](../plans/198-document-owned-editor-analysis.md),
+first after wave 2 on 2026-09-27. Follow the order in [the execution roadmap](../PLAN.md#first-after-wave-2)
+before starting the work below.
+
 Plan 189 (keep improving tree-sitter-md: open items, then correctness, memory and size, speed)
 after the MD lane; 171 composer (if E2 did not reach it); 111 P4–P5 → 108 P2–P3; 122 P6–P9 and E025; 088 after 087; 178 drag-and-drop and cleanup;
 143 P5–P6 and 155 (after 143); 156 P3–P5; 126 batches G (four drivers), H (pairing, balancing),

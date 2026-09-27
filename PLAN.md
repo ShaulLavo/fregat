@@ -18,6 +18,14 @@ The [Editor backlog](../Editor/plans/README.md) contains 30 stable entries from 
 wishlist. Its suggested order is advisory; promote selected work into this execution roadmap
 when scheduled. Completed entries link to permanent references.
 
+## First after wave 2
+
+Decided 2026-09-27 by the owner: execute
+[Plan 198, keep editor analysis with the document](plans/198-document-owned-editor-analysis.md),
+first after [wave 2](docs/next-wave.md), before starting other post-wave work. This records the
+implementation order; the current change is planning only and does not interrupt wave 2.
+The separate shared highlighting service in Plan 197 has no dependency on this plan.
+
 ## Verified completed foundations
 
 - Platform's one-document representation and deterministic file-sync cutover are live. Completed
@@ -32,7 +40,7 @@ when scheduled. Completed entries link to permanent references.
 - Editor-parity wave E0 is complete.
 - The bounded last-visible-paint contract is live across Editor and Platform. Editor owns
   `EditorVisibleSnapshot`, `EditorInitialHighlightStatus`, and the generation-tagged
-  `EditorInitialPaintEvent`; Platform owns the one-record, 256 KiB
+  `EditorInitialPaintEvent`; Platform owns the bounded recent-view cache, 256 KiB total,
   `editor-visible-snapshot-cache.ts`, inert overlay handoff, exact applied-theme guard, and
   `editor-open-benchmark.mjs` paint marks. This cache is unvalidated visual paint only: it never
   supplies text, tokens, revision truth, or a correctness decision to the live editor.

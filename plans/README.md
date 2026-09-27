@@ -19,6 +19,7 @@ a bare root `bun run verify`.
 
 | Plan                                                                                    | State                                                                               |
 | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| [198 — keep editor analysis with the document](198-document-owned-editor-analysis.md)   | **SCHEDULED 2026-09-27 — FIRST AFTER WAVE 2; IMPLEMENTATION NOT STARTED**           |
 | [197 — Editor-owned highlighting service](197-editor-highlighting-service.md)           | **PROPOSED 2026-09-27 — PLAN ONLY; IMPLEMENTATION NOT STARTED**                     |
 | [196 — shared control polish](196-shared-control-polish.md)                             | **PROPOSED 2026-09-27 — PLAN ONLY; IMPLEMENTATION NOT STARTED**                     |
 | [195 — browse Settings defaults in UI and JSON](195-settings-defaults-browser.md)       | **PROPOSED 2026-09-27 — PLAN APPROVED; IMPLEMENTATION NOT STARTED**                 |
