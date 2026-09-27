@@ -645,3 +645,7 @@ with the iPhone 13 viewport reproduced Settings at 390px with 428px of scrollabl
 The code-theme list occupied 288px and left its preview 10px wide; the preview title overflowed.
 Capping the list at half the available width restored a 390px scroll extent in the same page.
 The wallpaper gap remains open and requires Safari toolbar/device verification.
+
+At 320px, WebKit also exposed overflowing wallpaper search/order controls and shortcut filter
+tabs. Their control rows now wrap within their own width. DOM probes reduced Settings from
+371px to 320px of scrollable width. Physical iPhone confirmation remains pending.

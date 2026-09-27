@@ -170,7 +170,7 @@ export function WallpaperLibrary({
       onDrop={handleDrop}
       onPaste={handlePaste}
     >
-      <div className='flex shrink-0 items-center gap-(--density-control-gap)'>
+      <div className='flex shrink-0 flex-wrap items-center gap-(--density-control-gap)'>
         <InputGroup className='h-(--density-control-height-sm) w-52 shrink-0'>
           <InputGroupAddon align='inline-start'>
             <MagnifyingGlassIcon aria-hidden='true' className='size-(--icon-size-sm)' />
@@ -185,7 +185,7 @@ export function WallpaperLibrary({
             onChange={(event) => setSearch(event.currentTarget.value)}
           />
         </InputGroup>
-        <Tabs value={order} onValueChange={(next: Order) => setOrder(next)}>
+        <Tabs className='shrink-0' value={order} onValueChange={(next: Order) => setOrder(next)}>
           <TabsList aria-label='Order' variant='segmented'>
             <TabsTab value='library'>Library</TabsTab>
             <TabsTab value='matches'>Matches</TabsTab>
