@@ -19,6 +19,7 @@ a bare root `bun run verify`.
 
 | Plan                                                                                    | State                                                                               |
 | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| [195 — browse Settings defaults in UI and JSON](195-settings-defaults-browser.md)       | **PROPOSED 2026-09-27 — PLAN APPROVED; IMPLEMENTATION NOT STARTED**                 |
 | [194 — appearance back in settings](194-appearance-back-in-settings.md)                 | **DONE 2026-09-27 — phases 1–4 and PR #178 follow-up shipped**                      |
 | [193 — no late-bound slots](193-no-late-bound-slots.md)                                 | **DONE 2026-09-27 — phases 1–6 complete**                                           |
 | [192 — views switch subjects without flashing](192-no-swap-flash.md)                    | **PROPOSED 2026-09-26 — RULE LANDED; 21 SITES LEFT**                                |
