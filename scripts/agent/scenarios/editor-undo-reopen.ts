@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { strictEqual } from 'node:assert'
 import path from 'node:path'
@@ -18,7 +19,7 @@ export const editorUndoReopen: Scenario = {
   name: 'editor-undo-reopen',
   description: 'Type, save, close the tab, reopen and undo; then reload the window and undo again.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-undo-reopen-')
+    const fixture = await mkdtemp(scratchPath('fregat-undo-reopen-'))
     const diskPath = path.join(fixture, 'a.ts')
     try {
       await writeFile(diskPath, INITIAL)

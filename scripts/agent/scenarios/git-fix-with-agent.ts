@@ -53,7 +53,7 @@ export const gitFixWithAgent: Scenario = {
       await step('composer')
 
       const text = (await composer.textContent()) ?? ''
-      if (!text.includes('Git commit failed'))
+      if (!text.includes('Fix the Git commit failure'))
         throw createScriptError('The composer did not name the failed step')
       if (text.includes(EXISTING_DRAFT))
         throw createScriptError('Fix with AI reused the open chat instead of starting a new one')

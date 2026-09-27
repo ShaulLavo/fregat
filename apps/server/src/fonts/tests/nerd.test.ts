@@ -88,6 +88,33 @@ describe('NerdFontProvider', () => {
     expect(downloads).toBe(1)
   })
 
+  it('downloads a face without the rate-limited release API', async () => {
+    const requests: string[] = []
+    const service = provider({
+      cacheRoot: await fixtureRoot(),
+      fetcher: async (input) => {
+        requests.push(String(input))
+        if (String(input).includes('api.github.com'))
+          return new Response('rate limited', { status: 403 })
+        return fontFetch(input, nerdArchive())
+      },
+    })
+
+    await expect(service.font('JetBrainsMono')).resolves.toEqual(Buffer.from('regular-font'))
+    expect(requests).toEqual([
+      'https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip',
+    ])
+  })
+
+  it('answers null for a face the release does not have', async () => {
+    const service = provider({
+      cacheRoot: await fixtureRoot(),
+      fetcher: async () => new Response('Not Found', { status: 404 }),
+    })
+
+    await expect(service.font('NoSuchFont')).resolves.toBeNull()
+  })
+
   it('rejects invalid font names before fetching', async () => {
     let fetchCount = 0
     const service = provider({
@@ -140,7 +167,8 @@ function fontFetch(input: string | URL | Request, archive: ArrayBuffer) {
   const url = String(input)
   if (url.endsWith('/releases/latest'))
     return Promise.resolve(Response.json(nerdRelease(['JetBrainsMono'])))
-  if (url.endsWith('/JetBrainsMono.zip')) return Promise.resolve(new Response(archive))
+  if (url.endsWith('/releases/latest/download/JetBrainsMono.zip'))
+    return Promise.resolve(new Response(archive))
 
   throw new Error(`Unexpected fetch: ${url}`)
 }

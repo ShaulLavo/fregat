@@ -1,12 +1,9 @@
-import { Fragment } from 'react'
 import { CaretRightIcon, HandPalmIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { cn } from '@workspace/ui/lib/utils'
 
-import { ActivityRow } from '@/features/chat/components/activity-row'
-import { LiveTail } from '@/features/chat/components/live-tail'
-import { useWorkLogScroll } from '@/features/chat/hooks/use-work-log-scroll'
+import { ActivityHistory } from '@/features/chat/components/activity-history'
 import { useChatWorkLogExpansionStore } from '@/features/chat/state/chat-work-log-expansion-store'
 import type { ChatLiveActivity } from '@/features/chat/utils/live-activity'
 
@@ -23,11 +20,6 @@ export function LiveActivityRow({
   )
   const toggle = useChatWorkLogExpansionStore((state) => state.toggleGroupExpanded)
   const expandable = activity.activities.length > 0
-  const { scrollRef, rowsRef } = useWorkLogScroll(
-    `group:${historyId}`,
-    activity.activities.length,
-    'rows',
-  )
   const label = (
     <>
       {activity.active ? (
@@ -35,7 +27,6 @@ export function LiveActivityRow({
       ) : (
         <HandPalmIcon aria-hidden='true' className='size-(--icon-size-sm) shrink-0' />
       )}
-      {activity.active ? <span className='text-foreground shrink-0'>Working…</span> : null}
       <span className='min-w-0 truncate' role='status'>
         {activity.label}
       </span>
@@ -72,22 +63,11 @@ export function LiveActivityRow({
           {label}
         </div>
       )}
-      {!expanded && activity.tail.length > 0 ? <LiveTail entries={activity.tail} /> : null}
       {expanded && expandable ? (
-        <div
-          className='ml-2 max-h-[min(18rem,50dvh)] overflow-auto overscroll-contain pl-2'
-          aria-label='Tool calls'
-          role='region'
-          tabIndex={0}
-          data-tool-group-scroll
-          ref={scrollRef}
-        >
-          <Fragment ref={rowsRef}>
-            {activity.activities.map((entry) => (
-              <ActivityRow activity={entry} key={entry.id} />
-            ))}
-          </Fragment>
-        </div>
+        <ActivityHistory
+          activities={activity.activities}
+          streamingEntryId={activity.active && activity.entry?.reasoning ? activity.entry.id : null}
+        />
       ) : null}
     </section>
   )

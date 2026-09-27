@@ -1,4 +1,4 @@
-import { act, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { ReasoningRow } from '@/features/chat/components/reasoning-row'
@@ -33,52 +33,37 @@ function renderRow(streaming: boolean) {
 }
 
 function resetExpansion() {
-  useChatWorkLogExpansionStore.setState({ autoExpandedRowIds: {}, userExpandedRowIds: {} })
+  useChatWorkLogExpansionStore.setState({ expandedRowIds: {} })
 }
 
-test('reasoning from history starts folded, says how long it took, and opens on click', async () => {
+test('reasoning in mixed history starts folded and opens on click', async () => {
   resetExpansion()
   renderRow(false)
 
   expect(screen.queryByRole('region', { name: 'Reasoning' })).not.toBeInTheDocument()
-  await userEvent.click(screen.getByRole('button', { name: 'Thought for 12s' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Thought' }))
   expect(screen.getByRole('region', { name: 'Reasoning' })).toHaveTextContent(reasoning)
 })
 
-test('streaming reasoning says Thinking and shows what the automation opened', () => {
+test('streaming reasoning respects the reader expansion after it settles', async () => {
   resetExpansion()
-  useChatWorkLogExpansionStore.setState({ autoExpandedRowIds: { 'reasoning-full': true } })
-  renderRow(true)
-
-  expect(screen.getByRole('button', { name: 'Thinking' })).toHaveAttribute('aria-expanded', 'true')
-  expect(screen.getByRole('region', { name: 'Reasoning' })).toBeInTheDocument()
-})
-
-test('the reader toggle outranks the automation', async () => {
-  resetExpansion()
-  useChatWorkLogExpansionStore.setState({ autoExpandedRowIds: { 'reasoning-full': true } })
-  renderRow(true)
-
-  await userEvent.click(screen.getByRole('button', { name: 'Thinking' }))
-  useChatWorkLogExpansionStore.getState().setAutoRowsExpanded(['reasoning-full'], true)
-  expect(await screen.findByRole('button', { name: 'Thinking' })).toHaveAttribute(
-    'aria-expanded',
-    'false',
-  )
-})
-
-test('two reader clicks in one render keep the reasoning open after automation settles', () => {
-  resetExpansion()
-  useChatWorkLogExpansionStore.setState({ autoExpandedRowIds: { 'reasoning-full': true } })
-  renderRow(true)
+  const view = renderRow(true)
   const toggle = screen.getByRole('button', { name: 'Thinking' })
+  expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await userEvent.click(toggle)
+  expect(screen.getByRole('region', { name: 'Reasoning' })).toHaveTextContent(reasoning)
+  view.unmount()
+  renderRow(false)
+  expect(screen.getByRole('button', { name: 'Thought' })).toHaveAttribute('aria-expanded', 'true')
+})
 
-  act(() => {
-    toggle.click()
-    toggle.click()
-  })
-  act(() => useChatWorkLogExpansionStore.getState().setAutoRowsExpanded(['reasoning-full'], false))
-
-  expect(toggle).toHaveAttribute('aria-expanded', 'true')
-  expect(screen.getByRole('region', { name: 'Reasoning' })).toBeInTheDocument()
+test('a reasoning-only history shows the text without a second disclosure', () => {
+  resetExpansion()
+  renderWithProviders(
+    <TestEditorStateProvider>
+      <ReasoningRow entry={reasoningEntry()} streaming showHeader={false} />
+    </TestEditorStateProvider>,
+  )
+  expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  expect(screen.getByRole('region', { name: 'Reasoning' })).toHaveTextContent(reasoning)
 })

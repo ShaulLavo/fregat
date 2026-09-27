@@ -66,13 +66,14 @@ export function ChatInputEditor({
   }
 
   return (
-    <div className='relative px-(--density-section-padding) pt-(--density-section-padding) pb-(--density-section-gap)'>
+    // Phone: one line when empty, with the padding inside the field so all of it takes the tap.
+    <div className='phone:py-0 relative px-(--density-section-padding) pt-(--density-section-padding) pb-(--density-section-gap)'>
       <PlainTextPlugin
         contentEditable={
           <ContentEditable
             aria-label='Message'
             aria-placeholder={placeholder}
-            className='text-foreground scroll-gutter block max-h-48 min-h-14 w-full overflow-y-auto overscroll-contain bg-transparent text-sm leading-6 break-words whitespace-pre-wrap outline-none'
+            className='text-foreground scroll-gutter phone:min-h-0 phone:pt-(--density-section-padding) phone:pb-(--density-section-gap) block max-h-48 min-h-14 w-full overflow-y-auto overscroll-contain bg-transparent text-sm leading-6 break-words whitespace-pre-wrap outline-none'
             data-testid='chat-input-editor'
             placeholder={<span />}
             onPaste={handlePaste}

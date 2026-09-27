@@ -165,6 +165,21 @@ function stoppedTurnReasons(message) {
   const text = promptText(message)
   const seen = promptAttempts(text) + 1
   record({ event: 'turn/start', input: text, seen })
+  const usage = {
+    totalTokens: 123,
+    inputTokens: 100,
+    outputTokens: 23,
+    cachedInputTokens: 0,
+    reasoningOutputTokens: 0,
+  }
+  send({
+    method: 'thread/tokenUsage/updated',
+    params: {
+      threadId,
+      turnId: 'historical-turn',
+      tokenUsage: { last: usage, total: usage },
+    },
+  })
   const turn = startOwnTurn(message)
   const itemId = `${turn}-answer`
   if (text.startsWith('FILL')) {

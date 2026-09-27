@@ -44,6 +44,13 @@ export const themeStudioPreview: Scenario = {
 
     await selectors.themeStudioTab(page, 'Wallpaper').click()
     await studio.getByRole('button', { name: 'Hide the studio', exact: true }).click()
+    await step('collapsed-workspace-accessible')
+    const workspaceAccessible = await page.evaluate(
+      () =>
+        document
+          .elementFromPoint(window.innerWidth / 2, window.innerHeight - 100)
+          ?.closest('[data-slot="drawer-viewport"]') === null,
+    )
     await selectors.titlebar(page).click({ button: 'right' })
     await selectors.menuItem(page, 'Theme…').click()
     await selectors.menuItem(page, 'Theme…').waitFor({ state: 'hidden' })
@@ -63,11 +70,11 @@ export const themeStudioPreview: Scenario = {
 
     await selectors.themeStudioTab(page, 'Wallpaper').click()
     const filter = studio.getByRole('textbox', { name: 'Filter wallpapers', exact: true })
-    const darkBefore = await selectors.themeStudioTab(page, 'Dark').getAttribute('aria-selected')
+    const darkBefore = await selectors.themeStudioMode(page, 'light').isVisible()
     await filter.press('\\')
     const filterAcceptsSlash = (await filter.inputValue()) === '\\'
     const modeUnchanged =
-      (await selectors.themeStudioTab(page, 'Dark').getAttribute('aria-selected')) === darkBefore
+      (await selectors.themeStudioMode(page, 'light').isVisible()) === darkBefore
     await selectors.themeStudioTab(page, 'Colors').click()
     await accent.fill('#123456')
     await accent.press('End')
@@ -84,6 +91,7 @@ export const themeStudioPreview: Scenario = {
     await studio.getByRole('button', { name: 'Close', exact: true }).click()
     deepEqual(
       {
+        workspaceAccessible,
         bundleRestored,
         paletteRestored,
         themesReopened,
@@ -95,6 +103,7 @@ export const themeStudioPreview: Scenario = {
         jsonAcceptsSlash,
       },
       {
+        workspaceAccessible: true,
         bundleRestored: true,
         paletteRestored: true,
         themesReopened: true,

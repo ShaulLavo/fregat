@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { ok } from 'node:assert/strict'
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -13,7 +14,7 @@ export const editorConflictMerge: Scenario = {
   description:
     'Compare an unsaved edit against an external write, keep the local side from the conflict lens, and check the file on disk.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-conflict-merge-')
+    const fixture = await mkdtemp(scratchPath('fregat-conflict-merge-'))
     const disk = path.join(fixture, filename)
     try {
       await writeFile(disk, 'shared first line\nbase line\n')

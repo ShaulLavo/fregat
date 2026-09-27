@@ -17,7 +17,7 @@ export function TurnRetryActions() {
         variant='outline'
       >
         <ArrowRightIcon aria-hidden='true' className='size-(--icon-size)' />
-        Carry on
+        Continue
       </Button>
       {retry.tryAgain ? (
         <Tooltip>
@@ -32,7 +32,7 @@ export function TurnRetryActions() {
                 variant='ghost'
               >
                 <ArrowClockwiseIcon aria-hidden='true' className='size-(--icon-size)' />
-                Try again
+                Resend message
               </Button>
             }
           />

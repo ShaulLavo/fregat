@@ -63,7 +63,7 @@ export async function createSessions(page: Page, base: string, fixture: string, 
 }
 
 // A fresh server registers the workspace while the page boots, so the first snapshot can miss it.
-async function fixtureWorktree(page: Page, base: string, fixture: string) {
+export async function fixtureWorktree(page: Page, base: string, fixture: string) {
   const deadline = Date.now() + 10_000
   for (;;) {
     const snapshot = await readShell(page, base)

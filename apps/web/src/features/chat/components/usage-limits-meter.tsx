@@ -53,17 +53,25 @@ export function UsageLimitsMeter({
               render={
                 <Button
                   aria-label={label}
+                  // Compact: the same square as the composer's other icon controls.
                   className={cn(
-                    'h-auto cursor-pointer gap-1 px-1 py-0.5 font-normal',
+                    'cursor-pointer font-normal',
+                    !compact && 'h-auto gap-1 px-1 py-0.5',
                     USAGE_TONE_TEXT[tone],
                   )}
                   data-tone={tone}
                   data-usage-meter
-                  size='sm'
+                  size={compact ? 'icon-sm' : 'sm'}
                   type='button'
                   variant='ghost'
                 >
-                  <GaugeIcon aria-hidden className='size-(--icon-size) shrink-0' />
+                  <GaugeIcon
+                    aria-hidden
+                    className={cn(
+                      'shrink-0',
+                      compact ? 'size-(--icon-size-sm)' : 'size-(--icon-size)',
+                    )}
+                  />
                   {compact ? null : (
                     <span className='text-2xs tabular-nums'>
                       <TickerNumber value={Math.round(tightest.usedPercent)} />%

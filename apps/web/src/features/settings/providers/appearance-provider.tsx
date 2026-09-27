@@ -296,7 +296,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
       <BundleContext
         value={{
           apply: applyDraft,
-          bundleId: baseValues['workbench.theme']?.id ?? null,
+          theme: baseValues['workbench.theme'],
           catalog: bundles,
           preview: previewBundle,
           clear: clearBundlePreview,

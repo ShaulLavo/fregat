@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { strictEqual } from 'node:assert'
@@ -21,7 +22,7 @@ export const gitDiffHoverTokens: Scenario = {
   description:
     'Hover an identifier inside a diff pane and check its fenced code carries the editor token colours.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-diff-hover-')
+    const fixture = await mkdtemp(scratchPath('fregat-diff-hover-'))
     try {
       await fixtureGit(fixture, ['init', '--quiet'])
       await fixtureGit(fixture, ['config', 'user.email', 'fregat@example.com'])

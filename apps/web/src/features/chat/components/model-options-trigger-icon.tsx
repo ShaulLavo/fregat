@@ -21,7 +21,7 @@ export function ModelOptionsTriggerIcon({
       <LightningIcon className='text-foreground size-(--icon-size-sm) shrink-0' weight='fill' />
     )
   if (!compact) return null
-  if (!ultra) return <BrainIcon className='size-(--icon-size-sm) shrink-0 opacity-70' />
+  if (!ultra) return <BrainIcon className='size-(--icon-size-sm) shrink-0' />
 
   return (
     <BrainIcon

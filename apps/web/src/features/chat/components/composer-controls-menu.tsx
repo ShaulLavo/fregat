@@ -115,11 +115,11 @@ export function ComposerControlsMenu({
                   className='text-muted-foreground hover:text-foreground min-w-0 text-xs font-normal'
                   disabled={disabled}
                   focusableWhenDisabled
-                  size='sm'
+                  size={narrow && !planActive ? 'icon-sm' : 'sm'}
                   type='button'
                   variant='ghost'
                 >
-                  <SlidersHorizontalIcon className='size-(--icon-size-sm) shrink-0 opacity-70' />
+                  <SlidersHorizontalIcon className='size-(--icon-size-sm) shrink-0' />
                   {narrow ? null : (
                     <span className='truncate'>
                       {optionLabel(RUNTIME_MODE_OPTIONS, activeRuntimeMode)}

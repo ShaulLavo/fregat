@@ -2,8 +2,9 @@ import type { ReactNode } from 'react'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 
 import { BackButton } from '@/features/phone/components/back-button'
+import { PaletteButton } from '@/features/phone/components/palette-button'
 
-/** A phone screen's bar: Back, the screen's title over its detail, then the screen's actions. */
+/** A phone screen's bar: Back, the title over its detail, the screen's actions, then the palette. */
 export function Header({
   actions,
   detail,
@@ -28,9 +29,10 @@ export function Header({
           </div>
         ) : null}
       </div>
-      {actions ? (
-        <div className='flex shrink-0 items-center gap-(--density-gap-tight)'>{actions}</div>
-      ) : null}
+      <div className='flex shrink-0 items-center gap-(--density-gap-tight)'>
+        {actions}
+        <PaletteButton />
+      </div>
     </PaneBar>
   )
 }

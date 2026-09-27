@@ -15,7 +15,6 @@ import { cn } from '@workspace/ui/lib/utils'
 import { useTimelineRevealStore } from '@/features/chat/state/timeline-reveal-store'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 import { AgentsRow } from '@/features/chat/components/agents-row'
-import { ReasoningRow } from '@/features/chat/components/reasoning-row'
 import { ModelSwitchRow } from '@/features/chat/components/model-switch-row'
 import type { CheckpointRestoreRole } from '@/features/chat/utils/checkpoint-restore'
 
@@ -122,8 +121,6 @@ function timelineRowContent({
     )
   }
   if (item.type === 'activity-group') return <ActivityGroupRow activities={item.activities} />
-  if (item.type === 'reasoning')
-    return <ReasoningRow entry={item.entry} streaming={item.streaming} />
   if (item.type === 'proposed-plan') return <ProposedPlanCard plan={item.plan} />
   if (item.type === 'live-activity')
     return <LiveActivityRow activity={item.activity} groupId={item.id} />

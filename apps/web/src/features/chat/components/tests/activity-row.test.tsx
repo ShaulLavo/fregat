@@ -37,7 +37,7 @@ test('tool groups collapse to a useful summary and open on click', async () => {
   expect(screen.getByText('Second command')).toBeInTheDocument()
 })
 
-test('a collapsed group keeps failed calls visible after a later success', () => {
+test('a collapsed group summarizes failures and expands calls in chronological order', async () => {
   resetExpansion()
   renderWithProviders(
     <ActivityGroupRow
@@ -48,9 +48,12 @@ test('a collapsed group keeps failed calls visible after a later success', () =>
     />,
   )
 
-  expect(screen.getByText('Failed command')).toBeInTheDocument()
-  expect(screen.getByLabelText('Failed')).toBeInTheDocument()
+  expect(screen.queryByText('Failed command')).not.toBeInTheDocument()
   expect(screen.queryByText('Successful command')).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: /1 failed/ }))
+  expect(screen.getByText('Failed command')).toBeInTheDocument()
+  expect(screen.getByText('Successful command')).toBeInTheDocument()
+  expect(screen.getByLabelText('Failed')).toBeInTheDocument()
 })
 
 test('expanded MCP rows expose their arguments and full detail', async () => {

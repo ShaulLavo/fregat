@@ -5,6 +5,7 @@ import type { Locator, Page, Request } from 'playwright'
 
 import { createModifiedFileFixture, releaseFixture } from '../fixture-workspace'
 import { selectors } from '../selectors'
+import { longPress } from '../touch'
 import { sendPrompt } from './native-provider-verification'
 import { createSessions, openFixtureChat, PHONE_REPLY, PHONE_SESSIONS } from './phone-fixture'
 import type { Scenario } from './index'
@@ -94,10 +95,9 @@ async function walkTheStack(page: Page, step: (label: string) => Promise<void>) 
   await step('session')
 
   // The chat commands with no control of their own are one palette away.
-  await selectors.phoneHeaderAction(page, 'Session actions').click()
-  await page.getByRole('menuitem', { name: /command palette/i }).click()
+  await selectors.phoneHeaderAction(page, 'Command palette').click()
   await selectors.paletteInput(page).waitFor()
-  await step('palette-from-menu')
+  await step('palette-from-header')
   await page.keyboard.press('Escape')
   await selectors.paletteInput(page).waitFor({ state: 'hidden' })
 
@@ -364,18 +364,6 @@ function addressTabs(page: Page) {
   const tabs = new URL(page.url()).searchParams.get('tabs')
   if (tabs === null || tabs === '-') return []
   return tabs.split('~')
-}
-
-/** A held finger, as a touch screen sends it: no mouse events between down and up. */
-async function longPress(page: Page, locator: Locator, holdMs: number) {
-  const box = await locator.boundingBox()
-  ok(box, 'The pressed row must be laid out')
-  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
-  const cdp = await page.context().newCDPSession(page)
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
-  await page.waitForTimeout(holdMs)
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
-  await cdp.detach()
 }
 
 /** A finger dragged up the list scrolls it, and reorders nothing. */

@@ -33,13 +33,12 @@ export function gitFailurePrompt(
   outputLines: readonly string[],
 ) {
   const lines = [
-    `Git ${gitFailureLabel(failure.operation).toLowerCase()} failed in ${rootPath || 'this repository'}.`,
+    `Fix the Git ${gitFailureLabel(failure.operation).toLowerCase()} failure in ${rootPath || 'this repository'}.`,
     '',
     `Error: ${failure.message}`,
   ]
   const output = outputLines.map(plainText).filter((line) => line.trim().length > 0)
   if (output.length > 0) lines.push('', 'Output:', '```', ...output.slice(-MAX_OUTPUT_LINES), '```')
-  lines.push('', 'Find the cause and fix it so the same step succeeds.')
 
   return lines.join('\n')
 }

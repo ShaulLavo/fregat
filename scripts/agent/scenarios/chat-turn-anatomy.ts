@@ -11,7 +11,6 @@ const STEP_DELAY_MS = 1_200
 const FRAME = 'apps/web/src/features/chat/utils/work-log.ts:30'
 
 type Evidence = {
-  liveRowHeights: number[]
   maxBurst: { sweeps: number; rainbowOnTrigger: number } | null
   reducedMotionSweep: string | null
   caret: { label: string; painted: string | null; html: string }[]
@@ -34,11 +33,10 @@ const evidenceByPage = new WeakMap<Page, Evidence>()
 export const chatTurnAnatomy: Scenario = {
   name: 'chat-turn-anatomy',
   description:
-    'A scripted mock turn: reasoning fold, fixed live tail, settled summary with failures, stack-frame links, dropped plan step, agent tree, max and ultra effort bursts, the ultra rainbow, the model marker and the reader-kept reasoning fold.',
+    'A scripted mock turn: grouped reasoning and tool history, current activity, settled summary with failures, stack-frame links, dropped plan step, agent tree, max and ultra effort bursts, the ultra rainbow, the model marker and reader-opened activity history.',
   inspect: async (page) => evidenceByPage.get(page) ?? null,
   async run(page, { step }) {
     const evidence: Evidence = {
-      liveRowHeights: [],
       maxBurst: null,
       reducedMotionSweep: null,
       caret: [],
@@ -47,11 +45,10 @@ export const chatTurnAnatomy: Scenario = {
     evidenceByPage.set(page, evidence)
     const { base, cleanup, sessionId } = await createScriptedSession(page, await openChat(page))
     try {
-      await firstTurn(page, step, evidence)
+      await firstTurn(page, step)
       await verifyTurnDuration(page, `${base}/orchestration`, sessionId)
       await maxBurst(page, step, evidence)
       await secondTurn(page, step)
-      await thirdTurn(page, step)
       await ultrathinkWord(page, step, evidence)
       await stackFrame(page, step)
       await otherLooks(page, step, base)
@@ -66,28 +63,25 @@ export const chatTurnAnatomy: Scenario = {
 
 type Step = (label: string) => Promise<void>
 
-async function firstTurn(page: Page, step: Step, evidence: Evidence) {
+async function firstTurn(page: Page, step: Step) {
   await sendPrompt(page, 'Fix the failing stack-frame test.')
-  const reasoning = selectors.reasoningRows(page).first()
-  await reasoning.getByRole('button', { name: 'Thinking' }).waitFor()
-  await expectExpanded(reasoning, 'true', 'Streaming reasoning opens while the timeline follows')
-  await step('thinking-open')
-
+  const live = selectors.liveActivityRow(page)
+  const toggle = live.getByRole('button')
+  await live
+    .getByRole('status')
+    .filter({ hasText: /^Thinking$/ })
+    .waitFor()
+  await expectExpanded(live, 'false', 'Activity history starts collapsed')
+  await step('thinking-collapsed')
+  await toggle.click()
+  await selectors.reasoningDetail(page).waitFor()
+  await step('reasoning-history-open')
+  await toggle.click()
   await selectors.activePlanTrigger(page).click()
-  await selectors.liveTail(page).waitFor()
-  await sampleLiveRow(page, evidence, () =>
-    selectors
-      .chatMessages(page)
-      .getByRole('button', { name: /1 failed · / })
-      .isVisible(),
-  )
-  await step('live-tail')
-  const heights = new Set(evidence.liveRowHeights.map(Math.round))
-  ok(heights.size === 1, `The live row kept one height while calls streamed: ${[...heights]}`)
-
-  await reasoning.getByRole('button', { name: /^Thought for / }).waitFor()
-  await expectExpanded(reasoning, 'false', 'Reasoning folds a second after its stream ends')
-  await step('thought-folded')
+  await selectors
+    .chatMessages(page)
+    .getByRole('button', { name: /1 failed · / })
+    .waitFor()
   await step('summary-failed')
 
   const dropped = selectors
@@ -155,42 +149,15 @@ async function secondTurn(page: Page, step: Step) {
   ok((await marker.textContent())?.includes('Switched to GPT-5.5 · Max'), 'The marker names it')
   await step('model-switch-marker')
 
-  const reasoning = await streamingReasoning(page)
-  await expectExpanded(reasoning, 'true', 'The second turn opens its reasoning too')
-  const toggle = reasoning.getByRole('button')
-  const top = (await reasoning.boundingBox())?.y
-  await toggle.click()
-  await toggle.click()
-  const after = (await reasoning.boundingBox())?.y
-  ok(
-    top !== undefined && after !== undefined && Math.abs(after - top) <= 1,
-    'A reader toggle keeps the row in place',
-  )
-  await reasoning.getByRole('button', { name: /^Thought for / }).waitFor()
-  await page.waitForTimeout(2_000)
-  await expectExpanded(reasoning, 'true', 'A reader-opened fold stays open after the stream')
-  await step('reader-kept-open')
-  await waitForTurnEnd(page)
-}
-
-async function thirdTurn(page: Page, step: Step) {
-  await selectors
-    .timelineJumpToLatest(page)
-    .click({ timeout: 2_000 })
-    .catch(() => undefined)
-  await sendPrompt(page, 'Once more, while I read back.')
-  const reasoning = await streamingReasoning(page)
-  await expectExpanded(reasoning, 'true', 'The third turn opens its reasoning')
-  await selectors.chatMessages(page).hover()
-  await page.mouse.wheel(0, -300)
-  await reasoning.getByRole('button', { name: /^Thought for / }).waitFor()
-  await page.waitForTimeout(2_000)
-  await expectExpanded(reasoning, 'true', 'Nothing folds while the reader has scrolled away')
-  await step('scrolled-away-kept-open')
-
-  await selectors.timelineJumpToLatest(page).click()
-  await expectExpanded(reasoning, 'false', 'Back at the tail, the fold settles')
-  await step('back-at-tail-folded')
+  const live = selectors.liveActivityRow(page)
+  await live
+    .getByRole('status')
+    .filter({ hasText: /^Thinking$/ })
+    .waitFor()
+  await live.getByRole('button').click()
+  await selectors.reasoningDetail(page).waitFor()
+  await expectExpanded(live, 'true', 'The reader opens the activity history')
+  await step('reader-opened-history')
   await waitForTurnEnd(page)
 }
 
@@ -321,6 +288,13 @@ async function caretKeepsRainbow(page: Page, word: Locator, step: Step) {
 }
 
 async function stackFrame(page: Page, step: Step) {
+  const fold = selectors.completedWorkGroup(page).last()
+  if ((await fold.getAttribute('aria-expanded')) !== 'true') await fold.click()
+  const summary = selectors
+    .chatMessages(page)
+    .getByRole('button', { name: /Ran 2 commands.*1 failed/ })
+    .last()
+  if ((await summary.getAttribute('aria-expanded')) !== 'true') await summary.click()
   const failed = selectors.chatMessages(page).getByRole('button', { name: /tool call failed/ })
   await failed.first().scrollIntoViewIfNeeded()
   await failed.first().click()
@@ -330,17 +304,6 @@ async function stackFrame(page: Page, step: Step) {
   await frame.click()
   await page.locator('[data-editor-tab-path$="/work-log.ts"]').first().waitFor()
   await step('stack-frame-opened')
-}
-
-/** The row of the reasoning streaming now, pinned by id so a later row cannot stand in. */
-async function streamingReasoning(page: Page) {
-  const thinking = selectors.reasoningRows(page).filter({
-    has: page.getByRole('button', { name: 'Thinking' }),
-  })
-  await thinking.waitFor()
-  const id = await thinking.getAttribute('data-work-log-entry-id')
-  ok(id, 'A reasoning row carries its entry id')
-  return selectors.reasoningRow(page, id)
 }
 
 /** The same transcript in dark mode and at cozy density. */
@@ -358,19 +321,6 @@ async function otherLooks(page: Page, step: Step, base: string) {
   await page.waitForTimeout(500)
   await step('cozy-density')
   await writeSettings(page, base, [{ kind: 'reset', keys: ['workbench.density'] }])
-}
-
-async function sampleLiveRow(page: Page, evidence: Evidence, until: () => Promise<boolean>) {
-  const row = selectors.liveActivityRow(page)
-  const deadline = Date.now() + 40_000
-  while (Date.now() < deadline) {
-    if (await until()) return
-    const box = await row.boundingBox().catch(() => null)
-    if (box && (await selectors.liveTail(page).isVisible()))
-      evidence.liveRowHeights.push(box.height)
-    await page.waitForTimeout(150)
-  }
-  ok(false, 'The settled summary with a failure never appeared')
 }
 
 async function expectExpanded(row: Locator, expanded: 'false' | 'true', message: string) {

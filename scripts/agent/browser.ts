@@ -26,12 +26,13 @@ import { captureBrowserRenderer } from './browser-renderer'
 import { startIsolatedServer, type IsolatedServer } from './isolated-server'
 import { providerAccessRefusal } from './provider-access'
 import { devStateHome } from '../state-home'
+import { checkoutRoot, evidenceRoot } from './paths'
 
 const PRODUCT_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36'
 const DEFAULT_URL = `http://localhost:${process.env.WEB_PORT ?? '5173'}/`
 const DEFAULT_FILE = 'use-events.ts'
-const DEFAULT_WORKSPACE = 'work/projects/platform'
+const DEFAULT_WORKSPACE = checkoutRoot.slice(1)
 const HELP = `bun run agent:browser <verb> [options]
 
 Verbs
@@ -67,7 +68,7 @@ scenario, trace and renders refuse a production URL unless the scenario is decla
 The throwaway server runs Codex and Claude only from fixture binaries. Without --real-providers,
 a scenario declared realProviders refuses to start, and so does any writing scenario on a server
 the run does not own.
-Evidence lands under /work/tmp/fregat-evidence/<stamp>-<verb>-<label>/.`
+Evidence lands under ${evidenceRoot}/<stamp>-<verb>-<label>/.`
 
 type Options = CaptureSize & {
   readonly consoleCapture: boolean

@@ -28,11 +28,10 @@ test('accepts every media type the provider can actually read', () => {
   }
 })
 
-test('rejects a HEIC paste in the browser instead of failing the turn server-side', () => {
+test('accepts HEIC for conversion before upload', () => {
   expect(classifyChatImageFile(imageFile('image/heic'), 0)).toEqual({
-    status: 'reject',
-    reason: 'unsupported-type',
-    message: 'PNG, JPEG, WebP and GIF only.',
+    status: 'accept',
+    mimeType: 'image/heic',
   })
 })
 
@@ -40,7 +39,7 @@ test('rejects SVG even though it matches the contract image/* regex', () => {
   expect(classifyChatImageFile(imageFile('image/svg+xml'), 0)).toEqual({
     status: 'reject',
     reason: 'unsupported-type',
-    message: 'PNG, JPEG, WebP and GIF only.',
+    message: 'Choose a PNG, JPEG, WebP, GIF, HEIC, HEIF, AVIF, BMP or TIFF image.',
   })
 })
 
@@ -76,8 +75,8 @@ test('rejects once the count cap is reached', () => {
   })
 })
 
-test('the media type is checked before the count, so a HEIC names its real problem', () => {
-  const classification = classifyChatImageFile(imageFile('image/heic'), MAX_CHAT_ATTACHMENTS)
+test('the media type is checked before the count for unsupported SVG', () => {
+  const classification = classifyChatImageFile(imageFile('image/svg+xml'), MAX_CHAT_ATTACHMENTS)
 
   expect(classification.status === 'reject' && classification.reason).toBe('unsupported-type')
 })

@@ -1,3 +1,4 @@
+import { normalizeImageSource } from './image-source'
 import { createClientInvariantError } from '@/lib/structured-errors'
 
 import {
@@ -53,6 +54,7 @@ export async function prepareChatInputFile(
   file: File,
   currentCount: number,
 ): Promise<PreparedChatInputImage> {
+  file = await normalizeImageSource(file)
   if (!file.type.toLowerCase().startsWith('image/')) {
     if (currentCount >= MAX_CHAT_ATTACHMENTS)
       return { status: 'reject', message: `Up to ${MAX_CHAT_ATTACHMENTS} files per message.` }
@@ -92,8 +94,7 @@ export async function prepareChatInputFile(
     attachment: {
       dataUrl,
       id: `${IMAGE_ATTACHMENT_ID_PREFIX}-${crypto.randomUUID()}`,
-      // A pass-through keeps the classifier's normalized type; a re-encode
-      // reports what the codec actually produced. Either way it is allowlisted.
+      // Conversion produces a provider-supported type before the bytes are uploaded.
       mimeType: compressed.recompressed ? compressed.mimeType : classification.mimeType,
       name: compressed.file.name || 'image',
       previewUrl: dataUrl,

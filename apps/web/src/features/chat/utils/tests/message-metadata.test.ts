@@ -52,7 +52,7 @@ test('restores earlier response metadata after a user starts another response', 
   ).toMatchObject({ copyVisible: true, metaVisible: true })
 })
 
-test('Carry on preserves the previous answer incomplete marker after a new turn starts', () => {
+test('Continue preserves the previous answer incomplete marker after a new turn starts', () => {
   const latestTurn = v.parse(orchestrationLatestTurnSchema, sessionShell().latestTurn)
   const previous = {
     ...latestTurn,

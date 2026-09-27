@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -32,7 +33,7 @@ export const gitAutoPull: Scenario = {
   description:
     'With Keep the default branch current on, a dirty checkout says why it is not pulled, and once clean it fast-forwards to its upstream.',
   async run(page, { step }) {
-    const base = await mkdtemp('/work/tmp/fregat-auto-pull-')
+    const base = await mkdtemp(scratchPath('fregat-auto-pull-'))
     const remote = path.join(base, 'remote.git')
     const upstream = path.join(base, 'upstream')
     const checkout = path.join(base, 'checkout')

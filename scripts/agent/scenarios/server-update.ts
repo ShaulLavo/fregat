@@ -1,3 +1,4 @@
+import { checkoutRoot } from '../paths'
 import { ok } from 'node:assert/strict'
 import { mkdir, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -5,13 +6,14 @@ import type { Page } from 'playwright'
 
 import type { IsolatedServer } from '../isolated-server'
 import { selectors } from '../selectors'
+import { verifyClientUpdate } from './client-update'
 import { readShell } from './chat-verification'
 import type { Scenario } from './index'
 import { isolatedNativeScenario, nativeLog } from './native-provider-verification'
 
 const NAME = 'server-update'
 const DESCRIPTION =
-  'A staged release shows "Update available"; Restart names a running session, Cancel keeps it, an accepted restart shows "Restarting…", and a failed live check toasts its rollback fix.'
+  'A staged release shows "Update available"; Restart names a running session, Cancel keeps it, an accepted restart shows "Restarting…", and a failed live check shows the failed check. Desktop and phone clients offer manual Refresh when their web release changes.'
 const STAGED = '20260925T120000Z-scenario-staged'
 const LIVE = '20260925T120500Z-scenario-live'
 const restartRoute = /\/server\/restart$/
@@ -57,7 +59,7 @@ async function failLiveCheck(server: IsolatedServer) {
   )
   await writeFile(
     join(release, 'build-config.json'),
-    JSON.stringify({ source: '/work/projects/platform', previousRelease: STAGED }),
+    JSON.stringify({ source: checkoutRoot, previousRelease: STAGED }),
   )
   await symlink(release, join(server.productionRoot, 'current'))
   server.signal('SIGUSR2')
@@ -111,11 +113,12 @@ async function drive(
   }
 
   await failLiveCheck(server)
-  const toast = selectors.toast(page, 'failed its live check')
+  const toast = selectors.toast(page, 'Deployment check failed')
   await toast.waitFor({ state: 'visible', timeout: 10_000 })
   await page.waitForTimeout(600)
   const text = await toast.innerText()
-  ok(text.includes('bun run deploy --rollback'), `The toast must carry the rollback fix: ${text}`)
+  ok(text.includes('GET /platform/ answered 502'), `The toast must name the failed check: ${text}`)
+  ok(!text.includes('--rollback'), `The toast must not prescribe rollback: ${text}`)
   await step('live-check-failed')
 }
 
@@ -124,6 +127,7 @@ export const serverUpdate: Scenario = {
   description: DESCRIPTION,
   async run(page, context) {
     const server = context.server
+    const initialUrl = page.url()
     ok(server, `${NAME} stages releases for the throwaway API server; drop --shared-dev`)
     await isolatedNativeScenario({
       name: NAME,
@@ -131,5 +135,15 @@ export const serverUpdate: Scenario = {
       fixture: new URL('../fixtures/native-queue.mjs', import.meta.url),
       drive: (driven, native) => drive(driven, native, server),
     }).run(page, context)
+    await page.goto(initialUrl)
+    await verifyClientUpdate(page, {
+      ...context,
+      step: (name) => context.step(`desktop-${name}`),
+    })
+    await page.setViewportSize({ width: 390, height: 844 })
+    await verifyClientUpdate(page, {
+      ...context,
+      step: (name) => context.step(`phone-${name}`),
+    })
   },
 }

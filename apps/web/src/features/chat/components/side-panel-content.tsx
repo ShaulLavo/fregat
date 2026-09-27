@@ -140,7 +140,9 @@ export const ChatSidePanelContent = memo(({ rootPath }: { rootPath: string }) =>
       <ChatPanelStatus
         createError={null}
         projectError={projectState.error}
-        shellError={shell.error ? clientErrorDescription(shell.error) : null}
+        shellError={
+          shell.phase === 'blocked' && shell.error ? clientErrorDescription(shell.error) : null
+        }
       />
     </div>
   )

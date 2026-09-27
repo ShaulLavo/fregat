@@ -367,34 +367,7 @@ test('resolving one approval does not hide another outstanding request', () => {
   })
 })
 
-test('the tail holds the newest three calls of the response and leaves reasoning out', () => {
-  const call = (index: number) =>
-    sessionActivity({
-      id: v.parse(eventIdSchema, `call-${index}`),
-      createdAt: `2026-05-28T00:00:0${index}.000Z`,
-      kind: 'tool.completed',
-      tone: 'tool',
-      payload: {
-        toolCallId: `call-${index}`,
-        itemType: 'command_execution',
-        status: 'completed',
-        data: { command: `echo ${index}` },
-      },
-    })
-  const reasoning = sessionActivity({
-    id: v.parse(eventIdSchema, 'reasoning'),
-    createdAt: '2026-05-28T00:00:06.000Z',
-    kind: 'task.progress',
-    tone: 'thinking',
-    payload: { streamKind: 'reasoning_text', summary: 'Checking', taskId: 'r' },
-  })
-  const entries = chatWorkLogEntries({ activities: [1, 2, 3, 4].map(call).concat(reasoning) })
-  const live = deriveChatLiveActivity({ entries, trailingEntries: [], latestTurn })
-
-  expect(live?.tail.map((entry) => entry.id)).toEqual(['call-2', 'call-3', 'call-4'])
-})
-
-test('a live row reserves its tail in the estimate from the first call', () => {
+test('the current activity reserves one row from the first call', () => {
   const items = chatTimelineItems({
     activities: [
       sessionActivity({
@@ -411,5 +384,34 @@ test('a live row reserves its tail in the estimate from the first call', () => {
   const live = items.at(-1)
 
   expect(live?.type).toBe('live-activity')
-  expect(chatTimelineItemEstimate(live)).toBe(96)
+  expect(chatTimelineItemEstimate(live)).toBe(36)
+})
+
+test('later successes keep failed calls in one chronological live history', () => {
+  const activities = ['completed', 'failed', 'completed', 'completed'].map((status, index) =>
+    sessionActivity({
+      id: v.parse(eventIdSchema, `ordered-${index}`),
+      createdAt: `2026-05-28T00:00:0${index + 1}.000Z`,
+      kind: 'tool.completed',
+      tone: status === 'failed' ? 'error' : 'tool',
+      payload: {
+        toolCallId: `ordered-${index}`,
+        itemType: 'command_execution',
+        status,
+        data: { command: `echo ${index}`, exitCode: status === 'failed' ? 2 : 0 },
+      },
+    }),
+  )
+  const items = chatTimelineItems({
+    activities,
+    latestTurn,
+    messages: [],
+    optimisticMessages: [],
+    proposedPlans: [],
+  })
+  expect(items.filter((item) => item.type === 'activity-group')).toHaveLength(0)
+  const live = items.find((item) => item.type === 'live-activity')
+  expect(live?.activity.activities.map((entry) => entry.id)).toEqual(
+    activities.map((entry) => entry.id),
+  )
 })

@@ -1121,6 +1121,18 @@ export const SETTINGS_REGISTRY = {
     visibility: 'advanced',
     keywords: ['developer', 'dev server', 'mesh', 'idle', 'vite'],
   }),
+  'developer.clientUpdateCheckSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(10), v.maxValue(3600)),
+    default: 60,
+    scope: 'application',
+    widget: 'number',
+    category: 'Developer',
+    title: 'Client update check interval',
+    description:
+      'Seconds between checks for an available web update while the app is visible. Refresh applies the update when you choose.',
+    visibility: 'advanced',
+    keywords: ['developer', 'deploy', 'update', 'refresh'],
+  }),
   'developer.deployRestartWaitMinutes': defineSetting({
     schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1440)),
     // Long enough for a typical agent turn to finish; a session busy for longer is stuck or

@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { fixtureApiBase, openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import { mkdir, mkdtemp, readFile, rename, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -21,7 +22,7 @@ export const editorExternalEdit: Scenario = {
   description:
     'Delete a line through a linked folder, replace the file atomically, and protect an unsaved edit from an external write.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-external-edit-')
+    const fixture = await mkdtemp(scratchPath('fregat-external-edit-'))
     const project = path.join(fixture, 'project')
     const target = path.join(fixture, 'target')
     let disk = path.join(target, filename)

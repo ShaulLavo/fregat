@@ -51,10 +51,10 @@ export const selectors = {
   pullRequestLookupRetry: (page: Page) => page.locator('[data-pull-request-lookup-retry]'),
   liveWorkLogToggle: (page: Page) =>
     page.locator('[data-live-activity]').getByRole('button').first(),
-  workLogGroup: (page: Page) => page.getByRole('region', { name: 'Tool calls', exact: true }),
+  workLogGroup: (page: Page) => page.getByRole('region', { name: 'Activity history', exact: true }),
   workLogOutput: (page: Page) =>
     page
-      .getByRole('region', { name: 'Tool calls', exact: true })
+      .getByRole('region', { name: 'Activity history', exact: true })
       .locator('pre[aria-label="Output"]'),
   manageWorktrees: (page: Page) =>
     page.getByRole('button', { name: 'Manage worktrees', exact: true }),
@@ -333,9 +333,12 @@ export const selectors = {
     page
       .getByRole('region', { name: 'Theme studio', exact: true })
       .getByRole('tab', { name, exact: true }),
+  themeStudioMode: (page: Page, mode: 'dark' | 'light') =>
+    page.getByRole('button', { name: `Preview the ${mode} half`, exact: true }),
   themeStudioCard: (page: Page, id: string) =>
     page.locator(`[data-studio-themes] [role="option"][data-theme-id="${id}"]`),
   titlebar: (page: Page) => page.locator('header[data-native-window-drag-region]').first(),
+  settingsOpen: (page: Page) => page.getByRole('button', { name: 'Settings', exact: true }).first(),
   themeStudioOpen: (page: Page) => page.getByRole('button', { name: 'Open studio', exact: true }),
   quickOpenPreviewHeaderSelector: '[aria-label="File preview"] header',
   quickOpenPreviewTextSelector: '[aria-label="File preview"] [data-file-preview-text]',
@@ -591,7 +594,10 @@ export const selectors = {
   physicalDialog: (page: Page) =>
     page.getByRole('dialog', { name: 'Physical dialog', exact: true }),
   physicalRow: (page: Page) => page.getByRole('option', { name: 'Silent row', exact: true }),
+  settingsForm: (page: Page) => page.getByRole('region', { name: 'Settings form', exact: true }),
   settingsHeader: (page: Page) => page.locator('[data-settings-header]'),
+  settingsSummaryCount: (page: Page) =>
+    page.locator('[data-settings-header]').getByText(/^\d+ settings?$/),
   shortcutsSearch: (page: Page) =>
     page.getByRole('textbox', { name: 'Search keyboard shortcuts', exact: true }),
   shortcutsList: (page: Page) => page.getByRole('listbox', { name: 'Keyboard shortcuts' }),
@@ -799,6 +805,7 @@ export const selectors = {
   rewindFiles: (page: Page) =>
     page.getByRole('button', { name: 'Rewind and restore files', exact: true }),
   rewindDialog: (page: Page) => page.getByRole('alertdialog'),
+  clientUpdateRefresh: (page: Page) => page.getByRole('button', { name: 'Refresh', exact: true }),
   serverUpdate: (page: Page) => page.locator('[data-server-update]'),
   serverUpdateRestarting: (page: Page) => page.locator('[data-server-update="restarting"]'),
   serverUpdateRestart: (page: Page) =>
@@ -836,10 +843,14 @@ export const selectors = {
   chatFileDownload: (page: Page, name: string) =>
     page.getByRole('link', { name: `Download ${name}`, exact: true }),
   chatMessage: (page: Page) => page.getByRole('textbox', { name: 'Message', exact: true }),
+  chatWelcome: (page: Page) =>
+    page.getByText('Ask about your workspace', { exact: true }).locator('../..'),
   chatNewSession: (page: Page) => page.getByRole('button', { name: 'New session', exact: true }),
   chatCorrection: (page: Page) =>
     page.getByRole('button', { name: 'Send correction', exact: true }),
   chatStop: (page: Page) => page.getByRole('button', { name: 'Stop current turn', exact: true }),
+  chatAttach: (page: Page) =>
+    selectors.composerActions(page).getByRole('button', { name: /^Attach/ }),
   chatSend: (page: Page) => page.getByRole('button', { name: 'Send message', exact: true }),
   reviewChanges: (page: Page) =>
     page.getByRole('button', { name: 'Review changes', exact: true }).first(),
@@ -849,8 +860,8 @@ export const selectors = {
   cancelSchedules: (page: Page) =>
     page.getByRole('button', { name: 'Cancel schedules', exact: true }),
   sessionGoal: (page: Page) => page.getByRole('button', { name: /^Goal: / }).first(),
-  turnCarryOn: (page: Page) => page.getByRole('button', { name: 'Carry on', exact: true }),
-  turnTryAgain: (page: Page) => page.getByRole('button', { name: 'Try again', exact: true }),
+  turnCarryOn: (page: Page) => page.getByRole('button', { name: 'Continue', exact: true }),
+  turnTryAgain: (page: Page) => page.getByRole('button', { name: 'Resend message', exact: true }),
   incompleteAnswer: (page: Page) =>
     page.getByRole('group', { name: 'Incomplete answer', exact: true }),
   chatQueue: (page: Page) => page.getByRole('button', { name: 'Queue message', exact: true }),
@@ -875,6 +886,7 @@ export const selectors = {
     page.getByRole('menuitem', { name: 'Ask the Agent', exact: true }),
   terminalRendererRow: (page: Page) => page.getByRole('menuitem', { name: /^Renderer: / }),
   chatMessages: (page: Page) => page.getByRole('log', { name: 'Messages', exact: true }),
+  chatUserMessages: (page: Page) => page.locator('[data-user-message-body]'),
   chatCodeBlockBody: (page: Page, language: string) =>
     page
       .getByRole('log', { name: 'Messages', exact: true })
@@ -895,7 +907,6 @@ export const selectors = {
     page.locator(`[data-reasoning-row][data-work-log-entry-id="${entryId}"]`),
   liveActivityRow: (page: Page) =>
     page.locator('[data-index]:has(> [data-timeline-row-type="live-activity"])'),
-  liveTail: (page: Page) => page.getByRole('list', { name: 'Latest tool calls', exact: true }),
   stackFrame: (page: Page, frame: string) => page.locator(`[data-stack-frame="${frame}"]`).first(),
   activePlanTrigger: (page: Page) =>
     page.getByRole('button').filter({ has: page.getByLabel('Plan progress', { exact: true }) }),
@@ -907,6 +918,13 @@ export const selectors = {
     page.locator(`[data-agent-tree-level="child"] [data-agent-thread-id="${threadId}"]`),
   modelSwitch: (page: Page) => page.locator('[data-model-switch]').first(),
   composerActions: (page: Page) => page.locator('[data-composer-actions]'),
+  draftContext: (page: Page) => page.getByRole('group', { name: 'Session workspace', exact: true }),
+  draftSetup: (page: Page) => page.getByRole('button', { name: /^Session setup: / }),
+  draftSetupSheet: (page: Page) => page.getByRole('menu', { name: /^Session setup: / }),
+  draftSetupRow: (page: Page, label: string) =>
+    page
+      .getByRole('menu', { name: /^Session setup: / })
+      .getByRole('menuitem', { name: new RegExp(`^${label}`) }),
   usageMeter: (page: Page) => page.locator('[data-composer-actions] [data-usage-meter]'),
   usagePopover: (page: Page) => page.locator('[data-usage-popover]'),
   usageWindowRows: (page: Page) => page.locator('[data-usage-popover] [data-usage-window]'),
@@ -1150,10 +1168,10 @@ export const selectors = {
 }
 
 export const chords = {
-  commandPalette: 'Control+Shift+P',
-  togglePanel: 'Control+J',
-  nextItem: 'Control+Alt+BracketRight',
-  toggleSidebar: 'Control+B',
+  commandPalette: 'ControlOrMeta+Shift+P',
+  togglePanel: 'ControlOrMeta+J',
+  nextItem: 'ControlOrMeta+Alt+BracketRight',
+  toggleSidebar: 'ControlOrMeta+B',
 }
 
 export async function waitForApp(page: Page, timeoutMs = 45_000) {

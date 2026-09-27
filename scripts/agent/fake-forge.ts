@@ -1,3 +1,4 @@
+import { scratchPath } from './paths'
 import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -47,7 +48,7 @@ export function createFakeGitLab() {
 }
 
 async function fakeCli(binary: string, fixture: string) {
-  const directory = await mkdtemp(`/work/tmp/fregat-fake-${binary}-`)
+  const directory = await mkdtemp(scratchPath(`fregat-fake-${binary}-`))
   await copyFile(new URL(`./fixtures/${fixture}`, import.meta.url), join(directory, binary))
   await chmod(join(directory, binary), 0o755)
   return {
@@ -70,7 +71,7 @@ async function fakeCli(binary: string, fixture: string) {
  * and the server detects the forge from it.
  */
 export async function createSshRemote(repository: string) {
-  const root = await mkdtemp('/work/tmp/fregat-ssh-remote-')
+  const root = await mkdtemp(scratchPath('fregat-ssh-remote-'))
   const bare = join(root, `${repository}.git`)
   await mkdir(join(bare, '..'), { recursive: true })
   const init = Bun.spawn(['git', 'init', '--quiet', '--bare', '-b', 'main', bare])

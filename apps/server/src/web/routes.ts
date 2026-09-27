@@ -26,9 +26,10 @@ export function webRoutes(
   update: Pick<ServerUpdate, 'reread'>,
   terminal: Pick<TerminalService, 'hostInfo'>,
 ) {
-  const routes = new Elysia({ name: 'web-routes' }).get('/release', () =>
-    releaseDescriptor(options, update, terminal),
-  )
+  const routes = new Elysia({ name: 'web-routes' }).get('/release', ({ set }) => {
+    set.headers['cache-control'] = 'no-store'
+    return releaseDescriptor(options, update, terminal)
+  })
   const root = options.root
   if (!root) return routes
 

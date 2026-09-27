@@ -39,6 +39,55 @@ afterEach(() => {
 
 describe('orchestration read-model cache coherence', () => {
   it.each([
+    { status: 'interrupted', state: 'interrupted' },
+    { status: 'error', state: 'error' },
+    { status: 'ready', state: 'completed' },
+  ] as const)(
+    'keeps a turn $state when its file checkpoint finishes later',
+    ({ status, state }) => {
+      const projected = project([
+        ...sessionBootstrapEvents(),
+        turnStartEvent('turn-1', requestedAt),
+        runtimeSetEvent({ activeTurnId: 'turn-1', status: 'running', updatedAt: startedAt }),
+        runtimeSetEvent({ status, updatedAt: settledAt }),
+        turnDiffCompletedEvent({ turnId: 'turn-1', checkpointTurnCount: 1, status: 'ready' }),
+      ])
+      for (const session of [projected.shell, projected.memory, projected.sqlSession])
+        expect(session?.latestTurn).toMatchObject({ state, completedAt: settledAt })
+    },
+  )
+
+  it.each(['failure', 'interruption'] as const)(
+    'acknowledges a prior %s when the user continues and retains later failures',
+    (kind) => {
+      const failure =
+        kind === 'failure'
+          ? runtimeSetEvent({ status: 'error', lastError: 'Provider failed' })
+          : pendingEvent('session.runtime-recovered', {
+              sessionId: SESSION_ID,
+              turnId: 'turn-1',
+              observedSequence: 0,
+              runtimeEpoch: 'epoch-fixture',
+              message: 'The server restarted',
+              createdAt: startedAt,
+            })
+      const events = [...sessionBootstrapEvents(), turnStartEvent('turn-1', requestedAt), failure]
+      expect(project(events).shell?.hasError).toBe(true)
+
+      events.push(turnStartEvent('turn-2', revisedAt))
+      expect(project(events).shell).toMatchObject({ hasError: false, attentionState: 'working' })
+
+      events.push(runtimeSetEvent({ status: 'ready', updatedAt: settledAt }))
+      const completed = project(events)
+      for (const session of [completed.shell, completed.memory, completed.sqlSession])
+        expect(session).toMatchObject({ hasError: false, attentionState: 'settled' })
+
+      events.push(runtimeSetEvent({ status: 'error', lastError: 'New failure' }))
+      expect(project(events).shell).toMatchObject({ hasError: true, attentionReason: 'failure' })
+    },
+  )
+
+  it.each([
     { settledState: 'completed', status: 'idle' },
     { settledState: 'completed', status: 'ready' },
     { settledState: 'error', status: 'error' },

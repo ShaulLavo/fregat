@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -21,7 +22,7 @@ export const editorWidgetKeys: Scenario = {
   description:
     'With a signature hint and a completion list both open, the arrows move the list and Escape closes the list first, then the hint; Enter accepts in place; Escape closes find through its plugin key (E050 row 6: plugin keymap context keys).',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-widget-keys-')
+    const fixture = await mkdtemp(scratchPath('fregat-widget-keys-'))
     try {
       await writeFile(path.join(fixture, 'main.ts'), SOURCE)
       await writeFile(

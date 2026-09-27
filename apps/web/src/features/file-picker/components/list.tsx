@@ -8,6 +8,7 @@ import type { FsEntry } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 import { ListLoading } from '@/features/file-picker/components/list-loading'
 import { FileRow } from '@/features/file-picker/components/file-row'
+import { TouchRow } from '@/features/file-picker/components/touch-row'
 import { useFilePickerSessionActions } from '@/features/file-picker/hooks/use-file-picker-session-actions'
 import { fileListRows } from '@/features/file-picker/utils/rows'
 import { SCROLL_INTENT_SETTLE_MS } from '@/features/file-picker/utils/intent'
@@ -32,6 +33,7 @@ export function FileList({
   onGoParent,
   onRetry,
   selectedPath,
+  touch,
 }: {
   accept?: readonly string[]
   entries: FsEntry[]
@@ -46,6 +48,8 @@ export function FileList({
   onGoParent: () => void
   onRetry: () => void
   selectedPath: string | null
+  /** Finger-sized rows where one tap opens a folder. */
+  touch: boolean
 }) {
   const internalRef = useRef<HTMLDivElement>(null)
   const containerRef = listRef ?? internalRef
@@ -123,15 +127,32 @@ export function FileList({
         aria-describedby={showStatus ? statusId : undefined}
         aria-label={listLabel(mode)}
         className='focus-ring-inset absolute inset-0 outline-none'
-        renderRow={(row) =>
-          row.kind === 'section' ? (
-            <div
-              aria-hidden='true'
-              className='text-muted-foreground section-label flex h-(--density-control-height-sm) items-center px-(--density-row-padding-x)'
-            >
-              {row.label}
-            </div>
-          ) : (
+        renderRow={(row) => {
+          if (row.kind === 'section')
+            return (
+              <div
+                aria-hidden='true'
+                className='text-muted-foreground section-label flex h-(--density-control-height-sm) items-center px-(--density-row-padding-x)'
+              >
+                {row.label}
+              </div>
+            )
+          if (touch)
+            return (
+              <TouchRow
+                accept={accept}
+                entry={row.entry}
+                isBusy={isBusy}
+                mode={mode}
+                onOpen={onEntryDoubleClick}
+                position={row.position}
+                rowProps={list.rowProps(row.key)}
+                selected={row.entry.path === selectedPath}
+                setSize={entries.length}
+                showPath={row.showPath}
+              />
+            )
+          return (
             <FileRow
               accept={accept}
               entry={row.entry}
@@ -146,7 +167,7 @@ export function FileList({
               showPath={row.showPath}
             />
           )
-        }
+        }}
       />
       {showError ? (
         <div className='absolute inset-0' id={statusId}>

@@ -14,7 +14,7 @@ const HOUR_MS = 3_600_000
  * reads the Codex account. That reading is twenty minutes old, so its popover says it
  * may be out of date.
  */
-function usageFixture(nowMs: number, providerInstanceId: string) {
+export function usageFixture(nowMs: number, providerInstanceId: string) {
   const resetsIn = (hours: number) => new Date(nowMs + hours * HOUR_MS).toISOString()
 
   return {

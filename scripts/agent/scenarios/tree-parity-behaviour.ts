@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { deepStrictEqual, ok, strictEqual } from 'node:assert/strict'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -17,7 +18,7 @@ export const treeParityBehaviour: Scenario = {
   description:
     'Pin the file tree behaviours that need the app: Mod+F, folder hover prefetch, focus after delete, reload restore, deferred create.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-tree-behaviour-')
+    const fixture = await mkdtemp(scratchPath('fregat-tree-behaviour-'))
     try {
       await files(fixture, {
         'docs/guide.md': '# Guide\n',

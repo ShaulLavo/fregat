@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { strictEqual } from 'node:assert/strict'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -11,7 +12,7 @@ export const editorExternalDeletion: Scenario = {
     'Preserve deleted buffers, retire missing restored tabs, and recreate an explicitly opened missing file.',
   async run(page, { step }) {
     const originalUrl = page.url()
-    const fixture = await mkdtemp('/work/tmp/fregat-external-deletion-')
+    const fixture = await mkdtemp(scratchPath('fregat-external-deletion-'))
     const target = path.join(fixture, 'retained.txt')
     const tab = selectors.editorTab(page, target.slice(1))
     try {

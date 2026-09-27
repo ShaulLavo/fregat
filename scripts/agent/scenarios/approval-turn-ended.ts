@@ -10,7 +10,7 @@ import {
 export const approvalTurnEnded = isolatedNativeScenario({
   name: 'approval-turn-ended',
   description:
-    'Stop a turn while its approval is open: the panel closes, the transcript keeps an Ended unanswered receipt and the stopped line, and Carry on starts a new turn.',
+    'Stop a turn while its approval is open: the panel closes, the transcript keeps an Ended unanswered receipt and the stopped line, and Continue starts a new turn.',
   fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
   async drive(page, { step, root }) {
     await requestAppApproval(page)
@@ -36,7 +36,7 @@ export const approvalTurnEnded = isolatedNativeScenario({
     await step('ended-receipt-after-reload')
 
     await selectors.turnCarryOn(page).click()
-    await messages.getByText('Continue from where you stopped.', { exact: true }).waitFor()
+    await selectors.chatUserMessages(page).getByText('Continue', { exact: true }).waitFor()
     await selectors.appApproval(page).waitFor({ timeout: 30_000 })
     const responses = (await nativeLog(root)).filter((entry) => entry.event === 'approval-response')
     equal(responses.length, 0, 'No answer reached the agent for the ended approval')

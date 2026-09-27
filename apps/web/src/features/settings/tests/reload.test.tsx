@@ -57,7 +57,7 @@ test('an outgoing view cannot overwrite a new root generation', () => {
   expect(settingsScrollTop(owner, 'user', 'form', '')).toBe(0)
 })
 
-test('closing the settings form captures scroll before its ref detaches', () => {
+test('closing the settings form captures scroll before its ref detaches', async () => {
   selectSettingsScope('user')
   selectSettingsView('form')
   selectSettingsSearch('')
@@ -72,6 +72,7 @@ test('closing the settings form captures scroll before its ref detaches', () => 
     return <div ref={ref} />
   }
   const mounted = render(<Form />)
+  await act(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
   const scroller = mounted.container.firstElementChild
   expect(scroller).not.toBeNull()
   if (scroller) {
