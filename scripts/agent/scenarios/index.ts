@@ -203,6 +203,7 @@ import { filePickerLocations } from './file-picker-locations'
 import { filePickerAppearance } from './file-picker-appearance'
 import { quickOpenPreview } from './quick-open-preview'
 import { themeStudio } from './theme-studio'
+import { themeStudioSettings } from './theme-studio-settings'
 import { themeStudioLibrary } from './theme-studio-library'
 import { serverUpdate } from './server-update'
 import { commandPaletteTypeBurst } from './command-palette-type-burst'
@@ -556,6 +557,7 @@ export const scenarios: readonly Scenario[] = [
   themeStudioAsync,
   quickOpenPreview,
   themeStudio,
+  themeStudioSettings,
   themeStudioLibrary,
   serverUpdate,
   commandPaletteTypeBurst,

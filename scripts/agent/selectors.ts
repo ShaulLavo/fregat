@@ -338,6 +338,7 @@ export const selectors = {
   themeStudioCard: (page: Page, id: string) =>
     page.locator(`[data-studio-themes] [role="option"][data-theme-id="${id}"]`),
   titlebar: (page: Page) => page.locator('header[data-native-window-drag-region]').first(),
+  settingsOpen: (page: Page) => page.getByRole('button', { name: 'Settings', exact: true }).first(),
   themeStudioOpen: (page: Page) => page.getByRole('button', { name: 'Open studio', exact: true }),
   quickOpenPreviewHeaderSelector: '[aria-label="File preview"] header',
   quickOpenPreviewTextSelector: '[aria-label="File preview"] [data-file-preview-text]',

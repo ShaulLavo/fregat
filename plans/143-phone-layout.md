@@ -760,3 +760,14 @@ choices opened a second sheet on top. Redesign:
       Simulator Safari and read both screenshots back. Evidence on the Mac:
       `node_modules/.cache/opus-mobile-design/live-collapsed.png` and `live-sheet.png`.
       Physical-device and software-keyboard checks were not performed.
+
+### Theme studio from phone Settings (2026-09-27)
+
+- [x] Reproduce desktop working and phone failing through the Open studio button.
+      `20260927T100916Z-scenario-theme-studio-settings` captures the missing phone view.
+- [x] Move the studio above the workspace shell switch so phone and desktop both mount it.
+      Separate phone tabs from header actions; retain collapse and discard confirmation.
+- [x] Verify Settings entry, tab switching, collapse and dirty discard at 1440/390/320px.
+      WebKit `20260927T101546Z-scenario-theme-studio-settings` passes; screenshots read.
+      Known isolated provider update 500s remain. Web typecheck, design/compiler census and lint pass.
+- [ ] Commit, push, deploy to Mesh and inspect the served phone UI.

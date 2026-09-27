@@ -243,5 +243,10 @@
     "file": "apps/web/src/features/workspace/components/tree-truncate.tsx",
     "class": "truncate",
     "reason": "The file tree's own row machinery, moved into the app unchanged by Plan 178 app-owned-state; the rows and chrome sub-plans rebuild it on ListRow, InputGroup and the app's truncation, and delete this entry."
+  },
+  {
+    "file": "apps/web/src/features/theme-studio/components/dock-tabs.tsx",
+    "class": "no-scrollbar",
+    "reason": "The phone studio tabs scroll within one bar; a scrollbar would cover the labels. Arrow keys and horizontal gestures reach every tab."
   }
 ]
