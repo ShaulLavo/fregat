@@ -230,6 +230,7 @@ export function createFileBrowser(client: Client, storage: KeyValueStorage) {
       void navigate(parsed.path)
       return null
     },
+    store: store.store,
     getSnapshot: store.getSnapshot,
     subscribe: store.subscribe,
     dispose() {

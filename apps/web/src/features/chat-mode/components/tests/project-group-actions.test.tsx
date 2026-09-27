@@ -1,7 +1,7 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { onTestFinished } from 'vitest'
-import { ProjectMenu } from '@/features/chat-mode/components/project-menu'
+import { ProjectMenuHarness } from '../../../../../test/factories/project-menu'
 import { ProjectDeleteDialog } from '@/features/chat-mode/components/project-delete-dialog'
 import { useProjectDeleteRequestStore } from '@/features/chat-mode/state/project-delete-request-store'
 import { currentRailEnvironments } from '@/features/chat-mode/state/rail-environments'
@@ -36,7 +36,7 @@ for (const filtered of [false, true]) {
     onTestFinished(() => useProjectDeleteRequestStore.getState().dismissDelete())
     renderWithProviders(
       <>
-        <ProjectMenu group={group} trigger={<button>Project actions</button>} />
+        <ProjectMenuHarness group={group} />
         <ProjectDeleteDialog />
       </>,
       {
@@ -110,7 +110,7 @@ test('a disconnected owner remains visible and prevents an incomplete group dele
   onTestFinished(() => useProjectDeleteRequestStore.getState().dismissDelete())
   renderWithProviders(
     <>
-      <ProjectMenu group={group} trigger={<button>Project actions</button>} />
+      <ProjectMenuHarness group={group} />
       <ProjectDeleteDialog />
     </>,
     {

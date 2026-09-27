@@ -9,14 +9,14 @@ import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 export function defaultLogsFilterState(): LogsFilterState {
   const settings = readSettingsMirror()
 
-  return {
-    area: 'all',
-    level: 'all',
-    search: '',
-    slowMs: settings['logs.slowThresholdMs'],
-    source: 'all',
-    timeRange: settings['logs.defaultTimeRange'],
-  }
+  return logsFilterDefaults(settings['logs.slowThresholdMs'], settings['logs.defaultTimeRange'])
+}
+
+export function logsFilterDefaults(
+  slowMs: LogsFilterState['slowMs'],
+  timeRange: LogsFilterState['timeRange'],
+): LogsFilterState {
+  return { area: 'all', level: 'all', search: '', slowMs, source: 'all', timeRange }
 }
 
 /** Identity of the filter set, so a changed filter resets inspection and scroll. */

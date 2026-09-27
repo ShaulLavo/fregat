@@ -6,12 +6,11 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
-  useState,
   type KeyboardEvent,
   type MouseEvent,
 } from 'react'
 import { isContextMenuKey } from '@workspace/utils/keyboard'
-import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
+import { useListContextMenu } from '@/keymap/menus/hooks/use-list-context-menu'
 import { SearchFileMenu } from '@/features/search/components/file-menu'
 import { SearchFileMenuContext } from '@/features/search/providers/file-menu-context'
 
@@ -100,8 +99,21 @@ export const SearchResultEditorSurface = memo(
     const scrollToIndexRef = useRef<SearchResultEditorScrollToIndex>(noopScrollToIndex)
     const scrollToOffsetRef = useRef<(offset: number) => void>(noopScrollToOffset)
     const { editorTheme } = useEditorColorTheme()
-    const contextMenu = useContextMenu()
-    const [menuTarget, setMenuTarget] = useState<SearchResultOpenTarget | null>(null)
+    const contextMenu = useListContextMenu<SearchResultOpenTarget>({
+      containerRef: parentRef,
+      isTargetPresent: (target) =>
+        blocks.some(
+          (block) =>
+            block.path === target.path &&
+            (target.match === null ||
+              block.excerpts.some(
+                (excerpt) =>
+                  excerpt.sourceMatch.line === target.match?.line &&
+                  excerpt.sourceMatch.column === target.match?.column,
+              )),
+        ),
+    })
+    const menuTarget = contextMenu.target
     const menuPath = groups.find((group) => group.path === menuTarget?.path)?.pathLabel
     const selectResultWithoutReveal = (id: SearchResultId | null) => {
       if (id === activeResultId) return
@@ -150,8 +162,7 @@ export const SearchResultEditorSurface = memo(
     })
 
     function openFileMenu(target: SearchResultOpenTarget, event: MouseEvent<HTMLElement>) {
-      setMenuTarget(target)
-      contextMenu.openAtEvent(event, event.currentTarget)
+      contextMenu.openAtEvent(target, event)
     }
 
     function openActiveMenu(event: KeyboardEvent<HTMLDivElement>) {
@@ -160,9 +171,7 @@ export const SearchResultEditorSurface = memo(
         ? document.getElementById(searchResultDomId(treeId, searchResultVirtualRowId(activeRow)))
         : null
       if (!target) return
-      event.preventDefault()
-      setMenuTarget(target)
-      contextMenu.openAtElement(row ?? event.currentTarget)
+      contextMenu.openOnMenuKey(event, target, row)
     }
 
     function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -180,6 +189,7 @@ export const SearchResultEditorSurface = memo(
 
     return (
       <div
+        {...contextMenu.containerProps}
         aria-activedescendant={
           activeRow ? searchResultDomId(treeId, searchResultVirtualRowId(activeRow)) : undefined
         }
@@ -209,7 +219,7 @@ export const SearchResultEditorSurface = memo(
             <SearchFileMenu
               anchor={contextMenu.anchor}
               relativePath={menuPath ?? menuTarget.path}
-              returnFocusTo={() => parentRef.current}
+              returnFocusTo={contextMenu.returnFocusTo}
               target={menuTarget}
               onOpenChange={contextMenu.onOpenChange}
             />

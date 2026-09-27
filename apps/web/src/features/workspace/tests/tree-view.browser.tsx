@@ -559,7 +559,7 @@ describe('tree view browser behavior', () => {
     expect(currentModel.getSearchValue()).toBe('worker')
   })
 
-  it('inherits the consuming light color scheme for search colors', async () => {
+  it('uses the shared filter group in the consuming light color scheme', async () => {
     const { tree } = await mountSearchTree('retain', 'light')
     const host = document.querySelector<HTMLElement>('[data-file-tree]')
     const searchInput = tree.querySelector<HTMLInputElement>('[data-file-tree-search-input]')
@@ -567,7 +567,8 @@ describe('tree view browser behavior', () => {
     expect(host).not.toBeNull()
     expect(searchInput).not.toBeNull()
     expect(getComputedStyle(host!).colorScheme).toBe('light')
-    expect(getComputedStyle(searchInput!).backgroundColor).toBe('rgb(248, 248, 248)')
+    expect(searchInput!.closest('[data-slot="input-group"]')).not.toBeNull()
+    expect(getComputedStyle(searchInput!).backgroundColor).toBe('rgba(0, 0, 0, 0)')
   })
 
   it('keeps rename active for composing keys and commits on ordinary Enter', async () => {

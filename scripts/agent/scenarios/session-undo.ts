@@ -33,7 +33,7 @@ async function pinnedOrder(page: Page, titles: readonly string[]) {
 export const sessionUndo: Scenario = {
   name: 'session-undo',
   description:
-    'Unpin, settle, snooze and archive disposable sessions, then undo each by the notice button and by Mod+Z: pin keys and order return, the archived viewed session reopens, the composer keeps its own undo and history outlives its notice and repeated Undo/Redo restores rows.',
+    'Unpin, settle, snooze and archive disposable sessions, then undo each by the notice button and by Mod+Z: pin keys and order return, the archived viewed session reopens, the composer keeps its own undo, Mod+Z does nothing once a notice closes, stacked notices each undo their own action, and repeated Undo/Redo restores rows.',
   async run(page, { step }) {
     const base = await openChat(page)
     const shell = await readShell(page, base)
@@ -79,7 +79,7 @@ export const sessionUndo: Scenario = {
       await selectors.sessionInShelf(page, bravo, 'Active').waitFor()
       await noticeShown(page, '1 unpinned')
       await step('unpinned-notice')
-      await selectors.toastUndo(page).click()
+      await selectors.toastUndo(page, '1 unpinned').click()
       await selectors.sessionInShelf(page, bravo, 'Pinned').waitFor()
       strictEqual((await session(bravoId))?.pinOrderKey, 'g')
       deepStrictEqual(await pinnedOrder(page, [alpha, bravo]), [bravo, alpha])
@@ -96,7 +96,7 @@ export const sessionUndo: Scenario = {
       await act(charlie, 'Mark as settled')
       await selectors.sessionInShelf(page, charlie, 'Settled').waitFor()
       await selectors.undoNotice(page, '1 settled').waitFor()
-      await selectors.toastUndo(page).click()
+      await selectors.toastUndo(page, '1 settled').click()
       await selectors.sessionInShelf(page, charlie, 'Active').waitFor()
       await step('settle-undone-by-button')
 
@@ -125,7 +125,7 @@ export const sessionUndo: Scenario = {
       await page.waitForURL(isDraftChatUrl)
       await noticeShown(page, '1 archived')
       await step('viewed-session-archived')
-      await selectors.toastUndo(page).click()
+      await selectors.toastUndo(page, '1 archived').click()
       await page.waitForURL((url) => url.href.includes(charlieId))
       await selectors.sessionInShelf(page, charlie, 'Active').waitFor()
       strictEqual((await session(charlieId))?.archivedAt, null)
@@ -161,8 +161,25 @@ export const sessionUndo: Scenario = {
       await selectors.sessionInShelf(page, charlie, 'Settled').waitFor()
       await selectors.undoNotice(page, '1 settled').waitFor({ state: 'hidden', timeout: 8_000 })
       await undoByKey()
-      await selectors.sessionInShelf(page, charlie, 'Active').waitFor()
-      await step('undo-after-notice-expires')
+      await page.waitForTimeout(500)
+      strictEqual((await session(charlieId))?.settledOverride, 'settled')
+      await step('mod-z-after-notice-expires-changes-nothing')
+
+      await act(bravo, 'Mark as settled')
+      await act(charlie, 'Archive')
+      await page.waitForURL(isDraftChatUrl)
+      await noticeShown(page, '1 archived')
+      await selectors.undoNotice(page, '1 settled').waitFor()
+      strictEqual(await selectors.sessionUndoNotices(page).count(), 2)
+      await step('two-notices-stacked')
+      await selectors.undoNotice(page, '1 archived').hover()
+      await step('two-notices-expanded')
+      await selectors.toastUndo(page, '1 settled').click()
+      await selectors.sessionInShelf(page, bravo, 'Pinned').waitFor()
+      ok((await session(charlieId))?.archivedAt, 'The settle Undo leaves the archive alone')
+      await undoByKey()
+      await page.waitForURL((url) => url.href.includes(charlieId))
+      await step('each-notice-undoes-its-own-action')
 
       await act(alpha, 'Unpin')
       await selectors.sessionInShelf(page, alpha, 'Active').waitFor()
@@ -183,6 +200,30 @@ export const sessionUndo: Scenario = {
       await undoByKey()
       await page.waitForURL((url) => url.href.includes(charlieId))
       await step('archive-reopened-again')
+
+      await act(bravo, 'Snooze…')
+      await selectors.snoozePreset(page).click()
+      await selectors.snoozeDialog(page).waitFor({ state: 'hidden' })
+      await selectors.sessionInShelf(page, bravo, 'Snoozed').waitFor()
+      await act(bravo, 'Mark as settled')
+      await noticeShown(page, '1 settled')
+      await selectors.undoNotice(page, '1 settled').hover()
+      ok(await selectors.toastUndo(page, '1 snoozed').isDisabled())
+      await selectors.undoNotice(page, 'Undid 1 archived').waitFor({ state: 'hidden' })
+      await step('same-session-older-undo-disabled-and-redo-discarded')
+      await undoByKey()
+      await selectors.sessionInShelf(page, bravo, 'Snoozed').waitFor()
+      await selectors.undoNotice(page, 'Undid 1 settled').hover()
+      await selectors.toastUndo(page, '1 snoozed').click()
+      await selectors.sessionInShelf(page, bravo, 'Pinned').waitFor()
+      strictEqual((await session(bravoId))?.pinOrderKey, 'g')
+      await step('same-session-actions-undone-in-order')
+      await focusRail(page)
+      await page.keyboard.press('ControlOrMeta+Shift+z')
+      await selectors.sessionInShelf(page, bravo, 'Snoozed').waitFor()
+      await page.keyboard.press('ControlOrMeta+Shift+z')
+      await selectors.sessionInShelf(page, bravo, 'Settled').waitFor()
+      await step('same-session-actions-redone-in-order')
     } finally {
       for (const sessionId of ids) {
         if (!(await session(sessionId))) continue

@@ -19,10 +19,10 @@ import { chatModeMutationKeys } from '@/features/chat-mode/utils/mutation-keys'
 import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { useSessionMultiSelectStore } from '@/features/chat-mode/state/session-multi-select-store'
 import {
-  useSessionUndoStore,
   undoLatestSessionAction,
   redoLatestSessionAction,
 } from '@/features/chat-mode/state/session-undo'
+import { useSessionUndoStore } from '@/features/chat-mode/state/session-undo-history'
 import { useSessionActions } from '@/features/chat-mode/hooks/use-session-actions'
 import { reorderRailSession } from '@/features/chat-mode/state/rail-order-commands'
 import { railMarkerId } from '@workspace/client-core/chat/rail/drop'
@@ -216,6 +216,28 @@ test('archiving the viewed session opens a draft, and Undo unarchives it and ope
   await waitFor(() => expect(getNavigation().currentAddress().document).toBe(`t/${first}`))
 })
 
+test('two archives stack two notices; each Undo restores its own row and offers Redo', async ({
+  client,
+  server,
+}) => {
+  const h = await createRailHarness(client, server)
+  const [first, second] = h.sessionIds as [SessionId, SessionId]
+  renderRailHarness(h)
+  const archivedAt = async (id: SessionId) =>
+    (await h.refresh()).sessions.find((session) => session.id === id)?.archivedAt
+  await menu('Archive', 'First')
+  await menu('Archive', 'Second')
+  await waitFor(() => expect(screen.getAllByText('1 archived')).toHaveLength(2))
+  // Sonner lists the newest notice first.
+  const older = screen.getAllByText('1 archived').at(-1)!.closest('[data-sonner-toast]')!
+  await userEvent.click(within(older as HTMLElement).getByRole('button', { name: 'Undo' }))
+  await waitFor(async () => expect(await archivedAt(first)).toBeNull())
+  expect(await archivedAt(second)).not.toBeNull()
+  const undone = (await screen.findByText('Undid 1 archived')).closest('[data-sonner-toast]')!
+  await userEvent.click(within(undone as HTMLElement).getByRole('button', { name: 'Redo' }))
+  await waitFor(async () => expect(await archivedAt(first)).not.toBeNull())
+})
+
 test('bulk archive Undo restores only the rows that were archived', async ({ server }) => {
   let failedId: SessionId | undefined
   const unarchived: string[] = []
@@ -269,7 +291,7 @@ test('consecutive settles are separate, and a manual change discards only its ro
   const [first, second] = h.sessionIds as [SessionId, SessionId]
   await menu('Mark as settled', 'First')
   await menu('Mark as settled', 'Second')
-  await screen.findByText('1 settled')
+  await waitFor(() => expect(screen.getAllByText('1 settled')).toHaveLength(2))
   await menu('Move to active', 'First')
   await waitFor(() =>
     expect(
@@ -279,6 +301,7 @@ test('consecutive settles are separate, and a manual change discards only its ro
         ?.entries.map((entry) => entry.ref.sessionId),
     ).toEqual([second]),
   )
+  await waitFor(() => expect(screen.getAllByText('1 settled')).toHaveLength(1))
   await userEvent.click(await undoButton('1 settled'))
   await waitFor(async () => expect((await session(second)).settledOverride).toBeNull())
   expect((await session(first)).settledOverride).toBe('active')

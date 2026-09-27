@@ -1,4 +1,4 @@
-import { createSubscriptions } from '@workspace/utils/subscriptions'
+import { createStore } from 'zustand/vanilla'
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
 import {
   orchestrationDispatchResultSchema,
@@ -12,30 +12,31 @@ import { unwrapEdenResponse } from '@/lib/eden-events'
 import type { EnvironmentId } from '@workspace/contracts'
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
 
-const activeTransports = new Map<EnvironmentId, ChatTransport>()
-const subscriptions = createSubscriptions()
-export const subscribeTransports = subscriptions.subscribe
+/** The live transport per environment; a replaced one is closed before it leaves. */
+export const activeTransports = createStore<ReadonlyMap<EnvironmentId, ChatTransport>>(
+  () => new Map(),
+)
 
 export function transportFor(environmentId: EnvironmentId) {
-  return activeTransports.get(environmentId) ?? null
+  return activeTransports.getState().get(environmentId) ?? null
 }
 
 export function registerChatTransport(transport: ChatTransport) {
-  const held = activeTransports.get(transport.environmentId)
+  const held = transportFor(transport.environmentId)
   if (held && held !== transport) held.close()
-  activeTransports.set(transport.environmentId, transport)
-  subscriptions.notify()
+  activeTransports.setState(
+    new Map(activeTransports.getState()).set(transport.environmentId, transport),
+    true,
+  )
   return () => {
-    if (activeTransports.get(transport.environmentId) !== transport) return
+    if (transportFor(transport.environmentId) !== transport) return
     transport.close()
-    subscriptions.notify()
   }
 }
 
 export function closeChatTransports() {
-  for (const transport of activeTransports.values()) transport.close()
-  activeTransports.clear()
-  subscriptions.notify()
+  for (const transport of activeTransports.getState().values()) transport.close()
+  activeTransports.setState(new Map(), true)
 }
 
 export async function dispatchCommandForEnvironment(
@@ -57,7 +58,7 @@ export async function dispatchCommandForEnvironment(
     }),
   )
   if (
-    Array.from(activeTransports.values()).some(
+    Array.from(activeTransports.getState().values()).some(
       (transport) => transport.environmentId === environmentId && !transport.closed,
     )
   )

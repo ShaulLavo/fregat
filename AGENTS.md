@@ -41,6 +41,9 @@
 - One component per file, one hook per file; pure helpers go to `utils/`.
 - A module variable filled from an effect so non-React code can reach it is a last resort, for DOM nodes, live sockets and held component state. Anything else is read where it lives or pushed by its non-React owner.
 - No prop-drilling of app commands or setters: a prop that is only forwarded, or a command crossing more than two components, gets a narrow provider/hook. Providers expose small domain actions (`selectTab`), not state blobs.
+- State that outlives a component is a zustand store (web and TUI): `createStore` from `zustand/vanilla` when non-React code reads or writes it, read in React with `useStore(store, selector)`. A module `let` plus a listener set is a store; write it as one. A service with its own lifecycle keeps its state in a zustand store it exposes (`connections.store`), and components select from that.
+- Selectors return a primitive, a reference the store holds, or go through `useShallow`. A derived object needs a selector memoized on its inputs (`projectedTreeModel`); a `getSnapshot` that builds a fresh object or array each read re-renders forever.
+- `useSyncExternalStore` is for sources zustand does not own: DOM and renderer events (`matchMedia`, held keys, geometry), mutable objects that publish a revision (an editor buffer), live sockets, and services with their own lifecycle. A zustand store is read with `useStore`, never through `useSyncExternalStore`. Convert a hand-built store only when the result is less code or measurably fewer renders.
 - The React Compiler memoizes the app. Do not add `memo`, `useMemo` or `useCallback` by hand, except where identity is load-bearing: a value in a dependency array, a value passed to a hook (store selector, `useSyncExternalStore` pair), or a ref callback. The compiler's cache may recompute; those keep their manual memo with a comment naming the dependent hook.
 - Read what the compiler did; do not infer it. `bun run compiler:explain <file> [--component Name]` prints memo blocks as `[keys] → value`. `bun run compiler:memos [paths…]` classifies each manual memo: `redundant` (delete), `needed`, or `differs` (a missing key is a stale-value bug). Rows are not independent: remove memos one at a time.
 - Removing `useMemo<T>(…)` drops its contextual type; write `const value: T = …`.
@@ -69,6 +72,10 @@
 - Focus: `focus-ring` (act on), `focus-ring-within` (type into), `focus-ring-inset` (full-bleed scrollers); tint with `--focus-ring-color`, never a `ring-*` class. Opt out with `focus-visible:ring-0`. Inside a wrapper that draws the field ring, use `shadow-none!` and `aria-invalid:ring-0` on the inner control. A new `@utility` that sets `box-shadow` must join the focus class group in `packages/ui/src/lib/utils.ts` (tailwind-merge cannot see custom utilities).
 - `pressable` for press feedback. Motion uses the configured defaults (`--duration-enter`/`-exit`, `ease-*-strong`); never hand-write durations or curves. A transition that animates a focus ring must list `box-shadow`.
 - Composite fields (leading icon, trailing button or count) are `InputGroup` with addons, never absolute icons over a padded input.
+
+## TUI
+
+- The TUI (`apps/tui`) designs its own UX for the terminal. Never port a web pattern (toasts, notices, dialogs, layouts) to it because the web has it; solve the need the way a terminal app would. The reference is herdr (https://herdr.dev/). A redesign is coming, so TUI parity items from web plans wait for it.
 
 ## Loading, Empty And Error States
 

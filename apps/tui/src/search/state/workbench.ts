@@ -98,6 +98,7 @@ export function createSearchWorkbench(client: Client) {
   }
 
   return {
+    store: store.store,
     getSnapshot: store.getSnapshot,
     subscribe: store.subscribe,
     search,

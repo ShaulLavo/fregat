@@ -1,4 +1,5 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useStore } from 'zustand'
+import { useEffect, useState } from 'react'
 import type { ModelSelection, ProviderSnapshot } from '@workspace/contracts'
 import {
   providerModelOptions,
@@ -41,7 +42,7 @@ export function ModelPicker({
 }) {
   const commands = useCommands()
   const [store] = useState(() => createProviderCatalog(session.client))
-  const catalog = useSyncExternalStore(store.subscribe, store.getSnapshot)
+  const catalog = useStore(store.store)
   const [modal, setModal] = useState<Modal>({ kind: 'closed' })
   const hidden = useSettingValue(ready.owner, 'models.hidden')
   const order = useSettingValue(ready.owner, 'models.order')

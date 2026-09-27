@@ -1,3 +1,4 @@
+import { createStore } from 'zustand/vanilla'
 import {
   createFocusRequestToken,
   createFocusTargetToken,
@@ -69,23 +70,26 @@ export function createFocusRegistry(scope: FocusScope) {
 
 export class FocusRegistry {
   private readonly entries = new Map<FocusToken, FocusRegistration>()
-  private readonly listeners = new Set<() => void>()
-  private snapshot: Snapshot
+  /** What components select from with `useStore`. */
+  readonly store
   private lastActivated: FocusToken | null = null
   private overlayOwner: FocusToken | null = null
   private pending: Pending | null = null
   private disposed = false
+  // Set once dispose has settled the pending request; nothing publishes after it.
+  private closed = false
 
   constructor(scope: FocusScope) {
-    this.snapshot = { scope, current: null, lastCommandTarget: null, requested: null, result: null }
+    this.store = createStore<Snapshot>(() => ({
+      scope,
+      current: null,
+      lastCommandTarget: null,
+      requested: null,
+      result: null,
+    }))
   }
-  readonly subscribe = (listener: () => void) => {
-    this.listeners.add(listener)
-    return () => {
-      this.listeners.delete(listener)
-    }
-  }
-  readonly getSnapshot = () => this.snapshot
+  readonly subscribe = (listener: () => void) => this.store.subscribe(() => listener())
+  readonly getSnapshot = () => this.store.getState()
   readonly capture = () => this.snapshot.current?.token ?? null
 
   resolve(token: FocusToken | null): FocusTarget | null {
@@ -215,7 +219,7 @@ export class FocusRegistry {
     this.disposed = true
     this.settle({ status: 'rejected', reason: 'unregistered' })
     this.entries.clear()
-    this.listeners.clear()
+    this.closed = true
   }
 
   private unregister(token: FocusToken) {
@@ -326,8 +330,12 @@ export class FocusRegistry {
   }
 
   private publish(snapshot: Snapshot) {
-    this.snapshot = snapshot
-    for (const listener of this.listeners) listener()
+    if (this.closed) return
+    this.store.setState(snapshot, true)
+  }
+
+  private get snapshot() {
+    return this.store.getState()
   }
 }
 

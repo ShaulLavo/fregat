@@ -112,10 +112,19 @@ export const selectors = {
     page
       .getByRole('toolbar', { name: 'Selected sessions' })
       .getByRole('button', { name: 'Actions', exact: true }),
-  toastUndo: (page: Page) =>
-    page.locator('[data-sonner-toast]').getByRole('button', { name: 'Undo', exact: true }).last(),
+  toastUndo: (page: Page, text: string) =>
+    page
+      .locator('[data-sonner-toast]:not([data-removed="true"])')
+      .filter({ has: page.getByText(text, { exact: true }) })
+      .getByRole('button', { name: 'Undo', exact: true }),
   undoNotice: (page: Page, text: string) =>
-    page.locator('[data-sonner-toast]').filter({ hasText: text }),
+    page
+      .locator('[data-sonner-toast]:not([data-removed="true"])')
+      .filter({ has: page.getByText(text, { exact: true }) }),
+  sessionUndoNotices: (page: Page) =>
+    page
+      .locator('[data-sonner-toast]:not([data-removed="true"])')
+      .filter({ has: page.getByRole('button', { name: 'Undo', exact: true }) }),
   shelfRowTitles: (page: Page, shelf: string) =>
     page.getByRole('region', { name: shelf, exact: true }).locator('[title]'),
 
@@ -285,6 +294,7 @@ export const selectors = {
   clearTerminalHistory: (page: Page) => page.getByRole('menuitem', { name: 'Clear', exact: true }),
   restartTerminalShell: (page: Page) =>
     page.getByRole('menuitem', { name: 'Restart shell', exact: true }),
+  treeRenameInput: (page: Page) => selectors.folderTree(page).locator('[data-item-rename-input]'),
   terminalName: (page: Page) => page.getByRole('textbox', { name: 'Terminal name', exact: true }),
   commitFilesTree: (page: Page) => page.getByRole('tree', { name: 'Commit files', exact: true }),
   newTerminal: (page: Page) => page.getByRole('button', { name: 'New terminal', exact: true }),
@@ -1163,6 +1173,9 @@ export const selectors = {
     page.locator('[aria-label="Commit information"]').and(page.locator(`[title="${commit}"]`)),
   historyCopyMessage: (page: Page) =>
     page.getByRole('button', { name: 'Copy message', exact: true }),
+  treeFilterInput: (page: Page) => page.getByRole('textbox', { name: 'Filter files', exact: true }),
+  treeFilterClear: (page: Page) =>
+    page.getByRole('button', { name: 'Clear file filter', exact: true }),
   historySearch: (page: Page) => page.getByRole('textbox', { name: 'Search commit history' }),
   historyClearSearch: (page: Page) => page.getByRole('button', { name: 'Clear history search' }),
   historyExpand: (page: Page) => page.getByRole('button', { name: 'Expand commit graph' }),

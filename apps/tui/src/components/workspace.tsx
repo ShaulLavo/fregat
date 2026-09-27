@@ -1,3 +1,4 @@
+import { useStore } from 'zustand'
 import { AgentNavigationContext } from '@/navigation/providers/agent-context'
 import type { AgentNavigation } from '@/navigation/providers/agent-context'
 import { queuePrompt } from '@/agent-stage/state/inbox'
@@ -5,12 +6,12 @@ import { toWorkspaceAbsolute, toWorkspaceRelative } from '@workspace/client-core
 import { AgentScreen } from '@/agent/components/screen'
 import { agentHome, type AgentLocation } from '@/agent/utils/target'
 import { rememberAgent, rememberedAgent } from '@/agent/utils/location'
-import { currentWorktree, selectedWorktree } from '@/agent/utils/selection'
+import { selectedWorktree } from '@/agent/utils/selection'
 import { parsePickerPathInput } from '@workspace/client-core/files/path-input'
 import { createTuiError } from '@/host/utils/structured-errors'
 import { connectionFailure } from '@/connection/utils/failure'
 import { Toast } from '@/components/toast'
-import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { commandById, type CommandId } from '@workspace/client-core/commands/catalog'
 
 import { useCommands } from '@/commands/hooks/use-commands'
@@ -21,6 +22,7 @@ import { CommandPalette } from '@/commands/components/palette'
 import { ShortcutHelp } from '@/commands/components/help'
 import { SettingsBrowser } from '@/settings/components/browser'
 import { FileView } from '@/files/components/view'
+import { usePlaces } from '@/files/hooks/use-places'
 import { AddressDialog } from '@/navigation/components/address'
 import type { NavigationHistory } from '@/navigation/state/history'
 import type { DialogKind, Overlay } from '@/navigation/utils/overlay'
@@ -57,8 +59,8 @@ export function Workspace({
   const [fileFailure, setFileFailure] = useState<string | null>(null)
   const search = useRef(settingsQuery)
   const navigationRequest = useRef(0)
-  const navigation = useSyncExternalStore(history.subscribe, history.getSnapshot)
-  const chat = useSyncExternalStore(state.chat.subscribe, state.chat.getSnapshot)
+  const navigation = useStore(history.store)
+  const places = usePlaces(state.chat)
   useLayoutEffect(() => {
     const remember = () => {
       const location = history.getSnapshot().current
@@ -449,11 +451,7 @@ export function Workspace({
             initialPath={location.path}
             initialQuery={location.query}
             onQueryChange={updateFileQuery}
-            places={chat.projection.projectIds.flatMap((id) => {
-              const project = chat.projection.projectById[id]
-              const worktree = currentWorktree(chat.projection, id)
-              return worktree ? [{ name: project.title, path: worktree.path }] : []
-            })}
+            places={places}
             onLocationChange={recordLocation}
             onOpenWorkbench={openWorkbench}
             onOpenFile={location.workbenchRoot === undefined ? undefined : openBrowserFile}

@@ -1,4 +1,7 @@
 import { ChatDraftRail } from '@/components/chat-draft-rail'
+import { SessionMenu } from '@/features/chat-mode/components/session-menu'
+import { ProjectMenu } from '@/features/chat-mode/components/project-menu'
+import { useListContextMenu } from '@/keymap/menus/hooks/use-list-context-menu'
 import { SessionDragPreview } from '@/features/chat-mode/components/session-drag-preview'
 import { SessionShelf } from '@/features/chat-mode/components/session-shelf'
 import { railCollisions } from '@/features/chat-mode/utils/rail-collisions'
@@ -26,7 +29,7 @@ import {
   PlusIcon,
   XIcon,
 } from '@phosphor-icons/react'
-import { useEffect, useLayoutEffect, useMemo, useState, type KeyboardEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { createStore } from 'zustand/vanilla'
 
 import { SessionRailEmpty } from '@/features/chat-mode/components/session-rail-empty'
@@ -161,6 +164,16 @@ export function SessionRail({
   const [cursor, setCursor] = useState<{ owner: string | null; id: string } | null>(null)
   const [selection] = useState(() => createStore<string | null>(() => null))
   const visibleSessions = model.groups.flatMap((group) => group.sessions)
+  const listRef = useRef<HTMLDivElement>(null)
+  const contextMenu = useListContextMenu<string>({
+    containerRef: listRef,
+    touchPolicy: standalone ? 'context-menu' : 'suppress',
+    isTargetPresent: (target) =>
+      model.groups.some((group) => group.key === target) ||
+      visibleSessions.some((session) => session.key === target),
+  })
+  const menuSession = visibleSessions.find((session) => session.key === contextMenu.target)
+  const menuGroup = model.groups.find((group) => group.key === contextMenu.target)
   function selectSession(id: string) {
     setCursor({ owner: activeSessionKey, id })
     const session = visibleSessions.find((item) => item.key === id)
@@ -175,6 +188,7 @@ export function SessionRail({
   }
   const list = useListbox({
     role: 'listbox',
+    containerRef: listRef,
     items: model.groups.flatMap((group) => [
       { id: group.key, label: group.project.title },
       ...group.sessions.map((session) => ({ id: session.key, label: session.title })),
@@ -189,12 +203,8 @@ export function SessionRail({
         if ((event.key === 'ArrowLeft') !== group.collapsed) commitRow(id)
         return
       }
-      if (
-        event.key === ' ' ||
-        event.key === 'ContextMenu' ||
-        (event.shiftKey && event.key === 'F10')
-      )
-        forwardActiveRowKey(event)
+      if (contextMenu.openOnMenuKey(event, id)) return
+      if (event.key === ' ') forwardActiveRowKey(event)
     },
   })
 
@@ -208,7 +218,13 @@ export function SessionRail({
       .slice(0, ITEM_POSITIONS.length)
       .map((session, index) => [session.key, ITEM_POSITIONS[index]!]),
   )
-  const listContext = { rowBindings: list.rowBindings, focusList, positions, selection }
+  const listContext = {
+    rowBindings: list.rowBindings,
+    focusList,
+    positions,
+    selection,
+    openMenu: contextMenu.openAtEvent,
+  }
 
   function toggleView() {
     void navigation.setRail(view === 'archived' ? 'active' : 'archived')
@@ -387,6 +403,7 @@ export function SessionRail({
       <SessionListContext value={listContext}>
         <div
           {...list.containerProps}
+          {...contextMenu.containerProps}
           onKeyDown={(event) => {
             if (!keyed && isArrowKey(event.key)) {
               // The first arrow shows the cursor where it is; the next one moves it.
@@ -448,6 +465,22 @@ export function SessionRail({
             ) : null}
           </div>
         </div>
+        {contextMenu.anchor && menuSession ? (
+          <SessionMenu
+            anchor={contextMenu.anchor}
+            onOpenChange={contextMenu.onOpenChange}
+            returnFocusTo={contextMenu.returnFocusTo}
+            session={menuSession}
+          />
+        ) : null}
+        {contextMenu.anchor && menuGroup ? (
+          <ProjectMenu
+            anchor={contextMenu.anchor}
+            onOpenChange={contextMenu.onOpenChange}
+            returnFocusTo={contextMenu.returnFocusTo}
+            group={menuGroup}
+          />
+        ) : null}
       </SessionListContext>
       <SessionSearchStatus />
       {isSessionBulkSelection(markedSessionIds) ? <SessionBulkBar /> : null}

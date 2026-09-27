@@ -8,6 +8,7 @@ import {
 } from '@workspace/contracts'
 
 import { QueryClient } from '@tanstack/query-core'
+import { createStore } from 'zustand/vanilla'
 import {
   createSessionEarlierPages,
   earlierPageQueryOptions,
@@ -60,7 +61,6 @@ export function createChatOwner(options: ChatOwnerOptions) {
 }
 
 export class ChatOwner {
-  private readonly listeners = new Set<() => void>()
   private readonly lifetime = new AbortController()
   private readonly options: ChatOwnerOptions
   private shell: AbortController | null = null
@@ -69,7 +69,8 @@ export class ChatOwner {
   private readonly earlier: SessionEarlierPages
   private unsubscribeEarlier: (() => void) | undefined
   private started = false
-  private state: ChatOwnerSnapshot = {
+  /** What the owner publishes; components select from it with `useStore`. */
+  readonly store = createStore<ChatOwnerSnapshot>(() => ({
     projection: createInitialChatProjectionSlice(),
     selectedSessionId: null,
     status: 'loading',
@@ -77,7 +78,7 @@ export class ChatOwner {
     loadingEarlier: false,
     error: null,
     pendingCommands: 0,
-  }
+  }))
 
   constructor(options: ChatOwnerOptions) {
     this.options = options
@@ -96,11 +97,12 @@ export class ChatOwner {
     })
   }
 
-  getSnapshot = () => this.state
+  getSnapshot = () => this.store.getState()
 
-  subscribe = (listener: () => void) => {
-    this.listeners.add(listener)
-    return () => this.listeners.delete(listener)
+  subscribe = (listener: () => void) => this.store.subscribe(() => listener())
+
+  private get state() {
+    return this.store.getState()
   }
 
   start() {
@@ -244,13 +246,11 @@ export class ChatOwner {
     this.unsubscribeEarlier?.()
     this.earlier.dispose()
     this.pageClient.clear()
-    this.listeners.clear()
   }
 
   private publish(patch: Partial<ChatOwnerSnapshot>) {
     if (this.lifetime.signal.aborted) return
-    this.state = { ...this.state, ...patch }
-    for (const listener of this.listeners) listener()
+    this.store.setState(patch)
   }
 
   private project(projection: ChatProjectionSlice) {

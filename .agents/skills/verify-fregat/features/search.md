@@ -33,3 +33,5 @@ The Search side panel, or the address URL search parameters (`s.*`).
 ## Gotchas
 
 Replace runs through the workspace-edit lifecycle with a preview dialog. The dialog's confirm needs the rendered operation id; a stale dialog cannot confirm a newer operation.
+
+`search-result-recycle-focus` focuses an excerpt, scrolls until the same editor slot shows another file, checks that focus returns to the tree, and presses Enter to verify that the originally selected file opens.

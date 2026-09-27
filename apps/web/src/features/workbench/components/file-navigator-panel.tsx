@@ -9,8 +9,7 @@ import {
   type FileTreeActions,
 } from '@/features/workspace/providers/actions-context'
 import { FileNavigatorHeader } from '@/features/workbench/components/file-navigator-header'
-import { createTreeToolbarStore } from '@/features/workbench/utils/tree-toolbar-store'
-import { createVisibleTreeItemCountStore } from '@/features/workbench/utils/visible-tree-item-count-store'
+import { createNavigatorHeaderStore } from '@/features/workbench/state/navigator-header-store'
 import { useWorkspaceTreeForRootPath } from '@/features/workspace/hooks/use-tree'
 
 export function FileNavigatorPanel({
@@ -24,16 +23,15 @@ export function FileNavigatorPanel({
     { rootPath: selectedRoot, ...nextTree },
     nextTree.treeState.status !== 'loading',
   )
-  const [visibleTreeItemCountStore] = useState(() => createVisibleTreeItemCountStore())
-  const [treeToolbarStore] = useState(() => createTreeToolbarStore())
+  const [headerStore] = useState(() => createNavigatorHeaderStore())
   // Measured: visible-count publication should update the header, not repaint FilesPane.
   const handleVisibleTreeItemCountChange = (count: number) =>
-    visibleTreeItemCountStore.setCount(rootPath, count)
+    headerStore.setVisibleCount(rootPath, count)
   // Keep tree action identity stable so header count updates do not repaint the tree.
   const fileTreeActions: FileTreeActions = {
     loadDirectory: loadTreeDirectory,
     prefetchDirectory: prefetchTreeDirectory,
-    publishToolbar: treeToolbarStore.publish,
+    publishToolbar: headerStore.publishToolbar,
     publishVisibleItemCount: handleVisibleTreeItemCountChange,
   }
 
@@ -43,8 +41,7 @@ export function FileNavigatorPanel({
         loading={rootPath !== selectedRoot}
         rootPath={filesystemPath(rootPath)}
         treeState={treeState}
-        treeToolbarStore={treeToolbarStore}
-        visibleTreeItemCountStore={visibleTreeItemCountStore}
+        headerStore={headerStore.store}
       />
       <div className='min-h-0 min-w-0 flex-1 overflow-hidden'>
         <FileTreeActionsContext value={fileTreeActions}>

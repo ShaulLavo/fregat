@@ -23,12 +23,8 @@ const NO_OVERRIDES: RailOrderOverrides = { projectOrderKeys: {}, sessionLifecycl
 let cachedActive = railOrderIntents.getState().active
 let cachedOverrides = NO_OVERRIDES
 
-/**
- * The pending placements as the rail model reads them. Identity-stable while
- * the queue's active list is unchanged, so it can back `useSyncExternalStore`.
- */
-export function railOrderOverrides(): RailOrderOverrides {
-  const { active } = railOrderIntents.getState()
+/** The pending placements as the rail model reads them. Identity-stable while `active` is unchanged. */
+export function railOrderOverrides({ active } = railOrderIntents.getState()): RailOrderOverrides {
   if (active === cachedActive) return cachedOverrides
 
   cachedActive = active

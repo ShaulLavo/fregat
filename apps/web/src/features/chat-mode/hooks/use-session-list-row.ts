@@ -1,4 +1,4 @@
-import { useContext } from 'react'
+import { useContext, type MouseEvent } from 'react'
 import { useStore } from 'zustand'
 
 import { SessionListContext } from '@/features/chat-mode/providers/list-context'
@@ -8,5 +8,12 @@ export function useSessionListRow(id: string) {
   const list = useContext(SessionListContext)
   requireContext(list, 'Session rows require a session list')
   const active = useStore(list.selection, (activeId) => activeId === id)
-  return { rowProps: list.rowBindings(id), active, position: list.positions.get(id) ?? null }
+  return {
+    rowProps: {
+      ...list.rowBindings(id),
+      onContextMenu: (event: MouseEvent<HTMLElement>) => list.openMenu(id, event),
+    },
+    active,
+    position: list.positions.get(id) ?? null,
+  }
 }

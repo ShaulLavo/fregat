@@ -1,4 +1,5 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useStore } from 'zustand'
+import { useEffect, useState } from 'react'
 import type { SettingsSession } from '@/connection/state/session'
 import { useHostActions } from '@/host/hooks/use-host-actions'
 import { createViewerDocument } from '@/viewer/state/document'
@@ -8,7 +9,7 @@ export function useViewerDocument(session: SettingsSession, rootPath: string, pa
   const [document] = useState(() =>
     createViewerDocument({ session, rootPath, path, editText: host?.editText }),
   )
-  const state = useSyncExternalStore(document.subscribe, document.getSnapshot)
+  const state = useStore(document.store)
   useEffect(() => {
     void document.open()
     return () => document.dispose()

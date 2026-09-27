@@ -36,14 +36,18 @@ export const SearchResultFileEditorPoolSlot = memo(
     const id = searchResultVirtualRowId(row)
     const active = visible && searchResultFileContainsId(file, activeResultId)
     const slotRef = useRef<HTMLDivElement | null>(null)
+    const previousFileIdRef = useRef(file.id)
 
-    // A parked editor keeps its DOM for the next file, so focus inside it would type into a hidden view.
+    // Recycling preserves the input DOM, so focus must leave when its file changes or parks.
     useLayoutEffect(() => {
+      const fileChanged = previousFileIdRef.current !== file.id
+      previousFileIdRef.current = file.id
       const element = slotRef.current
-      if (visible || !element?.contains(document.activeElement)) return
+      if (visible && !fileChanged) return
+      if (!element?.contains(document.activeElement)) return
 
-      element.closest<HTMLElement>('[role="tree"]')?.focus()
-    }, [visible])
+      element.closest<HTMLElement>('[role="tree"]')?.focus({ preventScroll: true })
+    }, [file.id, visible])
 
     return (
       <div

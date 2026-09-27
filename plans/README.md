@@ -19,6 +19,7 @@ a bare root `bun run verify`.
 
 | Plan                                                                                    | State                                                                               |
 | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| [199 — one store library](199-one-store-library.md)                                     | **DONE 2026-09-27 — WEB AND TUI MIGRATED; GATE DROPPED**                            |
 | [198 — keep editor analysis with the document](198-document-owned-editor-analysis.md)   | **SCHEDULED 2026-09-27 — FIRST AFTER WAVE 2; IMPLEMENTATION NOT STARTED**           |
 | [197 — Editor-owned highlighting service](197-editor-highlighting-service.md)           | **PROPOSED 2026-09-27 — PLAN ONLY; IMPLEMENTATION NOT STARTED**                     |
 | [196 — shared control polish](196-shared-control-polish.md)                             | **PROPOSED 2026-09-27 — PLAN ONLY; IMPLEMENTATION NOT STARTED**                     |
@@ -39,7 +40,7 @@ a bare root `bun run verify`.
 | [175 — opening a very large folder](175-large-folder-open.md)                           | **DONE 2026-09-26 — DEPLOYED `plan-175`, PROD CHECKED**                             |
 | [174 — managed external MCP servers](174-external-mcp-servers.md)                       | **P1–P6 LANDED 2026-09-26 (wave 2 lane M); CLAUDE SCENARIOS NOT RUN (REAL CLI)**    |
 | [173 — two devices opening one workspace](173-two-devices-one-workspace.md)             | **RESEARCH — BEFORE PLAN 143'S PHONE SHELL**                                        |
-| [172 — one shared undo/redo stack](172-shared-undo-stack.md)                            | **RESEARCH — LIFE-13 FIRST; NOTICE-ONLY MOD+Z FIX ORDERED**                         |
+| [172 — one shared undo/redo stack](172-shared-undo-stack.md)                            | **RESEARCH; NOTICE-ONLY MOD+Z DONE (WEB) 2026-09-27; TUI AFTER REDESIGN**           |
 | [171 — the chat composer runs on our own editor](171-composer-on-our-editor.md)         | **PHASE 1 IMPLEMENTED 2026-09-26; PROSE WRAP, E058 THEN PHASE 3 (WAVE 2 E2)**       |
 | [170 — language census for grammar and theme prefetch](170-language-census.md)          | **PROPOSED — SPLIT FROM 110 Q7; TREE-SITTER WARM-UP ADDED 2026-09-26**              |
 | [156 — documents in the editor](156-documents-in-the-editor.md)                         | **PLACEHOLDER — FAR FUTURE; RESEARCH FIRST**                                        |

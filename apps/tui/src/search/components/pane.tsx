@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useStore } from 'zustand'
+import { useEffect, useRef, useState } from 'react'
 import { useCommands } from '@/commands/hooks/use-commands'
 import { usePaneFocus } from '@/commands/hooks/use-pane-focus'
 import { useCommandHandlers } from '@/commands/hooks/use-command-handlers'
@@ -14,7 +15,7 @@ import { resultOptions, searchQuery, type SearchOptions } from '@/search/utils/r
 export function SearchPane({ session, rootPath, theme, enabled, onOpenFile }: WorkbenchPaneProps) {
   const commands = useCommands()
   const [store] = useState(() => createSearchWorkbench(session.client))
-  const state = useSyncExternalStore(store.subscribe, store.getSnapshot)
+  const state = useStore(store.store)
   const [options, setOptions] = useState<SearchOptions>({
     query: '',
     include: '',

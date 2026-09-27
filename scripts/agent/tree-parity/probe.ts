@@ -17,7 +17,7 @@ export function probeTree(): Record<string, string> {
     decoration: '[data-item-section="decoration"]',
     decorationAction: '[data-item-decoration-action]',
     renameInput: '[data-item-rename-input]',
-    filterBar: '[data-file-tree-search-container]',
+    filterBar: '[data-slot="filter-field"]',
     filterInput: '[data-file-tree-search-input]',
     scroller: '[data-file-tree-virtualized-scroll]',
   }

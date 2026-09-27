@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useStore } from 'zustand'
+import { useEffect, useRef, useState } from 'react'
 import type { SessionId } from '@workspace/contracts'
 import type { ChatOwner } from '@workspace/client-core/chat/owner'
 import { quickAccessMode } from '@workspace/client-core/commands/palette'
@@ -48,7 +49,7 @@ export function CommandPalette({
   initialQuery?: string
 }) {
   const commands = useCommands()
-  const snapshot = useSyncExternalStore(chat.subscribe, chat.getSnapshot)
+  const snapshot = useStore(chat.store)
   const captured = commands.bus.capture('palette', origin)
   const [query, setQuery] = useState(initialQuery)
   const [selected, setSelected] = useState(0)

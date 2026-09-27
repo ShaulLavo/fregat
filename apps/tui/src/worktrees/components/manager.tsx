@@ -1,4 +1,5 @@
-import { useState, useSyncExternalStore } from 'react'
+import { useStore } from 'zustand'
+import { useState } from 'react'
 import type { OrchestrationProjectShell, WorktreeId } from '@workspace/contracts'
 import type { ChatOwner } from '@workspace/client-core/chat/owner'
 import { useCommandFocus } from '@/commands/hooks/use-command-focus'
@@ -32,7 +33,7 @@ export function WorktreeManager({
   readonly onOpenWorkbench?: (path: string) => void | Promise<void>
 }) {
   const commands = useCommands()
-  const snapshot = useSyncExternalStore(chat.subscribe, chat.getSnapshot)
+  const snapshot = useStore(chat.store)
   const [selected, setSelected] = useState(0)
   const [detailId, setDetailId] = useState<WorktreeId | null>(null)
   const worktrees = snapshot.projection.worktreeIds.flatMap((id) => {

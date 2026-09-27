@@ -1,4 +1,5 @@
-import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore } from 'react'
+import { useStore } from 'zustand'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { isDirectoryEntry } from '@workspace/contracts'
 import { useKeyboard, useTerminalDimensions } from '@opentui/react'
 import type { KeyValueStorage } from '@workspace/client-core/storage'
@@ -58,7 +59,7 @@ export function FileView({
   readonly enabled?: boolean
 }) {
   const [browser] = useState(() => createFileBrowser(session.client, storage))
-  const state = useSyncExternalStore(browser.subscribe, browser.getSnapshot)
+  const state = useStore(browser.store)
   const lastReportedPath = useRef<string | null>(null)
   const [filter, setFilter] = useState({ initialQuery, value: initialQuery })
   if (filter.initialQuery !== initialQuery) setFilter({ initialQuery, value: initialQuery })
@@ -77,13 +78,14 @@ export function FileView({
   }
   const commands = useCommands()
   const registry = commands.focus
-  const focusState = useSyncExternalStore(registry.subscribe, registry.getSnapshot)
-  const target = focusState.current?.capabilities.overlay
-    ? focusState.lastCommandTarget
-    : (focusState.requested?.target ?? focusState.current)
+  const targetWidgetId = useStore(registry.store, (state) =>
+    state.current?.capabilities.overlay
+      ? state.lastCommandTarget?.widgetId
+      : (state.requested?.target ?? state.current)?.widgetId,
+  )
   let focus: PickerFocus = 'filter'
-  if (target?.widgetId === 'file-picker-path') focus = 'path'
-  if (target?.widgetId === 'file-picker-places') focus = 'places'
+  if (targetWidgetId === 'file-picker-path') focus = 'path'
+  if (targetWidgetId === 'file-picker-places') focus = 'places'
   const filterFocused = usePaneFocus({
     id: 'file-picker-filter',
     area: 'file-tree',

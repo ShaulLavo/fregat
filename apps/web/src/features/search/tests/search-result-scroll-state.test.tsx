@@ -44,7 +44,7 @@ test('moving search to another container restores its latest scroll before a scr
   moved.remove()
 })
 
-test('scroll events read no layout; the position is read once when it is asked for', () => {
+test('scroll events retain the offset and defer anchor lookup until settlement', () => {
   const state = searchResultScrollState({})
   const element = document.createElement('div')
   document.body.append(element)
@@ -60,9 +60,13 @@ test('scroll events read no layout; the position is read once when it is asked f
       top = value
     },
   })
+  let rowReads = 0
   const rows = Array.from({ length: 1_000 }, (_, index) => ({
     key: `row-${index}`,
-    start: index * 28,
+    get start() {
+      rowReads += 1
+      return index * 28
+    },
     size: 28,
   }))
   const detach = attachSearchResultScroll({
@@ -75,23 +79,51 @@ test('scroll events read no layout; the position is read once when it is asked f
     geometry: rows,
   })
   reads = 0
+  rowReads = 0
 
   for (let step = 1; step <= 50; step += 1) {
     top = step * 100
     element.dispatchEvent(new Event('scroll'))
   }
-  expect(reads).toBe(0)
+  expect(reads).toBe(50)
+  expect(rowReads).toBe(0)
 
   element.dispatchEvent(new Event('scrollend'))
-  expect(reads).toBe(1)
+  expect(reads).toBe(50)
+  expect(rowReads).toBeGreaterThan(0)
+  expect(rowReads).toBeLessThan(30)
   expect(state.snapshot()).toEqual({
     query: 'const',
     viewport: { height: 0, top: 5_000 },
     anchor: { id: 'row-178', fraction: 16 / 28 },
   })
-  expect(reads).toBe(1)
+  expect(reads).toBe(50)
   detach()
   element.remove()
+})
+
+test('removal before scrollend preserves the latest offset and anchor', () => {
+  const state = searchResultScrollState({})
+  const element = document.createElement('div')
+  document.body.append(element)
+  const detach = attachSearchResultScroll({
+    element,
+    query: 'const',
+    state,
+    geometry: [{ key: 'result', start: 3_000, size: 300 }],
+    scrollToOffset: (offset) => {
+      element.scrollTop = offset
+    },
+  })
+  element.scrollTop = 3_150
+  element.dispatchEvent(new Event('scroll'))
+  element.remove()
+  element.scrollTop = 0
+  detach()
+  expect(state.snapshot()).toMatchObject({
+    viewport: { top: 3_150 },
+    anchor: { id: 'result', fraction: 0.5 },
+  })
 })
 
 test('the anchor row is found by offset over sorted rows', () => {
