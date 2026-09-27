@@ -189,6 +189,41 @@ test(
 )
 
 test(
+  'moving a part away and back to the theme value removes the override, so theme updates reach it',
+  async ({ client }) => {
+    expect(client).toBeDefined()
+    await seed([
+      { kind: 'set', key: 'workbench.colorTheme', value: 'dark' },
+      { kind: 'set', key: 'workbench.theme', value: THEME },
+    ])
+    const themed = THEME.variants.dark.material.contentOpacity
+    const next = (themed + 37) % 100
+    renderWithProviders(
+      <>
+        <SettingsPage />
+        <UpdateThemeButton contentOpacity={next} />
+      </>,
+    )
+
+    const slider = await contentSlider()
+    slider.focus()
+    await userEvent.keyboard('{ArrowRight}')
+    await waitFor(async () =>
+      expect((await userLayer()).halves?.dark?.material?.contentOpacity).toBe(themed + 1),
+    )
+    await userEvent.keyboard('{ArrowLeft}')
+    await waitFor(async () => expect((await userLayer()).halves).toBeUndefined())
+    await waitFor(() => expect(modifiedMarker(KEY)).toBeNull())
+
+    await userEvent.click(screen.getByRole('button', { name: 'Update theme' }))
+    await waitFor(async () =>
+      expect(await contentSlider()).toHaveAttribute('aria-valuenow', String(next)),
+    )
+  },
+  SLOW_RENDER_TIMEOUT_MS,
+)
+
+test(
   'Reset in dark mode removes the dark override and keeps the light one',
   async ({ client }) => {
     expect(client).toBeDefined()

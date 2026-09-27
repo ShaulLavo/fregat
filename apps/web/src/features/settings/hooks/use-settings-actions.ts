@@ -2,13 +2,7 @@ import { assertEnvironmentWritable } from '@/lib/environments/state/availability
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { SETTINGS_MUTATION_KEY } from '@/features/settings/utils/mutation-keys'
 import { nowMs } from '@workspace/utils/timing'
-import {
-  shownColorMode,
-  themePartPatch,
-  themePartSlot,
-  type ThemeBundle,
-  type ThemeId,
-} from '@workspace/contracts'
+import { shownColorMode, type ThemeBundle, type ThemeId } from '@workspace/contracts'
 import { systemColorMode } from '@/features/settings/state/system-color-mode'
 import {
   SETTING_IDS,
@@ -67,6 +61,7 @@ import {
   providerEnabledOperation,
   resetSettingOperations,
   themeCustomization,
+  themePartWriteOperation,
 } from '@workspace/client-core/settings/operations'
 import { admitSettingsMutationResult } from '@/features/settings/state/snapshot-admission'
 import { annotateClientError, clientErrorMetadata } from '@/lib/client-error-context'
@@ -113,23 +108,8 @@ export function useSettingsActions(owner?: QueryClient) {
 
   const targetFor = (key: SettingId) => deriveWriteTarget(key, projection()?.layers ?? [])
 
-  // Under a theme a part lives in the theme's customization for one mode.
-  const themeSlot = (key: SettingId) => {
-    const current = projection()
-    const theme = current?.values['workbench.theme']
-    if (!current || !theme) return null
-    const shown = shownColorMode(current.values['workbench.colorTheme'], systemColorMode())
-    const slot = themePartSlot(key, shown)
-    return slot ? { ...slot, id: theme.id } : null
-  }
-
-  const themePartOperation = (operation: SettingsOperation): SettingsOperation | null => {
-    if (operation.kind !== 'set') return null
-    const slot = themeSlot(operation.key)
-    const patch = themePartPatch(operation)
-    if (!slot || !patch) return null
-    return { kind: 'theme.customize', id: slot.id, mode: slot.mode, patch }
-  }
+  const shownMode = (values: SettingsValues) =>
+    shownColorMode(values['workbench.colorTheme'], systemColorMode())
 
   const setSetting = <K extends ScalarSettingId>(
     key: K,
@@ -138,8 +118,12 @@ export function useSettingsActions(owner?: QueryClient) {
     initiator?: string,
   ): SettingsSubmission => {
     const operation = { kind: 'set', key, value } as SettingsOperation
-    const customize = target === 'user' ? themePartOperation(operation) : null
-    return submit(target, [customize ?? operation], initiator)
+    const current = projection()
+    const themed =
+      target === 'user' && current
+        ? themePartWriteOperation(operation, current.values, shownMode(current.values))
+        : null
+    return submit(target, [themed ?? operation], initiator)
   }
 
   const setColorTheme = (
@@ -192,8 +176,7 @@ export function useSettingsActions(owner?: QueryClient) {
     resetSetting: (key: SettingId, target: SettingsWriteTarget = 'user') => {
       const current = projection()
       if (!current) return submit(target, [{ kind: 'reset', keys: settingRowIds(key) }])
-      const shown = shownColorMode(current.values['workbench.colorTheme'], systemColorMode())
-      return submit(target, resetSettingOperations(key, current, target, shown))
+      return submit(target, resetSettingOperations(key, current, target, shownMode(current.values)))
     },
     setColorTheme,
     /** The command's complete list; an empty list or `null` unbinds it. */

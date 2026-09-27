@@ -521,6 +521,26 @@ describe('theme part removal', () => {
     })
   })
 
+  it('leaves the document alone when there is nothing to remove', () => {
+    const raw = { 'workbench.theme.customizations': customizations }
+    const removals = [
+      { kind: 'theme.uncustomize', id: 'nord', mode: 'dark', part: 'palette' },
+      { kind: 'theme.uncustomize', id: 'graphite', mode: 'dark', part: 'wallpaper' },
+      { kind: 'theme.uncustomize', id: 'graphite', mode: 'dark', part: 'material.opacity' },
+      { kind: 'theme.uncustomize', id: 'graphite', mode: 'light', part: 'palette' },
+    ]
+    for (const removal of removals)
+      expect(applySettingsOperations(raw, [operation(removal)]).raw).toBe(raw)
+    const lightOnly = {
+      'workbench.theme.customizations': { graphite: { light: { palette: 'sage' } } },
+    }
+    expect(
+      applySettingsOperations(lightOnly, [
+        operation({ kind: 'theme.uncustomize', id: 'graphite', mode: 'dark', part: 'palette' }),
+      ]).raw,
+    ).toBe(lightOnly)
+  })
+
   it('shares a resource with a write of the same part and no other', () => {
     const remove = settingsOperationResourceKeys(
       operation({ kind: 'theme.uncustomize', id: 'graphite', mode: 'dark', part: 'material.blur' }),

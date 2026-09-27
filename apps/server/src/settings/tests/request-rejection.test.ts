@@ -70,6 +70,23 @@ describe('settings request rejection', () => {
     ).toMatch(/^Cannot set operations\.0: command: Invalid length/)
   })
 
+  it('names the allowed parts and modes when a theme part removal names neither', () => {
+    const remove = (patch: Record<string, unknown>) =>
+      reject(
+        write([
+          { kind: 'theme.uncustomize', id: 'graphite', mode: 'dark', part: 'palette', ...patch },
+        ]),
+      )
+    expect(remove({ part: 'material.bogus' })).toEqual({
+      code: 'settings.WRITE_INVALID',
+      message: expect.stringMatching(/^Cannot set operations\.0: part: .*"material\.blur"/),
+    })
+    expect(remove({ mode: 'dusk' })).toEqual({
+      code: 'settings.WRITE_INVALID',
+      message: expect.stringMatching(/^Cannot set operations\.0: mode: .*"light" \| "dark"/),
+    })
+  })
+
   it('reports a failure outside the operations array at its own path', () => {
     expect(
       reject(write([{ kind: 'set', key: 'editor.fontSize', value: 14 }], { target: 'galaxy' })),

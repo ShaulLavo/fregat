@@ -1,5 +1,8 @@
 import {
+  jsonEqual,
+  resolveThemeSettings,
   settingRowIds,
+  themePartPatch,
   themePartSlot,
   type ColorMode,
   type ProviderInstanceConfig,
@@ -61,4 +64,27 @@ export function resetSettingOperations(
     (layer) => layer.id === 'user' && Object.hasOwn(layer.raw, key),
   )
   return stray ? [uncustomize, { kind: 'reset', keys: [key] }] : [uncustomize]
+}
+
+/**
+ * A write of a theme part under a theme: a customization of the part's half, or, at the theme's
+ * own value, a removal, so later theme updates still reach the part. Null when no theme holds it.
+ */
+export function themePartWriteOperation(
+  operation: SettingsOperation,
+  values: SettingsValues,
+  shownMode: ColorMode,
+): SettingsOperation | null {
+  const theme = values['workbench.theme']
+  if (operation.kind !== 'set' || !theme) return null
+  const slot = themePartSlot(operation.key, shownMode)
+  const patch = themePartPatch(operation)
+  if (!slot || !patch) return null
+  const themed = resolveThemeSettings(
+    { ...values, 'workbench.colorTheme': slot.mode, 'workbench.theme.customizations': {} },
+    slot.mode,
+  )
+  if (jsonEqual(themed[operation.key], operation.value))
+    return { kind: 'theme.uncustomize', id: theme.id, ...slot }
+  return { kind: 'theme.customize', id: theme.id, mode: slot.mode, patch }
 }
