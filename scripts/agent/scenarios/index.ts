@@ -278,6 +278,7 @@ import { fileIcons } from './file-icons'
 import { searchInputUndo } from './search-input-undo'
 import { visualSearchPerformance } from './visual-search-performance'
 import { visualSearchTiers } from './visual-search-tiers'
+import { searchViewAllMatches } from './search-view-all-matches'
 import { visualSearchHeaders } from './visual-search-headers'
 import { visualSearchScrollContent } from './visual-search-scroll-content'
 import { quickOpenNewFile } from './quick-open-new-file'
@@ -610,6 +611,7 @@ export const scenarios: readonly Scenario[] = [
   searchInputUndo,
   visualSearchPerformance,
   ...visualSearchTiers,
+  searchViewAllMatches,
   visualSearchHeaders,
   visualSearchScrollContent,
   quickOpenNewFile,

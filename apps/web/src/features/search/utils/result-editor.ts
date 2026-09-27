@@ -1,5 +1,5 @@
 import type { EditorPointHit } from '@singapore-editor/core'
-import type { EditorRangeDecoration, EditorScrollMode } from '@singapore-editor/core/editor'
+import type { EditorRangeDecoration } from '@singapore-editor/core/editor'
 import type { CSSProperties, KeyboardEvent, RefObject } from 'react'
 
 import type { SearchResultId } from '@/features/search/utils/result-items'
@@ -26,7 +26,6 @@ import {
   SEARCH_RESULT_FILE_EDITOR_FULL_RENDER_LINE_LIMIT,
   SEARCH_RESULT_FILE_EDITOR_LINE_OVERSCAN,
   SEARCH_RESULT_FILE_EDITOR_ROW_GAP,
-  SEARCH_RESULT_STATIC_EDITOR_LINE_LIMIT,
   SEARCH_RESULT_VIRTUAL_BASE_MIN_OVERSCAN,
   SEARCH_RESULT_VIRTUAL_BASE_OVERSCAN_RATIO,
   SEARCH_RESULT_VIRTUAL_FAST_MIN_OVERSCAN,
@@ -138,9 +137,8 @@ export function searchResultVirtualRowScrollTarget(
 
 function searchResultFileExcerptOffset(index: number) {
   const rowStep = EXCERPT_EDITOR_LINE_HEIGHT + SEARCH_RESULT_FILE_EDITOR_ROW_GAP
-  const visibleIndex = Math.min(index, SEARCH_RESULT_STATIC_EDITOR_LINE_LIMIT - 1)
 
-  return FILE_RESULTS_ROW_VERTICAL_PADDING / 2 + Math.max(0, visibleIndex) * rowStep
+  return FILE_RESULTS_ROW_VERTICAL_PADDING / 2 + Math.max(0, index) * rowStep
 }
 
 function searchResultVirtualRowEstimate(
@@ -359,20 +357,6 @@ export function searchResultFileEditorStyle(document: SearchResultFileDocument):
   }
 }
 
-export function searchResultFileEditorScrollMode(lineCount: number): EditorScrollMode {
-  if (lineCount > SEARCH_RESULT_STATIC_EDITOR_LINE_LIMIT) return 'virtualized'
-
-  return 'static'
-}
-
-export function searchResultFileEditorVisibleLineCount(lineCount: number) {
-  return Math.max(0, Math.min(lineCount, SEARCH_RESULT_STATIC_EDITOR_LINE_LIMIT))
-}
-
-export function searchResultFileDocumentVisibleLines(document: SearchResultFileDocument) {
-  return document.lines.slice(0, searchResultFileEditorVisibleLineCount(document.lines.length))
-}
-
 export type SearchResultFileEditorLineWindow = {
   readonly end: number
   readonly offsetY: number
@@ -397,18 +381,17 @@ export function searchResultFileEditorLineWindow({
   virtualItem: SearchResultVirtualListMetrics['items'][number]
   viewport: SearchResultVirtualListViewport
 }): SearchResultFileEditorLineWindow {
-  const visibleLineCount = searchResultFileEditorVisibleLineCount(lineCount)
-  if (visibleLineCount === 0) return { end: 0, offsetY: 0, start: 0 }
+  if (lineCount <= 0) return { end: 0, offsetY: 0, start: 0 }
   const rowStride = EXCERPT_EDITOR_LINE_HEIGHT + SEARCH_RESULT_FILE_EDITOR_ROW_GAP
   const contentTop =
     virtualItem.start + SEARCH_RESULT_VIRTUAL_ROW_OFFSET + FILE_RESULTS_ROW_VERTICAL_PADDING / 2
   const startY = viewport.top - contentTop - SEARCH_RESULT_FILE_EDITOR_LINE_OVERSCAN
   const endY = viewport.top + viewport.height - contentTop + SEARCH_RESULT_FILE_EDITOR_LINE_OVERSCAN
   const start = Math.max(0, Math.floor(startY / rowStride))
-  const end = Math.min(visibleLineCount, Math.ceil(endY / rowStride))
+  const end = Math.min(lineCount, Math.ceil(endY / rowStride))
   if (end <= start) return { end: 0, offsetY: 0, start: 0 }
-  if (visibleLineCount <= SEARCH_RESULT_FILE_EDITOR_FULL_RENDER_LINE_LIMIT) {
-    return { end: visibleLineCount, offsetY: 0, start: 0 }
+  if (lineCount <= SEARCH_RESULT_FILE_EDITOR_FULL_RENDER_LINE_LIMIT) {
+    return { end: lineCount, offsetY: 0, start: 0 }
   }
 
   return {
@@ -486,11 +469,7 @@ export function searchResultFileEditorRowHeight(file: SearchResultFileBlock) {
 }
 
 export function searchResultFileEditorHeight(lineCount: number) {
-  const visibleLineCount = searchResultFileEditorVisibleLineCount(lineCount)
-  const rowGaps = Math.max(0, visibleLineCount - 1) * SEARCH_RESULT_FILE_EDITOR_ROW_GAP
+  const rowGaps = Math.max(0, lineCount - 1) * SEARCH_RESULT_FILE_EDITOR_ROW_GAP
 
-  return Math.max(
-    FILE_RESULTS_EDITOR_MIN_HEIGHT,
-    visibleLineCount * EXCERPT_EDITOR_LINE_HEIGHT + rowGaps,
-  )
+  return Math.max(FILE_RESULTS_EDITOR_MIN_HEIGHT, lineCount * EXCERPT_EDITOR_LINE_HEIGHT + rowGaps)
 }

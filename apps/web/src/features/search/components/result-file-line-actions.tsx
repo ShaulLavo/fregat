@@ -1,10 +1,7 @@
 import { memo, type RefObject } from 'react'
 
 import { SearchResultFileLineActionRow } from '@/features/search/components/result-file-line-action-row'
-import {
-  searchResultFileDocumentVisibleLines,
-  searchResultLineActionsStyle,
-} from '@/features/search/utils/result-editor'
+import { searchResultLineActionsStyle } from '@/features/search/utils/result-editor'
 import type { SearchResultId } from '@/features/search/utils/result-items'
 import type {
   SearchResultFileDocument,
@@ -29,7 +26,7 @@ export const SearchResultFileLineActions = memo(
     onOpenLine,
     onReplaceLine,
   }: SearchResultFileLineActionsProps) => {
-    const lines = searchResultFileDocumentVisibleLines(document)
+    const lines = document.lines
 
     return (
       <div

@@ -801,10 +801,13 @@ export const selectors = {
     page.locator(searchEditorSelector).locator('.editor-virtualized-row:visible'),
   editorHighlightStyles: (page: Page) =>
     page.locator('head style').filter({ hasText: '::highlight(' }),
+  searchFilterToggle: (page: Page) =>
+    page.getByRole('button', { name: 'Include and exclude files', exact: true }).first(),
+  searchInclude: (page: Page) => page.getByLabel('Include', { exact: true }).first(),
   searchSummary: (page: Page) =>
     page
       .locator('span[title]')
-      .filter({ hasText: /(?:matches|shown, limit reached) in [\d,]+ files/ }),
+      .filter({ hasText: /(?:matches|shown, limit reached) in [\d,]+ files?/ }),
   replaceBox: (page: Page) =>
     page.getByRole('textbox', { name: 'Replace in workspace', exact: true }),
   replaceToggle: (page: Page) => page.getByRole('button', { name: 'Replace', exact: true }),

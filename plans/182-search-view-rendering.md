@@ -32,6 +32,10 @@
   tasks 17–20 → 2–6; sampled time in `result-items` 575–660 → 81–105 ms, `use-summary-model`
   410–445 → 3–7 ms, `buffer-state` 108–122 → 3–8 ms. What remains per press is React and the sidebar's
   `results-view` render (`useListbox` maps every row).
+- 200-match cap fixed 2026-09-27: a file block sizes for all of its matches and its editor stays
+  static, holding the viewport's line window. `search-view-all-matches` (808 matches of `fixture` in one
+  file): the view was 5,634 px and ended at the 200th match (line 684); it is 22,658 px and ends at the
+  file's last match (line 2536).
 - Planned at: Platform `d5a901726`, 2026-09-26. Researched at Platform `c130dd35a`, Editor `74e76be`;
   second pass at Platform `4c78266f8`, Editor `74e76be`, Zed `933d8d9`, VS Code `90da900128e`; third
   pass at Platform `e04c94271`, Editor `860f861`, Zed `933d8d9`.
