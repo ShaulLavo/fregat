@@ -37,8 +37,8 @@ import { paletteMutationKeys } from '@/features/theme-studio/utils/mutation-keys
 const TAB_PADDING = 'px-(--bar-padding-x) py-(--density-section-gap)'
 
 /**
- * The theme studio: a strip along the bottom of a workbench that stays live and full size above
- * it. The app shows the draft throughout; only Apply writes, in one request.
+ * The theme studio: a drawer over the bottom of the window, with the app live behind it. The app
+ * shows the draft throughout; only Apply writes, in one request.
  */
 export function Dock() {
   const { customizations, draft, dirty } = useStudioDraft()
@@ -159,7 +159,7 @@ export function Dock() {
   return (
     <section
       aria-label='Theme studio'
-      className='bg-popover-solid flex shrink-0 flex-col'
+      className='flex flex-col'
       data-theme-studio=''
       ref={ref}
       onKeyDown={handleKeyDown}
