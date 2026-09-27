@@ -5,8 +5,8 @@ import { writeUserOperations } from '../preserve-settings'
 import { selectors, waitForApp } from '../selectors'
 import type { Scenario } from './index'
 
-// Two backoff periods at the stream's 5 s cap: long enough to see a loop repeat.
-const OBSERVE_MS = 14_000
+// Cross two real server heartbeats as well as repeated capped reconnects.
+const OBSERVE_MS = 32_000
 
 /** Every GET /settings the page made, with its status. */
 function recordSettingsReads(page: Page) {
@@ -87,6 +87,10 @@ export const settingsNewerServer: Scenario = {
       await page.reload()
       await waitForApp(page)
       await page.waitForTimeout(OBSERVE_MS)
+      ok(
+        (await selectors.toast(page, 'Settings stopped syncing').count()) === 0,
+        'Healthy heartbeats keep settings syncing',
+      )
       await step('observed')
     } finally {
       recorder.stop()

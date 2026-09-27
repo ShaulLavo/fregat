@@ -434,7 +434,16 @@ test('a failing server logs one warn, then one info with the count when it recov
     },
   })
 
-  // The stream counts as open once its request has not failed for a second.
+  await controller.waitForSettingsStreamRequest(5)
+  expect(info.events('settings.stream')).toEqual([])
+  await saveSettings(
+    {
+      mutationId: 'stream-proven-recovery',
+      operations: [{ key: 'editor.fontSize', kind: 'set', value: 26 }],
+      target: 'user',
+    },
+    getClient(),
+  )
   await waitFor(() => expect(info.events('settings.stream')).toHaveLength(1), { timeout: 3_000 })
   expect(info.events('settings.stream')[0]).toMatchObject({ failureCount: 4, outcome: 'recovered' })
   expect(warn.events('settings.read')).toEqual([])

@@ -39,8 +39,8 @@ export type SettingsStreamHost = {
 
 // About five minutes of failures at the 5 s backoff cap.
 export const SETTINGS_STREAM_MAX_FAILURES = 60
-const STREAM_OPEN_CONFIRM_MS = 1_000
 
+// Streaming transport owns reconnects; snapshot admission settles the query cache.
 export async function superviseSettingsStream(
   queryClient: QueryClient,
   signal: AbortSignal,
@@ -56,7 +56,7 @@ export async function superviseSettingsStream(
   let attempt = 0
   // Paces reconnects: only a stream that delivered events resets it.
   let quietAttempts = 0
-  // The current failure series: attempts that could not refetch or connect.
+  // The current failure series ends only when a stream delivers a healthy frame.
   let failureCount = 0
   let failingSince = 0
   const connected = () => {
@@ -98,7 +98,7 @@ export async function superviseSettingsStream(
 
     quietAttempts = result.receivedEventCount > 0 ? 0 : quietAttempts + 1
     const backoffMs = reconnectDelay(quietAttempts)
-    if (result.outcome === 'disconnected') {
+    if (result.outcome === 'disconnected' && result.receivedEventCount > 0) {
       host.record({ ...event, backoffMs, level: 'debug', outcome: result.outcome })
     } else {
       failureCount += 1
@@ -186,15 +186,15 @@ async function runStreamAttempt(
       )
     }
 
-    // An SSE response can stay unresolved until its first event, so a request that has not
-    // failed after a moment counts as open.
-    const confirm = globalThis.setTimeout(connected, STREAM_OPEN_CONFIRM_MS)
-    const opened = await connection.finally(() => globalThis.clearTimeout(confirm))
+    const opened = await connection
     if (opened.kind === 'error') throw opened.error
-    connected()
 
     for await (const event of parseSettingsStream(opened.stream)) {
       receivedEventCount += 1
+      if (event.event !== 'settings') {
+        connected()
+        continue
+      }
       const parsed = v.safeParse(settingsEventSchema, event.data)
       if (!parsed.success) {
         invalidEventCount += 1
@@ -203,6 +203,7 @@ async function runStreamAttempt(
 
       const admission = await host.admission.admitSettingsEvent(queryClient, parsed.output)
       if (admission.admitted) admittedEventCount += 1
+      connected()
     }
 
     return streamAttemptResult(
@@ -224,6 +225,7 @@ async function runStreamAttempt(
       error,
     )
   } finally {
+    abortAttempt()
     signal.removeEventListener('abort', abortAttempt)
   }
 }

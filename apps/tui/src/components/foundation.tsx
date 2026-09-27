@@ -15,6 +15,7 @@ import { rememberedWorkbench } from '@/workbench/utils/location'
 import { Toast } from '@/components/toast'
 import { EditorProvider } from '@/editor/providers/editor-provider'
 import { Status } from '@/components/status'
+import { SyncNotice } from '@/settings/components/sync-notice'
 
 export function Foundation({
   session,
@@ -57,6 +58,7 @@ export function Foundation({
         session.record({ action: 'tui.command.failed', ...reason })
       }}
     >
+      <SyncNotice owner={state.owner} theme={theme} />
       <EditorProvider theme={theme}>
         <Workspace session={session} state={state} theme={theme} history={history} />
       </EditorProvider>
