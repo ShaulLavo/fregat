@@ -1,4 +1,5 @@
 /** @jsxImportSource react */
+import '@workspace/ui/globals.css'
 import { flushSync } from 'react-dom'
 import { createRoot, type Root } from 'react-dom/client'
 import { expect, vi } from 'vitest'

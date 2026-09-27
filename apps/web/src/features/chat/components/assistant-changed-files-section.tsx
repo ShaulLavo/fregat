@@ -1,8 +1,8 @@
 import { checkpointIntentOptions } from '@/lib/checkpoint-intent'
 import { useDiffIntent } from '@/lib/intent-prefetch/hooks/use-diff-intent'
 import { useChatTransport } from '@/features/chat/hooks/use-chat-transport'
-import { CaretRightIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
+import { TreeChevron } from '@workspace/ui/patterns/tree-chevron'
 import { cn } from '@workspace/ui/lib/utils'
 import { useState } from 'react'
 
@@ -91,13 +91,7 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
           variant='ghost'
           onClick={() => setCardExpanded(expansionKey, !expanded)}
         >
-          <CaretRightIcon
-            aria-hidden='true'
-            className={cn(
-              'text-muted-foreground size-(--icon-size-sm) shrink-0 transition-transform',
-              expanded && 'rotate-90',
-            )}
-          />
+          <TreeChevron expanded={expanded} />
           <span className='text-muted-foreground section-label truncate'>
             <span className='font-mono tabular-nums'>{files.length}</span>
             {files.length === 1 ? ' changed file' : ' changed files'}

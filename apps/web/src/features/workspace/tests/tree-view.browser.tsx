@@ -1,3 +1,4 @@
+import '@workspace/ui/globals.css'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createRoot, type Root } from 'react-dom/client'
 import { flushSync } from 'react-dom'
