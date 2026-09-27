@@ -39,7 +39,7 @@ export default defineConfig({
           const frame = await context.frame()
           await frame.locator(selector).press(key)
         },
-        async dragBy(context, selector: string, deltaY: number) {
+        async dragBy(context, selector: string, deltaY: number, stepDelayMs = 0) {
           const frame = await context.frame()
           const box = await frame.locator(selector).boundingBox()
           if (!box) return
@@ -47,8 +47,10 @@ export default defineConfig({
           const y = box.y + box.height / 2
           await context.page.mouse.move(x, y)
           await context.page.mouse.down()
-          for (let step = 1; step <= 10; step += 1)
+          for (let step = 1; step <= 10; step += 1) {
             await context.page.mouse.move(x, y + (deltaY * step) / 10)
+            if (stepDelayMs > 0) await context.page.waitForTimeout(stepDelayMs)
+          }
           await context.page.mouse.up()
         },
         async rowPointer(context, selector: string, pressed: boolean) {

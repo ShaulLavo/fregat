@@ -7,14 +7,18 @@ import { mount } from '../../../test/render'
 
 declare module 'vitest/browser' {
   interface BrowserCommands {
-    dragBy: (selector: string, deltaY: number) => Promise<void>
+    dragBy: (selector: string, deltaY: number, stepDelayMs?: number) => Promise<void>
   }
 }
 
 const cleanups: Array<() => void> = []
-afterEach(() => cleanups.splice(0).forEach((cleanup) => cleanup()))
+afterEach(() => {
+  cleanups.splice(0).forEach((cleanup) => cleanup())
+  closeRequests.length = 0
+})
 
 const HEADER = '40px'
+const closeRequests: string[] = []
 
 function Example({ initial }: { initial: string | number }) {
   const [point, setPoint] = useState<string | number | null>(initial)
@@ -23,14 +27,13 @@ function Example({ initial }: { initial: string | number }) {
       disablePointerDismissal
       modal={false}
       open
-      snapToSequentialPoints
       snapPoint={point}
       snapPoints={[HEADER, 1]}
       onOpenChange={(next, details) => {
-        // As the studio does: a swipe past the lowest point rests there.
+        // As the studio does: a request to close is recorded, and the drawer stays until it is met.
         if (next) return
         details.cancel()
-        if (details.reason === 'swipe') setPoint(HEADER)
+        closeRequests.push(details.reason)
       }}
       onSnapPointChange={setPoint}
     >
@@ -65,23 +68,25 @@ it('collapses to its header and expands to its full height', async () => {
   expect(await shownHeight()).toBe(40)
 })
 
-it('follows a drag between its header and its full height', async () => {
+it('follows a slow drag between its header and its full height', async () => {
   cleanups.push(mount(<Example initial={HEADER} />).unmount)
   await expect.element(page.getByText('Body')).toBeInTheDocument()
   expect(await shownHeight()).toBe(40)
 
-  await commands.dragBy('[data-testid="header"]', -160)
+  await commands.dragBy('[data-testid="header"]', -160, 40)
   expect(await shownHeight()).toBe(200)
 
-  await commands.dragBy('[data-testid="header"]', 160)
+  await commands.dragBy('[data-testid="header"]', 160, 40)
   expect(await shownHeight()).toBe(40)
+  expect(closeRequests).toEqual([])
 })
 
-it('snaps a short drag down to its header', async () => {
+it('reads a flick down as a request to close and springs back until it is met', async () => {
   cleanups.push(mount(<Example initial={1} />).unmount)
   await expect.element(page.getByText('Body')).toBeInTheDocument()
   expect(await shownHeight()).toBe(200)
 
   await commands.dragBy('[data-testid="header"]', 110)
-  expect(await shownHeight()).toBe(40)
+  expect(closeRequests).toEqual(['swipe'])
+  expect(await shownHeight()).toBe(200)
 })

@@ -1,5 +1,5 @@
 import type { ColorMode } from '@workspace/contracts'
-import type { KeyboardEvent } from 'react'
+import { useEffect, useEffectEvent, type KeyboardEvent } from 'react'
 import { log } from '@/lib/client-logging'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 
@@ -119,6 +119,11 @@ export function Dock() {
     if (editsPending && !store.confirmingDiscard) return store.setConfirmingDiscard(true)
     store.closeStudio()
   }
+
+  const answerLeaveRequest = useEffectEvent(leave)
+  useEffect(() => {
+    if (store.leaveRequests > 0) answerLeaveRequest()
+  }, [store.leaveRequests])
 
   // Browsing themes is free; leaving a theme with edits of its own asks first, like closing.
   function chooseTheme(next: StudioDraft) {

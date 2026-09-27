@@ -19,7 +19,7 @@ function collapsedSnapPoint() {
 /**
  * The theme studio over the bottom of the window. A drawer rather than a row of the layout, so
  * opening, collapsing and closing it never resizes the workspace behind it. It rests open or
- * tucked down to its header; the header's Close is the only way out.
+ * tucked down to its header; Close, Escape or a flick down closes it.
  */
 export function ThemeStudioSlot() {
   const open = useStudioStore((state) => state.open)
@@ -31,15 +31,14 @@ export function ThemeStudioSlot() {
       disablePointerDismissal
       modal={false}
       open={open}
-      // A quick flick down stops at the header; skipping it would read as a close request.
-      snapToSequentialPoints
       snapPoint={collapsed ? collapsedPoint : EXPANDED}
       snapPoints={[collapsedPoint, EXPANDED]}
       onOpenChange={(next, details) => {
         if (next) return
-        // Closing, with its discard confirmation, is the dock's; a swipe past the header rests there.
+        // A flick down asks the dock to close, which confirms unapplied edits first; until then the
+        // drawer springs back. Other dismissals leave it as it is.
         details.cancel()
-        if (details.reason === 'swipe') useStudioStore.getState().setCollapsed(true)
+        if (details.reason === 'swipe') useStudioStore.getState().requestLeave()
       }}
       onSnapPointChange={(point) => {
         if (point !== null) useStudioStore.getState().setCollapsed(point !== EXPANDED)

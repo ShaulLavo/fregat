@@ -22,6 +22,8 @@ type StudioState = {
   readonly paletteEdits: Partial<Record<ColorMode, Palette>>
   /** A dirty Escape asks once: the second press discards. */
   readonly confirmingDiscard: boolean
+  /** Bumped by a request to leave from outside the dock (a swipe down); the dock answers it. */
+  readonly leaveRequests: number
   readonly openStudio: () => void
   readonly closeStudio: () => void
   readonly setDraft: (draft: StudioDraft) => void
@@ -34,6 +36,7 @@ type StudioState = {
   readonly setMode: (mode: ColorMode) => void
   readonly setCollapsed: (collapsed: boolean) => void
   readonly setConfirmingDiscard: (confirming: boolean) => void
+  readonly requestLeave: () => void
 }
 
 const CLOSED = {
@@ -44,6 +47,7 @@ const CLOSED = {
   draft: null,
   paletteEdits: {},
   confirmingDiscard: false,
+  leaveRequests: 0,
 } as const
 
 /** Transient by design: nothing about an unapplied draft survives a reload. */
@@ -87,4 +91,5 @@ export const useStudioStore = create<StudioState>((set) => ({
   setMode: (mode) => set({ mode }),
   setCollapsed: (collapsed) => set({ collapsed }),
   setConfirmingDiscard: (confirmingDiscard) => set({ confirmingDiscard }),
+  requestLeave: () => set((state) => ({ leaveRequests: state.leaveRequests + 1 })),
 }))
