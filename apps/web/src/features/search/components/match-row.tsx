@@ -115,7 +115,7 @@ export const SearchMatchRow = memo(
                 <Button
                   aria-label={searchMatchOpenLabel(match)}
                   className={cn(
-                    'pointer-events-none opacity-0 transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100',
+                    'pointer-events-none opacity-0 transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100 touch:pointer-events-auto touch:opacity-100',
                     compact && 'size-5',
                     active && 'pointer-events-auto opacity-100',
                   )}

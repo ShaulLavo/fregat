@@ -2,8 +2,8 @@
 
 ## Status and authorization
 
-- Status: IN PROGRESS (wave 2, lane P). Phases 1–2 implemented 2026-09-26 (phone shell frame and
-  screens); Phase 3 (touch) and Phase 4 (sessions and pairing) follow in their own pull requests.
+- Status: IN PROGRESS (wave 2, lane P). Phases 1–3 implemented 2026-09-26 (phone shell frame,
+  screens, touch paths); Phase 4 (sessions and pairing) follows in its own pull request.
   Owner check pending: a real iPhone and Android phone (Phase 5). iPhone (WebKit) behaviour is
   unmeasured: Playwright WebKit does not start on this host.
 - Priority: P2. Large product question; Plan 142 (Web Push) delivers the first away-from-desk
@@ -498,8 +498,41 @@ See "Proposed phases" under Research findings. The owner answered its questions 
   never downloads the workbench") measured +11 KB to +70 KB on the desktop from chunk fragmentation,
   for a phone first load of 1.01 MB instead of 1.75 MB. Recorded as a follow-up, not done.
 
+### Phase 3: touch paths (implemented 2026-09-26)
+
+- **Long press opens every context menu** (`keymap/menus/state/long-press.ts`, installed by the
+  phone shell). iOS fires no `contextmenu`, so after 550ms it dispatches one at the press point.
+  The finger's lift is cancelled (a non-passive `touchend`), so however long the hold, nothing under
+  the finger is pressed. A press on selectable text, or one that grows a selection, is the
+  platform's text selection. A native `contextmenu` during the press or just after the lift (Android,
+  a Windows touchscreen) turns the dispatcher off, and a native one that follows ours is swallowed.
+  `-webkit-touch-callout: none` sits on the phone root in `globals.css`, so portaled menus, dialogs
+  and the palette carry it too.
+- **Hover-revealed controls show at rest** on `(hover: none)`, through one `touch:` variant: git
+  row actions, search match and result-line actions, prompt-stash delete, wallpaper actions,
+  message metadata and copy actions (formerly `[@media(hover:hover)]:opacity-0`).
+- **The phone's session list scrolls.** In the standalone list (`data-standalone` on the rail) rows
+  take touch scrolling, a press never starts a reorder (keyboard reordering stays), and the
+  keyboard cursor stays hidden until the first arrow key shows it where it is.
+- **Palette:** a button on the session list's bar, and Command palette in the session menu.
+- **Terminal key row:** Esc, Tab, Ctrl (held for the next letter) and the arrows, one `KeyButton`
+  that never takes focus from the terminal. Decided 2026-09-26: owner — interactive.
+- **Tooltips:** icon-only controls keep their `aria-label`; a chat link's destination, shown only
+  in its hover tooltip, now heads its context menu.
+- Scenario `phone-shell` asserts each: the list scrolls under a CDP touch drag without reordering,
+  a 1.6s hold leaves the menu open and the session untouched, the Stage action draws at opacity 1
+  with no hover, the session menu opens the palette, and the key row's Up and Esc reach the
+  terminal's shell connection (`\x1b[A\x1b` sent) while the terminal keeps focus.
+
 Owner check pending: the phone shell on a real iPhone (WebKit: focus zoom, keyboard inset, safe
-areas, Back swipe) and an Android phone (`interactive-widget`), through the mesh.
+areas, Back swipe, long press on a row, text selection in a reply) and an Android phone
+(`interactive-widget`, the native long-press menu, and Ctrl then a letter in the terminal: a
+composing keyboard such as Gboard may type the letter), through the mesh.
+
+### Owner questions (wave 2)
+
+- The phone still downloads the workbench (see First load above). Keep, or schedule a chunking
+  change that splits it without growing the desktop's first load?
 
 ## Follow-up items
 
