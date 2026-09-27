@@ -176,7 +176,7 @@ export type NativeProvider = Awaited<ReturnType<typeof installNativeProvider>>
  * Codex home. `remove` drops the instance, waits for every fixture process to exit, deletes the
  * folder and returns what the fixture recorded.
  */
-async function installNativeProvider(
+export async function installNativeProvider(
   page: Page,
   base: string,
   input: {

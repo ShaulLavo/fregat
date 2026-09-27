@@ -77,7 +77,7 @@ export function ModelOptionsMenu({
                   className='group/options text-muted-foreground min-w-0 gap-1 text-xs font-normal'
                   disabled={disabled}
                   focusableWhenDisabled
-                  size='sm'
+                  size={narrow ? 'icon-sm' : 'sm'}
                   type='button'
                   variant='ghost'
                 >
