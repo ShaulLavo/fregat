@@ -18,7 +18,6 @@ import { TimelineRow } from '@/features/chat/components/timeline-row'
 import { useRestoringCheckpoint } from '@/features/chat/hooks/use-restoring-checkpoint'
 import { checkpointRestoreRoles } from '@/features/chat/utils/checkpoint-restore'
 import { TimelineViewport } from '@/features/chat/components/timeline-viewport'
-import { useReasoningAutoFold } from '@/features/chat/hooks/use-reasoning-auto-fold'
 
 export function MessagesTimeline({
   checkpointRevertPending = false,
@@ -56,7 +55,6 @@ export function MessagesTimeline({
     setPreviousSessionId(session.id)
     setDisclosureSettle(null)
   }
-  useReasoningAutoFold(items, scrollState.followMode !== 'free-scrolling')
   // End anchoring holds a reader in history when a page lands above them. Following is the
   // viewport's own: in flow layout the rows grow before the virtualizer measures them, and its end
   // pin would count that growth twice. A settling disclosure holds its own row still.

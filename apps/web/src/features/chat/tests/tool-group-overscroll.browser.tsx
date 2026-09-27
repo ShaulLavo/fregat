@@ -41,7 +41,6 @@ it('keeps the wheel inside an expanded tool group', async () => {
           label: 'Running',
           active: true,
           activities: entries,
-          tail: [],
         }}
         groupId='tool-0'
       />

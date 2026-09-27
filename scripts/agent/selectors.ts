@@ -51,10 +51,10 @@ export const selectors = {
   pullRequestLookupRetry: (page: Page) => page.locator('[data-pull-request-lookup-retry]'),
   liveWorkLogToggle: (page: Page) =>
     page.locator('[data-live-activity]').getByRole('button').first(),
-  workLogGroup: (page: Page) => page.getByRole('region', { name: 'Tool calls', exact: true }),
+  workLogGroup: (page: Page) => page.getByRole('region', { name: 'Activity history', exact: true }),
   workLogOutput: (page: Page) =>
     page
-      .getByRole('region', { name: 'Tool calls', exact: true })
+      .getByRole('region', { name: 'Activity history', exact: true })
       .locator('pre[aria-label="Output"]'),
   manageWorktrees: (page: Page) =>
     page.getByRole('button', { name: 'Manage worktrees', exact: true }),
@@ -906,7 +906,6 @@ export const selectors = {
     page.locator(`[data-reasoning-row][data-work-log-entry-id="${entryId}"]`),
   liveActivityRow: (page: Page) =>
     page.locator('[data-index]:has(> [data-timeline-row-type="live-activity"])'),
-  liveTail: (page: Page) => page.getByRole('list', { name: 'Latest tool calls', exact: true }),
   stackFrame: (page: Page, frame: string) => page.locator(`[data-stack-frame="${frame}"]`).first(),
   activePlanTrigger: (page: Page) =>
     page.getByRole('button').filter({ has: page.getByLabel('Plan progress', { exact: true }) }),

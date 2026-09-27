@@ -34,7 +34,11 @@ export function ChatModeSessionController({
 }) {
   const transport = useChatTransport()
   const origin = originForQueryClient(useQueryClient())
-  const shellFailure = useEnvironmentsStore((state) => state.entries[origin]?.lastError ?? null)
+  const shellFailure = useEnvironmentsStore((state) => {
+    const entry = state.entries[origin]
+    if (entry?.phase !== 'blocked' && entry?.phase !== 'identity-drift') return null
+    return entry.lastError
+  })
   const shellError = shellFailure ? clientErrorDescription(shellFailure) : null
   const activeWorkspaceRoot = useActiveProjectStore((state) => state.workspaceRoot)
   const rootPath = activeWorkspaceRoot ?? editorRootPath

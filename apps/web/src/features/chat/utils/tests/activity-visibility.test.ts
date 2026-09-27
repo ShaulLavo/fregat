@@ -44,7 +44,7 @@ describe('chat activity visibility', () => {
     ).toBe('2 steps')
   })
 
-  it('pins failures, requests and running tool calls in a collapsed group', () => {
+  it('pins requests and running calls, and summarizes completed failures', () => {
     const entries = [
       workLogEntry({ id: 'done', lifecycle: 'completed', outcome: 'succeeded' }),
       workLogEntry({ id: 'running', sourceKind: 'tool.started', lifecycle: 'running' }),
@@ -61,7 +61,6 @@ describe('chat activity visibility', () => {
 
     expect(entries.filter(isPinnedWorkLogEntry).map((entry) => entry.id)).toEqual([
       'running',
-      'failed',
       'approval',
       'question',
     ])
