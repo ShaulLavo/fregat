@@ -27,6 +27,18 @@ import { sessionNotifications } from './session-notifications'
 import { terminalHistory } from './terminal-history'
 import { chatStream } from './chat-stream'
 import { chatHistoryPages } from './chat-history-pages'
+import {
+  chatScrollDisclosure,
+  chatScrollFoldHeld,
+  chatScrollJump,
+  chatScrollLoadEarlier,
+  chatScrollLoadEarlierJump,
+  chatScrollPark,
+  chatScrollFollowing,
+  chatScrollReaderHeld,
+  chatScrollReload,
+  chatScrollHome,
+} from './chat-scroll'
 import { chatStashContext } from './chat-stash-context'
 import { chatDraftSentLeftover } from './chat-draft-sent-leftover'
 import { chatQueue } from './chat-queue'
@@ -409,6 +421,16 @@ export const scenarios: readonly Scenario[] = [
   chatStream,
   chatHistoryPages,
   sessionNoFlicker,
+  chatScrollPark,
+  chatScrollFollowing,
+  chatScrollReaderHeld,
+  chatScrollFoldHeld,
+  chatScrollJump,
+  chatScrollLoadEarlier,
+  chatScrollLoadEarlierJump,
+  chatScrollDisclosure,
+  chatScrollReload,
+  chatScrollHome,
   chatQueue,
   chatQueueAway,
   chatQueueStopUpload,
