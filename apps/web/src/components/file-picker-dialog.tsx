@@ -30,6 +30,7 @@ import {
   ResizablePanel,
 } from '@workspace/ui/components/resizable'
 import { Separator } from '@workspace/ui/components/separator'
+import { openingPopupTrigger } from '@workspace/ui/patterns/popup-trigger'
 import { deriveWriteTarget, policyControlledIds } from '@workspace/contracts'
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -477,6 +478,9 @@ export function FilePickerDialog({
 
   function handleDialogKeyDownCapture(event: KeyboardEvent<HTMLDivElement>) {
     if (event.target instanceof Node && !event.currentTarget.contains(event.target)) return
+    // A descendant popup (type filter, new-folder) can still have focus on its trigger while its
+    // popup opens; the dialog must yield to it so Escape closes only the innermost layer.
+    if (openingPopupTrigger(event.target)) return
     const chord = historyChord(event)
     if (chord) {
       event.preventDefault()
