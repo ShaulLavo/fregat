@@ -8,16 +8,18 @@
 - Dependencies: none. Reconcile overlapping appearance work before execution.
 - Owner decision: improve sliders using the useful parts of shadcn, retain Platform's design,
   fix menu switches and picker-trigger feedback, and evaluate a common toolbar toggle.
-- Settings switches are accepted as they are. The owner will try the Feel presets separately.
-  Drawer work belongs to another run. Neither is a redesign target here.
+- The settings switch is the shared reference for on/off switches throughout the app. Its reuse
+  and any extraction needed to share its presentation are in scope. Preserve its accepted design.
+  The owner will try the Feel presets separately. Drawer work belongs to another run.
 
 This document records the agreed work for a future implementation run. Publishing this plan does
 not authorize its execution in the planning run.
 
 ## Outcome
 
-Sliders remain recognizable and responsive in Flat, including dark themes. Menu switches share
-the settings switch's visual treatment while preserving menu behavior. Select and font-picker
+Sliders remain recognizable and responsive in Flat, including dark themes. On/off switches across
+the app reuse the settings switch. Menu switches share its presentation while preserving menu
+behavior. Select and font-picker
 triggers provide consistent hover and press feedback. Persistent toolbar toggles get one shared
 treatment if the composition review confirms that their behavior fits a common component.
 
@@ -27,14 +29,14 @@ the owner or change their saved settings.
 
 ## Findings and decisions
 
-| Control                | Evidence                                                                                                                                               | Agreed direction                                                                                                              | Effort / risk        |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| Slider                 | `packages/ui/src/components/slider.tsx:26` has a 4px track and a 14px `bg-background` thumb, with no explicit hover, active, or disabled treatment.    | Restore useful shadcn interaction cues through Platform tokens. Preserve the single-value API and existing settings behavior. | S / low              |
-| Settings switch        | `packages/ui/src/components/switch.tsx:17` already wraps Base UI and closely matches shadcn Lyra. Spring travel and stretch are in `globals.css:2708`. | Keep its appearance and behavior. Share presentation with menu switches only where needed.                                    | No standalone change |
-| Menu switch            | `packages/ui/src/components/dropdown-menu.tsx:170` uses Base UI `CheckboxItem`, then draws a separate switch with spans.                               | Share visual styling and applicable motion with the settings switch. Retain menu semantics and focus.                         | S / low to medium    |
-| Select and font picker | `select.tsx:57` and `combobox.tsx:15` omit shared press feedback and define explicit hover fill only in dark mode.                                     | Add consistent trigger feedback while keeping the popup anchor stationary.                                                    | S / low              |
-| Toolbar toggles        | `apps/web/src/components/toggle-icon-button.tsx:31` and `features/search/components/toggle-button.tsx:26` each own selected styling.                   | Review a shared Toggle and migrate the compatible callers together.                                                           | M / medium           |
-| Drawer                 | Theme studio already uses Base UI Drawer.                                                                                                              | Excluded.                                                                                                                     | Separate run         |
+| Control                | Evidence                                                                                                                                               | Agreed direction                                                                                                              | Effort / risk                    |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| Slider                 | `packages/ui/src/components/slider.tsx:26` has a 4px track and a 14px `bg-background` thumb, with no explicit hover, active, or disabled treatment.    | Restore useful shadcn interaction cues through Platform tokens. Preserve the single-value API and existing settings behavior. | S / low                          |
+| Settings switch        | `packages/ui/src/components/switch.tsx:17` already wraps Base UI and closely matches shadcn Lyra. Spring travel and stretch are in `globals.css:2708`. | Use it as the shared reference across the app. Extract its presentation for menu switches while preserving its design.        | Included in switch consolidation |
+| Menu switch            | `packages/ui/src/components/dropdown-menu.tsx:170` uses Base UI `CheckboxItem`, then draws a separate switch with spans.                               | Share visual styling and applicable motion with the settings switch. Retain menu semantics and focus.                         | S / low to medium                |
+| Select and font picker | `select.tsx:57` and `combobox.tsx:15` omit shared press feedback and define explicit hover fill only in dark mode.                                     | Add consistent trigger feedback while keeping the popup anchor stationary.                                                    | S / low                          |
+| Toolbar toggles        | `apps/web/src/components/toggle-icon-button.tsx:31` and `features/search/components/toggle-button.tsx:26` each own selected styling.                   | Review a shared Toggle and migrate the compatible callers together.                                                           | M / medium                       |
+| Drawer                 | Theme studio already uses Base UI Drawer.                                                                                                              | Excluded.                                                                                                                     | Separate run                     |
 
 The initial audit inspected settings on the running mesh app. The Feel setting displayed `flat`.
 The slider thumb nearly disappeared against the dark track. DOM inspection reported a 14px thumb,
@@ -93,6 +95,8 @@ Implementation may change these files and the narrowly related tests listed belo
 - `packages/ui/src/styles/globals.css`, limited to these controls and any necessary semantic tokens.
 - `apps/web/src/components/toggle-icon-button.tsx` and
   `apps/web/src/features/search/components/{toggle-button,replace-toggle-button}.tsx`.
+- Other on/off switch callers under `apps/web/src/` identified by the Phase 2 inventory, limited
+  to replacing duplicate switch implementations with the shared Switch or its menu presentation.
 - `apps/web/src/features/dev/components/physical-tab.tsx` and new focused gallery components beside it.
 - `packages/ui/src/patterns/tests/physical-controls.browser.tsx` and focused new control browser tests there.
 - `packages/ui/vitest.browser.config.ts` only if browser commands or dependency discovery need adjustment.
@@ -142,8 +146,14 @@ Verify: run the focused browser tests and `settings-appearance-rows` command bel
 including endpoint movement, disabled input, and existing appearance persistence behavior.
 Read screenshots for light and dark modes and both densities before continuing.
 
-### Phase 2: Share menu-switch presentation
+### Phase 2: Reuse the settings switch throughout the app
 
+- [ ] Inventory on/off switch implementations across `apps/web/src/` and `packages/ui/src/`.
+      Start with `rg -n 'Switch|role=.switch|switch-thumb|switch-item' apps/web/src packages/ui/src`.
+      Inspect custom track-and-thumb markup too. Record each caller and its migration or existing reuse.
+- [ ] Use `@workspace/ui/components/switch` directly wherever ordinary switch semantics fit.
+      The settings switch defines the accepted appearance, states, motion, and feedback policy.
+      Keep icon toggle buttons in Phase 4; they retain their toolbar presentation.
 - [ ] Factor the smallest shared track and thumb treatment needed by Switch and DropdownMenuSwitchItem.
       Preserve settings-switch rendering and behavior. Do not nest an interactive Switch inside a menu item.
 - [ ] Apply the same size-appropriate colors and state-travel timing to both presentations.
