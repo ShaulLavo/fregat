@@ -16,6 +16,15 @@
   first size. Broad wheel-fast on a production build, four interleaved traces each on a shared machine:
   busy 2,206 → 1,814 ms median, long tasks 20 → 8 median (range 1–18). What remains per open is the
   layout read in `measureInitialViewport`.
+- Phase 2 implementation 2026-09-27: the recorder retains the offset on each scroll event and
+  defers binary-search anchor lookup until reload flush, `scrollend`, or detach. Review found that
+  deferring the offset read itself lost a pending scroll when DOM removal preceded cleanup.
+  The original deferred-read prototype measured 0.04 ms per event against 0.09 ms (broad) and
+  0.26 ms (pathological, linear scan of 20,000 rows) on `0c8f470`; those timings do not describe the
+  corrected implementation and total fling time did not improve. The recorder was not forcing
+  layout in that baseline. Each sidebar scroll event forces 4 layouts inside TanStack's own scroll
+  handler (`virtual-core` `observeElementOffset`, 38–51 ms per event on the test machine); the search
+  view's window store forces one. Probe: `visual-search-{narrow,broad,pathological}`.
 - Planned at: Platform `d5a901726`, 2026-09-26. Researched at Platform `c130dd35a`, Editor `74e76be`;
   second pass at Platform `4c78266f8`, Editor `74e76be`, Zed `933d8d9`, VS Code `90da900128e`; third
   pass at Platform `e04c94271`, Editor `860f861`, Zed `933d8d9`.
@@ -328,7 +337,7 @@ Phases 1, 1b, 2 and 3 stand on their own and can ship any time.
    out of the string in favour of an identity check. Test: registering one descriptor twice stringifies
    once. Proof: the first pass's probe counters fall to one call per language. Every editor open
    app-wide registers through it too.
-2. **Scroll position without a layout read** (S, Platform: `features/search/state/result-scroll-state.ts`,
+2. **Done 2026-09-27.** **Scroll position without a layout read** (S, Platform: `features/search/state/result-scroll-state.ts`,
    `hooks/use-result-scroll-position.ts`). Take the offset from the scroll event without reading layout,
    and find the anchor row by binary search. The sidebar list keeps using it after R2. Proof: `trace` of
    the sidebar fling loses the 83 ms; `search-type-delete` still restores position.

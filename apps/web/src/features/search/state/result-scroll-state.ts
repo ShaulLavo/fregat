@@ -13,13 +13,24 @@ export type SearchScrollRow = {
   readonly size: number
 }
 
+type LiveScroll = {
+  readonly element: HTMLElement
+  readonly query: string | null
+  readonly geometry: readonly SearchScrollRow[] | undefined
+  height: number
+  top: number
+  moved: boolean
+}
+
 export class SearchResultScrollState {
   private query: string | null = null
   private anchor: { id: string; fraction: number } | null = null
   public onRemember: (() => void) | undefined
   private viewport: SearchResultVirtualListViewport = { height: 0, top: 0 }
+  private live: LiveScroll | null = null
 
   snapshot() {
+    this.settle()
     return { query: this.query, viewport: this.viewport, anchor: this.anchor }
   }
 
@@ -37,7 +48,7 @@ export class SearchResultScrollState {
     query: string | null,
     geometry?: readonly SearchScrollRow[],
   ): SearchResultVirtualListViewport {
-    const row = geometry?.find((value) => value.key === this.anchor?.id)
+    const row = this.anchor ? geometry?.find((value) => value.key === this.anchor?.id) : undefined
     if (this.query === query && row && this.anchor)
       return { ...this.viewport, top: row.start + this.anchor.fraction * row.size }
     if (this.query === query) return this.viewport
@@ -50,15 +61,73 @@ export class SearchResultScrollState {
     viewport: SearchResultVirtualListViewport,
     geometry?: readonly SearchScrollRow[],
   ): void {
+    this.record(query, viewport, geometry)
+    this.onRemember?.()
+  }
+
+  follow(live: LiveScroll) {
+    this.live = live
+    this.record(live.query, { height: live.height, top: live.top }, live.geometry)
+    this.onRemember?.()
+  }
+
+  /** Keep the offset before DOM removal; defer anchor lookup until settlement. */
+  moved() {
+    if (!this.live) return
+    this.live.top = this.live.element.scrollTop
+    this.live.moved = true
+    this.onRemember?.()
+  }
+
+  /** A detached element reads as zero; settle its last observed offset instead. */
+  release(live: LiveScroll) {
+    if (this.live !== live) return
+    if (live.element.isConnected) {
+      live.height = live.element.clientHeight || live.height
+      live.top = live.element.scrollTop
+      live.moved = true
+    }
+    this.settle()
+    this.live = null
+  }
+
+  settle() {
+    const live = this.live
+    if (!live?.moved) return
+    live.moved = false
+    this.record(live.query, { height: live.height, top: live.top }, live.geometry)
+  }
+
+  private record(
+    query: string | null,
+    viewport: SearchResultVirtualListViewport,
+    geometry: readonly SearchScrollRow[] | undefined,
+  ) {
     if (query !== this.query) this.anchor = null
     this.query = query
     this.viewport = viewport
-    const row = geometry?.find(
-      (value) => value.start <= viewport.top && value.start + value.size > viewport.top,
-    )
+    const row = geometry ? searchScrollRowAt(geometry, viewport.top) : undefined
     if (row) this.anchor = { id: row.key, fraction: (viewport.top - row.start) / row.size }
-    this.onRemember?.()
   }
+}
+
+/** The row covering `offset`; rows are sorted by `start`. */
+export function searchScrollRowAt(rows: readonly SearchScrollRow[], offset: number) {
+  let low = 0
+  let high = rows.length - 1
+  while (low <= high) {
+    const middle = (low + high) >>> 1
+    const row = rows[middle]
+    if (!row) return undefined
+    if (offset < row.start) {
+      high = middle - 1
+      continue
+    }
+    if (offset < row.start + row.size) return row
+    low = middle + 1
+  }
+
+  return undefined
 }
 
 const scrollStates = new WeakMap<object, Map<string, SearchResultScrollState>>()
@@ -94,19 +163,24 @@ export function attachSearchResultScroll({
 }) {
   const viewport = state.read(query, geometry)
   scrollToOffset(viewport.top)
-  let height = element.clientHeight || viewport.height
-  const remember = () => {
-    state.remember(query, { height, top: element.scrollTop }, geometry)
+  const live = {
+    element,
+    query,
+    geometry,
+    height: element.clientHeight || viewport.height,
+    top: element.scrollTop,
+    moved: false,
   }
-  remember()
-  element.addEventListener('scroll', remember, { passive: true })
+  state.follow(live)
+  const moved = () => state.moved()
+  const settle = () => state.settle()
+  element.addEventListener('scroll', moved, { passive: true })
+  element.addEventListener('scrollend', settle, { passive: true })
 
   return () => {
-    if (element.isConnected) {
-      height = element.clientHeight || height
-      remember()
-    }
-    element.removeEventListener('scroll', remember)
+    element.removeEventListener('scroll', moved)
+    element.removeEventListener('scrollend', settle)
+    state.release(live)
   }
 }
 
