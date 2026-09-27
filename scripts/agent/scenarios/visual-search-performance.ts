@@ -8,6 +8,7 @@ import {
   selectors,
 } from '../selectors'
 import type { Scenario } from './index'
+import { paintedVisualSearch, settledVisualSearch } from './visual-search-drive'
 
 type Snapshot = Awaited<ReturnType<typeof snapshot>>
 type Measurement = { label: string; elapsedMs: number; snapshot: Snapshot }
@@ -26,14 +27,14 @@ export const visualSearchPerformance: Scenario = {
     await step('search-query-begin')
     let started = performance.now()
     await selectors.workspaceSearch(page).fill('import')
-    await settledSearch(page)
+    await settledVisualSearch(page)
     await record(page, measurements, 'search-query', started)
     await step('search-query-end')
 
     await step('open-results-begin')
     started = performance.now()
     await selectors.openSearchEditor(page).click()
-    await paintedResults(page)
+    await paintedVisualSearch(page)
     await record(page, measurements, 'open-results', started)
     await step('open-results-end')
     const summary = measurements.at(-1)?.snapshot.summary ?? ''
@@ -49,7 +50,7 @@ export const visualSearchPerformance: Scenario = {
       await page.mouse.wheel(0, 1_200)
       await page.waitForTimeout(16)
     }
-    await paintedResults(page)
+    await paintedVisualSearch(page)
     await record(page, measurements, 'wheel-scroll', started)
     await step('wheel-scroll-end')
 
@@ -70,7 +71,7 @@ export const visualSearchPerformance: Scenario = {
         previousIndex,
       },
     )
-    await paintedResults(page)
+    await paintedVisualSearch(page)
     await record(page, measurements, 'jump-halfway', started)
     await step('jump-halfway-end')
     const preservedScrollTop = await selectors
@@ -81,7 +82,7 @@ export const visualSearchPerformance: Scenario = {
     started = performance.now()
     await moveSearchTab(page, 0, 'right')
     await selectors.editorGroups(page).nth(1).waitFor()
-    await paintedResults(page)
+    await paintedVisualSearch(page)
     strictEqual(await selectors.editorGroups(page).count(), 2)
     await assertSearchScroll(page, preservedScrollTop, 'Splitting preserves the search position')
     await record(page, measurements, 'split-search', started)
@@ -91,7 +92,7 @@ export const visualSearchPerformance: Scenario = {
     started = performance.now()
     await moveSearchTab(page, 1, 'center')
     await selectors.editorGroups(page).nth(1).waitFor({ state: 'hidden' })
-    await paintedResults(page)
+    await paintedVisualSearch(page)
     strictEqual(await selectors.editorGroups(page).count(), 1)
     await assertSearchScroll(page, preservedScrollTop, 'Merging preserves the search position')
     await record(page, measurements, 'merge-search', started)
@@ -100,36 +101,6 @@ export const visualSearchPerformance: Scenario = {
   async inspect(page) {
     return { query: 'import', measurements: inspections.get(page) ?? [] }
   },
-}
-
-async function settledSearch(page: Page) {
-  await selectors.searchSummary(page).first().waitFor({ timeout: 90_000 })
-  await page.waitForFunction(() => !document.body.textContent?.includes('Searching'), undefined, {
-    timeout: 90_000,
-  })
-}
-
-async function paintedResults(page: Page) {
-  await selectors.searchEditorVisibleRows(page).first().waitFor({ timeout: 90_000 })
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-      }),
-  )
-  await page.waitForFunction(
-    (selector) => {
-      return Array.from(CSS.highlights.entries())
-        .filter(([name]) => name.startsWith('editor-shared-token-'))
-        .some(([, highlight]) =>
-          Array.from(highlight).some((range) =>
-            range.startContainer.parentElement?.closest(selector),
-          ),
-        )
-    },
-    searchEditorSelector,
-    { timeout: 90_000 },
-  )
 }
 
 async function firstFileIndex(page: Page) {
