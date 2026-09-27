@@ -52,7 +52,8 @@ export const sessionActionsSurfaces: Scenario = {
       await selectors.sessionSearch(page).fill(title)
       await selectors.sessionByTitle(page, title).click({ button: 'right' })
       await selectors.menuItem(page, 'Rename').click()
-      const railInput = page.getByRole('textbox', { name: 'Session title' })
+      const railInput = selectors.sessionTitleInput(page)
+      await step('rail-renaming')
       await railInput.fill(`${title} rail`)
       await railInput.press('Enter')
       await until(page, shell, sessionId, (s) => s.title === `${title} rail`, 'Rail row renames')
@@ -67,7 +68,8 @@ export const sessionActionsSurfaces: Scenario = {
       await step('stage-pin-unpin')
 
       await choose(page, 'Rename')
-      const stageInput = page.getByRole('textbox', { name: 'Session title' })
+      const stageInput = selectors.sessionTitleInput(page)
+      await step('stage-renaming')
       await stageInput.fill(`${title} staged`)
       await stageInput.press('Enter')
       await until(
@@ -91,7 +93,8 @@ export const sessionActionsSurfaces: Scenario = {
       await step('sidebar-session')
 
       await choose(page, 'Rename')
-      const input = page.getByRole('textbox', { name: 'Session title' })
+      const input = selectors.sessionTitleInput(page)
+      await step('sidebar-renaming')
       await input.fill(renamed)
       await input.press('Enter')
       await until(page, shell, sessionId, (s) => s.title === renamed, 'Sidebar header renames')

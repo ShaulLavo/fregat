@@ -274,9 +274,7 @@ describe('tree view React integration', () => {
     outsideButton?.focus()
     firstModel.closeSearch()
     await vi.waitFor(() => {
-      expect(
-        tree.querySelector('[data-file-tree-search-container]')?.getAttribute('data-open'),
-      ).toBe('false')
+      expect(tree.querySelector<HTMLInputElement>('[data-file-tree-search-input]')?.value).toBe('')
     })
 
     flushSync(() =>

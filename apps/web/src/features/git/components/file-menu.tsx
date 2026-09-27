@@ -5,18 +5,20 @@ import { useFileMenu } from '../hooks/use-file-menu'
 import type { ChangeRow } from '@/features/git/utils/types'
 
 /**
- * Mounted by the row only while its menu is open, so the mutation hooks bind
+ * Mounted by the list only while its menu is open, so the mutation hooks bind
  * to this row's path at render time and idle rows pay nothing for a menu
  * nobody asked for.
  */
 export function FileMenu({
   anchor,
   onOpenChange,
+  returnFocusTo,
   rootPath,
   row,
 }: {
   readonly anchor: MenuAnchor
   readonly onOpenChange: (open: boolean) => void
+  readonly returnFocusTo: () => HTMLElement | null
   readonly rootPath: string
   readonly row: ChangeRow
 }) {
@@ -29,6 +31,7 @@ export function FileMenu({
       menu={menu}
       onOpenChange={onOpenChange}
       open
+      returnFocusTo={returnFocusTo}
       surface='git.file'
     />
   )

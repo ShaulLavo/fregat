@@ -47,3 +47,10 @@ Every create, rename, drag, duplicate and delete is a journaled `file-operation`
 ## Parity harness (Plan 178)
 
 `bun run agent:browser scenario tree-parity` captures the tree in 15 states (rest, hover, keyboard and click focus, multi-select, menu, rename, drag, filter, long name, loading file and folder, folder error, sticky) across compact/cozy × light/dark at scale 2, and diffs each capture pixel by pixel and property by property against `scripts/agent/baselines/tree-parity/`. Drift fails the run; the diff images and style lines land in the evidence directory under `tree-parity/`. `TREE_PARITY_UPDATE=1` rewrites the baseline (commit it with the change that moves the look on purpose); `TREE_PARITY_STATES=rest,hover` limits a run. `tree-parity-behaviour` pins the app-only behaviours, and `packages/tree/src/tests/parity-*.browser.tsx` the rest, with real input.
+
+## Filter field
+
+`bun run agent:browser scenario filter-fields` drives a disposable repository through type-to-filter,
+ArrowDown into results, IME Escape, the collapsed no-match tree, Escape clear then blur, and the clear
+button. The same scenario checks the shared field in the Git history toolbar. It records screenshots
+of matched, empty and cleared states without running a provider turn.

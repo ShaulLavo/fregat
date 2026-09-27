@@ -113,6 +113,7 @@ import { copyFeedback } from './copy-feedback'
 import { fileLabelCohesion } from './file-label-cohesion'
 import { checkpointStates } from './checkpoint-states'
 import { checkpointDiffTokens } from './checkpoint-diff-tokens'
+import { sessionRailMenu } from './session-rail-menu'
 import { sessionActionsSurfaces } from './session-actions-surfaces'
 import { exportTranscript } from './export-transcript'
 import { claudeHookRows } from './hook-rows'
@@ -378,6 +379,8 @@ import { treeStickyScroll } from './tree-sticky-scroll'
 import { treeLargeScroll } from './tree-large-scroll'
 import { treeParity } from './tree-parity'
 import { fileIconHues } from './file-icon-hues'
+import { filterFields } from './filter-fields'
+import { inlineRenameTree } from './inline-rename-tree'
 import { treeParityBehaviour } from './tree-parity-behaviour'
 import { demoWorkspace } from './demo-workspace'
 import { demoAgentGit } from './demo-agent-git'
@@ -502,6 +505,7 @@ export const scenarios: readonly Scenario[] = [
   checkpointStates,
   checkpointDiffTokens,
   sessionActionsSurfaces,
+  sessionRailMenu,
   exportTranscript,
   claudeHookRows,
   claudeBackgroundTasks,
@@ -743,6 +747,8 @@ export const scenarios: readonly Scenario[] = [
   treeParity,
   fileIconHues,
   treeParityBehaviour,
+  inlineRenameTree,
+  filterFields,
   treeFileClicks,
 ]
 

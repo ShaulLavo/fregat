@@ -1,6 +1,6 @@
 import { useRowHeight } from '@workspace/ui/patterns/use-row-height'
 import { useSearchResultScrollPosition } from '@/features/search/hooks/use-result-scroll-position'
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
+import { useLayoutEffect, useRef, type KeyboardEvent } from 'react'
 import { isContextMenuKey } from '@workspace/utils/keyboard'
 import type { WorkspaceSearchQuery } from '@workspace/contracts'
 import { VirtualList, type VirtualListHandle } from '@workspace/ui/patterns/virtual-list'
@@ -18,7 +18,7 @@ import {
 } from '@/features/search/utils/result-items'
 import { SearchFileMenu } from '@/features/search/components/file-menu'
 import { searchItemMenuTarget } from '@/features/search/utils/file-menu'
-import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
+import { useListContextMenu } from '@/keymap/menus/hooks/use-list-context-menu'
 import type {
   SearchBufferStatus,
   WorkspaceSearchFileGroup,
@@ -57,10 +57,12 @@ export function SearchResultsView({
   const parentRef = useRef<HTMLDivElement>(null)
   const virtualRef = useRef<VirtualListHandle>(null)
   const { openMatch, selectResult, toggleGroup } = useSearchResultActions()
-  const contextMenu = useContextMenu()
-  const [menuItem, setMenuItem] = useState<SearchResultItem | null>(null)
   const preview = useSearchPreviewMaxLength()
   const items = searchResultItems(groups)
+  const contextMenu = useListContextMenu<SearchResultItem>({
+    containerRef: parentRef,
+    isTargetPresent: (target) => items.some((item) => item.id === target.id),
+  })
   function toggle(id: string) {
     const item = searchResultItemById(items, id)
     if (item?.type === 'group') toggleGroup(item.group.path)
@@ -109,16 +111,7 @@ export function SearchResultsView({
   })
   function openActiveMenu(event: KeyboardEvent<HTMLDivElement>, id: string) {
     const item = searchResultItemById(items, id)
-    const row = document.getElementById(list.rowProps(id).id)
-    if (!item || !row) return
-    event.preventDefault()
-    setMenuItem(item)
-    contextMenu.openAtElement(row)
-  }
-
-  function openPointerMenu(item: SearchResultItem, event: MouseEvent<HTMLElement>) {
-    setMenuItem(item)
-    contextMenu.openAtEvent(event, event.currentTarget)
+    if (item) contextMenu.openOnMenuKey(event, item)
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -166,12 +159,16 @@ export function SearchResultsView({
     return <SearchPendingOrEmpty className={className} status={status} />
   }
 
-  const menu = contextMenu.anchor && menuItem ? searchItemMenuTarget(menuItem, groups) : null
+  const menu =
+    contextMenu.anchor && contextMenu.target
+      ? searchItemMenuTarget(contextMenu.target, groups)
+      : null
 
   return (
     <>
       <VirtualList
         {...list.containerProps}
+        {...contextMenu.containerProps}
         onKeyDown={handleKeyDown}
         activeIndex={activeResultPicked ? list.activeIndex : undefined}
         scrollRef={parentRef}
@@ -190,7 +187,7 @@ export function SearchResultsView({
               ...list.rowProps(item.id),
               'aria-level': item.level,
               'aria-expanded': item.type === 'group' ? !item.group.collapsed : undefined,
-              onContextMenu: (event) => openPointerMenu(item, event),
+              onContextMenu: (event) => contextMenu.openAtEvent(item, event),
             }}
             canReplace={canReplace}
             compact={compact}
@@ -207,7 +204,7 @@ export function SearchResultsView({
         <SearchFileMenu
           anchor={contextMenu.anchor}
           relativePath={menu.relativePath}
-          returnFocusTo={() => parentRef.current}
+          returnFocusTo={contextMenu.returnFocusTo}
           target={menu.target}
           onOpenChange={contextMenu.onOpenChange}
         />

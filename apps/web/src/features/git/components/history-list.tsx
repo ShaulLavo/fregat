@@ -1,11 +1,12 @@
 import type { GitHistoryRef } from '@workspace/contracts'
-import { useEffect, useEffectEvent, useRef } from 'react'
+import { useEffect, useEffectEvent, useRef, type RefObject } from 'react'
 import { VirtualList, type VirtualListHandle } from '@workspace/ui/patterns/virtual-list'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { HistoryRow } from '@/features/git/components/history-row'
 import type { HistoryRow as GraphRow } from '@/features/git/utils/history-layout'
 
 export function HistoryList({
+  containerRef: scrollRef,
   rows,
   refs,
   selected,
@@ -15,6 +16,7 @@ export function HistoryList({
   scrollTop,
   onScrollEnd,
 }: {
+  containerRef: RefObject<HTMLDivElement | null>
   rows: readonly GraphRow[]
   refs: ReadonlyMap<string, readonly GitHistoryRef[]>
   selected: string | null
@@ -24,7 +26,6 @@ export function HistoryList({
   scrollTop: number
   onScrollEnd: (scrollTop: number) => void
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null)
   const virtualList = useRef<VirtualListHandle>(null)
   const selectedIndex = rows.findIndex((row) => row.commit.id === selected)
   const laneCount = rows.reduce((width, row) => Math.max(width, row.width), 1)

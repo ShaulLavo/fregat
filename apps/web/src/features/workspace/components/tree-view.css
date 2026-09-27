@@ -4,17 +4,6 @@
 
 @layer file-tree {
   [data-file-tree] {
-    /* The inputs were drawn against browser defaults; the app's preflight must not resize them.
-     * Only inputs: a universal rule here is matched against every row element on each restyle. */
-    & input {
-      box-sizing: revert;
-      margin: revert;
-      padding: revert;
-      border-style: revert;
-      border-width: revert;
-      line-height: revert;
-    }
-
     & {
       /*
       CSS variables use a fallback stack to ensure user and theme colors slot
@@ -42,9 +31,6 @@
       --trees-focus-ring-offset-override
       --trees-truncate-marker-bg-override
 
-      --trees-search-fg-override
-      --trees-search-font-weight-override
-      --trees-search-bg-override
 
       --trees-selected-fg-override
       --trees-selected-bg-override
@@ -149,16 +135,6 @@
       );
       --trees-focus-ring-width: var(--trees-focus-ring-width-override, 1px);
       --trees-focus-ring-offset: var(--trees-focus-ring-offset-override, -1px);
-
-      --trees-search-fg: var(
-        --trees-search-fg-override,
-        var(--trees-theme-input-fg, var(--trees-fg))
-      );
-      --trees-search-font-weight: var(--trees-search-font-weight-override, 600);
-      --trees-search-bg: var(
-        --trees-search-bg-override,
-        var(--trees-theme-input-bg, var(--trees-input-bg))
-      );
 
       --trees-scrollbar-thumb: var(
         --trees-scrollbar-thumb-override,
@@ -457,41 +433,6 @@
       will-change: transform;
     }
 
-    [data-file-tree-search-container] {
-      display: flex;
-      padding: 0;
-      padding-inline: var(--trees-padding-inline);
-      margin-bottom: var(--trees-item-row-gap);
-    }
-
-    [data-file-tree-search-input] {
-      --trees-focus-ring-width: 2px;
-      font-family: var(--trees-font-family);
-      font-size: var(--trees-font-size);
-      flex: 1;
-      height: var(--trees-row-height);
-      /* 1px breathing room so the focus-visible outline isn't clipped when the
-     * input sits flush against the top of the scroll container. */
-      margin-block: 1px;
-      padding-inline: var(--trees-item-padding-x);
-      line-height: var(--trees-row-height);
-      color: var(--trees-search-fg);
-      background-color: var(--trees-search-bg);
-      border: 1px solid var(--trees-border-color);
-      border-radius: var(--trees-border-radius);
-      outline: none;
-
-      &::placeholder {
-        color: color-mix(in lab, var(--trees-search-fg) 65%, var(--trees-search-bg));
-      }
-
-      &:focus-visible,
-      &[data-file-tree-search-input-fake-focus='true'] {
-        outline: var(--trees-focus-ring-width) solid var(--trees-focus-ring-color);
-        outline-offset: var(--trees-focus-ring-offset);
-      }
-    }
-
     /* The wrapper for the tree items */
     [role='tree'] {
       position: relative;
@@ -662,22 +603,6 @@
 
     [data-item-action-affordance='decorative'] {
       opacity: 0.85;
-    }
-
-    [data-item-rename-input] {
-      appearance: none;
-      width: 100%;
-      min-width: 0;
-      height: calc(var(--trees-row-height) - 4px);
-      font-family: inherit;
-      font-size: inherit;
-      /* line-height: calc(var(--trees-row-height) - 8px); */
-      color: inherit;
-      background-color: transparent;
-      border: 0;
-      padding-inline: 6px;
-      outline: none;
-      box-sizing: border-box;
     }
 
     [data-item-section='content']:has([data-item-rename-input]) ~ [data-item-section='action'],

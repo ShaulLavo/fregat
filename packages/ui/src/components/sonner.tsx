@@ -32,6 +32,10 @@ const TOAST_CLASS_NAMES = {
     '[&:has(>[data-close-button])>[data-content]]:pr-7',
     // Sonner only hides the text of stacked-behind toasts when it styles them.
     'data-[expanded=false]:data-[front=false]:*:opacity-0',
+    // Every toast shows when the stack expands; collapsed, only the front three peek out, since
+    // Sonner shrinks each one behind by 5% and past twenty the scale turns negative.
+    'data-[expanded=false]:[&:not([data-index="0"],[data-index="1"],[data-index="2"])]:pointer-events-none',
+    'data-[expanded=false]:[&:not([data-index="0"],[data-index="1"],[data-index="2"])]:opacity-0!',
   ),
   icon: 'absolute top-(--density-section-padding) left-(--density-section-padding) flex h-5 w-(--icon-size) items-center [&_svg]:size-(--icon-size)',
   content: 'flex min-w-0 basis-full flex-col gap-0.5',
@@ -51,6 +55,7 @@ export function Toaster({
   className,
   closeButton = true,
   style,
+  visibleToasts = Number.POSITIVE_INFINITY,
   toastOptions,
   ...props
 }: Omit<ToasterProps, 'richColors' | 'theme'>) {
@@ -59,6 +64,7 @@ export function Toaster({
       closeButton={closeButton}
       className={cn('toaster group', className)}
       icons={TOAST_ICONS}
+      visibleToasts={visibleToasts}
       style={{ ...TOASTER_STYLE, ...style }}
       toastOptions={{
         ...toastOptions,

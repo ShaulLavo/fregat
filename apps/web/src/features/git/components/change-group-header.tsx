@@ -1,15 +1,13 @@
 import { TreeRowLead } from '@workspace/ui/patterns/tree-row-lead'
 import { listRowClassName } from '@workspace/ui/patterns/list-row-classes'
-import { use, type KeyboardEvent, type MouseEvent } from 'react'
+import { use } from 'react'
 
 import { useGitState } from '@/features/git/state/store'
 
 import { TickerNumber } from '@/components/ticker-number'
 import { ChangesContext } from '@/features/git/providers/changes-context'
 import { GroupActions } from '@/features/git/components/group-actions'
-import { GroupMenu } from '@/features/git/components/group-menu'
 import type { ChangesGroup } from '@/features/git/utils/change-entries'
-import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
 
 export function ChangeGroupHeader({
   group,
@@ -20,7 +18,6 @@ export function ChangeGroupHeader({
   rootPath: string
   onToggle: () => void
 }) {
-  const contextMenu = useContextMenu()
   const listbox = use(ChangesContext)
   const selected = useGitState((state) => state.activeChangeId === group.section)
   const rowProps = listbox
@@ -31,48 +28,28 @@ export function ChangeGroupHeader({
       }
     : undefined
 
-  function handleContextMenu(event: MouseEvent<HTMLDivElement>) {
-    contextMenu.openAtEvent(event, event.currentTarget)
-  }
-
-  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    contextMenu.openOnMenuKey(event)
-  }
-
   return (
-    <>
-      <div
-        {...rowProps}
-        role='treeitem'
-        aria-level={1}
-        aria-expanded={group.expanded}
-        className={listRowClassName({
-          className:
-            'group/group text-muted-foreground h-(--density-control-height-sm) w-full section-label',
-        })}
-        onClick={(event) => {
-          rowProps?.onClick(event)
-          onToggle()
-        }}
-        onContextMenu={handleContextMenu}
-        onKeyDown={handleKeyDown}
-      >
-        <TreeRowLead depth={0} expanded={group.expanded} />
-        <span className='min-w-0 flex-1 truncate'>{group.label}</span>
-        <GroupActions rootPath={rootPath} rows={group.rows} section={group.section} />
-        <span className='ml-1'>
-          <TickerNumber value={group.rows.length} />
-        </span>
-      </div>
-      {contextMenu.anchor ? (
-        <GroupMenu
-          anchor={contextMenu.anchor}
-          onOpenChange={contextMenu.onOpenChange}
-          rootPath={rootPath}
-          rows={group.rows}
-          section={group.section}
-        />
-      ) : null}
-    </>
+    <div
+      {...rowProps}
+      role='treeitem'
+      aria-level={1}
+      aria-expanded={group.expanded}
+      className={listRowClassName({
+        className:
+          'group/group text-muted-foreground h-(--density-control-height-sm) w-full section-label',
+      })}
+      onClick={(event) => {
+        rowProps?.onClick(event)
+        onToggle()
+      }}
+      onContextMenu={(event) => listbox?.openMenu(group.section, event)}
+    >
+      <TreeRowLead depth={0} expanded={group.expanded} />
+      <span className='min-w-0 flex-1 truncate'>{group.label}</span>
+      <GroupActions rootPath={rootPath} rows={group.rows} section={group.section} />
+      <span className='ml-1'>
+        <TickerNumber value={group.rows.length} />
+      </span>
+    </div>
   )
 }

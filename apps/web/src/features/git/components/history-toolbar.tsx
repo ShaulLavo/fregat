@@ -1,14 +1,7 @@
 import { Spinner } from '@workspace/ui/components/spinner'
 import type { GitHistoryRef } from '@workspace/contracts'
-import {
-  ArrowClockwiseIcon,
-  ArrowsOutSimpleIcon,
-  CrosshairIcon,
-  MagnifyingGlassIcon,
-  XIcon,
-} from '@phosphor-icons/react'
+import { ArrowClockwiseIcon, ArrowsOutSimpleIcon, CrosshairIcon } from '@phosphor-icons/react'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import {
   Select,
   SelectTrigger,
@@ -16,12 +9,7 @@ import {
   SelectContent,
   SelectItem,
 } from '@workspace/ui/components/select'
-import {
-  InputGroup,
-  InputGroupInput,
-  InputGroupAddon,
-  InputGroupButton,
-} from '@workspace/ui/components/input-group'
+import { FilterField } from '@workspace/ui/patterns/filter-field'
 import { ToolbarButton } from '@/components/toolbar-button'
 import { historyRefLabel } from '@/features/git/utils/history-presentation'
 import { useOwnedText } from '@/hooks/use-owned-text'
@@ -36,6 +24,7 @@ export function HistoryToolbar({
   onSearchChange,
   onRefresh,
   onExpand,
+  onFocusList,
 }: {
   refs: readonly GitHistoryRef[]
   refName: string
@@ -46,6 +35,7 @@ export function HistoryToolbar({
   onSearchChange: (value: string) => void
   onRefresh: () => void
   onExpand: () => void
+  onFocusList: () => void
 }) {
   const [searchText, changeSearch] = useOwnedText(search, onSearchChange)
   const choices = [
@@ -97,39 +87,17 @@ export function HistoryToolbar({
           </ToolbarButton>
         ) : null}
       </PaneBar>
-      <PaneBar>
-        <InputGroup className='h-(--density-control-height-sm) min-w-0 flex-1'>
-          <InputGroupAddon>
-            <MagnifyingGlassIcon />
-          </InputGroupAddon>
-          <InputGroupInput
-            aria-label='Search commit history'
-            placeholder='Search commit history…'
-            title='Search messages, authors, and commit IDs in the full selected history'
-            maxLength={1024}
-            value={searchText}
-            onChange={(event) => changeSearch(event.target.value)}
-          />
-          {search ? (
-            <InputGroupAddon align='inline-end'>
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <InputGroupButton
-                      aria-label='Clear history search'
-                      size='icon-xs'
-                      onClick={() => onSearchChange('')}
-                    >
-                      <XIcon />
-                    </InputGroupButton>
-                  }
-                />
-                <TooltipContent>Clear history search</TooltipContent>
-              </Tooltip>
-            </InputGroupAddon>
-          ) : null}
-        </InputGroup>
-      </PaneBar>
+      <FilterField
+        aria-label='Search commit history'
+        placeholder='Search commit history…'
+        title='Search messages, authors, and commit IDs in the full selected history'
+        maxLength={1024}
+        value={searchText}
+        onValueChange={changeSearch}
+        onArrowDown={onFocusList}
+        blurBehavior='retain'
+        clearLabel='Clear history search'
+      />
     </>
   )
 }
