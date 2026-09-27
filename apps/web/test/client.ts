@@ -1,7 +1,7 @@
 import { createEnvironmentClient, type Client } from '@workspace/client-core/transport/client'
+import { inProcessServerSocketConstructor } from '@workspace/client-core/test/in-process-server-socket'
 
 import type { TestServer } from './server'
-import { createLanguageServerSocket } from './factories/language-server-socket'
 
 type InjectedSettingsError = {
   readonly code: string
@@ -390,43 +390,31 @@ function normalizeInProcessSseHeaders(response: Response) {
 }
 
 function createClient(server: TestServer, fetcher: typeof fetch) {
-  const client = createEnvironmentClient({
+  return createEnvironmentClient({
     origin: server.origin,
     fetcher,
     headers: () => ({ origin: server.origin }),
   })
-  return withFakeLanguageServerSocket(client)
 }
 
-// Eden's `.lsp.subscribe` opens a real browser WebSocket to the page origin — there is
-// no `app.handle`-style bridge for a socket. A language server match (the settings
-// editor's json-ls schema association, for one) would otherwise reach a port no test
-// run listens on. The plugin only ever sees an idle, never-open connection, same as a
-// language server that has not answered yet.
-function withFakeLanguageServerSocket(client: Client): Client {
-  return new Proxy(client, {
-    get(target, property, receiver) {
-      const value: unknown = Reflect.get(target, property, receiver)
-      // `/lsp/match` and friends stay real; only the socket route is faked. Eden
-      // represents a route as a callable proxy (typeof "function"), not a plain object.
-      if (property !== 'lsp' || value === null || !['function', 'object'].includes(typeof value))
-        return value
-      return new Proxy(value as object, {
-        get(lspTarget, lspProperty, lspReceiver) {
-          if (lspProperty !== 'subscribe') return Reflect.get(lspTarget, lspProperty, lspReceiver)
-          return () => fakeEdenLanguageServerSocket()
-        },
-      })
-    },
-  })
+// Eden's `.lsp`/`.terminal` `.subscribe()` construct `WebSocket` directly — there is no
+// `app.handle`-style bridge for a socket. A language server match (the settings editor's
+// json-ls schema association, for one) or a terminal panel would otherwise reach a port
+// no test run listens on. Bridge the global constructor to this server's real route
+// hooks instead, for as long as the caller holds it open.
+export function installInProcessSocketBridge(server: TestServer): () => void {
+  const previous = globalThis.WebSocket
+  const bridged = inProcessServerSocketConstructor({
+    app: server.app,
+    clientOrigin: server.origin,
+  }) as unknown as typeof WebSocket
+  // happy-dom's `WebSocket` is a non-writable window property; a plain assignment throws.
+  setGlobalWebSocket(bridged)
+  return () => setGlobalWebSocket(previous)
 }
 
-function fakeEdenLanguageServerSocket() {
-  const { socket } = createLanguageServerSocket()
-  return {
-    ws: socket as unknown as WebSocket,
-    send: (data: unknown) => socket.send(typeof data === 'string' ? data : JSON.stringify(data)),
-  }
+function setGlobalWebSocket(value: typeof WebSocket) {
+  Object.defineProperty(globalThis, 'WebSocket', { configurable: true, writable: true, value })
 }
 
 // happy-dom's Request drops `origin` (a browser-forbidden header), which the
