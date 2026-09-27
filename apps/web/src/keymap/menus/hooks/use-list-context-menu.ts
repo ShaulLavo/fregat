@@ -16,9 +16,12 @@ import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
 export function useListContextMenu<T>({
   containerRef,
   isTargetPresent,
+  touchPolicy = 'suppress',
 }: {
   readonly containerRef: RefObject<HTMLElement | null>
   readonly isTargetPresent: (target: T) => boolean
+  /** Standalone phone lists keep their native long-press context-menu gesture. */
+  readonly touchPolicy?: 'suppress' | 'context-menu'
 }) {
   const contextMenu = useContextMenu()
   const [target, setTarget] = useState<T | null>(null)
@@ -81,7 +84,8 @@ export function useListContextMenu<T>({
 
   function openAtEvent(nextTarget: T, event: MouseEvent<HTMLElement>) {
     event.preventDefault()
-    if (pointerType.current === 'touch' || suppressed(event.currentTarget)) return
+    if (touchPolicy === 'suppress' && pointerType.current === 'touch') return
+    if (suppressed(event.currentTarget)) return
     setTarget(nextTarget)
     contextMenu.openAtEvent(event, event.currentTarget)
   }
