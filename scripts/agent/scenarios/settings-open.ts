@@ -43,5 +43,33 @@ export const settingsOpen: Scenario = {
       .waitFor()
     strictEqual(await shownRows(page), all, 'clearing the search shows every row again')
     await step('settings-search-cleared')
+
+    const actions = selectors.settingsRowActions(page, 'chat.planModeEnabled')
+    await actions.focus()
+    await page.keyboard.press('ArrowDown')
+    await page
+      .getByRole('menuitem', { name: 'Copy setting ID', exact: true })
+      .waitFor({ timeout: 5000 })
+    await step('settings-menu-keyboard')
+    await page.keyboard.press('Escape')
+    await page.getByRole('menu').waitFor({ state: 'hidden' })
+    ok(
+      await actions.evaluate((element) => element === document.activeElement),
+      'Escape restores focus to the row actions button',
+    )
+    await step('settings-menu-closed')
+
+    await selectors.settingsRow(page, LAST_ROW).scrollIntoViewIfNeeded()
+    const scrollTop = await selectors.settingsForm(page).evaluate((element) => element.scrollTop)
+    ok(scrollTop > 1000, 'the reload check starts well below the first mounting pass')
+    await step('settings-scrolled')
+    await page.reload()
+    await selectors.settingsRow(page, LAST_ROW).waitFor({ state: 'attached' })
+    const restored = await selectors.settingsForm(page).evaluate((element) => element.scrollTop)
+    ok(
+      Math.abs(restored - scrollTop) < 1,
+      `scroll restores after all rows mount: ${scrollTop} -> ${restored}`,
+    )
+    await step('settings-scroll-restored')
   },
 }

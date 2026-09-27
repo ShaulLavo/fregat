@@ -135,6 +135,27 @@ test(
   SLOW_RENDER_TIMEOUT_MS,
 )
 
+test('row actions support arrow-key opening and Escape focus return', async ({ client }) => {
+  expect(client).toBeDefined()
+  selectSettingsSearch('chat.planModeEnabled')
+  renderWithProviders(<SettingsPage />)
+  const actions = await screen.findByRole('button', { name: 'Actions for chat.planModeEnabled' })
+  actions.focus()
+
+  await userEvent.keyboard('{ArrowDown}')
+  const copyId = await screen.findByRole('menuitem', { name: 'Copy setting ID' })
+  await waitFor(() => expect(copyId).toHaveFocus())
+  await userEvent.keyboard('{Escape}')
+  await waitFor(() => expect(screen.queryByRole('menu')).toBe(null))
+  expect(actions).toHaveFocus()
+
+  await userEvent.keyboard('{ArrowUp}')
+  const editJson = await screen.findByRole('menuitem', { name: 'Edit in settings.json' })
+  await waitFor(() => expect(editJson).toHaveFocus())
+  await userEvent.keyboard('{Escape}')
+  await waitFor(() => expect(actions).toHaveFocus())
+})
+
 test('filters by id, label, keyword and description', () => {
   expect(matchingSettingIds('surface.blur')).toEqual(['workbench.surface.blur'])
   // A keyword match: "transparency" appears in no id or label.

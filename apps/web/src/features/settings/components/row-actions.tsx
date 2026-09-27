@@ -6,8 +6,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from '@workspace/ui/components/dropdown-menu'
-import { useState } from 'react'
 
 import { copyTextToClipboard } from '@/lib/clipboard'
 
@@ -33,68 +33,41 @@ export function RowActions({
 }) {
   const scope = writableSettingsScope(useSettingsScope())
   const { resetSetting } = useSettingsActions()
-  // The menu mounts on the first press: a menu and a tooltip root in each of a hundred rows were
-  // a large share of opening the page.
-  const [anchor, setAnchor] = useState<HTMLElement | null>(null)
-  const [open, setOpen] = useState(false)
 
   return (
-    <>
-      <Button
-        aria-expanded={open}
-        aria-haspopup='menu'
-        aria-label={`Actions for ${id}`}
-        data-tooltip={`Actions for ${id}`}
-        onClick={(event) => {
-          setAnchor(event.currentTarget)
-          setOpen(!open)
-        }}
-        size='icon-sm'
-        variant='ghost'
-      >
-        <DotsThreeIcon />
-      </Button>
-      {anchor ? (
-        <DropdownMenu
-          onOpenChange={(next, details) => {
-            // The button sits outside the popup: its press would close the menu for its click to reopen.
-            const target = details.event.target
-            if (
-              details.reason === 'outside-press' &&
-              target instanceof Node &&
-              anchor.contains(target)
-            )
-              return details.cancel()
-
-            setOpen(next)
-          }}
-          open={open}
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            aria-label={`Actions for ${id}`}
+            data-tooltip={`Actions for ${id}`}
+            size='icon-sm'
+            variant='ghost'
+          >
+            <DotsThreeIcon />
+          </Button>
+        }
+      />
+      <DropdownMenuContent align='end' className='w-56'>
+        <DropdownMenuItem disabled={!isModified} onClick={() => resetSetting(id, scope)}>
+          Reset setting
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => void copyTextToClipboard(id, 'setting ID')}>
+          Copy setting ID
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() =>
+            void copyTextToClipboard(JSON.stringify({ [id]: value }, null, 2), 'setting as JSON')
+          }
         >
-          <DropdownMenuContent align='end' anchor={anchor} className='w-56'>
-            <DropdownMenuItem disabled={!isModified} onClick={() => resetSetting(id, scope)}>
-              Reset setting
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => void copyTextToClipboard(id, 'setting ID')}>
-              Copy setting ID
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() =>
-                void copyTextToClipboard(
-                  JSON.stringify({ [id]: value }, null, 2),
-                  'setting as JSON',
-                )
-              }
-            >
-              Copy setting as JSON
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => selectSettingsView('json')}>
-              Edit in settings.json
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ) : null}
-    </>
+          Copy setting as JSON
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => selectSettingsView('json')}>
+          Edit in settings.json
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
