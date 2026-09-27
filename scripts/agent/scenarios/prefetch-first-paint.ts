@@ -13,6 +13,7 @@ import {
   openGitPanel,
   selectors,
   sharedTokenHighlightPrefix,
+  provisionalTokenSelector,
 } from '../selectors'
 import type { Scenario } from './index'
 
@@ -47,6 +48,7 @@ export function sampleEditorPaint({ needle, kind }: Target) {
     }
     const frame = { t: performance.now(), text: view !== null, colour: false, preview: false }
     if (!view) return frame
+    frame.colour = view.querySelector(${JSON.stringify(provisionalTokenSelector)}) !== null
     frame.preview = view.querySelector(${JSON.stringify(markdownPreviewRowSelector)}) !== null
     for (const [name, highlight] of CSS.highlights) {
       if (!name.startsWith(${JSON.stringify(sharedTokenHighlightPrefix)})) continue

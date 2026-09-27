@@ -26,7 +26,7 @@ import {
   PlusIcon,
   XIcon,
 } from '@phosphor-icons/react'
-import { useLayoutEffect, useMemo, useState, type KeyboardEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState, type KeyboardEvent } from 'react'
 import { createStore } from 'zustand/vanilla'
 
 import { SessionRailEmpty } from '@/features/chat-mode/components/session-rail-empty'
@@ -68,14 +68,24 @@ const RAIL_DND_MODIFIERS = [restrictToVerticalAxis]
 
 export function SessionRail({
   standalone = false,
+  onReady,
 }: {
   /**
    * The list is a screen of its own (the phone's first screen): no session is open beside it to
    * mark, and a press on a row is a scroll or a menu, never a drag.
    */
   readonly standalone?: boolean
+  readonly onReady?: () => void
 }) {
   const { activeSession, addProject, project, ready, transport } = useChatModeSession()
+  useEffect(() => {
+    if (!ready || !onReady) return
+    // The loaded rail gets its first paint before a caller prepares its next screen.
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(onReady)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [ready, onReady])
   const { reorderProject, reorderSession } = useChatRailOrder()
   const sensors = useRailDragSensors(!standalone)
   const orderOverrides = useRailOrderOverrides()

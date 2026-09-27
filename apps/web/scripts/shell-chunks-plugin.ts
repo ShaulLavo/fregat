@@ -58,8 +58,13 @@ export function shellManifest(
   const loaded = staticClosure(entry, byFile)
   const lazyRoots = dynamicRoots(entry, byFile)
   const manifest: Record<string, string[]> = {}
-  for (const [kind, relative] of Object.entries(SHELL_ENTRIES)) {
-    const entries = kind === 'phone' ? [relative, ...PHONE_BOOT_SCREENS] : [relative]
+  const entriesByKind = {
+    phone: [SHELL_ENTRIES.phone],
+    workbench: [SHELL_ENTRIES.workbench],
+    sessions: [PHONE_BOOT_SCREENS[0]],
+    session: [PHONE_BOOT_SCREENS[1]],
+  }
+  for (const [kind, entries] of Object.entries(entriesByKind)) {
     const files = [
       ...new Set(
         entries.flatMap((relative) => {

@@ -135,7 +135,7 @@ export function TreeHost({
   return (
     <div
       {...hostProps}
-      className={cn('group/tree', hostProps.className)}
+      className={cn('group/tree group/listbox', hostProps.className)}
       data-file-tree=''
       data-file-tree-virtualized='true'
       id={id}

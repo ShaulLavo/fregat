@@ -10,6 +10,7 @@ import {
 } from 'react'
 
 import { SparkleIcon } from '@phosphor-icons/react'
+import { ListRow } from '@workspace/ui/patterns/list-row'
 import { TreeRowLead } from '@workspace/ui/patterns/tree-row-lead'
 import { FileTypeIcon } from '@/components/file-type-icon'
 import { iconForEntry } from '@/lib/file-icons'
@@ -67,6 +68,15 @@ function formatFlattenedSegments(
     </span>
   )
 }
+
+// The tree keeps its own geometry and fonts. Hover waits for scrolling to stop: keyed on the
+// root's flag, a scroll restyles the rows alone. A selected row keeps its fill under the pointer.
+const TREE_ROW_CLASS = [
+  'h-(--trees-row-height) cursor-pointer gap-(--trees-item-row-gap) px-(--trees-item-padding-x) text-start font-(family-name:--workbench-tree-font-family) text-(length:--workbench-tree-font-size) leading-(--trees-row-height) touch-manipulation [-webkit-touch-callout:none]',
+  'not-aria-selected:not-data-[selected=true]:[[data-file-tree-virtualized-root]:not([data-is-scrolling])_&]:hover:bg-row-hover',
+  'not-aria-selected:not-data-[selected=true]:data-[item-context-hover=true]:bg-row-hover',
+  'data-[item-dragging=true]:opacity-50',
+].join(' ')
 
 type TreeGitDecoration =
   | { readonly text: string; readonly title: string | undefined }
@@ -249,6 +259,8 @@ export interface TreeRenderRowFrame {
   readonly contextMenuOpenPath: string | null
   /** The focused row's parent, whose guide stays lit under `onHover`. */
   readonly guideFocusPath: string | null
+  /** The row a mouse press focused, which draws no focus ring until a key is pressed. */
+  readonly pointerFocusPath: string | null
   readonly draggedPathSet: ReadonlySet<string> | null
   readonly dragAndDropEnabled: boolean
   readonly shouldSuppressContextMenu: () => boolean
@@ -403,6 +415,7 @@ export function TreeRow({ frame, options = {}, row }: TreeRowProps): JSX.Element
     renameInput,
     showDecorativeActionAffordance,
   })
+  const isFocusRinged = row.isFocused && visualFocusPath === targetPath
   const attributeProps = computeTreeRowElementAttributes({
     ariaLabel: getTreeRowAriaLabel(row),
     domId: row.isFocused ? getTreeFocusedRowDomId(instanceId, targetPath, isParked) : undefined,
@@ -423,7 +436,7 @@ export function TreeRow({ frame, options = {}, row }: TreeRowProps): JSX.Element
       effectiveGitStatus,
       isContextHovered: contextMenuOpenPath === targetPath,
       isDragging: draggedPathSet?.has(targetPath) === true,
-      isFocusRinged: row.isFocused && visualFocusPath === targetPath,
+      isFocusRinged,
       isLoading: loadingPaths?.has(targetPath) === true,
     },
     targetPath,
@@ -464,15 +477,24 @@ export function TreeRow({ frame, options = {}, row }: TreeRowProps): JSX.Element
     },
   } as const
   const rendersAsStaticContainer = !isSticky && isRenamingRow
+  const rowProps = {
+    ...commonProps,
+    className: TREE_ROW_CLASS,
+    cursor: isFocusRinged && frame.pointerFocusPath !== targetPath,
+    interactive: false,
+    selected: row.isSelected,
+    // The rename field's row draws no bar, as the tree's never has.
+    selectedBar: !rendersAsStaticContainer,
+  }
 
   if (rendersAsStaticContainer) {
-    return <div {...commonProps}>{rowContent}</div>
+    return <ListRow {...rowProps}>{rowContent}</ListRow>
   }
 
   return (
-    <button
-      {...commonProps}
-      type='button'
+    <ListRow
+      {...rowProps}
+      as='button'
       draggable={dragAndDropEnabled && !isParked}
       onDragEnd={dragAndDropEnabled && !isParked ? handleRowDragEnd : undefined}
       onDragStart={
@@ -508,6 +530,6 @@ export function TreeRow({ frame, options = {}, row }: TreeRowProps): JSX.Element
       }}
     >
       {rowContent}
-    </button>
+    </ListRow>
   )
 }

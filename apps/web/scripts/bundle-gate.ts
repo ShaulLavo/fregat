@@ -36,6 +36,7 @@ export type Pins = {
 export type GateReport = {
   readonly firstLoad: { readonly scriptGzip: number }
   readonly phoneFirstLoad: { readonly scriptGzip: number }
+  readonly phoneSessionFirstLoad: { readonly scriptGzip: number }
   readonly owners: readonly Pick<OwnerRow, 'owner' | 'firstLoadGzip'>[]
 }
 
@@ -52,7 +53,10 @@ export type GateResult = {
 
 export function checkFirstLoad(report: GateReport, pins: Pins): GateResult {
   const total = totalAgainst(pins.scriptGzip, report.firstLoad.scriptGzip)
-  const phone = totalAgainst(pins.phoneScriptGzip, report.phoneFirstLoad.scriptGzip)
+  const phone = totalAgainst(
+    pins.phoneScriptGzip,
+    Math.max(report.phoneFirstLoad.scriptGzip, report.phoneSessionFirstLoad.scriptGzip),
+  )
   const owners = report.owners.flatMap((row) => ownerGrowth(row, pins.owners[row.owner] ?? 0))
   // A grown owner explains a grown total; the total is named only when no owner is.
   const totalFailures =
@@ -91,7 +95,10 @@ export function pinsFrom(
       .filter((row) => row.firstLoadGzip > 0)
       .map((row) => [row.owner, Math.round(row.firstLoadGzip)]),
   )
-  const phoneScriptGzip = report.phoneFirstLoad.scriptGzip
+  const phoneScriptGzip = Math.max(
+    report.phoneFirstLoad.scriptGzip,
+    report.phoneSessionFirstLoad.scriptGzip,
+  )
   const entry = { at, scriptGzip: report.firstLoad.scriptGzip, phoneScriptGzip, reason }
   return {
     reading: 'disk',
