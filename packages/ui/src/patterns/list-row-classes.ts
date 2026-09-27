@@ -7,9 +7,9 @@ export function listRowClassName({
   className,
 }: {
   interactive?: boolean
-  /** A 2px foreground bar at the start edge of a selected row, inset 4px top and bottom. */
+  /** Draws a 2px foreground bar at the start edge, inset 4px top and bottom; pass it for a selected row only. */
   selectedBar?: boolean
-  /** Rings the row that carries `data-cursor` while focus is inside its `group/listbox` ancestor. */
+  /** Rings the row, the list's keyboard cursor, while focus is inside its `group/listbox` ancestor. */
   cursor?: boolean
   className?: string
 } = {}) {
@@ -18,9 +18,10 @@ export function listRowClassName({
     'aria-selected:bg-row-selected aria-selected:text-foreground data-[selected=true]:bg-row-selected data-[selected=true]:text-foreground data-[marked=true]:ring-1 data-[marked=true]:ring-inset data-[marked=true]:ring-ring/40 aria-disabled:opacity-50 data-[disabled=true]:opacity-50',
     interactive &&
       'not-aria-disabled:not-data-[disabled=true]:not-aria-selected:not-data-[selected=true]:hover:bg-row-hover not-aria-disabled:not-data-[disabled=true]:not-aria-selected:not-data-[selected=true]:active:bg-row-active',
+    // Only on the rows that draw them: a pseudo-element rule on every row costs each restyle.
     selectedBar &&
-      'aria-selected:after:pointer-events-none aria-selected:after:absolute aria-selected:after:inset-y-1 aria-selected:after:left-0 aria-selected:after:w-0.5 aria-selected:after:bg-foreground data-[selected=true]:after:pointer-events-none data-[selected=true]:after:absolute data-[selected=true]:after:inset-y-1 data-[selected=true]:after:left-0 data-[selected=true]:after:w-0.5 data-[selected=true]:after:bg-foreground',
-    cursor && 'group-focus-within/listbox:data-[cursor=true]:focus-ring-inset-drawn',
+      'after:pointer-events-none after:absolute after:inset-y-1 after:left-0 after:w-0.5 after:bg-foreground',
+    cursor && 'group-focus-within/listbox:focus-ring-inset-drawn',
     className,
   )
 }

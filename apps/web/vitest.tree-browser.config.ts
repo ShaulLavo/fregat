@@ -1,3 +1,4 @@
+import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
 import react from '@vitejs/plugin-react'
 import { playwright } from '@vitest/browser-playwright'
@@ -120,7 +121,7 @@ const treeCommands = {
 } satisfies Record<string, BrowserCommand<never[]>>
 
 export default defineConfig({
-  plugins: [react({ compiler: true })],
+  plugins: [react({ compiler: true }), tailwindcss()],
   resolve: { alias, dedupe: ['react', 'react-dom'] },
   test: {
     name: 'tree-browser',

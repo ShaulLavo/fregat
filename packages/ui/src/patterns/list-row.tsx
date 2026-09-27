@@ -12,7 +12,9 @@ export type ListRowProps = HTMLAttributes<RowElement> & {
   marked?: boolean
   disabled?: boolean
   interactive?: boolean
+  /** Draws the start-edge bar while the row is selected. */
   selectedBar?: boolean
+  /** The list's keyboard cursor: ringed while focus is inside the `group/listbox` ancestor. */
   cursor?: boolean
   /** A roving tab stop for a list whose rows take DOM focus; rows of a `useListbox` list leave it -1. */
   tabIndex?: number
@@ -60,7 +62,12 @@ export function ListRow({
       data-selected={acceptsSelected ? undefined : selected}
       aria-selected={acceptsSelected ? (selected ?? props['aria-selected']) : undefined}
       aria-disabled={disabled || props['aria-disabled'] || undefined}
-      className={listRowClassName({ interactive, selectedBar, cursor, className })}
+      className={listRowClassName({
+        interactive,
+        selectedBar: selectedBar && selected === true,
+        cursor,
+        className,
+      })}
       onClick={disabled ? undefined : onClick}
     />
   )

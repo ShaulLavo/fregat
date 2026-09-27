@@ -480,8 +480,7 @@ export function TreeRow({ frame, options = {}, row }: TreeRowProps): JSX.Element
   const rowProps = {
     ...commonProps,
     className: TREE_ROW_CLASS,
-    cursor: true,
-    'data-cursor': (isFocusRinged && frame.pointerFocusPath !== targetPath) || undefined,
+    cursor: isFocusRinged && frame.pointerFocusPath !== targetPath,
     interactive: false,
     selected: row.isSelected,
     // The rename field's row draws no bar, as the tree's never has.
