@@ -636,3 +636,12 @@ Carried in from other plans. They wait for the phone shell and join its split pl
 Integrated verification with PR #178 permits wallpaper strips to scroll inside the Settings
 shell while checking document, body and shell width. Passed evidence:
 `/work/tmp/fregat-evidence/20260927T054928Z-scenario-phone-surfaces/`.
+
+### iPhone follow-up after PR #179
+
+The owner still saw sideways Settings scrolling and the bottom wallpaper gap on iPhone.
+The shipped Chromium scenario did not verify these Safari behaviors. A macOS WebKit run
+with the iPhone 13 viewport reproduced Settings at 390px with 428px of scrollable content.
+The code-theme list occupied 288px and left its preview 10px wide; the preview title overflowed.
+Capping the list at half the available width restored a 390px scroll extent in the same page.
+The wallpaper gap remains open and requires Safari toolbar/device verification.
