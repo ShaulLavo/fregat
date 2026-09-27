@@ -401,6 +401,7 @@ export const selectors = {
       .locator('[data-dragging="true"]'),
   connectMachineMenu: (page: Page) =>
     page.getByRole('menuitem', { name: 'Connect machine…', exact: true }),
+  sessionTitleSelector: (title: string) => `[title=${JSON.stringify(title)}]`,
   sessionByTitle: (page: Page, title: string) => page.getByTitle(title, { exact: true }),
   draggingSession: (page: Page) =>
     page.locator('[data-dragging="true"][aria-roledescription="sortable session row"]'),
