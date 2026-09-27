@@ -1,7 +1,8 @@
 /**
  * First-load gate (Plan 109 Phase 4). Builds through `bundle-report.ts` and compares first-load
- * script gzip, in total and per owner, against `first-load-pins.json`. A ratchet: the pins are the
- * last accepted build plus a margin, re-pinned with `--write --reason=…` when a growth is intended.
+ * script gzip, in total and per owner, against `first-load-pins.json`, and the phone shell's
+ * first load in total. A ratchet: the pins are the last accepted build plus a margin, re-pinned
+ * with `--write --reason=…` when a growth is intended.
  *
  *   bun scripts/bundle-gate.ts                       build, compare, exit 1 on growth
  *   bun scripts/bundle-gate.ts --write --reason=…    build and re-pin
@@ -21,40 +22,53 @@ const OWNER_FLOOR = 2_048
 export type Pins = {
   readonly reading: 'disk'
   readonly scriptGzip: number
+  /** The phone shell's first load, which skips the workbench. */
+  readonly phoneScriptGzip: number
   readonly owners: Readonly<Record<string, number>>
   readonly history: readonly {
     readonly at: string
     readonly scriptGzip: number
+    readonly phoneScriptGzip?: number
     readonly reason: string
   }[]
 }
 
 export type GateReport = {
   readonly firstLoad: { readonly scriptGzip: number }
+  readonly phoneFirstLoad: { readonly scriptGzip: number }
   readonly owners: readonly Pick<OwnerRow, 'owner' | 'firstLoadGzip'>[]
 }
 
 export type GateFailure = { readonly owner: string; readonly pinned: number; readonly now: number }
 
+type Total = { readonly pinned: number; readonly now: number; readonly limit: number }
+
 export type GateResult = {
-  readonly total: { readonly pinned: number; readonly now: number; readonly limit: number }
+  readonly total: Total
+  readonly phone: Total
   readonly failures: readonly GateFailure[]
   readonly passed: boolean
 }
 
 export function checkFirstLoad(report: GateReport, pins: Pins): GateResult {
-  const limit = Math.round(pins.scriptGzip * (1 + TOTAL_MARGIN))
-  const total = { pinned: pins.scriptGzip, now: report.firstLoad.scriptGzip, limit }
-  const failures = report.owners.flatMap((row) => ownerGrowth(row, pins.owners[row.owner] ?? 0))
-  const totalFailed = total.now > limit
-  if (totalFailed && failures.length === 0)
-    return {
-      total,
-      failures: [{ owner: '(total)', pinned: total.pinned, now: total.now }],
-      passed: false,
-    }
+  const total = totalAgainst(pins.scriptGzip, report.firstLoad.scriptGzip)
+  const phone = totalAgainst(pins.phoneScriptGzip, report.phoneFirstLoad.scriptGzip)
+  const owners = report.owners.flatMap((row) => ownerGrowth(row, pins.owners[row.owner] ?? 0))
+  // A grown owner explains a grown total; the total is named only when no owner is.
+  const totalFailures =
+    total.now > total.limit && owners.length === 0 ? [totalFailure('(total)', total)] : []
+  const phoneFailures = phone.now > phone.limit ? [totalFailure('(phone total)', phone)] : []
+  const failures = [...owners, ...totalFailures, ...phoneFailures]
+  const passed = total.now <= total.limit && failures.length === 0
+  return { total, phone, failures, passed }
+}
 
-  return { total, failures, passed: !totalFailed && failures.length === 0 }
+function totalAgainst(pinned: number, now: number): Total {
+  return { pinned, now, limit: Math.round(pinned * (1 + TOTAL_MARGIN)) }
+}
+
+function totalFailure(owner: string, total: Total): GateFailure {
+  return { owner, pinned: total.pinned, now: total.now }
 }
 
 function ownerGrowth(
@@ -77,19 +91,22 @@ export function pinsFrom(
       .filter((row) => row.firstLoadGzip > 0)
       .map((row) => [row.owner, Math.round(row.firstLoadGzip)]),
   )
-  const entry = { at, scriptGzip: report.firstLoad.scriptGzip, reason }
+  const phoneScriptGzip = report.phoneFirstLoad.scriptGzip
+  const entry = { at, scriptGzip: report.firstLoad.scriptGzip, phoneScriptGzip, reason }
   return {
     reading: 'disk',
     scriptGzip: report.firstLoad.scriptGzip,
+    phoneScriptGzip,
     owners,
     history: [...(previous?.history ?? []), entry],
   }
 }
 
 export function formatResult(result: GateResult) {
-  const { total } = result
+  const { total, phone } = result
   const lines = [
     `first-load script gzip: ${total.now} (pinned ${total.pinned}, limit ${total.limit}, [disk])`,
+    `phone first-load script gzip: ${phone.now} (pinned ${phone.pinned}, limit ${phone.limit}, [disk])`,
   ]
   for (const failure of result.failures) {
     const delta = Math.round(failure.now - failure.pinned)

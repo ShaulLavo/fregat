@@ -1,7 +1,7 @@
 import { equal, ok } from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import type { Locator, Page } from 'playwright'
+import type { Locator, Page, Request } from 'playwright'
 
 import { createModifiedFileFixture, releaseFixture } from '../fixture-workspace'
 import { selectors } from '../selectors'
@@ -22,6 +22,18 @@ export const phoneShell: Scenario = {
     'At a touch phone viewport: session list, session, pickers as bottom sheets, changes, diffs that share one editor tab, the terminal, and Back through each, with no horizontal scroll.',
   capture: { width: 390, height: 844, scale: 2, touch: true },
   async run(page, { step }) {
+    const requests: string[] = []
+    const recordRequest = (request: Request) => requests.push(request.url())
+    page.on('request', recordRequest)
+    await page.reload({ waitUntil: 'commit' })
+    await page.locator(selectors.phoneFirstScreenSelector).waitFor()
+    page.off('request', recordRequest)
+    const desktopRequests = requests.filter((url) => /workbench-[^/]+[.](js|css)$/.test(url))
+    equal(
+      desktopRequests.length,
+      0,
+      `Phone boot fetched desktop chunks: ${desktopRequests.join(', ')}`,
+    )
     const fixture = await createModifiedFileFixture(
       'phone-shell',
       'notes.md',
