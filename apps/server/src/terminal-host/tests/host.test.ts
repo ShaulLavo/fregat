@@ -3,6 +3,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  type FSWatcher,
   rmSync,
   watch,
   writeFileSync,
@@ -10,15 +11,27 @@ import {
 import net from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, onTestFinished } from 'vitest'
 
 import { createTestTerminalHost } from '../testing'
 import { ensureSocketDirectory, ensureToken, hostPaths, RING_BYTES } from '../protocol'
 
 const hosts: Awaited<ReturnType<typeof createTestTerminalHost>>[] = []
+const children: Bun.Subprocess[] = []
+const watchers: FSWatcher[] = []
+const roots: string[] = []
 
 afterEach(async () => {
-  await Promise.all(hosts.splice(0).map((host) => host.close()))
+  for (const watcher of watchers.splice(0)) watcher.close()
+  const launched = children.splice(0)
+  for (const child of launched) child.kill('SIGKILL')
+  try {
+    const exited = Promise.all(launched.map((child) => child.exited)).then(() => 'exited')
+    expect(await Promise.race([exited, Bun.sleep(5_000).then(() => 'timed out')])).toBe('exited')
+    await Promise.all(hosts.splice(0).map((host) => host.close()))
+  } finally {
+    for (const root of roots.splice(0)) rmSync(root, { force: true, recursive: true })
+  }
 })
 
 async function testHost() {
@@ -193,35 +206,64 @@ it('reports a shell as exited when its host dies and a fresh host no longer list
   expect(host.hosts).toHaveLength(2)
 })
 
-// Two launchers can race for one home; the loser may still be starting when the home is removed.
-it('a host launched for a removed state root exits without bringing it back', async () => {
-  const root = mkdtempSync(path.join(tmpdir(), 'platform-pty-removed-'))
-  const stateRoot = path.join(root, 'home')
-  const { XDG_RUNTIME_DIR: _runtime, ...env } = process.env
-  // Whichever comes first settles it, so a host that recreates the home fails at once.
-  const watcher = watch(root)
-  const recreated = new Promise<string>((resolve) =>
-    watcher.on('change', (_event, name) => {
-      if (name === 'home') resolve('recreated the home')
-    }),
-  )
-  const host = Bun.spawn(
-    [process.execPath, path.join(import.meta.dirname, '../main.ts'), `--state-root=${stateRoot}`],
-    { env, stdio: ['ignore', 'ignore', 'inherit'] },
-  )
-  try {
-    const outcome = await Promise.race([host.exited.then((code) => `exited ${code}`), recreated])
-    expect(outcome).toBe('exited 0')
-    expect(existsSync(stateRoot)).toBe(false)
+// Two launchers can race; the loser may start after the isolated server's entire directory is gone.
+it.each(['host', 'stalled child'] as const)(
+  'a removed state root stays absent after %s startup',
+  async (kind) => {
+    const root = mkdtempSync(path.join(tmpdir(), 'platform-pty-removed-'))
+    roots.push(root)
+    const directory = path.join(root, 'server')
+    const stateRoot = path.join(directory, 'home')
+    mkdirSync(stateRoot, { recursive: true })
+    rmSync(directory, { recursive: true })
+    const { XDG_RUNTIME_DIR: _runtime, ...inherited } = process.env
+    const env = {
+      ...inherited,
+      OBSERVABILITY_ENABLED: 'true',
+      OBSERVABILITY_CONSOLE: 'false',
+      OBSERVABILITY_POSTHOG_ENABLED: 'false',
+      OBSERVABILITY_DIR: path.join(directory, 'logs'),
+    }
+    const watcher = watch(root)
+    watchers.push(watcher)
+    let watcherClosed = false
+    watcher.on('close', () => {
+      watcherClosed = true
+    })
+    const recreated = new Promise<string>((resolve) =>
+      watcher.on('change', (_event, name) => {
+        if (name === 'server') resolve('recreated the directory')
+      }),
+    )
+    const command =
+      kind === 'host'
+        ? [path.join(import.meta.dirname, '../main.ts'), `--state-root=${stateRoot}`]
+        : ['-e', 'setInterval(() => {}, 1000)']
+    const child = Bun.spawn([process.execPath, ...command], {
+      env,
+      stdio: ['ignore', 'ignore', 'inherit'],
+    })
+    children.push(child)
+    onTestFinished(async () => {
+      await expect.poll(() => watcherClosed).toBe(true)
+      expect(child.exitCode !== null || child.signalCode !== null).toBe(true)
+      expect(existsSync(root)).toBe(false)
+    })
+    const outcome = await Promise.race([
+      child.exited.then((code) => `exited ${code}`),
+      recreated,
+      Bun.sleep(kind === 'host' ? 5_000 : 50).then(() => 'timed out'),
+    ])
+    expect(outcome).toBe(kind === 'host' ? 'exited 0' : 'timed out')
+    expect(existsSync(directory)).toBe(false)
+    if (kind === 'stalled child') {
+      expect(child.exitCode).toBeNull()
+      expect(child.signalCode).toBeNull()
+    }
 
     const paths = hostPaths(stateRoot, env)
     expect(() => ensureToken(paths)).toThrow()
     expect(() => ensureSocketDirectory(paths)).toThrow()
-    expect(existsSync(stateRoot)).toBe(false)
-  } finally {
-    watcher.close()
-    host.kill('SIGKILL')
-    await host.exited
-    rmSync(root, { force: true, recursive: true })
-  }
-})
+    expect(existsSync(directory)).toBe(false)
+  },
+)

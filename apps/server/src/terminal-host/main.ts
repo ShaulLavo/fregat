@@ -409,6 +409,8 @@ async function main() {
   process.title = 'platform-pty-host'
   const outcome = await start(options.stateRoot, options.idleMs)
   if (outcome === 'listening') return
+  // The inherited file drain recreates its log directory, which may belong to the removed home.
+  if (outcome === 'state-root-gone') process.exit(0)
   recordProcessInfo('terminal.host.standdown', { area: 'terminal', reason: outcome })
   await flushObservability()
   process.exit(0)
