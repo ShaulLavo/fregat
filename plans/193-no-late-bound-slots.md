@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: IN PROGRESS 2026-09-27. Owner direction, same day, on `lib/fix-with-agent.ts`'s
+- Status: DONE 2026-09-27. Owner direction, same day, on `lib/fix-with-agent.ts`'s
   bound callback: "i hate it … it feel like a workaround", then "write a plan for all your other
   findings where we can fix the workaround".
 - Done as the first instance: `7f22085c0` (Fix with AI opens its draft through navigation).
@@ -13,7 +13,7 @@
   - [x] Phase 3: settings reach non-React consumers by subscription (slot 9 kept, see Keep)
   - [x] Phase 4: the command runtime reads settings at dispatch
   - [x] Phase 5: editor theme selection from settings (decided: slot 11 kept, see Keep)
-  - [ ] Phase 6: the rule (text ready; AGENTS.md is the project CLAUDE.md, so it waits for the owner)
+  - [x] Phase 6: the rule
 
 ## The shape
 
