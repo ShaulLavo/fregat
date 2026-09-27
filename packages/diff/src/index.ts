@@ -8,7 +8,13 @@ export { joinRenderLines } from './lines'
 export { createLiveDiffProjection } from './liveProjection'
 export { createTextDiff, parseGitPatch } from './model'
 export { createSplitProjection, createStackedProjection } from './projection'
-export { diffSyntaxBackend, projectDiffSyntaxTokens } from './diffSyntax'
+export {
+  diffSyntaxBackend,
+  prepareDiffSyntax,
+  PreparedDiffSyntaxSource,
+  projectDiffSyntaxTokens,
+} from './diffSyntax'
+export type { PrepareDiffSyntaxOptions, PreparedDiffSyntaxInput } from './diffSyntax'
 export type { DiffPlugin, DiffPluginMode, DiffPluginOptions, DiffRowHit } from './editorDiffPlugin'
 export type { DiffEditorOptions } from './editorOptions'
 export type { DiffGutterSide } from './gutters'

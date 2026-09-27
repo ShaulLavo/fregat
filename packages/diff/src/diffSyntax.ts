@@ -20,10 +20,7 @@ import {
   type EditorTokenStore,
   toEditorTokenStore,
 } from '@singapore-editor/core/syntax'
-import {
-  EditorSecondaryViewScheduler,
-  type EditorSecondaryWorkContext,
-} from '@singapore-editor/core/secondary-views'
+import { EditorSecondaryViewScheduler } from '@singapore-editor/core/secondary-views'
 import { languageIdForPath } from './lines'
 import type { DiffFile, DiffRenderRow, DiffSyntaxBackend } from './types'
 
@@ -52,6 +49,105 @@ export type DiffSyntaxControllerOptions = {
   readonly onDidChangeTokens: () => void
 }
 
+/** Streams from `prepareDiffSyntax`, or a preparation of them still running. */
+export type PreparedDiffSyntaxInput =
+  | readonly PreparedDiffSyntaxSource[]
+  | Promise<readonly PreparedDiffSyntaxSource[]>
+
+export type PrepareDiffSyntaxOptions = {
+  readonly backend?: DiffSyntaxBackend
+  /** Which pane the sources are for. `stacked` prepares both source sides. */
+  readonly side?: DiffSyntaxSide
+  readonly signal?: AbortSignal
+}
+
+/**
+ * One source side's parsed token stream and the session that recolours it on a theme change.
+ * Exactly one holder owns it at a time — a host's store, or the controller that adopted it — and
+ * that holder disposes it.
+ */
+export class PreparedDiffSyntaxSource {
+  private readonly listeners = new Set<() => void>()
+  private readonly disposables: { dispose(): void }[] = []
+  private current: EditorTokenStore = toEditorTokenStore([])
+  private disposed = false
+
+  constructor(
+    readonly side: DiffSyntaxSourceSide,
+    readonly lineStarts: readonly number[],
+  ) {}
+
+  get tokens(): EditorTokenStore {
+    return this.current
+  }
+
+  /** Fires when a theme change recolours the stream. */
+  onDidChangeTokens(listener: () => void): () => void {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+
+  dispose(): void {
+    if (this.disposed) return
+
+    this.disposed = true
+    this.listeners.clear()
+    disposeMutableSessions(this.disposables)
+  }
+
+  /** @internal */
+  own(disposable: { dispose(): void }): void {
+    this.disposables.push(disposable)
+  }
+
+  /** @internal */
+  setTokens(tokens: EditorTokenInput): void {
+    this.current = toEditorTokenStore(tokens)
+  }
+
+  /** @internal */
+  async recolor(session: DiffSyntaxServiceSession): Promise<void> {
+    try {
+      const result = await session.refresh()
+      if (this.disposed) return
+
+      this.setTokens(result.tokens)
+      for (const listener of this.listeners) listener()
+    } catch {
+      // Keep the last colors if the worker fails; a subsequent change can retry.
+    }
+  }
+}
+
+/**
+ * Parses a diff's sources ahead of the view that will show them, so `setFile(file, rows, prepared)`
+ * paints coloured on its first frame. The caller owns the result; an aborted preparation resolves
+ * empty.
+ */
+export async function prepareDiffSyntax(
+  file: DiffFile,
+  options: PrepareDiffSyntaxOptions = {},
+): Promise<readonly PreparedDiffSyntaxSource[]> {
+  const created: PreparedDiffSyntaxSource[] = []
+  const isCurrent = () => options.signal?.aborted !== true
+  try {
+    const sources = await loadSyntaxSources(
+      file,
+      options.side ?? 'stacked',
+      options.backend,
+      isCurrent,
+      created,
+    )
+    if (sources) return sources
+  } catch (error) {
+    disposeMutableSessions(created)
+    throw error
+  }
+
+  disposeMutableSessions(created)
+  return []
+}
+
 /**
  * The syntax half of the old `DiffView`, with one behavioural change.
  *
@@ -65,8 +161,9 @@ export type DiffSyntaxControllerOptions = {
 export class DiffSyntaxController {
   private readonly scheduler = new EditorSecondaryViewScheduler()
   private readonly key = `diff.syntax.${nextSyntaxControllerId++}`
-  private sessions: { dispose(): void }[] = []
-  private sources: readonly IndexedTokenSource[] = []
+  private sources: readonly PreparedDiffSyntaxSource[] = []
+  private sourceSubscriptions: (() => void)[] = []
+  private indexed: readonly IndexedTokenSource[] = []
   private sourcesFile: DiffFile | null = null
   private file: DiffFile | null = null
   private rows: readonly DiffRenderRow[] = []
@@ -89,17 +186,50 @@ export class DiffSyntaxController {
     return this.tokens
   }
 
-  /** New file: drop the cached streams and reparse. */
-  setFile(file: DiffFile | null, rows: readonly DiffRenderRow[]): void {
+  /**
+   * New file: drop the cached streams, then adopt `prepared` when it covers this side, or reparse.
+   * A preparation still running is awaited instead of parsing the same file twice. Takes ownership
+   * of `prepared` either way.
+   */
+  setFile(
+    file: DiffFile | null,
+    rows: readonly DiffRenderRow[],
+    prepared: PreparedDiffSyntaxInput = [],
+  ): void {
     this.file = file
     this.ready = !file || this.options.enabled === false
     this.rows = rows
-    this.sources = []
-    this.sourcesFile = null
     this.tokens = []
-    this.disposeSessions()
+    this.disposeSources()
     this.scheduler.cancel(this.key)
-    if (file) this.load(file)
+    if (!file || this.ready) {
+      void Promise.resolve(prepared).then(disposePrepared)
+      return
+    }
+    if (isPromiseLike(prepared)) {
+      const settle = (sources: readonly PreparedDiffSyntaxSource[]) => {
+        if (this.settlePrepared(file, sources)) this.options.onDidChangeTokens()
+      }
+      void prepared.then(settle, () => settle([]))
+      return
+    }
+    this.settlePrepared(file, prepared)
+  }
+
+  /** Whether `prepared` was adopted; otherwise it is disposed, and a current file reparses. */
+  private settlePrepared(file: DiffFile, prepared: readonly PreparedDiffSyntaxSource[]): boolean {
+    if (this.disposed || this.file !== file || this.ready) {
+      disposePrepared(prepared)
+      return false
+    }
+    if (!coversSide(prepared, this.options.side)) {
+      disposePrepared(prepared)
+      this.load(file)
+      return false
+    }
+
+    this.adoptSources(file, prepared)
+    return true
   }
 
   /** Same file, different rows — an expansion toggle. Re-project what is already parsed. */
@@ -108,140 +238,175 @@ export class DiffSyntaxController {
     this.reproject()
   }
 
+  /**
+   * Hands the parsed streams of the current file to the caller, which then owns them; empty while
+   * a parse is still running. The controller keeps painting what it projected.
+   */
+  release(): readonly PreparedDiffSyntaxSource[] {
+    if (!this.ready || this.sourcesFile !== this.file) return []
+
+    const sources = this.sources
+    this.unsubscribeSources()
+    this.sources = []
+    this.indexed = []
+    this.sourcesFile = null
+    return sources
+  }
+
   dispose(): void {
     this.disposed = true
     this.scheduler.cancel(this.key)
     this.scheduler.dispose()
-    this.disposeSessions()
-    this.sources = []
+    this.disposeSources()
     this.tokens = []
   }
 
   private reproject(): void {
-    if (this.sources.length === 0 || this.sourcesFile !== this.file) {
+    if (this.indexed.length === 0 || this.sourcesFile !== this.file) {
       this.tokens = []
       return
     }
 
-    this.tokens = projectIndexedTokens(this.rows, this.options.side, this.sources)
+    this.tokens = projectIndexedTokens(this.rows, this.options.side, this.indexed)
   }
 
   private load(file: DiffFile): void {
     if (this.options.enabled === false) return
 
-    const sessions: { dispose(): void }[] = []
+    const created: PreparedDiffSyntaxSource[] = []
     this.scheduler.schedule({
       key: this.key,
       taskClass: 'background-derived',
       priority: 'low',
       tags: { configuration: 'syntax', viewport: this.options.side },
-      run: (context) => this.loadSources(file, context, sessions),
-      apply: (sources) => this.applySources(file, sources, sessions),
+      run: (context) =>
+        loadSyntaxSources(
+          file,
+          this.options.side,
+          this.options.backend,
+          () => context.isCurrent(),
+          created,
+        ),
+      apply: (sources) => this.applySources(file, sources, created),
       fail: () => {
-        disposeMutableSessions(sessions)
+        disposeMutableSessions(created)
         if (this.file !== file) return
         this.ready = true
         this.options.onDidChangeTokens()
       },
-      cancel: () => disposeMutableSessions(sessions),
+      cancel: () => disposeMutableSessions(created),
     })
-  }
-
-  private async loadSources(
-    file: DiffFile,
-    context: EditorSecondaryWorkContext,
-    sessions: { dispose(): void }[],
-  ): Promise<readonly DiffSyntaxTokenSource[] | null> {
-    const service = await diffSyntaxService(diffSyntaxBackend(this.options.backend))
-    if (!service) return null
-
-    // Registered before the staleness check, and disposed here if the check fails. Creating a
-    // shiki service spins up a worker owner, and this `await` is a window the task can be
-    // cancelled in — `setFile` cancels on every call, so clicking through a file tree would
-    // otherwise strand one owner per click with nothing left holding a reference to it. The
-    // tree-sitter path hides this in tests because its service has no `dispose` at all.
-    if (service.dispose) sessions.push({ dispose: () => service.dispose?.() })
-    if (!context.isCurrent()) {
-      disposeMutableSessions(sessions)
-      return null
-    }
-
-    const sources: DiffSyntaxTokenSource[] = []
-    for (const document of syntaxDocumentsForFile(file, this.options.side)) {
-      if (!context.isCurrent()) return null
-
-      const session = await service.createSession(document)
-      if (!session) continue
-
-      sessions.push(session)
-      const source = {
-        lineStarts: document.lineStarts,
-        side: document.side,
-        tokens: toEditorTokenStore([]),
-      }
-      const unsubscribe = session.onDidChangeTheme?.(() => {
-        void this.recolorSource(file, session, source)
-      })
-      if (unsubscribe) sessions.push({ dispose: unsubscribe })
-      const result = await session.refresh()
-      if (!context.isCurrent()) {
-        disposeMutableSessions(sessions)
-        return null
-      }
-
-      source.tokens = toEditorTokenStore(result.tokens)
-      sources.push(source)
-    }
-
-    return sources
-  }
-
-  private async recolorSource(
-    file: DiffFile,
-    session: DiffSyntaxServiceSession,
-    source: { lineStarts: readonly number[]; side: DiffSyntaxSourceSide; tokens: EditorTokenStore },
-  ): Promise<void> {
-    try {
-      const result = await session.refresh()
-      source.tokens = toEditorTokenStore(result.tokens)
-      if (this.disposed || this.file !== file || !this.sessions.includes(session)) return
-
-      this.sources = this.sources.map((entry) =>
-        entry.side === source.side ? { ...source } : entry,
-      )
-      this.reproject()
-      this.options.onDidChangeTokens()
-    } catch {
-      // Keep the last colors if the worker fails; a subsequent change can retry.
-    }
   }
 
   private applySources(
     file: DiffFile,
-    sources: readonly DiffSyntaxTokenSource[] | null,
-    sessions: { dispose(): void }[],
+    sources: readonly PreparedDiffSyntaxSource[] | null,
+    created: PreparedDiffSyntaxSource[],
   ): void {
     if (this.file !== file) {
-      disposeMutableSessions(sessions)
+      disposeMutableSessions(created)
       return
     }
 
-    this.disposeSessions()
-    this.sessions = sessions
+    // Adopted: the task's cancel path must no longer reach them.
+    created.length = 0
+    this.adoptSources(file, sources ?? [])
+    this.options.onDidChangeTokens()
+  }
+
+  private adoptSources(file: DiffFile, sources: readonly PreparedDiffSyntaxSource[]): void {
+    this.disposeSources()
+    this.sources = sources
+    this.sourceSubscriptions = sources.map((source) =>
+      source.onDidChangeTokens(() => this.recolor(file)),
+    )
     // Indexed here, once per parse. The index depends only on the token streams, and expansion
     // does not change those — so rebuilding it inside every re-projection would be repeated work
     // plus a fresh Map and N arrays of garbage on each toggle.
-    this.sources = indexTokenSources(sources ?? [])
+    this.indexed = indexPreparedSources(sources)
     this.ready = true
     this.sourcesFile = file
+    this.reproject()
+  }
+
+  private recolor(file: DiffFile): void {
+    if (this.disposed || this.file !== file) return
+
+    this.indexed = indexPreparedSources(this.sources)
     this.reproject()
     this.options.onDidChangeTokens()
   }
 
-  private disposeSessions(): void {
-    disposeMutableSessions(this.sessions)
-    this.sessions = []
+  private unsubscribeSources(): void {
+    for (const unsubscribe of this.sourceSubscriptions) unsubscribe()
+    this.sourceSubscriptions = []
   }
+
+  private disposeSources(): void {
+    this.unsubscribeSources()
+    disposeMutableSessions([...this.sources])
+    this.sources = []
+    this.indexed = []
+    this.sourcesFile = null
+  }
+}
+
+async function loadSyntaxSources(
+  file: DiffFile,
+  side: DiffSyntaxSide,
+  backend: DiffSyntaxBackend | undefined,
+  isCurrent: () => boolean,
+  created: PreparedDiffSyntaxSource[],
+): Promise<readonly PreparedDiffSyntaxSource[] | null> {
+  const service = diffSyntaxService(diffSyntaxBackend(backend))
+  if (!service) return null
+
+  const sources: PreparedDiffSyntaxSource[] = []
+  for (const document of syntaxDocumentsForFile(file, side)) {
+    if (!isCurrent()) return null
+
+    const session = await service.createSession(document)
+    if (!session) continue
+
+    const source = new PreparedDiffSyntaxSource(document.side, document.lineStarts)
+    created.push(source)
+    source.own(session)
+    const unsubscribe = session.onDidChangeTheme?.(() => void source.recolor(session))
+    if (unsubscribe) source.own({ dispose: unsubscribe })
+    const result = await session.refresh()
+    if (!isCurrent()) return null
+
+    source.setTokens(result.tokens)
+    sources.push(source)
+  }
+
+  return sources
+}
+
+function disposePrepared(sources: readonly PreparedDiffSyntaxSource[]): void {
+  for (const source of sources) source.dispose()
+}
+
+function isPromiseLike(
+  value: PreparedDiffSyntaxInput,
+): value is Promise<readonly PreparedDiffSyntaxSource[]> {
+  return 'then' in value
+}
+
+function coversSide(sources: readonly PreparedDiffSyntaxSource[], side: DiffSyntaxSide): boolean {
+  const sides = new Set(sources.map((source) => source.side))
+  if (side === 'stacked') return sides.size === 2 && sources.length === 2
+  return sides.has(side) && sources.length === 1
+}
+
+function indexPreparedSources(
+  sources: readonly PreparedDiffSyntaxSource[],
+): readonly IndexedTokenSource[] {
+  return sources.map((source) => ({
+    lineStarts: source.lineStarts,
+    side: source.side,
+    tokens: source.tokens,
+  }))
 }
 
 export function diffSyntaxBackend(backend: DiffSyntaxBackend | undefined): DiffSyntaxBackend {
@@ -296,7 +461,6 @@ type DiffSyntaxDocument = DiffSyntaxSource & {
 
 type DiffSyntaxService = {
   createSession(document: DiffSyntaxDocument): Promise<DiffSyntaxServiceSession | null>
-  dispose?(): void
 }
 
 type DiffSyntaxServiceSession = {
