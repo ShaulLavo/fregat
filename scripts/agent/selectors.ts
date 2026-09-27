@@ -924,6 +924,7 @@ export const selectors = {
       .filter({ hasText: / failed/ })
       .getByRole('button', { name: 'Fix with AI', exact: true }),
   dialog: (page: Page) => page.getByRole('dialog').last(),
+  dialogClose: (dialog: Locator) => dialog.getByRole('button', { name: 'Close', exact: true }),
   buttonNamed: (page: Page, label: string) =>
     page.getByRole('button', { name: label, exact: true }).first(),
   changeRequestLink: (page: Page, number: number) =>
