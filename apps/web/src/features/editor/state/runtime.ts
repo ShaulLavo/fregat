@@ -44,6 +44,10 @@ import { log } from '@/lib/client-logging'
 import { createHistoryBuffer } from '@/features/editor/state/history-buffer'
 import { HistoryPersistenceService } from '@/features/editor/state/history-persistence'
 import { createFileOpenIntentServiceOwner } from '@/lib/file-open-intent/state/service'
+import { bindLanguageCensus } from '@/features/editor/state/language-census'
+import { registerEditorOpenBenchmarkControl } from '@/features/editor/state/performance-trace'
+import { watchFileAvailability } from '@/features/editor/state/file-availability'
+import { getNavigation } from '@/state/navigation-binding'
 
 export type EditorRuntime = ReturnType<typeof createEditorRuntime>
 
@@ -125,6 +129,7 @@ export function createEditorRuntime({
   )
   let rootGeneration = 1
   let active = false
+  let stopActive: readonly (() => void)[] = []
   let disposed = false
   let recoveryDiscovery: { readonly generation: number; readonly promise: Promise<void> } | null =
     null
@@ -211,6 +216,8 @@ export function createEditorRuntime({
   const suspend = () => {
     if (!active) return
     active = false
+    for (const stop of stopActive) stop()
+    stopActive = []
     fileOpenIntentOwner.scheduleDisconnect()
   }
 
@@ -249,6 +256,22 @@ export function createEditorRuntime({
     resume() {
       if (active || disposed) return
       active = true
+      stopActive = [
+        bindLanguageCensus({
+          queryClient,
+          root: () => workspaceStore.getState().rootFolder?.path ?? null,
+        }),
+        registerEditorOpenBenchmarkControl(editorOpenBenchmarkControl),
+        watchFileAvailability({
+          documentStore,
+          workspaceStore,
+          queryClient,
+          forgetFile: (document) => {
+            void getNavigation().editorCommands(workspaceStore).discardLiveEditorDocument(document)
+              .settled
+          },
+        }),
+      ]
       fileOpenIntentOwner.connect()
       discoverRecovery()
     },

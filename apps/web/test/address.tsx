@@ -9,6 +9,7 @@ import { useEffect } from 'react'
 import { onTestFinished } from 'vitest'
 import { expect } from './fixtures'
 import { NavigationProvider } from '@/providers/navigation-provider'
+import { bindNavigation } from '@/state/navigation-binding'
 
 import type { Navigation } from '@/state/navigation'
 import { createTestNavigation } from './factories/navigation'
@@ -105,6 +106,7 @@ export function startAt(href: string) {
 }
 
 export function renderPendingNavigation(navigation: Navigation) {
+  onTestFinished(bindNavigation(navigation))
   return render(<NavigationProvider navigation={navigation}>{null}</NavigationProvider>)
 }
 

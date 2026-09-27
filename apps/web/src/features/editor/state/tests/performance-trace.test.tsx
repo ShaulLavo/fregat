@@ -118,32 +118,6 @@ test('trace-only bridge forwards opaque sample controls and unregisters ownershi
   )
 })
 
-test('benchmark control registration rejects concurrent owners', () => {
-  const control = {
-    begin: vi.fn(),
-    prime: vi.fn(async () => ({ ready: true as const })),
-    reset: vi.fn(async () => ({
-      evictions: 0,
-      nonTargetIntents: 0,
-      preparedClaims: 0,
-      promotedBytes: 0,
-      highlighterRuntimeSessionIds: [],
-      quiescent: true as const,
-      structuralRuntimeSessionIds: [],
-      targetIntents: 0,
-      transferredHighlighterRuntimeSessionIds: [],
-      transferredStructuralRuntimeSessionIds: [],
-      wastedIntents: 0,
-    })),
-  }
-  const unregister = registerEditorOpenBenchmarkControl(control)
-
-  expect(() => registerEditorOpenBenchmarkControl({ ...control })).toThrow(
-    'Editor-open benchmark control is already registered',
-  )
-  unregister()
-})
-
 /** The trace rides on client logging, which is off under test by default. */
 function installTraceFromUrl(): void {
   vi.stubEnv('OBSERVABILITY_ENABLED', 'true')

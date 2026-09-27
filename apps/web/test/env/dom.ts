@@ -11,6 +11,7 @@ import { createInProcessClient } from '../client'
 import { installTestClient } from '../factories/client-binding'
 import { makeTestServer, type TestServer } from '../server'
 import './jest-dom'
+import './workspace-cache'
 
 // Every provider stack these tests mount reads settings through `getClient()`.
 // Left at its production default that client opens a real socket to a port no

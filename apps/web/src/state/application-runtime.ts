@@ -25,6 +25,7 @@ import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-
 import type { QueryClient } from '@tanstack/react-query'
 import type { EditorPreparedEnvironment } from '@/features/editor/utils/prepared-document'
 import { readWorkspaceCache, type CachedWorkspaceState } from '@/features/workspace/state/cache'
+import { subscribeWorkspaceCachePersistence } from '@/features/workspace/state/cache-persistence'
 import { activateWorkspaceRoot } from '@/features/workspace/state/active-project'
 import { createCommandRuntimeBinding } from '@/keymap/state/runtime-binding'
 import { canonicalServerOrigin } from '@workspace/client-core/transport/client'
@@ -35,12 +36,14 @@ import {
 } from '@/lib/environments/state/activity'
 import { queryClientFor } from '@/lib/environments/state/query-clients'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
+import { selectServerConnection } from '@workspace/client-core/environments/state/store'
 
 type RetainedEnvironment = {
   readonly origin: string
   readonly queryClient: QueryClient
   readonly editor: EditorRuntime
   readonly stopSearchReload: () => void
+  readonly stopCachePersistence: () => void
   readonly unsubscribeRoot: () => void
 }
 
@@ -65,6 +68,15 @@ export function createApplicationRuntime({
   const commandBinding = createCommandRuntimeBinding()
   const environments = new Map<EnvironmentId, RetainedEnvironment>()
   let current: RetainedEnvironment
+  let started = false
+  let disposed = false
+
+  // Only the active machine's editor runs, and not while ConnectionGate withholds its workbench.
+  function syncActiveEditor() {
+    if (!started || disposed) return
+    if (refusedBeforeHandshake(current.origin)) current.editor.suspend()
+    else current.editor.resume()
+  }
 
   function createEnvironment(origin: string, seed: CachedWorkspaceState): RetainedEnvironment {
     const storage = environmentScopedStorage(confirmedEnvironmentId(origin))
@@ -86,6 +98,13 @@ export function createApplicationRuntime({
       queryClient,
       editor,
       stopSearchReload,
+      // Before any recovery, so a recovered root recreates its erased cache entry.
+      stopCachePersistence: subscribeWorkspaceCachePersistence({
+        storage,
+        documentStore: editor.documentStore,
+        searchStore: editor.searchBufferStore,
+        workspaceStore: editor.workspaceStore,
+      }),
       unsubscribeRoot: editor.workspaceStore.subscribe(
         (state) => state.rootFolder?.path ?? null,
         (root) => {
@@ -103,6 +122,7 @@ export function createApplicationRuntime({
   activateWorkspaceRoot(current.editor.workspaceStore.getState().rootFolder?.path ?? null)
 
   const connections = createEnvironmentConnections()
+  const stopAdmissionWatch = useEnvironmentsStore.subscribe(syncActiveEditor)
 
   const application = {
     connections,
@@ -116,9 +136,14 @@ export function createApplicationRuntime({
       return null
     },
     subscribe: (listener: () => void) => useEnvironmentsStore.subscribe(listener),
+    /** Resumes the active editor; the boot calls it after pairing, so the first request is paired. */
+    start() {
+      started = true
+      syncActiveEditor()
+    },
     activateEnvironment(origin: string) {
       origin = canonicalServerOrigin(origin)
-      if (current.origin === origin) return
+      if (disposed || current.origin === origin) return
       const environmentId = confirmedEnvironmentId(origin)
       const next =
         environments.get(environmentId) ??
@@ -133,6 +158,7 @@ export function createApplicationRuntime({
       void current.queryClient.cancelQueries()
       resumeEnvironmentActivity(next.origin)
       current = next
+      syncActiveEditor()
       activateWorkspaceRoot(current.editor.workspaceStore.getState().rootFolder?.path ?? null)
       restoreEnvironmentSessionSelection(environmentId)
       useEnvironmentsStore.getState().activate(next.origin)
@@ -169,12 +195,15 @@ export function createApplicationRuntime({
     hasUnsavedDocuments: () =>
       [...environments.values()].some(({ editor }) => editor.hasUnsavedDocuments()),
     dispose() {
+      disposed = true
+      stopAdmissionWatch()
       commandBinding.clear()
       connections.stop()
       for (const environment of environments.values()) {
         suspendEnvironmentActivity(environment.origin)
         environment.unsubscribeRoot()
         environment.stopSearchReload()
+        environment.stopCachePersistence()
         environment.editor.dispose()
         environment.queryClient.unmount()
       }
@@ -187,3 +216,10 @@ export function createApplicationRuntime({
 }
 
 export type ApplicationRuntime = ReturnType<typeof createApplicationRuntime>
+
+/** ConnectionGate's rule: a refusal before this page's first handshake keeps the workbench out. */
+function refusedBeforeHandshake(origin: string) {
+  const connection = selectServerConnection(useEnvironmentsStore.getState(), origin)
+  const refused = connection.phase === 'identity-drift' || connection.phase === 'protocol-mismatch'
+  return refused && connection.generation === 0
+}

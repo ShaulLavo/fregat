@@ -545,7 +545,7 @@
   "src/features/workspace/tests/tree-git-status-patch.test.ts": 0,
   "src/features/workspace/tests/tree-pane.test.ts": 0,
   "src/features/workspace/tests/tree-reload.test.tsx": 0,
-  "src/features/workspace/tests/use-cache-persistence.test.ts": 0,
+  "src/features/workspace/tests/cache-persistence.test.ts": 0,
   "src/features/workspace/tests/use-events.test.ts": 0,
   "src/features/workspace/tests/use-fs-actions.test.tsx": 6.9,
   "src/features/workspace/tests/use-open-root.test.tsx": 0.8,

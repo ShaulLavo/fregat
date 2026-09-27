@@ -3,6 +3,7 @@ import { readCachedEnvironmentBindings } from '@/lib/environments/state/binding-
 import { createBootRuntime } from '@/state/bootstrap-runtime'
 import type { ApplicationRuntime } from '@/state/application-runtime'
 import type { createNavigation } from '@/state/navigation'
+import { bindNavigation } from '@/state/navigation-binding'
 import { primaryServerOrigin } from '@/lib/client'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { readEnvironmentDescriptor } from '@/lib/environments/utils/descriptor'
@@ -22,6 +23,7 @@ export function createBootstrap(
   navigation: ReturnType<typeof createNavigation>,
   { reload }: { readonly reload?: () => void } = {},
 ) {
+  const unbindNavigation = bindNavigation(navigation)
   const store = createStore<BootstrapState>(() => ({
     application: prepareCachedRuntime(navigation),
     error: null,
@@ -45,7 +47,10 @@ export function createBootstrap(
     const controller = new AbortController()
     abort = controller
     const prepared = store.getState().application
-    if (prepared) detach = navigation.attach(prepared)
+    if (prepared) {
+      detach = navigation.attach(prepared)
+      prepared.start()
+    }
     useEnvironmentsStore.getState().setPhase(primaryServerOrigin(), 'connecting')
     void readEnvironmentDescriptor(
       primaryServerOrigin(),
@@ -56,6 +61,7 @@ export function createBootstrap(
         const application =
           store.getState().application ?? createBootRuntime(descriptor, navigation.initial)
         if (!detach) detach = navigation.attach(application)
+        application.start()
         store.setState({ application, error: null })
       })
       .catch((cause) => {
@@ -96,6 +102,7 @@ export function createBootstrap(
   function dispose() {
     if (disposed) return
     disposed = true
+    unbindNavigation()
     stopIdentityWatch()
     abort?.abort()
     detach?.()

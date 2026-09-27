@@ -9,7 +9,7 @@
 - Effort: M. Phases land on their own; 1 goes first because 2 and 4 read through it.
 - Progress:
   - [x] Phase 1: navigation is bound at boot
-  - [ ] Phase 2: the editor runtime owns its own active lifetime
+  - [x] Phase 2: the editor runtime owns its own active lifetime
   - [ ] Phase 3: settings reach non-React consumers by subscription
   - [ ] Phase 4: the command runtime reads settings at dispatch
   - [ ] Phase 5: editor theme selection from settings
@@ -105,6 +105,23 @@ provider's effect (`state-provider.tsx:74`).
     `createEnvironment` and dispose with the environment instead.
 - "The active runtime" is read as `getNavigation().getSnapshot()` after phase 1, or passed in by
   `application-runtime.ts`. No new slot.
+- As landed: navigation exposes no application snapshot, so the census source and the benchmark
+  control are pushed by `EditorRuntime.resume()` (its non-React owner) and released by
+  `suspend()`; the last resumed runtime wins. Cache persistence lives for the environment
+  (`createEnvironment` to `dispose`) in `application-runtime.ts`, beside `prepareSearchReload`,
+  and moved to `features/workspace/state/cache-persistence.ts`. `createBootstrap` binds
+  navigation (phase 1 follow-up), so `cached-bootstrap.test.tsx` fails if the bind moves back
+  behind an effect. The application resumes its editor from `start()`, which `createBootstrap`
+  calls from `bootstrap.start()`, after `main.tsx` claims a pairing link, so recovery discovery
+  carries the pairing cookie. `ConnectionGate`'s refusal rule is also the runtime's: a machine
+  refused before this page's first handshake (identity drift or protocol mismatch at generation 0)
+  keeps its editor suspended until admitted. `activateEnvironment` throws for a machine already
+  refused (`confirmedEnvironmentId`); the hold covers one refused after activation.
+- Known edges, accepted: `activateEnvironment` resumes a re-activated editor before React's layout
+  effect refreshes its file-open preparer (theme, tab size), so prepares in that window use the
+  values from its last activation. The unscoped cache keys (`uiMode`, `workbenchLayout`,
+  `chatModePanels`) now have one writer per retained environment; a parked machine's write still
+  pending inside the 350 ms debounce can land after the active one's.
 - Verify: `features/editor` runtime tests for resume/suspend and a machine switch;
   `scenario editor-syntax-shiki-settled` (census preload); `apps/web/scripts/editor-open-benchmark.mjs`
   once; `scenario workspace-switch` and `scenario editor-reload-paint` (cache persistence and
@@ -169,6 +186,8 @@ reliably, and review catches it.
 
 ## Found along the way
 
+- `scenario session-undo` fails about 1 run in 4 with a `waitForURL` timeout in the archive and
+  reopen steps, on `origin/main` as well (seen 2026-09-27 during phase 1). Needs its own owner.
 - The Connect machine picker shows a refused connection as `TypeError: Failed to fetch`,
   `code: unknown` (seen in `scenario machine-connect-error`, 2026-09-27). The connect path passes a
   raw fetch failure to the dialog instead of a structured error with `why` and `fix`. Not in this
