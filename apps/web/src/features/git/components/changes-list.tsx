@@ -2,7 +2,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import { captureGitView, savedGitView } from '@/features/git/state/reload'
 import { addLifecycleFlush } from '@/lib/lifecycle-flush'
 import { useEffect, useState, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { isContextMenuKey } from '@workspace/utils/keyboard'
+import { useListContextMenu } from '@/keymap/menus/hooks/use-list-context-menu'
+import { GroupMenu } from '@/features/git/components/group-menu'
+import { FileMenu } from '@/features/git/components/file-menu'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { VirtualList, type VirtualListHandle } from '@workspace/ui/patterns/virtual-list'
@@ -59,19 +61,13 @@ export function ChangesList({
     void navigation.setWorkbenchPanels({ ...panels, gitChangesOpen: { ...open, [id]: expanded } })
   }
 
+  const contextMenu = useListContextMenu<string>({
+    containerRef: scrollRef,
+    isTargetPresent: (target) => entries.some((entry) => entry.id === target),
+  })
+
   function openActiveMenu(event: ReactKeyboardEvent<HTMLDivElement>, id: string): void {
-    if (!isContextMenuKey(event)) return
-    const row = document.getElementById(listbox.rowProps(id).id)
-    if (!row) return
-    event.preventDefault()
-    row.dispatchEvent(
-      new window.KeyboardEvent('keydown', {
-        key: event.key,
-        shiftKey: event.shiftKey,
-        bubbles: true,
-        cancelable: true,
-      }),
-    )
+    contextMenu.openOnMenuKey(event, id)
   }
 
   // A row the cursor reaches may be unmounted, so the virtualizer scrolls it in.
@@ -113,7 +109,13 @@ export function ChangesList({
   }, [owner, rootPath, activeId, restored])
 
   // Keep hundreds of rows independent of the list cursor's changing render state.
-  const bindings = { rowBindings: listbox.rowBindings, focus: listbox.focus }
+  const bindings = {
+    rowBindings: listbox.rowBindings,
+    focus: listbox.focus,
+    openMenu: contextMenu.openAtEvent,
+  }
+
+  const menuEntry = entries.find((entry) => entry.id === contextMenu.target)
 
   function renderEntry(entry: ChangesEntry) {
     if (entry.kind === 'group') {
@@ -155,6 +157,7 @@ export function ChangesList({
     <ChangesContext value={bindings}>
       <VirtualList
         {...listbox.containerProps}
+        {...contextMenu.containerProps}
         initialOffset={restored?.scrollTop}
         onScroll={(event) => {
           lastScroll.current = event.currentTarget.scrollTop
@@ -174,6 +177,25 @@ export function ChangesList({
         )}
         scrollRef={scrollRef}
       />
+      {contextMenu.anchor && menuEntry?.kind === 'file' ? (
+        <FileMenu
+          anchor={contextMenu.anchor}
+          onOpenChange={contextMenu.onOpenChange}
+          returnFocusTo={contextMenu.returnFocusTo}
+          rootPath={rootPath}
+          row={menuEntry.row}
+        />
+      ) : null}
+      {contextMenu.anchor && menuEntry?.kind === 'group' ? (
+        <GroupMenu
+          anchor={contextMenu.anchor}
+          onOpenChange={contextMenu.onOpenChange}
+          returnFocusTo={contextMenu.returnFocusTo}
+          rootPath={rootPath}
+          rows={menuEntry.group.rows}
+          section={menuEntry.group.section}
+        />
+      ) : null}
     </ChangesContext>
   )
 }
