@@ -27,7 +27,7 @@ type Fetcher = (url: string, init?: RequestInit) => Promise<Response>
 type UpdateCommandResult = { exitCode: number | null; output: string; timedOut: boolean }
 
 /** Everything maintenance asks the machine. Tests replace it so nothing is installed. */
-type ProviderMaintenanceProbe = {
+export type ProviderMaintenanceProbe = {
   fetcher: Fetcher
   realPath: (filePath: string) => string
   run: (argv: readonly string[], env: NodeJS.ProcessEnv) => Promise<UpdateCommandResult>

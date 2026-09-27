@@ -9,8 +9,42 @@ function TooltipProvider({ delay = TOOLTIP_DELAY, ...props }: TooltipPrimitive.P
   return <TooltipPrimitive.Provider data-slot='tooltip-provider' delay={delay} {...props} />
 }
 
-function Tooltip({ ...props }: TooltipPrimitive.Root.Props) {
-  return <TooltipPrimitive.Root data-slot='tooltip' {...props} />
+function Tooltip({ onOpenChange, ...props }: TooltipPrimitive.Root.Props) {
+  return (
+    <TooltipPrimitive.Root
+      data-slot='tooltip'
+      {...props}
+      onOpenChange={(open, details) => {
+        if (open && details.reason === 'trigger-focus' && isSurfaceOpeningFocus(details)) {
+          details.cancel()
+          return
+        }
+        onOpenChange?.(open, details)
+      }}
+    />
+  )
+}
+
+/**
+ * Base UI marks every floating surface's popup root with this attribute — dialog, popover,
+ * menu, select, the tooltip itself — regardless of which primitive it belongs to.
+ */
+const FLOATING_SURFACE_SELECTOR = '[data-base-ui-focusable]'
+
+/**
+ * True when a trigger's focus is a surface taking its own opening focus (autofocus on a
+ * dialog, popover, …), not the user tabbing to it. `:focus-visible` cannot tell these apart:
+ * both carry keyboard modality. Only the second should open a tooltip, or it would swallow
+ * the surface's first Escape.
+ */
+function isSurfaceOpeningFocus(
+  details: Extract<TooltipPrimitive.Root.ChangeEventDetails, { reason: 'trigger-focus' }>,
+) {
+  const surface = details.trigger?.closest(FLOATING_SURFACE_SELECTOR)
+  if (!surface) return false
+
+  const previous = details.event.relatedTarget
+  return !(previous instanceof Node) || !surface.contains(previous)
 }
 
 function TooltipTrigger({ ...props }: TooltipPrimitive.Trigger.Props) {

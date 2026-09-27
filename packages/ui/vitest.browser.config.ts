@@ -1,10 +1,11 @@
 import path from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
+import react from '@vitejs/plugin-react'
 import { playwright } from '@vitest/browser-playwright'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
-  plugins: [tailwindcss()],
+  plugins: [react({ compiler: true }), tailwindcss()],
   resolve: {
     alias: {
       '@workspace/ui/globals.css': path.resolve(import.meta.dirname, './src/styles/globals.css'),
@@ -16,6 +17,7 @@ export default defineConfig({
   optimizeDeps: {
     include: [
       '@base-ui/react/tooltip',
+      '@base-ui/react/dialog',
       '@base-ui/react/button',
       '@base-ui/react/switch',
       'class-variance-authority',

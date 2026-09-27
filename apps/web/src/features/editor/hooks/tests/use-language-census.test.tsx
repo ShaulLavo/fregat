@@ -2,7 +2,10 @@ import { act, waitFor } from '@testing-library/react'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { useLanguageCensus } from '@/features/editor/hooks/use-language-census'
-import { workspacePreloadLanguages } from '@/features/editor/state/language-census'
+import {
+  bindLanguageCensus,
+  workspacePreloadLanguages,
+} from '@/features/editor/state/language-census'
 import { createEditorWorkspaceStore } from '@/features/editor/state/workspace-state'
 import { languageCensusQueryOptions } from '@/features/editor/utils/language-census-query'
 import { EDITOR_SHIKI_PRELOAD_LANGUAGES } from '@/features/editor/utils/shiki-languages'
@@ -12,7 +15,7 @@ import { expect, test } from '../../../../../test/fixtures'
 import { watchFilesystem } from '../../../../../test/factories/filesystem-events'
 import { createTestQueryClient, renderHookWithProviders } from '../../../../../test/render'
 
-test('the preload getter reads the current cache, workspace root and machine', async ({
+test('the hook loads the census the preload getter reads for the bound root and machine', async ({
   client,
   server,
 }) => {
@@ -33,9 +36,12 @@ test('the preload getter reads the current cache, workspace root and machine', a
     new AbortController().signal,
     client,
   )
-  const { rerender, unmount } = renderHookWithProviders((owner) => useLanguageCensus(owner), {
+  const { unmount } = renderHookWithProviders((owner) => useLanguageCensus(owner), {
     initialProps: { queryClient, workspaceStore },
   })
+  // The editor runtime binds its source on resume; this test stands in for it.
+  const root = () => workspaceStore.getState().rootFolder?.path ?? null
+  let unbind = bindLanguageCensus({ queryClient, root })
   const getter = workspacePreloadLanguages
   expect(getter()).toBe(EDITOR_SHIKI_PRELOAD_LANGUAGES)
   act(() =>
@@ -65,8 +71,10 @@ test('the preload getter reads the current cache, workspace root and machine', a
 
   const otherMachine = createTestQueryClient()
   otherMachine.setQueryData(second, { readiness: 'ready', scanRoot: null, counts: { '.rs': 30 } })
-  rerender({ queryClient: otherMachine, workspaceStore })
+  unbind()
+  unbind = bindLanguageCensus({ queryClient: otherMachine, root })
   expect(getter()).toEqual(['rust'])
+  unbind()
   unmount()
   expect(getter()).toBe(EDITOR_SHIKI_PRELOAD_LANGUAGES)
   queryClient.clear()

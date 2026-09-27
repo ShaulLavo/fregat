@@ -183,6 +183,127 @@ describe('agent diagnostics deadlines', () => {
   })
 })
 
+describe('tsserver pull diagnostics', () => {
+  it('answers from the executeCommand pull, not a stale versionless publication that lands after the change', async () => {
+    const fixture = await tsserverFixture()
+    const uri = 'file:///repo/a.ts'
+    await fixture.first.handleClientMessage(json(didOpen(uri, 'const a = 1')))
+    await fixture.first.handleClientMessage(json(didChange(uri, 1, [{ text: 'const a = 2' }])))
+
+    const reading = fixture.pool.fileDiagnostics(fixture.match, uri, 500, 'const a = 2')
+    await waitFor(
+      () => tsserverExecuteCommands(fixture).length === 2,
+      'expected two tsserver diagnostics requests',
+    )
+
+    // A stale versionless publication for the pre-edit text lands after the change but before
+    // the pull answers. The bug this guards against read a publication like this as current.
+    fixture.respond({
+      jsonrpc: '2.0',
+      method: 'textDocument/publishDiagnostics',
+      params: {
+        uri,
+        diagnostics: [
+          {
+            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+            message: 'Stale diagnostic for the pre-edit text.',
+            severity: 1,
+          },
+        ],
+      },
+    })
+
+    for (const request of tsserverExecuteCommands(fixture)) {
+      const params = request.params as { arguments: [string, { file: string }] }
+      const body =
+        params.arguments[0] === 'semanticDiagnosticsSync'
+          ? [
+              {
+                start: { line: 1, offset: 7 },
+                end: { line: 1, offset: 8 },
+                text: 'Real error for the edited text.',
+                code: 2322,
+                category: 'error',
+              },
+            ]
+          : []
+      fixture.respond({ id: request.id, jsonrpc: '2.0', result: { success: true, body } })
+    }
+
+    await expect(reading).resolves.toEqual({
+      mode: 'pull',
+      diagnostics: [
+        {
+          range: { start: { line: 0, character: 6 }, end: { line: 0, character: 7 } },
+          severity: 1,
+          message: 'Real error for the edited text.',
+          code: 2322,
+          source: 'typescript',
+        },
+      ],
+    })
+  })
+
+  it('drops the tsserver answer when the document changes again before it lands', async () => {
+    const fixture = await tsserverFixture()
+    const uri = 'file:///repo/a.ts'
+    await fixture.first.handleClientMessage(json(didOpen(uri, 'const a = 1')))
+
+    const reading = fixture.pool.fileDiagnostics(fixture.match, uri, 500, 'const a = 1')
+    await waitFor(
+      () => tsserverExecuteCommands(fixture).length === 2,
+      'expected two tsserver diagnostics requests',
+    )
+    const requests = tsserverExecuteCommands(fixture)
+
+    // The editor sends another change while the pull is still in flight.
+    await fixture.first.handleClientMessage(json(didChange(uri, 1, [{ text: 'const a = 2' }])))
+
+    for (const request of requests) {
+      fixture.respond({ id: request.id, jsonrpc: '2.0', result: { success: true, body: [] } })
+    }
+
+    await expect(reading).resolves.toBeNull()
+  })
+
+  it('cancels a superseded read for the same uri and answers only the newest', async () => {
+    const fixture = await tsserverFixture()
+    const uri = 'file:///repo/a.ts'
+    await fixture.first.handleClientMessage(json(didOpen(uri, 'const a = 1')))
+
+    const first = fixture.pool.fileDiagnostics(fixture.match, uri, 500, 'const a = 1')
+    await waitFor(
+      () => tsserverExecuteCommands(fixture).length === 2,
+      'expected the first read to send two requests',
+    )
+    const firstRequests = tsserverExecuteCommands(fixture)
+
+    const second = fixture.pool.fileDiagnostics(fixture.match, uri, 500, 'const a = 1')
+    await waitFor(
+      () => tsserverExecuteCommands(fixture).length === 4,
+      'expected the second read to send two more requests',
+    )
+    const secondRequests = tsserverExecuteCommands(fixture).slice(2)
+
+    const cancellations = fixture.serverMessages.filter(
+      (message) => message.method === '$/cancelRequest',
+    )
+    expect(cancellations.map((message) => (message.params as { id: unknown }).id)).toEqual(
+      firstRequests.map((request) => request.id),
+    )
+
+    for (const request of firstRequests) {
+      fixture.respond({ id: request.id, jsonrpc: '2.0', result: { success: true, body: [] } })
+    }
+    await expect(first).resolves.toBeNull()
+
+    for (const request of secondRequests) {
+      fixture.respond({ id: request.id, jsonrpc: '2.0', result: { success: true, body: [] } })
+    }
+    await expect(second).resolves.toEqual({ mode: 'pull', diagnostics: [] })
+  })
+})
+
 describe('LspSessionPool pooling', () => {
   it('replays diagnostics when another browser opens the same document', async () => {
     const fixture = await initializedFixture()
@@ -2284,6 +2405,30 @@ async function initializedFixture(
   await initialize
 
   return { ...fixture, first, second }
+}
+
+/** A single backend that has negotiated tsserver's pull path instead of `textDocument/diagnostic`. */
+async function tsserverFixture(server: Partial<LspServerMatch['server']> = {}) {
+  const fixture = await lspFixture(server)
+  const first = await fixture.pool.acquire(fixture.firstSocket, fixture.match, '')
+  if (!first) throw new Error('expected a pooled LSP session')
+
+  const initialize = first.handleClientMessage(json(initializeRequest(1)))
+  await fixture.waitForServerMessageCount(1)
+  fixture.respond({
+    id: fixture.serverMessages[0].id,
+    jsonrpc: '2.0',
+    result: {
+      capabilities: { executeCommandProvider: { commands: ['typescript.tsserverRequest'] } },
+    },
+  })
+  await initialize
+
+  return { ...fixture, first }
+}
+
+function tsserverExecuteCommands(fixture: { serverMessages: readonly Record<string, unknown>[] }) {
+  return fixture.serverMessages.filter((message) => message.method === 'workspace/executeCommand')
 }
 
 async function lspFixture(

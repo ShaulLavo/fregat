@@ -1,6 +1,6 @@
 # Plan 178: app-owned state
 
-- Status: IN PROGRESS (wave 2, lane T): steps 1–2 landed 2026-09-26; step 3 (splits) next, then 4–9. Size L. After [out-of-the-root](out-of-the-root.md).
+- Status: IN PROGRESS (wave 2, lane T): steps 1–2 and the view half of step 3 landed 2026-09-26; the controller split next, then 4–9. Size L. After [out-of-the-root](out-of-the-root.md).
 - Owns: moving the view into the app and replacing the imperative facade with props and state.
 
 ## Outcome
@@ -139,3 +139,17 @@ No visual change. Behaviour tests from the harness stay green. The TUI tree stil
   the editor it just opened; three reruns clean), `tree-parity-behaviour`, `files-tree`,
   `tree-file-clicks`, `tree-sticky-scroll`, `file-tree-hover-prefetch`, `search-file-actions`
   green; package 109, workspace node/dom, tree browser 80 and `tree-pane.browser` tests green.
+
+### Step 3, the view, 2026-09-26
+
+`tree-view.tsx` went from 1,494 to 623 lines by moving code out unchanged:
+`utils/tree-view-layout.ts` (layout snapshot, sticky rows, guide style), `utils/tree-window-frame.ts`
+(window geometry and parked rows), `hooks/use-tree-layout.ts` (layout state, density anchor, scrollbar
+lane), `hooks/use-tree-viewport-sync.ts` (scroll, wheel, touch, keys, resize and controller sync),
+`hooks/use-tree-active-item.ts` (DOM focus tracking), `hooks/use-tree-rename.ts` (start and focus
+handoff), `hooks/use-tree-sticky-reveal.ts`, `hooks/use-tree-row-click.ts`, and the components
+`tree-filter-input.tsx`, `tree-sticky-overlay.tsx`, `tree-row-window.tsx`, `tree-context-menu-wash.tsx`.
+Layout effects keep their order; refs a hook writes live in that hook (the React Compiler rejects
+writes to a hook argument), so `useTreeLayout` hands the viewport sync a setter for its updater.
+Harness: zero drift, except `menu-open`, whose baseline moved because main's menu lost the `F2`
+chip on Rename (reproduced on main); re-baselined.

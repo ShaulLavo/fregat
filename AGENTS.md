@@ -39,6 +39,7 @@
 ## React
 
 - One component per file, one hook per file; pure helpers go to `utils/`.
+- A module variable filled from an effect so non-React code can reach it is a last resort, for DOM nodes, live sockets and held component state. Anything else is read where it lives or pushed by its non-React owner.
 - No prop-drilling of app commands or setters: a prop that is only forwarded, or a command crossing more than two components, gets a narrow provider/hook. Providers expose small domain actions (`selectTab`), not state blobs.
 - The React Compiler memoizes the app. Do not add `memo`, `useMemo` or `useCallback` by hand, except where identity is load-bearing: a value in a dependency array, a value passed to a hook (store selector, `useSyncExternalStore` pair), or a ref callback. The compiler's cache may recompute; those keep their manual memo with a comment naming the dependent hook.
 - Read what the compiler did; do not infer it. `bun run compiler:explain <file> [--component Name]` prints memo blocks as `[keys] → value`. `bun run compiler:memos [paths…]` classifies each manual memo: `redundant` (delete), `needed`, or `differs` (a missing key is a stale-value bug). Rows are not independent: remove memos one at a time.
@@ -114,6 +115,7 @@
 ## Dev, Gates, Verification
 
 - The dev server is a mesh route: the first connection to 5173 (Vite) or 3001 (API) starts it, and it stops after the idle window (`developer.devServerIdleMinutes`). Never start one by hand. `mesh serve ls` shows the `:5173` route, `mesh serve stop :5173` restarts it on the next connection, and `bun run dev:serve` registers it on a machine that lacks it. State homes: production `~/.platform`, dev `/work/platform-dev/home`, each `agent:browser` run a temp home. `/dev` (and `/platform/dev` on the mesh) is a component gallery; add a tab for anything worth eyeballing.
+- An agent's own dev server (not the shared mesh route) always takes an explicit free `--port`: a bare `vite`/host default resolves to `::1` and can shadow the shared `:5173`/`:3001` route instead of colliding with it (2026-09-27 incident).
 - `bun run gates` (`dupes:functions`, `dupes`, `design:census`, `compiler:census`, `errors:census`, `query:check`, `unused:check`) runs in pre-commit, `verify` and CI. `bun run hooks:pre-commit` is not a dry run: it stages what it fixes.
 - Prove changes with the `verify-fregat` skill (`bun run agent:browser look|scenario|trace|renders|caches`); evidence lands in `/work/tmp/fregat-evidence/<run>/`. Read the screenshot back and name the directory. Performance claims cite `trace --compare`, render claims `renders` before and after, settlement claims `caches`. Reproduce a bug on its surface before fixing it. A surface with no scenario gets one in `scripts/agent/scenarios/`, selectors in `scripts/agent/selectors.ts`.
 
@@ -129,7 +131,7 @@
 - Run only a test that could catch a specific plausible failure, and the narrowest one.
 - Vitest. Apps run `bun --bun vitest` (Bun APIs need `--bun`); runtime-neutral `packages/*` run plain `vitest`. Projects: `node`, `dom` (happy-dom, never jsdom), `browser` (`*.browser.tsx`, Playwright, plain Node, own `vitest.browser.config.ts` because `define` leaks across projects in one config).
 - Firefox and WebKit runs on this Arch machine need `scripts/playwright-webkit-arch.sh` after any `playwright install` that downloads a new WebKit (Editor and ghostty-webgpu too).
-- App tests import `{ test, expect }` from `apps/web/test/fixtures.ts` and drive the real in-process Elysia server (`server`, `client` fixtures) over real state (temp git repos, real files). Never mock our own modules. `setClient` in tests restores the previous client, not a default. No test opens a socket to our server; MSW uses `onUnhandledRequest: 'error'`.
+- App tests import `{ test, expect }` from `apps/web/test/fixtures.ts` and drive the real in-process Elysia server (`server`, `client` fixtures) over real state (temp git repos, real files). Never mock our own modules. `setClient` in tests restores the previous client, not a default. No test opens a socket to our server; MSW's `onUnhandledRequest` records every unhandled frame and fails in `afterEach`, so a request an app swallows still fails the test that made it.
 - Mock only the outside world: MSW or injected fetchers for third-party HTTP, injectable factories for PTY and LSP processes, Eden `Date` normalization. Prefer `MockProviderAdapter` over the real Codex adapter. Browser tests spawn the real server via `apps/web/test/env/browser-file-server.ts`.
 - Shared helpers: `test/fixtures.ts`, `test/render.tsx` (`renderWithProviders`), `test/factories/`, `test/env/`, `test/msw/`. No per-file factories or provider trees, no module-scope randomness.
 - `packages/ui` and `packages/tree` tests run through the React Compiler.

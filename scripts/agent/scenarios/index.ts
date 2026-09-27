@@ -1,6 +1,7 @@
 import { sessionNoFlicker } from './session-no-flicker'
 import { restNoFlicker } from './rest-no-flicker'
 import { deferredDialogs } from './deferred-dialogs'
+import { dialogEscape } from './dialog-escape'
 import { rootSwitchNoFlicker } from './root-switch-no-flicker'
 import { turnFilesNoFlicker } from './turn-files-no-flicker'
 import { branchActionsNoFlicker } from './branch-actions-no-flicker'
@@ -27,6 +28,7 @@ import { terminalHistory } from './terminal-history'
 import { chatStream } from './chat-stream'
 import { chatHistoryPages } from './chat-history-pages'
 import { chatStashContext } from './chat-stash-context'
+import { chatDraftSentLeftover } from './chat-draft-sent-leftover'
 import { chatQueue } from './chat-queue'
 import { chatQueueAway } from './chat-queue-away'
 import { chatQueueStopUpload } from './chat-queue-stop-upload'
@@ -403,6 +405,7 @@ export const scenarios: readonly Scenario[] = [
   codexApprovalRules,
   fileAttachments,
   chatStashContext,
+  chatDraftSentLeftover,
   chatStream,
   chatHistoryPages,
   sessionNoFlicker,
@@ -589,6 +592,7 @@ export const scenarios: readonly Scenario[] = [
   textFieldFkeys,
   settingsModuleFailure,
   deferredDialogs,
+  dialogEscape,
   projectMenu,
   workspaceSwitch,
   serverRestart,

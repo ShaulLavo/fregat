@@ -102,7 +102,10 @@ export function AppProviders({
       })
     const activeNavigation = navigation ?? createTestNavigation({ application: navigationOwner })
     const detach = activeNavigation.attach(navigationOwner)
+    // Binding in an effect is safe only here: children mount after setRuntime below.
+    // App code binds at boot, in createBootstrap.
     const unbind = bindNavigation(activeNavigation)
+    navigationOwner.start()
     // Runtime subscriptions belong to this effect's lifetime, including StrictMode replay.
     // oxlint-disable-next-line oxc-react-compiler/set-state-in-effect
     setRuntime({ application: navigationOwner, navigation: activeNavigation })
@@ -263,6 +266,7 @@ export function renderApplication(
   seedBootMirrorTheme('dark')
   const detach = navigation.attach(application)
   const unbind = bindNavigation(navigation)
+  application.start()
   const rendered = render(
     <StrictMode>
       <NavigationProvider navigation={navigation}>

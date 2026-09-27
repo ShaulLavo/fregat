@@ -1,7 +1,11 @@
 import { TEST_ENVIRONMENT_ID } from './factories/chat'
 import { test as base } from 'vitest'
 
-import { createControlledInProcessClient, createInProcessClient } from './client'
+import {
+  createControlledInProcessClient,
+  createInProcessClient,
+  installInProcessSocketBridge,
+} from './client'
 import { installTestClient } from './factories/client-binding'
 import { makeTestServer, type TestServer } from './server'
 
@@ -29,18 +33,22 @@ export const test = base.extend<Fixtures>({
   client: async ({ server }, provide) => {
     const client = createInProcessClient(server)
     const restore = installTestClient(client)
+    const restoreSocketBridge = installInProcessSocketBridge(server)
     try {
       await provide(client)
     } finally {
+      restoreSocketBridge()
       restore()
     }
   },
   controlledClient: async ({ server }, provide) => {
     const controlled = createControlledInProcessClient(server)
     const restore = installTestClient(controlled.client)
+    const restoreSocketBridge = installInProcessSocketBridge(server)
     try {
       await provide(controlled)
     } finally {
+      restoreSocketBridge()
       restore()
     }
   },

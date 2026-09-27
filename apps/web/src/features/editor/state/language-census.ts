@@ -8,7 +8,8 @@ type CensusSource = {
   readonly root: () => string | null
 }
 
-// The shared Shiki provider outlives workspace and machine switches.
+// The shared Shiki provider outlives workspace and machine switches; the active editor runtime
+// binds its source on resume.
 let activeSource: CensusSource | null = null
 
 export function bindLanguageCensus(source: CensusSource): () => void {

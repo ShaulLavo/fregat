@@ -1,4 +1,5 @@
 import { createEnvironmentClient, type Client } from '@workspace/client-core/transport/client'
+import { inProcessServerSocketConstructor } from '@workspace/client-core/test/in-process-server-socket'
 
 import type { TestServer } from './server'
 
@@ -394,6 +395,26 @@ function createClient(server: TestServer, fetcher: typeof fetch) {
     fetcher,
     headers: () => ({ origin: server.origin }),
   })
+}
+
+// Eden's `.lsp`/`.terminal` `.subscribe()` construct `WebSocket` directly — there is no
+// `app.handle`-style bridge for a socket. A language server match (the settings editor's
+// json-ls schema association, for one) or a terminal panel would otherwise reach a port
+// no test run listens on. Bridge the global constructor to this server's real route
+// hooks instead, for as long as the caller holds it open.
+export function installInProcessSocketBridge(server: TestServer): () => void {
+  const previous = globalThis.WebSocket
+  const bridged = inProcessServerSocketConstructor({
+    app: server.app,
+    clientOrigin: server.origin,
+  }) as unknown as typeof WebSocket
+  // happy-dom's `WebSocket` is a non-writable window property; a plain assignment throws.
+  setGlobalWebSocket(bridged)
+  return () => setGlobalWebSocket(previous)
+}
+
+function setGlobalWebSocket(value: typeof WebSocket) {
+  Object.defineProperty(globalThis, 'WebSocket', { configurable: true, writable: true, value })
 }
 
 // happy-dom's Request drops `origin` (a browser-forbidden header), which the

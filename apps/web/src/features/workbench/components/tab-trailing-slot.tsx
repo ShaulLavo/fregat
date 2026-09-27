@@ -74,5 +74,5 @@ function closeButtonVisibilityClassName({
 }) {
   if (active && !dirty) return 'opacity-100'
 
-  return 'pointer-events-none opacity-0 group-focus-within/proof-tab:pointer-events-auto group-focus-within/proof-tab:opacity-100 group-hover/proof-tab:pointer-events-auto group-hover/proof-tab:opacity-100'
+  return 'pointer-events-none opacity-0 group-focus-within/proof-tab:pointer-events-auto group-focus-within/proof-tab:opacity-100 group-hover/proof-tab:pointer-events-auto group-hover/proof-tab:opacity-100 touch:pointer-events-auto touch:opacity-100'
 }
