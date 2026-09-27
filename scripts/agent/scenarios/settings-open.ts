@@ -43,7 +43,17 @@ export const settingsOpen: Scenario = {
       .waitFor()
     strictEqual(await shownRows(page), all, 'clearing the search shows every row again')
     await step('settings-search-cleared')
+  },
+}
 
+export const settingsOpenNavigation: Scenario = {
+  name: 'settings-open-navigation',
+  description:
+    'Open Settings, search and clear, use a row menu from the keyboard, then reload a deeply scrolled page and keep its position.',
+  capture: settingsOpen.capture,
+  async run(page, context) {
+    await settingsOpen.run(page, context)
+    const { step } = context
     const actions = selectors.settingsRowActions(page, 'chat.planModeEnabled')
     await actions.focus()
     await page.keyboard.press('ArrowDown')
@@ -59,17 +69,27 @@ export const settingsOpen: Scenario = {
     )
     await step('settings-menu-closed')
 
-    await selectors.settingsRow(page, LAST_ROW).scrollIntoViewIfNeeded()
+    await selectors.settingsSearch(page).focus()
+    await selectors.settingsForm(page).hover()
+    await page.mouse.wheel(0, 3000)
+    await page.waitForFunction(
+      (element) => element !== null && element.scrollTop > 1000,
+      await selectors.settingsForm(page).elementHandle(),
+    )
+    await step('settings-scrolled')
     const scrollTop = await selectors.settingsForm(page).evaluate((element) => element.scrollTop)
     ok(scrollTop > 1000, 'the reload check starts well below the first mounting pass')
-    await step('settings-scrolled')
     await page.reload()
     await selectors.settingsRow(page, LAST_ROW).waitFor({ state: 'attached' })
+    await page.waitForFunction(
+      ({ element, offset }) => element !== null && Math.abs(element.scrollTop - offset) < 1,
+      { element: await selectors.settingsForm(page).elementHandle(), offset: scrollTop },
+    )
+    await step('settings-scroll-restored')
     const restored = await selectors.settingsForm(page).evaluate((element) => element.scrollTop)
     ok(
       Math.abs(restored - scrollTop) < 1,
       `scroll restores after all rows mount: ${scrollTop} -> ${restored}`,
     )
-    await step('settings-scroll-restored')
   },
 }

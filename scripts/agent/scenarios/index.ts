@@ -254,7 +254,7 @@ import { wallpaperCatalog } from './wallpaper-catalog'
 import { wallpaperPalette } from './wallpaper-palette'
 import { themeBundlePalette } from './theme-bundle-palette'
 import { settingsColdLoad } from './settings-cold-load'
-import { settingsOpen } from './settings-open'
+import { settingsOpen, settingsOpenNavigation } from './settings-open'
 import { serverRestart } from './server-restart'
 import { settingsDefaults } from './settings-defaults'
 import { settingsAppearanceRows } from './settings-appearance-rows'
@@ -618,6 +618,7 @@ export const scenarios: readonly Scenario[] = [
   settingsAppearanceOpen,
   settingsColdLoad,
   settingsOpen,
+  settingsOpenNavigation,
   settingsRoutePreparation,
   textFieldFkeys,
   settingsModuleFailure,

@@ -79,8 +79,8 @@ export function SettingsPage({
       ? editorHasWorkspace
       : Boolean(document.data?.layers.some((layer) => layer.id === 'workspace'))
   const query = useSettingsSearch()
-  // The list follows the box in a deferred render, which React time-slices: remounting every row
-  // for a cleared search holds no frame, and the old list stays whole until the new one paints.
+  // Defer the list so search keystrokes can paint before matching rows render.
+  // The old list stays whole until the new list commits.
   const shownQuery = useDeferredValue(query)
   const ready = Boolean(document.data && projection)
   const setQuery = selectSettingsSearch

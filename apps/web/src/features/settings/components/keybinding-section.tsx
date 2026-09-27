@@ -120,6 +120,7 @@ export function KeybindingSection() {
         setOverlay({ kind: 'menu', rowId, anchor })
       }
     },
+    revealOnMount: false,
     role: 'listbox',
     scrollToIndex: (index) => {
       if (virtualRowInView(scrollRef?.current ?? null, index, geometry.stickyHeight)) return
@@ -163,7 +164,7 @@ export function KeybindingSection() {
       <div {...listbox.containerProps} aria-label='Keyboard shortcuts' className='focus-ring-inset'>
         {visible.length === 0 ? <EmptyRow>No commands match this search.</EmptyRow> : null}
         <VirtualList
-          activeIndex={listbox.activeIndex}
+          activeIndex={activeId === null ? undefined : listbox.activeIndex}
           estimateSize={geometry.narrow ? () => 48 : undefined}
           fade={false}
           getKey={(row) => row.id}
