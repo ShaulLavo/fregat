@@ -2,8 +2,8 @@
 
 ## Status and authorization
 
-- Status: IN PROGRESS 2026-09-27. The rule landed in AGENTS.md ("React"). A1, A2, A4 and B1–B4
-  are done; the rest below is left.
+- Status: IN PROGRESS 2026-09-27. The rule landed in AGENTS.md ("React"). A1, A2, A4, A5, A8 (keep-alive),
+  B1–B4 and D5 are done; A3, A7, D4 and the preview budget stay (reasons below). A6 and C are left.
 - Origin: owner, 2026-09-27: "we prob abuse useSyncExternalStore too hard". Afterwards the owner
   approved the survey: hand-built stores become zustand, zustand stores read without a selector
   get selectors, snapshots that derive per read are cut down, and the TUI is in scope.
@@ -61,6 +61,14 @@ Done: A1 reads its list at module load (storage reads are safe there) and drops 
 A2's hook takes the defaults from `useSettingValue`, so they follow a settings change while the
 panel is open; `readLogsFilters()` still reads the mirror. A4 is one per-panel
 `state/navigator-header-store.ts`, covered by `components/tests/file-navigator-header.test.tsx`.
+A5 exposes `activeTransports` and `hooks/use-active-transport.ts`; the disposer's old `notify()`
+after `close()` changed nothing a reader saw (same reference), so it is gone. A8's keep-alive store
+exposes its `entries` store; the outlet reads it with `useStore`.
+
+Stays: A3 is a `WeakMap` keyed by `QueryClient`, mutated in place; a zustand `Map` would keep dead
+clients alive and the hooks only watch the per-owner generation. A7 keeps mutable indexes and builds
+its sorted list lazily; a store would rebuild it on every diagnostics publish. The preview budget is
+a ResizeObserver source with a number snapshot (rule 3).
 
 ### B. zustand stores read through raw `useSyncExternalStore` (web)
 
@@ -106,8 +114,8 @@ edit that returns an object.
 | D1  | `features/editor/providers/color-theme-provider.tsx:62-74`      | three lambdas over one source; folds into A6                                                                                                           |
 | D2  | `features/editor/components/history-pane.tsx:82-89`             | `historyBarrierGroup(buffer)` caches per buffer in the service; keep, but say so where it is read                                                      |
 | D3  | `features/editor/hooks/use-workspace-edit-state.ts`             | hand-rolled selector hook; works because `selectWorkspaceEditRecovery`/`Preview` return held refs. Becomes `useStore` once the service exposes a store |
-| D4  | `features/workbench/hooks/use-group-split-availability.ts`      | packs two booleans into a number and keeps a manual `useCallback` for the snapshot. With a geometry store and `useShallow` both go                     |
-| D5  | `features/chat-mode/hooks/use-session-checkout-refresh.ts:17`   | packs four worktree fields into a `\0` string, then splits it in the effect. `useShallow` over an object reads better                                  |
+| D4  | `features/workbench/hooks/use-group-split-availability.ts`      | stays: ResizeObserver source (rule 3); the packed number keeps the snapshot a primitive, and `compiler:memos` marks the `useCallback` needed           |
+| D5  | `features/chat-mode/hooks/use-session-checkout-refresh.ts:17`   | **done**: `useShallow` over `{ id, branch, headCommit, path }` replaces the `\0` string                                                                |
 | D6  | `keymap/hooks/use-shortcut-hint.ts`, `use-any-shortcut-hint.ts` | derive a label per read; primitive, stays (rule 3: DOM key events)                                                                                     |
 
 Also sweep zustand selectors that build a fresh array or object (`.filter`, `.map`, `{ … }`)

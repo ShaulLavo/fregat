@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { createStore } from 'zustand/vanilla'
 
 /** `attached` is false while no slot shows the entry, so content can stand down without unmounting. */
 export type KeptRender = (attached: boolean) => ReactNode
@@ -17,31 +18,23 @@ export type KeptEntry = {
  * parks the content instead of destroying it. Entries leave by `prune` alone.
  */
 export function createKeepAliveStore() {
-  let entries: readonly KeptEntry[] = []
+  const entries = createStore<readonly KeptEntry[]>(() => [])
   let parking: HTMLElement | null = null
-  const listeners = new Set<() => void>()
 
   function commit(next: readonly KeptEntry[]) {
-    entries = next
-    for (const listener of listeners) listener()
+    entries.setState(next, true)
   }
 
   function replace(id: string, update: (entry: KeptEntry) => KeptEntry) {
-    commit(entries.map((entry) => (entry.id === id ? update(entry) : entry)))
+    commit(entries.getState().map((entry) => (entry.id === id ? update(entry) : entry)))
   }
 
   function find(id: string) {
-    return entries.find((entry) => entry.id === id)
+    return entries.getState().find((entry) => entry.id === id)
   }
 
   return {
-    getEntries: () => entries,
-    subscribe(listener: () => void) {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
-    },
+    entries,
     setParking(element: HTMLElement | null) {
       parking = element
     },
@@ -52,7 +45,7 @@ export function createKeepAliveStore() {
       }
       const element = document.createElement('div')
       element.className = 'size-full min-h-0 min-w-0'
-      commit([...entries, { id, scope, element, attached: false, render }])
+      commit([...entries.getState(), { id, scope, element, attached: false, render }])
     },
     attach(id: string, container: HTMLElement) {
       const entry = find(id)
@@ -70,9 +63,10 @@ export function createKeepAliveStore() {
     },
     /** Drops every entry of `scope` that is not in `ids`. The only way content is destroyed. */
     prune(scope: string, ids: readonly string[]) {
-      const kept = entries.filter((entry) => entry.scope !== scope || ids.includes(entry.id))
-      if (kept.length === entries.length) return
-      for (const entry of entries) {
+      const current = entries.getState()
+      const kept = current.filter((entry) => entry.scope !== scope || ids.includes(entry.id))
+      if (kept.length === current.length) return
+      for (const entry of current) {
         if (!kept.includes(entry)) entry.element.remove()
       }
       commit(kept)
