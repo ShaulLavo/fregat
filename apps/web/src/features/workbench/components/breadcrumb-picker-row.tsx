@@ -1,7 +1,6 @@
 import { ListRow } from '@workspace/ui/patterns/list-row'
+import { TreeRowLead } from '@workspace/ui/patterns/tree-row-lead'
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'
-import { CaretRightIcon } from '@phosphor-icons/react'
-import { cn } from '@workspace/ui/lib/utils'
 import type { ReactNode } from 'react'
 
 export function BreadcrumbPickerRow({
@@ -39,7 +38,6 @@ export function BreadcrumbPickerRow({
       data-breadcrumb-path={path}
       data-breadcrumb-row=''
       role='treeitem'
-      style={{ paddingLeft: `calc(var(--density-row-padding-x) + ${depth} * 1rem)` }}
       title={path}
       type='button'
       onClick={(event) => {
@@ -47,21 +45,14 @@ export function BreadcrumbPickerRow({
         onActivate()
       }}
     >
-      <span className='flex size-3.5 shrink-0 items-center justify-center'>
-        {expandable ? (
-          <CaretRightIcon
-            aria-hidden='true'
-            className={cn(
-              'text-muted-foreground size-(--icon-size-sm) transition-transform',
-              expanded && 'rotate-90',
-            )}
-            onClick={(event) => {
-              event.stopPropagation()
-              onToggle()
-            }}
-          />
-        ) : null}
-      </span>
+      <TreeRowLead
+        depth={depth}
+        expanded={expandable ? expanded : undefined}
+        onChevronClick={(event) => {
+          event.stopPropagation()
+          onToggle()
+        }}
+      />
       {icon}
       <span className='min-w-0 flex-1 truncate'>{label}</span>
       {trailing}

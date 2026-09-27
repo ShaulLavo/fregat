@@ -1,5 +1,6 @@
 /** @jsxImportSource react */
 
+import { cn } from '@workspace/ui/lib/utils'
 import '@/features/workspace/components/tree-view.css'
 
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react'
@@ -134,6 +135,7 @@ export function TreeHost({
   return (
     <div
       {...hostProps}
+      className={cn('group/tree', hostProps.className)}
       data-file-tree=''
       data-file-tree-virtualized='true'
       id={id}

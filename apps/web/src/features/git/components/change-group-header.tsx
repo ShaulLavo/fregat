@@ -1,6 +1,5 @@
-import { CaretDownIcon } from '@phosphor-icons/react'
+import { TreeRowLead } from '@workspace/ui/patterns/tree-row-lead'
 import { listRowClassName } from '@workspace/ui/patterns/list-row-classes'
-import { cn } from '@workspace/ui/lib/utils'
 import { use, type KeyboardEvent, type MouseEvent } from 'react'
 
 import { useGitState } from '@/features/git/state/store'
@@ -58,12 +57,7 @@ export function ChangeGroupHeader({
         onContextMenu={handleContextMenu}
         onKeyDown={handleKeyDown}
       >
-        <CaretDownIcon
-          className={cn(
-            'size-(--icon-size-sm) shrink-0 transition-transform',
-            !group.expanded && '-rotate-90',
-          )}
-        />
+        <TreeRowLead depth={0} expanded={group.expanded} />
         <span className='min-w-0 flex-1 truncate'>{group.label}</span>
         <GroupActions rootPath={rootPath} rows={group.rows} section={group.section} />
         <span className='ml-1'>

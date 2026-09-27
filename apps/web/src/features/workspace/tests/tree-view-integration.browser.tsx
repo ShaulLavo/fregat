@@ -445,7 +445,7 @@ function rowButton(tree: ParentNode, path: string) {
 }
 
 function fileIcon(tree: ParentNode, path: string) {
-  const icon = rowButton(tree, path).querySelector<SVGSVGElement>('[data-item-section="icon"] svg')
+  const icon = rowButton(tree, path).querySelector<SVGSVGElement>('[data-slot="tree-row-lane"] svg')
   if (!icon) throw new Error(`missing file icon ${path}`)
 
   return icon

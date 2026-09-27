@@ -49,14 +49,6 @@
       font-size: var(--text-xs);
     }
 
-    &:hover [data-item-section='spacing-item'] {
-      border-left-color: var(--trees-indent-guide-current-bg);
-    }
-
-    [data-item-section='spacing-item'] {
-      border-left-color: var(--border);
-    }
-
     button[data-item-loading='true'] [data-item-section='content'] {
       background-image:
         linear-gradient(90deg, transparent 0%, var(--foreground) 50%, transparent 100%),

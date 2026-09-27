@@ -113,21 +113,6 @@ export function computeTreeViewLayoutState({
   }
 }
 
-export function getTreeGuideStyleText(
-  treeDomId: string | undefined,
-  focusedParentPath: string | null,
-): string {
-  if (focusedParentPath == null) {
-    return ''
-  }
-
-  const escape = (value: string) => value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')
-  // A document-level rule, so it names this tree; other trees keep their own guides.
-  const scope = treeDomId == null ? '' : `[id="${escape(treeDomId)}"] `
-  // Focus reveals the ancestor; its level colour deliberately stays unchanged.
-  return `${scope}[data-item-section="spacing-item"][data-ancestor-path="${escape(focusedParentPath)}"] { opacity: var(--trees-indent-guide-active-opacity); }`
-}
-
 export function getTreeRootDomId(instanceId: string | undefined): string | undefined {
   return instanceId == null ? undefined : `${instanceId}__tree`
 }
