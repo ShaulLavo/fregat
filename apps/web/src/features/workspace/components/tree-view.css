@@ -135,13 +135,6 @@
         --trees-border-color-override,
         var(--trees-theme-sidebar-border, light-dark(#eeeeef, #070707))
       );
-      --trees-indent-guide-bg: var(
-        --trees-indent-guide-bg-override,
-        color-mix(in lab, var(--trees-fg-muted) 25%, transparent)
-      );
-      --trees-indent-guide-opacity: var(--trees-indent-guide-opacity-override, 0);
-      --trees-indent-guide-hover-opacity: var(--trees-indent-guide-hover-opacity-override, 0.75);
-      --trees-indent-guide-active-opacity: var(--trees-indent-guide-active-opacity-override, 1);
       --trees-density: var(--trees-density-override, 1);
       --trees-border-radius: var(--trees-border-radius-override, calc(6px * var(--trees-density)));
 
@@ -282,6 +275,13 @@
       --trees-context-menu-trigger-inline-offset: calc(
         var(--trees-padding-inline) + var(--trees-item-padding-x) - var(--trees-focus-ring-width)
       );
+
+      /* TreeRowLead's geometry: a level steps past the guide, the row gap and half the lane. */
+      --tree-lane: var(--trees-icon-width);
+      --tree-indent: calc(
+        var(--trees-level-gap) + var(--trees-item-row-gap) + var(--trees-icon-width) / 2 - 0.5px
+      );
+      --tree-guide-offset: calc(var(--trees-icon-width) / 2 - 0.5px);
 
       --trees-scrollbar-gutter: var(--trees-scrollbar-gutter-override, 6px);
       --trees-padding-inline: var(--trees-padding-inline-override, 16px);
@@ -571,7 +571,7 @@
         --truncate-marker-background-overlay-color: var(--trees-selected-bg);
         z-index: 3;
 
-        [data-item-section='icon'] {
+        [data-slot='tree-chevron'] {
           color: var(--trees-selected-fg);
         }
       }
@@ -626,30 +626,18 @@
       text-decoration: underline;
     }
 
-    /* Icon for each item */
-    [data-item-section='icon'] {
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--trees-fg-muted);
-      fill: currentColor;
+    /* The lead's lane: the file icon, or the chevron nudged onto the text's x-height. */
+    [data-slot='tree-row-lane'] > [data-file-icon] {
       width: var(--trees-icon-width);
-
-      > [data-file-icon] {
-        width: var(--trees-icon-width);
-        height: var(--trees-icon-width);
-      }
+      height: var(--trees-icon-width);
     }
 
-    /* Chevron rotation and visual alignment */
-    /* Chevron pointing down */
-    [data-icon-name='file-tree-icon-chevron'] {
-      &[data-align-capitals='false'] {
-        transform: translate(0, var(--trees-icon-nudge));
-      }
-      &[data-align-capitals='true'] {
-        transform: translate(0, 0);
+    [data-slot='tree-chevron'] {
+      color: var(--trees-fg-muted);
+      transform: translate(0, var(--trees-icon-nudge));
+
+      &[data-expanded='false'] {
+        transform: translate(calc(var(--trees-icon-nudge) / -2), calc(var(--trees-icon-nudge) / 2));
       }
     }
 
@@ -756,98 +744,6 @@
       display: none;
     }
 
-    /* Chevron pointing right */
-    [aria-expanded='false'][data-item-type='folder']
-      > [data-item-section='icon']
-      > [data-icon-name='file-tree-icon-chevron'] {
-      &[data-align-capitals='true'] {
-        transform: rotate(-90deg)
-          translate(calc(var(--trees-icon-nudge) / 2), calc(var(--trees-icon-nudge) / 2));
-      }
-      &[data-align-capitals='false'] {
-        transform: rotate(-90deg)
-          translate(calc(var(--trees-icon-nudge) / 2 * -1), calc(var(--trees-icon-nudge) / 2));
-      }
-    }
-
-    /* LIST IDENTATION */
-    /* Spacing container */
-    [data-item-section='spacing'] {
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      justify-content: center;
-      height: var(--trees-row-height);
-      padding-left: calc(calc(var(--trees-icon-width) / 2) - 0.5px);
-
-      &:empty {
-        padding-left: 0;
-      }
-    }
-
-    /* Spacing per level */
-    [data-item-section='spacing-item'] {
-      --trees-indent-guide-current-bg: var(--trees-indent-guide-bg);
-
-      transform: translateX(-0.25px);
-      display: inline-block;
-      border-left: 1px solid var(--trees-indent-guide-current-bg);
-      height: 100%;
-      margin-right: calc(var(--trees-level-gap) - 1px);
-      opacity: var(--trees-indent-guide-opacity);
-      transition: opacity 150ms ease;
-
-      & + & {
-        margin-left: calc(var(--trees-item-row-gap) + calc(var(--trees-icon-width) / 2) - 0.5px);
-      }
-    }
-
-    [data-item-section='spacing-item']:nth-child(6n + 1) {
-      --trees-indent-guide-current-bg: var(
-        --trees-indent-guide-bg-0-override,
-        var(--trees-indent-guide-bg)
-      );
-    }
-
-    [data-item-section='spacing-item']:nth-child(6n + 2) {
-      --trees-indent-guide-current-bg: var(
-        --trees-indent-guide-bg-1-override,
-        var(--trees-indent-guide-bg)
-      );
-    }
-
-    [data-item-section='spacing-item']:nth-child(6n + 3) {
-      --trees-indent-guide-current-bg: var(
-        --trees-indent-guide-bg-2-override,
-        var(--trees-indent-guide-bg)
-      );
-    }
-
-    [data-item-section='spacing-item']:nth-child(6n + 4) {
-      --trees-indent-guide-current-bg: var(
-        --trees-indent-guide-bg-3-override,
-        var(--trees-indent-guide-bg)
-      );
-    }
-
-    [data-item-section='spacing-item']:nth-child(6n + 5) {
-      --trees-indent-guide-current-bg: var(
-        --trees-indent-guide-bg-4-override,
-        var(--trees-indent-guide-bg)
-      );
-    }
-
-    [data-item-section='spacing-item']:nth-child(6n) {
-      --trees-indent-guide-current-bg: var(
-        --trees-indent-guide-bg-5-override,
-        var(--trees-indent-guide-bg)
-      );
-    }
-
-    &:hover [data-item-section='spacing-item'] {
-      opacity: var(--trees-indent-guide-hover-opacity);
-    }
-
     /* Git status indicator */
 
     /* This is a folder that contains a git change */
@@ -879,7 +775,7 @@
     [data-item-git-status='ignored'] {
       --trees-item-git-status-color: var(--trees-git-ignored-color);
 
-      & > [data-item-section='icon'] {
+      & [data-slot='tree-row-lane'] {
         opacity: 0.5;
       }
     }

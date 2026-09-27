@@ -1,8 +1,8 @@
 import { FileLabel } from '@/components/file-label'
-import { CaretRightIcon } from '@phosphor-icons/react'
 import type { WorkspaceSearchFileGroup } from '@/features/search/state/buffer-state'
 import { Button } from '@workspace/ui/components/button'
 import { ListRow, type ListRowProps } from '@workspace/ui/patterns/list-row'
+import { TreeRowLead } from '@workspace/ui/patterns/tree-row-lead'
 import { cn } from '@workspace/ui/lib/utils'
 
 export function SearchFileGroupHeader({
@@ -38,12 +38,7 @@ export function SearchFileGroupHeader({
         onToggle(group.path)
       }}
     >
-      <CaretRightIcon
-        className={cn(
-          'size-(--icon-size-sm) shrink-0 text-muted-foreground transition-transform',
-          !group.collapsed && 'rotate-90',
-        )}
-      />
+      <TreeRowLead depth={0} expanded={!group.collapsed} />
       <FileLabel className='flex-1' path={group.pathLabel} />
       <span className='text-2xs text-muted-foreground shrink-0 font-mono tabular-nums'>
         {group.count.toLocaleString()}
