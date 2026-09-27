@@ -96,6 +96,45 @@ test(
   SLOW_RENDER_TIMEOUT_MS,
 )
 
+test(
+  'mounts every row after the first screen, down to the shortcut list',
+  async ({ client }) => {
+    expect(client).toBeDefined()
+    const { container } = renderWithProviders(<SettingsPage />)
+
+    await waitFor(
+      () =>
+        expect(container.querySelector('[data-setting-row="keybindings.overrides"]')).not.toBe(
+          null,
+        ),
+      { timeout: SLOW_RENDER_TIMEOUT_MS },
+    )
+    const summary = await screen.findByText(/^\d+ settings$/)
+    expect(container.querySelectorAll('[data-setting-row]')).toHaveLength(
+      Number.parseInt(summary.textContent ?? '', 10),
+    )
+  },
+  SLOW_RENDER_TIMEOUT_MS,
+)
+
+test(
+  'a second press on a row’s actions closes its menu',
+  async ({ client }) => {
+    expect(client).toBeDefined()
+    renderWithProviders(<SettingsPage />)
+    const actions = await screen.findByRole('button', { name: 'Actions for chat.planModeEnabled' })
+
+    await userEvent.click(actions)
+    await screen.findByRole('menuitem', { name: 'Copy setting ID' })
+    expect(actions).toHaveAttribute('aria-expanded', 'true')
+
+    await userEvent.click(actions)
+    await waitFor(() => expect(screen.queryByRole('menu')).toBe(null))
+    expect(actions).toHaveAttribute('aria-expanded', 'false')
+  },
+  SLOW_RENDER_TIMEOUT_MS,
+)
+
 test('filters by id, label, keyword and description', () => {
   expect(matchingSettingIds('surface.blur')).toEqual(['workbench.surface.blur'])
   // A keyword match: "transparency" appears in no id or label.

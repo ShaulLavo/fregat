@@ -588,6 +588,8 @@ export const selectors = {
     page.getByRole('dialog', { name: 'Physical dialog', exact: true }),
   physicalRow: (page: Page) => page.getByRole('option', { name: 'Silent row', exact: true }),
   settingsHeader: (page: Page) => page.locator('[data-settings-header]'),
+  settingsSummaryCount: (page: Page) =>
+    page.locator('[data-settings-header]').getByText(/^\d+ settings?$/),
   shortcutsSearch: (page: Page) =>
     page.getByRole('textbox', { name: 'Search keyboard shortcuts', exact: true }),
   shortcutsList: (page: Page) => page.getByRole('listbox', { name: 'Keyboard shortcuts' }),

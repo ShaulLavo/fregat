@@ -5,7 +5,7 @@ import {
 } from '@workspace/ui/patterns/virtual-list'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { matchingSettingIds } from '@workspace/client-core/settings/search'
-import { use, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { use, useDeferredValue, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 
 import { EmptyRow } from '@/features/settings/components/empty-row'
 import { ShortcutMenu } from '@/features/settings/components/shortcut-menu'
@@ -54,7 +54,8 @@ export function KeybindingSection() {
   const { defaults, overrides, platform, preset, rows } = useShortcutRows()
   const { setKeybinding } = useSettingsActions()
   const kept = useBrowserKept(platform)
-  const pageQuery = useSettingsSearch()
+  // The page lists rows for the deferred query; narrowing by the live one would split the two.
+  const pageQuery = useDeferredValue(useSettingsSearch())
   const scrollRef = use(SettingsScrollerContext)
   const listRef = useRef<HTMLDivElement>(null)
   const toolbarRef = useRef<HTMLDivElement>(null)
