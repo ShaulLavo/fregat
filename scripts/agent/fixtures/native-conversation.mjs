@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process'
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, isAbsolute, join, normalize } from 'node:path'
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from 'node:fs'
+import { dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createInterface } from 'node:readline'
 
@@ -10,7 +17,9 @@ import { createInterface } from 'node:readline'
  * `threads/`, so a resume, fork, rewind or history read in a fresh process sees the same turns.
  * A turn answers the way its prompt asks: "reply with exactly X" answers X, and "end with X"
  * first recites the thread's earlier prompts, which is how a fork shows what it remembers.
- * While `hold` exists beside this file a turn stays running. No credentials, no tokens.
+ * While `hold` exists beside this file a turn stays running. Commands run only as
+ * `touch <path>`, the path relative and inside the checkout. It exits when stdin closes, held
+ * turns and pending approvals included. No credentials, no tokens.
  */
 const root = dirname(fileURLToPath(import.meta.url))
 const codexHome = process.env.CODEX_HOME ?? root
@@ -165,6 +174,8 @@ function runCommand(turnId, prompt, argv) {
   }
   const id = ++serverRequestId
   pendingApprovals.set(id, { turnId, prompt, argv })
+  // Codex opens the command item before it asks, and completes it after the answer.
+  item('started', turnId, commandItem(turnId, argv))
   send({
     id,
     method: 'item/commandExecution/requestApproval',
@@ -196,24 +207,46 @@ function approvalAnswered(message) {
     appendFileSync(rulesFile, ruleFor(amendment))
   }
   if (decision === 'accept' || amendment)
-    return execute(pending.turnId, pending.prompt, pending.argv)
+    return execute(pending.turnId, pending.prompt, pending.argv, { started: true })
+  item('completed', pending.turnId, {
+    ...commandItem(pending.turnId, pending.argv),
+    status: 'declined',
+  })
   endTurn(pending.turnId, 'interrupted')
 }
 
-/** Runs only `touch` on a path inside the thread's checkout; anything else fails the turn. */
-function execute(turnId, prompt, argv) {
-  const path = argv[1] ?? ''
-  const clean = normalize(path)
-  const allowed =
-    argv[0] === 'touch' && argv.length === 2 && !isAbsolute(clean) && !clean.startsWith('..')
-  const command = { id: `${turnId}-command`, type: 'commandExecution', command: argv.join(' ') }
-  item('started', turnId, { ...command, status: 'inProgress', aggregatedOutput: '' })
-  if (allowed) execFileSync('touch', [join(current.cwd, clean)])
+const commandItem = (turnId, argv) => ({
+  id: `${turnId}-command`,
+  type: 'commandExecution',
+  command: argv.join(' '),
+  status: 'inProgress',
+  aggregatedOutput: '',
+})
+
+/** A relative path with no option, no `..`, and no symlink out of the thread's checkout. */
+function checkoutPath(path) {
+  if (!path || path.startsWith('-') || isAbsolute(path)) return null
+  if (path.split(/[\\/]/).includes('..')) return null
+  const checkout = realpathSync(current.cwd)
+  const target = resolve(checkout, path)
+  let existing = target
+  while (!existsSync(existing)) existing = dirname(existing)
+  const real = realpathSync(existing)
+  return real === checkout || real.startsWith(`${checkout}${sep}`) ? target : null
+}
+
+/** Runs only `touch <path>` inside the thread's checkout; anything else fails the command. */
+function execute(turnId, prompt, argv, { started = false } = {}) {
+  const target = argv[0] === 'touch' && argv.length === 2 ? checkoutPath(argv[1]) : null
+  const command = commandItem(turnId, argv)
+  if (!started) item('started', turnId, command)
+  if (target) execFileSync('touch', [target])
+  record({ event: 'command', argv, ran: Boolean(target) })
   item('completed', turnId, {
     ...command,
-    status: allowed ? 'completed' : 'failed',
-    exitCode: allowed ? 0 : 1,
-    aggregatedOutput: allowed ? '' : 'Refused by the conversation fixture\n',
+    status: target ? 'completed' : 'failed',
+    exitCode: target ? 0 : 1,
+    aggregatedOutput: target ? '' : 'Refused by the conversation fixture\n',
   })
   answer(turnId, prompt)
 }
@@ -337,7 +370,7 @@ function result(message) {
       })
       return opened(current)
     case 'thread/resume':
-      current = loadThread(message.params.threadId) ?? newThread(message.params)
+      current = loadThread(message.params.threadId)
       if (message.params.approvalPolicy) current.approvalPolicy = message.params.approvalPolicy
       saveThread(current)
       return opened(current)
@@ -389,6 +422,12 @@ function handle(message) {
   if (message.id === undefined) return
   if (message.method === 'turn/start') return turnStart(message)
   if (message.method === 'thread/compact/start') return compact(message)
+  // Codex refuses to resume a thread it has no rollout for.
+  if (message.method === 'thread/resume' && !loadThread(message.params.threadId))
+    return send({
+      id: message.id,
+      error: { code: -32600, message: `No rollout found for thread ${message.params.threadId}` },
+    })
 
   const reply = result(message)
   if (reply !== undefined) return send({ id: message.id, result: reply })
@@ -398,6 +437,9 @@ function handle(message) {
   })
 }
 
-createInterface({ input: process.stdin }).on('line', (line) => {
-  if (line.trim()) handle(JSON.parse(line))
-})
+createInterface({ input: process.stdin })
+  .on('line', (line) => {
+    if (line.trim()) handle(JSON.parse(line))
+  })
+  // Nothing can answer an approval or release a held turn once stdin closes.
+  .on('close', () => process.exit(0))

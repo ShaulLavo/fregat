@@ -10,6 +10,7 @@ import {
   settingsSnapshotSchema,
 } from '../../../packages/contracts/src/index'
 import type { Scenario } from './index'
+import { liveNativeProcesses, reapNativeProcesses } from '../native-processes'
 import { selectors } from '../selectors'
 import { dispatch, openChat, readShell } from './chat-verification'
 
@@ -17,6 +18,8 @@ const nativeEntrySchema = v.looseObject({
   event: v.string(),
   params: v.optional(v.unknown()),
   pid: v.optional(v.number()),
+  childPid: v.optional(v.number()),
+  cwd: v.optional(v.string()),
   result: v.optional(v.unknown()),
 })
 
@@ -153,17 +156,17 @@ export async function nativeLog(root: string) {
     .map((line) => v.parse(nativeEntrySchema, JSON.parse(line)))
 }
 
+/** Waits for the fixture and its recorded children to exit; SIGKILLs survivors, then fails. */
 async function waitForNativeExit(root: string) {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     const entries = await nativeLog(root)
-    const exited = new Set(
-      entries.filter((entry) => entry.event === 'exit').map((entry) => entry.pid),
-    )
-    if (entries.filter((entry) => entry.event === 'spawn').every((entry) => exited.has(entry.pid)))
-      return entries
+    if (liveNativeProcesses(root, entries).length === 0) return entries
     await Bun.sleep(100)
   }
-  ok(false, 'Isolated native fixture processes must exit before removing their directory')
+  const survivors = liveNativeProcesses(root, await nativeLog(root))
+  reapNativeProcesses(survivors)
+  const named = survivors.map((process) => `${process.kind} ${process.pid}`).join(', ')
+  ok(false, `Native fixture processes outlived their provider and were killed: ${named}`)
 }
 
 export type NativeProvider = Awaited<ReturnType<typeof installNativeProvider>>
@@ -213,9 +216,11 @@ async function installNativeProvider(
       (item) => item.providerInstanceId !== providerInstanceId,
     )
     await writeRawSetting(page, base, 'providers.instances', remaining)
-    const entries = await waitForNativeExit(root)
-    await rm(root, { recursive: true, force: true })
-    return entries
+    try {
+      return await waitForNativeExit(root)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   }
   return {
     binary,

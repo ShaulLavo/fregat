@@ -6,9 +6,10 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   writeFileSync,
 } from 'node:fs'
-import { dirname, isAbsolute, join, normalize } from 'node:path'
+import { dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createInterface } from 'node:readline'
 
@@ -20,7 +21,10 @@ import { createInterface } from 'node:readline'
  * `can_use_tool` unless a settings rule allows the call, writes the rules an approval adds, starts
  * `.mcp.json` servers and background shells for real. A turn answers the way its prompt asks:
  * "reply with exactly X" answers X, and "end with X" first recites the transcript's earlier
- * prompts. It runs only `touch`, `sleep` and `ls`. No credentials, no tokens.
+ * prompts. Its Bash tool runs only `sleep <seconds>`, `ls [path]` and `touch <path>`, each path
+ * relative and inside the checkout; project hooks and approved `.mcp.json` servers run their own
+ * commands, as the CLI's do. It exits when stdin closes, taking its children with it, and records
+ * each child's pid so the harness can reap them if it is killed first. No credentials, no tokens.
  */
 const VERSION = '99.0.0'
 const MODEL = 'claude-haiku-4-5'
@@ -70,6 +74,12 @@ process.on('exit', () => {
   record({ event: 'exit' })
 })
 process.on('SIGTERM', () => process.exit(0))
+
+const checkout = realpathSync(cwd)
+/** The harness reaps a recorded child by pid only while it still runs in this checkout. */
+function recordChild(kind, child) {
+  if (child.pid) record({ event: 'child', kind, childPid: child.pid, cwd: checkout })
+}
 
 // ---- Transcript, in the CLI's own layout so the SDK's session reads find it.
 
@@ -224,6 +234,7 @@ function connectMcp(name, config) {
       stdio: ['pipe', 'pipe', 'ignore'],
     })
     server.child = child
+    recordChild('mcp', child)
     child.on('error', (error) => settle('failed', error.message))
     child.on('exit', () => settle('failed', 'Server exited during startup'))
     let buffer = ''
@@ -308,7 +319,7 @@ let turns = 0
 let interrupted = false
 let jsonSchema = null
 
-function assistant(content) {
+function assistant(content, uuid) {
   const message = {
     id: `msg_${crypto.randomUUID().replaceAll('-', '')}`,
     type: 'message',
@@ -319,7 +330,7 @@ function assistant(content) {
     stop_sequence: null,
     usage,
   }
-  send({ type: 'assistant', message, parent_tool_use_id: null, ...base() })
+  send({ type: 'assistant', message, parent_tool_use_id: null, ...base(), uuid })
   return message
 }
 const toolResult = (toolUseId, content, isError) =>
@@ -411,13 +422,32 @@ function structured(schema) {
   )
 }
 
-const ALLOWED = new Set(['touch', 'sleep', 'ls'])
+/** A relative path with no option, no `..`, and no symlink out of the checkout. */
+function insideCheckout(path) {
+  if (!path || path.startsWith('-') || isAbsolute(path)) return false
+  if (path.split(/[\\/]/).includes('..')) return false
+  let existing = resolve(cwd, path)
+  while (!existsSync(existing)) existing = dirname(existing)
+  const real = realpathSync(existing)
+  return real === checkout || real.startsWith(`${checkout}${sep}`)
+}
+
+/** Why the Bash tool refuses `argv`, or null for the three shapes it runs. */
 function refusal(argv) {
-  if (!ALLOWED.has(argv[0])) return `The Claude fixture runs only ${[...ALLOWED].join(', ')}`
-  const path = argv[0] === 'touch' ? normalize(argv[1] ?? '') : ''
-  if (isAbsolute(path) || path.startsWith('..'))
-    return 'The Claude fixture touches only relative paths'
-  return null
+  const [name, ...rest] = argv
+  if (name === 'sleep')
+    return rest.length === 1 && /^\d+(\.\d+)?$/.test(rest[0])
+      ? null
+      : 'The fixture runs sleep with one number of seconds'
+  if (name === 'touch')
+    return rest.length === 1 && insideCheckout(rest[0])
+      ? null
+      : 'The fixture runs touch with one relative path inside the checkout'
+  if (name === 'ls')
+    return rest.length === 0 || (rest.length === 1 && insideCheckout(rest[0]))
+      ? null
+      : 'The fixture runs ls with at most one relative path inside the checkout'
+  return 'The fixture Bash tool runs only sleep, ls and touch'
 }
 
 async function permitted(toolUseId, input) {
@@ -511,6 +541,7 @@ function startTask(toolUseId, input, argv) {
   const child = spawn(argv[0], argv.slice(1), { cwd, stdio: 'ignore' })
   tasks.set(taskId, { child, description: input.command })
   record({ event: 'task-started', taskId, command: input.command })
+  recordChild('task', child)
   system('task_started', {
     task_id: taskId,
     tool_use_id: toolUseId,
@@ -573,15 +604,17 @@ async function turn(message) {
   transcriptEntry('user', uuid, { role: 'user', content: prompt })
   for (const input of toolCalls(prompt)) {
     const toolUseId = `toolu_${crypto.randomUUID().replaceAll('-', '').slice(0, 24)}`
-    const reply = assistant([{ type: 'tool_use', id: toolUseId, name: 'Bash', input }])
-    transcriptEntry('assistant', crypto.randomUUID(), reply)
+    const replyUuid = crypto.randomUUID()
+    const reply = assistant([{ type: 'tool_use', id: toolUseId, name: 'Bash', input }], replyUuid)
+    transcriptEntry('assistant', replyUuid, reply)
     const outcome = await runBash(toolUseId, input)
     if (interrupted) return
     toolResult(toolUseId, outcome.content, outcome.isError)
   }
   const text = answerFor(prompt, earlier)
-  const reply = assistant([{ type: 'text', text }])
-  transcriptEntry('assistant', crypto.randomUUID(), reply)
+  const replyUuid = crypto.randomUUID()
+  const reply = assistant([{ type: 'text', text }], replyUuid)
+  transcriptEntry('assistant', replyUuid, reply)
   await sdkHooks('Stop', {
     session_id: sessionId,
     transcript_path: transcriptFile(sessionId),
@@ -732,4 +765,5 @@ createInterface({ input: process.stdin })
     }
     if (message.type === 'user') queue = queue.then(() => turn(message))
   })
-  .on('close', () => queue.then(() => process.exit(0)))
+  // No control response can arrive once stdin closes, so a turn waiting on one never ends.
+  .on('close', () => process.exit(0))
