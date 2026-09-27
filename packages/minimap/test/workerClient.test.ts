@@ -1524,7 +1524,7 @@ function snapshot(
     contentWidth,
     totalHeight: 60,
     gutterWidth: 0,
-    gutterLayout: { fixedWidth: 0, lanes: [] },
+    gutterLayout: { leadingInset: 0, fixedWidth: 0, lanes: [] },
     tabSize: 4,
     foldMarkers: [],
     visibleRows: overrides.visibleRows ?? [],

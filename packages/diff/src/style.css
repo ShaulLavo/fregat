@@ -102,23 +102,44 @@
 
 /*
  * The gutter band's own tint, which the canvas used to fill. This *is* per pane — a split old pane
- * shows no tint behind an addition — so it keys off the row tone rather than the lane tone.
+ * shows no tint behind an addition, because that row is a placeholder there.
  *
- * These replace `.editor-diff-gutter-row-*  { background: inherit }`, which was inert: it inherited
- * from `.editor-virtualized-gutter` rather than from the row tint (§2.3).
+ * In document mode the diff gutter is the pane's whole gutter, so the tint is the gutter row's own
+ * background (`editor-diff-gutter-band-*`, from the row decoration). The row spans the gutter's
+ * leading inset as well as the lanes, so a tinted row runs from the pane's edge to its text.
  */
-.editor-diff-gutter[data-diff-row-tone='added'] {
+.editor-diff-gutter-band-addition {
   background: var(--editor-diff-added-bg);
 }
 
-.editor-diff-gutter[data-diff-row-tone='deleted'] {
+.editor-diff-gutter-band-deletion {
   background: var(--editor-diff-deleted-bg);
 }
 
-.editor-diff-gutter[data-diff-row-tone='hunk'] {
+.editor-diff-gutter-band-hunk {
   background: var(--editor-diff-hunk-bg);
 }
 
-.editor-diff-gutter[data-diff-row-type='placeholder'] {
+.editor-diff-gutter-band-placeholder {
+  background: var(--editor-diff-placeholder-bg);
+}
+
+/*
+ * In overlay mode the diff lane shares the gutter with the host's own lanes, so only its cell is
+ * tinted. The tone comes from `diffGutterRowTone`.
+ */
+.editor-diff-gutter-tinted[data-diff-row-tone='added'] {
+  background: var(--editor-diff-added-bg);
+}
+
+.editor-diff-gutter-tinted[data-diff-row-tone='deleted'] {
+  background: var(--editor-diff-deleted-bg);
+}
+
+.editor-diff-gutter-tinted[data-diff-row-tone='hunk'] {
+  background: var(--editor-diff-hunk-bg);
+}
+
+.editor-diff-gutter-tinted[data-diff-row-type='placeholder'] {
   background: var(--editor-diff-placeholder-bg);
 }

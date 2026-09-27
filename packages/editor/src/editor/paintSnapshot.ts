@@ -27,7 +27,7 @@ export type SavedPaintRow = {
 }
 
 export type SavedPaint = {
-  readonly format: 4
+  readonly format: 5
   readonly appearance: string
   readonly scrollTop: number
   readonly scrollLeft: number
@@ -58,7 +58,7 @@ export function encodePaintSnapshot(
   }[] = [],
 ): string | null {
   const paint: SavedPaint = {
-    format: 4,
+    format: 5,
     reservedLeft: reservations.left,
     reservedRight: reservations.right,
     appearance,
@@ -229,7 +229,7 @@ function isLayer(value: unknown): value is SavedPaint['layers'][number] {
 }
 
 function isSavedPaint(value: unknown): value is SavedPaint {
-  if (!record(value) || value.format !== 4 || !string(value.appearance)) return false
+  if (!record(value) || value.format !== 5 || !string(value.appearance)) return false
   if (
     ![
       'scrollTop',
@@ -246,7 +246,12 @@ function isSavedPaint(value: unknown): value is SavedPaint {
     ].every((key) => number(value[key]))
   )
     return false
-  if (!record(value.gutterLayout) || !number(value.gutterLayout.fixedWidth)) return false
+  if (
+    !record(value.gutterLayout) ||
+    !number(value.gutterLayout.leadingInset) ||
+    !number(value.gutterLayout.fixedWidth)
+  )
+    return false
   if (!array(value.gutterLayout.lanes, 32, isLane)) return false
   if (!array(value.rows, 400, isRow) || !array(value.layers, 32, isLayer)) return false
   const segmentCount = value.rows.reduce((count, row) => count + row.segments.length, 0)
@@ -267,7 +272,7 @@ function validPaintGeometry(paint: SavedPaint): boolean {
   if (paint.scrollLeft > Math.max(0, paint.scrollWidth - paint.viewportWidth) + 1) return false
   const laneWidth = paint.gutterLayout.lanes.reduce(
     (sum, lane) => sum + lane.width,
-    paint.gutterLayout.fixedWidth,
+    paint.gutterLayout.leadingInset + paint.gutterLayout.fixedWidth,
   )
   if (Math.abs(laneWidth - paint.gutterWidth) > 0.001) return false
   if (!uniqueIds(paint.gutterLayout.lanes) || !uniqueIds(paint.layers)) return false

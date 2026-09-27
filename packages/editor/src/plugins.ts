@@ -271,6 +271,8 @@ export type EditorVisibleChunkSnapshotJSON = Omit<EditorVisibleChunkSnapshot, 't
 }
 
 export type EditorVisibleGutterLayoutJSON = {
+  /** Empty space before the first lane; row decorations paint it, lanes start after it. */
+  readonly leadingInset: number
   readonly fixedWidth: number
   readonly lanes: readonly { readonly id: string; readonly width: number }[]
 }

@@ -577,7 +577,7 @@ function snapshot({
     ...overrides,
     initialHighlightStatus: overrides.initialHighlightStatus ?? 'painted',
     gutterWidth: overrides.gutterWidth ?? 0,
-    gutterLayout: overrides.gutterLayout ?? { fixedWidth: 0, lanes: [] },
+    gutterLayout: overrides.gutterLayout ?? { leadingInset: 0, fixedWidth: 0, lanes: [] },
     toVisibleSnapshot: overrides.toVisibleSnapshot ?? (() => null),
     documentSyncPoint: overrides.documentSyncPoint ?? {
       revision: overrides.textVersion ?? 1,

@@ -102,7 +102,7 @@ function baseSnapshot(): EditorViewSnapshot {
     contentWidth: 0,
     totalHeight: 0,
     gutterWidth: 0,
-    gutterLayout: { fixedWidth: 0, lanes: [] },
+    gutterLayout: { leadingInset: 0, fixedWidth: 0, lanes: [] },
     tabSize: 4,
     foldMarkers: [],
     visibleRows: visibleRows(0, 2),

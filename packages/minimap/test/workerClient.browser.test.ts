@@ -159,7 +159,7 @@ function snapshot(text: string): EditorViewSnapshot {
     contentWidth: 160,
     totalHeight: 40,
     gutterWidth: 0,
-    gutterLayout: { fixedWidth: 0, lanes: [] },
+    gutterLayout: { leadingInset: 0, fixedWidth: 0, lanes: [] },
     tabSize: 4,
     foldMarkers: [],
     visibleRows: [],

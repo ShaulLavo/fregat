@@ -573,6 +573,7 @@ function copyMetrics(metrics: EditorViewSnapshot['metrics']): EditorViewSnapshot
 
 function copyGutterLayout(layout: EditorViewSnapshot['gutterLayout']) {
   return {
+    leadingInset: finite('gutterLayout.leadingInset', layout.leadingInset),
     fixedWidth: finite('gutterLayout.fixedWidth', layout.fixedWidth),
     lanes: layout.lanes.map((lane) => ({
       id: lane.id,

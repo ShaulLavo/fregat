@@ -47,6 +47,7 @@ function decorationForRow(row: DiffRenderRow): VirtualizedTextRowDecoration | nu
   return {
     snapshotStyle: 'colors',
     className: `editor-diff-row editor-diff-row-${row.type}${expandable}`,
-    gutterClassName: 'editor-diff-gutter-row',
+    // The whole gutter row, so the tint also covers the gutter's leading inset.
+    gutterClassName: `editor-diff-gutter-row editor-diff-gutter-band-${row.type}`,
   }
 }

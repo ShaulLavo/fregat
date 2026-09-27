@@ -18,6 +18,13 @@ import type { DiffRenderRow } from './types'
 export type DiffGutterOptions = {
   readonly side: DiffGutterSide
   /**
+   * Where a changed row's gutter tint is painted. `row`: this gutter is the pane's whole gutter
+   * (document mode), so the row decoration tints the gutter row, leading inset included, and the
+   * cell stays clear. `cell`: the gutter is shared with the host's lanes (overlay mode), so only
+   * this cell is tinted.
+   */
+  readonly tint: 'cell' | 'row'
+  /**
    * The widest line number each lane must fit, computed once when the projection is built. Passing
    * rows here instead would make `width()` re-scan every projected row on every width
    * invalidation — which in overlay mode is every line of the file.
@@ -73,7 +80,9 @@ export function createDiffGutterContribution(options: DiffGutterOptions): Editor
       restore: (cell, paint) => restoreGutter(cell, paint, laneKinds),
     },
     createCell(document) {
-      return createDiffGutterCell(document, laneKinds)
+      const cell = createDiffGutterCell(document, laneKinds)
+      if (options.tint === 'cell') cell.classList.add('editor-diff-gutter-tinted')
+      return cell
     },
     width(context) {
       if (options.isEnabled && !options.isEnabled()) return 0

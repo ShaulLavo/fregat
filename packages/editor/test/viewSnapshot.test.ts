@@ -1165,6 +1165,7 @@ function snapshotHarness(
     totalHeight: 20,
     gutterWidth: options.gutterWidth ?? 32,
     gutterLayout: options.gutterLayout ?? {
+      leadingInset: 0,
       fixedWidth: 0,
       lanes: [{ id: 'line-gutter', width: 32 }],
     },

@@ -233,7 +233,7 @@ function snapshot(text: string, selection: readonly [number, number]): EditorVie
     contentWidth: 88,
     totalHeight: lineStarts.length * 20,
     gutterWidth: 0,
-    gutterLayout: { fixedWidth: 0, lanes: [] },
+    gutterLayout: { leadingInset: 0, fixedWidth: 0, lanes: [] },
     tabSize: 2,
     foldMarkers: [],
     visibleRows: [],

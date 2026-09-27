@@ -50,6 +50,7 @@ import {
   normalizeChunkSize,
   normalizeChunkThreshold,
   normalizeHorizontalOverscan,
+  normalizeGutterLeadingInset,
   normalizeRowGap,
   normalizeRowHeight,
   fontFamilyValue,
@@ -146,6 +147,7 @@ import {
   ensureOffsetMounted,
   getMountedRows,
   gutterWidth,
+  setGutterLeadingInsetProperty,
   horizontalViewportColumns,
   pageRowDelta,
   paintProvisionalRows,
@@ -384,6 +386,7 @@ export class VirtualizedTextView {
       gutterElement,
       gutterContributions,
       gutterWidthProvider,
+      gutterLeadingInset: normalizeGutterLeadingInset(options.gutterLeadingInset),
       caretLayerElement,
       caretElement,
       deferredCaret: null,
@@ -442,6 +445,7 @@ export class VirtualizedTextView {
       gutterContributionWidths: new Map(),
       gutterWidthDirty: true,
       currentGutterWidth: 0,
+      currentGutterLeadingInset: 0,
       contentWidth: 0,
       maxVisualColumnsSeen: 0,
       lastWidthScanStart: 0,
@@ -635,6 +639,7 @@ export class VirtualizedTextView {
     this.view.viewport.setViewportSize(paint.viewportWidth, paint.viewportHeight)
     this.view.viewport.setScrollPosition(paint.scrollLeft, paint.scrollTop)
     this.scrollElement.style.setProperty('--editor-gutter-width', `${paint.gutterWidth}px`)
+    setGutterLeadingInsetProperty(this.view, paint.gutterLayout.leadingInset)
     const release = paintProvisionalRows(this.view, paint)
     if (!release) {
       this.commitProvisionalPaint()
@@ -910,6 +915,17 @@ export class VirtualizedTextView {
 
   public setRowHeight(rowHeight: number): boolean {
     return this.setLineHeight(rowHeight)
+  }
+
+  public setGutterLeadingInset(inset: number): boolean {
+    const view = this.view
+    const next = normalizeGutterLeadingInset(inset)
+    if (view.gutterLeadingInset === next) return false
+
+    view.gutterLeadingInset = next
+    view.gutterWidthDirty = true
+    this.renderSnapshot(view.virtualizer.getSnapshot())
+    return true
   }
 
   public setRowGap(rowGap: number): boolean {
@@ -1320,8 +1336,10 @@ export class VirtualizedTextView {
       contentWidth: view.contentWidth,
       gutterWidth: view.currentGutterWidth,
       gutterLayout: {
+        leadingInset: view.currentGutterLeadingInset,
         fixedWidth:
           view.currentGutterWidth -
+          view.currentGutterLeadingInset -
           Array.from(view.gutterContributionWidths.values()).reduce(
             (total, width) => total + width,
             0,

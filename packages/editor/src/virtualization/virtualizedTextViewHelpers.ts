@@ -42,6 +42,12 @@ export function normalizeRowGap(rowGap: number | undefined): number {
   return rowGap
 }
 
+/** Whole pixels, like the lane widths, so the gutter's edge stays on the pixel grid. */
+export function normalizeGutterLeadingInset(inset: number | undefined): number {
+  if (!Number.isFinite(inset) || inset === undefined || inset <= 0) return 0
+  return Math.ceil(inset)
+}
+
 export function normalizeChunkSize(size: number | undefined): number {
   if (!Number.isFinite(size) || size === undefined || size <= 0) {
     return DEFAULT_LONG_LINE_CHUNK_SIZE

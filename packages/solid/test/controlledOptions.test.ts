@@ -46,6 +46,7 @@ const OPTION_SAMPLES: Record<EditorControlledOptionName, OptionSample> = {
     applied: ['JetBrains Mono, monospace'],
   },
   fontSize: { initial: 12, next: 15, method: 'setFontSize', applied: [15] },
+  gutterLeadingInset: { initial: 0, next: 12, method: 'setGutterLeadingInset', applied: [12] },
   hiddenCharacters: {
     initial: 'show-on-selection',
     next: 'hidden',
