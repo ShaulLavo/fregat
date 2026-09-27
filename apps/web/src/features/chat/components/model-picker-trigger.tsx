@@ -19,9 +19,12 @@ import { providerRequiresSignIn } from '@workspace/client-core/chat/providers/au
 export function ModelPickerTrigger({
   busy,
   disabled,
+  narrow,
 }: {
   readonly busy: boolean
   readonly disabled: boolean
+  /** Narrow composer: no caret, so the model name keeps the room. */
+  readonly narrow: boolean
 }) {
   const { additionalModels, modelSelection, provider } = useModelPicker()
   // No ready provider offers a model yet. Stay openable — the rows carry the
@@ -63,7 +66,7 @@ export function ModelPickerTrigger({
                 +{additionalModels.length}
               </span>
             ) : null}
-            <CaretDownIcon className='size-(--icon-size-sm) shrink-0' />
+            {narrow ? null : <CaretDownIcon className='size-(--icon-size-sm) shrink-0' />}
             <StatusDot aria-label={statusLabel} tone={providerTriggerTone(provider, busy)} />
           </PopoverTrigger>
         }

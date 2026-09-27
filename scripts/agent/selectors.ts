@@ -845,6 +845,8 @@ export const selectors = {
   chatCorrection: (page: Page) =>
     page.getByRole('button', { name: 'Send correction', exact: true }),
   chatStop: (page: Page) => page.getByRole('button', { name: 'Stop current turn', exact: true }),
+  chatAttach: (page: Page) =>
+    selectors.composerActions(page).getByRole('button', { name: /^Attach/ }),
   chatSend: (page: Page) => page.getByRole('button', { name: 'Send message', exact: true }),
   reviewChanges: (page: Page) =>
     page.getByRole('button', { name: 'Review changes', exact: true }).first(),

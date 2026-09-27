@@ -138,6 +138,7 @@ import { chatTurnSettle } from './chat-turn-settle'
 import { devicePairing } from './device-pairing'
 import { phoneShell } from './phone-shell'
 import { phoneSurfaces } from './phone-surfaces'
+import { phoneComposer } from './phone-composer'
 import { logsRestored } from './logs-restored'
 import { shellSwitch } from './shell-switch'
 import { phoneColdBoot, desktopColdBoot } from './shell-cold-boot'
@@ -664,6 +665,7 @@ export const scenarios: readonly Scenario[] = [
   devicePairing,
   phoneShell,
   phoneSurfaces,
+  phoneComposer,
   shellSwitch,
   logsRestored,
   phoneColdBoot,

@@ -86,14 +86,17 @@ export function ChatInputActions({
 
   return (
     <div
-      className='phone:pl-[calc(var(--density-section-padding)-var(--density-control-padding-x)-1px)] flex min-w-0 flex-col gap-1 px-(--density-control-padding-x) pb-(--density-section-gap)'
+      // Send sits in the corner with the same inset below and beside it.
+      className='phone:pl-[calc(var(--density-section-padding)-var(--density-control-padding-x)-1px)] flex min-w-0 flex-col gap-1 pr-(--density-section-gap) pb-(--density-section-gap) pl-(--density-control-padding-x)'
       data-composer-actions
       data-compact={compact}
       ref={actionsRef}
     >
       <div className='flex min-w-0 items-center justify-between gap-2'>
-        <div className='flex min-w-0 flex-1 items-center gap-1'>
-          <ModelPicker busy={busy} disabled={disabled} />
+        {/* What the message is sent with on the left, readouts and Send on the right. On a
+            phone the 40px targets already space the glyphs, so the gap goes to the model name. */}
+        <div className='phone:gap-0 flex min-w-0 flex-1 items-center gap-1'>
+          <ModelPicker busy={busy} disabled={disabled} narrow={narrow} />
           <ComposerControlsMenu
             disabled={disabled}
             draftTarget={draftTarget}
@@ -112,6 +115,16 @@ export function ChatInputActions({
             disabled={disabled}
             onSelectFiles={onSelectImageFiles}
           />
+          {statusLabel && !compact ? (
+            <span
+              className='text-muted-foreground text-2xs min-w-0 flex-1 truncate pl-1'
+              title={statusLabel}
+            >
+              {statusLabel}
+            </span>
+          ) : null}
+        </div>
+        <div className='flex shrink-0 items-center gap-1'>
           {contextMeterEnabled && contextUsage && !tiny ? (
             <ContextUsageRing
               compact={compact}
@@ -126,16 +139,6 @@ export function ChatInputActions({
           {accountUsage && !tiny ? (
             <UsageLimitsMeter account={accountUsage} compact={compact} />
           ) : null}
-          {statusLabel && !compact ? (
-            <span
-              className='text-muted-foreground text-2xs min-w-0 flex-1 truncate pl-1'
-              title={statusLabel}
-            >
-              {statusLabel}
-            </span>
-          ) : null}
-        </div>
-        <div className='flex shrink-0 items-center gap-1'>
           <PromptStashBadge disabled={disabled} draftTarget={draftTarget} />
           <ChatInputSubmitButton
             correctionDisabledReason={correctionDisabledReason}
