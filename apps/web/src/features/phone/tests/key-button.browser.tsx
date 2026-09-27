@@ -1,22 +1,17 @@
 import '@workspace/ui/globals.css'
-import { flushSync } from 'react-dom'
-import { createRoot, type Root } from 'react-dom/client'
+import { cleanup } from '@testing-library/react'
 import { afterEach, expect, test } from 'vitest'
 import { page, userEvent } from 'vitest/browser'
 
 import { KeyButton } from '@/features/phone/components/key-button'
+import { renderWithProviders } from '../../../../test/render'
 
-let root: Root | null = null
-
-afterEach(() => {
-  flushSync(() => root?.unmount())
-  root = null
-  document.body.replaceChildren()
-})
+afterEach(cleanup)
 
 test('a touch release sends once even when the browser also clicks', () => {
   let presses = 0
-  const button = mount(() => presses++)
+  const view = renderWithProviders(<KeyButton label='Esc' onPress={() => presses++} />)
+  const button = view.getByRole('button', { name: 'Esc' })
   const down = touch(button, 'pointerdown')
   expect(down.defaultPrevented).toBe(true)
   touch(button, 'pointerup')
@@ -27,7 +22,8 @@ test('a touch release sends once even when the browser also clicks', () => {
 
 test('dragging off or cancelling a touch sends no key', () => {
   let presses = 0
-  const button = mount(() => presses++)
+  const view = renderWithProviders(<KeyButton label='Esc' onPress={() => presses++} />)
+  const button = view.getByRole('button', { name: 'Esc' })
   touch(button, 'pointerdown')
   touch(button, 'pointerup', button.getBoundingClientRect().right + 20)
   expect(presses).toBe(0)
@@ -38,8 +34,9 @@ test('dragging off or cancelling a touch sends no key', () => {
 
 test('mouse and keyboard activation still send a key', async () => {
   let presses = 0
-  const button = mount(() => presses++)
-  await page.getByRole('button', { name: 'Esc', exact: true }).click()
+  const view = renderWithProviders(<KeyButton label='Esc' onPress={() => presses++} />)
+  const button = view.getByRole('button', { name: 'Esc' })
+  await page.getByRole('button', { name: 'Esc' }).click()
   expect(presses).toBe(1)
   button.focus()
   await userEvent.keyboard('{Enter}')
@@ -48,17 +45,7 @@ test('mouse and keyboard activation still send a key', async () => {
   expect(presses).toBe(3)
 })
 
-function mount(onPress: () => void) {
-  const host = document.createElement('main')
-  document.body.append(host)
-  root = createRoot(host)
-  flushSync(() => root?.render(<KeyButton label='Esc' onPress={onPress} />))
-  const button = host.querySelector('button')
-  expect(button).not.toBeNull()
-  return button!
-}
-
-function touch(button: HTMLButtonElement, type: string, clientX?: number) {
+function touch(button: HTMLElement, type: string, clientX?: number) {
   const box = button.getBoundingClientRect()
   const event = new PointerEvent(type, {
     bubbles: true,
