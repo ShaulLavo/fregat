@@ -5,6 +5,12 @@ import { rpcErrorPayload } from '@workspace/client-core/transport/rpc-error'
 import { toClientError } from './client-error-taxonomy'
 
 export const clientErrors = defineErrorCatalog('client', {
+  BOOT_FAILED: {
+    status: 500,
+    message: 'App could not start',
+    why: 'Application startup failed before the interface was ready.',
+    fix: 'Reload the app to try again.',
+  },
   CLIENT_INVARIANT_ERROR: {
     status: 500,
     message: ({ message }: { message: string }) => message,
@@ -157,4 +163,16 @@ function statusFromRpcError(error: unknown) {
 
   const status = error.status
   return typeof status === 'number' ? status : clientErrors.RPC_FAILED.status
+}
+
+export function createBootError(cause: unknown) {
+  return createClientError({
+    code: clientErrors.BOOT_FAILED.code,
+    status: clientErrors.BOOT_FAILED.status,
+    message: clientErrors.BOOT_FAILED.message,
+    why: clientErrors.BOOT_FAILED.why,
+    fix: clientErrors.BOOT_FAILED.fix,
+    cause,
+    internal: { phase: 'startup', causeType: typeof cause },
+  })
 }
