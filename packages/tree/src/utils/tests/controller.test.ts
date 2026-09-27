@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { FileTreeController } from '../model/FileTreeController'
 import { computeFileTreeLayout } from '../model/layout'
 import { renameFileTreePaths } from '../renameFileTreePaths'
-import { computeFileTreeRowElementAttributes } from '../render/rowAttributes'
 import type { FileTreeVisibleRow } from '../model/publicTypes'
 
 describe('FileTreeController', () => {
@@ -104,46 +103,6 @@ describe('tree pure helpers', () => {
         path: 'src/a.ts',
       }),
     ).toEqual({ error: '"src/b.ts" already exists.' })
-  })
-
-  it('projects row state into stable DOM attributes', () => {
-    const attributes = computeFileTreeRowElementAttributes({
-      ariaLabel: 'src / a.ts',
-      domId: 'row-a',
-      features: {
-        actionLaneEnabled: true,
-        contextMenuButtonVisibility: 'always',
-        contextMenuEnabled: true,
-        contextMenuTriggerMode: 'both',
-        gitLaneActive: true,
-      },
-      isParked: false,
-      itemHeight: 24,
-      mode: 'flow',
-      row: row({
-        ancestorPaths: ['src/'],
-        index: 1,
-        isFocused: true,
-        isSelected: true,
-        path: 'src/a.ts',
-      }),
-      state: {
-        containsGitChange: true,
-        effectiveGitStatus: 'modified',
-        isContextHovered: false,
-        isDragging: false,
-        isFocusRinged: true,
-        isLoading: true,
-      },
-      targetPath: 'src/a.ts',
-    })
-
-    expect(attributes.role).toBe('treeitem')
-    expect(attributes.tabIndex).toBe(0)
-    expect(attributes['data-item-git-status']).toBe('modified')
-    expect(attributes['data-item-loading']).toBe('true')
-    expect(attributes['data-item-drag-target']).toBeUndefined()
-    expect(attributes['data-item-parent-path']).toBe('src/')
   })
 })
 

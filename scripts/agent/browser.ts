@@ -24,6 +24,7 @@ import { createScriptError } from '../structured-errors'
 import { isolateProductTerminals } from './product-terminal'
 import { captureBrowserRenderer } from './browser-renderer'
 import { startIsolatedServer, type IsolatedServer } from './isolated-server'
+import { providerAccessRefusal } from './provider-access'
 import { devStateHome } from '../state-home'
 
 const PRODUCT_USER_AGENT =
@@ -59,9 +60,13 @@ Options
   --touch      emulate a touch phone: coarse pointer and touch events (look/scenario)
   --product-wallpaper image override for a real product scenario capture
   --shared-dev drive the running dev API server instead of a throwaway one
+  --real-providers  owner only: let this run start the machine's real Codex and Claude accounts
 
 Against the dev page, every run starts its own API server with temp state and removes it after.
 scenario, trace and renders refuse a production URL unless the scenario is declared readOnly.
+The throwaway server runs Codex and Claude only from fixture binaries. Without --real-providers,
+a scenario declared realProviders refuses to start, and so does any writing scenario on a server
+the run does not own.
 Evidence lands under /work/tmp/fregat-evidence/<stamp>-<verb>-<label>/.`
 
 type Options = CaptureSize & {
@@ -100,6 +105,7 @@ async function main() {
       file: { type: 'string' },
       headed: { type: 'boolean', default: false },
       'shared-dev': { type: 'boolean', default: false },
+      'real-providers': { type: 'boolean', default: false },
       selector: { type: 'string' },
       url: { type: 'string', default: DEFAULT_URL },
       workspace: { type: 'string', default: DEFAULT_WORKSPACE },
@@ -162,7 +168,14 @@ async function main() {
     throw createScriptError(
       `Scenario ${scenario.name} writes state, so it does not run against production (${options.url}). Drop --url to run it against the dev page with a throwaway server.`,
     )
-  if (!needsIsolatedServer(verb, scenario, options, values['shared-dev'])) {
+  const isolatedServer = needsIsolatedServer(verb, scenario, options, values['shared-dev'])
+  const refusal = providerAccessRefusal({
+    scenario,
+    isolatedServer,
+    realProviders: values['real-providers'],
+  })
+  if (refusal) throw createScriptError(refusal)
+  if (!isolatedServer) {
     if (scenario?.requiresIsolatedServer)
       throw createScriptError(
         `Scenario ${scenario.name} requires a throwaway server with fixture-only providers.`,
@@ -172,6 +185,7 @@ async function main() {
   const prepared = await scenario?.prepareServer?.()
   const server = await startIsolatedServer(new URL(options.url), {
     pathPrefix: prepared?.pathPrefix,
+    realProviders: values['real-providers'],
   })
   process.env.PORT = String(server.port)
   process.env.OBSERVABILITY_DIR = server.logs

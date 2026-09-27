@@ -7,7 +7,7 @@ import { act, cleanup } from '@testing-library/react'
 import { toast } from 'sonner'
 import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest'
 
-import { createInProcessClient } from '../client'
+import { createInProcessClient, installInProcessSocketBridge } from '../client'
 import { installTestClient } from '../factories/client-binding'
 import { makeTestServer, type TestServer } from '../server'
 import './jest-dom'
@@ -21,11 +21,13 @@ import './workspace-cache'
 // own workspace still take the `client` fixture, which layers over this.
 let server: TestServer | undefined
 let restoreClient: (() => void) | undefined
+let restoreSocketBridge: (() => void) | undefined
 
 beforeAll(async () => {
   server = await makeTestServer({ environmentId: TEST_ENVIRONMENT_ID })
   const client = createInProcessClient(server)
   restoreClient = installTestClient(client)
+  restoreSocketBridge = installInProcessSocketBridge(server)
   useEnvironmentsStore
     .getState()
     .recordDescriptor(
@@ -35,6 +37,8 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
+  restoreSocketBridge?.()
+  restoreSocketBridge = undefined
   restoreClient?.()
   restoreClient = undefined
   await server?.cleanup()

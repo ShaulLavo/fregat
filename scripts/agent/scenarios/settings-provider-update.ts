@@ -22,7 +22,7 @@ esac
 export const settingsProviderUpdate: Scenario = {
   name: 'settings-provider-update',
   description:
-    'Settings › Providers shows each CLI against its latest npm release. The real CLIs show their own update path; a fixture codex at a standalone-installer path updates in one click and reads Up to date after. No real CLI is touched.',
+    'Settings › Providers shows a CLI against its latest npm release: a fixture codex at a standalone-installer path updates in one click and reads Up to date after. No real CLI is touched.',
   async run(page, { step }) {
     const base = (await openChat(page)).replace(/\/orchestration$/, '')
     const root = await mkdtemp('/work/tmp/fregat-provider-update-')
@@ -53,7 +53,9 @@ export const settingsProviderUpdate: Scenario = {
       await selectors.settingsSearch(page).fill('providers')
       const fixture = selectors.settingsProviderRow(page, FIXTURE_ID)
       await fixture.getByText('0.1.0 →').waitFor({ timeout: 20_000 })
-      await selectors.providerUpdateChecking(page).waitFor({ state: 'detached', timeout: 20_000 })
+      await selectors
+        .providerUpdateChecking(fixture)
+        .waitFor({ state: 'detached', timeout: 20_000 })
       await step('versions-read')
 
       await fixture.getByRole('button', { name: 'Update', exact: true }).click()

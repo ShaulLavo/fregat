@@ -6,6 +6,47 @@ import { dispatch, readShell } from './chat-verification'
 import { settingsSnapshot, writeRawSetting, writeSettings } from './native-provider-verification'
 
 /**
+ * An enabled mock provider instance with `config`. `restore` puts the provider instances back as
+ * they were.
+ */
+export async function installMockProvider(
+  page: Page,
+  base: string,
+  input: { readonly name: string; readonly displayLabel: string; readonly config: object },
+) {
+  const before = await settingsSnapshot(page, base)
+  const originallySet =
+    before.layers.find((layer) => layer.id === 'user')?.raw['providers.instances'] !== undefined
+  const originalInstances = before.values['providers.instances']
+  const providerInstanceId = `${input.name}-${crypto.randomUUID()}`
+  await writeSettings(page, base, [
+    {
+      kind: 'provider.setEnabled',
+      providerInstanceId,
+      enabled: true,
+      createIfMissing: {
+        driverKind: 'mock',
+        displayLabel: input.displayLabel,
+        config: input.config,
+      },
+    },
+  ])
+  const restore = async () => {
+    const current = await settingsSnapshot(page, base)
+    const remaining = current.values['providers.instances'].filter(
+      (item) => item.providerInstanceId !== providerInstanceId,
+    )
+    const unchanged = JSON.stringify(remaining) === JSON.stringify(originalInstances)
+    if (!originallySet && unchanged) {
+      await writeSettings(page, base, [{ kind: 'reset', keys: ['providers.instances'] }])
+      return
+    }
+    await writeRawSetting(page, base, 'providers.instances', remaining)
+  }
+  return { providerInstanceId, restore }
+}
+
+/**
  * A mock provider instance with `config`, and a session on it opened in the chat. `cleanup`
  * stops and deletes the session and puts the provider instances back as they were.
  */
@@ -21,25 +62,9 @@ export async function createMockProviderSession(
   },
 ) {
   const base = orchestration.replace(/\/orchestration$/, '')
-  const before = await settingsSnapshot(page, base)
-  const originallySet =
-    before.layers.find((layer) => layer.id === 'user')?.raw['providers.instances'] !== undefined
-  const originalInstances = before.values['providers.instances']
-  const providerInstanceId = `${input.name}-${crypto.randomUUID()}`
+  const { providerInstanceId, restore } = await installMockProvider(page, base, input)
   const sessionId = crypto.randomUUID()
   const title = `${input.name} ${sessionId.slice(0, 8)}`
-  await writeSettings(page, base, [
-    {
-      kind: 'provider.setEnabled',
-      providerInstanceId,
-      enabled: true,
-      createIfMissing: {
-        driverKind: 'mock',
-        displayLabel: input.displayLabel,
-        config: input.config,
-      },
-    },
-  ])
   const worktreeId = input.worktreeId ?? (await firstWorktree(page, orchestration)).id
   await dispatch(page, orchestration, {
     type: 'session.create',
@@ -55,16 +80,7 @@ export async function createMockProviderSession(
   const cleanup = async () => {
     await dispatch(page, orchestration, { type: 'session.runtime.stop', sessionId })
     await dispatch(page, orchestration, { type: 'session.delete', sessionId })
-    const current = await settingsSnapshot(page, base)
-    const remaining = current.values['providers.instances'].filter(
-      (item) => item.providerInstanceId !== providerInstanceId,
-    )
-    const unchanged = JSON.stringify(remaining) === JSON.stringify(originalInstances)
-    if (!originallySet && unchanged) {
-      await writeSettings(page, base, [{ kind: 'reset', keys: ['providers.instances'] }])
-      return
-    }
-    await writeRawSetting(page, base, 'providers.instances', remaining)
+    await restore()
   }
   return { base, cleanup, sessionId }
 }
