@@ -112,6 +112,7 @@ describe('web routes', () => {
 
     const release = await app.handle(new Request('http://local/release'))
     expect(release.status).toBe(200)
+    expect(release.headers.get('cache-control')).toBe('no-store')
     expect(await release.json()).toEqual({
       release: 'stamp-abc-slug',
       commit: 'abc',
@@ -160,9 +161,9 @@ describe('web routes', () => {
         at: '2026-09-25T10:00:00.000Z',
         error: {
           code: 'update.LIVE_CHECK_FAILED',
-          message: 'current-release failed its live check',
+          message: 'Deployment check failed',
           why: 'no websocket received a frame',
-          fix: 'Run bun run deploy --rollback in /work/projects/platform to return to older-release.',
+          fix: 'Review the failed check in the deployment report and retry the check.',
         },
       },
     })

@@ -805,6 +805,7 @@ export const selectors = {
   rewindFiles: (page: Page) =>
     page.getByRole('button', { name: 'Rewind and restore files', exact: true }),
   rewindDialog: (page: Page) => page.getByRole('alertdialog'),
+  clientUpdateRefresh: (page: Page) => page.getByRole('button', { name: 'Refresh', exact: true }),
   serverUpdate: (page: Page) => page.locator('[data-server-update]'),
   serverUpdateRestarting: (page: Page) => page.locator('[data-server-update="restarting"]'),
   serverUpdateRestart: (page: Page) =>
@@ -842,6 +843,8 @@ export const selectors = {
   chatFileDownload: (page: Page, name: string) =>
     page.getByRole('link', { name: `Download ${name}`, exact: true }),
   chatMessage: (page: Page) => page.getByRole('textbox', { name: 'Message', exact: true }),
+  chatWelcome: (page: Page) =>
+    page.getByText('Ask about your workspace', { exact: true }).locator('../..'),
   chatNewSession: (page: Page) => page.getByRole('button', { name: 'New session', exact: true }),
   chatCorrection: (page: Page) =>
     page.getByRole('button', { name: 'Send correction', exact: true }),

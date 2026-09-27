@@ -54,6 +54,7 @@ export async function startIsolatedServer(
   const productionRoot = path.join(directory, 'production')
   mkdirSync(home)
   mkdirSync(productionRoot)
+  mkdirSync(path.join(directory, 'served', 'web'), { recursive: true })
   // Scenarios install their own fixture drivers; only an owner's --real-providers run keeps the
   // built-in accounts on.
   if (!realProviders)
@@ -173,6 +174,7 @@ export function isolatedServerEnv(input: {
     [HARNESS_FIXTURE_ROOT_ENV]: input.scratchRoot,
     PLATFORM_HOME: home,
     PLATFORM_PRODUCTION_ROOT: productionRoot,
+    WEB_ROOT: path.join(home, '..', 'served', 'web'),
     PORT: String(port),
     SERVER_ALLOWED_ORIGINS: allowedOriginsForWebPort(
       undefined,

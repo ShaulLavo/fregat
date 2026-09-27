@@ -4,7 +4,7 @@ import { useEffect, useEffectEvent, useRef } from 'react'
 import { liveCheckToastId } from '@/features/server-update/utils/live-check-toast'
 import { toastError } from '@/lib/toast-error'
 
-/** Toasts a failed post-restart live check once, with the server's rollback command as its fix. */
+/** Shows the failed check once during this page's lifetime. */
 export function useLiveCheckToast(verdict: LiveCheckVerdict | null | undefined) {
   const shown = useRef<string | null>(null)
   const id = liveCheckToastId(verdict, performance.timeOrigin)
@@ -15,7 +15,7 @@ export function useLiveCheckToast(verdict: LiveCheckVerdict | null | undefined) 
     shown.current = toastId
     toastError(
       error.message,
-      { id: toastId, description: error.fix, duration: Infinity },
+      { id: toastId, description: error.why ?? error.fix, duration: Infinity },
       { ...error, title: 'Live check failed' },
     )
   })

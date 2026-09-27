@@ -1,10 +1,10 @@
-import { mkdtemp, rm, symlink } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 
 import { stageRelease } from '../../../test/factories/server-update'
-import { readStagedRelease } from '../staged-release'
+import { readLiveCheck, readStagedRelease } from '../staged-release'
 
 const roots: string[] = []
 
@@ -41,4 +41,21 @@ it('reads the staged release by its directory name', async () => {
     staged: { release: 'next-release', stagedAt: expect.any(String) },
     reason: null,
   })
+})
+
+it('ignores a live-check report for a different release directory', async () => {
+  const root = await productionRoot()
+  const current = path.join(root, 'releases', 'current')
+  await mkdir(current, { recursive: true })
+  await symlink(current, path.join(root, 'current'))
+  await writeFile(
+    path.join(current, 'live-check.json'),
+    JSON.stringify({
+      release: 'other-release',
+      status: 'failed',
+      checkedAt: '2026-09-27T13:19:53.752Z',
+      fresh: ['no successful /health response'],
+    }),
+  )
+  expect(readLiveCheck(root)).toBeNull()
 })
