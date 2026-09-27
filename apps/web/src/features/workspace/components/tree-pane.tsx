@@ -395,11 +395,11 @@ function ReadyTreePane({
         aria-label='Folder tree'
         className='block h-full'
         model={tree}
-        renderContextMenu={(item, menuContext) => (
+        renderContextMenu={(item, menu) => (
           <TreeRowMenu
             actions={fsActions.actions}
             item={item}
-            menuContext={menuContext}
+            menu={menu}
             model={model}
             rootPath={rootPath}
           />

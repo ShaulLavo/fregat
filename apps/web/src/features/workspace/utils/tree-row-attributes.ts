@@ -1,9 +1,5 @@
 // Modified for Platform from Pierre. Apache-2.0; see packages/tree/LICENSE-pierre and UPSTREAM.md.
-import type {
-  FileTreeContextMenuButtonVisibility,
-  FileTreeContextMenuTriggerMode,
-  FileTreeVisibleRow,
-} from '@workspace/tree'
+import type { FileTreeVisibleRow } from '@workspace/tree'
 import type { GitStatus } from '@workspace/tree'
 import type { TreeRowClickMode } from '@/features/workspace/utils/tree-row-click-plan'
 
@@ -23,9 +19,6 @@ type TreeRowStateFlags = {
 // 1:1 into data attributes that downstream CSS and integration tests rely on.
 type TreeRowFeatureFlags = {
   contextMenuEnabled: boolean
-  actionLaneEnabled: boolean
-  contextMenuButtonVisibility: FileTreeContextMenuButtonVisibility | null
-  contextMenuTriggerMode: FileTreeContextMenuTriggerMode | null
   gitLaneActive: boolean
 }
 
@@ -98,13 +91,6 @@ export function computeTreeRowElementAttributes(
     'aria-setsize': !isSticky ? row.setSize : undefined,
     'data-file-tree-sticky-path': isSticky ? targetPath : undefined,
     'data-file-tree-sticky-row': isSticky ? 'true' : undefined,
-    'data-item-context-menu-button-visibility': features.actionLaneEnabled
-      ? features.contextMenuButtonVisibility
-      : undefined,
-    'data-item-context-menu-trigger-mode': features.contextMenuEnabled
-      ? features.contextMenuTriggerMode
-      : undefined,
-    'data-item-has-context-menu-action-lane': features.actionLaneEnabled ? 'true' : undefined,
     'data-item-has-git-lane': features.gitLaneActive ? 'true' : undefined,
     'data-item-parent-path': parentPath.length > 0 ? parentPath : undefined,
     'data-item-parked': isParked ? 'true' : undefined,

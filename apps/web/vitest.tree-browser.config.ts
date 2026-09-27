@@ -128,6 +128,8 @@ const treeCommands = {
 export default defineConfig({
   plugins: [react({ compiler: true }), tailwindcss()],
   resolve: { alias, dedupe: ['react', 'react-dom'] },
+  // Found mid-run, a dependency reloads the page and fails the file that found it.
+  optimizeDeps: { include: ['@workspace/ui > @base-ui/react/context-menu'] },
   test: {
     name: 'tree-browser',
     // Chromium's native drag and touch state must not overlap another file's input.

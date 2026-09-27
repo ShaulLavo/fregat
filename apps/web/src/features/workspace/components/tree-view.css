@@ -237,20 +237,6 @@
       --trees-icon-nudge: var(--trees-icon-nudge-override, calc(1px * var(--trees-density)));
       --trees-row-height: var(--trees-item-height, 30px);
       --trees-git-lane-width: var(--trees-git-lane-width-override, 12px);
-      --trees-action-lane-width: var(
-        --trees-action-lane-width-override,
-        calc(var(--trees-icon-width) + 2px)
-      );
-      /* Keep the floating trigger aligned with the row's action lane. Going in
-       from the root's right edge: the scroll container reserves
-       `--trees-padding-inline` of effective inset on each side (its asymmetric
-       padding formula cancels the scrollbar gutter on the right), the row
-       sits inside that inset, and its trailing `--trees-item-padding-x` is the
-       action lane itself. The trigger's own focus-ring margin then trims one
-       pixel back so the button's visible right edge lines up with the lane. */
-      --trees-context-menu-trigger-inline-offset: calc(
-        var(--trees-padding-inline) + var(--trees-item-padding-x) - var(--trees-focus-ring-width)
-      );
 
       /* TreeRowLead's geometry: a level steps past the guide, the row gap and half the lane. */
       --tree-lane: var(--trees-icon-width);
@@ -574,8 +560,7 @@
       opacity: 1;
     }
 
-    [data-item-section='git'],
-    [data-item-section='action'] {
+    [data-item-section='git'] {
       flex: 0 0 auto;
       display: flex;
       align-items: center;
@@ -586,26 +571,13 @@
       width: var(--trees-git-lane-width);
     }
 
-    [data-item-section='action'] {
-      width: var(--trees-action-lane-width);
-      color: var(--trees-fg-muted);
-      fill: currentColor;
-      pointer-events: none;
-    }
-
-    [data-item-section='git'] > span,
-    [data-item-section='action'] > span {
+    [data-item-section='git'] > span {
       width: 100%;
       display: inline-flex;
       align-items: center;
       justify-content: center;
     }
 
-    [data-item-action-affordance='decorative'] {
-      opacity: 0.85;
-    }
-
-    [data-item-section='content']:has([data-item-rename-input]) ~ [data-item-section='action'],
     [data-item-section='content']:has([data-item-rename-input]) ~ [data-item-section='decoration'] {
       display: none;
     }
@@ -667,73 +639,6 @@
     /* Drag and drop */
     [data-item-dragging='true'] {
       opacity: 0.5;
-    }
-
-    [data-type='context-menu-wash'] {
-      position: absolute;
-      inset: 0;
-      z-index: 3;
-      background-color: transparent;
-      touch-action: none;
-    }
-
-    [data-type='context-menu-anchor'] {
-      position: absolute;
-      top: 0;
-      right: var(--trees-context-menu-trigger-inline-offset);
-      z-index: 4;
-      display: none;
-      align-items: center;
-
-      &[data-visible='true'] {
-        display: flex;
-      }
-    }
-
-    /* Hide the floating trigger while the scroll container is actively moving.
-   * The anchor is positioned against the root, not the scroll content, so its
-   * `top` follows the row via a React state update — one frame behind the
-   * compositor. That delay is visible as the trigger hovering over the wrong
-   * row during the first frame of a scroll. The `data-is-scrolling` flag on
-   * the root is flipped synchronously on `wheel`/`touchmove`/`keydown` before
-   * the compositor commits the next paint, so this selector hides the anchor
-   * in the same frame the scroll begins. */
-    [data-file-tree-virtualized-root='true'][data-is-scrolling] [data-type='context-menu-anchor'] {
-      display: none;
-    }
-
-    [data-type='context-menu-anchor'] > [data-type='context-menu-content'] {
-      display: block;
-      width: 0;
-      min-width: 0;
-      flex: 0 0 0;
-      overflow: visible;
-    }
-
-    /* Single floating context menu trigger */
-    [data-type='context-menu-trigger'] {
-      all: unset;
-      align-items: center;
-      justify-content: center;
-      width: var(--trees-action-lane-width);
-      color: var(--trees-fg-muted);
-      fill: currentColor;
-      cursor: pointer;
-      font-family: var(--trees-font-family);
-      font-size: var(--trees-font-size);
-      border-top-right-radius: var(--trees-border-radius);
-      border-bottom-right-radius: var(--trees-border-radius);
-      margin: var(--trees-focus-ring-width);
-      height: calc(var(--trees-row-height) - var(--trees-focus-ring-width) * 2);
-      border-width: 0;
-      transition: color 120ms ease;
-
-      display: flex;
-    }
-
-    [data-type='context-menu-trigger']:hover,
-    [data-type='context-menu-trigger'][aria-expanded='true'] {
-      color: var(--trees-fg);
     }
 
     /** Truncate css copied into the tree package. */

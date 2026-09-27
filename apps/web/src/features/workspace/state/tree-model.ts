@@ -9,7 +9,6 @@ import {
 import type { TreeViewProps } from '@/features/workspace/utils/tree-view-props'
 import type {
   FileTreeBatchOperation,
-  FileTreeCompositionOptions,
   FileTreeGitStatusPatch,
   FileTreeItemHandle,
   FileTreeListener,
@@ -29,10 +28,12 @@ import { TreeRowElements, type TreeRowElement } from '@/features/workspace/state
 import { TREE_DEFAULT_ITEM_HEIGHT } from '@/features/workspace/utils/tree-view-layout'
 
 /** What the view renders from the model; its identity changes with every view-visible setter. */
-export type TreeViewModelProps = Omit<TreeViewProps, 'instanceId'>
+export type TreeViewModelProps = Omit<
+  TreeViewProps,
+  'instanceId' | 'menuPath' | 'onCloseMenu' | 'onOpenMenu'
+>
 
 export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSessionHandle {
-  #composition: FileTreeCompositionOptions | undefined
   readonly #controller: FileTreeController
   readonly #onSelectionChange: FileTreeSelectionChangeListener | undefined
   readonly #rowDecorationSource: FileTreeRowDecorationRenderer | undefined
@@ -58,7 +59,6 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
 
   public constructor(options: FileTreeOptions) {
     const {
-      composition,
       fileTreeSearchMode,
       gitStatus,
       initialSearchQuery,
@@ -76,7 +76,6 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
       onScrollTopChange,
       ...controllerOptions
     } = options
-    this.#composition = composition
     this.#gitStatusState = resolveFileTreeGitStatusState(gitStatus)
     this.#onSelectionChange = onSelectionChange
     this.#rowDecorationSource = renderRowDecoration
@@ -121,6 +120,10 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
     return this.#rowElements.rows()
   }
 
+  public getRowElement(path: string): HTMLElement | null {
+    return this.#rowElements.element(path)
+  }
+
   public subscribeRowElements(listener: () => void): () => void {
     return this.#rowElements.subscribe(listener)
   }
@@ -139,10 +142,6 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
 
   public getSelectedPaths(): readonly string[] {
     return this.#controller.getSelectedPaths()
-  }
-
-  public getComposition(): FileTreeCompositionOptions | undefined {
-    return this.#composition
   }
 
   public getItemHeight(): number {
@@ -298,14 +297,6 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
     this.#controller.resetPaths(paths, options)
   }
 
-  // Deliberately rerenders even when the same object reference is passed again.
-  // Callers can reuse one composition object while changing what its render
-  // callbacks return, so identity alone is not a reliable no-op signal.
-  public setComposition(composition?: FileTreeCompositionOptions): void {
-    this.#composition = composition
-    this.#invalidateView()
-  }
-
   public setGitStatus(gitStatus?: FileTreeOptions['gitStatus']): void {
     const nextGitStatusState = resolveFileTreeGitStatusState(gitStatus, this.#gitStatusState)
     if (nextGitStatusState === this.#gitStatusState) {
@@ -343,7 +334,6 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
 
   #createViewProps(): TreeViewModelProps {
     return {
-      composition: this.#composition,
       controller: this.#controller,
       gitStatusByPath: this.#gitStatusState?.statusByPath,
       ignoredGitDirectories: this.#gitStatusState?.ignoredDirectoryPaths,

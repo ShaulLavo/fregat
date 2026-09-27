@@ -5,10 +5,17 @@ import { createRoot, type Root } from 'react-dom/client'
 import { expect, vi } from 'vitest'
 import { commands } from 'vitest/browser'
 
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+} from '@workspace/ui/components/context-menu'
+import { useEffect, useEffectEvent } from 'react'
+
 import { TreeHost } from '@/features/workspace/components/tree-host'
+import type { TreeRowMenuHandle } from '@/features/workspace/utils/tree-row-menu-open'
 import type {
   FileTreeContextMenuItem,
-  FileTreeContextMenuOpenContext,
   FileTreeDropContext,
   FileTreeDropResult,
   FileTreeOptions,
@@ -74,8 +81,7 @@ type ParityEvents = {
   readonly dropChecks: FileTreeDropContext[]
   readonly renames: FileTreeRenameEvent[]
   readonly selections: (readonly string[])[]
-  readonly menus: { item: FileTreeContextMenuItem; context: FileTreeContextMenuOpenContext }[]
-  readonly menuCloses: number[]
+  readonly menus: { item: FileTreeContextMenuItem }[]
 }
 
 type Mounted = { readonly model: TreeViewModel; readonly events: ParityEvents }
@@ -103,7 +109,6 @@ export async function mountParityTree(
     renames: [],
     selections: [],
     menus: [],
-    menuCloses: [],
   }
   const { height = 360, ...modelOptions } = options
   const model = new TreeViewModel({
@@ -135,16 +140,9 @@ export async function mountParityTree(
       <TreeHost
         aria-label={TREE_LABEL}
         model={model}
-        renderContextMenu={(item, context) => {
-          events.menus.push({ item, context })
-          return (
-            <div role='menu' aria-label='Row menu'>
-              <button type='button' onClick={() => context.close()}>
-                Close menu
-              </button>
-            </div>
-          )
-        }}
+        renderContextMenu={(item, menu) => (
+          <ParityMenu item={item} menu={menu} onOpen={() => events.menus.push({ item })} />
+        )}
         style={{ display: 'block', height: `${height}px`, width: '360px' }}
       />,
     )
@@ -236,4 +234,34 @@ export async function mouse(
 /** A real click on the row's name, which a sticky copy of the row cannot intercept. */
 export async function clickRow(path: string, options: MouseOptions = {}) {
   await mouse('click', center(row(path)), options)
+}
+
+/** A real Base UI menu at the host's anchor, so dismissal behaves as the app's does. */
+function ParityMenu({
+  item,
+  menu,
+  onOpen,
+}: {
+  readonly item: FileTreeContextMenuItem
+  readonly menu: TreeRowMenuHandle
+  readonly onOpen: () => void
+}) {
+  // Reports once per opening: the host renders it only while a row's menu is open.
+  const reportOpen = useEffectEvent(onOpen)
+  useEffect(() => {
+    reportOpen()
+  }, [item.path])
+  return (
+    <ContextMenu
+      open
+      onOpenChange={(open) => {
+        menu.onOpenChange(open)
+        if (!open) menu.returnFocusTo()?.focus({ preventScroll: true })
+      }}
+    >
+      <ContextMenuContent anchor={menu.anchor} aria-label='Row menu' finalFocus={false}>
+        <ContextMenuItem>Close menu</ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  )
 }

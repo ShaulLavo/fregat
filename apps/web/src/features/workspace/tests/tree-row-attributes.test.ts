@@ -9,10 +9,7 @@ describe('tree row attributes', () => {
       ariaLabel: 'src / a.ts',
       domId: 'row-a',
       features: {
-        actionLaneEnabled: true,
-        contextMenuButtonVisibility: 'always',
         contextMenuEnabled: true,
-        contextMenuTriggerMode: 'both',
         gitLaneActive: true,
       },
       isParked: false,

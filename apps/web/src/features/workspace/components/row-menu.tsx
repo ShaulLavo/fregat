@@ -1,9 +1,9 @@
-import type { FileTreeContextMenuItem, FileTreeContextMenuOpenContext } from '@workspace/tree'
+import type { FileTreeContextMenuItem } from '@workspace/tree'
 
 import type { TreeFsActions } from '@/features/workspace/hooks/use-fs-actions'
 import { useRowMenu } from '@/features/workspace/hooks/use-row-menu'
+import type { TreeRowMenuHandle } from '@/features/workspace/utils/tree-row-menu-open'
 import { MenuSurface } from '@/keymap/menus/components/surface'
-import { rectAnchor } from '@/keymap/menus/utils/virtual-anchor'
 import type { TreeModel } from '@/lib/tree-model'
 
 /**
@@ -13,26 +13,26 @@ import type { TreeModel } from '@/lib/tree-model'
 export function TreeRowMenu({
   actions,
   item,
-  menuContext,
+  menu,
   model,
   rootPath,
 }: {
   readonly actions: TreeFsActions
   readonly item: FileTreeContextMenuItem
-  readonly menuContext: FileTreeContextMenuOpenContext
+  readonly menu: TreeRowMenuHandle
   readonly model: TreeModel
   readonly rootPath: string
 }) {
-  const menu = useRowMenu({ actions, item, menuContext, model, rootPath })
+  const rowMenu = useRowMenu({ actions, item, model, rootPath })
 
   return (
     <MenuSurface
-      anchor={rectAnchor(menuContext.anchorRect, menuContext.anchorElement)}
+      anchor={menu.anchor}
       className='w-56'
-      menu={menu}
-      // MenuSurface restores its captured FocusService origin after dismissal.
-      onOpenChange={(next) => next || menuContext.close({ restoreFocus: false })}
+      menu={rowMenu}
+      onOpenChange={menu.onOpenChange}
       open
+      returnFocusTo={menu.returnFocusTo}
       surface='files.row'
     />
   )

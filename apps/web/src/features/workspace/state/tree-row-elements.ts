@@ -24,6 +24,11 @@ export class TreeRowElements {
     this.#queueNotify()
   }
 
+  /** The row for `path`, its flow row before a sticky mirror. */
+  public element(path: string): HTMLElement | null {
+    return this.#flow.get(path) ?? this.#sticky.get(path) ?? null
+  }
+
   public rows(): readonly TreeRowElement[] {
     const rows: TreeRowElement[] = []
     for (const [path, element] of this.#flow) rows.push({ element, path })

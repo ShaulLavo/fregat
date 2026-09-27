@@ -1,4 +1,3 @@
-export { CONTEXT_MENU_TRIGGER_TYPE } from './utils/constants'
 export {
   GIT_STATUS_DESCENDANT_TITLE,
   GIT_STATUS_LABEL,
@@ -15,11 +14,7 @@ export type { FileTreeStickyRowCandidate } from './utils/model/internal-types'
 export type { FileTreeLayoutSnapshot, FileTreeLayoutStickyRow } from './utils/model/layout'
 export type {
   FileTreeBatchOperation,
-  FileTreeCompositionOptions,
-  FileTreeContextMenuButtonVisibility,
   FileTreeContextMenuItem,
-  FileTreeContextMenuOpenContext,
-  FileTreeContextMenuTriggerMode,
   FileTreeDirectoryHandle,
   FileTreeDropContext,
   FileTreeDropResult,

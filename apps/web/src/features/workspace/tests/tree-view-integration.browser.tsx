@@ -2,13 +2,14 @@ import '@workspace/ui/globals.css'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createRoot, type Root } from 'react-dom/client'
 import { flushSync } from 'react-dom'
-import { useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 
 import { TreeHost } from '@/features/workspace/components/tree-host'
 import { useTreeModel } from '@/features/workspace/hooks/use-tree-model'
 import type { GitStatusEntry } from '@workspace/tree'
-import type { FileTreeContextMenuItem, FileTreeContextMenuOpenContext } from '@workspace/tree'
+import type { FileTreeContextMenuItem } from '@workspace/tree'
 import { TreeViewModel } from '@/features/workspace/state/tree-model'
+import type { TreeRowMenuHandle } from '@/features/workspace/utils/tree-row-menu-open'
 import { fileIconRule, iconForEntry } from '@/lib/file-icons'
 
 let root: Root | null = null
@@ -291,132 +292,104 @@ describe('tree view React integration', () => {
       )
     })
     expect(document.activeElement).toBe(outsideButton)
-
   })
 
   it('keeps a right-click context menu mounted across incidental controller renders', async () => {
     const container = document.createElement('main')
     document.body.append(container)
     root = createRoot(container)
-    const openedItems: FileTreeContextMenuItem[] = []
-    const openedContexts: FileTreeContextMenuOpenContext[] = []
-    const renderMenu = vi.fn(
-      (item: FileTreeContextMenuItem, context: FileTreeContextMenuOpenContext) => {
-        const menu = document.createElement('div')
-        menu.textContent = item.path
-        openedItems.push(item)
-        openedContexts.push(context)
-        return menu
-      },
-    )
+    const mounts: FileTreeContextMenuItem[] = []
+    const menus: TreeRowMenuHandle[] = []
     const treeModel = new TreeViewModel({
-      composition: {
-        contextMenu: {
-          enabled: true,
-          render: renderMenu,
-          triggerMode: 'both',
-        },
-      },
       initialExpansion: 'open',
       initialSelectedPaths: ['src/a.ts'],
       paths: ['src/', 'src/a.ts', 'src/b.ts'],
     })
 
-    flushSync(() => root?.render(<TreeHost aria-label='Files' model={treeModel} />))
+    flushSync(() =>
+      root?.render(
+        <TreeHost
+          aria-label='Files'
+          model={treeModel}
+          renderContextMenu={(item, menu) => {
+            menus.push(menu)
+            return <MenuProbe item={item} onMount={(mounted) => mounts.push(mounted)} />
+          }}
+        />,
+      ),
+    )
     const tree = await waitForTree()
     rowButton(tree, 'src/a.ts').dispatchEvent(
-      new MouseEvent('contextmenu', {
-        bubbles: true,
-        clientX: 37,
-        clientY: 53,
-        composed: true,
-      }),
+      new MouseEvent('contextmenu', { bubbles: true, clientX: 37, clientY: 53 }),
     )
 
-    await vi.waitFor(() => {
-      expect(renderMenu).toHaveBeenCalledTimes(1)
-    })
-    expect(openedItems).toEqual([{ kind: 'file', name: 'a.ts', path: 'src/a.ts' }])
-    expect(openedContexts[0]?.anchorRect).toEqual({
-      bottom: 53,
-      height: 0,
-      left: 37,
-      right: 37,
-      top: 53,
-      width: 0,
-      x: 37,
-      y: 53,
-    })
+    await vi.waitFor(() => expect(mounts).toHaveLength(1))
+    expect(mounts).toEqual([{ kind: 'file', name: 'a.ts', path: 'src/a.ts' }])
+    const anchorRect = menus.at(-1)?.anchor.getBoundingClientRect()
+    expect({ x: anchorRect?.x, y: anchorRect?.y }).toEqual({ x: 37, y: 53 })
 
     treeModel.getItem('src/b.ts')?.select()
     await vi.waitFor(() => {
       expect(rowButton(tree, 'src/b.ts').getAttribute('aria-selected')).toBe('true')
     })
-    expect(renderMenu).toHaveBeenCalledTimes(1)
+    expect(mounts).toHaveLength(1)
+    expect(document.querySelector('[data-menu-probe]')?.textContent).toBe('src/a.ts')
   })
 
-  it('opens the focused row context menu from Shift+F10 and closes through its context', async () => {
+  it('opens the focused row menu from Shift+F10 and closes through its handle', async () => {
     const container = document.createElement('main')
     document.body.append(container)
     root = createRoot(container)
-    const onClose = vi.fn()
-    const openedContexts: FileTreeContextMenuOpenContext[] = []
-    const renderMenu = vi.fn(
-      (item: FileTreeContextMenuItem, context: FileTreeContextMenuOpenContext) => {
-        const menu = document.createElement('div')
-        const action = document.createElement('button')
-        action.textContent = item.path
-        menu.append(action)
-        openedContexts.push(context)
-        return menu
-      },
-    )
+    const menus: TreeRowMenuHandle[] = []
     const treeModel = new TreeViewModel({
-      composition: {
-        contextMenu: {
-          enabled: true,
-          onClose,
-          render: renderMenu,
-          triggerMode: 'both',
-        },
-      },
       initialExpansion: 'open',
       initialSelectedPaths: ['src/a.ts'],
       paths: ['src/', 'src/a.ts'],
     })
 
-    flushSync(() => root?.render(<TreeHost aria-label='Files' model={treeModel} />))
+    flushSync(() =>
+      root?.render(
+        <TreeHost
+          aria-label='Files'
+          model={treeModel}
+          renderContextMenu={(item, menu) => {
+            menus.push(menu)
+            return <MenuProbe item={item} onMount={() => {}} />
+          }}
+        />,
+      ),
+    )
     const tree = await waitForTree()
     const treeRoot = tree.querySelector<HTMLElement>('[role="tree"]')
     expect(treeRoot).not.toBeNull()
     treeRoot?.dispatchEvent(
-      new KeyboardEvent('keydown', {
-        bubbles: true,
-        composed: true,
-        key: 'F10',
-        shiftKey: true,
-      }),
+      new KeyboardEvent('keydown', { bubbles: true, key: 'F10', shiftKey: true }),
     )
 
     await vi.waitFor(() => {
-      expect(renderMenu).toHaveBeenCalledTimes(1)
+      expect(document.querySelector('[data-menu-probe]')?.textContent).toBe('src/a.ts')
     })
-    expect(renderMenu.mock.calls[0]?.[0]).toEqual({
-      kind: 'file',
-      name: 'a.ts',
-      path: 'src/a.ts',
-    })
-    expect(openedContexts[0]?.anchorElement.dataset.type).toBe('context-menu-trigger')
+    expect(menus.at(-1)?.anchor.contextElement).toBe(rowButton(tree, 'src/a.ts'))
 
-    openedContexts[0]?.close({ restoreFocus: false })
-    await vi.waitFor(() => {
-      expect(onClose).toHaveBeenCalledTimes(1)
-      expect(
-        tree.querySelector('[data-type="context-menu-trigger"]')?.getAttribute('aria-expanded'),
-      ).toBe('false')
-    })
+    flushSync(() => menus.at(-1)?.onOpenChange(false))
+    await vi.waitFor(() => expect(document.querySelector('[data-menu-probe]')).toBeNull())
   })
 })
+
+/** Stands in for the app's menu; reports each mount so a remount is visible. */
+function MenuProbe({
+  item,
+  onMount,
+}: {
+  readonly item: FileTreeContextMenuItem
+  readonly onMount: (item: FileTreeContextMenuItem) => void
+}) {
+  const reportMount = useEffectEvent(() => onMount(item))
+  useEffect(() => {
+    reportMount()
+  }, [])
+  return <div data-menu-probe>{item.path}</div>
+}
 
 async function waitForTree() {
   await vi.waitFor(() => {

@@ -1,6 +1,6 @@
 // Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
 import type { FileTreePreparedInput } from '../prepared-input'
-import type { ContextMenuAnchorRect, GitStatusEntry } from '../public-types'
+import type { GitStatusEntry } from '../public-types'
 
 // The types below intentionally duplicate private path-store shapes
 // (PathStoreCompareEntry, PathStorePathComparator, PathStoreInitialExpansion,
@@ -217,7 +217,6 @@ export interface FileTreeRenamingConfig {
 }
 
 type FileTreeOptionSurface = FileTreeRenderOptions & {
-  composition?: FileTreeCompositionOptions
   gitStatus?: readonly GitStatusEntry[]
   onSelectionChange?: FileTreeSelectionChangeListener
   renderRowDecoration?: FileTreeRowDecorationRenderer
@@ -306,39 +305,6 @@ export interface FileTreeContextMenuItem {
   kind: 'directory' | 'file'
   name: string
   path: string
-}
-
-export interface FileTreeContextMenuOpenContext {
-  anchorElement: HTMLElement
-  anchorRect: ContextMenuAnchorRect
-  /**
-   * Closes the current context menu. Pass `{ restoreFocus: false }` when the
-   * caller is about to transfer focus into another owned surface, such as the
-   * inline rename input, so the menu close path does not steal focus back to
-   * the row first.
-   */
-  close: (options?: { restoreFocus?: boolean }) => void
-  restoreFocus: () => void
-}
-
-export type FileTreeContextMenuTriggerMode = 'both' | 'button' | 'right-click'
-export type FileTreeContextMenuButtonVisibility = 'always' | 'when-needed'
-
-interface FileTreeContextMenuCompositionOptions {
-  enabled?: boolean
-  triggerMode?: FileTreeContextMenuTriggerMode
-  buttonVisibility?: FileTreeContextMenuButtonVisibility
-  onOpen?: (item: FileTreeContextMenuItem, context: FileTreeContextMenuOpenContext) => void
-  onClose?: () => void
-  /** The menu element, mounted inside the row's menu anchor. */
-  render?: (
-    item: FileTreeContextMenuItem,
-    context: FileTreeContextMenuOpenContext,
-  ) => HTMLElement | null
-}
-
-export interface FileTreeCompositionOptions {
-  contextMenu?: FileTreeContextMenuCompositionOptions
 }
 
 /** A small button after the decoration text, such as "Fix with AI" beside an error. */

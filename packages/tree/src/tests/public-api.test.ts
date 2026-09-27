@@ -3,9 +3,7 @@ import { expect, test } from 'vitest'
 import * as treePackage from '@workspace/tree'
 import type {
   FileTreeBatchOperation,
-  FileTreeCompositionOptions,
   FileTreeContextMenuItem,
-  FileTreeContextMenuOpenContext,
   FileTreeDirectoryHandle,
   FileTreeDropContext,
   FileTreeDropResult,
@@ -47,9 +45,7 @@ type PublicTypeAllowlist = readonly [
   FileTreeRenameEvent,
   FileTreeRowDecorationContext,
   FileTreeContextMenuItem,
-  FileTreeContextMenuOpenContext,
   FileTreeBatchOperation,
-  FileTreeCompositionOptions,
   FileTreeGitStatusPatch,
   FileTreeMoveOptions,
   FileTreeMutationEvent,
@@ -75,7 +71,6 @@ const publicTypesAreNameable: PublicTypesAreNameable = true
 
 test('exports the model and the helpers the app view renders with', () => {
   expect(Object.keys(treePackage).toSorted()).toEqual([
-    'CONTEXT_MENU_TRIGGER_TYPE',
     'FileTreeController',
     'GIT_STATUS_DESCENDANT_TITLE',
     'GIT_STATUS_LABEL',

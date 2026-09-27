@@ -1,6 +1,6 @@
 // Modified for Platform from Pierre. Apache-2.0; see packages/tree/LICENSE-pierre and UPSTREAM.md.
 import type { FileTreeController } from '@workspace/tree'
-import { type RefObject, useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 
 import { transitionControllerSnapshotSubscription } from '@/features/workspace/utils/tree-controller-subscription'
 import {
@@ -15,25 +15,17 @@ import {
   type TreeViewLayoutState,
 } from '@/features/workspace/utils/tree-view-layout'
 
-export type TreeContextMenuScrollActions = {
-  clearHoverPath: () => void
-  closeContextMenu: () => void
-  isContextMenuOpen: () => boolean
-}
-
 /**
  * Keeps the layout snapshot in step with the scroller: scroll, wheel, touch and scroll keys, the
  * controller's changes and the viewport's size. Marks the root while a scroll is in flight so CSS
  * can hide hover affordances in the same frame.
  */
 export function useTreeViewportSync({
-  contextMenuScrollActionsRef,
   controller,
   getRoot,
   getScroll,
   initialScrollTop,
   invalidateControllerView,
-  isScrollingRef,
   itemHeight,
   layoutScrollTop,
   onScrollTopChange,
@@ -44,13 +36,11 @@ export function useTreeViewportSync({
   setScrolling,
   setUpdateViewport,
 }: {
-  readonly contextMenuScrollActionsRef: RefObject<TreeContextMenuScrollActions>
   readonly controller: FileTreeController
   readonly getRoot: () => HTMLElement | null
   readonly getScroll: () => HTMLElement | null
   readonly initialScrollTop: number | undefined
   readonly invalidateControllerView: () => void
-  readonly isScrollingRef: RefObject<boolean>
   readonly itemHeight: number
   readonly layoutScrollTop: number
   readonly onScrollTopChange: ((scrollTop: number) => void) | undefined
@@ -240,16 +230,6 @@ export function useTreeViewportSync({
       if (scrollElement.scrollTop > 0) {
         clearOverlayReveal()
       }
-      // Only dismiss the context menu when the user drove the scroll
-      // (wheel/touch/keyboard). A programmatic scroll — browser-initiated to
-      // bring a newly-focused menu item into view, Playwright's scroll-into-
-      // view before a click, or React DOM updates adjusting scrollTop — must
-      // not close the menu the user is actively interacting with.
-      const contextMenuActions = contextMenuScrollActionsRef.current
-      if (contextMenuActions.isContextMenuOpen() && isScrollingRef.current) {
-        contextMenuActions.closeContextMenu()
-      }
-      contextMenuActions.clearHoverPath()
       markScrolling()
     }
 

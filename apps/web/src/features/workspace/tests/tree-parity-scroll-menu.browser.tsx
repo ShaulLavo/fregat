@@ -1,6 +1,6 @@
 /** @jsxImportSource react */
 // Plan 178 parity: scrolling, sticky folders and the row menu of today's tree, driven by real
-// input. The virtualization and context-menu sub-plans replace this machinery.
+// input. The virtualization sub-plan replaces this machinery; the row menu is the app's list menu.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { commands, userEvent } from 'vitest/browser'
 
@@ -152,33 +152,33 @@ describe('row menu', () => {
     await mountParityTree()
     await clickRow('docs/', { button: 'right' })
     await vi.waitFor(() => expect(menuOpen()).toBe(true))
+    // Base UI ignores an outside press for 500ms after a menu opens without its own trigger.
+    await new Promise((resolve) => setTimeout(resolve, 550))
     await mouse('click', { x: 500, y: 560 })
     await vi.waitFor(() => expect(menuOpen()).toBe(false))
   })
 
-  it('eats wheel input over the tree while open, so the list stays put and the menu open', async () => {
+  it('closes on wheel input over the tree and the list stays put', async () => {
     const { model } = await mountParityTree()
     await expandPaths(model, ['src/', 'src/lib/'])
     await clickRow('src/lib/x.ts', { button: 'right' })
     await vi.waitFor(() => expect(menuOpen()).toBe(true))
     await wheel(3 * ROW_HEIGHT)
-    await frames(3)
+    await vi.waitFor(() => expect(menuOpen()).toBe(false))
     expect(scroller().scrollTop).toBe(0)
-    expect(menuOpen()).toBe(true)
   })
 
-  it('stays open when its row is removed (today; the context-menu sub-plan decides)', async () => {
+  it('closes when its row is removed', async () => {
     const { model } = await mountParityTree()
     await expandPaths(model, ['docs/'])
     await clickRow('docs/notes.md', { button: 'right' })
     await vi.waitFor(() => expect(menuOpen()).toBe(true))
     model.remove('docs/notes.md')
-    await frames(3)
+    await vi.waitFor(() => expect(menuOpen()).toBe(false))
     expect(hasRow('docs/notes.md')).toBe(false)
-    expect(menuOpen()).toBe(true)
   })
 
-  it('an overlay eats pointer input on other rows while it is open', async () => {
+  it('the open menu keeps a click on another row from reaching the tree', async () => {
     const { model } = await mountParityTree()
     await expandPaths(model, ['docs/'])
     await clickRow('docs/guide.md')

@@ -5,12 +5,10 @@ import { flushSync } from 'react-dom'
 
 import { settleLayout } from '../../../../test/env/settle-layout'
 import { TreeHost } from '@/features/workspace/components/tree-host'
-import type {
-  FileTreeContextMenuItem,
-  FileTreeContextMenuOpenContext,
-  FileTreeSearchBlurBehavior,
-} from '@workspace/tree'
+import type { FileTreeContextMenuItem, FileTreeSearchBlurBehavior } from '@workspace/tree'
 import { TreeViewModel } from '@/features/workspace/state/tree-model'
+import type { TreeRowMenuHandle } from '@/features/workspace/utils/tree-row-menu-open'
+import type { TreeHostProps } from '@/features/workspace/components/tree-host'
 
 let root: Root | null = null
 
@@ -31,86 +29,43 @@ describe('tree view browser behavior', () => {
     scroll.dispatchEvent(new Event('scroll'))
     await vi.waitFor(() => expect(onScrollTopChange).toHaveBeenLastCalledWith(360))
   })
-  it.each(['right-click', 'both'] as const)(
-    'does not render rows on hover in %s mode',
-    async (triggerMode) => {
-      const renderRowDecoration = vi.fn(() => null)
-      const renderMenu = vi.fn(
-        (item: FileTreeContextMenuItem, _context: FileTreeContextMenuOpenContext) => {
-          const menu = document.createElement('div')
-          menu.textContent = item.path
-          return menu
-        },
-      )
-      const { tree } = await mountBrowserTree({
-        composition: { contextMenu: { enabled: true, triggerMode, render: renderMenu } },
-        renderRowDecoration,
-      })
-      await settleLayout(virtualScroll(tree))
-      renderRowDecoration.mockClear()
-
-      for (const path of ['src/features/a-0.ts', 'src/features/a-1.ts', 'src/features/a-2.ts']) {
-        rowButton(tree, path).dispatchEvent(new PointerEvent('pointerover', { bubbles: true }))
-        await settleBrowserFrames()
-        if (triggerMode === 'right-click') continue
-        const anchor = tree.querySelector<HTMLElement>('[data-type="context-menu-anchor"]')
-        expect(anchor?.getBoundingClientRect().top).toBeCloseTo(
-          rowButton(tree, path).getBoundingClientRect().top,
-          1,
-        )
-      }
-      expect(renderRowDecoration.mock.calls.length).toBe(0)
-
-      const trigger = tree.querySelector<HTMLButtonElement>('[data-type="context-menu-trigger"]')
-      expect(trigger?.dataset.visible).toBe(triggerMode === 'both' ? 'true' : 'false')
-      rowButton(tree, 'src/features/a-2.ts').dispatchEvent(
-        new PointerEvent('pointerout', { bubbles: true, relatedTarget: document.body }),
-      )
-      await settleBrowserFrames()
-      expect(
-        tree.querySelector<HTMLElement>('[data-type="context-menu-anchor"]')?.dataset.visible,
-      ).toBe('false')
-      expect(renderRowDecoration.mock.calls.length).toBe(0)
-      rowButton(tree, 'src/features/a-2.ts').dispatchEvent(
-        new PointerEvent('pointerover', { bubbles: true }),
-      )
-      await settleBrowserFrames()
-      if (triggerMode === 'both') {
-        trigger?.click()
-      } else {
-        rowButton(tree, 'src/features/a-2.ts').dispatchEvent(
-          new MouseEvent('contextmenu', { bubbles: true }),
-        )
-      }
-      await vi.waitFor(() => expect(renderMenu).toHaveBeenCalledTimes(1))
-      expect(renderMenu.mock.calls[0]?.[0].path).toBe('src/features/a-2.ts')
-      renderMenu.mock.calls[0]?.[1].close({ restoreFocus: false })
-      await settleBrowserFrames()
-      const keyboardRow = rowButton(tree, 'src/features/a-1.ts')
-      keyboardRow.focus()
-      keyboardRow.dispatchEvent(
-        new KeyboardEvent('keydown', { bubbles: true, key: 'F10', shiftKey: true }),
-      )
-      await vi.waitFor(() => expect(renderMenu).toHaveBeenCalledTimes(2))
-      expect(renderMenu.mock.calls[1]?.[0].path).toBe('src/features/a-1.ts')
-      expect(renderMenu.mock.calls[1]?.[1].anchorRect?.top).toBeCloseTo(
-        keyboardRow.getBoundingClientRect().top +
-          Number.parseFloat(getComputedStyle(trigger!).marginTop),
-        1,
-      )
-    },
-  )
-
-  it('positions the menu button on the hovered sticky row without rendering rows', async () => {
+  it('opens the row menu from a right-click and the menu key without rendering rows on hover', async () => {
     const renderRowDecoration = vi.fn(() => null)
-    const renderMenu = vi.fn((item: FileTreeContextMenuItem) => {
-      const menu = document.createElement('div')
-      menu.textContent = item.path
-      return menu
+    const menus: { item: FileTreeContextMenuItem; menu: TreeRowMenuHandle }[] = []
+    const { tree } = await mountBrowserTree({ renderRowDecoration }, (item, menu) => {
+      menus.push({ item, menu })
+      return null
     })
-    const { tree } = await mountBrowserTree({
-      composition: { contextMenu: { enabled: true, triggerMode: 'both', render: renderMenu } },
-      renderRowDecoration,
+    await settleLayout(virtualScroll(tree))
+    renderRowDecoration.mockClear()
+
+    for (const path of ['src/features/a-0.ts', 'src/features/a-1.ts', 'src/features/a-2.ts']) {
+      rowButton(tree, path).dispatchEvent(new PointerEvent('pointerover', { bubbles: true }))
+      await settleBrowserFrames()
+    }
+    expect(renderRowDecoration.mock.calls.length).toBe(0)
+
+    rowButton(tree, 'src/features/a-2.ts').dispatchEvent(
+      new MouseEvent('contextmenu', { bubbles: true }),
+    )
+    await vi.waitFor(() => expect(menus.at(-1)?.item.path).toBe('src/features/a-2.ts'))
+    flushSync(() => menus.at(-1)?.menu.onOpenChange(false))
+    await settleBrowserFrames()
+    const keyboardRow = rowButton(tree, 'src/features/a-1.ts')
+    keyboardRow.focus()
+    keyboardRow.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, key: 'F10', shiftKey: true }),
+    )
+    await vi.waitFor(() => expect(menus.at(-1)?.item.path).toBe('src/features/a-1.ts'))
+    expect(menus.at(-1)?.menu.anchor.contextElement).toBe(keyboardRow)
+  })
+
+  it("opens a sticky row's menu without scrolling or rendering rows", async () => {
+    const renderRowDecoration = vi.fn(() => null)
+    const menus: FileTreeContextMenuItem[] = []
+    const { tree } = await mountBrowserTree({ renderRowDecoration }, (item) => {
+      menus.push(item)
+      return null
     })
     const scroll = virtualScroll(tree)
     scroll.scrollTop = 120
@@ -124,15 +79,9 @@ describe('tree view browser behavior', () => {
     expect(stickyRow).not.toBeNull()
     stickyRow!.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }))
     await settleBrowserFrames()
-    const anchor = tree.querySelector<HTMLElement>('[data-type="context-menu-anchor"]')
-    expect(anchor?.getBoundingClientRect().top).toBeCloseTo(
-      stickyRow!.getBoundingClientRect().top,
-      1,
-    )
     expect(renderRowDecoration.mock.calls.length).toBe(0)
-    tree.querySelector<HTMLButtonElement>('[data-type="context-menu-trigger"]')?.click()
-    await vi.waitFor(() => expect(renderMenu).toHaveBeenCalledTimes(1))
-    expect(renderMenu.mock.calls[0]?.[0].path).toBe('src/features/')
+    stickyRow!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))
+    await vi.waitFor(() => expect(menus.at(-1)?.path).toBe('src/features/'))
     expect(scroll.scrollTop).toBe(120)
   })
 
@@ -720,15 +669,11 @@ async function settleBrowserFrames() {
 async function mountBrowserTree(
   options: Pick<
     ConstructorParameters<typeof TreeViewModel>[0],
-    | 'composition'
-    | 'renderRowDecoration'
-    | 'stickyFolders'
-    | 'initialScrollTop'
-    | 'onScrollTopChange'
+    'renderRowDecoration' | 'stickyFolders' | 'initialScrollTop' | 'onScrollTopChange'
   > & { pathCount?: number } = {},
+  renderContextMenu?: TreeHostProps['renderContextMenu'],
 ) {
   const mountedModel = new TreeViewModel({
-    composition: options.composition,
     renderRowDecoration: options.renderRowDecoration,
     gitStatus: [{ path: 'src/features/a-3.ts', status: 'modified' }],
     initialExpansion: 'open',
@@ -740,10 +685,16 @@ async function mountBrowserTree(
     stickyFolders: options.stickyFolders ?? true,
   })
 
-  return { model: mountedModel, tree: await renderBrowserTree(mountedModel) }
+  return {
+    model: mountedModel,
+    tree: await renderBrowserTree(mountedModel, renderContextMenu),
+  }
 }
 
-async function renderBrowserTree(mountedModel: TreeViewModel) {
+async function renderBrowserTree(
+  mountedModel: TreeViewModel,
+  renderContextMenu?: TreeHostProps['renderContextMenu'],
+) {
   const container = document.createElement('main')
   container.style.height = '180px'
   container.style.width = '360px'
@@ -755,6 +706,7 @@ async function renderBrowserTree(mountedModel: TreeViewModel) {
       <TreeHost
         aria-label='Files'
         model={mountedModel}
+        renderContextMenu={renderContextMenu}
         style={{ display: 'block', height: '180px', width: '360px' }}
       />,
     )

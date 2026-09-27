@@ -6,16 +6,19 @@ import { useListContextMenu } from '../use-list-context-menu'
 
 function ListMenu({
   items = ['first', 'second'],
+  rowFocus = false,
   scrolling = false,
   touchPolicy = 'suppress',
 }: {
   readonly items?: readonly string[]
+  readonly rowFocus?: boolean
   readonly scrolling?: boolean
   readonly touchPolicy?: 'suppress' | 'context-menu'
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const menu = useListContextMenu<string>({
     containerRef,
+    focusTargetOf: rowFocus ? (target) => document.getElementById(target) : undefined,
     touchPolicy,
     isTargetPresent: (target) => items.includes(target),
   })
@@ -44,7 +47,11 @@ function ListMenu({
       </div>
       {menu.anchor ? (
         <div role='menu' data-testid='menu'>
-          {JSON.stringify({ target: menu.target, rect: menu.anchor.getBoundingClientRect() })}
+          {JSON.stringify({
+            target: menu.target,
+            rect: menu.anchor.getBoundingClientRect(),
+            returnsTo: menu.returnFocusTo()?.id || menu.returnFocusTo()?.getAttribute('role'),
+          })}
         </div>
       ) : null}
     </>
@@ -61,6 +68,17 @@ test('right-click targets the clicked row at the pointer without changing select
   expect(menu.target).toBe('second')
   expect(menu.rect).toMatchObject({ x: 42, y: 73, height: 0, width: 0 })
   expect(screen.getByRole('option', { name: 'first' })).toHaveAttribute('aria-selected', 'true')
+})
+
+test('focus returns to the list, or to the target a list names', () => {
+  const view = render(<ListMenu />)
+  fireEvent.contextMenu(screen.getByRole('option', { name: 'second' }))
+  expect(JSON.parse(screen.getByTestId('menu').textContent ?? '').returnsTo).toBe('listbox')
+  view.unmount()
+
+  render(<ListMenu rowFocus />)
+  fireEvent.contextMenu(screen.getByRole('option', { name: 'second' }))
+  expect(JSON.parse(screen.getByTestId('menu').textContent ?? '').returnsTo).toBe('second')
 })
 
 test.each([{ key: 'F10', shiftKey: true }, { key: 'ContextMenu' }])(
