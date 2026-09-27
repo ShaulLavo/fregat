@@ -1,0 +1,197 @@
+# Plan 197: Editor-owned highlighting service
+
+## Status and outcome
+
+- Status: PROPOSED, 2026-09-27. Planning is authorized; implementation has not started.
+- Inspected: Platform `9c08916bf`, linked Editor `52099144`. Recheck both heads and CI's `editor-ref` before implementation.
+- Outcome: Editor supplies one reusable highlighting service. Plugins, diffs, Settings previews, and rendered code consume it. Platform supplies configuration and theme data without selecting engines or constructing workers.
+- Scope: a facade over existing Editor providers/workers, followed by bounded consumer migrations. Other plugin candidates are assessment only. Wallpaper image loading and Settings layout remain separate work.
+
+Planning checklist:
+
+- [x] Trace spelling, LSP ownership, highlighting workers, previews, and Markdown fences.
+- [x] Compare two API shapes and reconcile independent architecture reviews.
+- [x] Define ownership, semantics, implementation units, and checks.
+- [x] Check document formatting, index registration, and required repository gates/types.
+
+## Grounding
+
+Spelling already separates computation from presentation. Editor's `packages/spellcheck/src/service.ts` exports `SpellcheckService`. Its `check(words)` accepts an array of words and returns misspellings; it also supplies suggestions and accepted-word state. The worker starts on demand. `plugin.ts` requires an injected `SpellcheckChecker`, while its controller tokenizes prose and paints ranges. There is no current `check(text)` method or optional plugin-created spelling service.
+
+Optional ownership has a separate precedent. `packages/lsp-plugin/src/document.ts` exports `LanguageServerDocument`: views borrow it and its creator disposes it. The plugin disposes its document only when the caller did not supply one. Highlighting adopts that ownership distinction.
+
+| Existing path                                                                              | Responsibility and gap                                                                                                                                                                         |
+| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Editor `packages/editor/src/shiki/plugin.ts`                                               | Separate provider/plugin factories, registration caches, engine-specific resolver configuration.                                                                                               |
+| Editor `packages/editor/src/shiki/workerClient.ts` and `shiki.worker.ts`                   | Lazy worker, explicit runtime sessions, theme/language registrations, incremental edits, recoloring, packed tokens, and disposal. Oniguruma initialization and tokenization run in the worker. |
+| Editor `packages/tree-sitter/src/index.ts`, `session.ts`, and `treeSitter/workerClient.ts` | Provider/plugin separation, worker-backed sessions, captures, folds, injections, and structural selection.                                                                                     |
+| Platform `features/editor/state/syntax-highlighting.ts` and `utils/plugins.ts`             | Both provider families and engine choice. Tree-sitter remains available for structure when Shiki supplies colors. Diffs/prepared documents share these providers.                              |
+| Platform `lib/code-theme/state/preview.ts`                                                 | Separate main-thread Shiki instance for the fixed TypeScript sample, including built-in themes that use Tree-sitter in the editor.                                                             |
+| Platform `lib/code-highlight/` and `packages/markdown/src/utils/shiki-highlighter.ts`      | Another main-thread Shiki path: per-palette instances, dual-theme tokens, synchronous-cache-or-callback API, and host color normalization.                                                     |
+
+Preview history introduced the separate instance in `99550068f`; editor worker infrastructure already exists in that revision. `da272416b` disabled the tokenization time limit, `fc97d36a0` moved acquisition into queries, and `3aec85c51` deferred imports. No documented reason to bypass the workers was found.
+
+The motivating trace found a 90.2 ms main-thread task dominated by `highlightPreview`. It supports removing synchronous preview tokenization, but does not establish the cause of the owner's Wallpaper hitch. The scenario reached loaded wallpaper images in desktop Chromium at phone dimensions, using wheel events and a final programmatic scroll. Safari/image behavior remains unconfirmed. Evidence: `/work/tmp/fregat-evidence/20260927T131817Z-trace-settings-wallpaper-scroll/`. The engine-swap experiment was reverted.
+
+## Architecture decision
+
+Create the optional Editor package `@singapore-editor/highlighting`, above `core`, `tree-sitter`, and `tree-sitter-languages`. Tree-sitter already depends on core, so placing the aggregate implementation in `core/syntax` would reverse that dependency.
+
+| Candidate                                                  | Decision                                                                                                                                                                                                 |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Add standalone highlighting to `EditorHighlighterProvider` | Reuses a small interface, but leaves structural registration, engine choice, grammar loading, and lifecycle coordination in Platform. Reject as the final public API; retain it internally where useful. |
+| Editor-owned service plus plugin adapters                  | Hides those responsibilities and composes existing worker/session implementations. Choose this shape.                                                                                                    |
+
+The service owns engine policy, language alias resolution, lazy grammar loading, theme registration, and worker lifetime. This is no new parser, worker protocol framework, or common base class for every plugin. Platform's workspace census remains an optional list of language identities; Editor translates and schedules prewarming.
+
+### Caller-first API sketch
+
+Names are proposed. Reconcile them with existing public exports before implementation.
+
+```ts
+import { createHighlightingService, createHighlightingPlugin } from '@singapore-editor/highlighting'
+
+const highlighting = createHighlightingService({
+  resolveTheme: themeCatalog.resolve,
+  preloadLanguages: () => workspaceLanguageIds,
+})
+
+const syntax = createHighlightingPlugin({
+  service: highlighting,
+  theme: selectedTheme,
+})
+
+const result = await highlighting.highlight(sample, {
+  language: 'typescript',
+  theme: previewTheme,
+  signal,
+})
+
+await highlighting.dispose()
+
+// Simple editor use creates an activation-owned service.
+const simpleSyntax = createHighlightingPlugin()
+```
+
+`themeCatalog.resolve` is illustrative configuration, not a required new Platform abstraction. Editor supplies valid default theme/language assets for the simple path. A snippet needs no DOM node, Editor instance, DocumentSession, public document ID, or worker handle.
+
+Theme input describes actual data: an Editor palette or imported VS Code theme. It has no engine selector. The plugin accepts a per-binding theme or existing getter/subscription pattern. A snippet captures an explicit theme revision without changing a service-global active theme.
+
+Derive the standalone boundary from that usage:
+
+```ts
+type HighlightTheme =
+  | { readonly format: 'editor'; readonly definition: EditorTheme }
+  | { readonly format: 'vscode'; readonly definition: VscodeThemeDefinition }
+
+type HighlightOptions = {
+  readonly language: string
+  readonly theme?: HighlightTheme
+  readonly signal?: AbortSignal
+}
+
+type HighlightResult = {
+  readonly language: string
+  readonly themeRevision: string
+  readonly tokens: readonly Readonly<EditorToken>[]
+  readonly foreground: string
+  readonly background: string
+}
+
+interface HighlightingService {
+  highlight(text: string, options: HighlightOptions): Promise<HighlightResult>
+  dispose(): Promise<void>
+}
+```
+
+Reuse existing Editor theme/token style types. Tokens use UTF-16 offsets into exactly the submitted text; preserve gaps, Unicode, newlines, empty input, and font styles. Results and nested styles are immutable. A renderer derives lines without importing Shiki's `TokensResult`, packed transport types, or HTML style conventions.
+
+Keep `PackedEditorTokens`, `EditorTokenStore`, snapshots, and incremental patches on the document path. Convert short snippet output inside Editor; do not expand large documents into object tokens to share the snippet interface. Tokenize the complete multiline sample, preserving grammar state across lines.
+
+The service/plugin composes the existing document providers. Prepared opens and diffs borrow the same service. Put any shared domain contract required by core/diff in core's existing public surfaces, with no runtime import back into the aggregate. Platform passes service/theme into Editor adapters and stops branching on backend tags. Final adapter signatures must preserve the existing packed and exact-revision contracts.
+
+### Theme and language semantics
+
+- Built-in Editor themes retain Tree-sitter scope/style resolution where the document path supports it.
+- Imported VS Code themes retain Shiki/TextMate colors. Tree-sitter continues to supply structure where enabled, including folds, brackets, injections, selection, and captures.
+- Settings previews follow the same policy. Align the current synthetic-Shiki built-in preview with the real editor deliberately; record expected color changes and verify sample parity.
+- Preserve aliases, extension inference, JSX/TSX distinctions, embedded languages, and current document fallback behavior. Define standalone unknown-language fallback inside Editor.
+- Preserve Markdown's wider language set, including languages supplied only by Shiki. Do not reduce fence coverage to the Tree-sitter registry.
+- Theme identity includes content revision, not only name or dark/light mode. Same-name imported themes with changed content cannot share stale colors.
+- Keep registration normalization and mutations inside Editor.
+- Preserve Markdown's light/dark rendering contract through Editor-owned requests and a renderer adapter. Concurrent requests suffice initially; add a batch API only for demonstrated need.
+- Move proven color-normalization rules into Editor's shared style resolution. Cover CSS custom properties and font styles with golden cases; check worker output before retaining current workarounds.
+
+### Ownership, concurrency, and failures
+
+One explicit service owns lazy worker owners, registration caches, and grammar/theme acquisition. Platform stores the shared service at application/resource lifetime below feature boundaries. Themes, messages, preview rows, and tabs reuse it.
+
+An injected service is borrowed. Plugin disposal releases subscriptions, registrations, and sessions, never the shared service. An omitted service is created per plugin activation, then disposed after that activation's consumers detach. Reusing a plugin definition across two editors must not let one teardown terminate the other. Do not use a hidden page-global default as the new ownership contract.
+
+Snippets use independent transient runtime sessions and release their worker document state after success, abort, or failure. Document replies keep existing snapshot/version checks. An aborted or superseded request cannot publish into a new preview, theme, reopened document, or disposed service.
+
+Cancellation rejects the caller and suppresses publication; it does not terminate a shared worker. Synchronous tokenization already running inside that worker may complete before cleanup. Do not promise preemption the engine cannot provide.
+
+Reuse current queues and per-document ordering. Deduplicate safe acquisition while isolating each request's palette/session state. Canceling one subscriber must not cancel another's shared grammar load. Preview bursts must not queue a global theme change or large batch ahead of interactive edits; measure contention before adding scheduling machinery.
+
+Keep caches scoped and disposable. Do not add an unbounded text-to-token cache. Consumer resource queries retain preview results by exact content/theme revision; document stores retain incremental state. Measure transient-session retention after repeated previews.
+
+Unsupported syntax may return documented plain text. Operational failures must remain distinguishable from successful highlighting. Reuse Editor's error/reporting boundary, settle each pending request once, and allow only bounded recovery. Never silently fall back to heavy main-thread tokenization. UI consumers retain a correct held result or use their existing plain/error presentation. Repeated disposal is safe and leaves no live listeners or pending requests.
+
+## Implementation units
+
+### 1. Add the Editor service and adapters
+
+- [ ] Recheck source/API drift and package dependency directions.
+- [ ] Add public package exports, build entries, metadata, and built-entry smoke tests. Keep worker assets lazy.
+- [ ] Move engine policy, grammar/alias loading, and registration ownership into Editor; reuse current workers/providers. Do not duplicate Platform tables into another live owner.
+- [ ] Implement standalone highlighting, theme revisions, immutable output, abort behavior, and transient-session cleanup.
+- [ ] Implement optional-service plugin ownership and preserve Tree-sitter structure under Shiki colors.
+- [ ] Adapt prepared documents and diffs without changing packed/incremental or exact-revision behavior.
+- [ ] Migrate affected Editor examples/callers, then remove superseded setup paths. Retain low-level engine APIs only where independent consumers still need them.
+- [ ] Document simple-plugin, shared-plugin, standalone, and creator-disposes usage.
+
+### 2. Migrate Platform editor documents and Settings previews
+
+- [ ] Merge/push/build Editor first; bump Platform's exact `editor-ref` in `.github/actions/setup/action.yml` with the consumer change.
+- [ ] Add the package using existing linked-package symlink/override/CI provisioning conventions. Verify built exports from a clean CI clone.
+- [ ] Create one shared application resource owner. Platform supplies themes, language census, and product enablement.
+- [ ] Replace provider/worker ownership and the custom engine-switch plugin in `features/editor/state/syntax-highlighting.ts` and `utils/plugins.ts`. Preserve settings, diffs, prepared opens, and supported inspection/idle hooks.
+- [ ] Replace `lib/code-theme/state/preview.ts` with a resource query calling the service, keyed by exact theme revision. Retain visibility-triggered work and held-result behavior.
+- [ ] Migrate preview rendering to Editor token styles; delete the private engine and unused conversion path.
+- [ ] Audit direct Shiki imports/dependencies before removal. Markdown still uses them until unit 3.
+
+### 3. Migrate rendered Markdown
+
+- [ ] Replace `packages/markdown/src/utils/shiki-highlighter.ts` and Platform's per-theme engine cache with a thin shared-service adapter.
+- [ ] Change `CodeHighlighter`'s Shiki-specific result seam to renderer-neutral tokens. Preserve exact-content caching, streaming updates, and stale-result suppression.
+- [ ] Keep cold plain-text output followed by highlighted output. A warm cache can answer synchronously; a worker request remains asynchronous.
+- [ ] Verify wide language coverage, both theme modes, and color normalization.
+- [ ] Delete duplicate engine construction, obsolete grammar maps/result types, and dependencies proven unused. No Markdown parser rewrite.
+
+### 4. Verify and ship completed consumer units
+
+- [ ] Editor API tests: text-only simple plugin; standalone snippet without DOM/document; borrowed/owned disposal; simultaneous themes; same-name changed content; multiline/Unicode/empty/style goldens; unknown language; unavailable/crashed worker; abort during acquisition/tokenization; no leaked transient sessions.
+- [ ] Document regressions: incremental edits/recoloring, two views, exact prepared revision, diffs, theme switch with pending replies, and Tree-sitter structure under Shiki colors.
+- [ ] Platform previews: actual editor parity for built-in/imported themes, concurrent mode previews, revision-aware query keys, and rapid scroll/search/toggle without stale output.
+- [ ] Markdown: streaming supersession, aliases/unknown fences, CSS properties, and light/dark changes.
+- [ ] Measure cold/warm Settings scrolling and preview completion with `agent:browser trace --compare`. Record main-thread tasks, worker startup, transfers, and session retention. Read screenshots; exercise Chromium and mobile WebKit, and distinguish physical iPhone coverage.
+- [ ] Measure editor open/typing while previews/fences request work. Off-main computation must not delay interactive worker replies. Preserve Plan 170's deferred census-based prewarming.
+- [ ] Run affected Editor tests/types/build/export checks and Platform gates/types/bundle checks. Use package test scripts, not `bun test`.
+- [ ] Commit/push verified implementation units by path. Deploy completed Platform consumer changes to Mesh; inspect release/UI/logs/live check. This docs-only plan requires no runtime deployment.
+
+## Other plugin candidates
+
+| Candidate                                            | Existing separation                                              | Decision                                                                                                        |
+| ---------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Spellcheck                                           | Public service/checker; controller tokenizes and paints          | Use its computation/presentation precedent. Optional ownership or a text convenience API is a separate feature. |
+| LSP                                                  | Public client/document; plugin borrows or creates document state | Reuse its ownership rule. No protocol/transport rewrite.                                                        |
+| Tree-sitter                                          | Public backend/provider/session and plugin                       | Compose the existing implementation; preserve structural consumers.                                             |
+| Diff                                                 | Public computation, patch parsing, projections, view adapters    | Consume shared highlighting; retain diff computation ownership.                                                 |
+| Editor Markdown                                      | Pure source-decoration transformations over text/captures        | Already separate; distinct from Platform's rendered Markdown highlighter migration.                             |
+| Find                                                 | Internal pure matcher plus controller                            | Expose a matcher only when a real standalone consumer needs its semantics. No speculative FindService.          |
+| Gutters, minimap, scope lines, sticky scroll, decode | Viewport/caret/layout or paint-dependent contributions           | Keep editor adapters. No blanket service extraction.                                                            |
+
+## Completion boundary
+
+Finish when editor documents, Settings previews, and Markdown fences consume Editor-owned APIs and Platform no longer constructs their syntax engines/workers. Record intentional color changes and measured scheduling limits. Other plugin refactors and an unproven Wallpaper image fix remain outside this plan.
