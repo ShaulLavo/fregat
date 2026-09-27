@@ -1,4 +1,5 @@
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import { firstLoadFiles } from './first-load-files'
@@ -10,7 +11,7 @@ afterEach(() => {
 })
 
 function buildFixture(shellLoader: string, screenImport: string) {
-  const root = mkdtempSync('/work/tmp/pr172-bundle-')
+  const root = mkdtempSync(path.join(tmpdir(), 'first-load-files-'))
   fixtures.push(root)
   const dir = path.join(root, 'dist')
   mkdirSync(path.join(dir, 'assets'), { recursive: true })
