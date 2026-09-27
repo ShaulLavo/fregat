@@ -10,6 +10,7 @@ import {
   scrollFocusedRowIntoView,
 } from '@/features/workspace/utils/tree-focus'
 import {
+  TREE_DEFAULT_VIEWPORT_HEIGHT,
   computeTreeViewLayoutState,
   type TreeViewLayoutState,
 } from '@/features/workspace/utils/tree-view-layout'
@@ -31,7 +32,6 @@ export function useTreeViewportSync({
   getRoot,
   getScroll,
   initialScrollTop,
-  initialViewportHeight,
   invalidateControllerView,
   isScrollingRef,
   itemHeight,
@@ -49,7 +49,6 @@ export function useTreeViewportSync({
   readonly getRoot: () => HTMLElement | null
   readonly getScroll: () => HTMLElement | null
   readonly initialScrollTop: number | undefined
-  readonly initialViewportHeight: number
   readonly invalidateControllerView: () => void
   readonly isScrollingRef: RefObject<boolean>
   readonly itemHeight: number
@@ -100,14 +99,14 @@ export function useTreeViewportSync({
 
     measuredViewportHeightRef.current = readMeasuredViewportHeight(
       scrollElement,
-      initialViewportHeight,
+      TREE_DEFAULT_VIEWPORT_HEIGHT,
     )
 
     const update = (): void => {
       const nextItemCount = controller.getVisibleCount()
       const nextViewportHeight = getCachedViewportHeight(
         measuredViewportHeightRef.current,
-        initialViewportHeight,
+        TREE_DEFAULT_VIEWPORT_HEIGHT,
       )
       const maxScrollTop = Math.max(0, nextItemCount * itemHeight - nextViewportHeight)
       // Collapse can shrink total height under the current scroll position, so
@@ -138,7 +137,7 @@ export function useTreeViewportSync({
       if (initialScrollTop === undefined && initialFocusedIndex >= 0) {
         const initialViewportHeightPx = getCachedViewportHeight(
           measuredViewportHeightRef.current,
-          initialViewportHeight,
+          TREE_DEFAULT_VIEWPORT_HEIGHT,
         )
         const initialFocusedRow =
           controller.getVisibleRows(initialFocusedIndex, initialFocusedIndex)[0] ?? null
@@ -299,7 +298,7 @@ export function useTreeViewportSync({
               entries[0] == null ? null : getResizeObserverViewportHeight(entries[0])
             measuredViewportHeightRef.current =
               observedViewportHeight ??
-              readMeasuredViewportHeight(scrollElement, initialViewportHeight)
+              readMeasuredViewportHeight(scrollElement, TREE_DEFAULT_VIEWPORT_HEIGHT)
             update()
           })
         : null
@@ -334,7 +333,6 @@ export function useTreeViewportSync({
     controller,
     getRoot,
     getScroll,
-    initialViewportHeight,
     onScrollTopChange,
     initialScrollTop,
     invalidateControllerView,

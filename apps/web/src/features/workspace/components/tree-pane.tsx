@@ -182,7 +182,6 @@ function ReadyTreePane({
     ? [treePathForSelectedPath(rootPath, selectedFilePath)]
     : undefined
   const { model: tree } = useTreeModel({
-    density: 'compact',
     itemHeight: rowHeight,
     flattenEmptyDirectories: true,
     gitStatus: initialGitStatus,

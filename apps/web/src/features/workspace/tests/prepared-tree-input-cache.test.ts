@@ -31,6 +31,5 @@ test('uses a matching prepared path set for construction and reset', () => {
     ])
   } finally {
     unsubscribe()
-    tree.cleanUp()
   }
 })

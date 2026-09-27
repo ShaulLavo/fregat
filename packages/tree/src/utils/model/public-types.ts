@@ -1,7 +1,6 @@
 // Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
 import type { FileTreePreparedInput } from '../prepared-input'
 import type { ContextMenuAnchorRect, GitStatusEntry } from '../public-types'
-import type { FileTreeDensity } from './density'
 
 // The types below intentionally duplicate private path-store shapes
 // (PathStoreCompareEntry, PathStorePathComparator, PathStoreInitialExpansion,
@@ -137,10 +136,6 @@ export type FileTreeItemHandle = FileTreeDirectoryHandle | FileTreeFileHandle
 export interface FileTreeRenderOptions {
   initialScrollTop?: number
   onScrollTopChange?: (scrollTop: number) => void
-  // Hint how many rows should fit in the first render before the browser can
-  // measure the real scroll viewport. Fractional values are allowed when the
-  // desired first-render budget is not an exact multiple of itemHeight.
-  initialVisibleRowCount?: number
   itemHeight?: number
   overscan?: number
   stickyFolders?: boolean
@@ -223,18 +218,10 @@ export interface FileTreeRenamingConfig {
 
 type FileTreeOptionSurface = FileTreeRenderOptions & {
   composition?: FileTreeCompositionOptions
-  density?: FileTreeDensity
   gitStatus?: readonly GitStatusEntry[]
   onSelectionChange?: FileTreeSelectionChangeListener
   renderRowDecoration?: FileTreeRowDecorationRenderer
   search?: boolean
-  // When `true`, renders the search input with a synthetic focus ring so the
-  // input looks focused even though no browser focus is attached. The ring is
-  // dismissed automatically on the first real interaction with the input
-  // (focus, pointer down, or input). Intended for demos and marketing pages
-  // that pre-populate an `initialSearchQuery` and want the visual to match a
-  // focused state without stealing real focus from siblings.
-  searchFakeFocus?: boolean
   searchBlurBehavior?: FileTreeSearchBlurBehavior
   searchPlaceholder?: string
 }

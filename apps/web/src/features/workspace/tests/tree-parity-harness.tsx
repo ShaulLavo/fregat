@@ -81,13 +81,10 @@ type ParityEvents = {
 type Mounted = { readonly model: TreeViewModel; readonly events: ParityEvents }
 
 let root: Root | null = null
-let mounted: TreeViewModel | null = null
 
 export async function unmountParityTree() {
   await commands.treeResetInput()
   await commands.treeReducedMotion(false)
-  mounted?.cleanUp()
-  mounted = null
   flushSync(() => root?.unmount())
   root = null
   document.body.innerHTML = ''
@@ -128,7 +125,6 @@ export async function mountParityTree(
     onSelectionChange: (paths) => events.selections.push(paths),
     ...modelOptions,
   })
-  mounted = model
   const container = document.createElement('main')
   container.style.height = `${height}px`
   container.style.width = '360px'

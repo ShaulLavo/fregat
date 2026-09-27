@@ -1,6 +1,6 @@
 # Plan 178: app-owned state
 
-- Status: IN PROGRESS (wave 2, lane T): steps 1–3 and 9 landed 2026-09-26/27; 4–8 next. Size L. After [out-of-the-root](out-of-the-root.md).
+- Status: IN PROGRESS (wave 2, lane T): steps 1–3, 8 and 9 landed 2026-09-26/27; 4–7 next. Size L. After [out-of-the-root](out-of-the-root.md).
 - Owns: moving the view into the app and replacing the imperative facade with props and state.
 
 ## Outcome
@@ -191,3 +191,23 @@ chip on Rename (reproduced on main); re-baselined.
   tests and typecheck, web typecheck, gates. Tree browser 83 tests: one full run had
   `tree-parity-scroll-menu` "holds row hover until the scroll settles" fail; three reruns of the
   file passed. It times hover against scroll settlement, which this change does not touch.
+
+### Step 8, 2026-09-27
+
+- Gone: `searchFakeFocus` (and `FilterField`'s `fakeFocus`, which only the tree set),
+  `initialVisibleRowCount` (the first render uses a 420px viewport, as it did whenever the option was
+  unset), the density presets and numeric densities (`density.ts`, `resolveFileTreeDensity`,
+  `setDensity`): the model takes `itemHeight` and the host paints the app's 0.8 factor from
+  `TREE_DENSITY_FACTOR`. The view's defaults (`TREE_DEFAULT_ITEM_HEIGHT`, `_OVERSCAN`,
+  `_VIEWPORT_HEIGHT`) moved from the package into `utils/tree-view-layout.ts`.
+- `useTreeModel`'s 1ms teardown timeout and `TreeViewModel.cleanUp` are gone. The model owns
+  everything it subscribes to, so it needs no teardown; the one bridge out of it,
+  `onSelectionChange`, is connected by `TreeHost` in an effect (`connectSelectionChange`), which
+  StrictMode's remount handles, and reports a change made before it connected.
+- The tree-parity harness mounted without a density and so drew at factor 1; it now draws at the
+  app's 0.8, which is what it claims to mirror.
+- Verification: web typecheck, gates, package 100, `packages/ui` patterns 71, workspace node/dom
+  (the same container failures, plus `event-streams` once, which passes alone), tree browser 83.
+  `tree-parity-scroll-menu` "holds row hover until the scroll settles" fails intermittently under a
+  full run here; it fails the same way on the base commit `14eebe4` (the first hover never lands,
+  line 221), so it predates this work.

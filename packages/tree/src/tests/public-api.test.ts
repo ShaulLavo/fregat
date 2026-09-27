@@ -76,9 +76,6 @@ const publicTypesAreNameable: PublicTypesAreNameable = true
 test('exports the model and the helpers the app view renders with', () => {
   expect(Object.keys(treePackage).toSorted()).toEqual([
     'CONTEXT_MENU_TRIGGER_TYPE',
-    'FILE_TREE_DEFAULT_ITEM_HEIGHT',
-    'FILE_TREE_DEFAULT_OVERSCAN',
-    'FILE_TREE_DEFAULT_VIEWPORT_HEIGHT',
     'FileTreeController',
     'GIT_STATUS_DESCENDANT_TITLE',
     'GIT_STATUS_LABEL',
@@ -88,7 +85,6 @@ test('exports the model and the helpers the app view renders with', () => {
     'computeFileTreeLayout',
     'computeStickyRows',
     'prepareFileTreeInput',
-    'resolveFileTreeDensity',
     'resolveFileTreeGitStatusState',
   ])
   expect(publicTypesAreNameable).toBe(true)

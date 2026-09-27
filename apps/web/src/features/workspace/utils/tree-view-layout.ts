@@ -8,6 +8,13 @@ import type {
 } from '@workspace/tree'
 import { computeFileTreeLayout, computeStickyRows } from '@workspace/tree'
 
+export const TREE_DEFAULT_ITEM_HEIGHT = 30
+export const TREE_DEFAULT_OVERSCAN = 10
+// The first render's viewport before the scroller can be measured.
+export const TREE_DEFAULT_VIEWPORT_HEIGHT = 420
+// Spacing scale for gaps, radii and the level indent; the app draws the tree at 0.8.
+export const TREE_DENSITY_FACTOR = 0.8
+
 export type TreeViewLayoutState = {
   snapshot: FileTreeLayoutSnapshot<FileTreeVisibleRow>
   // Rows rendered inside the sticky overlay. Usually equal to

@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef, useState } from 'react'
 
 import {
   computeTreeViewLayoutState,
+  TREE_DEFAULT_VIEWPORT_HEIGHT,
   type TreeViewLayoutState,
 } from '@/features/workspace/utils/tree-view-layout'
 
@@ -21,7 +22,6 @@ export function useTreeLayout({
   getRoot,
   getScroll,
   initialScrollTop,
-  initialViewportHeight,
   itemHeight,
   overscan,
   stickyFolders,
@@ -30,7 +30,6 @@ export function useTreeLayout({
   readonly getRoot: () => HTMLElement | null
   readonly getScroll: () => HTMLElement | null
   readonly initialScrollTop: number | undefined
-  readonly initialViewportHeight: number
   readonly itemHeight: number
   readonly overscan: number
   readonly stickyFolders: boolean
@@ -53,7 +52,7 @@ export function useTreeLayout({
       overscan,
       scrollTop: initialScrollTop ?? 0,
       stickyFolders,
-      viewportHeight: initialViewportHeight,
+      viewportHeight: TREE_DEFAULT_VIEWPORT_HEIGHT,
     }),
   )
   const layoutSnapshot = layoutState.snapshot

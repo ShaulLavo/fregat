@@ -13,11 +13,8 @@ import type {
 import { TreeViewModel } from '@/features/workspace/state/tree-model'
 
 let root: Root | null = null
-let model: TreeViewModel | null = null
 
 afterEach(() => {
-  model?.cleanUp()
-  model = null
   flushSync(() => root?.unmount())
   root = null
   document.body.innerHTML = ''
@@ -207,7 +204,7 @@ describe('tree view browser behavior', () => {
       expect(scrollElement.scrollTop).toBe(120)
     })
 
-    currentModel.setDensity('compact', 20)
+    currentModel.setItemHeight(20)
 
     await vi.waitFor(() => {
       const visibleRow = tree.querySelector<HTMLButtonElement>(
@@ -235,7 +232,7 @@ describe('tree view browser behavior', () => {
       expect(tree.querySelector('[data-file-tree-sticky-path="src/features/"]')).toBeTruthy()
     })
 
-    currentModel.setDensity('compact', 24)
+    currentModel.setItemHeight(24)
 
     await vi.waitFor(() => {
       const expectedScrollTop = Math.round(compactScrollTop * (24 / 20))
@@ -471,8 +468,6 @@ describe('tree view browser behavior', () => {
       expect(document.activeElement).toBe(outsideButton)
     })
 
-    currentModel.cleanUp()
-    model = null
     flushSync(() => root?.unmount())
     root = null
     document.body.innerHTML = ''
@@ -737,7 +732,6 @@ async function mountBrowserTree(
     renderRowDecoration: options.renderRowDecoration,
     gitStatus: [{ path: 'src/features/a-3.ts', status: 'modified' }],
     initialExpansion: 'open',
-    initialVisibleRowCount: 6,
     initialScrollTop: options.initialScrollTop,
     onScrollTopChange: options.onScrollTopChange,
     itemHeight: 24,
@@ -745,7 +739,6 @@ async function mountBrowserTree(
     renaming: true,
     stickyFolders: options.stickyFolders ?? true,
   })
-  model = mountedModel
 
   return { model: mountedModel, tree: await renderBrowserTree(mountedModel) }
 }
@@ -784,12 +777,10 @@ async function mountSearchTree(
     fileTreeSearchMode: 'hide-non-matches',
     flattenEmptyDirectories: false,
     initialExpansion: 'open',
-    initialVisibleRowCount: 10,
     paths: ['README.md', 'src/utils/stream.ts', 'src/utils/worker-a.ts', 'src/utils/worker-b.ts'],
     search: true,
     searchBlurBehavior,
   })
-  model = mountedModel
 
   flushSync(() => {
     root?.render(<TreeHost aria-label='Search files' model={mountedModel} />)
@@ -878,7 +869,7 @@ function virtualScroll(tree: ParentNode) {
 }
 
 async function startSmoothReveal(currentModel: TreeViewModel, tree: ParentNode) {
-  currentModel.setDensity('compact', 20)
+  currentModel.setItemHeight(20)
   await expect
     .poll(() => rowButton(tree, 'src/features/a-0.ts').getBoundingClientRect().height)
     .toBe(20)

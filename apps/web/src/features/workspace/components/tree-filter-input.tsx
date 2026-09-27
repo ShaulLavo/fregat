@@ -10,9 +10,7 @@ export function TreeFilterInput({
   onArrowDown,
   activeDescendantId,
   controller,
-  fakeFocus,
   inputRef,
-  onInteract,
   placeholder,
   searchBlurBehavior,
   treeDomId,
@@ -22,9 +20,7 @@ export function TreeFilterInput({
   readonly onArrowDown: () => void
   readonly activeDescendantId: string | undefined
   readonly controller: FileTreeController
-  readonly fakeFocus: boolean
   readonly inputRef: RefObject<HTMLInputElement | null>
-  readonly onInteract: () => void
   readonly placeholder: string
   readonly searchBlurBehavior: FileTreeSearchBlurBehavior
   readonly treeDomId: string | undefined
@@ -39,15 +35,11 @@ export function TreeFilterInput({
       aria-controls={treeDomId}
       placeholder={placeholder}
       data-file-tree-search-input
-      fakeFocus={fakeFocus}
       value={value}
       blurBehavior={searchBlurBehavior === 'retain' ? 'retain' : 'clear'}
       clearLabel='Clear file filter'
       onArrowDown={onArrowDown}
-      onFocus={onInteract}
-      onPointerDown={onInteract}
       onValueChange={(next) => {
-        onInteract()
         if (next) controller.setSearch(next)
         else controller.closeSearch()
       }}

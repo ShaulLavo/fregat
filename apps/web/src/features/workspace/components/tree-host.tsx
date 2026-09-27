@@ -4,10 +4,11 @@ import { cn } from '@workspace/ui/lib/utils'
 import '@/features/workspace/components/tree-view.css'
 
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react'
-import { useCallback, useId, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useId, useState, useSyncExternalStore } from 'react'
 
 import { TreeView } from '@/features/workspace/components/tree-view'
 import { markTreeOwnedEvent } from '@/features/workspace/utils/tree-context-menu-anchor'
+import { TREE_DENSITY_FACTOR } from '@/features/workspace/utils/tree-view-layout'
 import type {
   FileTreeCompositionOptions,
   FileTreeContextMenuItem,
@@ -54,11 +55,11 @@ export interface TreeHostProps extends Omit<HTMLAttributes<HTMLElement>, 'childr
 }
 
 /**
- * Paints the model's resolved density onto the wrapper so callers don't have to set
- * `--trees-item-height` and `--trees-density-override` themselves; caller `style` keys still win.
+ * Paints the model's row height and the density factor onto the wrapper; caller `style` keys
+ * still win.
  *
- * `version` is the cache key, and it is why this is a function: the model changes its density in
- * place, so its identity cannot report the change and a memo keyed on it would serve stale sizes.
+ * `version` is the cache key, and it is why this is a function: the model changes its row height
+ * in place, so its identity cannot report the change and a memo keyed on it would serve stale sizes.
  */
 function densityStyle(
   model: TreeViewModel,
@@ -67,7 +68,7 @@ function densityStyle(
 ): CSSProperties {
   return {
     ['--trees-item-height' as string]: `${String(model.getItemHeight())}px`,
-    ['--trees-density-override' as string]: model.getDensityFactor(),
+    ['--trees-density-override' as string]: TREE_DENSITY_FACTOR,
     display: 'flex',
     ...style,
   }
@@ -100,16 +101,17 @@ export function TreeHost({
   }))
   if (baseline.model !== model) setBaseline({ composition: model.getComposition(), model })
   // Identity is load-bearing: useSyncExternalStore resubscribes when these change.
-  const subscribeToDensity = useCallback(
-    (listener: () => void) => model.subscribeDensity(listener),
+  const subscribeToItemHeight = useCallback(
+    (listener: () => void) => model.subscribeItemHeight(listener),
     [model],
   )
-  const getDensitySnapshot = useCallback(() => model.getDensityVersion(), [model])
-  const densityVersion = useSyncExternalStore(
-    subscribeToDensity,
-    getDensitySnapshot,
-    getDensitySnapshot,
+  const getItemHeightSnapshot = useCallback(() => model.getItemHeightVersion(), [model])
+  const itemHeightVersion = useSyncExternalStore(
+    subscribeToItemHeight,
+    getItemHeightSnapshot,
+    getItemHeightSnapshot,
   )
+  useEffect(() => model.connectSelectionChange(), [model])
   // Identity is load-bearing: useSyncExternalStore resubscribes when these change.
   const subscribeToView = useCallback(
     (listener: () => void) => model.subscribeView(listener),
@@ -143,7 +145,7 @@ export function TreeHost({
         hostProps.onMouseDownCapture?.(event)
         markTreeOwnedEvent(event.nativeEvent)
       }}
-      style={densityStyle(model, densityVersion, hostProps.style)}
+      style={densityStyle(model, itemHeightVersion, hostProps.style)}
     >
       <div data-file-tree-virtualized-wrapper='true'>
         <TreeView

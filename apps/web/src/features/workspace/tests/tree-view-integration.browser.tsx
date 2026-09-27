@@ -115,7 +115,6 @@ describe('tree view React integration', () => {
     function Harness() {
       const [itemHeight, setItemHeight] = useState(20)
       const { model } = useTreeModel({
-        density: 'compact',
         initialExpansion: 'open',
         itemHeight,
         paths: ['src/', 'src/a.ts', 'src/b.ts'],
@@ -151,7 +150,7 @@ describe('tree view React integration', () => {
       ).toBe('72px')
     })
 
-    capturedModels.first?.setDensity('compact', 20)
+    capturedModels.first?.setItemHeight(20)
 
     await vi.waitFor(() => {
       expect(host?.style.getPropertyValue('--trees-item-height')).toBe('20px')
@@ -204,7 +203,6 @@ describe('tree view React integration', () => {
       expect(icon.querySelector('use')?.getAttribute('href')).toBe(`#app-vscode-icon-${rule.glyph}`)
       expect(icon.getAttribute('class')).toContain(rule.className.split(' ')[0])
     }
-    treeModel.cleanUp()
   })
 
   it('mounts and cleans up through the public React wrapper without runtime warnings', async () => {
@@ -231,7 +229,6 @@ describe('tree view React integration', () => {
 
     expect(errorSpy).not.toHaveBeenCalled()
     expect(warnSpy).not.toHaveBeenCalled()
-    treeModel.cleanUp()
   })
 
   it('resets view hook state when the public wrapper replaces its model', async () => {
@@ -295,8 +292,6 @@ describe('tree view React integration', () => {
     })
     expect(document.activeElement).toBe(outsideButton)
 
-    firstModel.cleanUp()
-    nextModel.cleanUp()
   })
 
   it('keeps a right-click context menu mounted across incidental controller renders', async () => {
@@ -358,7 +353,6 @@ describe('tree view React integration', () => {
       expect(rowButton(tree, 'src/b.ts').getAttribute('aria-selected')).toBe('true')
     })
     expect(renderMenu).toHaveBeenCalledTimes(1)
-    treeModel.cleanUp()
   })
 
   it('opens the focused row context menu from Shift+F10 and closes through its context', async () => {
@@ -421,7 +415,6 @@ describe('tree view React integration', () => {
         tree.querySelector('[data-type="context-menu-trigger"]')?.getAttribute('aria-expanded'),
       ).toBe('false')
     })
-    treeModel.cleanUp()
   })
 })
 

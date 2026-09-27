@@ -4,11 +4,6 @@
 import { type JSX, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { FilterFieldHandle } from '@workspace/ui/patterns/filter-field'
 import type { FileTreeRowDecoration, FileTreeVisibleRow } from '@workspace/tree'
-import {
-  FILE_TREE_DEFAULT_ITEM_HEIGHT,
-  FILE_TREE_DEFAULT_OVERSCAN,
-  FILE_TREE_DEFAULT_VIEWPORT_HEIGHT,
-} from '@workspace/tree'
 
 import { TreeContextMenuWash } from '@/features/workspace/components/tree-context-menu-wash'
 import { TreeFilterInput } from '@/features/workspace/components/tree-filter-input'
@@ -36,7 +31,11 @@ import {
   getTreeFocusedRowDomId,
   getTreeRowPath,
 } from '@/features/workspace/utils/tree-row-identity'
-import { getTreeRootDomId } from '@/features/workspace/utils/tree-view-layout'
+import {
+  getTreeRootDomId,
+  TREE_DEFAULT_ITEM_HEIGHT,
+  TREE_DEFAULT_OVERSCAN,
+} from '@/features/workspace/utils/tree-view-layout'
 import type { TreeViewProps } from '@/features/workspace/utils/tree-view-props'
 import { treeWindowFrame } from '@/features/workspace/utils/tree-window-frame'
 
@@ -48,19 +47,17 @@ export function TreeView({
   directoriesWithGitChanges,
   instanceId,
   loadingPaths,
-  itemHeight = FILE_TREE_DEFAULT_ITEM_HEIGHT,
-  overscan = FILE_TREE_DEFAULT_OVERSCAN,
+  itemHeight = TREE_DEFAULT_ITEM_HEIGHT,
+  overscan = TREE_DEFAULT_OVERSCAN,
   renamingEnabled = false,
   renderRowDecoration,
   rowElements,
   searchBlurBehavior = 'close',
   searchEnabled = false,
-  searchFakeFocus = false,
   searchPlaceholder = 'Search…',
   stickyFolders = false,
   initialScrollTop,
   onScrollTopChange,
-  initialViewportHeight = FILE_TREE_DEFAULT_VIEWPORT_HEIGHT,
 }: TreeViewProps): JSX.Element {
   'use no memo'
   // The tree intentionally mutates its stable DOM-ref registry during layout and native events;
@@ -103,7 +100,6 @@ export function TreeView({
     getRoot,
     getScroll,
     initialScrollTop,
-    initialViewportHeight,
     itemHeight,
     overscan,
     stickyFolders,
@@ -133,27 +129,6 @@ export function TreeView({
   const skipInitialSearchAutoFocusRef = useRef(
     searchBlurBehavior === 'retain' && controller.isSearchOpen(),
   )
-
-  // When `searchFakeFocus` is enabled, render a synthetic focus ring on the
-  // search input until the user actually interacts with it. The flag flips off
-  // on the first real focus, pointer-down, or input event so normal focus
-  // behavior takes over once the user engages.
-  const [fakeSearchFocusActive, setFakeSearchFocusActive] = useState<boolean>(searchFakeFocus)
-  useEffect(() => {
-    if (searchFakeFocus) return
-
-    let active = true
-    queueMicrotask(() => {
-      if (active) setFakeSearchFocusActive(false)
-    })
-    return () => {
-      active = false
-    }
-  }, [searchFakeFocus])
-
-  const markSearchInputInteracted = useCallback(() => {
-    setFakeSearchFocusActive((previous) => (previous ? false : previous))
-  }, [])
 
   const [hasStickyUiMount, setHasStickyUiMount] = useState(false)
   useEffect(() => {
@@ -314,7 +289,6 @@ export function TreeView({
     getRoot,
     getScroll,
     initialScrollTop,
-    initialViewportHeight,
     invalidateControllerView,
     isScrollingRef,
     itemHeight,
@@ -562,11 +536,9 @@ export function TreeView({
         <TreeFilterInput
           activeDescendantId={activeDescendantId}
           controller={controller}
-          fakeFocus={fakeSearchFocusActive}
           inputRef={searchInputRef}
           fieldRef={filterField}
           onArrowDown={() => controller.requestFocus()}
-          onInteract={markSearchInputInteracted}
           placeholder={searchPlaceholder}
           searchBlurBehavior={searchBlurBehavior}
           treeDomId={treeDomId}
