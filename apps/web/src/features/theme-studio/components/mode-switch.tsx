@@ -1,7 +1,13 @@
+import { MoonIcon, SunIcon } from '@phosphor-icons/react'
 import type { ColorMode } from '@workspace/contracts'
-import { Tabs, TabsList, TabsTab } from '@workspace/ui/components/tabs'
+import { Button } from '@workspace/ui/components/button'
 
-/** Which half the app shows while the studio is open; it writes nothing. */
+import { IconTooltip } from '@/components/icon-tooltip'
+
+/**
+ * Which half the app shows while the studio is open; it writes nothing. One icon button that
+ * flips the half, so it reads as a view control beside the tabs.
+ */
 export function ModeSwitch({
   mode,
   onChange,
@@ -9,12 +15,18 @@ export function ModeSwitch({
   mode: ColorMode
   onChange: (mode: ColorMode) => void
 }) {
+  const next: ColorMode = mode === 'dark' ? 'light' : 'dark'
+  const label = next === 'dark' ? 'Preview the dark half' : 'Preview the light half'
+
   return (
-    <Tabs value={mode} onValueChange={(next: ColorMode) => onChange(next)}>
-      <TabsList aria-label='Light or dark' variant='segmented'>
-        <TabsTab value='light'>Light</TabsTab>
-        <TabsTab value='dark'>Dark</TabsTab>
-      </TabsList>
-    </Tabs>
+    <IconTooltip label={label} shortcut='\'>
+      <Button aria-label={label} size='icon-sm' variant='ghost' onClick={() => onChange(next)}>
+        {mode === 'dark' ? (
+          <MoonIcon className='size-(--icon-size)' />
+        ) : (
+          <SunIcon className='size-(--icon-size)' />
+        )}
+      </Button>
+    </IconTooltip>
   )
 }
