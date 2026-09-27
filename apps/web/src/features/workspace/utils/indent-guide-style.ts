@@ -20,7 +20,7 @@ export function fileTreeIndentGuideVariables(theme: EditorTheme): Record<string,
 
   for (const [index, guide] of GUIDE_COLORS.entries()) {
     const color = theme.syntax?.[guide.color] ?? guide.fallback
-    variables[`--trees-indent-guide-bg-${index}-override`] = transparentMix(color, guide.weight)
+    variables[`--tree-guide-${index + 1}`] = transparentMix(color, guide.weight)
   }
 
   return variables

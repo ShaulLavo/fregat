@@ -28,6 +28,18 @@ import { sessionNotifications } from './session-notifications'
 import { terminalHistory } from './terminal-history'
 import { chatStream } from './chat-stream'
 import { chatHistoryPages } from './chat-history-pages'
+import {
+  chatScrollDisclosure,
+  chatScrollFoldHeld,
+  chatScrollJump,
+  chatScrollLoadEarlier,
+  chatScrollLoadEarlierJump,
+  chatScrollPark,
+  chatScrollFollowing,
+  chatScrollReaderHeld,
+  chatScrollReload,
+  chatScrollHome,
+} from './chat-scroll'
 import { chatStashContext } from './chat-stash-context'
 import { chatDraftSentLeftover } from './chat-draft-sent-leftover'
 import { chatQueue } from './chat-queue'
@@ -242,6 +254,7 @@ import { settingsColdLoad } from './settings-cold-load'
 import { serverRestart } from './server-restart'
 import { settingsDefaults } from './settings-defaults'
 import { settingsAppearanceRows } from './settings-appearance-rows'
+import { settingsAppearanceOpen } from './settings-appearance-open'
 import { projectMenu } from './project-menu'
 import { workspaceSwitch } from './workspace-switch'
 import { sidebarSettingsButton } from './sidebar-settings-button'
@@ -410,6 +423,16 @@ export const scenarios: readonly Scenario[] = [
   chatStream,
   chatHistoryPages,
   sessionNoFlicker,
+  chatScrollPark,
+  chatScrollFollowing,
+  chatScrollReaderHeld,
+  chatScrollFoldHeld,
+  chatScrollJump,
+  chatScrollLoadEarlier,
+  chatScrollLoadEarlierJump,
+  chatScrollDisclosure,
+  chatScrollReload,
+  chatScrollHome,
   chatQueue,
   chatQueueAway,
   chatQueueStopUpload,
@@ -588,6 +611,7 @@ export const scenarios: readonly Scenario[] = [
   themeBundlePalette,
   settingsDefaults,
   settingsAppearanceRows,
+  settingsAppearanceOpen,
   settingsColdLoad,
   settingsRoutePreparation,
   textFieldFkeys,

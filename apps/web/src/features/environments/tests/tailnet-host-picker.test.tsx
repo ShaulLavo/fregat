@@ -73,6 +73,8 @@ test('refreshing an unavailable tailnet shows progress while SSH aliases remain 
   renderWithProviders(<MachineForm onCancel={() => {}} onSaved={() => {}} />, {
     connections: h.connections,
   })
+  // SSH and tailnet discovery are separate queries; either may answer first.
+  expect(await screen.findByRole('option', { name: 'available-ssh' })).toBeEnabled()
   const refresh = await screen.findByRole('button', { name: 'Refresh tailnet' })
   await userEvent.click(refresh)
   await waitFor(() => expect(refresh).toBeDisabled())

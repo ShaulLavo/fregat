@@ -207,6 +207,23 @@
   --icon-size: 1rem;
   --icon-size-sm: 0.875rem;
   --status-dot-size: 0.375rem;
+  /* A tree row's lead (`TreeRowLead`): one indent step per level, the chevron lane, and guides
+     centred on the lane. The file tree sets its own geometry; the guide tones come from the
+     editor theme where a tree draws guides. */
+  --tree-indent: 0.875rem;
+  --tree-lane: var(--icon-size-sm);
+  --tree-guide-offset: calc(var(--tree-lane) / 2 - 0.5px);
+  --tree-guide-shift: 0.25px;
+  --tree-guide: var(--border);
+  --tree-guide-1: var(--tree-guide);
+  --tree-guide-2: var(--tree-guide);
+  --tree-guide-3: var(--tree-guide);
+  --tree-guide-4: var(--tree-guide);
+  --tree-guide-5: var(--tree-guide);
+  --tree-guide-6: var(--tree-guide);
+  --tree-guide-opacity: 1;
+  --tree-guide-hover-opacity: 1;
+  --tree-guide-active-opacity: 1;
   /* One folder column in the file picker's columns view. */
   --picker-column-width: 15rem;
   /* One tile in the file picker's icons view; `TILE_WIDTH_PX` in the picker must match. */

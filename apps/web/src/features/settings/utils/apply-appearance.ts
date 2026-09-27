@@ -74,16 +74,7 @@ function applyFileTreeIndentGuideVisibility(
   visibility: AppearanceValues['workbench.tree.indentGuides'],
   root: Root,
 ) {
-  root.style.setProperty(
-    '--trees-indent-guide-opacity-override',
-    visibility === 'always' ? '1' : '0',
-  )
-  root.style.setProperty(
-    '--trees-indent-guide-hover-opacity-override',
-    visibility === 'none' ? '0' : '1',
-  )
-  root.style.setProperty(
-    '--trees-indent-guide-active-opacity-override',
-    visibility === 'none' ? '0' : '1',
-  )
+  root.style.setProperty('--tree-guide-opacity', visibility === 'always' ? '1' : '0')
+  root.style.setProperty('--tree-guide-hover-opacity', visibility === 'none' ? '0' : '1')
+  root.style.setProperty('--tree-guide-active-opacity', visibility === 'none' ? '0' : '1')
 }

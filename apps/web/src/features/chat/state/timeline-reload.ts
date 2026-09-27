@@ -161,9 +161,9 @@ export function timelineInitialView(
   const scrollState: TimelineScrollState = {
     ...initialTimelineScrollState,
     sessionId: session.id,
-    firstItemId: items[0]?.id ?? null,
     latestUserItemId: resolveTimelineAnchorItemId(items),
     followMode: saved.followEnd ? 'following-end' : 'free-scrolling',
+    readerLeftEnd: !saved.followEnd,
   }
   return { offset, measurements, rect: { width: saved.width, height: saved.height }, scrollState }
 }

@@ -35,10 +35,7 @@ import {
   getTreeFocusedRowDomId,
   getTreeRowPath,
 } from '@/features/workspace/utils/tree-row-identity'
-import {
-  getTreeGuideStyleText,
-  getTreeRootDomId,
-} from '@/features/workspace/utils/tree-view-layout'
+import { getTreeRootDomId } from '@/features/workspace/utils/tree-view-layout'
 import type { TreeViewProps } from '@/features/workspace/utils/tree-view-props'
 import { treeWindowFrame } from '@/features/workspace/utils/tree-window-frame'
 
@@ -443,10 +440,6 @@ export function TreeView({
         controller.getVisibleRows(focusedIndex, focusedIndex)[0] ??
         null)
       : null
-  const guideStyleText = getTreeGuideStyleText(
-    treeDomId,
-    focusedVisibleRow?.ancestorPaths.at(-1) ?? null,
-  )
   const activeDescendantId =
     isSearchOpen && focusedPath != null
       ? getTreeFocusedRowDomId(instanceId, focusedPath, !focusedRowIsMounted)
@@ -470,6 +463,7 @@ export function TreeView({
   // for where each ref is registered, which is the invariant sticky reuse
   // depends on.
   const flowRowFrame: TreeRenderRowFrame = {
+    guideFocusPath: focusedVisibleRow?.ancestorPaths.at(-1) ?? null,
     contextMenuOpenPath,
     contextMenuButtonTriggerEnabled,
     contextMenuButtonVisibility,
@@ -550,10 +544,6 @@ export function TreeView({
         position: 'relative',
       }}
     >
-      <style
-        data-file-tree-guide-style='true'
-        dangerouslySetInnerHTML={{ __html: guideStyleText }}
-      />
       {searchEnabled ? (
         <TreeFilterInput
           activeDescendantId={activeDescendantId}
