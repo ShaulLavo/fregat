@@ -1,8 +1,9 @@
 import { timingSafeEqual } from 'node:crypto'
-import { chmodSync, existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import net from 'node:net'
 import { parseArgs } from 'node:util'
 import type { PtyExit } from '@workspace/pty'
+import { errorStringField } from '@workspace/contracts'
 import * as v from 'valibot'
 
 import {
@@ -26,6 +27,11 @@ import { HostSession, type SessionSubscriber } from './session'
 import { processStart } from './identity'
 import { acquireHostLock } from './lock'
 import { readReleaseInfoSync, releaseFileFor } from '../web/release'
+import {
+  flushObservability,
+  initializeObservability,
+  recordProcessInfo,
+} from '../observability/runtime'
 
 const DEFAULT_IDLE_MS = 30_000
 const SHUTDOWN_GRACE_MS = 2_000
@@ -33,6 +39,8 @@ const SHUTDOWN_GRACE_MS = 2_000
 export const MAX_QUEUED_BYTES = 4 * RING_BYTES
 
 type SpawnControl = Extract<ClientControl, { type: 'spawn' }>
+/** Why a launched host serves nothing and leaves. */
+type Standdown = 'state-root-gone' | 'lock-held' | 'socket-answers'
 type AttachControl = Extract<ClientControl, { type: 'attach' }>
 
 /** Owns every PTY for one state root, so shells outlive the server that asked for them. */
@@ -59,14 +67,14 @@ class TerminalHost {
     this.idleMs = idleMs
   }
 
-  async listen() {
+  async listen(): Promise<Standdown | 'listening'> {
     ensureSocketDirectory(this.paths)
     this.lock = acquireHostLock(this.paths.directory)
-    if (!this.lock) return false
+    if (!this.lock) return 'lock-held'
     if (await socketAnswers(this.paths.socket)) {
       this.lock.close()
       this.lock = null
-      return false
+      return 'socket-answers'
     }
     rmSync(this.paths.socket, { force: true })
     this.writeManifest()
@@ -78,7 +86,7 @@ class TerminalHost {
     chmodSync(this.paths.socket, 0o600)
     this.server = server
     this.checkIdle()
-    return true
+    return 'listening'
   }
 
   hello(connection: HostConnection, token: string, version: number): HostControl {
@@ -397,16 +405,42 @@ function hostArguments() {
 async function main() {
   const options = hostArguments()
   if (!options) process.exit(2)
-  // Launched for a home removed while this process started (a racing launcher's loser): nobody to serve.
-  if (!existsSync(options.stateRoot)) process.exit(0)
+  initializeObservability(process.env, readReleaseInfoSync(releaseFileFor(import.meta.dirname)))
   process.title = 'platform-pty-host'
-  const paths = hostPaths(options.stateRoot)
-  const host = new TerminalHost(paths, ensureToken(paths), options.idleMs)
-  // Another host already serves this state root.
-  if (!(await host.listen())) process.exit(0)
-  process.on('SIGHUP', () => {})
-  process.once('SIGTERM', () => void host.shutdown())
-  process.once('SIGINT', () => void host.shutdown())
+  const outcome = await start(options.stateRoot, options.idleMs)
+  if (outcome === 'listening') return
+  recordProcessInfo('terminal.host.standdown', { area: 'terminal', reason: outcome })
+  await flushObservability()
+  process.exit(0)
+}
+
+async function start(stateRoot: string, idleMs: number): Promise<Standdown | 'listening'> {
+  // A racing launcher's loser can start after its home was removed; the home's owner creates it.
+  if (!stateRootExists(stateRoot)) return 'state-root-gone'
+  try {
+    const paths = hostPaths(stateRoot)
+    const host = new TerminalHost(paths, ensureToken(paths), idleMs)
+    const outcome = await host.listen()
+    if (outcome !== 'listening') return outcome
+    process.on('SIGHUP', () => {})
+    process.once('SIGTERM', () => void host.shutdown())
+    process.once('SIGINT', () => void host.shutdown())
+    return outcome
+  } catch (error) {
+    // The home can vanish between the check and the token, socket directory or lock it holds.
+    if (!stateRootExists(stateRoot)) return 'state-root-gone'
+    throw error
+  }
+}
+
+// Only a missing root is gone: any other stat failure leaves the host to fail on its own terms.
+function stateRootExists(stateRoot: string) {
+  try {
+    statSync(stateRoot)
+    return true
+  } catch (error) {
+    return errorStringField(error, 'code') !== 'ENOENT'
+  }
 }
 
 if (import.meta.main) await main()

@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  watch,
+  writeFileSync,
+} from 'node:fs'
 import net from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -189,13 +197,21 @@ it('reports a shell as exited when its host dies and a fresh host no longer list
 it('a host launched for a removed state root exits without bringing it back', async () => {
   const root = mkdtempSync(path.join(tmpdir(), 'platform-pty-removed-'))
   const stateRoot = path.join(root, 'home')
+  const { XDG_RUNTIME_DIR: _runtime, ...env } = process.env
+  // Whichever comes first settles it, so a host that recreates the home fails at once.
+  const watcher = watch(root)
+  const recreated = new Promise<string>((resolve) =>
+    watcher.on('change', (_event, name) => {
+      if (name === 'home') resolve('recreated the home')
+    }),
+  )
+  const host = Bun.spawn(
+    [process.execPath, path.join(import.meta.dirname, '../main.ts'), `--state-root=${stateRoot}`],
+    { env, stdio: ['ignore', 'ignore', 'inherit'] },
+  )
   try {
-    const { XDG_RUNTIME_DIR: _runtime, ...env } = process.env
-    const host = Bun.spawn(
-      [process.execPath, path.join(import.meta.dirname, '../main.ts'), `--state-root=${stateRoot}`],
-      { env, stdio: ['ignore', 'ignore', 'inherit'] },
-    )
-    expect(await host.exited).toBe(0)
+    const outcome = await Promise.race([host.exited.then((code) => `exited ${code}`), recreated])
+    expect(outcome).toBe('exited 0')
     expect(existsSync(stateRoot)).toBe(false)
 
     const paths = hostPaths(stateRoot, env)
@@ -203,6 +219,9 @@ it('a host launched for a removed state root exits without bringing it back', as
     expect(() => ensureSocketDirectory(paths)).toThrow()
     expect(existsSync(stateRoot)).toBe(false)
   } finally {
+    watcher.close()
+    host.kill('SIGKILL')
+    await host.exited
     rmSync(root, { force: true, recursive: true })
   }
 })
