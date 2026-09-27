@@ -141,6 +141,12 @@ export const sessionIdentityErrors = defineErrorCatalog('provider', {
     why: 'The Codex process ended while this app still had requests waiting on it.',
     fix: 'Send the message again. If it keeps exiting, run `codex app-server` in a terminal to see why.',
   },
+  HARNESS_FIXTURES_ONLY: {
+    status: 403,
+    message: 'The agent harness runs fixture providers only.',
+    why: "This instance would start the machine's own Codex or Claude CLI, which spends turns on the owner's account.",
+    fix: 'Point the instance at a fixture binary inside the harness fixture folder. Only the owner opts a run into real providers, with --real-providers.',
+  },
   CLAUDE_BINARY_MISSING: {
     status: 500,
     message: 'The configured Claude binary was not found',

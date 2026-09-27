@@ -22,12 +22,12 @@ const RAIL_DRAG_KEYS: KeyboardCodes = {
   start: ['Space'],
 }
 
-export function useRailDragSensors() {
-  return useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: railKeyboardCoordinates,
-      keyboardCodes: RAIL_DRAG_KEYS,
-    }),
-  )
+/** Without the pointer, only the keyboard reorders: a finger on the phone's list scrolls it. */
+export function useRailDragSensors(pointer: boolean) {
+  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  const keyboardSensor = useSensor(KeyboardSensor, {
+    coordinateGetter: railKeyboardCoordinates,
+    keyboardCodes: RAIL_DRAG_KEYS,
+  })
+  return useSensors(pointer ? pointerSensor : null, keyboardSensor)
 }

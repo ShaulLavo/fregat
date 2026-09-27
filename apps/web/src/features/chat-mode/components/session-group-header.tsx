@@ -38,7 +38,7 @@ export function SessionGroupHeader({
           data-active={active || undefined}
           data-dragging={dragging || undefined}
           aria-expanded={!group.collapsed}
-          className='text-muted-foreground text-2xs w-full touch-none gap-(--density-control-gap) text-left font-medium'
+          className='text-muted-foreground text-2xs w-full touch-none gap-(--density-control-gap) text-left font-medium group-data-standalone/rail:touch-auto'
           title={project.workspaceRoot}
           type='button'
           onClick={(event) => {

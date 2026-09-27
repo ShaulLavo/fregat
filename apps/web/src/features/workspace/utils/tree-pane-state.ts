@@ -5,7 +5,7 @@ import type {
   FileTreeScrollToPathOptions,
 } from '@workspace/tree'
 import type { FileTreePreparedInput } from '@workspace/tree'
-import type { FileTreeModel } from '@workspace/tree'
+import type { TreeViewModel } from '@/features/workspace/state/tree-model'
 
 import type { TreeEntry } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
@@ -29,7 +29,7 @@ export function syncTreePaneState({
   selectedFilePath,
   tree,
 }: {
-  loadExpandedDirectoriesForCurrentModel: (tree: FileTreeModel) => void
+  loadExpandedDirectoriesForCurrentModel: (tree: TreeViewModel) => void
   model: TreeModel
   previousPaths: readonly string[]
   prepareInputForPaths?: (paths: readonly string[]) => FileTreePreparedInput
@@ -37,7 +37,7 @@ export function syncTreePaneState({
   scrollBehavior?: FileTreeScrollToPathOptions['behavior']
   syncSelection?: boolean
   selectedFilePath: string | null
-  tree: FileTreeModel
+  tree: TreeViewModel
 }) {
   syncTreePaths(tree, previousPaths, model.paths, model, prepareInputForPaths)
   const selectedTreePath = syncSelection
@@ -57,7 +57,7 @@ export function syncTreePaneState({
 
 /** `refreshOnExpand`: a fresh expand reads a loaded folder again, for roots nothing watches below the top. */
 export function loadExpandedDirectories(
-  tree: FileTreeModel,
+  tree: TreeViewModel,
   model: TreeModel,
   onLoadDirectory: (entry: TreeEntry, treePath: string, options?: DirectoryLoadOptions) => void,
   previousExpandedDirectoryPaths?: ReadonlySet<string>,
@@ -81,7 +81,7 @@ export function loadExpandedDirectories(
   return expandedPaths
 }
 
-export function visibleTreeItemCount(tree: FileTreeModel, model: TreeModel) {
+export function visibleTreeItemCount(tree: TreeViewModel, model: TreeModel) {
   const childrenByParent = treeChildrenByParentPath(model)
 
   return visibleChildrenCount({
@@ -93,7 +93,7 @@ export function visibleTreeItemCount(tree: FileTreeModel, model: TreeModel) {
 }
 
 function syncSelectedFilePath(
-  tree: FileTreeModel,
+  tree: TreeViewModel,
   rootPath: string,
   selectedFilePath: string | null,
 ) {
@@ -119,7 +119,7 @@ function syncSelectedFilePath(
   return canonicalPath
 }
 
-function clearTreeSelection(tree: FileTreeModel) {
+function clearTreeSelection(tree: TreeViewModel) {
   for (const selectedPath of tree.getSelectedPaths()) {
     tree.getItem(selectedPath)?.deselect()
   }
@@ -134,7 +134,7 @@ type VisibleChildrenCountOptions = {
   childrenByParent: ReadonlyMap<string, readonly TreeChild[]>
   model: TreeModel
   parentPath: string
-  tree: FileTreeModel
+  tree: TreeViewModel
 }
 
 function visibleChildrenCount({
@@ -226,7 +226,7 @@ type TreePathChanges = {
 }
 
 function syncTreePaths(
-  tree: FileTreeModel,
+  tree: TreeViewModel,
   previousPaths: readonly string[],
   nextPaths: readonly string[],
   model: TreeModel,
@@ -269,7 +269,7 @@ function shouldResetTreePaths({ added, removed }: TreePathChanges) {
 }
 
 function resetTreePaths(
-  tree: FileTreeModel,
+  tree: TreeViewModel,
   paths: readonly string[],
   model: TreeModel,
   prepareInputForPaths?: (paths: readonly string[]) => FileTreePreparedInput,
@@ -298,7 +298,7 @@ function treePathBatchOperations(changes: TreePathChanges): readonly FileTreeBat
   return operations
 }
 
-function changesAgainstLiveTree(tree: FileTreeModel, changes: TreePathChanges): TreePathChanges {
+function changesAgainstLiveTree(tree: TreeViewModel, changes: TreePathChanges): TreePathChanges {
   return {
     added: changes.added.filter((path) => !treeHasPath(tree, path)),
     removed: changes.removed.filter((path) => treeHasPath(tree, path)),
@@ -323,11 +323,11 @@ function treePathDepth(path: string) {
   return canonicalTreePath(path).split('/').filter(Boolean).length
 }
 
-function treeHasPath(tree: FileTreeModel, path: string) {
+function treeHasPath(tree: TreeViewModel, path: string) {
   return tree.getItem(path) !== null
 }
 
-function expandKnownAncestorDirectories(tree: FileTreeModel, treePath: string) {
+function expandKnownAncestorDirectories(tree: TreeViewModel, treePath: string) {
   for (const directoryPath of ancestorDirectoryPaths(treePath)) {
     const item = tree.getItem(directoryPath)
     if (!isTreeDirectoryHandle(item)) continue
@@ -348,7 +348,7 @@ function ancestorDirectoryPaths(treePath: string) {
   return paths
 }
 
-function expandedDirectoryPaths(model: TreeModel, tree: FileTreeModel) {
+function expandedDirectoryPaths(model: TreeModel, tree: TreeViewModel) {
   const paths: string[] = []
   const expandedPaths = expandedDirectoryPathSet(model, tree)
   const childrenByParent = treeChildrenByParentPath(model)
@@ -366,7 +366,7 @@ function expandedDirectoryPaths(model: TreeModel, tree: FileTreeModel) {
   return paths
 }
 
-function expandedDirectoryPathSet(model: TreeModel, tree: FileTreeModel) {
+function expandedDirectoryPathSet(model: TreeModel, tree: TreeViewModel) {
   const paths = new Set<string>()
 
   for (const [treePath, entry] of model.entriesByTreePath) {
@@ -380,7 +380,7 @@ function expandedDirectoryPathSet(model: TreeModel, tree: FileTreeModel) {
 }
 
 function expandNewFlattenedDirectoryTerminals(
-  tree: FileTreeModel,
+  tree: TreeViewModel,
   model: TreeModel,
   addedPaths: readonly string[],
   expandedPathsBeforeSync: ReadonlySet<string>,
@@ -411,7 +411,7 @@ function addedDirectoryPathSet(paths: readonly string[]) {
   return directoryPaths
 }
 
-export function expandTreeDirectory(tree: FileTreeModel, treePath: string) {
+export function expandTreeDirectory(tree: TreeViewModel, treePath: string) {
   const item = tree.getItem(`${treePath}/`) ?? tree.getItem(treePath)
   if (!isTreeDirectoryHandle(item)) return
   if (item.isExpanded()) return
@@ -419,7 +419,7 @@ export function expandTreeDirectory(tree: FileTreeModel, treePath: string) {
   item.expand()
 }
 
-function isTreeDirectoryExpanded(tree: FileTreeModel, treePath: string) {
+function isTreeDirectoryExpanded(tree: TreeViewModel, treePath: string) {
   const item = tree.getItem(`${treePath}/`) ?? tree.getItem(treePath)
   if (!isTreeDirectoryHandle(item)) return false
 

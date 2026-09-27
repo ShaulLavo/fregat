@@ -1,4 +1,4 @@
-import type { FileTreeModel } from '@workspace/tree'
+import type { TreeViewModel } from '@/features/workspace/state/tree-model'
 import { useEffect } from 'react'
 
 import { treeMutationLogContext } from '@/features/workspace/utils/tree-mutation-log'
@@ -9,7 +9,7 @@ export function useFileTreeMutationEvents({
   tree,
 }: {
   readonly rootPath: string
-  readonly tree: FileTreeModel
+  readonly tree: TreeViewModel
 }) {
   useEffect(
     () =>

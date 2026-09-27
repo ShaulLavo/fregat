@@ -58,7 +58,7 @@ export function WallpaperCard({
                     <Button
                       size='icon-sm'
                       variant='secondary'
-                      className='absolute top-2 left-2 opacity-0 group-focus-within/wallpaper:opacity-100 group-hover/wallpaper:opacity-100 aria-expanded:opacity-100'
+                      className='touch:opacity-100 absolute top-2 left-2 opacity-0 group-focus-within/wallpaper:opacity-100 group-hover/wallpaper:opacity-100 aria-expanded:opacity-100'
                       aria-label={`Actions for ${asset.name}`}
                       disabled={disabled || deleting}
                       focusableWhenDisabled

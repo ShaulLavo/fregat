@@ -1,6 +1,8 @@
 import * as v from 'valibot'
 import { environmentIdSchema, type ConnectionError } from '@workspace/contracts'
 import { createEnvironmentEntry } from '@workspace/client-core/environments/utils/connection'
+import { inProcessOrchestrationSocketFactory } from '@workspace/client-core/test/in-process-orchestration-socket'
+import { createChatTransport } from '@/features/chat/transport/create-chat-transport'
 import { createTestEnvironmentConnections } from './environment-connections'
 import { activeServerOrigin, primaryServerOrigin, setActiveServerOrigin } from '@/lib/client'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
@@ -50,9 +52,18 @@ export async function createConnectionNoticeFixture(
     useEnvironmentsStore.getState().entries[remote]?.environmentId,
   )
   setActiveServerOrigin(previousOrigin)
-  const connections = createTestEnvironmentConnections({
-    'shaul-mac': { kind: 'origin', url: remote },
-  })
+  // A connected machine opens the orchestration socket too; bridge it to the
+  // real in-process app rather than letting it reach an unbound real port.
+  const connections = createTestEnvironmentConnections(
+    { 'shaul-mac': { kind: 'origin', url: remote } },
+    (origin) =>
+      createChatTransport(origin, {
+        createSocket: inProcessOrchestrationSocketFactory({
+          app: remoteServer.app,
+          clientOrigin: remoteServer.origin,
+        }),
+      }),
+  )
   useEnvironmentsStore.setState({
     activeOrigin: primary,
     entries: {

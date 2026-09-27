@@ -48,6 +48,17 @@ function near(actual: number, expected: number, message: string) {
   ok(Math.abs(actual - expected) <= 2, `${message}: ${actual} is not ${expected}`)
 }
 
+// The indicator slides for --duration-enter; a screenshot inside that slide shows the old tab.
+async function viewTabSettled(page: Page) {
+  await page.waitForFunction(() => {
+    const list = document.querySelector('[role="tablist"][aria-label="View"]')
+    const tab = list?.querySelector('[role="tab"][aria-selected="true"]')
+    const indicator = list?.querySelector('[data-slot="tabs-indicator"]')
+    if (!tab || !indicator) return false
+    return Math.abs(tab.getBoundingClientRect().x - indicator.getBoundingClientRect().x) < 1
+  })
+}
+
 async function goTo(page: Page, folder: string) {
   await selectors.pickerGoToFolder(page).click()
   await selectors.pickerFolderPath(page).fill(folder)
@@ -143,8 +154,16 @@ export const filePickerBrowse: Scenario = {
           .evaluate((column) => column === document.activeElement),
         '← returns to the parent column',
       )
+      // A switch keeps the deepest selection: the list opens its folder with it selected.
       await selectors.pickerView(page, 'List').click()
       await selectors.pickerList(page).waitFor()
+      await selectors
+        .pickerRow(page, 'inside.md')
+        .and(page.locator('[aria-selected="true"]'))
+        .waitFor()
+      await viewTabSettled(page)
+      await step('list-keeps-selection')
+      await page.keyboard.press('ControlOrMeta+ArrowUp')
 
       await selectors.pickerRow(page, 'app.ts').click()
       await selectors
@@ -235,14 +254,7 @@ export const filePickerBrowse: Scenario = {
         (await selectors.pickerView(page, 'Icons').getAttribute('aria-selected')) === 'true',
         'The Icons tab is the pressed one',
       )
-      // The indicator slides for --duration-enter; a screenshot inside that slide shows the old tab.
-      await page.waitForFunction(() => {
-        const list = document.querySelector('[role="tablist"][aria-label="View"]')
-        const tab = list?.querySelector('[role="tab"][aria-selected="true"]')
-        const indicator = list?.querySelector('[data-slot="tabs-indicator"]')
-        if (!tab || !indicator) return false
-        return Math.abs(tab.getBoundingClientRect().x - indicator.getBoundingClientRect().x) < 1
-      })
+      await viewTabSettled(page)
       await step('icons-grid')
       await page.keyboard.press('Escape')
     } finally {

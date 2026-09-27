@@ -103,6 +103,7 @@ async function searchConversation(
 
 export const sessionSearch: Scenario = {
   name: 'session-search',
+  realProviders: true,
   description:
     'Find hidden message text in one disposable real-provider session and reject stale matches after typing a new query.',
   run: (page, { step }) => searchConversation(page, step, false),
@@ -110,6 +111,7 @@ export const sessionSearch: Scenario = {
 
 export const sessionSearchEnvironments: Scenario = {
   name: 'session-search-environments',
+  realProviders: true,
   description:
     'Search hidden message text owned by another connected environment. Requires two existing live owners; uses one disposable real-provider session.',
   run: (page, { step }) => searchConversation(page, step, true),

@@ -30,6 +30,7 @@ const RECALL = 'FORK_RECALL_DONE'
 function sessionForkScenario(provider: ForkProvider): Scenario {
   return {
     name: provider.name,
+    realProviders: true,
     description: provider.description,
     async run(page, { step }) {
       const orchestration = await openChat(page)
