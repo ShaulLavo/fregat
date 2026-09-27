@@ -1,7 +1,6 @@
 import type { FileTreeController } from '@workspace/tree'
 import type {
   FileTreeCompositionOptions,
-  FileTreePublicId,
   FileTreeRenderOptions,
   FileTreeRowDecorationRenderer,
   FileTreeSearchBlurBehavior,
@@ -12,16 +11,16 @@ import type { TreeRowElements } from '@/features/workspace/state/tree-row-elemen
 export interface TreeViewProps extends Omit<FileTreeRenderOptions, 'initialVisibleRowCount'> {
   composition?: FileTreeCompositionOptions
   controller: FileTreeController
-  directoriesWithGitChanges?: ReadonlySet<FileTreePublicId>
-  gitStatusByPath?: ReadonlyMap<FileTreePublicId, GitStatus>
-  ignoredGitDirectories?: ReadonlySet<FileTreePublicId>
+  directoriesWithGitChanges?: ReadonlySet<string>
+  gitStatusByPath?: ReadonlyMap<string, GitStatus>
+  ignoredGitDirectories?: ReadonlySet<string>
   // First-render viewport height in CSS pixels, used as the fallback when the
   // scroll element's clientHeight is still zero. The public option is
   // `initialVisibleRowCount` (rows); the resolver multiplies it by itemHeight
   // before passing the pixel value down here.
   initialViewportHeight?: number
   instanceId?: string
-  loadingPaths?: ReadonlySet<FileTreePublicId>
+  loadingPaths?: ReadonlySet<string>
   renamingEnabled?: boolean
   renderRowDecoration?: FileTreeRowDecorationRenderer
   rowElements?: TreeRowElements

@@ -21,8 +21,3 @@ export function prepareFileTreeInput(
 ): FileTreePreparedInput {
   return PathStore.prepareInput(paths, options) as FileTreePreparedInput
 }
-
-// Marks already-sorted input so FileTree can skip both sorting and reparsing work.
-export function preparePresortedFileTreeInput(paths: readonly string[]): FileTreePreparedInput {
-  return PathStore.preparePresortedInput(paths) as FileTreePreparedInput
-}

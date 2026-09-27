@@ -1,6 +1,6 @@
 # Plan 178: app-owned state
 
-- Status: IN PROGRESS (wave 2, lane T): steps 1–3 landed 2026-09-26/27; 4–9 next. Size L. After [out-of-the-root](out-of-the-root.md).
+- Status: IN PROGRESS (wave 2, lane T): steps 1–3 and 9 landed 2026-09-26/27; 4–8 next. Size L. After [out-of-the-root](out-of-the-root.md).
 - Owns: moving the view into the app and replacing the imperative facade with props and state.
 
 ## Outcome
@@ -173,3 +173,21 @@ chip on Rename (reproduced on main); re-baselined.
 - Verification: package 109 tests, TUI tree tests, web typecheck, tree browser 83 tests (parity
   included), workspace node/dom tests (four failures are the container, not the tree: a
   permission-denied fixture under root and three linked-file watch timeouts).
+
+### Step 9, 2026-09-27
+
+- Presorted input is gone end to end: `preparePresortedFileTreeInput`, `PathStore.preparePresortedInput`,
+  the `presorted` option, the builder's presorted ingest (cursor, deferred directory indexes,
+  `presortedDirectoryNodeIds`) and the all-open startup fast path it alone could reach
+  (`didMatchAllInitialExpandedPaths`, `collapseNewDirectoriesByDefault`). Child name and position
+  maps are always built now, so `ensureChildIdByNameId`/`ensureChildPositions` went too. The
+  prepared-input path the app uses is unchanged.
+- `FLATTENED_PREFIX` and `getSelectionPath` deleted; `renamePaths` takes the path as given.
+- `FileTreePublicId` replaced by `string` in the package and the app.
+- The root export drops the five types nothing outside the package imports
+  (`FileTreeDragAndDropConfig`, `FileTreeInitialExpansion`, `FileTreeRenamingConfig`,
+  `FileTreeSearchMode`, `FileTreeSortComparator`); `public-api.test.ts` follows.
+- Verification: package 100 tests (the removed ones covered presorted ingest only), TUI tree
+  tests and typecheck, web typecheck, gates. Tree browser 83 tests: one full run had
+  `tree-parity-scroll-menu` "holds row hover until the scroll settles" fail; three reruns of the
+  file passed. It times hover against scroll settlement, which this change does not touch.

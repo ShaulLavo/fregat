@@ -14,7 +14,7 @@ export {
   FILE_TREE_DEFAULT_OVERSCAN,
   FILE_TREE_DEFAULT_VIEWPORT_HEIGHT,
 } from './utils/model/virtualization'
-export { prepareFileTreeInput, preparePresortedFileTreeInput } from './utils/prepared-input'
+export { prepareFileTreeInput } from './utils/prepared-input'
 
 export type { FileTreeDensityPreset } from './utils/model/density'
 export type { FileTreeGitStatusState } from './utils/model/gitStatus'
@@ -28,13 +28,11 @@ export type {
   FileTreeContextMenuOpenContext,
   FileTreeContextMenuTriggerMode,
   FileTreeDirectoryHandle,
-  FileTreeDragAndDropConfig,
   FileTreeDropContext,
   FileTreeDropResult,
   FileTreeDropTarget,
   FileTreeFileHandle,
   FileTreeGitStatusPatch,
-  FileTreeInitialExpansion,
   FileTreeItemHandle,
   FileTreeListener,
   FileTreeMoveOptions,
@@ -44,10 +42,8 @@ export type {
   FileTreeMutationHandle,
   FileTreeMutationSemanticEvent,
   FileTreeOptions,
-  FileTreePublicId,
   FileTreeRemoveOptions,
   FileTreeRenameEvent,
-  FileTreeRenamingConfig,
   FileTreeRenderOptions,
   FileTreeResetOptions,
   FileTreeRowDecoration,
@@ -58,10 +54,8 @@ export type {
   FileTreeScrollOffset,
   FileTreeScrollToPathOptions,
   FileTreeSearchBlurBehavior,
-  FileTreeSearchMode,
   FileTreeSearchSessionHandle,
   FileTreeSelectionChangeListener,
-  FileTreeSortComparator,
   FileTreeVisibleRow,
 } from './utils/model/public-types'
 export type { FileTreePreparedInput } from './utils/prepared-input'

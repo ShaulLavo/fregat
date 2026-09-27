@@ -19,7 +19,6 @@ import type {
   FileTreeMutationEventType,
   FileTreeMutationHandle,
   FileTreeOptions,
-  FileTreePublicId,
   FileTreeRemoveOptions,
   FileTreeResetOptions,
   FileTreeRowDecorationRenderer,
@@ -256,7 +255,7 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
     this.#controller.requestFocus()
   }
 
-  public scrollToPath(path: FileTreePublicId, options?: FileTreeScrollToPathOptions): void {
+  public scrollToPath(path: string, options?: FileTreeScrollToPathOptions): void {
     this.#controller.scrollToPath(path, options)
   }
 
@@ -367,7 +366,7 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
     this.#invalidateView()
   }
 
-  public setLoadingPaths(paths: readonly FileTreePublicId[]): void {
+  public setLoadingPaths(paths: readonly string[]): void {
     if (arePathSetsEqual(this.#loadingPaths, paths)) return
 
     this.#loadingPaths = new Set(paths)

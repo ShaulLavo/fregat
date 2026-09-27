@@ -3,12 +3,9 @@ import { createTreeError } from '../structured-errors'
 
 import {
   getPreparedInputEntries,
-  getPreparedInputPresortedPaths,
-  getPreparedInputPresortedPathsContainDirectories,
   PathStoreBuilder,
   prepareInput as prepareCanonicalInput,
   preparePaths as prepareCanonicalPaths,
-  preparePresortedInput as prepareCanonicalPresortedInput,
   preparePathEntries,
 } from './builder'
 import {
@@ -61,31 +58,23 @@ import type { PathStoreState } from './state'
 
 // Initializes the common all-directories-open startup shape without rerunning
 // the generic count-repair walk the constructor uses for arbitrary expansion
-// overrides. This keeps the presorted first-render path from paying for a
-// second full-tree pass after the builder has already finalized subtree counts.
+// overrides.
 function initializeOpenVisibleCounts(state: PathStoreState): void {
-  const { directories, nodes, options, rootId, presortedDirectoryNodeIds } = state.snapshot
+  const { directories, nodes, options, rootId } = state.snapshot
   const flattenEmptyDirectories = options.flattenEmptyDirectories === true
 
   // Iterative reverse-order walk processing directories in post-order.
-  // Presorted construction assigns node IDs sequentially, so a directory's
-  // descendants always have higher IDs than the directory itself. This means
-  // reverse iteration finalizes every descendant before its parent.
-  //
-  // When the builder's presorted fast path recorded the directory IDs (the
-  // common case for bulk ingest), we walk just that list in reverse and
-  // skip the ~94% of iterations that would be files. Otherwise we fall back
-  // to scanning the full nodes array and branching on kind per iteration.
+  // The builder assigns node IDs sequentially over sorted input, so a
+  // directory's descendants always have higher IDs than the directory itself.
+  // This means reverse iteration finalizes every descendant before its parent.
   //
   // The builder no longer accumulates subtree counts, so subtreeNodeCount
   // arrives un-accumulated (all 1s).
   // This walk writes both subtreeNodeCount and visibleSubtreeCount for
   // every directory; the reverse order guarantees children's counts are
   // already finalized before their parent reads them.
-  // Root (nodeId === rootId === 0) is never passed to walkDirectory: the
-  // fallback loop starts at nodeId >= 1, and appendPresortedFilePaths only
-  // pushes newly-created directories (not the pre-existing root) into
-  // presortedDirectoryNodeIds. No root check needed inside the walker.
+  // Root (nodeId === rootId === 0) is never passed to walkDirectory: the loop
+  // starts at nodeId >= 1. No root check needed inside the walker.
   const walkDirectory = (nodeId: NodeId): void => {
     const currentNode = nodes[nodeId]
     if (currentNode == null || !isDirectoryNode(currentNode)) {
@@ -115,7 +104,7 @@ function initializeOpenVisibleCounts(state: PathStoreState): void {
     currentIndex.totalChildVisibleSubtreeCount = totalChildVisibleSubtreeCount
     // Avoid the rebuildVisibleChildChunks function call for directories that
     // don't need chunk sums. The threshold matches the internal constant;
-    // createPresortedDirectoryChildIndex initializes childVisibleChunkSums
+    // createDirectoryChildIndex initializes childVisibleChunkSums
     // to null already, so directories below the threshold need no write.
     if (childCount >= PATH_STORE_CHILD_INDEX_CHUNK_THRESHOLD_EXTERNAL) {
       rebuildVisibleChildChunks(nodes, currentIndex)
@@ -145,14 +134,8 @@ function initializeOpenVisibleCounts(state: PathStoreState): void {
     currentNode.visibleSubtreeCount = newVisibleSubtreeCount
   }
 
-  if (presortedDirectoryNodeIds != null) {
-    for (let i = presortedDirectoryNodeIds.length - 1; i >= 0; i--) {
-      walkDirectory(presortedDirectoryNodeIds[i])
-    }
-  } else {
-    for (let nodeId = nodes.length - 1; nodeId >= 1; nodeId--) {
-      walkDirectory(nodeId)
-    }
+  for (let nodeId = nodes.length - 1; nodeId >= 1; nodeId--) {
+    walkDirectory(nodeId)
   }
 
   // Root is at id 0; the walk above skipped it so its visibleSubtreeCount
@@ -195,26 +178,12 @@ export class PathStore {
   public constructor(options: PathStoreConstructorOptions = {}) {
     const builder = new PathStoreBuilder(options)
     if (options.preparedInput != null) {
-      const presortedPaths = getPreparedInputPresortedPaths(options.preparedInput)
-      if (presortedPaths != null) {
-        builder.appendPresortedPaths(
-          presortedPaths,
-          getPreparedInputPresortedPathsContainDirectories(options.preparedInput),
-        )
-      } else {
-        // preparedInput is the caller's explicit fast path, so skip the
-        // builder's redundant monotonic-order validation and only keep
-        // duplicate checks.
-        builder.appendPreparedPaths(getPreparedInputEntries(options.preparedInput), false)
-      }
+      // preparedInput is the caller's explicit fast path, so skip the
+      // builder's redundant monotonic-order validation and only keep
+      // duplicate checks.
+      builder.appendPreparedPaths(getPreparedInputEntries(options.preparedInput), false)
     } else {
-      const inputPaths = options.paths ?? []
-
-      if (options.presorted === true) {
-        builder.appendPaths(inputPaths)
-      } else {
-        builder.appendPreparedPaths(preparePathEntries(inputPaths, options))
-      }
+      builder.appendPreparedPaths(preparePathEntries(options.paths ?? [], options))
     }
 
     // Either initializeOpenVisibleCounts or recomputeCountsRecursive runs
@@ -222,22 +191,10 @@ export class PathStore {
     // each directory's childIds — which is why the builder has no backward
     // accumulation pass of its own to do the same work twice.
     const snapshot = builder.finish()
-    const useExplicitOpenExpansionFastPath =
-      (options.initialExpansion ?? 'closed') === 'closed' &&
-      builder.didMatchAllInitialExpandedPaths()
-    this.#state = createPathStoreState(
-      snapshot,
-      useExplicitOpenExpansionFastPath ? 'open' : (options.initialExpansion ?? 'closed'),
-    )
-    if (useExplicitOpenExpansionFastPath) {
-      this.#state.collapseNewDirectoriesByDefault = true
-    }
+    this.#state = createPathStoreState(snapshot, options.initialExpansion ?? 'closed')
 
-    const expandedDirectoryCount = useExplicitOpenExpansionFastPath
-      ? this.#state.snapshot.directories.size - 1
-      : this.initializeExpandedPaths(options.initialExpandedPaths)
+    const expandedDirectoryCount = this.initializeExpandedPaths(options.initialExpandedPaths)
     const canUseOpenVisibleCounts =
-      useExplicitOpenExpansionFastPath ||
       canInitializeOpenVisibleCounts(options) ||
       ((options.initialExpansion ?? 'closed') === 'closed' &&
         expandedDirectoryCount === this.#state.snapshot.directories.size - 1) ||
@@ -258,10 +215,6 @@ export class PathStore {
     options: PathStoreOptions = {},
   ): PathStorePreparedInput {
     return prepareCanonicalInput(paths, options)
-  }
-
-  public static preparePresortedInput(paths: readonly string[]): PathStorePreparedInput {
-    return prepareCanonicalPresortedInput(paths)
   }
 
   public list(path?: string): string[] {

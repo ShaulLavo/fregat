@@ -3,12 +3,6 @@ import type { FileTreePreparedInput } from '../prepared-input'
 import type { ContextMenuAnchorRect, GitStatusEntry } from '../public-types'
 import type { FileTreeDensity } from './density'
 
-/**
- * Public tree identity is path-first so render and model callers never depend
- * on the underlying path-store numeric IDs.
- */
-export type FileTreePublicId = string
-
 // The types below intentionally duplicate private path-store shapes
 // (PathStoreCompareEntry, PathStorePathComparator, PathStoreInitialExpansion,
 // PathStoreRemoveOptions, PathStoreCollisionStrategy, PathStoreMoveOptions,
@@ -29,13 +23,13 @@ interface FileTreeSortEntry {
   basename: string
   depth: number
   isDirectory: boolean
-  path: FileTreePublicId
+  path: string
   segments: readonly string[]
 }
 
 export type FileTreeSortComparator = (left: FileTreeSortEntry, right: FileTreeSortEntry) => number
 
-export type FileTreeInitialExpansion = 'closed' | 'open' | number
+type FileTreeInitialExpansion = 'closed' | 'open' | number
 
 export interface FileTreeRemoveOptions {
   recursive?: boolean
@@ -48,16 +42,16 @@ export interface FileTreeMoveOptions {
 }
 
 export type FileTreeBatchOperation =
-  | { path: FileTreePublicId; type: 'add' }
-  | ({ path: FileTreePublicId; type: 'remove' } & FileTreeRemoveOptions)
+  | { path: string; type: 'add' }
+  | ({ path: string; type: 'remove' } & FileTreeRemoveOptions)
   | ({
-      from: FileTreePublicId
-      to: FileTreePublicId
+      from: string
+      to: string
       type: 'move'
     } & FileTreeMoveOptions)
 
 export interface FileTreeGitStatusPatch {
-  remove?: readonly FileTreePublicId[]
+  remove?: readonly string[]
   set?: readonly GitStatusEntry[]
 }
 
@@ -66,18 +60,17 @@ export interface FileTreeGitStatusPatch {
 interface FileTreeStoreOptions {
   flattenEmptyDirectories?: boolean
   initialExpansion?: FileTreeInitialExpansion
-  initialExpandedPaths?: readonly FileTreePublicId[]
-  presorted?: boolean
+  initialExpandedPaths?: readonly string[]
   sort?: 'default' | FileTreeSortComparator
 }
 
 type FileTreeInputOptions =
   | {
-      paths: readonly FileTreePublicId[]
+      paths: readonly string[]
       preparedInput?: FileTreePreparedInput
     }
   | {
-      paths?: readonly FileTreePublicId[]
+      paths?: readonly string[]
       preparedInput: FileTreePreparedInput
     }
 
@@ -85,7 +78,7 @@ type FileTreeControllerBehaviorOptions = FileTreeStoreOptions & {
   dragAndDrop?: boolean | FileTreeDragAndDropConfig
   fileTreeSearchMode?: FileTreeSearchMode
   initialSearchQuery?: string | null
-  initialSelectedPaths?: readonly FileTreePublicId[]
+  initialSelectedPaths?: readonly string[]
   onSearchChange?: FileTreeSearchChangeListener
   renaming?: boolean | FileTreeRenamingConfig
 }
@@ -95,11 +88,11 @@ export type FileTreeControllerOptions = FileTreeControllerBehaviorOptions & File
 interface FileTreeVisibleSegment {
   isTerminal: boolean
   name: string
-  path: FileTreePublicId
+  path: string
 }
 
 export interface FileTreeVisibleRow {
-  ancestorPaths: readonly FileTreePublicId[]
+  ancestorPaths: readonly string[]
   depth: number
   flattenedSegments?: readonly FileTreeVisibleSegment[]
   hasChildren: boolean
@@ -111,7 +104,7 @@ export interface FileTreeVisibleRow {
   kind: 'directory' | 'file'
   level: number
   name: string
-  path: FileTreePublicId
+  path: string
   posInSet: number
   setSize: number
 }
@@ -119,7 +112,7 @@ export interface FileTreeVisibleRow {
 interface FileTreeItemHandleBase {
   deselect(): void
   focus(): void
-  getPath(): FileTreePublicId
+  getPath(): string
   isFocused(): boolean
   isDirectory(): boolean
   isSelected(): boolean
@@ -180,7 +173,7 @@ export interface FileTreeSearchSessionHandle {
   closeSearch(): void
   focusNextSearchMatch(): void
   focusPreviousSearchMatch(): void
-  getSearchMatchingPaths(): readonly FileTreePublicId[]
+  getSearchMatchingPaths(): readonly string[]
   getSearchValue(): string
   isSearchOpen(): boolean
   openSearch(initialValue?: string): void
@@ -188,14 +181,14 @@ export interface FileTreeSearchSessionHandle {
 }
 
 export interface FileTreeDropTarget {
-  directoryPath: FileTreePublicId | null
-  flattenedSegmentPath: FileTreePublicId | null
-  hoveredPath: FileTreePublicId | null
+  directoryPath: string | null
+  flattenedSegmentPath: string | null
+  hoveredPath: string | null
   kind: 'directory' | 'root'
 }
 
 export interface FileTreeDropContext {
-  draggedPaths: readonly FileTreePublicId[]
+  draggedPaths: readonly string[]
   target: FileTreeDropTarget
 }
 
@@ -204,7 +197,7 @@ export interface FileTreeDropResult extends FileTreeDropContext {
 }
 
 export interface FileTreeDragAndDropConfig {
-  canDrag?: (paths: readonly FileTreePublicId[]) => boolean
+  canDrag?: (paths: readonly string[]) => boolean
   canDrop?: (event: FileTreeDropContext) => boolean
   onDropComplete?: (event: FileTreeDropResult) => void
   onDropError?: (error: string, event: FileTreeDropContext) => void
@@ -213,13 +206,13 @@ export interface FileTreeDragAndDropConfig {
 
 interface FileTreeRenamingItem {
   isFolder: boolean
-  path: FileTreePublicId
+  path: string
 }
 
 export interface FileTreeRenameEvent {
-  destinationPath: FileTreePublicId
+  destinationPath: string
   isFolder: boolean
-  sourcePath: FileTreePublicId
+  sourcePath: string
 }
 
 export interface FileTreeRenamingConfig {
@@ -256,19 +249,19 @@ interface FileTreeMutationEventInvalidation {
 
 interface FileTreeAddEvent extends FileTreeMutationEventInvalidation {
   operation: 'add'
-  path: FileTreePublicId
+  path: string
 }
 
 interface FileTreeRemoveEvent extends FileTreeMutationEventInvalidation {
   operation: 'remove'
-  path: FileTreePublicId
+  path: string
   recursive: boolean
 }
 
 interface FileTreeMoveEvent extends FileTreeMutationEventInvalidation {
-  from: FileTreePublicId
+  from: string
   operation: 'move'
-  to: FileTreePublicId
+  to: string
 }
 
 export interface FileTreeResetEvent extends FileTreeMutationEventInvalidation {
@@ -301,31 +294,31 @@ export interface FileTreeResetOptions {
   // time. Useful when the caller is swapping in a dramatically different path
   // list (e.g. upgrading from an SSR preview to a full dataset) and wants the
   // fresh store to start with expansion state that reflects the new paths.
-  initialExpandedPaths?: readonly FileTreePublicId[]
+  initialExpandedPaths?: readonly string[]
   // Must describe the same path list passed to resetPaths(paths, ...).
   preparedInput?: FileTreePreparedInput
 }
 
 export interface FileTreeMutationHandle {
-  add(path: FileTreePublicId): void
+  add(path: string): void
   batch(operations: readonly FileTreeBatchOperation[]): void
-  move(fromPath: FileTreePublicId, toPath: FileTreePublicId, options?: FileTreeMoveOptions): void
+  move(fromPath: string, toPath: string, options?: FileTreeMoveOptions): void
   onMutation<TType extends FileTreeMutationEventType | '*'>(
     type: TType,
     handler: (event: FileTreeMutationEventForType<TType>) => void,
   ): () => void
-  remove(path: FileTreePublicId, options?: FileTreeRemoveOptions): void
-  resetPaths(paths: readonly FileTreePublicId[], options?: FileTreeResetOptions): void
+  remove(path: string, options?: FileTreeRemoveOptions): void
+  resetPaths(paths: readonly string[], options?: FileTreeResetOptions): void
 }
 
 export type FileTreeListener = () => void
 
-export type FileTreeSelectionChangeListener = (selectedPaths: readonly FileTreePublicId[]) => void
+export type FileTreeSelectionChangeListener = (selectedPaths: readonly string[]) => void
 
 export interface FileTreeContextMenuItem {
   kind: 'directory' | 'file'
   name: string
-  path: FileTreePublicId
+  path: string
 }
 
 export interface FileTreeContextMenuOpenContext {

@@ -1,5 +1,4 @@
 // Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
-import { getSelectionPath } from './getSelectionPath'
 
 export type RenamePathsResult =
   | {
@@ -37,11 +36,10 @@ function joinPath(parentPath: string, baseName: string): string {
  */
 export function renamePaths({
   files,
-  path,
+  path: sourcePath,
   isFolder,
   nextBasename,
 }: RenamePathsParams): RenamePathsResult {
-  const sourcePath = getSelectionPath(path)
   const trimmedBasename = nextBasename.trim()
   if (trimmedBasename.length === 0) {
     return { error: 'Name cannot be empty.' }
