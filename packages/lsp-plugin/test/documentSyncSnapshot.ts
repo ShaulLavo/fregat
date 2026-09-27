@@ -31,7 +31,7 @@ export function viewSnapshotStructuralFields(): Pick<
   | 'toVisibleSnapshot'
 > {
   return {
-    gutterLayout: { fixedWidth: 0, lanes: [] },
+    gutterLayout: { leadingInset: 0, fixedWidth: 0, lanes: [] },
     gutterWidth: 0,
     initialHighlightStatus: 'painted',
     syntaxStatus: 'ready',

@@ -218,6 +218,7 @@ class DiffPluginRuntime {
       context.registerGutterContribution(
         createDiffGutterContribution({
           side: this.side,
+          tint: this.mode === 'document' ? 'row' : 'cell',
           getDigits: () => this.gutterDigits(),
           resolveRow: (row) => this.resolveGutterRow(row),
           isEnabled: () => this.enabled,

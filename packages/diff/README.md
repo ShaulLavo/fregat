@@ -121,8 +121,8 @@ editor.setTheme({
 | -------------------------------------- | ----------------------------------------------- |
 | `diff.added`, `diff.deleted`           | Added and deleted gutter numbers and indicators |
 | `diff.modified`                        | Input to the default hunk background mix        |
-| `diff.added.bg`, `diff.deleted.bg`     | Changed rows and gutter cells                   |
-| `diff.hunk.bg`, `diff.hunk.foreground` | Hunk separators and their gutter cells          |
+| `diff.added.bg`, `diff.deleted.bg`     | Changed rows and their gutter rows              |
+| `diff.hunk.bg`, `diff.hunk.foreground` | Hunk separators and their gutter rows           |
 | `diff.placeholder.bg`                  | Empty cells on one side of a split diff         |
 | `diff.muted`                           | Empty diff message                              |
 | `diff.border`, `diff.split.handle`     | Host diff borders and split handles             |

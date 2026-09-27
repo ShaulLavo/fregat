@@ -1,5 +1,6 @@
 import { normalizeEditorEditability } from './editorDocument'
 import {
+  normalizeGutterLeadingInset,
   normalizeRowGap,
   normalizeRowHeight,
   normalizeScrollMode,
@@ -32,6 +33,7 @@ type EditorControlledOptions = {
   readonly editability?: EditorEditability
   readonly fontFamily?: string
   readonly fontSize?: number
+  readonly gutterLeadingInset?: number
   readonly hiddenCharacters?: HiddenCharactersMode
   readonly keymap?: EditorKeymapOptions
   readonly lineHeight?: number
@@ -134,6 +136,18 @@ export const EDITOR_OPTION_DESCRIPTORS: readonly EditorOptionDescriptor[] = [
     equals: Object.is,
     applyTo: (editor, fontSize) => {
       editor.setFontSize(fontSize)
+      return true
+    },
+  }),
+  // Undefined resets to no inset, so a host that stops passing one gets the flush gutter back.
+  defineOption({
+    name: 'gutterLeadingInset',
+    defaultValue: 0,
+    validate: (input) =>
+      input === undefined ? undefined : normalizeGutterLeadingInset(input as number),
+    equals: Object.is,
+    applyTo: (editor, inset) => {
+      editor.setGutterLeadingInset(inset ?? 0)
       return true
     },
   }),

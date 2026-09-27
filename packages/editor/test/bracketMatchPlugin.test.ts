@@ -143,7 +143,7 @@ function snapshot(options: SnapshotOptions = {}): EditorViewSnapshot {
     brackets: options.brackets ?? BRACKETS,
     contentWidth: 80,
     gutterWidth: 0,
-    gutterLayout: { fixedWidth: 0, lanes: [] },
+    gutterLayout: { leadingInset: 0, fixedWidth: 0, lanes: [] },
     documentId: 'bracket-test',
     documentSyncPoint: TEST_DOCUMENT_SYNC_POINT,
     foldMarkers: [],

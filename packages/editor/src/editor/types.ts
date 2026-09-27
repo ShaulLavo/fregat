@@ -121,6 +121,11 @@ export type EditorOptions = {
   /** Row height in pixels, not a ratio; independent of `fontSize`. */
   readonly lineHeight?: number
   readonly rangeDecorations?: readonly EditorRangeDecoration[]
+  /**
+   * Empty pixels at the gutter's leading edge, before the first lane: room between a screen edge
+   * and the line numbers. Row decorations and diff tints cover it. Defaults to 0.
+   */
+  readonly gutterLeadingInset?: number
   readonly rowGap?: number
   readonly rowPositioning?: EditorRowPositioning
   /**

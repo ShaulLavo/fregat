@@ -31,6 +31,11 @@ describe('createDiffPlugin (overlay mode)', () => {
     // review: overlay's projection array interleaves injected deletions, so indexing it by buffer
     // row labels `b` as the deleted line and steals `add`'s `+`.
     expect(visibleDiffGutterTexts()).toEqual(['11', '2-', '32', '3+', '44'])
+    // The diff lane shares this gutter with the host's lanes, so only its own cell is tinted.
+    expect(container.querySelector('.editor-diff-gutter')?.classList).toContain(
+      'editor-diff-gutter-tinted',
+    )
+    expect(container.querySelector('[class*="editor-diff-gutter-band-"]')).toBeNull()
 
     editor.edit({
       from: editor.materializeFullText().length,

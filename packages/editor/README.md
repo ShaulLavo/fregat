@@ -64,6 +64,21 @@ Plugins can register more colors with `registerEditorColor` from the rendering e
 set these through `theme.colors`, keyed by the registered id. The [diff theme documentation](../diff/README.md#theme)
 lists its palette and the public replacements for the removed diff base CSS hooks.
 
+## Gutter inset
+
+`gutterLeadingInset` puts empty pixels at the gutter's leading edge, before the first lane: room
+between a screen edge and the line numbers. The lanes keep their widths and move right; the text
+starts after the widened gutter. Row decorations and diff tints paint the gutter row, so they cover
+the inset and a tinted row runs from the pane's edge to its text. With `cursorLineHighlight`
+`gutterBackground: true`, the cursor line's gutter band covers it too.
+
+```ts
+const editor = new Editor(container, { gutterLeadingInset: 12 })
+editor.setGutterLeadingInset(0) // back to a flush gutter
+```
+
+It defaults to 0, and at 0 the gutter is unchanged. An editor with no gutter lanes ignores it.
+
 ## Chords and host keymaps
 
 Declare shortcuts as a non-empty `chord` array. Single strokes use the same field.

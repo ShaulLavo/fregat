@@ -462,7 +462,7 @@ function snapshot(): EditorViewSnapshot {
     contentWidth: 160,
     totalHeight: LINES.length * ROW_HEIGHT,
     gutterWidth: 0,
-    gutterLayout: { fixedWidth: 0, lanes: [] },
+    gutterLayout: { leadingInset: 0, fixedWidth: 0, lanes: [] },
     tabSize: 2,
     foldMarkers: foldMarkers(),
     visibleRows: visibleRows(0, LINES.length - 1),

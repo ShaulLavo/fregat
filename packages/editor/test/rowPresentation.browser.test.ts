@@ -183,7 +183,7 @@ describe('row presentation lifetime', () => {
       connected = handle.element.isConnected
     })
     const paint: SavedPaint = {
-      format: 4,
+      format: 5,
       appearance: '',
       scrollTop: 0,
       scrollLeft: 0,
@@ -196,7 +196,7 @@ describe('row presentation lifetime', () => {
       boxWidth: 400,
       boxHeight: 20,
       gutterWidth: 0,
-      gutterLayout: { fixedWidth: 0, lanes: [] },
+      gutterLayout: { leadingInset: 0, fixedWidth: 0, lanes: [] },
       rows: [],
       layers: [],
     }

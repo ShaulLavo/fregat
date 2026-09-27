@@ -23,6 +23,7 @@ it('records one pointer jump, survives an edit, and binds Alt+Left and Alt+Right
       { x: rect.left + 20, y: rect.top + 5 },
       { x: rect.left + 90, y: rect.top + 5 },
     )
+    expect(editor.getState().cursor.row).toBe(1)
     editor.edit({ from: 0, to: 0, text: 'prefix ' })
     const destination = editor.getState().cursor
     await commands.proofKeyPress('Alt+ArrowLeft')

@@ -1871,7 +1871,7 @@ function editorSnapshot(options: SnapshotOptions = {}): EditorViewSnapshot {
     ...overrides,
     initialHighlightStatus: options.initialHighlightStatus ?? 'painted',
     gutterWidth: options.gutterWidth ?? 0,
-    gutterLayout: options.gutterLayout ?? { fixedWidth: 0, lanes: [] },
+    gutterLayout: options.gutterLayout ?? { leadingInset: 0, fixedWidth: 0, lanes: [] },
     toVisibleSnapshot: options.toVisibleSnapshot ?? (() => null),
     documentSyncPoint,
     changesSinceDocumentSyncPoint:

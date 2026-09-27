@@ -255,6 +255,19 @@ describe('diff plugin — gutter (§3.3)', () => {
     expect(laneTone(deletion, 'indicator')).toBe('deleted')
   })
 
+  it('tints the whole gutter row, so the tint covers a leading inset', () => {
+    const { host } = mountDiff({ file: singleHunkDiff(), side: 'stacked' })
+    const addition = gutterCellForIndicator(host, '+')
+    const deletion = gutterCellForIndicator(host, '-')
+
+    expect(addition.parentElement?.classList).toContain('editor-diff-gutter-band-addition')
+    expect(deletion.parentElement?.classList).toContain('editor-diff-gutter-band-deletion')
+    // The cell stays clear, or its tint would stack on the row's.
+    for (const cell of gutterCells(host)) {
+      expect(cell.classList).not.toContain('editor-diff-gutter-tinted')
+    }
+  })
+
   it('shows only its own side’s number lane in split mode', () => {
     const { host } = mountDiff({ file: singleHunkDiff(), side: 'old' })
 
@@ -288,6 +301,7 @@ describe('diff plugin — gutter (§3.3)', () => {
     let digits = diffGutterDigits([numberedRow(1000, 10)])
     const contribution = createDiffGutterContribution({
       side: 'stacked',
+      tint: 'row',
       getDigits: () => digits,
       resolveRow: () => null,
       onLayout: (layout) => published.push(layout.lanes.map((lane) => lane.width).join(',')),

@@ -80,6 +80,8 @@ export interface VirtualizedTextViewInternal {
   readonly gutterElement: HTMLDivElement
   gutterContributions: readonly EditorGutterContribution[]
   readonly gutterWidthProvider: ((context: EditorGutterWidthContext) => number) | null
+  /** Configured; the gutter applies it only while it is shown. */
+  gutterLeadingInset: number
   readonly caretLayerElement: HTMLDivElement
   readonly caretElement: HTMLDivElement
   readonly secondaryCaretElements: HTMLDivElement[]
@@ -148,6 +150,8 @@ export interface VirtualizedTextViewInternal {
   gutterContributionWidths: ReadonlyMap<string, number>
   gutterWidthDirty: boolean
   currentGutterWidth: number
+  /** The inset `currentGutterWidth` includes. */
+  currentGutterLeadingInset: number
   contentWidth: number
   maxVisualColumnsSeen: number
   lastWidthScanStart: number

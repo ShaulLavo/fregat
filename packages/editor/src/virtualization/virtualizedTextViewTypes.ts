@@ -77,6 +77,8 @@ export type VirtualizedTextViewOptions = {
   readonly rowPositioning?: VirtualizedTextViewRowPositioning
   readonly className?: string
   readonly gutterWidth?: number | ((context: EditorGutterWidthContext) => number)
+  /** Empty pixels at the gutter's leading edge, before the first lane. Defaults to 0. */
+  readonly gutterLeadingInset?: number
   readonly longLineChunkSize?: number
   readonly longLineChunkThreshold?: number
   readonly horizontalOverscanColumns?: number

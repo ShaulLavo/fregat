@@ -1,3 +1,4 @@
+import { normalizeGutterLeadingInset } from '../virtualization/virtualizedTextViewHelpers'
 import { captureJumpLocation, JumpHistory, type JumpLocation, type JumpCause } from './jumpHistory'
 import type { EditorPointHit, EditorMarkerHit } from '../pointQueries'
 import { decodePaintSnapshot, encodePaintSnapshot } from './paintSnapshot'
@@ -543,6 +544,7 @@ export class Editor {
       className: 'editor',
       highlightRegistry: getHighlightRegistry(),
       gutterContributions: this.composedGutterContributions(),
+      gutterLeadingInset: options.gutterLeadingInset,
       cursorLineHighlight: options.cursorLineHighlight,
       hiddenCharacters: options.hiddenCharacters,
       fontSize: options.fontSize,
@@ -1945,6 +1947,18 @@ export class Editor {
       action: 'editor.layout.line_height_changed',
       level: 'info',
       layout: { lineHeight },
+    })
+  }
+
+  /** Empty pixels before the first gutter lane; row decorations tint them. 0 removes the inset. */
+  setGutterLeadingInset(inset: number): void {
+    if (!this.view.setGutterLeadingInset(inset)) return
+
+    this.notifyViewContributions('layout', null)
+    this.log({
+      action: 'editor.layout.gutter_leading_inset_changed',
+      level: 'info',
+      layout: { gutterLeadingInset: normalizeGutterLeadingInset(inset) },
     })
   }
 

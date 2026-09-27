@@ -406,7 +406,7 @@ class EditorFixture {
       contentWidth: 0,
       totalHeight: rows.length * ROW_HEIGHT,
       gutterWidth: 0,
-      gutterLayout: { fixedWidth: 0, lanes: [] },
+      gutterLayout: { leadingInset: 0, fixedWidth: 0, lanes: [] },
       tabSize: 2,
       foldMarkers: [],
       visibleRows: rows,

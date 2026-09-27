@@ -96,6 +96,8 @@
   --editor-syntax-variable: #e4e4e7;
   --editor-syntax-variable-builtin: #fdba74;
   --editor-gutter-width: 0px;
+  /* Written by the editor from `gutterLeadingInset`; part of `--editor-gutter-width`. */
+  --editor-gutter-inset: 0px;
   --editor-row-height: 24px;
 
   flex: 1;
@@ -182,6 +184,8 @@
   justify-content: flex-start;
   line-height: var(--editor-row-height);
   left: 0;
+  /* Lanes start after the leading inset; the row's own background still covers it. */
+  padding-left: var(--editor-gutter-inset);
   position: absolute;
   right: 0;
   /* Same WebKit highlight-invalidation workaround as .editor-virtualized-row. */
@@ -218,6 +222,17 @@
 
 .editor-virtualized-gutter-cell.editor-virtualized-cursor-line-gutter {
   background: var(--editor-cursor-line-gutter-background);
+}
+
+/* With every lane highlighted, the band reaches the gutter's edge through the leading inset. */
+.editor-virtualized-cursor-line-gutter-band::before {
+  background: var(--editor-cursor-line-gutter-background);
+  bottom: 0;
+  content: '';
+  left: 0;
+  position: absolute;
+  top: 0;
+  width: var(--editor-gutter-inset);
 }
 
 .editor-virtualized-gutter-cell.editor-virtualized-cursor-line-gutter[hidden] {
