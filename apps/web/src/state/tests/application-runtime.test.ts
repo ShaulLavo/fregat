@@ -5,7 +5,9 @@ import { readWorkspaceCache } from '@/features/workspace/state/cache'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { activeServerOrigin, setActiveServerOrigin, setClient } from '@/lib/client'
 import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
-import { queryClientFor } from '@/lib/environments/state/query-clients'
+import { primaryQueryClient, queryClientFor } from '@/lib/environments/state/query-clients'
+import { settingsKeys } from '@workspace/client-core/settings/query-keys'
+import { settingsSnapshot } from '../../../test/factories/settings'
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { initialServerConnection } from '@workspace/client-core/environments/utils/connection'
@@ -77,6 +79,17 @@ test('the active editor serves its census without a React tree, and a machine sw
 
     application.activateEnvironment(originA)
     expect(workspacePreloadLanguages()).toEqual(['rust'])
+
+    // Spelling reaches every retained editor, the parked one included.
+    primaryQueryClient().setQueryData(
+      settingsKeys.document(),
+      settingsSnapshot({ values: { 'spellcheck.words': { fregat: true } } }),
+    )
+    for (const origin of [originA, originB]) {
+      const environment = application.getEnvironment(confirmedEnvironmentId(origin))
+      expect(environment?.editor.spellcheck.isAccepted('fregat')).toBe(true)
+    }
+    primaryQueryClient().removeQueries({ queryKey: settingsKeys.document() })
   } finally {
     application.dispose()
     expect(workspacePreloadLanguages()).toBe(EDITOR_SHIKI_PRELOAD_LANGUAGES)

@@ -102,18 +102,18 @@ export function createApplicationRuntime({
       editor,
       stopSearchReload,
       // Before any recovery, so a recovered root recreates its erased cache entry.
-      // `false` entries un-accept a word the merged dictionary would otherwise accept.
-      stopSpellcheckWords: watchSettingValue(primaryQueryClient(), 'spellcheck.words', (words) =>
-        editor.spellcheck.setAcceptedWords(
-          Object.entries(words).flatMap(([word, accepted]) => (accepted ? [word] : [])),
-        ),
-      ),
       stopCachePersistence: subscribeWorkspaceCachePersistence({
         storage,
         documentStore: editor.documentStore,
         searchStore: editor.searchBufferStore,
         workspaceStore: editor.workspaceStore,
       }),
+      // `false` entries un-accept a word the merged dictionary would otherwise accept.
+      stopSpellcheckWords: watchSettingValue(primaryQueryClient(), 'spellcheck.words', (words) =>
+        editor.spellcheck.setAcceptedWords(
+          Object.entries(words).flatMap(([word, accepted]) => (accepted ? [word] : [])),
+        ),
+      ),
       unsubscribeRoot: editor.workspaceStore.subscribe(
         (state) => state.rootFolder?.path ?? null,
         (root) => {
@@ -131,20 +131,21 @@ export function createApplicationRuntime({
   activateWorkspaceRoot(current.editor.workspaceStore.getState().rootFolder?.path ?? null)
 
   const connections = createEnvironmentConnections()
+  const stopAdmissionWatch = useEnvironmentsStore.subscribe(syncActiveEditor)
   const stopLatency = watchSettingValue(
     primaryQueryClient(),
     'developer.simulatedLatencyMs',
     setSimulatedLatencyMs,
   )
   let machines: SettingsValues['environments.machines'] | undefined
-  // Only confirmed settings may configure machines: the settings authority forgets undesired ones.
+  // Machines wait for the settings document: configuring from boot values would let the
+  // settings authority forget machines the document lists.
   const stopMachines = subscribeLiveSettings(primaryQueryClient(), (settings) => {
     const next = settings?.values['environments.machines']
     if (!next || next === machines) return
     machines = next
     connections.configureMachines(next)
   })
-  const stopAdmissionWatch = useEnvironmentsStore.subscribe(syncActiveEditor)
 
   const application = {
     connections,
@@ -221,7 +222,6 @@ export function createApplicationRuntime({
       stopAdmissionWatch()
       commandBinding.clear()
       stopLatency()
-      setSimulatedLatencyMs(0)
       stopMachines()
       connections.stop()
       for (const environment of environments.values()) {
