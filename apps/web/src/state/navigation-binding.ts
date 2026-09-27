@@ -11,6 +11,9 @@ export function bindNavigation(navigation: Navigation) {
 }
 
 export function getNavigation() {
-  if (!current) throw createClientInvariantError('Navigation is not attached to the application.')
+  if (!current)
+    throw createClientInvariantError(
+      'Navigation is not bound: createBootstrap binds it at boot, tests through test/render.tsx.',
+    )
   return current
 }

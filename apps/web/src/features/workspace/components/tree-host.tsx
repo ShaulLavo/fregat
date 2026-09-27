@@ -1,5 +1,6 @@
 /** @jsxImportSource react */
 
+import { cn } from '@workspace/ui/lib/utils'
 import '@/features/workspace/components/tree-view.css'
 
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react'
@@ -129,12 +130,12 @@ export function TreeHost({
   // survive into the commit that removes it.
   if (!hasContextMenu && activeContextMenu !== null) setActiveContextMenu(null)
 
-  const sprites = model.getSpriteSheets()
   const viewProps = model.getViewProps(viewVersion)
 
   return (
     <div
       {...hostProps}
+      className={cn('group/tree', hostProps.className)}
       data-file-tree=''
       data-file-tree-virtualized='true'
       id={id}
@@ -144,11 +145,7 @@ export function TreeHost({
       }}
       style={densityStyle(model, densityVersion, hostProps.style)}
     >
-      <div
-        data-file-tree-colored-icons={sprites.coloredIcons ? 'true' : undefined}
-        data-file-tree-virtualized-wrapper='true'
-      >
-        <TreeSprites builtIn={sprites.builtIn} custom={sprites.custom} />
+      <div data-file-tree-virtualized-wrapper='true'>
         <TreeView
           {...viewProps}
           composition={composition}
@@ -160,17 +157,5 @@ export function TreeHost({
         ? renderContextMenu(activeContextMenu.item, activeContextMenu.context)
         : null}
     </div>
-  )
-}
-
-/** The glyph sprites the rows `<use>`; ids are document-wide now, and identical per tree. */
-function TreeSprites({ builtIn, custom }: { builtIn: string; custom: string | null }) {
-  return (
-    <div
-      aria-hidden='true'
-      data-file-tree-sprites=''
-      dangerouslySetInnerHTML={{ __html: `${builtIn}${custom ?? ''}` }}
-      style={{ height: 0, overflow: 'hidden', position: 'absolute', width: 0 }}
-    />
   )
 }

@@ -85,7 +85,7 @@ function ContextMenuLabel({
       data-slot='context-menu-label'
       data-inset={inset}
       className={cn(
-        'px-2 py-(--density-menu-item-padding-y) text-xs text-muted-foreground data-inset:pl-7',
+        'px-2 py-(--density-menu-item-padding-y) text-xs text-muted-foreground wrap-anywhere data-inset:pl-7',
         className,
       )}
       {...props}

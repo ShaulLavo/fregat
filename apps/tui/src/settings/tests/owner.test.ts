@@ -271,3 +271,42 @@ test('theme part drafts use the chosen variant', async ({ client }) => {
     owner.dispose()
   }
 })
+
+test('saving a theme part at the theme value removes its override for that half', async ({
+  client,
+}) => {
+  const owner = await makeSettingsOwner(client)
+  try {
+    const bundle = BUNDLED_THEMES[1]!
+    const saved = owner.submit('user', [
+      { kind: 'set', key: 'workbench.theme', value: bundle },
+      {
+        kind: 'theme.customize',
+        id: bundle.id,
+        mode: 'dark',
+        patch: { material: { opacity: 37 } },
+      },
+      {
+        kind: 'theme.customize',
+        id: bundle.id,
+        mode: 'light',
+        patch: { material: { opacity: 41 } },
+      },
+    ])
+    if (saved.kind === 'submitted') await saved.settled
+    const outcome = await saveSettingDraft({
+      id: 'workbench.surface.opacity',
+      draft: String(bundle.variants.dark.material.opacity),
+      snapshot: owner.getSnapshot().snapshot,
+      target: 'user',
+      owner,
+      mode: 'dark',
+    })
+    expect(outcome).toBe('acknowledged')
+    expect(owner.readSettingsMirror()['workbench.theme.customizations'][bundle.id]).toEqual({
+      light: { material: { opacity: 41 } },
+    })
+  } finally {
+    owner.dispose()
+  }
+})

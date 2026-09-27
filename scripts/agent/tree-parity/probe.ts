@@ -10,8 +10,8 @@ export function probeTree(): Record<string, string> {
   const PARTS = {
     row: '[data-type="item"]',
     stickyRow: '[data-file-tree-sticky-row]',
-    guide: '[data-item-section="spacing-item"]',
-    icon: '[data-item-section="icon"]',
+    guide: '[data-slot="tree-row-guide"]',
+    icon: '[data-slot="tree-row-lane"]',
     name: '[data-item-section="content"]',
     git: '[data-item-section="git"]',
     decoration: '[data-item-section="decoration"]',
@@ -164,8 +164,8 @@ export function probeTree(): Record<string, string> {
     row.querySelectorAll(PARTS.guide).forEach((guide, index) => {
       put(`${key}.guide${index}.box`, box(guide))
       styles(`${key}.guide${index}`, guide, [
-        'border-left-width',
-        'border-left-color',
+        'width',
+        'background-color',
         'opacity',
         'transition-duration',
       ])

@@ -64,59 +64,6 @@
       --trees-git-untracked-color-override
       --trees-git-deleted-color-override
 
-      // Built-in File Icon Color Overrides
-      --trees-file-icon-color
-      --trees-file-icon-color-astro
-      --trees-file-icon-color-babel
-      --trees-file-icon-color-bash
-      --trees-file-icon-color-biome
-      --trees-file-icon-color-bootstrap
-      --trees-file-icon-color-browserslist
-      --trees-file-icon-color-bun
-      --trees-file-icon-color-c
-      --trees-file-icon-color-cpp
-      --trees-file-icon-color-claude
-      --trees-file-icon-color-css
-      --trees-file-icon-color-database
-      --trees-file-icon-color-default
-      --trees-file-icon-color-docker
-      --trees-file-icon-color-eslint
-      --trees-file-icon-color-git
-      --trees-file-icon-color-go
-      --trees-file-icon-color-graphql
-      --trees-file-icon-color-html
-      --trees-file-icon-color-image
-      --trees-file-icon-color-javascript
-      --trees-file-icon-color-json
-      --trees-file-icon-color-markdown
-      --trees-file-icon-color-mcp
-      --trees-file-icon-color-npm
-      --trees-file-icon-color-oxc
-      --trees-file-icon-color-postcss
-      --trees-file-icon-color-prettier
-      --trees-file-icon-color-python
-      --trees-file-icon-color-react
-      --trees-file-icon-color-ruby
-      --trees-file-icon-color-rust
-      --trees-file-icon-color-sass
-      --trees-file-icon-color-svg
-      --trees-file-icon-color-svelte
-      --trees-file-icon-color-svgo
-      --trees-file-icon-color-swift
-      --trees-file-icon-color-table
-      --trees-file-icon-color-text
-      --trees-file-icon-color-tailwind
-      --trees-file-icon-color-terraform
-      --trees-file-icon-color-typescript
-      --trees-file-icon-color-vite
-      --trees-file-icon-color-vscode
-      --trees-file-icon-color-vue
-      --trees-file-icon-color-wasm
-      --trees-file-icon-color-webpack
-      --trees-file-icon-color-yml
-      --trees-file-icon-color-zig
-      --trees-file-icon-color-zip
-
       // Density
       //
       // A unitless scale factor for padding, gaps, and indentation. Usually
@@ -188,13 +135,6 @@
         --trees-border-color-override,
         var(--trees-theme-sidebar-border, light-dark(#eeeeef, #070707))
       );
-      --trees-indent-guide-bg: var(
-        --trees-indent-guide-bg-override,
-        color-mix(in lab, var(--trees-fg-muted) 25%, transparent)
-      );
-      --trees-indent-guide-opacity: var(--trees-indent-guide-opacity-override, 0);
-      --trees-indent-guide-hover-opacity: var(--trees-indent-guide-hover-opacity-override, 0.75);
-      --trees-indent-guide-active-opacity: var(--trees-indent-guide-active-opacity-override, 1);
       --trees-density: var(--trees-density-override, 1);
       --trees-border-radius: var(--trees-border-radius-override, calc(6px * var(--trees-density)));
 
@@ -310,71 +250,6 @@
         var(--trees-status-untracked)
       );
 
-      --trees-icon-gray: light-dark(#84848a, #adadb1);
-      --trees-icon-red: light-dark(#d52c36, #ff6762);
-      --trees-icon-vermilion: light-dark(#ff8c5b, #d5512f);
-      --trees-icon-orange: light-dark(#d47628, #ffa359);
-      --trees-icon-yellow: light-dark(#d5a910, #ffd452);
-      --trees-icon-green: light-dark(#199f43, #5ecc71);
-      --trees-icon-teal: light-dark(#17a5af, #64d1db);
-      --trees-icon-cyan: light-dark(#1ca1c7, #68cdf2);
-      --trees-icon-blue: light-dark(#1a85d4, #69b1ff);
-      --trees-icon-indigo: light-dark(#693acf, #9d6afb);
-      --trees-icon-purple: light-dark(#a631be, #d568ea);
-      --trees-icon-pink: light-dark(#d32a61, #ff678d);
-      --trees-icon-mauve: light-dark(#594c5b, #79697b);
-
-      --trees-file-icon-color-default: var(--trees-file-icon-color, var(--trees-icon-gray));
-      --trees-file-icon-color-astro: var(--trees-file-icon-color, var(--trees-icon-purple));
-      --trees-file-icon-color-babel: var(--trees-file-icon-color, var(--trees-icon-yellow));
-      --trees-file-icon-color-bash: var(--trees-file-icon-color, var(--trees-icon-green));
-      --trees-file-icon-color-biome: var(--trees-file-icon-color, var(--trees-icon-blue));
-      --trees-file-icon-color-bootstrap: var(--trees-file-icon-color, var(--trees-icon-indigo));
-      --trees-file-icon-color-browserslist: var(--trees-file-icon-color, var(--trees-icon-yellow));
-      --trees-file-icon-color-bun: var(--trees-file-icon-color, var(--trees-icon-mauve));
-      --trees-file-icon-color-c: var(--trees-file-icon-color, var(--trees-icon-blue));
-      --trees-file-icon-color-cpp: var(--trees-file-icon-color, var(--trees-icon-blue));
-      --trees-file-icon-color-claude: var(--trees-file-icon-color, var(--trees-icon-orange));
-      --trees-file-icon-color-css: var(--trees-file-icon-color, var(--trees-icon-indigo));
-      --trees-file-icon-color-database: var(--trees-file-icon-color, var(--trees-icon-purple));
-      --trees-file-icon-color-docker: var(--trees-file-icon-color, var(--trees-icon-blue));
-      --trees-file-icon-color-eslint: var(--trees-file-icon-color, var(--trees-icon-indigo));
-      --trees-file-icon-color-git: var(--trees-file-icon-vermilion, var(--trees-icon-vermilion));
-      --trees-file-icon-color-go: var(--trees-file-icon-color, var(--trees-icon-cyan));
-      --trees-file-icon-color-graphql: var(--trees-file-icon-color, var(--trees-icon-pink));
-      --trees-file-icon-color-html: var(--trees-file-icon-color, var(--trees-icon-orange));
-      --trees-file-icon-color-image: var(--trees-file-icon-color, var(--trees-icon-pink));
-      --trees-file-icon-color-javascript: var(--trees-file-icon-color, var(--trees-icon-yellow));
-      --trees-file-icon-color-json: var(--trees-file-icon-color, var(--trees-icon-orange));
-      --trees-file-icon-color-markdown: var(--trees-file-icon-color, var(--trees-icon-green));
-      --trees-file-icon-color-mcp: var(--trees-file-icon-color, var(--trees-icon-teal));
-      --trees-file-icon-color-npm: var(--trees-file-icon-color, var(--trees-icon-red));
-      --trees-file-icon-color-oxc: var(--trees-file-icon-cyan, var(--trees-icon-cyan));
-      --trees-file-icon-color-postcss: var(--trees-file-icon-color, var(--trees-icon-red));
-      --trees-file-icon-color-prettier: var(--trees-file-icon-color, var(--trees-icon-teal));
-      --trees-file-icon-color-python: var(--trees-file-icon-color, var(--trees-icon-blue));
-      --trees-file-icon-color-react: var(--trees-file-icon-color, var(--trees-icon-cyan));
-      --trees-file-icon-color-ruby: var(--trees-file-icon-color, var(--trees-icon-red));
-      --trees-file-icon-color-rust: var(--trees-file-icon-color, var(--trees-icon-orange));
-      --trees-file-icon-color-sass: var(--trees-file-icon-color, var(--trees-icon-pink));
-      --trees-file-icon-color-svg: var(--trees-file-icon-color, var(--trees-icon-orange));
-      --trees-file-icon-color-svelte: var(--trees-file-icon-color, var(--trees-icon-red));
-      --trees-file-icon-color-svgo: var(--trees-file-icon-color, var(--trees-icon-green));
-      --trees-file-icon-color-swift: var(--trees-file-icon-color, var(--trees-icon-orange));
-      --trees-file-icon-color-table: var(--trees-file-icon-color, var(--trees-icon-teal));
-      --trees-file-icon-color-text: var(--trees-file-icon-color, var(--trees-icon-gray));
-      --trees-file-icon-color-tailwind: var(--trees-file-icon-color, var(--trees-icon-cyan));
-      --trees-file-icon-color-terraform: var(--trees-file-icon-color, var(--trees-icon-indigo));
-      --trees-file-icon-color-typescript: var(--trees-file-icon-color, var(--trees-icon-blue));
-      --trees-file-icon-color-vite: var(--trees-file-icon-color, var(--trees-icon-purple));
-      --trees-file-icon-color-vscode: var(--trees-file-icon-color, var(--trees-icon-blue));
-      --trees-file-icon-color-vue: var(--trees-file-icon-color, var(--trees-icon-green));
-      --trees-file-icon-color-wasm: var(--trees-file-icon-color, var(--trees-icon-indigo));
-      --trees-file-icon-color-webpack: var(--trees-file-icon-color, var(--trees-icon-blue));
-      --trees-file-icon-color-yml: var(--trees-file-icon-color, var(--trees-icon-red));
-      --trees-file-icon-color-zig: var(--trees-file-icon-color, var(--trees-icon-orange));
-      --trees-file-icon-color-zip: var(--trees-file-icon-color, var(--trees-icon-orange));
-
       --trees-level-gap: var(--trees-level-gap-override, calc(8px * var(--trees-density)));
       --trees-item-padding-x: var(
         --trees-item-padding-x-override,
@@ -400,6 +275,13 @@
       --trees-context-menu-trigger-inline-offset: calc(
         var(--trees-padding-inline) + var(--trees-item-padding-x) - var(--trees-focus-ring-width)
       );
+
+      /* TreeRowLead's geometry: a level steps past the guide, the row gap and half the lane. */
+      --tree-lane: var(--trees-icon-width);
+      --tree-indent: calc(
+        var(--trees-level-gap) + var(--trees-item-row-gap) + var(--trees-icon-width) / 2 - 0.5px
+      );
+      --tree-guide-offset: calc(var(--trees-icon-width) / 2 - 0.5px);
 
       --trees-scrollbar-gutter: var(--trees-scrollbar-gutter-override, 6px);
       --trees-padding-inline: var(--trees-padding-inline-override, 16px);
@@ -689,7 +571,7 @@
         --truncate-marker-background-overlay-color: var(--trees-selected-bg);
         z-index: 3;
 
-        [data-item-section='icon'] {
+        [data-slot='tree-chevron'] {
           color: var(--trees-selected-fg);
         }
       }
@@ -744,182 +626,18 @@
       text-decoration: underline;
     }
 
-    /* Icon for each item */
-    [data-item-section='icon'] {
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--trees-fg-muted);
-      fill: currentColor;
+    /* The lead's lane: the file icon, or the chevron nudged onto the text's x-height. */
+    [data-slot='tree-row-lane'] > [data-file-icon] {
       width: var(--trees-icon-width);
+      height: var(--trees-icon-width);
     }
 
-    :where([data-item-section='icon'] > [data-icon-token]) {
+    [data-slot='tree-chevron'] {
       color: var(--trees-fg-muted);
-    }
+      transform: translate(0, var(--trees-icon-nudge));
 
-    [data-file-tree-colored-icons='true'] {
-      [data-icon-token='astro'] {
-        color: var(--trees-file-icon-color-astro);
-      }
-      [data-icon-token='babel'] {
-        color: var(--trees-file-icon-color-babel);
-      }
-      [data-icon-token='bash'] {
-        color: var(--trees-file-icon-color-bash);
-      }
-      [data-icon-token='biome'] {
-        color: var(--trees-file-icon-color-biome);
-      }
-      [data-icon-token='bootstrap'] {
-        color: var(--trees-file-icon-color-bootstrap);
-      }
-      [data-icon-token='browserslist'] {
-        color: var(--trees-file-icon-color-browserslist);
-      }
-      [data-icon-token='bun'] {
-        color: var(--trees-file-icon-color-bun);
-      }
-      [data-icon-token='c'] {
-        color: var(--trees-file-icon-color-c);
-      }
-      [data-icon-token='cpp'] {
-        color: var(--trees-file-icon-color-cpp);
-      }
-      [data-icon-token='claude'] {
-        color: var(--trees-file-icon-color-claude);
-      }
-      [data-icon-token='css'] {
-        color: var(--trees-file-icon-color-css);
-      }
-      [data-icon-token='database'] {
-        color: var(--trees-file-icon-color-database);
-      }
-      [data-icon-token='default'] {
-        color: var(--trees-file-icon-color-default);
-      }
-      [data-icon-token='docker'] {
-        color: var(--trees-file-icon-color-docker);
-      }
-      [data-icon-token='eslint'] {
-        color: var(--trees-file-icon-color-eslint);
-      }
-      [data-icon-token='git'] {
-        color: var(--trees-file-icon-color-git);
-      }
-      [data-icon-token='go'] {
-        color: var(--trees-file-icon-color-go);
-      }
-      [data-icon-token='graphql'] {
-        color: var(--trees-file-icon-color-graphql);
-      }
-      [data-icon-token='html'] {
-        color: var(--trees-file-icon-color-html);
-      }
-      [data-icon-token='image'] {
-        color: var(--trees-file-icon-color-image);
-      }
-      [data-icon-token='javascript'] {
-        color: var(--trees-file-icon-color-javascript);
-      }
-      [data-icon-token='json'] {
-        color: var(--trees-file-icon-color-json);
-      }
-      [data-icon-token='markdown'] {
-        color: var(--trees-file-icon-color-markdown);
-      }
-      [data-icon-token='mcp'] {
-        color: var(--trees-file-icon-color-mcp);
-      }
-      [data-icon-token='npm'] {
-        color: var(--trees-file-icon-color-npm);
-      }
-      [data-icon-token='oxc'] {
-        color: var(--trees-file-icon-color-oxc);
-      }
-      [data-icon-token='postcss'] {
-        color: var(--trees-file-icon-color-postcss);
-      }
-      [data-icon-token='prettier'] {
-        color: var(--trees-file-icon-color-prettier);
-      }
-      [data-icon-token='python'] {
-        color: var(--trees-file-icon-color-python);
-      }
-      [data-icon-token='react'] {
-        color: var(--trees-file-icon-color-react);
-      }
-      [data-icon-token='ruby'] {
-        color: var(--trees-file-icon-color-ruby);
-      }
-      [data-icon-token='rust'] {
-        color: var(--trees-file-icon-color-rust);
-      }
-      [data-icon-token='sass'] {
-        color: var(--trees-file-icon-color-sass);
-      }
-      [data-icon-token='svg'] {
-        color: var(--trees-file-icon-color-svg);
-      }
-      [data-icon-token='svelte'] {
-        color: var(--trees-file-icon-color-svelte);
-      }
-      [data-icon-token='svgo'] {
-        color: var(--trees-file-icon-color-svgo);
-      }
-      [data-icon-token='swift'] {
-        color: var(--trees-file-icon-color-swift);
-      }
-      [data-icon-token='table'] {
-        color: var(--trees-file-icon-color-table);
-      }
-      [data-icon-token='text'] {
-        color: var(--trees-file-icon-color-text);
-      }
-      [data-icon-token='tailwind'] {
-        color: var(--trees-file-icon-color-tailwind);
-      }
-      [data-icon-token='terraform'] {
-        color: var(--trees-file-icon-color-terraform);
-      }
-      [data-icon-token='typescript'] {
-        color: var(--trees-file-icon-color-typescript);
-      }
-      [data-icon-token='vite'] {
-        color: var(--trees-file-icon-color-vite);
-      }
-      [data-icon-token='vscode'] {
-        color: var(--trees-file-icon-color-vscode);
-      }
-      [data-icon-token='vue'] {
-        color: var(--trees-file-icon-color-vue);
-      }
-      [data-icon-token='wasm'] {
-        color: var(--trees-file-icon-color-wasm);
-      }
-      [data-icon-token='webpack'] {
-        color: var(--trees-file-icon-color-webpack);
-      }
-      [data-icon-token='yml'] {
-        color: var(--trees-file-icon-color-yml);
-      }
-      [data-icon-token='zig'] {
-        color: var(--trees-file-icon-color-zig);
-      }
-      [data-icon-token='zip'] {
-        color: var(--trees-file-icon-color-zip);
-      }
-    }
-
-    /* Chevron rotation and visual alignment */
-    /* Chevron pointing down */
-    [data-icon-name='file-tree-icon-chevron'] {
-      &[data-align-capitals='false'] {
-        transform: translate(0, var(--trees-icon-nudge));
-      }
-      &[data-align-capitals='true'] {
-        transform: translate(0, 0);
+      &[data-expanded='false'] {
+        transform: translate(calc(var(--trees-icon-nudge) / -2), calc(var(--trees-icon-nudge) / 2));
       }
     }
 
@@ -1026,98 +744,6 @@
       display: none;
     }
 
-    /* Chevron pointing right */
-    [aria-expanded='false'][data-item-type='folder']
-      > [data-item-section='icon']
-      > [data-icon-name='file-tree-icon-chevron'] {
-      &[data-align-capitals='true'] {
-        transform: rotate(-90deg)
-          translate(calc(var(--trees-icon-nudge) / 2), calc(var(--trees-icon-nudge) / 2));
-      }
-      &[data-align-capitals='false'] {
-        transform: rotate(-90deg)
-          translate(calc(var(--trees-icon-nudge) / 2 * -1), calc(var(--trees-icon-nudge) / 2));
-      }
-    }
-
-    /* LIST IDENTATION */
-    /* Spacing container */
-    [data-item-section='spacing'] {
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      justify-content: center;
-      height: var(--trees-row-height);
-      padding-left: calc(calc(var(--trees-icon-width) / 2) - 0.5px);
-
-      &:empty {
-        padding-left: 0;
-      }
-    }
-
-    /* Spacing per level */
-    [data-item-section='spacing-item'] {
-      --trees-indent-guide-current-bg: var(--trees-indent-guide-bg);
-
-      transform: translateX(-0.25px);
-      display: inline-block;
-      border-left: 1px solid var(--trees-indent-guide-current-bg);
-      height: 100%;
-      margin-right: calc(var(--trees-level-gap) - 1px);
-      opacity: var(--trees-indent-guide-opacity);
-      transition: opacity 150ms ease;
-
-      & + & {
-        margin-left: calc(var(--trees-item-row-gap) + calc(var(--trees-icon-width) / 2) - 0.5px);
-      }
-    }
-
-    [data-item-section='spacing-item']:nth-child(6n + 1) {
-      --trees-indent-guide-current-bg: var(
-        --trees-indent-guide-bg-0-override,
-        var(--trees-indent-guide-bg)
-      );
-    }
-
-    [data-item-section='spacing-item']:nth-child(6n + 2) {
-      --trees-indent-guide-current-bg: var(
-        --trees-indent-guide-bg-1-override,
-        var(--trees-indent-guide-bg)
-      );
-    }
-
-    [data-item-section='spacing-item']:nth-child(6n + 3) {
-      --trees-indent-guide-current-bg: var(
-        --trees-indent-guide-bg-2-override,
-        var(--trees-indent-guide-bg)
-      );
-    }
-
-    [data-item-section='spacing-item']:nth-child(6n + 4) {
-      --trees-indent-guide-current-bg: var(
-        --trees-indent-guide-bg-3-override,
-        var(--trees-indent-guide-bg)
-      );
-    }
-
-    [data-item-section='spacing-item']:nth-child(6n + 5) {
-      --trees-indent-guide-current-bg: var(
-        --trees-indent-guide-bg-4-override,
-        var(--trees-indent-guide-bg)
-      );
-    }
-
-    [data-item-section='spacing-item']:nth-child(6n) {
-      --trees-indent-guide-current-bg: var(
-        --trees-indent-guide-bg-5-override,
-        var(--trees-indent-guide-bg)
-      );
-    }
-
-    &:hover [data-item-section='spacing-item'] {
-      opacity: var(--trees-indent-guide-hover-opacity);
-    }
-
     /* Git status indicator */
 
     /* This is a folder that contains a git change */
@@ -1129,11 +755,6 @@
 
     /* These are files that have a git change */
     [data-item-git-status] {
-      &
-        > :where([data-item-section='icon'])
-        > :where(:not([data-icon-name='file-tree-icon-chevron'])) {
-        color: var(--trees-item-git-status-color);
-      }
       & > [data-item-section='content'] {
         color: var(--trees-item-git-status-color);
       }
@@ -1154,7 +775,7 @@
     [data-item-git-status='ignored'] {
       --trees-item-git-status-color: var(--trees-git-ignored-color);
 
-      & > [data-item-section='icon'] {
+      & [data-slot='tree-row-lane'] {
         opacity: 0.5;
       }
     }
@@ -1180,18 +801,6 @@
     /* Drag and drop */
     [data-item-dragging='true'] {
       opacity: 0.5;
-    }
-
-    /* Lock icon for locked paths (sibling of content) */
-    [data-item-section='lock'] {
-      flex: 0 0 auto;
-      margin-left: auto;
-      display: flex;
-      align-items: center;
-      color: var(--trees-fg-muted);
-    }
-    [data-item-section='lock'] svg {
-      display: block;
     }
 
     [data-type='context-menu-wash'] {

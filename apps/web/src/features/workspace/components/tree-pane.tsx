@@ -44,7 +44,6 @@ import { preparedTreeInputForPaths } from '@/features/workspace/state/prepared-t
 import { treeCommandFocusCandidate } from '@/features/workspace/utils/tree-commands'
 import { treeGitStatusPatch } from '@/features/workspace/utils/tree-git-status-patch'
 import { reportError, toClientError } from '@/lib/client-error-taxonomy'
-import { fileTreeIconsForPaths } from '@/lib/file-icons'
 import { TreeRowMenu } from '@/features/workspace/components/row-menu'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 import type { LoadState } from '@/lib/load-state'
@@ -159,7 +158,6 @@ function ReadyTreePane({
   }, [gitStatus])
   const previousGitStatusRef = useRef(initialGitStatus)
   const [initialPreparedInput] = useState(() => preparedTreeInputForPaths(model.paths))
-  const icons = fileTreeIconsForPaths(model.paths)
   const fsActions = useFsActions({ modelRef, rootPath, treeRef })
   const actionsRef = useRef(fsActions.actions)
   const completeRenameRef = useRef(fsActions.completeRename)
@@ -188,7 +186,6 @@ function ReadyTreePane({
     itemHeight: rowHeight,
     flattenEmptyDirectories: true,
     gitStatus: initialGitStatus,
-    icons,
     initialExpansion: 'closed',
     initialExpandedPaths: restored?.record.expanded,
     initialScrollTop: restored?.record.scrollTop,
@@ -584,7 +581,6 @@ const treeStyle = {
   '--trees-selected-bg-override': 'var(--row-selected)',
   '--trees-item-margin-x-override': '0px',
   '--trees-border-color-override': 'var(--border)',
-  '--trees-indent-guide-bg-override': 'var(--border)',
   '--trees-fg-override': 'var(--foreground)',
   // The tree defines its own font variables inside the shadow root, so host
   // inheritance alone cannot reach the rows.

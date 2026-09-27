@@ -16,6 +16,7 @@
     "./patterns/use-tail-follow": "./src/patterns/use-tail-follow.ts",
     "./patterns/list-row": "./src/patterns/list-row.tsx",
     "./patterns/list-row-classes": "./src/patterns/list-row-classes.ts",
+    "./patterns/tree-row-lead": "./src/patterns/tree-row-lead.tsx",
     "./patterns/listbox-keys": "./src/patterns/listbox-keys.ts",
     "./patterns/use-listbox": "./src/patterns/use-listbox.ts",
     "./patterns/virtual-list": "./src/patterns/virtual-list.tsx",
@@ -25,13 +26,15 @@
     "./patterns/tooltip-layer": "./src/patterns/tooltip-layer.tsx",
     "./patterns/tooltip-parts": "./src/patterns/tooltip-parts.ts",
     "./patterns/tooltip-target": "./src/patterns/tooltip-target.ts",
+    "./patterns/popup-trigger": "./src/patterns/popup-trigger.ts",
     "./patterns/use-tooltip-layer": "./src/patterns/use-tooltip-layer.ts",
     "./patterns/tool-pane": "./src/patterns/tool-pane.tsx",
     "./patterns/tool-pane-header": "./src/patterns/tool-pane-header.tsx",
     "./patterns/use-row-height": "./src/patterns/use-row-height.ts",
     "./patterns/bar-tabs": "./src/patterns/bar-tabs.ts",
     "./patterns/panel-surface": "./src/patterns/panel-surface.ts",
-    "./patterns/width-handle": "./src/patterns/width-handle.tsx"
+    "./patterns/width-handle": "./src/patterns/width-handle.tsx",
+    "./patterns/sheet": "./src/patterns/sheet.ts"
   },
   "scripts": {
     "lint": "oxlint .",

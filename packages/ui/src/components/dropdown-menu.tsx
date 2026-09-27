@@ -1,14 +1,31 @@
 import { playControlFeedback } from '@workspace/ui/patterns/feedback-layer'
 ;('use client')
 
-import * as React from 'react'
 import { Menu as MenuPrimitive } from '@base-ui/react/menu'
 
 import { cn } from '@workspace/ui/lib/utils'
-import { CaretRightIcon, CheckIcon } from '@phosphor-icons/react'
+import {
+  SHEET_BACKDROP_CLASS,
+  SHEET_FRAME_CLASS,
+  SHEET_POSITIONER_CLASS,
+  SHEET_SURFACE_CLASS,
+  playSheetOpen,
+  usePresentation,
+} from '@workspace/ui/patterns/sheet'
+import { CheckIcon } from '@phosphor-icons/react'
 
-function DropdownMenu({ ...props }: MenuPrimitive.Root.Props) {
-  return <MenuPrimitive.Root data-slot='dropdown-menu' {...props} />
+function DropdownMenu({ onOpenChange, ...props }: MenuPrimitive.Root.Props) {
+  const presentation = usePresentation()
+  return (
+    <MenuPrimitive.Root
+      data-slot='dropdown-menu'
+      {...props}
+      onOpenChange={(open, details) => {
+        onOpenChange?.(open, details)
+        if (!details.isCanceled) playSheetOpen(presentation, open, details.event)
+      }}
+    />
+  )
 }
 
 function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props) {
@@ -32,10 +49,15 @@ function DropdownMenuContent({
     MenuPrimitive.Positioner.Props,
     'align' | 'alignOffset' | 'anchor' | 'side' | 'sideOffset'
   >) {
+  const presentation = usePresentation()
+  const sheet = presentation === 'sheet'
   return (
     <MenuPrimitive.Portal>
+      {sheet ? (
+        <MenuPrimitive.Backdrop data-slot='sheet-backdrop' className={SHEET_BACKDROP_CLASS} />
+      ) : null}
       <MenuPrimitive.Positioner
-        className='isolate z-50 outline-none'
+        className={sheet ? SHEET_POSITIONER_CLASS : 'isolate z-50 outline-none'}
         align={align}
         alignOffset={alignOffset}
         anchor={anchor}
@@ -44,10 +66,15 @@ function DropdownMenuContent({
       >
         <MenuPrimitive.Popup
           data-slot='dropdown-menu-content'
-          className={cn(
-            'z-50 overscroll-contain max-h-(--available-height) w-(--anchor-width) min-w-32 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg text-popover-foreground shadow-md ring-1 ring-foreground/10 bg-popover-solid ease-out-strong data-open:animation-duration-(--duration-enter) data-closed:animation-duration-(--duration-exit) outline-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:overflow-hidden data-closed:fade-out-0 data-closed:zoom-out-95',
-            className,
-          )}
+          data-presentation={presentation}
+          className={
+            sheet
+              ? cn(SHEET_SURFACE_CLASS, className, SHEET_FRAME_CLASS)
+              : cn(
+                  'z-50 overscroll-contain max-h-(--available-height) w-(--anchor-width) min-w-32 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg text-popover-foreground shadow-md ring-1 ring-foreground/10 bg-popover-solid ease-out-strong data-open:animation-duration-(--duration-enter) data-closed:animation-duration-(--duration-exit) outline-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:overflow-hidden data-closed:fade-out-0 data-closed:zoom-out-95',
+                  className,
+                )
+          }
           {...props}
         />
       </MenuPrimitive.Positioner>
@@ -98,58 +125,6 @@ function DropdownMenuItem({
         "group/dropdown-menu-item pointer-coarse:min-h-10 data-[selected=true]:bg-row-selected data-[selected=true]:text-foreground relative flex cursor-default items-center gap-2 rounded-md px-2 py-(--density-menu-item-padding-y) text-xs outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-(--icon-size) data-[variant=destructive]:*:[svg]:text-destructive",
         className,
       )}
-      {...props}
-    />
-  )
-}
-
-function DropdownMenuSub({ ...props }: MenuPrimitive.SubmenuRoot.Props) {
-  return <MenuPrimitive.SubmenuRoot data-slot='dropdown-menu-sub' {...props} />
-}
-
-function DropdownMenuSubTrigger({
-  className,
-  inset,
-  children,
-  ...props
-}: MenuPrimitive.SubmenuTrigger.Props & {
-  inset?: boolean
-}) {
-  return (
-    <MenuPrimitive.SubmenuTrigger
-      data-slot='dropdown-menu-sub-trigger'
-      data-inset={inset}
-      className={cn(
-        "flex cursor-default items-center gap-2 rounded-md px-2 py-(--density-menu-item-padding-y) text-xs outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-popup-open:bg-accent data-popup-open:text-accent-foreground data-open:bg-accent data-open:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-(--icon-size)",
-        className,
-      )}
-      {...props}
-    >
-      {children}
-      <CaretRightIcon className='ml-auto' />
-    </MenuPrimitive.SubmenuTrigger>
-  )
-}
-
-function DropdownMenuSubContent({
-  align = 'start',
-  alignOffset = -3,
-  side = 'right',
-  sideOffset = 0,
-  className,
-  ...props
-}: React.ComponentProps<typeof DropdownMenuContent>) {
-  return (
-    <DropdownMenuContent
-      data-slot='dropdown-menu-sub-content'
-      className={cn(
-        'w-auto min-w-[96px] text-popover-foreground ring-1 ring-foreground/10 bg-popover-solid ease-out-strong data-open:animation-duration-(--duration-enter) data-closed:animation-duration-(--duration-exit) data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
-        className,
-      )}
-      align={align}
-      alignOffset={alignOffset}
-      side={side}
-      sideOffset={sideOffset}
       {...props}
     />
   )
@@ -290,7 +265,4 @@ export {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent,
 }

@@ -2,9 +2,12 @@ import { slashPathsOverlap } from '@workspace/utils/slash-paths'
 import {
   themeCustomizeOperationSchema,
   themeResetOperationSchema,
+  themeUncustomizeOperationSchema,
   themeCustomizationsSchema,
+  withoutThemePart,
   type ThemeCustomizeOperation,
   type ThemeResetOperation,
+  type ThemeUncustomizeOperation,
 } from '../themes/bundle'
 import * as v from 'valibot'
 
@@ -166,6 +169,7 @@ export type SetProjectOverrideOperation = {
 export type SettingsOperation =
   | ThemeCustomizeOperation
   | ThemeResetOperation
+  | ThemeUncustomizeOperation
   | ScalarSettingOperation
   | ResetSettingsOperation
   | SetKeybindingOperation
@@ -279,6 +283,7 @@ export const nonSecretProviderSeedSchema: v.GenericSchema<unknown, NonSecretProv
 export const settingsOperationSchemasByKind = {
   'theme.customize': themeCustomizeOperationSchema,
   'theme.reset': themeResetOperationSchema,
+  'theme.uncustomize': themeUncustomizeOperationSchema,
   reset: v.strictObject({ kind: v.literal('reset'), keys: uniqueSettingIdsSchema }),
   'machine.set': v.strictObject({
     kind: v.literal('machine.set'),
@@ -411,6 +416,10 @@ export function settingsOperationResourceKeys(
 ): readonly SettingsMutationResourceKey[] {
   if (operation.kind === 'theme.reset')
     return [memberResourceKey('workbench.theme.customizations', operation.id)]
+  if (operation.kind === 'theme.uncustomize') {
+    const base = memberResourceKey('workbench.theme.customizations', operation.id)
+    return [`${base}/${operation.mode}/${operation.part.replace('.', '/')}`]
+  }
   if (operation.kind === 'theme.customize') {
     const base: SettingsMutationResourceKey = `${memberResourceKey('workbench.theme.customizations', operation.id)}/${operation.mode}`
     return Object.keys(operation.patch).flatMap((key) =>
@@ -462,7 +471,11 @@ function applySettingsOperation(
   raw: Readonly<Record<string, unknown>>,
   operation: SettingsOperation,
 ): Readonly<Record<string, unknown>> {
-  if (operation.kind === 'theme.customize' || operation.kind === 'theme.reset')
+  if (
+    operation.kind === 'theme.customize' ||
+    operation.kind === 'theme.reset' ||
+    operation.kind === 'theme.uncustomize'
+  )
     return applyThemeOperation(raw, operation)
   if (operation.kind === 'set') return replaceSetting(raw, operation.key, operation.value)
   if (operation.kind === 'reset') return resetSettings(raw, operation.keys)
@@ -684,7 +697,11 @@ function appendTouchedSettingIds(target: SettingId[], operation: SettingsOperati
 }
 
 function touchedSettingIds(operation: SettingsOperation): readonly SettingId[] {
-  if (operation.kind === 'theme.customize' || operation.kind === 'theme.reset')
+  if (
+    operation.kind === 'theme.customize' ||
+    operation.kind === 'theme.reset' ||
+    operation.kind === 'theme.uncustomize'
+  )
     return ['workbench.theme.customizations']
   if (operation.kind === 'set') return [operation.key]
   if (operation.kind === 'reset') return operation.keys
@@ -746,10 +763,20 @@ function modelResourceId(ref: ModelRef): string {
 
 function applyThemeOperation(
   raw: Readonly<Record<string, unknown>>,
-  operation: ThemeCustomizeOperation | ThemeResetOperation,
+  operation: ThemeCustomizeOperation | ThemeResetOperation | ThemeUncustomizeOperation,
 ) {
   const parsed = v.safeParse(themeCustomizationsSchema, raw['workbench.theme.customizations'] ?? {})
   const customizations = parsed.success ? { ...parsed.output } : {}
+  if (operation.kind === 'theme.uncustomize') {
+    const theme = withoutThemePart(
+      customizations[operation.id] ?? {},
+      operation.mode,
+      operation.part,
+    )
+    delete customizations[operation.id]
+    if (Object.keys(theme).length > 0) customizations[operation.id] = theme
+    return replaceSetting(raw, 'workbench.theme.customizations', customizations)
+  }
   if (operation.kind === 'theme.reset') {
     delete customizations[operation.id]
     if (operation.to && Object.keys(operation.to).length > 0)

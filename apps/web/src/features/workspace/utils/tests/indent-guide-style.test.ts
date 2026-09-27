@@ -15,7 +15,7 @@ test('uses the editor scope-line palette and weights exactly', () => {
   })
 
   expect(variables).toMatchObject({
-    '--trees-indent-guide-bg-0-override': 'color-mix(in srgb, #111111 34%, transparent)',
-    '--trees-indent-guide-bg-5-override': 'color-mix(in srgb, #666666 30%, transparent)',
+    '--tree-guide-1': 'color-mix(in srgb, #111111 34%, transparent)',
+    '--tree-guide-6': 'color-mix(in srgb, #666666 30%, transparent)',
   })
 })

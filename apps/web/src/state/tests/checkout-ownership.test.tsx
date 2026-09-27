@@ -7,7 +7,7 @@ import {
   registerFederatedProject,
 } from '../../../test/factories/federation'
 import { readWorkspaceCache, workspaceSliceStorageKey } from '@/features/workspace/state/cache'
-import { subscribeWorkspaceCachePersistence } from '@/features/workspace/hooks/use-cache-persistence'
+import { subscribeWorkspaceCachePersistence } from '@/features/workspace/state/cache-persistence'
 
 test('confirmed worktrees retain Git drafts across A/B/A and promote an open raw folder without replacing its store', async ({
   server,

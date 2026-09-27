@@ -1,5 +1,5 @@
 import { timingSafeEqual } from 'node:crypto'
-import { chmodSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import net from 'node:net'
 import { parseArgs } from 'node:util'
 import type { PtyExit } from '@workspace/pty'
@@ -392,6 +392,8 @@ function hostArguments() {
 async function main() {
   const options = hostArguments()
   if (!options) process.exit(2)
+  // Launched for a home removed while this process started (a racing launcher's loser): nobody to serve.
+  if (!existsSync(options.stateRoot)) process.exit(0)
   process.title = 'platform-pty-host'
   const paths = hostPaths(options.stateRoot)
   const host = new TerminalHost(paths, ensureToken(paths), options.idleMs)

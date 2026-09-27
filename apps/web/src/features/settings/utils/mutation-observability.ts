@@ -32,7 +32,11 @@ function appendOperationMetadata(
   settingIds: SettingId[],
   affectedIds: string[],
 ) {
-  if (operation.kind === 'theme.customize' || operation.kind === 'theme.reset') {
+  if (
+    operation.kind === 'theme.customize' ||
+    operation.kind === 'theme.reset' ||
+    operation.kind === 'theme.uncustomize'
+  ) {
     appendUnique(affectedIds, operation.id)
     return appendUnique(settingIds, 'workbench.theme.customizations')
   }

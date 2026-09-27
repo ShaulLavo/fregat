@@ -1,5 +1,3 @@
-import type { FileTreeIconConfig, RemappedIcon } from '@workspace/tree'
-
 import {
   FILE_ICON_EXTENSIONS,
   FILE_ICON_FILE_NAMES,
@@ -7,7 +5,6 @@ import {
   type FileIconRuleName,
 } from '@/lib/file-icon-rules.generated'
 import { VSCODE_ICON_GLYPHS, type FileIconGlyph } from '@/lib/vscode-icon-glyphs'
-import { lastPathSegment } from '@/lib/path-formatters'
 
 export type FileIconEntry = {
   name: string
@@ -15,11 +12,10 @@ export type FileIconEntry = {
 }
 
 export type ResolvedFileIcon = {
-  name: FileIconRuleName
+  readonly name: FileIconRuleName
 }
 
-const TREE_ICON_SYMBOL_PREFIX = 'app-vscode-icon-'
-const DEFAULT_FILE_ICON_TOKEN = 'default'
+const SYMBOL_PREFIX = 'app-vscode-icon-'
 const GLYPH_NAMES = Object.keys(VSCODE_ICON_GLYPHS) as FileIconGlyph[]
 
 const MIME_BY_EXTENSION = new Map<string, string>([
@@ -77,21 +73,24 @@ export function iconForEntry(
   return iconResult(iconNameForFile(entry.name))
 }
 
-export function fileTreeIconsForPaths(paths: readonly string[]): FileTreeIconConfig {
-  return {
-    ...BASE_FILE_TREE_ICONS,
-    byFileName: {
-      ...BASE_FILE_TREE_ICONS.byFileName,
-      ...fileTreeFileNameIconsForPaths(paths),
-    },
-  }
-}
-
 /** The glyph and the literal hue classes a resolved icon draws with. */
 export function fileIconRule(icon: ResolvedFileIcon) {
   return Object.hasOwn(FILE_ICON_RULES, icon.name)
     ? FILE_ICON_RULES[icon.name]
     : FILE_ICON_RULES['file-duo']
+}
+
+/** The `<use>` reference for a glyph in the document's `FileIconSprite`. */
+export function fileIconSymbolHref(glyph: FileIconGlyph) {
+  return `#${SYMBOL_PREFIX}${glyph}`
+}
+
+/** Every glyph as a `<symbol>`, for the one sprite the document mounts. */
+export function fileIconSpriteSymbols() {
+  return GLYPH_NAMES.map((name) => {
+    const glyph = VSCODE_ICON_GLYPHS[name]
+    return `<symbol id="${SYMBOL_PREFIX}${name}" viewBox="${glyph.viewBox}">${glyph.paths}</symbol>`
+  }).join('')
 }
 
 export function fileMatchesAccept(name: string, accept?: readonly string[]) {
@@ -143,145 +142,16 @@ function mimeMatches(name: string, token: string) {
   return mime === token
 }
 
+// One frozen object per rule, so a row that re-renders passes its icon the same prop.
+const RESOLVED_ICONS = new Map<FileIconRuleName, ResolvedFileIcon>()
+
 function iconResult(name: FileIconRuleName): ResolvedFileIcon {
-  return {
-    name,
-  }
-}
+  const cached = RESOLVED_ICONS.get(name)
+  if (cached) return cached
 
-const ICON_TOKENS: Partial<Record<FileIconGlyph, string>> = {
-  astro: 'astro',
-  babel: 'babel',
-  'bash-duo': 'bash',
-  bash: 'bash',
-  biome: 'biome',
-  'bootstrap-duo': 'bootstrap',
-  bootstrap: 'bootstrap',
-  braces: 'json',
-  'browserslist-duo': 'browserslist',
-  'bun-duo': 'bun',
-  bun: 'bun',
-  claude: 'claude',
-  css: 'css',
-  docker: 'docker',
-  eslint: 'eslint',
-  'file-table-duo': 'table',
-  'file-table': 'table',
-  'file-text-duo': 'text',
-  'file-text': 'text',
-  'file-zip-duo': 'zip',
-  'file-zip': 'zip',
-  font: 'default',
-  git: 'git',
-  graphql: 'graphql',
-  html: 'html',
-  'image-duo': 'image',
-  image: 'image',
-  javascript: 'javascript',
-  'lang-css-duo': 'css',
-  'lang-css': 'css',
-  'lang-go': 'go',
-  'lang-html-duo': 'html',
-  'lang-html': 'html',
-  'lang-html5-duo': 'html',
-  'lang-html5': 'html',
-  'lang-javascript-duo': 'javascript',
-  'lang-javascript': 'javascript',
-  'lang-markdown': 'markdown',
-  'lang-python': 'python',
-  'lang-ruby': 'ruby',
-  'lang-rust': 'rust',
-  'lang-swift': 'swift',
-  'lang-typescript-duo': 'typescript',
-  'lang-typescript': 'typescript',
-  markdown: 'markdown',
-  mcp: 'mcp',
-  nextjs: 'default',
-  'npm-duo': 'npm',
-  npm: 'npm',
-  'oxc-fill': 'oxc',
-  oxc: 'oxc',
-  postcss: 'postcss',
-  prettier: 'prettier',
-  react: 'react',
-  rss: 'text',
-  sass: 'sass',
-  stylelint: 'default',
-  svelte: 'svelte',
-  'svg-2': 'svg',
-  svg: 'svg',
-  svgo: 'svgo',
-  tailwind: 'tailwind',
-  terraform: 'terraform',
-  typescript: 'typescript',
-  vite: 'vite',
-  vscode: 'vscode',
-  vue: 'vue',
-  'wasm-duo': 'wasm',
-  wasm: 'wasm',
-  webpack: 'webpack',
-  yml: 'yml',
-  zig: 'zig',
-}
-
-const BASE_FILE_TREE_ICONS = {
-  set: 'complete',
-  colored: true,
-  spriteSheet: vscodeIconSpriteSheet(),
-  remap: {
-    'file-tree-icon-file': treeIconReference('file-duo'),
-  },
-  byFileName: fileTreeFileNameIconRules(),
-  byFileExtension: fileTreeExtensionIconRules(),
-} satisfies FileTreeIconConfig
-
-function fileTreeFileNameIconsForPaths(paths: readonly string[]) {
-  const icons: Record<string, RemappedIcon> = Object.create(null)
-
-  for (const path of paths) {
-    if (path.endsWith('/')) continue
-
-    const name = lastPathSegment(path)
-    icons[normalizeName(name)] = treeIconReference(iconNameForFile(name))
-  }
-
-  return icons
-}
-
-function fileTreeFileNameIconRules() {
-  const icons: Record<string, RemappedIcon> = Object.create(null)
-  for (const [name, rule] of Object.entries(FILE_ICON_FILE_NAMES)) {
-    icons[name] = treeIconReference(rule)
-  }
-  return icons
-}
-
-function fileTreeExtensionIconRules() {
-  const icons: Record<string, RemappedIcon> = Object.create(null)
-  for (const [extension, rule] of Object.entries(FILE_ICON_EXTENSIONS)) {
-    icons[extension.replace(/^\./u, '')] = treeIconReference(rule)
-  }
-  return icons
-}
-
-function vscodeIconSpriteSheet() {
-  const symbols = GLYPH_NAMES.map(vscodeIconSymbol).join('')
-
-  return `<svg data-vscode-icon-sprite aria-hidden="true" width="0" height="0">${symbols}</svg>`
-}
-
-function vscodeIconSymbol(name: FileIconGlyph) {
-  const glyph = VSCODE_ICON_GLYPHS[name]
-  return `<symbol id="${TREE_ICON_SYMBOL_PREFIX}${name}" viewBox="${glyph.viewBox}">${glyph.paths}</symbol>`
-}
-
-/** The tree draws each rule's glyph with the tree's own colour token for it. */
-function treeIconReference(rule: FileIconRuleName): RemappedIcon {
-  const glyph = fileIconRule({ name: rule }).glyph
-  return {
-    name: `${TREE_ICON_SYMBOL_PREFIX}${glyph}`,
-    token: ICON_TOKENS[glyph] ?? DEFAULT_FILE_ICON_TOKEN,
-  } as RemappedIcon
+  const icon = Object.freeze({ name })
+  RESOLVED_ICONS.set(name, icon)
+  return icon
 }
 
 function extensionCandidates(name: string) {

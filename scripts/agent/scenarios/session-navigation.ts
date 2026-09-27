@@ -3,6 +3,7 @@ import type { Scenario } from './index'
 import { holdToConfirm, selectors } from '../selectors'
 import { createGitFixture, fixtureGit, releaseFixture } from '../fixture-workspace'
 import { dispatch, openChat, readShell } from './chat-verification'
+import { isDraftChatUrl } from './draft-sessions'
 import { registerFixtureProject } from './native-provider-verification'
 
 export const sessionNavigation: Scenario = {
@@ -46,7 +47,7 @@ export const sessionNavigation: Scenario = {
       await selectors.sessionByTitle(page, titles[1]!).click()
       await selectors.sessionByTitle(page, titles[1]!).click({ button: 'right' })
       await selectors.archiveSession(page).click()
-      await page.waitForURL((url) => decodeURIComponent(url.href).includes('t/new'))
+      await page.waitForURL(isDraftChatUrl)
       await step('current-archive-opens-owner-draft')
       await selectors.sessionByTitle(page, titles[0]!).click()
       await page.waitForURL((url) => decodeURIComponent(url.href).includes(ids[0]!))

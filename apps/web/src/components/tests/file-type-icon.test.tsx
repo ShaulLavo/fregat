@@ -1,16 +1,17 @@
+import { FileIconSprite } from '@/components/file-icon-sprite'
 import { FileTypeIcon } from '@/components/file-type-icon'
-import { fileTreeIconsForPaths, iconForEntry } from '@/lib/file-icons'
+import { fileIconSpriteSymbols, iconForEntry } from '@/lib/file-icons'
 import { expect, test } from '../../../test/fixtures'
 import { renderWithProviders } from '../../../test/render'
 
 test.each(['index.html', '.prettierrc', 'next.config.js', 'component.tsx', 'unknown.file'])(
-  'inline icons preserve the tree artwork and viewBox for %s',
+  'inline icons draw the sprite symbol’s artwork and viewBox for %s',
   (name) => {
     const icon = iconForEntry({ name, type: 'file' })
     const { container } = renderWithProviders(<FileTypeIcon icon={icon} />)
     const svg = container.querySelector('svg')!
     const sprite = document.createElement('div')
-    sprite.innerHTML = fileTreeIconsForPaths([name]).spriteSheet ?? ''
+    sprite.innerHTML = `<svg>${fileIconSpriteSymbols()}</svg>`
     const symbol = sprite.querySelector(`#app-vscode-icon-${svg.getAttribute('data-file-icon')}`)!
 
     expect(svg.getAttribute('viewBox')).toBe(symbol.getAttribute('viewBox'))
@@ -22,11 +23,19 @@ test.each(['index.html', '.prettierrc', 'next.config.js', 'component.tsx', 'unkn
   },
 )
 
-test('tree file-name icons key on the last path segment', () => {
-  const byFileName = fileTreeIconsForPaths(['src/Unlisted.file']).byFileName
+test('sprite icons use the symbol the document sprite defines, in their hue', () => {
+  const { container } = renderWithProviders(
+    <>
+      <FileIconSprite />
+      <FileTypeIcon icon={iconForEntry({ name: 'main.c', type: 'file' })} sprite />
+    </>,
+  )
+  const svg = container.querySelector('svg[data-file-icon]')!
+  const href = svg.querySelector('use')!.getAttribute('href')!
 
-  expect(Object.keys(byFileName ?? {})).toContain('unlisted.file')
-  expect(Object.keys(byFileName ?? {})).not.toContain('src/unlisted.file')
+  expect(container.querySelector(`[data-file-icon-sprite] symbol${href}`)).not.toBeNull()
+  expect(svg.getAttribute('class')).toContain('text-file-icon-blue')
+  expect(svg.querySelector('path')).toBeNull()
 })
 
 test('repeated gradient icons reference their own definitions', () => {

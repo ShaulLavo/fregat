@@ -1,10 +1,11 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import net from 'node:net'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 
 import { createTestTerminalHost } from '../testing'
-import { RING_BYTES } from '../protocol'
+import { ensureSocketDirectory, ensureToken, hostPaths, RING_BYTES } from '../protocol'
 
 const hosts: Awaited<ReturnType<typeof createTestTerminalHost>>[] = []
 
@@ -182,4 +183,26 @@ it('reports a shell as exited when its host dies and a fresh host no longer list
 
   await expect(pty.exited).resolves.toEqual({ exitCode: 1, signal: null })
   expect(host.hosts).toHaveLength(2)
+})
+
+// Two launchers can race for one home; the loser may still be starting when the home is removed.
+it('a host launched for a removed state root exits without bringing it back', async () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'platform-pty-removed-'))
+  const stateRoot = path.join(root, 'home')
+  try {
+    const { XDG_RUNTIME_DIR: _runtime, ...env } = process.env
+    const host = Bun.spawn(
+      [process.execPath, path.join(import.meta.dirname, '../main.ts'), `--state-root=${stateRoot}`],
+      { env, stdio: ['ignore', 'ignore', 'inherit'] },
+    )
+    expect(await host.exited).toBe(0)
+    expect(existsSync(stateRoot)).toBe(false)
+
+    const paths = hostPaths(stateRoot, env)
+    expect(() => ensureToken(paths)).toThrow()
+    expect(() => ensureSocketDirectory(paths)).toThrow()
+    expect(existsSync(stateRoot)).toBe(false)
+  } finally {
+    rmSync(root, { force: true, recursive: true })
+  }
 })

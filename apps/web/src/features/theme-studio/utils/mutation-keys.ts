@@ -11,9 +11,3 @@ export const bundleMutationKeys = {
   create: ['themes', 'bundles', 'create'],
   import: ['themes', 'bundles', 'import'],
 } as const
-
-export const wallpaperMutationKeys = {
-  upload: ['themes', 'wallpapers', 'upload'],
-  remove: ['themes', 'wallpapers', 'remove'],
-  install: ['themes', 'wallpapers', 'install'],
-} as const

@@ -1,6 +1,7 @@
 import { matchingSettingIds } from '@workspace/client-core/settings/search'
 import { useKeyboard, useTerminalDimensions } from '@opentui/react'
 import type { SettingsOwner } from '@workspace/client-core/settings/owner'
+import { resetSettingOperations } from '@workspace/client-core/settings/operations'
 import {
   settingRowIds,
   errorStringField,
@@ -204,7 +205,7 @@ export function SettingsBrowser({
         if (selectedId)
           owner.submit(
             target,
-            [{ kind: 'reset', keys: settingRowIds(selectedId) }],
+            resetSettingOperations(selectedId, snapshot, target, theme.appearance),
             'tui.settings.reset',
           )
       },

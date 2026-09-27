@@ -1,6 +1,7 @@
 import { sessionNoFlicker } from './session-no-flicker'
 import { restNoFlicker } from './rest-no-flicker'
 import { deferredDialogs } from './deferred-dialogs'
+import { dialogEscape } from './dialog-escape'
 import { rootSwitchNoFlicker } from './root-switch-no-flicker'
 import { turnFilesNoFlicker } from './turn-files-no-flicker'
 import { branchActionsNoFlicker } from './branch-actions-no-flicker'
@@ -39,6 +40,7 @@ import {
   chatScrollHome,
 } from './chat-scroll'
 import { chatStashContext } from './chat-stash-context'
+import { chatDraftSentLeftover } from './chat-draft-sent-leftover'
 import { chatQueue } from './chat-queue'
 import { chatQueueAway } from './chat-queue-away'
 import { chatQueueStopUpload } from './chat-queue-stop-upload'
@@ -250,6 +252,7 @@ import { themeBundlePalette } from './theme-bundle-palette'
 import { settingsColdLoad } from './settings-cold-load'
 import { serverRestart } from './server-restart'
 import { settingsDefaults } from './settings-defaults'
+import { settingsAppearanceRows } from './settings-appearance-rows'
 import { projectMenu } from './project-menu'
 import { workspaceSwitch } from './workspace-switch'
 import { sidebarSettingsButton } from './sidebar-settings-button'
@@ -414,6 +417,7 @@ export const scenarios: readonly Scenario[] = [
   codexApprovalRules,
   fileAttachments,
   chatStashContext,
+  chatDraftSentLeftover,
   chatStream,
   chatHistoryPages,
   sessionNoFlicker,
@@ -604,11 +608,13 @@ export const scenarios: readonly Scenario[] = [
   wallpaperPalette,
   themeBundlePalette,
   settingsDefaults,
+  settingsAppearanceRows,
   settingsColdLoad,
   settingsRoutePreparation,
   textFieldFkeys,
   settingsModuleFailure,
   deferredDialogs,
+  dialogEscape,
   projectMenu,
   workspaceSwitch,
   serverRestart,

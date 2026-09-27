@@ -1,15 +1,17 @@
 import type { ScalarSettingOperation } from '../settings/mutations'
-import { descriptorFor, type SettingsValues, type SettingId } from '../settings/keys'
+import { descriptorFor, type SettingId, type SettingsValues } from '../settings/keys'
 import { layerAllowsScope, type SettingsLayer } from '../settings/resolve'
 import * as v from 'valibot'
 import {
   customizeThemeVariant,
   type ThemeBundle,
   type ThemeCustomizations,
+  type ThemePart,
   type ThemeVariant,
   type ThemeVariantPatch,
 } from './bundle'
 import type { ColorMode } from './palette'
+import { THEME_PART_KEYS, type ThemePartKey } from './part-keys'
 
 export function themeVariants(theme: ThemeBundle, customizations: ThemeCustomizations) {
   const patches = customizations[theme.id]
@@ -17,6 +19,14 @@ export function themeVariants(theme: ThemeBundle, customizations: ThemeCustomiza
     light: customizeThemeVariant(theme.variants.light, patches?.light),
     dark: customizeThemeVariant(theme.variants.dark, patches?.dark),
   }
+}
+
+/** The half of a theme on screen: the chosen mode, or the system's while following it. */
+export function shownColorMode(
+  preference: SettingsValues['workbench.colorTheme'],
+  systemMode: ColorMode,
+): ColorMode {
+  return preference === 'system' ? systemMode : preference
 }
 
 export function resolveThemeSettings<
@@ -27,8 +37,7 @@ export function resolveThemeSettings<
 >(values: T, systemMode: ColorMode, layers: readonly SettingsLayer[] = []): T {
   const theme = values['workbench.theme']
   if (!theme) return values
-  const mode =
-    values['workbench.colorTheme'] === 'system' ? systemMode : values['workbench.colorTheme']
+  const mode = shownColorMode(values['workbench.colorTheme'], systemMode)
   const variants = themeVariants(theme, values['workbench.theme.customizations'])
   const active = variants[mode]
   const resolved = {
@@ -43,6 +52,29 @@ export function resolveThemeSettings<
     'workbench.surface.saturation': active.material.saturation,
   }
   return { ...resolved, ...appearanceLayerOverrides(layers) }
+}
+
+const THEME_PART_OF_KEY = {
+  'workbench.palette': 'palette',
+  'editor.codeTheme.light': 'codeTheme',
+  'editor.codeTheme.dark': 'codeTheme',
+  'workbench.wallpaper': 'wallpaper',
+  'workbench.surface.opacity': 'material.opacity',
+  'workbench.surface.contentOpacity': 'material.contentOpacity',
+  'workbench.surface.blur': 'material.blur',
+  'workbench.surface.saturation': 'material.saturation',
+} as const satisfies Record<ThemePartKey, ThemePart>
+
+/** Where a setting lives in a theme's customization: the half on screen, or the code theme's own. */
+export function themePartSlot(
+  key: SettingId,
+  shownMode: ColorMode,
+): { readonly mode: ColorMode; readonly part: ThemePart } | null {
+  if (!Object.hasOwn(THEME_PART_OF_KEY, key)) return null
+  const part = THEME_PART_OF_KEY[key as ThemePartKey]
+  if (key === 'editor.codeTheme.light') return { mode: 'light', part }
+  if (key === 'editor.codeTheme.dark') return { mode: 'dark', part }
+  return { mode: shownMode, part }
 }
 
 export function themePartPatch(operation: ScalarSettingOperation): ThemeVariantPatch | null {
@@ -81,16 +113,6 @@ export function variantFromSettings(values: SettingsValues, mode: ColorMode): Th
   }
 }
 
-export const THEME_PART_KEYS = [
-  'workbench.palette',
-  'editor.codeTheme.light',
-  'editor.codeTheme.dark',
-  'workbench.wallpaper',
-  'workbench.surface.opacity',
-  'workbench.surface.contentOpacity',
-  'workbench.surface.blur',
-  'workbench.surface.saturation',
-] as const satisfies readonly SettingId[]
 function appearanceLayerOverrides(layers: readonly SettingsLayer[]) {
   let overrides: Partial<SettingsValues> = {}
   for (const layer of layers) {

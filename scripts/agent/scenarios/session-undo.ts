@@ -4,6 +4,7 @@ import type { Scenario } from './index'
 import { selectors } from '../selectors'
 import { DEFAULT_PROVIDER_INSTANCE_ID } from '../../../packages/contracts/src/index'
 import { dispatch, openChat, readShell } from './chat-verification'
+import { isDraftChatUrl } from './draft-sessions'
 
 /** Mod+Z only belongs to the rail while focus sits outside text, editors, terminals and the tree. */
 async function focusRail(page: Page) {
@@ -121,7 +122,7 @@ export const sessionUndo: Scenario = {
       await selectors.sessionByTitle(page, charlie).click()
       await page.waitForURL((url) => url.href.includes(charlieId))
       await act(charlie, 'Archive')
-      await page.waitForURL((url) => decodeURIComponent(url.href).includes('t/new'))
+      await page.waitForURL(isDraftChatUrl)
       await noticeShown(page, '1 archived')
       await step('viewed-session-archived')
       await selectors.toastUndo(page).click()
@@ -131,7 +132,7 @@ export const sessionUndo: Scenario = {
       await step('archive-undone-by-button-reopens')
 
       await act(charlie, 'Archive')
-      await page.waitForURL((url) => decodeURIComponent(url.href).includes('t/new'))
+      await page.waitForURL(isDraftChatUrl)
       await undoByKey()
       await page.waitForURL((url) => url.href.includes(charlieId))
       strictEqual((await session(charlieId))?.archivedAt, null)
@@ -166,7 +167,7 @@ export const sessionUndo: Scenario = {
       await act(alpha, 'Unpin')
       await selectors.sessionInShelf(page, alpha, 'Active').waitFor()
       await act(charlie, 'Archive')
-      await page.waitForURL((url) => decodeURIComponent(url.href).includes('t/new'))
+      await page.waitForURL(isDraftChatUrl)
       await undoByKey()
       await page.waitForURL((url) => url.href.includes(charlieId))
       await undoByKey()
@@ -177,7 +178,7 @@ export const sessionUndo: Scenario = {
       await page.keyboard.press('ControlOrMeta+Shift+z')
       await selectors.sessionInShelf(page, alpha, 'Active').waitFor()
       await page.keyboard.press('ControlOrMeta+Shift+z')
-      await page.waitForURL((url) => decodeURIComponent(url.href).includes('t/new'))
+      await page.waitForURL(isDraftChatUrl)
       await step('two-actions-redone')
       await undoByKey()
       await page.waitForURL((url) => url.href.includes(charlieId))

@@ -1,12 +1,11 @@
 import type { RefObject } from 'react'
 
-import { Icon } from '@/features/workspace/components/tree-icon'
+import { TreeGlyphIcon } from '@/features/workspace/components/tree-glyph'
 import { useMenuTrigger } from '@/features/workspace/hooks/use-tree-menu-trigger'
 import type { TreeRowDom } from '@/features/workspace/hooks/use-tree-row-dom'
 import type { MenuTriggerStore } from '@/features/workspace/state/tree-menu-trigger'
 import { CONTEXT_MENU_TRIGGER_TYPE } from '@workspace/tree'
 import type { FileTreeContextMenuOpenContext } from '@workspace/tree'
-import type { TreeResolvedIcon } from '@/features/workspace/utils/tree-icon-resolver'
 import { menuTriggerAnchorStyle } from '@/features/workspace/utils/tree-menu-trigger-style'
 
 export function MenuTrigger({
@@ -22,7 +21,6 @@ export function MenuTrigger({
   isRenaming,
   isScrolling,
   buttonEnabled,
-  icon,
   closeMenu,
   openMenu,
 }: {
@@ -38,7 +36,6 @@ export function MenuTrigger({
   isRenaming: boolean
   isScrolling: RefObject<boolean>
   buttonEnabled: boolean
-  icon: TreeResolvedIcon
   closeMenu: () => void
   openMenu: (path: string, button: HTMLElement) => void
 }) {
@@ -85,7 +82,7 @@ export function MenuTrigger({
         tabIndex={-1}
         style={isPointerMenu ? { opacity: 0 } : undefined}
       >
-        <Icon {...icon} />
+        <TreeGlyphIcon name='ellipsis' />
       </button>
       {isOpen ? <div data-type='context-menu-content' ref={contentHostRef} /> : null}
     </div>

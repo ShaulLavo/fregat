@@ -1,9 +1,11 @@
-import { providerEnabledOperation } from '@workspace/client-core/settings/operations'
+import {
+  providerEnabledOperation,
+  themePartWriteOperation,
+} from '@workspace/client-core/settings/operations'
 import {
   descriptorFor,
   resolveThemeSettings,
   THEME_PART_KEYS,
-  themePartPatch,
   type ColorMode,
   layerAllowsScope,
   settingsOperationSchema,
@@ -79,12 +81,8 @@ function settingOperations(
   if (id === 'models.favorites') return modelMembershipOperations(current, value, 'favorite')
   if (id === 'providers.instances') return providerOperations(value, snapshot)
   const scalar = operation({ kind: 'set', key: id, value })
-  const theme = snapshot.values['workbench.theme']
-  const patch = scalar.kind === 'set' ? themePartPatch(scalar) : null
-  if (!theme || !patch || target !== 'user') return [scalar]
-  if (id === 'editor.codeTheme.light') mode = 'light'
-  if (id === 'editor.codeTheme.dark') mode = 'dark'
-  return [{ kind: 'theme.customize', id: theme.id, mode, patch }]
+  const themed = target === 'user' ? themePartWriteOperation(scalar, snapshot.values, mode) : null
+  return [themed ?? scalar]
 }
 
 export async function saveSettingDraft({
