@@ -28,7 +28,8 @@ import { selectSettingsView } from '@/features/settings/state/view-store'
 import { FocusService } from '@/lib/focus/state/service'
 import { matchesActiveSurface } from '@/lib/focus/utils/active-surface'
 
-// The whole settings page renders here; a shared CI runner takes about 6x a workstation.
+// The whole settings page renders here, and the code theme previews start a highlighter that
+// holds the thread for about a second; a shared CI runner takes about 6x a workstation.
 const SLOW_RENDER_TIMEOUT_MS = 60_000
 
 test.beforeEach(() => {
@@ -55,10 +56,13 @@ test(
 
     // Asserted against the server, not the control: the point is that the click
     // reached the settings file, not that a switch flipped locally.
-    await waitFor(async () => {
-      const snapshot = await fetchSettings(undefined, getClient())
-      expect(snapshot.values['chat.planModeEnabled']).toBe(true)
-    })
+    await waitFor(
+      async () => {
+        const snapshot = await fetchSettings(undefined, getClient())
+        expect(snapshot.values['chat.planModeEnabled']).toBe(true)
+      },
+      { timeout: SLOW_RENDER_TIMEOUT_MS },
+    )
   },
   SLOW_RENDER_TIMEOUT_MS,
 )
@@ -78,13 +82,16 @@ test(
 
     // Reset removes the key rather than writing the default into the file, which
     // is what keeps the default coming from the running build.
-    await waitFor(async () => {
-      const snapshot = await fetchSettings(undefined, getClient())
-      expect(snapshot.values['chat.planModeEnabled']).toBe(false)
-      expect(snapshot.layers.find((layer) => layer.id === 'user')?.raw).not.toHaveProperty(
-        'chat.planModeEnabled',
-      )
-    })
+    await waitFor(
+      async () => {
+        const snapshot = await fetchSettings(undefined, getClient())
+        expect(snapshot.values['chat.planModeEnabled']).toBe(false)
+        expect(snapshot.layers.find((layer) => layer.id === 'user')?.raw).not.toHaveProperty(
+          'chat.planModeEnabled',
+        )
+      },
+      { timeout: SLOW_RENDER_TIMEOUT_MS },
+    )
   },
   SLOW_RENDER_TIMEOUT_MS,
 )
@@ -145,13 +152,16 @@ test('reset all clears every key from the layer in one write', async ({ client }
   await userEvent.click(await screen.findByRole('button', { name: 'Settings actions' }))
   await userEvent.click(await screen.findByRole('menuitem', { name: /Reset all/ }))
 
-  await waitFor(async () => {
-    const snapshot = await fetchSettings(undefined, getClient())
-    // Removed, not overwritten with defaults: what is in the file is what the
-    // user changed, so a default that moves in a later build still applies.
-    expect(snapshot.layers.find((layer) => layer.id === 'user')?.raw).toEqual({})
-    expect(snapshot.values['workbench.colorTheme']).toBe('system')
-  })
+  await waitFor(
+    async () => {
+      const snapshot = await fetchSettings(undefined, getClient())
+      // Removed, not overwritten with defaults: what is in the file is what the
+      // user changed, so a default that moves in a later build still applies.
+      expect(snapshot.layers.find((layer) => layer.id === 'user')?.raw).toEqual({})
+      expect(snapshot.values['workbench.colorTheme']).toBe('system')
+    },
+    { timeout: SLOW_RENDER_TIMEOUT_MS },
+  )
 })
 
 test(
@@ -234,10 +244,13 @@ test('lists the real model catalog, and hiding one keeps its row to bring it bac
   const label = first!.getAttribute('aria-label')
   await userEvent.click(first!)
 
-  await waitFor(async () => {
-    const snapshot = await fetchSettings(undefined, getClient())
-    expect(snapshot.values['models.hidden']).toHaveLength(1)
-  })
+  await waitFor(
+    async () => {
+      const snapshot = await fetchSettings(undefined, getClient())
+      expect(snapshot.values['models.hidden']).toHaveLength(1)
+    },
+    { timeout: SLOW_RENDER_TIMEOUT_MS },
+  )
 
   // The row survives the toggle, unchecked. If hiding removed it, the switch
   // that un-hides it would go with it and the model would be hidden for good.
@@ -285,21 +298,27 @@ test('a collection edited back to empty leaves no key behind to look modified', 
   expect(first).toBeDefined()
   const label = first!.getAttribute('aria-label')
   await userEvent.click(first!)
-  await waitFor(async () => {
-    expect((await fetchSettings(undefined, getClient())).values['models.hidden']).toHaveLength(1)
-  })
+  await waitFor(
+    async () => {
+      expect((await fetchSettings(undefined, getClient())).values['models.hidden']).toHaveLength(1)
+    },
+    { timeout: SLOW_RENDER_TIMEOUT_MS },
+  )
 
   await userEvent.click(await screen.findByRole('switch', { name: label! }))
 
   // Un-hiding the last model used to write `[]` — the default, but *present*,
   // which is what the page reads as modified. The row then claimed a change it
   // could not describe and offered a Reset with nothing to remove.
-  await waitFor(async () => {
-    const snapshot = await fetchSettings(undefined, getClient())
-    expect(snapshot.layers.find((layer) => layer.id === 'user')?.raw).not.toHaveProperty(
-      'models.hidden',
-    )
-  })
+  await waitFor(
+    async () => {
+      const snapshot = await fetchSettings(undefined, getClient())
+      expect(snapshot.layers.find((layer) => layer.id === 'user')?.raw).not.toHaveProperty(
+        'models.hidden',
+      )
+    },
+    { timeout: SLOW_RENDER_TIMEOUT_MS },
+  )
   expect(screen.queryByLabelText('Modified')).toBeNull()
 })
 
@@ -343,10 +362,13 @@ test('every visible row is reachable and operable from the keyboard', async ({ c
   planMode.focus()
   await userEvent.keyboard(' ')
 
-  await waitFor(async () => {
-    const snapshot = await fetchSettings(undefined, getClient())
-    expect(snapshot.values['chat.planModeEnabled']).toBe(true)
-  })
+  await waitFor(
+    async () => {
+      const snapshot = await fetchSettings(undefined, getClient())
+      expect(snapshot.values['chat.planModeEnabled']).toBe(true)
+    },
+    { timeout: SLOW_RENDER_TIMEOUT_MS },
+  )
 })
 
 test('settings JSON exposes its nested editor as the sole active surface', async ({ client }) => {
@@ -411,22 +433,31 @@ test('Unicode settings preserve allowed characters and can clear them', async ({
   renderWithProviders(<SettingsPage />)
   const input = await screen.findByRole('textbox', { name: 'Unicode highlight allowed characters' })
   await userEvent.type(input, '–\u00a0{Enter}')
-  await waitFor(async () => {
-    const snapshot = await fetchSettings(undefined, client)
-    expect(snapshot.values['editor.unicodeHighlight.allowedCharacters']).toBe('–\u00a0')
-  })
+  await waitFor(
+    async () => {
+      const snapshot = await fetchSettings(undefined, client)
+      expect(snapshot.values['editor.unicodeHighlight.allowedCharacters']).toBe('–\u00a0')
+    },
+    { timeout: SLOW_RENDER_TIMEOUT_MS },
+  )
   await userEvent.clear(input)
   await userEvent.type(input, '{Enter}')
-  await waitFor(async () => {
-    const snapshot = await fetchSettings(undefined, client)
-    expect(snapshot.values['editor.unicodeHighlight.allowedCharacters']).toBe('')
-  })
+  await waitFor(
+    async () => {
+      const snapshot = await fetchSettings(undefined, client)
+      expect(snapshot.values['editor.unicodeHighlight.allowedCharacters']).toBe('')
+    },
+    { timeout: SLOW_RENDER_TIMEOUT_MS },
+  )
   await userEvent.click(
     screen.getByRole('switch', { name: 'Unicode highlight ambiguous characters' }),
   )
-  await waitFor(async () => {
-    const snapshot = await fetchSettings(undefined, client)
-    expect(snapshot.values['editor.unicodeHighlight.ambiguousCharacters']).toBe(false)
-    expect(snapshot.values['editor.unicodeHighlight.invisibleCharacters']).toBe(true)
-  })
+  await waitFor(
+    async () => {
+      const snapshot = await fetchSettings(undefined, client)
+      expect(snapshot.values['editor.unicodeHighlight.ambiguousCharacters']).toBe(false)
+      expect(snapshot.values['editor.unicodeHighlight.invisibleCharacters']).toBe(true)
+    },
+    { timeout: SLOW_RENDER_TIMEOUT_MS },
+  )
 })
