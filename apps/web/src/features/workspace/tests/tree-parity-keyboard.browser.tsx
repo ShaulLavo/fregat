@@ -27,6 +27,24 @@ async function focusRow(path: string) {
 }
 
 describe('keyboard', () => {
+  it.each(['{Enter}', ' '])('clears the filter with %s without selecting a result', async (key) => {
+    const { model, events } = await mountParityTree()
+    await clickRow('README.md')
+    await userEvent.keyboard('notes')
+    await vi.waitFor(() => expect(filterInput().value).toBe('notes'))
+    const selectionsBefore = [...events.selections]
+    const selectedBefore = model.getSelectedPaths()
+    await userEvent.keyboard('{Tab}')
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Clear file filter')
+
+    await userEvent.keyboard(key)
+
+    await vi.waitFor(() => expect(filterInput().value).toBe(''))
+    expect(document.activeElement).toBe(filterInput())
+    expect(model.getSelectedPaths()).toEqual(selectedBefore)
+    expect(events.selections).toEqual(selectionsBefore)
+  })
+
   it('ArrowUp moves focus up and clamps at the first row', async () => {
     await mountParityTree()
     // Folders sort first, so the chain is the first row.

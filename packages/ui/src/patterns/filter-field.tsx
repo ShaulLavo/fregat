@@ -100,6 +100,10 @@ export function FilterField({
                   <InputGroupButton
                     aria-label={clearLabel}
                     size='icon-xs'
+                    onKeyDown={(event) => {
+                      // Keep native button activation out of enclosing list keyboard handlers.
+                      if (event.key === 'Enter' || event.key === ' ') event.stopPropagation()
+                    }}
                     onClick={() => {
                       onValueChange('')
                       control.current?.focus()

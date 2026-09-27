@@ -51,6 +51,20 @@ export const filterFields: Scenario = {
       ok(await filter.evaluate((node) => node === document.activeElement))
       await step('tree-filter-cleared')
 
+      const tabsBefore = await selectors.editorTabs(page).count()
+      for (const key of ['Enter', 'Space']) {
+        await filter.fill('notes')
+        await filter.press('Tab')
+        ok(
+          await selectors.treeFilterClear(page).evaluate((node) => node === document.activeElement),
+        )
+        await page.keyboard.press(key)
+        strictEqual(await filter.inputValue(), '')
+        ok(await filter.evaluate((node) => node === document.activeElement))
+        strictEqual(await selectors.editorTabs(page).count(), tabsBefore)
+        await step(`tree-filter-cleared-${key.toLowerCase()}`)
+      }
+
       await openGitPanel(page)
       await selectors.graphButton(page).click()
       await selectors.historyRows(page).nth(1).waitFor()
