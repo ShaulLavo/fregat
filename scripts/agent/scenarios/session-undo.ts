@@ -4,20 +4,11 @@ import type { Scenario } from './index'
 import { selectors } from '../selectors'
 import { DEFAULT_PROVIDER_INSTANCE_ID } from '../../../packages/contracts/src/index'
 import { dispatch, openChat, readShell } from './chat-verification'
+import { isDraftChatUrl } from './draft-sessions'
 
 /** Mod+Z only belongs to the rail while focus sits outside text, editors, terminals and the tree. */
 async function focusRail(page: Page) {
   await selectors.sessionShelfTarget(page, 'pinned').click()
-}
-
-/**
- * A vacated main chat is a draft: `t/new` until the composer claims an id, `t/draft-<uuid>`
- * after (`chatReferenceForToken` maps both to `{ kind: 'draft' }`). Which one a navigation
- * lands on is a rendering detail, not a distinct state, so the wait accepts either.
- */
-function isDraftChatUrl(url: URL) {
-  const path = decodeURIComponent(url.href)
-  return /\/t\/new(?:[/?]|$)/.test(path) || /\/t\/draft-[^/?]+/.test(path)
 }
 
 /** Waits out the notice's enter transition so the step screenshot shows it whole. */
