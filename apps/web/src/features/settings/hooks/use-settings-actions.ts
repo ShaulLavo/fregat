@@ -65,6 +65,7 @@ import { durationBetweenMs } from '@workspace/utils/timing'
 import { dismissSaveError, notifySaveError } from '@/features/settings/utils/notify-save-error'
 import {
   providerEnabledOperation,
+  resetSettingOperations,
   themeCustomization,
 } from '@workspace/client-core/settings/operations'
 import { admitSettingsMutationResult } from '@/features/settings/state/snapshot-admission'
@@ -189,14 +190,10 @@ export function useSettingsActions(owner?: QueryClient) {
     resetKeybinding: (command: PlatformCommandId) =>
       submit(targetFor('keybindings.overrides'), [{ kind: 'keybinding.remove', command }]),
     resetSetting: (key: SettingId, target: SettingsWriteTarget = 'user') => {
-      const slot = target === 'user' ? themeSlot(key) : null
-      if (!slot) return submit(target, [{ kind: 'reset', keys: settingRowIds(key) }])
-      const uncustomize: SettingsOperation = { kind: 'theme.uncustomize', ...slot }
-      // A value written before the theme was picked is ignored under it; Reset clears it too.
-      const stray = projection()?.layers.some(
-        (layer) => layer.id === 'user' && Object.hasOwn(layer.raw, key),
-      )
-      return submit('user', stray ? [uncustomize, { kind: 'reset', keys: [key] }] : [uncustomize])
+      const current = projection()
+      if (!current) return submit(target, [{ kind: 'reset', keys: settingRowIds(key) }])
+      const shown = shownColorMode(current.values['workbench.colorTheme'], systemColorMode())
+      return submit(target, resetSettingOperations(key, current, target, shown))
     },
     setColorTheme,
     /** The command's complete list; an empty list or `null` unbinds it. */
