@@ -116,3 +116,16 @@ test.each(['constructor', '__proto__', 'toString'])(
     expect(iconFor(name)).toBe('file-duo gray')
   },
 )
+
+test('the same icon rule resolves to one shared, frozen object', () => {
+  const first = iconForEntry({ name: 'a.ts', type: 'file' })
+
+  expect(iconForEntry({ name: 'b.ts', type: 'file' })).toBe(first)
+  expect(iconForEntry({ name: 'src', type: 'directory' })).toBe(
+    iconForEntry({ name: 'lib', type: 'directory' }),
+  )
+  expect(iconForEntry({ name: 'src', type: 'directory' }, { open: true })).not.toBe(
+    iconForEntry({ name: 'src', type: 'directory' }),
+  )
+  expect(Object.isFrozen(first)).toBe(true)
+})

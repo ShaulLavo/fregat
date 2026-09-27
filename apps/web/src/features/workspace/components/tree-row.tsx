@@ -12,7 +12,7 @@ import {
 import { SparkleIcon } from '@phosphor-icons/react'
 import { FileTypeIcon } from '@/components/file-type-icon'
 import { iconForEntry } from '@/lib/file-icons'
-import { TreeGlyph } from '@/features/workspace/components/tree-glyph'
+import { TreeGlyphIcon } from '@/features/workspace/components/tree-glyph'
 import { MiddleTruncate } from '@/features/workspace/components/tree-middle-truncate'
 import { Truncate } from '@/features/workspace/components/tree-truncate'
 import { RenameInput } from '@/features/workspace/components/tree-rename-input'
@@ -154,7 +154,7 @@ function renderGitDecoration(decoration: TreeGitDecoration | null): JSX.Element 
 
   return (
     <span title={decoration.title}>
-      {'dot' in decoration ? <TreeGlyph name='dot' /> : decoration.text}
+      {'dot' in decoration ? <TreeGlyphIcon name='dot' /> : decoration.text}
     </span>
   )
 }
@@ -215,7 +215,7 @@ function renderTreeRowContent(
       ) : null}
       <div data-item-section='icon'>
         {row.kind === 'directory' ? (
-          <TreeGlyph name='chevron' />
+          <TreeGlyphIcon name='chevron' />
         ) : (
           <FileTypeIcon icon={iconForEntry({ name: row.name, type: 'file' })} sprite />
         )}
@@ -239,7 +239,7 @@ function renderTreeRowContent(
         <div data-item-section='action'>
           {showDecorativeActionAffordance ? (
             <span aria-hidden='true' data-item-action-affordance='decorative'>
-              <TreeGlyph name='ellipsis' />
+              <TreeGlyphIcon name='ellipsis' />
             </span>
           ) : null}
         </div>

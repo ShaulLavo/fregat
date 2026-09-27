@@ -10,7 +10,7 @@ const ELLIPSIS =
   'M5 8.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0M9.5 8.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0M14 8.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0'
 
 /** The tree's own marks: the folder chevron, the changed-descendant dot and the row menu's dots. */
-export function TreeGlyph({ name }: { name: TreeGlyphName }): JSX.Element {
+export function TreeGlyphIcon({ name }: { name: TreeGlyphName }): JSX.Element {
   // A 6-unit viewport inside a 16-unit one, as the sprite nested it, so it lands on the same pixels.
   if (name === 'dot')
     return (

@@ -12,7 +12,7 @@ export type FileIconEntry = {
 }
 
 export type ResolvedFileIcon = {
-  name: FileIconRuleName
+  readonly name: FileIconRuleName
 }
 
 const SYMBOL_PREFIX = 'app-vscode-icon-'
@@ -142,10 +142,16 @@ function mimeMatches(name: string, token: string) {
   return mime === token
 }
 
+// One frozen object per rule, so a row that re-renders passes its icon the same prop.
+const RESOLVED_ICONS = new Map<FileIconRuleName, ResolvedFileIcon>()
+
 function iconResult(name: FileIconRuleName): ResolvedFileIcon {
-  return {
-    name,
-  }
+  const cached = RESOLVED_ICONS.get(name)
+  if (cached) return cached
+
+  const icon = Object.freeze({ name })
+  RESOLVED_ICONS.set(name, icon)
+  return icon
 }
 
 function extensionCandidates(name: string) {

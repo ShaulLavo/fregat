@@ -1,6 +1,6 @@
 import type { RefObject } from 'react'
 
-import { TreeGlyph } from '@/features/workspace/components/tree-glyph'
+import { TreeGlyphIcon } from '@/features/workspace/components/tree-glyph'
 import { useMenuTrigger } from '@/features/workspace/hooks/use-tree-menu-trigger'
 import type { TreeRowDom } from '@/features/workspace/hooks/use-tree-row-dom'
 import type { MenuTriggerStore } from '@/features/workspace/state/tree-menu-trigger'
@@ -82,7 +82,7 @@ export function MenuTrigger({
         tabIndex={-1}
         style={isPointerMenu ? { opacity: 0 } : undefined}
       >
-        <TreeGlyph name='ellipsis' />
+        <TreeGlyphIcon name='ellipsis' />
       </button>
       {isOpen ? <div data-type='context-menu-content' ref={contentHostRef} /> : null}
     </div>
