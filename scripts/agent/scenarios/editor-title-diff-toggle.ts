@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -14,7 +15,7 @@ export const editorTitleDiffToggle: Scenario = {
   description:
     'Open a diff tab, switch its layout from the editor title, and switch back so the setting is left alone.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-title-diff-')
+    const fixture = await mkdtemp(scratchPath('fregat-title-diff-'))
     try {
       await fixtureGit(fixture, ['init', '--quiet'])
       await fixtureGit(fixture, ['config', 'user.email', 'fregat@example.com'])

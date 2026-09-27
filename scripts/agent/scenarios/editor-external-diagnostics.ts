@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { match } from 'node:assert/strict'
 import { mkdir, mkdtemp, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -32,7 +33,7 @@ export const editorExternalDiagnostics: Scenario = {
     const inspection = { phases: new Array<string>() }
     inspections.set(page, inspection)
     for (const runtime of RUNTIMES) {
-      const fixture = await mkdtemp(`/work/tmp/fregat-external-diagnostics-${runtime.name}-`)
+      const fixture = await mkdtemp(scratchPath(`fregat-external-diagnostics-${runtime.name}-`))
       try {
         await writeFixture(fixture, runtime.typescript)
         const dependency = path.join(fixture, 'dependency.ts')

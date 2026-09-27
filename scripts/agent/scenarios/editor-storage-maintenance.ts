@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Page } from 'playwright'
@@ -20,7 +21,7 @@ export const editorStorageMaintenance: Scenario = {
   description:
     'Replace a file three times and type-and-backspace a word, wait for the quiet-time pass to compact tombstones and reclaim text, then undo and redo across it.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-storage-maintenance-')
+    const fixture = await mkdtemp(scratchPath('fregat-storage-maintenance-'))
     try {
       await writeFile(path.join(fixture, 'notes.txt'), `${block(0)}\n`)
       await openFixtureWorkspace(page, fixture)

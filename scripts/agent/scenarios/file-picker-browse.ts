@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { ok } from 'node:assert/strict'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -12,7 +13,7 @@ const PNG = Buffer.from(
 )
 
 async function createTree() {
-  const root = await mkdtemp('/work/tmp/fregat-picker-browse-')
+  const root = await mkdtemp(scratchPath('fregat-picker-browse-'))
   await mkdir(path.join(root, 'nested', 'deeper'), { recursive: true })
   await writeFile(
     path.join(root, 'app.ts'),

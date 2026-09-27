@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { ok } from 'node:assert/strict'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -12,7 +13,7 @@ export const editorDiagnosticHoverFix: Scenario = {
     'A diagnostic hover opens a draft with its exact problem and unsaved source excerpt.',
   async run(page, { step }) {
     const originalUrl = page.url()
-    const fixture = await mkdtemp('/work/tmp/fregat-diagnostic-hover-')
+    const fixture = await mkdtemp(scratchPath('fregat-diagnostic-hover-'))
     const restore = await preserveAppearance(page, ['files.autoSave'])
     try {
       await writeFile(

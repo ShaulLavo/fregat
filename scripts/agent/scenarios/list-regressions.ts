@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { ok, strictEqual } from 'node:assert/strict'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import path from 'node:path'
@@ -11,7 +12,7 @@ export const filePickerNavigation: Scenario = {
   description:
     'Leave empty folders with keyboard navigation and page above search section headers.',
   async run(page, { step }) {
-    const root = await mkdtemp('/work/tmp/fregat-picker-navigation-')
+    const root = await mkdtemp(scratchPath('fregat-picker-navigation-'))
     const prefix = `picker-${crypto.randomUUID()}`
     await Promise.all(
       ['empty', `${prefix}-a`, `${prefix}-b`].map((name) => mkdir(path.join(root, name))),

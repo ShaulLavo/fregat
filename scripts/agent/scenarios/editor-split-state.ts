@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { openFixtureWorkspace, releaseFixture, waitForFileContent } from '../fixture-workspace'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { strictEqual, ok } from 'node:assert'
@@ -14,7 +15,7 @@ export const editorSplitState: Scenario = {
   description:
     'Save from the focused split, close one dirty copy without a prompt, then cancel and save the final dirty view.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-split-state-')
+    const fixture = await mkdtemp(scratchPath('fregat-split-state-'))
     const diskPath = path.join(fixture, 'a.ts')
     const originalUrl = page.url()
     const initial = 'export const count = 1\n'

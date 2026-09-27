@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import { selectedEditorTabId as selectedTabId } from '../selectors'
 import { ok, strictEqual } from 'node:assert'
@@ -17,7 +18,7 @@ export const editorSplitHistoryState: Scenario = {
     'Move a selected history barrier into a group showing another history tab, preserving each tab’s selection.',
   async run(page, { step }) {
     const originalUrl = page.url()
-    const fixture = await mkdtemp('/work/tmp/fregat-split-history-')
+    const fixture = await mkdtemp(scratchPath('fregat-split-history-'))
     const result = { phases: [] as string[], movedTabId: null as string | null }
     observations.set(page, result)
     try {

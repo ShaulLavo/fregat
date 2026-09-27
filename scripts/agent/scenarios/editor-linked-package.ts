@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Page } from 'playwright'
@@ -17,7 +18,7 @@ export const editorLinkedPackage: Scenario = {
   async run(page, { step }) {
     const inspection = { phases: new Array<string>() }
     inspections.set(page, inspection)
-    const fixture = await mkdtemp('/work/tmp/fregat-linked-package-')
+    const fixture = await mkdtemp(scratchPath('fregat-linked-package-'))
     const project = path.join(fixture, 'app')
     const linked = path.join(fixture, 'linked')
     const declarations = path.join(linked, 'dist/index.d.ts')

@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { ok, strictEqual } from 'node:assert/strict'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -9,7 +10,7 @@ import { focusEditor, openFileFromTree, selectors } from '../selectors'
 
 /** Two files that fail type checking as written, so nothing has to be typed into them. */
 async function createFixture() {
-  const fixture = await mkdtemp('/work/tmp/fregat-problems-panel-rows-')
+  const fixture = await mkdtemp(scratchPath('fregat-problems-panel-rows-'))
   await writeFile(
     join(fixture, 'tsconfig.json'),
     JSON.stringify({ compilerOptions: { strict: true, noEmit: true } }),

@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { ok } from 'node:assert/strict'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -13,7 +14,7 @@ export const fileTreeHoverPrefetch: Scenario = {
   description:
     'Moving the pointer onto a file row reads the file ahead of the click, and opens nothing.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-hover-prefetch-')
+    const fixture = await mkdtemp(scratchPath('fregat-hover-prefetch-'))
     try {
       await writeFile(path.join(fixture, FILENAME), 'export const hovered = true\n')
       await writeFile(path.join(fixture, 'other.ts'), 'export const other = true\n')

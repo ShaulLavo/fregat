@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { ok, strictEqual } from 'node:assert/strict'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -40,7 +41,7 @@ export const markdownSplitView: Scenario = {
   description:
     'Cycle a markdown file to source beside a rendered view: headings render, scrolling either side follows the other through a 100-line fence, workspace links open and images load; cycling on returns to source only.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-markdown-split-')
+    const fixture = await mkdtemp(scratchPath('fregat-markdown-split-'))
     try {
       await writeFile(path.join(fixture, 'guide.md'), guide())
       await writeFile(path.join(fixture, 'other.md'), '# Other\n')

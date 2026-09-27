@@ -14,6 +14,7 @@ import { hostPaths } from '../../apps/server/src/terminal-host/protocol'
 import { allowedOriginsForWebPort, isPortAvailable, selectAvailablePort } from '../runtime-network'
 import { linkWallpaperLibrary, productionStateHome } from '../state-home'
 import { createScriptError } from '../structured-errors'
+import { scratchRoot as defaultScratchRoot } from './paths'
 
 const SERVER_ROOT = path.resolve(import.meta.dirname, '../../apps/server')
 const START_TIMEOUT_MS = 30_000
@@ -37,7 +38,7 @@ export type IsolatedServer = {
 
 /**
  * One throwaway API server per `agent:browser` run: its own port, state home and log
- * directory under `/work/tmp`, all removed when the run ends. The shared Vite page reaches
+ * directory under the OS temporary directory, all removed when the run ends. The Vite page reaches
  * it through `window.platformDevServerUrl`.
  */
 export async function startIsolatedServer(
@@ -45,7 +46,7 @@ export async function startIsolatedServer(
   {
     pathPrefix,
     realProviders = false,
-    scratchRoot = '/work/tmp',
+    scratchRoot = defaultScratchRoot,
   }: { pathPrefix?: string; realProviders?: boolean; scratchRoot?: string } = {},
 ): Promise<IsolatedServer> {
   const directory = mkdtempSync(path.join(scratchRoot, 'fregat-agent-'))
@@ -61,6 +62,7 @@ export async function startIsolatedServer(
     writeFileSync(
       path.join(home, 'settings.json'),
       JSON.stringify({
+        'workbench.wallpaper': { enabled: false, source: { kind: 'desktop' } },
         'providers.instances': DEFAULT_PROVIDER_INSTANCES.map((provider) => ({
           ...provider,
           enabled: false,

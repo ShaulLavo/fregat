@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { strictEqual } from 'node:assert'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -9,7 +10,7 @@ export const treeFileClicks: Scenario = {
   name: 'tree-file-clicks',
   description: 'Keep nested folders expanded while clicking files and refreshing their ancestors.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-tree-clicks-')
+    const fixture = await mkdtemp(scratchPath('fregat-tree-clicks-'))
     try {
       await mkdir(path.join(fixture, 'src', 'nested'), { recursive: true })
       await writeFile(path.join(fixture, 'src', 'sibling.txt'), 'Sibling\n')

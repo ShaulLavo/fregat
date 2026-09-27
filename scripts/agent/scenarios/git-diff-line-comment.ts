@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -15,7 +16,7 @@ export const gitDiffLineComment: Scenario = {
   description:
     'Drag a line range in a diff: the selection bar must name the dragged lines, and still name the right ones after unhiding the unmodified lines above shifts every row; a comment on them joins the review draft in the composer.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-diff-comment-')
+    const fixture = await mkdtemp(scratchPath('fregat-diff-comment-'))
     try {
       await fixtureGit(fixture, ['init', '--quiet'])
       await fixtureGit(fixture, ['config', 'user.email', 'fregat@example.com'])

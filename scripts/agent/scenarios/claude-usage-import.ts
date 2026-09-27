@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { ok, strictEqual } from 'node:assert/strict'
 import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -82,7 +83,7 @@ export const claudeUsageImport: Scenario = {
     const orchestration = await openChat(page)
     const base = orchestration.replace(/\/orchestration$/, '')
     const fixture = await realpath(await createGitFixture('claude-usage-import'))
-    const configDir = await mkdtemp('/work/tmp/fregat-claude-usage-import-config-')
+    const configDir = await mkdtemp(scratchPath('fregat-claude-usage-import-config-'))
     try {
       const project = join(configDir, 'projects', fixture.replace(/[^a-zA-Z0-9]/g, '-'))
       await mkdir(project, { recursive: true })

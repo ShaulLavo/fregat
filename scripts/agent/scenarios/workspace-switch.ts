@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { ok } from 'node:assert/strict'
 import { mkdtemp } from 'node:fs/promises'
 import type { Scenario } from './index'
@@ -11,7 +12,7 @@ export const workspaceSwitch: Scenario = {
     'In chat mode, switch to a recent folder from the project menu and check the switch settles on a draft: one address registration, then quiet.',
   async run(page, { step }) {
     await selectors.projectMenuTrigger(page).waitFor({ timeout: 15_000 })
-    const folder = await mkdtemp('/work/tmp/fregat-workspace-switch-')
+    const folder = await mkdtemp(scratchPath('fregat-workspace-switch-'))
     const { base, headers } = serverApi(page)
     const recorded = await page.request.post(`${base}/fs/recents`, {
       data: { path: folder.slice(1) },

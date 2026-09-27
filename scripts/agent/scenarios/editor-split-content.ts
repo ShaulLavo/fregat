@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { fixtureGit, openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import { selectedEditorTabId as selectedTabId } from '../selectors'
 import { deepStrictEqual, ok, strictEqual } from 'node:assert'
@@ -16,7 +17,7 @@ export const editorSplitContent: Scenario = {
     'Move singleton tools and split read-only references, empty comparisons, and history or comparison diffs.',
   async run(page, { step }) {
     const originalUrl = page.url()
-    const fixture = await mkdtemp('/work/tmp/fregat-split-content-')
+    const fixture = await mkdtemp(scratchPath('fregat-split-content-'))
     const result = { fixture, phases: [] as string[], diskChanged: false }
     inspection.set(page, result)
     try {

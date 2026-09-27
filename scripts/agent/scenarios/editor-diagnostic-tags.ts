@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { ok } from 'node:assert/strict'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -12,7 +13,7 @@ export async function runDiagnosticTagScenario(
   kind: 'fade' | 'strike',
 ) {
   const originalUrl = page.url()
-  const fixture = await mkdtemp('/work/tmp/fregat-diagnostic-tags-')
+  const fixture = await mkdtemp(scratchPath('fregat-diagnostic-tags-'))
   const target = kind === 'fade' ? 'unused' : 'substr'
   try {
     await writeFile(

@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -29,7 +30,7 @@ export const editorAddToChat: Scenario = {
   description:
     "Mod+L puts the editor's selected lines in the workspace composer, quoted under path and lines; Add File to Chat from the text menu mentions the file; with the setting on, the active file shows as a removable chip.",
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-add-to-chat-')
+    const fixture = await mkdtemp(scratchPath('fregat-add-to-chat-'))
     try {
       await writeFile(
         path.join(fixture, 'a.ts'),

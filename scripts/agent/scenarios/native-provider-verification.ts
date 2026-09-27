@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { ok } from 'node:assert/strict'
 import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -172,7 +173,7 @@ async function waitForNativeExit(root: string) {
 export type NativeProvider = Awaited<ReturnType<typeof installNativeProvider>>
 
 /**
- * A Codex instance that runs `fixture` from its own folder under /work/tmp, which is also its
+ * A Codex instance that runs `fixture` from its own temporary folder, which is also its
  * Codex home. `remove` drops the instance, waits for every fixture process to exit, deletes the
  * folder and returns what the fixture recorded.
  */
@@ -187,7 +188,7 @@ export async function installNativeProvider(
   },
 ) {
   const kind = input.kind ?? 'codex'
-  const root = await mkdtemp(`/work/tmp/fregat-${input.name}-native-`)
+  const root = await mkdtemp(scratchPath(`fregat-${input.name}-native-`))
   // Claude's SDK runs a path without a script extension directly, as it runs the real CLI.
   const binary = join(root, kind === 'codex' ? 'codex.mjs' : 'claude')
   await copyFile(input.fixture, binary)

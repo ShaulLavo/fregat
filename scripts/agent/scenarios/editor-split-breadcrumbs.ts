@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { fixtureGit, openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import { strictEqual } from 'node:assert'
 import { mkdtemp, writeFile } from 'node:fs/promises'
@@ -19,7 +20,7 @@ export const editorSplitBreadcrumbs: Scenario = {
   name: 'editor-split-breadcrumbs',
   description: 'Keep each split view’s symbol breadcrumbs attached to its own cursor.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-split-breadcrumbs-')
+    const fixture = await mkdtemp(scratchPath('fregat-split-breadcrumbs-'))
     const originalUrl = page.url()
     try {
       await writeFile(path.join(fixture, 'regions.ts'), source)
