@@ -2,8 +2,8 @@
 
 ## Status and authorization
 
-- Status: IN PROGRESS 2026-09-27. The rule landed in AGENTS.md ("React"). A1, A2, A4, A5, A8 (keep-alive),
-  B1–B4 and D5 are done; A3, A7, D4 and the preview budget stay (reasons below). A6 and C are left.
+- Status: IN PROGRESS 2026-09-27. The rule landed in AGENTS.md ("React"). All of A that moves (A1, A2, A4–A6, A8 keep-alive),
+  B1–B4, D1 and D5 are done; A3, A7, D4 and the preview budget stay (reasons below). C is left.
 - Origin: owner, 2026-09-27: "we prob abuse useSyncExternalStore too hard". Afterwards the owner
   approved the survey: hand-built stores become zustand, zustand stores read without a selector
   get selectors, snapshots that derive per read are cut down, and the TUI is in scope.
@@ -47,7 +47,7 @@ No second library. If one ever replaces zustand, it replaces all of it.
 | A3  | `features/git/state/reload.ts`, `features/settings/state/reload.ts`                  | `WeakMap<QueryClient,…>` + listener set, read by `use-reload-owner`                                                        | confirmed |
 | A4  | `features/workbench/utils/visible-tree-item-count-store.ts`, `tree-toolbar-store.ts` | factory with snapshot + listener set                                                                                       | **done**  |
 | A5  | `features/chat/state/active-transports.ts`                                           | `Map` + `createSubscriptions`; `transport-provider.tsx`, `queued-follow-up-senders.tsx` read `transportFor(id)` per render | confirmed |
-| A6  | `features/editor/state/color-theme-store.ts` (363 lines)                             | three module `let`s + listener set; provider reads three lambdas                                                           | confirmed |
+| A6  | `features/editor/state/color-theme-store.ts` (363 lines)                             | three module `let`s + listener set; provider reads three lambdas                                                           | **done**  |
 | A7  | `lib/markers/store.ts`                                                               | factory with cached `resources`; `hooks/use-markers.ts`                                                                    | likely    |
 | A8  | `lib/keep-alive/state/store.ts`, `features/search/state/preview-budget.ts`           | factory stores; the budget also measures DOM                                                                               | likely    |
 
@@ -63,7 +63,12 @@ panel is open; `readLogsFilters()` still reads the mirror. A4 is one per-panel
 `state/navigator-header-store.ts`, covered by `components/tests/file-navigator-header.test.tsx`.
 A5 exposes `activeTransports` and `hooks/use-active-transport.ts`; the disposer's old `notify()`
 after `close()` changed nothing a reader saw (same reference), so it is gone. A8's keep-alive store
-exposes its `entries` store; the outlet reads it with `useStore`.
+exposes its `entries` store; the outlet reads it with `useStore`. A6 is `colorThemeStore`
+(`selection`, `activeColorMode`, `preview`, `loadedRevision`); a registration landing bumps
+`loadedRevision` where it used to notify. An unsynced selection is read from the mirror on each
+read, where the old code froze it at the first read. Its getters take the state as an optional
+argument and serve as the provider's selectors (D1). Browser tests `prepared-open` and
+`syntax-worker` pass.
 
 Stays: A3 is a `WeakMap` keyed by `QueryClient`, mutated in place; a zustand `Map` would keep dead
 clients alive and the hooks only watch the per-owner generation. A7 keeps mutable indexes and builds
@@ -111,7 +116,7 @@ edit that returns an object.
 
 | #   | Where                                                           | Note                                                                                                                                                   |
 | --- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| D1  | `features/editor/providers/color-theme-provider.tsx:62-74`      | three lambdas over one source; folds into A6                                                                                                           |
+| D1  | `features/editor/providers/color-theme-provider.tsx:62-74`      | **done** with A6: three selectors over `colorThemeStore`                                                                                               |
 | D2  | `features/editor/components/history-pane.tsx:82-89`             | `historyBarrierGroup(buffer)` caches per buffer in the service; keep, but say so where it is read                                                      |
 | D3  | `features/editor/hooks/use-workspace-edit-state.ts`             | hand-rolled selector hook; works because `selectWorkspaceEditRecovery`/`Preview` return held refs. Becomes `useStore` once the service exposes a store |
 | D4  | `features/workbench/hooks/use-group-split-availability.ts`      | stays: ResizeObserver source (rule 3); the packed number keeps the snapshot a primitive, and `compiler:memos` marks the `useCallback` needed           |

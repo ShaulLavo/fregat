@@ -1,12 +1,6 @@
 import { interfaceTheme } from '@/features/editor/utils/interface-theme'
-import {
-  createElement,
-  useEffect,
-  useLayoutEffect,
-  useState,
-  useSyncExternalStore,
-  type ReactNode,
-} from 'react'
+import { createElement, useEffect, useLayoutEffect, useState, type ReactNode } from 'react'
+import { useStore } from 'zustand'
 import type { SettingsSubmission } from '@workspace/client-core/settings/intent-store'
 
 import { useTheme } from '@/features/settings/hooks/use-theme'
@@ -19,6 +13,7 @@ import {
 import { editorThemeColorMode } from '@/lib/code-theme/utils/catalog'
 import {
   clearEditorThemePreview,
+  colorThemeStore,
   getCommittedEditorThemeId,
   getResolvedShikiThemeContentHash,
   getSelectedEditorThemeId,
@@ -26,7 +21,6 @@ import {
   loadedEditorThemeForSelection,
   setActiveEditorColorMode,
   syncEditorThemeSelection,
-  subscribeEditorColorTheme,
   type LoadedEditorColorTheme,
 } from '@/features/editor/state/color-theme-store'
 
@@ -59,16 +53,17 @@ export function EditorColorThemeProvider({ children }: { readonly children: Reac
   }
   // The selection id doubles as the shiki theme name (id === shikiName), so the
   // provider knows the theme name synchronously even before the JSON loads.
-  const shikiTheme = useSyncExternalStore(subscribeEditorColorTheme, () =>
-    getSelectedEditorThemeId(resolvedTheme),
+  const shikiTheme = useStore(colorThemeStore, (state) =>
+    getSelectedEditorThemeId(resolvedTheme, state),
   )
-  const committedThemeId = useSyncExternalStore(subscribeEditorColorTheme, () =>
-    getCommittedEditorThemeId(resolvedTheme),
+  const committedThemeId = useStore(colorThemeStore, (state) =>
+    getCommittedEditorThemeId(resolvedTheme, state),
   )
   const [loadedTheme, setLoadedTheme] = useState<LoadedEditorColorTheme | null>(() =>
     loadedEditorThemeForSelection(resolvedTheme),
   )
-  const appliedThemeContentHash = useSyncExternalStore(subscribeEditorColorTheme, () => {
+  // The hash lives in the query cache; `loadedRevision` bumps re-run this when it lands.
+  const appliedThemeContentHash = useStore(colorThemeStore, () => {
     const themeId = loadedTheme?.resolvedThemeId
     return themeId ? getResolvedShikiThemeContentHash(themeId) : null
   })
