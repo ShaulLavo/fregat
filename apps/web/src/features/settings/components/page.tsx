@@ -2,6 +2,7 @@ import { MCP_CATEGORY } from '@/features/settings/utils/mcp'
 import { SettingsDisplayProvider } from '@/features/settings/providers/display-provider'
 import { useReloadView } from '@/features/settings/hooks/use-reload-view'
 import { ToolPane } from '@workspace/ui/patterns/tool-pane'
+import { usePresentation } from '@workspace/ui/patterns/sheet'
 import { workspaceRoot } from '@/lib/documents/utils/identity'
 import type { TabId, WorkspaceRoot } from '@/lib/documents/utils/types'
 import { useNavigation } from '@/hooks/use-navigation'
@@ -61,6 +62,7 @@ export function SettingsPage({
   tabId?: TabId
 } = {}) {
   const navigation = useNavigation()
+  const phone = usePresentation() === 'sheet'
   const editorOwner = useQueryClient()
   const settingsOwner = useSettingsOwner()
   const {
@@ -167,7 +169,7 @@ export function SettingsPage({
                     autoCapitalize='off'
                     autoComplete='off'
                     autoCorrect='off'
-                    autoFocus={active}
+                    autoFocus={active && !phone}
                     ref={searchRef}
                     onChange={(event) => setQuery(event.currentTarget.value)}
                     placeholder='Search settings'

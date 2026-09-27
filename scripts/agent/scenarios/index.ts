@@ -259,7 +259,9 @@ import { settingsColdLoad } from './settings-cold-load'
 import { settingsOpen, settingsOpenNavigation } from './settings-open'
 import { serverRestart } from './server-restart'
 import { settingsDefaults } from './settings-defaults'
+import { settingsFocus } from './settings-focus'
 import { settingsAppearanceRows } from './settings-appearance-rows'
+import { settingsWallpaperScroll } from './settings-wallpaper-scroll'
 import { settingsAppearanceOpen } from './settings-appearance-open'
 import { projectMenu } from './project-menu'
 import { workspaceSwitch } from './workspace-switch'
@@ -617,8 +619,10 @@ export const scenarios: readonly Scenario[] = [
   wallpaperPalette,
   themeBundlePalette,
   settingsDefaults,
+  settingsFocus,
   settingsAppearanceRows,
   settingsAppearanceOpen,
+  settingsWallpaperScroll,
   settingsColdLoad,
   settingsOpen,
   settingsOpenNavigation,
