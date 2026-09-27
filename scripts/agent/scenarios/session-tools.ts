@@ -2,16 +2,10 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Locator, Page } from 'playwright'
 import type { Scenario } from './index'
-import { selectors } from '../selectors'
-import { createGitFixture, fixtureGit } from '../fixture-workspace'
-import {
-  openChat,
-  openScenarioSession,
-  removeScenarioSessions,
-  typePrompt,
-  waitForReply,
-} from './chat-verification'
-import { registerFixtureProject } from './native-provider-verification'
+import { selectors, settleAnimations } from '../selectors'
+import { typePrompt, waitForReply } from './chat-verification'
+import { runInFixtureRepository } from './fixture-repository'
+import type { FixtureProviderKind, NativeProvider } from './native-provider-verification'
 
 const DONE = 'TOOLS_READY'
 
@@ -41,9 +35,9 @@ process.stdin.on('data', (chunk) => {
 type SessionToolsProvider = {
   readonly name: string
   readonly description: string
-  readonly model: { providerInstanceId: string; model: string }
+  readonly kind: FixtureProviderKind
   /** Writes the provider's project config into the fixture before its first commit. */
-  readonly prepare: (fixture: string) => Promise<void>
+  readonly prepare: (fixture: string, native: NativeProvider) => Promise<void>
   readonly check: (
     popover: Locator,
     page: Page,
@@ -55,25 +49,11 @@ type SessionToolsProvider = {
 function sessionToolsScenario(provider: SessionToolsProvider): Scenario {
   return {
     name: provider.name,
-    realProviders: true,
+    requiresIsolatedServer: true,
     description: provider.description,
-    async run(page, { step }) {
-      const orchestration = await openChat(page)
-      const fixture = await createGitFixture(provider.name)
-      const sessionId = crypto.randomUUID()
-      let projectId: string | null = null
-      try {
-        await provider.prepare(fixture)
-        await fixtureGit(fixture, ['add', '.'])
-        await fixtureGit(fixture, ['commit', '--quiet', '-m', 'initial'])
-        const worktree = await registerFixtureProject(page, orchestration, fixture)
-        projectId = worktree.projectId
-        await openScenarioSession(page, orchestration, {
-          model: provider.model,
-          sessionId,
-          title: `Session tools ${sessionId.slice(0, 8)}`,
-          worktreeId: worktree.id,
-        })
+    run: (page, { step }) =>
+      runInFixtureRepository(page, step, provider, async ({ openSession }) => {
+        await openSession('Session tools')
         await typePrompt(page, `Use no tools. Reply with exactly ${DONE}.`)
         await selectors.chatSend(page).click()
         await waitForReply(page, DONE)
@@ -84,25 +64,15 @@ function sessionToolsScenario(provider: SessionToolsProvider): Scenario {
           page,
           step,
         )
-      } catch (error) {
-        await step('failed-before-cleanup')
-        throw error
-      } finally {
-        await removeScenarioSessions(page, orchestration, {
-          fixture,
-          projectId,
-          sessions: [sessionId],
-        })
-      }
-    },
+      }),
   }
 }
 
 export const claudeSessionTools = sessionToolsScenario({
   name: 'claude-session-tools',
   description:
-    'Real Claude (Haiku) in a fixture repository with two project MCP servers, one working and one whose command does not exist: the header popover shows Connected and Failed with the error, Reconnect runs, and the hooks section names where Claude keeps hooks. Removes the fixture, session and project.',
-  model: { providerInstanceId: 'claude', model: 'claude-haiku-4-5' },
+    'The Claude fixture in a fixture repository with two project MCP servers, one working and one whose command does not exist: the popover offers each for approval, and once both are approved the fixture starts each as the CLI does and the popover shows Connected and Failed with the error, Reconnect runs, and the hooks section names where Claude keeps hooks. Removes the fixture, session and project.',
+  kind: 'claude',
   async prepare(fixture) {
     await writeFile(path.join(fixture, 'fixture-mcp.mjs'), FIXTURE_SERVER)
     await writeFile(
@@ -121,9 +91,16 @@ export const claudeSessionTools = sessionToolsScenario({
     )
   },
   async check(popover, page, step) {
+    // A checkout's .mcp.json servers stay off until the owner approves each; approving restarts the CLI.
+    await popover.getByRole('button', { name: 'Approve fixture' }).waitFor({ timeout: 30_000 })
+    await settleAnimations(popover)
+    await step('servers-await-approval')
+    for (const name of ['fixture', 'broken'])
+      await popover.getByRole('button', { name: `Approve ${name}` }).click()
     await popover.getByTitle(/^fixture · Connected/).waitFor({ timeout: 30_000 })
     await popover.getByTitle(/^broken · Failed/).waitFor()
     await popover.getByText('Claude Code reads hooks from its settings files.').waitFor()
+    await settleAnimations(popover)
     await step('servers-listed')
 
     const reconnect = page.waitForResponse((response) =>
@@ -139,9 +116,13 @@ export const claudeSessionTools = sessionToolsScenario({
 export const codexSessionTools = sessionToolsScenario({
   name: 'codex-session-tools',
   description:
-    "Real Codex in a fixture repository with one project hook: after a turn the header popover lists the user's MCP servers with their states and the checkout's configured hook, read through mcpServerStatus/list and hooks/list. Removes the fixture, session and project.",
-  model: { providerInstanceId: 'codex', model: 'gpt-5.5' },
-  async prepare(fixture) {
+    "The Codex fixture in a fixture repository with one project hook: after a turn the header popover lists the MCP server in the fixture's Codex home with its state and the checkout's configured hook, read through mcpServerStatus/list and hooks/list. Removes the fixture, session and project.",
+  kind: 'codex',
+  async prepare(fixture, native) {
+    await writeFile(
+      path.join(native.root, 'config.toml'),
+      '[mcp_servers.fixture]\ncommand = "true"\n',
+    )
     await mkdir(path.join(fixture, '.codex'), { recursive: true })
     await writeFile(
       path.join(fixture, '.codex', 'hooks.json'),
@@ -155,6 +136,7 @@ export const codexSessionTools = sessionToolsScenario({
   async check(popover, _page, step) {
     await popover.getByText('preToolUse', { exact: true }).waitFor({ timeout: 15_000 })
     await popover.getByText('Connected').first().waitFor()
+    await settleAnimations(popover)
     await step('codex-tools')
   },
 })

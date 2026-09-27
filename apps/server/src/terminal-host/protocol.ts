@@ -75,14 +75,19 @@ export function hostPaths(stateRoot: string, env: NodeJS.ProcessEnv = process.en
   }
 }
 
+// Only the state root's owner creates it: a host still starting after its home was removed must not bring it back.
 export function ensureSocketDirectory(paths: HostPaths) {
-  mkdirSync(paths.directory, { recursive: true, mode: 0o700 })
+  const underRoot = path.dirname(paths.directory) === path.dirname(paths.token)
+  try {
+    mkdirSync(paths.directory, { recursive: !underRoot, mode: 0o700 })
+  } catch (error) {
+    if (!isErrnoCode(error, 'EEXIST')) throw error
+  }
   chmodSync(paths.directory, 0o700)
 }
 
-/** Created once by whichever side needs it first; both sides then read the same file. */
+/** Created once by whichever side needs it first, in a state root that already exists. */
 export function ensureToken(paths: HostPaths) {
-  mkdirSync(path.dirname(paths.token), { recursive: true })
   try {
     writeFileSync(paths.token, randomBytes(32).toString('hex'), { flag: 'wx', mode: 0o600 })
   } catch (error) {

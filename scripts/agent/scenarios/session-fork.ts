@@ -2,21 +2,14 @@ import { ok, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
-import { createGitFixture, fixtureGit } from '../fixture-workspace'
-import {
-  openScenarioSession,
-  openChat,
-  readShell,
-  removeScenarioSessions,
-  typePrompt,
-  waitForReply,
-} from './chat-verification'
-import { registerFixtureProject } from './native-provider-verification'
+import { readShell, typePrompt, waitForCompletedTurn, waitForReply } from './chat-verification'
+import { runInFixtureRepository } from './fixture-repository'
+import type { FixtureProviderKind } from './native-provider-verification'
 
 type ForkProvider = {
   readonly name: string
   readonly description: string
-  readonly model: { providerInstanceId: string; model: string }
+  readonly kind: FixtureProviderKind
 }
 
 const WORDS = ['mango', 'kiwi', 'papaya'] as const
@@ -25,90 +18,66 @@ const RECALL = 'FORK_RECALL_DONE'
 /**
  * Three turns each hand the agent a fruit. Forking from the second answer
  * must give a session that knows the first two fruits and not the third, while
- * the source keeps all three turns.
+ * the source keeps all three turns. The fixture answers a recall by reciting the
+ * prompts its own copy of the conversation holds.
  */
 function sessionForkScenario(provider: ForkProvider): Scenario {
   return {
     name: provider.name,
-    realProviders: true,
+    requiresIsolatedServer: true,
     description: provider.description,
-    async run(page, { step }) {
-      const orchestration = await openChat(page)
-      const fixture = await createGitFixture(provider.name)
-      const sourceId = crypto.randomUUID()
-      const sessions: string[] = [sourceId]
-      let projectId: string | null = null
-      try {
-        await fixtureGit(fixture, ['commit', '--quiet', '--allow-empty', '-m', 'initial'])
-        const worktree = await registerFixtureProject(page, orchestration, fixture)
-        projectId = worktree.projectId
-        const title = `Fork source ${sourceId.slice(0, 8)}`
-        await openScenarioSession(page, orchestration, {
-          model: provider.model,
-          sessionId: sourceId,
-          title,
-          worktreeId: worktree.id,
-        })
-        for (const [index, word] of WORDS.entries()) {
-          const reply = `STORED_${index + 1}`
+    run: (page, { step }) =>
+      runInFixtureRepository(
+        page,
+        step,
+        provider,
+        async ({ orchestration, openSession, sessions }) => {
+          const sourceId = await openSession('Fork source')
+          let previous: string | null = null
+          for (const [index, word] of WORDS.entries()) {
+            const reply = `STORED_${index + 1}`
+            await typePrompt(
+              page,
+              `I am testing conversation memory. Fruit number ${index + 1} on my list is ${word}. Use no tools; just reply with ${reply}.`,
+            )
+            await selectors.chatSend(page).click()
+            await waitForReply(page, reply)
+            previous = await waitForCompletedTurn(page, orchestration, sourceId, previous)
+          }
+          await step('source-three-turns')
+
+          const second = selectors.chatMessages(page).getByText('STORED_2', { exact: true }).last()
+          await second.click({ button: 'right' })
+          await selectors.menuItem(page, 'Fork from Here').click()
+          await page.waitForURL((url) => !url.href.includes(sourceId), { timeout: 30_000 })
+          sessions.push(await forkedSessionId(page, orchestration, sourceId))
+          await selectors.chatMessages(page).getByText('STORED_2', { exact: true }).waitFor()
+          strictEqual(
+            await selectors.chatMessages(page).getByText('STORED_3', { exact: true }).count(),
+            0,
+            'The fork shows the conversation only through the chosen turn',
+          )
+          await step('fork-opened')
+
           await typePrompt(
             page,
-            `I am testing conversation memory. Fruit number ${index + 1} on my list is ${word}. Use no tools; just reply with ${reply}.`,
+            `Which fruits have I listed in this conversation so far? Name them, then end with ${RECALL}. Use no tools.`,
           )
           await selectors.chatSend(page).click()
-          await waitForReply(page, reply)
-          await waitForIdle(page, orchestration, sourceId)
-        }
-        await step('source-three-turns')
+          await waitForReply(page, RECALL)
+          const text = await selectors.chatMessages(page).innerText()
+          const answer = text.slice(text.lastIndexOf('Name them')).toLowerCase()
+          ok(answer.includes('mango') && answer.includes('kiwi'), `fork recalled: ${answer}`)
+          ok(!answer.includes('papaya'), `fork must not know turn 3: ${answer}`)
+          await step('fork-recalls-two-fruits')
 
-        const second = selectors.chatMessages(page).getByText('STORED_2', { exact: true }).last()
-        await second.click({ button: 'right' })
-        await selectors.menuItem(page, 'Fork from Here').click()
-        await page.waitForURL((url) => !url.href.includes(sourceId), { timeout: 30_000 })
-        const forkId = await forkedSessionId(page, orchestration, sourceId)
-        sessions.push(forkId)
-        await selectors.chatMessages(page).getByText('STORED_2', { exact: true }).waitFor()
-        strictEqual(
-          await selectors.chatMessages(page).getByText('STORED_3', { exact: true }).count(),
-          0,
-          'The fork shows the conversation only through the chosen turn',
-        )
-        await step('fork-opened')
-
-        await typePrompt(
-          page,
-          `Which fruits have I listed in this conversation so far? Name them, then end with ${RECALL}. Use no tools.`,
-        )
-        await selectors.chatSend(page).click()
-        await waitForReply(page, RECALL)
-        const text = await selectors.chatMessages(page).innerText()
-        const answer = text.slice(text.lastIndexOf('Name them')).toLowerCase()
-        ok(answer.includes('mango') && answer.includes('kiwi'), `fork recalled: ${answer}`)
-        ok(!answer.includes('papaya'), `fork must not know turn 3: ${answer}`)
-        await step('fork-recalls-two-fruits')
-
-        const source = (await readShell(page, orchestration)).sessions.find(
-          (session) => session.id === sourceId,
-        )
-        ok(source?.latestTurn?.state === 'completed', 'The source is untouched')
-      } catch (error) {
-        await step('failed-before-cleanup')
-        throw error
-      } finally {
-        await removeScenarioSessions(page, orchestration, { fixture, projectId, sessions })
-      }
-    },
+          const source = (await readShell(page, orchestration)).sessions.find(
+            (session) => session.id === sourceId,
+          )
+          ok(source?.latestTurn?.state === 'completed', 'The source is untouched')
+        },
+      ),
   }
-}
-
-async function waitForIdle(page: Page, orchestration: string, sessionId: string) {
-  const deadline = Date.now() + 60_000
-  while (Date.now() < deadline) {
-    const session = (await readShell(page, orchestration)).sessions.find((s) => s.id === sessionId)
-    if (session?.latestTurn?.state === 'completed') return
-    await Bun.sleep(250)
-  }
-  ok(false, 'The turn never completed')
 }
 
 async function forkedSessionId(page: Page, orchestration: string, sourceId: string) {
@@ -122,13 +91,13 @@ async function forkedSessionId(page: Page, orchestration: string, sourceId: stri
 export const claudeSessionFork = sessionForkScenario({
   name: 'claude-session-fork',
   description:
-    'Real Claude (Haiku): three turns each name a fruit; Fork from Here on the second answer opens a session that recalls the first two fruits and not the third, and the source keeps its three turns. Removes the fixture, sessions and project.',
-  model: { providerInstanceId: 'claude', model: 'claude-haiku-4-5' },
+    'The Claude fixture: three turns each name a fruit; Fork from Here on the second answer resumes the transcript cut at that answer, so the fork recalls the first two fruits and not the third, and the source keeps its three turns. Removes the fixture, sessions and project.',
+  kind: 'claude',
 })
 
 export const codexSessionFork = sessionForkScenario({
   name: 'codex-session-fork',
   description:
-    'Real Codex: three turns each name a fruit; Fork from Here on the second answer opens a session that recalls the first two fruits and not the third, and the source keeps its three turns. Removes the fixture, sessions and project.',
-  model: { providerInstanceId: 'codex', model: 'gpt-5.5' },
+    'The Codex fixture: three turns each name a fruit; Fork from Here on the second answer forks the thread through that turn, so the fork recalls the first two fruits and not the third, and the source keeps its three turns. Removes the fixture, sessions and project.',
+  kind: 'codex',
 })
