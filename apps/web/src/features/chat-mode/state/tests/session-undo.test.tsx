@@ -8,8 +8,8 @@ import {
   offerSessionUndo,
   resetSessionUndo,
   sessionUndoAvailable,
-  useSessionUndoStore,
 } from '@/features/chat-mode/state/session-undo'
+import { useSessionUndoStore } from '@/features/chat-mode/state/session-undo-history'
 import { renderWithProviders } from '../../../../../test/render'
 import { expect, test } from '../../../../../test/fixtures'
 
@@ -72,4 +72,21 @@ test('forgetting every row of an action drops that action from the history', () 
   offerSessionUndo({ kind: 'archive', entries: [entry('b')], detail: '', shortcut: null })
   forgetSessionUndo([entry('b').ref])
   expect(useSessionUndoStore.getState().undo.map((batch) => batch.kind)).toEqual(['settle'])
+})
+
+test('forgetting one row of a bulk action lowers the count its notice shows', () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  renderWithProviders(<Toaster />)
+  act(() => {
+    offerSessionUndo({
+      kind: 'archive',
+      entries: [entry('a'), entry('b')],
+      detail: '',
+      shortcut: null,
+    })
+  })
+  act(() => vi.advanceTimersByTime(0))
+  expect(screen.getByText('2 archived')).toBeTruthy()
+  act(() => forgetSessionUndo([entry('a').ref]))
+  expect(screen.getByText('1 archived')).toBeTruthy()
 })

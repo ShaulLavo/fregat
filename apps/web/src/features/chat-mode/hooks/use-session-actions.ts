@@ -14,11 +14,8 @@ import {
   sessionLifecycleUndoEntry,
   sessionLifecycleVerb,
 } from '@workspace/client-core/chat/rail/lifecycle-undo'
-import {
-  forgetSessionUndo,
-  offerSessionUndo,
-  type SessionUndoEntry,
-} from '@/features/chat-mode/state/session-undo'
+import { forgetSessionUndo, offerSessionUndo } from '@/features/chat-mode/state/session-undo'
+import type { SessionUndoEntry } from '@/features/chat-mode/state/session-undo-history'
 import {
   batchDetail,
   lifecycleUndoKind,

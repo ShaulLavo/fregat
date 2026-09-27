@@ -1,12 +1,9 @@
 import { toast } from 'sonner'
-import { create } from 'zustand'
-import type { ProjectId, ScopedSessionRef } from '@workspace/contracts'
+import { createElement } from 'react'
+import type { ScopedSessionRef } from '@workspace/contracts'
 import {
-  createSessionLifecycleHistory,
   sessionLifecycleUndoEntry,
   sessionLifecycleRestoreCommand,
-  sessionLifecycleVerb,
-  type SessionLifecycleUndoEntry,
   type SessionLifecycleUndoKind,
 } from '@workspace/client-core/chat/rail/lifecycle-undo'
 import type { HistoryDirection } from '@workspace/client-core/history/undo-stack'
@@ -22,17 +19,16 @@ import { errorMessage } from '@/lib/error-message'
 import { getNavigation } from '@/state/navigation-binding'
 import { sessionArchive } from '@/features/chat-mode/state/removal'
 import { batchDetail } from '@/features/chat-mode/utils/session-undo'
+import {
+  sessionUndoHistory as history,
+  type SessionUndoEntry,
+} from '@/features/chat-mode/state/session-undo-history'
+import { SessionUndoNoticeTitle } from '@/features/chat-mode/components/session-undo-notice-title'
 
-export type SessionUndoEntry = SessionLifecycleUndoEntry & {
-  readonly reopen: { readonly surface: 'main' | 'sidebar'; readonly projectId: ProjectId } | null
-}
-const history = createSessionLifecycleHistory<SessionUndoEntry>()
 const NOTICE_DURATION_MS = 5_000
 // A step closes its notice at once but runs behind queued lifecycle mutations; the close must not expire it.
 const claimed = new Set<number>()
 const undoShortcuts = new Map<number, string | null>()
-export const useSessionUndoStore = create(() => history.getSnapshot())
-history.subscribe(() => useSessionUndoStore.setState(history.getSnapshot()))
 
 export function sessionUndoAvailable() {
   return history.getSnapshot().undo.length > 0
@@ -56,7 +52,7 @@ export function offerSessionUndo({
   const id = history.record(kind, entries)
   if (id === null) return
   undoShortcuts.set(id, shortcut)
-  showNotice(id, 'undo', `${entries.length} ${sessionLifecycleVerb(kind)}${detail}`)
+  showNotice(id, 'undo', { kind, detail, count: entries.length })
 }
 export function forgetSessionUndo(refs: readonly ScopedSessionRef[]) {
   const before = batchIds()
@@ -84,19 +80,31 @@ function batchIds() {
 function noticeId(id: number) {
   return `session-lifecycle-undo-${id}`
 }
-function showNotice(id: number, direction: HistoryDirection, title: string) {
+function showNotice(
+  id: number,
+  direction: HistoryDirection,
+  title: {
+    readonly kind: SessionLifecycleUndoKind
+    readonly detail: string
+    readonly count: number
+  },
+) {
   const shortcut = direction === 'undo' ? undoShortcuts.get(id) : null
-  toast(title, {
-    id: noticeId(id),
-    duration: NOTICE_DURATION_MS,
-    ...(shortcut ? { description: `${shortcut} to undo` } : {}),
-    action: {
-      label: direction === 'undo' ? 'Undo' : 'Redo',
-      onClick: () => void stepSessionHistory(direction, id),
+  // The title reads the batch, so a row forgotten later lowers its count in place.
+  toast(
+    createElement(SessionUndoNoticeTitle, { batchId: id, undone: direction === 'redo', ...title }),
+    {
+      id: noticeId(id),
+      duration: NOTICE_DURATION_MS,
+      ...(shortcut ? { description: `${shortcut} to undo` } : {}),
+      action: {
+        label: direction === 'undo' ? 'Undo' : 'Redo',
+        onClick: () => void stepSessionHistory(direction, id),
+      },
+      onAutoClose: () => expireBatch(id),
+      onDismiss: () => expireBatch(id),
     },
-    onAutoClose: () => expireBatch(id),
-    onDismiss: () => expireBatch(id),
-  })
+  )
 }
 function closeNotice(id: number) {
   undoShortcuts.delete(id)
@@ -132,14 +140,12 @@ async function stepBatch(direction: HistoryDirection, id: number) {
   undoShortcuts.delete(id)
   if (result.inverse) {
     const { inverse } = result
-    const detail = batchDetail({ failed: result.failed })
     undoShortcuts.set(inverse.id, shortcut)
-    const summary = `${inverse.entries.length} ${sessionLifecycleVerb(inverse.kind)}${detail}`
-    showNotice(
-      inverse.id,
-      direction === 'undo' ? 'redo' : 'undo',
-      direction === 'undo' ? `Undid ${summary}` : summary,
-    )
+    showNotice(inverse.id, direction === 'undo' ? 'redo' : 'undo', {
+      kind: inverse.kind,
+      detail: batchDetail({ failed: result.failed }),
+      count: inverse.entries.length,
+    })
   }
   return result.applied.length > 0 && result.failed === 0
 }

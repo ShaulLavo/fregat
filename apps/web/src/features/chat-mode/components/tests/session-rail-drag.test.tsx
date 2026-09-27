@@ -1,4 +1,5 @@
-import { offerSessionUndo, useSessionUndoStore } from '@/features/chat-mode/state/session-undo'
+import { offerSessionUndo } from '@/features/chat-mode/state/session-undo'
+import { useSessionUndoStore } from '@/features/chat-mode/state/session-undo-history'
 import { sessionLifecycleUndoEntry } from '@workspace/client-core/chat/rail/lifecycle-undo'
 import { createObservedInProcessClient } from '../../../../../test/client'
 import { sessionDropPatch } from '@/features/chat-mode/utils/rail-drop'

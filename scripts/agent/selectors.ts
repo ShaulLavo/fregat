@@ -112,8 +112,11 @@ export const selectors = {
     page
       .getByRole('toolbar', { name: 'Selected sessions' })
       .getByRole('button', { name: 'Actions', exact: true }),
-  toastUndo: (page: Page) =>
-    page.locator('[data-sonner-toast]').getByRole('button', { name: 'Undo', exact: true }).last(),
+  toastUndo: (page: Page, text: string) =>
+    page
+      .locator('[data-sonner-toast]')
+      .filter({ hasText: text })
+      .getByRole('button', { name: 'Undo', exact: true }),
   undoNotice: (page: Page, text: string) =>
     page.locator('[data-sonner-toast]').filter({ hasText: text }),
   shelfRowTitles: (page: Page, shelf: string) =>

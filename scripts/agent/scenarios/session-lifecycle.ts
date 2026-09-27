@@ -65,7 +65,7 @@ export const sessionLifecycle: Scenario = {
         await selectors.sessionInShelf(page, title, 'Snoozed').waitFor()
         await selectors.sessionInShelf(page, other, 'Snoozed').waitFor()
         await step('bulk-snoozed')
-        await selectors.toastUndo(page).click()
+        await selectors.toastUndo(page, '2 snoozed').click()
         await selectors.sessionInShelf(page, title, 'Active').waitFor()
         await selectors.sessionInShelf(page, other, 'Active').waitFor()
         await step('bulk-undo')

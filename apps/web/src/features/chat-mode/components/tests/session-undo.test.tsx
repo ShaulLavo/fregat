@@ -19,10 +19,10 @@ import { chatModeMutationKeys } from '@/features/chat-mode/utils/mutation-keys'
 import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { useSessionMultiSelectStore } from '@/features/chat-mode/state/session-multi-select-store'
 import {
-  useSessionUndoStore,
   undoLatestSessionAction,
   redoLatestSessionAction,
 } from '@/features/chat-mode/state/session-undo'
+import { useSessionUndoStore } from '@/features/chat-mode/state/session-undo-history'
 import { useSessionActions } from '@/features/chat-mode/hooks/use-session-actions'
 import { reorderRailSession } from '@/features/chat-mode/state/rail-order-commands'
 import { railMarkerId } from '@workspace/client-core/chat/rail/drop'

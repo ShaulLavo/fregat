@@ -70,6 +70,10 @@
 - `pressable` for press feedback. Motion uses the configured defaults (`--duration-enter`/`-exit`, `ease-*-strong`); never hand-write durations or curves. A transition that animates a focus ring must list `box-shadow`.
 - Composite fields (leading icon, trailing button or count) are `InputGroup` with addons, never absolute icons over a padded input.
 
+## TUI
+
+- The TUI (`apps/tui`) designs its own UX for the terminal. Never port a web pattern (toasts, notices, dialogs, layouts) to it because the web has it; solve the need the way a terminal app would. The reference is herdr (https://herdr.dev/). A redesign is coming, so TUI parity items from web plans wait for it.
+
 ## Loading, Empty And Error States
 
 - Three loaders from `@workspace/ui`, nothing hand-rolled: `LoadingState` (skeleton for a region with no content yet, mirroring the loaded view's primitives, one placeholder per element), `Spinner` (anything else; `size` `xs` rows, `sm` control icon, `md` panel, `lg` surface; none inside `Button`; no `text-*` class), `Shimmer` (inline in a running sentence only).
