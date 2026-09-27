@@ -33,7 +33,7 @@ import type {
 import {
   subscribeWorkspaceCachePersistence,
   type WorkspaceCacheWriters,
-} from '@/features/workspace/hooks/use-cache-persistence'
+} from '@/features/workspace/state/cache-persistence'
 
 type CacheWrite =
   | {

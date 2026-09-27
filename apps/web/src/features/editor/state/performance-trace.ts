@@ -113,13 +113,10 @@ export type EditorPerformanceLayoutVariant = 'absolute-rows' | 'default'
 let disabledFeatureSet: ReadonlySet<string> | null = null
 let editorOpenBenchmarkControl: EditorOpenBenchmarkControl | null = null
 
+/** The active editor runtime registers its control on resume. */
 export function registerEditorOpenBenchmarkControl(
   control: EditorOpenBenchmarkControl,
 ): () => void {
-  if (editorOpenBenchmarkControl && editorOpenBenchmarkControl !== control) {
-    throw createClientInvariantError('Editor-open benchmark control is already registered')
-  }
-
   editorOpenBenchmarkControl = control
   return () => {
     if (editorOpenBenchmarkControl === control) editorOpenBenchmarkControl = null

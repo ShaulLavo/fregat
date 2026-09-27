@@ -2808,6 +2808,12 @@
   }
 }
 
+/* No iOS link preview or image callout in the phone shell: a long press opens the app's own menu.
+   On the root, so portaled menus, dialogs and the palette inherit it. */
+:root[data-shell='phone'] {
+  -webkit-touch-callout: none;
+}
+
 /* Unlayered, so it outranks a field's text-size utility: iOS zooms the page into any focused
    field whose text is under 16px, and the phone shell never wants that zoom. */
 :root[data-shell='phone'] :is(input, textarea, select, [contenteditable='true']) {

@@ -24,6 +24,7 @@ test('the machine menu filters the federated rail and keeps project actions owne
     expect(sessionRailModel({ environments: currentRailEnvironments() }).sessions).toHaveLength(2),
   )
   renderWithProviders(<SessionMachineMenu />, {
+    application: h.application,
     queryClient: queryClientFor(h.originA),
     connections: h.connections,
   })
