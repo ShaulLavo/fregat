@@ -1,4 +1,4 @@
-import { fileIconRule, fileTreeIconsForPaths, iconForEntry } from '@/lib/file-icons'
+import { fileIconRule, iconForEntry } from '@/lib/file-icons'
 import { expect, test } from '../../../test/fixtures'
 
 function iconFor(name: string) {
@@ -117,16 +117,15 @@ test.each(['constructor', '__proto__', 'toString'])(
   },
 )
 
-test.each(['constructor', '__proto__', 'toString'])(
-  '%s gets its own default tree icon override',
-  (name) => {
-    const icons = fileTreeIconsForPaths([`src/${name}`])
-    const key = name.toLocaleLowerCase()
-    expect(icons.byFileName).toBeDefined()
-    expect(Object.hasOwn(icons.byFileName ?? {}, key)).toBe(true)
-    expect(icons.byFileName?.[key]).toEqual({
-      name: 'app-vscode-icon-file-duo',
-      token: 'default',
-    })
-  },
-)
+test('the same icon rule resolves to one shared, frozen object', () => {
+  const first = iconForEntry({ name: 'a.ts', type: 'file' })
+
+  expect(iconForEntry({ name: 'b.ts', type: 'file' })).toBe(first)
+  expect(iconForEntry({ name: 'src', type: 'directory' })).toBe(
+    iconForEntry({ name: 'lib', type: 'directory' }),
+  )
+  expect(iconForEntry({ name: 'src', type: 'directory' }, { open: true })).not.toBe(
+    iconForEntry({ name: 'src', type: 'directory' }),
+  )
+  expect(Object.isFrozen(first)).toBe(true)
+})

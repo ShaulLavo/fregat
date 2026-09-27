@@ -1,4 +1,3 @@
-import type { FileTreeIcons } from '@workspace/tree'
 import type { FileTreeController } from '@workspace/tree'
 import type {
   FileTreeCompositionOptions,
@@ -16,7 +15,6 @@ export interface TreeViewProps extends Omit<FileTreeRenderOptions, 'initialVisib
   directoriesWithGitChanges?: ReadonlySet<FileTreePublicId>
   gitStatusByPath?: ReadonlyMap<FileTreePublicId, GitStatus>
   ignoredGitDirectories?: ReadonlySet<FileTreePublicId>
-  icons?: FileTreeIcons
   // First-render viewport height in CSS pixels, used as the fallback when the
   // scroll element's clientHeight is still zero. The public option is
   // `initialVisibleRowCount` (rows); the resolver multiplies it by itemHeight

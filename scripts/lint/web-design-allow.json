@@ -205,6 +205,11 @@
     "reason": "The file tree's own row machinery, moved into the app unchanged by Plan 178 app-owned-state; the rows and chrome sub-plans rebuild it on ListRow, InputGroup and the app's truncation, and delete this entry."
   },
   {
+    "file": "apps/web/src/features/workspace/components/tree-menu-trigger.tsx",
+    "class": "missing Tooltip",
+    "reason": "The file tree's own row machinery, moved into the app unchanged by Plan 178 app-owned-state; the rows and chrome sub-plans rebuild it on ListRow, InputGroup and the app's truncation, and delete this entry."
+  },
+  {
     "file": "apps/web/src/features/workspace/components/tree-rename-input.tsx",
     "class": "<input>",
     "reason": "The file tree's own row machinery, moved into the app unchanged by Plan 178 app-owned-state; the rows and chrome sub-plans rebuild it on ListRow, InputGroup and the app's truncation, and delete this entry."
@@ -222,11 +227,6 @@
   {
     "file": "apps/web/src/features/workspace/components/tree-filter-input.tsx",
     "class": "<input>",
-    "reason": "The file tree's own row machinery, moved into the app unchanged by Plan 178 app-owned-state; the rows and chrome sub-plans rebuild it on ListRow, InputGroup and the app's truncation, and delete this entry."
-  },
-  {
-    "file": "apps/web/src/features/workspace/components/tree-menu-trigger.tsx",
-    "class": "missing Tooltip",
     "reason": "The file tree's own row machinery, moved into the app unchanged by Plan 178 app-owned-state; the rows and chrome sub-plans rebuild it on ListRow, InputGroup and the app's truncation, and delete this entry."
   },
   {
