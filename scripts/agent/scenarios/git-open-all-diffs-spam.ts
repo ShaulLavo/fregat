@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { strictEqual } from 'node:assert/strict'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -11,7 +12,7 @@ export const gitOpenAllDiffsSpam: Scenario = {
   name: 'git-open-all-diffs-spam',
   description: 'Spam Open all diffs; every diff opens and no error surfaces.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-git-open-diffs-')
+    const fixture = await mkdtemp(scratchPath('fregat-git-open-diffs-'))
     try {
       await fixtureGit(fixture, ['init', '-b', 'main'])
       for (const file of files) await writeFile(path.join(fixture, file), 'change\n')

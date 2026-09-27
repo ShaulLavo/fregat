@@ -95,7 +95,7 @@ export class ServerUpdate {
       pendingReason: read.reason,
       stagedAt: read.staged?.stagedAt ?? null,
       serverRelease: this.serverRelease,
-      liveCheck: liveCheck ? { release: liveCheck.release, status: liveCheck.status } : null,
+      liveCheck,
     })
     this.publish()
     return this.state()

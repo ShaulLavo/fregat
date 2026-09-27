@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import type { Page } from 'playwright'
 import { strictEqual, ok } from 'node:assert/strict'
 import { mkdtemp, writeFile } from 'node:fs/promises'
@@ -28,7 +29,7 @@ export const editorLspTabSwitch: Scenario = {
     'Switch away and back to a TypeScript error without closing its LSP document or waiting for new diagnostics.',
   async run(page, { step }) {
     const originalUrl = page.url()
-    const fixture = await mkdtemp('/work/tmp/fregat-lsp-tabs-')
+    const fixture = await mkdtemp(scratchPath('fregat-lsp-tabs-'))
     const messages = captureProtocol(page)
     try {
       await writeFile(

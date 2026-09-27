@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { ok } from 'node:assert/strict'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -12,7 +13,7 @@ import type { Scenario } from './index'
 type IndexStatus = { holderCount: number; readiness: string; scanRoot: string | null }
 
 async function twoRootFixture() {
-  const root = await mkdtemp('/work/tmp/fregat-two-roots-')
+  const root = await mkdtemp(scratchPath('fregat-two-roots-'))
   for (const name of ['alpha', 'beta']) {
     await mkdir(path.join(root, name, 'src'), { recursive: true })
     await writeFile(path.join(root, name, 'src', `${name}-marker.ts`), `export const ${name} = 1\n`)

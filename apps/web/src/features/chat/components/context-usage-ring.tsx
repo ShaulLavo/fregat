@@ -46,17 +46,22 @@ export function ContextUsageRing({
               render={
                 <Button
                   aria-label={contextUsageLabel(usage, percent)}
+                  // Compact: the same square as the composer's other icon controls.
                   className={cn(
-                    'h-auto cursor-pointer gap-1.5 px-1 py-0.5 font-normal',
+                    'cursor-pointer font-normal',
+                    !compact && 'h-auto gap-1.5 px-1 py-0.5',
                     toneClass(usage.ratio),
                   )}
-                  size='sm'
+                  size={compact ? 'icon-sm' : 'sm'}
                   type='button'
                   variant='ghost'
                 >
                   <svg
                     aria-hidden
-                    className='size-4 shrink-0 -rotate-90'
+                    className={cn(
+                      'shrink-0 -rotate-90',
+                      compact ? 'size-(--icon-size-sm)' : 'size-4',
+                    )}
                     fill='none'
                     viewBox='0 0 18 18'
                     xmlns='http://www.w3.org/2000/svg'

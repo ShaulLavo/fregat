@@ -77,7 +77,8 @@ export function ThemesToolbar() {
       <Input
         accept='application/json,.json'
         aria-label='Import theme file'
-        className='sr-only'
+        // Not sr-only: the primitive's width wins, and the clipped box widens the scroller on iOS.
+        className='hidden'
         ref={fileRef}
         tabIndex={-1}
         type='file'

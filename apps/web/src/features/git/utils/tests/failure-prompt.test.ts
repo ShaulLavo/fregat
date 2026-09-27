@@ -17,7 +17,7 @@ test('a commit failure carries the hook output without its escapes', () => {
 
   expect(prompt).toBe(
     [
-      'Git commit failed in work/projects/platform.',
+      'Fix the Git commit failure in work/projects/platform.',
       '',
       'Error: git commit exited with code 1',
       '',
@@ -26,8 +26,6 @@ test('a commit failure carries the hook output without its escapes', () => {
       'format check',
       'apps/web/a.tsx (10ms)',
       '```',
-      '',
-      'Find the cause and fix it so the same step succeeds.',
     ].join('\n'),
   )
 })
@@ -40,5 +38,5 @@ test('a failure with no output is only the step and the error', () => {
   )
 
   expect(prompt).not.toContain('Output:')
-  expect(prompt).toContain('Git push failed in this repository.')
+  expect(prompt).toContain('Fix the Git push failure in this repository.')
 })

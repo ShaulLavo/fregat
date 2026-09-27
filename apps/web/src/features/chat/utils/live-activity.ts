@@ -9,12 +9,7 @@ export type ChatLiveActivity = {
   label: string
   active: boolean
   activities: readonly ChatWorkLogEntry[]
-  /** The response's newest calls, oldest first; empty until its first one. */
-  tail: readonly ChatWorkLogEntry[]
 }
-
-/** Rows the live tail shows; its height is reserved for all of them from the first call. */
-export const LIVE_TAIL_ROWS = 3
 
 export function deriveChatLiveActivity({
   entries,
@@ -38,9 +33,8 @@ export function deriveChatLiveActivity({
         (entry.turnId !== null && activeResponseTurnIds?.has(entry.turnId))),
   )
   const activities = trailingEntries
-  const tail = responseEntries.filter((entry) => !entry.reasoning).slice(-LIVE_TAIL_ROWS)
   const live = liveActivityState({ activities, assistantStreaming, latestTurn, responseEntries })
-  return { ...live, activities, tail }
+  return { ...live, activities }
 }
 
 function liveActivityState({
@@ -105,8 +99,4 @@ function waitingLabel(entry: ChatWorkLogEntry) {
   return entry.sourceKind === 'approval.requested'
     ? 'Waiting for approval'
     : 'Waiting for your answer'
-}
-
-export function liveTailLabel(entry: ChatWorkLogEntry) {
-  return entry.command ?? workLogEntryLabel(entry, entry.lifecycle === 'running')
 }

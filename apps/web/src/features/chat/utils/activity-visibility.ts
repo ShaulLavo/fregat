@@ -3,9 +3,9 @@ import { isWorkLogToolEntry } from '@/features/chat/utils/tool-label'
 import { formatChatElapsed } from '@/features/chat/utils/formatters'
 import { isWorkLogFailure } from '@/features/chat/utils/work-row'
 
-/** A collapsed group still shows every failure, every request and every tool call still running. */
+/** Requests, running tools and session errors remain visible while a group is collapsed. */
 export function isPinnedWorkLogEntry(entry: ChatWorkLogEntry) {
-  if (isWorkLogFailure(entry)) return true
+  if (isWorkLogFailure(entry) && !isWorkLogToolEntry(entry)) return true
   if (entry.icon === 'approval' || entry.icon === 'user-input') return true
 
   return isWorkLogToolEntry(entry) && entry.lifecycle === 'running'
@@ -31,7 +31,11 @@ export function activityGroupSummary(activities: readonly ChatWorkLogEntry[]) {
   if (searches > 0) parts.push(`Searched ${searches} ${searches === 1 ? 'time' : 'times'}`)
   if (others > 0) parts.push(`Used ${others} ${others === 1 ? 'tool' : 'tools'}`)
   if (hooks > 0) parts.push(`Ran ${hooks} ${hooks === 1 ? 'hook' : 'hooks'}`)
-  if (parts.length === 0) parts.push(`${activities.length} steps`)
+  if (parts.length === 0) {
+    const thoughts = activities.filter((activity) => activity.reasoning).length
+    if (thoughts === activities.length) return thoughts > 1 ? `Thought (×${thoughts})` : 'Thought'
+    parts.push(`${activities.length} steps`)
+  }
   const failures = activities.filter(isWorkLogFailure).length
   if (failures > 0) parts.push(`${failures} failed`)
   const duration = activityGroupDuration(activities)

@@ -278,8 +278,8 @@
   {
     "from": "chat-mode",
     "to": "logs",
-    "module": "features/logs/components/panel.tsx",
-    "reason": "owner: The chat mode tool area composes this pane through LogsPanel."
+    "module": "features/logs/components/deferred-panel.tsx",
+    "reason": "owner: The chat mode tool area composes this pane through DeferredLogsPanel."
   },
   {
     "from": "chat-mode",
@@ -1010,8 +1010,8 @@
   {
     "from": "workbench",
     "to": "logs",
-    "module": "features/logs/components/panel.tsx",
-    "reason": "owner: The workbench composes feature panes and their commands; this module supplies LogsPanel."
+    "module": "features/logs/components/deferred-panel.tsx",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies DeferredLogsPanel."
   },
   {
     "from": "workbench",

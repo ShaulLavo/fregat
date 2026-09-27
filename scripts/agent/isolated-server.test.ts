@@ -1,14 +1,11 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { expect, it } from 'vitest'
 
 import { TerminalHostClient } from '../../apps/server/src/terminal/host-client'
 import { startIsolatedServer } from './isolated-server'
 
 it('ends the isolated host and its live shell before removing its home', async () => {
-  const server = await startIsolatedServer(new URL('http://localhost:5214'), {
-    scratchRoot: tmpdir(),
-  })
+  const server = await startIsolatedServer(new URL('http://localhost:5214'))
   const client = new TerminalHostClient({ stateRoot: server.home })
   const host = await client.host()
   const shell = await client.spawn({
@@ -19,6 +16,7 @@ it('ends the isolated host and its live shell before removing its home', async (
   void shell.exited.catch(() => {})
   try {
     const settings = JSON.parse(readFileSync(`${server.home}/settings.json`, 'utf8'))
+    expect(settings['workbench.wallpaper']).toEqual({ enabled: false, source: { kind: 'desktop' } })
     expect(
       settings['providers.instances'].map((provider: { driverKind: string; enabled: boolean }) => [
         provider.driverKind,

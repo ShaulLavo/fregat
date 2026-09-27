@@ -26,7 +26,7 @@ import {
 } from '@/features/chat/utils/timeline-items'
 
 describe('chat timeline items', () => {
-  it('keeps the stopped fold label after Carry on starts another turn', () => {
+  it('keeps the stopped fold label after Continue starts another turn', () => {
     const sessionId = parseSessionId('bc3e1c41-73bd-5eb7-824f-b1fd01bf336d')
     const turnId = parseTurnId('previous-turn')
     const previous = {
@@ -636,8 +636,8 @@ describe('chat timeline items', () => {
     expect(items.find((item) => item.type === 'turn-fold')).toMatchObject({ label })
   })
 
-  describe('folds never hide a failure, a wait or a running call', () => {
-    it('keeps a failed call outside the settled turn fold', () => {
+  describe('settled work folds preserve current failures and pending work', () => {
+    it('folds earlier failed calls with their history when the answer completes', () => {
       const sessionId = parseSessionId('bc3e1c41-73bd-5eb7-824f-b1fd01bf336d')
       const turnId = parseTurnId('turn-1')
       const items = chatTimelineItems({
@@ -661,10 +661,10 @@ describe('chat timeline items', () => {
       expect(items.map((item) => item.id)).toEqual([
         'message:message-1',
         'turn-fold:turn-1',
-        'activity-group:tool-failed',
         'message:message-3',
       ])
       expect(foldedItemIds(items[1])).toEqual(['message:message-2', 'activity-group:tool-ok'])
+      expect(foldedActivityIds(items[1]!)).toEqual(['tool-ok', 'tool-failed'])
     })
 
     it('never folds a turn that is waiting on the user or running a tool', () => {
@@ -731,13 +731,11 @@ describe('chat timeline items', () => {
       })
 
       const activities = items.flatMap((item) =>
-        item.type === 'activity-group' ? item.activities : [],
+        item.type === 'live-activity' ? item.activity.activities : [],
       )
-      expect(activities.map((entry) => entry.id)).toEqual(['running', 'done', 'failed'])
-      expect(activities.filter(isPinnedWorkLogEntry).map((entry) => entry.id)).toEqual([
-        'running',
-        'failed',
-      ])
+      expect(items.filter((item) => item.type === 'activity-group')).toHaveLength(0)
+      expect(activities.map((entry) => entry.id)).toEqual(['running', 'done', 'failed', 'thinking'])
+      expect(activities.filter(isPinnedWorkLogEntry).map((entry) => entry.id)).toEqual(['running'])
     })
   })
 
@@ -819,7 +817,7 @@ describe('chat timeline items', () => {
     expect(chatTimelineItemEstimate(items[2])).toBe(24)
   })
 
-  it('gives reasoning its own row that streams while it is the newest work of a running turn', () => {
+  it('groups reasoning with adjacent tools under one current activity', () => {
     const sessionId = parseSessionId('ad686244-5b2e-59be-805f-ef86eac80feb')
     const turnId = parseTurnId('reasoning-turn')
     const thinking = activity(
@@ -849,17 +847,19 @@ describe('chat timeline items', () => {
     const streaming = chatTimelineItems({ ...base, activities: [thinking] })
     const settled = chatTimelineItems({ ...base, activities: [thinking, tool] })
 
-    expect(streaming.find((item) => item.type === 'reasoning')).toMatchObject({
-      id: 'reasoning:think',
-      streaming: true,
+    expect(streaming.at(-1)).toMatchObject({
+      type: 'live-activity',
+      activity: { label: 'Thinking', entry: { id: 'think' }, activities: [{ id: 'think' }] },
     })
     expect(settled.map((item) => item.id)).toEqual([
       'message:user',
       'working:reasoning-turn',
-      'reasoning:think',
       'live-activity:user',
     ])
-    expect(settled.find((item) => item.type === 'reasoning')).toMatchObject({ streaming: false })
+    expect(settled.at(-1)).toMatchObject({
+      type: 'live-activity',
+      activity: { activities: [{ id: 'think' }, { id: 'tool' }] },
+    })
   })
 })
 

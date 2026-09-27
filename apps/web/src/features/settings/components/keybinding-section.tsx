@@ -5,7 +5,7 @@ import {
 } from '@workspace/ui/patterns/virtual-list'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { matchingSettingIds } from '@workspace/client-core/settings/search'
-import { use, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { use, useDeferredValue, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 
 import { EmptyRow } from '@/features/settings/components/empty-row'
 import { ShortcutMenu } from '@/features/settings/components/shortcut-menu'
@@ -54,7 +54,8 @@ export function KeybindingSection() {
   const { defaults, overrides, platform, preset, rows } = useShortcutRows()
   const { setKeybinding } = useSettingsActions()
   const kept = useBrowserKept(platform)
-  const pageQuery = useSettingsSearch()
+  // The page lists rows for the deferred query; narrowing by the live one would split the two.
+  const pageQuery = useDeferredValue(useSettingsSearch())
   const scrollRef = use(SettingsScrollerContext)
   const listRef = useRef<HTMLDivElement>(null)
   const toolbarRef = useRef<HTMLDivElement>(null)
@@ -119,6 +120,7 @@ export function KeybindingSection() {
         setOverlay({ kind: 'menu', rowId, anchor })
       }
     },
+    revealOnMount: false,
     role: 'listbox',
     scrollToIndex: (index) => {
       if (virtualRowInView(scrollRef?.current ?? null, index, geometry.stickyHeight)) return
@@ -162,7 +164,7 @@ export function KeybindingSection() {
       <div {...listbox.containerProps} aria-label='Keyboard shortcuts' className='focus-ring-inset'>
         {visible.length === 0 ? <EmptyRow>No commands match this search.</EmptyRow> : null}
         <VirtualList
-          activeIndex={listbox.activeIndex}
+          activeIndex={activeId === null ? undefined : listbox.activeIndex}
           estimateSize={geometry.narrow ? () => 48 : undefined}
           fade={false}
           getKey={(row) => row.id}

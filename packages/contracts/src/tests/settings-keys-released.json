@@ -32,6 +32,7 @@
     "chat.sendShortcut",
     "chat.sessionSortOrder",
     "chat.textGenerationModel",
+    "developer.clientUpdateCheckSeconds",
     "developer.deployRestartWaitMinutes",
     "developer.devServerIdleMinutes",
     "developer.simulatedLatencyMs",

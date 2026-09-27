@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import { attachObserver, observedProblems, serializable } from '../agent/observe.mjs'
 import { readRefusals, refusalFailures } from './live-refusals.mjs'
+import { liveVerdict } from './live-verdict.mjs'
 
 const origin = 'https://omarchy.mesh.shaulavo.dev'
 const base = `${origin}/platform/`
@@ -58,6 +59,7 @@ try {
       crossOriginIsolated,
       errorFrame: document.querySelector(errorFrame)?.textContent ?? null,
       rootChildren: document.querySelector('#root')?.childElementCount ?? 0,
+      clientRelease: document.querySelector('meta[name="platform-release"]')?.content ?? null,
       wallpaperPreloads: [...document.querySelectorAll('link[rel="preload"][as="image"]')].map(
         (link) => link.href,
       ),
@@ -88,23 +90,25 @@ try {
 }
 
 report.logNoise = await logNoise(values.logs)
-report.failures.push(...report.logNoise.failures)
+// Shared logs include old tabs and earlier releases. Retain the census as diagnostics;
+// only evidence from this check decides whether the candidate works.
+for (const warning of report.logNoise.failures) console.log(`[live] diagnostic: ${warning}`)
 try {
   report.refusals = await readRefusals(values.logs, { release: values.release, since: startedAt })
   report.failures.push(...refusalFailures(report.refusals, values.release))
 } catch (error) {
   report.failures.push(`refusal log scan did not run: ${error.message}`)
 }
-report.preexisting = await baselineFailures(values.baseline, report.logNoise.failures)
+report.preexisting = await baselineFailures(values.baseline)
 await finish(report.preexisting)
 
 // Writes the report with its verdict; the server reads status, checkedAt and fresh.
 async function finish(preexisting) {
-  const fresh = report.failures.filter((failure) => !preexisting.includes(failure))
+  const verdict = liveVerdict(report, preexisting)
+  const { fresh } = verdict
   Object.assign(report, {
-    status: fresh.length === 0 ? 'passed' : 'failed',
+    ...verdict,
     checkedAt: new Date().toISOString(),
-    fresh,
   })
   await writeFile(resolve(values.out, 'live-check.json'), `${JSON.stringify(report, null, 2)}\n`)
   for (const failure of report.failures) {
@@ -141,6 +145,8 @@ function failures({ served, rendered, publicFavicon, observed }) {
   const found = []
   if (values.release && served.release !== values.release)
     found.push(`served release is ${served.release}, expected ${values.release}`)
+  if (values.release && rendered.clientRelease !== values.release)
+    found.push(`loaded client release is ${rendered.clientRelease}, expected ${values.release}`)
   found.push(...observedProblems(observed))
   if (rendered.errorFrame)
     found.push(
@@ -161,13 +167,12 @@ function failures({ served, rendered, publicFavicon, observed }) {
   return found
 }
 
-// A previous check without a log census has no noise baseline, so today's noise counts as known.
-async function baselineFailures(file, noise) {
+async function baselineFailures(file) {
   if (!file) return []
   try {
     const previous = JSON.parse(await readFile(file, 'utf8'))
     const failures = Array.isArray(previous.failures) ? previous.failures : []
-    return previous.logNoise ? failures : [...failures, ...noise]
+    return failures
   } catch {
     return []
   }

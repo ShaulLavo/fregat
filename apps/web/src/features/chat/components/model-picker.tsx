@@ -69,9 +69,11 @@ const SEARCH_FIELD_CLASS = [
 export function ModelPicker({
   busy,
   disabled,
+  narrow = false,
 }: {
   readonly busy: boolean
   readonly disabled: boolean
+  readonly narrow?: boolean
 }) {
   const {
     additionalModels,
@@ -161,7 +163,7 @@ export function ModelPicker({
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
-      <ModelPickerTrigger busy={busy} disabled={disabled} />
+      <ModelPickerTrigger busy={busy} disabled={disabled} narrow={narrow} />
       <PopoverContent align='start' className={PANEL_CLASS} side='top'>
         {activeGroup ? (
           <ModelPickerRail

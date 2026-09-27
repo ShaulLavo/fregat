@@ -19,6 +19,7 @@ import path from 'node:path'
 
 import { checkoutRoot, currentLink, pendingLink, releasesRoot, webBase } from './config'
 import { log, output, run } from './run'
+import { stampWebRelease } from './web-release'
 import { createScriptError } from '../structured-errors'
 import {
   missingReleaseFiles,
@@ -147,6 +148,7 @@ export async function buildWeb(release: Release) {
     webPackage,
     path.join(release.directory, 'web-build.log'),
   )
+  stampWebRelease(release.web, release.name)
 }
 
 /** How long a hashed asset stays loadable after the release that built it is replaced. */

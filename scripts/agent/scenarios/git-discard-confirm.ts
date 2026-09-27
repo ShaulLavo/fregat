@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { strictEqual } from 'node:assert/strict'
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -16,7 +17,7 @@ export const gitDiscardConfirm: Scenario = {
     'Discard asks first: Cancel keeps the change, holding Discard restores it, holding Delete removes a new file.',
   async run(page, { step }) {
     // Never the dev workspace: confirming a discard there destroys real work.
-    const fixture = await mkdtemp('/work/tmp/fregat-git-discard-')
+    const fixture = await mkdtemp(scratchPath('fregat-git-discard-'))
     try {
       await fixtureGit(fixture, ['init', '-b', 'main'])
       await writeFile(path.join(fixture, 'tracked.txt'), 'base\n')

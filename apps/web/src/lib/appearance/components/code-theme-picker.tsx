@@ -55,7 +55,7 @@ export function CodeThemePicker({
         activeIndex={list.activeIndex}
         aria-label={labelledBy ? undefined : 'Code colors'}
         aria-labelledby={labelledBy}
-        className='focus-ring-inset w-72 outline-none'
+        className='focus-ring-inset w-72 max-w-1/2 outline-none'
         getKey={(option) => option.id}
         handleRef={virtualRef}
         items={options}

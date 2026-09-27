@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Scenario } from './index'
@@ -12,7 +13,7 @@ export const editorDefinitionCrlf: Scenario = {
     'Go to a definition in a CRLF file and prove its caret offset by saving an insertion.',
   async run(page, { step }) {
     const originalUrl = page.url()
-    const fixture = await mkdtemp('/work/tmp/fregat-definition-crlf-')
+    const fixture = await mkdtemp(scratchPath('fregat-definition-crlf-'))
     const target = path.join(fixture, 'target.ts')
     try {
       await writeFile(target, targetText)

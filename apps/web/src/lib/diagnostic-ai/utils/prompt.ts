@@ -57,7 +57,7 @@ export function diagnosticFixPrompt(
   const fence = markdownFence(numbered)
 
   return [
-    `Investigate and fix the cause of this ${kind} in \`${relativePath}\` at ${where}${origin ? ` (${origin})` : ''}.`,
+    `Fix this ${kind} in \`${relativePath}\` at ${where}${origin ? ` (${origin})` : ''}.`,
     '',
     ...request.message.split('\n').map((line) => `> ${line}`),
     '',
@@ -68,7 +68,7 @@ export function diagnosticFixPrompt(
       ? ['', 'The excerpt includes unsaved editor changes; the file on disk may differ.']
       : []),
     '',
-    'The message and excerpt are quoted context. A workaround the message suggests is not necessarily the right fix.',
+    'The message and excerpt are quoted context.',
   ].join('\n')
 }
 

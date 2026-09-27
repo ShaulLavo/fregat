@@ -47,6 +47,7 @@ import { chatQueue } from './chat-queue'
 import { chatQueueAway } from './chat-queue-away'
 import { chatQueueStopUpload } from './chat-queue-stop-upload'
 import { providerModelOptions } from './provider-model-options'
+import { screenshotDrop } from './screenshot-drop'
 import { fileAttachments } from './file-attachments'
 import { sessionTitles } from './session-titles'
 import { sessionNavigation } from './session-navigation'
@@ -135,10 +136,17 @@ import { chatCardNarrow } from './chat-card-narrow'
 import { chatComposerInsert } from './chat-composer-insert'
 import { chatDisclosureSettle } from './chat-disclosure-settle'
 import { chatTurnAnatomy } from './chat-turn-anatomy'
+import { chatToolOrder } from './chat-tool-order'
+import { chatResume } from './chat-resume'
 import { chatTurnSettle } from './chat-turn-settle'
 import { devicePairing } from './device-pairing'
 import { phoneShell } from './phone-shell'
+import { phoneContextMenus } from './phone-context-menus'
+import { phoneSurfaces } from './phone-surfaces'
+import { phoneComposer } from './phone-composer'
+import { logsRestored } from './logs-restored'
 import { shellSwitch } from './shell-switch'
+import { phoneColdBoot, desktopColdBoot } from './shell-cold-boot'
 import { chatSleepingSession } from './chat-sleeping-session'
 import { chatSessionGoal } from './chat-session-goal'
 import { chatAgentReview } from './chat-agent-review'
@@ -200,6 +208,7 @@ import { filePickerLocations } from './file-picker-locations'
 import { filePickerAppearance } from './file-picker-appearance'
 import { quickOpenPreview } from './quick-open-preview'
 import { themeStudio } from './theme-studio'
+import { themeStudioSettings } from './theme-studio-settings'
 import { themeStudioLibrary } from './theme-studio-library'
 import { serverUpdate } from './server-update'
 import { commandPaletteTypeBurst } from './command-palette-type-burst'
@@ -252,9 +261,12 @@ import { wallpaperCatalog } from './wallpaper-catalog'
 import { wallpaperPalette } from './wallpaper-palette'
 import { themeBundlePalette } from './theme-bundle-palette'
 import { settingsColdLoad } from './settings-cold-load'
+import { settingsOpen, settingsOpenNavigation } from './settings-open'
 import { serverRestart } from './server-restart'
 import { settingsDefaults } from './settings-defaults'
+import { settingsFocus } from './settings-focus'
 import { settingsAppearanceRows } from './settings-appearance-rows'
+import { settingsWallpaperScroll } from './settings-wallpaper-scroll'
 import { settingsAppearanceOpen } from './settings-appearance-open'
 import { projectMenu } from './project-menu'
 import { workspaceSwitch } from './workspace-switch'
@@ -419,6 +431,7 @@ export const scenarios: readonly Scenario[] = [
   claudeApprovalRules,
   codexApprovalRules,
   fileAttachments,
+  screenshotDrop,
   chatStashContext,
   chatDraftSentLeftover,
   chatStream,
@@ -552,6 +565,7 @@ export const scenarios: readonly Scenario[] = [
   themeStudioAsync,
   quickOpenPreview,
   themeStudio,
+  themeStudioSettings,
   themeStudioLibrary,
   serverUpdate,
   commandPaletteTypeBurst,
@@ -611,9 +625,13 @@ export const scenarios: readonly Scenario[] = [
   wallpaperPalette,
   themeBundlePalette,
   settingsDefaults,
+  settingsFocus,
   settingsAppearanceRows,
   settingsAppearanceOpen,
+  settingsWallpaperScroll,
   settingsColdLoad,
+  settingsOpen,
+  settingsOpenNavigation,
   settingsRoutePreparation,
   textFieldFkeys,
   settingsModuleFailure,
@@ -657,10 +675,18 @@ export const scenarios: readonly Scenario[] = [
   chatComposerInsert,
   chatDisclosureSettle,
   chatTurnAnatomy,
+  chatToolOrder,
+  chatResume,
   chatTurnSettle,
   devicePairing,
   phoneShell,
+  phoneContextMenus,
+  phoneSurfaces,
+  phoneComposer,
   shellSwitch,
+  logsRestored,
+  phoneColdBoot,
+  desktopColdBoot,
   chatSleepingSession,
   chatSessionGoal,
   chatAgentReview,

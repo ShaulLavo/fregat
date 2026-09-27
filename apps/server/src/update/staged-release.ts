@@ -9,17 +9,12 @@ export type StagedReleaseRead =
   | { staged: StagedRelease; reason: null }
   | { staged: null; reason: 'no-root' | 'absent' | 'dangling' | 'same-as-running' }
 
-// Written by scripts/deploy/live-check.mjs; reports without `status` predate the verdict.
+// Written by scripts/deploy/live-check.mjs.
 const liveCheckReportSchema = v.object({
   release: v.pipe(v.string(), v.nonEmpty()),
   status: v.picklist(['passed', 'failed']),
   checkedAt: v.pipe(v.string(), v.isoTimestamp()),
   fresh: v.optional(v.array(v.string()), []),
-})
-
-const buildConfigSchema = v.object({
-  source: v.optional(v.nullable(v.string()), null),
-  previousRelease: v.optional(v.nullable(v.string()), null),
 })
 
 /** Consumed once by the installed promotion step, and valid only for this staged release. */
@@ -57,23 +52,15 @@ export function readLiveCheck(root: string | null): LiveCheckVerdict | null {
   if (!report.success) return null
 
   const { release, status, checkedAt, fresh } = report.output
-  const error =
-    status === 'failed' ? liveCheckError(release, fresh[0], readBuildConfig(current)) : null
+  if (release !== path.basename(realTarget(current) ?? '')) return null
+  const error = status === 'failed' ? liveCheckError(release, fresh) : null
   return { release, status, at: new Date(checkedAt).toISOString(), error }
 }
 
-function liveCheckError(
-  release: string,
-  failure: string | undefined,
-  config: v.InferOutput<typeof buildConfigSchema> | null,
-): ServerUpdateError {
-  const previous = config?.previousRelease ? path.basename(config.previousRelease) : null
+function liveCheckError(release: string, failures: readonly string[]): ServerUpdateError {
   const error = updateErrors.LIVE_CHECK_FAILED({
-    release,
-    ...(failure ? { why: failure } : {}),
-    ...(config?.source && previous
-      ? { fix: `Run bun run deploy --rollback in ${config.source} to return to ${previous}.` }
-      : {}),
+    ...(failures.length ? { why: failures.join('; ') } : {}),
+    internal: { release, failedChecks: failures },
   })
   return {
     code: error.code ?? 'update.LIVE_CHECK_FAILED',
@@ -81,11 +68,6 @@ function liveCheckError(
     ...(error.why ? { why: error.why } : {}),
     ...(error.fix ? { fix: error.fix } : {}),
   }
-}
-
-function readBuildConfig(current: string) {
-  const config = v.safeParse(buildConfigSchema, readJson(path.join(current, 'build-config.json')))
-  return config.success ? config.output : null
 }
 
 function readJson(file: string): unknown {

@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { ok, strictEqual } from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
 import type { Page } from 'playwright'
@@ -27,7 +28,7 @@ export const projectMenu: Scenario = {
 }
 
 async function seedRecent(page: Page) {
-  const folder = await mkdtemp('/work/tmp/fregat-project-menu-')
+  const folder = await mkdtemp(scratchPath('fregat-project-menu-'))
   const { base, headers } = serverApi(page)
   const response = await page.request.post(`${base}/fs/recents`, {
     data: { path: folder.slice(1) },

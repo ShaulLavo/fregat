@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -15,7 +16,7 @@ export const chatComposerInsert: Scenario = {
   description:
     'Diff lines sent to the agent and a path dropped on the composer both land in it with the caret there, and the action row is compact exactly when it measures narrow.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-composer-insert-')
+    const fixture = await mkdtemp(scratchPath('fregat-composer-insert-'))
     try {
       await fixtureGit(fixture, ['init', '--quiet'])
       await writeFile(path.join(fixture, 'a.ts'), 'const a = 1\n')

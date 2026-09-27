@@ -30,11 +30,5 @@ export function agentErrorReport(error: AgentErrorInput, at = new Date()): strin
 
 /** The composer text "Fix with AI" starts a chat with. */
 export function agentFixPrompt(error: AgentErrorInput, at = new Date()): string {
-  return [
-    'Platform showed me this error. Find the cause and fix it.',
-    '',
-    '```',
-    agentErrorReport(error, at),
-    '```',
-  ].join('\n')
+  return ['Fix this error:', '', '```', agentErrorReport(error, at), '```'].join('\n')
 }

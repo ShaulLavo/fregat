@@ -33,7 +33,7 @@ export function languageServerSnapshot(
     contentWidth: 120,
     totalHeight: 20,
     gutterWidth: 0,
-    gutterLayout: { fixedWidth: 0, lanes: [] },
+    gutterLayout: { leadingInset: 0, fixedWidth: 0, lanes: [] },
     tabSize: 4,
     foldMarkers: [],
     visibleRows: [],

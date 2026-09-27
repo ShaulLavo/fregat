@@ -2858,6 +2858,8 @@
    On the root, so portaled menus, dialogs and the palette inherit it. */
 :root[data-shell='phone'] {
   -webkit-touch-callout: none;
+  /* Screens own scrolling; the wallpaper extends beneath Safari's toolbar. */
+  overflow: hidden;
 }
 
 /* Unlayered, so it outranks a field's text-size utility: iOS zooms the page into any focused

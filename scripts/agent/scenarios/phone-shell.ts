@@ -1,10 +1,11 @@
 import { equal, ok } from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import type { Locator, Page } from 'playwright'
+import type { Locator, Page, Request } from 'playwright'
 
 import { createModifiedFileFixture, releaseFixture } from '../fixture-workspace'
 import { selectors } from '../selectors'
+import { longPress } from '../touch'
 import { sendPrompt } from './native-provider-verification'
 import { createSessions, openFixtureChat, PHONE_REPLY, PHONE_SESSIONS } from './phone-fixture'
 import type { Scenario } from './index'
@@ -22,6 +23,18 @@ export const phoneShell: Scenario = {
     'At a touch phone viewport: session list, session, pickers as bottom sheets, changes, diffs that share one editor tab, the terminal, and Back through each, with no horizontal scroll.',
   capture: { width: 390, height: 844, scale: 2, touch: true },
   async run(page, { step }) {
+    const requests: string[] = []
+    const recordRequest = (request: Request) => requests.push(request.url())
+    page.on('request', recordRequest)
+    await page.reload({ waitUntil: 'commit' })
+    await page.locator(selectors.phoneFirstScreenSelector).waitFor()
+    page.off('request', recordRequest)
+    const desktopRequests = requests.filter((url) => /workbench-[^/]+[.](js|css)$/.test(url))
+    equal(
+      desktopRequests.length,
+      0,
+      `Phone boot fetched desktop chunks: ${desktopRequests.join(', ')}`,
+    )
     const fixture = await createModifiedFileFixture(
       'phone-shell',
       'notes.md',
@@ -82,10 +95,9 @@ async function walkTheStack(page: Page, step: (label: string) => Promise<void>) 
   await step('session')
 
   // The chat commands with no control of their own are one palette away.
-  await selectors.phoneHeaderAction(page, 'Session actions').click()
-  await page.getByRole('menuitem', { name: /command palette/i }).click()
+  await selectors.phoneHeaderAction(page, 'Command palette').click()
   await selectors.paletteInput(page).waitFor()
-  await step('palette-from-menu')
+  await step('palette-from-header')
   await page.keyboard.press('Escape')
   await selectors.paletteInput(page).waitFor({ state: 'hidden' })
 
@@ -352,18 +364,6 @@ function addressTabs(page: Page) {
   const tabs = new URL(page.url()).searchParams.get('tabs')
   if (tabs === null || tabs === '-') return []
   return tabs.split('~')
-}
-
-/** A held finger, as a touch screen sends it: no mouse events between down and up. */
-async function longPress(page: Page, locator: Locator, holdMs: number) {
-  const box = await locator.boundingBox()
-  ok(box, 'The pressed row must be laid out')
-  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
-  const cdp = await page.context().newCDPSession(page)
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
-  await page.waitForTimeout(holdMs)
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
-  await cdp.detach()
 }
 
 /** A finger dragged up the list scrolls it, and reorders nothing. */

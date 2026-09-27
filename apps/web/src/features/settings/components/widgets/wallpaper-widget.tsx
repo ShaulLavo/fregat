@@ -25,12 +25,13 @@ export function WallpaperWidget({
   return (
     <div
       aria-labelledby={labelledBy}
-      className={cn('h-96 w-full min-w-0', disabled && 'opacity-50')}
+      className={cn('w-full min-w-0', disabled && 'opacity-50')}
       inert={disabled}
       role='group'
     >
       <WallpaperLibrary
         colors={palette ? paletteColorsFor(palette, mode) : null}
+        strips
         value={value}
         onChange={(source) => onChange(selectWallpaper(value, source))}
       />

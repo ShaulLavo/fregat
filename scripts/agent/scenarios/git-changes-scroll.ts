@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fixtureGit, openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
@@ -57,7 +58,7 @@ export const gitChangesScroll: Scenario = {
   name: 'git-changes-scroll',
   description: `Wheel-scroll a Changes list of ${FILES.toLocaleString()} modified files in a fixture repo.`,
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-git-scroll-')
+    const fixture = await mkdtemp(scratchPath('fregat-git-scroll-'))
     try {
       await buildRepository(fixture)
       await openFixtureWorkspace(page, fixture)

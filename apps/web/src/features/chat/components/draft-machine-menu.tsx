@@ -6,14 +6,12 @@ import { WidestLabel } from '@workspace/ui/components/widest-label'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@workspace/ui/components/dropdown-menu'
 
 import { Phase } from '@/lib/environments/components/phase'
 import type { DraftMachine } from '../utils/draft-workspace'
+import { DraftMachineList } from './draft-machine-list'
 
 export function DraftMachineMenu({
   machines,
@@ -58,30 +56,12 @@ export function DraftMachineMenu({
         }
       />
       <DropdownMenuContent align='start' className='w-56 p-1' side='top'>
-        <DropdownMenuRadioGroup aria-label='Run on' value={environmentId}>
-          <DropdownMenuLabel>Run on</DropdownMenuLabel>
-          {lockedReason ? (
-            <p className='text-muted-foreground px-2 pb-1 text-xs'>{lockedReason}</p>
-          ) : null}
-          {machines.map((machine) => (
-            <DropdownMenuRadioItem
-              key={machine.environmentId}
-              closeOnClick
-              disabled={
-                machine.environmentId !== environmentId &&
-                (lockedReason !== null || machine.phase !== 'live' || !machine.worktree)
-              }
-              title={machine.label}
-              value={machine.environmentId}
-              onClick={() => {
-                if (machine.environmentId !== environmentId) onSelect(machine)
-              }}
-            >
-              <Phase phase={machine.phase} label={machine.label} />
-              <span className='truncate'>{machine.label}</span>
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
+        <DraftMachineList
+          environmentId={environmentId}
+          lockedReason={lockedReason}
+          machines={machines}
+          onSelect={onSelect}
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   )

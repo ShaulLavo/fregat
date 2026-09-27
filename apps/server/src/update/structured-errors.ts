@@ -15,8 +15,8 @@ export const updateErrors = defineErrorCatalog('update', {
   },
   LIVE_CHECK_FAILED: {
     status: 500,
-    message: ({ release }: { release: string }) => `${release} failed its live check`,
-    why: 'The headless check of the page through the mesh found a failure the previous release did not have.',
-    fix: 'Run bun run deploy --rollback from the checkout that deployed it.',
+    message: 'Deployment check failed',
+    why: 'The deployment verification found a failure while checking the served app.',
+    fix: 'Review the failed check in the deployment report and retry the check.',
   },
 })

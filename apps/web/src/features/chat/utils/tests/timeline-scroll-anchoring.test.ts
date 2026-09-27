@@ -24,7 +24,7 @@ test('live tool activity releases the send-time anchor beside the composer', () 
   expect(
     shouldReleaseTimelineAnchorForActivity([
       {
-        activity: { active: true, activities: [entry], entry, label: 'Running rg', tail: [] },
+        activity: { active: true, activities: [entry], entry, label: 'Running rg' },
         id: 'live-activity:turn-1',
         timestamp: entry.createdAt,
         type: 'live-activity',
@@ -51,7 +51,6 @@ test('reasoning and historical tool groups retain the new-turn anchor', () => {
           activities: [reasoning],
           entry: reasoning,
           label: 'Thinking',
-          tail: [],
         },
         id: 'live-activity:turn-1',
         timestamp: reasoning.createdAt,

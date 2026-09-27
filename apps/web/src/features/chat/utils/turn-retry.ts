@@ -3,16 +3,13 @@ import type { ChatSession } from '@workspace/client-core/chat/types'
 
 import type { ChatInputSubmitPayload } from '@/features/chat/utils/composed-message'
 
-/** D2: a fixed prompt, sent at once. */
-export const CARRY_ON_PROMPT = 'Continue from where you stopped.'
-
 type RetrySession = Pick<
   ChatSession,
   'interactionMode' | 'latestTurn' | 'messages' | 'modelSelection' | 'runtimeMode'
 >
 
 export function carryOnPayload(session: RetrySession): ChatInputSubmitPayload {
-  return { ...retrySettings(session), attachments: [], terminalContexts: [], text: CARRY_ON_PROMPT }
+  return { ...retrySettings(session), attachments: [], terminalContexts: [], text: 'Continue' }
 }
 
 /** The stopped turn's own message and attachments, or null when there is none to send. */

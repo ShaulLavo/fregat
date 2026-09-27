@@ -37,7 +37,11 @@ export function composerConnection({
     return { kind: 'disconnected', label: 'Chat disconnected', detail: sync.error }
   }
   if (sync.status === 'reconnecting') {
-    return { kind: 'reconnecting', label: 'Reconnecting chat…', detail: sync.error }
+    return {
+      kind: 'reconnecting',
+      label: 'Reconnecting chat…',
+      detail: 'You can keep drafting while we reconnect.',
+    }
   }
   if (sync.status === 'connecting') {
     return { kind: 'syncing', label: 'Syncing messages…', detail: null }

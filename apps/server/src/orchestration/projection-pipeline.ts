@@ -597,6 +597,10 @@ export class OrchestrationProjectionPipeline {
       return
     }
     if (event.aggregateKind !== 'session') return
+    if (event.type === 'session.turn-start-requested')
+      this.updateSession(event.aggregateId, {
+        acknowledgedFailureThroughSequence: event.sequence,
+      })
     const failure = failureKind(event)
     if (failure === 'failure')
       this.updateSession(event.aggregateId, { latestFailureSequence: event.sequence })
@@ -1049,6 +1053,8 @@ export class OrchestrationProjectionPipeline {
     // Recording a checkpoint is not a turn ending: a placeholder arrives while
     // the session is still streaming the very turn it describes.
     if (this.isSessionRunningTurn(sessionId, turnId)) return
+    const turn = this.selectTurn(sessionId, turnId)
+    if (turn && turn.state !== 'running') return
 
     this.completeTurn(
       sessionId,

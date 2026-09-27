@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { deepEqual } from 'node:assert/strict'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import path from 'node:path'
@@ -8,7 +9,7 @@ export const filePickerSelection: Scenario = {
   name: 'file-picker-selection',
   description: 'Leave an empty column, select its sibling, then hide a selected hidden folder.',
   async run(page, { step }) {
-    const root = await mkdtemp('/work/tmp/fregat-picker-selection-')
+    const root = await mkdtemp(scratchPath('fregat-picker-selection-'))
     await Promise.all(
       ['empty-review-folder', 'sibling-review-folder/child', '.hidden'].map((folder) =>
         mkdir(path.join(root, folder), { recursive: true }),

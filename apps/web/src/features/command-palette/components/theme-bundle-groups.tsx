@@ -9,7 +9,7 @@ import { useCommand } from '@/keymap/hooks/use-command'
 import { useCommandBus } from '@/keymap/hooks/use-command-bus'
 
 export function ThemeBundleGroups() {
-  const { bundleId, catalog, select } = useBundles()
+  const { theme, catalog, select } = useBundles()
   const { closePalette } = useCommand()
   const bus = useCommandBus()
   const bundled = catalog.filter((bundle) => bundle.source === 'bundled')
@@ -29,7 +29,7 @@ export function ThemeBundleGroups() {
       >
         <SwatchesIcon className='text-muted-foreground' />
         <RowLabel label={bundle.name} />
-        {bundle.id === bundleId && <CommandShortcut>active</CommandShortcut>}
+        {bundle.id === theme?.id && <CommandShortcut>active</CommandShortcut>}
       </CommandItem>
     )
   }

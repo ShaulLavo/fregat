@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, readlinkSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { existsSync, readFileSync, readlinkSync, realpathSync } from 'node:fs'
 
 /** A native.jsonl line about a process: a fixture's own spawn and exit, or a child it started. */
 export type NativeProcessEntry = {
@@ -17,8 +18,8 @@ const PROC = existsSync('/proc/self/stat')
 function running(pid: number) {
   if (!PROC) {
     try {
-      process.kill(pid, 0)
-      return true
+      const state = execFileSync('ps', ['-p', String(pid), '-o', 'stat='], { encoding: 'utf8' })
+      return state.trim().length > 0 && !state.trim().startsWith('Z')
     } catch {
       return false
     }
@@ -30,14 +31,28 @@ function running(pid: number) {
   }
 }
 
-// Without /proc a pid cannot be told from its reuse, so only the log's own record counts.
 function holds(check: () => boolean) {
-  if (!PROC) return true
   try {
     return check()
   } catch {
     return false
   }
+}
+
+function fixtureCommand(pid: number) {
+  if (PROC) return readFileSync(`/proc/${pid}/cmdline`, 'utf8')
+  return execFileSync('ps', ['-p', String(pid), '-o', 'command='], { encoding: 'utf8' })
+}
+
+function workingDirectory(pid: number) {
+  if (PROC) return readlinkSync(`/proc/${pid}/cwd`)
+  const files = execFileSync('lsof', ['-nP', '-a', '-p', String(pid), '-d', 'cwd', '-Fn'], {
+    encoding: 'utf8',
+  })
+  return files
+    .split('\n')
+    .find((line) => line.startsWith('n'))
+    ?.slice(1)
 }
 
 /**
@@ -53,13 +68,13 @@ export function liveNativeProcesses(root: string, entries: readonly NativeProces
   for (const entry of entries) {
     if (entry.event === 'spawn' && entry.pid !== undefined) {
       const pid = entry.pid
-      const fixture = holds(() => readFileSync(`/proc/${pid}/cmdline`, 'utf8').includes(root))
+      const fixture = holds(() => fixtureCommand(pid).includes(root))
       if (running(pid) && fixture && (PROC || !exited.has(pid))) live.push({ pid, kind: 'fixture' })
       continue
     }
     if (entry.event !== 'child' || entry.childPid === undefined || !entry.cwd) continue
     const { childPid, cwd } = entry
-    if (running(childPid) && holds(() => readlinkSync(`/proc/${childPid}/cwd`) === cwd))
+    if (running(childPid) && holds(() => workingDirectory(childPid) === realpathSync(cwd)))
       live.push({ pid: childPid, kind: 'child' })
   }
   return live

@@ -2,10 +2,13 @@
 
 ## Status and authorization
 
-- Status: IN PROGRESS (wave 2, lane P). Phases 1–3 implemented 2026-09-26 (phone shell frame,
-  screens, touch paths); Phase 4 (sessions and pairing) follows in its own pull request.
-  Owner check pending: a real iPhone and Android phone (Phase 5). iPhone (WebKit) behaviour is
-  unmeasured: Playwright WebKit does not start on this host.
+- Status: IN PROGRESS. Phases 1–4 landed, including sessions and pairing in PR #143.
+  Phone sheets and single-tab navigation landed in #168; the first-load split landed in #172.
+  Those changes shipped in deployment batch 27. PR #179 adds the phone folder picker,
+  palette access across screens and iOS layout fixes, shipped in release
+  `20260927T055046Z-850f2d88-review-178-179`; the live check passed.
+  Phase 5 still needs real iPhone and Android checks, including the Safari toolbar, keyboard
+  movement, focus zoom and safe areas. The Platform half of full-bleed diff tinting remains open.
 - Priority: P2. Large product question; Plan 142 (Web Push) delivers the first away-from-desk
   value without it.
 - Effort: XL overall, unknown until the direction is set. The discussion itself is S.
@@ -491,12 +494,18 @@ See "Proposed phases" under Research findings. The owner answered its questions 
 - **Tooling.** `agent:browser --touch` (and `capture.touch` on a scenario) emulates a touch phone;
   `waitForApp` accepts the phone shell. Scenario `phone-shell` walks the whole stack on a fixture
   repository with a scripted mock turn and checks nothing scrolls sideways.
-- **First load.** Measured on the same machine state, the app entry's initial graph now ships as one
-  chunk (`scripts/initial-chunk.ts`, a `codeSplitting` group traced from `main.tsx`): desktop
-  first load fell by 30 KB gzip against `origin/main`, and the phone shell adds nothing to it. The
-  workbench stays in the entry: splitting it out as its own lazy chunk (the Direction's "a phone
-  never downloads the workbench") measured +11 KB to +70 KB on the desktop from chunk fragmentation,
-  for a phone first load of 1.01 MB instead of 1.75 MB. Recorded as a follow-up, not done.
+- **First load.** Each shell is a lazy chunk, and the boot script preloads the chosen one's chunks and
+  stylesheets beside the entry script (`scripts/shell-chunks-plugin.ts`). `scripts/shell-chunk-groups.ts`
+  gives each first load whole chunks: `initial` (the entry's static graph, plus the phone shell's
+  static modules the workbench also needs), `workbench-shared` (the rest of the workbench's static
+  graph that a phone can reach, which a phone loads only with a screen that needs it) and
+  `workbench` (desktop only). This builds on #174, which took the top-level await out of
+  `main.tsx`: since #134 a lazy chunk importing the entry's chunk deadlocked the boot (a blank
+  phone on the mesh, and a blank desktop reload with the terminal panel restored).
+  The Logs pane is a deferred chunk, prefetched on idle like the terminal, and the modulepreload
+  polyfill is gone; together they pay for the split. Against main `d45f1c5ae`: phone first-load
+  script gzip 1,684,252 → 1,071,142 bytes, now pinned by `bundle:gate`; desktop 1,680,766 →
+  1,678,529.
 
 ### Phase 3: touch paths (implemented 2026-09-26)
 
@@ -580,7 +589,8 @@ composing keyboard such as Gboard may type the letter), through the mesh.
 ### Owner questions (wave 2)
 
 - The phone still downloads the workbench (see First load above). Keep, or schedule a chunking
-  change that splits it without growing the desktop's first load?
+  change that splits it without growing the desktop's first load? Decided 2026-09-27: owner —
+  split it without growing the desktop. Done; see First load.
 
 ## Follow-up items
 
@@ -604,3 +614,188 @@ Carried in from other plans. They wait for the phone shell and join its split pl
   reaches the phone.
 - A third-party push service (Expo push): Plan 142 uses standard Web Push.
 - An offline outbox (T3 mobile) before the phone surface exists.
+
+### PR #179 review follow-up (2026-09-27)
+
+- Corrected the compact menu's dynamic icon weight, which broke both production bundle and
+  landing-page builds. Both icon variants now have literal weights that the build can retain.
+- Made `phone-surfaces` create and release its own folder tree. It previously depended on
+  `/work/tmp/phone-ws`, a folder outside the scenario's lifecycle.
+- Removed the unsafe wallpaper-worker error cast and arbitrary exception-message logging.
+  The parent receives a structured reason or the exception type.
+- Phone evidence: `/work/tmp/fregat-evidence/20260927T053733Z-scenario-phone-surfaces/`.
+  Picker, folder navigation, menu, new-session palette and Settings completed; screenshots read
+  back. The fixture's absent Codex/Claude instances returned 500 from their update-status reads
+  in Settings. No real provider ran. Those unrelated responses remain visible in the evidence.
+- Desktop evidence: `/work/tmp/fregat-evidence/20260927T053903Z-scenario-file-picker-browse/`.
+  Column navigation, previews, history keys and icon view completed with no server warnings.
+- Focused checks: picker row/list tests, Nerd Font and route tests, wallpaper decode tests,
+  web/server typechecks, required gates and first-load bundle gate. Real-device checks remain
+  pending; desktop Chromium does not reproduce Safari's browser toolbar or on-screen keyboard.
+
+Integrated verification with PR #178 permits wallpaper strips to scroll inside the Settings
+shell while checking document, body and shell width. Passed evidence:
+`/work/tmp/fregat-evidence/20260927T054928Z-scenario-phone-surfaces/`.
+
+### iPhone follow-up after PR #179
+
+The owner still saw sideways Settings scrolling and the bottom wallpaper gap on iPhone.
+The shipped Chromium scenario did not verify these Safari behaviors. A macOS WebKit run
+with the iPhone 13 viewport reproduced Settings at 390px with 428px of scrollable content.
+The code-theme list occupied 288px and left its preview 10px wide; the preview title overflowed.
+Capping the list at half the available width restored a 390px scroll extent in the same page.
+The wallpaper gap was reproduced in iOS 26.5 Simulator Safari; see the follow-up below.
+
+At 320px, WebKit also exposed overflowing wallpaper search/order controls and shortcut filter
+tabs. Their control rows now wrap within their own width. DOM probes reduced Settings from
+371px to 320px of scrollable width. Physical iPhone confirmation remains pending.
+
+### Safari wallpaper follow-up (2026-09-27)
+
+- [x] Reproduce the black band in native iOS Simulator Safari, including the browser toolbar.
+      On iPhone 17 Pro, the dynamic viewport was 714px, the large viewport 754px and the browser
+      window 874px. A fixed wallpaper was clipped at 714px regardless of its height.
+- [x] Compare fixed and absolute layers in the same page. The absolute layer covered the
+      toolbar only when sized to the browser window. One continuous glass layer removed the seam.
+- [x] Keep controls in the dynamic viewport and extend only the decorative background.
+      Phone screens own scrolling; the document clips the extra background without scrolling.
+- [x] Run phone scenarios and desktop look; inspect the screenshots.
+      `/work/tmp/fregat-evidence/20260927T064159Z-scenario-phone-surfaces/` passed. Its empty
+      provider fixture still emits the known update-status 500s. Desktop look
+      `20260927T064137Z-look-1440x1000` had no problems. Native Safari dev screenshot `app-dev.png`
+      confirms the wallpaper continues behind the toolbar with the source change.
+- [x] Commit, push, deploy and verify the unmodified release in iOS Simulator Safari.
+      Code commit `035df7af2`, release `20260927T064439Z-035df7af-iphone-wallpaper`; live check
+      passed. `app-live.png` shows continuous wallpaper beneath the toolbar after fresh navigation.
+      `live-metrics.json` records 874px of wallpaper and 714px of interactive content, with no
+      document offset. Required gates, formatting, lint and repository typechecks passed.
+      Existing settings/orchestration/reaper log noise remains in the deployment live check.
+- [ ] Physical iPhone and software-keyboard checks. SafariDriver did not produce a software
+      keyboard during the input test, so this run cannot confirm keyboard movement.
+
+Native Safari evidence on the Mac is in
+`node_modules/.cache/iphone-wallpaper-investigation/`: `app-before.png`, `probe.png`,
+`outer-background.png`, `app-unified-probe.png`, `app-dev.png`, `app-live.png` and
+`live-metrics.json`. Physical iPhone confirmation remains open.
+
+### Composer controls follow-up (2026-09-27)
+
+- [x] Reproduce checkout/agent controls squeezing the branch out of the draft footer.
+      Baseline: `/work/tmp/fregat-evidence/20260927T075039Z-scenario-phone-surfaces/04-new-session.png`.
+- [x] Give phones two columns for selectors and a full-width line for the current branch.
+      Compact labels preserve room at 320px; a long current branch wraps.
+- [x] Measure Safari spacing. The native simulator has 8px of app padding below the footer,
+      zero safe-area/keyboard padding, and the rest belongs to Safari. Reduce app padding to 4px.
+- [x] Inspect drawers. Theme Studio wraps Base UI Drawer; phone menus use Base UI Menu with
+      shared sheet positioning. This follow-up changes their triggers, not their presentation.
+- [x] Verify narrow screens, long branches, menu access, desktop and native Safari screenshots.
+      Scenario `/work/tmp/fregat-evidence/20260927T075358Z-scenario-phone-surfaces/` passes at
+      320/390/430px, including workspace, agent and base-branch pickers. The known empty-provider
+      update-status 500s remain. Mac screenshots `composer-dev-native.png`, `composer-320.png`,
+      `workspace-sheet-320.png` and `composer-desktop-webkit.png` were inspected in
+      `node_modules/.cache/iphone-wallpaper-investigation/`. Desktop keeps its single row.
+- [x] Commit, push, deploy and inspect the live release. Code `e62f7bd15`, release
+      `20260927T075516Z-e62f7bd1-phone-composer`; live check passed. Native Safari screenshot
+      `composer-live-native.png` and `composer-live-metrics.json` confirm two selector columns,
+      the full `main` label and 4px bottom padding. Required gates and repository typechecks pass.
+      Physical phone confirmation remains pending; this run used iOS 26.5 Simulator Safari.
+
+### Compact session setup revision (2026-09-27)
+
+The owner rejected the extra footer row. Replace it with one phone-only setup trigger showing
+branch and agent, with the complete workspace/agent/branch controls inside a sheet. Two visual
+prototypes compared icon-only individual controls with this summary; the summary keeps the
+agent selection visible and gives long values their full space inside the sheet. Remove the
+remaining 4px composer bottom padding on phones. Desktop retains individual controls.
+
+- [x] Compare compact layouts and implement the single setup control.
+- [x] Verify one-row geometry at 320/390/430px, nested picker actions and focus return.
+      `/work/tmp/fregat-evidence/20260927T080353Z-scenario-phone-surfaces/` passes. The known
+      fixture provider update-status errors remain; no real provider turn ran.
+- [x] Inspect native Safari and desktop screenshots. `setup-dev-native.png` shows a 40px
+      trigger whose bottom equals the 714px viewport edge, with zero extra bottom space. Desktop
+      `composer-desktop-webkit.png` retains individual controls. Both are in the Mac evidence folder.
+- [x] Pass required gates, formatting, lint and repository typechecks.
+- [x] Commit, push, deploy and verify the live page. Code `6e0dfa808`, release
+      `20260927T080511Z-6e0dfa80-phone-session-setup`; live check passed.
+      `setup-live-native.png` and `setup-live-metrics.json` show the deployed 40px control ending
+      exactly at the viewport edge. Native Safari sheet screenshot: `setup-sheet-native.png`.
+      Physical iPhone confirmation remains open.
+
+### Session setup redesign (2026-09-27)
+
+The owner found the compact control read as two buttons opening one sheet (branch on the left,
+robot and "Default" on the right), and the sheet as a stack of old dropdown triggers whose
+choices opened a second sheet on top. Redesign:
+
+- Collapsed: one left-aligned control sized to its content, like the model picker above it. It
+  has one icon, one run of text and one caret: the branch (or `New worktree from <branch>`, or
+  the folder), plus `· <agent>` only when the agent is not the default. It keeps zero bottom
+  padding.
+- Expanded: one sheet (`DraftSetupSheet`, a `DropdownMenu`) with a titled overview. Each
+  setting is a row with its label, its full value (branches wrap, no truncation) and a chevron:
+  Runs on (two or more machines), Workspace (with the checkout's branch), Starts from (new
+  worktree only) and Agent. A row opens its choices in the same sheet behind a `‹ Session setup`
+  back row, reusing the desktop lists (`DraftWorkspaceList` and `DraftMachineList`, extracted
+  from their menus, plus `DraftAgentList` and `DraftBranchList`). After a choice, the sheet
+  returns to the overview. Escape and the phone Back gesture step back before they close.
+- The sheet header no longer shows the path. The fixture's `base.path` has no leading `/`,
+  both here and in the owner's screenshot, and the phone header already names the project.
+- Desktop keeps its individual menus.
+
+- [x] Implement it and update `phone-surfaces` to check one-row geometry at 320/390/430px, zero
+      bottom gap, a single open sheet, full branch recovery in the overview and the branch list,
+      step-back on Escape, focus return, and a new-worktree round trip with no send.
+      `/work/tmp/fregat-evidence/20260927T083527Z-scenario-phone-surfaces/` passes; the known
+      fixture provider update-status 500s remain.
+- [x] Desktop `chat-draft-context-strip` passes (`20260927T083329Z`), and so do the
+      workspace/machine menu tests, `bun run gates` and the web typecheck.
+- [x] Native iPhone 17 Pro / iOS 26.5 Safari check on the Mac: browser Back returns from
+      Workspace choices to the overview, then closes the sheet without leaving the draft.
+      Read back the final collapsed and overview screenshots. Production has one 40px-high
+      trigger, a 0px bottom gap, and 402px document width in a 402px viewport.
+- [x] Committed and pushed `7dd0deaef`; full pre-commit gates and repository typechecks pass.
+      Deployed `20260927T084030Z-7dd0deae-opus-phone-setup`; `/platform/release` confirms that
+      commit, zero dirty files and a passed live check. Opened the deployed page in native
+      Simulator Safari and read both screenshots back. Evidence on the Mac:
+      `node_modules/.cache/opus-mobile-design/live-collapsed.png` and `live-sheet.png`.
+      Physical-device and software-keyboard checks were not performed.
+
+### Theme studio from phone Settings (2026-09-27)
+
+- [x] Reproduce desktop working and phone failing through the Open studio button.
+      `20260927T100916Z-scenario-theme-studio-settings` captures the missing phone view.
+- [x] Move the studio above the workspace shell switch so phone and desktop both mount it.
+      Separate phone tabs from header actions; retain collapse and discard confirmation.
+- [x] Verify Settings entry, tab switching, collapse and dirty discard at 1440/390/320px.
+      WebKit `20260927T101546Z-scenario-theme-studio-settings` passes; screenshots read.
+      Known isolated provider update 500s remain. Web typecheck, design/compiler census and lint pass.
+- [x] Chromium `20260927T101611Z-scenario-theme-studio-settings` also passes.
+- [x] Commit/push `d874e641a`; full pre-commit gates and repository typechecks pass.
+      Mesh `20260927T101704Z-d874e641-phone-theme-studio` serves that commit with zero dirty
+      files and a passed live check. Live touch WebKit at 390px opens Studio from Settings,
+      switches to Surfaces and closes. Read both production screenshots on the Mac:
+      `node_modules/.cache/studio-mobile/live-open.png` and `live-surfaces.png`.
+      Physical iPhone was not tested; no persisted appearance or provider state was changed.
+
+### Scrolling into Wallpaper (2026-09-27, investigated; fix deferred)
+
+- [x] Add `settings-wallpaper-scroll`: a 390px touch viewport scrolls through Appearance
+      into Wallpaper without changing any settings. Scenario shipped in `972c05665`.
+- [x] Trace the reported path and inspect its screenshot. The arrival task is 90.2ms,
+      with 85.8ms attributed to `highlightPreview` in `lib/code-theme/state/preview.ts`.
+      The code-color preview immediately above Wallpaper starts syntax highlighting
+      as it becomes visible. Wallpaper decoding and staged row mounting are not the
+      dominant work in this capture.
+- [x] Try the existing Shiki Oniguruma/WASM engine. The same task still takes 79.2ms,
+      so the small engine swap does not remove the hitch. Removed that experiment;
+      the shipped highlighter is unchanged.
+- Deferred: move preview tokenization off the main thread in a separately scoped task.
+  No worker or highlighting architecture change was made here. Measurements are from
+  desktop Chromium at phone dimensions, not a physical iPhone; no production speed claim.
+
+Evidence under `/work/tmp/fregat-evidence/`: baseline
+`20260927T131817Z-trace-settings-wallpaper-scroll`, engine experiment
+`20260927T132146Z-trace-settings-wallpaper-scroll` (includes `--compare` output).
+The fixture provider-update 500s are unrelated to the traced preview task.
+No runtime deployment is needed for this note.

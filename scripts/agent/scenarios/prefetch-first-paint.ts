@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Page } from 'playwright'
@@ -94,7 +95,7 @@ async function nextTabName(page: Page) {
 }
 
 async function createFixture() {
-  const fixture = await mkdtemp('/work/tmp/fregat-prefetch-first-paint-')
+  const fixture = await mkdtemp(scratchPath('fregat-prefetch-first-paint-'))
   try {
     await fixtureGit(fixture, ['init', '--quiet'])
     await fixtureGit(fixture, ['config', 'user.email', 'fregat@example.com'])

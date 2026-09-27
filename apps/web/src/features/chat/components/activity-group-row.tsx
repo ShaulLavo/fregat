@@ -1,10 +1,9 @@
-import { Fragment } from 'react'
 import { CaretRightIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 
 import { ActivityRow } from '@/features/chat/components/activity-row'
-import { useWorkLogScroll } from '@/features/chat/hooks/use-work-log-scroll'
+import { ActivityHistory } from '@/features/chat/components/activity-history'
 import { useChatWorkLogExpansionStore } from '@/features/chat/state/chat-work-log-expansion-store'
 import type { ChatWorkLogEntry } from '@/features/chat/utils/work-log'
 import {
@@ -16,12 +15,12 @@ export function ActivityGroupRow({ activities }: { activities: readonly ChatWork
   const groupId = activities[0]?.id ?? ''
   const expanded = useChatWorkLogExpansionStore((state) => state.expandedGroupIds[groupId] ?? false)
   const toggle = useChatWorkLogExpansionStore((state) => state.toggleGroupExpanded)
-  const { scrollRef, rowsRef } = useWorkLogScroll(`group:${groupId}`, activities.length, 'rows')
   const visible = expanded ? activities : activities.filter(isPinnedWorkLogEntry)
   const hiddenCount = activities.length - visible.length
   const summary = activityGroupSummary(activities)
 
-  if (activities.length === 1 && activities[0]) return <ActivityRow activity={activities[0]} />
+  if (activities.length === 1 && activities[0] && !activities[0].reasoning)
+    return <ActivityRow activity={activities[0]} />
 
   return (
     <section className='min-w-0 space-y-0.5'>
@@ -43,24 +42,11 @@ export function ActivityGroupRow({ activities }: { activities: readonly ChatWork
           <span className='truncate'>{summary}</span>
         </Button>
       ) : null}
-      <div
-        className={
-          expanded
-            ? 'ml-2 max-h-[min(18rem,50dvh)] overflow-auto overscroll-contain pl-2'
-            : undefined
-        }
-        aria-label={expanded ? 'Tool calls' : undefined}
-        role={expanded ? 'region' : undefined}
-        tabIndex={expanded ? 0 : undefined}
-        data-tool-group-scroll={expanded || undefined}
-        ref={expanded ? scrollRef : undefined}
-      >
-        <Fragment ref={rowsRef}>
-          {visible.map((activity) => (
-            <ActivityRow activity={activity} key={activity.id} />
-          ))}
-        </Fragment>
-      </div>
+      {expanded ? (
+        <ActivityHistory activities={activities} />
+      ) : (
+        visible.map((activity) => <ActivityRow activity={activity} key={activity.id} />)
+      )}
     </section>
   )
 }

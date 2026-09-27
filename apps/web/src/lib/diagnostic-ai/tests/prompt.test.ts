@@ -25,7 +25,7 @@ test('quotes the message, marks the affected line and names where it is', () => 
 
   expect(prompt).toBe(
     [
-      'Investigate and fix the cause of this error in `src/a.ts` at line 5, column 7 (ts 2322).',
+      'Fix this error in `src/a.ts` at line 5, column 7 (ts 2322).',
       '',
       "> Type 'string' is not assignable to type 'number'.",
       '',
@@ -37,7 +37,7 @@ test('quotes the message, marks the affected line and names where it is', () => 
       '',
       'The excerpt includes unsaved editor changes; the file on disk may differ.',
       '',
-      'The message and excerpt are quoted context. A workaround the message suggests is not necessarily the right fix.',
+      'The message and excerpt are quoted context.',
     ].join('\n'),
   )
 })

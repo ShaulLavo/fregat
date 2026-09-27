@@ -7,6 +7,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
 
+import { CodeHighlighterReady } from '../../../../test/factories/code-highlighter-ready'
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { AppProviders, createTestQueryClient, seedBootMirrorTheme } from '../../../../test/render'
 import {
@@ -57,6 +58,7 @@ afterEach(() => {
 
 describe('MessageBubble browser rendering', () => {
   it('highlights streamed code while the fence is still open', async () => {
+    const highlighting = Promise.withResolvers<void>()
     const container = document.createElement('main')
     container.style.width = '720px'
     document.body.append(container)
@@ -65,6 +67,7 @@ describe('MessageBubble browser rendering', () => {
     flushSync(() => {
       root?.render(
         <AppProviders queryClient={queryClient}>
+          <CodeHighlighterReady language='html' onReady={highlighting.resolve} />
           {withChatTimelineActions(
             <MessageBubble
               message={{
@@ -77,6 +80,8 @@ describe('MessageBubble browser rendering', () => {
         </AppProviders>,
       )
     })
+
+    await highlighting.promise
 
     await vi.waitFor(() => {
       expect(markdownCodeBlock()?.dataset.incomplete).toBe('true')

@@ -1,5 +1,5 @@
 import type { ColorMode } from '@workspace/contracts'
-import type { KeyboardEvent } from 'react'
+import { useEffect, useEffectEvent, type KeyboardEvent } from 'react'
 import { log } from '@/lib/client-logging'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 
@@ -37,8 +37,8 @@ import { paletteMutationKeys } from '@/features/theme-studio/utils/mutation-keys
 const TAB_PADDING = 'px-(--bar-padding-x) py-(--density-section-gap)'
 
 /**
- * The theme studio: a strip along the bottom of a workbench that stays live and full size above
- * it. The app shows the draft throughout; only Apply writes, in one request.
+ * The theme studio: a drawer over the bottom of the window, with the app live behind it. The app
+ * shows the draft throughout; only Apply writes, in one request.
  */
 export function Dock() {
   const { customizations, draft, dirty } = useStudioDraft()
@@ -120,6 +120,11 @@ export function Dock() {
     store.closeStudio()
   }
 
+  const answerLeaveRequest = useEffectEvent(leave)
+  useEffect(() => {
+    if (store.leaveRequests > 0) answerLeaveRequest()
+  }, [store.leaveRequests])
+
   // Browsing themes is free; leaving a theme with edits of its own asks first, like closing.
   function chooseTheme(next: StudioDraft) {
     const edited =
@@ -159,7 +164,7 @@ export function Dock() {
   return (
     <section
       aria-label='Theme studio'
-      className='bg-popover-solid flex shrink-0 flex-col'
+      className='flex flex-col'
       data-theme-studio=''
       ref={ref}
       onKeyDown={handleKeyDown}
@@ -178,51 +183,50 @@ export function Dock() {
         onTab={store.setTab}
         onToggleCollapsed={() => store.setCollapsed(!store.collapsed)}
       />
-      {store.collapsed ? null : (
-        <div className='h-48 min-h-0'>
-          {store.tab === 'themes' ? (
-            <ThemesTab
-              customizations={customizations}
-              draft={draft}
-              mode={mode}
-              onApply={() => void apply()}
-              onChoose={chooseTheme}
-            />
-          ) : null}
-          {store.tab === 'colors' && draft ? (
-            <ColorsTab
-              colors={draftPalette.colors}
-              mode={mode}
-              palette={draftPalette.palette}
-              onChoose={draftPalette.choose}
-              onColors={draftPalette.setColors}
-            />
-          ) : null}
-          {store.tab === 'wallpaper' && draft ? (
-            <WallpaperLibrary
-              className={TAB_PADDING}
-              colors={draftPalette.colors}
-              value={draft.variants[mode].wallpaper}
-              onChange={(source) =>
-                edit((variant) => ({ wallpaper: selectWallpaper(variant.wallpaper, source) }))
-              }
-              onColorsFromImage={(asset) => void colorsFromImage(asset)}
-            />
-          ) : null}
-          {store.tab === 'code' && draft ? (
-            <CodeThemePicker
-              className={TAB_PADDING}
-              live
-              mode={mode}
-              value={draft.variants[mode].codeTheme}
-              onChange={(codeTheme) => edit({ codeTheme })}
-            />
-          ) : null}
-          {store.tab === 'surfaces' && draft ? (
-            <SurfacesTab material={draft.variants[mode].material} onEdit={edit} />
-          ) : null}
-        </div>
-      )}
+      {/* Collapsed, the drawer tucks this under the window edge; inert keeps Tab off it. */}
+      <div className='h-48 min-h-0' inert={store.collapsed}>
+        {store.tab === 'themes' ? (
+          <ThemesTab
+            customizations={customizations}
+            draft={draft}
+            mode={mode}
+            onApply={() => void apply()}
+            onChoose={chooseTheme}
+          />
+        ) : null}
+        {store.tab === 'colors' && draft ? (
+          <ColorsTab
+            colors={draftPalette.colors}
+            mode={mode}
+            palette={draftPalette.palette}
+            onChoose={draftPalette.choose}
+            onColors={draftPalette.setColors}
+          />
+        ) : null}
+        {store.tab === 'wallpaper' && draft ? (
+          <WallpaperLibrary
+            className={TAB_PADDING}
+            colors={draftPalette.colors}
+            value={draft.variants[mode].wallpaper}
+            onChange={(source) =>
+              edit((variant) => ({ wallpaper: selectWallpaper(variant.wallpaper, source) }))
+            }
+            onColorsFromImage={(asset) => void colorsFromImage(asset)}
+          />
+        ) : null}
+        {store.tab === 'code' && draft ? (
+          <CodeThemePicker
+            className={TAB_PADDING}
+            live
+            mode={mode}
+            value={draft.variants[mode].codeTheme}
+            onChange={(codeTheme) => edit({ codeTheme })}
+          />
+        ) : null}
+        {store.tab === 'surfaces' && draft ? (
+          <SurfacesTab material={draft.variants[mode].material} onEdit={edit} />
+        ) : null}
+      </div>
     </section>
   )
 }

@@ -1,19 +1,23 @@
 import path from 'node:path'
 import type { Plugin, ResolvedConfig, Rolldown } from 'vite'
+import { createScriptError } from '../../../scripts/structured-errors'
 
-/**
- * Each lazy shell's root module, by the kind the boot script picks (src/lib/shell/utils/kind.ts).
- * The workbench ships in the entry script, so it has none.
- */
-const SHELL_ENTRIES = {
+/** Each lazy shell's root module, by the kind the boot script picks (src/lib/shell/utils/kind.ts). */
+export const SHELL_ENTRIES = {
   phone: 'src/features/phone/components/shell.tsx',
+  workbench: 'src/features/workspace/components/workbench-shell.tsx',
 } as const
+
+export const PHONE_BOOT_SCREENS = [
+  'src/features/phone/components/sessions-screen.tsx',
+  'src/features/phone/components/session-screen.tsx',
+] as const
 
 const PLACEHOLDER = '<!-- shell-chunks -->'
 
 /**
- * Names every chunk each shell needs beyond the entry script, in a JSON script the pre-paint boot
- * script reads to `modulepreload` the chosen shell. Dev serves modules unbundled and gets none.
+ * Names every chunk and stylesheet each shell needs beyond the entry, in a JSON script the
+ * pre-paint boot script reads to preload the chosen shell. Dev serves modules unbundled and gets none.
  */
 export function shellChunksPlugin(webRoot: string): Plugin {
   let config: ResolvedConfig
@@ -52,14 +56,28 @@ export function shellManifest(
   )
   const byFile = new Map(chunks.map((chunk) => [chunk.fileName, chunk]))
   const loaded = staticClosure(entry, byFile)
+  const lazyRoots = dynamicRoots(entry, byFile)
   const manifest: Record<string, string[]> = {}
   for (const [kind, relative] of Object.entries(SHELL_ENTRIES)) {
-    const facade = path.join(webRoot, relative)
-    const root = chunks.find((chunk) => chunk.facadeModuleId === facade)
-    if (!root) throw new Error(`shell-chunks: no chunk for ${relative}; is it still lazy?`)
-    manifest[kind] = [...staticClosure(root, byFile)]
-      .filter((fileName) => !loaded.has(fileName))
-      .map((fileName) => `${base}${fileName}`)
+    const entries = kind === 'phone' ? [relative, ...PHONE_BOOT_SCREENS] : [relative]
+    const files = [
+      ...new Set(
+        entries.flatMap((relative) => {
+          const facade = path.join(webRoot, relative)
+          const root = chunks.find((chunk) => chunk.facadeModuleId === facade)
+          if (!root) throw createScriptError(`shell-chunks: no chunk for ${relative}`)
+          if (!lazyRoots.has(root.fileName))
+            throw createScriptError(`shell-chunks: ${relative} must remain dynamically imported`)
+          return [...staticClosure(root, byFile)].filter((fileName) => !loaded.has(fileName))
+        }),
+      ),
+    ]
+    // The shell's stylesheets too: the dynamic import waits for them, so they would otherwise
+    // start only once the entry runs.
+    const styles = files.flatMap((fileName) => [
+      ...(byFile.get(fileName)?.viteMetadata?.importedCss ?? []),
+    ])
+    manifest[kind] = [...files, ...new Set(styles)].map((fileName) => `${base}${fileName}`)
   }
   return manifest
 }
@@ -76,4 +94,19 @@ function staticClosure(
     pending.push(...(byFile.get(fileName)?.imports ?? []))
   }
   return seen
+}
+
+function dynamicRoots(
+  entry: Rolldown.OutputChunk,
+  byFile: ReadonlyMap<string, Rolldown.OutputChunk>,
+) {
+  const pending = new Set([entry.fileName])
+  const lazy = new Set<string>()
+  for (const file of pending) {
+    const chunk = byFile.get(file)
+    if (!chunk) continue
+    for (const target of chunk.dynamicImports) lazy.add(target)
+    for (const target of [...chunk.imports, ...chunk.dynamicImports]) pending.add(target)
+  }
+  return lazy
 }

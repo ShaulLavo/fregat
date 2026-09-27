@@ -365,3 +365,10 @@ function blobOfSize(bytes: number, type: string) {
 function defineGlobal(name: string, value: unknown) {
   Object.defineProperty(globalThis, name, { configurable: true, value, writable: true })
 }
+
+test('converts HEIC even below the upload budget', async () => {
+  stubImageEnvironment({ canvases: ['offscreen'] })
+  const result = await compressImageToByteLimit(imageFile(512, 'image/heic'), 1024 * 1024)
+  expect(result.ok && result.recompressed).toBe(true)
+  expect(result.ok && result.mimeType).toBe('image/webp')
+})

@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { strictEqual } from 'node:assert/strict'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -15,7 +16,7 @@ export const gitStageSettles: Scenario = {
   description: 'Stage and unstage in a fixture repo; the panel settles from the write response.',
   async run(page, { step }) {
     // Never the dev workspace: clicking Stage there would stage real work.
-    const fixture = await mkdtemp('/work/tmp/fregat-git-stage-')
+    const fixture = await mkdtemp(scratchPath('fregat-git-stage-'))
     let statusRequests = 0
     page.on('request', (request) => {
       if (new URL(request.url()).pathname.endsWith('/git/status')) statusRequests += 1

@@ -19,8 +19,11 @@ a bare root `bun run verify`.
 
 | Plan                                                                                    | State                                                                               |
 | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| [194 — appearance back in settings](194-appearance-back-in-settings.md)                 | **IN PROGRESS 2026-09-27 — phases 1–4 in review; Q1 decided**                       |
-| [193 — no late-bound slots](193-no-late-bound-slots.md)                                 | **PROPOSED 2026-09-27 — READY; FIX WITH AI DONE (`7f22085c0`)**                     |
+| [197 — Editor-owned highlighting service](197-editor-highlighting-service.md)           | **PROPOSED 2026-09-27 — PLAN ONLY; IMPLEMENTATION NOT STARTED**                     |
+| [196 — shared control polish](196-shared-control-polish.md)                             | **PROPOSED 2026-09-27 — PLAN ONLY; IMPLEMENTATION NOT STARTED**                     |
+| [195 — browse Settings defaults in UI and JSON](195-settings-defaults-browser.md)       | **PROPOSED 2026-09-27 — PLAN APPROVED; IMPLEMENTATION NOT STARTED**                 |
+| [194 — appearance back in settings](194-appearance-back-in-settings.md)                 | **DONE 2026-09-27 — phases 1–4 and PR #178 follow-up shipped**                      |
+| [193 — no late-bound slots](193-no-late-bound-slots.md)                                 | **DONE 2026-09-27 — phases 1–6 complete**                                           |
 | [192 — views switch subjects without flashing](192-no-swap-flash.md)                    | **PROPOSED 2026-09-26 — RULE LANDED; 21 SITES LEFT**                                |
 | [191 — file picker, resizable and in the app's icons](191-file-picker-polish.md)        | **IMPLEMENTED 2026-09-26 — WAVE 2 LANE FP; DEPLOY PENDING**                         |
 | [190 — faster CI](190-faster-ci.md)                                                     | **PROPOSED 2026-09-26 — READY; FIRST IN WAVE 2**                                    |
@@ -48,7 +51,7 @@ a bare root `bun run verify`.
 | [147 — log hygiene and a noise gate](147-log-hygiene-and-noise-gate.md)                 | **PROPOSED — PHASE 1 READY; PHASE 3 CARRIES PLAN 125'S REST**                       |
 | [145 — harness controls](145-harness-controls.md)                                       | **IMPLEMENTED (L3); OWNER REVIEW FIXES COMPLETE, VALIDATION IN PROGRESS**           |
 | [144 — unattended agent work](144-unattended-agent-work.md)                             | **IN PROGRESS — P2–P3 DONE (LANE A); P1 LANE B; P4 AFTER 087 M1**                   |
-| [143 — phone layout](143-phone-layout.md)                                               | **DISCUSSION — OWNER DIRECTION FIRST**                                              |
+| [143 — phone layout](143-phone-layout.md)                                               | **IN PROGRESS — phases 1–4 and PR #179 shipped; device and diff-edge checks open**  |
 | [142 — web push](142-web-push.md)                                                       | **PROPOSED — SPIKE FIRST**                                                          |
 | [141 — usage and rate limits](141-usage-and-rate-limits.md)                             | **PHASES 1–3 IMPLEMENTED; PHASE 4 OPEN; PHASE 5 NEEDS THE OWNER**                   |
 | [140 — the editor as the agent's advantage](140-editor-agent-advantage.md)              | **RESEARCH — RESEARCH PHASE FIRST**                                                 |

@@ -15,7 +15,7 @@ const STOP_PROMPT = 'STOP me after a partial answer.'
 export const stoppedTurnReasons = isolatedNativeScenario({
   name: 'stopped-turn-reasons',
   description:
-    'Stop a partial answer three ways — the Stop button, a runtime stop through the command API, a provider failure — and read each status line; Try again resends the same message while the reader, scrolled up, keeps their place.',
+    'Stop a partial answer three ways — the Stop button, a runtime stop through the command API, a provider failure — and read each status line; Resend message resends the same message while the reader, scrolled up, keeps their place.',
   fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
   async drive(page, { step, root, orchestration, sessionId }) {
     const setting = { key: 'chat.responseStreamingMode', value: 'token' }
@@ -33,7 +33,7 @@ export const stoppedTurnReasons = isolatedNativeScenario({
       await sendPrompt(page, STOP_PROMPT)
       await messages.getByText(/^PARTIAL_ANSWER STOP/).waitFor({ timeout: 30_000 })
       await selectors.chatStop(page).click()
-      await expectLine(/^You stopped it after \d/)
+      await expectLine(/^You stopped it(?: after \d.*)?$/)
       await selectors
         .incompleteAnswer(page)
         .filter({ hasText: 'PARTIAL_ANSWER STOP' })
@@ -55,14 +55,34 @@ export const stoppedTurnReasons = isolatedNativeScenario({
 
       await scrollToEnd(page)
       await sendPrompt(page, 'FAIL after a partial answer.')
-      await expectLine(/^Failed after \d/)
+      await expectLine(/^(?:Failed after \d|Response failed$)/)
       await selectors.incompleteAnswer(page).filter({ hasText: 'PARTIAL_ANSWER FAIL' }).waitFor()
       await step('provider-failed')
+
+      const title = (await readSessionDetail(page, orchestration, sessionId)).title
+      const errorLabel = selectors.sessionByTitle(page, title).getByText('Error', { exact: true })
+      await selectors.sessionStatus(page, title, 'Failed').waitFor()
+      await errorLabel.waitFor()
+      await selectors.turnTryAgain(page).last().click()
+      await selectors.sessionStatus(page, title, 'Working').waitFor()
+      await errorLabel.waitFor({ state: 'hidden' })
+      await settled(page, root, 3)
+      await step('successful-retry-sidebar')
+      await selectors.sessionStatus(page, title, 'Ready').waitFor({ timeout: 5_000 })
+      strictEqual(await errorLabel.count(), 0)
+      strictEqual(
+        (await readSessionDetail(page, orchestration, sessionId)).runtime?.lastError,
+        null,
+      )
+      await page.reload()
+      await selectors.sessionStatus(page, title, 'Ready').waitFor()
+      strictEqual(await errorLabel.count(), 0)
+      await step('successful-retry-after-reload')
 
       await sendPrompt(page, 'SESSION stop after a partial answer.')
       await messages.getByText(/^PARTIAL_ANSWER SESSION/).waitFor({ timeout: 30_000 })
       await dispatch(page, orchestration, { type: 'session.runtime.stop', sessionId })
-      await expectLine(/^The session was stopped after \d/)
+      await expectLine(/^The session was stopped(?: after \d.*)?$/)
       await step('runtime-stopped')
       const stopped = await readSessionDetail(page, orchestration, sessionId)
       strictEqual(stopped.runtime?.lastError, null, 'A deliberate stop has no session error')
@@ -118,7 +138,7 @@ async function retriedWithSameMessage(page: Page, root: string) {
     if (starts.length === 2) return
     await Bun.sleep(100)
   }
-  ok(false, 'Try again must start a second turn with the same message')
+  ok(false, 'Resend message must start a second turn with the same message')
 }
 
 async function readViewport(page: Page) {

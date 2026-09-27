@@ -3,7 +3,7 @@ import { Kbd } from '@workspace/ui/components/kbd'
 
 export function ChatWelcomeView() {
   return (
-    <div className='flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-6 text-center'>
+    <div className='flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-hidden px-6 text-center'>
       <div className='bg-muted/40 text-muted-foreground flex size-11 items-center justify-center rounded-md'>
         <ChatTeardropDotsIcon className='size-(--icon-size)' />
       </div>

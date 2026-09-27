@@ -244,6 +244,13 @@
       "required": ["model", "providerInstanceId"],
       "type": "object"
     },
+    "developer.clientUpdateCheckSeconds": {
+      "default": 60,
+      "description": "Seconds between checks for an available web update while the app is visible. Refresh applies the update when you choose.",
+      "maximum": 3600,
+      "minimum": 10,
+      "type": "integer"
+    },
     "developer.deployRestartWaitMinutes": {
       "default": 30,
       "description": "Minutes `bun run deploy --restart` waits for running sessions to finish before it gives up. `--interrupt` restarts at once and ends those turns.",
