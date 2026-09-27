@@ -1,9 +1,9 @@
 // Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
-import type { GitStatus, GitStatusEntry } from '../publicTypes'
-import { getGitStatusSignature } from '../getGitStatusSignature'
-import { normalizeInputPath } from '../normalizeInputPath'
-import { getAncestorDirectoryPaths } from './pathHelpers'
-import type { FileTreeGitStatusPatch } from './publicTypes'
+import type { GitStatus, GitStatusEntry } from '../public-types'
+import { getGitStatusSignature } from '../git-status-signature'
+import { normalizeInputPath } from '../normalize-input-path'
+import { getAncestorDirectoryPaths } from './path-helpers'
+import type { FileTreeGitStatusPatch } from './public-types'
 
 export interface FileTreeGitStatusState {
   readonly changeCountByDirectoryPath: ReadonlyMap<string, number>

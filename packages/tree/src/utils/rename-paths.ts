@@ -1,7 +1,7 @@
 // Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
 import { getSelectionPath } from './getSelectionPath'
 
-export type RenameFileTreePathsResult =
+export type RenamePathsResult =
   | {
       nextFiles: string[]
       sourcePath: string
@@ -10,7 +10,7 @@ export type RenameFileTreePathsResult =
     }
   | { error: string }
 
-type RenameFileTreePathsParams = {
+type RenamePathsParams = {
   files: string[]
   path: string
   isFolder: boolean
@@ -35,12 +35,12 @@ function joinPath(parentPath: string, baseName: string): string {
 /**
  * Computes a renamed file list using same-parent basename rename semantics.
  */
-export function renameFileTreePaths({
+export function renamePaths({
   files,
   path,
   isFolder,
   nextBasename,
-}: RenameFileTreePathsParams): RenameFileTreePathsResult {
+}: RenamePathsParams): RenamePathsResult {
   const sourcePath = getSelectionPath(path)
   const trimmedBasename = nextBasename.trim()
   if (trimmedBasename.length === 0) {

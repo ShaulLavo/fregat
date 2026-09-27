@@ -11,8 +11,8 @@ import type {
   PathStoreVisibleTreeProjectionData,
 } from '../path-store/public-types'
 
-import type { FileTreePreparedInput } from '../preparedInput'
-import { renameFileTreePaths } from '../renameFileTreePaths'
+import type { FileTreePreparedInput } from '../prepared-input'
+import { renamePaths } from '../rename-paths'
 import {
   buildDropOperations,
   createDropContext,
@@ -20,18 +20,18 @@ import {
   type FileTreeDragSession,
   isSelfOrDescendantDrop,
   resolveDraggedPathsForStart,
-} from './dragAndDrop'
-import { resolveFileTreeInput } from './inputResolution'
+} from './drag-and-drop'
+import { resolveFileTreeInput } from './input-resolution'
 import type {
   FileTreeControllerListener,
   FileTreeScrollRequest,
   FileTreeStickyRowCandidate,
-} from './internalTypes'
+} from './internal-types'
 import {
   isPathMutationEvent,
   remapPathThroughMutation,
   toTreesMutationEvent,
-} from './mutationEvents'
+} from './mutation-events'
 import {
   arePathSetsEqual,
   getAncestorDirectoryPaths,
@@ -39,7 +39,7 @@ import {
   getSiblingComparisonKey,
   isCanonicalDirectoryPath,
   toLowerCaseSearchPath,
-} from './pathHelpers'
+} from './path-helpers'
 import type {
   FileTreeBatchOperation,
   FileTreeControllerOptions,
@@ -64,9 +64,9 @@ import type {
   FileTreeSearchMode,
   FileTreeSearchSessionHandle,
   FileTreeVisibleRow,
-} from './publicTypes'
-import { getRenameLeafName, toCanonicalRenamePath, toRenameHelperPath } from './renameHelpers'
-import { normalizeSearchQuery } from './searchHelpers'
+} from './public-types'
+import { getRenameLeafName, toCanonicalRenamePath, toRenameHelperPath } from './rename-helpers'
+import { normalizeSearchQuery } from './search-helpers'
 
 type ProjectionIndexBuffer = Int32Array<ArrayBufferLike>
 
@@ -1174,7 +1174,7 @@ export class FileTreeController implements FileTreeMutationHandle, FileTreeSearc
     }
 
     const isFolder = isCanonicalDirectoryPath(renamingPath)
-    const result = renameFileTreePaths({
+    const result = renamePaths({
       files: this.#store.list(),
       isFolder,
       nextBasename: this.#renamingValue,

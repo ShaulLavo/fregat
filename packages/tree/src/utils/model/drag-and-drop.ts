@@ -1,12 +1,12 @@
 // Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
-import { getAncestorDirectoryPaths, isCanonicalDirectoryPath } from './pathHelpers'
+import { getAncestorDirectoryPaths, isCanonicalDirectoryPath } from './path-helpers'
 import type {
   FileTreeBatchOperation,
   FileTreeDropContext,
   FileTreeDropResult,
   FileTreeDropTarget,
   FileTreePublicId,
-} from './publicTypes'
+} from './public-types'
 
 export interface FileTreeDragSession {
   draggedPaths: readonly FileTreePublicId[]

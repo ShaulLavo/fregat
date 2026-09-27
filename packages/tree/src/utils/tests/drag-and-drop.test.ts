@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { resolveDraggedPathsForStart } from '../model/dragAndDrop'
+import { resolveDraggedPathsForStart } from '../model/drag-and-drop'
 
 describe('resolveDraggedPathsForStart', () => {
   it.each([

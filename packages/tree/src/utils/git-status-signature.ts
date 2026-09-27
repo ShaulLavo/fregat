@@ -1,5 +1,5 @@
 // Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
-import type { GitStatusEntry } from './publicTypes'
+import type { GitStatusEntry } from './public-types'
 
 /**
  * Produces a stable cache key for a git status array.

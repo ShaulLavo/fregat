@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { getAncestorDirectoryPaths } from '../model/pathHelpers'
+import { getAncestorDirectoryPaths } from '../model/path-helpers'
 
 describe('getAncestorDirectoryPaths', () => {
   it.each([

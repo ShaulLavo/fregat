@@ -1,6 +1,6 @@
 // Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
-import type { FileTreePreparedInput } from '../preparedInput'
-import type { ContextMenuAnchorRect, GitStatusEntry } from '../publicTypes'
+import type { FileTreePreparedInput } from '../prepared-input'
+import type { ContextMenuAnchorRect, GitStatusEntry } from '../public-types'
 import type { FileTreeDensity } from './density'
 
 /**

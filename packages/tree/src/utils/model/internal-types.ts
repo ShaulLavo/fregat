@@ -3,7 +3,7 @@ import type {
   FileTreeScrollBehavior,
   FileTreeScrollOffset,
   FileTreeVisibleRow,
-} from './publicTypes'
+} from './public-types'
 
 export type FileTreeControllerListener = () => void
 
