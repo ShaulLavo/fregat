@@ -39,6 +39,7 @@
 ## React
 
 - One component per file, one hook per file; pure helpers go to `utils/`.
+- A module variable filled from an effect so non-React code can reach it is a last resort, for DOM nodes, live sockets and held component state. Anything else is read where it lives or pushed by its non-React owner.
 - No prop-drilling of app commands or setters: a prop that is only forwarded, or a command crossing more than two components, gets a narrow provider/hook. Providers expose small domain actions (`selectTab`), not state blobs.
 - The React Compiler memoizes the app. Do not add `memo`, `useMemo` or `useCallback` by hand, except where identity is load-bearing: a value in a dependency array, a value passed to a hook (store selector, `useSyncExternalStore` pair), or a ref callback. The compiler's cache may recompute; those keep their manual memo with a comment naming the dependent hook.
 - Read what the compiler did; do not infer it. `bun run compiler:explain <file> [--component Name]` prints memo blocks as `[keys] → value`. `bun run compiler:memos [paths…]` classifies each manual memo: `redundant` (delete), `needed`, or `differs` (a missing key is a stale-value bug). Rows are not independent: remove memos one at a time.
