@@ -1,8 +1,5 @@
-import {
-  MAX_CHAT_ATTACHMENTS,
-  normalizeChatAttachmentMimeType,
-  type ChatAttachmentMimeType,
-} from '@workspace/contracts'
+import { imageSourceMimeType } from './image-source'
+import { MAX_CHAT_ATTACHMENTS } from '@workspace/contracts'
 
 // Bound decoding memory before the browser re-encodes the image.
 const BYTES_PER_MEGABYTE = 1024 * 1024
@@ -13,27 +10,18 @@ type ChatImageRejectionReason = 'empty' | 'too-large' | 'too-many' | 'unsupporte
 export type ChatImageClassification =
   | {
       status: 'accept'
-      /** Normalized media type — use this, not `file.type`, downstream. */
-      mimeType: ChatAttachmentMimeType
+      // Source formats outside the provider allowlist are converted before upload.
+      mimeType: NonNullable<ReturnType<typeof imageSourceMimeType>>
     }
   | { status: 'reject'; reason: ChatImageRejectionReason; message: string }
 
-/**
- * Decides whether `file` can be staged, given how many images are already
- * staged. Rejections carry the sentence shown to the user, so every refusal
- * names its own cause instead of collapsing into one generic error.
- *
- * Note what is *not* rejected here: anything between `MAX_CHAT_ATTACHMENT_BYTES` and
- * `MAX_COMPRESSIBLE_SOURCE_BYTES` is accepted and downscaled instead, so the
- * wire cap never shows up as a refusal the user cannot act on.
- */
 export function classifyChatImageFile(file: File, currentCount: number): ChatImageClassification {
-  const mimeType = normalizeChatAttachmentMimeType(file.type)
+  const mimeType = imageSourceMimeType(file.type)
   if (!mimeType) {
     return {
       status: 'reject',
       reason: 'unsupported-type',
-      message: 'PNG, JPEG, WebP and GIF only.',
+      message: 'Choose a PNG, JPEG, WebP, GIF, HEIC, HEIF, AVIF, BMP or TIFF image.',
     }
   }
   if (currentCount >= MAX_CHAT_ATTACHMENTS) {

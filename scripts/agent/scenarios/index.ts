@@ -46,6 +46,7 @@ import { chatQueue } from './chat-queue'
 import { chatQueueAway } from './chat-queue-away'
 import { chatQueueStopUpload } from './chat-queue-stop-upload'
 import { providerModelOptions } from './provider-model-options'
+import { screenshotDrop } from './screenshot-drop'
 import { fileAttachments } from './file-attachments'
 import { sessionTitles } from './session-titles'
 import { sessionNavigation } from './session-navigation'
@@ -134,6 +135,8 @@ import { chatCardNarrow } from './chat-card-narrow'
 import { chatComposerInsert } from './chat-composer-insert'
 import { chatDisclosureSettle } from './chat-disclosure-settle'
 import { chatTurnAnatomy } from './chat-turn-anatomy'
+import { chatToolOrder } from './chat-tool-order'
+import { chatResume } from './chat-resume'
 import { chatTurnSettle } from './chat-turn-settle'
 import { devicePairing } from './device-pairing'
 import { phoneShell } from './phone-shell'
@@ -426,6 +429,7 @@ export const scenarios: readonly Scenario[] = [
   claudeApprovalRules,
   codexApprovalRules,
   fileAttachments,
+  screenshotDrop,
   chatStashContext,
   chatDraftSentLeftover,
   chatStream,
@@ -667,6 +671,8 @@ export const scenarios: readonly Scenario[] = [
   chatComposerInsert,
   chatDisclosureSettle,
   chatTurnAnatomy,
+  chatToolOrder,
+  chatResume,
   chatTurnSettle,
   devicePairing,
   phoneShell,
