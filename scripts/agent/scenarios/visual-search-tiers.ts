@@ -3,7 +3,7 @@ import type { Page } from 'playwright'
 
 import { openFileByName, selectors } from '../selectors'
 import type { Scenario } from './index'
-import { paintVisualSearch, paintedVisualSearch, settledVisualSearch } from './visual-search-drive'
+import { paintVisualSearch, settledVisualSearch } from './visual-search-drive'
 
 type Tier = { readonly name: string; readonly query: string }
 type PhaseCounters = {
@@ -16,6 +16,7 @@ type PhaseCounters = {
   readonly editorHostsMounted: number
   readonly editorHostsRemoved: number
   readonly editorHostsLive: number
+  readonly scrollHeight: number
   readonly summary: string | null
 }
 
@@ -106,7 +107,7 @@ async function runTier(page: Page, tier: Tier, step: (label: string) => Promise<
   await selectors.workspaceSearch(page).fill('useSettingValue')
   await settledVisualSearch(page)
   await selectors.openSearchEditor(page).click()
-  await paintedVisualSearch(page)
+  await paintedRows(page)
   await page.evaluate(installProbe)
   await page.evaluate(readProbe)
 
@@ -129,6 +130,7 @@ async function runTier(page: Page, tier: Tier, step: (label: string) => Promise<
       editorHostsMounted: probe.mounted,
       editorHostsRemoved: probe.removed,
       editorHostsLive: probe.live,
+      scrollHeight: await selectors.searchEditor(page).evaluate((element) => element.scrollHeight),
       summary: summary?.split(' · ')[0] ?? null,
     })
   }
@@ -139,7 +141,7 @@ async function runTier(page: Page, tier: Tier, step: (label: string) => Promise<
     await input.press('ControlOrMeta+a')
     await page.keyboard.type(tier.query, { delay: 120 })
     await settledVisualSearch(page)
-    await paintedVisualSearch(page)
+    await paintedRows(page)
   })
   await hoverCentre(page, selectors.searchEditor(page))
   await phase('wheel-fast', () => wheel(page, 20, 1_200))
@@ -148,7 +150,7 @@ async function runTier(page: Page, tier: Tier, step: (label: string) => Promise<
     await selectors.searchEditor(page).evaluate((element) => {
       element.scrollTop = (element.scrollHeight - element.clientHeight) / 2
     })
-    await paintedVisualSearch(page)
+    await paintedRows(page)
   })
   await hoverCentre(page, selectors.searchResultTree(page))
   await phase('sidebar-wheel-fast', () => wheel(page, 20, 1_200))
@@ -172,4 +174,10 @@ async function hoverCentre(page: Page, locator: ReturnType<Page['locator']>) {
   const box = await locator.boundingBox()
   ok(box, 'The scroller to wheel has a box')
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+}
+
+// Rows only: a tier can open on a file with no grammar, which never gets syntax tokens.
+async function paintedRows(page: Page) {
+  await selectors.searchEditorVisibleRows(page).first().waitFor({ timeout: 90_000 })
+  await paintVisualSearch(page)
 }
