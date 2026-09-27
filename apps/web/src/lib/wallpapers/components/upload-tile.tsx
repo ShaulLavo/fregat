@@ -3,10 +3,7 @@ import { Button } from '@workspace/ui/components/button'
 import { Input } from '@workspace/ui/components/input'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { useRef } from 'react'
-import {
-  ACCEPTED_WALLPAPER_TYPES,
-  WALLPAPER_LIMITS_HINT,
-} from '@/features/theme-studio/utils/wallpaper-upload'
+import { ACCEPTED_WALLPAPER_TYPES, WALLPAPER_LIMITS_HINT } from '@/lib/wallpapers/utils/upload'
 
 export function WallpaperUploadTile({
   disabled,

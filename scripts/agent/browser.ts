@@ -9,7 +9,7 @@ import { createEvidence, type Evidence } from './evidence'
 import { formatLogEvent, readLogs } from './logs'
 import { attachObserver, observedProblems, serializable } from './observe.mjs'
 import { scenarioNamed, scenarios, type Scenario } from './scenarios/index'
-import { waitForApp } from './selectors'
+import { settleRunningAnimations, waitForApp } from './selectors'
 import { compareTraceSummaries, formatTraceSummary, summarizeTrace } from './trace-summary'
 import { captureTraceSources } from './trace-source-maps'
 import { captureSize, type CaptureSize } from './capture-options'
@@ -309,6 +309,8 @@ async function runScenario(scenario: Scenario, options: Options) {
     const steps: string[] = []
     const step = async (label: string, target: Page = page) => {
       const file = `${String(steps.length + 1).padStart(2, '0')}-${label}.png`
+      // A tab indicator or fade caught mid-flight shows a state the page is leaving.
+      await settleRunningAnimations(target)
       await target.screenshot({ path: evidence.file(file) })
       if (scenario.inspect)
         await evidence.json(file.replace('.png', '.json'), await scenario.inspect(page))

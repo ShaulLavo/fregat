@@ -1,4 +1,4 @@
-import { WallpaperChoice } from '@/features/theme-studio/components/wallpaper-choice'
+import { WallpaperChoice } from '@/lib/wallpapers/components/choice'
 import type { ReactNode } from 'react'
 
 export function WallpaperSourceCard({

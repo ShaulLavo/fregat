@@ -13,41 +13,43 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@workspace/ui/comp
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { Tabs, TabsList, TabsTab } from '@workspace/ui/components/tabs'
+import { cn } from '@workspace/ui/lib/utils'
 import { useState, type ClipboardEvent, type DragEvent } from 'react'
 
 import { errorMessage } from '@/lib/error-message'
 import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
-import { useWallpaperActions } from '@/features/theme-studio/hooks/use-wallpaper-actions'
-import { useWallpaperUpload } from '@/features/theme-studio/hooks/use-wallpaper-upload'
-import { wallpaperMutationKeys } from '@/features/theme-studio/utils/mutation-keys'
+import { useWallpaperActions } from '@/lib/wallpapers/hooks/use-actions'
+import { useWallpaperUpload } from '@/lib/wallpapers/hooks/use-upload'
+import { wallpaperMutationKeys } from '@/lib/wallpapers/utils/mutation-keys'
 import { toastError } from '@/lib/toast-error'
 import { wallpaperColorsOptions, wallpaperLibraryOptions } from '@/lib/wallpapers/state/queries'
 import { wallpaperSections } from '@/lib/wallpapers/utils/groups'
 import { visibleWallpaper } from '@/lib/wallpapers/utils/selection'
-import { WallpaperCard } from '@/features/theme-studio/components/wallpaper-card'
-import { WallpaperCatalogCard } from '@/features/theme-studio/components/wallpaper-catalog-card'
-import { WallpaperSection } from '@/features/theme-studio/components/wallpaper-section'
-import { WallpaperSourceCard } from '@/features/theme-studio/components/wallpaper-source-card'
-import { WallpaperUploadTile } from '@/features/theme-studio/components/wallpaper-upload-tile'
-import { sortByMatch } from '@/features/theme-studio/utils/wallpaper-matches'
+import { WallpaperCard } from '@/lib/wallpapers/components/card'
+import { WallpaperCatalogCard } from '@/lib/wallpapers/components/catalog-card'
+import { WallpaperSection } from '@/lib/wallpapers/components/section'
+import { WallpaperSourceCard } from '@/lib/wallpapers/components/source-card'
+import { WallpaperUploadTile } from '@/lib/wallpapers/components/upload-tile'
+import { sortByMatch } from '@/lib/wallpapers/utils/matches'
 
 type Order = 'library' | 'matches'
 
 /**
- * The wallpaper library for the half on screen: sources, uploads (drop or paste), and each theme's
- * images. Matches sorts by closeness to the draft's colors; the reverse, colors from an image,
- * is one action away.
+ * The wallpaper library: sources, uploads (drop or paste), and each theme's images. Matches sorts
+ * by closeness to `colors`; with `onColorsFromImage`, the reverse is one action away.
  */
-export function WallpaperTab({
+export function WallpaperLibrary({
+  className,
   colors,
   value,
   onChange,
   onColorsFromImage,
 }: {
+  className?: string
   colors: PaletteColors | null
   value: WallpaperSelection
   onChange: (source: WallpaperSource) => void
-  onColorsFromImage: (asset: AssetId) => void
+  onColorsFromImage?: (asset: AssetId) => void
 }) {
   const owner = useSettingsOwner()
   const library = useQuery(wallpaperLibraryOptions(), owner)
@@ -132,7 +134,7 @@ export function WallpaperTab({
 
   return (
     <div
-      className='flex h-full min-h-0 flex-col gap-2 px-(--bar-padding-x) py-(--density-section-gap)'
+      className={cn('flex h-full min-h-0 flex-col gap-2', className)}
       onDragLeave={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false)
       }}
@@ -168,16 +170,18 @@ export function WallpaperTab({
           <Spinner label='Reading wallpaper colors' size='xs' />
         ) : null}
         <span className='min-w-0 flex-1' />
-        <Button
-          disabled={selection.kind !== 'library'}
-          size='sm'
-          variant='outline'
-          onClick={() => {
-            if (selection.kind === 'library') onColorsFromImage(selection.asset)
-          }}
-        >
-          Colors from this image
-        </Button>
+        {onColorsFromImage ? (
+          <Button
+            disabled={selection.kind !== 'library'}
+            size='sm'
+            variant='outline'
+            onClick={() => {
+              if (selection.kind === 'library') onColorsFromImage(selection.asset)
+            }}
+          >
+            Colors from this image
+          </Button>
+        ) : null}
       </div>
       <div className='flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain'>
         {library.isPending ? (

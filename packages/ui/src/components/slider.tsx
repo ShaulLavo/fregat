@@ -3,8 +3,16 @@ import { Slider as SliderPrimitive } from '@base-ui/react/slider'
 
 import { cn } from '@workspace/ui/lib/utils'
 
-/** One value on a track. The fill and the thumb are the only surfaces; the track is a tint. */
-function Slider({ className, onValueCommitted, ...props }: SliderPrimitive.Root.Props<number>) {
+/**
+ * One value on a track. The fill and the thumb are the only surfaces; the track is a tint.
+ * `aria-label` names the thumb's range input, which is what assistive tech and label queries read.
+ */
+function Slider({
+  'aria-label': ariaLabel,
+  className,
+  onValueCommitted,
+  ...props
+}: SliderPrimitive.Root.Props<number>) {
   return (
     <SliderPrimitive.Root
       data-slot='slider'
@@ -19,6 +27,7 @@ function Slider({ className, onValueCommitted, ...props }: SliderPrimitive.Root.
         <SliderPrimitive.Track className='bg-muted relative h-1 w-full rounded-full'>
           <SliderPrimitive.Indicator className='bg-primary rounded-full' />
           <SliderPrimitive.Thumb
+            aria-label={ariaLabel}
             data-slot='slider-thumb'
             className='focus-ring bg-background ring-foreground/10 size-3.5 rounded-full shadow-(--shadow-key) ring-1'
           />

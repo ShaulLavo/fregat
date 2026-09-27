@@ -618,6 +618,9 @@ export const selectors = {
   settingsScopeTab: (page: Page, name: 'User' | 'Workspace' | 'Defaults', selected?: boolean) =>
     page.getByRole('tab', { name, exact: true, selected }),
   settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),
+  settingsRow: (page: Page, id: string) => page.locator(`[data-setting-row="${id}"]`),
+  settingsSlider: (page: Page, title: string) =>
+    page.getByRole('slider', { name: title, exact: true }),
   settingsRowActions: (page: Page, id: string) =>
     page.getByRole('button', { name: `Actions for ${id}`, exact: true }),
   pushSection: (page: Page) =>
@@ -1249,6 +1252,26 @@ export async function chooseColorMode(page: Page, value: 'light' | 'dark' | 'sys
   await selectors.commandOption(page, 'Choose light / dark mode').click()
   await selectors.colorModeOption(page, value).click()
   await selectors.paletteInput(page).waitFor({ state: 'hidden' })
+}
+
+/**
+ * Waits for the page's running, finite animations (tab indicators, fades, view transitions),
+ * capped at a second. Looping spinners and paused animations are left alone.
+ */
+export async function settleRunningAnimations(page: Page, capMs = 1_000) {
+  await Promise.race([
+    page.evaluate(async () => {
+      const finite = document
+        .getAnimations()
+        .filter(
+          (animation) =>
+            animation.playState === 'running' &&
+            Number.isFinite(animation.effect?.getComputedTiming().endTime),
+        )
+      await Promise.all(finite.map((animation) => animation.finished.catch(() => undefined)))
+    }),
+    new Promise((resolve) => setTimeout(resolve, capMs)),
+  ])
 }
 
 /** Two frames, then every running animation under the target. Collapsed panels animate open. */
