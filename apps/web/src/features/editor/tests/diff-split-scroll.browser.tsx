@@ -85,15 +85,15 @@ test('the panes are never seen at different offsets while a wheel is turning', a
   }
   requestAnimationFrame(sample)
 
-  // Waits count frames, not milliseconds: a loaded runner paints fewer frames per second, and a
-  // wall-clock wait there left too few samples to prove anything.
+  // Waits count frames, not milliseconds: with other files sharing the browser it paints fewer
+  // frames a second, and a wall-clock window then holds too few samples to see a lag.
   await commands.diffMouseWheel({ deltaY: 120, selector: '.editor-diff-pane-old' })
   await animationFrames(8)
   await commands.diffMouseWheel({ deltaY: 120, selector: '.editor-diff-pane-old' })
   await animationFrames(24)
   sampling = false
 
-  expect(samples.length).toBeGreaterThan(20)
+  expect(new Set(samples).size).toBeGreaterThan(1)
   expect(samples.filter((pair) => pair.split('/')[0] !== pair.split('/')[1])).toEqual([])
 })
 

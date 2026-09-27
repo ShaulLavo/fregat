@@ -392,10 +392,30 @@ async function expectListScrollsUnderAFinger(page: Page) {
     })
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
   await cdp.detach()
-  await page.waitForTimeout(300)
+  await scrollSettled(list)
   ok((await list.evaluate((element) => element.scrollTop)) > 0, 'The list scrolled')
   equal((await order()).join('|'), before.join('|'), 'The drag reordered nothing')
   await list.evaluate((element) => element.scrollTo({ top: 0 }))
+  // The next step long-presses a row, and a scroll event arriving after the touch cancels it.
+  await scrollSettled(list)
+}
+
+/** The fling has stopped and its last scroll event is dispatched: three frames without movement. */
+function scrollSettled(list: Locator) {
+  return list.evaluate(
+    (element) =>
+      new Promise<void>((resolve) => {
+        let last = element.scrollTop
+        let still = 0
+        const check = () => {
+          still = element.scrollTop === last ? still + 1 : 0
+          last = element.scrollTop
+          if (still >= 3) return resolve()
+          requestAnimationFrame(check)
+        }
+        requestAnimationFrame(check)
+      }),
+  )
 }
 
 /** The opacity the element is drawn at: its own times every ancestor's. */

@@ -45,6 +45,9 @@ function sessionRowForWorktree(page: Page, worktreeId: string) {
 }
 
 export const selectors = {
+  startupFailure: (page: Page) =>
+    page.getByRole('status').filter({ hasText: 'App could not start' }),
+  reloadApp: (page: Page) => page.getByRole('button', { name: 'Reload app', exact: true }),
   pullRequestLookupRetry: (page: Page) => page.locator('[data-pull-request-lookup-retry]'),
   liveWorkLogToggle: (page: Page) =>
     page.locator('[data-live-activity]').getByRole('button').first(),
@@ -234,6 +237,7 @@ export const selectors = {
   changedFilesSections: (page: Page) => page.locator('[data-changed-files-state]'),
   chatToolsHandle: (page: Page) => page.locator('[data-slot="resizable-handle"]').last(),
   tooltipPopup: (page: Page) => page.locator('[data-slot="tooltip-content"]'),
+  openTooltipPopup: (page: Page) => page.locator('[data-slot="tooltip-content"][data-open]'),
   sidebarHandle: (page: Page) => page.locator('[data-slot="resizable-handle"]').first(),
   changedFilesCard: (page: Page) => page.locator('[data-changed-files-state]').first(),
   changedFileName: (page: Page) =>
@@ -1231,7 +1235,12 @@ export async function openFileByName(page: Page, name: string) {
   const input = selectors.paletteInput(page)
   await input.waitFor({ timeout: 5_000 })
   await input.fill(name)
-  await page.waitForTimeout(400)
+  // Enter opens the selected row: a row of the previous query until this query's results land.
+  const basename = name.split('/').at(-1) ?? name
+  await selectors
+    .selectedPaletteOption(page)
+    .filter({ hasText: basename })
+    .waitFor({ timeout: 15_000 })
   await page.keyboard.press('Enter')
   await selectors.editorInput(page).first().waitFor({ timeout: 15_000 })
 }
