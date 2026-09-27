@@ -5,6 +5,7 @@ import type { Locator, Page, Request } from 'playwright'
 
 import { createModifiedFileFixture, releaseFixture } from '../fixture-workspace'
 import { selectors } from '../selectors'
+import { longPress } from '../touch'
 import { sendPrompt } from './native-provider-verification'
 import { createSessions, openFixtureChat, PHONE_REPLY, PHONE_SESSIONS } from './phone-fixture'
 import type { Scenario } from './index'
@@ -363,18 +364,6 @@ function addressTabs(page: Page) {
   const tabs = new URL(page.url()).searchParams.get('tabs')
   if (tabs === null || tabs === '-') return []
   return tabs.split('~')
-}
-
-/** A held finger, as a touch screen sends it: no mouse events between down and up. */
-async function longPress(page: Page, locator: Locator, holdMs: number) {
-  const box = await locator.boundingBox()
-  ok(box, 'The pressed row must be laid out')
-  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
-  const cdp = await page.context().newCDPSession(page)
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
-  await page.waitForTimeout(holdMs)
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
-  await cdp.detach()
 }
 
 /** A finger dragged up the list scrolls it, and reorders nothing. */

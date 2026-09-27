@@ -89,14 +89,15 @@ test('a press that starts on selectable text is the platform’s', () => {
   expect(opened).not.toHaveBeenCalled()
 })
 
-test('a platform that fires its own long-press menu is left alone from then on', () => {
+test('a native menu handles its press without disabling later long presses', () => {
   touch('touchstart', 40, 60)
   row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 40, clientY: 60 }))
   vi.advanceTimersByTime(600)
   touch('touchend', 40, 60, 0)
   touch('touchstart', 10, 10)
   vi.advanceTimersByTime(600)
-  expect(opened).toHaveBeenCalledOnce()
+  expect(opened).toHaveBeenCalledTimes(2)
+  expect(opened).toHaveBeenLastCalledWith(10, 10)
 })
 
 test('a platform whose menu comes on the lift, after this one opened, gets no second menu', () => {
@@ -110,5 +111,31 @@ test('a platform whose menu comes on the lift, after this one opened, gets no se
 
   touch('touchstart', 10, 10)
   vi.advanceTimersByTime(600)
-  expect(opened).toHaveBeenCalledOnce()
+  expect(opened).toHaveBeenCalledTimes(2)
 })
+
+test('a native menu before the timer suppresses the lift that would activate its item', () => {
+  touch('touchstart', 40, 60)
+  row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))
+  expect(touch('touchend', 40, 60, 0).defaultPrevented).toBe(true)
+})
+
+test.each([
+  ['auto', 1],
+  ['text', 0],
+] as const)(
+  'WebKit child selection %s opens %i menus inside a select-none row',
+  (selection, count) => {
+    const title = document.createElement('span')
+    title.style.userSelect = selection
+    title.textContent = row.textContent
+    row.replaceChildren(title)
+    Object.assign(document, { caretRangeFromPoint: () => ({ startContainer: title.firstChild }) })
+    const event = new Event('touchstart', { bubbles: true, cancelable: true })
+    Object.assign(event, { touches: [{ clientX: 40, clientY: 60 }] })
+    title.dispatchEvent(event)
+    vi.advanceTimersByTime(600)
+    Reflect.deleteProperty(document, 'caretRangeFromPoint')
+    expect(opened).toHaveBeenCalledTimes(count)
+  },
+)

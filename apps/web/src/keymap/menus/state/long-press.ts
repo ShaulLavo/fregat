@@ -1,5 +1,5 @@
 // iOS fires no `contextmenu` on a long press; this dispatches one for every surface's handler.
-// Native text selection wins on selectable text, and a platform with its own menu turns this off.
+// Native text selection wins on selectable text; native menus cancel only their own press.
 const LONG_PRESS_MS = 550
 const MOVE_TOLERANCE_PX = 10
 /** A native `contextmenu` this soon after a finger lifts still belongs to that press. */
@@ -22,7 +22,6 @@ export function installLongPressContextMenu(target: Window = window) {
   /** The last lifted press opened a menu; a native one right after it is the same request. */
   let liftedAfterFire = false
   let dispatching = false
-  let platformFires = false
 
   function cancel() {
     if (press) clearTimeout(press.timer)
@@ -52,7 +51,7 @@ export function installLongPressContextMenu(target: Window = window) {
     liftedAfterFire = false
     touching = true
     const touch = event.touches[0]
-    if (platformFires || event.touches.length !== 1 || !touch || !event.target) return
+    if (event.touches.length !== 1 || !touch || !event.target) return
     if (startsOnSelectableText(document, event.target, touch.clientX, touch.clientY)) return
     press = {
       target: event.target,
@@ -90,9 +89,12 @@ export function installLongPressContextMenu(target: Window = window) {
   function onContextMenu(event: MouseEvent) {
     if (dispatching) return
     if (!touching && performance.now() - liftedAt > NATIVE_AFTER_LIFT_MS) return
-    platformFires = true
+    const pending = press !== null
     cancel()
-    if (!fired && !(liftedAfterFire && !touching)) return
+    if (!fired && !(liftedAfterFire && !touching)) {
+      fired = touching && pending
+      return
+    }
     // This press already opened the menu; the native event would open it a second time.
     event.preventDefault()
     event.stopPropagation()
@@ -127,7 +129,14 @@ export function installLongPressContextMenu(target: Window = window) {
 function startsOnSelectableText(document: Document, target: EventTarget, x: number, y: number) {
   if (!(target instanceof Element)) return false
   const view = document.defaultView
-  if (!view || view.getComputedStyle(target).userSelect === 'none') return false
+  if (!view) return false
+  // WebKit reports `auto` on descendants of a select-none row. Resolve its used value
+  // through ancestors, stopping at an explicit text override such as a rename field.
+  for (let element: Element | null = target; element; element = element.parentElement) {
+    const selection = view.getComputedStyle(element).userSelect
+    if (selection === 'none') return false
+    if (selection === 'text' || selection === 'all') break
+  }
   const range = document.caretRangeFromPoint?.(x, y)
   return range?.startContainer.nodeType === Node.TEXT_NODE
 }
