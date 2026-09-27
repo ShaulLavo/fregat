@@ -19,6 +19,7 @@ import {
 import { isContextMenuKey as isContextMenuOpenKey } from '@workspace/utils/keyboard'
 
 interface UseTreeKeyboardOptions {
+  readonly seedSearch: (character: string) => void
   readonly closeContextMenu: () => void
   readonly contextMenuEnabled: boolean
   readonly controller: FileTreeController
@@ -164,6 +165,7 @@ export function useTreeKeyboard(
     resolvedViewportHeight,
     searchBlurBehavior,
     searchEnabled,
+    seedSearch,
     startRenameFromPath,
     stickyOverlayHeight,
     stickyRowPathSet,
@@ -284,6 +286,7 @@ export function useTreeKeyboard(
   }
 
   const handleTreeKeyDown: KeyboardEventHandler<HTMLElement> = (event): void => {
+    if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
     if (isContextMenuOpen) {
       handleOpenContextMenuKey(event)
       return
@@ -302,7 +305,7 @@ export function useTreeKeyboard(
       return
     }
     if (searchEnabled && isSearchOpenSeedKey(event)) {
-      controller.openSearch(event.key)
+      seedSearch(event.key)
       invalidateControllerView()
       event.preventDefault()
       event.stopPropagation()

@@ -48,6 +48,30 @@ describe('filter', () => {
     expect(filterInput().value).toBe('')
   })
 
+  it('ArrowDown moves from the filter into the retained result and Escape closes from the row', async () => {
+    const { model } = await mountParityTree()
+    await clickRow('README.md')
+    await userEvent.keyboard('x.ts')
+    await vi.waitFor(() => expect(hasRow('src/lib/x.ts')).toBe(true))
+    await userEvent.keyboard('{ArrowDown}')
+    await vi.waitFor(() => expect(focusedRowPath()).toBe('src/lib/x.ts'))
+    expect(model.getSearchValue()).toBe('x.ts')
+    await userEvent.keyboard('{Escape}')
+    await vi.waitFor(() => expect(model.isSearchOpen()).toBe(false))
+  })
+
+  it('composing row keys do not seed a search', async () => {
+    const { model } = await mountParityTree()
+    await clickRow('README.md')
+    row('README.md').dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, key: 'x', isComposing: true }),
+    )
+    row('README.md').dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, key: 'x', keyCode: 229 }),
+    )
+    expect(model.isSearchOpen()).toBe(false)
+  })
+
   it('an empty result shows the collapsed tree with the query kept in the box', async () => {
     const { model } = await mountParityTree()
     await expandPaths(model, ['docs/'])

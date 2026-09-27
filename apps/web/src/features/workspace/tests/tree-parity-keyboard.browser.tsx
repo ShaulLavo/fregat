@@ -235,7 +235,7 @@ describe('accessibility today', () => {
     expect(tree).not.toBeNull()
     expect(tree?.getAttribute('aria-label')).toBeNull()
     expect(tree?.getAttribute('aria-multiselectable')).toBeNull()
-    expect(filterInput().getAttribute('aria-label')).toBeNull()
+    expect(filterInput().getAttribute('aria-label')).toBeTruthy()
     // The git letter is not part of the row's accessible name.
     expect(row('README.md').getAttribute('aria-label')).toBe('README.md')
   })

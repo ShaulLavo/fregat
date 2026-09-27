@@ -174,30 +174,30 @@ test('the live navigator retains search, consumes requested focus, reveals, and 
   searchInput.focus()
   await expect.poll(() => document.activeElement).toBe(searchInput)
   typeSearch(searchInput, 'file-7')
-  await expect.poll(() => searchContainer(treeRoot).dataset.open).toBe('true')
+  await expect.poll(() => searchField(treeRoot).value).not.toBe('')
 
   clickToolbarButton('Outside tree')
   expect(searchInput.value).toBe('file-7')
-  expect(searchContainer(treeRoot).dataset.open).toBe('true')
+  expect(searchField(treeRoot).value).not.toBe('')
 
   searchInput.focus()
   await expect.poll(() => searchInput.getAttribute('aria-activedescendant')).not.toBeNull()
   const firstMatch = searchInput.getAttribute('aria-activedescendant')
   searchInput.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }))
-  await expect.poll(() => searchInput.getAttribute('aria-activedescendant')).not.toBe(firstMatch)
-  searchInput.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowUp' }))
-  await expect.poll(() => searchInput.getAttribute('aria-activedescendant')).toBe(firstMatch)
+  await expect.poll(() => document.activeElement?.id).toBe(firstMatch)
+  expect(searchInput.value).toBe('file-7')
+  searchInput.focus()
 
   searchInput.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))
-  await expect.poll(() => searchContainer(treeRoot).dataset.open).toBe('false')
+  await expect.poll(() => searchField(treeRoot).value).toBe('')
 
   searchInput.focus()
   typeSearch(searchInput, 'file-0')
-  await expect.poll(() => searchContainer(treeRoot).dataset.open).toBe('true')
+  await expect.poll(() => searchField(treeRoot).value).not.toBe('')
   clickToolbarButton('Select deep file')
   await expect.poll(() => selectedFilePathText()).toBe(DEEP_FILE_PATH)
   revealActiveFile()
-  await expect.poll(() => searchContainer(treeRoot).dataset.open).toBe('false')
+  await expect.poll(() => searchField(treeRoot).value).toBe('')
   await expect.poll(() => activeTreePath(treeRoot)).toBe('src/file-79.ts')
   expect(treeScroller(treeRoot).scrollTop).toBeGreaterThan(0)
 
@@ -712,10 +712,6 @@ function treeRuntimeIsReady(): boolean {
 
 function treeRow(treeRoot: ParentNode, path: string) {
   return treeRoot.querySelector<HTMLButtonElement>(`button[data-item-path="${path}"]`)
-}
-
-function searchContainer(treeRoot: ParentNode) {
-  return treeRoot.querySelector<HTMLElement>('[data-file-tree-search-container]')!
 }
 
 function treeScroller(treeRoot: ParentNode) {
