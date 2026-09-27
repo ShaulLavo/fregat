@@ -1,6 +1,7 @@
 import { useChatTransport } from '@/features/chat/hooks/use-chat-transport'
 import { readTimelineReload, timelineInitialView } from '@/features/chat/state/timeline-reload'
 import { useReducer, useState } from 'react'
+import type { DisclosureSettle } from '@/features/chat/state/timeline-scroll'
 import { VirtualList } from '@workspace/ui/patterns/virtual-list'
 import type { ChatSession } from '@workspace/client-core/chat/types'
 
@@ -10,6 +11,7 @@ import {
   initialTimelineScrollState,
   timelineScrollReducer,
   TIMELINE_COMPOSER_INSET_PX,
+  TIMELINE_UNPINNED_THRESHOLD_PX,
   TIMELINE_TOP_INSET_PX,
 } from '@/features/chat/utils/timeline-scroll-anchoring'
 import { TimelineRow } from '@/features/chat/components/timeline-row'
@@ -48,7 +50,17 @@ export function MessagesTimeline({
     timelineScrollReducer,
     initialView?.scrollState ?? initialTimelineScrollState,
   )
+  const [disclosureSettle, setDisclosureSettle] = useState<DisclosureSettle | null>(null)
+  const [previousSessionId, setPreviousSessionId] = useState(session.id)
+  if (previousSessionId !== session.id) {
+    setPreviousSessionId(session.id)
+    setDisclosureSettle(null)
+  }
   useReasoningAutoFold(items, scrollState.followMode !== 'free-scrolling')
+  // End anchoring holds a reader in history when a page lands above them. Following is the
+  // viewport's own: in flow layout the rows grow before the virtualizer measures them, and its end
+  // pin would count that growth twice. A settling disclosure holds its own row still.
+  const readerAnchored = scrollState.followMode === 'free-scrolling' && disclosureSettle === null
 
   return (
     <VirtualList
@@ -62,6 +74,8 @@ export function MessagesTimeline({
       measureItems
       paddingStart={TIMELINE_TOP_INSET_PX}
       paddingEnd={TIMELINE_COMPOSER_INSET_PX + scrollState.anchoredEndSpace}
+      anchorTo={readerAnchored ? 'end' : 'start'}
+      scrollEndThreshold={TIMELINE_UNPINNED_THRESHOLD_PX}
       contentClassName='[overflow-anchor:none]'
       renderRow={(item) => (
         <TimelineRow
@@ -77,6 +91,8 @@ export function MessagesTimeline({
           session={session}
           scrollState={scrollState}
           dispatch={dispatch}
+          disclosureSettle={disclosureSettle}
+          onDisclosureSettle={setDisclosureSettle}
         />
       )}
     />

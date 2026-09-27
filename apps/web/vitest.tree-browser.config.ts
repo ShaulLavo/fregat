@@ -24,6 +24,8 @@ type CommandPage = Parameters<BrowserCommand<[]>>[0]['page']
 const touchSessions = new WeakMap<CommandPage, Awaited<ReturnType<typeof openTouchSession>>>()
 const activeTouches = new WeakSet<CommandPage>()
 const pausedClocks = new WeakSet<CommandPage>()
+// Pausing jumps this far ahead, firing only timers due in that span.
+const PAUSE_LEAD_MS = 1_000
 
 // Emulation lives as long as its session, so one session serves every touch of a page.
 async function openTouchSession(page: CommandPage) {
@@ -44,11 +46,14 @@ async function touchSession(page: CommandPage) {
 const treeCommands = {
   async treeClock(context, action: 'pause' | 'advance', milliseconds = 0) {
     if (action === 'advance') return context.page.clock.runFor(milliseconds)
+    // Recorded first: pauseAt stops the clock before it can throw, and a clock left paused
+    // freezes the runner's own timers, so every later file hangs.
+    pausedClocks.add(context.page)
     // The page's clock, which runs ahead of this process's once an earlier test advanced it.
     const now = await context.page.evaluate(() => Date.now())
     await context.page.clock.install({ time: now })
-    await context.page.clock.pauseAt(now)
-    pausedClocks.add(context.page)
+    // The running clock passes `now` before pauseAt lands, and pausing in the past throws.
+    await context.page.clock.pauseAt(now + PAUSE_LEAD_MS)
   },
   async treeResetInput(context) {
     if (pausedClocks.has(context.page)) await context.page.clock.resume()

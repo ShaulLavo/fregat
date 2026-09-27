@@ -2,60 +2,29 @@ import type { Dispatch } from 'react'
 import type { VirtualListVirtualizer as TimelineVirtualizer } from '@workspace/ui/patterns/virtual-list'
 import type { ChatTimelineItem } from '@/features/chat/utils/timeline-items'
 import {
+  isTimelineAtContentEnd,
   shouldReleaseTimelineAnchorForActivity,
   timelineAnchoredTurnMetrics,
-  timelinePrependedScrollTop,
-  timelineRemeasureScrollDelta,
   TIMELINE_ANCHOR_OFFSET_PX,
   TIMELINE_COMPOSER_INSET_PX,
-  TIMELINE_TOP_INSET_PX,
   type TimelineScrollEvent,
   type TimelineScrollState,
 } from '@/features/chat/utils/timeline-scroll-anchoring'
 import { readTimelineViewport } from '@/features/chat/state/timeline-navigation'
 
-export function observeTimelineMeasurements(virtualizer: TimelineVirtualizer, suspended: boolean) {
-  virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item, delta, instance) =>
-    timelineRemeasureScrollDelta({
-      delta,
-      rowStart: item.start,
-      scrollTop: instance.scrollOffset ?? 0,
-      suspended,
-    }) !== 0
+export type DisclosureSettle = { readonly disclosure: Element; readonly measured: boolean }
+
+/**
+ * No re-measure moves the offset: a toggled disclosure holds its row still until it settles, and
+ * while following the viewport holds the end. A compensation written at the end is clamped by the
+ * browser, and virtual-core replays a clamped write on a later resize, after the reader has left.
+ */
+export function holdTimelineMeasurements(virtualizer: TimelineVirtualizer, held: boolean) {
+  if (!held) return
+  virtualizer.shouldAdjustScrollPositionOnItemSizeChange = () => false
   return () => {
     virtualizer.shouldAdjustScrollPositionOnItemSizeChange = undefined
   }
-}
-
-// Browser anchoring is disabled; restore the reader after history is prepended.
-export function absorbTimelinePrepend({
-  dispatch,
-  itemId,
-  items,
-  scrollElement,
-  virtualizer,
-}: {
-  dispatch: Dispatch<TimelineScrollEvent>
-  itemId: string
-  items: readonly ChatTimelineItem[]
-  scrollElement: HTMLDivElement
-  virtualizer: TimelineVirtualizer
-}) {
-  const index = items.findIndex((item) => item.id === itemId)
-  if (index < 0) {
-    dispatch({ type: 'prepend-absorbed' })
-    return
-  }
-
-  const scrollTop = timelinePrependedScrollTop({
-    anchorRow: virtualizer.measurementsCache[index],
-    scrollTop: readTimelineViewport(scrollElement).scrollTop,
-    topInset: TIMELINE_TOP_INSET_PX,
-  })
-  dispatch({ type: 'prepend-absorbed' })
-  if (scrollTop === null) return
-
-  virtualizer.scrollToOffset(scrollTop, { behavior: 'auto' })
 }
 
 export function applyTimelineScroll({
@@ -74,7 +43,7 @@ export function applyTimelineScroll({
   virtualizer: TimelineVirtualizer
 }) {
   if (scrollState.pendingInitialScroll) {
-    virtualizer.scrollToEnd({ behavior: 'auto' })
+    scrollTimelineToEnd(scrollElement)
     dispatch({ type: 'initial-scroll-done' })
     return
   }
@@ -88,8 +57,20 @@ export function applyTimelineScroll({
     return
   }
   if (scrollState.followMode !== 'following-end') return
+  // Growth between renders is held by the viewport's resize observer; this lands a jump or a
+  // release into following.
+  if (isTimelineAtContentEnd(readTimelineViewport(scrollElement))) return
 
-  virtualizer.scrollToEnd({ behavior: 'auto' })
+  scrollTimelineToEnd(scrollElement)
+}
+
+/**
+ * One write to the element's real end. virtual-core's `scrollToEnd` keeps re-aiming at the end
+ * every frame the content grows until one frame holds still, so a wheel-up in that window is
+ * pulled back to the end.
+ */
+export function scrollTimelineToEnd(scrollElement: HTMLDivElement) {
+  scrollElement.scrollTop = scrollElement.scrollHeight
 }
 
 function applyAnchoredTurnScroll({

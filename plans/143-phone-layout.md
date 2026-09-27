@@ -491,12 +491,18 @@ See "Proposed phases" under Research findings. The owner answered its questions 
 - **Tooling.** `agent:browser --touch` (and `capture.touch` on a scenario) emulates a touch phone;
   `waitForApp` accepts the phone shell. Scenario `phone-shell` walks the whole stack on a fixture
   repository with a scripted mock turn and checks nothing scrolls sideways.
-- **First load.** Measured on the same machine state, the app entry's initial graph now ships as one
-  chunk (`scripts/initial-chunk.ts`, a `codeSplitting` group traced from `main.tsx`): desktop
-  first load fell by 30 KB gzip against `origin/main`, and the phone shell adds nothing to it. The
-  workbench stays in the entry: splitting it out as its own lazy chunk (the Direction's "a phone
-  never downloads the workbench") measured +11 KB to +70 KB on the desktop from chunk fragmentation,
-  for a phone first load of 1.01 MB instead of 1.75 MB. Recorded as a follow-up, not done.
+- **First load.** Each shell is a lazy chunk, and the boot script preloads the chosen one's chunks and
+  stylesheets beside the entry script (`scripts/shell-chunks-plugin.ts`). `scripts/shell-chunk-groups.ts`
+  gives each first load whole chunks: `initial` (the entry's static graph, plus the phone shell's
+  static modules the workbench also needs), `workbench-shared` (the rest of the workbench's static
+  graph that a phone can reach, which a phone loads only with a screen that needs it) and
+  `workbench` (desktop only). This builds on #174, which took the top-level await out of
+  `main.tsx`: since #134 a lazy chunk importing the entry's chunk deadlocked the boot (a blank
+  phone on the mesh, and a blank desktop reload with the terminal panel restored).
+  The Logs pane is a deferred chunk, prefetched on idle like the terminal, and the modulepreload
+  polyfill is gone; together they pay for the split. Against main `d45f1c5ae`: phone first-load
+  script gzip 1,684,252 → 1,071,142 bytes, now pinned by `bundle:gate`; desktop 1,680,766 →
+  1,678,529.
 
 ### Phase 3: touch paths (implemented 2026-09-26)
 
@@ -580,7 +586,8 @@ composing keyboard such as Gboard may type the letter), through the mesh.
 ### Owner questions (wave 2)
 
 - The phone still downloads the workbench (see First load above). Keep, or schedule a chunking
-  change that splits it without growing the desktop's first load?
+  change that splits it without growing the desktop's first load? Decided 2026-09-27: owner —
+  split it without growing the desktop. Done; see First load.
 
 ## Follow-up items
 

@@ -45,6 +45,9 @@ function sessionRowForWorktree(page: Page, worktreeId: string) {
 }
 
 export const selectors = {
+  startupFailure: (page: Page) =>
+    page.getByRole('status').filter({ hasText: 'App could not start' }),
+  reloadApp: (page: Page) => page.getByRole('button', { name: 'Reload app', exact: true }),
   pullRequestLookupRetry: (page: Page) => page.locator('[data-pull-request-lookup-retry]'),
   liveWorkLogToggle: (page: Page) =>
     page.locator('[data-live-activity]').getByRole('button').first(),
@@ -234,6 +237,7 @@ export const selectors = {
   changedFilesSections: (page: Page) => page.locator('[data-changed-files-state]'),
   chatToolsHandle: (page: Page) => page.locator('[data-slot="resizable-handle"]').last(),
   tooltipPopup: (page: Page) => page.locator('[data-slot="tooltip-content"]'),
+  openTooltipPopup: (page: Page) => page.locator('[data-slot="tooltip-content"][data-open]'),
   sidebarHandle: (page: Page) => page.locator('[data-slot="resizable-handle"]').first(),
   changedFilesCard: (page: Page) => page.locator('[data-changed-files-state]').first(),
   changedFileName: (page: Page) =>
@@ -619,6 +623,8 @@ export const selectors = {
     page.getByRole('tab', { name, exact: true, selected }),
   settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),
   settingsRow: (page: Page, id: string) => page.locator(`[data-setting-row="${id}"]`),
+  settingsCodeThemePreview: (page: Page, id: string) =>
+    page.locator(`[data-setting-row="${id}"] [data-code-theme-preview] pre[data-theme-id]`),
   settingsSlider: (page: Page, title: string) =>
     page.getByRole('slider', { name: title, exact: true }),
   settingsRowActions: (page: Page, id: string) =>
@@ -1009,6 +1015,8 @@ export const selectors = {
   bootstrapFailure: (page: Page) =>
     page.getByText('Cannot connect to the local machine', { exact: true }),
   windowToolbar: (page: Page) => page.getByLabel('Window toolbar', { exact: true }),
+  phoneFirstScreenSelector: '[data-phone-level="sessions"] section[aria-label="Sessions"]',
+  desktopFirstScreenSelector: '[aria-label="Window toolbar"]',
   phoneShell: (page: Page) => page.locator('[data-phone-shell]'),
   /** The phone shell showing `level`: sessions, session, changes, file or terminal. */
   phoneLevel: (page: Page, level: string) => page.locator(`[data-phone-level="${level}"]`),
@@ -1107,6 +1115,7 @@ export const selectors = {
   logCopyButtons: (page: Page) => page.getByRole('button', { name: 'Copy log event', exact: true }),
   logCleared: (page: Page) => page.getByText('Visible logs cleared.', { exact: true }),
   logRows: (page: Page) => page.locator('[data-log-row-summary]'),
+  logsModuleSpinnerSelector: '[aria-label="Opening logs"]',
   logsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search logs' }),
   logsTab: (page: Page) => page.getByRole('button', { name: 'Logs', exact: true }),
   renderErrorState: (page: Page) =>
@@ -1227,7 +1236,12 @@ export async function openFileByName(page: Page, name: string) {
   const input = selectors.paletteInput(page)
   await input.waitFor({ timeout: 5_000 })
   await input.fill(name)
-  await page.waitForTimeout(400)
+  // Enter opens the selected row: a row of the previous query until this query's results land.
+  const basename = name.split('/').at(-1) ?? name
+  await selectors
+    .selectedPaletteOption(page)
+    .filter({ hasText: basename })
+    .waitFor({ timeout: 15_000 })
   await page.keyboard.press('Enter')
   await selectors.editorInput(page).first().waitFor({ timeout: 15_000 })
 }

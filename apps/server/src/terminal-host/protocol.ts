@@ -9,6 +9,8 @@ export const PROTOCOL_VERSION = 1
 export const HOST_CAPABILITIES: readonly string[] = []
 /** Per-session output the host keeps for a server that is away. */
 export const RING_BYTES = 1024 * 1024
+/** How long a launcher polls for the host it started before giving up. */
+export const HOST_CONNECT_TIMEOUT_MS = 5_000
 const MAX_FRAME_BYTES = 16 * 1024 * 1024
 
 const FRAME_CONTROL = 0

@@ -4,26 +4,32 @@ import type { ComponentType } from 'react'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import type { ShellKind } from '@/lib/shell/utils/kind'
 import { workspaceQueryKeys } from '@/features/workspace/utils/query-keys'
-import { WorkbenchShell } from '@/features/workspace/components/workbench-shell'
 
-export type ShellView = ComponentType<{ readonly rootPath: FilesystemPath }>
+type ShellView = ComponentType<{ readonly rootPath: FilesystemPath }>
 
 /**
- * The phone shell is its own chunk, so a desktop never downloads it. The workbench stays in the
- * entry: splitting it out fragments its closure into dozens of chunks that gzip worse than one,
- * which grows the desktop's first load by more than the phone would save.
+ * Each shell is its own chunk, so a desktop never downloads the phone shell and a phone never
+ * downloads the workbench. The boot script preloads the chosen one beside the entry script.
  */
 export function shellQueryOptions(kind: ShellKind) {
   return queryOptions({
     queryKey: workspaceQueryKeys.shellModule(kind),
-    queryFn: (): Promise<ShellView> =>
-      kind === 'phone'
-        ? import('@/features/phone/components/shell').then((module) => module.PhoneShell)
-        : Promise.resolve(WorkbenchShell),
+    queryFn: kind === 'phone' ? loadPhone : loadWorkbench,
     staleTime: 'static',
     structuralSharing: false,
     gcTime: Infinity,
     // The browser may already have the chunk while offline.
     networkMode: 'always',
   })
+}
+
+// Separate functions keep Vite from merging both imports into one preload dependency list.
+function loadPhone(): Promise<ShellView> {
+  return import('@/features/phone/components/shell').then((module) => module.PhoneShell)
+}
+
+function loadWorkbench(): Promise<ShellView> {
+  return import('@/features/workspace/components/workbench-shell').then(
+    (module) => module.WorkbenchShell,
+  )
 }

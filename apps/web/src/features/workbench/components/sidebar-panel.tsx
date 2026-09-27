@@ -5,7 +5,7 @@ import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundar
 
 import { SearchPane } from '@/features/workspace/components/search-pane'
 import { ChatSidePanel } from '@/features/chat/components/chat-side-panel'
-import { LogsPanel } from '@/features/logs/components/panel'
+import { DeferredLogsPanel } from '@/features/logs/components/deferred-panel'
 import { FileNavigatorPanel } from '@/features/workbench/components/file-navigator-panel'
 import { GitChangesPanel } from '@/features/workbench/components/git-changes-panel'
 import {
@@ -52,7 +52,7 @@ function renderSidebarPanel({
 }) {
   if (tab === 'chat') return <ChatSidePanel rootPath={rootPath} />
   if (tab === 'git') return <GitChangesPanel rootPath={rootPath} />
-  if (tab === 'logs') return <LogsPanel active />
+  if (tab === 'logs') return <DeferredLogsPanel active />
   if (tab === 'search') return <SearchPane rootPath={rootPath} />
 
   return <FileNavigatorPanel rootPath={rootPath} />

@@ -12,6 +12,7 @@ import {
 } from './comparison-no-flicker'
 import { textFieldFkeys } from './text-field-fkeys'
 import { settingsRoutePreparation } from './settings-route-preparation'
+import { startupFailure } from './startup-failure'
 import { settingsModuleFailure } from './settings-module-failure'
 import { connectionRefusalRetention } from './connection-refusal-retention'
 import { cachedProtocolStartup } from './cached-protocol-startup'
@@ -27,6 +28,18 @@ import { sessionNotifications } from './session-notifications'
 import { terminalHistory } from './terminal-history'
 import { chatStream } from './chat-stream'
 import { chatHistoryPages } from './chat-history-pages'
+import {
+  chatScrollDisclosure,
+  chatScrollFoldHeld,
+  chatScrollJump,
+  chatScrollLoadEarlier,
+  chatScrollLoadEarlierJump,
+  chatScrollPark,
+  chatScrollFollowing,
+  chatScrollReaderHeld,
+  chatScrollReload,
+  chatScrollHome,
+} from './chat-scroll'
 import { chatStashContext } from './chat-stash-context'
 import { chatDraftSentLeftover } from './chat-draft-sent-leftover'
 import { chatQueue } from './chat-queue'
@@ -124,7 +137,9 @@ import { chatTurnAnatomy } from './chat-turn-anatomy'
 import { chatTurnSettle } from './chat-turn-settle'
 import { devicePairing } from './device-pairing'
 import { phoneShell } from './phone-shell'
+import { logsRestored } from './logs-restored'
 import { shellSwitch } from './shell-switch'
+import { phoneColdBoot, desktopColdBoot } from './shell-cold-boot'
 import { chatSleepingSession } from './chat-sleeping-session'
 import { chatSessionGoal } from './chat-session-goal'
 import { chatAgentReview } from './chat-agent-review'
@@ -241,6 +256,7 @@ import { settingsColdLoad } from './settings-cold-load'
 import { serverRestart } from './server-restart'
 import { settingsDefaults } from './settings-defaults'
 import { settingsAppearanceRows } from './settings-appearance-rows'
+import { settingsAppearanceOpen } from './settings-appearance-open'
 import { projectMenu } from './project-menu'
 import { workspaceSwitch } from './workspace-switch'
 import { sidebarSettingsButton } from './sidebar-settings-button'
@@ -409,6 +425,16 @@ export const scenarios: readonly Scenario[] = [
   chatStream,
   chatHistoryPages,
   sessionNoFlicker,
+  chatScrollPark,
+  chatScrollFollowing,
+  chatScrollReaderHeld,
+  chatScrollFoldHeld,
+  chatScrollJump,
+  chatScrollLoadEarlier,
+  chatScrollLoadEarlierJump,
+  chatScrollDisclosure,
+  chatScrollReload,
+  chatScrollHome,
   chatQueue,
   chatQueueAway,
   chatQueueStopUpload,
@@ -587,10 +613,12 @@ export const scenarios: readonly Scenario[] = [
   themeBundlePalette,
   settingsDefaults,
   settingsAppearanceRows,
+  settingsAppearanceOpen,
   settingsColdLoad,
   settingsRoutePreparation,
   textFieldFkeys,
   settingsModuleFailure,
+  startupFailure,
   deferredDialogs,
   dialogEscape,
   projectMenu,
@@ -632,6 +660,9 @@ export const scenarios: readonly Scenario[] = [
   devicePairing,
   phoneShell,
   shellSwitch,
+  logsRestored,
+  phoneColdBoot,
+  desktopColdBoot,
   chatSleepingSession,
   chatSessionGoal,
   chatAgentReview,
