@@ -1161,6 +1161,9 @@ export const selectors = {
     page.locator('[aria-label="Commit information"]').and(page.locator(`[title="${commit}"]`)),
   historyCopyMessage: (page: Page) =>
     page.getByRole('button', { name: 'Copy message', exact: true }),
+  treeFilterInput: (page: Page) => page.getByRole('textbox', { name: 'Filter files', exact: true }),
+  treeFilterClear: (page: Page) =>
+    page.getByRole('button', { name: 'Clear file filter', exact: true }),
   historySearch: (page: Page) => page.getByRole('textbox', { name: 'Search commit history' }),
   historyClearSearch: (page: Page) => page.getByRole('button', { name: 'Clear history search' }),
   historyExpand: (page: Page) => page.getByRole('button', { name: 'Expand commit graph' }),

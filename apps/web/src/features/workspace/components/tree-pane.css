@@ -9,25 +9,6 @@
     font-family: var(--workbench-tree-font-family);
     font-size: var(--workbench-tree-font-size);
 
-    [data-file-tree-search-container] {
-      align-items: center;
-      height: var(--bar-height);
-      margin: 0;
-      padding-inline: var(--bar-padding-x);
-    }
-
-    [data-file-tree-search-input] {
-      height: var(--density-control-height-sm);
-      line-height: normal;
-      margin-block: 0;
-      padding-inline: var(--density-control-padding-x);
-      border-radius: var(--radius-md);
-      border-color: var(--input);
-      background-color: color-mix(in oklch, var(--input) 30%, transparent);
-      font-family: var(--font-ui);
-      font-size: var(--text-xs);
-    }
-
     button[data-item-loading='true'] [data-item-section='content'] {
       background-image:
         linear-gradient(90deg, transparent 0%, var(--foreground) 50%, transparent 100%),

@@ -550,7 +550,8 @@
   @apply transition-[color,background-color,border-color,box-shadow];
   transition-duration: var(--duration-color);
 
-  &:has(:is(input, textarea, [contenteditable='true']):focus) {
+  &:has(:is(input, textarea, [contenteditable='true']):focus),
+  &[data-focus-within='true'] {
     border-color: var(--focus-ring-color, var(--ring));
     box-shadow: 0 0 0 2px color-mix(in oklch, var(--focus-ring-color, var(--ring)) 45%, transparent);
   }

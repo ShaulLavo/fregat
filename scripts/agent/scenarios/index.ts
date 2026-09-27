@@ -378,6 +378,7 @@ import { treeStickyScroll } from './tree-sticky-scroll'
 import { treeLargeScroll } from './tree-large-scroll'
 import { treeParity } from './tree-parity'
 import { fileIconHues } from './file-icon-hues'
+import { filterFields } from './filter-fields'
 import { inlineRenameTree } from './inline-rename-tree'
 import { treeParityBehaviour } from './tree-parity-behaviour'
 import { demoWorkspace } from './demo-workspace'
@@ -745,6 +746,7 @@ export const scenarios: readonly Scenario[] = [
   fileIconHues,
   treeParityBehaviour,
   inlineRenameTree,
+  filterFields,
   treeFileClicks,
 ]
 

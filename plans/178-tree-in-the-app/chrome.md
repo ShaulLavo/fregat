@@ -65,3 +65,27 @@ filter and scrollbar parts of `treeUnsafeCss`.
 - Harness states: filter match, filter empty, rename, loading.
 - Behaviour tests from the harness: filter keys, rename lifecycle, IME, blur commit.
 - `look` on each adopter.
+
+## Filter field slice, 2026-09-27
+
+Implemented the shared `packages/ui/src/patterns/filter-field.tsx` and adopted it in the workspace
+file tree and Git history toolbar. The field owns `PaneBar`, `InputGroup`, the magnifier and
+clear tooltip, IME-safe keys, Escape clearing followed by empty-field blur, ArrowDown handoff,
+`retain` / `clear` blur policy, and imperative `seed(character)`. The tree adapter keeps controller
+search state, expansion restoration, and focus coordination. Its old input CSS and raw-input
+allow-list entry are deleted. History keeps `useOwnedText` for asynchronous search updates.
+
+The remaining filter adopters are follow-up work: session rail, logs toolbar, settings page, and
+keybinding section. This slice does not change inline rename, loading skeletons or scrollbars.
+The inline rename pattern was already shipped in PR #182.
+
+Verification for this slice:
+
+- `packages/ui/src/patterns/tests/filter-field.test.tsx`: Escape, ArrowDown, both blur policies,
+  focus through the clear button, composition keys including keyCode 229, and seeding.
+- Tree chrome, keyboard, view and integration browser tests preserve empty-result collapse,
+  expansion restoration, type-to-filter and row focus; the tree-pane browser test covers app focus.
+- `agent:browser scenario filter-fields` drives both adopters through a disposable Git repository,
+  captures the match, empty and cleared states, and checks the input geometry.
+- Remaining adopters and the existing full tree screenshot baseline matrix are deferred. The shared
+  field deliberately changes the filter geometry and appearance; the parity probe uses its new slot.
