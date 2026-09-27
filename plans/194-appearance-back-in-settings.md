@@ -4,7 +4,8 @@
 
 - Status: COMPLETE 2026-09-27. PRs #160 and #169 shipped in deploy batch 24. The owner's
   settings cleanup completed with backup `/work/backups/platform/settings.json.20260927T072835.bak`.
-  PR #178 adds a reviewed follow-up; its merge and deployment are pending. Q1 decided as recommended: one
+  PR #178 shipped the reviewed follow-up in release
+  `20260927T055046Z-850f2d88-review-178-179`; the live check passed. Q1 decided as recommended: one
   row per part, editing the mode on screen. Owner direction, same day, on finding the surface
   opacity controls gone from settings: "the studio never meant to replace any setting! it's just an extra feature on
   top! we need to integrate it back into the settings".

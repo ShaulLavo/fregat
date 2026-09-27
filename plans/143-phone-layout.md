@@ -5,7 +5,8 @@
 - Status: IN PROGRESS. Phases 1–4 landed, including sessions and pairing in PR #143.
   Phone sheets and single-tab navigation landed in #168; the first-load split landed in #172.
   Those changes shipped in deployment batch 27. PR #179 adds the phone folder picker,
-  palette access across screens and iOS layout fixes; reviewed follow-up deployment is pending.
+  palette access across screens and iOS layout fixes, shipped in release
+  `20260927T055046Z-850f2d88-review-178-179`; the live check passed.
   Phase 5 still needs real iPhone and Android checks, including the Safari toolbar, keyboard
   movement, focus zoom and safe areas. The Platform half of full-bleed diff tinting remains open.
 - Priority: P2. Large product question; Plan 142 (Web Push) delivers the first away-from-desk
@@ -631,3 +632,7 @@ Carried in from other plans. They wait for the phone shell and join its split pl
 - Focused checks: picker row/list tests, Nerd Font and route tests, wallpaper decode tests,
   web/server typechecks, required gates and first-load bundle gate. Real-device checks remain
   pending; desktop Chromium does not reproduce Safari's browser toolbar or on-screen keyboard.
+
+Integrated verification with PR #178 permits wallpaper strips to scroll inside the Settings
+shell while checking document, body and shell width. Passed evidence:
+`/work/tmp/fregat-evidence/20260927T054928Z-scenario-phone-surfaces/`.
