@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { languageCensusQueryOptions } from '@/features/editor/utils/language-census-query'
-import { shikiGrammarsForCensus } from '@/features/editor/utils/shiki-grammars-for-census'
+import { shikiGrammarsForCensus } from '@/features/editor/utils/census-languages'
 import { EDITOR_SHIKI_PRELOAD_LANGUAGES } from '@/features/editor/utils/shiki-languages'
 
 type CensusSource = {

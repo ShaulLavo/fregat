@@ -37,6 +37,11 @@ export function languageIdForFilePath(
   return languageForShebang(hints.firstLine)
 }
 
+/** The tree-sitter language an editor language id or alias names, if one is bundled. */
+export function treeSitterLanguageId(languageId: string): string | null {
+  return nativeAliases.get(languageId.toLowerCase()) ?? null
+}
+
 function languageForShebang(line: string | undefined): EditorSyntaxLanguageId | null {
   if (!line?.startsWith('#!')) return null
   const words = line.slice(2).trim().split(/\s+/)

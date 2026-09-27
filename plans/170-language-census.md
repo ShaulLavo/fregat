@@ -1,6 +1,6 @@
 # Plan 170: Language census for grammar and theme prefetch
 
-Status: **Phases 1–3 done 2026-09-26; Phase 4 and the full Phase 5 matrix remain** (wave 2 lane W: `GET /fs/workspace-index/languages?root=`, on the per-root indexes of [Plan 173](173-two-devices-one-workspace.md)); research done 2026-09-25 (findings below; the in-app before/after paint measurement belongs to the implementation phases). Split out of [Plan 110](110-workspace-indexing.md) question 7. Decided 2026-09-25: owner — split the language census into its own small plan. Amended 2026-09-26: tree-sitter warm-up joins the scope (see "Tree-sitter has no warm-up"). [Root PLAN.md](../PLAN.md) owns scheduling.
+Status: **Phases 1–4 done (Phase 4 2026-09-27); the Phase 5 matrix is partly measured, and the vscode, production-byte and worker-busy rows remain** (wave 2 lane W: `GET /fs/workspace-index/languages?root=`, on the per-root indexes of [Plan 173](173-two-devices-one-workspace.md)); research done 2026-09-25 (findings below; the in-app before/after paint measurement belongs to the implementation phases). Split out of [Plan 110](110-workspace-indexing.md) question 7. Decided 2026-09-25: owner — split the language census into its own small plan. Amended 2026-09-26: tree-sitter warm-up joins the scope (see "Tree-sitter has no warm-up"). [Root PLAN.md](../PLAN.md) owns scheduling.
 
 Editor fix (owner question 1, answer (a)) done 2026-09-26 in wave 2, lane E1:
 [singapore#41](https://github.com/ShaulLavo/singapore/pull/41), in `editor-ref` `ec3fc15`. A Shiki
@@ -333,3 +333,54 @@ Evidence directories under `/work/tmp/fregat-evidence/`:
 - `20260926T203029Z-trace-editor-syntax-shiki-settled` — after open/preload, with trace comparison.
 
 The final web build also passes against the new Editor pin. No deployment was performed.
+
+## Phase 4 implementation (2026-09-27)
+
+Editor `9d611f7` (branch `claude/wizardly-bardeen-f8nsv1` on singapore, pinned as `editor-ref`
+together with Plan 177's diff API in `199ba7e`):
+
+- [x] `TreeSitterSyntaxProvider.warmLanguages(ids)` starts the worker, resolves each id with its
+      injection closure (`resolveTreeSitterLanguageClosure`, shared with the session), registers
+      the descriptors and posts `warmLanguages`. The worker compiles each grammar and its highlight,
+      fold and injection queries, one language per macrotask, skipping any language that already
+      has a runtime. The client skips a language it already warmed, and warms it again after a
+      changed registration. It never rejects: unknown ids and load or worker failures are skipped,
+      and the language's first document reports them.
+- [x] Platform: `treeSitterLanguagesForCensus(counts)` applies the same 0.5% share floor as
+      `shikiGrammarsForCensus` (`utils/census-languages.ts`). It aggregates aliases through the
+      bundled tree-sitter metadata and drops keys that have no tree-sitter grammar.
+- [x] `useLanguageCensus` runs the `editor.tree-sitter.warm-up` mutation once per distinct language
+      set, when the census is `ready` or `stale`, and not while syntax is disabled. A census that is
+      not ready warms nothing, which is the behaviour before this phase.
+- [x] Tests:
+  - worker-client dedupe and re-warm (EchoWorker);
+  - closure, unknown-id and failure handling at the provider;
+  - a real-worker browser test that warms TypeScript beside a broken grammar, then parses;
+  - the hook test, which asserts the warmed sets through the mutation cache.
+
+### Phase 5 measurements (2026-09-27, cloud container)
+
+These are partial. The container has no `references/vscode`, no production build and no mesh.
+Runs used `agent:browser` against a local Vite on a free port, with the throwaway API server, a
+Chromium 141 headless shell and fallback fonts.
+
+- **Reload paint** (`trace editor-reload-paint --file shiki-languages.ts`, worktree workspace):
+  - The change passed 2 of 2 runs: 18.7–19.0 s, 0 unhighlighted frames
+    (`20260927T224210Z`, `20260927T224812Z`).
+  - The baseline passed 1 of 4. Its failures had 87–158 unhighlighted frames, the same count the
+    change showed when run from a checkout with real `node_modules`. Those failures come from the
+    container's shared inotify budget across several Vite servers (EMFILE in the server log), not
+    from either build, so the pair supports no speed claim.
+- **Tree-sitter warm-up, first file of a language** (`scenario prefetch-first-paint`, change with
+  the warm-up switched off versus on, n=2 each), text / colour ms:
+  - Quick-open markdown painted colour with its text either way (off 313/313 and 214/214, on
+    236/236 and 237/237). Plan 177's quick-open active-row preparation already starts the
+    tree-sitter worker, so the warm-up adds nothing measurable there.
+  - Quick-open TypeScript measured off 209/343 and 277/688, on 256/256 and 280/371. That leans
+    toward the warm-up, but n=2 on a noisy machine is not a claim.
+- **Not run:** `editor-syntax-benchmark` and `editor-syntax-shiki-settled` on vscode, production
+  wire bytes, and worker busy time after paint. These still need the owner's machine, which has
+  `references/vscode` and the production build.
+
+Evidence directories are under `/home/user/fregat-evidence/` in the session container, which is
+reclaimed with the session.
