@@ -619,6 +619,8 @@ export const selectors = {
     page.getByRole('tab', { name, exact: true, selected }),
   settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),
   settingsRow: (page: Page, id: string) => page.locator(`[data-setting-row="${id}"]`),
+  settingsCodeThemePreview: (page: Page, id: string) =>
+    page.locator(`[data-setting-row="${id}"] [data-code-theme-preview] pre[data-theme-id]`),
   settingsSlider: (page: Page, title: string) =>
     page.getByRole('slider', { name: title, exact: true }),
   settingsRowActions: (page: Page, id: string) =>

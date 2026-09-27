@@ -253,6 +253,7 @@ import { settingsColdLoad } from './settings-cold-load'
 import { serverRestart } from './server-restart'
 import { settingsDefaults } from './settings-defaults'
 import { settingsAppearanceRows } from './settings-appearance-rows'
+import { settingsAppearanceOpen } from './settings-appearance-open'
 import { projectMenu } from './project-menu'
 import { workspaceSwitch } from './workspace-switch'
 import { sidebarSettingsButton } from './sidebar-settings-button'
@@ -609,6 +610,7 @@ export const scenarios: readonly Scenario[] = [
   themeBundlePalette,
   settingsDefaults,
   settingsAppearanceRows,
+  settingsAppearanceOpen,
   settingsColdLoad,
   settingsRoutePreparation,
   textFieldFkeys,
