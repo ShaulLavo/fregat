@@ -572,7 +572,8 @@
 /* focus-ring-inset's ring, drawn without :focus-visible, for a list's keyboard cursor row: the
    row may hold focus from script, or focus may sit in a field that drives the list. */
 @utility focus-ring-inset-drawn {
-  box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--focus-ring-color, var(--ring)) 45%, transparent);
+  box-shadow: inset 0 0 0 2px
+    color-mix(in oklch, var(--focus-ring-color, var(--ring)) 45%, transparent);
 }
 
 /* A small uppercase label above a group, in the metadata mono at the quietest
