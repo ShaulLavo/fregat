@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { ok, strictEqual } from 'node:assert/strict'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -145,7 +146,7 @@ async function assertListFocus(list: Locator) {
 }
 
 async function withPatternFixture(page: Page, run: () => Promise<void>) {
-  const fixture = await mkdtemp('/work/tmp/fregat-pattern-extras-')
+  const fixture = await mkdtemp(scratchPath('fregat-pattern-extras-'))
   const original = page.url()
   try {
     await mkdir(path.join(fixture, 'folder'))

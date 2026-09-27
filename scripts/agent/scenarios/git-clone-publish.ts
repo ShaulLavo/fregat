@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Page } from 'playwright'
@@ -31,7 +32,7 @@ export const gitClonePublish: Scenario = {
   },
   async run(page, { step }) {
     if (!forge) throw createScriptError('The fake forge was not prepared')
-    const base = await mkdtemp('/work/tmp/fregat-clone-publish-')
+    const base = await mkdtemp(scratchPath('fregat-clone-publish-'))
     const source = await createGitFixture('clone-source')
     const unpublished = await createGitFixture('publish')
     const bare = path.join(base, 'published.git')

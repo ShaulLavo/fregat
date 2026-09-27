@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import { deepStrictEqual, ok, strictEqual } from 'node:assert'
 import { mkdtemp, writeFile } from 'node:fs/promises'
@@ -13,7 +14,7 @@ export const editorSplitTargets: Scenario = {
   description:
     'Suppress unchanged drops, ignore clipped neighboring tabs, and insert accurately after tab-strip auto-scroll.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-split-targets-')
+    const fixture = await mkdtemp(scratchPath('fregat-split-targets-'))
     const originalUrl = page.url()
     try {
       await prepareFixture(fixture)

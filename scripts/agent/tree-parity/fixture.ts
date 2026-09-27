@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { chmod, mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { createScriptError } from '../../structured-errors'
@@ -14,7 +15,7 @@ export const LONG_FILE_NAME =
  * folder long enough for sticky rows. Names are fixed so captures compare across runs.
  */
 export async function createTreeParityFixture() {
-  const root = await mkdtemp('/work/tmp/fregat-tree-parity-')
+  const root = await mkdtemp(scratchPath('fregat-tree-parity-'))
   try {
     await fillFixture(root)
     return { root, release: () => releaseTreeParityFixture(root) }

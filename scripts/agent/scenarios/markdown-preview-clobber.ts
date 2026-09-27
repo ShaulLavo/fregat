@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { deepStrictEqual, strictEqual } from 'node:assert/strict'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -22,7 +23,7 @@ export const markdownPreviewClobber: Scenario = {
   description:
     'Previews a markdown file whose raw HTML names document properties, then types in its source: the document keeps getSelection and typing raises no page error.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-preview-clobber-')
+    const fixture = await mkdtemp(scratchPath('fregat-preview-clobber-'))
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
     try {

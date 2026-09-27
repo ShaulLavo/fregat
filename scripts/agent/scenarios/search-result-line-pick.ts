@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { strictEqual } from 'node:assert'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -24,7 +25,7 @@ export const searchResultLinePick: Scenario = {
     'Hover and click excerpt lines in the search editor, from the text, the gap, the source-line gutter and the action column, and prove the picked line by opening it.',
   async run(page, { step }) {
     const originalUrl = page.url()
-    const fixture = await mkdtemp('/work/tmp/fregat-search-line-pick-')
+    const fixture = await mkdtemp(scratchPath('fregat-search-line-pick-'))
     const file = path.join(fixture, 'picks.ts')
     try {
       await writeFile(file, fixtureText)

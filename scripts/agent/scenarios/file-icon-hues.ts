@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Page } from 'playwright'
@@ -58,7 +59,7 @@ export const fileIconHues: Scenario = {
     'Show file icon hues in tabs, quick open, git changes and the /dev icon sheet in light and dark.',
   capture: { scale: 2, width: 1440, height: 900 },
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-icon-hues-')
+    const fixture = await mkdtemp(scratchPath('fregat-icon-hues-'))
     try {
       await fixtureGit(fixture, ['init', '--quiet'])
       await writeFile(path.join(fixture, '.gitignore'), 'nothing\n')

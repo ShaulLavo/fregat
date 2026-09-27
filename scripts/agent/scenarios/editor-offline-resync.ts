@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Page } from 'playwright'
@@ -15,7 +16,7 @@ export const editorOfflineResync: Scenario = {
   async run(page, { step }) {
     const inspection = { phases: new Array<string>() }
     inspections.set(page, inspection)
-    const fixture = await mkdtemp('/work/tmp/fregat-offline-resync-')
+    const fixture = await mkdtemp(scratchPath('fregat-offline-resync-'))
     try {
       await writeFile(path.join(fixture, 'clean.txt'), 'CLEAN_BEFORE\n')
       await writeFile(path.join(fixture, 'dirty.txt'), 'DIRTY_BEFORE\n')

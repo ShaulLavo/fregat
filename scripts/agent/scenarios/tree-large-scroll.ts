@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -16,7 +17,7 @@ function folderName(index: number) {
 
 /** `src/` holds 20 folders of 2,500 files each: 50,000 entries. */
 async function largeTreeFixture() {
-  const root = await mkdtemp('/work/tmp/fregat-tree-large-')
+  const root = await mkdtemp(scratchPath('fregat-tree-large-'))
   for (let folder = 0; folder < FOLDERS; folder += 1) {
     const directory = path.join(root, 'src', folderName(folder))
     await mkdir(directory, { recursive: true })

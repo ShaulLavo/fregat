@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { fixtureGit, openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import { deepStrictEqual, ok, strictEqual } from 'node:assert'
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
@@ -21,7 +22,7 @@ export const editorSplitFolds: Scenario = {
   description:
     'Copy a collapsed structural fold, unfold one view, and preserve both views through split-tree remounts.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-split-folds-')
+    const fixture = await mkdtemp(scratchPath('fregat-split-folds-'))
     const diskPath = path.join(fixture, 'folds.ts')
     const originalUrl = page.url()
     const result = { phases: [] as string[], diskChanged: false }

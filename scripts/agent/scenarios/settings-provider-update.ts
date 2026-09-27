@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { ok } from 'node:assert/strict'
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -25,7 +26,7 @@ export const settingsProviderUpdate: Scenario = {
     'Settings › Providers shows a CLI against its latest npm release: a fixture codex at a standalone-installer path updates in one click and reads Up to date after. No real CLI is touched.',
   async run(page, { step }) {
     const base = (await openChat(page)).replace(/\/orchestration$/, '')
-    const root = await mkdtemp('/work/tmp/fregat-provider-update-')
+    const root = await mkdtemp(scratchPath('fregat-provider-update-'))
     const bin = join(root, 'packages', 'standalone', 'bin')
     try {
       await mkdir(bin, { recursive: true })

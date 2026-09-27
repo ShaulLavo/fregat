@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { deepStrictEqual, strictEqual } from 'node:assert/strict'
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -64,7 +65,7 @@ export const editorSpellcheck: Scenario = {
   description:
     'With editor.spellcheck on, a typed misspelling is marked; right-clicking it offers replacements and one click replaces it; the Spelling suggestions command opens them at the caret; Add to Dictionary writes the word to user settings, and after a reload the word is no longer marked.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-spellcheck-')
+    const fixture = await mkdtemp(scratchPath('fregat-spellcheck-'))
     const file = path.join(fixture, 'notes.txt')
     try {
       await writeFile(file, 'Release notes\n')

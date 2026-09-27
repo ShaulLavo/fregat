@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { ok, strictEqual } from 'node:assert/strict'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -9,7 +10,7 @@ export const paletteScriptsPending: Scenario = {
   name: 'palette-scripts-pending',
   description: 'Script mode holds its "No scripts" verdict while the manifest read is in flight.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-palette-scripts-')
+    const fixture = await mkdtemp(scratchPath('fregat-palette-scripts-'))
     try {
       const manifest = { scripts: { build: 'echo build', test: 'echo test' } }
       await writeFile(path.join(fixture, 'package.json'), JSON.stringify(manifest))

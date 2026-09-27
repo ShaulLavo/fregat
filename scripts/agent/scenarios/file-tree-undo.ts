@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { ok, strictEqual } from 'node:assert/strict'
 import { mkdir, rm, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -6,7 +7,7 @@ import type { Scenario } from './index'
 import { openFixtureWorkspace, releaseFixture, waitForFileContent } from '../fixture-workspace'
 import { focusEditor, openFileFromTree, selectors, waitForApp } from '../selectors'
 
-const FIXTURE = '/work/tmp/plan136-undo'
+const FIXTURE = scratchPath('plan136-undo')
 const UNSAVED = '// unsaved edit'
 
 export const fileTreeUndo: Scenario = {

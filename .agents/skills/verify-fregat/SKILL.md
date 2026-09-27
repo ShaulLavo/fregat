@@ -9,13 +9,23 @@ The app is a Vite web client (`apps/web`) over a Bun server (`apps/server`). One
 
 ## Launch
 
-Use the existing Vite dev server on `http://localhost:5173/`. Against it, every run starts its own throwaway API server from the current source, with a temp state home and log directory under `/work/tmp/fregat-agent-*`, and removes it when the run ends; the summary names its port and directory, and its full log is copied into the evidence. So a run never touches the owner's sessions or settings, and never sees a stale server. `--shared-dev` drives the running dev API on `http://localhost:3001/` instead (state in `/work/platform-dev/home`). This project, including the mesh deployment called production, is under development. Restart the existing service when needed to complete an authorized fix. Persisted sessions survive restarts; active processes and connections may be interrupted.
+Use the existing Vite dev server on `http://localhost:5173/`. Against it, every run starts its own throwaway API server from the current source, with a temp state home and log directory under the OS temporary directory as `fregat-agent-*`, and removes it when the run ends; the summary names its port and directory, and its full log is copied into the evidence. So a run never touches the owner's sessions or settings, and never sees a stale server. `--shared-dev` drives the running dev API on `http://localhost:3001/` instead (state in `/work/platform-dev/home`). This project, including the mesh deployment called production, is under development. Restart the existing service when needed to complete an authorized fix. Persisted sessions survive restarts; active processes and connections may be interrupted.
 
-The throwaway server never starts the machine's Codex or Claude CLI: those drivers run only a fixture binary under `/work/tmp`, so status probes, discovery and turns on real accounts are refused, and a chat scenario installs a mock (`installMockProvider`, `createMockProviderSession`) or a native fixture: `isolatedNativeScenario` for one session, `withFixtureProvider` (Codex `native-conversation.mjs` or Claude `native-claude.mjs`) for scenarios that manage their own sessions. A scenario that needs a real account declares `realProviders: true`, and `agent:browser` refuses it, and any writing scenario under `--shared-dev` or a foreign `--url`, unless the owner passes `--real-providers`. Never pass that flag yourself.
+The throwaway server never starts the machine's Codex or Claude CLI: those drivers run only a fixture binary under the canonical OS temporary directory, so status probes, discovery and turns on real accounts are refused, and a chat scenario installs a mock (`installMockProvider`, `createMockProviderSession`) or a native fixture: `isolatedNativeScenario` for one session, `withFixtureProvider` (Codex `native-conversation.mjs` or Claude `native-claude.mjs`) for scenarios that manage their own sessions. A scenario that needs a real account declares `realProviders: true`, and `agent:browser` refuses it, and any writing scenario under `--shared-dev` or a foreign `--url`, unless the owner passes `--real-providers`. Never pass that flag yourself.
 
 When web changes depend on a server protocol change, deploy both with `bun run deploy --server`. A web-only deployment reuses the old server. Verify `/release` and exercise the changed protocol in the browser before calling the deployment done.
 
 Never hand-start a Vite or API dev server on `:5173`/`:3001`; if a task needs one outside `agent:browser`'s own throwaway server, give it an explicit free `--port` — a bare host default can resolve to `::1` and shadow the shared route instead of colliding with it.
+
+The runner supports macOS and Linux. Fixture-only runs start with desktop wallpaper disabled; appearance scenarios can enable it or supply `--product-wallpaper`. It uses the host's temporary directory and Playwright's installed browsers; Linux also recognizes the existing `/work/cache/ms-playwright` cache. `FREGAT_EVIDENCE_ROOT` overrides the evidence directory. If the shared mesh route points to another machine, run a local Vite instance on an explicit free port and give the runner the same `WEB_PORT`:
+
+```bash
+# Terminal 1, from this checkout. Pick a free port.
+cd apps/web && bun --bun vite --host 127.0.0.1 --port 5214 --strictPort
+# Terminal 2, from the repository root.
+WEB_PORT=5214 bun run agent:browser look --doctor
+WEB_PORT=5214 bun run agent:browser scenario approval-turn-ended
+```
 
 `--engine firefox` or `--engine webkit` runs `look`, `scenario`, `renders` or `caches` in another engine; `trace` needs Chromium. The desktop app is CEF, so other engines matter for the mesh (every iPhone browser is WebKit). Playwright's WebKit does not start on this Arch host (missing libicu74, libxml2, libflite).
 
@@ -49,7 +59,7 @@ A scenario that makes a fixture workspace releases it with `releaseFixture` from
 
 A second window in the same browser context stalls against the dev server. Each tab holds four event streams (`/settings/events`, `/machines/events`, two `/fs/events`), and a browser allows six HTTP/1.1 connections per host across every tab in a profile, so a second tab's requests queue until a stream closes — for tens of seconds, and a keypress that needs a read looks like it did nothing. Open a second window with `browser.newContext()`, which has its own pool. The mesh serves HTTP/2 and is unaffected; the desktop app talks HTTP/1.1 to `127.0.0.1`.
 
-The scenarios land on a workspace by registering a root-relative folder (`--workspace`, default `work/projects/platform`) and opening its address URL. A fresh browser context has no workspace otherwise.
+The scenarios land on a workspace by registering a root-relative folder (`--workspace`, default the checkout running the CLI) and opening its address URL. A fresh browser context has no workspace otherwise.
 
 ## Landing page and product assets
 
@@ -73,7 +83,7 @@ For a real editor hero capture, see [landing.md](features/landing.md). The `edit
 
 ## Evidence
 
-`/work/tmp/fregat-evidence/<stamp>-<verb>-<label>/` holds `summary.md`, the screenshots, `observed.json` (page errors, console, failed requests, sockets), `logs.txt` (warn and error events written during the run) and the verb's artifact: `trace.json` for Chrome's Performance panel, `renders.json`, `caches.json`.
+`<OS temp>/fregat-evidence/<stamp>-<verb>-<label>/` holds `summary.md`, the screenshots, `observed.json` (page errors, console, failed requests, sockets), `logs.txt` (warn and error events written during the run) and the verb's artifact: `trace.json` for Chrome's Performance panel, `renders.json`, `caches.json`.
 
 Proof standards: exercise the real user path, not a setter. Capture the action and the resulting state, not just the final screen. Check side effects where they land: the file on disk, the log line, the cache entry. A claim about performance cites a `trace` summary before and after on the same scenario. A claim about fewer renders cites `renders` before and after. Read the screenshot back with the image-viewing tool; a screenshot nobody looked at is not evidence.
 

@@ -1,3 +1,4 @@
+import { checkoutRoot, scratchPath } from '../paths'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Page } from 'playwright'
@@ -7,8 +8,6 @@ import type { Scenario } from './index'
 
 const MODES = ['light', 'dark'] as const
 const DENSITIES = ['cozy', 'compact'] as const
-// agent:browser's default --workspace, which the file tree beside the picker shows.
-const WORKSPACE = '/work/projects/platform'
 
 async function openAt(page: Page, folder: string, row: string) {
   await selectors.projectMenu(page).click()
@@ -30,7 +29,7 @@ export const filePickerAppearance: Scenario = {
     'The picker beside the file tree in light and dark, cozy and compact: the workspace folder in columns (same rows as the tree), then a fixture with a long file in the list.',
   async run(page, { step }) {
     const restore = await preserveAppearance(page, ['workbench.colorTheme', 'workbench.density'])
-    const root = await mkdtemp('/work/tmp/fregat-picker-appearance-')
+    const root = await mkdtemp(scratchPath('fregat-picker-appearance-'))
     await mkdir(path.join(root, 'src'))
     await writeFile(path.join(root, 'README.md'), '# Fixture\n')
     await writeFile(
@@ -46,7 +45,7 @@ export const filePickerAppearance: Scenario = {
           ])
           await page.locator(`html[data-density="${density}"].${mode}`).waitFor()
           await step(`tree-${mode}-${density}`)
-          await openAt(page, WORKSPACE, 'apps')
+          await openAt(page, checkoutRoot, 'apps')
           await selectors.pickerView(page, 'Columns').click()
           await selectors.pickerRow(page, 'apps').click()
           await selectors.pickerColumn(page, 1).waitFor()

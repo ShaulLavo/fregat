@@ -1,9 +1,11 @@
+import { scratchPath } from './paths'
 import { strictEqual } from 'node:assert/strict'
-import { chmod, mkdtemp, readdir, readFile, readlink, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Page } from 'playwright'
 import { createScriptError } from '../structured-errors'
 import { selectors, waitForApp } from './selectors'
+import { processesIn } from './fixture-processes'
 
 export async function fixtureGit(project: string, args: readonly string[]) {
   const process = Bun.spawn(['git', '-C', project, ...args], { stdout: 'ignore', stderr: 'pipe' })
@@ -55,7 +57,7 @@ export async function createModifiedFileFixture(
  * the caller's cleanup only starts once it has the path.
  */
 async function initFixtureRepository(slug: string, fill: (fixture: string) => Promise<void>) {
-  const fixture = await mkdtemp(`/work/tmp/fregat-${slug}-`)
+  const fixture = await mkdtemp(scratchPath(`fregat-${slug}-`))
   try {
     await fixtureGit(fixture, ['init', '--quiet'])
     await fixtureGit(fixture, ['config', 'user.email', 'fregat@example.com'])
@@ -139,21 +141,4 @@ export async function openFixtureWorkspace(page: Page, project: string) {
 export async function releaseFixture(fixture: string) {
   for (const pid of await processesIn(fixture)) process.kill(pid, 'SIGKILL')
   await rm(fixture, { recursive: true, force: true })
-}
-
-/** Processes whose working directory is the fixture, optionally filtered by their stdin target. */
-export async function processesIn(
-  fixture: string,
-  stdin: (target: string) => boolean = () => true,
-) {
-  const pids = (await readdir('/proc')).filter((entry) => /^\d+$/.test(entry)).map(Number)
-  const matches = await Promise.all(pids.map((pid) => runsIn(pid, fixture, stdin)))
-  return pids.filter((_, index) => matches[index])
-}
-
-async function runsIn(pid: number, fixture: string, stdin: (target: string) => boolean) {
-  const cwd = await readlink(`/proc/${pid}/cwd`).catch(() => null)
-  if (cwd !== fixture && cwd !== `${fixture} (deleted)`) return false
-
-  return stdin(await readlink(`/proc/${pid}/fd/0`).catch(() => ''))
 }

@@ -1,10 +1,12 @@
+import { processesIn } from '../fixture-processes'
+import { scratchPath } from '../paths'
 import { ok, strictEqual } from 'node:assert/strict'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Page } from 'playwright'
 import { createScriptError } from '../../structured-errors'
 import type { Scenario } from './index'
-import { openFixtureWorkspace, processesIn, releaseFixture } from '../fixture-workspace'
+import { openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import {
   focusEditor,
   openFileFromTree,
@@ -19,7 +21,7 @@ export const editorLspServerExit: Scenario = {
     'Kill the language server behind an open TypeScript file: it restarts and diagnostics return with no toast. Keep killing it and one toast says it stopped and what to do.',
   async run(page, { step }) {
     const originalUrl = page.url()
-    const fixture = await mkdtemp('/work/tmp/fregat-lsp-exit-')
+    const fixture = await mkdtemp(scratchPath('fregat-lsp-exit-'))
     try {
       await writeFile(
         path.join(fixture, 'tsconfig.json'),

@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { countBlankFrames } from '../blank-frames'
@@ -11,7 +12,7 @@ const PNG = Buffer.from(
 )
 
 async function createTree() {
-  const root = await mkdtemp('/work/tmp/fregat-picker-locations-')
+  const root = await mkdtemp(scratchPath('fregat-picker-locations-'))
   await mkdir(path.join(root, 'b-folder'))
   await writeFile(path.join(root, 'b-folder', 'inside.md'), '# Inside\n')
   await writeFile(path.join(root, 'c-first.ts'), 'export const first = 1\n')

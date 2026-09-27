@@ -1,3 +1,4 @@
+import { checkoutRoot } from '../paths'
 import { ok } from 'node:assert/strict'
 import { mkdir, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -58,7 +59,7 @@ async function failLiveCheck(server: IsolatedServer) {
   )
   await writeFile(
     join(release, 'build-config.json'),
-    JSON.stringify({ source: '/work/projects/platform', previousRelease: STAGED }),
+    JSON.stringify({ source: checkoutRoot, previousRelease: STAGED }),
   )
   await symlink(release, join(server.productionRoot, 'current'))
   server.signal('SIGUSR2')

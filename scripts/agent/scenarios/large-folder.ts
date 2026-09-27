@@ -1,3 +1,4 @@
+import { scratchPath } from '../paths'
 import { ok, strictEqual } from 'node:assert/strict'
 import { chmod, mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -13,7 +14,7 @@ const DEFAULT_LIMIT = 200_000
 
 /** `big/` holds `directories` nested folders, an unreadable `locked/` and a top-level file. */
 async function largeFolderFixture(slug: string, directories: number) {
-  const root = await mkdtemp(`/work/tmp/fregat-${slug}-`)
+  const root = await mkdtemp(scratchPath(`fregat-${slug}-`))
   const big = path.join(root, 'big')
   const locked = path.join(big, 'locked')
   await mkdir(path.join(locked, 'inner'), { recursive: true })
@@ -155,8 +156,8 @@ export const workspaceSwitchClickDuringOpen: Scenario = {
   description:
     'While a picked folder is still opening, a click in the old workspace leaves the switch running and the status names the folder.',
   async run(page, { step }) {
-    const first = await mkdtemp('/work/tmp/fregat-switch-first-')
-    const second = await mkdtemp('/work/tmp/fregat-switch-second-')
+    const first = await mkdtemp(scratchPath('fregat-switch-first-'))
+    const second = await mkdtemp(scratchPath('fregat-switch-second-'))
     try {
       await writeFile(path.join(first, 'a.ts'), 'export const a = 1\n')
       await writeFile(path.join(first, 'b.ts'), 'export const b = 2\n')
@@ -194,7 +195,7 @@ export const filePickerPrefetchBound: Scenario = {
   description:
     'Moving the pointer down and scrolling a 600-folder list in the picker lists only folders the pointer settles near.',
   async run(page, { step }) {
-    const root = await mkdtemp('/work/tmp/fregat-picker-prefetch-')
+    const root = await mkdtemp(scratchPath('fregat-picker-prefetch-'))
     const many = path.join(root, 'many')
     for (let index = 0; index < 600; index += 1)
       await mkdir(path.join(many, `f${String(index).padStart(3, '0')}`), { recursive: true })
