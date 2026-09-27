@@ -1,115 +1,105 @@
 import { describe, expect, it } from 'vitest'
 
-import type { SearchResultRenderedFileResultItem } from '@/features/search/utils/result-editor-types'
+import type {
+  SearchResultFileEditorSlot,
+  SearchResultRenderedFileResultItem,
+} from '@/features/search/utils/result-editor-types'
+import { syncSearchResultFileEditorSlots } from '@/features/search/state/result-editor-pool'
 
-import {
-  createSearchResultFileEditorPoolState,
-  nextSearchResultFileEditorPoolKeys,
-  syncSearchResultFileEditorPoolEntries,
-} from '@/features/search/state/result-editor-pool'
+const FILE_HEIGHT = 100
+const VIEWPORT = { height: 300, top: 0 }
 
-describe('search result editor pool', () => {
-  it('keeps visible file slots keyed by file id and preserves current slot order', () => {
+describe('search result editor slots', () => {
+  it('gives each file with lines in view a slot, in file order', () => {
+    const slots = sync([], files(0, 3))
+
+    expect(slots.map((slot) => [slot.key, slot.item.row.file.id, slot.visible])).toEqual([
+      ['slot:0', 'file:0', true],
+      ['slot:1', 'file:1', true],
+      ['slot:2', 'file:2', true],
+    ])
+  })
+
+  it('skips files whose line window is empty', () => {
+    const far = file(100)
+
+    expect(sync([], [...files(0, 2), far]).map((slot) => slot.item.row.file.id)).toEqual([
+      'file:0',
+      'file:1',
+    ])
+  })
+
+  it('hands a freed slot to the next file that scrolls in and keeps the rest in place', () => {
+    const first = sync([], files(0, 3))
+    const next = sync(first, files(1, 4), { height: 300, top: 100 })
+
+    expect(next.map((slot) => [slot.key, slot.item.row.file.id])).toEqual([
+      ['slot:0', 'file:3'],
+      ['slot:1', 'file:1'],
+      ['slot:2', 'file:2'],
+    ])
+    expect(next[1]?.lineWindow).toEqual(first[1]?.lineWindow)
+  })
+
+  it('builds no new slot while a fling passes through a hundred files', () => {
+    let slots = sync([], files(0, 3))
+    for (let start = 1; start < 100; start += 1) {
+      slots = sync(slots, files(start, start + 3), { height: 300, top: start * FILE_HEIGHT })
+    }
+
+    expect(slots.map((slot) => slot.key)).toEqual(['slot:0', 'slot:1', 'slot:2'])
+  })
+
+  it('parks slots with no file in view and keeps their last file', () => {
+    const first = sync([], files(0, 3))
+    const next = sync(first, files(0, 1))
+
+    expect(next.map((slot) => [slot.item.row.file.id, slot.visible])).toEqual([
+      ['file:0', true],
+      ['file:1', false],
+      ['file:2', false],
+    ])
+    expect(next[0]).toBe(first[0])
+    expect(sync(next, files(0, 1))).toBe(next)
+  })
+
+  it('keeps the slots array while the same files stay in view', () => {
+    const items = files(0, 3)
+    const first = sync([], items)
+
     expect(
-      nextSearchResultFileEditorPoolKeys(
-        ['file:a', 'file:b', 'file:c', 'file:d', 'file:e'],
-        ['file:c', 'file:f'],
-        true,
+      sync(
+        first,
+        items.map((item) => ({ ...item })),
       ),
-    ).toEqual(['file:a', 'file:c', 'file:f'])
-  })
-
-  it('drops hidden file slots while prewarming is disabled', () => {
-    expect(
-      nextSearchResultFileEditorPoolKeys(['file:a', 'file:b', 'file:c'], ['file:b'], false),
-    ).toEqual(['file:b'])
-  })
-
-  it('caps retained hidden slots to the recent pool size', () => {
-    expect(
-      nextSearchResultFileEditorPoolKeys(
-        ['file:a', 'file:b', 'file:c', 'file:d', 'file:e', 'file:f'],
-        ['file:g'],
-        true,
-      ),
-    ).toEqual(['file:a', 'file:g'])
-  })
-
-  it('preserves entry and array identity when the pool is unchanged', () => {
-    const item = searchResultFileItem('file:a')
-    const first = syncSearchResultFileEditorPoolEntries(
-      createSearchResultFileEditorPoolState(),
-      [item],
-      true,
-    )
-    const next = syncSearchResultFileEditorPoolEntries(first, [item], true)
-
-    expect(next).toBe(first)
-    expect(next.entries).toBe(first.entries)
-    expect(next.entries[0]).toBe(first.entries[0])
-  })
-
-  it('reuses a new visible item wrapper when the rendered item inputs are unchanged', () => {
-    const item = searchResultFileItem('file:a')
-    const wrapper = { ...item }
-    const first = syncSearchResultFileEditorPoolEntries(
-      createSearchResultFileEditorPoolState(),
-      [item],
-      true,
-    )
-    const next = syncSearchResultFileEditorPoolEntries(first, [wrapper], true)
-
-    expect(next).toBe(first)
-    expect(next.entries[0]).toBe(first.entries[0])
-    expect(next.entries[0]?.item).toBe(item)
-  })
-
-  it('replaces only entries whose visibility changes', () => {
-    const itemA = searchResultFileItem('file:a')
-    const itemB = searchResultFileItem('file:b')
-    const first = syncSearchResultFileEditorPoolEntries(
-      createSearchResultFileEditorPoolState(),
-      [itemA],
-      true,
-    )
-    const next = syncSearchResultFileEditorPoolEntries(first, [itemB], true)
-
-    expect(next.entries.map((entry) => entry.key)).toEqual(['file:a', 'file:b'])
-    expect(next.entries[0]).not.toBe(first.entries[0])
-    expect(next.entries[0]?.visible).toBe(false)
-    expect(next.entries[0]?.item).toBe(itemA)
-  })
-
-  it('replaces an entry when the cached item reference changes', () => {
-    const firstItem = searchResultFileItem('file:a', 0)
-    const nextItem = searchResultFileItem('file:a', 1)
-    const first = syncSearchResultFileEditorPoolEntries(
-      createSearchResultFileEditorPoolState(),
-      [firstItem],
-      true,
-    )
-    const next = syncSearchResultFileEditorPoolEntries(first, [nextItem], true)
-
-    expect(next.entries).not.toBe(first.entries)
-    expect(next.entries[0]).not.toBe(first.entries[0])
-    expect(next.entries[0]?.item).toBe(nextItem)
+    ).toBe(first)
   })
 })
 
-function searchResultFileItem(id: string, index = 0): SearchResultRenderedFileResultItem {
-  return {
+function sync(
+  slots: readonly SearchResultFileEditorSlot[],
+  items: readonly SearchResultRenderedFileResultItem[],
+  viewport = VIEWPORT,
+) {
+  return syncSearchResultFileEditorSlots(slots, items, viewport)
+}
+
+function files(start: number, end: number) {
+  return Array.from({ length: end - start }, (_, index) => file(start + index))
+}
+
+const fileRows = new Map<number, SearchResultRenderedFileResultItem>()
+
+function file(index: number): SearchResultRenderedFileResultItem {
+  const cached = fileRows.get(index)
+  if (cached) return cached
+
+  const id = `file:${index}`
+  const item = {
     renderKey: id,
-    row: {
-      file: {
-        id,
-      },
-      type: 'file-results',
-    },
-    virtualItem: {
-      index,
-      key: id,
-      size: 20,
-      start: index * 20,
-    },
-  } as SearchResultRenderedFileResultItem
+    row: { file: { excerpts: [{ id: `${id}:line` }], id }, type: 'file-results' },
+    virtualItem: { index, key: id, size: FILE_HEIGHT, start: index * FILE_HEIGHT },
+  } as unknown as SearchResultRenderedFileResultItem
+  fileRows.set(index, item)
+  return item
 }

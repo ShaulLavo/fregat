@@ -22,10 +22,12 @@ export const SEARCH_RESULT_VIRTUAL_ROW_OFFSET = 6
 export const FILE_RESULTS_EDITOR_MIN_HEIGHT = 28
 export const FILE_RESULTS_ROW_VERTICAL_PADDING = 8
 
+// A parked editor keeps its DOM and layout for the next file; zero height at the top adds no overflow.
 export const SEARCH_RESULT_FILE_EDITOR_POOL_HIDDEN_STYLE = {
-  contain: 'layout paint style',
-  display: 'none',
+  contentVisibility: 'hidden',
+  height: 0,
   pointerEvents: 'none',
+  transform: 'translateY(0)',
 } satisfies CSSProperties
 
 export const SEARCH_RESULT_CURSOR_LINE_HIGHLIGHT = {

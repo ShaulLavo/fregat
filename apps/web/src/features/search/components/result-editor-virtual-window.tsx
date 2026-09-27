@@ -13,7 +13,7 @@ import type { SearchResultId } from '@/features/search/utils/result-items'
 import type { SearchResultVirtualRow } from '@/features/search/utils/result-view-model'
 import type { SearchResultVirtualListViewport } from '@/features/search/utils/result-virtual-list'
 import { useSearchResultEditorVirtualizer } from '@/features/search/hooks/use-result-editor-virtualizer'
-import { useSearchResultFileEditorPoolEntries } from '@/features/search/hooks/use-result-file-editor-pool-entries'
+import { useSearchResultFileEditorSlots } from '@/features/search/hooks/use-result-file-editor-slots'
 
 type SearchResultEditorVirtualWindowProps = {
   readonly activeResultId: SearchResultId | null
@@ -22,7 +22,6 @@ type SearchResultEditorVirtualWindowProps = {
   readonly initialViewport: SearchResultVirtualListViewport
 
   readonly parentRef: RefObject<HTMLDivElement | null>
-  readonly prewarmEditorPool: boolean
   readonly replaceVisible: boolean
   readonly rows: readonly SearchResultVirtualRow[]
   readonly scrollToIndexRef: RefObject<SearchResultEditorScrollToIndex>
@@ -38,7 +37,6 @@ export const SearchResultEditorVirtualWindow = memo(
     initialViewport,
 
     parentRef,
-    prewarmEditorPool,
     replaceVisible,
     rows,
     scrollToIndexRef,
@@ -69,10 +67,7 @@ export const SearchResultEditorVirtualWindow = memo(
       () => renderedVirtualItems.filter(isSearchResultRenderedFileResultItem),
       [renderedVirtualItems],
     )
-    const fileEditorPoolEntries = useSearchResultFileEditorPoolEntries(
-      fileResultItems,
-      prewarmEditorPool,
-    )
+    const fileEditorSlots = useSearchResultFileEditorSlots(fileResultItems, viewport)
     const windowStyle = { height: virtualTotalSize + SEARCH_RESULT_VIRTUAL_PADDING }
 
     return (
@@ -92,16 +87,15 @@ export const SearchResultEditorVirtualWindow = memo(
             />
           )
         })}
-        {fileEditorPoolEntries.map((entry) => (
+        {fileEditorSlots.map((slot) => (
           <SearchResultFileEditorPoolSlot
             activeResultId={activeResultId}
             canReplace={canReplace}
             editorTheme={editorTheme}
-            entry={entry}
-            key={`file-results-pool:${entry.key}`}
+            key={slot.key}
             replaceVisible={replaceVisible}
+            slot={slot}
             treeId={treeId}
-            viewport={viewport}
           />
         ))}
       </div>
