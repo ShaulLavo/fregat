@@ -8,6 +8,7 @@ import { selectors } from '../selectors'
 import { longPress } from '../touch'
 import { sendPrompt } from './native-provider-verification'
 import { createSessions, openFixtureChat, PHONE_REPLY, PHONE_SESSIONS } from './phone-fixture'
+import { expectPhoneSafeAreas } from './phone-safe-areas'
 import type { Scenario } from './index'
 
 const SESSIONS = PHONE_SESSIONS
@@ -35,11 +36,12 @@ export const phoneShell: Scenario = {
       0,
       `Phone boot fetched desktop chunks: ${desktopRequests.join(', ')}`,
     )
+    const originalUrl = page.url()
     const fixture = await createModifiedFileFixture(
       'phone-shell',
       'notes.md',
-      ['# Notes', '', 'The upload retries twice.'],
-      ['# Notes', '', 'The upload retries three times, then reports why.'],
+      notesWith('The upload retries twice.'),
+      notesWith('The upload retries three times, then reports why.'),
     )
     try {
       // A second changed file, so the phone opens two files from the changes screen.
@@ -51,6 +53,7 @@ export const phoneShell: Scenario = {
       await step('failed')
       throw error
     } finally {
+      await page.goto(originalUrl)
       await releaseFixture(fixture)
     }
   },
@@ -62,6 +65,7 @@ async function walkTheStack(page: Page, step: (label: string) => Promise<void>) 
   await selectors.sessionRows(page).first().waitFor({ timeout: 20_000 })
   await expectFits(page)
   await step('sessions')
+  await expectPhoneSafeAreas(page, step)
 
   await expectListScrollsUnderAFinger(page)
 
@@ -142,9 +146,16 @@ async function walkTheStack(page: Page, step: (label: string) => Promise<void>) 
   await selectors.phoneLevel(page, 'file').waitFor()
   await selectors.editorSurface(page).first().waitFor({ timeout: 20_000 })
   await expectFits(page)
-  await expectGutterInset(page)
+  await expectDiffTintAtScreenEdge(page, 'addition')
+  await expectDiffTintAtScreenEdge(page, 'deletion')
   equal(addressTabs(page).length, 1, 'The diff opens one editor tab')
   await step('diff')
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await page.waitForFunction(() => document.documentElement.classList.contains('dark'))
+  await expectDiffTintAtScreenEdge(page, 'addition')
+  await expectDiffTintAtScreenEdge(page, 'deletion')
+  await step('diff-dark')
+  await page.emulateMedia({ colorScheme: null })
 
   // The phone has no tab strip: the next file it opens takes the place of the last one.
   await page.goBack()
@@ -175,8 +186,12 @@ async function walkTheStack(page: Page, step: (label: string) => Promise<void>) 
   await page.waitForFunction(() => document.activeElement?.matches('[data-phone-level="terminal"]'))
   // The terminal takes focus once its session is attached; until then a focus call is a no-op.
   await expectFocusable(input)
-  const sentBefore = terminalInput().length
   const keys = page.getByRole('toolbar', { name: 'Terminal keys' })
+  const positiveStart = terminalInput().length
+  await keys.getByRole('button', { name: 'Up' }).click()
+  await keys.getByRole('button', { name: 'Esc' }).click()
+  await expectTerminalSent(terminalInput, positiveStart, '\x1b[A\x1b')
+  const sentBefore = terminalInput().length
   await keys.getByRole('button', { name: 'Up' }).tap()
   await keys.getByRole('button', { name: 'Esc' }).tap()
   await expectTerminalSent(terminalInput, sentBefore, '\x1b[A\x1b')
@@ -350,13 +365,51 @@ async function expectSelectSheet(page: Page, step: (label: string) => Promise<vo
   await selectors.settingsSearch(page).fill('')
 }
 
-/** The editor's line numbers keep the phone's gutter inset off the screen edge. */
-async function expectGutterInset(page: Page) {
-  const gutter = selectors.phoneEditorGutter(page).first()
-  await gutter.waitFor()
-  const box = await gutter.boundingBox()
-  ok(box, 'The gutter must be laid out')
-  ok(box.x >= 8, `The gutter sits against the screen edge: x=${box.x}`)
+/**
+ * A changed row's tint runs from the screen edge to its text, while the line numbers keep the
+ * phone's gutter inset and show all three digits.
+ */
+async function expectDiffTintAtScreenEdge(page: Page, type: 'addition' | 'deletion') {
+  const band = selectors.phoneDiffBand(page, type).first()
+  await band.waitFor({ timeout: 20_000 })
+  const row = await band.evaluate((gutterRow) => {
+    const index = gutterRow.getAttribute('data-editor-virtual-gutter-row')
+    const scroller = gutterRow.closest('.editor-virtualized')
+    const text = scroller?.querySelector(`[data-editor-virtual-row="${index}"]`)
+    const lane = gutterRow.querySelector('.editor-diff-gutter-lane')
+    return {
+      left: gutterRow.getBoundingClientRect().left,
+      right: gutterRow.getBoundingClientRect().right,
+      tint: getComputedStyle(gutterRow).backgroundColor,
+      textLeft: text?.getBoundingClientRect().left ?? null,
+      textTint: text ? getComputedStyle(text).backgroundColor : null,
+      laneLeft: lane?.getBoundingClientRect().left ?? null,
+    }
+  })
+  ok(row.left <= 0.5, `The tint starts at the screen edge: x=${row.left}`)
+  equal(row.right, row.textLeft, 'The gutter tint meets the text row’s tint')
+  ok(row.tint !== 'rgba(0, 0, 0, 0)', 'The gutter row carries the tint')
+  equal(row.tint, row.textTint, 'The gutter and the text share one tint')
+  ok(row.laneLeft !== null && row.laneLeft >= 8, `Line numbers keep the inset: x=${row.laneLeft}`)
+
+  const numbers = await selectors.phoneDiffNumberLanes(page).evaluateAll((lanes) =>
+    lanes.map((lane) => ({
+      text: lane.textContent ?? '',
+      clipped: lane.scrollWidth > lane.clientWidth,
+    })),
+  )
+  ok(
+    numbers.some((lane) => /^\d{3}$/.test(lane.text)),
+    `The diff shows three-digit line numbers: ${JSON.stringify(numbers)}`,
+  )
+  const clipped = numbers.filter((lane) => lane.clipped)
+  equal(clipped.length, 0, `No line number is clipped: ${JSON.stringify(clipped)}`)
+}
+
+/** The notes file, long enough that its change sits on a three-digit line. */
+function notesWith(line: string) {
+  const filler = Array.from({ length: 118 }, (_, index) => `Note ${index + 1}.`)
+  return ['# Notes', ...filler.slice(0, 108), line, ...filler.slice(108)]
 }
 
 /** The editor tabs the address records: one token per open tab. */
@@ -368,6 +421,8 @@ function addressTabs(page: Page) {
 
 /** A finger dragged up the list scrolls it, and reorders nothing. */
 async function expectListScrollsUnderAFinger(page: Page) {
+  // WebKit's driver cannot send a native touch drag; Chromium covers scrolling without reordering.
+  if (page.context().browser()?.browserType().name() !== 'chromium') return
   const list = page.locator('[data-phone-shell] [role="listbox"][aria-label="Sessions"]')
   const order = () => selectors.sessionRows(page).allInnerTexts()
   const before = await order()
@@ -441,6 +496,8 @@ async function expectTerminalSent(sent: () => string, from: number, expected: st
     )
     await new Promise((resolve) => setTimeout(resolve, 100))
   }
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  equal(sent().slice(from), expected, 'Each key sends its bytes once')
 }
 
 async function expectFocusable(input: Locator) {

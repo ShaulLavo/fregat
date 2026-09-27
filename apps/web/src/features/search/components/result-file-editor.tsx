@@ -49,6 +49,7 @@ import {
 } from '@/features/search/utils/result-view-model'
 import { useEditorFocusTarget } from '@/lib/focus/hooks/use-editor-target'
 import { useSettingValue } from '@/hooks/use-setting-value'
+import { useEditorGutterInset } from '@/hooks/use-editor-gutter-inset'
 import { fontStack } from '@/lib/fonts/utils/stack'
 
 type SearchResultFileEditorProps = {
@@ -84,6 +85,7 @@ export const SearchResultFileEditor = memo(
     const sourceLineDigits = fileBlockLineDigits(file)
     const fontFamily = fontStack(useSettingValue('editor.fontFamily'), 'code')
     const tabSize = useSettingValue('editor.tabSize')
+    const gutterLeadingInset = useEditorGutterInset()
     const document = {
       documentId: searchResultFileDocumentId(file),
       documentMode: 'static' as const,
@@ -105,6 +107,7 @@ export const SearchResultFileEditor = memo(
       editability: 'readonly',
       fontFamily,
       fontSize: EXCERPT_EDITOR_FONT_SIZE,
+      gutterLeadingInset,
       keymap: HOSTED_EDITOR_KEYMAP,
       lineHeight: EXCERPT_EDITOR_LINE_HEIGHT,
       plugins,
