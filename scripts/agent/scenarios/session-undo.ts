@@ -10,6 +10,16 @@ async function focusRail(page: Page) {
   await selectors.sessionShelfTarget(page, 'pinned').click()
 }
 
+/**
+ * A vacated main chat is a draft: `t/new` until the composer claims an id, `t/draft-<uuid>`
+ * after (`chatReferenceForToken` maps both to `{ kind: 'draft' }`). Which one a navigation
+ * lands on is a rendering detail, not a distinct state, so the wait accepts either.
+ */
+function isDraftChatUrl(url: URL) {
+  const path = decodeURIComponent(url.href)
+  return /\/t\/new(?:[/?]|$)/.test(path) || /\/t\/draft-[^/?]+/.test(path)
+}
+
 /** Waits out the notice's enter transition so the step screenshot shows it whole. */
 async function noticeShown(page: Page, text: string) {
   const notice = selectors.undoNotice(page, text)
@@ -121,7 +131,7 @@ export const sessionUndo: Scenario = {
       await selectors.sessionByTitle(page, charlie).click()
       await page.waitForURL((url) => url.href.includes(charlieId))
       await act(charlie, 'Archive')
-      await page.waitForURL((url) => decodeURIComponent(url.href).includes('t/new'))
+      await page.waitForURL(isDraftChatUrl)
       await noticeShown(page, '1 archived')
       await step('viewed-session-archived')
       await selectors.toastUndo(page).click()
@@ -131,7 +141,7 @@ export const sessionUndo: Scenario = {
       await step('archive-undone-by-button-reopens')
 
       await act(charlie, 'Archive')
-      await page.waitForURL((url) => decodeURIComponent(url.href).includes('t/new'))
+      await page.waitForURL(isDraftChatUrl)
       await undoByKey()
       await page.waitForURL((url) => url.href.includes(charlieId))
       strictEqual((await session(charlieId))?.archivedAt, null)
@@ -166,7 +176,7 @@ export const sessionUndo: Scenario = {
       await act(alpha, 'Unpin')
       await selectors.sessionInShelf(page, alpha, 'Active').waitFor()
       await act(charlie, 'Archive')
-      await page.waitForURL((url) => decodeURIComponent(url.href).includes('t/new'))
+      await page.waitForURL(isDraftChatUrl)
       await undoByKey()
       await page.waitForURL((url) => url.href.includes(charlieId))
       await undoByKey()
@@ -177,7 +187,7 @@ export const sessionUndo: Scenario = {
       await page.keyboard.press('ControlOrMeta+Shift+z')
       await selectors.sessionInShelf(page, alpha, 'Active').waitFor()
       await page.keyboard.press('ControlOrMeta+Shift+z')
-      await page.waitForURL((url) => decodeURIComponent(url.href).includes('t/new'))
+      await page.waitForURL(isDraftChatUrl)
       await step('two-actions-redone')
       await undoByKey()
       await page.waitForURL((url) => url.href.includes(charlieId))
