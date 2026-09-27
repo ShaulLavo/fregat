@@ -45,6 +45,9 @@ function sessionRowForWorktree(page: Page, worktreeId: string) {
 }
 
 export const selectors = {
+  startupFailure: (page: Page) =>
+    page.getByRole('status').filter({ hasText: 'App could not start' }),
+  reloadApp: (page: Page) => page.getByRole('button', { name: 'Reload app', exact: true }),
   pullRequestLookupRetry: (page: Page) => page.locator('[data-pull-request-lookup-retry]'),
   liveWorkLogToggle: (page: Page) =>
     page.locator('[data-live-activity]').getByRole('button').first(),

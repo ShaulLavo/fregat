@@ -11,6 +11,10 @@ import { systemColorMode } from '@/features/settings/state/system-color-mode'
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import { ApplicationBootstrap } from '@/components/application-bootstrap'
 import { StrictMode } from 'react'
+import { Button } from '@workspace/ui/components/button'
+import { EmptyState } from '@workspace/ui/components/empty-state'
+import { createBootError } from '@/lib/structured-errors'
+import { reportClientError } from '@/lib/client-error-reporting'
 import { createRoot } from 'react-dom/client'
 
 // Production tree shaking can skip the editor barrels that import these styles.
@@ -112,7 +116,24 @@ const restoredWorkspace = bootstrap
 if (import.meta.hot) import.meta.hot.dispose(() => bootstrap.dispose())
 // Not a top-level await: the lazy chunks the boot waits on import this module's chunk, and would
 // wait on its evaluation forever.
-void start()
+void start().catch((cause: unknown) => {
+  const error = createBootError(cause)
+  reportClientError({
+    area: 'app',
+    operation: 'app.startup_failed',
+    message: error.message,
+    cause: error,
+  })
+  createRoot(document.getElementById('root')!).render(
+    <EmptyState
+      className='h-dvh'
+      tone='error'
+      title={error.message}
+      description={error.fix}
+      action={<Button onClick={() => window.location.reload()}>Reload app</Button>}
+    />,
+  )
+})
 
 async function start() {
   // Paired before the bootstrap asks the machine anything, so its first request carries the cookie.

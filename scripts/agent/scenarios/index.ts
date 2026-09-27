@@ -12,6 +12,7 @@ import {
 } from './comparison-no-flicker'
 import { textFieldFkeys } from './text-field-fkeys'
 import { settingsRoutePreparation } from './settings-route-preparation'
+import { startupFailure } from './startup-failure'
 import { settingsModuleFailure } from './settings-module-failure'
 import { connectionRefusalRetention } from './connection-refusal-retention'
 import { cachedProtocolStartup } from './cached-protocol-startup'
@@ -615,6 +616,7 @@ export const scenarios: readonly Scenario[] = [
   settingsRoutePreparation,
   textFieldFkeys,
   settingsModuleFailure,
+  startupFailure,
   deferredDialogs,
   dialogEscape,
   projectMenu,
