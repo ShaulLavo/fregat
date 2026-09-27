@@ -59,13 +59,12 @@ export function useTooltipLayer(describedById: string) {
     }
 
     function show(event: Event) {
-      open(tooltipTargetFor(eventOrigin(event)))
+      open(tooltipTargetFor(event.target))
     }
 
-    // Chromium can skip `pointerover` inside a shadow root after a click there; moves still say
-    // where the pointer is, so a changed owner opens or hides here too.
+    // Moves say where the pointer is, so a changed owner opens or hides here too.
     function follow(event: Event) {
-      const next = tooltipTargetFor(eventOrigin(event))
+      const next = tooltipTargetFor(event.target)
       const element = next?.element ?? null
       // A press hides the tooltip; it stays hidden over that control until the pointer leaves it.
       if (element !== pressed.current) pressed.current = null
@@ -74,13 +73,13 @@ export function useTooltipLayer(describedById: string) {
     }
 
     function hideOnPress(event: Event) {
-      pressed.current = tooltipTargetFor(eventOrigin(event))?.element ?? null
+      pressed.current = tooltipTargetFor(event.target)?.element ?? null
       hide()
     }
 
     // Pointer focus is ignored, not treated as a leave: a menu focuses the item under the pointer.
     function showOnFocus(event: FocusEvent) {
-      const next = tooltipTargetFor(eventOrigin(event))
+      const next = tooltipTargetFor(event.target)
       if (!next?.element.matches(':focus-visible')) return
 
       open(next)
@@ -88,8 +87,7 @@ export function useTooltipLayer(describedById: string) {
 
     // Only the anchor's own blur ends it: focus leaving some other menu item is not a leave.
     function hideOnBlur(event: FocusEvent) {
-      const origin = eventOrigin(event)
-      if (!(origin instanceof Node) || !anchor.current?.contains(origin)) return
+      if (!(event.target instanceof Node) || !anchor.current?.contains(event.target)) return
 
       hide()
     }
@@ -142,9 +140,4 @@ export function useTooltipLayer(describedById: string) {
   }, [target, describedById])
 
   return target
-}
-
-// A shadow root retargets events to its host; the element under the pointer is the path's first.
-function eventOrigin(event: Event) {
-  return event.composedPath()[0] ?? event.target
 }

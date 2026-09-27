@@ -197,7 +197,7 @@ export function MessageBubble({
                 'text-muted-foreground text-3xs mt-1 flex items-center justify-end gap-1.5 tabular-nums transition-opacity',
                 restoring
                   ? 'opacity-100'
-                  : 'group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:opacity-0',
+                  : 'pointer-events-none opacity-0 group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 touch:pointer-events-auto touch:opacity-100',
               )}
               data-user-message-meta='true'
             >
@@ -207,7 +207,7 @@ export function MessageBubble({
                   <Shimmer>Restoring…</Shimmer>
                 </span>
               ) : null}
-              <span className='size-5 shrink-0 transition-transform group-focus-within/message:translate-x-0 group-hover/message:translate-x-0 [@media(hover:hover)]:-translate-x-2'>
+              <span className='touch:translate-x-0 size-5 shrink-0 -translate-x-2 transition-transform group-focus-within/message:translate-x-0 group-hover/message:translate-x-0'>
                 {canRevertCheckpoint ? (
                   <Tooltip>
                     <TooltipTrigger
@@ -239,7 +239,7 @@ export function MessageBubble({
           ) : null}
           {!user && assistantChrome.metaVisible ? (
             <div
-              className='mt-1.5 flex items-center gap-2 transition-opacity group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:opacity-0'
+              className='touch:pointer-events-auto touch:opacity-100 pointer-events-none mt-1.5 flex items-center gap-2 opacity-0 transition-opacity group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100'
               data-assistant-message-meta='true'
             >
               <p className='text-muted-foreground text-3xs tabular-nums'>

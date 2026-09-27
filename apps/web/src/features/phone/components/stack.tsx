@@ -8,6 +8,7 @@ import { useSessionSelectionStore } from '@/features/chat-mode/state/session-sel
 import { Screen } from '@/features/phone/components/screen'
 import { useBackAction } from '@/features/phone/hooks/use-back-action'
 import { useKeyboardInset } from '@/features/phone/hooks/use-keyboard-inset'
+import { useLongPressMenus } from '@/features/phone/hooks/use-long-press-menus'
 import { useStart } from '@/features/phone/hooks/use-start'
 import { useWarmScreens } from '@/features/phone/hooks/use-warm-screens'
 import { BackContext } from '@/features/phone/providers/back-context'
@@ -26,6 +27,7 @@ export function Stack({ rootPath }: { readonly rootPath: string }) {
   const diffScope = useSessionDiffScope()
   useSessionCheckoutRefresh()
   useStart()
+  useLongPressMenus()
   useWarmScreens()
 
   return (

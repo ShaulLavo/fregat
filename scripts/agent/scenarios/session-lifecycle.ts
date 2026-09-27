@@ -5,6 +5,7 @@ import { dispatch, openChatShell, readShell } from './chat-verification'
 
 export const sessionLifecycle: Scenario = {
   name: 'session-lifecycle',
+  realProviders: true,
   description:
     'Drive pin, settle, snooze, exact timer wake, bulk snooze and Undo in disposable sessions, then snooze a real running provider turn.',
   async run(page, { step }) {

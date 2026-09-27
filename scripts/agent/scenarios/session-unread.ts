@@ -5,6 +5,7 @@ import { dispatch, openChatShell, readShell } from './chat-verification'
 
 export const sessionUnread: Scenario = {
   name: 'session-unread',
+  realProviders: true,
   description:
     'Visit, leave, complete, mark unread, reload and acknowledge a timer wake in disposable sessions. Uses one short provider turn.',
   async run(page, { step }) {

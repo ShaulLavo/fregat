@@ -310,7 +310,7 @@ jobs:
 
       - name: Browser test (tree)
         if: ${{ !cancelled() }}
-        run: bun run --cwd packages/tree test:browser
+        run: bun run --cwd apps/web test:tree-browser
 
   # The site's demo build bundles apps/web in a different mode than the app build, so it
   # pulls in packages (like MSW) the other CI jobs never touch and needs its own licence

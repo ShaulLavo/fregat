@@ -96,7 +96,7 @@ import { ProviderSessionDirectory } from './provider/provider-session-directory'
 import { ProviderService } from './provider/provider-service'
 import { ProviderUsageHistoryReader } from './provider/usage-history'
 import { ProviderPriceCatalog } from './provider/price-catalog'
-import { ProviderMaintenance } from './provider/provider-maintenance'
+import { ProviderMaintenance, type ProviderMaintenanceProbe } from './provider/provider-maintenance'
 import { ProviderUsageRecorder } from './provider/usage-recorder'
 import { ProviderUsageStore } from './provider/usage-store'
 import { ProviderResetCredits } from './provider/reset-credits'
@@ -169,6 +169,12 @@ export type AppOptions = FileSystemServiceOptions & {
   /** Staged releases and Restart. Absent leaves both inert, as in dev and tests. */
   update?: UpdateOptions
   push?: { fetcher?: PushFetcher }
+  provider?: {
+    /** Test seam: the npm registry check and CLI probing maintenance runs against the machine. */
+    maintenanceProbe?: Partial<ProviderMaintenanceProbe>
+    /** Test seam: the models.dev price catalog download every price lookup can trigger. */
+    priceCatalogFetcher?: (url: string, init?: RequestInit) => Promise<Response>
+  }
   /** Paired devices: where they are kept, the cookie naming one, and this machine's addresses. */
   devices?: {
     readonly filePath?: string
@@ -355,14 +361,17 @@ export function createApp(options: AppOptions) {
     providerAdapterRegistry,
     providerUsage,
   )
-  const providerPrices = new ProviderPriceCatalog(database)
+  const providerPrices = new ProviderPriceCatalog(database, options.provider?.priceCatalogFetcher)
   const providerUsageRecorder = new ProviderUsageRecorder(
     database,
     providerAdapterRegistry,
     providerPrices,
   )
   const providerUsageHistory = new ProviderUsageHistoryReader(database)
-  const providerMaintenance = new ProviderMaintenance(providerAdapterRegistry)
+  const providerMaintenance = new ProviderMaintenance(
+    providerAdapterRegistry,
+    options.provider?.maintenanceProbe,
+  )
   providerService.subscribeRuntimeEvents((event) => providerUsage.accept(event))
   providerService.subscribeUsage((event, purpose) => providerUsageRecorder.accept(event, purpose))
   providerService.subscribeImportedUsage((input, usage) =>

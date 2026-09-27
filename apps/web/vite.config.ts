@@ -1,3 +1,4 @@
+import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import { createRequire } from 'node:module'
@@ -5,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
 import { portFromEnv, runtimeUrl, serverUrlFromEnv } from '../../scripts/runtime-network'
+import { createScriptError } from '../../scripts/structured-errors'
 import {
   readDevSources,
   reportDevSources,
@@ -24,7 +26,7 @@ const workspaceRoot = path.resolve(import.meta.dirname, '../..')
 const markdownRequire = createRequire(path.join(workspaceRoot, 'packages/markdown/package.json'))
 const sharedMarkdown = ['unified', 'remark-parse', 'remark-gfm', 'unist-util-visit']
 
-const devServerHost = process.env.WEB_HOST ?? '127.0.0.1'
+const devServerHost = requireLiteralAddress(process.env.WEB_HOST, '127.0.0.1')
 const devServerPort = portFromEnv(process.env, 'WEB_PORT', 5173)
 
 /**
@@ -34,6 +36,18 @@ const devServerPort = portFromEnv(process.env, 'WEB_PORT', 5173)
  */
 export function bunInstallCacheRoot(env: NodeJS.ProcessEnv = process.env): string {
   return env.BUN_INSTALL_CACHE_DIR ?? path.join(os.homedir(), '.bun', 'install', 'cache')
+}
+
+/**
+ * A hostname needs DNS resolution and can land on a different address family than the one
+ * already bound: `localhost` resolved to `::1` next to mesh's IPv4 `:5173` listener, and a stray
+ * Vite bound there instead of colliding with it, shadowing the route for 90 minutes (2026-09-27).
+ * Only a literal IP keeps `strictPort` below fighting over the same socket mesh holds.
+ */
+export function requireLiteralAddress(value: string | undefined, fallback: string): string {
+  if (value === undefined) return fallback
+  if (net.isIP(value)) return value
+  throw createScriptError(`WEB_HOST must be a literal IP address, got ${JSON.stringify(value)}.`)
 }
 
 export default defineConfig(({ command, isPreview, mode }) => {
@@ -116,6 +130,7 @@ export default defineConfig(({ command, isPreview, mode }) => {
       fs: {
         allow: [workspaceRoot, bunInstallCacheRoot(), ...packages.map((pkg) => pkg.checkout)],
       },
+      // A literal address (see `requireLiteralAddress`), never a hostname Vite would resolve itself.
       host: devServerHost,
       port: devServerPort,
       // The port is authoritative, not a preference: the server's origin

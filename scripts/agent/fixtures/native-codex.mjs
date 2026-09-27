@@ -223,6 +223,46 @@ function streamWorkLog(message) {
   }, 35)
 }
 
+/**
+ * `chat-turn-settle`: the answer streams whole while the turn still runs; the answer and the
+ * turn complete only once the scenario writes `settle-N`, so it can measure both sides. A
+ * prompt asking for a tool runs one command first.
+ */
+function settleTurn(message) {
+  const turn = startOwnTurn(message)
+  const index = turnCount
+  if (promptText(message).includes('with a tool'))
+    for (const phase of ['started', 'completed'])
+      send({
+        method: `item/${phase}`,
+        params: {
+          threadId,
+          turnId: turn,
+          item: {
+            id: `${turn}-command`,
+            type: 'commandExecution',
+            command: 'echo SETTLE_TOOL',
+            status: phase === 'started' ? 'inProgress' : 'completed',
+            exitCode: phase === 'started' ? null : 0,
+            aggregatedOutput: 'SETTLE_TOOL\n',
+          },
+        },
+      })
+  const text = `SETTLE_ANSWER_${index} The whole answer streams before the turn ends.\n\n`
+  // Later than the work, so the answer sorts after it.
+  setTimeout(() => {
+    agentDelta(turn, `${turn}-answer`, text)
+    record({ event: 'settle-answered', index })
+  }, 1_000)
+  const timer = setInterval(() => {
+    if (!fixtureStepReady(`settle-${index}`)) return
+    clearInterval(timer)
+    agentMessage(turn, `${turn}-answer`, text)
+    endTurn(turn, 'completed')
+    record({ event: 'settle-ended', index })
+  }, 50)
+}
+
 function historyPages(message) {
   const running = { id: turnId, status: 'inProgress', items: [] }
   send({ id: message.id, result: { turn: running } })
@@ -713,6 +753,7 @@ function handle(message) {
     endTurn(activeTurnId, 'completed')
     return
   }
+  if (scenario === 'chat-turn-settle' && message.method === 'turn/start') return settleTurn(message)
   if (scenario === 'stream-ambiguous-tail' && message.method === 'turn/start') {
     const turn = startOwnTurn(message)
     streamAnswer(turn, `${turn}-answer`, AMBIGUOUS_TAIL_CHUNKS, 250)
