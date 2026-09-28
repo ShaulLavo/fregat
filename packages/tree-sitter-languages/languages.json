@@ -708,9 +708,9 @@
     },
     "tree-sitter-md": {
       "package": "tree-sitter-md",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "repository": "https://github.com/ShaulLavo/tree-sitter-md",
-      "revision": "5dd917ae70eea5f6a38a2ba8825ce6d3baca697d",
+      "revision": "ff455a7dd3dc6177ddaf6879de462cecc34df73f",
       "license": "MIT",
       "compiler": "wasi-sdk 34"
     }
