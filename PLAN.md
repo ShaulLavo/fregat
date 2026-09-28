@@ -42,6 +42,29 @@ contracts a consumer needs:
   authoring/parser work before scheduling their remaining parts. [189](plans/189-tree-sitter-md-improvement.md)
   owns subsequent parser correctness and performance work.
 
+## bubli TUI workstream
+
+[201: the existing TUI runs on bubli](plans/201-bubli-tui.md) owns Fregat's adoption of the
+OpenTUI fork and Charm-inspired terminal experience. Keep the existing backend and shared
+React/TypeScript application logic. This workstream does not reorder the wave-2 queue above.
+Its status and acceptance checks live in 201; these are coordinated plans, not delivered features.
+
+- [bubli PR 1](https://github.com/ShaulLavo/bubli/pull/1) owns toolkit defaults, controls,
+  focus/overlays, arbitrary React Markdown components and terminal rendering. Theme/control work
+  can proceed alongside parser work; Fregat first proves coherent fork/package resolution.
+- [tree-sitter-md PR 5](https://github.com/ShaulLavo/tree-sitter-md/pull/5) owns the renderer-facing
+  semantic API and CommonMark/GFM/selected Goldmark, streaming and packaging gates. Those gates
+  precede bubli's production Marked removal and Fregat's Markdown cutover. Reconcile the now-reported
+  676/676 normalized baseline; do not repeat older release failures or treat it as rendering parity.
+- [Singapore PR 62](https://github.com/ShaulLavo/singapore/pull/62) coordinates its existing
+  Markdown consumer with that semantic release. Pair any Editor/runtime pin changes with Fregat's
+  lockfile and CI setup. Unrelated browser UI and full 099/198 completion are not blanket TUI
+  prerequisites; verify only the exact publication/analysis contracts a consumer uses.
+- Plans 176/189 retain parser integration/improvement ownership and 189's required extensions.
+  Plans 171/179/197/200 keep composer, isolation, highlighting and document-view scope. The
+  [coordination index](https://github.com/ShaulLavo/bubli/blob/docs/bubli-plans-2026-09-28/docs/bubli/README.md)
+  links the full series, reference specification, capability catalog and producer/consumer handoffs.
+
 ## Other work and boundaries
 
 The [plan index](plans/README.md) lists the remaining numbered plans without duplicating their
