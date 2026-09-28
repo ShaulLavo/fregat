@@ -2,8 +2,8 @@
 
 ## Status and authorization
 
-- Status: RESEARCH DONE (2026-09-25) — findings, recommendations and proposed phases below;
-  owner questions answered 2026-09-26. Nothing here authorizes implementation. "Work items"
+- Status: APPROVED; research done (2026-09-25) — findings, recommendations and proposed phases below;
+  owner questions answered 2026-09-26. "Work items"
   records a fix to shipped behaviour that the owner ordered 2026-09-26.
 - Phase 2 (routing) DONE 2026-09-26, wave 2 lane W: `UNDO_OWNING_PANES` and `FOCUS_AREAS` in
   `client-core/src/commands/focus.ts`; session undo and redo bind Mod+Z / Mod+Shift+Z in every

@@ -3,8 +3,7 @@
 ## Status and authorization
 
 - Status: wave 2 P0–P2 remaining, reconciled 2026-09-28. Research and owner direction are
-  recorded below. Later format/editing phases remain follow-up work under their stated gates;
-  this planning update does not authorize implementation.
+  recorded below. Later format/editing phases remain follow-up work under their stated gates.
 - Priority: wave 2 closeout for P0–P2; later phases follow format readiness.
 - Planned at: Platform `9c1c45d1`, 2026-09-25. Origin: the UI library survey
   ([docs/ui-research/extend-ui.md](../docs/ui-research/extend-ui.md)).

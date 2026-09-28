@@ -4,6 +4,9 @@
 its current status, scope, authorization and acceptance checks. This index lists the files that
 exist; it does not duplicate status summaries that drift when a plan changes.
 
+A plan the owner asks for is approved work: write its status as `APPROVED` and write it for
+execution. `IDEA` is only for a plan the owner explicitly calls an idea or is unsure about.
+
 ## Current plan files
 
 | Plan                                         | Topic                                                                         |
@@ -55,7 +58,7 @@ exist; it does not duplicate status summaries that drift when a plan changes.
 | [198](198-document-owned-editor-analysis.md) | Keep editor analysis with the document                                        |
 | [200](200-document-backed-content-views.md)  | Shared documents behind content views                                         |
 | [201](201-cheap-overlay-marks.md)            | One-frame typing in large files, starting with cheap underlines               |
-| [202](202-bubli-tui.md)                     | Run the existing React TUI on bubli with a Charm-inspired experience            |
+| [202](202-bubli-tui.md)                      | Run the existing React TUI on bubli with a Charm-inspired experience          |
 
 ## Supporting work
 

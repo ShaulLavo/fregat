@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: PROPOSED 2026-09-26 (owner). Ongoing: it follows [Plan 176](176-markdown-parser.md), which
+- Status: APPROVED 2026-09-26 (owner). Ongoing: it follows [Plan 176](176-markdown-parser.md), which
   releases `tree-sitter-md` (its Phase 0) and puts it in the Editor (Phases 1–3). This plan owns
   what comes after: the open items the spike left, then three passes (correctness, memory and bundle
   size, speed). Each pass ships as its own releases of the package.

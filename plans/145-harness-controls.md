@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: PROPOSED — eight small plans; approval-rules implemented 2026-09-25 (PR #29).
+- Status: APPROVED — eight small plans; approval-rules implemented 2026-09-25 (PR #29).
 - Priority: P2 overall; approval rules and fork are P1 (see the table).
 - Effort: eight S–M plans. Each ships and deploys on its own.
 - Planned at: Platform `c2af88b4`, 2026-09-24. Origin: the 2026-09-24 reference survey.

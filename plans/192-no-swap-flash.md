@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: PROPOSED 2026-09-26. Rule landed in AGENTS.md ("Loading, Empty And Error States") with
+- Status: APPROVED 2026-09-26. Rule landed in AGENTS.md ("Loading, Empty And Error States") with
   `useHeldUntilReady`; the file picker preview is fixed on `picker-locations`. The rest is below.
 - Origin: owner, 2026-09-26: "the preview flashes we need some rule to make it less annoying and the
   app has 100 examples like this".

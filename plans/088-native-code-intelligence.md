@@ -1,6 +1,6 @@
 # Build native code intelligence for agents and the editor
 
-Status: proposed, implementation not started. Requested 2026-09-11.
+Status: approved, implementation not started. Requested 2026-09-11.
 
 Hard prerequisite: [Plan 087, stateless MCP](087-stateless-mcp.md), including real provider
 interoperability. [Root PLAN.md](../PLAN.md) owns scheduling. The

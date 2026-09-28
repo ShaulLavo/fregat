@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-- Status: PROPOSED, 2026-09-27. The owner authorized writing and pushing this plan; implementation has not started.
+- Status: APPROVED, 2026-09-27. Implementation has not started.
 - Inspected at: Platform `37e7171df`. Recheck the source map below before implementation, especially concurrent Settings focus work.
 - Outcome: Defaults is a searchable, read-only reference with UI and JSON views. Changing the scope preserves the chosen view. Changing the view preserves the scope.
 - Size: M, one bounded Settings feature. Web only. No registry value changes, server endpoints, account operations, or native client work.

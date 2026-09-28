@@ -7,7 +7,6 @@
   stronger light palette and wider file coverage (5.6% → 2.1% generic). Provenance settled in round 2:
   the pack is Pierre's own drawing on its `@pierre/icons` library plus brand marks, not a recoloured
   VS Code set; one glyph (`claude`) is a verbatim Codicons copy. Q3 reopened with a cheaper route.
-  Nothing here authorizes implementation.
 - Planned at: Platform `0de7f2212`, 2026-09-26; researched at `c130dd35a`. Origin: [Plan 178](178-tree-in-the-app.md)
   Q1, where the tree's icon colours looked better than the app's in places.
 - Size: S–M in total. Phase 1 can land before Plan 178's [icons](178-tree-in-the-app/icons.md) sub-plan,

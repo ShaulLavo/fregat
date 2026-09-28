@@ -9,7 +9,7 @@
   multibuffer. Third pass: [docs/search-view-many-editors.md](../docs/search-view-many-editors.md).
   Second pass (design): [docs/search-view-results-in-editor.md](../docs/search-view-results-in-editor.md).
   First pass: [docs/search-view-rendering-findings.md](../docs/search-view-rendering-findings.md).
-  Two owner questions (Q3, Q4) stand before implementation. Nothing here authorizes implementation.
+  Two owner questions (Q3, Q4) stand before implementation.
 - Phases 1 and 1b done 2026-09-26 (wave 2, lane E1): Editor
   [singapore#40](https://github.com/ShaulLavo/singapore/pull/40). The unfocused caret is drawn in the
   next frame (still visible), padding is read once per element, and the viewport origin waits for the

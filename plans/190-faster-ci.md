@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: PROPOSED 2026-09-26 (owner: "make CI faster, it is painfully slow"). Ready. First queue item
+- Status: APPROVED 2026-09-26 (owner: "make CI faster, it is painfully slow"). First queue item
   of wave 2's first lane, because every PR in the wave waits on it.
 - Effort: M overall, as S slices that each land and are measured on their own.
 

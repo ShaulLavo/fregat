@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: PROPOSED 2026-09-26, ready. Follow-up to Plan 126 EXT-04 (lane L9), from the
+- Status: APPROVED 2026-09-26. Follow-up to Plan 126 EXT-04 (lane L9), from the
   2026-09-26 direction audit, item 5.
 - Decided 2026-09-26: owner — "Setup scripts (L9, EXT-04): run them in visible terminals like
   T3, not as hidden server children."

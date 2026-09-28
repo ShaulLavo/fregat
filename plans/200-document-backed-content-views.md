@@ -1,6 +1,6 @@
 # Plan 200: Shared documents behind content views
 
-Status: proposed, planning requested by the owner on 2026-09-28. Implementation has not started.
+Status: approved, planning requested by the owner on 2026-09-28. Implementation has not started.
 Owners: Platform for resource identity, acquisition, retention and product adapters; Editor for
 document attachment and reusable projections. Cross-project order lives in [PLAN.md](../PLAN.md).
 

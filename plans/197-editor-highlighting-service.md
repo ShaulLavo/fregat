@@ -2,7 +2,7 @@
 
 ## Status and outcome
 
-- Status: PROPOSED, 2026-09-27. Planning is authorized; implementation has not started.
+- Status: APPROVED, 2026-09-27. Implementation has not started.
 - Inspected: Platform `9c08916bf`, linked Editor `52099144`. Recheck both heads and CI's `editor-ref` before implementation.
 - Outcome: Editor supplies one reusable highlighting service. Plugins, diffs, Settings previews, and rendered code consume it. Platform supplies configuration and theme data without selecting engines or constructing workers.
 - Scope: a facade over existing Editor providers/workers, followed by bounded consumer migrations. Other plugin candidates are assessment only. Wallpaper image loading and Settings layout remain separate work.
