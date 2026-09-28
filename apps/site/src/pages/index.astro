@@ -127,7 +127,7 @@ const demoUrl = import.meta.env.DEV
         </section>
 
         <section class="pane" id="parts" aria-labelledby="parts-heading">
-          <div class="bar"><span>what's inside</span><span class="count">5</span></div>
+          <div class="bar"><span>what's inside</span><span class="count">6</span></div>
           <div class="pane-body">
             <h2 id="parts-heading">hand-rolled, so it's fast</h2>
             <dl class="parts">
@@ -135,8 +135,16 @@ const demoUrl = import.meta.env.DEV
                 <dt>editor</dt>
                 <dd>
                   <a href="https://github.com/ShaulLavo/singapore">singapore</a>, our own editor,
-                  written from the text buffer up. tree-sitter for syntax, language servers for the
-                  rest.
+                  written from the text buffer up, with language servers for completions and
+                  diagnostics.
+                </dd>
+              </div>
+              <div>
+                <dt>parsing</dt>
+                <dd>
+                  <a href="https://github.com/ShaulLavo/tree-sitter-x">tree-sitter-x</a>, our fork
+                  of tree-sitter. built without emscripten, it keeps the text inside the parser and
+                  reparses a 1 mb file after a keystroke in 0.35 ms, down from 0.8.
                 </dd>
               </div>
               <div>
@@ -175,16 +183,18 @@ const demoUrl = import.meta.env.DEV
               <div>
                 <dt>markdown</dt>
                 <dd>
-                  our own parser, with c underneath. it will render the agent's streaming replies,
-                  power the chat composer, and open any .md file as source, preview side by side,
-                  or one live view you edit as it renders.
+                  <a href="https://github.com/ShaulLavo/tree-sitter-md">tree-sitter-md</a>, our
+                  parser in c, already passes all 676 commonmark and gfm examples. next it renders
+                  the agent's streaming replies, powers the chat composer, and opens any .md file as
+                  source, side by side with a preview, or as one live view you edit as it renders.
                 </dd>
               </div>
               <div>
                 <dt>mcp</dt>
                 <dd>
-                  every action in the app, open to your agents. plus the editor's own
-                  intelligence, so an agent sees types and references the way you do.
+                  fregat already runs its own mcp server, and agents can read the workspace
+                  through it today. next: every action in the app, and the editor's types and
+                  references, so an agent sees the code the way you do.
                 </dd>
               </div>
               <div>
