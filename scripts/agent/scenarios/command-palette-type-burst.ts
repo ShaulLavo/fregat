@@ -13,6 +13,16 @@ export const commandPaletteTypeBurst: Scenario = {
     const input = selectors.paletteInput(page)
     await input.waitFor()
     await input.fill('>')
+    const availability = await selectors
+      .paletteOptions(page)
+      .evaluateAll((rows) => rows.map((row) => row.getAttribute('aria-disabled') === 'true'))
+    const firstDisabled = availability.indexOf(true)
+    ok(firstDisabled > 0, 'The palette must contain enabled and disabled commands')
+    ok(
+      availability.slice(firstDisabled).every(Boolean),
+      'Disabled commands must follow enabled commands',
+    )
+    await step('initial-commands')
     await page.keyboard.type('toggle sidebar', { delay: 70 })
     const rows = await selectors.paletteOptions(page).count()
     ok(rows > 0, 'The command query must leave at least one row')

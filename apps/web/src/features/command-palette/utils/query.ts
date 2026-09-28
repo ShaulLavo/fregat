@@ -1,7 +1,9 @@
 import { filesystemResource } from '@/lib/documents/utils/capabilities'
-import { quickAccessMode } from '@workspace/client-core/commands/palette'
+import {
+  groupedCommandItems as rankedCommandGroups,
+  quickAccessMode,
+} from '@workspace/client-core/commands/palette'
 export {
-  groupedCommandItems,
   quickAccessMode,
   quickAccessQuery,
   quickAccessFilter,
@@ -72,6 +74,22 @@ export function inspectedCommandItems<Inspection extends Inspected>(
     if (!visible(item, inspection)) return []
     return [{ ...item, disabledReason: disabledReasonOf(inspection) }]
   })
+}
+
+export function groupedCommandItems(
+  items: readonly CommandPaletteItem[],
+  search = '',
+  recentCommandIds: readonly string[] = [],
+): readonly (readonly [string, readonly CommandPaletteItem[]])[] {
+  const groups = rankedCommandGroups(items, search, recentCommandIds)
+  const disabled = groups.flatMap(([, group]) => group.filter((item) => item.disabledReason))
+  if (disabled.length === 0) return groups
+
+  const enabled = groups.flatMap(([heading, group]) => {
+    const available = group.filter((item) => !item.disabledReason)
+    return available.length > 0 ? [[heading, available] as const] : []
+  })
+  return [...enabled, ['Unavailable Commands', disabled]]
 }
 
 export function filePaletteItems(state: LoadState<TreeModel>): readonly FilePaletteItem[] {

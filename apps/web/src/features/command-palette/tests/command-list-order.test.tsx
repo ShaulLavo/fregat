@@ -37,8 +37,10 @@ const COMMAND_PALETTE_ACTIONS: CommandPaletteActions = {
  * order React computed only survives if the palette turns that off. These render the
  * real list to assert the order the user actually sees, not the array we handed over.
  */
-function renderCommandList(search: string, shouldFilter: boolean) {
-  const items = commandPaletteItems(platformCommandSpecs, defaultPlatformKeyBindings('linux'))
+function renderCommandList(search: string, shouldFilter: boolean, disabledId?: string) {
+  const items = commandPaletteItems(platformCommandSpecs, defaultPlatformKeyBindings('linux')).map(
+    (item) => ({ ...item, disabledReason: item.id === disabledId ? 'Unavailable here' : null }),
+  )
   const view = render(
     <Command filter={quickAccessFilter} shouldFilter={shouldFilter}>
       {/* The input is what puts the query into cmdk's own state, and cmdk only
@@ -77,3 +79,20 @@ test('the unfiltered list renders recents at the top', () => {
 
   expect(rendered.slice(0, 2)).toEqual(['workspace.showSettings', 'workspace.showChatMode'])
 })
+
+test.each(['>', '> mode'])(
+  'disabled recent commands follow every enabled result for %s',
+  (search) => {
+    const baseline = renderCommandList(search, !paletteOwnsItemOrder('commands'))
+    const rendered = renderCommandList(
+      search,
+      !paletteOwnsItemOrder('commands'),
+      'workspace.showSettings',
+    )
+
+    expect(rendered).toEqual([
+      ...baseline.filter((id) => id !== 'workspace.showSettings'),
+      'workspace.showSettings',
+    ])
+  },
+)
