@@ -18,5 +18,12 @@ export const treeStickyScroll: Scenario = {
       await page.waitForTimeout(350)
       await step(`scroll-${index + 1}`)
     }
+    for (const [direction, delta] of [
+      ['down', 120],
+      ['up', -120],
+    ] as const) {
+      for (let burst = 0; burst < 4; burst++) await page.mouse.wheel(0, delta)
+      await step(`fast-${direction}`)
+    }
   },
 }

@@ -81,6 +81,46 @@ describe('sticky folders', () => {
     expect(stickyRow('docs/').style.clipPath).toMatch(/^inset\(/)
   })
 
+  it.each([8, -8, 120, -120])(
+    'keeps the guide seam fixed while rendering trails a %ipx scroll',
+    async (delta) => {
+      const { model } = await mountParityTree()
+      await expandPaths(model, ['src/', 'src/lib/'])
+      await wheel(12 * ROW_HEIGHT)
+      await scrollSettled()
+      const overlay = stickyRow('src/lib/').getBoundingClientRect()
+      const x = overlay.left + 100
+      const flowAt = (y: number) =>
+        document
+          .elementsFromPoint(x, y)
+          .some((element) =>
+            element.matches('[data-type="item"]:not([data-file-tree-sticky-row="true"])'),
+          )
+      expect(flowAt(overlay.bottom - 2)).toBe(false)
+      expect(flowAt(overlay.bottom + 2)).toBe(true)
+      const pauseLayout = (event: Event) => event.stopImmediatePropagation()
+      scroller().addEventListener('scroll', pauseLayout, { capture: true })
+      try {
+        scroller().scrollTop += delta
+        await frames(2)
+        expect(flowAt(overlay.bottom - 2)).toBe(false)
+        expect(flowAt(overlay.bottom + 2)).toBe(true)
+      } finally {
+        scroller().removeEventListener('scroll', pauseLayout, { capture: true })
+      }
+    },
+  )
+
+  it('scrolls with wheel input over a pinned folder', async () => {
+    const { model } = await mountParityTree()
+    await expandPaths(model, ['src/', 'src/lib/'])
+    await wheel(12 * ROW_HEIGHT)
+    await scrollSettled()
+    const before = scroller().scrollTop
+    await commands.treeWheel(center(stickyRow('src/lib/')), ROW_HEIGHT)
+    await vi.waitFor(() => expect(scroller().scrollTop).toBeGreaterThan(before))
+  })
+
   it('a sticky-row click reveals the real row below its sticky parents and focuses it', async () => {
     const { model } = await mountParityTree()
     await expandPaths(model, ['src/', 'src/lib/'])

@@ -8,6 +8,9 @@ import { commands } from 'vitest/browser'
 import {
   center,
   frames,
+  expandPaths,
+  scroller,
+  stickyRow,
   mountParityTree,
   row,
   unmountParityTree,
@@ -16,6 +19,19 @@ import {
 afterEach(unmountParityTree)
 
 describe('touch', () => {
+  it('pans from a pinned folder', async () => {
+    const { model } = await mountParityTree()
+    await expandPaths(model, ['src/', 'src/lib/'])
+    scroller().scrollTop = 288
+    await frames(3)
+    const before = scroller().scrollTop
+    const start = center(stickyRow('src/lib/'))
+    await commands.treeTouch('touchStart', start)
+    await commands.treeTouch('touchMove', { x: start.x, y: start.y + 60 })
+    await commands.treeTouch('touchEnd', { x: start.x, y: start.y + 60 })
+    await vi.waitFor(() => expect(scroller().scrollTop).toBeLessThan(before))
+  })
+
   it('a long press of 400ms starts a drag that drops on release', async () => {
     const { events } = await mountParityTree()
     const start = center(row('README.md'))

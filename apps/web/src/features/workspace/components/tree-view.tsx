@@ -509,6 +509,8 @@ export function TreeView({
           rows={rangeRows}
           stickyBottomInset={windowFrame.stickyBottomInset}
           stickyTopInset={windowFrame.stickyTopInset}
+          stickyOverlayHeight={stickyOverlayHeight}
+          viewportHeight={resolvedViewportHeight}
           totalHeight={totalScrollableHeight}
         />
       </div>

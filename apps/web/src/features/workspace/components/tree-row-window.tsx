@@ -4,6 +4,7 @@ import type { FileTreeVisibleRow } from '@workspace/tree'
 import type { JSX, RefObject } from 'react'
 
 import { TreeRow, type TreeRenderRowFrame } from '@/features/workspace/components/tree-row'
+import { useTreeWindowClip } from '@/features/workspace/hooks/use-tree-window-clip'
 
 /** A row kept mounted outside the window, invisible, so focus or a drag keeps its element. */
 export type TreeParkedRow = { readonly row: FileTreeVisibleRow; readonly offset: number }
@@ -25,7 +26,9 @@ export function TreeRowWindow({
   rows,
   stickyBottomInset,
   stickyTopInset,
+  stickyOverlayHeight,
   totalHeight,
+  viewportHeight,
 }: {
   readonly clipTop: number
   readonly draggedPrimaryPath: string | null
@@ -39,8 +42,20 @@ export function TreeRowWindow({
   readonly rows: readonly FileTreeVisibleRow[]
   readonly stickyBottomInset: number
   readonly stickyTopInset: number
+  readonly stickyOverlayHeight: number
+  readonly viewportHeight: number
   readonly totalHeight: number
 }): JSX.Element {
+  const windowRef = useTreeWindowClip({
+    height,
+    listRef,
+    offsetTop,
+    stickyBottomInset,
+    stickyOverlayHeight,
+    stickyTopInset,
+    totalHeight,
+    viewportHeight,
+  })
   return (
     <div
       ref={listRef}
@@ -53,6 +68,7 @@ export function TreeRowWindow({
         style={{ height: `${offsetTop}px` }}
       />
       <div
+        ref={windowRef}
         data-file-tree-virtualized-sticky='true'
         style={{
           clipPath: clipTop > 0 ? `inset(${clipTop}px 0 0)` : undefined,
