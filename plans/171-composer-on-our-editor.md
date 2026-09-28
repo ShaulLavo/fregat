@@ -58,6 +58,14 @@ its reservation; file-on-disk completion alone does not mean that reservation is
 Always-visual interaction, mixed-format rich selections, tables/images and actual
 composer acceptance remain open.
 
+Self-review fixes, 2026-09-28: all seven reported authoring bugs are covered by
+regressions. Formatting uses parsed spans, preserves unselected formatting, handles
+separate paragraphs and intraword italics, escapes backslashes in link labels, and
+toggles numbered tasks. Commands wait for current records and cancel stale intent.
+The browser check also exposed and fixed selection changes canceling a pending parse
+and retained parser ranges exceeding a shortened document. Evidence:
+`/work/tmp/fregat-evidence/20260928T175033Z-scenario-markdown-authoring/`.
+
 The composer swap additionally requires mention interaction, draft restoration,
 attachments, IME, narrow widths and spellcheck in the actual composer. Rendered
 tables and image blocks remain Plan 111/108 work; inline visual presentation does
