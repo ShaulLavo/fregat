@@ -35,6 +35,10 @@ progress and remains cancellable. Every view's next read/copy aborts its previou
 views share the document cache. Hosts must show pending/error/stale states, keep global line labels,
 and honor `truncated`. An unavailable range is never represented by an empty string.
 
+`readLines(line, count, signal?)` and `copyRange(start, end, signal?)` accept a request-owned
+`AbortSignal`. Aborting it cancels only that request, including after a newer request starts.
+Pass query cancellation signals directly; `view.cancel()` explicitly cancels the current request.
+
 Defaults are explicit in `PAGED_PROOF_OPTIONS`: 64 KiB pages, 8 MiB cached raw bytes, two requests
 in flight, two views, at most 4096 sparse checkpoints, 128 rows and 524288 UTF-16 units per returned
 window or copied range. The text cap is 1 MiB at two bytes per UTF-16 unit. A large line returns a

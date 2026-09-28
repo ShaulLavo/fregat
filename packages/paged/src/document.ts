@@ -387,12 +387,12 @@ export class PagedDocumentView {
     private readonly release: () => void,
   ) {}
 
-  readLines(line: number, count: number) {
-    return this.read(line, count, this.begin())
+  readLines(line: number, count: number, signal?: AbortSignal) {
+    return this.read(line, count, this.begin(signal))
   }
 
-  copyRange(start: number, end: number) {
-    return this.copy(start, end, this.begin())
+  copyRange(start: number, end: number, signal?: AbortSignal) {
+    return this.copy(start, end, this.begin(signal))
   }
 
   cancel() {
@@ -407,10 +407,10 @@ export class PagedDocumentView {
     this.release()
   }
 
-  private begin() {
+  private begin(signal?: AbortSignal) {
     if (this.#disposed) throw failure('The paged view is disposed')
     this.cancel()
     this.#request = new AbortController()
-    return this.#request.signal
+    return signal ? AbortSignal.any([signal, this.#request.signal]) : this.#request.signal
   }
 }
