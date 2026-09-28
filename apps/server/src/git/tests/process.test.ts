@@ -102,17 +102,24 @@ describe('git process limits', () => {
 })
 
 describe('git service output limit', () => {
-  it('fails a diff that overflows the command output budget', async () => {
+  it('bounds aggregate patches while admitting each individual file', async () => {
     const root = await fixtureRepo()
-    await writeFile(path.join(root, 'tracked.txt'), `${'line\n'.repeat(50_000)}`)
+    const files = Array.from({ length: 20 }, (_, index) => `part-${index}.txt`)
+    await Promise.all(files.map((file) => writeFile(path.join(root, file), 'a'.repeat(128))))
+    await runProcess({ args: ['add', '.'], cwd: root })
+    await runProcess({ args: ['commit', '-m', 'many files'], cwd: root })
+    await Promise.all(files.map((file) => writeFile(path.join(root, file), 'b'.repeat(128))))
     const service = new GitService(createWorkspacePaths(root), {
       maxCommandOutputBytes: 4096,
+      maxDiffFileBytes: () => 128,
     })
 
+    expect((await service.diff('part-0.txt'))[0]?.newText).toHaveLength(128)
     const diff = service.diff('')
 
     await expect(diff).rejects.toMatchObject({
       code: gitProcessErrors.OUTPUT_LIMIT_EXCEEDED.code,
+      message: expect.stringContaining('4608 bytes'),
       status: 413,
     })
   })

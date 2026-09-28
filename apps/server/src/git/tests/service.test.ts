@@ -413,6 +413,36 @@ describe('git rpc patches and file content', () => {
 })
 
 describe('git diff size budget', () => {
+  it('admits 11 MiB replacements through worktree, staged, ref, blob and untracked routes', async () => {
+    const root = await fixtureRepo()
+    const size = 11 * 1024 * 1024
+    await writeFile(path.join(root, 'tracked.txt'), 'a'.repeat(size))
+    await runGit(root, ['commit', '-am', 'large baseline'])
+    const oldObjectId = (await runGit(root, ['rev-parse', 'HEAD:tracked.txt'])).stdout.trim()
+    await writeFile(path.join(root, 'tracked.txt'), 'b'.repeat(size))
+    const service = new GitService(createWorkspacePaths(root))
+    const [working] = await service.diff('tracked.txt')
+    expect(working?.omitted).toBeUndefined()
+    expect(working?.patch.length).toBeGreaterThan(2 * size)
+    expect(working?.oldText?.length).toBe(size)
+    expect(working?.newText?.length).toBe(size)
+    await runGit(root, ['add', 'tracked.txt'])
+    const [staged] = await service.diff('tracked.txt', true)
+    expect(staged?.patch.length).toBeGreaterThan(2 * size)
+    await runGit(root, ['commit', '-m', 'large replacement'])
+    const [refs] = await service.diffRefs({ path: '', oldRef: 'HEAD~1', newRef: 'HEAD' })
+    expect(refs?.patch.length).toBeGreaterThan(2 * size)
+    const newObjectId = (await runGit(root, ['rev-parse', 'HEAD:tracked.txt'])).stdout.trim()
+    const [blob] = await service.diffBlob({ path: 'tracked.txt', oldObjectId, newObjectId })
+    expect(blob?.patch.length).toBeGreaterThan(2 * size)
+    expect(blob?.oldText?.length).toBe(size)
+    expect(blob?.newText?.length).toBe(size)
+    await writeFile(path.join(root, 'new.txt'), 'c'.repeat(size))
+    const [untracked] = await service.diff('new.txt')
+    expect(untracked?.patch.length).toBeGreaterThan(size)
+    expect(untracked?.newText?.length).toBe(size)
+  }, 30_000)
+
   it('keeps filesystem reads independent of the configured Git budget', async () => {
     const root = await fixtureRepo()
     await mkdir(path.join(root, '.platform-test'), { recursive: true })

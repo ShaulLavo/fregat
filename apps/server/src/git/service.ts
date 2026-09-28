@@ -1278,7 +1278,11 @@ export class GitService {
     const result =
       omitted.length === entries.length
         ? ''
-        : (await this.git(repository.rootAbsolutePath, patchArgs)).stdout
+        : (
+            await this.git(repository.rootAbsolutePath, patchArgs, {
+              maxOutputBytes: this.maxPatchOutputBytes(),
+            })
+          ).stdout
     return [
       ...parseDiff(result, repository.rootPath, staged),
       ...omitted.map((entry) => ({
@@ -1500,7 +1504,7 @@ export class GitService {
         '/dev/null',
         pathspec,
       ],
-      { allowFailure: true },
+      { allowFailure: true, maxOutputBytes: this.maxPatchOutputBytes() },
     )
     if (result.exitCode <= 1) return result.stdout
 
@@ -1597,6 +1601,12 @@ export class GitService {
     )
   }
 
+  private maxPatchOutputBytes(): number {
+    // Two full sides plus line prefixes; the command allowance covers patch headers.
+    // Directory diffs share this bound, regardless of how many files passed preflight.
+    return 4 * this.maxDiffFileBytes() + this.maxCommandOutputBytes
+  }
+
   private async blobPatch(repository: GitRepositoryLocation, query: GitBlobDiffQuery) {
     const [oldObjectId, newObjectId] = await Promise.all([
       query.oldObjectId ?? this.emptyBlobObjectId(repository),
@@ -1607,7 +1617,7 @@ export class GitService {
     const result = await this.git(
       repository.rootAbsolutePath,
       ['diff', '--no-color', '--no-ext-diff', '--unified=3', oldObjectId, newObjectId],
-      { allowFailure: true },
+      { allowFailure: true, maxOutputBytes: this.maxPatchOutputBytes() },
     )
     if (result.exitCode <= 1) return result.stdout
 
