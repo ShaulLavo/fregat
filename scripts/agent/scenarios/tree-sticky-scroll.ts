@@ -1,12 +1,13 @@
 import type { Scenario } from './index'
 import { openFileByName, selectors } from '../selectors'
 import { inspectTreeOcclusion } from '../tree-occlusion'
+import { captureTreeScroll } from '../tree-scroll-frames'
 
 export const treeStickyScroll: Scenario = {
   name: 'tree-sticky-scroll',
   description: 'Scroll a transparent file tree through partial rows and sticky folder boundaries.',
   inspect: inspectTreeOcclusion,
-  async run(page, { step }) {
+  async run(page, { step, evidence }) {
     await openFileByName(page, 'syntax-highlighting.ts')
     await openFileByName(page, 'save-service.ts')
     await openFileByName(page, 'plugins.ts')
@@ -25,5 +26,7 @@ export const treeStickyScroll: Scenario = {
       for (let burst = 0; burst < 4; burst++) await page.mouse.wheel(0, delta)
       await step(`fast-${direction}`)
     }
+    await captureTreeScroll(page, evidence)
+    await step('throttled-scroll')
   },
 }

@@ -4,17 +4,16 @@ import type { FileTreeVisibleRow } from '@workspace/tree'
 import type { JSX, RefObject } from 'react'
 
 import { TreeRow, type TreeRenderRowFrame } from '@/features/workspace/components/tree-row'
-import { useTreeWindowClip } from '@/features/workspace/hooks/use-tree-window-clip'
+import { useTreeWindowPosition } from '@/features/workspace/hooks/use-tree-window-position'
 
 /** A row kept mounted outside the window, invisible, so focus or a drag keeps its element. */
 export type TreeParkedRow = { readonly row: FileTreeVisibleRow; readonly offset: number }
 
 /**
- * The windowed rows inside a list as tall as every row. The window sticks with negative insets so
- * a render that falls behind a fast scroll still fills the view in either direction.
+ * The viewport clips flowing rows below the pinned folders; overscan keeps it filled while
+ * the native scroll position advances ahead of React.
  */
 export function TreeRowWindow({
-  clipTop,
   draggedPrimaryPath,
   frame,
   height,
@@ -24,13 +23,10 @@ export function TreeRowWindow({
   parkedFocusedRow,
   rangeStart,
   rows,
-  stickyBottomInset,
-  stickyTopInset,
   stickyOverlayHeight,
   totalHeight,
   viewportHeight,
 }: {
-  readonly clipTop: number
   readonly draggedPrimaryPath: string | null
   readonly frame: TreeRenderRowFrame
   readonly height: number
@@ -40,19 +36,15 @@ export function TreeRowWindow({
   readonly parkedFocusedRow: TreeParkedRow | null
   readonly rangeStart: number
   readonly rows: readonly FileTreeVisibleRow[]
-  readonly stickyBottomInset: number
-  readonly stickyTopInset: number
   readonly stickyOverlayHeight: number
   readonly viewportHeight: number
   readonly totalHeight: number
 }): JSX.Element {
-  const windowRef = useTreeWindowClip({
+  const windowRef = useTreeWindowPosition({
     height,
     listRef,
     offsetTop,
-    stickyBottomInset,
     stickyOverlayHeight,
-    stickyTopInset,
     totalHeight,
     viewportHeight,
   })
@@ -63,60 +55,61 @@ export function TreeRowWindow({
       style={{ height: `${totalHeight}px` }}
     >
       <div
-        data-file-tree-virtualized-sticky-offset='true'
-        aria-hidden='true'
-        style={{ height: `${offsetTop}px` }}
-      />
-      <div
-        ref={windowRef}
-        data-file-tree-virtualized-sticky='true'
+        data-file-tree-viewport-clip='true'
+        className='sticky overflow-clip'
         style={{
-          clipPath: clipTop > 0 ? `inset(${clipTop}px 0 0)` : undefined,
-          height: `${height}px`,
-          top: `${stickyTopInset}px`,
-          bottom: `${stickyBottomInset}px`,
+          top: stickyOverlayHeight,
+          height: Math.max(0, viewportHeight - stickyOverlayHeight),
         }}
       >
-        {rows.map((row, slotIndex) => (
-          <TreeRow key={rangeStart + slotIndex} frame={frame} row={row} />
-        ))}
-        {parkedFocusedRow != null ? (
-          <TreeRow
-            key={`parked:${parkedFocusedRow.row.path}`}
-            frame={frame}
-            row={parkedFocusedRow.row}
-            options={{
-              isParked: true,
-              style: {
-                left: '0',
-                opacity: '0',
-                pointerEvents:
-                  draggedPrimaryPath === parkedFocusedRow.row.path ? 'none' : undefined,
-                position: 'absolute',
-                right: '0',
-                top: `${parkedFocusedRow.offset}px`,
-              },
-            }}
-          />
-        ) : null}
-        {parkedDraggedRow != null ? (
-          <TreeRow
-            key={`parked-drag:${parkedDraggedRow.row.path}`}
-            frame={frame}
-            row={parkedDraggedRow.row}
-            options={{
-              isParked: true,
-              style: {
-                left: '0',
-                opacity: '0',
-                pointerEvents: 'none',
-                position: 'absolute',
-                right: '0',
-                top: `${parkedDraggedRow.offset}px`,
-              },
-            }}
-          />
-        ) : null}
+        <div
+          ref={windowRef}
+          data-file-tree-virtualized-sticky='true'
+          style={{
+            height: `${height}px`,
+          }}
+        >
+          {rows.map((row, slotIndex) => (
+            <TreeRow key={rangeStart + slotIndex} frame={frame} row={row} />
+          ))}
+          {parkedFocusedRow != null ? (
+            <TreeRow
+              key={`parked:${parkedFocusedRow.row.path}`}
+              frame={frame}
+              row={parkedFocusedRow.row}
+              options={{
+                isParked: true,
+                style: {
+                  left: '0',
+                  opacity: '0',
+                  pointerEvents:
+                    draggedPrimaryPath === parkedFocusedRow.row.path ? 'none' : undefined,
+                  position: 'absolute',
+                  right: '0',
+                  top: `${parkedFocusedRow.offset}px`,
+                },
+              }}
+            />
+          ) : null}
+          {parkedDraggedRow != null ? (
+            <TreeRow
+              key={`parked-drag:${parkedDraggedRow.row.path}`}
+              frame={frame}
+              row={parkedDraggedRow.row}
+              options={{
+                isParked: true,
+                style: {
+                  left: '0',
+                  opacity: '0',
+                  pointerEvents: 'none',
+                  position: 'absolute',
+                  right: '0',
+                  top: `${parkedDraggedRow.offset}px`,
+                },
+              }}
+            />
+          ) : null}
+        </div>
       </div>
     </div>
   )

@@ -18,9 +18,7 @@ export function treeWindowFrame({
   itemHeight,
   layoutSnapshot,
   range,
-  resolvedViewportHeight,
   shouldRenderParkedFocusedRow,
-  stickyOverlayHeight,
   visibleRows,
 }: {
   readonly controller: { getVisibleRows(start: number, end: number): readonly FileTreeVisibleRow[] }
@@ -32,32 +30,11 @@ export function treeWindowFrame({
   readonly itemHeight: number
   readonly layoutSnapshot: FileTreeLayoutSnapshot<FileTreeVisibleRow>
   readonly range: { readonly end: number; readonly start: number }
-  readonly resolvedViewportHeight: number
   readonly shouldRenderParkedFocusedRow: boolean
-  readonly stickyOverlayHeight: number
   readonly visibleRows: readonly FileTreeVisibleRow[]
 }) {
   const windowHeight = layoutSnapshot.window.height
   const windowOffsetTop = layoutSnapshot.window.offsetTop
-  const windowClipTop =
-    stickyOverlayHeight > 0 ? Math.max(0, layoutSnapshot.projected.paneTop - windowOffsetTop) : 0
-  // The virtualized window is usually taller than the viewport once overscan
-  // is included, so a negative sticky inset lets the overscanned slice hang
-  // above and below the scroll container without pinning the element during
-  // normal scrolling. Both edges together catch the window when React falls
-  // behind a fast scroll in either direction, which is what keeps the list
-  // from blanking mid-flick.
-  //
-  // The bottom edge gets the `stickyOverlayHeight` allowance because sticky
-  // folders can bump `windowOffsetTop` below `scrollTop`; loosening only that
-  // edge keeps the synced window from being pulled upward. The top edge stays
-  // tied to the viewport bottom so a lagging window still fills the view while
-  // the user scrolls quickly downward.
-  const windowStickyTopInset = Math.min(0, resolvedViewportHeight - windowHeight)
-  const windowStickyBottomInset = Math.min(
-    0,
-    resolvedViewportHeight - windowHeight - stickyOverlayHeight,
-  )
   const parkedFocusedRow =
     focusedPath != null && shouldRenderParkedFocusedRow && !focusedRowIsMounted && focusedIndex >= 0
       ? (visibleRows[focusedIndex] ??
@@ -95,12 +72,9 @@ export function treeWindowFrame({
       ? { offset: parkedDraggedRowOffset, row: parkedDraggedRow }
       : null
   return {
-    clipTop: windowClipTop,
     height: windowHeight,
     offsetTop: windowOffsetTop,
     parkedDragged,
     parkedFocused,
-    stickyBottomInset: windowStickyBottomInset,
-    stickyTopInset: windowStickyTopInset,
   }
 }

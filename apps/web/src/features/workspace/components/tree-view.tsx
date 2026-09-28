@@ -370,9 +370,7 @@ export function TreeView({
     itemHeight,
     layoutSnapshot,
     range,
-    resolvedViewportHeight,
     shouldRenderParkedFocusedRow: activeItemPath === focusedPath || shouldRestoreSearchCloseFocus(),
-    stickyOverlayHeight,
     visibleRows,
   })
   const focusedVisibleRow =
@@ -497,7 +495,6 @@ export function TreeView({
           />
         ) : null}
         <TreeRowWindow
-          clipTop={windowFrame.clipTop}
           draggedPrimaryPath={draggedPrimaryPath}
           frame={flowRowFrame}
           height={windowFrame.height}
@@ -507,8 +504,6 @@ export function TreeView({
           parkedFocusedRow={windowFrame.parkedFocused}
           rangeStart={range.start}
           rows={rangeRows}
-          stickyBottomInset={windowFrame.stickyBottomInset}
-          stickyTopInset={windowFrame.stickyTopInset}
           stickyOverlayHeight={stickyOverlayHeight}
           viewportHeight={resolvedViewportHeight}
           totalHeight={totalScrollableHeight}

@@ -98,6 +98,9 @@ describe('sticky folders', () => {
           )
       expect(flowAt(overlay.bottom - 2)).toBe(false)
       expect(flowAt(overlay.bottom + 2)).toBe(true)
+      const window = treeScope().querySelector('[data-file-tree-virtualized-sticky]')
+      const animations = window?.getAnimations() ?? []
+      for (const animation of animations) animation.pause()
       const pauseLayout = (event: Event) => event.stopImmediatePropagation()
       scroller().addEventListener('scroll', pauseLayout, { capture: true })
       try {
@@ -107,6 +110,7 @@ describe('sticky folders', () => {
         expect(flowAt(overlay.bottom + 2)).toBe(true)
       } finally {
         scroller().removeEventListener('scroll', pauseLayout, { capture: true })
+        for (const animation of animations) animation.play()
       }
     },
   )

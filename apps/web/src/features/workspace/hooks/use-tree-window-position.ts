@@ -1,22 +1,18 @@
 import { useLayoutEffect, useRef, type RefObject } from 'react'
 
-/** Keep the guide seam on the scroll timeline, including frames before React catches up. */
-export function useTreeWindowClip({
+/** Scroll the row window inside a fixed clip, retaining overscan coverage between renders. */
+export function useTreeWindowPosition({
   height,
   listRef,
   offsetTop,
-  stickyBottomInset,
   stickyOverlayHeight,
-  stickyTopInset,
   totalHeight,
   viewportHeight,
 }: {
   readonly height: number
   readonly listRef: RefObject<HTMLDivElement | null>
   readonly offsetTop: number
-  readonly stickyBottomInset: number
   readonly stickyOverlayHeight: number
-  readonly stickyTopInset: number
   readonly totalHeight: number
   readonly viewportHeight: number
 }) {
@@ -25,15 +21,16 @@ export function useTreeWindowClip({
     const element = windowRef.current
     const scroll = listRef.current?.parentElement
     const maxScroll = totalHeight - viewportHeight
-    if (!element || !scroll || maxScroll <= 0 || stickyOverlayHeight <= 0) return
-    const bottomTop = viewportHeight - height - stickyBottomInset
-    const clipAt = (scrollTop: number): string => {
-      const top = Math.max(stickyTopInset, Math.min(offsetTop - scrollTop, bottomTop))
-      return `inset(${Math.max(0, stickyOverlayHeight - top)}px 0 0)`
+    if (!element || !scroll) return
+    const minimum = Math.min(0, viewportHeight - stickyOverlayHeight - height)
+    const positionAt = (scrollTop: number): string => {
+      const offset = offsetTop - scrollTop - stickyOverlayHeight
+      return `translateY(${Math.max(minimum, Math.min(0, offset))}px)`
     }
+    const update = () => element.style.setProperty('transform', positionAt(scroll.scrollTop))
+    update()
+    if (maxScroll <= 0) return
     if (typeof ScrollTimeline === 'undefined') {
-      const update = () => element.style.setProperty('clip-path', clipAt(scroll.scrollTop))
-      update()
       scroll.addEventListener('scroll', update, { passive: true })
       return () => scroll.removeEventListener('scroll', update)
     }
@@ -42,27 +39,20 @@ export function useTreeWindowClip({
       ...new Set(
         [
           0,
-          offsetTop - bottomTop,
           offsetTop - stickyOverlayHeight,
-          offsetTop - stickyTopInset,
+          offsetTop - stickyOverlayHeight - minimum,
           maxScroll,
         ].map((value) => Math.max(0, Math.min(maxScroll, value))),
       ),
     ].sort((a, b) => a - b)
     const animation = element.animate(
-      positions.map((position) => ({ offset: position / maxScroll, clipPath: clipAt(position) })),
+      positions.map((position) => ({
+        offset: position / maxScroll,
+        transform: positionAt(position),
+      })),
       { timeline: new ScrollTimeline({ source: scroll, axis: 'block' }), fill: 'both' },
     )
     return () => animation.cancel()
-  }, [
-    height,
-    listRef,
-    offsetTop,
-    stickyBottomInset,
-    stickyOverlayHeight,
-    stickyTopInset,
-    totalHeight,
-    viewportHeight,
-  ])
+  }, [height, listRef, offsetTop, stickyOverlayHeight, totalHeight, viewportHeight])
   return windowRef
 }

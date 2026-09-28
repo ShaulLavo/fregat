@@ -1,6 +1,13 @@
 import type { Locator, Page } from 'playwright'
 import { createScriptError } from '../structured-errors'
 
+export const treeScrollSelectors = {
+  scroll: '[data-file-tree-virtualized-scroll]',
+  flow: '[data-file-tree-virtualized-sticky]',
+  overlay: '[data-file-tree-sticky-overlay-content]',
+  clip: '[data-file-tree-viewport-clip]',
+} as const
+
 export const folderTreeShadowHost = 'file-tree-container[aria-label="Folder tree"]'
 export const rootSwitchRows = {
   Git: '[aria-label="Git changes"] [role="treeitem"][aria-level="2"]',

@@ -401,13 +401,8 @@
       overflow-anchor: none;
     }
 
-    [data-file-tree-virtualized-sticky-offset='true'] {
-      contain: layout size;
-    }
-
     [data-file-tree-virtualized-sticky='true'] {
-      position: sticky;
-      top: 0;
+      position: relative;
       width: 100%;
       display: flex;
       flex-direction: column;

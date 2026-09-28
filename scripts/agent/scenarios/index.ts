@@ -377,6 +377,7 @@ import { editorProduct } from './editor-product'
 import { editorTerminalSurface } from './editor-terminal-surface'
 import { treeFileClicks } from './tree-file-clicks'
 import { treeStickyScroll } from './tree-sticky-scroll'
+import { treeScrollLive } from './tree-scroll-live'
 import { treeLargeScroll } from './tree-large-scroll'
 import { treeParity } from './tree-parity'
 import { fileIconHues } from './file-icon-hues'
@@ -745,6 +746,7 @@ export const scenarios: readonly Scenario[] = [
   editorProduct,
   editorTerminalSurface,
   treeStickyScroll,
+  treeScrollLive,
   treeLargeScroll,
   treeParity,
   fileIconHues,
