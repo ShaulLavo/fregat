@@ -113,7 +113,7 @@
         "happy-dom": "^20.14.5",
         "oxfmt": "0.70.0",
         "oxlint": "1.85.0",
-        "tree-sitter-md": "0.1.0",
+        "tree-sitter-md": "0.1.1",
         "typescript": "~6.0.3",
         "vitest": "^5.0.2",
       },
@@ -197,7 +197,7 @@
         "@singapore-editor/core": "workspace:*",
         "micromark-util-decode-string": "2.0.1",
         "micromark-util-normalize-identifier": "2.0.1",
-        "tree-sitter-md": "0.1.0",
+        "tree-sitter-md": "0.1.1",
       },
       "devDependencies": {
         "@types/node": "^26.6.3",
@@ -380,7 +380,7 @@
       "version": "0.1.1",
       "dependencies": {
         "@singapore-editor/core": "workspace:*",
-        "tree-sitter-md": "0.1.0",
+        "tree-sitter-md": "0.1.1",
         "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#e2985e0",
       },
       "devDependencies": {
@@ -416,7 +416,7 @@
         "tree-sitter-java": "0.23.5",
         "tree-sitter-javascript": "0.25.0",
         "tree-sitter-json": "0.24.8",
-        "tree-sitter-md": "0.1.0",
+        "tree-sitter-md": "0.1.1",
         "tree-sitter-php": "0.24.2",
         "tree-sitter-python": "0.25.0",
         "tree-sitter-rust": "0.24.0",
@@ -1127,7 +1127,7 @@
 
     "tree-sitter-json": ["tree-sitter-json@0.24.8", "", { "dependencies": { "node-addon-api": "^8.2.2", "node-gyp-build": "^4.8.2" }, "peerDependencies": { "tree-sitter": "^0.21.1" }, "optionalPeers": ["tree-sitter"] }, "sha512-Tc9ZZYwHyWZ3Tt1VEw7Pa2scu1YO7/d2BCBbKTx5hXwig3UfdQjsOPkPyLpDJOn/m1UBEWYAtSdGAwCSyagBqQ=="],
 
-    "tree-sitter-md": ["tree-sitter-md@0.1.0", "", { "dependencies": { "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#e2985e082d9f3f137ca20af6d7cee9d1a1c8ddda" } }, "sha512-tqKFpopAoMVG9IpIFzkT/TaDwL3nxNIn5pRWzBr3luGKIqR3RDpTQ/F11lKVnSiAnSfTv9iCc7Z1sHRpq6q2oQ=="],
+    "tree-sitter-md": ["tree-sitter-md@0.1.1", "", { "dependencies": { "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#e2985e082d9f3f137ca20af6d7cee9d1a1c8ddda" } }, "sha512-Tk7x/J3i5xylTPRCRFgxI70IWdGuZ2w0/IaLsXii6uDJ70RC7U8EVW3LaUXHxfLnfivqlUiOhBK4l+F9oj4n3Q=="],
 
     "tree-sitter-php": ["tree-sitter-php@0.24.2", "", { "dependencies": { "node-addon-api": "^8.2.2", "node-gyp-build": "^4.8.2" }, "peerDependencies": { "tree-sitter": "^0.22.4" }, "optionalPeers": ["tree-sitter"] }, "sha512-zwgAePc/HozNaWOOfwRAA+3p8yhuehRw8Fb7vn5qd2XjiIc93uJPryDTMYTSjBRjVIUg/KY6pM3rRzs8dSwKfw=="],
 
@@ -1202,6 +1202,8 @@
     "rolldown/@oxc-project/types": ["@oxc-project/types@0.151.0", "", {}, "sha512-J1yXrIlNDZVzE3ada310xeAw7nH8yCAyLPuUIsjKatFPmfn5bS1oW+cM+QsGOtVWd5nhSpbwZWx/rue+r5Z+PA=="],
 
     "tree-sitter-cpp/tree-sitter-c": ["tree-sitter-c@0.23.6", "", { "dependencies": { "node-addon-api": "^8.3.0", "node-gyp-build": "^4.8.4" }, "peerDependencies": { "tree-sitter": "^0.22.1" }, "optionalPeers": ["tree-sitter"] }, "sha512-0dxXKznVyUA0s6PjNolJNs2yF87O5aL538A/eR6njA5oqX3C3vH4vnx3QdOKwuUdpKEcFdHuiDpRKLLCA/tjvQ=="],
+
+    "tree-sitter-md/web-tree-sitter": ["web-tree-sitter@github:ShaulLavo/tree-sitter-x#e2985e0", {}, "ShaulLavo-tree-sitter-x-e2985e0", "sha512-lq4zLvvfasW+Iiy4Mv2yfoOOkRSsPDD73NuUihEhnlCePmEaaZdHP8vLywtwiCW/521twM6otnzfSYggiIvQBg=="],
 
     "tree-sitter-typescript/tree-sitter-javascript": ["tree-sitter-javascript@0.23.1", "", { "dependencies": { "node-addon-api": "^8.2.2", "node-gyp-build": "^4.8.2" }, "peerDependencies": { "tree-sitter": "^0.21.1" }, "optionalPeers": ["tree-sitter"] }, "sha512-/bnhbrTD9frUYHQTiYnPcxyHORIw157ERBa6dqzaKxvR/x3PC4Yzd+D1pZIMS6zNg2v3a8BZ0oK7jHqsQo9fWA=="],
 
