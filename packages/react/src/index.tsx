@@ -11,6 +11,7 @@ import {
   type EditorCommandContext,
   type EditorCommandId,
   type EditorDocumentMode,
+  type EditorDocumentAnalysis,
   type EditorEditInput,
   type EditorEditOptions,
   type EditorOpenDocumentOptions,
@@ -52,6 +53,7 @@ import {
 } from 'react'
 
 export type ReactEditorDocument = {
+  readonly analysis?: EditorDocumentAnalysis | null
   readonly documentId?: string
   readonly revision?: string | number
   readonly buffer?: EditorTextBuffer | null
@@ -742,6 +744,7 @@ function syncDocument(
   const session = reactEditorDocumentSession(document)
   if (session) {
     editor.attachSession(session, {
+      analysis: document.analysis,
       documentId: document.documentId,
       documentConfigurationTag: document.documentConfigurationTag,
       highlighterConfigurationTag: document.highlighterConfigurationTag,
@@ -872,6 +875,7 @@ function createDocumentState(): ReactEditorDocumentState {
 function documentKey(
   document:
     | (Readonly<{
+        readonly analysis?: EditorDocumentAnalysis | null
         readonly buffer?: EditorTextBuffer | null
         readonly documentId?: string
         readonly documentMode?: EditorDocumentMode
@@ -901,7 +905,7 @@ function documentKey(
 
   return `${identityKey}\u0000${revision}\u0000${textVersion}\u0000${preparedDocumentIdentity(
     document.preparedDocument,
-  )}\u0000${preparedTagsKey(document)}`
+  )}\u0000${analysisIdentity(document.analysis ?? document.preparedDocument?.analysis)}\u0000${preparedTagsKey(document)}`
 }
 
 function documentRevisionKey(
@@ -947,6 +951,7 @@ function documentIdentityKey(
 
 const sessionKeys = new WeakMap<DocumentSession, number>()
 const preparedDocumentKeys = new WeakMap<EditorPreparedDocument, number>()
+const analysisKeys = new WeakMap<EditorDocumentAnalysis, number>()
 const bufferKeys = new WeakMap<EditorTextBuffer, number>()
 const viewKeys = new WeakMap<EditorViewSession, number>()
 const bufferViewSessions = new WeakMap<
@@ -955,6 +960,7 @@ const bufferViewSessions = new WeakMap<
 >()
 let nextSessionKey = 1
 let nextPreparedDocumentKey = 1
+let nextAnalysisKey = 1
 let nextBufferKey = 1
 let nextViewKey = 1
 
@@ -981,6 +987,15 @@ function preparedDocumentIdentity(
   const key = nextPreparedDocumentKey
   nextPreparedDocumentKey += 1
   preparedDocumentKeys.set(preparedDocument, key)
+  return `${key}`
+}
+
+function analysisIdentity(analysis: EditorDocumentAnalysis | null | undefined): string {
+  if (!analysis) return ''
+  const existing = analysisKeys.get(analysis)
+  if (existing !== undefined) return `${existing}`
+  const key = nextAnalysisKey++
+  analysisKeys.set(analysis, key)
   return `${key}`
 }
 

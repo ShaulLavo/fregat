@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Kind } from 'tree-sitter-md'
 
 import { createDecodePlugin } from '../../decode/src/index'
 import { createMarkdownPreviewPlugin } from '../../markdown/src/index'
@@ -288,14 +289,21 @@ function recordSnapshots(snapshots: EditorViewSnapshot[]): EditorPlugin {
   }
 }
 
-// The Markdown provider only acts on captures, so a structural session hands it a fixed set.
+// Supply the structural records consumed by the Markdown preview.
 function markdownCaptures(): EditorPlugin {
   const captures: EditorSyntaxCapture[] = [
     capture_('text.strong', BOLD_START, BOLD_START + 8),
     capture_('punctuation.delimiter', BOLD_START, BOLD_START + 2),
     capture_('punctuation.delimiter', BOLD_START + 6, BOLD_START + 8),
   ]
-  const result = (): EditorSyntaxResult => ({ ...createEmptySyntaxResult(), captures })
+  const result = (): EditorSyntaxResult => ({
+    ...createEmptySyntaxResult(),
+    captures,
+    records: {
+      languageId: 'markdown',
+      data: new Uint32Array([BOLD_START, BOLD_START + 8, Kind.Strong, 0]),
+    },
+  })
   const session: EditorSyntaxSession = {
     refresh: async () => result(),
     applyChange: async () => result(),

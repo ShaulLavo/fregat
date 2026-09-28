@@ -19,6 +19,7 @@ import type { DisplayTextRowSource, InjectedTextRow } from './displayTransforms'
 import {
   type BracketInfo,
   type EditorSyntaxCapture,
+  type EditorSyntaxRecords,
   type EditorSyntaxLanguageId,
   type EditorSyntaxProvider,
   type EditorSyntaxSession,
@@ -982,6 +983,7 @@ export type EditorGutterContribution = {
 }
 
 export type EditorInlineReplacementContext = {
+  readonly records?: EditorSyntaxRecords
   readonly textSnapshot: TextReadSnapshot
   readonly languageId: EditorSyntaxLanguageId | null
   readonly captures: readonly EditorSyntaxCapture[]
@@ -1007,10 +1009,13 @@ export type EditorInlineReplacementProvider = (
 export type EditorInlineReplacementTrigger = 'syntax' | 'edit'
 
 export type EditorInlineReplacementProviderOptions = {
+  /** Request current syntax when an edit-triggered provider consumes parsed records. */
+  readonly requiresSyntax?: boolean
   readonly trigger?: EditorInlineReplacementTrigger
 }
 
 export type EditorInlineReplacementSource = {
+  readonly requiresSyntax?: boolean
   readonly provide: EditorInlineReplacementProvider
   readonly trigger: EditorInlineReplacementTrigger
 }
@@ -2083,7 +2088,11 @@ export class EditorPluginHost implements EditorDisposable {
     provider: EditorInlineReplacementProvider,
     options: EditorInlineReplacementProviderOptions = {},
   ): EditorDisposable {
-    const source = { provide: provider, trigger: options.trigger ?? 'syntax' }
+    const source = {
+      provide: provider,
+      trigger: options.trigger ?? 'syntax',
+      requiresSyntax: options.requiresSyntax,
+    }
     this.inlineReplacementProviders.push(source)
     const disposable = disposableOnce(() => this.unregisterInlineReplacementProvider(source))
     notifyRegistrationAdded(disposable, () => this.events.onInlineReplacementProvidersChanged?.())

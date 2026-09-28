@@ -391,3 +391,24 @@ describe('InlinePoint conversion', () => {
     expect(bufferPointToInlinePoint(row, { row: 1, column: 6 }).row).toBe(1)
   })
 })
+
+describe('explicit construct reveal ranges', () => {
+  it('reveals a leading marker when a caret enters the construct body', () => {
+    const snapshot = createPieceTableSnapshot('# heading\n')
+    const map = createInlineMap(snapshot, [
+      { id: 'heading', startIndex: 0, endIndex: 2, text: '', revealRange: { start: 0, end: 9 } },
+    ])
+    expect(revealInlineMap(map, [{ start: 5, end: 5 }]).ranges).toEqual([])
+  })
+
+  it('keeps reveal ranges anchored across source edits', () => {
+    const snapshot = createPieceTableSnapshot('before\n# heading\n')
+    const map = createInlineMap(snapshot, [
+      { id: 'heading', startIndex: 7, endIndex: 9, text: '', revealRange: { start: 7, end: 16 } },
+    ])
+    const next = insertIntoPieceTable(snapshot, 0, 'prefix\n')
+    const updated = updateInlineMapForEdit(map, { from: 0, to: 0, text: 'prefix\n' }, next)
+    expect(revealInlineMap(updated.map, [{ start: 20, end: 20 }]).ranges).toEqual([])
+    expect(revealInlineMap(updated.map, [{ start: 1, end: 1 }]).ranges).toHaveLength(1)
+  })
+})

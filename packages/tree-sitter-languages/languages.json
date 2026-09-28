@@ -140,39 +140,19 @@
       "extensions": [".md", ".markdown"],
       "filenames": [],
       "aliases": ["md", "gfm"],
-      "wasm": "./grammars/tree-sitter-markdown.wasm",
+      "wasm": "tree-sitter-md/tree-sitter-markdown.wasm",
       "queries": {
-        "highlights": ["./queries/markdown-highlights.scm"],
-        "folds": ["./queries/markdown-folds.scm"],
-        "injections": ["./queries/markdown-injections.scm"]
+        "highlights": [],
+        "folds": [],
+        "injections": []
       },
-      "injectionDependencies": ["html", "markdown_inline"],
-      "source": "@tree-sitter-grammars/tree-sitter-markdown",
+      "injectionDependencies": [],
+      "source": "tree-sitter-md",
       "capabilities": {
         "highlighting": "partial",
         "injections": "partial",
         "detection": "verified",
         "folds": "partial"
-      }
-    },
-    {
-      "id": "markdown_inline",
-      "extensions": [],
-      "filenames": [],
-      "aliases": [],
-      "wasm": "./grammars/tree-sitter-markdown-inline.wasm",
-      "queries": {
-        "highlights": ["./queries/markdown-inline-highlights.scm"],
-        "folds": [],
-        "injections": ["./queries/markdown-inline-injections.scm"]
-      },
-      "injectionDependencies": ["html"],
-      "source": "@tree-sitter-grammars/tree-sitter-markdown",
-      "capabilities": {
-        "highlighting": "partial",
-        "injections": "partial",
-        "detection": "verified",
-        "folds": "none"
       }
     },
     {
@@ -489,7 +469,7 @@
         "folds": [],
         "injections": ["./queries/mdx-injections.scm"]
       },
-      "injectionDependencies": ["markdown_inline", "markdown"],
+      "injectionDependencies": ["markdown"],
       "source": "mdx",
       "capabilities": {
         "highlighting": "partial",
@@ -510,17 +490,6 @@
       "queryRevision": "f975a621f4e7f532fe322e13c4f79495e0a7b2e7",
       "integrity": "sha512-e04JUUKxTT53/x3Uq1zIL45DoYKVfHH4CZqwgZhPg5qYROl5nQjV+85ruFzFGZxu+QeFVbRTPDRnqL9UbU4VeA==",
       "tarball": "https://registry.npmjs.org/tree-sitter-typescript/-/tree-sitter-typescript-0.23.2.tgz"
-    },
-    "@tree-sitter-grammars/tree-sitter-markdown": {
-      "package": "@tree-sitter-grammars/tree-sitter-markdown",
-      "version": "0.3.2",
-      "repository": "github:tree-sitter-grammars/tree-sitter-markdown",
-      "license": "MIT",
-      "compiler": "upstream artifact; compiler not recorded",
-      "revision": "1c8dea73bc0c996d92dd9ebc30dd388716b1c5db",
-      "queryRevision": "1c8dea73bc0c996d92dd9ebc30dd388716b1c5db",
-      "integrity": "sha512-hQXCcDVvg2t4E8cn7zz6jjIBerzk9E9ZlHxJp5IrUOpY4s1YVpXJbMeWZks2/V7lmkPRnnkM8IrTbQ5ltwEOnA==",
-      "tarball": "https://registry.npmjs.org/@tree-sitter-grammars/tree-sitter-markdown/-/tree-sitter-markdown-0.3.2.tgz"
     },
     "tree-sitter-html": {
       "package": "tree-sitter-html",
@@ -736,6 +705,14 @@
       "queryRevision": "3aa29e8de1bf0213948a04fe953039b6ab73777b",
       "license": "MIT",
       "compiler": "wasi-sdk 34; tree-sitter 0.27.0"
+    },
+    "tree-sitter-md": {
+      "package": "tree-sitter-md",
+      "version": "0.1.0",
+      "repository": "https://github.com/ShaulLavo/tree-sitter-md",
+      "revision": "5dd917ae70eea5f6a38a2ba8825ce6d3baca697d",
+      "license": "MIT",
+      "compiler": "wasi-sdk 34"
     }
   },
   "captureMappings": {

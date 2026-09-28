@@ -736,7 +736,7 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
       )
 
       expect(languages).toEqual(
-        new Set(['css', 'html', 'javascript', 'markdown_inline'] satisfies TreeSitterLanguageId[]),
+        new Set(['css', 'html', 'javascript'] satisfies TreeSitterLanguageId[]),
       )
     }
   })
@@ -850,7 +850,7 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
     }
   })
 
-  it('keeps the injection cap filled after deletes and joins inside the capped region', async () => {
+  it('resolves all 300 paragraphs after deletes and joins without inline injection layers', async () => {
     // Headings split the document into sections, so an edit's changed range stays in its section.
     let text = Array.from({ length: 300 }, (_, index) => {
       const heading = index % 5 === 0 ? `## Part ${index}\n\n` : ''
@@ -900,7 +900,11 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
 
       expect(incremental?.injections, `step ${step}`).toEqual(full?.injections)
       expect(incremental?.captures, `step ${step}`).toEqual(full?.captures)
-      expect(incremental?.injections).toHaveLength(256)
+      expect(incremental?.injections).toHaveLength(0)
+      expect(
+        incremental?.captures.filter((capture) => capture.captureName === 'text.emphasis').length,
+      ).toBeGreaterThan(290)
+      expect(incremental?.records?.data).toEqual(full?.records?.data)
       workerClient.disposeDocument(`${runtimeSessionId}:full-${step}`)
       text = text.slice(0, edit.from) + edit.text + text.slice(edit.to)
       snapshot = nextSnapshot
@@ -961,7 +965,7 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
       result.incremental.injections.map((injection) => injection.languageId),
     )
 
-    expect(languages).toEqual(new Set(['html', 'javascript', 'markdown_inline']))
+    expect(languages).toEqual(new Set(['html', 'javascript']))
   })
 
   it('expands and shrinks structural selections through the cached syntax tree', async () => {

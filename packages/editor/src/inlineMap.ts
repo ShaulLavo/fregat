@@ -51,6 +51,7 @@ export type InlineReplacementSpec = {
   readonly groupId?: string
   /** Defaults to `'touch'`. */
   readonly reveal?: InlineReplacementReveal
+  readonly revealRange?: TextOffsetRange
   /** Deletes take the whole span, and caret motion never rests strictly inside it. */
   readonly atomic?: boolean
   /**
@@ -77,6 +78,11 @@ export type InlineReplacementRange = {
   readonly render?: InlineReplacementRender
   readonly groupId?: string
   readonly reveal?: InlineReplacementReveal
+  readonly revealRange?: {
+    readonly start: PieceTableAnchor
+    readonly end: PieceTableAnchor
+    readonly offsets: TextOffsetRange
+  }
   readonly atomic?: boolean
   readonly key?: string
   readonly metadata?: unknown
@@ -144,6 +150,7 @@ const inlineSpecFromRange = (range: InlineReplacementRange): InlineReplacementSp
   ...(range.render === undefined ? {} : { render: range.render }),
   ...(range.groupId === undefined ? {} : { groupId: range.groupId }),
   ...(range.reveal === undefined ? {} : { reveal: range.reveal }),
+  ...(range.revealRange === undefined ? {} : { revealRange: range.revealRange.offsets }),
   ...(range.atomic === undefined ? {} : { atomic: range.atomic }),
   ...(range.key === undefined ? {} : { key: range.key }),
   ...(range.metadata === undefined ? {} : { metadata: range.metadata }),
@@ -236,6 +243,10 @@ const inlineRangeFromSpec = (
 
   const anchors = inlineAnchorPair(snapshot, startOffset, endOffset)
   if (!anchors) return null
+  const revealAnchors = spec.revealRange
+    ? inlineAnchorPair(snapshot, spec.revealRange.start, spec.revealRange.end)
+    : null
+  if (spec.revealRange && !revealAnchors) return null
 
   return {
     id: spec.id,
@@ -253,6 +264,9 @@ const inlineRangeFromSpec = (
     ...(spec.groupId === undefined ? {} : { groupId: spec.groupId }),
     ...(spec.render === undefined ? {} : { render: spec.render }),
     ...(spec.reveal === undefined ? {} : { reveal: spec.reveal }),
+    ...(revealAnchors && spec.revealRange
+      ? { revealRange: { ...revealAnchors, offsets: spec.revealRange } }
+      : {}),
     ...(spec.atomic === true ? { atomic: true } : {}),
     ...(spec.key === undefined ? {} : { key: spec.key }),
     ...(spec.metadata === undefined ? {} : { metadata: spec.metadata }),
@@ -314,14 +328,28 @@ const resolveInlineRange = (
 
   const offsets = resolvedInlineOffsets(range, start.offset, end.offset)
   if (!offsets) return null
+  const revealRange = resolveRevealRange(snapshot, range.revealRange)
+  if (range.revealRange && !revealRange) return null
 
   return {
     ...range,
+    ...(revealRange ? { revealRange } : {}),
     startOffset: offsets.start,
     endOffset: offsets.end,
     startPoint: offsetToPoint(snapshot, offsets.start),
     endPoint: offsetToPoint(snapshot, offsets.end),
   }
+}
+
+function resolveRevealRange(
+  snapshot: PieceTableSnapshot,
+  range: InlineReplacementRange['revealRange'],
+): InlineReplacementRange['revealRange'] {
+  if (!range) return undefined
+  const start = resolveAnchor(snapshot, range.start),
+    end = resolveAnchor(snapshot, range.end)
+  if (start.liveness === 'deleted' || end.liveness === 'deleted') return undefined
+  return { ...range, offsets: { start: start.offset, end: end.offset } }
 }
 
 /**
@@ -490,6 +518,7 @@ const revealSpanForRange = (
   range: InlineReplacementRange,
   groupSpans: ReadonlyMap<string, TextOffsetRange>,
 ): TextOffsetRange => {
+  if (range.revealRange) return range.revealRange.offsets
   const span = range.groupId === undefined ? undefined : groupSpans.get(range.groupId)
   return span ?? { start: range.startOffset, end: range.endOffset }
 }

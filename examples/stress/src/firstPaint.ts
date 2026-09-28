@@ -1,3 +1,4 @@
+import { createEditorDocumentAnalysis } from '@singapore-editor/core/editor'
 import {
   Editor,
   createEditorPreparedDocument,
@@ -135,6 +136,7 @@ async function configure(options: Configuration) {
   buffer = createBuffer()
   prepared = createEditorPreparedDocument({
     buffer,
+    analysis: createEditorDocumentAnalysis({ buffer, documentId: options.fixture }),
     documentId: options.fixture,
     languageId: options.plugin ? 'typescript' : null,
     configuredTabSize: 4,
@@ -273,6 +275,7 @@ function dispose() {
   ].flatMap(({ label, value }) => (value ? [{ label, reference: new WeakRef(value) }] : []))
   editor?.dispose()
   prepared?.dispose()
+  prepared?.analysis.dispose()
   editor = null
   buffer = null
   prepared = null

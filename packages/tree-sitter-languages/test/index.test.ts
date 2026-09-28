@@ -32,7 +32,6 @@ describe('Tree-sitter language contributions', () => {
       'css',
       'json',
       'markdown',
-      'markdown_inline',
       'astro',
       'python',
       'shellscript',

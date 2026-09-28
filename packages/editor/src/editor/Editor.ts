@@ -1,3 +1,4 @@
+import type { EditorDocumentAnalysis } from './documentAnalysis'
 import { normalizeGutterLeadingInset } from '../virtualization/virtualizedTextViewHelpers'
 import { captureJumpLocation, JumpHistory, type JumpLocation, type JumpCause } from './jumpHistory'
 import type { EditorPointHit, EditorMarkerHit } from '../pointQueries'
@@ -133,7 +134,7 @@ import {
 } from './viewContributions'
 import type { FoldMap } from '../foldMap'
 import { createInlineMap, inlineSpecsAtSnapshot, type InlineMap } from '../inlineMap'
-import type { BracketInfo, EditorSyntaxCapture } from '../syntax/session'
+import type { BracketInfo, EditorSyntaxCapture, EditorSyntaxRecords } from '../syntax/session'
 import type {
   EditorInlineReplacementContext,
   EditorInlineReplacementProvider,
@@ -327,6 +328,7 @@ export class Editor {
   private readonly pluginHost: EditorPluginHost
   private readonly ambientPlugins: EditorAmbientPluginController
   private readonly commandRouter: EditorCommandRouter
+  private analysis: EditorDocumentAnalysis | null = null
   private readonly document: EditorDocumentController
   private readonly editorFeatures = new Map<EditorCapabilityToken<unknown>, unknown>()
   private readonly editorFeatureTokensById = new Map<string, EditorCapabilityToken<unknown>>()
@@ -391,6 +393,7 @@ export class Editor {
   private inlineReplacementProvider: EditorInlineReplacementSource | null = null
   private syntaxInlineMap: InlineMap | null = null
   private syntaxCaptures: readonly EditorSyntaxCapture[] = []
+  private syntaxRecords: EditorSyntaxRecords | undefined
   private syntaxCaptureDemand = 0
   // The text version whose parse supplied the requested captures.
   private syntaxCapturesVersion: number | null = null
@@ -603,10 +606,12 @@ export class Editor {
       },
       clearSyntaxFolds: () => this.clearSyntaxFolds(),
       setSyntaxFolds: (folds) => this.setSyntaxFolds(folds),
-      setSyntaxCaptures: (captures) => this.setSyntaxCaptures(captures),
+      setSyntaxCaptures: (captures, records) => this.setSyntaxCaptures(captures, records),
       needsSyntaxCaptures: () =>
         this.syntaxCaptureDemand > 0 ||
-        this.inlineReplacementProviders().some((source) => source.trigger === 'syntax'),
+        this.inlineReplacementProviders().some(
+          (source) => source.trigger === 'syntax' || source.requiresSyntax,
+        ),
       notifyChange: (change) => this.notifyChange(change),
       notifyViewUpdate: () => this.notifyViewContributions('tokens', null),
       onInitialPaint: (event) => {
@@ -1358,7 +1363,11 @@ export class Editor {
     options: EditorInlineReplacementProviderOptions = {},
   ): void {
     this.inlineReplacementProvider = provider
-      ? { provide: provider, trigger: options.trigger ?? 'syntax' }
+      ? {
+          provide: provider,
+          trigger: options.trigger ?? 'syntax',
+          requiresSyntax: options.requiresSyntax,
+        }
       : null
     this.handleInlineReplacementProvidersChanged()
   }
@@ -1372,11 +1381,15 @@ export class Editor {
     this.refreshInlineMap('rerun')
   }
 
-  private setSyntaxCaptures(captures: readonly EditorSyntaxCapture[]): void {
+  private setSyntaxCaptures(
+    captures: readonly EditorSyntaxCapture[],
+    records?: EditorSyntaxRecords,
+  ): void {
     this.syntaxCaptures = captures
+    this.syntaxRecords = records
+    this.syntaxCapturesVersion = this.textVersion
     this.refreshInlineMap('rerun')
     if (this.syntaxCaptureDemand === 0) return
-    this.syntaxCapturesVersion = this.textVersion
     // With a highlighter attached, no token adoption follows a structural parse to say it landed.
     this.notifyViewContributions('tokens', null)
   }
@@ -1454,6 +1467,7 @@ export class Editor {
       textSnapshot: this.getTextSnapshot(),
       languageId: this.languageId,
       captures: this.syntaxCaptures,
+      records: this.syntaxCapturesVersion === this.textVersion ? this.syntaxRecords : undefined,
       selections: this.inputSelection.resolveViewSelections(),
     }
   }
@@ -2103,6 +2117,9 @@ export class Editor {
   }
 
   attachSession(session: DocumentSession, options: EditorSessionOptions = {}): void {
+    const analysis = options.analysis ?? options.preparedDocument?.analysis
+    if (analysis && analysis.buffer !== editorBufferSession(session)?.buffer)
+      throw new TypeError('Document analysis must reference the attached buffer')
     this.runDocumentReplacement(() => {
       this.preparingDocument = true
       const savedScroll = this.pendingDocumentScroll ?? this.view.provisionalScrollPosition
@@ -2112,15 +2129,19 @@ export class Editor {
       this.disposeBufferSubscriptions()
       const attachment = this.document.attachSession(session, options)
       if (this.view.isProvisional) this.snapshotGeneration = attachment.documentVersion
+      this.attachAnalysis(session, options.analysis ?? options.preparedDocument?.analysis)
       this.subscribeToBufferSession(session)
       const syntaxDocument = {
+        analysis: this.analysis,
+        structuralConfigurationTag: options.structuralConfigurationTag,
+        highlighterConfigurationTag: options.highlighterConfigurationTag,
         documentId: attachment.internalDocumentId,
         languageId: attachment.languageId,
         textSnapshot: attachment.textSnapshot,
         snapshot: attachment.session.getSnapshot(),
       }
       const prepared = options.preparedDocument
-        ? this.syntax.claimPreparedDocument(syntaxDocument, options.preparedDocument, {
+        ? this.syntax.borrowPreparedDocument(syntaxDocument, options.preparedDocument, {
             configuredTabSize: this.configuredTabSize,
             tabSizePolicy: this.detectIndentation ? 'detect-indentation' : 'fixed',
             documentConfigurationTag: options.documentConfigurationTag ?? [],
@@ -2148,7 +2169,10 @@ export class Editor {
           this.syntax.adoptPreparedReadyResults(prepared)
         })
       } else {
-        this.renderContent(attachment.textSnapshot)
+        this.view.runAtomicRender(() => {
+          this.renderContent(attachment.textSnapshot)
+          this.syntax.adoptReadyAnalysis()
+        })
       }
       // A host handing over its own session is replacing the document just as much as opening one is.
       if (replacingDocument) this.forgetOutgoingDocumentProjections()
@@ -2174,6 +2198,8 @@ export class Editor {
     this.fallbackFolds.reset()
     this.foldState.clear()
     this.disposeBufferSubscriptions()
+    this.syntax.clearDocument()
+    this.releaseAnalysis()
     this.document.detachSession()
     this.inputSelection.clearSelectionHighlight()
     this.view.setEditable(false)
@@ -2190,6 +2216,7 @@ export class Editor {
     this.disposeBufferSubscriptions()
     this.document.clear()
     this.syntax.clearDocument()
+    this.releaseAnalysis()
     this.inputSelection.clearSelectionHighlight()
     this.forgetOutgoingDocumentProjections()
     this.view.setEditable(false)
@@ -2224,6 +2251,7 @@ export class Editor {
     this.keymap.dispose()
     this.announcer.dispose()
     this.syntax.dispose()
+    this.releaseAnalysis()
     this.detachSession()
     this.logLifecycleSummary()
     // The view owns listeners on window and document, so it has to come down even when a plugin
@@ -2251,10 +2279,12 @@ export class Editor {
     const replacingDocument = this.session !== null
     this.disposeBufferSubscriptions()
     const attachment = this.document.resetOwnedDocument(document, options)
+    this.attachAnalysis(attachment.session)
     this.subscribeToBufferSession(attachment.session)
     if (this.view.isProvisional) this.snapshotGeneration = attachment.documentVersion
     this.syntaxCapturesVersion = null
     this.syntax.startDocument({
+      analysis: this.analysis,
       documentId: attachment.internalDocumentId,
       languageId: attachment.languageId,
       textSnapshot: attachment.textSnapshot,
@@ -3482,6 +3512,17 @@ export class Editor {
       point: session.buffer.getDocumentSyncPoint(),
       changesSince: (point, scope) => session.buffer.changesSinceDocumentSyncPoint(point, scope),
     }
+  }
+
+  private attachAnalysis(session: DocumentSession, analysis?: EditorDocumentAnalysis | null): void {
+    const buffer = editorBufferSession(session)?.buffer
+    if (analysis && analysis.buffer !== buffer)
+      throw new TypeError('Document analysis must reference the attached buffer')
+    this.analysis = analysis ?? null
+  }
+
+  private releaseAnalysis(): void {
+    this.analysis = null
   }
 
   private subscribeToBufferSession(session: DocumentSession): void {

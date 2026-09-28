@@ -1,86 +1,21 @@
-import { readFile } from 'node:fs/promises'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { Language, Parser, Query } from 'web-tree-sitter'
-import type { EditorSyntaxCapture } from '@singapore-editor/core/syntax'
+import { init, MarkdownDocument } from 'tree-sitter-md'
 import { createInlineMap, inlineRowForBufferRow } from '@singapore-editor/core/rendering'
 import { createPieceTableSnapshot, createStringTextSnapshot } from '@singapore-editor/core/document'
 import { markdownInlineReplacements } from '../src/replacements'
 
-/**
- * These run the real markdown grammars rather than hand-written capture fixtures. The derivation
- * reads generic capture names structurally, so fixtures would only ever re-assert the assumptions
- * the derivation was written against; parsing for real is what catches the grammar disagreeing.
- */
-const languagesDir = `${process.cwd()}/../tree-sitter-languages/src/`
+beforeAll(() => init())
 
-let parseMarkdown: (text: string) => readonly EditorSyntaxCapture[]
-
-beforeAll(async () => {
-  await Parser.init()
-
-  const blockLanguage = await Language.load(
-    await readFile(`${languagesDir}grammars/tree-sitter-markdown.wasm`),
-  )
-  const inlineLanguage = await Language.load(
-    await readFile(`${languagesDir}grammars/tree-sitter-markdown-inline.wasm`),
-  )
-  const blockQuery = new Query(
-    blockLanguage,
-    await readFile(`${languagesDir}queries/markdown-highlights.scm`, 'utf8'),
-  )
-  const inlineQuery = new Query(
-    inlineLanguage,
-    await readFile(`${languagesDir}queries/markdown-inline-highlights.scm`, 'utf8'),
-  )
-
-  const blockParser = new Parser()
-  blockParser.setLanguage(blockLanguage)
-  const inlineParser = new Parser()
-  inlineParser.setLanguage(inlineLanguage)
-
-  parseMarkdown = (text) => {
-    const captures: EditorSyntaxCapture[] = []
-    const tree = blockParser.parse(text)!
-    const root = tree.rootNode
-
-    for (const capture of blockQuery.captures(root)) {
-      captures.push({
-        captureName: capture.name,
-        startIndex: capture.node.startIndex,
-        endIndex: capture.node.endIndex,
-      })
-    }
-
-    // Mirrors the markdown -> markdown_inline injection: inline content is parsed separately and its
-    // captures are shifted back into document offsets.
-    for (const inlineNode of inlineNodes(root)) {
-      const inlineTree = inlineParser.parse(text.slice(inlineNode.startIndex, inlineNode.endIndex))!
-      for (const capture of inlineQuery.captures(inlineTree.rootNode)) {
-        captures.push({
-          captureName: capture.name,
-          startIndex: inlineNode.startIndex + capture.node.startIndex,
-          endIndex: inlineNode.startIndex + capture.node.endIndex,
-        })
-      }
-      inlineTree.delete()
-    }
-
-    tree.delete()
-    return captures
+function parseMarkdown(text: string): Uint32Array {
+  const doc = new MarkdownDocument({ frontmatter: true })
+  try {
+    doc.setText(text)
+    return doc.decorations(0, text.length)
+  } finally {
+    doc.dispose()
   }
-})
-
-type SyntaxNode = { type: string; startIndex: number; endIndex: number; children: SyntaxNode[] }
-
-const inlineNodes = (node: SyntaxNode): SyntaxNode[] => {
-  if (node.type === 'inline') return [node]
-  return node.children.flatMap((child) => inlineNodes(child))
 }
 
-/**
- * Renders a single-line document through the real map, so assertions read as what a user sees and
- * anchoring plus overlap normalization are exercised on the way.
- */
 const preview = (text: string): string => {
   const specs = markdownInlineReplacements(createStringTextSnapshot(text), parseMarkdown(text))
   const map = createInlineMap(createPieceTableSnapshot(text), specs)
@@ -106,7 +41,7 @@ describe('markdown inline replacements', () => {
   it('collapses links and images to their label', () => {
     expect(preview('see [docs](https://x.dev) now')).toBe('see docs now')
     expect(preview('![alt](img.png)')).toBe('alt')
-    expect(preview('a [ref] b')).toBe('a ref b')
+    expect(preview('a [ref] b')).toBe('a [ref] b')
   })
 
   it('substitutes bullets width-for-width', () => {
@@ -137,11 +72,16 @@ describe('markdown inline replacements', () => {
     expect(preview('text with * lone star')).toBe('text with * lone star')
   })
 
-  it('never collapses a fenced code block', () => {
+  it('hides fence marks while keeping code content', () => {
     const text = '```js\nconst a = 1\n```'
     const specs = markdownInlineReplacements(createStringTextSnapshot(text), parseMarkdown(text))
 
-    expect(specs.filter((spec) => spec.text === '')).toEqual([])
+    expect(specs.every((spec) => spec.endIndex <= 5 || spec.startIndex >= 18)).toBe(true)
+    expect(specs.map((spec) => text.slice(spec.startIndex, spec.endIndex))).toEqual([
+      '```',
+      'js',
+      '```',
+    ])
   })
 
   it('groups both fences of one construct so they reveal together', () => {
@@ -161,10 +101,62 @@ describe('markdown inline replacements', () => {
     expect(preview(text)).toBe('a and b')
   })
 
-  it('drops zero-width captures rather than emitting empty replacements', () => {
+  it('emits nonempty marker spans', () => {
     const text = '- item\n- other'
     const specs = markdownInlineReplacements(createStringTextSnapshot(text), parseMarkdown(text))
 
     for (const spec of specs) expect(spec.endIndex).toBeGreaterThan(spec.startIndex)
   })
+})
+
+describe('record coverage', () => {
+  const rows = (text: string): readonly string[] => {
+    const map = createInlineMap(
+      createPieceTableSnapshot(text),
+      markdownInlineReplacements(createStringTextSnapshot(text), parseMarkdown(text)),
+    )
+    return text.split('\n').map((line, row) => inlineRowForBufferRow(map, row, line).text)
+  }
+
+  it('handles delimiters across lines and Unicode offsets', () => {
+    expect(rows('😀 **עברית\nacross** tail')).toEqual(['😀 עברית', 'across tail'])
+    expect(rows('~~across\nlines~~')).toEqual(['across', 'lines'])
+    expect(rows('``code\nacross``')).toEqual(['code', 'across'])
+  })
+
+  it('resolves references defined after the viewport', () => {
+    expect(rows('[ref]\n\n[ref]: /target')[0]).toBe('ref')
+    expect(rows('[missing]\n')[0]).toBe('[missing]')
+  })
+
+  it('uses link labels with nested formatting and nested images', () => {
+    expect(preview('[**bold**](url)')).toBe('bold')
+    expect(preview('[![alt](image)](target)')).toBe('alt')
+    expect(preview('https://example.com')).toBe('https://example.com')
+  })
+
+  it('decorates tables and task markers', () => {
+    expect(rows('| head | other |\n| --- | --- |\n| **bold** | `code` |')[2]).toBe(
+      '| bold | code |',
+    )
+    expect(preview('- [x] done')).toBe('• ☑ done')
+    expect(preview('- [ ] todo')).toBe('• ☐ todo')
+  })
+
+  it('has no paragraph injection cap', () => {
+    const lines = rows(Array.from({ length: 320 }, (_, i) => `**paragraph ${i}**`).join('\n\n'))
+    expect(lines[638]).toBe('paragraph 319')
+  })
+})
+
+it('hides multiline link targets while preserving source lines and whole-link reveal', () => {
+  const source = '[label](\n/destination\n"title")'
+  const specs = markdownInlineReplacements(createStringTextSnapshot(source), parseMarkdown(source))
+  const map = createInlineMap(createPieceTableSnapshot(source), specs)
+  expect(source.split('\n').map((line, row) => inlineRowForBufferRow(map, row, line).text)).toEqual(
+    ['label', '', ''],
+  )
+  expect(
+    specs.every((spec) => spec.revealRange?.start === 0 && spec.revealRange.end === source.length),
+  ).toBe(true)
 })

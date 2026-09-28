@@ -83,25 +83,12 @@ export const TREE_SITTER_LANGUAGE_METADATA = [
     extensions: ['.md', '.markdown'],
     filenames: [],
     aliases: ['md', 'gfm'],
-    injectionDependencies: ['html', 'markdown_inline'],
+    injectionDependencies: [],
     capabilities: {
       highlighting: 'partial',
       injections: 'partial',
       detection: 'verified',
       folds: 'partial',
-    },
-  },
-  {
-    id: 'markdown_inline',
-    extensions: [],
-    filenames: [],
-    aliases: [],
-    injectionDependencies: ['html'],
-    capabilities: {
-      highlighting: 'partial',
-      injections: 'partial',
-      detection: 'verified',
-      folds: 'none',
     },
   },
   {
@@ -304,7 +291,7 @@ export const TREE_SITTER_LANGUAGE_METADATA = [
     extensions: ['.mdx'],
     filenames: [],
     aliases: [],
-    injectionDependencies: ['markdown_inline', 'markdown'],
+    injectionDependencies: ['markdown'],
     capabilities: {
       highlighting: 'partial',
       injections: 'partial',

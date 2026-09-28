@@ -28,8 +28,9 @@ export function createMarkdownPreviewPlugin(
   return {
     name: 'markdown-preview',
     activate: (context) =>
-      context.registerInlineReplacementProvider((replacementContext) =>
-        replacementsForContext(replacementContext, languageIds),
+      context.registerInlineReplacementProvider(
+        (replacementContext) => replacementsForContext(replacementContext, languageIds),
+        { trigger: 'edit', requiresSyntax: true },
       ),
   }
 }
@@ -40,5 +41,6 @@ const replacementsForContext = (
 ): readonly InlineReplacementSpec[] => {
   if (context.languageId === null) return []
   if (!languageIds.has(context.languageId)) return []
-  return markdownInlineReplacements(context.textSnapshot, context.captures)
+  if (context.records?.languageId !== context.languageId) return []
+  return markdownInlineReplacements(context.textSnapshot, context.records.data)
 }

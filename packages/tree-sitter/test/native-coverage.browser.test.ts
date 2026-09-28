@@ -85,17 +85,7 @@ browserTest.each(['full', 'range'] as const)(
       if (syntaxMode === 'range')
         result = await session.queryRange({ startIndex: 0, endIndex: snapshot.length })
       expect(result.degraded).toBeNull()
-      expect(new Set(loads)).toEqual(
-        new Set([
-          'markdown',
-          'markdown_inline',
-          'html',
-          'javascript',
-          'css',
-          'astro',
-          'typescript',
-        ]),
-      )
+      expect(new Set(loads)).toEqual(new Set(['markdown', 'css', 'astro', 'typescript']))
       expect(loads.length).toBe(new Set(loads).size)
       expect(result.injections.some((injection) => injection.languageId === 'astro')).toBe(true)
       expect(
@@ -315,9 +305,12 @@ browserTest.each([
       expect(new Set(loads)).toEqual(new Set([...requiredLanguages('mdx'), 'sql']))
       assertPaint(result, text, MDX_CATEGORIES)
       if (languageId === 'markdown') {
-        expect(markdownInlineReplacements(createStringTextSnapshot(text), result.captures)).toEqual(
-          [],
-        )
+        expect(
+          markdownInlineReplacements(createStringTextSnapshot(text), result.records!.data).every(
+            (spec) =>
+              spec.endIndex <= text.indexOf('\n') || spec.startIndex >= text.lastIndexOf('~~~'),
+          ),
+        ).toBe(true)
       }
       for (const [before, after] of [
         ['{title}', '{title.toUpperCase()}'],

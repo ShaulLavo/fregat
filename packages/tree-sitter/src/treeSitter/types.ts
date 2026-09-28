@@ -71,6 +71,7 @@ export type TreeSitterParseResult = {
   readonly snapshotVersion: number
   readonly languageId: TreeSitterLanguageId
   readonly captures: readonly TreeSitterCapture[]
+  readonly records?: { readonly languageId: string; readonly data: Uint32Array }
   readonly folds: readonly FoldRange[]
   readonly brackets: readonly BracketInfo[]
   readonly errors: readonly TreeSitterError[]

@@ -34,11 +34,6 @@ export const NATIVE_FIXTURES = [
   },
   { id: 'markdown', text: '# Title 🪐\n\n**bold** and `code`\n', captures: ['text.title'] },
   {
-    id: 'markdown_inline',
-    text: '**bold** and `code` 🪐\n',
-    captures: ['text.strong', 'text.literal'],
-  },
-  {
     id: 'astro',
     text: '---\nconst title = "🪐"\n---\n<!-- note --><Card title={title}>{title}</Card>\n',
     captures: ['tag', 'attribute', 'comment'],

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { Editor } from '@singapore-editor/core/editor'
 import {
   setEditorSyntaxSessionFactory,
@@ -7,50 +7,38 @@ import {
 } from '@singapore-editor/core/testing'
 import {
   createEmptySyntaxResult,
-  type EditorSyntaxCapture,
   type EditorSyntaxResult,
   type EditorSyntaxSession,
 } from '@singapore-editor/core/syntax'
+import { init, MarkdownDocument } from 'tree-sitter-md'
 import { createMarkdownPreviewPlugin } from '../src/index'
-
-/**
- * Proves the whole path: plugin registration -> syntax captures -> inline map -> rendered rows. The
- * capture fixtures are exactly what the real grammars emit; replacements.test.ts is what keeps them
- * honest by parsing for real.
- */
-const capture = (
-  captureName: string,
-  startIndex: number,
-  endIndex: number,
-): EditorSyntaxCapture => ({ captureName, startIndex, endIndex })
 
 const DOCUMENT = '# Title\na **bold** b'
 
-// '# Title' -> atx_h1_marker + inline; 'a **bold** b' -> strong_emphasis + four emphasis delimiters.
-const CAPTURES: readonly EditorSyntaxCapture[] = [
-  capture('punctuation.special', 0, 1),
-  capture('text.title', 2, 7),
-  capture('text.strong', 10, 18),
-  capture('punctuation.delimiter', 10, 11),
-  capture('punctuation.delimiter', 11, 12),
-  capture('punctuation.delimiter', 16, 17),
-  capture('punctuation.delimiter', 17, 18),
-]
+beforeAll(() => init())
 
-const syntaxResult = (): EditorSyntaxResult => ({
-  ...createEmptySyntaxResult(),
-  captures: CAPTURES,
-})
-
-const markdownSyntaxSession = (): EditorSyntaxSession => ({
-  foldingSupport: 'supported',
-  refresh: async () => syntaxResult(),
-  applyChange: async () => syntaxResult(),
-  getResult: () => syntaxResult(),
-  getTokens: () => [],
-  getSnapshotVersion: () => 0,
-  dispose: () => undefined,
-})
+const markdownSyntaxSession = (): EditorSyntaxSession => {
+  const doc = new MarkdownDocument({ frontmatter: true })
+  let result = createEmptySyntaxResult()
+  const parse = (text: string): EditorSyntaxResult => {
+    doc.setText(text)
+    result = {
+      ...createEmptySyntaxResult(),
+      records: { languageId: 'markdown', data: doc.decorations(0, text.length) },
+    }
+    return result
+  }
+  return {
+    foldingSupport: 'supported',
+    refresh: async (snapshot) => parse(snapshot.readRange(0, snapshot.length)),
+    applyChange: async (change) =>
+      parse(change.textSnapshot.readRange(0, change.textSnapshot.length)),
+    getResult: () => result,
+    getTokens: () => [],
+    getSnapshotVersion: () => 0,
+    dispose: () => doc.dispose(),
+  }
+}
 
 const highlights = new Map<string, Highlight>()
 class MockHighlight extends Set<Range> {}
@@ -129,4 +117,76 @@ describe('markdown preview plugin', () => {
 
     expect(rowTexts()).toEqual(['# Title', 'a **bold** b'])
   })
+  for (const source of [
+    '**bold** and _italic_',
+    '[label](/destination)',
+    '![alt](/image)',
+    '> **one\n> two**',
+    '- [x] task',
+    '| a | b |\n| - | - |\n| **cell** | value |',
+    '```js\nconst value = 1\n```',
+    '**שלום 🪐**',
+    '[label][ref]\n\n[ref]: /eof',
+  ]) {
+    it(`keeps editing and composition source-equivalent: ${JSON.stringify(source)}`, async () => {
+      const plainContainer = document.createElement('div')
+      document.body.appendChild(plainContainer)
+      const plain = new Editor(plainContainer)
+      try {
+        editor.openDocument({ documentId: 'preview.md', text: source, languageId: 'markdown' })
+        plain.openDocument({ documentId: 'source.md', text: source, languageId: 'markdown' })
+        await flush()
+        editor.setSelection(0, source.length)
+        const copied = new Map<string, string>()
+        const copy = new Event('copy', { bubbles: true, cancelable: true })
+        Object.defineProperty(copy, 'clipboardData', {
+          value: { setData: (type: string, value: string) => copied.set(type, value) },
+        })
+        container.querySelector('textarea')!.dispatchEvent(copy)
+        expect(copied.get('text/plain')).toBe(source)
+        for (const [type, data] of [
+          ['insertText', 'x'],
+          ['deleteContentBackward', null],
+          ['historyUndo', null],
+          ['historyRedo', null],
+        ] as const) {
+          for (const [subject, host] of [
+            [editor, container],
+            [plain, plainContainer],
+          ] as const) {
+            subject.setSelection(2, 2)
+            host.querySelector('textarea')!.dispatchEvent(
+              new InputEvent('beforeinput', {
+                bubbles: true,
+                cancelable: true,
+                inputType: type,
+                data,
+              }),
+            )
+          }
+          await flush()
+          expect(editor.materializeFullText()).toBe(plain.materializeFullText())
+        }
+        for (const [subject, host] of [
+          [editor, container],
+          [plain, plainContainer],
+        ] as const) {
+          subject.setSelection(2, 2)
+          for (const type of ['compositionstart', 'compositionupdate', 'compositionend']) {
+            const event = new Event(type, { bubbles: true })
+            Object.defineProperty(event, 'data', {
+              value: type === 'compositionstart' ? '' : '日本',
+            })
+            host.querySelector('textarea')!.dispatchEvent(event)
+          }
+        }
+        await flush()
+        expect(editor.materializeFullText()).toBe(plain.materializeFullText())
+        expect(editor.materializeFullText()).toContain('日本')
+      } finally {
+        plain.dispose()
+        plainContainer.remove()
+      }
+    })
+  }
 })

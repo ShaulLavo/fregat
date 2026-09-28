@@ -1,3 +1,4 @@
+import { createEditorDocumentAnalysis } from '../src/editor/documentAnalysis'
 import { EditorSyntaxController } from '../src/editor/syntaxController'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -31,6 +32,7 @@ describe('prepared editor documents', () => {
     const readRange = vi.spyOn(snapshot, 'readRange')
     const prepared = createEditorPreparedDocument({
       buffer,
+      analysis: createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' }),
       configuredTabSize: 4,
       tabSizePolicy: 'fixed',
       documentConfigurationTag: [],
@@ -38,7 +40,7 @@ describe('prepared editor documents', () => {
       languageId: 'typescript',
     })
 
-    const claimed = prepared.take({ ...match(buffer, null, null), tabSizePolicy: 'fixed' })
+    const claimed = prepared.borrow({ ...match(buffer, null, null), tabSizePolicy: 'fixed' })
 
     expect(materialize).not.toHaveBeenCalled()
     expect(readRange).not.toHaveBeenCalledWith(0, snapshot.length)
@@ -52,7 +54,7 @@ describe('prepared editor documents', () => {
     const buffer = createEditorTextBuffer('root\n  child\n'.repeat(2_000))
     const prepared = fixedPreparedDocument(buffer)
 
-    const claimed = prepared.take({ ...match(buffer, null, null), tabSizePolicy: 'fixed' })
+    const claimed = prepared.borrow({ ...match(buffer, null, null), tabSizePolicy: 'fixed' })
 
     expect(claimed?.fallbackFoldIndex?.ready).toBe(false)
     expect(claimed?.fallbackFoldIndex?.diagnostics.rowsRead).toBeLessThan(4_001)
@@ -72,7 +74,7 @@ describe('prepared editor documents', () => {
       expect(settled).toEqual([])
       await vi.runAllTimersAsync()
       await expect(prepared.fallbackReady).resolves.toBe(true)
-      const claimed = prepared.take({ ...match(buffer, null, null), tabSizePolicy: 'fixed' })
+      const claimed = prepared.borrow({ ...match(buffer, null, null), tabSizePolicy: 'fixed' })
       expect(claimed?.fallbackFoldIndex?.ready).toBe(true)
       expect(claimed?.fallbackFoldIndex?.count).toBe(2_000)
     } finally {
@@ -100,7 +102,7 @@ describe('prepared editor documents', () => {
       })
       await vi.runAllTimersAsync()
       await expect(prepared.fallbackReady).resolves.toBe(false)
-      const claimed = prepared.take({ ...match(buffer, provider, null), tabSizePolicy: 'fixed' })
+      const claimed = prepared.borrow({ ...match(buffer, provider, null), tabSizePolicy: 'fixed' })
 
       expect(claimed?.fallbackFoldIndex).toBeNull()
       expect(claimed?.structural?.readyResult).toBeNull()
@@ -122,7 +124,7 @@ describe('prepared editor documents', () => {
       prepared.dispose()
       await vi.runAllTimersAsync()
       expect(prepared.estimatedBytes).toBeLessThan(retained)
-      expect(prepared.take({ ...match(buffer, null, null), tabSizePolicy: 'fixed' })).toBeNull()
+      expect(prepared.borrow({ ...match(buffer, null, null), tabSizePolicy: 'fixed' })).toBeNull()
     } finally {
       vi.useRealTimers()
     }
@@ -159,7 +161,10 @@ describe('prepared editor documents', () => {
         })
         await vi.runAllTimersAsync()
         await expect(prepared.fallbackReady).resolves.toBe(false)
-        const claimed = prepared.take({ ...match(buffer, provider, null), tabSizePolicy: 'fixed' })
+        const claimed = prepared.borrow({
+          ...match(buffer, provider, null),
+          tabSizePolicy: 'fixed',
+        })
 
         expect(claimed?.fallbackFoldIndex?.ready).toBe(true)
         expect(claimed?.fallbackFoldIndex?.count).toBe(2_000)
@@ -222,6 +227,7 @@ describe('prepared editor documents', () => {
     }
     const prepared = createEditorPreparedDocument({
       buffer,
+      analysis: createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' }),
       configuredTabSize: 4,
       tabSizePolicy: 'detect-indentation',
       documentConfigurationTag: [],
@@ -252,7 +258,7 @@ describe('prepared editor documents', () => {
     prepared.dispose()
   })
 
-  it('transfers exact structural and highlighter sessions once', async () => {
+  it('borrows compatible structural and highlighter sessions across views', async () => {
     const buffer = createEditorTextBuffer('const value = 1;\n')
     const structuralSession = syntaxSession()
     const highlighterSession = highlightSession()
@@ -264,6 +270,7 @@ describe('prepared editor documents', () => {
     }
     const prepared = createEditorPreparedDocument({
       buffer,
+      analysis: createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' }),
       configuredTabSize: 4,
       tabSizePolicy: 'detect-indentation',
       documentConfigurationTag: [],
@@ -293,7 +300,7 @@ describe('prepared editor documents', () => {
       highlighter: [expect.any(String)],
       structural: [expect.any(String)],
     })
-    const claimed = prepared.take(match(buffer, structuralProvider, highlighterProvider))
+    const claimed = prepared.borrow(match(buffer, structuralProvider, highlighterProvider))
 
     expect(claimed?.lineStarts).toEqual([0, 17])
     expect(claimed?.structural?.runtimeSessionId).not.toBe(claimed?.highlighter?.runtimeSessionId)
@@ -308,7 +315,11 @@ describe('prepared editor documents', () => {
       expect.objectContaining({ textSnapshot: source }),
     )
     expect(highlighterSession.refresh).toHaveBeenCalledWith(source)
-    expect(prepared.take(match(buffer, structuralProvider, highlighterProvider))).toBeNull()
+    const second = prepared.borrow(match(buffer, structuralProvider, highlighterProvider))
+    expect(second?.structural?.runtimeSessionId).toBe(claimed?.structural?.runtimeSessionId)
+    expect(second?.highlighter?.runtimeSessionId).toBe(claimed?.highlighter?.runtimeSessionId)
+    second?.structural?.dispose()
+    second?.highlighter?.dispose()
 
     prepared.dispose()
     expect(structuralSession.dispose).not.toHaveBeenCalled()
@@ -317,16 +328,18 @@ describe('prepared editor documents', () => {
     claimed?.structural?.dispose()
     claimed?.highlighter?.dispose()
     claimed?.highlighter?.dispose()
+    prepared.analysis.dispose()
     expect(structuralSession.dispose).toHaveBeenCalledTimes(1)
     expect(highlighterSession.dispose).toHaveBeenCalledTimes(1)
   })
 
-  it('rejects a stale snapshot and disposes unfinished ownership', () => {
+  it('rejects a stale prepared snapshot while retaining document analysis', () => {
     const buffer = createEditorTextBuffer('alpha\n')
     const session = syntaxSession()
     const provider: EditorSyntaxProvider = { createSession: () => session }
     const prepared = createEditorPreparedDocument({
       buffer,
+      analysis: createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' }),
       configuredTabSize: 2,
       tabSizePolicy: 'detect-indentation',
       documentConfigurationTag: [],
@@ -342,12 +355,14 @@ describe('prepared editor documents', () => {
       range: { startIndex: 0, endIndex: 6 },
     })
 
-    const claimed = prepared.take({
+    const claimed = prepared.borrow({
       ...match(buffer, provider, null, 2),
       snapshot: createPieceTableSnapshot('alpha\n'),
     })
 
     expect(claimed).toBeNull()
+    expect(session.dispose).not.toHaveBeenCalled()
+    prepared.analysis.dispose()
     expect(session.dispose).toHaveBeenCalledTimes(1)
   })
 
@@ -363,6 +378,7 @@ describe('prepared editor documents', () => {
     }
     const prepared = createEditorPreparedDocument({
       buffer,
+      analysis: createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' }),
       configuredTabSize: 2,
       tabSizePolicy: 'detect-indentation',
       documentConfigurationTag: [],
@@ -385,20 +401,22 @@ describe('prepared editor documents', () => {
       range: 'full',
     })
 
-    const claimed = prepared.take({
+    const claimed = prepared.borrow({
       ...match(buffer, structuralProvider, highlighterProvider, 2),
       highlighterConfigurationTag: ['shiki', 'light'],
     })
     await Promise.resolve()
 
-    expect(claimed?.structural?.session).toBe(structuralSession)
+    expect(claimed?.structural?.runtimeSessionId).toBe(prepared.runtimeSessionIds().structural[0])
     expect(claimed?.highlighter).toBeNull()
+    expect(highlighterSession.dispose).not.toHaveBeenCalled()
+    prepared.analysis.dispose()
     expect(highlighterSession.dispose).toHaveBeenCalledTimes(1)
     claimed?.structural?.dispose()
   })
 
   it.each(['repeat', 'edit-first'])(
-    'attaches transferred sessions without repeating covered preparation: %s',
+    'attaches borrowed sessions without repeating covered preparation: %s',
     async (mode) => {
       const buffer = createEditorTextBuffer('const value = 1;\n')
       const structuralSession = syntaxSession()
@@ -411,6 +429,7 @@ describe('prepared editor documents', () => {
       }
       const prepared = createEditorPreparedDocument({
         buffer,
+        analysis: createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' }),
         configuredTabSize: 4,
         tabSizePolicy: 'detect-indentation',
         documentConfigurationTag: [],
@@ -483,72 +502,80 @@ describe('prepared editor documents', () => {
 
       editor.dispose()
       container.remove()
+      prepared.analysis.dispose()
       expect(structuralSession.dispose).toHaveBeenCalledTimes(1)
       expect(highlighterSession.dispose).toHaveBeenCalledTimes(1)
     },
   )
 
-  it('installs ready prepared tokens without publishing an empty initial token state', async () => {
-    const buffer = createEditorTextBuffer('const value = 1;\n')
-    const readyTokens = EditorTokenStore.fromTokens([
-      { start: 0, end: 5, style: { color: 'prepared-token' } },
-    ])
-    const highlighterSession = highlightSession()
-    highlighterSession.refresh = vi.fn(async () => ({ tokens: readyTokens }))
-    const highlighterProvider: EditorHighlighterProvider = {
-      createSession: vi.fn(() => highlighterSession),
-    }
-    const observedTokenColors: Array<readonly (string | undefined)[]> = []
-    const plugin: EditorPlugin = {
-      activate: (context) => [
-        context.registerHighlighter(highlighterProvider),
-        context.registerViewContribution({
-          createContribution: () => ({
-            update: (snapshot) => {
-              observedTokenColors.push(snapshot.tokens.toTokens().map((token) => token.style.color))
-            },
-            dispose: () => undefined,
+  it.each(['prepared', 'retained'])(
+    'installs ready %s tokens without publishing an empty initial token state',
+    async (mode) => {
+      const buffer = createEditorTextBuffer('const value = 1;\n')
+      const readyTokens = EditorTokenStore.fromTokens([
+        { start: 0, end: 5, style: { color: 'prepared-token' } },
+      ])
+      const highlighterSession = highlightSession()
+      highlighterSession.refresh = vi.fn(async () => ({ tokens: readyTokens }))
+      const highlighterProvider: EditorHighlighterProvider = {
+        createSession: vi.fn(() => highlighterSession),
+      }
+      const observedTokenColors: Array<readonly (string | undefined)[]> = []
+      const plugin: EditorPlugin = {
+        activate: (context) => [
+          context.registerHighlighter(highlighterProvider),
+          context.registerViewContribution({
+            createContribution: () => ({
+              update: (snapshot) => {
+                observedTokenColors.push(
+                  snapshot.tokens.toTokens().map((token) => token.style.color),
+                )
+              },
+              dispose: () => undefined,
+            }),
           }),
-        }),
-      ],
-    }
-    const prepared = createEditorPreparedDocument({
-      buffer,
-      configuredTabSize: 4,
-      tabSizePolicy: 'detect-indentation',
-      documentConfigurationTag: [],
-      documentId: 'file.ts',
-      languageId: 'typescript',
-    })
-    const outcome = prepared.startStage({
-      abortSignal: new AbortController().signal,
-      configurationTag: ['shiki', 'dark'],
-      family: 'highlighter',
-      provider: highlighterProvider,
-      range: 'full',
-    })
-    await expect(outcome).resolves.toBe('ready')
-    const container = document.createElement('div')
-    document.body.appendChild(container)
-    const editor = createVisibleEditor(container, { plugins: [plugin] })
-    observedTokenColors.length = 0
-
-    editor.attachSession(
-      createEditorBufferSession(buffer, createEditorViewSession(buffer, 'ready-highlight-view')),
-      {
+        ],
+      }
+      const prepared = createEditorPreparedDocument({
+        buffer,
+        analysis: createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' }),
+        configuredTabSize: 4,
+        tabSizePolicy: 'detect-indentation',
         documentConfigurationTag: [],
         documentId: 'file.ts',
-        highlighterConfigurationTag: ['shiki', 'dark'],
         languageId: 'typescript',
-        preparedDocument: prepared,
-      },
-    )
+      })
+      const outcome = prepared.startStage({
+        abortSignal: new AbortController().signal,
+        configurationTag: ['shiki', 'dark'],
+        family: 'highlighter',
+        provider: highlighterProvider,
+        range: 'full',
+      })
+      await expect(outcome).resolves.toBe('ready')
+      const container = document.createElement('div')
+      document.body.appendChild(container)
+      const editor = createVisibleEditor(container, { plugins: [plugin] })
+      observedTokenColors.length = 0
 
-    expect(observedTokenColors[0]).toEqual(['prepared-token'])
-    expect(observedTokenColors).not.toContainEqual([])
-    editor.dispose()
-    container.remove()
-  })
+      editor.attachSession(
+        createEditorBufferSession(buffer, createEditorViewSession(buffer, 'ready-highlight-view')),
+        {
+          documentConfigurationTag: [],
+          documentId: 'file.ts',
+          highlighterConfigurationTag: ['shiki', 'dark'],
+          languageId: 'typescript',
+          preparedDocument: mode === 'prepared' ? prepared : null,
+          analysis: prepared.analysis,
+        },
+      )
+
+      expect(observedTokenColors[0]).toEqual(['prepared-token'])
+      expect(observedTokenColors).not.toContainEqual([])
+      editor.dispose()
+      container.remove()
+    },
+  )
 
   it('publishes prepared tab size and fallback folds with the first document snapshot', () => {
     const buffer = createEditorTextBuffer('root\n  child\n    grandchild\nnext\n')
@@ -574,6 +601,7 @@ describe('prepared editor documents', () => {
     }
     const prepared = createEditorPreparedDocument({
       buffer,
+      analysis: createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' }),
       configuredTabSize: 4,
       tabSizePolicy: 'detect-indentation',
       documentConfigurationTag: [],
@@ -616,6 +644,7 @@ describe('prepared editor documents', () => {
     }
     const prepared = createEditorPreparedDocument({
       buffer,
+      analysis: createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' }),
       configuredTabSize: 4,
       tabSizePolicy: 'detect-indentation',
       documentConfigurationTag: [],
@@ -678,6 +707,7 @@ describe('prepared editor documents', () => {
     }
     const prepared = createEditorPreparedDocument({
       buffer,
+      analysis: createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' }),
       configuredTabSize: 4,
       tabSizePolicy: 'detect-indentation',
       documentConfigurationTag: [],
@@ -725,6 +755,7 @@ describe('prepared editor documents', () => {
     }
     const prepared = createEditorPreparedDocument({
       buffer,
+      analysis: createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' }),
       configuredTabSize: 4,
       tabSizePolicy: 'detect-indentation',
       documentConfigurationTag: [],
@@ -797,6 +828,7 @@ describe('prepared editor documents', () => {
     }
     const prepared = createEditorPreparedDocument({
       buffer,
+      analysis: createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' }),
       configuredTabSize: 4,
       tabSizePolicy: 'detect-indentation',
       documentConfigurationTag: [],
@@ -864,6 +896,7 @@ describe('prepared editor documents', () => {
     }
     const prepared = createEditorPreparedDocument({
       buffer,
+      analysis: createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' }),
       configuredTabSize: 4,
       tabSizePolicy: 'detect-indentation',
       documentConfigurationTag: [],
@@ -907,7 +940,7 @@ describe('prepared editor documents', () => {
     container.remove()
   })
 
-  it('finishes an aborted stage and disposes its session once', async () => {
+  it('finishes an aborted interest and disposes its session with the owner', async () => {
     const buffer = createEditorTextBuffer('alpha\n')
     const completion = deferred<ReturnType<typeof createEmptySyntaxResult>>()
     const session = syntaxSession()
@@ -916,6 +949,7 @@ describe('prepared editor documents', () => {
     const abortController = new AbortController()
     const prepared = createEditorPreparedDocument({
       buffer,
+      analysis: createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' }),
       configuredTabSize: 4,
       tabSizePolicy: 'detect-indentation',
       documentConfigurationTag: [],
@@ -936,6 +970,8 @@ describe('prepared editor documents', () => {
 
     await expect(outcome).resolves.toBe('aborted')
     prepared.dispose()
+    expect(session.dispose).not.toHaveBeenCalled()
+    prepared.analysis.dispose()
     expect(session.dispose).toHaveBeenCalledOnce()
   })
 
@@ -949,6 +985,7 @@ describe('prepared editor documents', () => {
     abortController.abort()
     const prepared = createEditorPreparedDocument({
       buffer,
+      analysis: createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' }),
       configuredTabSize: 4,
       tabSizePolicy: 'detect-indentation',
       documentConfigurationTag: [],
@@ -974,6 +1011,7 @@ describe('prepared editor documents', () => {
     const buffer = createEditorTextBuffer('\talpha\n')
     const prepared = createEditorPreparedDocument({
       buffer,
+      analysis: createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' }),
       configuredTabSize: 2,
       tabSizePolicy: 'detect-indentation',
       documentConfigurationTag: [],
@@ -981,7 +1019,7 @@ describe('prepared editor documents', () => {
       languageId: 'typescript',
     })
 
-    const claimed = prepared.take({
+    const claimed = prepared.borrow({
       ...match(buffer, null, null, 2),
       configuredTabSize: 4,
     })
@@ -993,6 +1031,7 @@ describe('prepared editor documents', () => {
     const buffer = createEditorTextBuffer('\talpha\n')
     const prepared = createEditorPreparedDocument({
       buffer,
+      analysis: createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' }),
       configuredTabSize: 4,
       tabSizePolicy: 'detect-indentation',
       documentConfigurationTag: [],
@@ -1000,7 +1039,7 @@ describe('prepared editor documents', () => {
       languageId: 'typescript',
     })
 
-    const claimed = prepared.take({
+    const claimed = prepared.borrow({
       ...match(buffer, null, null, 4),
       tabSizePolicy: 'fixed',
     })
@@ -1039,6 +1078,7 @@ function match(
 function fixedPreparedDocument(buffer: ReturnType<typeof createEditorTextBuffer>) {
   return createEditorPreparedDocument({
     buffer,
+    analysis: createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' }),
     configuredTabSize: 4,
     tabSizePolicy: 'fixed',
     documentConfigurationTag: [],

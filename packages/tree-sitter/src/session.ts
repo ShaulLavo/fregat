@@ -606,6 +606,7 @@ const treeSitterParseResultToEditorSyntaxResultInner = (
   context: TreeSitterSyntaxResultContext,
 ): EditorSyntaxResult => ({
   captures: result.captures,
+  ...{ records: result.records },
   degraded: treeSitterDegradedStateToEditorSyntaxState(result.degraded),
   folds: result.folds,
   brackets: result.brackets,

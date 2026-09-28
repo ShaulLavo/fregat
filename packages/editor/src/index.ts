@@ -38,11 +38,11 @@ export type {
   EditorPreparedDocument,
   EditorPreparedDocumentMatch,
   EditorPreparedDocumentPayload,
-  EditorPreparedHighlighterTransfer,
+  EditorPreparedHighlighterBorrow,
   EditorPreparedStageOutcome,
   EditorPreparedStageRequest,
   EditorPreparedStructuralConfiguration,
-  EditorPreparedStructuralTransfer,
+  EditorPreparedStructuralBorrow,
   EditorPreparedTagValue,
   EditorPreparedTabSizePolicy,
 } from './editor/preparedDocument'

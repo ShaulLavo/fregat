@@ -1,3 +1,8 @@
+import type {
+  EditorDocumentAnalysis,
+  EditorRetainedSyntaxSession,
+  EditorRetainedHighlighterSession,
+} from './documentAnalysis'
 import type { DocumentSession, DocumentSessionChange } from '../documentSession'
 import type { DocumentEditChain, DocumentSyncPoint } from './editChain'
 import type { DocumentTextSnapshot } from '../documentTextSnapshot'
@@ -32,9 +37,9 @@ import { syntaxRefreshDelay, SYNTAX_REFRESH_MAX_DELAY_MS } from './editorUtils'
 import type {
   EditorPreparedDocument,
   EditorPreparedDocumentPayload,
-  EditorPreparedHighlighterTransfer,
+  EditorPreparedHighlighterBorrow,
   EditorPreparedStructuralConfiguration,
-  EditorPreparedStructuralTransfer,
+  EditorPreparedStructuralBorrow,
   EditorPreparedTagValue,
   EditorPreparedTabSizePolicy,
 } from './preparedDocument'
@@ -46,13 +51,16 @@ import {
 } from './performanceDiagnostics'
 
 export type EditorSyntaxDocumentStartOptions = {
+  readonly analysis?: EditorDocumentAnalysis | null
+  readonly structuralConfigurationTag?: readonly EditorPreparedTagValue[]
+  readonly highlighterConfigurationTag?: readonly EditorPreparedTagValue[]
   readonly documentId: string
   readonly languageId: EditorSyntaxLanguageId | null
   readonly snapshot: PieceTableSnapshot
   readonly textSnapshot: DocumentTextSnapshot
 }
 
-export type EditorPreparedDocumentClaimOptions = {
+export type EditorPreparedDocumentBorrowOptions = {
   readonly configuredTabSize: number
   readonly tabSizePolicy: EditorPreparedTabSizePolicy
   readonly documentConfigurationTag: readonly EditorPreparedTagValue[]
@@ -76,7 +84,10 @@ export type EditorSyntaxControllerOptions = {
   notifyChange(change: DocumentSessionChange | null): void
   notifyViewUpdate(): void
   onInitialPaint?(event: EditorInitialPaintEvent): void
-  setSyntaxCaptures?(captures: readonly EditorSyntaxCapture[]): void
+  setSyntaxCaptures?(
+    captures: readonly EditorSyntaxCapture[],
+    records?: EditorSyntaxResult['records'],
+  ): void
   /**
    * Whether anything downstream reads raw captures. Captures cost payload on every parse, so a
    * session asks for them only while an inline replacement provider is registered to consume them.
@@ -174,6 +185,11 @@ const syntaxWorkTags = (
 })
 
 export class EditorSyntaxController {
+  private analysis: EditorDocumentAnalysis | null = null
+  private retainedSyntax: EditorRetainedSyntaxSession | null = null
+  private retainedHighlighter: EditorRetainedHighlighterSession | null = null
+  private structuralConfigurationTag: readonly EditorPreparedTagValue[] = []
+  private highlighterConfigurationTag: readonly EditorPreparedTagValue[] = []
   private disposed = false
   private syntaxStatus: EditorSyntaxStatus = 'plain'
   private applyingRenderData = false
@@ -375,10 +391,10 @@ export class EditorSyntaxController {
     return tokens
   }
 
-  claimPreparedDocument(
+  borrowPreparedDocument(
     document: EditorSyntaxDocumentStartOptions,
     preparedDocument: EditorPreparedDocument,
-    tags: EditorPreparedDocumentClaimOptions,
+    tags: EditorPreparedDocumentBorrowOptions,
   ): EditorPreparedDocumentPayload | null {
     const highlighterProvider = this.options.pluginHost.getHighlighterProvider()
     const structuralProvider = this.options.pluginHost.getSyntaxProvider()
@@ -387,7 +403,7 @@ export class EditorSyntaxController {
       structuralProvider !== null,
       highlighterProvider !== null,
     )
-    return preparedDocument.take({
+    return preparedDocument.borrow({
       configuredTabSize: tags.configuredTabSize,
       tabSizePolicy: tags.tabSizePolicy,
       documentId: document.documentId,
@@ -415,6 +431,9 @@ export class EditorSyntaxController {
     this.resetSyntaxContentVersion()
     this.currentBrackets = []
     this.currentInjections = []
+    this.analysis = document.analysis ?? null
+    this.structuralConfigurationTag = document.structuralConfigurationTag ?? []
+    this.highlighterConfigurationTag = document.highlighterConfigurationTag ?? []
     this.failedHighlightRefreshes = 0
     this.highlighterSession =
       prepared?.highlighter?.session ??
@@ -424,9 +443,11 @@ export class EditorSyntaxController {
         document.textSnapshot,
         document.snapshot,
       )
+    if (prepared?.highlighter) this.retainedHighlighter = prepared.highlighter.session
     this.preparedHighlighterDisposer = prepared?.highlighter?.dispose ?? null
     this.observeHighlighterTheme()
     this.syntaxSession = prepared?.structural?.session ?? this.createSyntaxSession(document)
+    if (prepared?.structural) this.retainedSyntax = prepared.structural.session
     this.preparedSyntaxDisposer = prepared?.structural?.dispose ?? null
     this.preparedStructuralContentVersion = prepared?.structural ? this.syntaxContentVersion : null
     this.preparedHighlighterContentVersion = prepared?.highlighter
@@ -477,6 +498,36 @@ export class EditorSyntaxController {
     }
   }
 
+  adoptReadyAnalysis(): void {
+    const documentVersion = this.options.getDocumentVersion()
+    const configurationGeneration = this.initialHighlightConfigurationGeneration
+    const range = this.options.getVisibleSyntaxRange()
+    const structural = this.retainedSyntax?.read(range ?? undefined)
+    if (structural?.kind === 'ready') {
+      this.applySyntaxResult(
+        {
+          contentVersion: this.syntaxContentVersion,
+          range,
+          result: structural.result,
+          source: range ? 'visible' : 'full',
+          suppressWarm: true,
+          updatesDocument: true,
+        },
+        documentVersion,
+        nowMs(),
+        configurationGeneration,
+      )
+    }
+    const highlighter = this.retainedHighlighter?.read()
+    if (highlighter?.kind === 'ready')
+      this.applyHighlightResult(
+        highlighter.result,
+        documentVersion,
+        nowMs(),
+        configurationGeneration,
+      )
+  }
+
   notifyBaseTextPainted(): void {
     if (this.initialPaintDocumentVersion !== this.options.getDocumentVersion()) return
 
@@ -504,11 +555,13 @@ export class EditorSyntaxController {
     this.resetSyntaxContentVersion()
     this.disposeSyntaxSession()
     this.disposeHighlighterSession()
+    this.analysis = null
     this.logSyntaxStatus('editor.syntax.document_cleared')
   }
 
   dispose(): void {
     this.disposed = true
+    this.analysis = null
     this.highlighterThemeRequests.dispose()
     this.disposeSyntaxSession()
     this.disposeHighlighterSession()
@@ -777,7 +830,17 @@ export class EditorSyntaxController {
       textSnapshot: document.textSnapshot,
       snapshot: document.snapshot,
     }
+    const provider = this.options.pluginHost.getSyntaxProvider()
+    this.retainedSyntax =
+      this.analysis && provider
+        ? this.analysis.borrowStructural({
+            ...sessionOptions,
+            provider,
+            configurationTag: this.structuralConfigurationTag,
+          })
+        : null
     const session =
+      this.retainedSyntax ??
       this.options.pluginHost.createSyntaxSession(sessionOptions) ??
       getEditorSyntaxSessionFactory()?.(sessionOptions) ??
       null
@@ -848,7 +911,7 @@ export class EditorSyntaxController {
   }
 
   private applyPreparedHighlighterResult(
-    transfer: EditorPreparedHighlighterTransfer,
+    transfer: EditorPreparedHighlighterBorrow,
     result: EditorHighlightResult,
     documentVersion: number,
     configurationGeneration: number,
@@ -865,7 +928,7 @@ export class EditorSyntaxController {
   }
 
   private applyPreparedStructuralResult(
-    transfer: EditorPreparedStructuralTransfer,
+    transfer: EditorPreparedStructuralBorrow,
     result: EditorSyntaxResult,
     documentVersion: number,
     configurationGeneration: number,
@@ -889,7 +952,7 @@ export class EditorSyntaxController {
   }
 
   private recoverPreparedStructural(
-    transfer: EditorPreparedStructuralTransfer,
+    transfer: EditorPreparedStructuralBorrow,
     documentVersion: number,
     configurationGeneration: number,
   ): void {
@@ -913,7 +976,7 @@ export class EditorSyntaxController {
   }
 
   private recoverPreparedHighlighter(
-    transfer: EditorPreparedHighlighterTransfer,
+    transfer: EditorPreparedHighlighterBorrow,
     documentVersion: number,
     configurationGeneration: number,
   ): void {
@@ -952,12 +1015,23 @@ export class EditorSyntaxController {
     textSnapshot: DocumentTextSnapshot,
     snapshot: PieceTableSnapshot,
   ): EditorHighlighterSession | null {
-    const session = this.options.pluginHost.createHighlighterSession({
-      documentId,
-      languageId,
-      textSnapshot,
-      snapshot,
-    })
+    const provider = this.options.pluginHost.getHighlighterProvider()
+    this.retainedHighlighter =
+      this.analysis && provider
+        ? this.analysis.borrowHighlighter({
+            provider,
+            languageId,
+            configurationTag: this.highlighterConfigurationTag,
+          })
+        : null
+    const session =
+      this.retainedHighlighter ??
+      this.options.pluginHost.createHighlighterSession({
+        documentId,
+        languageId,
+        textSnapshot,
+        snapshot,
+      })
     if (session) {
       recordEditorPerformanceDiagnostic('editor.syntax.session_created', {
         family: 'highlighter',
@@ -981,6 +1055,7 @@ export class EditorSyntaxController {
     this.preparedSyntaxDisposer = null
     this.preparedStructuralContentVersion = null
     this.syntaxSession = null
+    this.retainedSyntax = null
     this.structuralDispatchPoint = null
     this.syntaxSessionIncludesCaptures = false
   }
@@ -1043,6 +1118,7 @@ export class EditorSyntaxController {
     this.preparedHighlighterDisposer = null
     this.preparedHighlighterContentVersion = null
     this.highlighterSession = null
+    this.retainedHighlighter = null
     this.setHighlighterTheme(null)
   }
 
@@ -1256,7 +1332,7 @@ export class EditorSyntaxController {
         ? { kind: 'range', range: loadResult.range }
         : { kind: 'full' }
       this.options.setSyntaxFolds(result.folds)
-      this.options.setSyntaxCaptures?.(result.captures)
+      this.options.setSyntaxCaptures?.(result.captures, result.records)
     }
     if (!applyScopeFacts) {
       const visibleRange = this.options.getVisibleSyntaxRange()
@@ -1560,6 +1636,7 @@ export class EditorSyntaxController {
     startedAt: number,
     configurationGeneration: number,
   ): void {
+    if (error instanceof DOMException && error.name === 'AbortError') return
     if (documentVersion !== this.options.getDocumentVersion()) return
     if (configurationGeneration !== this.initialHighlightConfigurationGeneration) return
     const changeKind = change?.kind ?? 'refresh'
@@ -1627,6 +1704,7 @@ export class EditorSyntaxController {
     startedAt: number,
     configurationGeneration: number,
   ): void {
+    if (error instanceof DOMException && error.name === 'AbortError') return
     if (documentVersion !== this.options.getDocumentVersion()) return
     if (configurationGeneration !== this.initialHighlightConfigurationGeneration) return
     if (!change) this.failedHighlightRefreshes += 1

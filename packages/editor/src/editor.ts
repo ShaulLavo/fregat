@@ -35,11 +35,11 @@ export type {
   EditorPreparedDocument,
   EditorPreparedDocumentMatch,
   EditorPreparedDocumentPayload,
-  EditorPreparedHighlighterTransfer,
+  EditorPreparedHighlighterBorrow,
   EditorPreparedStageOutcome,
   EditorPreparedStageRequest,
   EditorPreparedStructuralConfiguration,
-  EditorPreparedStructuralTransfer,
+  EditorPreparedStructuralBorrow,
   EditorPreparedTagValue,
   EditorPreparedTabSizePolicy,
 } from './editor/preparedDocument'
@@ -189,3 +189,13 @@ export type {
 } from './plugins'
 
 export type { JumpCause } from './editor/jumpHistory'
+
+export { createEditorDocumentAnalysis } from './editor/documentAnalysis'
+export type {
+  EditorDocumentAnalysis,
+  EditorAnalysisRead,
+  EditorAnalysisStructuralRequest,
+  EditorAnalysisHighlighterRequest,
+  EditorRetainedSyntaxSession,
+  EditorRetainedHighlighterSession,
+} from './editor/documentAnalysis'

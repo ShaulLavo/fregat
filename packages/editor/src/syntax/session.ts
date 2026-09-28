@@ -110,7 +110,13 @@ export type EditorSyntaxDegradedState =
       readonly message: string
     }
 
+export type EditorSyntaxRecords = {
+  readonly languageId: EditorSyntaxLanguageId
+  readonly data: Uint32Array
+}
+
 export type EditorSyntaxResult = {
+  readonly records?: EditorSyntaxRecords
   readonly captures: readonly EditorSyntaxCapture[]
   readonly folds: readonly FoldRange[]
   readonly brackets: readonly BracketInfo[]

@@ -11,17 +11,17 @@ import type { TreeSitterBackend } from '../src/treeSitter/workerClient.ts'
 
 /**
  * The worker cannot ask for a language it was never sent, so an injection whose grammar stayed on
- * the main thread silently drops its whole layer — markdown_inline is an injection, which is why
- * markdown used to lose every inline construct.
+ * the main thread silently drops its whole layer — embedded is an injection, which is why
+ * container used to lose every inline construct.
  */
 
 const DESCRIPTORS: Record<string, TreeSitterLanguageDescriptor> = {
-  markdown: descriptor(
-    'markdown',
-    '((inline) @injection.content (#set! injection.language "markdown_inline"))',
+  container: descriptor(
+    'container',
+    '((inline) @injection.content (#set! injection.language "embedded"))',
   ),
-  markdown_inline: descriptor(
-    'markdown_inline',
+  embedded: descriptor(
+    'embedded',
     '((html_tag) @injection.content (#set! injection.language "html"))',
   ),
   html: descriptor('html'),
@@ -30,11 +30,11 @@ const DESCRIPTORS: Record<string, TreeSitterLanguageDescriptor> = {
 describe('injected language registration', () => {
   it('registers the languages an injection query names, transitively', async () => {
     const registered: string[][] = []
-    const session = createSession('markdown', registered)
+    const session = createSession('container', registered)
 
     await session.refresh(createDocumentTextSnapshot(createPieceTableSnapshot('# Title\n')))
 
-    expect(registered).toEqual([['markdown', 'markdown_inline', 'html']])
+    expect(registered).toEqual([['container', 'embedded', 'html']])
   })
 
   it('registers only the document language when nothing is injected', async () => {
@@ -76,7 +76,7 @@ function descriptor(id: string, injectionQuerySource?: string): TreeSitterLangua
   return {
     id,
     aliases: [id],
-    injectionDependencies: { markdown: ['markdown_inline'], markdown_inline: ['html'] }[id] ?? [],
+    injectionDependencies: { container: ['embedded'], embedded: ['html'] }[id] ?? [],
     extensions: [],
     wasmUrl: `${id}.wasm`,
     ...(injectionQuerySource ? { injectionQuerySource } : {}),
@@ -112,7 +112,7 @@ it('does not register or parse a delayed injection after disposal', async () => 
   const snapshot = createPieceTableSnapshot('```astro\n<Card />\n```')
   const session = new TreeSitterSyntaxSession({
     documentId: 'delayed',
-    languageId: 'markdown',
+    languageId: 'container',
     snapshot,
     textSnapshot: createDocumentTextSnapshot(snapshot),
     backend,
@@ -131,7 +131,7 @@ it('does not register or parse a delayed injection after disposal', async () => 
   release(descriptor('astro'))
   await refresh
   expect(parses).toBe(1)
-  expect(registered).toEqual([['markdown', 'markdown_inline', 'html']])
+  expect(registered).toEqual([['container', 'embedded', 'html']])
 })
 
 it('shares a delayed language load with the newer document version', async () => {
@@ -160,7 +160,7 @@ it('shares a delayed language load with the newer document version', async () =>
   const snapshot = createPieceTableSnapshot('```astro\n<Card />\n```')
   const session = new TreeSitterSyntaxSession({
     documentId: 'delayed',
-    languageId: 'markdown',
+    languageId: 'container',
     snapshot,
     textSnapshot: createDocumentTextSnapshot(snapshot),
     backend,
@@ -183,19 +183,19 @@ it('shares a delayed language load with the newer document version', async () =>
   await Promise.all([first, second])
   expect(loads).toBe(1)
   expect(session.getResult().projection.snapshot.version).toBe(2)
-  expect(registered).toEqual([['markdown', 'markdown_inline', 'html'], ['astro']])
+  expect(registered).toEqual([['container', 'embedded', 'html'], ['astro']])
   session.dispose()
 })
 
 describe('provider warm-up', () => {
   it('warms the host languages with their injection closures after a first parse', async () => {
-    const warm = warmingProvider(() => ['markdown', 'html', 'unknown'])
+    const warm = warmingProvider(() => ['container', 'html', 'unknown'])
 
     expect(warm.warmed).toEqual([])
     await warm.openDocument('html')
     await flushPromises()
 
-    expect(warm.warmed).toEqual([['markdown', 'markdown_inline', 'html']])
+    expect(warm.warmed).toEqual([['container', 'embedded', 'html']])
   })
 
   it('reads the host set again for each new document and skips an unchanged one', async () => {
@@ -204,11 +204,11 @@ describe('provider warm-up', () => {
 
     await warm.openDocument('html')
     await warm.openDocument('html')
-    languages = ['markdown']
+    languages = ['container']
     await warm.openDocument('html')
     await flushPromises()
 
-    expect(warm.warmed).toEqual([['html'], ['markdown', 'markdown_inline', 'html']])
+    expect(warm.warmed).toEqual([['html'], ['container', 'embedded', 'html']])
   })
 
   it('warms replaced registrations even when the host language list is unchanged', async () => {

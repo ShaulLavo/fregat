@@ -1,3 +1,4 @@
+import type { EditorDocumentAnalysis } from './documentAnalysis'
 import type { DocumentSessionChange } from '../documentSession'
 import type {
   EditorSyntaxLanguageId,
@@ -67,6 +68,7 @@ export type EditorScrollPosition = {
 }
 
 export type EditorSessionOptions = {
+  readonly analysis?: EditorDocumentAnalysis | null
   readonly documentId?: string | null
   readonly documentConfigurationTag?: readonly EditorPreparedTagValue[]
   readonly highlighterConfigurationTag?: readonly EditorPreparedTagValue[]

@@ -14,6 +14,10 @@ import {
   type EditorLogEvent,
   type EditorState,
 } from '../src/editor'
+import {
+  createEditorDocumentAnalysis,
+  type EditorDocumentAnalysis,
+} from '../src/editor/documentAnalysis'
 import { EDITOR_OPTION_DESCRIPTORS } from '../src/editor/optionDescriptors'
 import {
   acquireDocumentMutationLease,
@@ -246,8 +250,7 @@ class MockResizeObserver implements ResizeObserver {
 }
 
 async function flushMicrotasks(): Promise<void> {
-  await Promise.resolve()
-  await Promise.resolve()
+  await new Promise((resolve) => setTimeout(resolve, 0))
 }
 
 async function flushTimers(): Promise<void> {
@@ -895,6 +898,22 @@ function trackedDisposal(dispose: () => void, onDispose: () => void): () => void
 }
 
 describe('Editor', () => {
+  const analyses: EditorDocumentAnalysis[] = []
+
+  function openRetainedDocument(text: string): void {
+    const buffer = createEditorTextBuffer(text)
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'main.ts' })
+    analyses.push(analysis)
+    editor.attachSession(
+      createEditorBufferSession(buffer, createEditorViewSession(buffer, 'main')),
+      {
+        analysis,
+        documentId: 'main.ts',
+        languageId: 'typescript',
+      },
+    )
+  }
+
   let container: HTMLElement
   let editor: Editor
 
@@ -912,6 +931,7 @@ describe('Editor', () => {
   })
 
   afterEach(() => {
+    for (const analysis of analyses.splice(0)) analysis.dispose()
     editor.dispose()
     container.remove()
     setHighlightRegistry(undefined)
@@ -1083,7 +1103,7 @@ describe('Editor', () => {
       expect(editorRoot().style.getPropertyValue('--editor-foreground')).toBe('')
     })
 
-    it('hands the highlighter every edit the debounce skipped as one batch', async () => {
+    it('hands retained highlighters every committed edit once', async () => {
       const applied: DocumentSessionChange[] = []
       const highlighter = createMockHighlighterSession({
         applyChange: async (change) => {
@@ -1097,11 +1117,7 @@ describe('Editor', () => {
       })
       setEditorSyntaxSessionFactory(() => createMockSyntaxSession())
 
-      editor.openDocument({
-        documentId: 'main.ts',
-        languageId: 'typescript',
-        text: 'const a = 1;\nconst b = 2;',
-      })
+      openRetainedDocument('const a = 1;\nconst b = 2;')
       await flushMicrotasks()
       await flushSyntaxDebounce()
 
@@ -1113,12 +1129,9 @@ describe('Editor', () => {
       })
       await flushSyntaxDebounce()
 
-      // One request for the burst, carrying both edits in the coordinates of the last text the
-      // highlighter saw, rather than only the second edit against a document it never received.
-      expect(applied).toHaveLength(1)
-      expect([...applied[0]!.edits].sort((left, right) => left.from - right.from)).toEqual([
-        { from: 12, to: 12, text: '!' },
-        { from: 25, to: 25, text: '?' },
+      expect(applied.map((change) => change.edits)).toEqual([
+        [{ from: 12, to: 12, text: '!' }],
+        [{ from: 26, to: 26, text: '?' }],
       ])
     })
 
@@ -7731,7 +7744,7 @@ describe('Editor', () => {
       expect(highlightsMap.size).toBe(1)
     })
 
-    it('debounces rapid edit plugin highlight requests to the latest text', async () => {
+    it('updates retained plugin highlights for every committed revision', async () => {
       const changes: string[] = []
       const highlighter = createMockHighlighterSession({
         refresh: async () => createHighlightResult([]),
@@ -7751,17 +7764,13 @@ describe('Editor', () => {
         }),
       )
 
-      editor.openDocument({
-        documentId: 'main.ts',
-        languageId: 'typescript',
-        text: 'const a = 1;',
-      })
+      openRetainedDocument('const a = 1;')
       await flushMicrotasks()
       editorRoot().dispatchEvent(createInsertEvent('!'))
       editorRoot().dispatchEvent(createInsertEvent('?'))
 
       await flushSyntaxDebounce()
-      expect(changes).toEqual(['const a = 1;!?'])
+      expect(changes).toEqual(['const a = 1;!', 'const a = 1;!?'])
       expect(tokenHighlightRanges()[0]?.startOffset).toBe(0)
     })
 
@@ -7837,11 +7846,7 @@ describe('Editor', () => {
         }),
       )
 
-      editor.openDocument({
-        documentId: 'main.ts',
-        languageId: 'typescript',
-        text: 'const a = 1;',
-      })
+      openRetainedDocument('const a = 1;')
       await flushMicrotasks()
       editorRoot().dispatchEvent(createInsertEvent('!'))
       editorRoot().dispatchEvent(
@@ -7854,13 +7859,9 @@ describe('Editor', () => {
       )
 
       await flushSyntaxDebounce()
-      expect(changes).toHaveLength(1)
-      // The insert and its undo land in one debounce window, so the highlighter, which last saw
-      // the original text, receives the burst composed against that text: a no-op at the caret.
-      expect(changes[0]).toMatchObject({
-        kind: 'undo',
-        edits: [{ from: 12, to: 12, text: '' }],
-      })
+      expect(changes).toHaveLength(2)
+      expect(changes[0]).toMatchObject({ kind: 'edit', edits: [{ from: 12, to: 12, text: '!' }] })
+      expect(changes[1]).toMatchObject({ kind: 'undo', edits: [{ from: 12, to: 13, text: '' }] })
     })
 
     it('ignores stale plugin highlight results after a newer edit', async () => {
@@ -7882,11 +7883,7 @@ describe('Editor', () => {
         }),
       )
 
-      editor.openDocument({
-        documentId: 'main.ts',
-        languageId: 'typescript',
-        text: 'const a = 1;',
-      })
+      openRetainedDocument('const a = 1;')
       await flushMicrotasks()
       editorRoot().dispatchEvent(createInsertEvent('!'))
       await flushSyntaxDebounce()
@@ -7895,7 +7892,7 @@ describe('Editor', () => {
 
       secondEdit.resolve(createHighlightResult([{ start: 0, end: 5, style: { color: '#00ff00' } }]))
       await flushMicrotasks()
-      expect(tokenHighlightRanges()[0]?.startOffset).toBe(0)
+      expect(tokenHighlightRanges()).toHaveLength(0)
 
       firstEdit.resolve(createHighlightResult([{ start: 6, end: 7, style: { color: '#ff0000' } }]))
       await flushMicrotasks()

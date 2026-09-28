@@ -1,18 +1,17 @@
+import type {
+  EditorDocumentAnalysis,
+  EditorRetainedSyntaxSession,
+  EditorRetainedHighlighterSession,
+} from './documentAnalysis'
 import type { EditorTextBuffer } from '../documentSession'
 import type { PieceTableSnapshot } from '@singapore-editor/textbuffer'
-import type {
-  EditorHighlighterProvider,
-  EditorHighlighterSession,
-  EditorHighlightResult,
-} from '../plugins'
+import type { EditorHighlighterProvider, EditorHighlightResult } from '../plugins'
 import {
   createEmptySyntaxResult,
-  createEditorRuntimeSessionId,
   type EditorSyntaxLanguageId,
   type EditorSyntaxProvider,
   type EditorSyntaxRange,
   type EditorSyntaxResult,
-  type EditorSyntaxSession,
 } from '../syntax/session'
 import { IndentationFoldIndex } from './indentationFoldIndex'
 import { guessedTabSize } from './indentationGuess'
@@ -61,26 +60,26 @@ export type EditorPreparedStageRequest =
 
 export type EditorPreparedStageOutcome = 'ready' | 'aborted' | 'failed' | 'stale'
 
-export type EditorPreparedStructuralTransfer = {
+export type EditorPreparedStructuralBorrow = {
   readonly family: 'structural'
   readonly runtimeSessionId: string
   readonly provider: EditorSyntaxProvider
   readonly configuration: EditorPreparedStructuralConfiguration
   readonly configurationTag: readonly EditorPreparedTagValue[]
   readonly range: EditorSyntaxRange
-  readonly session: EditorSyntaxSession
+  readonly session: EditorRetainedSyntaxSession
   readonly result: Promise<EditorSyntaxResult>
   readonly readyResult: EditorSyntaxResult | null
   dispose(): void
 }
 
-export type EditorPreparedHighlighterTransfer = {
+export type EditorPreparedHighlighterBorrow = {
   readonly family: 'highlighter'
   readonly runtimeSessionId: string
   readonly provider: EditorHighlighterProvider
   readonly configurationTag: readonly EditorPreparedTagValue[]
   readonly range: 'full'
-  readonly session: EditorHighlighterSession
+  readonly session: EditorRetainedHighlighterSession
   readonly result: Promise<EditorHighlightResult>
   readonly readyResult: EditorHighlightResult | null
   dispose(): void
@@ -90,14 +89,15 @@ export type EditorPreparedDocumentPayload = {
   readonly lineStarts: readonly number[]
   readonly tabSize: number
   readonly fallbackFoldIndex: IndentationFoldIndex | null
-  readonly structural: EditorPreparedStructuralTransfer | null
-  readonly highlighter: EditorPreparedHighlighterTransfer | null
+  readonly structural: EditorPreparedStructuralBorrow | null
+  readonly highlighter: EditorPreparedHighlighterBorrow | null
 }
 
 export type EditorPreparedDocument = {
   startStage(request: EditorPreparedStageRequest): Promise<EditorPreparedStageOutcome> | null
   runtimeSessionIds(): EditorPreparedRuntimeSessionIds
-  take(expected: EditorPreparedDocumentMatch): EditorPreparedDocumentPayload | null
+  readonly analysis: EditorDocumentAnalysis
+  borrow(expected: EditorPreparedDocumentMatch): EditorPreparedDocumentPayload | null
   dispose(): void
   readonly estimatedBytes: number
   /** True if fallback preparation finishes before takeover, incomplete transfer, or disposal. */
@@ -110,6 +110,7 @@ type EditorPreparedRuntimeSessionIds = {
 }
 
 export type CreateEditorPreparedDocumentOptions = {
+  readonly analysis: EditorDocumentAnalysis
   readonly buffer: EditorTextBuffer
   readonly documentId: string
   readonly languageId: EditorSyntaxLanguageId | null
@@ -134,6 +135,8 @@ const SYNTAX_INJECTION_ESTIMATED_BYTES = 48
 export function createEditorPreparedDocument(
   options: CreateEditorPreparedDocumentOptions,
 ): EditorPreparedDocument {
+  if (options.analysis.buffer !== options.buffer)
+    throw new TypeError('Prepared analysis must reference the source buffer')
   const snapshot = options.buffer.getSnapshot()
   const textSnapshot = options.buffer.getTextSnapshot()
   const lineStarts = computeLineStarts(textSnapshot)
@@ -144,7 +147,6 @@ export function createEditorPreparedDocument(
   const documentConfigurationTag = checkedTag(options.documentConfigurationTag)
   let structural: PreparedStructuralStage | null = null
   let highlighter: PreparedHighlighterStage | null = null
-  let consumed = false
   let disposed = false
   const fallback = new PreparedFallbackIndex(
     new IndentationFoldIndex({ snapshot: textSnapshot, languageId: options.languageId, tabSize }),
@@ -157,11 +159,12 @@ export function createEditorPreparedDocument(
 
     disposed = true
     fallback.dispose()
-    structural?.disposeIfOwned()
-    highlighter?.disposeIfOwned()
+    structural?.dispose()
+    highlighter?.dispose()
   }
 
   return {
+    analysis: options.analysis,
     fallbackReady: fallback.ready,
     get estimatedBytes() {
       const documentBytes =
@@ -171,15 +174,15 @@ export function createEditorPreparedDocument(
       return documentBytes + readyStageEstimatedBytes(structural, highlighter)
     },
     startStage(request) {
-      if (consumed || disposed) return null
+      if (disposed) return null
       if (request.family === 'structural') {
         if (structural) return null
-        structural = createStructuralStage(options, snapshot, textSnapshot, request)
+        structural = createStructuralStage(options, textSnapshot, request)
         observePreparedStructuralOwnership(structural, fallback, options.languageId)
         return structural.outcome
       }
       if (highlighter) return null
-      highlighter = createHighlighterStage(options, snapshot, textSnapshot, request)
+      highlighter = createHighlighterStage(options, textSnapshot, request)
       return highlighter.outcome
     },
     runtimeSessionIds() {
@@ -188,16 +191,15 @@ export function createEditorPreparedDocument(
         structural: structural?.runtimeSessionId ? [structural.runtimeSessionId] : [],
       }
     },
-    take(expected) {
-      if (consumed || disposed) return null
+    borrow(expected) {
+      if (disposed) return null
       if (!matchesDocument(expected, options, snapshot, documentConfigurationTag)) {
         dispose()
         return null
       }
 
-      consumed = true
-      const structuralTransfer = takeStructural(structural, expected)
-      const highlighterTransfer = takeHighlighter(highlighter, expected)
+      const structuralTransfer = borrowStructural(structural, expected, options.analysis)
+      const highlighterTransfer = borrowHighlighter(highlighter, expected, options.analysis)
       return {
         lineStarts,
         tabSize,
@@ -362,7 +364,6 @@ function structuralResultEstimatedBytes(result: EditorSyntaxResult | null): numb
 
 function createStructuralStage(
   options: CreateEditorPreparedDocumentOptions,
-  snapshot: PieceTableSnapshot,
   textSnapshot: ReturnType<EditorTextBuffer['getTextSnapshot']>,
   request: Extract<EditorPreparedStageRequest, { readonly family: 'structural' }>,
 ) {
@@ -370,17 +371,14 @@ function createStructuralStage(
     return createMissingStructuralStage(request.abortSignal, 'aborted')
   }
 
-  const runtimeSessionId = createEditorRuntimeSessionId()
   const configurationTag = checkedTag(request.configurationTag)
-  const session = request.provider.createSession({
-    documentId: options.documentId,
-    runtimeSessionId,
+  const session = options.analysis.borrowStructural({
+    provider: request.provider,
+    configurationTag: request.configurationTag,
     languageId: options.languageId,
     includeCaptures: request.configuration.includeCaptures,
     includeHighlights: request.configuration.includeHighlights,
     syntaxMode: request.configuration.syntaxMode,
-    snapshot,
-    textSnapshot,
   })
   if (!session) return createMissingStructuralStage(request.abortSignal, 'failed')
 
@@ -400,14 +398,13 @@ function createStructuralStage(
     provider: request.provider,
     range: request.range,
     result: tracked,
-    runtimeSessionId,
+    runtimeSessionId: session.runtimeSessionId,
     session,
   }
 }
 
 function createHighlighterStage(
   options: CreateEditorPreparedDocumentOptions,
-  snapshot: PieceTableSnapshot,
   textSnapshot: ReturnType<EditorTextBuffer['getTextSnapshot']>,
   request: Extract<EditorPreparedStageRequest, { readonly family: 'highlighter' }>,
 ) {
@@ -415,14 +412,11 @@ function createHighlighterStage(
     return createMissingHighlighterStage(request.abortSignal, 'aborted')
   }
 
-  const runtimeSessionId = createEditorRuntimeSessionId()
   const configurationTag = checkedTag(request.configurationTag)
-  const session = request.provider.createSession({
-    documentId: options.documentId,
-    runtimeSessionId,
+  const session = options.analysis.borrowHighlighter({
+    provider: request.provider,
+    configurationTag: request.configurationTag,
     languageId: options.languageId,
-    snapshot,
-    textSnapshot,
   })
   if (!session) return createMissingHighlighterStage(request.abortSignal, 'failed')
 
@@ -437,7 +431,7 @@ function createHighlighterStage(
     provider: request.provider,
     range: 'full' as const,
     result: tracked,
-    runtimeSessionId,
+    runtimeSessionId: session.runtimeSessionId,
     session,
   }
 }
@@ -445,10 +439,8 @@ function createHighlighterStage(
 function createStageOwner<TResult>(session: { dispose(): void }, abortSignal: AbortSignal) {
   let disposed = false
   let failed = false
-  let transferred = false
   let readyResult: TResult | null = null
   const abort = () => {
-    if (transferred) return
     dispose()
   }
   const dispose = () => {
@@ -463,19 +455,9 @@ function createStageOwner<TResult>(session: { dispose(): void }, abortSignal: Ab
   return {
     abortSignal,
     dispose,
-    disposeIfOwned: () => {
-      if (transferred) return
-      dispose()
-    },
     disposed: () => disposed,
     failed: () => failed,
     readyResult: () => readyResult,
-    takeOwnership: () => {
-      if (disposed) return false
-      transferred = true
-      abortSignal.removeEventListener('abort', abort)
-      return true
-    },
     track: (result: Promise<TResult>): Promise<TResult> =>
       result.then(
         (value) => {
@@ -510,7 +492,6 @@ function createMissingStructuralStage(
     configuration: null,
     configurationTag: [] as readonly EditorPreparedTagValue[],
     dispose: () => undefined,
-    disposeIfOwned: () => undefined,
     disposed: () => true,
     failed: () => true,
     outcome: Promise.resolve(outcome),
@@ -520,7 +501,6 @@ function createMissingStructuralStage(
     result: Promise.resolve(createEmptySyntaxResult()),
     runtimeSessionId: '',
     session: null,
-    takeOwnership: () => false,
     track: <T>(result: Promise<T>) => result,
   }
 }
@@ -533,7 +513,6 @@ function createMissingHighlighterStage(
     abortSignal,
     configurationTag: [] as readonly EditorPreparedTagValue[],
     dispose: () => undefined,
-    disposeIfOwned: () => undefined,
     disposed: () => true,
     failed: () => true,
     outcome: Promise.resolve(outcome),
@@ -543,15 +522,15 @@ function createMissingHighlighterStage(
     result: Promise.resolve({ tokens: [] }),
     runtimeSessionId: '',
     session: null,
-    takeOwnership: () => false,
     track: <T>(result: Promise<T>) => result,
   }
 }
 
-function takeStructural(
+function borrowStructural(
   stage: PreparedStructuralStage | null,
   expected: EditorPreparedDocumentMatch,
-): EditorPreparedStructuralTransfer | null {
+  analysis: EditorDocumentAnalysis,
+): EditorPreparedStructuralBorrow | null {
   if (!stage?.session || !stage.provider || !stage.configuration || !stage.range) return null
   if (stage.provider !== expected.structuralProvider) return disposeStage(stage)
   if (!sameStructuralConfiguration(stage.configuration, expected.structuralConfiguration)) {
@@ -560,9 +539,19 @@ function takeStructural(
   if (!sameTag(stage.configurationTag, expected.structuralConfigurationTag)) {
     return disposeStage(stage)
   }
-  if (!stage.takeOwnership()) return null
-
-  return transferWithReadyResult(
+  const session = analysis.borrowStructural({
+    provider: stage.provider,
+    languageId: expected.languageId,
+    ...stage.configuration,
+    configurationTag: stage.configurationTag,
+  })
+  if (!session) return null
+  const range = stage.range
+  const result = session
+    .refresh(analysis.buffer.getTextSnapshot())
+    .then(() => session.queryRange?.(range) ?? session.getResult())
+  void result.catch(() => undefined)
+  return borrowWithReadyResult(
     {
       family: 'structural' as const,
       runtimeSessionId: stage.runtimeSessionId,
@@ -570,41 +559,54 @@ function takeStructural(
       configuration: stage.configuration,
       configurationTag: stage.configurationTag,
       range: stage.range,
-      session: stage.session,
-      result: stage.result,
-      dispose: stage.dispose,
+      session,
+      result,
+      dispose: () => session.dispose(),
     },
-    stage.readyResult,
+    () => {
+      const state = session.read(stage.range ?? undefined)
+      return state.kind === 'ready' ? state.result : null
+    },
   )
 }
 
-function takeHighlighter(
+function borrowHighlighter(
   stage: PreparedHighlighterStage | null,
   expected: EditorPreparedDocumentMatch,
-): EditorPreparedHighlighterTransfer | null {
+  analysis: EditorDocumentAnalysis,
+): EditorPreparedHighlighterBorrow | null {
   if (!stage?.session || !stage.provider) return null
   if (stage.provider !== expected.highlighterProvider) return disposeStage(stage)
   if (!sameTag(stage.configurationTag, expected.highlighterConfigurationTag)) {
     return disposeStage(stage)
   }
-  if (!stage.takeOwnership()) return null
-
-  return transferWithReadyResult(
+  const session = analysis.borrowHighlighter({
+    provider: stage.provider,
+    languageId: expected.languageId,
+    configurationTag: stage.configurationTag,
+  })
+  if (!session) return null
+  const result = session.refresh(analysis.buffer.getTextSnapshot())
+  void result.catch(() => undefined)
+  return borrowWithReadyResult(
     {
       family: 'highlighter' as const,
       runtimeSessionId: stage.runtimeSessionId,
       provider: stage.provider,
       configurationTag: stage.configurationTag,
       range: 'full' as const,
-      session: stage.session,
-      result: stage.result,
-      dispose: stage.dispose,
+      session,
+      result,
+      dispose: () => session.dispose(),
     },
-    stage.readyResult,
+    () => {
+      const state = session.read()
+      return state.kind === 'ready' ? state.result : null
+    },
   )
 }
 
-function transferWithReadyResult<TResult, T extends object>(
+function borrowWithReadyResult<TResult, T extends object>(
   transfer: T,
   readyResult: () => TResult | null,
 ): T & { readonly readyResult: TResult | null } {
