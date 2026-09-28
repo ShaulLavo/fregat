@@ -12,7 +12,6 @@ export function useTreeRenameStart({
   getScroll,
   invalidateControllerView,
   itemHeight,
-  noteContextMenuInteraction,
   renamingEnabled,
   requestSearchCloseFocusRestore,
   resolvedViewportHeight,
@@ -21,7 +20,6 @@ export function useTreeRenameStart({
   readonly getScroll: () => HTMLElement | null
   readonly invalidateControllerView: () => void
   readonly itemHeight: number
-  readonly noteContextMenuInteraction: () => void
   readonly renamingEnabled: boolean
   readonly requestSearchCloseFocusRestore: (viewportOffset: number | null) => void
   readonly resolvedViewportHeight: number
@@ -55,7 +53,6 @@ export function useTreeRenameStart({
         return
       }
 
-      noteContextMenuInteraction()
       invalidateControllerView()
     },
     [
@@ -63,7 +60,6 @@ export function useTreeRenameStart({
       getScroll,
       invalidateControllerView,
       itemHeight,
-      noteContextMenuInteraction,
       renamingEnabled,
       requestSearchCloseFocusRestore,
       resolvedViewportHeight,

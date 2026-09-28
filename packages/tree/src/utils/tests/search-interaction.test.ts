@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { FileTreeController } from '../model/FileTreeController'
+import { FileTreeController } from '../model/controller'
 
 const SEARCH_PATHS = [
   'README.md',

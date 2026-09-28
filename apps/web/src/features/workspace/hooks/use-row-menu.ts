@@ -1,5 +1,5 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import type { FileTreeContextMenuItem, FileTreeContextMenuOpenContext } from '@workspace/tree'
+import type { FileTreeContextMenuItem } from '@workspace/tree'
 import { containerTreePath, entryName } from '@/features/workspace/utils/entry-paths'
 import { rowGitActions, treeRowMenu } from '@/features/workspace/utils/row-menu'
 import type { TreeFsActions } from '@/features/workspace/hooks/use-fs-actions'
@@ -16,13 +16,11 @@ import { entryForTreePath, type TreeModel } from '@/lib/tree-model'
 export function useRowMenu({
   actions,
   item,
-  menuContext,
   model,
   rootPath,
 }: {
   readonly actions: TreeFsActions
   readonly item: FileTreeContextMenuItem
-  readonly menuContext: FileTreeContextMenuOpenContext
   readonly model: TreeModel
   readonly rootPath: string
 }): Menu {
@@ -39,22 +37,10 @@ export function useRowMenu({
   // Same query key the git panel uses, so this is a cache read, not a refetch.
   const status = useStatus(rootPath)
 
-  /**
-   * Inline edits take focus into the tree's rename input. Closing with
-   * `restoreFocus: false` first stops the menu's own close path from pulling
-   * focus back onto the row.
-   */
-  function startInlineEdit(begin: () => void) {
-    menuContext.close({ restoreFocus: false })
-    begin()
-  }
-
   return treeRowMenu({
     copyPath: (value, label) => void copyTextToClipboard(value, label),
-    createFile: () =>
-      startInlineEdit(() => actions.createEntry(containerTreePath(treePath, isDirectory), false)),
-    createFolder: () =>
-      startInlineEdit(() => actions.createEntry(containerTreePath(treePath, isDirectory), true)),
+    createFile: () => actions.createEntry(containerTreePath(treePath, isDirectory), false),
+    createFolder: () => actions.createEntry(containerTreePath(treePath, isDirectory), true),
     discard: () => discard.mutate(),
     duplicate: () => actions.duplicateEntry(treePath, isDirectory),
     git: rowGitActions(status.data?.files, path, isDirectory),
@@ -63,7 +49,7 @@ export function useRowMenu({
     openFile: () => selectFile(path),
     path,
     relativePath: treePath,
-    rename: () => startInlineEdit(() => actions.renameEntry(item.path)),
+    rename: () => actions.renameEntry(item.path),
     requestDelete: () =>
       actions.requestDelete({
         isDirectory,

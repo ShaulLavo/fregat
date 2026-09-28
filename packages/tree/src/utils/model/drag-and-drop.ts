@@ -1,16 +1,15 @@
 // Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
-import { getAncestorDirectoryPaths, isCanonicalDirectoryPath } from './pathHelpers'
+import { ancestorDirectoryPaths, isDirectoryPath } from '@workspace/utils/slash-paths'
 import type {
   FileTreeBatchOperation,
   FileTreeDropContext,
   FileTreeDropResult,
   FileTreeDropTarget,
-  FileTreePublicId,
-} from './publicTypes'
+} from './public-types'
 
 export interface FileTreeDragSession {
-  draggedPaths: readonly FileTreePublicId[]
-  primaryPath: FileTreePublicId
+  draggedPaths: readonly string[]
+  primaryPath: string
   target: FileTreeDropTarget | null
 }
 
@@ -23,9 +22,9 @@ function getPathBasename(path: string): string {
 
 // Multi-select drags should move each subtree once, even when callers selected
 // both a folder and descendants inside that same folder.
-function normalizeDraggedPaths(paths: readonly FileTreePublicId[]): readonly FileTreePublicId[] {
-  const uniquePaths: FileTreePublicId[] = []
-  const seenPaths = new Set<FileTreePublicId>()
+function normalizeDraggedPaths(paths: readonly string[]): readonly string[] {
+  const uniquePaths: string[] = []
+  const seenPaths = new Set<string>()
   for (const path of paths) {
     if (seenPaths.has(path)) {
       continue
@@ -34,7 +33,7 @@ function normalizeDraggedPaths(paths: readonly FileTreePublicId[]): readonly Fil
     uniquePaths.push(path)
   }
 
-  const keptPaths = new Set<FileTreePublicId>()
+  const keptPaths = new Set<string>()
   for (const path of uniquePaths.toSorted((left, right) => {
     if (left.length !== right.length) {
       return left.length - right.length
@@ -42,7 +41,7 @@ function normalizeDraggedPaths(paths: readonly FileTreePublicId[]): readonly Fil
 
     return left.localeCompare(right)
   })) {
-    if (getAncestorDirectoryPaths(path).some((ancestor) => keptPaths.has(ancestor))) {
+    if (ancestorDirectoryPaths(path).some((ancestor) => keptPaths.has(ancestor))) {
       continue
     }
 
@@ -53,9 +52,9 @@ function normalizeDraggedPaths(paths: readonly FileTreePublicId[]): readonly Fil
 }
 
 export function resolveDraggedPathsForStart(
-  path: FileTreePublicId,
-  selectedPaths: readonly FileTreePublicId[],
-): readonly FileTreePublicId[] {
+  path: string,
+  selectedPaths: readonly string[],
+): readonly string[] {
   return selectedPaths.includes(path) ? normalizeDraggedPaths(selectedPaths) : [path]
 }
 
@@ -80,7 +79,7 @@ export function dropTargetsEqual(
 }
 
 export function createDropContext(
-  draggedPaths: readonly FileTreePublicId[],
+  draggedPaths: readonly string[],
   target: FileTreeDropTarget,
 ): FileTreeDropContext {
   return {
@@ -90,7 +89,7 @@ export function createDropContext(
 }
 
 export function isSelfOrDescendantDrop(
-  draggedPaths: readonly FileTreePublicId[],
+  draggedPaths: readonly string[],
   target: FileTreeDropTarget,
 ): boolean {
   if (target.kind !== 'directory' || target.directoryPath == null) {
@@ -98,7 +97,7 @@ export function isSelfOrDescendantDrop(
   }
 
   for (const draggedPath of draggedPaths) {
-    if (!isCanonicalDirectoryPath(draggedPath)) {
+    if (!isDirectoryPath(draggedPath)) {
       continue
     }
 
@@ -110,10 +109,7 @@ export function isSelfOrDescendantDrop(
   return false
 }
 
-function resolveMoveDestinationPath(
-  sourcePath: FileTreePublicId,
-  target: FileTreeDropTarget,
-): FileTreePublicId {
+function resolveMoveDestinationPath(sourcePath: string, target: FileTreeDropTarget): string {
   if (target.kind === 'root' || target.directoryPath == null) {
     return getPathBasename(sourcePath)
   }
@@ -122,7 +118,7 @@ function resolveMoveDestinationPath(
 }
 
 export function buildDropOperations(
-  draggedPaths: readonly FileTreePublicId[],
+  draggedPaths: readonly string[],
   target: FileTreeDropTarget,
 ): {
   operations: readonly FileTreeBatchOperation[]

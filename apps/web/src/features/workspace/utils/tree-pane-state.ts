@@ -9,6 +9,7 @@ import type { TreeViewModel } from '@/features/workspace/state/tree-model'
 
 import type { TreeEntry } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
+import { ancestorDirectoryPaths } from '@workspace/utils/slash-paths'
 import { canonicalTreePath } from '@/lib/path-formatters'
 import { containerTreePath } from '@/features/workspace/utils/entry-paths'
 import {
@@ -335,17 +336,6 @@ function expandKnownAncestorDirectories(tree: TreeViewModel, treePath: string) {
 
     item.expand()
   }
-}
-
-function ancestorDirectoryPaths(treePath: string) {
-  const segments = canonicalTreePath(treePath).split('/').filter(Boolean)
-  const paths: string[] = []
-
-  for (let index = 0; index < segments.length - 1; index += 1) {
-    paths.push(`${segments.slice(0, index + 1).join('/')}/`)
-  }
-
-  return paths
 }
 
 function expandedDirectoryPaths(model: TreeModel, tree: TreeViewModel) {

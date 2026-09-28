@@ -3,7 +3,8 @@ import type { KeyboardEvent as ReactKeyboardEvent, KeyboardEventHandler } from '
 import type { TreeFocusCoordinator } from '@/features/workspace/hooks/use-tree-focus-sync'
 import type { TreeRowDom } from '@/features/workspace/hooks/use-tree-row-dom'
 import type { FileTreeController } from '@workspace/tree'
-import type { FileTreeContextMenuOpenContext, FileTreeVisibleRow } from '@workspace/tree'
+import type { FileTreeVisibleRow } from '@workspace/tree'
+import type { TreeMenuTrigger } from '@/features/workspace/utils/tree-row-menu-open'
 import { getContextMenuAnchorButton } from '@/features/workspace/utils/tree-context-menu-anchor'
 import { isTreeDirectoryHandle } from '@/features/workspace/utils/tree-drag-pointer'
 import {
@@ -32,14 +33,10 @@ interface UseTreeKeyboardOptions {
   readonly isSearchOpen: boolean
   readonly itemHeight: number
   readonly markActiveItem: (path: string) => void
-  readonly noteContextMenuInteraction: () => void
   readonly openContextMenuForRow: (
     row: FileTreeVisibleRow,
     targetPath: string,
-    options?: {
-      anchorRect?: FileTreeContextMenuOpenContext['anchorRect']
-      source?: 'button' | 'keyboard' | 'right-click'
-    },
+    trigger: TreeMenuTrigger,
   ) => void
   readonly renameView: ReturnType<FileTreeController['getRenameView']>
   readonly renamingEnabled: boolean
@@ -133,10 +130,8 @@ function getStickyKeyState(
 
 function finishHandledEvent(
   event: ReactKeyboardEvent<HTMLElement>,
-  noteContextMenuInteraction: () => void,
   invalidateControllerView: () => void,
 ): void {
-  noteContextMenuInteraction()
   invalidateControllerView()
   event.preventDefault()
   event.stopPropagation()
@@ -158,7 +153,6 @@ export function useTreeKeyboard(
     isSearchOpen,
     itemHeight,
     markActiveItem,
-    noteContextMenuInteraction,
     openContextMenuForRow,
     renameView,
     renamingEnabled,
@@ -257,7 +251,11 @@ export function useTreeKeyboard(
       )
       if (focusedRow == null || focusedButton == null) return false
 
-      openContextMenuForRow(focusedRow, effectiveFocusedPath)
+      openContextMenuForRow(focusedRow, effectiveFocusedPath, {
+        element: focusedButton,
+        event,
+        kind: 'key',
+      })
       return true
     }
     if ((event.ctrlKey || event.metaKey) && isSpaceSelectionKey(event)) {
@@ -300,7 +298,7 @@ export function useTreeKeyboard(
     }
     if (isSearchOpen) {
       if (handleSearchKey(event)) {
-        finishHandledEvent(event, noteContextMenuInteraction, invalidateControllerView)
+        finishHandledEvent(event, invalidateControllerView)
       }
       return
     }
@@ -345,7 +343,6 @@ export function useTreeKeyboard(
       focusedDirectoryItem?.isExpanded() === true
     if (!performNavigation(event, effectiveFocusedPath, effectiveFocusedIndex)) return
 
-    noteContextMenuInteraction()
     const nextFocusedPath = controller.getFocusedPath()
     const nextPathIsMountedSticky =
       nextFocusedPath != null &&

@@ -25,7 +25,6 @@ export interface MoveTarget {
 export interface PathStoreState {
   activeNodeCount: number
   collapsedDirectoryIds: Set<NodeId>
-  collapseNewDirectoriesByDefault: boolean
   defaultExpansion: PathStoreInitialExpansion
   directoriesOpenByDefault: boolean
   hasCollapsedDirectoryOverrides: boolean
@@ -45,7 +44,6 @@ export function createPathStoreState(
   return {
     activeNodeCount: snapshot.nodes.length - 1,
     collapsedDirectoryIds: new Set<NodeId>(),
-    collapseNewDirectoriesByDefault: false,
     defaultExpansion,
     directoriesOpenByDefault: defaultExpansion === 'open',
     hasCollapsedDirectoryOverrides: false,

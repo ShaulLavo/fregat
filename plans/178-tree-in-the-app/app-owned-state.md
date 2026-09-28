@@ -1,6 +1,6 @@
 # Plan 178: app-owned state
 
-- Status: IN PROGRESS (wave 2, lane T): steps 1–2 and the view half of step 3 landed 2026-09-26; the controller split next, then 4–9. Size L. After [out-of-the-root](out-of-the-root.md).
+- Status: IN PROGRESS (wave 2, lane T): steps 1–3, 8 and 9 landed 2026-09-26/27; 4–7 next. Size L. After [out-of-the-root](out-of-the-root.md).
 - Owns: moving the view into the app and replacing the imperative facade with props and state.
 
 ## Outcome
@@ -153,3 +153,78 @@ Layout effects keep their order; refs a hook writes live in that hook (the React
 writes to a hook argument), so `useTreeLayout` hands the viewport sync a setter for its updater.
 Harness: zero drift, except `menu-open`, whose baseline moved because main's menu lost the `F2`
 chip on Rename (reproduced on main); re-baselined.
+
+### Steps 2–3, the package, 2026-09-27
+
+- Package files renamed kebab-case in their own commit: `utils/model/controller.ts` (the `./model`
+  export), `public-types.ts`, `internal-types.ts`, `drag-and-drop.ts`, `input-resolution.ts`,
+  `mutation-events.ts`, `path-helpers.ts`, `rename-helpers.ts`, `search-helpers.ts`,
+  `utils/prepared-input.ts`, `git-status-signature.ts`, `git-status-presentation.ts`,
+  `normalize-input-path.ts`, `public-types.ts`, `rename-paths.ts` (`renameFileTreePaths` is
+  `renamePaths`).
+- The controller went from 2,116 lines to a coordinator over one class per concern, moved
+  unchanged: `visible-projection.ts` (rows, sticky candidates, the filtered subset) with its pure
+  helpers in `visible-projection-data.ts`, `focus.ts` (focus index, focus and scroll requests),
+  `selection.ts`, `search.ts` (the filter), `expansion.ts`, `rename.ts`, `drag-session.ts`,
+  `known-paths.ts`, `item-handles.ts`, `mutation-listeners.ts`. Each takes a small host interface
+  of closures back to the coordinator, which still orders the rebuild a store event triggers
+  (remap, filter refresh, projection, focus). The coordinator is 598 lines, nearly all one-line
+  delegators on the public surface; steps 6 and keyboard-and-selection remove most of them.
+- Verification: package 109 tests, TUI tree tests, web typecheck, tree browser 83 tests (parity
+  included), workspace node/dom tests (four failures are the container, not the tree: a
+  permission-denied fixture under root and three linked-file watch timeouts).
+
+### Step 9, 2026-09-27
+
+- Presorted input is gone end to end: `preparePresortedFileTreeInput`, `PathStore.preparePresortedInput`,
+  the `presorted` option, the builder's presorted ingest (cursor, deferred directory indexes,
+  `presortedDirectoryNodeIds`) and the all-open startup fast path it alone could reach
+  (`didMatchAllInitialExpandedPaths`, `collapseNewDirectoriesByDefault`). Child name and position
+  maps are always built now, so `ensureChildIdByNameId`/`ensureChildPositions` went too. The
+  prepared-input path the app uses is unchanged.
+- `FLATTENED_PREFIX` and `getSelectionPath` deleted; `renamePaths` takes the path as given.
+- `FileTreePublicId` replaced by `string` in the package and the app.
+- The root export drops the five types nothing outside the package imports
+  (`FileTreeDragAndDropConfig`, `FileTreeInitialExpansion`, `FileTreeRenamingConfig`,
+  `FileTreeSearchMode`, `FileTreeSortComparator`); `public-api.test.ts` follows.
+- Verification: package 100 tests (the removed ones covered presorted ingest only), TUI tree
+  tests and typecheck, web typecheck, gates. Tree browser 83 tests: one full run had
+  `tree-parity-scroll-menu` "holds row hover until the scroll settles" fail; three reruns of the
+  file passed. It times hover against scroll settlement, which this change does not touch.
+
+### Step 8, 2026-09-27
+
+- Gone: `searchFakeFocus` (and `FilterField`'s `fakeFocus`, which only the tree set),
+  `initialVisibleRowCount` (the first render uses a 420px viewport, as it did whenever the option was
+  unset), the density presets and numeric densities (`density.ts`, `resolveFileTreeDensity`,
+  `setDensity`): the model takes `itemHeight` and the host paints the app's 0.8 factor from
+  `TREE_DENSITY_FACTOR`. The view's defaults (`TREE_DEFAULT_ITEM_HEIGHT`, `_OVERSCAN`,
+  `_VIEWPORT_HEIGHT`) moved from the package into `utils/tree-view-layout.ts`.
+- `useTreeModel`'s 1ms teardown timeout and `TreeViewModel.cleanUp` are gone. The model owns
+  everything it subscribes to, so it needs no teardown; the one bridge out of it,
+  `onSelectionChange`, is connected by `TreeHost` in an effect (`connectSelectionChange`), which
+  StrictMode's remount handles, and reports a change made before it connected.
+- The tree-parity harness mounted without a density and so drew at factor 1; it now draws at the
+  app's 0.8, which is what it claims to mirror.
+- Verification: web typecheck, gates, package 100, `packages/ui` patterns 71, workspace node/dom
+  (the same container failures, plus `event-streams` once, which passes alone), tree browser 83.
+  `tree-parity-scroll-menu` "holds row hover until the scroll settles" fails intermittently under a
+  full run here; it fails the same way on the base commit `14eebe4` (the first hover never lands,
+  line 221), so it predates this work.
+
+### Verification environment, 2026-09-27
+
+These landings ran in a cloud container without the mesh. The Chromium tests ran (Playwright 1.63
+against the installed Chromium build). `agent:browser` did not: opening the checkout as a workspace
+exhausts the container's 20,000-descriptor hard limit (`EMFILE` from the recursive watch), and with
+a small workspace `tree-parity` still stops at the unreadable folder, which stays "loading"; the
+base commit `14eebe4` stops at the same step. So `tree-parity` (pixels and styles),
+`tree-parity-behaviour` and the guarding scenarios have not run on steps 2–3, 8, 9 or the
+context-menu adoption. Run them on the mesh before building on these.
+
+### Local review, 2026-09-28
+
+The removed `cleanUp` still had two benchmark callers; local review removed them and the CI
+benchmark gate passes. Tree package tests and all 82 tree browser tests pass. Fresh main and PR
+visual captures match in all 64 cases. See [local-review.md](local-review.md) for the scenario
+repairs, evidence and remaining verification notes.

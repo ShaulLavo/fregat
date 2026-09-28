@@ -14,7 +14,7 @@ const ORDERED_FILES = [
   'src/file10.ts',
   'README.md',
 ]
-const INGESTION_MODES = ['paths', 'prepared', 'presorted-files', 'presorted-directories'] as const
+const INGESTION_MODES = ['paths', 'prepared'] as const
 
 describe('builder ingestion modes', () => {
   it.each(INGESTION_MODES)('keeps natural order and mutable indexes after %s ingestion', (mode) => {
@@ -64,18 +64,6 @@ describe('builder ingestion modes', () => {
     expect(cache.size).toBeGreaterThan(0)
   })
 
-  it('preserves node layout when deferred indexes are flushed before a checked append', () => {
-    const files = ['src/a.ts', 'src/b.ts']
-    const deferred = new PathStoreBuilder()
-      .appendPresortedPaths(files, false)
-      .appendPaths(['src/c.ts', 'z.ts'])
-      .finish()
-    const checked = new PathStoreBuilder().appendPaths([...files, 'src/c.ts', 'z.ts']).finish()
-    expect(deferred.nodes).toEqual(checked.nodes)
-    expect(deferred.directories).toEqual(checked.directories)
-    expect(deferred.segmentTable.valueById).toEqual(checked.segmentTable.valueById)
-  })
-
   it('uses the same node layout for checked and trusted prepared paths', () => {
     const entries = preparePathEntries(['src/', ...ORDERED_FILES])
     const checked = new PathStoreBuilder().appendPreparedPaths(entries).finish()
@@ -104,16 +92,10 @@ describe('builder ingestion modes', () => {
     expect(() => new PathStoreBuilder().appendPaths(paths)).toThrow(error)
   })
 
-  it.each([false, true, null])('rejects adjacent duplicates with directory hint %s', (hint) => {
-    expect(() =>
-      new PathStoreBuilder().appendPresortedPaths(['src/a.ts', 'src/a.ts'], hint),
-    ).toThrow('Duplicate path')
-  })
-
-  it('tracks fully expanded file-only startup hints without including files', () => {
+  it('expands every startup hint directory over prepared input', () => {
     const store = new PathStore({
       initialExpandedPaths: ['src/', 'src/dir2', 'src/dir10/'],
-      preparedInput: PathStore.preparePresortedInput(ORDERED_FILES),
+      preparedInput: PathStore.prepareInput(ORDERED_FILES),
       flattenEmptyDirectories: false,
     })
     expect(store.getVisibleCount()).toBe(ORDERED_FILES.length + 3)
@@ -134,13 +116,6 @@ describe('builder ingestion modes', () => {
 function createStore(mode: (typeof INGESTION_MODES)[number], paths: string[]): PathStore {
   const options = { flattenEmptyDirectories: false, initialExpansion: 'open' } as const
   if (mode === 'paths') return new PathStore({ ...options, paths })
-  if (mode === 'prepared')
-    return new PathStore({ ...options, preparedInput: PathStore.prepareInput(paths) })
-  const input = mode === 'presorted-files' ? paths.filter((path) => !path.endsWith('/')) : paths
-  const store = new PathStore({
-    ...options,
-    preparedInput: PathStore.preparePresortedInput(PathStore.preparePaths(input)),
-  })
-  if (mode === 'presorted-files') store.add('empty/')
-  return store
+
+  return new PathStore({ ...options, preparedInput: PathStore.prepareInput(paths) })
 }

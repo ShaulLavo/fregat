@@ -4,20 +4,12 @@
 import { type JSX, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { FilterFieldHandle } from '@workspace/ui/patterns/filter-field'
 import type { FileTreeRowDecoration, FileTreeVisibleRow } from '@workspace/tree'
-import {
-  FILE_TREE_DEFAULT_ITEM_HEIGHT,
-  FILE_TREE_DEFAULT_OVERSCAN,
-  FILE_TREE_DEFAULT_VIEWPORT_HEIGHT,
-} from '@workspace/tree'
 
-import { TreeContextMenuWash } from '@/features/workspace/components/tree-context-menu-wash'
 import { TreeFilterInput } from '@/features/workspace/components/tree-filter-input'
-import { MenuTrigger } from '@/features/workspace/components/tree-menu-trigger'
 import type { TreeRenderRowFrame } from '@/features/workspace/components/tree-row'
 import { TreeRowWindow } from '@/features/workspace/components/tree-row-window'
 import { TreeStickyOverlay } from '@/features/workspace/components/tree-sticky-overlay'
 import { useTreeActiveItem } from '@/features/workspace/hooks/use-tree-active-item'
-import { useContextMenu } from '@/features/workspace/hooks/use-tree-context-menu'
 import { useTreeDrag } from '@/features/workspace/hooks/use-tree-drag'
 import { useTreeFocusSync } from '@/features/workspace/hooks/use-tree-focus-sync'
 import { useTreeKeyboard } from '@/features/workspace/hooks/use-tree-keyboard'
@@ -36,43 +28,45 @@ import {
   getTreeFocusedRowDomId,
   getTreeRowPath,
 } from '@/features/workspace/utils/tree-row-identity'
-import { getTreeRootDomId } from '@/features/workspace/utils/tree-view-layout'
+import {
+  getTreeRootDomId,
+  TREE_DEFAULT_ITEM_HEIGHT,
+  TREE_DEFAULT_OVERSCAN,
+} from '@/features/workspace/utils/tree-view-layout'
 import type { TreeViewProps } from '@/features/workspace/utils/tree-view-props'
 import { treeWindowFrame } from '@/features/workspace/utils/tree-window-frame'
+import {
+  openTreeRowMenu,
+  type TreeMenuTrigger,
+} from '@/features/workspace/utils/tree-row-menu-open'
 
 export function TreeView({
-  composition,
   controller,
   gitStatusByPath,
   ignoredGitDirectories,
   directoriesWithGitChanges,
   instanceId,
   loadingPaths,
-  itemHeight = FILE_TREE_DEFAULT_ITEM_HEIGHT,
-  overscan = FILE_TREE_DEFAULT_OVERSCAN,
+  menuPath = null,
+  onCloseMenu,
+  onOpenMenu,
+  itemHeight = TREE_DEFAULT_ITEM_HEIGHT,
+  overscan = TREE_DEFAULT_OVERSCAN,
   renamingEnabled = false,
   renderRowDecoration,
   rowElements,
   searchBlurBehavior = 'close',
   searchEnabled = false,
-  searchFakeFocus = false,
   searchPlaceholder = 'Search…',
   stickyFolders = false,
   initialScrollTop,
   onScrollTopChange,
-  initialViewportHeight = FILE_TREE_DEFAULT_VIEWPORT_HEIGHT,
 }: TreeViewProps): JSX.Element {
   'use no memo'
   // The tree intentionally mutates its stable DOM-ref registry during layout and native events;
   // compiler freezing would break that imperative ownership contract.
   const filterField = useRef<FilterFieldHandle>(null)
   const isScrollingRef = useRef(false)
-  const contextMenuScrollActionsRef = useRef({
-    clearHoverPath: (): void => {},
-    closeContextMenu: (): void => {},
-    isContextMenuOpen: (): boolean => false,
-  })
-  const contextMenuFocusInteractionRef = useRef<() => void>(() => {})
   const {
     getList,
     getRenameInput,
@@ -103,7 +97,6 @@ export function TreeView({
     getRoot,
     getScroll,
     initialScrollTop,
-    initialViewportHeight,
     itemHeight,
     overscan,
     stickyFolders,
@@ -112,9 +105,6 @@ export function TreeView({
   const [, setControllerRevision] = useState(0)
   const invalidateControllerView = useCallback((): void => {
     setControllerRevision((revision) => revision + 1)
-  }, [])
-  const noteContextMenuInteraction = useCallback((): void => {
-    contextMenuFocusInteractionRef.current()
   }, [])
   const [activeItemPath, setActiveItemPath] = useState<string | null>(null)
   const markContextMenuActiveItem = useCallback(
@@ -133,27 +123,6 @@ export function TreeView({
   const skipInitialSearchAutoFocusRef = useRef(
     searchBlurBehavior === 'retain' && controller.isSearchOpen(),
   )
-
-  // When `searchFakeFocus` is enabled, render a synthetic focus ring on the
-  // search input until the user actually interacts with it. The flag flips off
-  // on the first real focus, pointer-down, or input event so normal focus
-  // behavior takes over once the user engages.
-  const [fakeSearchFocusActive, setFakeSearchFocusActive] = useState<boolean>(searchFakeFocus)
-  useEffect(() => {
-    if (searchFakeFocus) return
-
-    let active = true
-    queueMicrotask(() => {
-      if (active) setFakeSearchFocusActive(false)
-    })
-    return () => {
-      active = false
-    }
-  }, [searchFakeFocus])
-
-  const markSearchInputInteracted = useCallback(() => {
-    setFakeSearchFocusActive((previous) => (previous ? false : previous))
-  }, [])
 
   const [hasStickyUiMount, setHasStickyUiMount] = useState(false)
   useEffect(() => {
@@ -239,7 +208,6 @@ export function TreeView({
   const {
     claimDomFocus,
     clearCanonicalStickyReveal,
-    ownsDomFocus,
     preserveStickyAtScrollTop,
     releaseDomFocus,
     requestCanonicalStickyReveal,
@@ -260,7 +228,6 @@ export function TreeView({
     getScroll,
     invalidateControllerView,
     itemHeight,
-    noteContextMenuInteraction,
     renamingEnabled,
     requestSearchCloseFocusRestore,
     resolvedViewportHeight,
@@ -309,14 +276,11 @@ export function TreeView({
   useTreeActiveItem({ claimDomFocus, getRoot, releaseDomFocus, setActiveItemPath })
 
   useTreeViewportSync({
-    contextMenuScrollActionsRef,
     controller,
     getRoot,
     getScroll,
     initialScrollTop,
-    initialViewportHeight,
     invalidateControllerView,
-    isScrollingRef,
     itemHeight,
     layoutScrollTop: layoutSnapshot.physical.scrollTop,
     onScrollTopChange,
@@ -330,55 +294,30 @@ export function TreeView({
     stickyFolders,
   })
 
-  const focusedRowIsVisible =
-    focusedIndex >= 0 &&
-    focusedIndex >= layoutSnapshot.visible.startIndex &&
-    focusedIndex <= layoutSnapshot.visible.endIndex
-  const focusedRowIsSticky =
-    focusedPath != null && stickyRows.some((entry) => getTreeRowPath(entry.row) === focusedPath)
-  const focusedRowHasVisibleAnchor = focusedRowIsVisible || focusedRowIsSticky
-  const {
-    anchorRef: contextMenuAnchorRef,
-    contentHostRef: contextMenuContentHostRef,
-    clearHoverPath,
-    closeContextMenu,
-    closeContextMenuRef,
-    triggerStore,
-    focusTriggerPath,
-    contextMenuButtonTriggerEnabled,
-    contextMenuButtonVisibility,
-    contextMenuEnabled,
-    contextMenuOpenPath,
-    contextMenuPointerAnchorRect,
-    contextMenuRightClickEnabled,
-    contextMenuTriggerMode,
-    handleTreePointerLeave,
-    handleTreePointerOver,
-    isContextMenuOpen,
-    isContextMenuOpenNow,
-    isPointerContextMenuOpen,
-    noteFocusInteraction,
-    openContextMenuForRow,
-    openMenuFromTrigger,
-    triggerRef: contextMenuTriggerRef,
-  } = useContextMenu({
-    composition,
-    controller,
-    dom,
-    claimDomFocus,
-    focusedPath,
-    focusedRowHasVisibleAnchor,
-    isScrolling: isScrollingRef,
-    markActiveItem: markContextMenuActiveItem,
-    ownsDomFocus,
-    preserveStickyAtScrollTop,
-  })
-  useLayoutEffect(() => {
-    contextMenuScrollActionsRef.current.clearHoverPath = clearHoverPath
-    contextMenuScrollActionsRef.current.closeContextMenu = closeContextMenuRef.current
-    contextMenuScrollActionsRef.current.isContextMenuOpen = isContextMenuOpenNow
-    contextMenuFocusInteractionRef.current = noteFocusInteraction
-  }, [clearHoverPath, closeContextMenuRef, isContextMenuOpenNow, noteFocusInteraction])
+  // The host's list menu closes itself on scroll and when its row goes; the view only reports.
+  const contextMenuEnabled = onOpenMenu != null
+  const contextMenuOpenPath = menuPath
+  const isContextMenuOpen = menuPath != null
+  const closeContextMenu = (): void => onCloseMenu?.()
+  const openContextMenuForRow = (
+    row: FileTreeVisibleRow,
+    targetPath: string,
+    trigger: TreeMenuTrigger,
+  ): void => {
+    if (onOpenMenu == null) return
+
+    openTreeRowMenu({
+      claimDomFocus,
+      controller,
+      dom,
+      markActiveItem: markContextMenuActiveItem,
+      onOpenMenu,
+      preserveStickyAtScrollTop,
+      row,
+      targetPath,
+      trigger,
+    })
+  }
   const onTreeKeyDown = useTreeKeyboard({
     seedSearch: (character) => filterField.current?.seed(character),
     closeContextMenu,
@@ -393,7 +332,6 @@ export function TreeView({
     isSearchOpen,
     itemHeight,
     markActiveItem: markContextMenuActiveItem,
-    noteContextMenuInteraction,
     openContextMenuForRow,
     renameView,
     renamingEnabled,
@@ -461,7 +399,6 @@ export function TreeView({
     claimDomFocus,
     controller,
     isSearchOpen,
-    noteContextMenuInteraction,
     revealCanonicalRowAtStickyOffset,
     searchBlurBehavior,
     setActiveItemPath,
@@ -478,11 +415,7 @@ export function TreeView({
     pointerFocusPath,
     guideFocusPath: focusedVisibleRow?.ancestorPaths.at(-1) ?? null,
     contextMenuOpenPath,
-    contextMenuButtonTriggerEnabled,
-    contextMenuButtonVisibility,
     contextMenuEnabled,
-    contextMenuRightClickEnabled,
-    contextMenuTriggerMode,
     controller,
     directoriesWithGitChanges,
     dragAndDropEnabled,
@@ -528,29 +461,12 @@ export function TreeView({
     <div
       ref={rootRef}
       id={treeDomId}
-      data-file-tree-context-menu-button-visibility={
-        contextMenuEnabled && contextMenuButtonTriggerEnabled
-          ? contextMenuButtonVisibility
-          : undefined
-      }
-      data-file-tree-context-menu-trigger-mode={
-        contextMenuEnabled ? contextMenuTriggerMode : undefined
-      }
-      data-file-tree-has-context-menu-action-lane={
-        contextMenuEnabled && contextMenuButtonTriggerEnabled ? 'true' : undefined
-      }
       data-file-tree-has-git-lane={gitLaneActive ? 'true' : undefined}
       data-file-tree-virtualized-root='true'
       onDragLeave={dragAndDropEnabled ? handleTreeDragLeave : undefined}
       onDragOver={dragAndDropEnabled ? handleTreeDragOver : undefined}
       onDrop={dragAndDropEnabled ? handleTreeDrop : undefined}
       onKeyDown={onTreeKeyDown}
-      onPointerLeave={
-        contextMenuEnabled && contextMenuButtonTriggerEnabled ? handleTreePointerLeave : undefined
-      }
-      onPointerOver={
-        contextMenuEnabled && contextMenuButtonTriggerEnabled ? handleTreePointerOver : undefined
-      }
       role='tree'
       tabIndex={-1}
       style={{
@@ -562,11 +478,9 @@ export function TreeView({
         <TreeFilterInput
           activeDescendantId={activeDescendantId}
           controller={controller}
-          fakeFocus={fakeSearchFocusActive}
           inputRef={searchInputRef}
           fieldRef={filterField}
           onArrowDown={() => controller.requestFocus()}
-          onInteract={markSearchInputInteracted}
           placeholder={searchPlaceholder}
           searchBlurBehavior={searchBlurBehavior}
           treeDomId={treeDomId}
@@ -598,26 +512,6 @@ export function TreeView({
           totalHeight={totalScrollableHeight}
         />
       </div>
-      {contextMenuEnabled ? (
-        <MenuTrigger
-          anchorRef={contextMenuAnchorRef}
-          contentHostRef={contextMenuContentHostRef}
-          triggerRef={contextMenuTriggerRef}
-          store={triggerStore}
-          dom={dom}
-          focusPath={focusTriggerPath}
-          openPath={contextMenuOpenPath}
-          pointerRect={contextMenuPointerAnchorRect}
-          isPointerMenu={isPointerContextMenuOpen}
-          isRenaming={isRenaming}
-          isScrolling={isScrollingRef}
-          buttonEnabled={contextMenuButtonTriggerEnabled}
-          closeMenu={closeContextMenu}
-          openMenu={openMenuFromTrigger}
-        />
-      ) : null}
-
-      {isContextMenuOpen ? <TreeContextMenuWash onClose={closeContextMenu} /> : null}
     </div>
   )
 }

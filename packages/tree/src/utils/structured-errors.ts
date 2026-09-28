@@ -5,7 +5,7 @@ const treeErrors = defineErrorCatalog('tree', {
   INVARIANT_ERROR: {
     status: 500,
     message: ({ message }: { message: string }) => message,
-    why: 'The file tree model or renderer hit an invariant violation.',
+    why: 'The file tree model hit an invariant violation.',
     fix: 'Inspect the tree state mutation or caller input that produced the invalid state.',
   },
 })

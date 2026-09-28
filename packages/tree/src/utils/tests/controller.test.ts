@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { FileTreeController } from '../model/FileTreeController'
+import { FileTreeController } from '../model/controller'
 import { computeFileTreeLayout } from '../model/layout'
-import { renameFileTreePaths } from '../renameFileTreePaths'
-import type { FileTreeVisibleRow } from '../model/publicTypes'
+import { renamePaths } from '../rename-paths'
+import type { FileTreeVisibleRow } from '../model/public-types'
 
 describe('FileTreeController', () => {
   it('tracks selection, search, drag/drop, and rename state', () => {
@@ -82,7 +82,7 @@ describe('tree pure helpers', () => {
 
   it('renames folders and rejects path collisions', () => {
     expect(
-      renameFileTreePaths({
+      renamePaths({
         files: ['src/', 'src/a.ts', 'src/nested/', 'src/nested/b.ts'],
         isFolder: true,
         nextBasename: 'app',
@@ -96,7 +96,7 @@ describe('tree pure helpers', () => {
     })
 
     expect(
-      renameFileTreePaths({
+      renamePaths({
         files: ['src/a.ts', 'src/b.ts'],
         isFolder: false,
         nextBasename: 'b.ts',

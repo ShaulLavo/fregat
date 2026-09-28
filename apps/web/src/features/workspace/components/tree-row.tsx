@@ -21,15 +21,12 @@ import { InlineRenameInput } from '@workspace/ui/patterns/inline-rename-input'
 import { GIT_STATUS_DESCENDANT_TITLE, GIT_STATUS_LABEL, GIT_STATUS_TITLE } from '@workspace/tree'
 import type { FileTreeController } from '@workspace/tree'
 import type {
-  FileTreeContextMenuButtonVisibility,
-  FileTreeContextMenuOpenContext,
-  FileTreeContextMenuTriggerMode,
   FileTreeRowDecoration,
   FileTreeRowDecorationAction,
   FileTreeVisibleRow,
 } from '@workspace/tree'
 import type { GitStatus } from '@workspace/tree'
-import { createAnchorRectFromPoint } from '@/features/workspace/utils/tree-context-menu-anchor'
+import type { TreeMenuTrigger } from '@/features/workspace/utils/tree-row-menu-open'
 import { focusElement } from '@/features/workspace/utils/tree-focus'
 import { computeTreeRowElementAttributes } from '@/features/workspace/utils/tree-row-attributes'
 import type { TreeRowClickMode } from '@/features/workspace/utils/tree-row-click-plan'
@@ -165,7 +162,7 @@ function renderGitDecoration(decoration: TreeGitDecoration | null): JSX.Element 
 
   return (
     <span title={decoration.title}>
-      {'dot' in decoration ? <TreeGlyphIcon name='dot' /> : decoration.text}
+      {'dot' in decoration ? <TreeGlyphIcon /> : decoration.text}
     </span>
   )
 }
@@ -194,23 +191,19 @@ function DecorationAction({ action }: { action: FileTreeRowDecorationAction }): 
 function renderTreeRowContent(
   row: FileTreeVisibleRow,
   {
-    actionLaneEnabled = false,
     customDecoration = null,
     decorationLaneEnabled = false,
     gitDecoration = null,
     gitLaneActive = false,
     lead,
     renameInput = null,
-    showDecorativeActionAffordance = false,
   }: {
-    actionLaneEnabled?: boolean
     lead: JSX.Element
     customDecoration?: FileTreeRowDecoration | null
     decorationLaneEnabled?: boolean
     gitDecoration?: TreeGitDecoration | null
     gitLaneActive?: boolean
     renameInput?: JSX.Element | null
-    showDecorativeActionAffordance?: boolean
   },
 ): JSX.Element {
   return (
@@ -230,15 +223,6 @@ function renderTreeRowContent(
       ) : null}
       {gitLaneActive ? (
         <div data-item-section='git'>{renderGitDecoration(gitDecoration)}</div>
-      ) : null}
-      {actionLaneEnabled ? (
-        <div data-item-section='action'>
-          {showDecorativeActionAffordance ? (
-            <span aria-hidden='true' data-item-action-affordance='decorative'>
-              <TreeGlyphIcon name='ellipsis' />
-            </span>
-          ) : null}
-        </div>
       ) : null}
     </Fragment>
   )
@@ -285,10 +269,6 @@ export interface TreeRenderRowFrame {
   readonly directoriesWithGitChanges: ReadonlySet<string> | undefined
   readonly gitLaneActive: boolean
   readonly contextMenuEnabled: boolean
-  readonly contextMenuTriggerMode: FileTreeContextMenuTriggerMode
-  readonly contextMenuButtonTriggerEnabled: boolean
-  readonly contextMenuButtonVisibility: FileTreeContextMenuButtonVisibility
-  readonly contextMenuRightClickEnabled: boolean
   readonly registerRenameInput: (element: HTMLInputElement | null) => void
   readonly registerButton: (path: string, element: HTMLElement | null) => void
   readonly renderDecorationForRow: (
@@ -298,10 +278,7 @@ export interface TreeRenderRowFrame {
   readonly openContextMenuForRow: (
     row: FileTreeVisibleRow,
     targetPath: string,
-    options?: {
-      anchorRect?: FileTreeContextMenuOpenContext['anchorRect']
-      source?: 'button' | 'keyboard' | 'right-click'
-    },
+    trigger: TreeMenuTrigger,
   ) => void
   readonly onRowClick: (
     event: ReactMouseEvent<HTMLElement>,
@@ -348,10 +325,6 @@ export function TreeRow({ frame, options = {}, row }: TreeRowProps): JSX.Element
     directoriesWithGitChanges,
     gitLaneActive,
     contextMenuEnabled,
-    contextMenuTriggerMode,
-    contextMenuButtonTriggerEnabled,
-    contextMenuButtonVisibility,
-    contextMenuRightClickEnabled,
     registerRenameInput,
     registerButton,
     renderDecorationForRow,
@@ -370,10 +343,7 @@ export function TreeRow({ frame, options = {}, row }: TreeRowProps): JSX.Element
     row.kind === 'directory' && (directoriesWithGitChanges?.has(targetPath) ?? false)
   const customDecoration = renderDecorationForRow(row, targetPath)
   const gitDecoration = getBuiltInGitStatusDecoration(effectiveGitStatus, containsGitChange)
-  const actionLaneEnabled = contextMenuEnabled && contextMenuButtonTriggerEnabled
-  const decorationLaneEnabled = customDecoration != null || gitLaneActive || actionLaneEnabled
-  const showDecorativeActionAffordance =
-    actionLaneEnabled && contextMenuButtonVisibility === 'always'
+  const decorationLaneEnabled = customDecoration != null || gitLaneActive
   const renamingPath = renameView.getPath()
   const isRenamingRow = renamingPath === targetPath
   const renamingValue = isRenamingRow ? renameView.getValue() : ''
@@ -408,14 +378,12 @@ export function TreeRow({ frame, options = {}, row }: TreeRowProps): JSX.Element
     </TreeRowLead>
   )
   const rowContent = renderTreeRowContent(row, {
-    actionLaneEnabled,
     lead,
     customDecoration,
     decorationLaneEnabled,
     gitDecoration,
     gitLaneActive,
     renameInput,
-    showDecorativeActionAffordance,
   })
   const isFocusRinged = row.isFocused && visualFocusPath === targetPath
   const attributeProps = computeTreeRowElementAttributes({
@@ -423,10 +391,7 @@ export function TreeRow({ frame, options = {}, row }: TreeRowProps): JSX.Element
     domId: row.isFocused ? getTreeFocusedRowDomId(instanceId, targetPath, isParked) : undefined,
     extraStyle: style,
     features: {
-      actionLaneEnabled,
-      contextMenuButtonVisibility: actionLaneEnabled ? contextMenuButtonVisibility : null,
       contextMenuEnabled,
-      contextMenuTriggerMode: contextMenuEnabled ? contextMenuTriggerMode : null,
       gitLaneActive,
     },
     isParked,
@@ -458,14 +423,8 @@ export function TreeRow({ frame, options = {}, row }: TreeRowProps): JSX.Element
             }
 
             event.preventDefault()
-            if (!contextMenuRightClickEnabled) {
-              return
-            }
             controller.focusMountedPathFromInput(targetPath)
-            openContextMenuForRow(row, targetPath, {
-              anchorRect: createAnchorRectFromPoint(event.clientX, event.clientY),
-              source: 'right-click',
-            })
+            openContextMenuForRow(row, targetPath, { event, kind: 'pointer' })
           }
         : undefined,
     onFocus: !isSticky

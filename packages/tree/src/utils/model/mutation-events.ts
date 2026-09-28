@@ -4,7 +4,7 @@ import type {
   FileTreeBatchEvent,
   FileTreeMutationEvent,
   FileTreeMutationSemanticEvent,
-} from './publicTypes'
+} from './public-types'
 
 // Mirrors only the underlying store event fields this module reads. These are
 // FileTree-prefixed on purpose: this file is emitted as a declaration entry,

@@ -84,8 +84,8 @@ export function setNodeDepth(node: PathStoreNode, depth: number): void {
 
 export interface DirectoryChildIndex {
   childIds: NodeId[]
-  childIdByNameId: Map<SegmentId, NodeId> | null
-  childPositionById: Map<NodeId, number> | null
+  childIdByNameId: Map<SegmentId, NodeId>
+  childPositionById: Map<NodeId, number>
   childVisibleChunkSums: Int32Array<ArrayBufferLike> | null
   totalChildSubtreeNodeCount: number
   totalChildVisibleSubtreeCount: number
@@ -105,8 +105,6 @@ export interface PreparedPath {
 
 export type InternalPreparedInput = PathStorePreparedInput & {
   readonly preparedPaths?: readonly PreparedPath[]
-  readonly presortedPaths?: readonly string[]
-  readonly presortedPathsContainDirectories?: boolean
 }
 
 export interface LookupPath {
@@ -120,9 +118,4 @@ export interface PathStoreSnapshot {
   options: ResolvedPathStoreOptions
   rootId: NodeId
   segmentTable: SegmentTable
-  // Set by the presorted file-only ingest path to let initializeOpenVisibleCounts
-  // walk only directories in post-order (via reverse iteration) without
-  // scanning the whole nodes array. Null when the snapshot came from any
-  // non-presorted path; consumers must fall back to iterating `nodes`.
-  presortedDirectoryNodeIds: readonly NodeId[] | null
 }

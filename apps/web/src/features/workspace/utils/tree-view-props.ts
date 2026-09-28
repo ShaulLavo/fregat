@@ -1,32 +1,29 @@
 import type { FileTreeController } from '@workspace/tree'
 import type {
-  FileTreeCompositionOptions,
-  FileTreePublicId,
   FileTreeRenderOptions,
   FileTreeRowDecorationRenderer,
   FileTreeSearchBlurBehavior,
 } from '@workspace/tree'
 import type { GitStatus } from '@workspace/tree'
 import type { TreeRowElements } from '@/features/workspace/state/tree-row-elements'
+import type { TreeMenuRequest } from '@/features/workspace/utils/tree-row-menu-open'
 
-export interface TreeViewProps extends Omit<FileTreeRenderOptions, 'initialVisibleRowCount'> {
-  composition?: FileTreeCompositionOptions
+export interface TreeViewProps extends FileTreeRenderOptions {
   controller: FileTreeController
-  directoriesWithGitChanges?: ReadonlySet<FileTreePublicId>
-  gitStatusByPath?: ReadonlyMap<FileTreePublicId, GitStatus>
-  ignoredGitDirectories?: ReadonlySet<FileTreePublicId>
-  // First-render viewport height in CSS pixels, used as the fallback when the
-  // scroll element's clientHeight is still zero. The public option is
-  // `initialVisibleRowCount` (rows); the resolver multiplies it by itemHeight
-  // before passing the pixel value down here.
-  initialViewportHeight?: number
+  directoriesWithGitChanges?: ReadonlySet<string>
+  gitStatusByPath?: ReadonlyMap<string, GitStatus>
+  ignoredGitDirectories?: ReadonlySet<string>
   instanceId?: string
-  loadingPaths?: ReadonlySet<FileTreePublicId>
+  loadingPaths?: ReadonlySet<string>
+  /** The row whose menu is open; it keeps its hover fill. */
+  menuPath?: string | null
+  onCloseMenu?: () => void
+  /** Present when the host renders row menus. */
+  onOpenMenu?: TreeMenuRequest
   renamingEnabled?: boolean
   renderRowDecoration?: FileTreeRowDecorationRenderer
   rowElements?: TreeRowElements
   searchBlurBehavior?: FileTreeSearchBlurBehavior
   searchEnabled?: boolean
-  searchFakeFocus?: boolean
   searchPlaceholder?: string
 }

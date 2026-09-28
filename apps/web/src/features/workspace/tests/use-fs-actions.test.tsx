@@ -488,7 +488,6 @@ async function renderFsActions(rootPath: string) {
     cleanUp: () => {
       hook.unmount()
       queryClient.clear()
-      tree.cleanUp()
     },
     tree,
   }
