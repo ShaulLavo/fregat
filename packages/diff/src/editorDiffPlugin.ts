@@ -261,9 +261,12 @@ class DiffPluginRuntime {
 
   setFile(file: DiffFile | null, prepared: PreparedDiffSyntaxInput = []): void {
     if (this.mode !== 'document') {
-      void Promise.resolve(prepared).then((sources) => {
-        for (const source of sources) source.dispose()
-      })
+      void Promise.resolve(prepared).then(
+        (sources) => {
+          for (const source of sources) source.dispose()
+        },
+        () => undefined,
+      )
       return
     }
 

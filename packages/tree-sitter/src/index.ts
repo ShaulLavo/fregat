@@ -147,8 +147,16 @@ export const createTreeSitterSyntaxProvider = (
         onFirstParse: warm,
       })
     },
-    registerLanguage: (contribution, registrationOptions) =>
-      registry.registerLanguage(contribution, registrationOptions),
+    registerLanguage: (contribution, registrationOptions) => {
+      const registration = registry.registerLanguage(contribution, registrationOptions)
+      warmedKey = null
+      return {
+        dispose: () => {
+          registration.dispose()
+          warmedKey = null
+        },
+      }
+    },
     resolveTreeSitterLanguage: (languageId) => registry.resolveTreeSitterLanguage(languageId),
   }
 }

@@ -177,6 +177,22 @@ describe('prepared diff syntax', () => {
     expect(plugin.getTokens().length).toBe(tokens.length)
   })
 
+  it.each(['empty', 'disabled', 'overlay'] as const)(
+    'handles a rejected preparation when the pane is %s',
+    async (pane) => {
+      const plugin = createDiffPlugin({
+        mode: pane === 'overlay' ? 'overlay' : 'document',
+        syntaxHighlight: pane !== 'disabled',
+      })
+      plugin.setFile(
+        pane === 'empty' ? null : typescriptDiff(),
+        Promise.reject(new Error('preparation failed')),
+      )
+      await flushPromises()
+      expect(plugin.getTokens()).toEqual([])
+    },
+  )
+
   it('an aborted preparation resolves empty and keeps no session', async () => {
     const backend = countingBackend()
     const controller = new AbortController()

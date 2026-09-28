@@ -203,7 +203,7 @@ export class DiffSyntaxController {
     this.disposeSources()
     this.scheduler.cancel(this.key)
     if (!file || this.ready) {
-      void Promise.resolve(prepared).then(disposePrepared)
+      void Promise.resolve(prepared).then(disposePrepared, () => undefined)
       return
     }
     if (isPromiseLike(prepared)) {

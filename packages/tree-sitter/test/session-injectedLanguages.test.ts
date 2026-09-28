@@ -211,6 +211,33 @@ describe('provider warm-up', () => {
     expect(warm.warmed).toEqual([['html'], ['markdown', 'markdown_inline', 'html']])
   })
 
+  it('warms replaced registrations even when the host language list is unchanged', async () => {
+    const warmedUrls: string[][] = []
+    const warm = warmingProvider(
+      () => ['html'],
+      async (languages) => {
+        warmedUrls.push(languages.map((language) => language.wasmUrl))
+      },
+    )
+    await warm.openDocument('html')
+    await flushPromises()
+    const replacement = warm.provider.registerLanguage(
+      { ...descriptor('html'), wasmUrl: '/replacement.wasm' },
+      { replace: true },
+    )
+    await warm.openDocument('html')
+    await flushPromises()
+    replacement.dispose()
+    await warm.openDocument('html')
+    await flushPromises()
+
+    expect(warmedUrls).toEqual([
+      [descriptor('html').wasmUrl],
+      ['/replacement.wasm'],
+      [descriptor('html').wasmUrl],
+    ])
+  })
+
   it('skips a grammar that fails to load and survives a worker that cannot start', async () => {
     const warm = warmingProvider(() => ['broken', 'html'])
     warm.provider.registerLanguage({
