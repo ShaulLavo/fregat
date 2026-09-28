@@ -7,16 +7,19 @@ export function LargeFileNotice({
 }) {
   if (analysisAllowed && minimapAllowed) return null
   const paused = [
-    ...(!analysisAllowed ? ['syntax, language services, folding and document analysis'] : []),
-    ...(!minimapAllowed ? ['minimap'] : []),
-  ].join('; ')
+    ...(analysisAllowed ? [] : ['syntax colours', 'language services', 'folding']),
+    ...(minimapAllowed ? [] : ['the minimap']),
+  ]
+  const list =
+    paused.length === 1 ? paused[0] : `${paused.slice(0, -1).join(', ')} and ${paused.at(-1)}`
   return (
     <div
       role='status'
       data-testid='large-file-mode'
-      className='bg-info/10 text-muted-foreground absolute inset-x-0 bottom-0 px-3 py-2 text-xs'
+      className='bg-info/10 text-muted-foreground shrink-0 px-3 py-2 text-xs'
     >
-      Large file mode: {paused} paused. Editing and saving remain available.
+      Large file: {list} {paused.length === 1 ? 'is' : 'are'} paused. Editing and saving work as
+      usual.
     </div>
   )
 }

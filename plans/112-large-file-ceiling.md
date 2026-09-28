@@ -315,7 +315,10 @@ after the first independently shippable change. Decision trail:
 - [x] Compare resident, streamed and paged read-only contracts; verify the standalone E015 proof
       and Platform sparse 300 MiB read-only navigation/copy/session release.
 - [x] Re-run 1/10/50/100/150/200 MiB plain-text open-edit-save with exact saved bytes.
-- [ ] Record final integrated Unicode and clean above-limit browser checks.
+- [x] Record final integrated Unicode and clean above-limit browser checks. Clean build
+      (Platform e4a13fa9a, Editor 560d35db): two-byte 10/100/200 MiB open, edit and save exact
+      bytes, 200 MiB typing p95 27 ms, save 9.8 s (`/work/tmp/fregat-evidence/112-unicode-committed-20260928/`);
+      `editor-paged-readonly` opens a 300 MiB file read-only, jumps to line 3000 and copies.
 - [ ] Independently review the final diffs and evidence, commit/push both repositories,
       update the Editor pin and deploy the verified result.
 

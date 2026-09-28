@@ -340,34 +340,37 @@ export function Editor({
     formattedDocument !== key &&
     !provisional
 
+  // The notice is a row under the frame, so it never covers the last lines of the document.
   return (
-    <EditorFrame
-      active={active && focusTarget.focused}
-      controller={controller}
-      preparing={preparingMarkdown}
-      onRequestCloseOverlay={diagnosticPeek.snapshot ? diagnosticPeek.close : undefined}
-      targetRef={focusTarget.ref}
-      textMenuRequest={textMenuRequest}
-    >
+    <>
+      <EditorFrame
+        active={active && focusTarget.focused}
+        controller={controller}
+        preparing={preparingMarkdown}
+        onRequestCloseOverlay={diagnosticPeek.snapshot ? diagnosticPeek.close : undefined}
+        targetRef={focusTarget.ref}
+        textMenuRequest={textMenuRequest}
+      >
+        {(provisional || preparingMarkdown) && liveDocument ? (
+          <div className='bg-background text-muted-foreground absolute inset-x-0 bottom-0 flex items-center gap-2 px-3 py-2 text-xs'>
+            <Spinner size='xs' label='Preparing editor' />
+            Preparing editor…
+          </div>
+        ) : null}
+        {diagnosticPeek.snapshot ? (
+          <DiagnosticPeek
+            model={diagnosticPeek.snapshot}
+            onClose={diagnosticPeek.close}
+            onOpenTarget={(target) => {
+              onOpenDefinition?.(target)
+            }}
+            tabId={tabId}
+          />
+        ) : null}
+      </EditorFrame>
       {liveDocument ? (
         <LargeFileNotice analysisAllowed={analysisAllowed} minimapAllowed={minimapAllowed} />
       ) : null}
-      {(provisional || preparingMarkdown) && liveDocument ? (
-        <div className='bg-background text-muted-foreground absolute inset-x-0 bottom-0 flex items-center gap-2 px-3 py-2 text-xs'>
-          <Spinner size='xs' label='Preparing editor' />
-          Preparing editor…
-        </div>
-      ) : null}
-      {diagnosticPeek.snapshot ? (
-        <DiagnosticPeek
-          model={diagnosticPeek.snapshot}
-          onClose={diagnosticPeek.close}
-          onOpenTarget={(target) => {
-            onOpenDefinition?.(target)
-          }}
-          tabId={tabId}
-        />
-      ) : null}
-    </EditorFrame>
+    </>
   )
 }
