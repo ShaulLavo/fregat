@@ -35,10 +35,13 @@ the composer acceptance checks pass. File-editor authoring can ship first.
       preserves text, selection and undo history.
 - [x] Verify formatting, lists, tasks, links, fences, copy/paste and undo through real
       user interactions, in source and preview presentations.
-- [ ] Run focused checks, inspect browser evidence, commit, push and deploy.
+- [x] Run focused checks, inspect browser evidence, commit, push and deploy the first authoring slice.
+
+Shipped as Platform `0e2395cef` with Editor `401d30cd`. Mesh release
+`20260928T172713Z-0e2395ce-main` passed its live check on 2026-09-28.
 
 Verification: 53 Markdown tests, 13 core keymap tests, 27 Platform command/menu
-tests, web typecheck, formatting and Platform gates pass. Editor health passes its
+tests, 152 settings-contract tests, repository typechecks, formatting and Platform gates pass. Editor health passes its
 full-text and command-reference checks but fails its existing document-analysis
 public API inventory mismatch; that baseline was left for its owning work.
 

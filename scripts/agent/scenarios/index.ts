@@ -188,6 +188,7 @@ import { shortcutHints } from './shortcut-hints'
 import { editorAddToChat } from './editor-add-to-chat'
 import { editorSpellcheck } from './editor-spellcheck'
 import { markdownSplitView } from './markdown-split-view'
+import { markdownAuthoring } from './markdown-authoring'
 import { markdownPreviewClobber } from './markdown-preview-clobber'
 import { gitOpenAllDiffsSpam } from './git-open-all-diffs-spam'
 import { gitStageSettles } from './git-stage-settles'
@@ -353,6 +354,7 @@ import { editorPressParticipants } from './editor-press-participants'
 import { editorWidgetKeys } from './editor-widget-keys'
 import { gitDiffLineComment } from './git-diff-line-comment'
 import { gitDiffFold } from './git-diff-fold'
+import { gitDiffScroll } from './git-diff-scroll'
 import { gitCommitMessageFile } from './git-commit-message-file'
 import { gitCommitMessagePersists } from './git-commit-message-persists'
 import { gitCommitSlowHook } from './git-commit-slow-hook'
@@ -553,6 +555,7 @@ export const scenarios: readonly Scenario[] = [
   editorAddToChat,
   editorSpellcheck,
   markdownSplitView,
+  markdownAuthoring,
   markdownPreviewClobber,
   gitOpenAllDiffsSpam,
   gitStageSettles,
@@ -686,6 +689,7 @@ export const scenarios: readonly Scenario[] = [
   editorWidgetKeys,
   gitDiffLineComment,
   gitDiffFold,
+  gitDiffScroll,
   chatCardNarrow,
   chatComposerInsert,
   chatDisclosureSettle,
