@@ -101,3 +101,12 @@ menu scenarios.
   `copy-feedback`, `file-tree-undo` and `search-file-actions` scenarios and the `menu-open` pixel
   capture were not run: `agent:browser` cannot open a workspace in this container (see
   app-owned-state, step 8 notes).
+
+## Local review, 2026-09-28
+
+The row-menu capture matches fresh main exactly in all four density/theme combinations. The
+committed baseline was stale from the shared filter-field change, so it was refreshed from main
+along with the other states; no menu-anchor exception was needed. The local behavior scenario now
+checks Shift+F10 and Escape, Rename/New File/New Folder inline focus, and Delete dialog focus.
+Copy feedback uses a mock response in its fresh test home. Undo uses a correctly wired second
+window and completes through cross-window undo. See [local-review.md](local-review.md).

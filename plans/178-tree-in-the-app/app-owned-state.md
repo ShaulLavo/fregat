@@ -221,3 +221,10 @@ a small workspace `tree-parity` still stops at the unreadable folder, which stay
 base commit `14eebe4` stops at the same step. So `tree-parity` (pixels and styles),
 `tree-parity-behaviour` and the guarding scenarios have not run on steps 2–3, 8, 9 or the
 context-menu adoption. Run them on the mesh before building on these.
+
+### Local review, 2026-09-28
+
+The removed `cleanUp` still had two benchmark callers; local review removed them and the CI
+benchmark gate passes. Tree package tests and all 82 tree browser tests pass. Fresh main and PR
+visual captures match in all 64 cases. See [local-review.md](local-review.md) for the scenario
+repairs, evidence and remaining verification notes.

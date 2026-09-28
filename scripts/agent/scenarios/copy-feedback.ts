@@ -4,6 +4,9 @@ import type { Page } from 'playwright'
 import type { Scenario } from './index'
 import { expectClipboard, readClipboard } from '../clipboard'
 import { runPaletteCommand, selectors } from '../selectors'
+import { openChat } from './chat-verification'
+import { createMockProviderSession } from './mock-provider-session'
+import { sendPrompt } from './native-provider-verification'
 
 const SETTING_ID = 'workbench.density'
 
@@ -33,20 +36,6 @@ async function copyTreePath(page: Page) {
   await selectors.toast(page, 'Copied relative path').waitFor()
 }
 
-async function openTranscriptWithCopy(page: Page) {
-  await runPaletteCommand(page, 'Chat mode')
-  const sessions = selectors.sessionRows(page)
-  await sessions.first().waitFor()
-  const count = await sessions.count()
-  for (let index = 0; index < count; index += 1) {
-    await sessions.nth(index).click()
-    await selectors.timelineRows(page).first().waitFor()
-    const copy = selectors.copyButton(page, 'response').last()
-    if ((await copy.count()) > 0) return copy
-  }
-  ok(false, 'An existing session needs a completed assistant response to copy')
-}
-
 export const copyFeedback: Scenario = {
   name: 'copy-feedback',
   description:
@@ -65,24 +54,38 @@ export const copyFeedback: Scenario = {
     await expectClipboard(page, 'package.json', 'Copy Relative Path wrote the path')
     await step('file-menu-copy')
 
-    await clearClipboard(page)
-    const copy = await openTranscriptWithCopy(page)
-    // The copy action is revealed by hovering its message.
-    await copy.locator('xpath=ancestor::article[1]').hover()
-    await copy.click()
-    await selectors.copiedButton(page, 'response').last().waitFor()
-    ok((await readClipboard(page)).length > 0, 'The response reached the clipboard')
-    strictEqual(
-      await selectors.toast(page, 'Copied response').count(),
-      0,
-      'Inline copy never toasts',
-    )
-    await step('chat-inline-copy')
+    await runPaletteCommand(page, 'Chat mode')
+    const session = await createMockProviderSession(page, await openChat(page), {
+      name: 'copy-feedback',
+      displayLabel: 'Copy feedback fixture',
+      config: { script: 'turn-anatomy', stepDelayMs: 10 },
+    })
+    try {
+      await sendPrompt(page, 'Write a response to copy.')
+      await selectors
+        .chatMessages(page)
+        .getByText('Fixed the frame match; the suite passes again.', { exact: true })
+        .waitFor()
+      await clearClipboard(page)
+      const copy = selectors.copyButton(page, 'response').last()
+      await copy.locator('xpath=ancestor::article[1]').hover()
+      await copy.click()
+      await selectors.copiedButton(page, 'response').last().waitFor()
+      ok((await readClipboard(page)).length > 0, 'The response reached the clipboard')
+      strictEqual(
+        await selectors.toast(page, 'Copied response').count(),
+        0,
+        'Inline copy never toasts',
+      )
+      await step('chat-inline-copy')
 
-    await clearClipboard(page)
-    await refuseAsyncClipboard(page)
-    await copySettingId(page)
-    await expectClipboard(page, SETTING_ID, 'execCommand fallback wrote the text')
-    await step('execcommand-fallback')
+      await clearClipboard(page)
+      await refuseAsyncClipboard(page)
+      await copySettingId(page)
+      await expectClipboard(page, SETTING_ID, 'execCommand fallback wrote the text')
+      await step('execcommand-fallback')
+    } finally {
+      await session.cleanup()
+    }
   },
 }

@@ -121,3 +121,11 @@ file, no row could show hover. The touch tests moved to `tree-parity-touch.brows
 `vitest.tree-browser.config.ts` runs as a second project after the rest. Six full runs in a row
 passed afterwards; the drag, touch and menu files together, which failed every time before, passed
 twice.
+
+## Local review, 2026-09-28
+
+PR 187 changed the shared filter field after the stored snapshots were captured. Both main
+`74bfd0d61` and PR 192 fail all 64 old snapshots, but their fresh captures compare with zero pixel
+and style differences in every state. Refresh the snapshots from those main captures. PR 192 then
+passes the full matrix, including `menu-open` without an exception. See
+[local-review.md](local-review.md) for evidence and the repaired behavior-scenario setup.

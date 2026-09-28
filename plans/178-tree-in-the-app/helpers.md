@@ -107,3 +107,9 @@ comparators above once they call the shared ones.
   Tailnet host lists, `shortcut-rows`) match labels and host names, not paths: the tree's
   normalizer maps `\` to `/`, which would change what they match. The shared matcher needs a
   per-site decision, with a test at each site first.
+
+### Local review, 2026-09-28
+
+Shared path helper tests and the tree package tests pass locally. All 64 tree captures match
+fresh main pixel for pixel and style for style. File ordering and filter matching remain open as
+listed above. Evidence and verification details are in [local-review.md](local-review.md).

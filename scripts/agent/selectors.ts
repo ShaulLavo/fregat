@@ -295,6 +295,7 @@ export const selectors = {
   restartTerminalShell: (page: Page) =>
     page.getByRole('menuitem', { name: 'Restart shell', exact: true }),
   treeRenameInput: (page: Page) => selectors.folderTree(page).locator('[data-item-rename-input]'),
+  treeRenameMenuItem: (page: Page) => page.getByRole('menuitem', { name: /^Rename\b/ }),
   terminalName: (page: Page) => page.getByRole('textbox', { name: 'Terminal name', exact: true }),
   commitFilesTree: (page: Page) => page.getByRole('tree', { name: 'Commit files', exact: true }),
   newTerminal: (page: Page) => page.getByRole('button', { name: 'New terminal', exact: true }),
