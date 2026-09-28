@@ -54,3 +54,17 @@ That differs from the application's windowed queries and cannot establish its sy
 The stock run later failed its Markdown fixture with an invalid fetch URL. Its combined Bun RSS
 is not a per-worker memory attribution. Plan 112's application benchmark owns syntax/LSP tiers
 and the 200 MiB end-to-end acceptance result.
+
+## Larger standalone cases
+
+With one view, 50 paced native keys and the same indented corpus, the candidate passed text/undo
+and release checks at 50 and 200 MiB. Plain-text input-to-applied p95 was 1.0/0.9ms and next-frame
+p95 was 15.4/16.1ms. See [plain results](e112-results/plain-large.json).
+
+At 50 MiB with minimap, p95 was 2.0ms applied and 11.9ms next-frame. Its worker retained 244.8 MiB
+JS heap after typing; see [minimap results](e112-results/minimap-50.json). At 200 MiB the minimap
+case painted, then Chromium crashed during the first measured burst. The runner produced no
+success JSON; the pre-input screenshot remains at
+`/work/tmp/editor-112-performance/candidate-200-minimap.json.minimap.209715200.png`.
+The main-thread fix therefore supports the plain-text frame target, while the host still needs a
+minimap residency tier. These are standalone Editor cases, not filesystem save measurements.
