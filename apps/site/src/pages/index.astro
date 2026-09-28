@@ -51,6 +51,7 @@ const demoUrl = import.meta.env.DEV
       <nav>
         <a href="#window">one window</a>
         <a href="#parts">what's inside</a>
+        <a href="#next">on the way</a>
         <a href="#agents">agents</a>
         <a href="#name">the name</a>
         <a href="#try">try it</a>
@@ -126,35 +127,23 @@ const demoUrl = import.meta.env.DEV
         </section>
 
         <section class="pane" id="parts" aria-labelledby="parts-heading">
-          <div class="bar"><span>what's inside</span><span class="count">6</span></div>
+          <div class="bar"><span>what's inside</span><span class="count">5</span></div>
           <div class="pane-body">
-            <h2 id="parts-heading">every piece is ours, down to the libraries</h2>
+            <h2 id="parts-heading">hand-rolled, so it's fast</h2>
             <dl class="parts">
               <div>
                 <dt>editor</dt>
                 <dd>
-                  <a href="https://github.com/ShaulLavo/singapore">singapore</a>, written by hand.
-                  piece table storage, tree-sitter for syntax, language servers for the rest.
+                  <a href="https://github.com/ShaulLavo/singapore">singapore</a>, our own editor,
+                  written from the text buffer up. tree-sitter for syntax, language servers for the
+                  rest.
                 </dd>
               </div>
               <div>
                 <dt>terminal</dt>
                 <dd>
                   <a href="https://github.com/ShaulLavo/ghostty-webgpu">ghostty-webgpu</a>, real
-                  ghostty compiled to wasm, in a pane next to the code.
-                </dd>
-              </div>
-              <div>
-                <dt>file tree</dt>
-                <dd>
-                  started as a fork and rewritten until little of the original is left.
-                </dd>
-              </div>
-              <div>
-                <dt>agents</dt>
-                <dd>
-                  the harness you already use, side by side. each in its own session, each with its
-                  own permission mode.
+                  ghostty compiled to wasm and drawn on the gpu, in a pane next to the code.
                 </dd>
               </div>
               <div>
@@ -162,11 +151,49 @@ const demoUrl = import.meta.env.DEV
                 <dd>status, diffs, branches and commits in the same window, watched live.</dd>
               </div>
               <div>
+                <dt>yours to tune</dt>
+                <dd>
+                  themes, fonts, keybindings, density, and a setting for nearly everything else.
+                </dd>
+              </div>
+              <div>
                 <dt>anywhere</dt>
                 <dd>
                   a small server runs on each machine. every workspace opens from a browser, the
-                  desktop app, a terminal, or a phone over tailscale.
+                  desktop app, a terminal, or your phone.
                 </dd>
+              </div>
+            </dl>
+          </div>
+        </section>
+
+        <section class="pane" id="next" aria-labelledby="next-heading">
+          <div class="bar"><span>on the way</span><span class="count">4</span></div>
+          <div class="pane-body">
+            <h2 id="next-heading">what we're building now</h2>
+            <dl class="parts">
+              <div>
+                <dt>markdown</dt>
+                <dd>
+                  our own parser, with c underneath. it will render the agent's streaming replies,
+                  power the chat composer, and open any .md file as source, preview side by side,
+                  or one live view you edit as it renders.
+                </dd>
+              </div>
+              <div>
+                <dt>mcp</dt>
+                <dd>
+                  every action in the app, open to your agents. plus the editor's own
+                  intelligence, so an agent sees types and references the way you do.
+                </dd>
+              </div>
+              <div>
+                <dt>github</dt>
+                <dd>pull requests, reviews and checks, next to the diff they're about.</dd>
+              </div>
+              <div>
+                <dt>phone</dt>
+                <dd>a native app for checking on agents and answering them from anywhere.</dd>
               </div>
             </dl>
           </div>
@@ -213,8 +240,8 @@ const demoUrl = import.meta.env.DEV
               terminal is, and a diff opens in the chat without a context switch.
             </p>
             <p>
-              the dependency list keeps shrinking. the forks we started from have been rewritten,
-              and the rest are on their way out.
+              it's also why it's fast: every hot path is code we wrote and can tune, and the
+              dependency list shrinks every week.
             </p>
           </div>
         </section>
