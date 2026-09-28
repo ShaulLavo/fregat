@@ -1,5 +1,4 @@
-import { PagedFileViewer } from '@/features/workbench/components/paged-file-viewer'
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { documentKey } from '@/lib/documents/utils/identity'
 import { MarkdownPreviewPane } from '@/features/workbench/components/markdown-preview-pane'
 import { createMarkdownScrollSync } from '@/features/workbench/state/markdown-scroll-sync'
@@ -28,6 +27,13 @@ import type { LoadState } from '@/lib/load-state'
 import type { EditorInitialPaintEvent } from '@singapore-editor/core/extensions'
 import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
 import type { LanguageServerReferencesResult } from '@singapore-editor/lsp-plugin'
+
+// The read-only viewer and its paged package load when an oversized file asks for them.
+const PagedFileViewer = lazy(() =>
+  import('@/features/workbench/components/paged-file-viewer').then((module) => ({
+    default: module.PagedFileViewer,
+  })),
+)
 
 export function FileEditorBody({
   active,
@@ -131,7 +137,11 @@ export function FileEditorBody({
   }
 
   if (resource && pagedKey === key && active && fileState.status === 'error')
-    return <PagedFileViewer path={resource.path} />
+    return (
+      <Suspense fallback={<Spinner size='md' label='Loading read-only viewer' />}>
+        <PagedFileViewer path={resource.path} />
+      </Suspense>
+    )
 
   return (
     <div className={fileBodyGridClass(splitMarkdown, currentReferences !== null)}>

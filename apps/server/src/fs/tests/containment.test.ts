@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { readTextResponse } from '../../../test/file-transport'
 import { closeTestApps, createTestApp } from '../../../test/server'
 import { testSettingsOptions } from '../../settings/testing'
 import { FsError } from '../errors'
@@ -26,7 +27,7 @@ describe('workspace containment', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({ content: 'contents\n', path: '..foo' })
+    expect(await readTextResponse(response)).toMatchObject({ content: 'contents\n', path: '..foo' })
   })
 
   it('lists a root-level directory whose name begins with two dots', async () => {
@@ -52,7 +53,7 @@ describe('workspace containment', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({ content: 'deep\n', path: 'a/..baz' })
+    expect(await readTextResponse(response)).toMatchObject({ content: 'deep\n', path: 'a/..baz' })
   })
 
   it('still refuses paths that leave the workspace', async () => {
