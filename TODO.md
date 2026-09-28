@@ -639,3 +639,10 @@ Added 2026-09-26, from Platform Plans 111 and 171. The editor paints text outsid
 element, and EditContext makes the browser's spellcheck unreachable, so no misspelling is ever
 marked. The chat composer keeps Lexical until the editor marks misspelled prose itself, offers
 suggestions and learns words, using permissively licensed dictionaries only.
+
+## One highlight pipeline for tokens and range highlights
+
+Added 2026-09-29. Syntax tokens and range highlights (find, diagnostics, spellcheck, links,
+semantic tokens and the rest) paint through two separate pipelines. Only tokens use `StaticRange`
+and know about edits; range highlights rebuild live `Range`s and are never projected through an
+edit. Whatever we do with highlights should be reusable across every painter.

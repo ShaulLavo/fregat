@@ -738,6 +738,19 @@
       "dependsOn": [],
       "topics": ["Tree-sitter query features"],
       "baseline": "8def2ec2163b15f3ad02779515841eb94305c55c"
+    },
+    {
+      "id": "E064",
+      "file": "e064-one-highlight-pipeline.md",
+      "title": "One highlight pipeline for tokens and range highlights",
+      "status": "Proposed",
+      "owner": "Editor",
+      "kind": "Design",
+      "priority": "P2",
+      "effort": "L",
+      "dependsOn": [],
+      "topics": ["One highlight pipeline for tokens and range highlights"],
+      "baseline": "6d8269f39eb40e38d0e8b1de90f353923396bc8c"
     }
   ]
 }
