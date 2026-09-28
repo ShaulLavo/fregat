@@ -206,30 +206,54 @@ describe.runIf(process.platform === 'linux')('native watch structure changes', (
 })
 
 describe.runIf(process.platform === 'linux')('git state changes', () => {
-  // A commit made outside the app writes only under `.git`, which the file stream drops.
-  it('reports a commit to the repository that contains it', async () => {
+  // A commit made outside the app writes only git metadata, which the file stream drops.
+  it('reports commits in a checkout, a linked worktree and a subfolder workspace', async () => {
     const base = await fixtureRoot()
     const root = path.join(base, 'root')
     const repo = path.join(root, 'repo')
-    await mkdir(repo, { recursive: true })
+    const linked = path.join(root, 'linked')
+    await mkdir(path.join(repo, 'sub'), { recursive: true })
     await mkdir(path.join(root, 'other'))
-    await writeFile(path.join(repo, 'a.txt'), 'a')
-    const git = (...args: string[]) =>
-      execFileAsync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: repo })
-    await git('init', '-q')
-    await git('add', 'a.txt')
+    await writeFile(path.join(repo, 'sub/a.txt'), 'a')
+    const git = (cwd: string, ...args: string[]) =>
+      execFileAsync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd })
+    await git(repo, 'init', '-q', '-b', 'main')
+    await git(repo, 'add', '.')
+    await git(repo, 'commit', '-qm', 'base')
+    await git(repo, 'worktree', 'add', '-q', '-b', 'side', linked)
     const hub = new FileChangeHub(createWorkspacePaths(root), { enabled: true })
     const abort = new AbortController()
-    const inside = collect(hub.stream(['repo'], abort.signal))
-    const elsewhere = collect(hub.stream(['other'], abort.signal))
+    const stream = (input: string) => collect(hub.stream([input], abort.signal, { git: true }))
+    const checkout = stream('repo')
+    const worktree = stream('linked')
+    const subfolder = stream('repo/sub')
+    const elsewhere = stream('other')
+    const plain = collect(hub.stream(['repo'], abort.signal))
+    const gitEvents = (events: readonly WatchServerMessage[]) =>
+      events.filter((event) => event.type === 'git')
     try {
-      await expect.poll(() => inside.length > 0 && elsewhere.length > 0).toBe(true)
-      await git('commit', '-q', '-m', 'first')
       await expect
-        .poll(() => inside.filter((event) => event.type === 'git'), { timeout: 3000 })
-        .toContainEqual(expect.objectContaining({ type: 'git', path: 'repo' }))
-      expect(elsewhere.filter((event) => event.type === 'git')).toEqual([])
-      expect(paths(inside).filter((relative) => relative.includes('.git'))).toEqual([])
+        .poll(() => [checkout, worktree, subfolder, elsewhere, plain].every((e) => e.length > 0))
+        .toBe(true)
+      await writeFile(path.join(linked, 'b.txt'), 'b')
+      await git(linked, 'add', 'b.txt')
+      await git(linked, 'commit', '-qm', 'side')
+      await expect
+        .poll(() => gitEvents(worktree), { timeout: 3000 })
+        .toContainEqual(expect.objectContaining({ path: 'linked' }))
+
+      await writeFile(path.join(repo, 'c.txt'), 'c')
+      await git(repo, 'add', 'c.txt')
+      await git(repo, 'commit', '-qm', 'main')
+      await expect
+        .poll(() => gitEvents(checkout), { timeout: 3000 })
+        .toContainEqual(expect.objectContaining({ path: 'repo' }))
+      await expect
+        .poll(() => gitEvents(subfolder), { timeout: 3000 })
+        .toContainEqual(expect.objectContaining({ path: 'repo' }))
+      expect(gitEvents(elsewhere)).toEqual([])
+      expect(gitEvents(plain)).toEqual([])
+      expect(paths(checkout).filter((relative) => relative.includes('.git'))).toEqual([])
     } finally {
       abort.abort()
       await hub.close()
