@@ -1,53 +1,57 @@
 # Processes, leases and dev plumbing each get an owner
 
-Status: Phase 1 deployed 2026-09-23. Phases 2 and 3 landed on lane L4 2026-09-25 except the items
-below. **Phase 4 implemented 2026-09-26** (branch `plan-132-p4`): the migration chain (versions 11
-to 38) is one schema at `PRAGMA user_version` 1. The backup and reset of the dev and production
-databases is pending the deploy, with the owner. Covers `apps/desktop`, `apps/tui`, `apps/server`,
-`apps/web/vite.config.ts` and `scripts/`.
+Status: wave 2 closeout, reconciled 2026-09-28. Phase 1 and the schema collapse are delivered;
+phases 2 and 3 retain the items below. Source review only; remaining runtime checks are explicit.
 
-Everything done is in git history (`git log -- plans/132-process-and-dev-ownership.md`). This file
-keeps only what is left.
+## Delivered schema collapse
 
-## Phase 4 — the reset at deploy
+`apps/server/src/db/initialize.ts` accepts an empty database or `SCHEMA_VERSION`, currently 1,
+and refuses a mismatch. The migration chain is deleted. On 2026-09-28, read-only queries found
+`PRAGMA user_version = 1` in both `/work/platform-dev/home/fs-metadata.sqlite` and
+`~/.platform/fs-metadata.sqlite`. Production `/platform/release` reported phase `serving`, no
+pending release and a passed live check for `20260928T173104Z-4a85ec00-main`.
 
-`apps/server/src/db/initialize.ts` creates the schema in an empty database, accepts one at
-`SCHEMA_VERSION`, and refuses anything else at boot with `db.SCHEMA_VERSION_MISMATCH`, whose
-message names the database file. A schema change bumps `SCHEMA_VERSION`. The equality with the
-chain was proved against migration 38 before the chain was deleted, by `schema-equivalence.test.ts`
-in the commit "One schema at user_version 1, proved equal to migrations 11–38".
+The old instruction to reset those databases at the next deploy is obsolete. Do not reset them
+for this plan. The historical backup/reset procedure remains in
+[the preflight record](../docs/verification/2026-09-25-schema-collapse-preflight.md); this audit
+does not establish which backups were retained. A future schema bump needs its own concrete
+state-loss review and authorization.
 
-Left: deploy with `bun run deploy --server`, after backing up and moving aside
-`/work/platform-dev/home/fs-metadata.sqlite` and `~/.platform/fs-metadata.sqlite` with their `-wal`
-and `-shm` files. The exact procedure is in the PR body and in
-`docs/verification/2026-09-25-schema-collapse-preflight.md`. Sessions, chat history, terminal
-history, worktree registrations and usage totals in those files are lost; the deploy reason says so.
+## Phase 2 remaining
 
-## Phase 2 — left
+- Item 10: reconcile the generated tsconfig from `dev-sources.ts` with every typecheck path.
+  Editor sources must be checked under the intended settings without competing configurations.
+- Item 12: add lifecycle disposal in `@singapore-editor/react` and ghostty-webgpu's `Terminal`,
+  verify mounted instances release old resources, then remove the forced full reload from
+  `devSourcePlugin`. Until disposal works, preserve the reload.
+- Restrict the current `hotUpdate` reload to relevant served modules. It still watches package
+  roots and does not check `modules`, so generated `dist/` writes need a focused non-reload proof.
+- Re-measure Vite memory against today's Vite/rolldown versions. The 2026-09-25 proposal for
+  `RAYON_NUM_THREADS=4 MIMALLOC_PURGE_DELAY=0` is not in `apps/web`'s `dev:vite`. Treat the old
+  2.50 GB → 1.31 GB result as a historical experiment, not current proof. Use the existing
+  configuration policy for any permanent tuning; avoid adding speculative environment controls.
 
-- Item 10: one generated tsconfig (the one `dev-sources.ts` writes) serving every typecheck path.
-  It typechecks the Editor's source under Platform's settings, which the Editor lane owns.
-- Item 12: `import.meta.hot.dispose` in `@singapore-editor/react`'s controller and ghostty-webgpu's
-  `Terminal`, then delete the forced reload in `devSourcePlugin` (`apps/web/vite.config.ts`).
-- Vite memory (research `132mem`, 2026-09-25). A lane Vite's RSS is rolldown's dependency optimizer:
-  a cold optimizer cache leaves about 2.2 GB in mimalloc arenas that are never returned
-  (rolldown#10985), and each in-process `server.restart` keeps the old server alive (rolldown#10887).
-  Three measured changes:
-  1. Launch Vite with `RAYON_NUM_THREADS=4 MIMALLOC_PURGE_DELAY=0` in `apps/web`'s `dev:vite`
-     (`run-with-env.ts` takes leading assignments). Cold-cache RSS 2.50 GB → 1.31 GB, same look time.
-  2. Add the linked sources to `optimizeDeps.entries` from `readDevSources`, excluding tests and
-     benches, so a cold start bundles once and the first page does not reload.
-  3. `devSourcePlugin`'s hook reloads only when `modules` is non-empty. It watches whole package
-     roots, so an Editor `bun run build` rewriting `dist/` reloads every open page today.
+Linked-source dependency prebundling landed in `6d940b3c5`: `optimizeDeps.include` explicitly
+lists transitive dependencies of the excluded Editor packages. Recheck a cold cache for late
+optimizer reloads before changing it. The former proposal to add all sources to
+`optimizeDeps.entries` is superseded unless that proof finds a remaining gap.
 
-  Revisit the environment settings when rolldown#10985 or #10887 ships a fix.
+## Phase 3 remaining and transferred work
 
-## Phase 3 — left
+- The Electrobun `vibrancy.m` window-title lookup is transferred to Plan 114 Gate 3, which replaces
+  that host. Verify native window ownership and vibrancy on the Mac there; do not repair an
+  Electrobun pointer workaround solely to delete it afterward.
+- Item 11 remains deferred: the harness patches `globalThis.WebSocket` to rewrite terminal ids.
+  The capture prefix identifies terminals for `chat-queue`, `terminal-history` and product
+  captures. Default browser runs have isolated servers; only `--shared-dev` needs this behavior.
+  Remove it only with equivalent capture ownership across reloads.
 
-- Item 6: `vibrancy.m` resolves the native window by title because Electrobun's `createWindow`
-  pointer type is not a public contract, and messaging a non-Objective-C pointer would crash the
-  app. Verifiable only on the Mac: owner check.
-- Item 11, deferred: the harness patches `globalThis.WebSocket` to rewrite terminal ids. The capture
-  prefix is also how `chat-queue`, `terminal-history` and product captures find their own terminals,
-  and a page URL parameter does not survive the app's URL rewriting across reloads. Since Plan 146 a
-  default run has its own server, so this matters only for `--shared-dev` captures.
+## Order and closeout
+
+Finish the bounded development-plumbing work before Plan 114's launcher cutover. The existing
+desktop connects to mesh-managed servers and its quit path only flushes desktop observability;
+114 must preserve that ownership. This plan does not own shared-server or terminal-host shutdown.
+
+Close each remaining item with the narrow relevant configuration/lifecycle test and actual
+cold-start, HMR or memory evidence. Record transferred/deferred items explicitly. No UI or schema
+change is required merely to reconcile this plan.

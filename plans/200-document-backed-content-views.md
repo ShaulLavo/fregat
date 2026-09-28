@@ -24,7 +24,7 @@ Read before implementation, including their current status and linked delivery r
 | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [098 delivery](../docs/document-and-tab-domain.md) and [097 delivery](../docs/async-operation-ownership.md) | Typed document/tab identity, save destinations, captured environment owners, operation-bound text and transaction provenance                   | Extend these contracts. Preserve operation snapshots, leases and stale-write refusal.                                                                                 |
 | [099: contribution runtime](099-document-contributions.md)                                                  | Canonical committed-revision publication, consumer synchronization, contribution lifetime and backend-specific adapters, including diff syntax | Consume its publication/runtime contracts. Create no second revision journal, worker synchronization protocol or contribution registry. Its gated units remain gated. |
-| [198: document-owned analysis](198-document-owned-editor-analysis.md)                                       | Retained analysis beside the authoritative buffer, shared acquisition/preparation, view attachment, retention and exact-result admission       | Foundation for this work. Reuse its buffer/analysis pair and preparation path; preserve its first-after-wave-2 priority.                                              |
+| [198: document-owned analysis](198-document-owned-editor-analysis.md)                                       | Retained analysis beside the authoritative buffer, shared acquisition/preparation, view attachment, retention and exact-result admission       | Foundation for this work. Reuse its buffer/analysis pair and preparation path; verify the required guarantees before their consumer cutover.                          |
 | [197: highlighting service](197-editor-highlighting-service.md)                                             | Provider/service ownership, snippet highlighting and the prepared diff syntax store, in-flight work and eviction                               | Use the landed service. Keep the prepared-diff cache migration here owned by 197; never move it into a second Platform document cache.                                |
 | [177: prefetch every press](177-prefetch-every-press.md)                                                    | Intent preparation and promotion                                                                                                               | Hover and activation acquire the same sources with different demand. Preserve intent cancellation and priority.                                                       |
 | [182: search view rendering](182-search-view-rendering.md)                                                  | Search multibuffer choice, editor rendering, per-file horizontal scroll, streaming results and edit forwarding                                 | This plan supplies source ownership and revision/range references. 182 owns the search UI and composite editing implementation. Preserve its unresolved decisions.    |
@@ -33,12 +33,14 @@ Read before implementation, including their current status and linked delivery r
 | [192: subject switching](192-no-swap-flash.md)                                                              | Hold the previous subject whole until the next can paint                                                                                       | Carry the subject identity with the content through attachment. Preserve loading/error behavior.                                                                      |
 | [156: documents in the editor](156-documents-in-the-editor.md)                                              | Future PDF, Office and CSV support                                                                                                             | Leave room for content capabilities beyond text. Add no format engine, binary-to-text conversion or keep-alive policy here.                                           |
 
-Execution order: reconcile landed 099 publication and 198 acquisition/attachment contracts first;
+Execution order: establish the required 099 publication and 198 acquisition/attachment contracts first;
 integrate comparison analysis only after 197's diff service ownership is available. Research and
 baseline capture can run earlier. Full completion of 099's unrelated minimap/LSP units is not a
 dependency. If a required contribution API remains gated, defer that dependent unit to its owner
-instead of implementing an alternate runtime. This plan grants no authorization to execute gated
-work in other plans and does not reorder their lanes.
+instead of implementing an alternate runtime. The owner superseded 198's fixed post-wave
+priority on 2026-09-28; schedule these contracts by dependency. 099 publication remains open,
+while some 198 analysis code has landed. This plan grants no authorization to execute gated
+work in other plans.
 
 ## Source audit and drift check
 
@@ -49,7 +51,7 @@ linked package build and CI `editor-ref` before executing.
   compare-saved, history, conflict and search documents. Adding identity alone will not fix the
   ownership split.
 - `features/editor/state/workspace-document-service.ts` retains live buffers and already carries
-  an `EditorDocumentAnalysis` handle. Plan 198 still says implementation has not started. Establish
+  an `EditorDocumentAnalysis` handle. Plan 198 now records partial implementation. Establish
   which acquisition, attachment and retention guarantees have actually landed; a handle in the
   record is insufficient evidence that the plan is complete.
 - `features/editor/components/editor.tsx` receives a joined buffer/view/analysis document. Files,

@@ -2,9 +2,10 @@
 
 ## Status and authorization
 
-- Status: RESEARCHED 2026-09-25 — the five research questions are answered below, with proposed
-  phases that wait on the owner questions. Far future; nothing here authorizes implementation.
-- Priority: P4.
+- Status: wave 2 P0–P2 remaining, reconciled 2026-09-28. Research and owner direction are
+  recorded below. Later format/editing phases remain follow-up work under their stated gates;
+  this planning update does not authorize implementation.
+- Priority: wave 2 closeout for P0–P2; later phases follow format readiness.
 - Planned at: Platform `9c1c45d1`, 2026-09-25. Origin: the UI library survey
   ([docs/ui-research/extend-ui.md](../docs/ui-research/extend-ui.md)).
 
@@ -13,6 +14,30 @@
 PDF, Word, Excel, PowerPoint and CSV files are first-class documents. They open in editor tabs
 with a real rendering, and agents can read them, edit them, create new ones and preview the
 result, the way they already work on text files today.
+
+## Current implementation and dependencies (2026-09-28)
+
+The source audit found no production web consumer of `seemsBinary` and no installed PDF/Office
+viewer integration in the web app. P0–P2 remain implementation work. The measurements below are
+2026-09-25 research results, not refreshed dependency recommendations or current bundle budgets.
+Recheck versions, licences and representative files before selecting an engine.
+
+Use existing file-document identity. Plan 200 owns shared content-source ownership, 198 owns
+retained analysis and attachment, and 099 owns buffer publication/consumer synchronization.
+Their full completion is not required for the binary guard or a view-only PDF tab. CSV keeps the
+existing live text buffer and must reuse whichever publication contract has landed. Do not create
+another retained-document registry or synchronization service while those plans proceed.
+
+Follow Plan 179's isolation policy: PDF scripting disabled, DOCX-generated styles/ids in a shadow
+root, active HTML in an opaque-origin sandbox. Shared chat/file previews use the same format
+viewer. Historical projection diffs read immutable blobs and preserve the partial/complete source
+contract from 099; never substitute current disk text for a historical side.
+
+The owner's optional-LibreOffice decision requires a browser viewer for every supported format.
+The old PPTX-only-through-LibreOffice phase did not meet it. Browser PPTX fidelity is an explicit
+research gate before that format ships. XLSX editing is a separate phase after viewer delivery.
+DOCX editing follows completion of the required Markdown authoring behavior; its proposed round trip must expose fidelity
+loss and preserve the original until the user accepts the result.
 
 ## What we know so far
 
@@ -28,7 +53,7 @@ result, the way they already work on text files today.
   document-contribution work ([Plan 099](099-document-contributions.md)) and `lib/keep-alive` are
   the likely seams.
 
-## Research needed before any phase exists
+## Research questions answered by the findings below
 
 1. **Survey the libraries.** extend-ui is one; more is needed for each format. Check rendering
    fidelity, bundle and wasm weight, licence, and whether each can edit or only view.
@@ -90,8 +115,10 @@ Shipped weight is esbuild-minified JS plus runtime wasm, gzip -9.
   pptxgenjs; and every skill verifies its output by rendering it (`soffice --convert-to pdf`, then
   `pdftoppm`). See the docx, xlsx and pptx `SKILL.md` files under
   `~/.agents/skills/synced/…/{docx,xlsx,pptx}/`. Claude Code's Read tool reads PDFs natively. Codex
-  has no document skill on this machine; its `openai-templates` plugin defers to a hosted
-  "preinstalled spreadsheet capability".
+  now has the shared document skills available through `~/.agents/skills`, as does Claude.
+  The earlier claim that Codex had no document skills is obsolete. Verify actual CLI/session
+  skill availability when proving the agent workflow; availability in this audit does not prove
+  every provider session loads the skills.
 - **Editing a text form and converting back loses the document.** Mammoth drops styling by design,
   and Markdown has no headers, footers, section layout, comments or tracked changes. A round trip
   through Markdown would wipe all of those on the first agent edit.
@@ -199,7 +226,11 @@ Shipped weight is esbuild-minified JS plus runtime wasm, gzip -9.
      roadmap needs.
    - Decided 2026-09-26: recommendation (owner deferred) — (a) pdf.js.
 
-### Proposed phases
+### Execution phases
+
+Wave 2 closes P0–P2, following 132, 179, 099 and 114 in the closeout queue, with 126 split by
+remaining batch. These are scheduling preferences, not dependencies on every phase of those
+plans. P3 onward stays the documented follow-up scope; DOCX editing retains its owner gate.
 
 0. **Binary files stop opening as text.** Honour `seemsBinary`: show a file-facts body (size,
    type, reveal) and no text buffer.
@@ -210,5 +241,21 @@ Shipped weight is esbuild-minified JS plus runtime wasm, gzip -9.
 3. **Projection diffs** for DOCX, XLSX and PDF in Git and checkpoint diffs, computed on the server.
    Add a blob-restore per-file undo to Plan 139.
 4. **DOCX and XLSX viewers:** docx-preview, and SheetJS into our grid. Both are lazy.
-5. **LibreOffice capability:** probe it; add the PPTX viewer, DOCX page view and turn-file
-   thumbnails through PDF.
+5. **PPTX browser gate and optional conversion:** prove a permissively licensed browser fallback
+   on the representative decks before choosing its engine or declaring PPTX supported. Record
+   missing layout, fonts and objects visibly. LibreOffice may add faithful pages, DOCX page view
+   and turn-file thumbnails when available on the owning machine. Test with LibreOffice absent;
+   conversion cannot be the only way to view a supported document. If no candidate meets the
+   browser requirement, keep this phase blocked on that finding and obtain a scope decision.
+6. **XLSX cell editing:** spike IronCalc's current XLSX support and distribution, or document a
+   replacement candidate. Prove formula preservation/recalculation and safe byte writes through
+   the existing filesystem transaction owner before exposing editing. Preserve untouched sheets,
+   detect external changes and verify whole-file undo. A grid editor alone does not close this phase.
+7. **DOCX source editing, parked:** after Plans 176 and 108 settle, evaluate the owner's
+   Markdown-like source direction using our editor. Define the supported subset, loss reporting,
+   original-file retention and explicit acceptance of a lossy export. Do not add a WYSIWYG
+   dependency or promise a lossless Markdown round trip.
+
+Each delivered format needs an actual open/preview scenario, read-back screenshots, remote-file
+ownership checks and the relevant unavailable-engine/error cases. P3 additionally proves review
+and whole-file restore against binary checkpoint blobs. This refresh ran no format/browser tests.

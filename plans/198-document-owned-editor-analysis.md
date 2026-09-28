@@ -1,8 +1,29 @@
 # Plan 198: Keep editor analysis with the document
 
-Status: direction and priority approved by the owner on 2026-09-27. Implementation has not started.
-Execute first after wave 2, as ordered in [the execution roadmap](../PLAN.md).
+Status: implementation partly landed; acceptance closeout remains unverified, reconciled
+2026-09-28. The owner superseded the fixed “first after wave 2” priority on 2026-09-28.
+Schedule by the [current dependency order](../PLAN.md#wave-2-closeout-and-dependency-order).
 Owners: Editor for analysis and view attachment; Platform for document retention and file opening.
+
+## Landed code and remaining proof
+
+At Editor `401d30cd` and Platform `cf7bc9343`, `editor/documentAnalysis.ts` exposes retained
+structural/highlighter sessions and `workspace-document-service.ts` retains an
+`EditorDocumentAnalysis` beside each buffer. Editor `7edf180c` and Platform `e94c62fae` include
+retained analysis/Markdown integration; `documentAnalysis.node.test.ts` covers shared sessions.
+The old “implementation has not started” status is obsolete.
+
+This source check does not close the contracts below. Inventory acquisition/preparation callers,
+range/configuration admission, cancellation, eviction and attachment behavior before changing
+them. Run the first-frame/dirty-buffer/multiple-view/memory proofs against today's implementation.
+Each sequence item is now “verify landed behavior, implement the missing part,” not permission
+to create a second analysis resource.
+
+099 still owns the missing canonical revision-tagged publication contract. Its unit 1 must
+include the retained-analysis subscriber; 198 consumes that event contract rather than building
+another journal. Baseline/attachment investigation can proceed alongside 099. Full minimap/LSP
+migration, Polaron and binary viewers are independent. Plan 197 owns standalone/diff highlighting;
+200 consumes the relevant retained-source and attachment guarantees as they become proven.
 
 ## Outcome
 
@@ -199,13 +220,13 @@ with saved paint disabled. This plan does not turn `EditorViewSnapshot` JSON int
 ## Implementation sequence
 
 Each unit ends with a working, reviewable contract and its narrow checks. Reconcile the exact API
-names after wave 2; the ownership and observable behavior above are the required result.
+names against the landed code; the ownership and observable behavior above are the required result.
 
 ### 0. Reconcile and establish the baseline
 
 - Record Platform and Editor HEADs, dirty diffs, the CI `editor-ref`, and the actual linked build.
   Planning inspected Platform `ae3bf6d92` and Editor `f97fdad99`.
-- Read the completed wave 2 changes before designing replacement types. Reuse the buffer revision
+- Read current landed changes before designing replacement types. Reuse the buffer revision
   publication from Plan 099 units 0–1 if landed. This work covers syntax lifetime and tab
   attachment; it does not require the broader minimap/LSP contribution migration.
 - Inventory all callers of `startDocument`, `createEditorPreparedDocument`, prepared `.take()`, and view

@@ -5,9 +5,9 @@
 > contract below. Re-run each executable plan's drift check and capture its current HEAD plus full
 > dirty diff before editing.
 
-> **Active:** the [completion wave](docs/completion-wave.md) (2026-09-25) runs every executable
-> plan in parallel lanes, each lane in its own worktree. Its lane order overrides the lane
-> sections below until the wave ends.
+> **Active:** the [wave 2 closeout](docs/next-wave.md#wave-2-closeout-reconciled-2026-09-28)
+> supersedes historical lane ordering where they disagree. The completed-wave documents remain
+> delivery history; current repository instructions govern checkout, commit and deployment work.
 
 This file is the sole source of cross-project execution order. [`plans/README.md`](plans/README.md)
 is the Platform executable-plan inventory. Strategy documents under `docs/` describe product scope
@@ -18,21 +18,39 @@ The [Editor backlog](../Editor/plans/README.md) contains 30 stable entries from 
 wishlist. Its suggested order is advisory; promote selected work into this execution roadmap
 when scheduled. Completed entries link to permanent references.
 
-## First after wave 2
+## Wave 2 closeout and dependency order
 
-Decided 2026-09-27 by the owner: execute
-[Plan 198, keep editor analysis with the document](plans/198-document-owned-editor-analysis.md),
-first after [wave 2](docs/next-wave.md), before starting other post-wave work. This records the
-implementation order; the current change is planning only and does not interrupt wave 2.
-The separate shared highlighting service in Plan 197 has no dependency on this plan.
+Decided 2026-09-28: owner identified Plans 099, 156, 179, 114, 126 and 132 as the remaining
+wave 2 closeout queue and requested a plan refresh. The owner also superseded the earlier
+“198 first after wave 2” scheduling rule. Order follows current code and actual dependencies;
+a historical wave label alone does not hold work back or make it a prerequisite.
 
-[Plan 200, shared documents behind content views](plans/200-document-backed-content-views.md),
-was requested as planning work on 2026-09-28. Its production cutover follows the relevant landed
-099 publication and 198 acquisition/attachment contracts; comparison analysis integration follows
-197's diff service ownership. It does not change 198's priority or authorize gated 099 units.
-Plan 182 retains search multibuffer/rendering/editing, 171 retains the composer migration, and
-156 retains richer file formats. Plan 200 supplies shared content ownership and their integration
-boundaries; baseline research may proceed before those dependencies land.
+Default sequence for the six: **132 → 179 → 099 → 114 → 126 → 156**. This is a work queue,
+not a chain of hard dependencies. Use the [wave 2 closeout table](docs/next-wave.md#wave-2-closeout-reconciled-2026-09-28)
+for the remaining phases and evidence. Existing explicit implementation/data-loss gates remain;
+this documentation refresh does not authorize gated implementation.
+
+- Reconcile 132's small development-plumbing remainder first. Its database collapse is deployed;
+  no repeat reset. Its obsolete Electrobun vibrancy workaround moves into 114's native host work.
+- 179 finishes trace instruments, Mermaid isolation, CSS hygiene and the isolation rule. Its
+  delivered security fixes and Editor highlight-churn fix are not new work.
+- 099 units 0–1 refresh the baseline and supply canonical publication. Reconcile the landed
+  retained-analysis code from 198 at this boundary; 198 is not “unstarted” and has no fixed
+  first/last position. Any remaining 198 work needed for a consumer's acquisition/attachment
+  contract precedes that consumer. Full minimap/LSP migration is not that prerequisite.
+- 114 preserves mesh-owned services while replacing the shell. 126's desktop host acceptance
+  cases follow the relevant gates; independent rail, chat, provider and server proofs can run
+  earlier. Reconcile delivered 126 batches before scheduling more implementation.
+- 156 P0–P2 need the existing file/buffer contracts and 179's isolation policy. A binary guard
+  or PDF viewer need not wait for all of 099, 126 or 198. Its later format phases retain their
+  research/owner gates.
+
+Plan 197 owns standalone highlighting and diff analysis, independently of 198's retained-view
+lifetime. Plan 200's production cutover requires the relevant 099 publication and 198
+acquisition/attachment guarantees; comparison analysis integration also needs 197's diff service.
+Those contracts are prerequisites only where consumed. Baseline research can run earlier.
+Plan 182 keeps search multibuffer/rendering/editing, 171 keeps composer migration, and 156 keeps
+rich file formats. Neither 197 nor 200 authorizes gated work in 099.
 
 ## Verified completed foundations
 
@@ -139,8 +157,8 @@ It extends Editor's existing buffer owner with one committed-revision publicatio
 document contribution runtime. Tree-sitter, Shiki, minimap, and language-service adapters share
 source synchronization while retaining typed APIs, independent queues, and domain-specific data.
 Text delivery uses ordinary strings/chunks and incremental edits in the existing separate workers.
-The syntax migration removes SAB text transport while preserving atomic cancellation and packed results.
-Decided 2026-09-25: owner — the SAB transport is deleted ahead of 099 as Editor E057, a small task.
+Editor E057 already removed SAB text transport on 2026-09-26. Preserve its ordinary-string
+transport, atomic cancellation and packed results; do not repeat the deletion.
 
 Its internal order is calibrated baseline and consumer inventory, canonical publication, shared
 runtime with all syntax callers, minimap, local/external LSP, remaining ownership checks, a
@@ -489,7 +507,8 @@ Suggested order (steps 1–4 done by 2026-09-23; step 5 is in progress):
    rows 2, 7, 8, 9, 11 and the rest of row 5 done 2026-09-25 (lane L7), row 8 closing Plan 130
    item 8. Row 4 and `getStackedRows` close Plan 130 on 2026-09-25. The diff comment layer asks the mounted plugin, and theme colours flow through EditorTheme; light/dark browser proof passes.
 
-Left in the lane: the Plan 132 items its file still lists, and the Phase 4 database reset at deploy. E050 and Plan 130 are complete.
+Left in the lane: Plan 132's reconciled development-plumbing items. Its schema collapse is
+already deployed; no database reset remains for this plan. E050 and Plan 130 are complete.
 
 The owner decided Plan 132 D4 on 2026-09-21: the server's migrations are deleted and the schema
 starts from scratch (Plan 132 Phase 4). External-change
@@ -600,7 +619,7 @@ surfaces, the file picker and the site. The owner is taking it one topic at a ti
 | 165 (done)                                      | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                                    |
 | 166 (done, wave 2 lane S)                       | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, several per command                |
 | [155](plans/155-site-demo-replica.md)           | Placeholder: the site hero becomes an animated replica of the app, like cursor.com                                        |
-| [156](plans/156-documents-in-the-editor.md)     | Placeholder, far future: PDF, DOCX, XLSX, PPTX and CSV as editor documents agents can edit                                |
+| [156](plans/156-documents-in-the-editor.md)     | Wave 2 P0–P2 remaining: binary guard, PDF and CSV; later formats/editing have explicit gates                              |
 | [178](plans/178-tree-in-the-app.md)             | Plan of plans: the file tree rebuilt on app primitives (VirtualList, useListbox, dnd-kit, icons, Tailwind) at full parity |
 | [179](plans/179-isolating-foreign-content.md)   | Where a shadow root earns its place: mermaid, previews, an editor style-recalc experiment                                 |
 | [180](plans/180-file-icon-variants.md)          | Quick research: more glyphs, variants and per-mode colours from the icon pack we already use                              |
@@ -618,12 +637,11 @@ Suggested order:
 4. Plan 165, the font catalog, is done (`d9c6069e`, review `7ad4c866`, 2026-09-25).
 5. Plan 154 near the end. Phases 1–3 may land earlier; Phases 4–6 wait for the base components so
    every new primitive is wired and audited once. D6 (settings semantics) comes first.
-6. Plans 155 and 156 are placeholders; their research phases run when the site or documents matter.
+6. Plan 155 retains its own schedule. Plan 156 is researched; P0–P2 are in the wave 2 closeout queue.
 7. Plan 166 any time; its research phase runs first, and it takes 102 P3, 157 and 080 from `main` as
    they land.
-8. Plan 178: the parity harness first, then out-of-the-root and app-owned state; Q1–Q5 before the
-   sub-plans they gate. Plan 179's Phase 0 instruments (style recalc split out of `trace`) any time;
-   its editor experiment reuses Plan 178's scroll baseline.
+8. Plan 178 keeps its own sub-plan gates. Plan 179's remaining Phase 0 instruments precede its
+   Mermaid/CSS measurements. The owner declined an editor shadow-root experiment; it is dropped.
 9. Plan 181 before Plan 178's virtualization sub-plan: it upgrades TanStack Virtual and makes the
    `VirtualList` key stable, which 178 builds on. Plan 182's research any time.
 
@@ -631,8 +649,8 @@ Suggested order:
 
 Not in the [completion wave](docs/completion-wave.md), each for the reason given there:
 
-- [Plan 114](plans/114-polaron-shell.md), a desktop shell we own (tao, wry, Bun as a child). It
-  needs an explicit go/no-go, and it collides with the desktop work in Plans 132 and 149.
+- Plan 114 is no longer parked here. Its Chromium-first Bun launcher and C/Objective-C fallback
+  hosts are in the wave 2 closeout queue. It preserves the current mesh process ownership.
 - Plan 168, a flat file view under a chosen root (ex-Editor E030): dropped 2026-09-25 by owner:
   tree search covers it. Decided 2026-09-25: owner — drop it; the file tree's existing search
   already covers the need. Its plan file is deleted; git history keeps it.

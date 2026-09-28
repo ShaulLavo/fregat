@@ -9,6 +9,42 @@ Inputs: the [inventory](/work/reports/next-wave/README.md), the
 [owner questions log](/work/reports/next-wave/owner-questions.md), and each plan file (every answer
 is recorded there as "Decided 2026-09-26: owner").
 
+## Wave 2 closeout (reconciled 2026-09-28)
+
+The owner identified 099, 156, 179, 114, 126 and 132 as the remaining wave 2 closeout queue.
+This section supersedes the original lane ordering below for those plans. It is a scheduling
+reconciliation, not proof that every other wave item is complete. Do not infer new production
+permission from a documentation update; preserve explicit gates and owner-only checks.
+
+Default sequence: **132 → 179 → 099 → 114 → 126 → 156**. Independent work can move earlier;
+only the dependencies in this table require serialization.
+
+| Plan | Remaining wave 2 delivery                                                                | Actual dependencies and follow-ups                                                                                                                                                                  |
+| ---- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 132  | Typecheck ownership, HMR disposal/reload filtering, current Vite memory/cold-start proof | Schema collapse is deployed. Prebundling landed. Transfer old vibrancy workaround to 114; shared-dev terminal-id patch remains deferred.                                                            |
+| 179  | P0 instruments, P3 Mermaid, P5 CSS, P6 isolation rule                                    | P1/P2/P4 landed. Instruments precede performance claims; 156 consumes isolation policy.                                                                                                             |
+| 099  | Units 0–1: current consumer baseline and canonical publication                           | Include landed retained analysis from 198 in the inventory. Units 2–7 retain their explicit gate; no repeat SAB deletion.                                                                           |
+| 114  | Gates 1–4: Chromium, native fallback, macOS, Electrobun removal                          | Preserve mesh ownership; Mac verification precedes removal. Consumes 132 ownership reconciliation, not an obsolete server lease.                                                                    |
+| 126  | Remaining A–F/J proof and implementation residues                                        | A/D/F and parts of C/J delivered. Desktop cases use 114; independent chat/provider work can move earlier. G/H/I retain follow-up scope, with H pairing and I agent review already partly delivered. |
+| 156  | P0 binary guard, P1 PDF, P2 CSV                                                          | Existing file identity/buffers and 179 policy suffice. P3–P6 are format/review/editing follow-ups; P7 DOCX source editing stays parked on Markdown and fidelity decisions.                          |
+
+The owner superseded the former “198 first after wave 2” rule on 2026-09-28. Reconcile its
+landed analysis code alongside 099. Schedule remaining 198 guarantees before the consumers that
+need them, without making unrelated shell, Mermaid or PDF work wait. Plan 197's standalone/diff
+highlighting is independent; Plan 200 needs the relevant 099/198 contracts and 197's diff service
+for its comparison integration. The [root roadmap](../PLAN.md#wave-2-closeout-and-dependency-order)
+records those boundaries.
+
+Closeout checklist:
+
+- [x] Refresh the six plan statuses and remove known completed implementation from their queues.
+- [x] Replace historical ordering with current ownership/dependency boundaries.
+- [ ] Execute remaining authorized units and record focused checks plus applicable live evidence.
+- [ ] Reconcile owner-only checks and explicit follow-ups before declaring wave 2 complete.
+
+The lane protocol below records the original multi-agent wave. Current `AGENTS.md` governs
+shared-checkout work; refreshing these plans does not launch agents or a merge queue.
+
 ## What changes from the completion wave
 
 The completion wave ended in a merge train: nine lane PRs of 113–628 files each, 11–23 conflicts per
@@ -159,8 +195,8 @@ dependency manifests, `vite.config.ts`.
 `features/chat` markdown rendering, `lib/prefetch`.
 
 1. 177 P0–P2, P4–P5 (P3 needs E1's prepared-syntax API; schedule with E1).
-2. 156 P0–P2: binary files stop opening as text, pdf.js viewer, CSV table.
-3. 179 P0, P3, P5, P6: trace instruments, mermaid in a shadow root, app CSS, AGENTS.md rule.
+2. 179 P0, P3, P5, P6: trace instruments, Mermaid isolation, app CSS and the isolation rule.
+3. 156 P0–P2: binary guard, PDF viewer and CSV table, using the shared isolation policy.
 
 ### Tier 2 (start as tier 1 lanes finish)
 
@@ -188,14 +224,16 @@ checks are owner checks.
 
 ## Wave 3 (what wave 2 unblocks)
 
-The owner scheduled [Plan 198, keep editor analysis with the document](../plans/198-document-owned-editor-analysis.md),
-first after wave 2 on 2026-09-27. Follow the order in [the execution roadmap](../PLAN.md#first-after-wave-2)
-before starting the work below.
+The former fixed priority for Plan 198 is superseded by the owner's 2026-09-28 direction.
+Use the [current dependency order](../PLAN.md#wave-2-closeout-and-dependency-order). Remaining
+198 work can join the document lane when its consumer contracts need it; unrelated work does
+not wait for its full closeout.
 
 Plan 189 (keep improving tree-sitter-md: open items, then correctness, memory and size, speed)
 after the MD lane; 171 composer (if E2 did not reach it); 111 P4–P5 → 108 P2–P3; 122 P6–P9 and E025; 088 after 087; 178 drag-and-drop and cleanup;
-143 P5–P6 and 155 (after 143); 156 P3–P5; 126 batches G (four drivers), H (pairing, balancing),
-I (PR review workspace); 177 P3 if it slipped.
+143 P5–P6 and 155 (after 143); 156 P3–P6; 126 batch G (four drivers), H's remaining remote
+scope/balancing work after shipped pairing, I's actual forge-review residues after shipped agent
+review; 177 P3 if it slipped. These labels do not supersede current dependencies or completion evidence.
 
 ## Parked
 

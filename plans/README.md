@@ -21,7 +21,7 @@ a bare root `bun run verify`.
 | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | [200 — shared documents behind content views](200-document-backed-content-views.md)     | **PROPOSED 2026-09-28 — PLAN ONLY; BUILDS ON 099/198/197, SEARCH STAYS IN 182**     |
 | [199 — one store library](199-one-store-library.md)                                     | **DONE 2026-09-27 — WEB AND TUI MIGRATED; GATE DROPPED**                            |
-| [198 — keep editor analysis with the document](198-document-owned-editor-analysis.md)   | **SCHEDULED 2026-09-27 — FIRST AFTER WAVE 2; IMPLEMENTATION NOT STARTED**           |
+| [198 — keep editor analysis with the document](198-document-owned-editor-analysis.md)   | **PARTLY IMPLEMENTED — VERIFY REMAINING CONTRACTS; DEPENDENCY ORDER**               |
 | [197 — Editor-owned highlighting service](197-editor-highlighting-service.md)           | **PROPOSED 2026-09-27 — PLAN ONLY; IMPLEMENTATION NOT STARTED**                     |
 | [196 — shared control polish](196-shared-control-polish.md)                             | **PROPOSED 2026-09-27 — PLAN ONLY; IMPLEMENTATION NOT STARTED**                     |
 | [195 — browse Settings defaults in UI and JSON](195-settings-defaults-browser.md)       | **PROPOSED 2026-09-27 — PLAN APPROVED; IMPLEMENTATION NOT STARTED**                 |
@@ -44,7 +44,8 @@ a bare root `bun run verify`.
 | [172 — one shared undo/redo stack](172-shared-undo-stack.md)                            | **RESEARCH; NOTICE-ONLY MOD+Z DONE (WEB) 2026-09-27; TUI AFTER REDESIGN**           |
 | [171 — the chat composer runs on our own editor](171-composer-on-our-editor.md)         | **PHASE 1 IMPLEMENTED 2026-09-26; PROSE WRAP, E058 THEN PHASE 3 (WAVE 2 E2)**       |
 | [170 — language census for grammar and theme prefetch](170-language-census.md)          | **PROPOSED — SPLIT FROM 110 Q7; TREE-SITTER WARM-UP ADDED 2026-09-26**              |
-| [156 — documents in the editor](156-documents-in-the-editor.md)                         | **PLACEHOLDER — FAR FUTURE; RESEARCH FIRST**                                        |
+| [179 — isolating foreign content](179-isolating-foreign-content.md)                     | **WAVE 2 P0/P3/P5/P6 REMAINING — P1/P2/P4 DELIVERED**                               |
+| [156 — documents in the editor](156-documents-in-the-editor.md)                         | **WAVE 2 P0–P2 REMAINING — LATER FORMAT/EDITING PHASES GATED**                      |
 | [155 — site demo becomes an animated replica](155-site-demo-replica.md)                 | **PLACEHOLDER — RESEARCH NOT STARTED**                                              |
 | [152 — dev primary ships its working tree](152-remote-dev-builds.md)                    | **PROPOSED — NICE TO HAVE; AFTER 151**                                              |
 | [151 — remote machines run the primary's release](151-remote-server-releases.md)        | **PROPOSED — DEPENDS ON 150 PHASE 1; D2/D4 TO CONFIRM**                             |
@@ -60,19 +61,19 @@ a bare root `bun run verify`.
 | [140 — the editor as the agent's advantage](140-editor-agent-advantage.md)              | **RESEARCH — RESEARCH PHASE FIRST**                                                 |
 | [139 — acting on agent diffs](139-acting-on-agent-diffs.md)                             | **RESEARCH — RESEARCH PHASE FIRST**                                                 |
 | [135 — TanStack async ownership and route preparation](135-tanstack-async-ownership.md) | **PROPOSED — RESEARCH COMPLETE; IMPLEMENTATION NOT STARTED**                        |
-| [132 — process and dev ownership](132-process-and-dev-ownership.md)                     | **PHASE 1 IMPLEMENTED (`4749fd05`); PHASES 2–4 OPEN**                               |
+| [132 — process and dev ownership](132-process-and-dev-ownership.md)                     | **WAVE 2 CLOSEOUT — SCHEMA DEPLOYED; DEV/HMR REMAINDER**                            |
 | [129 — dependency shape](129-dependency-shape.md)                                       | **PHASES 1–2 DEPLOYED; PHASE 3 Q2–Q4 OPEN**                                         |
 | [128 — React 19 patterns](128-react-19-patterns.md)                                     | **NOT STARTED — PARTLY OBSOLETE; REWRITE SMALL FIRST**                              |
-| [126 — T3 Code behavioral alignment](126-t3code-alignment.md)                           | **IN PROGRESS — 26 OF 57 GROUPS DONE (10 VERIFIED), 9 PARTIAL, 22 OPEN**            |
+| [126 — T3 Code behavioral alignment](126-t3code-alignment.md)                           | **WAVE 2 CLOSEOUT — BATCHES RECONCILED; ROW PROOF STILL REQUIRED**                  |
 | [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md)         | **PROPOSED — INTERACTION RULES CONFIRMED**                                          |
 | [087 — stateless MCP support](087-stateless-mcp.md)                                     | **M0 APPROVED; M1 SCOPE DECIDED 2026-09-26; M2/M3 MOVED TO 174**                    |
 | [088 — native code intelligence](088-native-code-intelligence.md)                       | **PROPOSED — DEPENDS ON 087**                                                       |
 | [091 — error and timing helpers](091-error-and-timing-helpers.md)                       | **PARTIAL — IDENTICAL HALVES MERGED (`becdf722`); REST OPEN**                       |
 | [092 — path and URI helpers](092-path-and-uri-helpers.md)                               | **PARTIAL — IDENTICAL HALVES MERGED (`becdf722`); REST OPEN**                       |
 | [093 — web React and store ceremony](093-web-react-and-store-ceremony.md)               | **PARTIAL — 3 OF 14 DONE; GUARD SWEEP AFTER 091 ITEM 1.4**                          |
-| [099 — document contribution runtime](099-document-contributions.md)                    | **PROPOSED — UNITS 0–1 APPROVED 2026-09-25; 2–7 GATED**                             |
+| [099 — document contribution runtime](099-document-contributions.md)                    | **WAVE 2 UNITS 0–1 OPEN — RETAINED ANALYSIS LANDED; 2–7 GATED**                     |
 | [122 - composable full-power plugins](122-composable-plugins.md)                        | **PROPOSED - RESEARCH AND PERFORMANCE GATES FIRST**                                 |
-| [114 — Polaron, a desktop shell we own](114-polaron-shell.md)                           | **PARKED — NEEDS A GO/NO-GO**                                                       |
+| [114 — Polaron, a desktop shell we own](114-polaron-shell.md)                           | **WAVE 2 — CHROMIUM FIRST; PRESERVE MESH PROCESS OWNERSHIP**                        |
 | [108 — two markdown modes](108-markdown-modes.md)                                       | **PROPOSED — PHASE 1 READY; PHASE 2 NEEDS 111 AND 176**                             |
 | [109 — boot boundaries and gate](109-boot-boundaries.md)                                | **PHASES 2–3 IMPLEMENTED 2026-09-21; GATE NOT STARTED**                             |
 | [110 — workspace indexing](110-workspace-indexing.md)                                   | **RESEARCH — NO IMPLEMENTATION SCOPE YET**                                          |

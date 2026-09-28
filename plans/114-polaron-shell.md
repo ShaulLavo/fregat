@@ -8,7 +8,9 @@
 
 - **State**: RESEARCH DONE 2026-09-26 — reworked around the owner's order (installed Chromium in
   `--app` mode first, system webview second). Chromium path prototyped end to end on Linux; native
-  webview hosts prototyped in C (Linux) and Objective-C (macOS). No Rust. Ready to execute Gate 1.
+  webview hosts prototyped in C (Linux) and Objective-C (macOS). No Rust. Wave 2 remains open.
+  Reconciled 2026-09-28: Gate 1 follows the remaining Plan 132 development-plumbing work and
+  preserves mesh ownership. Host/browser measurements below remain historical research.
 - **Priority**: P2 — the shell works today (plan 073), but every week on Electrobun is a week of
   someone else's toolchain
 - **Effort**: M — about 500 lines of TypeScript in the launcher and ~150 lines of C or Objective-C
@@ -36,9 +38,11 @@ What the 2.x migration cost, measured on 2026-09-13 and 2026-09-25:
   `setenv('GTK_USE_PORTAL')` FFI call (`gtk-portal.ts`), and the `GDK_SCALE` note.
 - Hutch builds only for the host, three runners and a 700 MB cache each.
 
-What the shell does for Platform is small: spawn the server and, in dev, Vite; open one window at
-a URL; install `window.platformBridge`; answer `pickEntry`; quit cleanly; and on macOS attach
-vibrancy behind a transparent window. That is the surface Polaron reproduces.
+Today the desktop waits for the mesh-managed API and Vite URLs, opens a window, installs
+`window.platformBridge`, answers `pickEntry`, and flushes observability on quit. It does not
+spawn or stop those shared servers. On macOS it attaches vibrancy behind a transparent window.
+Polaron preserves that ownership. A future packaged standalone server lifecycle belongs to the
+packaging follow-up and requires an explicit owned-process contract.
 
 ## The shape
 
@@ -46,9 +50,8 @@ The owner's order (2026-09-26, Q1): use the user's installed Chromium-family bro
 when there is none, the system webview; when there is neither, the default browser in a tab.
 
 ```text
-bun  apps/desktop/src/launcher/index.ts   (the process root, TypeScript)
- ├─ server  bun apps/server/src/index.ts  (dev) | server/index.js (packaged)     unchanged
- ├─ web     vite                          (dev only)                            unchanged
+bun  apps/desktop/src/launcher/index.ts   (owns the window process)
+ ├─ waits for mesh-managed API and web URLs (shared services, no child ownership)
  └─ window, one of:
      1. chromium --app=<url> --user-data-dir=<home>/desktop/chromium --remote-debugging-pipe
           CDP over fds 3/4: bridge injection, pickEntry, lifecycle, permissions
@@ -57,9 +60,10 @@ bun  apps/desktop/src/launcher/index.ts   (the process root, TypeScript)
      3. xdg-open / open <url>             (a tab in whatever the system has; no bridge)
 ```
 
-- **Bun stays the brain and the root.** The launcher is today's `src/bun/index.ts` without
-  Electrobun: `spawnServer`, `spawnWeb`, the child lease, `requireFreePort`, the quit handler and
-  the wide events carry over. The single-runtime property holds.
+- **Bun runs the launcher.** Reuse today's readiness checks, bridge, quit handling and wide
+  events from `src/bun/index.ts`. The former `spawnServer`, `spawnWeb`, child lease and port
+  ownership assumptions are obsolete. No separate runtime is bundled for the shell; packaged
+  server/runtime validation stays in the packaging follow-up.
 - **No Rust.** Rust paid for itself when it had to own every window. With Chromium as the common
   path, only the fallback needs a native window, on two OSes (Windows ships Edge, a Chromium), and
   each host is ~150 lines against the platform's own C API: measured below. tao/wry would add a
@@ -124,27 +128,27 @@ Chromium measured on this machine (Chromium 151 and Helium 0.15.7, Hyprland 0.56
 RTX 3060 Ti); macOS rows measured on `shaul-mac` (macOS 26.4, Chrome 153, Helium 0.16.3) where
 noted; Electrobun rows from today's code.
 
-| Capability                         | Electrobun today                                 | Chromium `--app` (path 1)                                                                                                                                          | Webview host (path 2)                                                                                                         |
-| ---------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| Engine                             | CEF, 409 MB bundled                              | the user's Chromium, nothing bundled; WebGPU and EditContext present                                                                                               | WebKitGTK 2.52 / WKWebView; no EditContext                                                                                    |
-| Profile                            | CEF's own                                        | `--user-data-dir=<PLATFORM_HOME>/desktop/chromium`, `--profile-directory=Platform`; 12–28 MB fresh                                                                 | WebKit default data dir                                                                                                       |
-| Isolation from user's browsing     | yes                                              | yes: separate process, no shared cookies; `--disable-extensions` needed (below)                                                                                    | yes                                                                                                                           |
-| Bridge injection                   | preload string                                   | `Page.addScriptToEvaluateOnNewDocument` plus an immediate `Runtime.evaluate`                                                                                       | `WKUserScript` / `webkit_user_script` at document start                                                                       |
-| `pickEntry`                        | Electrobun GTK dialog, X11                       | `Runtime.addBinding` → launcher → `platform-webview pick` (portal / `NSOpenPanel`)                                                                                 | host's own dialog: portal on Linux, sheet on macOS                                                                            |
-| Titlebar                           | macOS `hiddenInset`, traffic lights over our bar | native frame; none on Hyprland; macOS draws Chrome's titlebar above ours                                                                                           | macOS `hiddenInset`; Linux native frame                                                                                       |
-| Window drag                        | `electrobun-webkit-app-region-drag`              | native frame does it                                                                                                                                               | macOS: `performWindowDragWithEvent` on a `drag` message                                                                       |
-| Dark mode                          | `gdbus` portal read (X11 workaround)             | native: `prefers-color-scheme: dark` true before first load                                                                                                        | native on Wayland (Gate 0) and macOS                                                                                          |
-| Transparent / vibrancy             | macOS vibrancy (CEF OSR, 5.5 MB/paint)           | no                                                                                                                                                                 | macOS `NSVisualEffectView`                                                                                                    |
-| Keyboard                           | CEF passes everything                            | every chord probed reaches the page first and is preventable: Ctrl+W, Ctrl+Shift+W, Ctrl+T, Ctrl+N, Ctrl+Tab, Ctrl+L, Ctrl+Shift+I/J/C, F5, F11, F12, Ctrl+Shift+Q | as the engine                                                                                                                 |
-| Clipboard, notifications           | CEF defaults                                     | `Browser.grantPermissions` pre-grants `clipboardReadWrite` and `notifications` for our origin (measured `prompt` → `granted`)                                      | WKWebView: `clipboard.readText` and `Notification` exist on `http://127.0.0.1`                                                |
-| Screen capture (Plan 163)          | `getDisplayMedia` in CEF                         | `getDisplayMedia` with the portal picker, as in a tab                                                                                                              | WKWebView: `getDisplayMedia` absent (feature reports unsupported). WebKitGTK: `captureStream` aborts the web process; hide it |
-| Devtools                           | CEF devtools                                     | Chrome DevTools (Ctrl+Shift+I when the page does not claim it)                                                                                                     | Web Inspector                                                                                                                 |
-| Close window                       | quits                                            | Linux: browser exits in 407 ms, code 0. macOS: Chrome keeps running (measured), so the launcher sends `Browser.close` on the last page's `Target.targetDestroyed`  | host exits, launcher quits                                                                                                    |
-| Second launch                      | port check fails                                 | Chromium's singleton hands off in 44 ms and opens a second window, which the first launcher's CDP session attaches to and bridges                                  | launcher lease decides                                                                                                        |
-| Launcher crash                     | —                                                | the pipe closes and the browser exits within 300 ms: no orphan window                                                                                              | stdin EOF ends the host                                                                                                       |
-| Tray, global shortcuts, deep links | available, unused                                | none                                                                                                                                                               | none                                                                                                                          |
-| Window identity                    | —                                                | Wayland `app_id` `chrome-127.0.0.1__platform_-Platform` (host + path + profile dir); `--class` is ignored on Wayland                                               | `app_id` of the host binary                                                                                                   |
-| Dock icon                          | ours                                             | Linux: ours through a `.desktop` with that `StartupWMClass`. macOS: the browser's icon                                                                             | ours once bundled                                                                                                             |
+| Capability                         | Electrobun today                                            | Chromium `--app` (path 1)                                                                                                                                          | Webview host (path 2)                                                                                                         |
+| ---------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Engine                             | CEF, 409 MB bundled                                         | the user's Chromium, nothing bundled; WebGPU and EditContext present                                                                                               | WebKitGTK 2.52 / WKWebView; no EditContext                                                                                    |
+| Profile                            | CEF's own                                                   | `--user-data-dir=<PLATFORM_HOME>/desktop/chromium`, `--profile-directory=Platform`; 12–28 MB fresh                                                                 | WebKit default data dir                                                                                                       |
+| Isolation from user's browsing     | yes                                                         | yes: separate process, no shared cookies; `--disable-extensions` needed (below)                                                                                    | yes                                                                                                                           |
+| Bridge injection                   | preload string                                              | `Page.addScriptToEvaluateOnNewDocument` plus an immediate `Runtime.evaluate`                                                                                       | `WKUserScript` / `webkit_user_script` at document start                                                                       |
+| `pickEntry`                        | Electrobun GTK dialog, X11                                  | `Runtime.addBinding` → launcher → `platform-webview pick` (portal / `NSOpenPanel`)                                                                                 | host's own dialog: portal on Linux, sheet on macOS                                                                            |
+| Titlebar                           | macOS `hiddenInset`, traffic lights over our bar            | native frame; none on Hyprland; macOS draws Chrome's titlebar above ours                                                                                           | macOS `hiddenInset`; Linux native frame                                                                                       |
+| Window drag                        | `electrobun-webkit-app-region-drag`                         | native frame does it                                                                                                                                               | macOS: `performWindowDragWithEvent` on a `drag` message                                                                       |
+| Dark mode                          | `gdbus` portal read (X11 workaround)                        | native: `prefers-color-scheme: dark` true before first load                                                                                                        | native on Wayland (Gate 0) and macOS                                                                                          |
+| Transparent / vibrancy             | macOS vibrancy (CEF OSR, 5.5 MB/paint)                      | no                                                                                                                                                                 | macOS `NSVisualEffectView`                                                                                                    |
+| Keyboard                           | CEF passes everything                                       | every chord probed reaches the page first and is preventable: Ctrl+W, Ctrl+Shift+W, Ctrl+T, Ctrl+N, Ctrl+Tab, Ctrl+L, Ctrl+Shift+I/J/C, F5, F11, F12, Ctrl+Shift+Q | as the engine                                                                                                                 |
+| Clipboard, notifications           | CEF defaults                                                | `Browser.grantPermissions` pre-grants `clipboardReadWrite` and `notifications` for our origin (measured `prompt` → `granted`)                                      | WKWebView: `clipboard.readText` and `Notification` exist on `http://127.0.0.1`                                                |
+| Screen capture (Plan 163)          | `getDisplayMedia` in CEF                                    | `getDisplayMedia` with the portal picker, as in a tab                                                                                                              | WKWebView: `getDisplayMedia` absent (feature reports unsupported). WebKitGTK: `captureStream` aborts the web process; hide it |
+| Devtools                           | CEF devtools                                                | Chrome DevTools (Ctrl+Shift+I when the page does not claim it)                                                                                                     | Web Inspector                                                                                                                 |
+| Close window                       | quits                                                       | Linux: browser exits in 407 ms, code 0. macOS: Chrome keeps running (measured), so the launcher sends `Browser.close` on the last page's `Target.targetDestroyed`  | host exits, launcher quits                                                                                                    |
+| Second launch                      | connects to shared services; no server-port ownership check | Chromium's singleton hands off in 44 ms and opens a second window, which the first launcher's CDP session attaches to and bridges                                  | explicit host-instance ownership                                                                                              |
+| Launcher crash                     | —                                                           | the pipe closes and the browser exits within 300 ms: no orphan window                                                                                              | stdin EOF ends the host                                                                                                       |
+| Tray, global shortcuts, deep links | available, unused                                           | none                                                                                                                                                               | none                                                                                                                          |
+| Window identity                    | —                                                           | Wayland `app_id` `chrome-127.0.0.1__platform_-Platform` (host + path + profile dir); `--class` is ignored on Wayland                                               | `app_id` of the host binary                                                                                                   |
+| Dock icon                          | ours                                                        | Linux: ours through a `.desktop` with that `StartupWMClass`. macOS: the browser's icon                                                                             | ours once bundled                                                                                                             |
 
 Nothing on the page needs the bridge at document start in the Chromium path: `backdrop` falls out
 of the user agent (`compositesOverDesktop`), `colorScheme` is `null` because Chromium reads the
@@ -153,14 +157,20 @@ long as the launcher also evaluates the bridge into the current document.
 
 ### Supervision and quit
 
-The launcher is the root and owns both halves. Chromium is a child on a pipe; the server and Vite
-are children in their own process groups under today's lease (`child-lease.ts`). Quit is one
-path whichever side starts it: the browser exits (window closed, Cmd-Q, Ctrl+Shift+Q, or the
-launcher's `Browser.close`), the launcher sends Plan 149's `shutdown` to the terminal host, SIGTERMs
-the groups, waits, clears the lease and exits. A server that exits on its own still quits the app,
-as today, but the launcher first navigates the window to a `data:` page naming the exit code, so
-the failure is on screen instead of a vanished window. Start failures before a window exists keep
-`showStartFailure`: `platform-webview message` on Linux and macOS, stderr and a log event elsewhere.
+The launcher owns its browser or native-host process and its IPC, plus any picker helper it
+starts. Window close flushes desktop observability and releases those owned processes/resources.
+It must leave mesh-managed API/Vite processes and the shared terminal host running. Verify that
+closing or crashing the launcher preserves an existing browser session and its running terminal.
+
+A shared-server outage uses the app's existing connection/recovery behavior. Start failures before
+a window exists retain `showStartFailure`: `platform-webview message` on Linux and macOS, stderr
+and a log event elsewhere. Browser singleton handoff must distinguish a process started by this
+launch from a pre-existing instance; a second launcher cannot tear down the first window.
+
+Plan 132 transfers its Electrobun vibrancy pointer workaround to Gate 3. The replacement native
+host owns its window directly; verify that path on macOS instead of patching obsolete Electrobun
+window discovery. Plan 126's desktop capability matrix consumes these host results. Its unrelated
+chat/provider batches do not wait on Polaron.
 
 ## Gates
 
@@ -197,16 +207,17 @@ Owner: `apps/desktop/src/launcher/*` (new), `scripts/desktop-dev.ts`,
 4. Bridge in the Chromium path: `{ backdrop, platform, colorScheme: null, titlebar: 'native' }`
    and no `pickEntry` yet, so the web picker is used. `isMacDesktop()` becomes
    `titlebar === 'overlay'`.
-5. Lifecycle: browser exit → quit path. A second `desktop:dev` while one runs finds the live lease
-   and execs the browser with the same `--user-data-dir`, which opens a second window in the
-   running instance, then exits 0.
+5. Lifecycle: browser exit → owned-window cleanup only. A second `desktop:dev` uses Chromium's
+   singleton handoff with the same profile, opens a bridged second window, then exits 0. Prove
+   that handoff and launcher failure do not stop shared services or another launcher's window.
 6. Settings: register `window.browser` (machine scope, `requiresRestart`) with its consumer here.
    Regenerate `docs/settings-reference.md`.
 7. Frame counter: 2 s after `Page.loadEventFired`, count rAF for one second and put
    `rafPerSecond`, `product` and `engine: 'chromium'` on `desktop.window.open`. A zero is the NVIDIA
    signature from Gate 0 in any engine.
-8. Lease path: `childLeaseFile` uses `homedir()/.platform`; move it under `PLATFORM_HOME` so dev,
-   prod and agent homes stop sharing one lease directory (Plan 146).
+8. Resolve the browser profile under the effective desktop state home and prove dev/test/prod
+   isolation. There is no current `childLeaseFile` to move. Do not reintroduce a shared-server
+   lease or take ownership of another launcher through a stale profile record.
 
 **Exit**: `bun run desktop:dev -- --shell=polaron` opens Platform in the default Chromium-family
 browser as an app window, picks a folder through the web picker, and quits on window close with
@@ -259,7 +270,7 @@ Owner: `apps/desktop/native/macos/platform-webview.m` (new, absorbs `vibrancy.m`
    with a `mousedown` listener on `[data-native-window-drag-region]` that the preload installs when
    `titlebar === 'overlay'`, posting `drag`.
 5. Verify on `shaul-mac`: Chromium path (Helium, the default there, and Chrome), webview path with
-   `window.transparency: 'window'`, Cmd-Q, and that Bun from the app is the one running the server.
+   `window.transparency: 'window'`, Cmd-Q, and that quitting leaves shared servers/terminals alive.
 
 **Exit**: the Gate 1 and 2 checklists pass on the Mac in both paths.
 
@@ -270,7 +281,9 @@ Owner: `apps/desktop/native/macos/platform-webview.m` (new, absorbs `vibrancy.m`
    in git, oxlint and oxfmt, and the CI cache and prepare steps from `15df2033`. Add the host
    builds to CI (`pkg-config` + `cc` on the Linux runner, `clang` on macOS).
 2. Delete `color-scheme.ts` and `gtk-portal.ts`: both exist only because of the X11 forcing.
-3. Delete `/work/cache/hutch` and the `~/.hutch` symlink on the developer machine.
+3. Remove repository references to Hutch. Machine cache/symlink cleanup is a separate owner
+   action after checking other consumers; this plan does not authorize deleting outside-checkout
+   payloads. No shell-delivery gate depends on reclaiming that cache.
 4. `desktop:dev` runs the launcher without the flag. Update `AGENTS.md`: the desktop shell
    section, the dev-server note, and the mesh section's claim that the shell is a convenience.
 5. Update the `window.transparency` description: it no longer mentions CEF's copy per paint, and

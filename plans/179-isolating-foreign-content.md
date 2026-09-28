@@ -2,10 +2,9 @@
 
 ## Status and authorization
 
-- Status: RESEARCH DONE 2026-09-26 — measured per surface. Mermaid gets a shadow root for display;
-  chat markdown, previews and the editor get none. Two live bugs found on the way (raw-HTML DOM
-  clobbering breaks the editor; occurrence highlights rewrite a head `<style>` every ~3.5 keys).
-  Phases below are ready to execute; one owner question on the editor root.
+- Status: PARTIALLY DELIVERED, reconciled 2026-09-28. Phases 1, 2 and 4 landed. Remaining
+  wave 2 work: phases 0, 3, 5 and 6. The owner declined an editor shadow root on 2026-09-26;
+  no editor-root decision is pending. Research measurements below describe the historical baseline.
 - Phase 1 done 2026-09-26 (wave 2, lane E1): [singapore#42](https://github.com/ShaulLavo/singapore/pull/42),
   in `editor-ref` `ec3fc15`. `p179-type-burst` on a production build, two traces each: head
   `<style>` writes 42 → 1, style recalc 358 → 203 ms (1.26 → 0.71 ms per key on a busier machine
@@ -13,6 +12,18 @@
 - Planned at: Platform `d103638de`, Editor `74e76be`, 2026-09-26. Researched at Platform
   `c130dd35a`, Editor `74e76be`. Origin: a discussion of the file tree's shadow root.
   [Plan 178](178-tree-in-the-app.md) removes that root; this plan asks where a root earns its place.
+
+## Remaining execution order
+
+Run phase 0 instrumentation before measuring phases 3 and 5. Then deliver Mermaid isolation,
+CSS cleanup and the phase 6 rule. No dependency on full completion of 099 or 114. Plan 156
+consumes the isolation policy; its PDF/CSV work can proceed independently of Mermaid delivery.
+Reproduce current costs before applying the old research thresholds.
+
+The 2026-09-28 source audit confirmed the sanitizer prefix and blob headers. Mermaid still
+renders in light DOM without palette/font invalidation, and `trace-summary.ts` still groups
+style recalc under layout. Phase 1's Editor delivery evidence remains below; no new performance
+or browser run was performed for this planning update.
 
 ## Outcome
 
@@ -191,7 +202,7 @@ Each phase is independent and shippable. Verification runs through `agent:browse
    change bumps `rangeHighlightRuleVersion`. Gate: `trace editor-type-burst --compare` shows head
    writes near 0 and style ≤0.35 ms per key. Editor-side test beside `editor.test.ts`'s
    "updates semantic range highlights in place".
-2. **Sanitizer prefix (S, `packages/markdown`).** `clobberPrefix: ''` into `toHast`, the default
+2. **Done. Sanitizer prefix (S, `packages/markdown`).** `clobberPrefix: ''` into `toHast`, the default
    `user-content-` prefix back in `sanitize-schema.ts`, in-document `#` hrefs rewritten in
    `rehypeDecorate`. Tests: `hast.test.ts` footnote case plus `<img name="getSelection">`,
    `<form name>`, raw `id`. Scenario: commit `p179-clobber` as `markdown-preview-clobber` (no page
@@ -213,7 +224,7 @@ Each phase is independent and shippable. Verification runs through `agent:browse
    - Scenario `chat-mermaid` on the native-provider fixture: a `classDef hidden` diagram, a font
      switch, light and dark palettes; `look` on each. Gate: `trace editor-type-burst` with 30
      diagrams mounted matches the no-diagram baseline.
-4. **`/fs/blob` headers (S, `apps/server/src/fs/routes.ts`).** `x-content-type-options: nosniff` on
+4. **Done. `/fs/blob` headers (S, `apps/server/src/fs/routes.ts`).** `x-content-type-options: nosniff` on
    every response; `content-security-policy: sandbox` on HTML, SVG and XML. Route test in
    `apps/server/src/fs/tests/`.
    Landed 2026-09-26 (wave 2 lane B), with `application/xhtml+xml` and XML covered too; route test
@@ -226,8 +237,7 @@ Each phase is independent and shippable. Verification runs through `agent:browse
    prefixed ids; library output that ships its own stylesheet or ids gets a shadow root; anything
    that can run script gets a sandboxed opaque-origin iframe. Plan 156's DOCX viewer follows it.
 
-Dropped: the plan's former Phase 3 (a `/dev` tab mounting the editor in a root), pending the owner
-question below.
+Dropped by the owner's no-go decision: the former editor-in-a-shadow-root `/dev` experiment.
 
 ## Owner questions
 

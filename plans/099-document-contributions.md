@@ -1,6 +1,9 @@
 # Plan 099: Route document consumers through one contribution runtime
 
-Status: proposed. The session diff source correction has landed (2026-09-25). Unit 0 research partial (2026-09-25): inventory, baseline identity and probes done; harness extension and calibrated controls left for the unit 1 lane. Requested on 2026-09-12.
+Status: wave 2 units 0–1 remaining, reconciled 2026-09-28. The session diff correction and
+Editor E057 transport removal landed. Unit 0's old inventory/probes require a current baseline;
+unit 1 publication remains open. Retained-analysis code has landed and changes the consumer
+migration. Units 2–7 retain their explicit implementation gate. Requested on 2026-09-12.
 Owner: Editor and Platform. Priority P1, effort XL, change risk high.
 Inspected Platform: `2f9528ac1e147615cf81431ef8509f551af4b290`.
 Inspected Editor: `64926519bfdd39f4afcfae225019a932d3e27785`.
@@ -21,6 +24,36 @@ begins only when requested. Reconcile both checkouts and their dirty diffs befor
 Decided 2026-09-25: owner — units 0–1 (baseline and consumer inventory, then buffer publication) are approved to
 start. Units 2–7 stay gated as this plan says: implementation of them begins only when requested.
 
+## Wave 2 reconciliation (2026-09-28)
+
+This is one of the six remaining wave 2 plans named by the owner on 2026-09-28. Its
+wave 2 delivery remains units 0–1; the existing authorization gate on units 2–7 remains.
+The plan refresh authorizes no production implementation beyond those decisions.
+
+Source audit: Platform `cf7bc9343`, Editor `401d30cd`. Editor has concurrent Markdown edits;
+take a fresh dirty diff and linked-build baseline before execution. Findings:
+
+- Unit 1 remains open. `EditorTextBufferChange` in `documentSession.ts` carries `change`,
+  `origin` and `sourceViewId`, without the proposed revision pair or sync point. Revision fields
+  on transaction receipts do not satisfy the publication contract.
+- `editor/documentAnalysis.ts` now retains structural/highlighter sessions. Platform's
+  `workspace-document-service.ts` creates and retains `EditorDocumentAnalysis`. Extend the
+  consumer inventory to this owner and its raw subscription, revision reads and queued work.
+  The old per-view duplication measurements are historical; measure today's baseline again.
+- Editor E057 removed SAB text transport. Keep its string-path correctness coverage; no unit
+  should schedule that deletion again.
+- The checkpoint source correction is already delivered. Unit 2 retains only the missing Editor
+  partial/complete source contract and contribution attachment work.
+
+Ownership: 099 owns publication and common consumer synchronization. Plan 198 owns acquisition,
+retained analysis and view attachment. The owner removed its fixed post-wave priority on
+2026-09-28. Reuse its landed code and schedule missing guarantees before their consumers,
+without claiming its full acceptance contract is verified or blocking unrelated wave work.
+Plan 197 owns standalone highlighting and diff analysis services. Plan 200 owns content-source
+ownership across comparisons, previews and search. Neither is a prerequisite for units 0–1.
+Reconcile the public backend cutover with those owners before executing gated unit 2; do not
+introduce a second analysis handle, revision journal or synchronization runtime.
+
 ## Scope and completion boundary
 
 Route every successful buffer mutation through one publication operation. Route every first-party
@@ -33,7 +66,7 @@ Keep synchronous, inexpensive consumers synchronous through their existing typed
 hooks. This plan does not move every reader to a worker or turn every API into a promise.
 
 Use ordinary strings/chunks and incremental edit batches for text synchronization. Keep the
-existing separate workers. Remove the existing SAB text transport with the syntax migration;
+existing separate workers. Preserve the completed E057 removal of SAB text transport;
 shared text storage, worker consolidation, and an intermediate relay worker are outside this plan.
 Preserve the separate atomic cancellation flag and existing packed-result buffer transfers.
 
@@ -568,9 +601,8 @@ and packed results. Remove their feature-owned source history/recovery and direc
 Keep only domain-specific synchronization required to update parser/tokenizer state after the
 common reader advances.
 
-Keep their separate workers. Delete the `shared-utf16` text payload, encode/decode helpers, source
-capability selection, and obsolete transport-only tests in this same unit. Decided 2026-09-25: owner — that deletion
-landed as Editor E057 on 2026-09-26 ([singapore#52](https://github.com/ShaulLavo/singapore/pull/52),
+Keep their separate workers. The `shared-utf16` payload, transport helpers and capability
+selection are already removed. That deletion landed as Editor E057 on 2026-09-26 ([singapore#52](https://github.com/ShaulLavo/singapore/pull/52),
 record in [sab-transport-2026-09-12.md](../../Editor/docs/performance/sab-transport-2026-09-12.md)),
 so this unit has no SAB work left. Carry forward exact
 UTF-16, chunk identity, and retention coverage against strings. Preserve atomic cancellation and
@@ -582,10 +614,11 @@ Remove the replaced provider session entry points only after their entire caller
 contribution contract, in this same unit. Do not defer those callers to unit 5 or add a temporary
 compatibility adapter. Public cutover therefore follows the host prerequisites listed below.
 
-Include the session diff source-completeness correction above in this unit. Share the regular
-blob acquisition path across snapshot and checkpoint consumers, then register each complete old/new
-source with the contribution runtime. Keep display-row projection separate from source identity.
-Remove the path that submits concatenated patch hunks as complete source documents.
+Preserve the delivered checkpoint blob acquisition and whitespace-policy correction. Register
+complete old/new sources with the contribution runtime and move the partial/complete distinction
+into Editor's syntax contract. Coordinate source ownership with 200 and diff analysis with 197.
+Keep display-row projection separate from source identity; partial patches cannot enter a
+complete-source syntax API.
 
 Use their real worker results to prove source equivalence, lifecycle independence, exact pinned
 reads, missed-history reset, and stale completion rejection. Compare input and syntax-visible
@@ -630,7 +663,7 @@ Measure initial string/chunk delivery, acknowledged edits, resets, source retent
 consumer readiness against the frozen baseline. Attribute centralized publication improvements
 separately from source transport costs. Preserve clipped minimap payloads and LSP protocol behavior.
 
-Confirm unit 2 removed all production SAB text paths and their unused capability abstractions.
+Confirm the completed E057 removal remains intact across the runtime migration.
 Verify cancellation on supported hosts and packed-result transfers independently. The text transport
 decision is settled; this unit does not add a competing shared-storage prototype or a relay worker.
 Keep the recorded SAB measurements as evidence, without maintaining obsolete production transport
@@ -802,7 +835,7 @@ and complete validation. Writing the plan does not schedule production execution
 - [Completed E032](../../Editor/docs/performance/e032-edit-batches.md) supplies incremental batch
   behavior and measurements. Preserve its sparse-region requirements and canonical batch semantics.
 - E009 supplied transport measurement scope and is folded into unit 6 (2026-09-25).
-  Its initial measurements informed the decision to remove SAB text transport in unit 2. Unit 6
+  Its initial measurements informed the SAB text-transport removal completed in E057. Unit 6
   validates string delivery under the new runtime and records remaining measurement gaps.
 - E010, E012 and E013, the shared-storage research, were closed as no-go on 2026-09-25
   ([decision](../../Editor/docs/performance/sab-transport-2026-09-12.md#decision-2026-09-25)); E011
@@ -898,10 +931,9 @@ language-server lane: unit 4. Platform saved-state diffs read whole text, one th
 LSP worker is used only by Editor `examples/app`; Platform runs TypeScript on the server. The TUI
 viewer's LSP client has no Editor buffer and is outside the plan.
 
-**SAB (Editor E057).** Owner decision: the SAB text transport is deleted. E057 is Proposed and not
-landed; the `shared-utf16` arm, `useSharedBuffers` and `supportsSharedTreeSitterSource` still exist,
-all in `packages/tree-sitter/src/treeSitter/source.ts`. Nothing else in either repository passes the
-option. Unit 1 does not touch them; if E057 lands first, unit 2 has no SAB work.
+**SAB (Editor E057), updated 2026-09-28.** E057 landed on 2026-09-26. The former
+`shared-utf16` arm, `useSharedBuffers` and `supportsSharedTreeSitterSource` are absent from
+`packages/tree-sitter/src/treeSitter/source.ts`. Units 1 and 2 have no transport deletion left.
 
 **E009 in unit 6.** Owner decision: E009 is folded into unit 6 and closed in the Editor backlog.
 The per-keystroke message and payload counts above are the unit-0 slice of its string-path

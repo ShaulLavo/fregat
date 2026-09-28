@@ -1,45 +1,50 @@
 # Plan 126: Align Platform behavior with pinned T3 Code
 
-Status: **RESEARCH DONE 2026-09-26 — 24 of 57 groups verified by scenario, 13 implemented with one
-proof step left, 11 partial, 4 open, 5 parked** ([row-by-row audit](126-t3code-alignment/status-2026-09-26.md)).
-Counted on `origin/main` `c130dd35a`, after lanes L2, L3, L5, L8 and L9. Of the open lane PRs only
-#32 (Plan 149) touches a row, EXT-05. A row closes when its `agent:browser` scenario proves the
-behaviour; the paired run against upstream T3 Code is dropped
-([owner decision](../docs/completion-wave.md#owner-decisions-for-this-wave-2026-09-25)).
-Most older scenarios fail on `main` today from seven harness defects, not product regressions;
-batch A below repairs them first. Upstream moved 114 commits past the 2026-09-24 delta; see
-[the 2026-09-26 delta](126-t3code-alignment/delta-2026-09-26.md).
+Status: **wave 2 closeout, reconciled 2026-09-28**. The edited 2026-09-26 ledger currently
+contains 34 V, 8 D, 7 P, 3 O and 5 K rows, totaling 57. These are recorded ledger states, not a
+fresh runtime certification. Its former headline totals were stale, and several remaining rows
+still need implementation/evidence reconciliation. See the
+[current source reconciliation](126-t3code-alignment/status-2026-09-28.md).
+
+Harness batch A and batches D/F landed; batch C has recorded scenario deliveries. Project
+settings and device pairing also exist. Do not schedule those implementations again or treat
+historical open PR numbers as current blockers. Recheck the remaining acceptance cases before
+closing their rows. Upstream is at `d15210cd`, 18 commits after the last delta's `295d7cba`;
+the acceptance pin remains `7445aa73`.
 
 LIFE-01/02 shipped on 2026-09-20. Rewind/native permissions/PR lookup have an initial deployment and follow-up validation in [delivery evidence](126-t3code-alignment/rewind-permissions-delivery.md); bounded delivery and MCP approval implementation are recorded in [their delivery evidence](126-t3code-alignment/live-delivery-approvals-delivery.md). The active-list exceptions and automatic unarchive are removed; archive eligibility is separate from settlement. See [archive delivery evidence](126-t3code-alignment/archive-delivery.md). The source-derived archive fixture is the first focused conformance case, not completion of Wave 0 or proof of full upstream parity.
 
-Priority: P0 for the archive defect and conformance foundation; execute the remaining work in
-the dependency order below. Overall effort is large and spans multiple deliveries. No honest
-date estimate is possible before provider/platform prerequisites and live comparison are measured.
+Priority: finish the remaining wave 2 batches in dependency order. The original P0 archive
+fix is delivered. Provider/host follow-ups retain their own capability and proof boundaries;
+paired upstream runtime comparison is no longer a completion requirement.
 
 A 2026-09-24 upstream delta audit against `9383f4ad` added nine groups (57 in total) and reopened four stale non-parity rejections. The acceptance baseline stays pinned; see [the delta record](126-t3code-alignment/delta-2026-09-24.md).
 
 The user resumed all parity work on 2026-09-23, including providers, remote access, browser/device tools, mobile, desktop and distribution. The previous stop applied to the 2026-09-20 run only. See [the resumed execution record](126-t3code-alignment/resumed-execution.md) for the first batch and [the historical wrap-up](126-t3code-alignment/wrap-up.md) for completed deliveries and their limits.
 
-## Remaining work in lane batches (2026-09-26)
+## Remaining work by batch (reconciled 2026-09-28)
 
 Grouped by the files each batch touches, so two lanes rarely edit the same file. Row states and
-evidence are in the [status audit](126-t3code-alignment/status-2026-09-26.md). Batch A goes
-first; B, C and D need it.
+evidence are in the [historical status audit](126-t3code-alignment/status-2026-09-26.md) and
+[the current reconciliation](126-t3code-alignment/status-2026-09-28.md). Batch A is delivered;
+its scenario prerequisites no longer block the remaining proofs. Schedule residual work only.
 
-| Batch                                     | Rows                                                                                      | Files                                                                                                                                                                 | Size                               | Blockers                                                                                                                                                                                                                                                                           |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A. Scenario harness repair                | LIFE-01, LIFE-02; keeps RUNTIME-03, RUNTIME-09 and every Codex-fixture proof reproducible | `scripts/agent/fixtures/*.mjs`, `scripts/agent/selectors.ts`, `scenarios/chat-verification.ts`, `archive-lifecycle.ts`, `response-delivery.ts`, `terminal-history.ts` | S                                  | Decided 2026-09-26: owner — relax the same-site navigation rule. Require an allowlisted referrer; reject cross-site and missing or untrusted referrers. Start from `/work/tmp/research2/126/scenario-harness-fixes.patch` (H1–H4 tested; H6 needs a harness-owned second context). |
-| B. Two-owner rail proofs                  | LIFE-03, LIFE-04, LIFE-05, LIFE-08, LIFE-10                                               | `scenarios/session-{lifecycle,ordering,search,navigation}.ts`, `second-owner.ts`                                                                                      | S–M                                | A. Move `session-lifecycle` and `session-search` off the real provider onto native fixtures (done 2026-09-27: Codex conversation fixture; `session-search-environments` on `connectSecondOwner`). Coordinate with Plan 172 if it moves rail Undo                                   |
-| C. Server protocol proofs                 | EXT-13, RUNTIME-04, RUNTIME-11, RUNTIME-07, RUNTIME-08                                    | `scripts/agent/fixtures/native-codex.mjs`, `fake-gh.mjs`, new scenarios; `provider/adapters/codex.ts` only if a proof fails                                           | M                                  | A. RUNTIME-07 rechecks the monitor-only signal on Codex 0.157 (decided). RUNTIME-08's live redemption stays the owner's check                                                                                                                                                      |
-| D. Composer residues (done 2026-09-26)    | INTERACTION-01, -02, -04, -08, -11 (Enter on touch)                                       | `features/chat/{state,components}` composer, follow-up store, question panel; `apps/server/src/auth.ts` or the download link                                          | M                                  | A. INTERACTION-11's rich composer stays parked on Plan 111                                                                                                                                                                                                                         |
-| E. Lifecycle and terminal delta           | EXT-05, LIFE-06 switch, LIFE-04 idle shells, LIFE-14 repo name, EXT-12 log retention      | `terminal/service.ts`, orchestration decider and settlement, rail row menu, log writer                                                                                | M                                  | #32 merged first (Plan 149 rewrites terminal and observability files)                                                                                                                                                                                                              |
-| F. Typed source context (done 2026-09-27) | INTERACTION-09, INTERACTION-03                                                            | composer draft model, `lib/use-attach-to-composer.ts`, review draft, message menu                                                                                     | L                                  | Plan 139 P3 and 140 are on `main`. Browser annotation waits on EXT-07                                                                                                                                                                                                              |
-| G. Four provider drivers                  | RUNTIME-02                                                                                | `provider/adapters/*`, new ACP peer, contracts provider defaults                                                                                                      | XL (4 × L; two lanes after step 0) | Accounts only for smoke runs; untested drivers ship marked untested (owner, 2026-09-25). Status probes must never run a mise shim                                                                                                                                                  |
-| H. Remote machines                        | EXT-08, EXT-16                                                                            | `apps/server/src/auth*`, `machines/**`, `features/environments`, composer machine picker                                                                              | L + M                              | EXT-08 is a security boundary; relay stays later (Plan 143 Q4)                                                                                                                                                                                                                     |
-| I. Pull-request review and idle cleanup   | EXT-02, EXT-12 rules                                                                      | `apps/server/src/git/**`, `features/git/**`, worktree lifecycle                                                                                                       | L                                  | Plan 169 for review; EXT-12 rules wait on owner question 3                                                                                                                                                                                                                         |
-| J. Owner-gated                            | LIFE-09, LIFE-12, EXT-17                                                                  | project registration; Settings; usage page                                                                                                                            | L, M, S                            | Owner questions 1, 2, 4                                                                                                                                                                                                                                                            |
+| Batch                                       | Rows                                                | Files                                                                                                                        | Size                               | Blockers                                                                                                                                                                                        |
+| ------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A. Scenario harness repair, delivered       | Historical H1–H7                                    | Existing fixtures and wired second context                                                                                   | Proof refresh only                 | Re-run only a scenario needed by an open row; do not reapply the scratch patch.                                                                                                                 |
+| B. Two-owner rail proofs                    | LIFE-03/04/05/08/10                                 | Session lifecycle, ordering, search and navigation scenarios                                                                 | S–M                                | Native fixture migration exists. Check evidence for identical scoped IDs, ordering and partial failures; close only proved rows.                                                                |
+| C. Server protocol proofs, partly delivered | EXT-13, RUNTIME-04/11/07/08                         | Native fixtures and protocol scenarios                                                                                       | Residual proof                     | EXT-13 and RUNTIME-04/11/08 have scenario records. RUNTIME-07 monitor semantics remain open; real credit redemption remains an owner check.                                                     |
+| D. Composer residues (done 2026-09-26)      | INTERACTION-01, -02, -04, -08, -11 (Enter on touch) | `features/chat/{state,components}` composer, follow-up store, question panel; `apps/server/src/auth.ts` or the download link | M                                  | Delivered. Rich composer follows Plan 171 and its Editor/Markdown prerequisites                                                                                                                 |
+| E. Lifecycle and terminal residues          | EXT-05, LIFE-06 switch, LIFE-04 idle shells         | Terminal host, settlement and rail                                                                                           | M                                  | Plan 149 is delivered. Log retention and repository badge labeling landed. Prove restart-safe attachment; implement/prove idle-shell ownership. LIFE-06 schema change remains separately gated. |
+| F. Typed source context (done 2026-09-27)   | INTERACTION-09, INTERACTION-03                      | composer draft model, `lib/use-attach-to-composer.ts`, review draft, message menu                                            | L                                  | Plan 139 P3 and 140 are on `main`. Browser annotation waits on EXT-07                                                                                                                           |
+| G. Four provider drivers                    | RUNTIME-02                                          | `provider/adapters/*`, new ACP peer, contracts provider defaults                                                             | XL (4 × L; two lanes after step 0) | Accounts only for smoke runs; untested drivers ship marked untested (owner, 2026-09-25). Status probes must never run a mise shim                                                               |
+| H. Remote machines, partly delivered        | EXT-08, EXT-16                                      | Auth, pairing, machines and machine picker                                                                                   | Residual L + M                     | Pairing landed with Plan 143 P4. Reconcile scopes/revocation and remaining balancing/preferences against current code. Relay remains later.                                                     |
+| I. Pull-request review residues             | EXT-02, EXT-12                                      | Forge review and worktree lifecycle                                                                                          | Residual L                         | Plans 139 P3 and 169 landed. Audit actual forge comment/reply/viewed/review-submission coverage. Owner declined idle restore-on-resume cleanup; do not reintroduce it as open work.             |
+| J. Decided scope and remaining proof        | LIFE-09, LIFE-12, EXT-17                            | Project registration, Settings, usage                                                                                        | Residual work                      | Subprojects remain after A–E; project settings landed; automatic pricing accepted. These are no longer unanswered owner questions.                                                              |
 
-Parked: EXT-07 and EXT-09 (Plan 087 automation, Plan 143 research, per-OS matrix), EXT-10
+Follow-up scope: EXT-07 and the remaining EXT-09 native/mobile matrix. Plan 143's phone shell
+and pairing have shipped; desktop coverage consumes Plan 114's host matrix. Keep unverified
+operations explicit. EXT-10
 (needs pinned BackgroundPolicy semantics and a measurement), INTERACTION-12 (Plan 144).
 
 ## Owner questions (2026-09-26)
@@ -79,7 +84,8 @@ Parked: EXT-07 and EXT-09 (Plan 087 automation, Plan 143 research, per-OS matrix
    wave 2 lane W; not built.) Upstream stores `autoSettleDisabledAt` on the thread row. Ours would
    add an `auto_settle_disabled_at` column to `sessions`, and since Plan 132 Phase 4 any schema
    change bumps `SCHEMA_VERSION`: the server then refuses the dev and production databases (both
-   at `user_version` 1 today) until they are moved aside, losing sessions and history again.
+   at `user_version` 1 in the 2026-09-28 read-only check) until an authorized reset. Plan 132's
+   original collapse is already deployed; it is not an outstanding reset to batch this into.
    (a) Bump the schema for this column and reset at the deploy; (b) hold LIFE-06 until another
    schema change is due and take one reset for both; (c) close LIFE-06 on the per-project
    `chat.projectAutoSettle` alone. **Recommendation: (b).** The switch is small, and each reset
@@ -523,13 +529,13 @@ until registered. Use `bun run agent:browser list` to confirm, then `scenario <n
 screenshots and wide logs and record the evidence directory. Performance/resource claims require
 `trace <scenario> --compare <before-dir>`; render claims require before/after `renders` evidence.
 
-The dev server at `localhost:5173` was unavailable in the preceding investigation; never start
-or restart one just to make proof convenient. Mesh homepage health was checked at
+The dev-server outage below is historical. Use the current mesh route and repository verification
+instructions; do not start a competing server on the shared route. Mesh homepage health was checked at
 `/work/tmp/fregat-evidence/20260920T105844Z-look-platform-1440x1000/`. That evidence proves only
 homepage availability. At audit time, browser/provider/platform cases had not run. The delivery notes now record completed cases; unverified host/provider paths remain open.
 
 After each implemented, verified unit deploy through `bun run deploy --slug=t3code-<unit>`;
-server changes require `--server` per repository policy. Record the release response and live
+server changes require dev verification and `--server --restart` per current repository policy. Record the release response and live
 check evidence. Coordinate shared file work before a restart; no restart for web-only changes.
 Completed implementation deliveries deploy through this procedure.
 
