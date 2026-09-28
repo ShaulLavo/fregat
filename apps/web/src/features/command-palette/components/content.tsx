@@ -34,11 +34,13 @@ import {
   quickAccessQuery,
   scopeLabelForMode,
   scopedPaletteFilter,
+  highlightedEditorFile,
   highlightedFileItem,
 } from '@/features/command-palette/utils/query'
 import { fileUriForPath } from '@workspace/contracts'
 import { ScopeChip } from '@/features/command-palette/components/scope-chip'
 import { HighlightReporter } from '@/features/command-palette/components/highlight-reporter'
+import { useFileIntent } from '@/lib/file-open-intent/hooks/use-file-intent'
 import { useRecentCommandIds } from '@/features/command-palette/hooks/use-recent-command-ids'
 import { paletteIdFromItemValue } from '@/features/command-palette/utils/app-colors'
 import { themeBundleFromItemValue } from '@/features/command-palette/utils/theme-bundles'
@@ -110,6 +112,7 @@ export function CommandPaletteContent() {
   const query = paletteScope ? search : quickAccessQuery(search)
   const treeState = useWorkspaceTreeState(rootFolder)
   const editorItems = editorPaletteItems(openTabContents, selectedTabContent)
+  const prepareFile = useFileIntent('quick-open')
   const listRef = useRef<HTMLDivElement | null>(null)
   const {
     fileQuery,
@@ -217,6 +220,11 @@ export function CommandPaletteContent() {
 
   function previewHighlightedColorMode(value: string) {
     previewColorModeItem(value, previewTheme)
+  }
+
+  function prepareHighlightedEditor(value: string) {
+    const path = highlightedEditorFile(editorItems, value)
+    if (path) prepareFile(path, 'active-row')
   }
 
   function previewHighlighted(value: string) {
@@ -424,6 +432,7 @@ export function CommandPaletteContent() {
         ref={listRef}
       >
         {isPreviewScope(mode) && <HighlightReporter onHighlight={previewHighlighted} />}
+        {mode === 'editors' && <HighlightReporter onHighlight={prepareHighlightedEditor} />}
         {!fileSearchUnsettled && <CommandEmpty>{emptyLabelForMode(mode)}</CommandEmpty>}
         <CommandPaletteActionsContext value={actions}>
           <GroupsFactory

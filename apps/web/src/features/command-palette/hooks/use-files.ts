@@ -11,9 +11,11 @@ import { useLayoutEffect, useState, type RefObject } from 'react'
 import type { QuickAccessMode } from '@/features/command-palette/utils/types'
 import {
   filePaletteItems,
+  highlightedFileItem,
   searchFilePaletteItems,
   selectedFileCommandValue,
 } from '@/features/command-palette/utils/query'
+import { useActiveRowFileIntent } from '@/lib/file-open-intent/hooks/use-active-row-file-intent'
 
 type UseCommandPaletteFilesOptions = {
   readonly listRef: RefObject<HTMLElement | null>
@@ -62,6 +64,8 @@ export function useFiles({
     fileSearchEnabled && (fileSearchQuery.isPending || fileSearchQuery.isPlaceholderData)
   const selectedCommandValue =
     mode === 'files' ? selectedFileCommandValue(selectedFileItemValue, visibleFileItems) : undefined
+  const highlighted = open ? highlightedFileItem(visibleFileItems, selectedCommandValue) : null
+  useActiveRowFileIntent(highlighted?.entry.path ?? null, 'quick-open', highlighted?.entry.size)
 
   // New rows start from the top; a list left scrolled would hide the best match.
   useLayoutEffect(() => {

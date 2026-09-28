@@ -148,6 +148,25 @@ Unsupported syntax may return documented plain text. Operational failures must r
 - [ ] Implement standalone highlighting, theme revisions, immutable output, abort behavior, and transient-session cleanup.
 - [ ] Implement optional-service plugin ownership and preserve Tree-sitter structure under Shiki colors.
 - [ ] Adapt prepared documents and diffs without changing packed/incremental or exact-revision behavior.
+- [ ] Take over prepared diff syntax from Platform (Plan 177 Phase 3, added 2026-09-28).
+  - Today Platform's `features/editor/state/prepared-diff-syntax.ts` owns a 16-side store of the
+    Editor's `PreparedDiffSyntaxSource` objects, each holding a live session. Platform also owns
+    the store's key (a fingerprint of each side's drawn lines), its eviction, the map of
+    preparations still running, the set of views on screen, and clearing the store when a provider
+    is disposed.
+  - Move all of that into the service. The diff plugin then finds or awaits prepared syntax by
+    content, and a closing view hands its parse back to the service. Platform keeps only the
+    intent call ("prepare this diff" when a git read settles), which runs through the service.
+  - Delete Platform's store, `claimPreparedDiffSyntax`, `storePreparedDiffSyntax`,
+    `viewDiffSyntax` and the per-source clearing in `syntax-highlighting.ts`.
+    `prepareDiffSyntax`, the `setFile(file, prepared)` input and `releasePreparedSyntax()` become
+    service internals, or are removed.
+  - Keep: a hovered diff and a revisit paint colour with their first rows; a view awaits a running
+    preparation instead of parsing twice; no preparation starts for a diff already on screen or a
+    read already claimed.
+- [ ] Take over the tree-sitter warm-up. Plan 170 already made it a `warmLanguages` getter on the
+      tree-sitter provider; the service accepts the same getter (its `preloadLanguages`) for both
+      engines.
 - [ ] Migrate affected Editor examples/callers, then remove superseded setup paths. Retain low-level engine APIs only where independent consumers still need them.
 - [ ] Document simple-plugin, shared-plugin, standalone, and creator-disposes usage.
 

@@ -562,12 +562,60 @@ describe('file open intent service', () => {
     )
     service.setRoot(filesystemPath('/repo'))
 
-    for (const path of paths) service.prepare(intent(path))
-    await vi.waitFor(() => expect(settledStages).toBe(paths.length))
+    // One at a time: a burst past the queue limit drops its oldest guesses.
+    for (const [index, path] of paths.entries()) {
+      service.prepare(intent(path))
+      await vi.waitFor(() => expect(settledStages).toBe(index + 1))
+    }
 
     expect(service.claimReadyClean(filesystemPath(paths[0])!)).toBeNull()
-    expect(service.claimReadyClean(filesystemPath(paths.at(-1)!))).toBeNull()
-    expect(service.claimReadyClean(filesystemPath(paths[1])!)).not.toBeNull()
+    expect(service.claimReadyClean(filesystemPath(paths[1])!)).toBeNull()
+    expect(service.claimReadyClean(filesystemPath(paths.at(-1)!))).not.toBeNull()
+  })
+
+  it('keeps the newest four queued guesses when a held key outruns preparation', async () => {
+    const queryClient = new QueryClient()
+    const paths = Array.from({ length: 8 }, (_, index) => `/repo/${index}.ts`)
+    for (const path of paths) {
+      queryClient.setQueryData(
+        fileSnapshotQueryOptions(filesystemPath(path)).queryKey,
+        fileResult(path),
+      )
+    }
+    const prepared: string[] = []
+    const events = recordingEvents()
+    const service = createTestFileOpenIntentOwner(
+      queryClient,
+      testPreparer((buffer, _key, path) => {
+        prepared.push(path)
+        return { buffer, preparedDocument: preparedDocumentLease() }
+      }),
+      () => null,
+      () => false,
+      () => false,
+      () => undefined,
+      undefined,
+      events.factory,
+    )
+    try {
+      service.setRoot(filesystemPath('/repo'))
+      for (const path of paths) service.prepare({ ...intent(path), trigger: 'active-row' })
+      await vi.waitFor(() => expect(prepared).toHaveLength(5))
+
+      expect(prepared).toEqual([
+        '/repo/0.ts',
+        '/repo/7.ts',
+        '/repo/6.ts',
+        '/repo/5.ts',
+        '/repo/4.ts',
+      ])
+      const skipped = events.emitted.filter((event) => event.outcome === 'skipped-budget')
+      expect(skipped.map((event) => event.path)).toEqual(['/repo/1.ts', '/repo/2.ts', '/repo/3.ts'])
+      expect(skipped[0]).toMatchObject({ surface: 'files', trigger: 'active-row' })
+    } finally {
+      service.disposeNow()
+      queryClient.clear()
+    }
   })
 
   it('lets activation claim document data before queued provider stages start', async () => {

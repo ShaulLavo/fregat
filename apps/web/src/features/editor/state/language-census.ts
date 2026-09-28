@@ -1,6 +1,9 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { languageCensusQueryOptions } from '@/features/editor/utils/language-census-query'
-import { shikiGrammarsForCensus } from '@/features/editor/utils/shiki-grammars-for-census'
+import {
+  shikiGrammarsForCensus,
+  treeSitterLanguagesForCensus,
+} from '@/features/editor/utils/census-languages'
 import { EDITOR_SHIKI_PRELOAD_LANGUAGES } from '@/features/editor/utils/shiki-languages'
 
 type CensusSource = {
@@ -20,11 +23,20 @@ export function bindLanguageCensus(source: CensusSource): () => void {
 }
 
 export function workspacePreloadLanguages(): readonly string[] {
+  const counts = usableCensusCounts()
+  return counts ? shikiGrammarsForCensus(counts) : EDITOR_SHIKI_PRELOAD_LANGUAGES
+}
+
+/** Tree-sitter warms nothing without a census: compiling every bundled grammar is the cost. */
+export function workspaceWarmLanguages(): readonly string[] {
+  const counts = usableCensusCounts()
+  return counts ? treeSitterLanguagesForCensus(counts) : []
+}
+
+function usableCensusCounts() {
   const root = activeSource?.root()
-  if (!activeSource || root === null || root === undefined) return EDITOR_SHIKI_PRELOAD_LANGUAGES
+  if (!activeSource || root === null || root === undefined) return null
   const census = activeSource.queryClient.getQueryData(languageCensusQueryOptions(root).queryKey)
-  if (!census || (census.readiness !== 'ready' && census.readiness !== 'stale')) {
-    return EDITOR_SHIKI_PRELOAD_LANGUAGES
-  }
-  return shikiGrammarsForCensus(census.counts)
+  if (!census || (census.readiness !== 'ready' && census.readiness !== 'stale')) return null
+  return census.counts
 }

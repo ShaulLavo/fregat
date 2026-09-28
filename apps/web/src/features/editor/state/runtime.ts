@@ -45,6 +45,9 @@ import { createHistoryBuffer } from '@/features/editor/state/history-buffer'
 import { HistoryPersistenceService } from '@/features/editor/state/history-persistence'
 import { createFileOpenIntentServiceOwner } from '@/lib/file-open-intent/state/service'
 import { bindLanguageCensus } from '@/features/editor/state/language-census'
+import { prepareDiffSyntaxForDiffs } from '@/features/editor/state/diff-syntax-preparation'
+import { watchAdjacentTabIntents } from '@/features/editor/state/adjacent-tab-intent'
+import { bindDiffSyntaxPreparer } from '@/lib/intent-prefetch/state/diff-syntax-preparer'
 import { registerEditorOpenBenchmarkControl } from '@/features/editor/state/performance-trace'
 import { watchFileAvailability } from '@/features/editor/state/file-availability'
 import { getNavigation } from '@/state/navigation-binding'
@@ -261,6 +264,8 @@ export function createEditorRuntime({
           queryClient,
           root: () => workspaceStore.getState().rootFolder?.path ?? null,
         }),
+        bindDiffSyntaxPreparer(prepareDiffSyntaxForDiffs),
+        watchAdjacentTabIntents(workspaceStore, fileOpenIntentOwner.service),
         registerEditorOpenBenchmarkControl(editorOpenBenchmarkControl),
         watchFileAvailability({
           documentStore,

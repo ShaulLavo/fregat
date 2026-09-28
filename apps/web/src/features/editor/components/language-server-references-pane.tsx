@@ -9,6 +9,8 @@ import {
   referenceListRows,
 } from '@/features/editor/utils/language-server-references'
 import { toggledSet } from '@/lib/toggled-set'
+import { useActiveRowFileIntent } from '@/lib/file-open-intent/hooks/use-active-row-file-intent'
+import { useFileIntent } from '@/lib/file-open-intent/hooks/use-file-intent'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import { XIcon } from '@phosphor-icons/react'
@@ -78,6 +80,16 @@ export function LanguageServerReferencesPane({
     const row = rows.find((row) => row.id === id)
     if (row?.kind === 'target') onPreviewReference(row.target)
   }
+  const activeRow = rows.find((row) => row.id === activeId)
+  const prepareFile = useFileIntent('references')
+  useActiveRowFileIntent(
+    activeRow?.kind === 'target' ? filesystemPath(activeRow.target.path) : null,
+    'references',
+  )
+  function hoverTarget(target: LanguageServerDefinitionTarget) {
+    prepareFile(filesystemPath(target.path), 'hover')
+    onPreviewReference(target)
+  }
   const list = useListbox({
     role: 'tree',
     items: rows,
@@ -144,7 +156,7 @@ export function LanguageServerReferencesPane({
                 document={documents.byPath[row.target.path]}
                 target={row.target}
                 onOpenReference={onOpenReference}
-                onPreviewReference={onPreviewReference}
+                onPreviewReference={hoverTarget}
               />
             ),
           )}

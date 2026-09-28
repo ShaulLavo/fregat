@@ -536,3 +536,9 @@ function nextDuplicateIndex(duplicateCounts: Map<string, number>, identity: stri
 
   return duplicateIndex
 }
+
+/** The file a press on the item opens: a match's file, or the file a group row heads. */
+export function searchResultItemPath(item: SearchResultItem | null): string | null {
+  if (!item) return null
+  return item.type === 'match' ? item.match.path : item.group.path
+}

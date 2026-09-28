@@ -13,12 +13,15 @@ import { useSearchPreviewMaxLength } from '@/features/search/hooks/use-preview-m
 import {
   searchResultItems,
   searchResultItemById,
+  searchResultItemPath,
   type SearchResultId,
   type SearchResultItem,
 } from '@/features/search/utils/result-items'
 import { SearchFileMenu } from '@/features/search/components/file-menu'
 import { searchItemMenuTarget } from '@/features/search/utils/file-menu'
 import { useListContextMenu } from '@/keymap/menus/hooks/use-list-context-menu'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import { useActiveRowFileIntent } from '@/lib/file-open-intent/hooks/use-active-row-file-intent'
 import type {
   SearchBufferStatus,
   WorkspaceSearchFileGroup,
@@ -63,6 +66,8 @@ export function SearchResultsView({
     containerRef: parentRef,
     isTargetPresent: (target) => items.some((item) => item.id === target.id),
   })
+  const activePath = searchResultItemPath(searchResultItemById(items, activeResultId))
+  useActiveRowFileIntent(activePath ? filesystemPath(activePath) : null, 'search')
   function toggle(id: string) {
     const item = searchResultItemById(items, id)
     if (item?.type === 'group') toggleGroup(item.group.path)

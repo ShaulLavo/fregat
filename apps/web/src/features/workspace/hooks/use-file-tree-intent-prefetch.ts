@@ -10,6 +10,7 @@ import {
 import { createIdleScheduler } from '@/features/workspace/utils/intent-prefetch-scheduler'
 import { FILE_SNAPSHOT_STALE_MS } from '@/lib/file-snapshot-query-cache'
 import { useFileOpenIntent } from '@/lib/file-open-intent/providers/context'
+import type { FileOpenIntentTrigger } from '@/lib/file-open-intent/state/service'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 import { INTENT_PREFETCH_HIT_SLOP_PX } from '@/lib/intent-prefetch-options'
 import { canonicalTreePath } from '@/lib/path-formatters'
@@ -36,18 +37,31 @@ export function useFileTreeIntentPrefetch({
     modelRef.current = model
   }, [model])
 
-  const prefetchTreePath = useEffectEvent((treePath: string) => {
-    const entry = entryForTreePath(modelRef.current, treePath)
-    if (!entry) return
-    if (isDirectoryEntry(entry)) {
-      prefetchDirectory(entry, `${treePath}/`)
-      return
-    }
-    const intent = fileTreeFileOpenIntent(rootPath, entry)
-    if (!intent) return
+  const prefetchTreePath = useEffectEvent(
+    (treePath: string, trigger: FileOpenIntentTrigger = 'trajectory') => {
+      const entry = entryForTreePath(modelRef.current, treePath)
+      if (!entry) return
+      if (isDirectoryEntry(entry)) {
+        prefetchDirectory(entry, `${treePath}/`)
+        return
+      }
+      const intent = fileTreeFileOpenIntent(rootPath, entry, trigger)
+      if (!intent) return
 
-    fileOpenIntent.prepare(intent)
-  })
+      fileOpenIntent.prepare(intent)
+    },
+  )
+
+  // Arrow keys move focus without a pointer; the row they land on is the next Enter.
+  useEffect(() => {
+    let focused = tree.getFocusedPath()
+    return tree.subscribe(() => {
+      const next = tree.getFocusedPath()
+      if (next === focused) return
+      focused = next
+      if (next) prefetchTreePath(canonicalTreePath(next), 'focus')
+    })
+  }, [tree])
 
   const syncRegistrations = useEffectEvent((registry: IntentPrefetchRegistry<string>) => {
     registry.sync(tree.getRowElements().map(fileTreeRowTarget), prefetchTreePath)

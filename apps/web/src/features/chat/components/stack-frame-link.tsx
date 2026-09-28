@@ -6,20 +6,24 @@ import type { StackFrame } from '@/features/chat/utils/stack-frames'
 
 /** A frame in tool output that opens the editor at its line. */
 export function StackFrameLink({ frame, text }: { frame: StackFrame; text: string }) {
-  const { openFileReference, rootPath } = useOpenFileReference()
+  const { openFileReference, prepareFileReference, rootPath } = useOpenFileReference()
 
-  function handleClick(event: MouseEvent<HTMLAnchorElement>) {
-    event.preventDefault()
-    // Relative frames resolve against the chat's project, as transcript file links do.
+  // Relative frames resolve against the chat's project, as transcript file links do.
+  function frameReference() {
     const position = `${frame.path}:${frame.line}${frame.column === null ? '' : `:${frame.column}`}`
-    openFileReference(
+    return (
       resolveInlineCodeFileReference(position, rootPath) ?? {
         column: frame.column,
         label: frame.path,
         line: frame.line,
         path: frame.path,
-      },
+      }
     )
+  }
+
+  function handleClick(event: MouseEvent<HTMLAnchorElement>) {
+    event.preventDefault()
+    openFileReference(frameReference())
   }
 
   return (
@@ -28,6 +32,7 @@ export function StackFrameLink({ frame, text }: { frame: StackFrame; text: strin
       data-stack-frame={`${frame.path}:${frame.line}`}
       href={frame.path}
       onClick={handleClick}
+      onPointerEnter={() => prepareFileReference(frameReference())}
     >
       {text}
     </a>

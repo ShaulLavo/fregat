@@ -5,6 +5,7 @@ import { useLanguageCensus } from '@/features/editor/hooks/use-language-census'
 import {
   bindLanguageCensus,
   workspacePreloadLanguages,
+  workspaceWarmLanguages,
 } from '@/features/editor/state/language-census'
 import { createEditorWorkspaceStore } from '@/features/editor/state/workspace-state'
 import { languageCensusQueryOptions } from '@/features/editor/utils/language-census-query'
@@ -44,18 +45,22 @@ test('the hook loads the census the preload getter reads for the bound root and 
   let unbind = bindLanguageCensus({ queryClient, root })
   const getter = workspacePreloadLanguages
   expect(getter()).toBe(EDITOR_SHIKI_PRELOAD_LANGUAGES)
+  expect(workspaceWarmLanguages()).toEqual([])
   act(() =>
     workspaceStore.getState().switchWorkspace({ ...one.entry, name: 'one', type: 'directory' }),
   )
   await waitFor(() => expect(queryClient.getQueryData(first)?.readiness).toBe('ready'))
   expect(getter()).toEqual(['typescript'])
+  expect(workspaceWarmLanguages()).toEqual(['typescript'])
 
   act(() =>
     queryClient.setQueryData(first, { readiness: 'stale', scanRoot: null, counts: { '.tsx': 20 } }),
   )
   expect(getter()).toEqual(['tsx'])
+  expect(workspaceWarmLanguages()).toEqual(['tsx'])
   act(() => queryClient.setQueryData(first, { readiness: 'failed', scanRoot: null, counts: {} }))
   expect(getter()).toBe(EDITOR_SHIKI_PRELOAD_LANGUAGES)
+  expect(workspaceWarmLanguages()).toEqual([])
 
   const two = await openWorkspaceRootPath(
     filesystemPath('two'),
@@ -66,6 +71,7 @@ test('the hook loads the census the preload getter reads for the bound root and 
     workspaceStore.getState().switchWorkspace({ ...two.entry, name: 'two', type: 'directory' }),
   )
   await waitFor(() => expect(getter()).toEqual(['python']))
+  expect(workspaceWarmLanguages()).toEqual(['python'])
   act(() => queryClient.setQueryData(second, { readiness: 'ready', scanRoot: null, counts: {} }))
   expect(getter()).toEqual([])
 

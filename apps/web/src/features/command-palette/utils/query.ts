@@ -1,3 +1,4 @@
+import { filesystemResource } from '@/lib/documents/utils/capabilities'
 import { quickAccessMode } from '@workspace/client-core/commands/palette'
 export {
   groupedCommandItems,
@@ -107,6 +108,17 @@ export function selectedFileCommandValue(
 
 export function fileItemValue(item: FilePaletteItem) {
   return `file:${item.entry.path}`
+}
+
+export function editorItemValue(item: EditorPaletteItem) {
+  return `editor:${item.key}`
+}
+
+/** The file behind the editor row cmdk has highlighted, if that editor shows one. */
+export function highlightedEditorFile(items: readonly EditorPaletteItem[], value: string) {
+  const item = items.find((entry) => editorItemValue(entry) === value)
+  if (item?.content.kind !== 'document') return null
+  return filesystemResource(item.content.document)?.path ?? null
 }
 
 /** The file row cmdk has highlighted, which the preview follows. */

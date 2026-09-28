@@ -1,10 +1,17 @@
 import {
   joinRenderLines,
   type DiffFile,
+  type DiffGutterSide,
   type DiffPlugin,
   type DiffRenderRow,
 } from '@singapore-editor/diff'
+import { useQueryClient } from '@tanstack/react-query'
 import { useLayoutEffect, useState } from 'react'
+import {
+  claimPreparedDiffSyntax,
+  storePreparedDiffSyntax,
+  viewDiffSyntax,
+} from '@/features/editor/state/prepared-diff-syntax'
 
 export type DiffRowsState = {
   readonly rows: readonly DiffRenderRow[]
@@ -21,14 +28,35 @@ export type DiffRowsState = {
  * an empty editor before the rows arrived. The rows array is the state, not a copy of it: the
  * plugin hands out a stable reference until it rebuilds, so React bails out on its own when a
  * notification changes nothing.
+ *
+ * With a `syntaxSource`, the file takes syntax prepared on intent or kept from an earlier view,
+ * and hands its own parse back when the pane leaves it, so a revisit paints coloured at once.
  */
-export function useDiffRows(plugin: DiffPlugin, file: DiffFile | null): DiffRowsState {
+export function useDiffRows(
+  plugin: DiffPlugin,
+  file: DiffFile | null,
+  side: DiffGutterSide,
+  syntaxSource: string | null,
+): DiffRowsState {
   const [rows, setRows] = useState<readonly DiffRenderRow[]>(() => plugin.getRows())
   const [tokensRevision, setTokensRevision] = useState(0)
+  const queryClient = useQueryClient()
 
   useLayoutEffect(() => {
-    plugin.setFile(file)
-  }, [file, plugin])
+    if (!file || syntaxSource === null) {
+      plugin.setFile(file)
+      return
+    }
+    let current = true
+    const claim = claimPreparedDiffSyntax(queryClient, file, side, syntaxSource, () => current)
+    plugin.setFile(file, claim)
+    const leave = viewDiffSyntax(file, syntaxSource)
+    return () => {
+      current = false
+      leave()
+      storePreparedDiffSyntax(file, syntaxSource, plugin.releasePreparedSyntax())
+    }
+  }, [file, plugin, queryClient, side, syntaxSource])
 
   useLayoutEffect(() => {
     const pull = () => setRows(plugin.getRows())

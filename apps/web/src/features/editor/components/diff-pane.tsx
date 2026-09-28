@@ -26,6 +26,7 @@ import {
   bindDiffPlugin,
   createDiffPresentationBinding,
 } from '@/features/editor/state/diff-presentation'
+import type { EditorSyntaxHighlightingSource } from '@/features/editor/state/syntax-highlighting'
 import type {
   DiffPanePresentation,
   DiffScrollPosition,
@@ -43,6 +44,7 @@ export function DiffPane({
   side,
   syntaxBackend,
   syntaxHighlight = true,
+  syntaxSource = null,
   tabId,
   theme,
   onFocus,
@@ -57,6 +59,8 @@ export function DiffPane({
   side: DiffGutterSide
   syntaxBackend: DiffSyntaxBackend
   syntaxHighlight?: boolean
+  /** Names the configuration prepared diff syntax is kept under; omit to parse every time. */
+  syntaxSource?: EditorSyntaxHighlightingSource | null
   tabId?: TabId
   theme: EditorTheme
   onFocus?: (side: DiffGutterSide) => void
@@ -82,7 +86,12 @@ export function DiffPane({
     if (!presentation) return
     return bindDiffPlugin(presentation, plugin)
   }, [plugin, presentation])
-  const { rows, text, tokensRevision } = useDiffRows(plugin, file)
+  const { rows, text, tokensRevision } = useDiffRows(
+    plugin,
+    file,
+    side,
+    highlight && syntaxSource !== 'disabled' ? syntaxSource : null,
+  )
   const diffLanguagePlugin = useDiffLanguage(file, rows, theme, languageServer)
   const unicodeHighlights = useUnicodeHighlights()
   // A plugin instance owns its registered view context for the lifetime of this pane.
@@ -103,7 +112,6 @@ export function DiffPane({
   const gutterInset = useEditorGutterInset()
   const controller = useEditor({
     ...createDiffEditorOptions(),
-    presentationReady: false,
     suspiciousCharacters: unicodeHighlights.options,
     // No `document`: the React wrapper pushes text through `openDocument`, which takes no scroll
     // position from us and therefore lands back at the top — so every expansion toggle, and every
@@ -145,7 +153,6 @@ export function DiffPane({
 
     if (!file || rows !== plugin.getRows()) return
     persistence?.detach()
-    editor.setPresentationReady(false)
     const tokens = plugin.getTokens()
     if (
       installedProjection.current?.editor !== editor ||
@@ -157,7 +164,6 @@ export function DiffPane({
       editor.setTokens(tokens)
     }
     persistence?.restore(editor)
-    editor.setPresentationReady(plugin.isSyntaxReady())
     notePressPaint('diffs', file.path, 'text')
   }, [controller, file, persistence, plugin, rows, text])
 
@@ -167,7 +173,6 @@ export function DiffPane({
     const editor = controller.getEditor()
     editor?.setTokens(tokens)
     if (file && rows === plugin.getRows()) {
-      editor?.setPresentationReady(plugin.isSyntaxReady())
       if (!highlight) notePressPaint('diffs', file.path, 'colour', { highlight: 'off' })
       else if (plugin.isSyntaxReady()) notePressPaint('diffs', file.path, 'colour')
     }

@@ -7,6 +7,7 @@ import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import type { MarkdownFileReference } from '@/features/chat/utils/markdown-file-links'
 import { log } from '@/lib/client-logging'
+import { useFileIntent } from '@/lib/file-open-intent/hooks/use-file-intent'
 import { fileUriForPath } from '@workspace/contracts'
 
 /**
@@ -20,6 +21,17 @@ export function useOpenFileReference() {
   const editorRoot = useEditorWorkspaceState((state) => state.rootFolder?.path ?? null)
   const rootPath = chatWorkspace?.canonicalPath ?? editorRoot
   const workspacePath = chatWorkspace?.path ?? editorRoot
+  const prepare = useFileIntent('chat-link')
+
+  /**
+   * A hovered link prepares its file. The intent names the chat's workspace in server form, the
+   * form the editor root takes, so a link under another project is rejected.
+   */
+  function prepareFileReference(source: MarkdownFileReference) {
+    const path = markdownServerFilePath(source.path, rootPath, workspacePath)
+    if (path === null || workspacePath === null) return
+    prepare(filesystemPath(path), 'hover', { rootPath: filesystemPath(workspacePath) })
+  }
 
   function openFileReference(source: MarkdownFileReference) {
     const path = markdownServerFilePath(source.path, rootPath, workspacePath)
@@ -47,7 +59,7 @@ export function useOpenFileReference() {
     openDefinition(fileReferenceDefinitionTarget(reference))
   }
 
-  return { openFileReference, rootPath, workspacePath }
+  return { openFileReference, prepareFileReference, rootPath, workspacePath }
 }
 
 /** Editor positions are zero-based; transcript references are one-based. */
