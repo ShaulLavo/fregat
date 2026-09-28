@@ -99,6 +99,28 @@ test('no recents leaves the plain category order alone', () => {
   expect(groupedCommandItems(items, '>', [])).toEqual(groupedCommandItems(items, '>'))
 })
 
+test('enabled commands fill all six recent slots when newer recents are disabled', () => {
+  const base = commandPaletteItems(platformCommandSpecs, defaultPlatformKeyBindings('linux'))
+  const recentIds = base
+    .slice(-13)
+    .map((item) => item.id)
+    .reverse()
+  const disabledIds = new Set(recentIds.slice(0, 6))
+  const items = base.map((item) => ({
+    ...item,
+    disabledReason: disabledIds.has(item.id) ? 'Unavailable here' : null,
+  }))
+
+  const groups = groupedCommandItems(items, '>', recentIds)
+
+  expect(groups[0]?.[0]).toBe(RECENTLY_USED_COMMANDS_HEADING)
+  expect(groups[0]?.[1].map((item) => item.id)).toEqual(recentIds.slice(6, 12))
+  expect(new Set(groups.at(-1)?.[1].map((item) => item.id))).toEqual(disabledIds)
+  const ids = groups.flatMap(([, group]) => group.map((item) => item.id))
+  expect(ids).toHaveLength(base.length)
+  expect(new Set(ids).size).toBe(base.length)
+})
+
 test('a matching recent leads the query results even when something else scores higher', () => {
   const items = commandPaletteItems(platformCommandSpecs, defaultPlatformKeyBindings('linux'))
   const ids = (recentCommandIds: readonly string[]) =>

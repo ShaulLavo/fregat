@@ -81,7 +81,9 @@ export function groupedCommandItems(
   search = '',
   recentCommandIds: readonly string[] = [],
 ): readonly (readonly [string, readonly CommandPaletteItem[]])[] {
-  const groups = rankedCommandGroups(items, search, recentCommandIds)
+  const disabledIds = new Set(items.filter((item) => item.disabledReason).map((item) => item.id))
+  const enabledRecentIds = recentCommandIds.filter((id) => !disabledIds.has(id))
+  const groups = rankedCommandGroups(items, search, enabledRecentIds)
   const disabled = groups.flatMap(([, group]) => group.filter((item) => item.disabledReason))
   if (disabled.length === 0) return groups
 
