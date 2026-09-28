@@ -111,7 +111,8 @@ function installAuthoringCommands(scope: EditorViewScope, isMarkdown: () => bool
         pending = null
         return
       }
-      // Apply after the contribution pass; recheck the document and selection at execution.
+      // @justification Applies after the contribution pass so the edit never runs inside a view
+      // update; the pending request, disposal and document are rechecked when it runs.
       queueMicrotask(() => {
         const request = pending
         if (!request || disposed) return

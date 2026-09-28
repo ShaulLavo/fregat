@@ -66,6 +66,7 @@
         "packages/editor/src/editor/cursorHistory.ts",
         "packages/editor/src/editor/decorationStore.ts",
         "packages/editor/src/editor/disposables.ts",
+        "packages/editor/src/editor/documentAnalysis.ts",
         "packages/editor/src/editor/editChain.ts",
         "packages/editor/src/editor/editorUtils.ts",
         "packages/editor/src/editor/foldOperations.ts",

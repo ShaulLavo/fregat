@@ -16,6 +16,8 @@ function source(size: number): RangeSource {
     revision,
     byteLength: size,
     async readBytes(start, end, signal) {
+      // @justification Simulated source latency for the paged proof; it only resolves the awaited
+      // read, and the abort signal is checked right after.
       if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs))
       signal.throwIfAborted()
       const bytes = new Uint8Array(end - start)

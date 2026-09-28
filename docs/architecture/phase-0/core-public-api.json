@@ -832,7 +832,7 @@
         },
         {
           "kind": "type",
-          "name": "EditorPreparedHighlighterTransfer",
+          "name": "EditorPreparedHighlighterBorrow",
           "source": "packages/editor/src/editor/preparedDocument.ts",
           "via": "packages/editor/src/index.ts"
         },
@@ -850,13 +850,13 @@
         },
         {
           "kind": "type",
-          "name": "EditorPreparedStructuralConfiguration",
+          "name": "EditorPreparedStructuralBorrow",
           "source": "packages/editor/src/editor/preparedDocument.ts",
           "via": "packages/editor/src/index.ts"
         },
         {
           "kind": "type",
-          "name": "EditorPreparedStructuralTransfer",
+          "name": "EditorPreparedStructuralConfiguration",
           "source": "packages/editor/src/editor/preparedDocument.ts",
           "via": "packages/editor/src/index.ts"
         },
@@ -3508,6 +3508,24 @@
         },
         {
           "kind": "type",
+          "name": "EditorAnalysisHighlighterRequest",
+          "source": "packages/editor/src/editor/documentAnalysis.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorAnalysisRead",
+          "source": "packages/editor/src/editor/documentAnalysis.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorAnalysisStructuralRequest",
+          "source": "packages/editor/src/editor/documentAnalysis.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
           "name": "EditorAnyCommandId",
           "source": "packages/editor/src/editor/commandCatalog.ts",
           "via": "packages/editor/src/editor.ts"
@@ -3612,6 +3630,12 @@
           "kind": "type",
           "name": "EditorDisposable",
           "source": "packages/editor/src/plugins.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorDocumentAnalysis",
+          "source": "packages/editor/src/editor/documentAnalysis.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {
@@ -3904,7 +3928,7 @@
         },
         {
           "kind": "type",
-          "name": "EditorPreparedHighlighterTransfer",
+          "name": "EditorPreparedHighlighterBorrow",
           "source": "packages/editor/src/editor/preparedDocument.ts",
           "via": "packages/editor/src/editor.ts"
         },
@@ -3922,13 +3946,13 @@
         },
         {
           "kind": "type",
-          "name": "EditorPreparedStructuralConfiguration",
+          "name": "EditorPreparedStructuralBorrow",
           "source": "packages/editor/src/editor/preparedDocument.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {
           "kind": "type",
-          "name": "EditorPreparedStructuralTransfer",
+          "name": "EditorPreparedStructuralConfiguration",
           "source": "packages/editor/src/editor/preparedDocument.ts",
           "via": "packages/editor/src/editor.ts"
         },
@@ -3954,6 +3978,18 @@
           "kind": "type",
           "name": "EditorResolvedSelection",
           "source": "packages/editor/src/plugins.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorRetainedHighlighterSession",
+          "source": "packages/editor/src/editor/documentAnalysis.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorRetainedSyntaxSession",
+          "source": "packages/editor/src/editor/documentAnalysis.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {
@@ -4284,6 +4320,12 @@
           "kind": "unknown",
           "name": "createEditorConsoleLoggingPlugin",
           "source": "packages/editor/src/logging/index.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "createEditorDocumentAnalysis",
+          "source": "packages/editor/src/editor/documentAnalysis.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {

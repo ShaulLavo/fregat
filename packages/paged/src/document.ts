@@ -246,6 +246,8 @@ export class PagedDocument {
       this.#units = units
       this.notifyProgress()
       if ((start + this.#options.pageBytes) % (1024 * 1024) === 0)
+        // @justification Yields once per MiB so indexing a large source never holds the thread; it
+        // only resolves the awaited promise, and the next page read carries the lifetime signal.
         await new Promise<void>((resolve) => setTimeout(resolve, 0))
     }
     this.#units = units + decoder.decode().length
