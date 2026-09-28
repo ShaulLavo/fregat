@@ -30,7 +30,9 @@ export type EditorControlledSelection = EditorSetSelectionOptions & {
 }
 
 type EditorControlledOptions = {
+  readonly detectIndentation?: boolean
   readonly editability?: EditorEditability
+  readonly folding?: boolean
   readonly fontFamily?: string
   readonly fontSize?: number
   readonly gutterLeadingInset?: number
@@ -103,6 +105,28 @@ type AppliedOption = {
  * noticing, because nothing relates the two.
  */
 export const EDITOR_OPTION_DESCRIPTORS: readonly EditorOptionDescriptor[] = [
+  defineOption({
+    name: 'detectIndentation',
+    defaultValue: true,
+    validate: (input) => (typeof input === 'boolean' ? input : undefined),
+    equals: Object.is,
+    applyTo: (editor, enabled) => {
+      if (enabled === undefined) return false
+      editor.setDetectIndentation(enabled)
+      return true
+    },
+  }),
+  defineOption({
+    name: 'folding',
+    defaultValue: true,
+    validate: (input) => (typeof input === 'boolean' ? input : undefined),
+    equals: Object.is,
+    applyTo: (editor, enabled) => {
+      if (enabled === undefined) return false
+      editor.setFolding(enabled)
+      return true
+    },
+  }),
   defineOption({
     name: 'editability',
     defaultValue: 'editable',

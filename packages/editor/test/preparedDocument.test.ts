@@ -23,6 +23,28 @@ import {
 import { EditorTokenStore } from '../src/syntax/tokenStore'
 
 describe('prepared editor documents', () => {
+  it('skips fallback preparation when folding is disabled', async () => {
+    const buffer = createEditorTextBuffer('root\n  child\n'.repeat(2_000))
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' })
+    const prepared = createEditorPreparedDocument({
+      buffer,
+      analysis,
+      configuredTabSize: 4,
+      tabSizePolicy: 'fixed',
+      folding: false,
+      documentConfigurationTag: [],
+      documentId: 'file.ts',
+      languageId: 'typescript',
+    })
+
+    await expect(prepared.fallbackReady).resolves.toBe(false)
+    const claimed = prepared.borrow({ ...match(buffer, null, null), tabSizePolicy: 'fixed' })
+    expect(claimed).not.toBeNull()
+    expect(claimed?.fallbackFoldIndex).toBeNull()
+    prepared.dispose()
+    analysis.dispose()
+  })
+
   it('prepares fixed-tab fallback folds without materializing or reading the full snapshot', () => {
     const buffer = createEditorTextBuffer('root\n  child\nnext\n')
     const snapshot = buffer.getTextSnapshot()

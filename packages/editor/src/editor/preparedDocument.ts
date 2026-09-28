@@ -110,6 +110,7 @@ type EditorPreparedRuntimeSessionIds = {
 }
 
 export type CreateEditorPreparedDocumentOptions = {
+  readonly folding?: boolean
   readonly analysis: EditorDocumentAnalysis
   readonly buffer: EditorTextBuffer
   readonly documentId: string
@@ -149,7 +150,13 @@ export function createEditorPreparedDocument(
   let highlighter: PreparedHighlighterStage | null = null
   let disposed = false
   const fallback = new PreparedFallbackIndex(
-    new IndentationFoldIndex({ snapshot: textSnapshot, languageId: options.languageId, tabSize }),
+    options.folding === false
+      ? null
+      : new IndentationFoldIndex({
+          snapshot: textSnapshot,
+          languageId: options.languageId,
+          tabSize,
+        }),
     options.documentId,
     () => preparedFallbackSelection(options.languageId, structural),
   )
@@ -260,6 +267,7 @@ class PreparedFallbackIndex {
     private readonly documentId: string,
     private readonly selection: () => ReturnType<typeof preparedFallbackSelection>,
   ) {
+    if (!index) this.resolveReady(false)
     this.advance()
   }
 

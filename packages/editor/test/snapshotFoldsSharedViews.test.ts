@@ -30,6 +30,46 @@ afterEach(() => {
 })
 
 describe('snapshot folds in shared buffer views', () => {
+  it('cancels pending folding work when disabled and rebuilds the current buffer when enabled', async () => {
+    const buffer = createEditorTextBuffer(TEXT)
+    const mounted = mount(buffer, 'switching')
+    await vi.runAllTimersAsync()
+    const replacement = 'header\n  child\n'.repeat(5_000)
+    mounted.editor.edit({ from: 0, to: TEXT.length, text: replacement })
+    await vi.advanceTimersByTimeAsync(150)
+    expect(mounted.editor['fallbackFolds'].index).toBeNull()
+    const snapshot = buffer.getSnapshot()
+
+    mounted.editor.setFolding(false)
+    await vi.runAllTimersAsync()
+    expect(buffer.getSnapshot()).toBe(snapshot)
+    expect(mounted.editor['fallbackFolds'].index).toBeNull()
+    expect(mounted.editor['view'].getState().foldMarkers).toEqual([])
+    expect(mounted.editor.fold(0)).toBe(false)
+
+    mounted.editor.edit({ from: 0, to: replacement.length, text: TEXT })
+    await vi.runAllTimersAsync()
+    expect(mounted.editor['fallbackFolds'].index).toBeNull()
+    mounted.editor.setFolding(true)
+    await vi.runAllTimersAsync()
+    expect(mounted.editor['fallbackFolds'].index?.ready).toBe(true)
+    expect(mounted.editor.fold(0)).toBe(true)
+    expect(mounted.editor.materializeFullText()).toBe(TEXT)
+  })
+
+  it('switches indentation inference while retaining the configured tab width', async () => {
+    const mounted = mount(createEditorTextBuffer(TEXT), 'indentation')
+    await vi.runAllTimersAsync()
+    mounted.editor.setTabSize(8)
+    expect(mounted.snapshots.at(-1)?.tabSize).toBe(2)
+
+    mounted.editor.setDetectIndentation(false)
+    expect(mounted.snapshots.at(-1)?.tabSize).toBe(8)
+    mounted.editor.setDetectIndentation(true)
+    expect(mounted.snapshots.at(-1)?.tabSize).toBe(2)
+    expect(mounted.editor.materializeFullText()).toBe(TEXT)
+  })
+
   it('keeps deferred secondary folds at the captured revision after edits and collapse changes', async () => {
     const buffer = createEditorTextBuffer(TEXT)
     const mounted = mount(buffer, 'deferred')

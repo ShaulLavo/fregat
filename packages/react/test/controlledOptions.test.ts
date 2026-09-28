@@ -37,6 +37,13 @@ const DOCUMENT = { text: 'alpha beta', documentId: 'a.ts', revision: 1 }
  * fails here rather than in a host that notices months later.
  */
 const OPTION_SAMPLES: Record<EditorControlledOptionName, OptionSample> = {
+  detectIndentation: {
+    initial: true,
+    next: false,
+    method: 'setDetectIndentation',
+    applied: [false],
+  },
+  folding: { initial: true, next: false, method: 'setFolding', applied: [false] },
   editability: {
     initial: 'editable',
     next: 'readonly',

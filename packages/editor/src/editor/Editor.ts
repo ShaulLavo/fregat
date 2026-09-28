@@ -413,8 +413,8 @@ export class Editor {
   private readonly lifecycleSummary = createEditorLifecycleSummary()
   /** The width a host named, which no document may contradict. */
   private configuredTabSize: number
-  private readonly detectIndentation: boolean
-  private readonly folding: boolean
+  private detectIndentation: boolean
+  private folding: boolean
   /** The width in effect: the host's when it named one, otherwise the loaded document's own. */
   private tabSize: number
   private tabMovesFocus: boolean
@@ -2013,6 +2013,23 @@ export class Editor {
       level: 'info',
       layout: { configuredTabSize: configured, tabSize: this.tabSize },
     })
+  }
+
+  setDetectIndentation(enabled: boolean): void {
+    if (this.detectIndentation === enabled) return
+    this.detectIndentation = enabled
+    this.tabSize = enabled
+      ? guessedTabSize(this.getTextSnapshot(), this.configuredTabSize)
+      : this.configuredTabSize
+    this.scheduleFallbackFoldProjection()
+    this.notifyViewContributions('layout', null)
+  }
+
+  setFolding(enabled: boolean): void {
+    if (this.folding === enabled) return
+    this.folding = enabled
+    this.scheduleFallbackFoldProjection()
+    this.notifyViewContributions('layout', null)
   }
 
   /** Undefined hands the size back to the stylesheet. */
