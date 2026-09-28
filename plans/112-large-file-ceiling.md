@@ -1,6 +1,7 @@
 # The large-file ceiling: what we can actually open, and who gets to decide
 
-Status: **Done 2026-09-28.** All five phases shipped; see the execution checklist. Requested
+Status: **Done 2026-09-28.** All five phases shipped; see the execution checklist. Typing with analysis on
+continues in [Plan 201](201-cheap-overlay-marks.md). Requested
 2026-09-13. Measurements: [docs/large-file-ceiling/](../docs/large-file-ceiling/README.md).
 
 Decided 2026-09-25: owner — this plan and Editor
