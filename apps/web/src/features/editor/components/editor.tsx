@@ -1,4 +1,7 @@
+import { useDocumentFeatureTier } from '@/features/editor/hooks/use-document-feature-tier'
+import { LargeFileNotice } from '@/features/editor/components/large-file-notice'
 import { useMarkdownView } from '@/lib/markdown-mode/hooks/use-markdown-view'
+import { useMarkdownLinkOpener } from '@/features/editor/hooks/use-markdown-link-opener'
 import { useUnicodeHighlights } from '@/features/editor/hooks/use-unicode-highlights'
 import { HOSTED_EDITOR_KEYMAP } from '@/keymap/editor-keymap'
 import { useEditor } from '@singapore-editor/react'
@@ -100,6 +103,7 @@ export function Editor({
   onTextChange,
 }: EditorProps) {
   const [provisional, setProvisional] = useState(false)
+  const [formattedDocument, setFormattedDocument] = useState<string | null>(null)
   const unavailable = useUnavailableEnvironment()
   const currentTarget = liveDocument?.target ?? target
   const key = liveDocument?.key ?? documentKey(target)
@@ -108,15 +112,16 @@ export function Editor({
   const editability = unavailable || !liveDocument ? 'readonly' : liveDocument.editability
   const { appliedThemeContentHash, appliedThemeId, editorTheme, selectedThemeId } =
     useEditorColorTheme()
-  const syntaxHighlightingEnabled = useSettingValue('editor.syntaxHighlighting.enabled')
-  const indentationGuidesEnabled = useSettingValue('editor.guides.indentation')
-  const minimapEnabled = useSettingValue('editor.minimap.enabled')
+  const { analysisAllowed, minimapAllowed } = useDocumentFeatureTier(liveDocument?.buffer ?? null)
+  const syntaxHighlightingEnabled =
+    useSettingValue('editor.syntaxHighlighting.enabled') && analysisAllowed
+  const indentationGuidesEnabled = useSettingValue('editor.guides.indentation') && analysisAllowed
+  const minimapEnabled = useSettingValue('editor.minimap.enabled') && minimapAllowed
   const decodeSetting = useSettingValue('editor.decode.mode')
   const inputRoute = useSettingValue('editor.inputRoute')
-  const decodeMode = effectiveDecodeMode(
-    decodeSetting,
-    typeof window === 'undefined' ? '' : location.search,
-  )
+  const decodeMode = analysisAllowed
+    ? effectiveDecodeMode(decodeSetting, typeof window === 'undefined' ? '' : location.search)
+    : null
   const mountedEditors = useMountedEditorRegistry()
   const diagnosticPeek = useDiagnosticPeek({ active, filePath })
   const { languageServer, languageServerStatusSource } = useLanguageServerPlugin({
@@ -149,9 +154,11 @@ export function Editor({
           selectedThemeId,
           syntaxHighlightingEnabled,
         },
+        analysisAllowed,
         documentLanguageId,
       ),
     [
+      analysisAllowed,
       appliedThemeContentHash,
       appliedThemeId,
       documentLanguageId,
@@ -164,6 +171,7 @@ export function Editor({
   // per conflict, so it rebuilds the plugins only when the conflict behind the tab changes.
   const markdownView = useMarkdownView(key)
   const markdownPreview = documentLanguageId === 'markdown' && markdownView === 'preview'
+  const openMarkdownLink = useMarkdownLinkOpener(filePath, rootPath)
   const criticalEditorCorePlugins = useMemo(
     () =>
       createCriticalEditorCorePlugins(
@@ -171,14 +179,18 @@ export function Editor({
         indentationGuidesEnabled,
         minimapEnabled,
         {
+          analysisAllowed,
           compareMergeConflict: onCompareMergeConflict,
           markdownPreview,
+          openMarkdownLink,
         },
       ),
     [
+      analysisAllowed,
       documentLanguageId,
       indentationGuidesEnabled,
       markdownPreview,
+      openMarkdownLink,
       minimapEnabled,
       onCompareMergeConflict,
     ],
@@ -192,7 +204,7 @@ export function Editor({
   const plugins = [
     ...criticalEditorCorePlugins,
     unicodeHighlights.plugin,
-    ...(spellcheckPlugin ? [spellcheckPlugin] : []),
+    ...(analysisAllowed && spellcheckPlugin ? [spellcheckPlugin] : []),
     diagnosticPeek.plugin,
     languageServer,
     decodePlugin,
@@ -221,6 +233,8 @@ export function Editor({
       rowBackground: true,
     },
     document,
+    folding: analysisAllowed,
+    detectIndentation: analysisAllowed,
     documentKey: paintKey,
     snapshot: decodeMode ? null : snapshot,
     editability,
@@ -233,7 +247,10 @@ export function Editor({
 
       onTextChange?.(tabId, key, change)
     },
-    onInitialPaint,
+    onInitialPaint: (event) => {
+      if (event.phase === 'highlight-settled') setFormattedDocument(event.documentId)
+      onInitialPaint?.(event)
+    },
     onPresentationChange: (state) => setProvisional(state === 'provisional'),
     plugins,
     rowPositioning,
@@ -315,15 +332,27 @@ export function Editor({
     document: liveDocument,
   })
 
+  const preparingMarkdown =
+    analysisAllowed &&
+    markdownPreview &&
+    syntaxHighlightingEnabled &&
+    liveDocument !== null &&
+    formattedDocument !== key &&
+    !provisional
+
   return (
     <EditorFrame
       active={active && focusTarget.focused}
       controller={controller}
+      preparing={preparingMarkdown}
       onRequestCloseOverlay={diagnosticPeek.snapshot ? diagnosticPeek.close : undefined}
       targetRef={focusTarget.ref}
       textMenuRequest={textMenuRequest}
     >
-      {provisional && liveDocument ? (
+      {liveDocument ? (
+        <LargeFileNotice analysisAllowed={analysisAllowed} minimapAllowed={minimapAllowed} />
+      ) : null}
+      {(provisional || preparingMarkdown) && liveDocument ? (
         <div className='bg-background text-muted-foreground absolute inset-x-0 bottom-0 flex items-center gap-2 px-3 py-2 text-xs'>
           <Spinner size='xs' label='Preparing editor' />
           Preparing editor…

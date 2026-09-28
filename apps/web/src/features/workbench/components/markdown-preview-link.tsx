@@ -1,7 +1,7 @@
 import { use, type ComponentProps } from 'react'
 
 import { MarkdownPreviewContext } from '@/features/workbench/providers/markdown-preview-context'
-import { markdownPreviewTarget } from '@/features/workbench/utils/markdown-preview-paths'
+import { markdownPreviewTarget } from '@/lib/markdown-mode/utils/paths'
 
 /** A link in rendered markdown: another workspace file opens in the editor, anything else outside. */
 export function MarkdownPreviewLink({

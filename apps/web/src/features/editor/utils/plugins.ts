@@ -43,51 +43,64 @@ const PLATFORM_SEARCH_RESULT_EDITOR_LOGGING_PLUGIN = createEditorLoggingPlugin(
 )
 
 export type CriticalEditorCorePluginOptions = {
+  readonly analysisAllowed: boolean
   /** Backs the "Compare Changes" lens on a merge conflict; absent hides it. */
   readonly compareMergeConflict?: () => void
   /** Markdown renders in place (live preview); false shows its source. */
   readonly markdownPreview?: boolean
+  readonly openMarkdownLink?: (href: string) => void
 }
 
 export function createCriticalEditorCorePlugins(
   languageId: EditorSyntaxLanguageId | null,
   indentationGuidesEnabled: boolean,
   minimapEnabled: boolean,
-  options: CriticalEditorCorePluginOptions = {},
+  options: CriticalEditorCorePluginOptions,
 ): readonly EditorPlugin[] {
   const includeGuides =
+    options.analysisAllowed &&
     indentationGuidesEnabled &&
     editorIndentationGuidesSupported(languageId) &&
     !editorPerformanceFeatureDisabled('scope-lines')
   return [
-    ...createEditorSyntaxHighlightingPlugins(languageId),
-    ...(languageId === 'markdown' ? [createMarkdownAuthoringPlugin()] : []),
+    ...(options.analysisAllowed ? createEditorSyntaxHighlightingPlugins(languageId) : []),
+    ...(options.analysisAllowed && languageId === 'markdown'
+      ? [createMarkdownAuthoringPlugin()]
+      : []),
     createLineGutterPlugin(),
-    createFoldGutterPlugin({
-      width: 16,
-      icon: FOLD_CHEVRON_ICON,
-      iconClassName: 'size-3 [[data-editor-fold-state=collapsed]_&]:-rotate-90',
-    }),
+    ...(options.analysisAllowed
+      ? [
+          createFoldGutterPlugin({
+            width: 16,
+            icon: FOLD_CHEVRON_ICON,
+            iconClassName: 'size-3 [[data-editor-fold-state=collapsed]_&]:-rotate-90',
+          }),
+        ]
+      : []),
     ...(minimapEnabled && !editorPerformanceFeatureDisabled('minimap')
       ? [createMinimapPlugin()]
       : []),
     createEditorFindPlugin(),
-    createMergeConflictPlugin({ compare: options.compareMergeConflict }),
-    createBracketMatchPlugin({
-      style: { backgroundColor: 'var(--editor-bracket-match-background)' },
-    }),
-    createOccurrenceHighlightPlugin({
-      style: {
-        backgroundColor: 'var(--editor-occurrence-highlight-background)',
-      },
-    }),
-    createDocumentLinkPlugin(),
+    ...(options.analysisAllowed
+      ? [
+          createMergeConflictPlugin({ compare: options.compareMergeConflict }),
+          createBracketMatchPlugin({
+            style: { backgroundColor: 'var(--editor-bracket-match-background)' },
+          }),
+          createOccurrenceHighlightPlugin({
+            style: {
+              backgroundColor: 'var(--editor-occurrence-highlight-background)',
+            },
+          }),
+          createDocumentLinkPlugin(),
+        ]
+      : []),
     ...(includeGuides ? [createScopeLinesPlugin()] : []),
     // Critical rather than lazy: loading it after first paint would flash raw markdown first. It
     // derives its replacements from Markdown records, so a file renders as source
     // while syntax highlighting is off.
-    ...(languageId === 'markdown' && options.markdownPreview !== false
-      ? [createMarkdownPreviewPlugin()]
+    ...(options.analysisAllowed && languageId === 'markdown' && options.markdownPreview !== false
+      ? [createMarkdownPreviewPlugin({ openLink: options.openMarkdownLink })]
       : []),
     createPlatformEditorLoggingPlugin(),
   ]

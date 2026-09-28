@@ -1,3 +1,5 @@
+import { editorPagedReadonly } from './editor-paged-readonly'
+import { editorFeatureTiers } from './editor-feature-tiers'
 import { editorSavedSnapshot } from './editor-saved-snapshot'
 import { sessionNoFlicker } from './session-no-flicker'
 import { restNoFlicker } from './rest-no-flicker'
@@ -340,6 +342,8 @@ import { editorFind } from './editor-find'
 import { problemsPanelRows } from './problems-panel-rows'
 import { problemsPanelWorkspace } from './problems-panel-workspace'
 import { markdownSourceEditing } from './markdown-source-editing'
+import { markdownLoadStability } from './markdown-load-stability'
+import { markdownLinks } from './markdown-links'
 import { editorTypeBurst } from './editor-type-burst'
 import { editorUndoBarrier } from './editor-undo-barrier'
 import { editorUndoBranch } from './editor-undo-branch'
@@ -397,8 +401,10 @@ import { demoThemeStartup } from './demo-theme-startup'
 import { demoWallpaperStartup } from './demo-wallpaper-startup'
 
 export const scenarios: readonly Scenario[] = [
+  editorPagedReadonly,
   diffNoFlicker,
   savedComparisonNoFlicker,
+  editorFeatureTiers,
   editorSavedSnapshot,
   historyComparisonNoFlicker,
   terminalHistory,
@@ -682,6 +688,8 @@ export const scenarios: readonly Scenario[] = [
   problemsPanelWorkspace,
   editorTypeBurst,
   markdownSourceEditing,
+  markdownLoadStability,
+  markdownLinks,
   editorUndoBarrier,
   editorUndoBranch,
   editorTitleDiffToggle,

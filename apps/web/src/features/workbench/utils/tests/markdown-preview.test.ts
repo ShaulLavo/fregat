@@ -1,9 +1,6 @@
 import { expect, test } from '../../../../../test/fixtures'
 
-import {
-  markdownPreviewImageSource,
-  markdownPreviewTarget,
-} from '@/features/workbench/utils/markdown-preview-paths'
+import { markdownPreviewImageSource, markdownPreviewTarget } from '@/lib/markdown-mode/utils/paths'
 import {
   lineForRenderedTop,
   renderedTopForLine,

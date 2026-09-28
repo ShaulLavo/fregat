@@ -64,7 +64,7 @@ function markdownCoverageRows(needle: string): readonly string[] {
     '• ☑ task',
     '│ one',
     '│ two',
-    '| cell | value |',
+    '|   cell   | value |',
     'const coverage = 1',
   ]
 }

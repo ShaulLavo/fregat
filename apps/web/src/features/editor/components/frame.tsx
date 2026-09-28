@@ -16,6 +16,7 @@ import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
 
 type EditorFrameProps = {
   active: boolean
+  preparing?: boolean
   controller: ComponentProps<typeof EditorHost>['controller']
   targetRef?: Ref<HTMLDivElement>
   children?: ReactNode
@@ -27,6 +28,7 @@ type EditorFrameProps = {
 export const EditorFrame = memo(
   ({
     active,
+    preparing = false,
     controller,
     targetRef,
     children,
@@ -82,7 +84,10 @@ export const EditorFrame = memo(
         onKeyDown={handleKeyDown}
       >
         <div className='contents' onPointerDownCapture={handleHostPointerDown}>
-          <EditorHost className='app-editor-host' controller={controller} />
+          <EditorHost
+            className={preparing ? 'app-editor-host invisible' : 'app-editor-host'}
+            controller={controller}
+          />
         </div>
         {children}
         {contextMenu.anchor ? (

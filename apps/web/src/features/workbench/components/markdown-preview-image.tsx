@@ -1,6 +1,6 @@
 import { use, type ComponentProps } from 'react'
 import { MarkdownPreviewContext } from '@/features/workbench/providers/markdown-preview-context'
-import { markdownPreviewImageSource } from '@/features/workbench/utils/markdown-preview-paths'
+import { markdownPreviewImageSource } from '@/lib/markdown-mode/utils/paths'
 
 import { fsBlobCrossOrigin } from '@/lib/fs-blob-image'
 

@@ -21,6 +21,7 @@ export const diffContentRowSelector = '.editor-diff-pane [data-editor-virtual-ro
 export const editorViewportSelector = '.editor-virtualized-viewport'
 /** Rows the markdown live preview has decorated (headings, lists, emphasis). */
 export const markdownPreviewRowSelector = '[class*="editor-inline-"]'
+export const markdownEditorLinkSelector = '.editor-markdown-link'
 export const chatMessagesLogSelector = '[role="log"][aria-label="Messages"]'
 export const editorRowSelector = '[data-editor-virtual-row]'
 export const sharedTokenHighlightPrefix = 'editor-shared-token-'
@@ -1031,6 +1032,7 @@ export const selectors = {
   editorFindInput: (page: Page) => page.getByRole('textbox', { name: 'Find', exact: true }),
   editorFindCount: (page: Page) => page.locator('.editor-find-count'),
   editorFindWidget: (page: Page) => page.locator('.editor-find-widget'),
+  editorLargeFileNotice: (page: Page) => page.getByTestId('large-file-mode'),
   editorMinimap: (page: Page) => page.locator('.editor-minimap-right'),
   terminalSurface: (page: Page) =>
     page.locator('[data-slot="tool-pane"][aria-label="Terminal"]:visible'),
@@ -1087,6 +1089,12 @@ export const selectors = {
       '[data-phone-level="file"] .editor-diff-gutter:not([hidden]) :is(.editor-diff-gutter-lane-old, .editor-diff-gutter-lane-new)',
     ),
   editorTab: (page: Page, path: string) => page.locator(`[data-editor-tab-path="${path}"]`),
+  openReadOnly: (page: Page) => page.getByRole('button', { name: 'Open read-only', exact: true }),
+  pagedContents: (page: Page) => page.getByLabel('Read-only file contents'),
+  pagedNext: (page: Page) => page.getByRole('button', { name: 'Next lines', exact: true }),
+  pagedLine: (page: Page) => page.getByRole('spinbutton', { name: 'Line number' }),
+  pagedGo: (page: Page) => page.getByRole('button', { name: 'Go to line', exact: true }),
+  pagedCopy: (page: Page) => page.getByRole('button', { name: 'Copy displayed text', exact: true }),
   createMissingFile: (page: Page) => page.getByRole('button', { name: 'Create File', exact: true }),
   editorTabs: (page: Page) => page.locator('[data-editor-tab-id]'),
   gitPanel: (page: Page) => page.getByRole('region', { name: 'Git panel' }),
