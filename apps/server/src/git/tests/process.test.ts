@@ -2,7 +2,6 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
 import { GitService } from '../service'
 import {
@@ -108,7 +107,6 @@ describe('git service output limit', () => {
     await writeFile(path.join(root, 'tracked.txt'), `${'line\n'.repeat(50_000)}`)
     const service = new GitService(createWorkspacePaths(root), {
       maxCommandOutputBytes: 4096,
-      maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
     })
 
     const diff = service.diff('')
@@ -124,7 +122,6 @@ describe('git service output limit', () => {
     await writeFile(path.join(root, 'tracked.txt'), 'two\n')
     const service = new GitService(createWorkspacePaths(root), {
       maxCommandOutputBytes: 4096,
-      maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
     })
 
     const diffs = await service.diff('')

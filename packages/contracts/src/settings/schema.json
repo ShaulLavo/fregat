@@ -559,6 +559,13 @@
       "markdownDescription": "Fast-forward a project checkout on its default branch when its upstream moves. A checkout with changes, local commits or another branch checked out is left alone.\n\nChecked on each Git status read after the background fetch moves the upstream. After a failed pull the next try waits 60 seconds. The Git panel shows why a pull was skipped.",
       "type": "boolean"
     },
+    "git.maxDiffFileSizeMiB": {
+      "default": 50,
+      "description": "Maximum size in MiB of each file version loaded for a Git comparison. Larger files show their change summary. Applies to Git revision reads too.",
+      "maximum": 200,
+      "minimum": 1,
+      "type": "integer"
+    },
     "git.projectAutoPull": {
       "additionalProperties": {
         "type": "boolean"

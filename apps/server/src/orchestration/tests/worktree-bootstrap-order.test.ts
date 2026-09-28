@@ -16,7 +16,6 @@ import {
   worktreeLifecycleFixture,
 } from '../../../test/factories/worktree-lifecycle'
 import { createWorkspacePaths } from '../../fs/path'
-import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { GitService } from '../../git/service'
 import { OrchestrationEngine } from '../engine'
 import { SessionDeletionReactor } from '../session-deletion-reactor'
@@ -72,7 +71,7 @@ test('startup reconciles orphans before cleanup and subscribes live reactors aft
     attachmentsDir: path.join(fixture.root, '.git', 'attachments'),
     registration: {
       paths,
-      git: new GitService(paths, { maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES }),
+      git: new GitService(paths),
     },
   })
   engines.push(restarted)

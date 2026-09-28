@@ -4,7 +4,6 @@ import path from 'node:path'
 import * as v from 'valibot'
 import { orchestrationCommandSchema, type WorktreeId } from '@workspace/contracts'
 import { createMetadataDatabase } from '../../src/db/client'
-import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../src/fs/limits'
 import { createWorkspacePaths } from '../../src/fs/path'
 import { GitService } from '../../src/git/service'
 import {
@@ -28,7 +27,6 @@ export async function createOrchestrationFixture(
   const sqlite = database.$client
   const paths = createWorkspacePaths(root)
   const git = new GitService(paths, {
-    maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
     repositoryCacheTtlMs: options.repositoryCacheTtlMs,
   })
   const registration = { paths, git }

@@ -10,7 +10,6 @@ import {
 import * as v from 'valibot'
 import type { ProviderDiscoveredSession, ProviderHistoryMessage } from '../../../provider/types'
 import { createWorkspacePaths } from '../../../fs/path'
-import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../../fs/limits'
 import { GitService } from '../../../git/service'
 import { runGit } from '../../../testing/git'
 import { OrchestrationEngine } from '../../engine'
@@ -93,7 +92,7 @@ export async function discoveryFixture() {
   await mkdir(main)
   const persistence = createProjectionFixture()
   const paths = createWorkspacePaths(root)
-  const git = new GitService(paths, { maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES })
+  const git = new GitService(paths)
   const registration = { git, paths }
   const engine = new OrchestrationEngine(persistence.database, {
     registration,

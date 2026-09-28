@@ -5,7 +5,6 @@ import path from 'node:path'
 import type { GitCloneProgressEvent } from '@workspace/contracts'
 import { afterEach, describe, expect, it } from 'vitest'
 import { runGit } from '../../testing/git'
-import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
 import { cloneUrl, parseCloneProgress } from '../clone'
 import { GitService } from '../service'
@@ -26,9 +25,7 @@ async function workspace() {
   await writeFile(path.join(source, 'readme.md'), 'hello\n')
   await runGit(source, ['add', '--all'])
   await runGit(source, ['commit', '-m', 'initial'])
-  const git = new GitService(createWorkspacePaths(root), {
-    maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
-  })
+  const git = new GitService(createWorkspacePaths(root))
   return { root, source, git }
 }
 
@@ -118,9 +115,7 @@ describe('clone', () => {
     const { root, source } = await workspace()
     const outside = await workspace()
     await symlink(outside.root, path.join(root, 'link'))
-    const git = new GitService(createWorkspacePaths(root), {
-      maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
-    })
+    const git = new GitService(createWorkspacePaths(root))
     await expect(
       collect(git.cloneProgress({ source, destination: 'link/new/copy' }, async () => null)),
     ).rejects.toThrow()

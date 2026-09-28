@@ -9,7 +9,6 @@ import {
 import { GitService } from '../../git/service'
 import { GitWorktreeService } from '../../git/worktrees'
 import { createWorkspacePaths } from '../../fs/path'
-import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 
 const fixtures: Awaited<ReturnType<typeof worktreeLifecycleFixture>>[] = []
 afterEach(async () => {
@@ -26,11 +25,7 @@ test('the final ProviderService check blocks a real adapter runtime appearing af
   await fixture.command({ type: 'session.delete', sessionId: lifecycleSessionId })
   await fixture.engine.providerRuntimeIdle()
   expect(await fixture.adapter.hasRuntime({ sessionId: lifecycleSessionId })).toBe(false)
-  const git = new GitWorktreeService(
-    new GitService(createWorkspacePaths(fixture.root), {
-      maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
-    }),
-  )
+  const git = new GitWorktreeService(new GitService(createWorkspacePaths(fixture.root)))
   await git.withRepositoryLane(fixture.root, async () => {
     await fixture.command({ type: 'worktree.cleanup', worktreeId: lifecycleWorktreeId })
     expect(

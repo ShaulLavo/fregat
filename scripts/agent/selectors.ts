@@ -647,6 +647,7 @@ export const selectors = {
   settingsScopeTab: (page: Page, name: 'User' | 'Workspace' | 'Defaults', selected?: boolean) =>
     page.getByRole('tab', { name, exact: true, selected }),
   settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),
+  settingsNumber: (page: Page, name: string) => page.getByRole('spinbutton', { name, exact: true }),
   settingsRow: (page: Page, id: string) => page.locator(`[data-setting-row="${id}"]`),
   settingsCodeThemePreview: (page: Page, id: string) =>
     page.locator(`[data-setting-row="${id}"] [data-code-theme-preview] pre[data-theme-id]`),
@@ -1495,4 +1496,18 @@ export async function diagnosticTagPaint(page: Page, kind: 'fade' | 'strike') {
     }
     return painted
   })(${JSON.stringify(kind)})`) as Promise<{ text: string; color: string; decoration: string }[]>
+}
+
+/** Page-side: selected source text in the focused editor's input window. */
+export function focusedEditorSelectedText(): string {
+  const input = document.activeElement as
+    | (HTMLElement & {
+        editContext?: { text: string; selectionStart: number; selectionEnd: number } | null
+      })
+    | null
+  if (input instanceof HTMLTextAreaElement)
+    return input.value.slice(input.selectionStart, input.selectionEnd)
+  const context = input?.editContext
+  if (context) return context.text.slice(context.selectionStart, context.selectionEnd)
+  return document.getSelection()?.toString() ?? ''
 }

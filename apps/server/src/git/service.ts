@@ -16,7 +16,7 @@ import type {
   GitShipResult,
   WorktreeSubmoduleMode,
 } from '@workspace/contracts'
-import { errorMessage, isBinaryGitDiff } from '@workspace/contracts'
+import { DEFAULT_SETTING_VALUES, errorMessage, isBinaryGitDiff } from '@workspace/contracts'
 import {
   gitCommonDirectory,
   withGitRepositoryLane,
@@ -106,7 +106,7 @@ type GitServiceOptions = {
   forgeBoundaries?: ForgeBoundaries
   diffConcurrency?: number
   maxCommandOutputBytes?: number
-  maxTextFileBytes: number
+  maxDiffFileBytes?: () => number
   now?: () => number
   repositoryCacheTtlMs?: number
   statusCacheTtlMs?: number
@@ -191,18 +191,20 @@ export class GitService {
   private readonly paths: WorkspacePaths
   private readonly diffConcurrency: number
   private readonly maxCommandOutputBytes: number
-  private readonly maxTextFileBytes: number
+  private readonly maxDiffFileBytes: () => number
   private readonly repositoryRoots: BoundedTtlCache<GitRepositoryRoot | null>
   private readonly statuses: BoundedTtlCache<GitStatusResult>
   private readonly upstreamFetch: UpstreamFetchScheduler
   private readonly autoPull: AutoPull | null
   private readonly forgeBoundaries: ForgeBoundaries
 
-  constructor(paths: WorkspacePaths, options: GitServiceOptions) {
+  constructor(paths: WorkspacePaths, options: GitServiceOptions = {}) {
     this.paths = paths
     this.diffConcurrency = positiveInteger(options.diffConcurrency, DEFAULT_DIFF_CONCURRENCY)
     this.maxCommandOutputBytes = positiveInteger(options.maxCommandOutputBytes, MAX_OUTPUT_BYTES)
-    this.maxTextFileBytes = options.maxTextFileBytes
+    this.maxDiffFileBytes =
+      options.maxDiffFileBytes ??
+      (() => DEFAULT_SETTING_VALUES['git.maxDiffFileSizeMiB'] * 1024 * 1024)
     this.repositoryRoots = new BoundedTtlCache({
       capacity: REPOSITORY_CACHE_CAPACITY,
       now: options.now,
@@ -463,7 +465,7 @@ export class GitService {
 
     const revisionPath = `${ref}:${repository.pathspec}`
     const result = await this.git(repository.rootAbsolutePath, ['show', revisionPath], {
-      maxOutputBytes: this.maxTextFileBytes,
+      maxOutputBytes: this.maxDiffFileBytes(),
     })
     return { content: result.stdout, path: input, ref }
   }
@@ -1358,7 +1360,7 @@ export class GitService {
     if (!objectId || objectId !== diff.oldObjectId) return diff
 
     const size = await this.gitObjectSize(repository, objectId)
-    if (isTooLarge(size, this.maxTextFileBytes)) return diff
+    if (isTooLarge(size, this.maxDiffFileBytes())) return diff
 
     const text = await this.gitObjectText(repository, objectId)
     if (!text || isBinaryText(text)) return diff
@@ -1410,7 +1412,7 @@ export class GitService {
   private async diffableUntrackedFile(repository: GitRepositoryLocation, pathspec: string) {
     const size = await this.workingTreeSize(repository, pathspec)
     if (size === null) return null
-    if (size > this.maxTextFileBytes) return null
+    if (size > this.maxDiffFileBytes()) return null
 
     return pathspec
   }
@@ -1474,7 +1476,9 @@ export class GitService {
       this.diffSideSize(repository, diff, 'new'),
     ])
 
-    return isTooLarge(oldSize, this.maxTextFileBytes) || isTooLarge(newSize, this.maxTextFileBytes)
+    return (
+      isTooLarge(oldSize, this.maxDiffFileBytes()) || isTooLarge(newSize, this.maxDiffFileBytes())
+    )
   }
 
   private async gitObjectId(repository: GitRepositoryLocation, revisionPath: string) {
@@ -1551,7 +1555,7 @@ export class GitService {
   // size, so the budget here is the workspace's text-file limit.
   private async gitObjectText(repository: GitRepositoryLocation, objectId: string) {
     const result = await this.git(repository.rootAbsolutePath, ['cat-file', '-p', objectId], {
-      maxOutputBytes: this.maxTextFileBytes,
+      maxOutputBytes: this.maxDiffFileBytes(),
     })
     return result.stdout
   }
@@ -1562,7 +1566,9 @@ export class GitService {
       query.newObjectId ? this.gitObjectSize(repository, query.newObjectId) : null,
     ])
 
-    return isTooLarge(oldSize, this.maxTextFileBytes) || isTooLarge(newSize, this.maxTextFileBytes)
+    return (
+      isTooLarge(oldSize, this.maxDiffFileBytes()) || isTooLarge(newSize, this.maxDiffFileBytes())
+    )
   }
 
   private async blobPatch(repository: GitRepositoryLocation, query: GitBlobDiffQuery) {

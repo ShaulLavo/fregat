@@ -271,3 +271,18 @@ In the order a user meets them:
    numbers.
 5. **E015 paged read-only view**, for files past the resident-memory ceiling (about 300 MiB
    today).
+
+### Execution 2026-09-28
+
+Phase 1 continues in independently verified changes.
+
+- [x] Separate Git comparison and revision-read budgets with a machine setting, default 50 MiB.
+- [ ] Verify the boundary and ordinary file reads, refresh the settings reference, and ship.
+- [ ] Remove retained save text while preserving saved-snapshot consumers.
+- [ ] Land `bench:large-file`, including the 150 MiB save case.
+
+Verification: `src/git/tests/service.test.ts` passes 27 tests, including exact-boundary,
+live budget changes, untracked files and an HTTP read above the configured diff limit.
+Repository typecheck passes. The `git-diff-budget` browser scenario confirms the 50 MiB
+default and persistence after reload; its saved-setting screenshot was read at
+`/tmp/fregat-evidence/20260928T174147Z-scenario-git-diff-budget/`.

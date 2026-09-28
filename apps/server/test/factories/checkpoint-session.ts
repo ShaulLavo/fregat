@@ -16,7 +16,6 @@ import {
 
 import * as schema from '../../src/db/schema'
 import { initializePlatformDatabase } from '../../src/db/initialize'
-import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../src/fs/limits'
 import { createWorkspacePaths } from '../../src/fs/path'
 import { GitService } from '../../src/git/service'
 import { OrchestrationEngine } from '../../src/orchestration/engine'
@@ -46,9 +45,7 @@ export function checkpointOrchestration(root: string) {
   const database = drizzle({ client: sqlite, schema })
   initializePlatformDatabase(database)
   const engine = new OrchestrationEngine(database)
-  const git = new GitService(createWorkspacePaths(root), {
-    maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
-  })
+  const git = new GitService(createWorkspacePaths(root))
   return { close: () => sqlite.close(), database, engine, git }
 }
 

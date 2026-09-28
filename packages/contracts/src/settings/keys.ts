@@ -310,6 +310,18 @@ export const SETTINGS_REGISTRY = {
       'A browser on another device, such as a phone reaching this machine over the mesh, shows a pairing screen until a link from this machine pairs it. This machine’s own browser needs no pairing.',
     keywords: ['pair', 'phone', 'device', 'security', 'mesh', 'tailnet'],
   }),
+  'git.maxDiffFileSizeMiB': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200)),
+    default: 50,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Git',
+    title: 'Diff file size limit',
+    description:
+      'Maximum size in MiB of each file version loaded for a Git comparison. Larger files show their change summary. Applies to Git revision reads too.',
+    visibility: 'advanced',
+    keywords: ['diff', 'size', 'limit', 'memory', 'large'],
+  }),
   'git.autoPull': defineSetting({
     schema: v.boolean(),
     default: false,

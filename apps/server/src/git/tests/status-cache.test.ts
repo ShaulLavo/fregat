@@ -2,7 +2,6 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
 import { GitService } from '../service'
 import { runGit } from '../../testing/git'
@@ -18,7 +17,6 @@ describe('git status cache', () => {
     const root = await fixtureRepo()
     const clock = manualClock()
     const service = new GitService(createWorkspacePaths(root), {
-      maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
       now: clock.now,
       statusCacheTtlMs: 1_000,
     })
@@ -37,7 +35,6 @@ describe('git status cache', () => {
     const root = await fixtureRepo()
     const clock = manualClock()
     const service = new GitService(createWorkspacePaths(root), {
-      maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
       now: clock.now,
       statusCacheTtlMs: 60_000,
     })
@@ -55,7 +52,6 @@ describe('git status cache', () => {
     const root = await fixtureRepo()
     const clock = manualClock()
     const service = new GitService(createWorkspacePaths(root), {
-      maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
       now: clock.now,
       statusCacheTtlMs: 60_000,
     })
@@ -76,7 +72,6 @@ describe('git status cache', () => {
     const root = await mkdtemp(path.join(tmpdir(), 'platform-git-cache-'))
     roots.push(root)
     const service = new GitService(createWorkspacePaths(root), {
-      maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
       repositoryCacheTtlMs: 60_000,
     })
     expect((await service.status('')).repository).toBeNull()
@@ -92,7 +87,6 @@ describe('git status cache', () => {
   it('fresh status replaces a cached repository after its metadata is removed', async () => {
     const root = await fixtureRepo()
     const service = new GitService(createWorkspacePaths(root), {
-      maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
       repositoryCacheTtlMs: 60_000,
       statusCacheTtlMs: 60_000,
     })
@@ -118,7 +112,6 @@ describe('git status cache', () => {
     roots.push(root)
     const clock = manualClock()
     const service = new GitService(createWorkspacePaths(root), {
-      maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
       now: clock.now,
       repositoryCacheTtlMs: 60_000,
     })

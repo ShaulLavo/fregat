@@ -4,7 +4,6 @@ import path from 'node:path'
 import type { GitAutoPullState } from '@workspace/contracts'
 import { afterEach, describe, expect, it } from 'vitest'
 import { runGit } from '../../testing/git'
-import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
 import { withGitRepositoryLane } from '../repository-lane'
 import { autoPullEnabled } from '../auto-pull'
@@ -31,7 +30,6 @@ async function fixture(enabled = true) {
   await identity(checkout)
   const git = new GitService(createWorkspacePaths(base), {
     autoPullPolicy: async () => enabled,
-    maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
   })
   const advance = async () => {
     await commitFile(upstream, 'tracked.txt', `${Date.now()}\n`)

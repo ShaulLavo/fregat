@@ -4,7 +4,6 @@ import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { closeTestApps, createTestApp } from '../../../test/server'
-import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
 import { GitService } from '../service'
 import type { GitCommitProgressEvent } from '@workspace/contracts'
@@ -189,9 +188,7 @@ async function collect(events: AsyncIterable<GitCommitProgressEvent>) {
 }
 
 function gitService(root: string) {
-  return new GitService(createWorkspacePaths(root), {
-    maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
-  })
+  return new GitService(createWorkspacePaths(root))
 }
 
 async function writeHook(root: string, name: string, lines: readonly string[]) {

@@ -4,7 +4,6 @@ import path from 'node:path'
 import type { GitPublishRequest } from '@workspace/contracts'
 import { afterEach, describe, expect, it } from 'vitest'
 import { runGit } from '../../testing/git'
-import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
 import type { RunProcess } from '../forges/types'
 import { GitService } from '../service'
@@ -54,7 +53,6 @@ async function checkout(options: { commit?: boolean; bare?: boolean } = {}) {
 function service(root: string, run: RunProcess) {
   return new GitService(createWorkspacePaths(root), {
     forgeBoundaries: { run },
-    maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
   })
 }
 

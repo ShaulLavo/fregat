@@ -18,7 +18,6 @@ import {
 
 import * as schema from '../../db/schema'
 import { initializePlatformDatabase } from '../../db/initialize'
-import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
 import { GitService } from '../../git/service'
 import { MockProviderAdapter, MOCK_ADAPTER_CAPABILITIES } from '../../provider/adapters/mock'
@@ -101,7 +100,7 @@ describe('checkpoint reactor', () => {
 
     const diffQuery = new OrchestrationCheckpointDiffQuery(
       fixture.database,
-      new GitService(createWorkspacePaths(root), { maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES }),
+      new GitService(createWorkspacePaths(root)),
     )
     const diffs = await diffQuery.turnDiff({ fromTurnCount: 0, sessionId, toTurnCount: 1 })
 
@@ -494,9 +493,7 @@ function checkpointEngine(
   return new OrchestrationEngine(fixture.database, {
     providerRuntime: {
       adapterRegistry: new ProviderAdapterRegistry({ adapters: [adapter] }),
-      checkpointGit: new GitService(createWorkspacePaths(root), {
-        maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
-      }),
+      checkpointGit: new GitService(createWorkspacePaths(root)),
     },
   })
 }
@@ -509,9 +506,7 @@ function standaloneCheckpointReactor(
   return new CheckpointReactor({
     dispatch: (command) => engine.dispatch(command),
     getReadModel: () => new OrchestrationSnapshotQuery(fixture.database).fullReadModel(),
-    git: new GitService(createWorkspacePaths(root), {
-      maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
-    }),
+    git: new GitService(createWorkspacePaths(root)),
   })
 }
 

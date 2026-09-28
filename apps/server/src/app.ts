@@ -223,7 +223,7 @@ export function createApp(options: AppOptions) {
   const git = new GitService(fs.paths, {
     autoPullPolicy: (root) =>
       autoPullEnabled(settings, () => orchestration.checkoutProjectId(root)),
-    maxTextFileBytes: fs.info().maxTextFileBytes,
+    maxDiffFileBytes: () => settings.snapshot().values['git.maxDiffFileSizeMiB'] * MIB,
     forgeBoundaries: options.orchestration?.forgeBoundaries,
   })
   const database = options.orchestration?.database ?? getDefaultPlatformDatabase()

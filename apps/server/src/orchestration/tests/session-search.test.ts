@@ -6,7 +6,6 @@ import {
   ORCHESTRATION_SESSION_SEARCH_SNIPPET_MAX_LENGTH,
   type OrchestrationSearchSessionsResult,
 } from '@workspace/contracts'
-import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
 import { GitService } from '../../git/service'
 import { OrchestrationCheckpointHunks } from '../checkpoint-hunks'
@@ -136,9 +135,7 @@ function createSearchApp(
   sessionSearch: OrchestrationSessionSearchQuery,
 ) {
   const engine = new OrchestrationEngine(database)
-  const git = new GitService(createWorkspacePaths(), {
-    maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
-  })
+  const git = new GitService(createWorkspacePaths())
   const checkpointDiff = new OrchestrationCheckpointDiffQuery(database, git)
   const checkpointHunks = new OrchestrationCheckpointHunks({
     runWorkspaceOperation: (sessionId, operation) =>

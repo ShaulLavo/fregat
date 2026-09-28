@@ -15,7 +15,6 @@ import type { ForgeBoundaries } from '../../src/git/pull-request'
 import { GitService } from '../../src/git/service'
 import { GitWorktreeService } from '../../src/git/worktrees'
 import { createWorkspacePaths } from '../../src/fs/path'
-import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../src/fs/limits'
 import { FIXTURE_MODEL } from './orchestration'
 import { runGit } from '../../src/testing/git'
 
@@ -148,10 +147,6 @@ export async function stopLifecycleEffects(
     attachmentsDir: path.join(fixture.root, '.git', 'attachments'),
   })
   await engine.ready
-  const git = new GitWorktreeService(
-    new GitService(createWorkspacePaths(fixture.root), {
-      maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
-    }),
-  )
+  const git = new GitWorktreeService(new GitService(createWorkspacePaths(fixture.root)))
   return { engine, git }
 }
