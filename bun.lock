@@ -234,6 +234,7 @@
       "name": "@workspace/contracts",
       "version": "0.0.0",
       "dependencies": {
+        "@workspace/observability": "workspace:*",
         "@workspace/utils": "workspace:*",
         "culori": "^4.0.2",
         "minimatch": "^10.2.6",

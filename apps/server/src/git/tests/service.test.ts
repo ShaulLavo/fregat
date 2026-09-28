@@ -1,4 +1,5 @@
 import { checkpointFilesFromDiffs } from '../../orchestration/checkpoint-files'
+import { readTextResponse } from '../../../test/file-transport'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -440,7 +441,7 @@ describe('git diff size budget', () => {
       }),
     )
     expect(read.status).toBe(200)
-    expect(await read.json()).toMatchObject({ content: text })
+    expect(await readTextResponse(read)).toMatchObject({ content: text })
   })
 
   it('opens a revision above the diff budget and refuses a large patch before collecting it', async () => {

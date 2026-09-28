@@ -205,11 +205,10 @@ export const lookupWorkspaceAddressesBodySchema = v.object({
 })
 export const workspaceAddressParamsSchema = v.object({ id: workspaceAddressIdSchema })
 
-export const writeBodySchema = v.object({
+export const writeQuerySchema = v.object({
   path: pathSchema,
-  content: v.string(),
   baseVersion: v.optional(v.string()),
-  expectedMtimeMs: v.optional(v.number()),
+  expectedMtimeMs: v.optional(v.pipe(v.string(), v.toNumber(), v.finite())),
   origin: v.optional(v.string()),
   writeId: v.optional(v.string()),
 })
@@ -472,7 +471,7 @@ export const workspaceEditResultSchema = v.pipe(
   ),
 )
 
-export type WriteBody = v.InferOutput<typeof writeBodySchema>
+export type WriteBody = v.InferOutput<typeof writeQuerySchema> & { content: string | Uint8Array }
 export type OpenWorkspaceRootBody = v.InferOutput<typeof openWorkspaceRootBodySchema>
 export type CreateFileBody = v.InferOutput<typeof createFileBodySchema>
 export type CreateFolderBody = v.InferOutput<typeof createFolderBodySchema>

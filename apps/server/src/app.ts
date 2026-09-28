@@ -210,10 +210,8 @@ const appCleanups = new WeakMap<object, () => Promise<void>>()
 
 const MIB = 1024 * 1024
 
-/**
- * Every file the server opens has to save. A save is JSON, where a character can take six bytes
- * (a `\u` escape); Bun's own default is 128 MiB, which failed every save of a 129–200 MiB file.
- */
+// Workspace-edit and create-file still send JSON, whose escaped characters take six bytes.
+// Raw saves enforce the file byte budget at the write boundary.
 export function requestBodyLimit(maxTextFileBytes: number) {
   return maxTextFileBytes * 6 + MIB
 }
@@ -530,6 +528,8 @@ export function createApp(options: AppOptions) {
           'content-type',
           'x-fs-mtime-ms',
           'x-fs-path',
+          'x-fs-size',
+          'x-fs-version',
         ],
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
         origin: (request) => isCorsOriginAllowed(auth, request.headers.get('origin')),

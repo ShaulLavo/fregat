@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { decodeText, detectTextEncoding, isByteExactText } from '../text-encoding'
+import { decodeText, detectTextEncoding, isByteExactText } from '@workspace/contracts/text-encoding'
 
 const utf8 = (input: string) => new Uint8Array(Buffer.from(input, 'utf8'))
 const utf16le = (input: string) => new Uint8Array(Buffer.from(input, 'utf16le'))

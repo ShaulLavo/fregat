@@ -1,3 +1,4 @@
+import { textWriteRequest } from '../../server/test/file-transport'
 import { mkdir, realpath, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
@@ -25,10 +26,10 @@ async function devServer() {
 // The app addresses files relative to the workspace root; Vite reports absolute paths.
 async function appSave(server: TestServer, file: string, content: string) {
   const response = await server.app.handle(
-    new Request('http://127.0.0.1:3001/fs/write', {
+    textWriteRequest('http://127.0.0.1:3001/fs/write', {
       method: 'POST',
       headers: { 'content-type': 'application/json', origin: server.origin },
-      body: JSON.stringify({ path: file, content, origin: 'editor', writeId: 'save-1' }),
+      body: { path: file, content, origin: 'editor', writeId: 'save-1' },
     }),
   )
   expect(response.status, await response.clone().text()).toBe(200)
@@ -69,10 +70,10 @@ test('a refused save is not the app’s version of the file', async () => {
   await writeFile(file, 'on disk\n')
 
   const response = await server.app.handle(
-    new Request('http://127.0.0.1:3001/fs/write', {
+    textWriteRequest('http://127.0.0.1:3001/fs/write', {
       method: 'POST',
       headers: { 'content-type': 'application/json', origin: server.origin },
-      body: JSON.stringify({ path: 'app.ts', content: 'stale\n', baseVersion: 'sha256:0' }),
+      body: { path: 'app.ts', content: 'stale\n', baseVersion: 'sha256:0' },
     }),
   )
   expect(response.ok).toBe(false)

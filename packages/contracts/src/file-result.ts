@@ -3,7 +3,7 @@ export type TextEncodingLabel = 'utf8' | 'utf16le' | 'utf16be'
 /**
  * Decode metadata describing how bytes on disk became `content`.
  *
- * Every `/fs/read` response carries all three. They are optional here because a `FileResult` is
+ * Every decoded `/fs/read` result carries all three. They are optional here because a `FileResult` is
  * also synthesized from text that never came off disk — a projected workspace edit, a conflict
  * resolution, a saved-buffer snapshot — and such a result has no decode to describe. Absent means
  * "this text came from an editor buffer", for which the defaults below are the truthful answer.

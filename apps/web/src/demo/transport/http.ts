@@ -1,3 +1,5 @@
+import { createFileResponse } from '@workspace/contracts/file-response'
+import { decodeText } from '@workspace/contracts/text-encoding'
 import { jsonResponse as json } from '@/demo/utils/response'
 import { bypass, http } from 'msw'
 import * as v from 'valibot'
@@ -9,7 +11,7 @@ import {
   settingsSnapshotSchema,
 } from '@workspace/contracts'
 import {
-  writeBodySchema,
+  writeQuerySchema,
   createFileBodySchema,
   createFolderBodySchema,
   renameBodySchema,
@@ -174,8 +176,10 @@ async function get(
       return json(required(workspace.stat(path)))
     case '/fs/tree':
       return json(workspace.tree(path, Number(url.searchParams.get('depth') ?? 1)))
-    case '/fs/read':
-      return json(required(workspace.readFile(path)))
+    case '/fs/read': {
+      const file = required(workspace.readFile(path))
+      return createFileResponse(new TextEncoder().encode(file.content), file)
+    }
     case '/fs/blob':
       return new Response(required(workspace.readFile(path)).content, {
         headers: { 'content-type': 'text/plain' },
@@ -237,6 +241,11 @@ async function post(
 ): Promise<Response> {
   if (url.pathname === '/_log/ingest') return json({ ok: true })
   if (url.pathname === '/terminal/kill') return json({ killed: true })
+  if (url.pathname === '/fs/write') {
+    const input = v.parse(writeQuerySchema, Object.fromEntries(url.searchParams))
+    const { content } = decodeText(new Uint8Array(await request.arrayBuffer()))
+    return json(await workspace.writeFile(input.path, content, input))
+  }
   const body: unknown = await request.json()
   switch (url.pathname) {
     case '/fs/workspace-address':
@@ -252,10 +261,6 @@ async function post(
       return json({ entry: { ...workspace.stat(DEMO_ROOT), workspaceAddress: DEMO_ADDRESS } })
     case '/fs/recents':
       return json({ recorded: true })
-    case '/fs/write': {
-      const input = v.parse(writeBodySchema, body)
-      return json(await workspace.writeFile(input.path, input.content, input))
-    }
     case '/fs/create-file': {
       const input = v.parse(createFileBodySchema, body)
       return json(await workspace.writeFile(input.path, input.content ?? '', input))

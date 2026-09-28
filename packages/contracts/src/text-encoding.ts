@@ -1,24 +1,14 @@
-/**
- * Text decoding for the read boundary.
- *
- * Decoding never fails. A file we cannot decode cleanly still comes back as text with U+FFFD in
- * place of the bytes we could not read, the way VS Code has always done it — refusing to decode is
- * a refusal to *look at* a file, and looking is not the operation that can lose data. Writing is,
- * so the round-trip guard lives on the write side and keys off `lossy` (see `assertByteExactText`).
- *
- * Binary detection is the same heuristic VS Code uses
- * (`src/vs/workbench/services/textfile/common/encoding.ts` `detectEncodingFromBuffer`): a NUL in
- * the first 512 bytes, disambiguated against UTF-16 by which parity the NULs land on. It is a hint
- * for callers that would rather show a binary viewer, never a reason to fail a read.
- */
+import { createStructuredError } from '@workspace/observability/errors'
+import type { TextEncodingLabel } from './file-result'
+export type { TextEncodingLabel } from './file-result'
+// Malformed bytes remain readable through replacement characters; writes enforce byte fidelity.
+// NUL parity in the first 512 bytes separates UTF-16 from the binary hint.
 
 const zeroByteDetectionMaxBytes = 512
 
 const utf8Bom = [0xef, 0xbb, 0xbf]
 const utf16beBom = [0xfe, 0xff]
 const utf16leBom = [0xff, 0xfe]
-
-export type TextEncodingLabel = 'utf8' | 'utf16le' | 'utf16be'
 
 export type DetectedTextEncoding = {
   readonly encoding: TextEncodingLabel
@@ -57,30 +47,81 @@ export function isByteExactText(bytes: Uint8Array): boolean {
   // A UTF-16 source does not, because every write goes out as UTF-8.
   if (detectTextEncoding(bytes).encoding !== 'utf8') return false
 
-  return !decodeUtf8(bytes).lossy
+  return isValidUtf8(bytes)
 }
 
-const fatalUtf8Decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true })
-const lossyUtf8Decoder = new TextDecoder('utf-8', { ignoreBOM: true })
-
-function decodeUtf8(bytes: Uint8Array) {
-  // `ignoreBOM` keeps a leading U+FEFF in the string so the editor's round-trip policy still sees
-  // it. The fatal decoder is only here to tell us whether the lossy one would have substituted;
-  // it is reusable after it throws.
+export function isValidUtf8(bytes: Uint8Array): boolean {
+  const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true })
   try {
-    return { content: fatalUtf8Decoder.decode(bytes), lossy: false }
+    for (let offset = 0; offset < bytes.length; offset += decodeChunkBytes) {
+      decoder.decode(bytes.subarray(offset, offset + decodeChunkBytes), { stream: true })
+    }
+    decoder.decode()
+    return true
   } catch {
-    return { content: lossyUtf8Decoder.decode(bytes), lossy: true }
+    return false
   }
 }
 
-function decodeUtf16(bytes: Uint8Array, encoding: 'utf16le' | 'utf16be') {
-  const evenLength = bytes.byteLength - (bytes.byteLength % 2)
-  const view = Buffer.from(bytes.buffer, bytes.byteOffset, evenLength)
-  if (encoding === 'utf16le') return view.toString('utf16le')
+// Bounded calls avoid engines silently returning empty text above their string ceiling.
+const decodeChunkBytes = 1024 * 1024
 
-  // `swap16` mutates, so byte-swap a copy rather than the caller's buffer.
-  return Buffer.from(view).swap16().toString('utf16le')
+function decodeUtf8(bytes: Uint8Array) {
+  try {
+    return { content: decodeUtf8Chunks(bytes, true), lossy: false }
+  } catch (error) {
+    if (!(error instanceof TypeError)) throw error
+    return { content: decodeUtf8Chunks(bytes, false), lossy: true }
+  }
+}
+
+function decodeUtf8Chunks(bytes: Uint8Array, fatal: boolean) {
+  const decoder = new TextDecoder('utf-8', { fatal, ignoreBOM: true })
+  const chunks: string[] = []
+  for (let offset = 0; offset < bytes.length; offset += decodeChunkBytes) {
+    chunks.push(decoder.decode(bytes.subarray(offset, offset + decodeChunkBytes), { stream: true }))
+  }
+  chunks.push(decoder.decode())
+  return joinDecodedChunks(chunks, bytes.byteLength)
+}
+
+function decodeUtf16(bytes: Uint8Array, encoding: 'utf16le' | 'utf16be') {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  const chunks: string[] = []
+  const units = new Uint16Array(8192)
+  const length = Math.floor(bytes.byteLength / 2)
+  for (let offset = 0; offset < length; offset += units.length) {
+    const count = Math.min(units.length, length - offset)
+    for (let index = 0; index < count; index += 1) {
+      units[index] = view.getUint16((offset + index) * 2, encoding === 'utf16le')
+    }
+    chunks.push(String.fromCharCode(...units.subarray(0, count)))
+  }
+  return joinDecodedChunks(chunks, length)
+}
+
+function joinDecodedChunks(chunks: readonly string[], sourceBytes: number) {
+  const expectedLength = chunks.reduce((length, chunk) => length + chunk.length, 0)
+  try {
+    const content = chunks.join('')
+    if (content.length === expectedLength && (sourceBytes === 0 || expectedLength > 0))
+      return content
+  } catch (cause) {
+    throw decodeCapacityError(sourceBytes, expectedLength, cause)
+  }
+  throw decodeCapacityError(sourceBytes, expectedLength)
+}
+
+function decodeCapacityError(sourceBytes: number, expectedLength: number, cause?: unknown) {
+  return createStructuredError({
+    code: 'FILE_DECODE_CAPACITY',
+    status: 413,
+    message: 'The file exceeds this app’s text capacity.',
+    why: 'The runtime could not retain the complete decoded file.',
+    fix: 'Open a smaller file or use a viewer that reads sections of the file.',
+    internal: { sourceBytes, expectedLength },
+    cause,
+  })
 }
 
 function encodingByBom(bytes: Uint8Array): TextEncodingLabel | null {

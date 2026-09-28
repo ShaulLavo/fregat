@@ -6,7 +6,7 @@ import { FsError, mapNodeError } from './errors'
 import { writeFileAtomic } from './atomic-write'
 import { statOptional, type MutationTarget } from './mutation-target'
 import { assertFile } from './stat'
-import { decodeText, isByteExactText } from './text-encoding'
+import { isByteExactText, isValidUtf8 } from '@workspace/contracts/text-encoding'
 import type { WriteBody } from './contracts'
 import { fileVersion, textFileVersion } from './version'
 
@@ -19,6 +19,12 @@ export async function writeTextFile(
   maxBytes: number,
 ) {
   try {
+    const size =
+      typeof body.content === 'string' ? Buffer.byteLength(body.content) : body.content.byteLength
+    if (size > maxBytes)
+      throw new FsError('FILE_TOO_LARGE', undefined, undefined, { internal: { size, maxBytes } })
+    if (typeof body.content !== 'string' && !isValidUtf8(body.content))
+      throw new FsError('LOSSY_WRITE_BLOCKED')
     const writePath = target.absolutePath
     const existing = await assertWritableTarget(writePath, {
       baseVersion: body.baseVersion,
@@ -77,8 +83,7 @@ async function assertByteExactTarget(absolutePath: string, stats: Stats, maxByte
 function targetVersion(bytes: Uint8Array, stats: Stats, baseVersion: string) {
   if (!baseVersion.startsWith('sha256:')) return fileVersion(stats)
 
-  // Safe to decode here: `assertByteExactTarget` has already proven these bytes are UTF-8.
-  return textFileVersion(decodeText(bytes).content)
+  return textFileVersion(bytes)
 }
 
 function temporaryPath(absolutePath: string) {

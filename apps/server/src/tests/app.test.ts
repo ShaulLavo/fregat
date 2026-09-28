@@ -1,3 +1,5 @@
+import { textWriteRequest } from '../../test/file-transport'
+import { readTextResponse } from '../../test/file-transport'
 import { randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, lstat, readFile, rm, symlink, truncate, writeFile } from 'node:fs/promises'
 import { hostname, tmpdir } from 'node:os'
@@ -184,7 +186,7 @@ describe('fs rpc filesystem limits', () => {
         headers: trustedOriginHeaders(),
       }),
     )
-    const result = (await response.json()) as Record<string, unknown>
+    const result = (await readTextResponse(response)) as Record<string, unknown>
 
     expect(response.status).toBe(200)
     expect(result).toMatchObject({
@@ -208,7 +210,7 @@ describe('fs rpc filesystem limits', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({
+    expect(await readTextResponse(response)).toMatchObject({
       content,
       size: Buffer.byteLength(content),
       version: textFileVersion(content),
@@ -226,7 +228,7 @@ describe('fs rpc filesystem limits', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({
+    expect(await readTextResponse(response)).toMatchObject({
       content: 'f\uFFFDo',
       encoding: 'utf8',
       lossy: true,
@@ -246,7 +248,7 @@ describe('fs rpc filesystem limits', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({
+    expect(await readTextResponse(response)).toMatchObject({
       content: 'left\0right',
       // Valid UTF-8 throughout, so the bytes still round-trip even though it looks binary.
       lossy: false,
@@ -279,7 +281,7 @@ describe('fs rpc filesystem limits', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({
+    expect(await readTextResponse(response)).toMatchObject({
       content: '\uFEFFhello',
       encoding: 'utf16le',
       // We only ever write UTF-8 back, so a UTF-16 source cannot round-trip through an edit.
@@ -301,7 +303,48 @@ describe('fs rpc filesystem limits', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({ seemsBinary: true, size: 1024 })
+    expect(await readTextResponse(response)).toMatchObject({ seemsBinary: true, size: 1024 })
+  })
+
+  it('hashes original malformed bytes and carries Unicode paths in headers', async () => {
+    const root = await fixtureRoot()
+    const name = 'שלום 文.txt'
+    const bytes = new Uint8Array([0x66, 0x80, 0x6f])
+    await writeFile(path.join(root, name), bytes)
+    const response = await testApp(root).handle(
+      new Request(`http://local/fs/read?path=${encodeURIComponent(name)}`, {
+        headers: trustedOriginHeaders(),
+      }),
+    )
+    expect(response.headers.get('content-type')).toBe('application/octet-stream')
+    expect(response.headers.get('x-fs-version')).toBe(textFileVersion(bytes))
+    expect(response.headers.get('x-fs-version')).not.toBe(textFileVersion('f�' + 'o'))
+    expect(await readTextResponse(response)).toMatchObject({ path: name, content: 'f�o', size: 3 })
+  })
+
+  it('saves raw UTF-8 BOMs and enforces the outgoing file size cap', async () => {
+    const root = await fixtureRoot()
+    const app = testApp(root, { maxTextFileBytes: 5 })
+    const content = '\uFEFFé'
+    const saved = await app.handle(
+      textWriteRequest('http://local/fs/write', {
+        method: 'POST',
+        headers: trustedOriginHeaders(),
+        body: { path: 'bom.txt', content },
+      }),
+    )
+    expect(saved.status).toBe(200)
+    expect(await readFile(path.join(root, 'bom.txt'))).toEqual(Buffer.from(content))
+    const refused = await app.handle(
+      textWriteRequest('http://local/fs/write', {
+        method: 'POST',
+        headers: trustedOriginHeaders(),
+        body: { path: 'bom.txt', content: content + 'a' },
+      }),
+    )
+    expect(refused.status).toBe(413)
+    expect(await errorCode(refused)).toBe('FILE_TOO_LARGE')
+    expect(await readFile(path.join(root, 'bom.txt'))).toEqual(Buffer.from(content))
   })
 
   it('refuses to overwrite a file whose bytes do not round-trip as UTF-8', async () => {
@@ -309,8 +352,8 @@ describe('fs rpc filesystem limits', () => {
     await writeFile(path.join(root, 'malformed.txt'), new Uint8Array([0x66, 0x80, 0x6f]))
     const app = testApp(root)
     const response = await app.handle(
-      new Request('http://local/fs/write', {
-        body: JSON.stringify({ content: 'f\uFFFDo', path: 'malformed.txt' }),
+      textWriteRequest('http://local/fs/write', {
+        body: { content: 'f\uFFFDo', path: 'malformed.txt' },
         headers: { ...trustedOriginHeaders(), 'content-type': 'application/json' },
         method: 'POST',
       }),
@@ -328,8 +371,8 @@ describe('fs rpc filesystem limits', () => {
     await writeFile(path.join(root, 'nul.txt'), 'left\0right')
     const app = testApp(root)
     const response = await app.handle(
-      new Request('http://local/fs/write', {
-        body: JSON.stringify({ content: 'edited', path: 'nul.txt' }),
+      textWriteRequest('http://local/fs/write', {
+        body: { content: 'edited', path: 'nul.txt' },
         headers: { ...trustedOriginHeaders(), 'content-type': 'application/json' },
         method: 'POST',
       }),
@@ -423,12 +466,12 @@ describe('fs rpc filesystem limits', () => {
     const root = await fixtureRoot()
     const app = testApp(root)
     const response = await app.handle(
-      new Request('http://local/fs/write', {
-        body: JSON.stringify({
+      textWriteRequest('http://local/fs/write', {
+        body: {
           baseVersion: textFileVersion('before'),
           content: 'after',
           path: 'missing.txt',
-        }),
+        },
         headers: trustedOriginHeaders({ 'content-type': 'application/json' }),
         method: 'POST',
       }),
@@ -499,15 +542,15 @@ describe('fs rpc filesystem limits', () => {
       }),
     )
     const written = await app.handle(
-      new Request('http://local/fs/write', {
-        body: JSON.stringify({ path: linkedPath, content: 'after' }),
+      textWriteRequest('http://local/fs/write', {
+        body: { path: linkedPath, content: 'after' },
         headers: trustedOriginHeaders({ 'content-type': 'application/json' }),
         method: 'POST',
       }),
     )
 
     expect(read.status).toBe(200)
-    expect(await read.json()).toMatchObject({
+    expect(await readTextResponse(read)).toMatchObject({
       content: 'before',
       path: linkedPath,
     })
@@ -779,8 +822,8 @@ describe('fs workspace edit rpc', () => {
     })
 
     const legacyWrite = await app.handle(
-      new Request('http://local/fs/write', {
-        body: JSON.stringify({ content: 'after abort', path: 'paused.txt' }),
+      textWriteRequest('http://local/fs/write', {
+        body: { content: 'after abort', path: 'paused.txt' },
         headers: trustedOriginHeaders({ 'content-type': 'application/json' }),
         method: 'POST',
       }),
@@ -862,8 +905,8 @@ describe('fs rpc events', () => {
     expect(await events.next()).toMatchObject({ type: 'ready' })
 
     const changed = app.handle(
-      new Request('http://local/fs/write', {
-        body: JSON.stringify({ path: 'file.txt', content: 'after' }),
+      textWriteRequest('http://local/fs/write', {
+        body: { path: 'file.txt', content: 'after' },
         headers: trustedOriginHeaders({ 'content-type': 'application/json' }),
         method: 'POST',
       }),

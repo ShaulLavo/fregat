@@ -117,7 +117,12 @@ test('newer resolution retries with the acknowledged base and finishes its secon
     const requests = fixture.transport.requests.filter(
       (request) => new URL(request.url).pathname === '/fs/write',
     )
-    const bodies = await Promise.all(requests.map((request) => request.json()))
+    const bodies = await Promise.all(
+      requests.map(async (request) => ({
+        baseVersion: new URL(request.url).searchParams.get('baseVersion'),
+        content: await request.text(),
+      })),
+    )
     expect(bodies).toHaveLength(2)
     expect(bodies[0].baseVersion).not.toBe(bodies[1].baseVersion)
     expect(bodies.map((body) => body.content)).toEqual(['merged text', 'merged textnew '])

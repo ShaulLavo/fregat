@@ -1,3 +1,4 @@
+import { readFilePreview } from '@workspace/client-core/files/read'
 import { writeFile } from 'node:fs/promises'
 import { act } from 'react'
 import { Application } from '@/components/application'
@@ -80,7 +81,11 @@ test('viewer jumps beyond its viewport, restores focus after prompts, and cannot
     expect(frame.captureCharFrame()).toContain('1 matches for source row 50')
     expect(frame.renderer.currentFocusedRenderable?.id).toBe('workbench-viewer')
     expect(
-      (await session.client.fs.read.get({ query: { path: 'sample.txt' } })).data,
+      await readFilePreview({
+        client: session.client,
+        path: 'sample.txt',
+        signal: new AbortController().signal,
+      }),
     ).toMatchObject({ content })
   } finally {
     session.dispose()

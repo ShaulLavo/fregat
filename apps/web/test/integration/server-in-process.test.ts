@@ -1,3 +1,4 @@
+import { readFilePreview } from '@workspace/client-core/files/read'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { WorkspaceSearchProviderSource, WorkspaceSearchQuery } from '@workspace/contracts'
@@ -25,9 +26,11 @@ test('health reports the real workspace root', async ({ client, server }) => {
 test('reads a file written to the real workspace', async ({ client, server }) => {
   await writeFile(path.join(server.root, 'hello.ts'), 'export const greeting = "hi"\n')
 
-  const { data, status } = await client.fs.read.get({ query: { path: 'hello.ts' } })
-
-  expect(status).toBe(200)
+  const data = await readFilePreview({
+    client,
+    path: 'hello.ts',
+    signal: new AbortController().signal,
+  })
   expect(JSON.stringify(data)).toContain('export const greeting')
 })
 

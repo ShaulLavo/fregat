@@ -6,7 +6,9 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./error-fields": "./src/error-fields.ts"
+    "./error-fields": "./src/error-fields.ts",
+    "./text-encoding": "./src/text-encoding.ts",
+    "./file-response": "./src/file-response.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",
@@ -17,6 +19,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@workspace/observability": "workspace:*",
     "@workspace/utils": "workspace:*",
     "culori": "^4.0.2",
     "minimatch": "^10.2.6",

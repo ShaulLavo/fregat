@@ -1,3 +1,4 @@
+import { readFilePreview } from '@workspace/client-core/files/read'
 import { readFile, readdir, writeFile } from 'node:fs/promises'
 import { createEnvironmentClient } from '@workspace/client-core/transport/client'
 import { commitWorkspaceEdits } from '@workspace/client-core/files/write'
@@ -52,8 +53,11 @@ for (const transition of ['commit', 'release'])
       headers: () => ({ origin: server.clientOrigin }),
       fetcher: loseNextWorkspaceEditResponse(server, `/fs/workspace-edit/${transition}`),
     })
-    const read = await client.fs.read.get({ query: { path: 'sample.ts' } })
-    if (!read.data) return expect.unreachable('Expected readable file')
+    const read = await readFilePreview({
+      client: client,
+      path: 'sample.ts',
+      signal: new AbortController().signal,
+    })
     const result = await commitWorkspaceEdits({
       client,
       rootPath: '',
@@ -63,7 +67,7 @@ for (const transition of ['commit', 'release'])
           index: 0,
           path: 'sample.ts',
           text: 'edited',
-          expected: { kind: 'snapshot', mtimeMs: read.data.mtimeMs, version: read.data.version },
+          expected: { kind: 'snapshot', mtimeMs: read.mtimeMs, version: read.version },
         },
       ],
       signal: new AbortController().signal,
@@ -83,8 +87,11 @@ test('a lost rolled-back commit response cannot turn failure into a successful s
     headers: () => ({ origin: server.clientOrigin }),
     fetcher: loseNextWorkspaceEditResponse(server, '/fs/workspace-edit/commit'),
   })
-  const read = await client.fs.read.get({ query: { path: 'sample.ts' } })
-  if (!read.data) return expect.unreachable('Expected readable file')
+  const read = await readFilePreview({
+    client: client,
+    path: 'sample.ts',
+    signal: new AbortController().signal,
+  })
   editFaults.failNextWrite('sample.ts')
   await expect(
     commitWorkspaceEdits({
@@ -96,7 +103,7 @@ test('a lost rolled-back commit response cannot turn failure into a successful s
           index: 0,
           path: 'sample.ts',
           text: 'edited',
-          expected: { kind: 'snapshot', mtimeMs: read.data.mtimeMs, version: read.data.version },
+          expected: { kind: 'snapshot', mtimeMs: read.mtimeMs, version: read.version },
         },
       ],
       signal: new AbortController().signal,
@@ -113,8 +120,11 @@ test('a lost prepare response aborts and releases the pending transaction', asyn
     headers: () => ({ origin: server.clientOrigin }),
     fetcher: loseNextWorkspaceEditResponse(server, '/fs/workspace-edit/prepare'),
   })
-  const read = await client.fs.read.get({ query: { path: 'sample.ts' } })
-  if (!read.data) return expect.unreachable('Expected readable file')
+  const read = await readFilePreview({
+    client: client,
+    path: 'sample.ts',
+    signal: new AbortController().signal,
+  })
   await expect(
     commitWorkspaceEdits({
       client,
@@ -125,7 +135,7 @@ test('a lost prepare response aborts and releases the pending transaction', asyn
           index: 0,
           path: 'sample.ts',
           text: 'edited',
-          expected: { kind: 'snapshot', mtimeMs: read.data.mtimeMs, version: read.data.version },
+          expected: { kind: 'snapshot', mtimeMs: read.mtimeMs, version: read.version },
         },
       ],
       signal: new AbortController().signal,

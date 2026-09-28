@@ -19,7 +19,7 @@ import { readDrives } from './drives'
 import { readUserPlaces } from './places'
 import { readProjectFolders } from './project-folders'
 import { readTree } from './tree'
-import { getBlobFile, readTextFile, readTextHead } from './read'
+import { getBlobFile, readFileBytes, readTextFile, readTextHead } from './read'
 import { writeTextFile } from './write'
 import { textFileVersion } from './version'
 import { AppWrites } from './app-writes'
@@ -380,6 +380,14 @@ export class FileSystemService {
     )
   }
 
+  readBytes(path: string, acceptTextOnly = false) {
+    return observeRequestOperation(
+      { area: 'fs', acceptTextOnly, operation: 'read', path },
+      () => readFileBytes(this.paths, path, this.maxTextFileBytes, { acceptTextOnly }),
+      (result) => ({ size: result.size }),
+    )
+  }
+
   blob(path: string) {
     return observeRequestOperation(
       { area: 'fs', operation: 'blob', path },
@@ -392,7 +400,10 @@ export class FileSystemService {
     return observeRequestOperation(
       {
         area: 'fs',
-        contentBytes: Buffer.byteLength(body.content, 'utf8'),
+        contentBytes:
+          typeof body.content === 'string'
+            ? Buffer.byteLength(body.content, 'utf8')
+            : body.content.byteLength,
         hasBaseVersion: body.baseVersion !== undefined,
         hasExpectedMtime: body.expectedMtimeMs !== undefined,
         operation: 'write',

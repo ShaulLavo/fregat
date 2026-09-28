@@ -1,3 +1,4 @@
+import { readFilePreview } from '@workspace/client-core/files/read'
 import { writeFile } from 'node:fs/promises'
 import { act } from 'react'
 import { test, expect } from '../../../test/fixtures'
@@ -178,7 +179,11 @@ test('hidden and offline viewers cannot launch the editor', async ({ server }) =
     await runPaletteCommand(frame, 'Edit file')
     expect(edits).toBe(0)
     expect(
-      (await fixture.session.client.fs.read.get({ query: { path: 'sample.txt' } })).data,
+      await readFilePreview({
+        client: fixture.session.client,
+        path: 'sample.txt',
+        signal: new AbortController().signal,
+      }),
     ).toMatchObject({ content: 'unchanged' })
   } finally {
     await fixture.cleanup()

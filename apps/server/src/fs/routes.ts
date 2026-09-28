@@ -1,3 +1,4 @@
+import { createFileResponse } from '@workspace/contracts/file-response'
 import { Elysia } from 'elysia'
 import {
   appWriteQuerySchema,
@@ -18,7 +19,7 @@ import {
   renameBodySchema,
   searchQuerySchema,
   treeQuerySchema,
-  writeBodySchema,
+  writeQuerySchema,
   workspaceEditPrepareBodySchema,
   workspaceEditRecoverBodySchema,
   workspaceEditHistoryQuerySchema,
@@ -51,9 +52,13 @@ export function fsRoutes(fs: FileSystemService) {
       .get('/head', ({ query }) => fs.head(query.path, query.maxBytes), {
         query: headQuerySchema,
       })
-      .get('/read', ({ query }) => fs.read(query.path, query.acceptTextOnly), {
-        query: readQuerySchema,
-      })
+      .get(
+        '/read',
+        async ({ query }) => textFileResponse(await fs.readBytes(query.path, query.acceptTextOnly)),
+        {
+          query: readQuerySchema,
+        },
+      )
       .get('/blob', async ({ query }) => fileResponse(await fs.blob(query.path)), {
         query: pathQuerySchema,
       })
@@ -120,9 +125,15 @@ export function fsRoutes(fs: FileSystemService) {
       .get('/workspace-address/:id', ({ params }) => fs.resolveWorkspaceAddress(params.id), {
         params: workspaceAddressParamsSchema,
       })
-      .post('/write', ({ body }) => fs.write(body), {
-        body: writeBodySchema,
-      })
+      .post(
+        '/write',
+        async ({ request, query }) =>
+          fs.write({ ...query, content: new Uint8Array(await request.arrayBuffer()) }),
+        {
+          parse: 'none',
+          query: writeQuerySchema,
+        },
+      )
       .post('/create-file', ({ body }) => fs.createFile(body), {
         body: createFileBodySchema,
       })
@@ -178,6 +189,10 @@ export function fsRoutes(fs: FileSystemService) {
           }),
       ),
   )
+}
+
+function textFileResponse(result: Awaited<ReturnType<FileSystemService['readBytes']>>) {
+  return createFileResponse(result.bytes, result)
 }
 
 type BlobFile = Awaited<ReturnType<FileSystemService['blob']>>

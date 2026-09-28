@@ -359,7 +359,8 @@ export async function writeFileContent(
     },
     async () => {
       const body = writeFileContentBody(path, content, writeOptions)
-      const response = await client.fs.write.post(body)
+      const { content: text, ...query } = body
+      const response = await client.fs.write.post(text, { query })
 
       if (response.error) throw createRpcError(response.error)
 

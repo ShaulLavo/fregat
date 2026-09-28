@@ -25,7 +25,7 @@ import type {
   WorkspaceResourcePrecondition,
   WorkspaceResourceType,
 } from '@workspace/contracts'
-import { isByteExactText } from './text-encoding'
+import { isByteExactText } from '@workspace/contracts/text-encoding'
 import { fileVersion } from './version'
 import { FsError } from './errors'
 import { fileOperationWriteId, isProvisionalWorkspaceEditState } from '@workspace/contracts'

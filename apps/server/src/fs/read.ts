@@ -1,8 +1,12 @@
-import { open, readFile, stat } from 'node:fs/promises'
+import { open, stat, type FileHandle } from 'node:fs/promises'
 import { FsError, mapNodeError } from './errors'
 import { resolveExistingPath, type WorkspacePaths } from './path'
 import { assertFile } from './stat'
-import { decodeText, type TextEncodingLabel } from './text-encoding'
+import {
+  detectTextEncoding,
+  decodeText,
+  type TextEncodingLabel,
+} from '@workspace/contracts/text-encoding'
 import { fileVersion, textFileVersion } from './version'
 
 export type ReadFileResult = {
@@ -40,31 +44,66 @@ export async function readTextFile(
   options: ReadTextFileOptions = {},
 ): Promise<ReadFileResult> {
   try {
-    const target = await resolveExistingPath(paths, input)
-    const stats = await stat(target.absolutePath)
-    assertFile(stats)
-    if (stats.size > maxBytes)
-      throw new FsError('FILE_TOO_LARGE', undefined, undefined, {
-        internal: { size: stats.size, maxBytes },
-      })
-    const bytes = await readFile(target.absolutePath)
-    const decoded = decodeText(bytes)
-    if (decoded.seemsBinary && options.acceptTextOnly) throw new FsError('FILE_IS_BINARY')
+    const { bytes, ...metadata } = await readFileBytes(paths, input, maxBytes, options)
+    return { ...metadata, ...decodeText(bytes) }
+  } catch (error) {
+    if (error instanceof FsError) throw error
+    throw mapNodeError(error)
+  }
+}
 
-    return {
-      path: target.relativePath,
-      content: decoded.content,
-      mtimeMs: stats.mtimeMs,
-      size: stats.size,
-      version: textFileVersion(decoded.content),
-      encoding: decoded.encoding,
-      lossy: decoded.lossy,
-      seemsBinary: decoded.seemsBinary,
+export async function readFileBytes(
+  paths: WorkspacePaths,
+  input: string,
+  maxBytes: number,
+  options: ReadTextFileOptions = {},
+) {
+  try {
+    const target = await resolveExistingPath(paths, input)
+    const handle = await open(target.absolutePath, 'r')
+    try {
+      return await readOpenedFileBytes(handle, target.relativePath, maxBytes, options)
+    } finally {
+      await handle.close()
     }
   } catch (error) {
     if (error instanceof FsError) throw error
     throw mapNodeError(error)
   }
+}
+
+async function readOpenedFileBytes(
+  handle: FileHandle,
+  path: string,
+  maxBytes: number,
+  options: ReadTextFileOptions,
+) {
+  const stats = await handle.stat()
+  assertFile(stats)
+  assertReadSize(stats.size, maxBytes)
+  const bytes = await handle.readFile()
+  assertReadSize(bytes.length, maxBytes)
+  const after = await handle.stat()
+  if (
+    after.size !== stats.size ||
+    after.mtimeMs !== stats.mtimeMs ||
+    after.ctimeMs !== stats.ctimeMs
+  )
+    throw new FsError('FILE_CHANGED')
+  if (options.acceptTextOnly && detectTextEncoding(bytes).seemsBinary)
+    throw new FsError('FILE_IS_BINARY')
+  return {
+    bytes,
+    path,
+    mtimeMs: stats.mtimeMs,
+    size: bytes.length,
+    version: textFileVersion(bytes),
+  }
+}
+
+function assertReadSize(size: number, maxBytes: number) {
+  if (size > maxBytes)
+    throw new FsError('FILE_TOO_LARGE', undefined, undefined, { internal: { size, maxBytes } })
 }
 
 export type TextHeadResult = {

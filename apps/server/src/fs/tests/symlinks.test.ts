@@ -1,3 +1,4 @@
+import { readTextResponse } from '../../../test/file-transport'
 import { mkdir, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect } from 'vitest'
@@ -41,7 +42,7 @@ test('browses directory links, reads file links, and retains broken links in lis
     type: 'symlink',
     targetType: 'file',
   })
-  expect(await (await request(app, '/fs/read?path=file-link')).json()).toMatchObject({
+  expect(await readTextResponse(await request(app, '/fs/read?path=file-link'))).toMatchObject({
     content: 'linked content',
   })
   expect(await (await request(app, '/fs/blob?path=file-link')).text()).toBe('linked content')
@@ -99,7 +100,9 @@ test('preserves the real containment boundary when the configured root is itself
     path: 'directory-link',
     entries: [expect.objectContaining({ path: 'directory-link/note.txt' })],
   })
-  expect(await (await request(app, '/fs/read?path=directory-link/note.txt')).json()).toMatchObject({
+  expect(
+    await readTextResponse(await request(app, '/fs/read?path=directory-link/note.txt')),
+  ).toMatchObject({
     content: 'inside content',
   })
   expect(await (await request(app, '/fs/stat?path=')).json()).toMatchObject({

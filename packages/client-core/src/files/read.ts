@@ -1,3 +1,4 @@
+import { decodeFileResponse } from '@workspace/contracts/file-response'
 import type { Client } from '../transport/client'
 import { createRpcError } from '../transport/rpc-error'
 import * as v from 'valibot'
@@ -37,13 +38,13 @@ export async function readFilePreview({
   path,
   signal,
 }: ReadOptions & { readonly acceptTextOnly?: boolean }) {
-  const { data, error } = await client.fs.read.get({
+  const { data, error, headers } = await client.fs.read.get({
     query: { acceptTextOnly, path },
     fetch: { signal },
   })
   if (error) throw createRpcError(error)
   signal.throwIfAborted()
-  return data
+  return decodeFileResponse(data, new Headers(headers))
 }
 
 export async function readEntry({ client, path, signal }: ReadOptions) {
