@@ -20,6 +20,21 @@ test.each([
   const body = JSON.stringify({ baseVersion: 'v'.repeat(64), content, path: 'a/b/file.txt' })
 
   expect(Buffer.byteLength(body, 'utf8')).toBeLessThanOrEqual(requestBodyLimit(MAX_TEXT_FILE_BYTES))
+  const didOpen = JSON.stringify({
+    jsonrpc: '2.0',
+    method: 'textDocument/didOpen',
+    params: {
+      textDocument: {
+        uri: 'file:///workspace/file.txt',
+        languageId: 'plaintext',
+        version: 1,
+        text: content,
+      },
+    },
+  })
+  expect(Buffer.byteLength(didOpen, 'utf8')).toBeLessThanOrEqual(
+    requestBodyLimit(MAX_TEXT_FILE_BYTES),
+  )
 })
 
 test('the server is built with the body limit its open limit implies', async () => {
@@ -32,6 +47,7 @@ test('the server is built with the body limit its open limit implies', async () 
       workspaceRoot: root,
     })
     expect(app.config.serve?.maxRequestBodySize).toBe(requestBodyLimit(MAX_TEXT_FILE_BYTES))
+    expect(app.config.websocket?.maxPayloadLength).toBe(requestBodyLimit(MAX_TEXT_FILE_BYTES))
   } finally {
     await closeTestApps()
     await rm(root, { force: true, recursive: true })

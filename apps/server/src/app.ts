@@ -523,6 +523,8 @@ export function createApp(options: AppOptions) {
   const app = new Elysia({
     name: 'platform',
     serve: { maxRequestBodySize: requestBodyLimit(fs.info().maxTextFileBytes) },
+    // LSP didOpen carries the complete document as JSON; Bun otherwise closes frames above 16 MiB.
+    websocket: { maxPayloadLength: requestBodyLimit(fs.info().maxTextFileBytes) },
   })
   applyObservability(app)
 
