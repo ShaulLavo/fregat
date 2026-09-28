@@ -33,6 +33,13 @@ Opening the rendered pane preserves the editor's selected style. Switching the
 editing style leaves the rendered pane open. All combinations use the same
 document and preserve selection and undo history.
 
+The owner chooses these behaviors through settings. Plain source is a full
+editing mode, available both alone and beside the rendered pane. Expose editing
+style and rendered-pane visibility independently, with defaults for file editing
+and composition plus per-document or per-composer overrides. A host may supply
+an initial default, but the user can change it. Register each setting with its
+consumer and describe the behavior plainly in Settings.
+
 The ambition is to exceed the reference products in correctness, interaction,
 polish and speed. Treat the references as experience benchmarks, not a requirement
 to clone their implementation or reproduce every unrelated product feature.
@@ -44,8 +51,8 @@ resolver, through the existing `tree-sitter-x` integration. A single parser
 implementation serves different document owners; this does not require sharing
 one mutable parser instance between unrelated documents or workers.
 
-Markdown source is the canonical content. Each host chooses its presentation and
-interaction policy. Switching presentation preserves the exact document, selection
+Markdown source is the canonical content. Each host applies the user's chosen
+presentation and interaction settings. Switching presentation preserves the exact document, selection
 and undo history. A rich editing mode needs real editing semantics for hidden
 syntax; merely hiding delimiters is not sufficient.
 

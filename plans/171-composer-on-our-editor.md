@@ -24,7 +24,8 @@ This plan's composer migration is one part of that direction.
 
 ### Authoring milestone (authorized 2026-09-28)
 
-The owner wants both source-revealing and visual editing, chosen by the host. Keep
+The owner wants plain source, source-revealing and visual editing, chosen through
+user-facing settings with composer defaults and per-composer overrides. Keep
 one Markdown buffer and undo history across presentations. Lexical remains until
 the composer acceptance checks pass. File-editor authoring can ship first.
 

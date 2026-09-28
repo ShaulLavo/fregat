@@ -15,6 +15,12 @@ visual) and a separate rendered-pane choice. Opening the pane preserves the
 editing style; changing the style preserves the pane, document, selection and
 undo history. Verify each style both alone and beside the rendered page.
 
+These choices are user-facing settings. Plain source remains available as a full
+editing mode. Provide defaults and per-document overrides for editing style and
+rendered-pane visibility independently; register settings with their consumers.
+Host defaults do not lock the user into a mode. Composer choices follow the same
+principle in Plan 171.
+
 Status: Phase 1 done (completion wave, lane L8, 2026-09-25): the mode setting
 `editor.markdownView` (default live preview, the behaviour before this plan; source; split),
 Cycle markdown view (per-document, in the palette and the editor title), the rendered pane
