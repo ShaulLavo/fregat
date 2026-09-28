@@ -12,7 +12,10 @@ import { createEditorFindPlugin } from '@singapore-editor/find'
 import { createFoldGutterPlugin } from '@singapore-editor/gutters/fold-gutter'
 import { createLineGutterPlugin } from '@singapore-editor/gutters/line-gutter'
 import { createMinimapPlugin } from '@singapore-editor/minimap'
-import { createMarkdownPreviewPlugin } from '@singapore-editor/markdown'
+import {
+  createMarkdownAuthoringPlugin,
+  createMarkdownPreviewPlugin,
+} from '@singapore-editor/markdown'
 import { createScopeLinesPlugin } from '@singapore-editor/scope-lines'
 import { createTreeSitterSyntaxPlugin } from '@singapore-editor/tree-sitter'
 import { subscribeActiveShikiTheme } from '@/features/editor/state/color-theme-store'
@@ -58,6 +61,7 @@ export function createCriticalEditorCorePlugins(
     !editorPerformanceFeatureDisabled('scope-lines')
   return [
     ...createEditorSyntaxHighlightingPlugins(languageId),
+    ...(languageId === 'markdown' ? [createMarkdownAuthoringPlugin()] : []),
     createLineGutterPlugin(),
     createFoldGutterPlugin({
       width: 16,

@@ -10,6 +10,7 @@ export type CommandWhen =
   | 'chatMode'
   | 'editorTarget'
   | 'editorWritable'
+  | 'editorMarkdown'
   | 'fileBackedTab'
   | 'fileOperationRedoable'
   | 'fileOperationUndoable'
@@ -85,6 +86,7 @@ export function defineEditorMetadata<const Id extends EditorCommandId>(
 ) {
   const when: CommandWhen[] = ['editorTarget']
   if (editorCommandMutates(command.id)) when.push('editorWritable')
+  if (command.id.startsWith('markdown.')) when.push('editorMarkdown')
   return {
     ...command,
     keys: command.keys?.map((key) => ({ pane: 'editor' as const, ...key })),

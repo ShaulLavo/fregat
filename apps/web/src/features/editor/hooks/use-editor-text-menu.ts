@@ -14,13 +14,14 @@ import { editorTextMenu } from '@/features/editor/utils/text-menu'
  * or the caret when the menu opened from the keyboard.
  */
 export function useEditorTextMenu(editor: Editor | null, offset: number | null) {
+  const markdown = editor?.getKeymapContext().markdown === true
   const spelling = editor?.getFeature(EDITOR_SPELLCHECK_FEATURE) ?? null
   const issue = spelling && offset !== null ? spelling.issueAt(offset) : null
   const suggestions = useQuery(spellingSuggestionsQueryOptions(spelling, issue))
   const hasWorkspace = useEditorWorkspaceState((state) => state.rootFolder !== null)
   const { setSpellingWord } = useSettingsActions()
 
-  if (!spelling || !issue) return editorTextMenu()
+  if (!spelling || !issue) return editorTextMenu(null, markdown)
   return editorTextMenu(
     spellingMenuSection({
       word: issue.word,
@@ -29,5 +30,6 @@ export function useEditorTextMenu(editor: Editor | null, offset: number | null) 
       replace: (word) => spelling.replace(issue.start, word),
       accept: (target) => setSpellingWord(issue.word, true, target),
     }),
+    markdown,
   )
 }

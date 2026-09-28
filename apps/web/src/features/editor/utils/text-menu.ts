@@ -18,7 +18,13 @@ import {
   PencilSimpleIcon,
 } from '@phosphor-icons/react'
 
-import { commandItem, section, type Menu, type MenuSection } from '@/keymap/menus/utils/model'
+import {
+  commandItem,
+  section,
+  submenuItem,
+  type Menu,
+  type MenuSection,
+} from '@/keymap/menus/utils/model'
 
 /**
  * The menu for a right-click inside editor text.
@@ -35,9 +41,35 @@ import { commandItem, section, type Menu, type MenuSection } from '@/keymap/menu
  * menu a mirror of the keyboard shortcuts at that moment. The one exception is
  * `spelling`, which the caller builds for the word under the pointer.
  */
-export function editorTextMenu(spelling: MenuSection | null = null): Menu {
+export function editorTextMenu(spelling: MenuSection | null = null, markdown = false): Menu {
   return [
     ...(spelling ? [spelling] : []),
+    ...(markdown
+      ? [
+          section('markdown', [
+            submenuItem({
+              id: 'markdown',
+              label: 'Markdown',
+              sections: [
+                section('format', [
+                  commandItem('editor.markdown.bold'),
+                  commandItem('editor.markdown.italic'),
+                  commandItem('editor.markdown.strikethrough'),
+                  commandItem('editor.markdown.code'),
+                  commandItem('editor.markdown.link'),
+                  commandItem('editor.markdown.heading'),
+                  commandItem('editor.markdown.bulletList'),
+                  commandItem('editor.markdown.orderedList'),
+                  commandItem('editor.markdown.taskList'),
+                  commandItem('editor.markdown.toggleTask'),
+                  commandItem('editor.markdown.quote'),
+                  commandItem('editor.markdown.codeBlock'),
+                ]),
+              ],
+            }),
+          ]),
+        ]
+      : []),
     section('navigate', [
       commandItem('editor.goToDefinition', {
         icon: ArrowSquareOutIcon,

@@ -20,8 +20,7 @@ Support all of these, chosen for the place the user is working:
 
 Owner clarification, 2026-09-28: the StackEdit-inspired target combines
 Obsidian-style source-revealing editing on the left with a fully rendered page on
-the right. Our current plain-source split view does not yet provide that
-combination. This describes the desired experience, not a claim that StackEdit
+the right. The file editor supports that combination, alongside plain source with a rendered pane. This describes the desired experience, not a claim that StackEdit
 and Obsidian have identical editing semantics.
 
 Editing style and layout are independent choices:
@@ -78,12 +77,16 @@ fences and variable-height content.
 As inspected on 2026-09-28, Platform already renders complete Markdown through
 `packages/markdown`, and the file editor has a source/rendered split view with
 workspace links, images, themed code fences and two-way scroll synchronization.
-That split currently uses plain source on the left. Source-revealing live preview
-is a separate mode; combining it with the rendered pane remains work to do.
+Editing style and rendered-pane visibility now have independent settings and
+per-document overrides. Plain source and source-revealing editing both work beside
+the rendered page. Shared authoring commands cover marks, links, headings, lists,
+tasks, quotes and fences; visual rich-text interaction remains to be built.
 The UI is in `apps/web/src/features/workbench/components/markdown-preview-pane.tsx`;
 `scripts/agent/scenarios/markdown-split-view.ts` exercises the split workflow.
-This is source inspection and existing verification coverage, not a fresh live
-verification of those behaviors.
+Fresh browser checks on 2026-09-28 covered editing, saves, undo/redo, source
+clipboard content, both split combinations, links, images and synchronized scrolling.
+Evidence: `/work/tmp/fregat-evidence/20260928T172154Z-scenario-markdown-authoring/`
+and `/work/tmp/fregat-evidence/20260928T172221Z-scenario-markdown-split-view/`.
 
 [StackEdit's feature page](https://stackedit.io/), inspected 2026-09-28, documents
 formatting buttons and shortcuts plus linked scrolling between editor and preview.

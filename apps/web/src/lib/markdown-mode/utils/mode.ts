@@ -1,6 +1,6 @@
-export type MarkdownView = 'preview' | 'source' | 'split'
+export type MarkdownView = 'preview' | 'source'
 
-const ORDER: readonly MarkdownView[] = ['preview', 'split', 'source']
+const ORDER: readonly MarkdownView[] = ['preview', 'source']
 
 export function nextMarkdownView(view: MarkdownView): MarkdownView {
   return ORDER[(ORDER.indexOf(view) + 1) % ORDER.length]!

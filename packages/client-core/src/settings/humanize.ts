@@ -52,7 +52,6 @@ export function settingsDiagnosticLabel(kind: SettingsDiagnostic['kind']) {
 }
 
 function markdownViewTitle(value: string) {
-  if (value === 'split') return 'Source and rendered'
-  if (value === 'source') return 'Source'
+  if (value === 'source') return 'Plain source'
   return 'Live preview'
 }

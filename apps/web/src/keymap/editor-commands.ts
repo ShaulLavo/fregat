@@ -23,6 +23,19 @@ import {
 } from '@phosphor-icons/react'
 
 export const editorCommands = [
+  { ...editorCommandMetadata['markdown.bold'] },
+  { ...editorCommandMetadata['markdown.italic'] },
+  { ...editorCommandMetadata['markdown.strikethrough'] },
+  { ...editorCommandMetadata['markdown.code'] },
+  { ...editorCommandMetadata['markdown.link'] },
+  { ...editorCommandMetadata['markdown.heading'] },
+  { ...editorCommandMetadata['markdown.bulletList'] },
+  { ...editorCommandMetadata['markdown.orderedList'] },
+  { ...editorCommandMetadata['markdown.taskList'] },
+  { ...editorCommandMetadata['markdown.toggleTask'] },
+  { ...editorCommandMetadata['markdown.quote'] },
+  { ...editorCommandMetadata['markdown.codeBlock'] },
+
   { ...editorCommandMetadata['undo'], icon: ArrowArcLeftIcon },
   { ...editorCommandMetadata['redo'], icon: ArrowArcRightIcon },
   { ...editorCommandMetadata['find'], icon: MagnifyingGlassIcon },

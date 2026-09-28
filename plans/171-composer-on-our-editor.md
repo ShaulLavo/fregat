@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: FOUNDATIONS IMPLEMENTED; AUTHORING MILESTONE NEXT, refreshed 2026-09-28.
+- Status: AUTHORING COMMANDS IMPLEMENTED; VISUAL EDITING AND COMPOSER NEXT, refreshed 2026-09-28.
   Phase 1 landed 2026-09-26. Word-boundary and proportional-font wrap landed in
   [E052](../../Editor/plans/e052-proportional-font-extents.md#as-landed-2026-09-26).
   Spellcheck exists in the Editor and Platform file editor; composer wiring remains.
@@ -29,13 +29,31 @@ user-facing settings with composer defaults and per-composer overrides. Keep
 one Markdown buffer and undo history across presentations. Lexical remains until
 the composer acceptance checks pass. File-editor authoring can ship first.
 
-- [ ] Add reusable selection formatting, links, block formatting and task commands.
-- [ ] Expose authoring through the file editor's commands and context menu.
+- [x] Add reusable selection formatting, links, block formatting and task commands.
+- [x] Expose authoring through the file editor's commands and context menu.
 - [ ] Support host-selected source-revealing and visual presentation; verify switching
       preserves text, selection and undo history.
-- [ ] Verify formatting, lists, tasks, links, fences, copy/paste and undo through real
+- [x] Verify formatting, lists, tasks, links, fences, copy/paste and undo through real
       user interactions, in source and preview presentations.
 - [ ] Run focused checks, inspect browser evidence, commit, push and deploy.
+
+Verification: 53 Markdown tests, 13 core keymap tests, 27 Platform command/menu
+tests, web typecheck, formatting and Platform gates pass. Editor health passes its
+full-text and command-reference checks but fails its existing document-analysis
+public API inventory mismatch; that baseline was left for its owning work.
+
+The first authoring slice adds twelve Editor commands, parser-aware mark/link edits,
+list indentation, keyboard shortcuts and the file-editor context menu. Editing style
+(`editor.markdownView`) and rendered-page visibility (`editor.markdownRenderedPane`)
+are independent settings with per-document overrides. The preview now subscribes
+to immutable text snapshots so the React Compiler observes edits.
+
+Browser evidence is recorded in [Markdown experiences](../docs/markdown-experiences.md).
+The save scenario waits for rendered edits before its next save. Existing workspace
+mutation exclusion can decline a second Save while the preceding save still owns
+its reservation; file-on-disk completion alone does not mean that reservation is released.
+Always-visual interaction, mixed-format rich selections, tables/images and actual
+composer acceptance remain open.
 
 The composer swap additionally requires mention interaction, draft restoration,
 attachments, IME, narrow widths and spellcheck in the actual composer. Rendered

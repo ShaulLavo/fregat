@@ -498,13 +498,24 @@ export const workspaceCommandMetadata = {
   'workspace.cycleMarkdownView': defineMetadata({
     category: 'Editor',
     description:
-      'Show this markdown file as live preview, source beside a rendered view, or source, in turn.',
+      'Switch this Markdown file between plain source and source-revealing live preview, keeping the rendered pane as it is.',
     id: 'workspace.cycleMarkdownView',
     execution: 'sync',
     target: 'workspace',
     undoCategory: 'view-only',
     when: ['fileBackedTab'],
     title: 'Cycle markdown view',
+  }),
+  'workspace.toggleMarkdownRenderedPane': defineMetadata({
+    category: 'Editor',
+    description:
+      'Show or hide the rendered page beside this Markdown editor, keeping its editing style.',
+    id: 'workspace.toggleMarkdownRenderedPane',
+    execution: 'sync',
+    target: 'workspace',
+    undoCategory: 'view-only',
+    when: ['fileBackedTab'],
+    title: 'Toggle Markdown rendered pane',
   }),
   'workspace.showSpellingSuggestions': defineMetadata({
     category: 'Editor',

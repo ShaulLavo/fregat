@@ -78,3 +78,24 @@ test('takes editor availability and writability from the resolved target', () =>
   ).toBe(commandWhenDisabledReasons.editorWritable)
   expect(commandWhenDisabledReason(['editorWritable'], searchSnapshot, editorTarget)).toBeNull()
 })
+
+test('Markdown commands require the resolved editor Markdown context', () => {
+  expect(commandWhenDisabledReason(['editorMarkdown'], enabledSnapshot, editorTarget)).toBe(
+    commandWhenDisabledReasons.editorMarkdown,
+  )
+  expect(commandWhenDisabledReason(['editorMarkdown'], enabledSnapshot, workspaceTarget)).toBe(
+    commandWhenDisabledReasons.editorMarkdown,
+  )
+  expect(
+    commandWhenDisabledReason(['editorMarkdown'], enabledSnapshot, {
+      ...editorTarget,
+      keymapContext: {
+        markdown: true,
+        writable: true,
+        hasSelection: false,
+        tabFocusMode: false,
+        inlineSuggestionVisible: false,
+      },
+    }),
+  ).toBeNull()
+})

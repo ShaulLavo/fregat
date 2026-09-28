@@ -38,6 +38,7 @@ const EDITOR_TITLE_ACTIONS: readonly EditorTitleAction[] = [
   { command: 'editor.merge-conflict.next', when: ({ tab }) => tab.mergeConflicts },
   { command: 'workspace.toggleDiffViewMode', present: diffViewModeToggle, when: isDiffTab },
   { command: 'workspace.cycleMarkdownView', when: isMarkdownFileTab },
+  { command: 'workspace.toggleMarkdownRenderedPane', when: isMarkdownFileTab },
 ]
 
 export function editorTitleActions(

@@ -50,6 +50,7 @@
     "editor.history.retainedStates",
     "editor.inputRoute",
     "editor.lineHeight",
+    "editor.markdownRenderedPane",
     "editor.markdownView",
     "editor.minimap.enabled",
     "editor.retainedTextBudget",

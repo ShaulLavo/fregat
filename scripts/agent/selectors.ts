@@ -715,6 +715,7 @@ export const selectors = {
   comparisonRowsSelector: '.editor-diff-pane [data-editor-virtual-row]',
   selectedComparisonTabSelector: '[data-editor-tab-id][aria-selected="true"]',
   diffRows: (page: Page) => page.locator('.editor-diff-pane [data-editor-virtual-row]'),
+  diffScrollerSelector: '.editor-virtualized',
   diffPanes: (page: Page) => page.locator(diffPaneSelector),
   diffExpandRows: (page: Page) => page.locator('.editor-diff-pane .editor-diff-row-expandable'),
   diffPartialNotice: (page: Page) =>
@@ -724,6 +725,7 @@ export const selectors = {
       .getByRole('button', { name: 'Ask the agent about these lines', exact: true })
       .locator('xpath=preceding-sibling::span'),
   editorRows: (page: Page) => page.locator('.editor-virtualized-row'),
+  markdownRenderedPane: (page: Page) => page.locator('[data-markdown-preview]'),
   editorCursorLineRow: (page: Page) => page.locator('.editor-virtualized-cursor-line-row:visible'),
   editorTabNamed: (page: Page, label: RegExp) =>
     page.locator('[data-editor-tab-path]').filter({ hasText: label }),
@@ -1003,6 +1005,10 @@ export const selectors = {
   focusedTreeRow: (page: Page) =>
     page.getByLabel('Folder tree', { exact: true }).locator('[role="treeitem"][tabindex="0"]'),
   editorInput: (page: Page) => page.getByRole('textbox', { name: 'Editor input' }),
+  writableEditorInput: (page: Page) =>
+    page
+      .getByRole('textbox', { name: 'Editor input' })
+      .and(page.locator('[aria-readonly="false"]')),
   problemsTree: (page: Page) => page.getByRole('tree', { name: 'Problems', exact: true }),
   problemsSettled: (page: Page) =>
     page.getByText(/^(No problems reported|No diagnostics received|Diagnostics unavailable)$/),

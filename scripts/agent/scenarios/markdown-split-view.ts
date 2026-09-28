@@ -39,7 +39,7 @@ function preview(page: Page) {
 export const markdownSplitView: Scenario = {
   name: 'markdown-split-view',
   description:
-    'Cycle a markdown file to source beside a rendered view: headings render, scrolling either side follows the other through a 100-line fence, workspace links open and images load; cycling on returns to source only.',
+    'Open a rendered pane beside Markdown editing: headings render, scrolling either side follows the other through a 100-line fence, workspace links open and images load; closing the pane preserves the editor.',
   async run(page, { step }) {
     const fixture = await mkdtemp(scratchPath('fregat-markdown-split-'))
     try {
@@ -50,7 +50,7 @@ export const markdownSplitView: Scenario = {
       await openFixtureWorkspace(page, fixture)
       await openFileFromTree(page, 'guide.md')
 
-      await runPaletteCommand(page, 'Cycle markdown view')
+      await runPaletteCommand(page, 'Toggle Markdown rendered pane')
       await preview(page).getByRole('heading', { name: 'Guide', level: 1 }).waitFor()
       await page
         .locator('[data-markdown-preview] img')
@@ -106,7 +106,7 @@ export const markdownSplitView: Scenario = {
       await step('link-opens-file')
 
       await selectors.editorTab(page, path.join(fixture, 'guide.md').slice(1)).click()
-      await runPaletteCommand(page, 'Cycle markdown view')
+      await runPaletteCommand(page, 'Toggle Markdown rendered pane')
       await page.locator('[data-markdown-preview]').waitFor({ state: 'detached' })
       strictEqual(await page.locator('[data-markdown-preview]').count(), 0)
       await step('source-only')

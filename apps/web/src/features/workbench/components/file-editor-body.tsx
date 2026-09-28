@@ -3,7 +3,7 @@ import { documentKey } from '@/lib/documents/utils/identity'
 import { MarkdownPreviewPane } from '@/features/workbench/components/markdown-preview-pane'
 import { createMarkdownScrollSync } from '@/features/workbench/state/markdown-scroll-sync'
 import { fileBodyGridClass } from '@/features/workbench/utils/file-body-grid'
-import { useMarkdownView } from '@/lib/markdown-mode/hooks/use-markdown-view'
+import { useMarkdownRenderedPane } from '@/lib/markdown-mode/hooks/use-markdown-rendered-pane'
 import { isMarkdownPath } from '@/lib/markdown-mode/utils/mode'
 import { filesystemResource } from '@/lib/documents/utils/capabilities'
 import type { FilesystemPath, StandaloneDocumentRef, TabId } from '@/lib/documents/utils/types'
@@ -84,12 +84,9 @@ export function FileEditorBody({
     theme: { appliedThemeId, committedThemeId, selectedThemeId },
   })
 
-  const markdownView = useMarkdownView(key)
+  const renderedPane = useMarkdownRenderedPane(key)
   const splitMarkdown =
-    markdownView === 'split' &&
-    editorDocument !== null &&
-    resource !== null &&
-    isMarkdownPath(resource.path)
+    renderedPane && editorDocument !== null && resource !== null && isMarkdownPath(resource.path)
   const [scrollSync] = useState(createMarkdownScrollSync)
   // Manual memo: plugin identity is the editor's registration lifetime; a new array re-registers
   // every plugin on each render.

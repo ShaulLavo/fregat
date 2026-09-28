@@ -8,7 +8,8 @@ import type { MarkdownView } from '@/lib/markdown-mode/utils/mode'
  */
 export const useMarkdownViewOverrides = create<{
   readonly views: Readonly<Record<string, MarkdownView>>
-}>(() => ({ views: {} }))
+  readonly renderedPanes: Readonly<Record<string, boolean>>
+}>(() => ({ views: {}, renderedPanes: {} }))
 
 export function setMarkdownViewOverride(documentKey: string, view: MarkdownView) {
   useMarkdownViewOverrides.setState((state) => ({ views: { ...state.views, [documentKey]: view } }))
@@ -16,4 +17,14 @@ export function setMarkdownViewOverride(documentKey: string, view: MarkdownView)
 
 export function markdownViewOverride(documentKey: string): MarkdownView | undefined {
   return useMarkdownViewOverrides.getState().views[documentKey]
+}
+
+export function setMarkdownRenderedPaneOverride(documentKey: string, visible: boolean) {
+  useMarkdownViewOverrides.setState((state) => ({
+    renderedPanes: { ...state.renderedPanes, [documentKey]: visible },
+  }))
+}
+
+export function markdownRenderedPaneOverride(documentKey: string): boolean | undefined {
+  return useMarkdownViewOverrides.getState().renderedPanes[documentKey]
 }

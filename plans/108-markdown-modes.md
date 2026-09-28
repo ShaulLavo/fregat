@@ -1,5 +1,11 @@
 # Two markdown modes: split view and live preview
 
+2026-09-28 implementation update: editing style (`source` or `preview`) and the
+rendered pane now have independent settings and per-document overrides. Both
+styles work beside the live rendered page, verified by `markdown-authoring` and
+`markdown-split-view`. Visual rich-text editing and block widgets remain open.
+The historical three-way mode model below is superseded by these independent choices.
+
 Owner direction, 2026-09-28: support both visual rich-text authoring and
 source-revealing authoring, selected by the host, alongside source and split
 views. [Markdown experiences](../docs/markdown-experiences.md) defines the product

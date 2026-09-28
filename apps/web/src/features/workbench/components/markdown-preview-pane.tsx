@@ -3,14 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Markdown, type MarkdownComponents } from '@workspace/markdown/components/markdown'
 import { CodeHighlighterContext } from '@workspace/markdown/providers/code-highlighter-context'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
-import {
-  useCallback,
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useRef,
-  useSyncExternalStore,
-} from 'react'
+import { useCallback, useDeferredValue, useEffect, useRef, useSyncExternalStore } from 'react'
 
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { MarkdownPreviewBlock } from '@/features/workbench/components/markdown-preview-block'
@@ -64,10 +57,9 @@ export function MarkdownPreviewPane({
 }) {
   // Manual memo: useSyncExternalStore resubscribes whenever `subscribe` changes identity.
   const subscribe = useCallback((listener: () => void) => buffer.subscribe(listener), [buffer])
-  const revision = useSyncExternalStore(subscribe, () => buffer.getRevision())
-  const deferredRevision = useDeferredValue(revision)
-  // Manual memo: the buffer mutates in place, so its revision is what says the text changed.
-  const text = useMemo(() => buffer.materializeFullText(), [buffer, deferredRevision])
+  const snapshot = useSyncExternalStore(subscribe, () => buffer.getTextSnapshot())
+  const deferredSnapshot = useDeferredValue(snapshot)
+  const text = deferredSnapshot.readRange(0, deferredSnapshot.length)
   const highlighter = useCodeHighlighter()
   const origin = serverEndpoint(originForQueryClient(useQueryClient()))
   const commands = useEditorCommands()

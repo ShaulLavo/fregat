@@ -115,6 +115,19 @@ const ASYNC_COMMAND_IDS = [
 ] as const satisfies readonly PlatformCommandId[]
 
 const TEXT_EDIT_COMMAND_IDS = [
+  'editor.markdown.bold',
+  'editor.markdown.italic',
+  'editor.markdown.strikethrough',
+  'editor.markdown.code',
+  'editor.markdown.link',
+  'editor.markdown.heading',
+  'editor.markdown.bulletList',
+  'editor.markdown.orderedList',
+  'editor.markdown.taskList',
+  'editor.markdown.toggleTask',
+  'editor.markdown.quote',
+  'editor.markdown.codeBlock',
+
   'workspace.historyBack',
   'workspace.historyForward',
   'editor.undo',
@@ -194,6 +207,7 @@ const WORKSPACE_OPERATION_COMMAND_IDS = [
 
 const FILE_BACKED_COMMAND_IDS = [
   'workspace.cycleMarkdownView',
+  'workspace.toggleMarkdownRenderedPane',
   'workspace.showSpellingSuggestions',
   'workspace.addSelectionToChat',
   'workspace.addFileToChat',
@@ -298,6 +312,7 @@ describe('command table', () => {
       const mutates = editorId !== null && editorCommandMutates(editorId)
       expect(command.undoCategory).toBe(mutates ? 'text-edit' : 'view-only')
       const when = mutates ? ['editorTarget', 'editorWritable'] : ['editorTarget']
+      if (command.id.startsWith('editor.markdown.')) when.push('editorMarkdown')
       expect({ id: command.id, when: command.when }).toEqual({
         id: command.id,
         when,

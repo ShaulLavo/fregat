@@ -361,11 +361,16 @@
       "minimum": 8,
       "type": "integer"
     },
+    "editor.markdownRenderedPane": {
+      "default": false,
+      "description": "Show a fully rendered page beside the Markdown editor, with synchronized scrolling. Works with either editing style.",
+      "type": "boolean"
+    },
     "editor.markdownView": {
       "default": "preview",
-      "description": "How markdown files open: source text, source beside a rendered view, or rendered in place while you edit. Cycle markdown view changes one file.",
-      "enum": ["preview", "source", "split"],
-      "markdownDescription": "How markdown files open: source text, source beside a rendered view, or rendered in place while you edit. Cycle markdown view changes one file.\n\nLive preview draws markdown from tree-sitter's markdown captures, so with syntax highlighting off a file shows as source. Split view renders with the chat's markdown renderer.",
+      "description": "Edit Markdown as plain source or source-revealing live preview. Cycle markdown view changes one file.",
+      "enum": ["preview", "source"],
+      "markdownDescription": "Edit Markdown as plain source or source-revealing live preview. Cycle markdown view changes one file.\n\nLive preview formats Markdown in place and reveals syntax near the caret. Plain source keeps Markdown syntax visible. The rendered side pane is a separate setting.",
       "type": "string"
     },
     "editor.minimap.enabled": {

@@ -39,6 +39,7 @@ const MIRRORED_KEYS = [
   'editor.codeTheme.dark',
   'editor.codeTheme.light',
   'editor.markdownView',
+  'editor.markdownRenderedPane',
   'environments.machines',
   'editor.decode.mode',
   'editor.diff.viewMode',

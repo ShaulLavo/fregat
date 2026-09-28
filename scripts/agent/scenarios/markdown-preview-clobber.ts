@@ -30,7 +30,7 @@ export const markdownPreviewClobber: Scenario = {
       await writeFile(path.join(fixture, 'readme.md'), README)
       await openFixtureWorkspace(page, fixture)
       await openFileFromTree(page, 'readme.md')
-      await runPaletteCommand(page, 'Cycle markdown view')
+      await runPaletteCommand(page, 'Toggle Markdown rendered pane')
       await page.locator('[data-markdown-preview] h1').waitFor()
       await page.locator('[data-markdown-preview] img').waitFor({ state: 'attached' })
       await step('preview')

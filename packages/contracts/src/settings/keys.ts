@@ -751,16 +751,27 @@ export const SETTINGS_REGISTRY = {
     keywords: ['undo', 'history', 'storage', 'budget', 'persist'],
   }),
   'editor.markdownView': defineSetting({
-    schema: v.picklist(['source', 'split', 'preview'] as const),
+    schema: v.picklist(['source', 'preview'] as const),
     default: 'preview',
     scope: 'window',
     widget: 'enum',
     category: 'Editor',
-    title: 'Markdown view',
+    title: 'Markdown editing style',
     details:
-      "Live preview draws markdown from tree-sitter's markdown captures, so with syntax highlighting off a file shows as source. Split view renders with the chat's markdown renderer.",
+      'Live preview formats Markdown in place and reveals syntax near the caret. Plain source keeps Markdown syntax visible. The rendered side pane is a separate setting.',
     description:
-      'How markdown files open: source text, source beside a rendered view, or rendered in place while you edit. Cycle markdown view changes one file.',
+      'Edit Markdown as plain source or source-revealing live preview. Cycle markdown view changes one file.',
+    keywords: ['markdown', 'preview', 'split', 'render'],
+  }),
+  'editor.markdownRenderedPane': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    scope: 'window',
+    widget: 'boolean',
+    category: 'Editor',
+    title: 'Markdown rendered side pane',
+    description:
+      'Show a fully rendered page beside the Markdown editor, with synchronized scrolling. Works with either editing style.',
     keywords: ['markdown', 'preview', 'split', 'render'],
   }),
   'editor.spellcheck': defineSetting({

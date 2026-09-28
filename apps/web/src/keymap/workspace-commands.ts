@@ -19,6 +19,7 @@ import {
   PlayIcon,
   ClockCounterClockwiseIcon,
   CommandIcon,
+  ColumnsIcon,
   CrosshairIcon,
   DesktopIcon,
   DownloadSimpleIcon,
@@ -85,7 +86,12 @@ import type { EditorDocumentStoreApi } from '@/features/editor/state/document-st
 import { nextEditorDiffViewMode } from '@/features/editor/utils/diff-view-mode'
 import { commitMessageFilePath } from '@/keymap/utils/commit-message-file'
 import { focusInsideSidebar } from '@/keymap/utils/sidebar-focus'
-import { markdownViewOverride, setMarkdownViewOverride } from '@/lib/markdown-mode/state/overrides'
+import {
+  markdownViewOverride,
+  setMarkdownViewOverride,
+  markdownRenderedPaneOverride,
+  setMarkdownRenderedPaneOverride,
+} from '@/lib/markdown-mode/state/overrides'
 import { isMarkdownPath, nextMarkdownView } from '@/lib/markdown-mode/utils/mode'
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import { selectionPrompt, type SelectedLines } from '@/keymap/utils/selection-prompt'
@@ -1050,6 +1056,20 @@ export const workspaceCommands = [
     run: ({ runtime, snapshot }) => {
       if (!snapshot.activeTabId) return declined
       runtime.editorUi.getState().requestTextMenu(snapshot.activeTabId)
+      return handled
+    },
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.toggleMarkdownRenderedPane'],
+    icon: ColumnsIcon,
+    run: ({ snapshot }) => {
+      const document = snapshot.activeDocument
+      const path = filesystemResource(document)?.path
+      if (!document || !path || !isMarkdownPath(path)) return declined
+      const key = documentKey(document)
+      const current =
+        markdownRenderedPaneOverride(key) ?? readSettingsMirror()['editor.markdownRenderedPane']
+      setMarkdownRenderedPaneOverride(key, !current)
       return handled
     },
   }),

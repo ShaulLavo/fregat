@@ -34,12 +34,14 @@ export type CommandWhenSnapshot = {
 export type CommandWhenTarget = {
   readonly kind: CommandTargetKind
   readonly writable?: boolean
+  readonly keymapContext?: EditorKeymapContext | null
 }
 
 export const commandWhenDisabledReasons = {
   chatMode: 'Chat mode is not active.',
   editorTarget: 'No text editor is active.',
   editorWritable: 'The active editor is read-only.',
+  editorMarkdown: 'Select a Markdown editor.',
   fileBackedTab: 'No file-backed surface is active.',
   fileOperationRedoable: 'No file operation can be redone.',
   fileOperationUndoable: 'No file operation can be undone.',
@@ -81,6 +83,11 @@ function conditionDisabledReason(
     return target.kind === 'editor' && target.writable
       ? null
       : commandWhenDisabledReasons.editorWritable
+  }
+  if (condition === 'editorMarkdown') {
+    return target.kind === 'editor' && target.keymapContext?.markdown
+      ? null
+      : commandWhenDisabledReasons.editorMarkdown
   }
   if (condition === 'fileBackedTab') {
     return filesystemResource(snapshot.activeDocument)
