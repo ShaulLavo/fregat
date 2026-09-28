@@ -78,6 +78,12 @@ import { createTreeSitterWorkerBackend, type TreeSitterBackend } from './treeSit
 
 export type TreeSitterSyntaxProviderOptions = {
   readonly backend?: TreeSitterBackend
+  /**
+   * Languages to compile ahead of their first document, read each time a document's first parse
+   * answers, so the host's set can change (a workspace switch) and paint is never delayed. Each is
+   * compiled once with its injection closure; unknown ids and load failures are skipped.
+   */
+  readonly warmLanguages?: () => readonly TreeSitterLanguageId[]
 }
 
 export type TreeSitterSyntaxProvider = EditorSyntaxProvider &
@@ -86,12 +92,6 @@ export type TreeSitterSyntaxProvider = EditorSyntaxProvider &
       contribution: TreeSitterLanguageContribution,
       options?: TreeSitterLanguageRegistrationOptions,
     ): TreeSitterLanguageDisposable
-    /**
-     * Starts the worker and compiles each language with its injection closure, so the first
-     * document of a warmed language pays none of it. Never rejects: unknown ids and load or
-     * worker failures are skipped, and the language's first document reports them.
-     */
-    warmLanguages(languageIds: readonly TreeSitterLanguageId[]): Promise<void>
   }
 
 export type TreeSitterLanguagePluginOptions = TreeSitterLanguageRegistrationOptions & {
@@ -127,6 +127,14 @@ export const createTreeSitterSyntaxProvider = (
 ): TreeSitterSyntaxProvider => {
   const registry = new TreeSitterLanguageRegistry()
   const backend = options.backend ?? createTreeSitterWorkerBackend()
+  let warmedKey: string | null = null
+  const warm = () => {
+    const languageIds = options.warmLanguages?.() ?? []
+    const key = languageIds.join('\n')
+    if (languageIds.length === 0 || key === warmedKey) return
+    warmedKey = key
+    void warmTreeSitterLanguages(registry, backend, languageIds)
+  }
 
   return {
     createSession: (sessionOptions) => {
@@ -136,12 +144,12 @@ export const createTreeSitterSyntaxProvider = (
         languageId: sessionOptions.languageId,
         languageResolver: registry,
         backend,
+        onFirstParse: warm,
       })
     },
     registerLanguage: (contribution, registrationOptions) =>
       registry.registerLanguage(contribution, registrationOptions),
     resolveTreeSitterLanguage: (languageId) => registry.resolveTreeSitterLanguage(languageId),
-    warmLanguages: (languageIds) => warmTreeSitterLanguages(registry, backend, languageIds),
   }
 }
 

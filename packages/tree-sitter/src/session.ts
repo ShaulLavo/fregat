@@ -53,6 +53,8 @@ export type TreeSitterSyntaxSessionOptions = {
   readonly textSnapshot: DocumentTextSnapshot
   readonly snapshot: PieceTableSnapshot
   readonly backend?: TreeSitterBackend
+  /** Called once, after the session's first parse answers. */
+  readonly onFirstParse?: () => void
 }
 
 export class TreeSitterSyntaxSession implements EditorSyntaxSession {
@@ -76,6 +78,7 @@ export class TreeSitterSyntaxSession implements EditorSyntaxSession {
     Promise<readonly TreeSitterLanguageDescriptor[]>
   >()
   private disposed = false
+  private onFirstParse: (() => void) | undefined
 
   public constructor(options: TreeSitterSyntaxSessionOptions) {
     this.documentId = options.documentId
@@ -91,6 +94,7 @@ export class TreeSitterSyntaxSession implements EditorSyntaxSession {
     this.textSnapshot = options.textSnapshot
     this.snapshot = options.snapshot
     this.backend = options.backend ?? createTreeSitterWorkerBackend()
+    this.onFirstParse = options.onFirstParse
     this.result = this.createEmptyResult({ snapshot: options.snapshot, snapshotVersion: 0 })
   }
 
@@ -139,7 +143,15 @@ export class TreeSitterSyntaxSession implements EditorSyntaxSession {
       )
     }
 
-    return this.updateFromTreeSitterResult(result, snapshotVersion, textSnapshot, snapshot)
+    const next = this.updateFromTreeSitterResult(result, snapshotVersion, textSnapshot, snapshot)
+    if (result && !this.disposed) this.notifyFirstParse()
+    return next
+  }
+
+  private notifyFirstParse(): void {
+    const onFirstParse = this.onFirstParse
+    this.onFirstParse = undefined
+    onFirstParse?.()
   }
 
   public async applyChange(change: DocumentSessionChange): Promise<EditorSyntaxResult> {
