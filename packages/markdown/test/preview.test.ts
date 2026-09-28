@@ -139,6 +139,20 @@ describe('markdown preview plugin', () => {
     expect(editor.materializeFullText()).toBe('- first\n- second')
   })
 
+  it('leaves modified Tab shortcuts available to the host', () => {
+    editor.setText('- item', { languageId: 'markdown' })
+    editor.setSelection(6)
+    editor.getInputElement().dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Tab',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    )
+    expect(editor.materializeFullText()).toBe('- item')
+  })
+
   it('uses current parser records to remove a mark around the caret', async () => {
     await openMarkdown()
     editor.setSelection(13)

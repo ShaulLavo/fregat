@@ -12,6 +12,9 @@ export function createMarkdownAuthoringPlugin(): EditorPlugin {
       scope.keyParticipant((event, context) => {
         if (
           event.key !== 'Tab' ||
+          event.ctrlKey ||
+          event.metaKey ||
+          event.altKey ||
           !isMarkdown() ||
           !context.writable ||
           context.tabFocusMode ||
