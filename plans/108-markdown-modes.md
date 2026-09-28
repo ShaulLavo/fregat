@@ -6,6 +6,15 @@ views. [Markdown experiences](../docs/markdown-experiences.md) defines the produ
 target and acceptance checks. The earlier exclusion of always-visual editing
 below is superseded by this direction; that behavior still needs implementation.
 
+Owner clarification, 2026-09-28: editing style and layout are independent.
+The StackEdit-inspired target includes Obsidian-style source-revealing editing
+on the left and a fully rendered page on the right. Phase 1's plain-source split
+view does not complete this combination. Replace the mutually exclusive
+source/split/preview model with an editing-style choice (source, source-revealing,
+visual) and a separate rendered-pane choice. Opening the pane preserves the
+editing style; changing the style preserves the pane, document, selection and
+undo history. Verify each style both alone and beside the rendered page.
+
 Status: Phase 1 done (completion wave, lane L8, 2026-09-25): the mode setting
 `editor.markdownView` (default live preview, the behaviour before this plan; source; split),
 Cycle markdown view (per-document, in the palette and the editor title), the rendered pane

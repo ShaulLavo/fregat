@@ -8,15 +8,30 @@ does not complete this direction.
 
 Support all of these, chosen for the place the user is working:
 
-| Experience                                                                           | Intended behavior                                                                                                                                                                                             |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Visual authoring, with Milkdown and rich-text Markdown editors as references         | Edit formatted prose directly. Formatting stays visual at the caret. Commands and controls handle marks, links, lists, tasks, code, images and tables.                                                        |
-| Source-revealing authoring, with Obsidian as a reference                             | Keep Markdown source editable in place. Reveal the relevant syntax around the caret and render the surrounding document.                                                                                      |
-| Rich prompt composition, with T3 Code as a reference                                 | Combine formatted Markdown with atomic mentions, attachments, paste, prompt history, draft restoration, spellcheck and reliable submit behavior.                                                              |
-| Streaming conversation, with ChatGPT as a reference                                  | Render growing assistant messages, including incomplete Markdown, without losing selection, jumping scroll position or flashing whole blocks. Support completed messages through the same rendering contract. |
-| Static formatted pages                                                               | Render a complete Markdown document as a readable page, with no editing or streaming requirement.                                                                                                             |
-| Split editing, with [StackEdit](https://github.com/benweet/stackedit) as a reference | Show editable Markdown source on the left and the rendered document on the right, updating as the user types and synchronizing scroll in both directions.                                                     |
-| Source editing                                                                       | Keep direct access to Markdown text.                                                                                                                                                                          |
+| Experience                                                                           | Intended behavior                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Visual authoring, with Milkdown and rich-text Markdown editors as references         | Edit formatted prose directly. Formatting stays visual at the caret. Commands and controls handle marks, links, lists, tasks, code, images and tables.                                                             |
+| Source-revealing authoring, with Obsidian as a reference                             | Keep Markdown source editable in place. Reveal the relevant syntax around the caret and render the surrounding document.                                                                                           |
+| Rich prompt composition, with T3 Code as a reference                                 | Combine formatted Markdown with atomic mentions, attachments, paste, prompt history, draft restoration, spellcheck and reliable submit behavior.                                                                   |
+| Streaming conversation, with ChatGPT as a reference                                  | Render growing assistant messages, including incomplete Markdown, without losing selection, jumping scroll position or flashing whole blocks. Support completed messages through the same rendering contract.      |
+| Static formatted pages                                                               | Render a complete Markdown document as a readable page, with no editing or streaming requirement.                                                                                                                  |
+| Split editing, with [StackEdit](https://github.com/benweet/stackedit) as a reference | Show source-revealing, formatted editing on the left and a fully rendered page on the right, with live updates and synchronized scrolling. Plain source and visual rich text can also accompany the rendered pane. |
+| Source editing                                                                       | Keep direct access to Markdown text.                                                                                                                                                                               |
+
+Owner clarification, 2026-09-28: the StackEdit-inspired target combines
+Obsidian-style source-revealing editing on the left with a fully rendered page on
+the right. Our current plain-source split view does not yet provide that
+combination. This describes the desired experience, not a claim that StackEdit
+and Obsidian have identical editing semantics.
+
+Editing style and layout are independent choices:
+
+- Editing style: plain source, source-revealing live preview, or visual rich text.
+- Layout: editor alone or editor beside a fully rendered page.
+
+Opening the rendered pane preserves the editor's selected style. Switching the
+editing style leaves the rendered pane open. All combinations use the same
+document and preserve selection and undo history.
 
 The ambition is to exceed the reference products in correctness, interaction,
 polish and speed. Treat the references as experience benchmarks, not a requirement
@@ -56,6 +71,8 @@ fences and variable-height content.
 As inspected on 2026-09-28, Platform already renders complete Markdown through
 `packages/markdown`, and the file editor has a source/rendered split view with
 workspace links, images, themed code fences and two-way scroll synchronization.
+That split currently uses plain source on the left. Source-revealing live preview
+is a separate mode; combining it with the rendered pane remains work to do.
 The UI is in `apps/web/src/features/workbench/components/markdown-preview-pane.tsx`;
 `scripts/agent/scenarios/markdown-split-view.ts` exercises the split workflow.
 This is source inspection and existing verification coverage, not a fresh live
@@ -83,6 +100,10 @@ are outside this Markdown effort.
 - Static rendering and the split preview agree with the completed streaming
   output. Split editing updates from the live buffer, tracks scroll in both
   directions and preserves position through long fences and loaded images.
+- Verify all three editing styles both alone and beside the rendered page.
+  In particular, source-revealing live preview and the fully rendered pane must
+  work together. Revealing syntax around the caret preserves scroll alignment;
+  opening or closing the rendered pane preserves the editing style.
 - Plain copy, rich copy and paste have explicit contracts in each host. Source
   text must not silently change when switching presentation.
 - Accessibility, keyboard navigation, touch and reduced motion are verified in
