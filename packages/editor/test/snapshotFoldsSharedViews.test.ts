@@ -10,6 +10,7 @@ import type { EditorViewSnapshot } from '../src/plugins'
 import { setHighlightRegistry } from '../src/public/testing'
 import { createVisibleEditor } from './factories/visibleEditor'
 import { fallbackFoldRanges } from './oracles/foldRanges'
+import { createEditorSecondaryViewProjection } from '../src/public/secondaryViews'
 
 const editors: Editor[] = []
 const TEXT = 'root\n  child\n    grandchild\nnext\n  tail\nend'
@@ -29,6 +30,33 @@ afterEach(() => {
 })
 
 describe('snapshot folds in shared buffer views', () => {
+  it('keeps deferred secondary folds at the captured revision after edits and collapse changes', async () => {
+    const buffer = createEditorTextBuffer(TEXT)
+    const mounted = mount(buffer, 'deferred')
+    await vi.runAllTimersAsync()
+    const snapshot = mounted.snapshots.at(-1)!
+    const projection = createEditorSecondaryViewProjection(snapshot)
+    const capturedVersion = projection.textVersion
+
+    mounted.editor.fold(0)
+    mounted.editor.edit({ from: 0, to: 0, text: 'intro\n' })
+    await vi.runAllTimersAsync()
+
+    expect(mounted.snapshots.at(-1)!.textVersion).toBeGreaterThan(capturedVersion)
+    expect(
+      projection.foldSummaries.map((fold) => ({
+        start: fold.startLineNumber,
+        end: fold.endLineNumber,
+        collapsed: fold.collapsed,
+      })),
+    ).toEqual([
+      { start: 1, end: 3, collapsed: false },
+      { start: 2, end: 3, collapsed: false },
+      { start: 4, end: 5, collapsed: false },
+    ])
+    expect(projection.text.snapshot.readRange(0, TEXT.length)).toBe(TEXT)
+  })
+
   it('preserves independent collapse through peer edits, undo, redo and a new history branch', async () => {
     const buffer = createEditorTextBuffer(TEXT)
     const first = mount(buffer, 'first')
