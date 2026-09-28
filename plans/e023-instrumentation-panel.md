@@ -1,6 +1,6 @@
 # E023: Inspect editor timing and retained memory
 
-- Status: Proposed
+- Status: Approved
 - Kind: Implementation
 - Owner: Editor
 - Priority: P2

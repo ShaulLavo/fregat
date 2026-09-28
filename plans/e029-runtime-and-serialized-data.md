@@ -1,6 +1,6 @@
 # E029: Document runtime and serialized data boundaries
 
-- Status: Proposed
+- Status: Approved
 - Kind: Design
 - Owner: Editor
 - Priority: P2

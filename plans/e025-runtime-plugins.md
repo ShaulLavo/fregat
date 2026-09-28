@@ -1,6 +1,6 @@
 # E025: Design and prove reloadable user plugins
 
-- Status: Proposed
+- Status: Approved
 - Kind: Research
 - Owner: Cross-repo
 - Priority: P2

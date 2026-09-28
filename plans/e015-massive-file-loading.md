@@ -1,6 +1,6 @@
 # E015: Design bounded loading for massive files
 
-- Status: Proposed
+- Status: Approved
 - Kind: Research
 - Owner: Cross-repo
 - Priority: P3

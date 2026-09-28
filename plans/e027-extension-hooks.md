@@ -1,6 +1,6 @@
 # E027: Define and verify the extension hook contract
 
-- Status: Proposed
+- Status: Approved
 - Kind: Design
 - Owner: Editor
 - Priority: P2

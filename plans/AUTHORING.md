@@ -1,8 +1,9 @@
 # Editor backlog plan contract
 
-These plans began with proposals commissioned on 2026-09-05. They authorize planning, not implementation
-or publication. Platform's [cross-project roadmap](../../platform/PLAN.md) remains the execution
-scheduler. The Editor backlog index recommends an order without scheduling work.
+These plans began with proposals commissioned on 2026-09-05. A plan the owner asks for is approved
+work: its status is `Approved` and it is written for execution. `Idea` is only for a plan the
+owner explicitly calls an idea or is unsure about. Platform's [cross-project roadmap](../../platform/PLAN.md)
+remains the execution scheduler. The Editor backlog index recommends an order without scheduling work.
 
 ## Write a plan another engineer can execute
 

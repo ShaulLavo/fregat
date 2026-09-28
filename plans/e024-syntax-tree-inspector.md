@@ -1,6 +1,6 @@
 # E024: Inspect the live syntax tree
 
-- Status: Proposed
+- Status: Approved
 - Kind: Implementation
 - Owner: Editor
 - Priority: P2

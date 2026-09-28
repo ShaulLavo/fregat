@@ -1,6 +1,6 @@
 # E014: Search immutable snapshots across workers and stream results
 
-- Status: Proposed
+- Status: Approved
 - Kind: Implementation
 - Owner: Cross-repo
 - Priority: P2

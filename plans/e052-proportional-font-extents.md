@@ -1,6 +1,6 @@
 # E052: Wrap and horizontal extent from measured advances when the font is not monospace
 
-- Status: Proposed
+- Status: Approved
 - Kind: Implementation
 - Owner: Editor
 - Priority: P3

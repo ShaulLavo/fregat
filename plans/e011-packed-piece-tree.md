@@ -1,6 +1,6 @@
 # E011: Evaluate a packed representation of persistent piece trees
 
-- Status: Proposed
+- Status: Approved
 - Kind: Research
 - Owner: Editor
 - Priority: P3

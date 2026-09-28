@@ -1,6 +1,6 @@
 # E016: Evaluate bounded structural parsing
 
-- Status: Proposed
+- Status: Approved
 - Kind: Research
 - Owner: Editor
 - Priority: P2

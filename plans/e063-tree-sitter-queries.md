@@ -1,6 +1,6 @@
 # E063: More editor features from tree-sitter queries
 
-- Status: Proposed
+- Status: Approved
 - Kind: Implementation
 - Owner: Editor
 - Priority: P2

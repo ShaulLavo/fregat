@@ -1,11 +1,15 @@
 # E064: One highlight pipeline for tokens and range highlights
 
-- Status: Proposed
+- Status: Approved
 - Kind: Design
 - Owner: Editor
 - Priority: P2
 - Effort: L
 - Dependencies: none
+- Related: [Platform Plan 197](../../platform/plans/197-editor-highlighting-service.md) owns
+  _computing_ highlights (one service over Shiki and tree-sitter); this plan owns _painting_ them.
+  [Platform Plan 201](../../platform/plans/201-cheap-overlay-marks.md) owns the overlay underline
+  mask, which this plan leaves out of scope.
 - Inspected baseline: `6d8269f39eb40e38d0e8b1de90f353923396bc8c` (main)
 
 ## Outcome
