@@ -203,6 +203,7 @@ export function Editor({
     ? {
         documentId: liveDocument.key,
         buffer: liveDocument.buffer,
+        analysis: liveDocument.analysis,
         ...preparedTags,
         languageId: documentLanguageId,
         preparedDocument: liveDocument.preparedDocument,

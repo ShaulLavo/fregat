@@ -337,6 +337,7 @@ import { editorLargePaste } from './editor-large-paste'
 import { editorFind } from './editor-find'
 import { problemsPanelRows } from './problems-panel-rows'
 import { problemsPanelWorkspace } from './problems-panel-workspace'
+import { markdownSourceEditing } from './markdown-source-editing'
 import { editorTypeBurst } from './editor-type-burst'
 import { editorUndoBarrier } from './editor-undo-barrier'
 import { editorUndoBranch } from './editor-undo-branch'
@@ -674,6 +675,7 @@ export const scenarios: readonly Scenario[] = [
   problemsPanelRows,
   problemsPanelWorkspace,
   editorTypeBurst,
+  markdownSourceEditing,
   editorUndoBarrier,
   editorUndoBranch,
   editorTitleDiffToggle,

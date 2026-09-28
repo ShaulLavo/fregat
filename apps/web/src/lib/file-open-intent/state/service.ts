@@ -7,6 +7,7 @@ import { createEditorTextBuffer, type EditorTextBuffer } from '@singapore-editor
 import { type EditorInitialPaintEvent } from '@singapore-editor/core/extensions'
 import {
   type EditorPreparedDocument,
+  type EditorDocumentAnalysis,
   type EditorPreparedTagValue,
   type EditorScrollPosition,
 } from '@singapore-editor/core/editor'
@@ -41,6 +42,7 @@ const MAX_PREPARED_FILE_BYTES = 1024 * 1024
 const PROMOTION_PAINT_TIMEOUT_MS = 10_000
 
 export type FileOpenIntentLiveDocument = {
+  readonly analysis: EditorDocumentAnalysis
   readonly buffer: EditorTextBuffer
   readonly key: DocumentKey
   readonly localRevision: number
@@ -108,6 +110,7 @@ export type FileOpenIntentPreparer = {
     path: FilesystemPath,
     abortSignal: AbortSignal,
     structuralRange: FileOpenIntentStructuralRange,
+    analysis?: EditorDocumentAnalysis,
   ): FileOpenIntentPreparation
   reconfigure(
     preparedDocument: EditorPreparedDocument,
@@ -1063,6 +1066,7 @@ class FileOpenIntentServiceState {
       this.noteBenchmarkRuntimeSessionIds(preparation.preparedDocument)
       if (!this.generationIsCurrent(lifecycleGeneration) || abortSignal.aborted) {
         preparation.preparedDocument.dispose()
+        preparation.preparedDocument.analysis.dispose()
         this.finishIntent(path, 'aborted', { reason: 'generation-changed' })
         return
       }
@@ -1083,6 +1087,7 @@ class FileOpenIntentServiceState {
       )
       if (preparedSourceRejection) {
         preparation.preparedDocument.dispose()
+        preparation.preparedDocument.analysis.dispose()
         this.finishIntent(path, 'superseded', { reason: preparedSourceRejection })
         return
       }
@@ -1132,6 +1137,7 @@ class FileOpenIntentServiceState {
       path,
       abortSignal,
       structuralRange,
+      document.analysis,
     )
     this.intentOperations.get(path)?.event.set({
       stages: {
@@ -1393,6 +1399,7 @@ class FileOpenIntentServiceState {
     this.noteBenchmarkRuntimeSessionIds(record.preparedDocument)
     record.abortController.abort()
     record.preparedDocument.dispose()
+    if (record.claim.kind === 'clean') record.preparedDocument.analysis.dispose()
     if (this.records.get(path) === record) this.records.delete(path)
   }
 

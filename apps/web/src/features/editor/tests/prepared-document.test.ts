@@ -21,3 +21,21 @@ test('resolved theme content participates in prepared Shiki identity', () => {
   expect(first.highlighterConfigurationTag).toContain('theme-content-v1')
   expect(second.highlighterConfigurationTag).toContain('theme-content-v2')
 })
+
+test('Markdown preparation selects the structural color source for custom themes', () => {
+  const environment = {
+    appliedThemeContentHash: 'theme-content-v1',
+    appliedThemeId: 'custom-dark',
+    selectedThemeId: 'custom-dark',
+    syntaxHighlightingEnabled: true,
+  }
+  expect(editorPreparedDocumentTags('/repo/file.md', environment).documentConfigurationTag).toEqual(
+    ['platform-editor', 'markdown', 'tree-sitter'],
+  )
+  expect(
+    editorPreparedDocumentTags('/repo/file.mdx', environment).documentConfigurationTag,
+  ).toEqual(['platform-editor', 'mdx', 'tree-sitter'])
+  expect(editorPreparedDocumentTags('/repo/file.ts', environment).documentConfigurationTag).toEqual(
+    ['platform-editor', 'typescript', 'shiki'],
+  )
+})

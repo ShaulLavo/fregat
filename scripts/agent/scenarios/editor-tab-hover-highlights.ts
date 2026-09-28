@@ -7,7 +7,11 @@ import { openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import { scratchPath } from '../paths'
 import { measurePress, pressStampScript, type PressTiming } from '../press-timing'
 import { openFileByName, selectors } from '../selectors'
-import { sampleEditorPaint } from './prefetch-first-paint'
+import {
+  sampleEditorPaint,
+  markdownCoverageSource,
+  assertMarkdownCoverage,
+} from './prefetch-first-paint'
 import type { Scenario } from './index'
 
 const results = new WeakMap<Page, PressTiming[]>()
@@ -29,6 +33,10 @@ export const editorTabHoverHighlights: Scenario = {
         'utf8',
       )
       await writeFile(path.join(fixture, 'target.ts'), `// HOVER_TARGET\n${source}`)
+      await writeFile(
+        path.join(fixture, 'hover.md'),
+        markdownCoverageSource('MARKFILEhover.md') + '\n[coverage-ref]: /eof\n',
+      )
       await writeFile(path.join(fixture, 'other.ts'), 'export const OTHER_FILE = false\n')
       await page.addInitScript(pressStampScript)
       await openFixtureWorkspace(page, fixture)
@@ -47,6 +55,28 @@ export const editorTabHoverHighlights: Scenario = {
         })
         await step(`hover-${dwell}`)
         strictEqual(timing.uncoloredTextFrames, 0, 'Revisited text keeps its syntax colors')
+      }
+      await openFileByName(page, 'hover.md')
+      await assertMarkdownCoverage(page, 'MARKFILEhover.md')
+      for (const dwell of [0, 2000, 35_000]) {
+        const timing = await measureTabHover(page, {
+          dwell,
+          needle: 'MARKFILEhover.md',
+          other: selectors.editorTab(page, path.join(fixture.slice(1), 'other.ts')),
+          target: selectors.editorTab(page, path.join(fixture.slice(1), 'hover.md')),
+        })
+        await assertMarkdownCoverage(page, 'MARKFILEhover.md')
+        await step(`markdown-hover-${dwell}`)
+        strictEqual(
+          timing.previewMs,
+          timing.textMs,
+          'Revisited Markdown paints complete preview with its first text frame',
+        )
+        strictEqual(
+          timing.uncoloredTextFrames,
+          0,
+          'Revisited Markdown keeps complete syntax coverage',
+        )
       }
     } finally {
       await releaseFixture(fixture)

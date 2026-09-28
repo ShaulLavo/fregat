@@ -6,6 +6,8 @@ import {
 import { type EditorHighlighterProvider } from '@singapore-editor/core/extensions'
 import {
   createEditorPreparedDocument,
+  createEditorDocumentAnalysis,
+  type EditorDocumentAnalysis,
   type EditorPreparedDocument,
   type EditorPreparedTagValue,
 } from '@singapore-editor/core/editor'
@@ -53,8 +55,14 @@ export function createPlatformFileOpenPreparer(
       highlighterProvider,
       structuralProvider,
     },
-    prepare: (buffer, documentId, path, abortSignal, structuralRange) => {
-      const preparedDocument = prepareEditorDocument(buffer, documentId, path, environment)
+    prepare: (buffer, documentId, path, abortSignal, structuralRange, analysis) => {
+      const preparedDocument = prepareEditorDocument(
+        buffer,
+        documentId,
+        path,
+        environment,
+        analysis,
+      )
       return {
         buffer,
         preparedDocument,
@@ -88,7 +96,7 @@ export function editorPreparedDocumentTags(
   languageId = languageIdForFilePath(path),
 ): EditorPreparedDocumentTags {
   const source = environment.syntaxHighlightingEnabled
-    ? editorSyntaxHighlightingSource(environment.selectedThemeId)
+    ? editorSyntaxHighlightingSource(environment.selectedThemeId, languageId)
     : 'disabled'
   const captures = languageId === 'markdown'
   return {
@@ -109,10 +117,12 @@ function prepareEditorDocument(
   documentId: string,
   path: string,
   environment: EditorPreparedEnvironment,
+  analysis: EditorDocumentAnalysis = createEditorDocumentAnalysis({ buffer, documentId }),
 ): EditorPreparedDocument {
   const languageId = languageIdForFilePath(path)
   const tags = editorPreparedDocumentTags(path, environment)
   return createEditorPreparedDocument({
+    analysis,
     buffer,
     configuredTabSize: environment.tabSize,
     tabSizePolicy: 'detect-indentation',
@@ -133,7 +143,7 @@ function preparedDocumentConfiguration(
 ): FileOpenIntentPreparationConfiguration {
   const languageId = languageIdForFilePath(path)
   const source = environment.syntaxHighlightingEnabled
-    ? editorSyntaxHighlightingSource(environment.selectedThemeId)
+    ? editorSyntaxHighlightingSource(environment.selectedThemeId, languageId)
     : 'disabled'
   const tags = editorPreparedDocumentTags(path, environment)
   const highlighter = highlighterPreparationStage(

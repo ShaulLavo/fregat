@@ -39,11 +39,6 @@ const PLATFORM_SEARCH_RESULT_EDITOR_LOGGING_PLUGIN = createEditorLoggingPlugin(
   },
 )
 
-/**
- * `languageId` gates the language-specific plugins. Markdown preview is registered only for markdown
- * documents because registering it at all makes the editor ask tree-sitter for raw captures, and
- * that query is pure waste on a file shiki is already painting.
- */
 export type CriticalEditorCorePluginOptions = {
   /** Backs the "Compare Changes" lens on a merge conflict; absent hides it. */
   readonly compareMergeConflict?: () => void
@@ -62,7 +57,7 @@ export function createCriticalEditorCorePlugins(
     editorIndentationGuidesSupported(languageId) &&
     !editorPerformanceFeatureDisabled('scope-lines')
   return [
-    ...createEditorSyntaxHighlightingPlugins(),
+    ...createEditorSyntaxHighlightingPlugins(languageId),
     createLineGutterPlugin(),
     createFoldGutterPlugin({
       width: 16,
@@ -85,7 +80,7 @@ export function createCriticalEditorCorePlugins(
     createDocumentLinkPlugin(),
     ...(includeGuides ? [createScopeLinesPlugin()] : []),
     // Critical rather than lazy: loading it after first paint would flash raw markdown first. It
-    // derives its replacements from tree-sitter's markdown captures, so a file renders as source
+    // derives its replacements from Markdown records, so a file renders as source
     // while syntax highlighting is off.
     ...(languageId === 'markdown' && options.markdownPreview !== false
       ? [createMarkdownPreviewPlugin()]
@@ -174,8 +169,10 @@ function disposeAll(disposables: readonly EditorDisposable[]) {
   for (const disposable of disposables) disposable.dispose()
 }
 
-function createEditorSyntaxHighlightingPlugins(): readonly EditorPlugin[] {
-  if (editorSyntaxHighlightingSource() === 'disabled') return []
+function createEditorSyntaxHighlightingPlugins(
+  languageId: EditorSyntaxLanguageId | null,
+): readonly EditorPlugin[] {
+  if (editorSyntaxHighlightingSource(undefined, languageId) === 'disabled') return []
 
   const treeSitter = editorTreeSitterSyntaxProvider()
 
@@ -185,19 +182,21 @@ function createEditorSyntaxHighlightingPlugins(): readonly EditorPlugin[] {
     createTreeSitterSyntaxPlugin(treeSitter, {
       name: 'platform.tree-sitter-syntax',
     }),
-    createEditorShikiHighlighterPlugin(),
+    createEditorShikiHighlighterPlugin(languageId),
   ]
 }
 
 /** Only changing syntax engines replaces the provider; theme changes stay inside its sessions. */
-function createEditorShikiHighlighterPlugin(): EditorPlugin {
+function createEditorShikiHighlighterPlugin(
+  languageId: EditorSyntaxLanguageId | null,
+): EditorPlugin {
   return {
     name: 'platform.shiki-highlighter',
     activate: (context) => {
       let registration: EditorDisposable | null = null
 
       const syncRegistration = () => {
-        const enabled = editorSyntaxHighlightingSource() === 'shiki'
+        const enabled = editorSyntaxHighlightingSource(undefined, languageId) === 'shiki'
         if (enabled === (registration !== null)) return
 
         registration?.dispose()

@@ -1,3 +1,4 @@
+import { createEditorDocumentAnalysis } from '@singapore-editor/core/editor'
 import {
   fileDocument,
   fileResource,
@@ -641,6 +642,7 @@ function liveDocument(
 ): LiveEditorDocument {
   return {
     buffer,
+    analysis: createEditorDocumentAnalysis({ buffer, documentId: path }),
     contentRevision: `h:test:${mtimeMs.toString(36)}`,
     key: fileDocumentKey(filesystemPath(path)),
     localRevision: buffer.getRevision(),

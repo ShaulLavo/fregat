@@ -65,6 +65,37 @@ and [Lexical Markdown shortcuts](https://github.com/facebook/lexical/blob/b8cd39
 protect active IME composition. Their Markdown serializers and rich-paste behaviour are separate
 product choices. Adopting those would change Platform's source-editing contract.
 
+## Adopted execution strategy — 2026-09-28
+
+Complete source preparation and committed edits run in the existing Editor syntax worker. A
+retained buffer owns its analysis; views and hover preparation borrow it. One MarkdownDocument
+supplies preview records, highlights, folds and fence boundaries. The worker runs generic language
+grammars only for code fences; MDX owns its JSX/JavaScript tree and uses offset-preserving Markdown
+content with the same resolver. Chat and split rendering continue using remark.
+
+The budget is the Editor's 1–2 ms input target and 16.7 ms per 60 Hz frame. Measured in Chromium
+153 against ab81f6c, npm 0.1.0 cold complete-source parsing costs 6.3 ms at 46 KB, 41.4 ms for a
+mixed 1 MB document, and 92.9 ms for a 1.08 MB fence. A giant paragraph takes another 45.3 ms to
+resolve its first visible inline output; paragraph/fence edits take 50.0/56.6 ms median. These
+measurements rule out synchronous main-thread parsing. Source edits do not wait for parser work;
+stale markers are removed on committed edits while revision-bound worker outputs are pending.
+
+[Release measurements and raw three-run data](https://github.com/ShaulLavo/tree-sitter-md/blob/5dd917a/docs/RELEASE-0.1.md)
+include payload, reserved wasm heap growth and the baseline on the same machine. All four parser
+outputs are compared with a fresh parse after each measured edit sequence. An idle reparse helps
+the mixed 1 MB first edit (9.6 → about 1.4 ms for 7.4 ms idle work), but does not solve giant
+blocks. The integration keeps correctness independent of idle work.
+
+The 1 MB app trace also records the remaining main-thread cost: 24 tasks exceeded 16 ms,
+including seven over 50 ms across initial load, select-all/copy and bulk source replacement.
+Moving parsing to the worker does not establish the 1–2 ms target for every editor operation.
+Evidence: `/work/tmp/fregat-evidence/20260928T151644Z-trace-markdown-source-editing`.
+
+The required Plan 198 ownership seam lands with this integration: parser leases do not own the
+retained buffer's parser, committed revisions are fed once and serialized, and disposal belongs
+to buffer eviction/replacement. Results are admitted by owner, revision, provider/configuration
+and requested range. This does not claim the rest of Plan 198's scheduling work is complete.
+
 ## Proposed contract for Platform
 
 This preserves Plan 108's existing source-on-entry behaviour pending the owner's clarification

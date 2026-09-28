@@ -13,8 +13,15 @@ import { filesystemPath, tabId as testTabId } from '@/lib/documents/utils/identi
 import { createDefaultWorkbenchLayout } from '@/features/workbench/utils/layout'
 import { createDefaultChatModePanels } from '@/features/chat-mode/utils/panels'
 import { QueryClient } from '@tanstack/react-query'
-import { createEditorBufferSession, type EditorTextBuffer } from '@singapore-editor/core/document'
-import { type EditorPreparedDocument } from '@singapore-editor/core/editor'
+import {
+  createEditorBufferSession,
+  createEditorTextBuffer,
+  type EditorTextBuffer,
+} from '@singapore-editor/core/document'
+import {
+  createEditorDocumentAnalysis,
+  type EditorPreparedDocument,
+} from '@singapore-editor/core/editor'
 import { describe, vi } from 'vitest'
 import { expect, test } from '../../../../test/fixtures'
 import {
@@ -777,7 +784,11 @@ function preparedDocumentLease(): EditorPreparedDocument {
     fallbackReady: Promise.resolve(true),
     runtimeSessionIds: () => ({ highlighter: [], structural: [] }),
     startStage: vi.fn(() => null),
-    take: vi.fn(() => null),
+    borrow: vi.fn(() => null),
+    analysis: createEditorDocumentAnalysis({
+      buffer: createEditorTextBuffer(''),
+      documentId: 'prepared-test',
+    }),
   }
 }
 

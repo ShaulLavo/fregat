@@ -2,15 +2,13 @@
 
 ## Status and authorization
 
-- Status: **RELEASE COMPLETION AND EDITOR INTEGRATION REMAIN**, refreshed 2026-09-28.
+- Status: **IMPLEMENTED**, refreshed 2026-09-28.
   Owner adopted `tree-sitter-md` on 2026-09-26. The C resolver rewrite and the subsequent
   `tree-sitter-x` extension migration have landed upstream. Phase 0 below is the remaining
   release gate; do not repeat those migrations. The parser serves the source-backed live preview
   and future rendered blocks inside the Editor. Chat and the existing split renderer keep remark.
-- Current source of truth: upstream `tree-sitter-md` `ab81f6cb216c102dd6e551c095843d1a08da6ba2`,
-  Editor and Platform's CI `editor-ref` `2c4a27bcc6b8ebaac18a95744d16dcc7e003e15f`, checked
-  2026-09-28. The local parser checkout was still at `e819c44`; this refresh read the newer
-  upstream sources without changing that checkout.
+- Released parser: `tree-sitter-md@0.1.0`, source `5dd917a`. Editor integration and Platform
+  CI pin: `7edf180cea1e03a477db4c4626d39c9e985cdb3b`.
 - The original research and Rust measurements below are historical. The
   [current implementation and release gate](#current-implementation-and-release-gate) supersede
   their packaging, completion and performance claims. The [behaviour research](../docs/markdown-parser/editor-behaviour.md)
@@ -21,6 +19,38 @@
   `c130dd35a`, Editor `74e76be`. Origin: the investigation into markdown files painting as raw
   source before their live-preview decorations land.
 - Method, tables and pinned versions: [docs/markdown-parser/measurements.md](../docs/markdown-parser/measurements.md).
+
+## Implementation evidence — 2026-09-28
+
+- Published `tree-sitter-md@0.1.0` from `5dd917a`; npm tarball integrity matches the verified pack.
+- Phase 0: 676/676 spec, 240 JS tests, 11,300 fuzz edits plus negative control, 183 chat messages,
+  497 pinned repository fixtures with zero unexpected differences, native ASan/UBSan and nine
+  packed Node/Bun/Chromium initialization checks pass.
+- [Current complete-source browser measurements](https://github.com/ShaulLavo/tree-sitter-md/blob/5dd917a/docs/RELEASE-0.1.md)
+  replace historical first-frame/payload numbers below. Giant blocks exceed frame/input budgets;
+  the integration uses a retained worker parser and exact revision-bound visible outputs.
+- Editor integration uses one retained owner across hover and view attachments, including the
+  necessary Plan 198 ownership API. Live preview consumes records; colors, folds and fence ranges
+  use the same MarkdownDocument. Old Markdown/inline grammars and queries are removed.
+- Focused validation: 368 Editor lifecycle/owner/inline/fold tests, 64 real worker browser checks,
+  73 language checks and 92 Platform ownership/preparation tests. Repository gates and Editor,
+  Platform and scenario typechecks pass. An independent audit verified ownership, cancellation,
+  stale-result admission and disposal.
+- Browser source editing passes for a complete 1 MB document, including EOF references, exact
+  preview rows, fenced-code keyword colors, copy, save, undo, redo and paste. Screenshots read
+  from `/work/tmp/fregat-evidence/20260928T152358Z-scenario-markdown-source-editing`.
+- Tab revisits after 0, 2 and 35 seconds show complete Markdown preview and fenced-code
+  colors with the first text frame, with zero uncolored frames. Screenshots read from
+  `/work/tmp/fregat-evidence/20260928T152414Z-scenario-editor-tab-hover-highlights`.
+- Final first-paint trace: cold quick-open Markdown text/color/preview at 94 ms, warm at
+  63 ms, keyboard revisit at 61 ms. Cold tree open shows editable source at 87 ms and complete
+  color/preview at 118 ms; prepared tree opens paint together. Evidence:
+  `/work/tmp/fregat-evidence/20260928T152625Z-trace-prefetch-first-paint`.
+- Markdown and MDX use the shared parser for colors, including code fences, under every theme.
+  The source-backed preview is enabled for Markdown. Chat and split rendering retain remark.
+
+The following release inventory records the state before implementation; the evidence above
+supersedes its remaining-work and benchmark claims.
 
 ## Current implementation and release gate
 

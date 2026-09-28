@@ -32,6 +32,8 @@ import {
   type PieceTableSnapshot,
 } from '@singapore-editor/core/document'
 import {
+  createEditorDocumentAnalysis,
+  type EditorDocumentAnalysis,
   type EditorScrollPosition,
   type EditorPreparedDocument,
 } from '@singapore-editor/core/editor'
@@ -70,6 +72,7 @@ type LiveDocumentSync =
     }
 
 export type LiveEditorDocument = {
+  readonly analysis: EditorDocumentAnalysis
   readonly buffer: EditorTextBuffer
   readonly contentRevision: string
   readonly key: DocumentKey
@@ -340,7 +343,7 @@ export class WorkspaceDocumentService {
     const resource = filesystemResource(document?.target)
     const wasDirty = this.isDirtyDocument(documentKey)
     const hadLiveDocument = this.liveDocumentsByKey.delete(documentKey)
-    if (document) this.detachBuffer(document.buffer)
+    if (document) this.detachPreviousBuffer(document)
     if (hadLiveDocument) {
       this.pathOwnershipRevision += 1
       if (resource) this.advancePathOwnership(resource.path)
@@ -417,6 +420,7 @@ export class WorkspaceDocumentService {
     const buffer = createHistoryBuffer(snapshot.content)
     buffer.markClean()
     const record: LiveEditorDocument = {
+      analysis: createEditorDocumentAnalysis({ buffer, documentId: key }),
       buffer,
       contentRevision: contentRevisionForText(snapshot.content),
       key,
@@ -990,6 +994,7 @@ export class WorkspaceDocumentService {
     const contentRevision = contentRevisionForText(text)
     this.setLiveDocument({
       ...document,
+      analysis: createEditorDocumentAnalysis({ buffer, documentId: document.key }),
       buffer,
       contentRevision,
       localRevision: buffer.getRevision(),
@@ -1178,6 +1183,9 @@ export class WorkspaceDocumentService {
     buffer.markClean()
 
     return {
+      analysis:
+        claim?.preparedDocument.analysis ??
+        createEditorDocumentAnalysis({ buffer, documentId: documentKey(target) }),
       buffer,
       contentRevision: fileContentRevision(file.version),
       key: documentKey(target),
@@ -1198,6 +1206,7 @@ export class WorkspaceDocumentService {
     buffer.markClean()
 
     return {
+      analysis: createEditorDocumentAnalysis({ buffer, documentId: documentKey(input.target) }),
       buffer,
       contentRevision: contentRevisionForText(input.content),
       key: documentKey(input.target),
@@ -1365,7 +1374,13 @@ export class WorkspaceDocumentService {
   private rollbackDeleteProjection(projection: WorkspaceDocumentDeleteProjection): boolean {
     if (this.liveDocumentsByKey.has(projection.document.key)) return false
 
-    this.setLiveDocument(projection.document)
+    this.setLiveDocument({
+      ...projection.document,
+      analysis: createEditorDocumentAnalysis({
+        buffer: projection.document.buffer,
+        documentId: projection.document.key,
+      }),
+    })
     if (projection.contentRevision !== undefined) {
       this.setContentRevision(projection.document.key, projection.contentRevision)
     }
@@ -1397,6 +1412,7 @@ export class WorkspaceDocumentService {
 
   private detachPreviousBuffer(document: LiveEditorDocument | undefined): void {
     if (!document) return
+    document.analysis.dispose()
     this.detachBuffer(document.buffer)
   }
 
@@ -1542,6 +1558,8 @@ function preparedDocumentForClaim(
   if (!claim?.preparedDocument) return null
   if (!preparedClaimMatchesDocument(document, claim)) {
     claim.preparedDocument.dispose()
+    if (claim.kind === 'clean' && claim.buffer !== document.buffer)
+      claim.preparedDocument.analysis.dispose()
     return null
   }
 

@@ -64,6 +64,11 @@ export function EditorSurfaceTabBody({
       ? (state.liveDocumentsByKey[selectedViewDocumentKey]?.buffer ?? null)
       : null,
   )
+  const selectedDocumentAnalysis = useEditorDocumentState((state) =>
+    selectedViewDocumentKey
+      ? (state.liveDocumentsByKey[selectedViewDocumentKey]?.analysis ?? null)
+      : null,
+  )
   const selectedDocumentTarget = useEditorDocumentState((state) =>
     selectedViewDocumentKey
       ? (state.liveDocumentsByKey[selectedViewDocumentKey]?.target ?? null)
@@ -85,6 +90,7 @@ export function EditorSurfaceTabBody({
   const selectedLiveDocument = useMemo(
     () =>
       joinedEditorRenderDocument({
+        analysis: selectedDocumentAnalysis,
         buffer: selectedDocumentBuffer,
         documentKey: selectedViewDocumentKey,
         editability: selectedDocumentEditability,
@@ -93,6 +99,7 @@ export function EditorSurfaceTabBody({
         view: selectedViewSession,
       }),
     [
+      selectedDocumentAnalysis,
       selectedDocumentBuffer,
       selectedDocumentEditability,
       selectedDocumentTarget,

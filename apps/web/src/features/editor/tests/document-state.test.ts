@@ -18,7 +18,10 @@ import {
   reverseDocumentTransaction,
   subscribeDocumentMutationLeaseState,
 } from '@singapore-editor/core/document'
-import { type EditorPreparedDocument } from '@singapore-editor/core/editor'
+import {
+  createEditorDocumentAnalysis,
+  type EditorPreparedDocument,
+} from '@singapore-editor/core/editor'
 
 describe('editor document store state identity', () => {
   it('keeps unrelated slices referentially stable across scroll updates', () => {
@@ -786,7 +789,11 @@ function preparedDocumentLease(): EditorPreparedDocument {
     fallbackReady: Promise.resolve(true),
     runtimeSessionIds: () => ({ highlighter: [], structural: [] }),
     startStage: vi.fn(() => null),
-    take: vi.fn(() => null),
+    borrow: vi.fn(() => null),
+    analysis: createEditorDocumentAnalysis({
+      buffer: createEditorTextBuffer(''),
+      documentId: 'prepared-test',
+    }),
   }
 }
 

@@ -6,7 +6,11 @@ import { expect, test as it } from '../../../test/fixtures'
 
 import { createEditorBufferSession, createEditorTextBuffer } from '@singapore-editor/core/document'
 import { type EditorInitialPaintEvent } from '@singapore-editor/core/extensions'
-import { type EditorPreparedDocument } from '@singapore-editor/core/editor'
+import {
+  createEditorDocumentAnalysis,
+  type EditorDocumentAnalysis,
+  type EditorPreparedDocument,
+} from '@singapore-editor/core/editor'
 import type { FileResult } from '@/lib/file-system-types'
 import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
 import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-clients'
@@ -114,6 +118,7 @@ describe('file open intent service', () => {
     const preparedDocument = preparedDocumentLease()
     let liveDocument: FileOpenIntentLiveDocument | null = {
       buffer,
+      analysis: createEditorDocumentAnalysis({ buffer, documentId: 'live-test' }),
       key: testDocumentKey('/repo/a.ts'),
       localRevision: 1,
     }
@@ -248,6 +253,7 @@ describe('file open intent service', () => {
     const buffer = createEditorTextBuffer('alpha\n')
     let liveDocument: FileOpenIntentLiveDocument = {
       buffer,
+      analysis: createEditorDocumentAnalysis({ buffer, documentId: 'live-test' }),
       key: testDocumentKey('/repo/a.ts'),
       localRevision: buffer.getRevision(),
     }
@@ -1121,8 +1127,10 @@ describe('file open intent service', () => {
   it('attributes promotion paint only to the claimed document and its first text paint', async () => {
     const queryClient = new QueryClient()
     const file = fileResult('/repo/a.ts')
+    const buffer = createEditorTextBuffer(file.content)
     const liveDocument: FileOpenIntentLiveDocument = {
-      buffer: createEditorTextBuffer(file.content),
+      buffer,
+      analysis: createEditorDocumentAnalysis({ buffer, documentId: file.path }),
       key: testDocumentKey(file.path),
       localRevision: 1,
     }
@@ -1501,6 +1509,7 @@ function testPreparer(
     path: string,
     abortSignal: AbortSignal,
     structuralRange: FileOpenIntentStructuralRange,
+    analysis?: EditorDocumentAnalysis,
   ) => {
     readonly buffer: ReturnType<typeof createEditorTextBuffer>
     readonly preparedDocument: EditorPreparedDocument
@@ -1631,7 +1640,11 @@ function preparedDocumentLease(
     fallbackReady: Promise.resolve(true),
     runtimeSessionIds: () => runtimeSessionIds,
     startStage: vi.fn(() => null),
-    take: vi.fn(() => null),
+    borrow: vi.fn(() => null),
+    analysis: createEditorDocumentAnalysis({
+      buffer: createEditorTextBuffer(''),
+      documentId: 'prepared-test',
+    }),
   }
 }
 

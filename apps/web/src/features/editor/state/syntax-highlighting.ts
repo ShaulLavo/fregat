@@ -47,12 +47,14 @@ export type EditorDiffSyntaxConfiguration = {
   readonly source: EditorSyntaxHighlightingSource
 }
 
-/** The single policy used by regular documents and diffs. */
+/** Markdown structure and colors share one document parser. */
 export function editorSyntaxHighlightingSource(
   selectedThemeId?: string,
+  languageId?: string | null,
 ): EditorSyntaxHighlightingSource {
   if (!readSettingsMirror()['editor.syntaxHighlighting.enabled']) return 'disabled'
   if (editorPerformanceFeatureDisabled('syntax')) return 'disabled'
+  if (languageId === 'markdown' || languageId === 'mdx') return 'tree-sitter'
 
   const usesShiki = selectedThemeId
     ? !isBuiltinEditorThemeId(selectedThemeId)

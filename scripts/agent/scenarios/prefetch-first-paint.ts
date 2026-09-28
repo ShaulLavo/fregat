@@ -1,3 +1,4 @@
+import { strictEqual } from 'node:assert'
 import { scratchPath } from '../paths'
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -8,6 +9,7 @@ import { measurePress, pressStampScript, type PressTiming } from '../press-timin
 import {
   chords,
   diffPaneSelector,
+  editorRowSelector,
   editorViewportSelector,
   markdownPreviewRowSelector,
   openGitPanel,
@@ -36,8 +38,51 @@ const results = new WeakMap<Page, PressTiming[]>()
 
 type Target = { readonly needle: string; readonly kind: 'file' | 'diff' }
 
+export const markdownCoverageSource = (needle: string) => `# ${needle}
+
+plain **strong** *italic* ~~strike~~ \`code\` [label][coverage-ref]
+
+- [x] task
+
+> one
+> two
+
+| left | right |
+| --- | --- |
+| **cell** | value |
+
+\`\`\`javascript
+const coverage = 1
+\`\`\`
+
+`
+
+function markdownCoverageRows(needle: string): readonly string[] {
+  return [
+    needle,
+    'plain strong italic strike code label',
+    '• ☑ task',
+    '│ one',
+    '│ two',
+    '| cell | value |',
+    'const coverage = 1',
+  ]
+}
+
+export async function assertMarkdownCoverage(page: Page, needle: string): Promise<void> {
+  await page.waitForFunction(`(${sampleEditorPaint({ needle, kind: 'file' })})().preview`)
+  strictEqual(
+    await page.evaluate(`(${sampleEditorPaint({ needle, kind: 'file' })})().preview`),
+    true,
+  )
+}
+
 // A view is the target's when it holds the marker line written into that file only.
 export function sampleEditorPaint({ needle, kind }: Target) {
+  const expected =
+    kind === 'file' && needle.startsWith('MARKFILE') && needle.endsWith('.md')
+      ? markdownCoverageRows(needle)
+      : null
   return `() => {
     const diff = ${JSON.stringify(kind === 'diff')}
     let view = null
@@ -50,13 +95,26 @@ export function sampleEditorPaint({ needle, kind }: Target) {
     if (!view) return frame
     frame.colour = view.querySelector(${JSON.stringify(provisionalTokenSelector)}) !== null
     frame.preview = view.querySelector(${JSON.stringify(markdownPreviewRowSelector)}) !== null
+    const expected = ${JSON.stringify(expected)}
+    if (expected) {
+      const rows = Array.from(view.querySelectorAll(${JSON.stringify(editorRowSelector)}), row => row.textContent || '')
+      frame.preview = expected.every(text => rows.includes(text))
+    }
+    let fenceColour = false
+    const textRange = expected ? document.createRange() : null
     for (const [name, highlight] of CSS.highlights) {
       if (!name.startsWith(${JSON.stringify(sharedTokenHighlightPrefix)})) continue
       for (const range of highlight) {
-        if (view.contains(range.startContainer)) { frame.colour = true; break }
+        if (!view.contains(range.startContainer)) continue
+        frame.colour = true
+        if (!textRange || range.startContainer.parentElement?.closest(${JSON.stringify(editorRowSelector)})?.textContent !== 'const coverage = 1') continue
+        textRange.setStart(range.startContainer, range.startOffset)
+        textRange.setEnd(range.endContainer, range.endOffset)
+        if (textRange.toString() === 'const') fenceColour = true
       }
-      if (frame.colour) break
+      if (frame.colour && (!expected || fenceColour)) break
     }
+    if (expected) frame.preview = frame.preview && fenceColour
     return frame
   }`
 }
@@ -67,6 +125,8 @@ async function measure(page: Page, name: string, target: Target, press: () => Pr
   const timing = await measurePress(page, name, sampleEditorPaint(target), press)
   results.get(page)?.push(timing)
   console.log(JSON.stringify(timing))
+  if (target.kind === 'file' && target.needle.endsWith('.md'))
+    await assertMarkdownCoverage(page, target.needle)
 }
 
 async function typeQuickOpen(page: Page, file: string) {
@@ -112,7 +172,15 @@ async function createFixture() {
     for (const [name, source] of Object.entries(SOURCES)) {
       const lines = (await readFile(path.join(REPOSITORY, source), 'utf8')).split('\n')
       lines.splice(2, 0, name.endsWith('.md') ? `MARKFILE${name}` : `// MARKFILE${name}`)
-      await writeFile(path.join(fixture, name), lines.join('\n'))
+      const text = lines.join('\n')
+      await writeFile(
+        path.join(fixture, name),
+        name.endsWith('.md')
+          ? markdownCoverageSource(`MARKFILE${name}`) +
+              text +
+              '\n\n[coverage-ref]: /resolved-at-eof\n'
+          : text,
+      )
     }
     await fixtureGit(fixture, ['add', '.'])
     await fixtureGit(fixture, ['commit', '--quiet', '-m', 'initial'])

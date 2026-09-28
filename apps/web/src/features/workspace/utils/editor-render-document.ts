@@ -10,6 +10,7 @@ export function readyFile(fileState: LoadState<FileResult>) {
 }
 
 export function joinedEditorRenderDocument({
+  analysis,
   buffer,
   documentKey,
   editability,
@@ -17,6 +18,7 @@ export function joinedEditorRenderDocument({
   preparedDocument,
   view,
 }: {
+  analysis?: EditorRenderDocument['analysis']
   buffer: EditorRenderDocument['buffer'] | null
   documentKey: DocumentKey | null
   editability: EditorRenderDocument['editability']
@@ -30,6 +32,7 @@ export function joinedEditorRenderDocument({
   if (!view) return null
 
   return {
+    analysis,
     buffer,
     editability,
     key: documentKey,
