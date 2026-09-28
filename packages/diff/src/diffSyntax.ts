@@ -240,7 +240,8 @@ export class DiffSyntaxController {
 
   /**
    * Hands the parsed streams of the current file to the caller, which then owns them; empty while
-   * a parse is still running. The controller keeps painting what it projected.
+   * a parse is still running. The controller keeps projecting their current tokens, and stops
+   * following their recolouring.
    */
   release(): readonly PreparedDiffSyntaxSource[] {
     if (!this.ready || this.sourcesFile !== this.file) return []
@@ -248,8 +249,6 @@ export class DiffSyntaxController {
     const sources = this.sources
     this.unsubscribeSources()
     this.sources = []
-    this.indexed = []
-    this.sourcesFile = null
     return sources
   }
 
@@ -361,9 +360,15 @@ async function loadSyntaxSources(
   const service = diffSyntaxService(diffSyntaxBackend(backend))
   if (!service) return null
 
+  // A task cancelled mid-load has already run its cancel callback, so a stale load disposes
+  // whatever it created itself: nothing else will.
+  const stale = () => {
+    disposeMutableSessions(created)
+    return null
+  }
   const sources: PreparedDiffSyntaxSource[] = []
   for (const document of syntaxDocumentsForFile(file, side)) {
-    if (!isCurrent()) return null
+    if (!isCurrent()) return stale()
 
     const session = await service.createSession(document)
     if (!session) continue
@@ -371,10 +376,11 @@ async function loadSyntaxSources(
     const source = new PreparedDiffSyntaxSource(document.side, document.lineStarts)
     created.push(source)
     source.own(session)
+    if (!isCurrent()) return stale()
     const unsubscribe = session.onDidChangeTheme?.(() => void source.recolor(session))
     if (unsubscribe) source.own({ dispose: unsubscribe })
     const result = await session.refresh()
-    if (!isCurrent()) return null
+    if (!isCurrent()) return stale()
 
     source.setTokens(result.tokens)
     sources.push(source)

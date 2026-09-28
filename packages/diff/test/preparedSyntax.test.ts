@@ -159,6 +159,24 @@ describe('prepared diff syntax', () => {
     expect(backend.disposed).toBe(2)
   })
 
+  it('keeps projecting released streams across an expansion toggle', async () => {
+    const backend = countingBackend()
+    const plugin = createDiffPlugin({
+      mode: 'document',
+      side: 'stacked',
+      syntaxBackend: backend.backend,
+    })
+    plugin.setFile(typescriptDiff())
+    await flushUntil(() => plugin.isSyntaxReady())
+    const tokens = plugin.getTokens()
+
+    expect(plugin.releasePreparedSyntax()).toHaveLength(2)
+    const hunk = plugin.getRows().find((row) => row.type === 'hunk')
+    if (hunk?.expandKey) plugin.toggleRegion(hunk.expandKey)
+
+    expect(plugin.getTokens().length).toBe(tokens.length)
+  })
+
   it('an aborted preparation resolves empty and keeps no session', async () => {
     const backend = countingBackend()
     const controller = new AbortController()
