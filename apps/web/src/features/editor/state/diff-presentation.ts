@@ -50,7 +50,7 @@ export function createDiffPresentationBinding(presentation: DiffPanePresentation
           'editor.restoreDiffSelection',
         )
       }
-      if (scroll) editor.setScrollPosition(scroll)
+      editor.setScrollPosition(scroll ?? { left: 0, top: 0 })
       restored = true
     },
   }
