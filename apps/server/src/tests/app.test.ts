@@ -1243,8 +1243,13 @@ describe('git rpc', () => {
     await runGit(root, ['add', 'binary.dat', 'large.txt'])
     await runGit(root, ['commit', '-m', 'initial'])
     await writeFile(path.join(root, 'binary.dat'), new Uint8Array([0, 1, 3]))
-    await writeFile(path.join(root, 'large.txt'), 'larger\n')
-    const app = testApp(root, { maxTextFileBytes: 5 })
+    await writeFile(path.join(root, 'large.txt'), 'x'.repeat(1024 * 1024 + 1))
+    await mkdir(path.join(root, '.platform-test'), { recursive: true })
+    await writeFile(
+      path.join(root, '.platform-test', 'settings.json'),
+      JSON.stringify({ 'git.maxDiffFileSizeMiB': 1 }),
+    )
+    const app = testApp(root)
 
     const binary = await app.handle(
       new Request('http://local/git/diff?path=binary.dat', {
@@ -1269,18 +1274,24 @@ describe('git rpc', () => {
     expect(large.status).toBe(200)
     const [largeDiff] = (await large.json()) as GitDiffTestPayload
     expect(largeDiff.path).toBe('large.txt')
-    expect(largeDiff.hunks.length).toBeGreaterThan(0)
-    expect(largeDiff.oldObjectId).toBeUndefined()
+    expect(largeDiff.hunks).toEqual([])
+    expect(largeDiff.omitted).toBe('size')
+    expect(largeDiff.oldObjectId).toEqual(expect.any(String))
     expect(largeDiff.newObjectId).toBeUndefined()
     expect(largeDiff.oldText).toBeUndefined()
     expect(largeDiff.newText).toBeUndefined()
   })
 
-  it('skips untracked files above the text diff limit', async () => {
+  it('reports untracked files above the diff limit', async () => {
     const root = await fixtureRoot()
     await initGitRepository(root)
-    await writeFile(path.join(root, 'large.txt'), 'larger\n')
-    const app = testApp(root, { maxTextFileBytes: 5 })
+    await writeFile(path.join(root, 'large.txt'), 'x'.repeat(1024 * 1024 + 1))
+    await mkdir(path.join(root, '.platform-test'), { recursive: true })
+    await writeFile(
+      path.join(root, '.platform-test', 'settings.json'),
+      JSON.stringify({ 'git.maxDiffFileSizeMiB': 1 }),
+    )
+    const app = testApp(root)
 
     const response = await app.handle(
       new Request('http://local/git/diff?path=large.txt', {
@@ -1289,14 +1300,14 @@ describe('git rpc', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual([])
+    expect(await response.json()).toMatchObject([{ path: 'large.txt', omitted: 'size', patch: '' }])
   })
 
   it('omits blob text when the opened snapshot exceeds the text limit', async () => {
     const root = await fixtureRoot()
     await initGitRepository(root)
     await writeFile(path.join(root, 'old.txt'), 'one\n')
-    await writeFile(path.join(root, 'new.txt'), 'larger\n')
+    await writeFile(path.join(root, 'new.txt'), 'x'.repeat(1024 * 1024 + 1))
     const oldObject = await runGit(root, ['hash-object', '-w', 'old.txt'])
     const newObject = await runGit(root, ['hash-object', '-w', 'new.txt'])
     const params = new URLSearchParams({
@@ -1304,7 +1315,12 @@ describe('git rpc', () => {
       oldObjectId: oldObject.stdout.trim(),
       path: 'large.txt',
     })
-    const app = testApp(root, { maxTextFileBytes: 5 })
+    await mkdir(path.join(root, '.platform-test'), { recursive: true })
+    await writeFile(
+      path.join(root, '.platform-test', 'settings.json'),
+      JSON.stringify({ 'git.maxDiffFileSizeMiB': 1 }),
+    )
+    const app = testApp(root)
 
     const response = await app.handle(
       new Request(`http://local/git/diff/blob?${params}`, {
@@ -1314,7 +1330,8 @@ describe('git rpc', () => {
 
     expect(response.status).toBe(200)
     const [diff] = (await response.json()) as GitDiffTestPayload
-    expect(diff.hunks.length).toBeGreaterThan(0)
+    expect(diff.hunks).toEqual([])
+    expect(diff.omitted).toBe('size')
     expect(diff.oldObjectId).toBe(oldObject.stdout.trim())
     expect(diff.newObjectId).toBe(newObject.stdout.trim())
     expect(diff.oldText).toBeUndefined()
@@ -1517,6 +1534,7 @@ type GitStatusTestPayload = {
 }
 
 type GitDiffTestPayload = Array<{
+  omitted?: 'size'
   hunks: Array<Record<string, unknown>>
   newObjectId?: string
   newText?: string

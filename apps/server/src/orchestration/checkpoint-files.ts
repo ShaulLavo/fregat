@@ -18,8 +18,8 @@ export function checkpointFilesFromDiffs(
     if (!diff.path) continue
 
     files.push({
-      additions: countChangedLines(diff, 'added'),
-      deletions: countChangedLines(diff, 'deleted'),
+      additions: diff.lineStats?.additions ?? countChangedLines(diff, 'added'),
+      deletions: diff.lineStats?.deletions ?? countChangedLines(diff, 'deleted'),
       kind: checkpointFileKind(diff),
       path: diff.path,
     })

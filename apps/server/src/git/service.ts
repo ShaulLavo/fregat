@@ -3,6 +3,8 @@ import { elapsedMs } from '@workspace/utils/timing'
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { FsError } from '../fs/errors'
+import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../fs/limits'
+import { parseRawDiff } from './raw-diff'
 import type { WorkspacePath, WorkspacePaths } from '../fs/path'
 import { limitText, recordGitCommand, recordRequestContext } from '../observability'
 import type {
@@ -45,6 +47,7 @@ import {
   type ForgeBoundaries,
 } from './pull-request'
 import {
+  joinPath,
   mutationPaths,
   pathspecArgs,
   relativeInsideRoot,
@@ -107,6 +110,7 @@ type GitServiceOptions = {
   diffConcurrency?: number
   maxCommandOutputBytes?: number
   maxDiffFileBytes?: () => number
+  maxTextFileBytes?: number
   now?: () => number
   repositoryCacheTtlMs?: number
   statusCacheTtlMs?: number
@@ -192,6 +196,7 @@ export class GitService {
   private readonly diffConcurrency: number
   private readonly maxCommandOutputBytes: number
   private readonly maxDiffFileBytes: () => number
+  private readonly maxTextFileBytes: number
   private readonly repositoryRoots: BoundedTtlCache<GitRepositoryRoot | null>
   private readonly statuses: BoundedTtlCache<GitStatusResult>
   private readonly upstreamFetch: UpstreamFetchScheduler
@@ -200,6 +205,7 @@ export class GitService {
 
   constructor(paths: WorkspacePaths, options: GitServiceOptions = {}) {
     this.paths = paths
+    this.maxTextFileBytes = options.maxTextFileBytes ?? DEFAULT_MAX_TEXT_FILE_BYTES
     this.diffConcurrency = positiveInteger(options.diffConcurrency, DEFAULT_DIFF_CONCURRENCY)
     this.maxCommandOutputBytes = positiveInteger(options.maxCommandOutputBytes, MAX_OUTPUT_BYTES)
     this.maxDiffFileBytes =
@@ -309,13 +315,12 @@ export class GitService {
       ...(staged ? ['--cached'] : []),
       ...pathspecs,
     ]
-    const result = await this.git(repository.rootAbsolutePath, args)
-    const tracked = parseDiff(result.stdout, repository.rootPath, staged)
+    const tracked = await this.boundedDiff(repository, args, staged)
     const untracked = staged ? [] : await this.untrackedDiffs(repository)
     const diffs = tracked.concat(untracked)
     const results = await mapWithConcurrency(diffs, this.diffConcurrency, async (diff) => {
       const snapshot = await this.withDiffSnapshotRefs(repository, diff)
-      if (!snapshot.oldObjectId && !snapshot.newObjectId) return snapshot
+      if (snapshot.omitted || (!snapshot.oldObjectId && !snapshot.newObjectId)) return snapshot
       // A file open needs both sources; directory-wide patch listings stay bounded to patches.
       const paths = [diff.path, diff.oldPath].filter((value) => value !== undefined)
       const singleFile = paths.some(
@@ -331,6 +336,9 @@ export class GitService {
     recordGitServiceOperation('diff_blob', query.path || query.oldPath || '')
     const repository = await this.requiredRepositoryLocation(query.path || query.oldPath || '')
     const oldPath = query.oldPath ?? query.path
+    if (await this.isBlobDiffTooLarge(repository, query)) {
+      return [{ ...query, staged: false, patch: '', hunks: [], omitted: 'size' }]
+    }
     const rawPatch = await this.blobPatch(repository, query)
     // parseDiff below re-roots the patch's paths under repository.rootPath, so the
     // paths written into it here must already be repo-root-relative, not workspace-relative.
@@ -367,26 +375,29 @@ export class GitService {
       ignoreWhitespace: input.ignoreWhitespace ?? false,
     })
     const repository = await this.requiredRepositoryLocation(input.path)
-    const result = await this.git(repository.rootAbsolutePath, [
-      'diff',
-      '--no-color',
-      '--no-ext-diff',
-      '--no-textconv',
-      '--src-prefix=a/',
-      '--dst-prefix=b/',
-      '--find-renames',
-      '--unified=3',
-      ...(input.ignoreWhitespace ? ['--ignore-all-space'] : []),
-      // Peel to a commit and close the revision list, exactly like the `hasRef`
-      // gate does. Without both, a checkpoint ref that `hasRef` accepts can
-      // still be read as a pathspec here and resolve to a different thing.
-      `${input.oldRef}^{commit}`,
-      `${input.newRef}^{commit}`,
-      '--',
-    ])
-    const diffs = parseDiff(result.stdout, repository.rootPath, false)
+    const diffs = await this.boundedDiff(
+      repository,
+      [
+        'diff',
+        '--no-color',
+        '--no-ext-diff',
+        '--no-textconv',
+        '--src-prefix=a/',
+        '--dst-prefix=b/',
+        '--find-renames',
+        '--unified=3',
+        ...(input.ignoreWhitespace ? ['--ignore-all-space'] : []),
+        // Peel to a commit and close the revision list, exactly like the `hasRef`
+        // gate does. Without both, a checkpoint ref that `hasRef` accepts can
+        // still be read as a pathspec here and resolve to a different thing.
+        `${input.oldRef}^{commit}`,
+        `${input.newRef}^{commit}`,
+        '--',
+      ],
+      false,
+    )
     const results = await mapWithConcurrency(diffs, this.diffConcurrency, async (diff) =>
-      this.withRefDiffSnapshotRefs(repository, diff, input),
+      diff.omitted ? diff : this.withRefDiffSnapshotRefs(repository, diff, input),
     )
 
     recordRequestContext({ git: { diffCount: results.length } })
@@ -465,7 +476,7 @@ export class GitService {
 
     const revisionPath = `${ref}:${repository.pathspec}`
     const result = await this.git(repository.rootAbsolutePath, ['show', revisionPath], {
-      maxOutputBytes: this.maxDiffFileBytes(),
+      maxOutputBytes: this.maxTextFileBytes,
     })
     return { content: result.stdout, path: input, ref }
   }
@@ -1235,12 +1246,70 @@ export class GitService {
     ].filter((pathspec) => pathspec.length > 0)
   }
 
+  private async boundedDiff(
+    repository: GitRepositoryLocation,
+    args: readonly string[],
+    staged: boolean,
+  ): Promise<GitFileDiff[]> {
+    const raw = await this.git(repository.rootAbsolutePath, [
+      ...args.slice(0, 1),
+      '--raw',
+      '-z',
+      '--no-abbrev',
+      ...args.slice(1).filter((argument) => !argument.startsWith('--unified=')),
+    ])
+    const entries = parseRawDiff(raw.stdout, repository.rootPath, staged)
+    const checked = await mapWithConcurrency(entries, this.diffConcurrency, async (entry) => {
+      const [oldSize, newSize] = await Promise.all([
+        entry.oldObjectId ? this.gitObjectSize(repository, entry.oldObjectId) : null,
+        this.rawDiffNewSize(repository, entry),
+      ])
+      const limit = this.maxDiffFileBytes()
+      return isTooLarge(oldSize, limit) || isTooLarge(newSize, limit) ? entry : null
+    })
+    const omitted = checked.filter((entry) => entry !== null)
+    const stats = omitted.length
+      ? await this.diffLineStats(repository, args)
+      : new Map<string, GitLineStat>()
+    const excludes = omitted
+      .flatMap((entry) => [entry.path, entry.oldPath].filter(isString))
+      .map((file) => `:(exclude,literal)${repositoryRelativePath(repository.rootPath, file)}`)
+    const patchArgs = args.includes('--') ? [...args, ...excludes] : [...args, '--', ...excludes]
+    const result =
+      omitted.length === entries.length
+        ? ''
+        : (await this.git(repository.rootAbsolutePath, patchArgs)).stdout
+    return [
+      ...parseDiff(result, repository.rootPath, staged),
+      ...omitted.map((entry) => ({
+        ...entry,
+        omitted: 'size' as const,
+        lineStats: stats.get(entry.path),
+      })),
+    ]
+  }
+
+  private async diffLineStats(repository: GitRepositoryLocation, args: readonly string[]) {
+    const result = await this.git(repository.rootAbsolutePath, [
+      args[0]!,
+      '--numstat',
+      '-z',
+      ...args.slice(1).filter((argument) => !argument.startsWith('--unified=')),
+    ])
+    return parseNumstat(result.stdout, repository.rootPath)
+  }
+
+  private rawDiffNewSize(repository: GitRepositoryLocation, entry: GitFileDiff) {
+    if (entry.newFileMissing) return Promise.resolve(null)
+    if (entry.newObjectId) return this.gitObjectSize(repository, entry.newObjectId)
+    return this.workingTreeSize(repository, repositoryRelativePath(repository.rootPath, entry.path))
+  }
+
   private async withDiffSnapshotRefs(
     repository: GitRepositoryLocation,
     diff: GitFileDiff,
   ): Promise<GitFileDiff> {
     if (isBinaryGitDiff(diff)) return diff
-    if (await this.isDiffTooLarge(repository, diff)) return diff
 
     const [oldObjectId, newObjectId] = await Promise.all([
       this.diffSideObjectId(repository, diff, 'old'),
@@ -1384,16 +1453,23 @@ export class GitService {
 
   private async untrackedDiffs(repository: GitRepositoryLocation): Promise<GitFileDiff[]> {
     const files = await this.untrackedFiles(repository)
-    const diffableFiles = await mapWithConcurrency(files, this.diffConcurrency, async (file) =>
-      this.diffableUntrackedFile(repository, file),
-    )
-    const outputs = await mapWithConcurrency(
-      diffableFiles.filter(isString),
-      this.diffConcurrency,
-      async (file) => this.noIndexDiff(repository, file),
-    )
-
-    return outputs.flatMap((output) => parseDiff(output, repository.rootPath, false))
+    const results = await mapWithConcurrency(files, this.diffConcurrency, async (file) => {
+      const size = await this.workingTreeSize(repository, file)
+      if (size === null) return []
+      if (size > this.maxDiffFileBytes())
+        return [
+          {
+            path: joinPath(repository.rootPath, file),
+            oldFileMissing: true,
+            staged: false,
+            patch: '',
+            hunks: [],
+            omitted: 'size' as const,
+          },
+        ]
+      return parseDiff(await this.noIndexDiff(repository, file), repository.rootPath, false)
+    })
+    return results.flat()
   }
 
   private async untrackedFiles(repository: GitRepositoryLocation) {
@@ -1407,14 +1483,6 @@ export class GitService {
     ])
 
     return result.stdout.split('\0').filter(Boolean)
-  }
-
-  private async diffableUntrackedFile(repository: GitRepositoryLocation, pathspec: string) {
-    const size = await this.workingTreeSize(repository, pathspec)
-    if (size === null) return null
-    if (size > this.maxDiffFileBytes()) return null
-
-    return pathspec
   }
 
   private async noIndexDiff(repository: GitRepositoryLocation, pathspec: string) {
@@ -1467,20 +1535,6 @@ export class GitService {
     return this.writeWorkingTreeObject(repository, path)
   }
 
-  private async isDiffTooLarge(
-    repository: GitRepositoryLocation,
-    diff: GitFileDiff,
-  ): Promise<boolean> {
-    const [oldSize, newSize] = await Promise.all([
-      this.diffSideSize(repository, diff, 'old'),
-      this.diffSideSize(repository, diff, 'new'),
-    ])
-
-    return (
-      isTooLarge(oldSize, this.maxDiffFileBytes()) || isTooLarge(newSize, this.maxDiffFileBytes())
-    )
-  }
-
   private async gitObjectId(repository: GitRepositoryLocation, revisionPath: string) {
     const result = await this.git(repository.rootAbsolutePath, ['rev-parse', revisionPath], {
       allowFailure: true,
@@ -1499,34 +1553,6 @@ export class GitService {
     if (result.exitCode !== 0) return null
 
     return result.stdout.trim() || null
-  }
-
-  private async diffSideSize(
-    repository: GitRepositoryLocation,
-    diff: GitFileDiff,
-    side: 'old' | 'new',
-  ) {
-    if (side === 'old') return this.oldDiffSize(repository, diff)
-
-    return this.newDiffSize(repository, diff)
-  }
-
-  private async oldDiffSize(repository: GitRepositoryLocation, diff: GitFileDiff) {
-    const path = repositoryRelativePath(repository.rootPath, diff.oldPath ?? diff.path)
-    if (!path) return null
-    if (diff.oldFileMissing) return null
-    if (diff.staged) return this.gitObjectSize(repository, `HEAD:${path}`)
-
-    return this.gitObjectSize(repository, `:${path}`)
-  }
-
-  private async newDiffSize(repository: GitRepositoryLocation, diff: GitFileDiff) {
-    const path = repositoryRelativePath(repository.rootPath, diff.path)
-    if (!path) return null
-    if (diff.newFileMissing) return null
-    if (diff.staged) return this.gitObjectSize(repository, `:${path}`)
-
-    return this.workingTreeSize(repository, path)
   }
 
   private async gitObjectSize(repository: GitRepositoryLocation, revisionPath: string) {
@@ -1552,7 +1578,7 @@ export class GitService {
   }
 
   // File content, not command output: the caller already gated on the blob
-  // size, so the budget here is the workspace's text-file limit.
+  // size, so the output budget follows the Git comparison limit.
   private async gitObjectText(repository: GitRepositoryLocation, objectId: string) {
     const result = await this.git(repository.rootAbsolutePath, ['cat-file', '-p', objectId], {
       maxOutputBytes: this.maxDiffFileBytes(),

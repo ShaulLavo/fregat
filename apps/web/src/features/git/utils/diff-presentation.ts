@@ -31,6 +31,8 @@ export function unrenderableDiffNotice(
   info: GitComparison,
   rootPath: string,
 ): string {
+  if (diffs.some((diff) => diff.omitted === 'size'))
+    return 'File exceeds the Git diff size limit. Adjust Diff file size limit in Settings to compare it.'
   if (diffs.some(isBinaryGitDiff)) return 'Binary file — no text diff to show.'
 
   const renamed = diffs.find(isRenamedDiff)

@@ -224,6 +224,7 @@ export function createApp(options: AppOptions) {
     autoPullPolicy: (root) =>
       autoPullEnabled(settings, () => orchestration.checkoutProjectId(root)),
     maxDiffFileBytes: () => settings.snapshot().values['git.maxDiffFileSizeMiB'] * MIB,
+    maxTextFileBytes: fs.info().maxTextFileBytes,
     forgeBoundaries: options.orchestration?.forgeBoundaries,
   })
   const database = options.orchestration?.database ?? getDefaultPlatformDatabase()

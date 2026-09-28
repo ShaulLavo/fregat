@@ -15,7 +15,8 @@ export function parseNumstat(output: string, rootPath: string) {
   const records = output.split('\0')
 
   for (let index = 0; index < records.length; index += 1) {
-    const [additions, deletions, inlinePath] = (records[index] ?? '').split('\t')
+    const [additions, deletions, ...pathParts] = (records[index] ?? '').split('\t')
+    const inlinePath = pathParts.length ? pathParts.join('\t') : undefined
     if (additions === undefined || deletions === undefined || inlinePath === undefined) continue
 
     // A rename leaves the path field empty and follows with old and new paths.

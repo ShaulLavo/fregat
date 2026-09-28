@@ -318,7 +318,7 @@ export const SETTINGS_REGISTRY = {
     category: 'Git',
     title: 'Diff file size limit',
     description:
-      'Maximum size in MiB of each file version loaded for a Git comparison. Larger files show their change summary. Applies to Git revision reads too.',
+      'Maximum size in MiB of each file version loaded for a Git comparison. Larger files show a size-limit notice.',
     visibility: 'advanced',
     keywords: ['diff', 'size', 'limit', 'memory', 'large'],
   }),

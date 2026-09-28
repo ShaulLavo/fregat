@@ -12,6 +12,7 @@ export function diffQueryOptions(path: string, staged: boolean) {
     queryFn: async ({ signal, client }) => {
       const diffs = await fetchDiff(path, staged, signal, clientForQueryClient(client))
       for (const diff of diffs) {
+        if (diff.omitted) continue
         if (!diff.oldObjectId && !diff.newObjectId) continue
         client.setQueryData(blobDiffQueryKey(diff), [diff])
       }

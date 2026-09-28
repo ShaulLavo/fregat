@@ -647,6 +647,11 @@ export const selectors = {
   settingsScopeTab: (page: Page, name: 'User' | 'Workspace' | 'Defaults', selected?: boolean) =>
     page.getByRole('tab', { name, exact: true, selected }),
   settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),
+  gitSizeLimitNotice: (page: Page) =>
+    page.getByText(
+      'File exceeds the Git diff size limit. Adjust Diff file size limit in Settings to compare it.',
+      { exact: true },
+    ),
   settingsNumber: (page: Page, name: string) => page.getByRole('spinbutton', { name, exact: true }),
   settingsRow: (page: Page, id: string) => page.locator(`[data-setting-row="${id}"]`),
   settingsCodeThemePreview: (page: Page, id: string) =>

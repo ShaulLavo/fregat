@@ -7,6 +7,7 @@ import {
   createQueryClientOwnerConflictError,
   createQueryClientOwnerMissingError,
 } from '@workspace/client-core/environments/utils/structured-errors'
+import { installGitBudgetInvalidation } from '@/lib/environments/state/git-budget-invalidation'
 import { installFileSnapshotQueryCachePolicy } from '@/lib/file-snapshot-query-cache'
 import { retryUnlessClientError } from '@/lib/environments/utils/query-retry'
 
@@ -39,6 +40,7 @@ export function queryClientFor(origin: string): QueryClient {
   })
   registerEnvironmentQueryClient(queryClient, origin)
   installFileSnapshotQueryCachePolicy(queryClient)
+  installGitBudgetInvalidation(queryClient)
   installServerRestartInvalidation(queryClient, origin)
   queryClients.set(origin, queryClient)
   return queryClient

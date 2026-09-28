@@ -109,6 +109,8 @@ export type GitDiffHunk = {
 }
 
 export type GitFileDiff = {
+  omitted?: 'size'
+  lineStats?: GitLineStat
   path: string
   oldPath?: string
   oldFileMissing?: boolean

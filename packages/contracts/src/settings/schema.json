@@ -561,7 +561,7 @@
     },
     "git.maxDiffFileSizeMiB": {
       "default": 50,
-      "description": "Maximum size in MiB of each file version loaded for a Git comparison. Larger files show their change summary. Applies to Git revision reads too.",
+      "description": "Maximum size in MiB of each file version loaded for a Git comparison. Larger files show a size-limit notice.",
       "maximum": 200,
       "minimum": 1,
       "type": "integer"

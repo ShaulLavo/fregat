@@ -1,3 +1,4 @@
+import { checkpointFilesFromDiffs } from '../../orchestration/checkpoint-files'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -431,7 +432,8 @@ describe('git diff size budget', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0].newText).toBeUndefined()
     expect(rows[0].path).toBe('tracked.txt')
-    expect(rows[0].hunks.length).toBeGreaterThan(0)
+    expect(rows[0].omitted).toBe('size')
+    expect(rows[0].patch).toBe('')
     const read = await app.handle(
       new Request('http://local/fs/read?path=tracked.txt', {
         headers: trustedOriginHeaders(),
@@ -439,6 +441,103 @@ describe('git diff size budget', () => {
     )
     expect(read.status).toBe(200)
     expect(await read.json()).toMatchObject({ content: text })
+  })
+
+  it('opens a revision above the diff budget and refuses a large patch before collecting it', async () => {
+    const root = await fixtureRepo()
+    await writeFile(path.join(root, 'tracked.txt'), 'a'.repeat(4096))
+    await runGit(root, ['commit', '-am', 'large baseline'])
+    await writeFile(path.join(root, 'tracked.txt'), 'b'.repeat(4096))
+    const service = new GitService(createWorkspacePaths(root), {
+      maxDiffFileBytes: () => 1024,
+      maxCommandOutputBytes: 512,
+    })
+    expect((await service.file('tracked.txt', 'HEAD')).content).toHaveLength(4096)
+    expect(await service.diff('tracked.txt')).toMatchObject([{ omitted: 'size', patch: '' }])
+    await runGit(root, ['commit', '-am', 'large change'])
+    expect(await service.diffRefs({ path: '', oldRef: 'HEAD~1', newRef: 'HEAD' })).toMatchObject([
+      { path: 'tracked.txt', omitted: 'size', patch: '' },
+    ])
+    const oldObjectId = (await runGit(root, ['rev-parse', 'HEAD~1:tracked.txt'])).stdout.trim()
+    const newObjectId = (await runGit(root, ['rev-parse', 'HEAD:tracked.txt'])).stdout.trim()
+    expect(await service.diffBlob({ path: 'tracked.txt', oldObjectId, newObjectId })).toMatchObject(
+      [{ path: 'tracked.txt', omitted: 'size', patch: '' }],
+    )
+  })
+
+  it('keeps exact checkpoint counts and object identities for an oversized staged rename', async () => {
+    const root = await fixtureRepo()
+    const original = 'unchanged\n'.repeat(100) + 'old\n'
+    const changed = 'unchanged\n'.repeat(100) + 'new\nextra\n'
+    const renamed = 'renamed\twith\nlines.txt'
+    await writeFile(path.join(root, 'tracked.txt'), original)
+    await runGit(root, ['commit', '-am', 'large baseline'])
+    await runGit(root, ['mv', 'tracked.txt', renamed])
+    await writeFile(path.join(root, renamed), changed)
+    await runGit(root, ['add', renamed])
+    const service = new GitService(createWorkspacePaths(root), { maxDiffFileBytes: () => 64 })
+    const staged = await service.diff(renamed, true)
+    expect(staged).toMatchObject([
+      {
+        path: renamed,
+        oldPath: 'tracked.txt',
+        omitted: 'size',
+        patch: '',
+        lineStats: { additions: 2, deletions: 1 },
+        oldObjectId: expect.stringMatching(/^[a-f0-9]{40}$/),
+        newObjectId: expect.stringMatching(/^[a-f0-9]{40}$/),
+      },
+    ])
+    await runGit(root, ['commit', '-m', 'rename and edit'])
+    const refs = await service.diffRefs({ path: '', oldRef: 'HEAD~1', newRef: 'HEAD' })
+    expect(checkpointFilesFromDiffs(refs)).toEqual([
+      {
+        path: renamed,
+        kind: 'renamed',
+        additions: 2,
+        deletions: 1,
+      },
+    ])
+    await writeFile(path.join(root, renamed), changed + 'another\n')
+    const worktree = await service.diff(renamed)
+    expect(worktree[0]?.lineStats).toEqual({ additions: 1, deletions: 0 })
+  })
+
+  it('pins an omitted untracked version so raising the budget opens that exact snapshot', async () => {
+    const root = await fixtureRepo()
+    const saved = 'original snapshot\n'
+    await writeFile(path.join(root, 'new.txt'), saved)
+    let budget = 4
+    const service = new GitService(createWorkspacePaths(root), { maxDiffFileBytes: () => budget })
+    const [omitted] = await service.diff('new.txt')
+    expect(omitted).toMatchObject({
+      omitted: 'size',
+      newObjectId: expect.stringMatching(/^[a-f0-9]{40}$/),
+    })
+    expect(omitted?.oldObjectId).toBeUndefined()
+    await writeFile(path.join(root, 'new.txt'), 'later disk change\n')
+    budget = 64
+    const hydrated = await service.diffBlob({ path: 'new.txt', newObjectId: omitted!.newObjectId })
+    expect(hydrated).toMatchObject([{ newText: saved }])
+  })
+
+  it('keeps small diffs when a neighboring path exceeds the budget', async () => {
+    const root = await fixtureRepo()
+    await writeFile(path.join(root, 'large [x].txt'), 'a'.repeat(64))
+    await runGit(root, ['add', '.'])
+    await runGit(root, ['commit', '-m', 'second file'])
+    await writeFile(path.join(root, 'large [x].txt'), 'b'.repeat(64))
+    await writeFile(path.join(root, 'tracked.txt'), 'two\n')
+    const service = new GitService(createWorkspacePaths(root), { maxDiffFileBytes: () => 4 })
+    const diffs = await service.diff()
+    expect(diffs).toHaveLength(2)
+    expect(diffs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: 'large [x].txt', omitted: 'size', patch: '' }),
+        expect.objectContaining({ path: 'tracked.txt', hunks: expect.any(Array) }),
+      ]),
+    )
+    expect(diffs.find((diff) => diff.path === 'tracked.txt')?.patch).toContain('+two')
   })
 
   it('includes the exact boundary and uses a changed budget on the next read', async () => {
@@ -456,7 +555,7 @@ describe('git diff size budget', () => {
     expect(diff?.oldText).toBeUndefined()
     expect(diff?.newText).toBeUndefined()
     await writeFile(path.join(root, 'new.txt'), 'new\n')
-    expect(await service.diff('new.txt')).toEqual([])
+    expect(await service.diff('new.txt')).toMatchObject([{ path: 'new.txt', omitted: 'size' }])
     budget = 4
     expect(await service.diff('new.txt')).toMatchObject([{ newText: 'new\n' }])
   })
