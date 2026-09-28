@@ -166,10 +166,13 @@ dependency manifests, `vite.config.ts`.
 
 **MD — tree-sitter-md · port 5234 · Tier 1 if a slot is free, else first in Tier 2.** Owns the
 `ShaulLavo/tree-sitter-md` repo and Editor `packages/markdown`. Plan 176 (owner adopted 2026-09-26):
-P0 release (the C resolver spike on cmark's inline parser, then the four spec failures, frontmatter
-switch, CI, npm publish once the owner logs in), P1 the markdown document on the main thread, P2 live preview from records (needs
-E2's 111 P1 `trigger: 'edit'`), P3 colours, folds and injections from the same document, deleting the
-two old markdown grammars and the 256-layer cap path.
+Refreshed 2026-09-28: the C rewrite and tree-sitter-x extension have landed. P0 finishes the
+four spec failures, frontmatter switch, expanded incremental/fresh and nesting safety gates, CI
+and first publish. P1 integrates document-owned analysis and proves preparation responsiveness,
+aligned with Plan 198; reconcile that ownership boundary before implementation. P2 reads preview
+records using the landed 111 P1 edit trigger. P3 supplies colours, folds and fence injections
+from the same document and removes the old markdown grammars/cap path. Extend the existing
+first-paint scenarios. Full rendered blocks additionally require 111 P4–P5 and 108 P2.
 
 **D — documents and large files · port 5229.** 099 units 0–1 (harness extension first), then 112
 P2–P4 (raw-byte transport, thresholds after the minimap fold fix, tiers).

@@ -5,7 +5,7 @@ Status: Phase 1 done (completion wave, lane L8, 2026-09-25): the mode setting
 Cycle markdown view (per-document, in the palette and the editor title), the rendered pane
 (`features/workbench/components/markdown-preview-pane.tsx`) with the chat renderer and the
 editor's fence theme (highlighters moved to `lib/code-highlight`), workspace links and images,
-and scroll sync both ways. Scenario `markdown-split-view` drives all of it. Phase 2 stays parked on Plan 111.
+and scroll sync both ways. Scenario `markdown-split-view` drives all of it. Phase 2 awaits Plan 176 integration and Plan 111 Phases 4–5 for range mapping and block widgets.
 Default mode: live preview, the behaviour before this plan (no recommendation was written;
 Decided 2026-09-25 by keeping the existing behaviour).
 
@@ -50,11 +50,16 @@ Completion: a markdown file can be edited in source with a live rendered pane be
 
 ## Phase 2 — live preview, after Plans 111 and 176
 
-Blocked on Plan 111 Phase 1 (`trigger: 'edit'` sources) and Plan 176's owner question 1. The steps below are the intended shape, not a commitment ahead of its findings.
+Refreshed 2026-09-28: Plan 111 Phase 1's edit trigger has landed, and the owner selected
+`tree-sitter-md`. Parser release/integration remains in Plan 176; efficient range mapping and
+block layout remain in Plan 111 Phases 4–5. The [editor-behaviour research](../docs/markdown-parser/editor-behaviour.md)
+records the source-reveal precedent and proposed parsing/readiness contract. Fully rendered
+blocks stay backed by the same source buffer. Permanently hidden syntax with rich-text editing
+would require a separate interaction decision.
 
-1. **Re-source the structure (D5).** Drive replacements from the parser [Plan 176](176-markdown-parser.md) picks, with position data, rather than from highlight captures. Plan 176 recommends `@lezer/markdown` on the main thread (its owner question 1), parsed to the viewport inside the edit operation so the first frame is decorated, and its Phases 1–2 are this step. The existing structural recovery in `replacements.ts` is deleted, not extended.
+1. **Re-source the structure (D5).** Drive replacements from the parser [Plan 176](176-markdown-parser.md) picks, with position data, rather than from highlight captures. The selected parser is `tree-sitter-md`, now a C resolver and block grammar on `tree-sitter-x`. Plan 176 Phases 1–2 own complete block/reference preparation, lazy visible inline records and current-revision publication. Its first-frame guarantee applies to compatible ready analysis; cold-path responsiveness is a measured integration gate. The existing structural recovery in `replacements.ts` is deleted, not extended.
 2. **Block widgets (D6).** Whatever primitive Plan 111 concludes the editor needs, so a table, an image and a fence can each be replaced by a rendered block that the caret can enter and leave predictably.
-3. **Caret semantics.** Source reappears under the caret, as today, but defined against the AST: entering a node's range reveals its syntax, leaving it re-renders. Selection across a boundary must not lose characters — the current implementation's stated fallback is to leave malformed markdown alone, and that guarantee is kept.
+3. **Caret semantics.** Source reappears under the caret, as today, but defined against the AST: any caret or selection intersecting a construct reveals its syntax, leaving it re-renders. Selection across a boundary must not lose characters — the current implementation's stated fallback is to leave malformed markdown alone, and that guarantee is kept.
 4. **Undo and edit correctness.** A replacement is a view concern; the buffer holds source at all times. Every editing gesture over a replaced range produces the same buffer as it would in source mode. This is the test surface, not the visuals.
 5. **The experiment's behaviour is the baseline.** Nothing it renders correctly today may regress.
 

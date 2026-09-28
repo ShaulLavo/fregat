@@ -3,6 +3,12 @@
 Numbers behind [Plan 176](../../plans/176-markdown-parser.md). The plan carries the answers,
 the recommendation and the phases; this file carries the method and the tables.
 
+These are historical 2026-09-26 measurements. For the completed C rewrite, the newer
+`tree-sitter-x` extension at `ab81f6c`, and its additional correctness findings, see
+[Plan 176's current implementation and release gate](../../plans/176-markdown-parser.md#current-implementation-and-release-gate).
+This pass did not rerun timings. Do not compare the later container measurements directly
+with the machine and runtime below.
+
 ## Pinned sources
 
 | Source                               | Version / commit                                                       |

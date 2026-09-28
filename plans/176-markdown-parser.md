@@ -2,18 +2,19 @@
 
 ## Status and authorization
 
-- Status: RESEARCH DONE 2026-09-26 — recommendation: one parser, `tree-sitter-md` (a custom
-  tree-sitter block grammar and an inline resolver in one wasm module, its own repository),
-  behind live preview, colours, folds and fence injections; remark stays in chat. It passes 672/676
-  spec examples (lezer 662), has no real mismatch on our corpus (lezer about 20), and keystrokes at
-  1 MB cost 0.49 ms median, 1.0 ms p95 (lezer 0.59 and 3.0 ms in the same runs). See
-  [Custom grammar + Rust resolver spike](#custom-grammar--rust-resolver-spike). The lezer
-  findings below stand as the benchmark it was measured against. Adopted by the owner 2026-09-26
-  (question 1 (d)); the phases below are scheduled in the waves. The spike's resolver is Rust; the
-  release's is C (owner, 2026-09-26; Phase 0).
-  Calibrated 2026-09-26 ([tree-sitter-calibration.md](../docs/markdown-parser/tree-sitter-calibration.md)):
-  the 42 ms tree-sitter keystroke was the first reparse of a freshly parsed tree. A careful
-  integration of today's grammar costs 2.4 ms at 1 MB.
+- Status: **RELEASE COMPLETION AND EDITOR INTEGRATION REMAIN**, refreshed 2026-09-28.
+  Owner adopted `tree-sitter-md` on 2026-09-26. The C resolver rewrite and the subsequent
+  `tree-sitter-x` extension migration have landed upstream. Phase 0 below is the remaining
+  release gate; do not repeat those migrations. The parser serves the source-backed live preview
+  and future rendered blocks inside the Editor. Chat and the existing split renderer keep remark.
+- Current source of truth: upstream `tree-sitter-md` `ab81f6cb216c102dd6e551c095843d1a08da6ba2`,
+  Editor and Platform's CI `editor-ref` `2c4a27bcc6b8ebaac18a95744d16dcc7e003e15f`, checked
+  2026-09-28. The local parser checkout was still at `e819c44`; this refresh read the newer
+  upstream sources without changing that checkout.
+- The original research and Rust measurements below are historical. The
+  [current implementation and release gate](#current-implementation-and-release-gate) supersede
+  their packaging, completion and performance claims. The [behaviour research](../docs/markdown-parser/editor-behaviour.md)
+  separates observed editor practices from the proposed integration contract.
 - Replaces [Plan 108](108-markdown-modes.md) D5. Plan 108 Phase 2 and the chat parser decision
   wait on this plan. [Plan 111](111-editor-decorations.md)'s decoration API does not.
 - Planned at: Platform `d42184dc`, Editor `74e76be`, 2026-09-26. Researched at Platform
@@ -21,10 +22,40 @@
   source before their live-preview decorations land.
 - Method, tables and pinned versions: [docs/markdown-parser/measurements.md](../docs/markdown-parser/measurements.md).
 
+## Current implementation and release gate
+
+The [current upstream package](https://github.com/ShaulLavo/tree-sitter-md/tree/ab81f6cb216c102dd6e551c095843d1a08da6ba2)
+loads two artifacts, a block grammar and a C resolver extension, into `tree-sitter-x`. It shares
+that host's tree-sitter runtime and memory in a realm. Main thread and worker remain separate
+realms; this does not share a heap across them. Both the package and Editor pin the fork's built
+`web-tree-sitter` dependency to `e2985e082d9f3f137ca20af6d7cee9d1a1c8ddda`.
+
+Recorded evidence, not fresh benchmarks from this documentation pass:
+
+| Stage                          | Evidence                                                                                                                            | Meaning for implementation                                                                                   |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| C rewrite, merged as `299aa70` | 672/676 spec cases; 183/183 chat messages; exact gate over 497 docs; 129,793 gzip bytes; 1 MB edits 0.438 ms median / 0.891 ms p95  | Rewrite complete; these are the standalone C artifact's historical figures                                   |
+| Shared runtime, `ab81f6c`      | Resolver 54,897 + grammar 20,040 gzip bytes; 109 focused tests reported passing; spec remains 672/676                               | About 75 KB for the two modules, excluding host runtime/JS; runtime-sharing spike complete                   |
+| Extension measurements         | Separate Node 22/container run reports warm 1 MB edits 0.6412 ms median / 1.3590 ms p95; some bulk workloads regress                | Re-measure the integrated Editor on the same machine; do not compare directly with the older Node 26 figures |
+| Expanded stress suite          | 120 incremental/fresh discrepancies reported in both old and new builds; 256-level nesting still fails                              | Migration equivalence is not a clean correctness gate; reduce and resolve these before release               |
+| Release plumbing               | No `.github` workflows in the inspected upstream tree; constructor exposes only `gfm`; npm `latest` returned HTTP 404 on 2026-09-28 | Frontmatter option, CI and first publish remain                                                              |
+
+Sources: [C review measurements](https://github.com/ShaulLavo/tree-sitter-md/blob/ab81f6cb216c102dd6e551c095843d1a08da6ba2/docs/FINDINGS.md#review-fixes-and-current-artifact),
+[extension measurements](https://github.com/ShaulLavo/tree-sitter-md/blob/ab81f6cb216c102dd6e551c095843d1a08da6ba2/docs/measurements/tree-sitter-x/README.md),
+and the [stress runner](https://github.com/ShaulLavo/tree-sitter-md/blob/ab81f6cb216c102dd6e551c095843d1a08da6ba2/experiments/perf-next/stress.mjs).
+The 120 figure counts reported comparisons, not 120 independent bugs.
+
+Development can continue with Phase 0. Editor release is gated on its correctness work. Full
+rendered-block UX additionally needs Plan 111 Phases 4–5 and Plan 108 Phase 2; a parser alone does
+not provide block layout, hit testing or editing controls. Document lifetime and result admission
+must follow [Plan 198](198-document-owned-editor-analysis.md), with one compatible parser document
+per retained buffer and view-specific selections and range demands.
+
 ## Outcome
 
-A measured choice of the parser behind the editor's live preview and split view, and a measured
-answer to whether that parser can also replace remark in chat.
+One parser supplies structure for source-backed live preview and future fully rendered blocks
+inside the Editor, along with colours, folds and fence boundaries. The existing split view and
+chat keep remark. The historical research below explains the parser choice.
 
 Owner direction, 2026-09-26: lean towards tree-sitter as the only markdown parser, editor and chat,
 if it can be made correct and fast enough. `@lezer/markdown` is a benchmark candidate and a fork of
@@ -39,7 +70,7 @@ parse tables and runtime are C already; Rust only made sense for a parser writte
 language and one clang toolchain build the whole module, and the inline pass is vendored from the
 CommonMark reference implementation (`commonmark/cmark`).
 
-## What exists today
+## Baseline at the original research revision
 
 - **Live preview reads highlight captures, not the tree.** `@singapore-editor/markdown` receives
   `{ startIndex, endIndex, captureName }` records (`Editor/packages/editor/src/syntax/session.ts:9`).
@@ -76,7 +107,7 @@ CommonMark reference implementation (`commonmark/cmark`).
   streaming. Plan 108 D4 renders the split view with the same package. Chat and split-view fences
   are highlighted by Shiki with the editor theme; the editor highlights with tree-sitter.
 
-## Candidates
+## Candidates compared in the original research
 
 | Candidate                                 | Shape                                                                                                               | Known limits                                                              |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
@@ -84,7 +115,7 @@ CommonMark reference implementation (`commonmark/cmark`).
 | tree-sitter-markdown with a grown scanner | Fork or upstream the C external scanner                                                                             | Parser work in C against the spec examples                                |
 | A Rust parser compiled to wasm            | `pulldown-cmark`, `comrak`, `markdown-rs`                                                                           | None is incremental; a wasm load before the first parse                   |
 | `@lezer/markdown`, forked if needed       | Hand-written TypeScript that emits Lezer trees and reuses old tree fragments when it reparses; ships GFM extensions | Does not validate link references; a second tree format                   |
-| `tree-sitter-md` (owner direction)        | Custom block grammar + C inline resolver in one wasm module, own repository                                         | Its own tree-sitter runtime; 193 KB gzip                                  |
+| `tree-sitter-md` (owner direction)        | Block grammar + C resolver extension in tree-sitter-x, own repository                                               | Current modules about 75 KB gzip, host runtime excluded                   |
 | micromark (remark)                        | Today's chat parser, the baseline                                                                                   | One-shot parse; the editor would reparse the whole document per keystroke |
 
 ## Findings
@@ -147,7 +178,7 @@ reference links whose label has no definition, which neither tree-sitter nor lez
    time) it can: its block grammar has no stop position, but a 60-row prefix parses in 1.0 ms at
    any size, its visible inline nodes in 1.2 ms, and the rest arrives as an append edit (128 ms at
    1 MB, same tree as a fresh parse). lezer's first frame is 0.48 ms. Plan 177's frame-count
-   scenario does not exist yet; Phase 2 adds it.
+   scenario did not exist at that revision; it now exists as `prefetch-first-paint` and Phase 2 extends it.
 4. **What each tree carries** against remark: see the feature table in the measurements doc. In
    short, neither carries list tightness (derivable from blank lines between items), neither checks
    references, neither has footnotes; tree-sitter has frontmatter and a `$x$` math node chat does
@@ -187,8 +218,8 @@ reference links whose label has no definition, which neither tree-sitter nor lez
 Measured 2026-09-26 in [ShaulLavo/tree-sitter-md](https://github.com/ShaulLavo/tree-sitter-md)
 `b962319` (`/work/projects/tree-sitter-md`; findings in its `docs/FINDINGS.md`, method and rows
 in [measurements](../docs/markdown-parser/measurements.md#tree-sitter-md-custom-grammar--rust-resolver)).
-It clears every bar. The resolver measured here is Rust on pulldown-cmark; Phase 0 rewrites it in
-C and must match these numbers.
+It cleared the original spike gates. The resolver measured here is Rust on pulldown-cmark.
+The C rewrite has since landed; current release gates and expanded stress findings are above.
 
 - **Shape.** A fork of tree-sitter-markdown v0.5.3's block grammar with one token per line (556
   parse states against 925), and a Rust pass that runs each leaf block (paragraph, heading
@@ -235,83 +266,98 @@ C and must match these numbers.
 - **Incrementality per layer.** Block: tree-sitter's incremental reparse. Definitions: rescanned in
   the changed ranges, invalidation by label. Inline: per leaf, cached by text, resolved lazily for
   the requested rows, so a keystroke resolves one paragraph.
-- **Not done in the spike.** pulldown-cmark runs its whole pipeline per leaf, with continuation
+- **Not done in the original Rust spike.** pulldown-cmark runs its whole pipeline per leaf, with continuation
   lines re-indented by four virtual spaces so it cannot start a block the grammar ruled out;
-  Phase 0 replaces it with cmark's inline pass in C behind a leaf entry point. No footnotes, math
-  or CJK flanking (chat features). No license chosen. Not published: `npm publish` needs an npm login with
-  rights to the free `tree-sitter-md` name (and 2FA if the account has it), a license, and the
-  wasm built before `npm pack`.
+  the completed C rewrite removed that workaround. Footnotes, math and CJK flanking remain
+  outside this plan. MIT was subsequently chosen; current release tasks are in Phase 0 above.
 
-## Recommendation
+## Recommendation and integration scope
 
 - **Editor: `tree-sitter-md` for live preview, colours, folds and fence injections**, one parse
-  per document on the main thread, inside the edit operation. It is the owner's preferred shape
-  and it clears the bar: 99.4% against lezer's 97.9%, no real corpus mismatch, faster than lezer
-  at every size measured, and the one module serves every markdown output, so the editor holds
-  one markdown tree. Fence contents stay with web-tree-sitter's language grammars in the worker.
-  The price is bytes (193 KB gzip against 20 KB) and a second tree-sitter runtime beside
-  web-tree-sitter's.
+  per retained document, with ordinary edits integrated into the edit operation. The original
+  spike scored 99.4% against lezer's 97.9% with no unexplained corpus mismatch. The parser
+  supplies all Markdown outputs, so the Editor holds one Markdown tree. Fence contents stay with web-tree-sitter's language grammars in the worker.
+  The current extension modules cost about 75 KB gzip plus the host runtime and JS. Use
+  the current release gates above before claiming the integrated implementation meets the original
+  timings.
 - **Split view** keeps remark (Plan 108 D4); its scroll sync reads remark positions.
 - **Chat keeps remark** until the editor settles (owner, question 2). tree-sitter-md reaches chat
   only with footnotes, `$$` math and CJK flanking added and measured against remark.
 - **lezer** stays the fallback: if the owner rejects the bytes or the own-repository cost, Plan
   176's lezer recommendation and phases as of research/176b `1f74ff059` apply unchanged.
 
-Decided 2026-09-26: research recommendation — the document lives on the main thread, not in the
-worker: a keystroke costs 0.49 ms median and 1.0 ms p95 at 1 MB, the first frame needs a
-main-thread instance anyway, and one instance avoids parsing twice. The combined inline injection
+The 2026-09-26 research recommended a main-thread document: the spike's 1 MB keystrokes cost
+0.49 ms median and 1.0 ms p95, and one instance avoided parsing twice. Phase 1 must now verify
+that placement with the current implementation and complete-document preparation. The combined inline injection
 is closed (finding 6). A Rust parser alone stays closed (none is
 incremental; comrak's AST crossing costs more than a JavaScript parse); an inline pass behind
 an incremental block grammar, per leaf and cached, is the shape that works (Rust in the spike, C
-from Phase 0).
+from the completed Phase 0 rewrite).
 
 ## Proposed phases
 
-0. **tree-sitter-md to a release** (M; repository `ShaulLavo/tree-sitter-md`). First a C resolver
-   spike on a branch: replace the Rust crate with C that builds on `commonmark/cmark` 0.31.2's
-   inline parser (`inlines.c` and what it needs; BSD-2) through a one-leaf entry point, with GFM
-   strikethrough and autolink literals ported from `github/cmark-gfm`'s extensions (BSD-2; its own
-   core follows spec 0.29, so only the extensions come from it). The per-leaf cache, label-based
-   definition invalidation and the record, highlight, fold and injection outputs move to C; the JS
-   API stays, and the virtual-indent workaround goes with pulldown-cmark. clang builds grammar,
-   scanner, runtime and resolver for `wasm32`. The spike merges only if it holds the Rust build's
-   numbers: 672/676 spec examples or better, 0 real corpus mismatches, fuzz clean, and keystroke
-   median and p95 at 1 MB no slower than the Rust build in the same runs (0.49 and 1.0 ms at the
-   spike); size and memory reported. It also answers whether grammar and resolver can load as one web-tree-sitter side
-   module sharing the Editor's runtime (Plan 189 Pass 2 acts on the answer).
-   Then: fix the four spec failures and add a frontmatter switch; C tests, the spec floor, the corpus check and
-   the fuzz test in CI with a wasm build job; publish 0.1 to npm (MIT, chosen 2026-09-26;
-   publishing needs the owner's `npm login`). Notices: tree-sitter-markdown, tree-sitter, cmark
-   and cmark-gfm; pulldown-cmark's and markdown-rs's leave with their code.
-1. **Markdown document in `@singapore-editor/markdown`** (M; Editor `packages/markdown`). Depend
-   on `tree-sitter-md`; one `MarkdownDocument` per open markdown file on the main thread, edited
-   inside the edit operation; `setText` parses a 60-row prefix and appends the rest in idle time
-   (measure a chunked append: the whole append is one 29 ms task at 1 MB); one idle `reparse()`
-   after every full parse. Load and exercise the module ahead of the first markdown file (Plan 170).
-   Port `bench/spec.mjs` and `constructs.mjs` into `packages/markdown/test/` with micromark as a
-   dev dependency.
+0. **Finish the tree-sitter-md release** (M; repository `ShaulLavo/tree-sitter-md`).
+   Completed: C/cmark inline pass, removal of Rust and its virtual-indent workaround, MIT license
+   and third-party notices, shared-runtime extension, reference-boundary and viewport-seek fixes.
+   Remaining:
+   - Reduce the expanded stress suite's incremental/fresh discrepancies to regression fixtures;
+     fix them and require equality for decorations, highlights, folds and injections. Preserve
+     negative controls. Address deep-nesting failure with bounded parsing or a controlled,
+     documented source fallback; a wasm trap cannot leave a view frozen or corrupt sibling docs.
+   - Fix spec examples 96, 98, 216 and 260. Add a frontmatter option: CommonMark/GFM conformance
+     runs with it off; Editor file parsing enables it. Require 676/676 in conformance mode and
+     extension fixtures with it on. Keep exact, per-document corpus differences, not just totals.
+   - Add CI for the two wasm builds, focused JS and native ASan/UBSan checks, spec, corpus and
+     incremental/fresh tests. Use the committed chat corpus; make pinned repository fixtures
+     reproducible without the deleted research scratch directories.
+   - Verify packed-package import and wasm loading in Node, Bun and the Editor's Vite browser
+     build. Pin the same `tree-sitter-x` build in both consumers; exercise initialization order
+     and repeated initialization, and include both wasm assets and notices.
+   - Record current payload including host/JS, per-document memory, cold/warm browser opening,
+     edits and bulk workloads against the same-run baseline. Publish 0.1 to npm after these
+     gates. Publishing credentials may need the owner; implementation and package checks do not.
+1. **Markdown document in `@singapore-editor/markdown`** (M; Editor `packages/markdown`).
+   Implement the [proposed behaviour contract](../docs/markdown-parser/editor-behaviour.md#proposed-contract-for-platform).
+   One compatible parser belongs to the retained source buffer's analysis, aligned with Plan 198;
+   view attachment borrows it. Feed committed edits once, preserve undo, and dispose with the
+   analysis owner. Reconcile integration order with Plan 198 before changing its ownership APIs.
+   Use the current full-source block/definition pass and lazy visible inline resolution first.
+   Prepare/warm through Plans 170/177's existing paths; request restored visible ranges too.
+   Measure cold preparation, worst-case blocks, input latency and memory in Chromium. The current
+   synchronous API cannot promise cooperative slices: if it exceeds the established budget,
+   add and verify resumable or off-thread preparation before shipping that path. Record the
+   numeric budgets and chosen mechanism in the behaviour research. The former fixed 60-row
+   prefix/append prescription is retired; any partial parse needs explicit coverage, global
+   reference readiness and equality with a fresh full parse.
+   An idle `reparse()` is an optimization to retain only if its cost and first-edit benefit hold
+   for the current build. Share the parser's conformance fixtures; keep Editor integration tests
+   for buffer lifecycle, revision admission, visible records and source editing equivalence.
 2. **Live preview from records** (M; Editor `packages/markdown/src/replacements.ts`, `index.ts`;
-   needs Plan 111 Phase 1's `trigger: 'edit'`). Replace capture recovery with the records for the
+   uses the landed Plan 111 Phase 1 `trigger: 'edit'`). Replace capture recovery with records for
    visible rows plus a margin: heading, list, quote and fence marks, emphasis and strikethrough
    delimiters, code-span runs, `LinkText` inside each link or image, table cells, tasks.
-   Multi-line spans work. Delete the containment and adjacency code. Platform adds Plan 177's
-   frame-count scenario for markdown and Plan 108 Phase 2's editing-equivalence suite.
+   Multi-line spans work. Delete the containment and adjacency code. Extend the existing
+   `prefetch-first-paint` and `editor-tab-hover-highlights` scenarios with exact visible Markdown
+   coverage and stale-result checks. Add Plan 108 Phase 2's editing-equivalence suite; a probe
+   that only finds one preview span is insufficient.
 3. **Colours, folds and injections from the same document** (L; Editor syntax controller,
    `tree-sitter/src/treeSitter/treeSitter.worker.ts`, `tree-sitter-languages`). Markdown's root
-   layer reads `highlights()` and `folds()` on the main thread; `injections()` hands fence ranges
-   and languages to the worker, which parses only those layers. Delete the markdown and
-   markdown-inline grammars, their queries and the markdown path through the 256-layer cap. The
-   worker repairs from the calibration that still apply to fence layers: discover injections from
-   changed ranges plus the edit, bound each input read to its range, one idle reparse after a
-   full parse.
+   layer consumes `highlights()` and `folds()` from the document owner; `injections()` supplies
+   fence ranges/languages to the worker, which parses only fence layers. Follow Phase 1's
+   measured execution strategy: if preparation moves off-thread, publish revision-bound records
+   to the owner without repeating the full parse on the main thread. Delete the markdown and
+   markdown-inline grammars, their queries and the markdown path through the 256-layer cap.
+   Preserve the landed fence-layer worker repairs below. Fence requests and results carry
+   buffer incarnation/revision and configuration identity; a stale reply cannot decorate a moved
+   or deleted fence.
    The worker repairs landed 2026-09-26 in wave 2, lane E1 ([singapore#43](https://github.com/ShaulLavo/singapore/pull/43),
-   in `editor-ref` `db3e1bd`): injections found from changed ranges plus the edit, bounded input
-   reads, one idle reparse after a full parse, and the cap refilled after deletes. Worker bench at
+   originally in `editor-ref` `db3e1bd`, also present in the current `2c4a27b` pin): injections
+   found from changed ranges plus the edit, bounded input reads, one idle reparse after a full parse, and the cap refilled after deletes. Worker bench at
    1 MB: keystroke median 37 → 10 ms, first keystroke 82 → 20 ms. This phase keeps the rest.
 
 Chat: no phase while question 2 stands at (a).
 
-## Owner questions
+## Recorded owner decisions
 
 1. **The parser behind live preview.** (a) `@lezer/markdown` on the main thread; tree-sitter
    keeps colours, folds and fence injections. (b) tree-sitter in the worker with a preview query,
@@ -321,7 +367,8 @@ Chat: no phase while question 2 stands at (a).
    **Recommendation:** (d) — the owner's preferred shape, and it clears the bar: 672/676 against
    lezer's 662, no real corpus mismatch against lezer's ~20, keystroke at 1 MB 0.49 / 1.0 ms
    (median / p95) against 0.59 / 3.0 ms, first frame 0.36 against 0.47 ms, and one markdown tree
-   in the editor. The price is 193 KB gzip against 20 KB and a repository to maintain.
+   in the editor. These are the original Rust comparison figures; current packaging and release
+   gates are recorded above.
    Decided 2026-09-26: owner — (d), adopt `tree-sitter-md`. Licence MIT (committed `4214f0c`).
 2. **Chat.** The rule says remark leaves only for a candidate close to micromark with remark's
    features closed. (a) Keep remark in chat. (b) Move chat to lezer, with math and footnote
@@ -335,6 +382,8 @@ Chat: no phase while question 2 stands at (a).
 
 ## What this plan does not do
 
-- No decoration API work (Plan 111), no block widgets, no Obsidian features (Plan 108 Phase 3).
-- No grammar warm-up (Plan 170) and no prefetch work (Plan 177).
+- Plan 111 owns decoration/block-layout APIs and Plan 108 owns rendered-block interactions. This
+  parser must support both; Plan 176 alone does not ship their full UX or Plan 108 Phase 3 features.
+- Plans 170/177 own general warm-up and prefetch infrastructure; Phase 1 integrates this parser
+  with those paths and verifies its cold behaviour.
 - No change to chat rendering before the decision.

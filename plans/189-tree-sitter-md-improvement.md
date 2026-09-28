@@ -9,10 +9,11 @@
 - Repository: [ShaulLavo/tree-sitter-md](https://github.com/ShaulLavo/tree-sitter-md) (MIT), npm
   `tree-sitter-md`. Spike findings: `docs/FINDINGS.md` in that repository; Platform measurements in
   [`docs/markdown-parser/measurements.md`](../docs/markdown-parser/measurements.md).
-- Starting point (spike, 2026-09-26, Rust resolver; Plan 176 Phase 0 moves it to C at the same
-  numbers or better): 672/676 spec examples, 0 real mismatches against micromark on
-  our corpus, keystroke at 1 MB 0.49 ms median and 1.0 ms p95, first frame 0.36 ms warm and
-  6.4–9.5 ms cold, full parse 26 ms at 1 MB, 193 KB gzip, 7.5 MB linear memory for a 1 MB document.
+- Refreshed 2026-09-28 against `tree-sitter-md` `ab81f6c`. The C rewrite and shared-runtime
+  extension are complete. The two extension modules total 74,937 gzip bytes, excluding host/JS.
+  The spec score remains 672/676. The expanded stress runner reports 120 incremental/fresh
+  mismatching comparisons, and depth 256 still traps. Those release blockers belong to Plan 176
+  Phase 0. Its current-state table links the evidence and separates historical timing runs.
 
 ## Rules for every pass
 
@@ -24,20 +25,19 @@
   ordinary Editor bump.
 - **No pass trades another away silently.** A size or speed change reports all three numbers.
 
-## Open items from the spike (after Plan 176 Phase 0)
+## Boundary with Plan 176
 
-Plan 176 Phase 0 owns the inline pass rewrite, the four spec failures, the frontmatter switch, CI
-and the first publish. What remains:
+Plan 176 Phase 0 owns the four spec failures, frontmatter switch, existing incremental/fresh
+mismatches and nesting safety, CI and first publish. Its Phase 1 owns document integration,
+correct first paint, reference readiness, cold-load warm-up and the measured scheduling decision.
+The [behaviour contract](../docs/markdown-parser/editor-behaviour.md) replaces a fixed prefix-append
+assumption. Chunking is not a separate deferred task here: if needed for responsive integration,
+it must be proved in Phase 1. CodeMirror's scheduling is precedent, not an API the current parser has.
 
-1. **Chunked append** (S–M). `setText` on a 1 MB file appends the rest after the first 60 rows as one
-   29 ms task. Split it into idle-time chunks that keep incremental equal to fresh.
-2. **Cold first frame** (S). 6.4–9.5 ms cold against 0.4 ms warm is V8 compiling wasm lazily. Try
-   eager compile hints and one throwaway parse during Plan 170's warm-up; measure in Chromium.
-3. **Corpus differences that are shape, not error** (S). The 33 task-item paragraph shapes and the
-   3 autolink literals without positions: decide per construct whether to match mdast or document
-   the difference.
-4. **Example 260** (S). The lazy continuation inside nested quotes fails in upstream's scanner too;
-   fix it here and offer the fix upstream to tree-sitter-markdown.
+After that release, this plan owns new differential findings, extensions, and measured improvements
+to the shipped budgets. For the 33 task-item paragraph shapes and 3 positionless mdast autolinks,
+retain explicit per-construct differences until the rendering contract requires a change. Example
+260 belongs to Plan 176's four-spec-failure gate; offer its scanner fix upstream when it lands.
 
 ## Pass 1: correctness
 
@@ -63,15 +63,14 @@ to.
 
 ## Pass 2: memory and bundle size
 
-Starting at Phase 0's C release; the spike measured 193 KB gzip (pulldown-cmark ~120 KB of code, the
-tree-sitter C runtime 96 KB, parse tables and data 178 KB raw) and 7.5 MB of linear memory for a 1 MB
-document (2 MB of it the UTF-16 text). Re-measure before the first change.
+Start from Phase 0's released extension and re-measure its complete host/JS/grammar/resolver
+payload and per-document memory. The old Rust 193 KB figure and standalone C 130 KB figure are
+historical baselines, not current bundle costs.
 
-- **Size.** `-Oz` against `-O3` and `wasm-opt` (the Rust build measured 161 KB at `opt-level=z`, 10–20%
-  slower keystrokes, so decide with Pass 3's numbers); compress or drop the entity table; strip what
-  the Editor never calls. If Phase 0 found that grammar and resolver load as one web-tree-sitter side
-  module, drop the module's own tree-sitter runtime and share the Editor's; otherwise measure the
-  cost of the tree crossing a module boundary against the 96 KB.
+- **Size.** Compare `-Oz`, `-O3` and `wasm-opt` with speed and cold-load results; investigate entity
+  tables and unused exports. Runtime sharing already landed through `tree-sitter-x`; do not repeat
+  the stock-web-tree-sitter side-module experiment or plan a tree-transfer adapter. Measure both
+  main-thread and worker loading, since they cannot share one wasm heap across realms.
 - **Memory.** Stop holding the document twice: read text from JS in chunks or keep one UTF-8 copy;
   bound the per-paragraph inline cache; reuse linear memory across documents, since a wasm heap grows
   and never shrinks.
@@ -81,7 +80,7 @@ document (2 MB of it the UTF-16 text). Re-measure before the first change.
 ## Pass 3: speed
 
 - **Budgets in CI**, like the Editor's `bench:check`: keystroke median and p95 at 46 KB and 1 MB,
-  first frame warm and cold, full parse, first reparse after open (8.6 ms at 1 MB today).
+  first frame warm and cold, full parse, first reparse after open.
 - **Profile before tuning.** A per-function profile of a keystroke and a full parse (native and
   wasm) names where the time goes: scanner, parse tables, the inline resolver, or the JS boundary.
 - **Candidates**, each kept only with a measured win: fewer records crossing into JS per request,
@@ -90,6 +89,7 @@ document (2 MB of it the UTF-16 text). Re-measure before the first change.
 
 ## Order
 
-Open items 1–2 with Plan 176 Phase 1 (they need the real Editor document); then the three passes,
-which touch different code and can run in parallel. Scheduled in wave 3 of
-[docs/next-wave.md](../docs/next-wave.md), after wave 2's MD lane.
+After Plan 176's release and integration gates, run these passes against the shipped baseline.
+Coordinate shared resolver/runtime files when scheduling work. The wave placement remains in
+[docs/next-wave.md](../docs/next-wave.md); Plan 176 owns integration blockers and this plan owns
+subsequent improvements.

@@ -412,9 +412,11 @@ Obsidian mode, and the question of whether the chat composer still needs Lexical
 Decided 2026-09-25: owner — 111's research is authorized with the composer as its first consumer,
 and runs before the next wave.
 [Plan 176](plans/176-markdown-parser.md) replaces Plan 108 D5 (decided 2026-09-26: owner): it
-measures which parser drives live preview, with tree-sitter as the lead against `@lezer/markdown`, a
-Rust parser and remark, and whether the winner can also replace remark in chat. Plan 108 Phase 2
-waits on it.
+adopts `tree-sitter-md` for the source-backed Editor's live preview, colours, folds and fence
+injections. Refreshed 2026-09-28: its C rewrite and tree-sitter-x extension are complete; release
+correctness gates and document integration remain. Plan 108 Phase 2 waits on that integration
+and Plan 111's block layout. Align parser lifetime with Plan 198. Chat and split rendering keep
+remark; the parsing/UX contract is in `docs/markdown-parser/editor-behaviour.md`.
 [Plan 171](plans/171-composer-on-our-editor.md) is that composer migration: it inventories what
 the composer uses Lexical for and orders the Editor gaps to close, with 111 first (decided
 2026-09-25: owner — delete Lexical; the replacement is our own editor).
