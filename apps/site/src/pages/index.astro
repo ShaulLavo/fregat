@@ -7,11 +7,10 @@ import '../styles/global.css'
 
 const title = 'fregat'
 const description =
-  'an open cursor, built from scratch. a code editor with claude code and codex inside, on the subscriptions you already have. nothing forked from vs code.'
+  'cursor, built right, from scratch. chat first, with the whole editor in the same window, across every project on every machine. bring claude code or codex on the subscription you already have.'
 const demoUrl = import.meta.env.DEV
   ? 'http://localhost:5173/demo.html'
   : `${import.meta.env.BASE_URL.replace(/\/$/, '')}/demo/index.html`
-    console.log('dsdsd')
 
 ---
 
@@ -50,7 +49,9 @@ const demoUrl = import.meta.env.DEV
         fregat<small>Фрегат</small>
       </a>
       <nav>
+        <a href="#window">one window</a>
         <a href="#parts">what's inside</a>
+        <a href="#next">on the way</a>
         <a href="#agents">agents</a>
         <a href="#name">the name</a>
         <a href="#try">try it</a>
@@ -61,8 +62,11 @@ const demoUrl = import.meta.env.DEV
     <main>
       <section class="hero" aria-labelledby="hero-heading">
         <div class="hero-copy">
-          <h1 id="hero-heading">an open cursor, built from scratch</h1>
-          <p>claude code and codex inside, on the subscriptions you already have.</p>
+          <h1 id="hero-heading">cursor, built right, from scratch</h1>
+          <p>
+            chat first, with diffs, search and the full editor in the same window. every project,
+            on every machine, one keystroke apart. bring the agent you already pay for.
+          </p>
           <div class="actions">
             <a class="button" href="https://github.com/ShaulLavo/fregat">get the source</a>
             <a class="button ghost" href="#try">run it locally</a>
@@ -104,31 +108,50 @@ const demoUrl = import.meta.env.DEV
       </section>
 
       <div class="wrap panes">
-        <section class="pane" id="parts" aria-labelledby="parts-heading">
-          <div class="bar"><span>what's inside</span><span class="count">5</span></div>
+        <section class="pane" id="window" aria-labelledby="window-heading">
+          <div class="bar"><span>one window</span></div>
           <div class="pane-body">
-            <h2 id="parts-heading">open a folder and this is what's in the window</h2>
+            <h2 id="window-heading">the chat and the editor are one app</h2>
+            <p>
+              cursor keeps its agent view and its editor in separate windows. antigravity does the
+              same. fregat puts the conversation first and keeps the editor inside it: open the
+              diff an agent just wrote, search the workspace, jump to a definition, run it in the
+              terminal, and land back in the chat where you left it.
+            </p>
+            <p>
+              every workspace sits in one sidebar, whether it lives on your laptop, a desktop at
+              home or a server you ssh into. run agents in five projects on three machines and
+              move between them the way you move between tabs.
+            </p>
+          </div>
+        </section>
+
+        <section class="pane" id="parts" aria-labelledby="parts-heading">
+          <div class="bar"><span>what's inside</span><span class="count">6</span></div>
+          <div class="pane-body">
+            <h2 id="parts-heading">hand-rolled, so it's fast</h2>
             <dl class="parts">
               <div>
                 <dt>editor</dt>
                 <dd>
-                  <a href="https://github.com/ShaulLavo/singapore">singapore</a>, written from
-                  scratch. piece table storage, tree-sitter for syntax, language servers for the
-                  rest.
+                  <a href="https://github.com/ShaulLavo/singapore">singapore</a>, our own editor,
+                  written from the text buffer up, with language servers for completions and
+                  diagnostics.
+                </dd>
+              </div>
+              <div>
+                <dt>parsing</dt>
+                <dd>
+                  <a href="https://github.com/ShaulLavo/tree-sitter-x">tree-sitter-x</a>, our fork
+                  of tree-sitter. built without emscripten, it keeps the text inside the parser and
+                  reparses a 1 mb file after a keystroke in 0.35 ms, down from 0.8.
                 </dd>
               </div>
               <div>
                 <dt>terminal</dt>
                 <dd>
                   <a href="https://github.com/ShaulLavo/ghostty-webgpu">ghostty-webgpu</a>, real
-                  ghostty compiled to wasm, in a pane next to the code.
-                </dd>
-              </div>
-              <div>
-                <dt>agents</dt>
-                <dd>
-                  claude code and codex, side by side. each in its own session, each with its own
-                  permission mode.
+                  ghostty compiled to wasm and drawn on the gpu, in a pane next to the code.
                 </dd>
               </div>
               <div>
@@ -136,11 +159,51 @@ const demoUrl = import.meta.env.DEV
                 <dd>status, diffs, branches and commits in the same window, watched live.</dd>
               </div>
               <div>
+                <dt>yours to tune</dt>
+                <dd>
+                  themes, fonts, keybindings, density, and a setting for nearly everything else.
+                </dd>
+              </div>
+              <div>
                 <dt>anywhere</dt>
                 <dd>
-                  the server runs on your machine. the same workspace opens from a browser, the
-                  desktop app, a terminal, or a phone over tailscale.
+                  a small server runs on each machine. every workspace opens from a browser, the
+                  desktop app, a terminal, or your phone.
                 </dd>
+              </div>
+            </dl>
+          </div>
+        </section>
+
+        <section class="pane" id="next" aria-labelledby="next-heading">
+          <div class="bar"><span>on the way</span><span class="count">4</span></div>
+          <div class="pane-body">
+            <h2 id="next-heading">what we're building now</h2>
+            <dl class="parts">
+              <div>
+                <dt>markdown</dt>
+                <dd>
+                  <a href="https://github.com/ShaulLavo/tree-sitter-md">tree-sitter-md</a>, our
+                  parser in c, already passes all 676 commonmark and gfm examples. next it renders
+                  the agent's streaming replies, powers the chat composer, and opens any .md file as
+                  source, side by side with a preview, or as one live view you edit as it renders.
+                </dd>
+              </div>
+              <div>
+                <dt>mcp</dt>
+                <dd>
+                  fregat already runs its own mcp server, and agents can read the workspace
+                  through it today. next: every action in the app, and the editor's types and
+                  references, so an agent sees the code the way you do.
+                </dd>
+              </div>
+              <div>
+                <dt>github</dt>
+                <dd>pull requests, reviews and checks, next to the diff they're about.</dd>
+              </div>
+              <div>
+                <dt>phone</dt>
+                <dd>a native app for checking on agents and answering them from anywhere.</dd>
               </div>
             </dl>
           </div>
@@ -149,7 +212,7 @@ const demoUrl = import.meta.env.DEV
         <section class="pane" id="agents" aria-labelledby="agents-heading">
           <div class="bar"><span>agents</span><span class="count">2</span></div>
           <div class="pane-body">
-            <h2 id="agents-heading">your agents, on your account</h2>
+            <h2 id="agents-heading">bring your own harness</h2>
             <div class="sessions" aria-hidden="true">
               <div class="session">
                 <div class="bar"><span>claude code</span><span class="mode">approval required</span></div>
@@ -169,22 +232,26 @@ const demoUrl = import.meta.env.DEV
               </div>
             </div>
             <p>
-              sign in from inside the app, against your own claude or openai account. no accounts
-              here, nothing proxied. run both at once. claude code takes full access, approval
-              required, or auto accept edits. codex runs full access.
+              cursor is the harness. fregat runs yours: claude code and codex today, opencode and
+              cursor's own agent next. sign in from inside the app against your own account. no
+              accounts here, nothing proxied, run as many at once as you like.
             </p>
           </div>
         </section>
 
         <section class="pane" id="why" aria-labelledby="where-heading">
-          <div class="bar"><span>why not fork vs code</span></div>
+          <div class="bar"><span>why from scratch</span></div>
           <div class="pane-body">
-            <h2 id="where-heading">a fork inherits the shell. fregat owns it.</h2>
+            <h2 id="where-heading">owning every layer is what makes it smooth</h2>
             <p>
-              a fork inherits vs code's editor, its extension model and its release cadence. fregat
-              owns all three, so an agent is a pane the same way the terminal is, not a panel added
-              to someone else's shell. t3 code has the same idea about agents and stops at the
-              harness.
+              cursor is a fork of vs code, so the chat is a panel bolted onto someone else's
+              editor, and the agent view had to become a second app. fregat owns the editor, the
+              terminal, the tree and the shell around them, so an agent is a pane the same way the
+              terminal is, and a diff opens in the chat without a context switch.
+            </p>
+            <p>
+              it's also why it's fast: every hot path is code we wrote and can tune, and the
+              dependency list shrinks every week.
             </p>
           </div>
         </section>
