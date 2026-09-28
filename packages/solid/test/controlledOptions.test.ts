@@ -33,6 +33,12 @@ const DOCUMENT = { text: 'alpha beta', documentId: 'a.ts', revision: 1 }
  * suite walks the descriptor list, so an option this binding never wires to a signal fails here.
  */
 const OPTION_SAMPLES: Record<EditorControlledOptionName, OptionSample> = {
+  detectIndentation: {
+    initial: true,
+    next: false,
+    method: 'setDetectIndentation',
+    applied: [false],
+  },
   editability: {
     initial: 'editable',
     next: 'readonly',
@@ -45,6 +51,7 @@ const OPTION_SAMPLES: Record<EditorControlledOptionName, OptionSample> = {
     method: 'setFontFamily',
     applied: ['JetBrains Mono, monospace'],
   },
+  folding: { initial: true, next: false, method: 'setFolding', applied: [false] },
   fontSize: { initial: 12, next: 15, method: 'setFontSize', applied: [15] },
   gutterLeadingInset: { initial: 0, next: 12, method: 'setGutterLeadingInset', applied: [12] },
   hiddenCharacters: {
