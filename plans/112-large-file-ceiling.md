@@ -1,6 +1,7 @@
 # The large-file ceiling: what we can actually open, and who gets to decide
 
-Status: **Phase 1 in progress 2026-09-28; research and owner decisions complete.** Requested
+Status: **Done 2026-09-28.** All five phases shipped; see the execution checklist. Typing with analysis on
+continues in [Plan 201](201-cheap-overlay-marks.md). Requested
 2026-09-13. Measurements: [docs/large-file-ceiling/](../docs/large-file-ceiling/README.md).
 
 Decided 2026-09-25: owner — this plan and Editor
@@ -258,9 +259,8 @@ In the order a user meets them:
    times the open limit plus 1 MiB (a JSON character can take six bytes), so a 129–200 MiB file
    saves (`src/tests/request-body-limit.test.ts`: every worst-case JSON encoding of a max-size file
    fits the limit, and the app is built with it; a 129 MiB POST returned 413 before); the
-   client write log counts characters instead of copying the text into a `Blob`. Still open in
-   this phase after 2026-09-28: the saved text outliving the save in the query cache and
-   `bench:large-file`. Git now uses the machine setting `git.maxDiffFileSizeMiB`, default 50,
+   client write log counts characters instead of copying the text into a `Blob`. The saved-text cache retention fix and `bench:large-file` subsequently landed on
+   2026-09-28; see the execution evidence below. Git now uses the machine setting `git.maxDiffFileSizeMiB`, default 50,
    independently of the 200 MiB file-open limit.
 2. **Raw-bytes transport** for read and write: shared decoder with the decoded-length check,
    byte-hash `version`, metadata in headers.
@@ -305,13 +305,26 @@ after the first independently shippable change. Decision trail:
 - [x] Review the delivered budget and fix misleading oversized-file results.
 - [x] Land a reproducible production-browser benchmark and capture the current baseline.
 - [x] Remove saved-text retention with cache and compare-with-saved evidence.
-- [ ] Ship raw-byte read/write transport, shared decoding and byte-hash versions.
-- [ ] Measure current Editor work per worker, remove whole-document edit work and compare.
-- [ ] Set feature tiers from the new measurements and verify switching, saving and refusal.
-- [ ] Compare resident, streamed and paged read-only contracts; build and verify E015 proof.
-- [ ] Re-run 1/10/50/100/150/200 MiB open-edit-save, Unicode and above-limit cases.
-- [ ] Independently review the final diffs and evidence, commit/push both repositories,
-      update the Editor pin and deploy the verified result.
+- [x] Implement and verify raw-byte read/write transport, shared decoding and byte-hash versions;
+      final deployment remains in the release item below.
+- [x] Attribute worker costs, remove whole-document edit work and compare resident measurements.
+- [x] Finish final highlighting readiness/worker validation and confirm the analysis threshold:
+      10 Mi code units, the largest size where Shiki and Tree-sitter both pass (results report).
+- [x] Implement independent analysis/minimap tiers and verify live switching, undo and exact save.
+      Crossing the analysis limit has no hysteresis: typing back and forth across it re-attaches
+      the session and re-sends a full LSP `didOpen` each time. Acceptable at 10 Mi; revisit if seen.
+- [x] Compare resident, streamed and paged read-only contracts; verify the standalone E015 proof
+      and Platform sparse 300 MiB read-only navigation/copy/session release.
+- [x] Re-run 1/10/50/100/150/200 MiB plain-text open-edit-save with exact saved bytes.
+- [x] Record final integrated Unicode and clean above-limit browser checks. Clean build
+      (Platform e4a13fa9a, Editor 560d35db): two-byte 10/100/200 MiB open, edit and save exact
+      bytes, 200 MiB typing p95 27 ms, save 9.8 s (`/work/tmp/fregat-evidence/112-unicode-committed-20260928/`);
+      `editor-paged-readonly` opens a 300 MiB file read-only, jumps to line 3000 and copies.
+- [x] Independently review the final diffs and evidence, commit/push both repositories,
+      update the Editor pin and deploy the verified result. Review fixes: the read-only viewer
+      opens only over a too-large error with no buffer content, a refetched paged resource releases
+      the one it replaced, stale paged codes share the reopen message. Shipped e4a13fa9a,
+      fa8708e36, 8d49903bc (Editor pin 560d35db) as release `20260928T193219Z-8d49903b-main`.
 
 Done means repeatable measurements support each tier; 200 MiB files can open and save;
 large-file typing meets the measured target or a documented, reproduced constraint remains;
@@ -322,3 +335,19 @@ item remains work, including when an intermediate commit ships.
 Execution uses isolated worktrees for transport and Editor changes. The main lane owns
 the benchmark, budget review, integration, final checks and deployment. Cache ownership is
 reviewed independently before edits because saved snapshots also serve comparisons.
+
+### Integrated candidate evidence, 2026-09-28
+
+[The results report](../docs/large-file-ceiling/results/resident-20260928.md) preserves the six-size
+before/after rows, per-worker interpretation, trace comparison and E015 decision. Final resident
+200 MiB saves exactly 209,715,200 bytes; typing p95 is 15.5ms, saved main heap 223.5 MiB plus
+71.1 MiB backing. The 10/50/150 MiB p95 values remain above a 60Hz frame, and 200 MiB save still
+costs 7.47s with a large transient RSS peak. These are single Chromium trials, not a universal
+performance guarantee. These runs used dirty integration builds; clean committed-build
+confirmation is pending. The 15/20 MiB Shiki checks failed under the 8 GiB memory scope; 10 MiB
+passes for both engines, so the analysis default is 10 Mi code units. Unicode checks and
+deployment remain pending.
+
+E015 supports bounded read-only access beyond the resident limit. Streaming lowers construction
+copies but keeps full residency; editable paging is outside the verified capability envelope.
+The final 200 MiB saved screenshot and Platform paged line-3000 screenshot were inspected.

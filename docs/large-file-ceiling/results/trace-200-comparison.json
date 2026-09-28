@@ -1,0 +1,132 @@
+{
+  "beforePath": "/work/tmp/fregat-evidence/112-trace-pretiers-20260928/txt-200/trace.json",
+  "afterPath": "/work/tmp/fregat-evidence/112-final-resident-20260928/txt-200/trace.json",
+  "before": {
+    "durationMs": 30413.3,
+    "longTasks": [
+      {
+        "durationMs": 4968.1,
+        "frames": [
+          "handleWorkerMessage assets/workbench-shared-Dh0Pc5ww.js:10 4968ms FunctionCall wall (no application samples)"
+        ],
+        "sampledFrames": [],
+        "phase": null,
+        "startMs": 1434.9
+      },
+      {
+        "durationMs": 4002.7,
+        "frames": [
+          "(anonymous) assets/initial-GO0Lye9z.js:320 1.9ms FunctionCall wall (no application samples)",
+          "D assets/initial-GO0Lye9z.js:119 0.8ms FunctionCall wall (no application samples)",
+          "(anonymous) assets/initial-GO0Lye9z.js:22 0ms FunctionCall wall (no application samples)"
+        ],
+        "sampledFrames": [],
+        "phase": null,
+        "startMs": 21558.5
+      },
+      {
+        "durationMs": 620.8,
+        "frames": [],
+        "sampledFrames": [],
+        "phase": null,
+        "startMs": 16437.2
+      },
+      {
+        "durationMs": 480.8,
+        "frames": [
+          "(anonymous) assets/initial-GO0Lye9z.js:320 480.2ms FunctionCall wall (no application samples)",
+          "(anonymous) assets/workbench-shared-Dh0Pc5ww.js:5 0.2ms FunctionCall wall (no application samples)",
+          "(anonymous) assets/initial-GO0Lye9z.js:2 0.2ms FunctionCall wall (no application samples)"
+        ],
+        "sampledFrames": [],
+        "phase": null,
+        "startMs": 947.4
+      },
+      {
+        "durationMs": 468.7,
+        "frames": [],
+        "sampledFrames": [],
+        "phase": null,
+        "startMs": 17529.3
+      }
+    ],
+    "phaseTasks": [],
+    "marks": ["editor.authoritative_text_paint", "editor.authoritative_highlight_paint"],
+    "split": {
+      "scripting": 13967.3,
+      "layout": 77.9,
+      "paint": 234.3,
+      "other": 0
+    },
+    "tasksOver16ms": 20,
+    "tasksOver50ms": 14,
+    "worstTaskMs": 4968.1
+  },
+  "after": {
+    "durationMs": 23683.2,
+    "longTasks": [
+      {
+        "durationMs": 4968,
+        "frames": [
+          "(anonymous) assets/initial-C5Gn50Ig.js:320 1.4ms FunctionCall wall (no application samples)",
+          "D assets/initial-C5Gn50Ig.js:119 0.4ms FunctionCall wall (no application samples)",
+          "(anonymous) assets/initial-C5Gn50Ig.js:22 0ms FunctionCall wall (no application samples)"
+        ],
+        "sampledFrames": [],
+        "phase": null,
+        "startMs": 14527.4
+      },
+      {
+        "durationMs": 161.9,
+        "frames": [
+          "(anonymous) assets/initial-C5Gn50Ig.js:320 161.5ms FunctionCall wall (no application samples)",
+          "(anonymous) assets/initial-C5Gn50Ig.js:2 0.1ms FunctionCall wall (no application samples)",
+          "(anonymous) assets/workbench-shared-BSyH-r8M.js:5 0.1ms FunctionCall wall (no application samples)"
+        ],
+        "sampledFrames": [],
+        "phase": null,
+        "startMs": 922.3
+      },
+      {
+        "durationMs": 116.3,
+        "frames": [
+          "entries :0 0.1ms FunctionCall wall (no application samples)",
+          "(anonymous) assets/initial-C5Gn50Ig.js:55 0ms FunctionCall wall (no application samples)",
+          "next :0 0ms FunctionCall wall (no application samples)"
+        ],
+        "sampledFrames": [],
+        "phase": null,
+        "startMs": 804.5
+      },
+      {
+        "durationMs": 104.8,
+        "frames": [
+          "runFit assets/panel-cMF2oqNE.js:1 15.4ms FunctionCall wall (no application samples)",
+          "(anonymous) assets/panel-cMF2oqNE.js:1 7ms FunctionCall wall (no application samples)",
+          "handleResize assets/panel-cMF2oqNE.js:1 0.1ms FunctionCall wall (no application samples)"
+        ],
+        "sampledFrames": [],
+        "phase": null,
+        "startMs": 202.9
+      },
+      {
+        "durationMs": 75.8,
+        "frames": [],
+        "sampledFrames": [],
+        "phase": null,
+        "startMs": 634.5
+      }
+    ],
+    "phaseTasks": [],
+    "marks": ["editor.authoritative_text_paint", "editor.authoritative_highlight_paint"],
+    "split": {
+      "scripting": 1859.9,
+      "layout": 56.5,
+      "paint": 191.6,
+      "other": 0
+    },
+    "tasksOver16ms": 15,
+    "tasksOver50ms": 8,
+    "worstTaskMs": 4968
+  }
+}

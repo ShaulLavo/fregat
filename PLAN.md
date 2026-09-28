@@ -44,10 +44,10 @@ contracts a consumer needs:
 
 ## bubli TUI workstream
 
-[201: the existing TUI runs on bubli](plans/201-bubli-tui.md) owns Fregat's adoption of the
+[202: the existing TUI runs on bubli](plans/202-bubli-tui.md) owns Fregat's adoption of the
 OpenTUI fork and Charm-inspired terminal experience. Keep the existing backend and shared
 React/TypeScript application logic. This workstream does not reorder the wave-2 queue above.
-Its status and acceptance checks live in 201; these are coordinated plans, not delivered features.
+Its status and acceptance checks live in 202; these are coordinated plans, not delivered features.
 
 - [bubli PR 1](https://github.com/ShaulLavo/bubli/pull/1) owns toolkit defaults, controls,
   focus/overlays, arbitrary React Markdown components and terminal rendering. Theme/control work

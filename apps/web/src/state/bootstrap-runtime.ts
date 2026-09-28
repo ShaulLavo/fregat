@@ -55,6 +55,7 @@ export function createBootRuntime(
       appliedThemeId: null,
       selectedThemeId: getSelectedEditorThemeId(systemColorMode()),
       syntaxHighlightingEnabled: readSettingsMirror()['editor.syntaxHighlighting.enabled'],
+      analysisLimitMiCodeUnits: readSettingsMirror()['editor.largeFile.analysisLimitMiCodeUnits'],
       tabSize: readSettingsMirror()['editor.tabSize'],
     },
   })

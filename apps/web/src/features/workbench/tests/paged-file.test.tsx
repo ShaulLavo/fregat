@@ -1,0 +1,99 @@
+import { writeFile } from 'node:fs/promises'
+import path from 'node:path'
+import { waitFor } from '@testing-library/react'
+import { test, expect } from '../../../../test/fixtures'
+import { createTestQueryClient, renderHookWithProviders } from '../../../../test/render'
+import { usePagedFile } from '@/features/workbench/hooks/use-paged-file'
+
+test('each view owns its handle and unmount releases only that handle', async ({
+  server,
+  client,
+}) => {
+  await writeFile(
+    path.join(server.root, 'paged.txt'),
+    Array.from({ length: 300 }, (_, i) => `row ${i}\n`).join(''),
+  )
+  const queryClient = createTestQueryClient()
+  const first = renderHookWithProviders(() => usePagedFile('paged.txt', 0, 0), { queryClient })
+  const second = renderHookWithProviders(() => usePagedFile('paged.txt', 128, 0), { queryClient })
+  await waitFor(() => expect(first.result.current.page.isSuccess).toBe(true))
+  await waitFor(() => expect(second.result.current.page.isSuccess).toBe(true))
+  const firstResource = first.result.current.resource.data!
+  const secondResource = second.result.current.resource.data!
+  expect(firstResource.source.id).not.toBe(secondResource.source.id)
+  expect(second.result.current.page.data?.rows[0]?.text).toBe('row 128')
+  first.unmount()
+  await waitFor(() => expect(firstResource.document.stats.state).toBe('disposed'))
+  const alive = await secondResource.source.readBytes(0, 5, new AbortController().signal)
+  expect(new TextDecoder().decode(alive.bytes)).toBe('row 0')
+  await waitFor(async () => {
+    const closed = await client.fs['read-session']({ id: firstResource.source.id }).get({
+      query: { start: 0, end: 5 },
+    })
+    expect(closed.error?.status).toBe(410)
+  })
+  second.unmount()
+  await waitFor(() => expect(secondResource.document.stats.state).toBe('disposed'))
+})
+
+test('a refetched resource releases the handle it replaced', async ({ server, client }) => {
+  await writeFile(path.join(server.root, 'refetch.txt'), 'row 0\nrow 1\n')
+  const queryClient = createTestQueryClient()
+  const view = renderHookWithProviders(() => usePagedFile('refetch.txt', 0, 0), { queryClient })
+  await waitFor(() => expect(view.result.current.page.isSuccess).toBe(true))
+  const before = view.result.current.resource.data!
+  await queryClient.invalidateQueries()
+  await waitFor(() => expect(view.result.current.resource.data).not.toBe(before))
+  const after = view.result.current.resource.data!
+  await waitFor(() => expect(before.document.stats.state).toBe('disposed'))
+  expect(after.document.stats.state).not.toBe('disposed')
+  await waitFor(async () => {
+    const closed = await client.fs['read-session']({ id: before.source.id }).get({
+      query: { start: 0, end: 5 },
+    })
+    expect(closed.error?.status).toBe(410)
+  })
+  view.unmount()
+  await waitFor(() => expect(after.document.stats.state).toBe('disposed'))
+})
+
+test('UTF-16 is refused explicitly and changed files require a new session', async ({
+  server,
+  client,
+}) => {
+  void client
+  await writeFile(path.join(server.root, 'utf16.txt'), Buffer.from([0xff, 0xfe, 65, 0]))
+  const utf16 = renderHookWithProviders(() => usePagedFile('utf16.txt', 0, 0))
+  await waitFor(() => expect(utf16.result.current.page.isError).toBe(true))
+  expect(utf16.result.current.page.error).toMatchObject({ code: 'PAGED_ENCODING_UNSUPPORTED' })
+  utf16.unmount()
+  const target = path.join(server.root, 'mutable.txt')
+  await writeFile(target, 'before\n')
+  const mutable = renderHookWithProviders(() => usePagedFile('mutable.txt', 0, 0))
+  await waitFor(() => expect(mutable.result.current.page.isSuccess).toBe(true))
+  const resource = mutable.result.current.resource.data!
+  await writeFile(target, 'after\n')
+  await expect(resource.source.readBytes(0, 4, new AbortController().signal)).rejects.toMatchObject(
+    { code: 'FILE_CHANGED' },
+  )
+  mutable.unmount()
+})
+
+test('a changed source invalidates cached pages and every view', async ({ server, client }) => {
+  void client
+  const target = path.join(server.root, 'changing-pages.txt')
+  await writeFile(target, 'line\n'.repeat(2 * 1024 * 1024))
+  const opened = renderHookWithProviders(() => usePagedFile('changing-pages.txt', 0, 0))
+  await waitFor(() => expect(opened.result.current.index.isSuccess).toBe(true), { timeout: 10_000 })
+  const resource = opened.result.current.resource.data!
+  const secondView = resource.document.createView()
+  await writeFile(target, 'changed\n')
+  await expect(resource.view.readLines(0, 1)).rejects.toMatchObject({
+    code: 'PAGED_DOCUMENT_STALE',
+  })
+  expect(resource.document.stats.state).toBe('stale')
+  expect(resource.document.stats.cachedBytes).toBe(0)
+  await expect(secondView.readLines(2 * 1024 * 1024 - 1, 1)).rejects.toThrow()
+  secondView.dispose()
+  opened.unmount()
+})

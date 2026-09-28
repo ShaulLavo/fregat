@@ -103,7 +103,7 @@ export function createMatchedLanguageServerPlugin({
   if (eligible.length === 0 || document === null)
     return createIdleLanguageServerPlugin(statusSource, () => {
       documents?.configure(configurationGeneration)
-      if (document && matches !== null) documents?.delete(document.key)
+      if (document && (!enabled || matches !== null)) documents?.delete(document.key)
     })
 
   const descriptors = eligible.map((match) => ({
@@ -114,6 +114,10 @@ export function createMatchedLanguageServerPlugin({
     name: 'editor.language-server',
     activate: (context) => {
       documents?.configure(configurationGeneration)
+      if (buffer && documents && !documents.accepts(buffer)) {
+        documents.delete(document.key)
+        return
+      }
       const configuration = JSON.stringify([origin, rootPath, document.uri, descriptors, target])
       const entry =
         buffer && documents
@@ -130,6 +134,7 @@ export function createMatchedLanguageServerPlugin({
               }),
             )
           : null
+      if (buffer && documents && !entry) return
       const semanticControllers =
         entry?.semanticControllers ?? new Map<string, Set<SemanticTokenController>>()
       statusSource.setServers(statusOrderedMatches(descriptors).map((match) => match.serverId))

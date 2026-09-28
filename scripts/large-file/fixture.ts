@@ -13,14 +13,23 @@ const CORPUS = `export function sum(values: readonly number[]) {
 }
 `
 
-export function writeFixture(file: string, bytes: number, twoByte: boolean) {
+export function writeFixture(file: string, bytes: number, twoByte: boolean, typed = false) {
   const head = Buffer.from(`${MARKER}${twoByte ? ' →' : ''}\n`)
-  const body = Buffer.from(CORPUS.repeat(Math.ceil(65536 / CORPUS.length)))
+  const scoped = typed
+    ? `{\n${CORPUS.replace('export function sum', 'const sum = function')}\n}\n`
+    : CORPUS
+  const corpus = twoByte ? scoped.replaceAll('total', 'totalΣ') : scoped
+  const body = Buffer.from(corpus.repeat(Math.ceil(65536 / corpus.length)))
   const handle = openSync(file, 'w')
   try {
     writeSync(handle, head)
-    for (let remaining = bytes - head.length - 1; remaining > 0; remaining -= body.length)
-      writeSync(handle, body, 0, Math.min(remaining, body.length))
+    for (let remaining = bytes - head.length - 1; remaining > 0; remaining -= body.length) {
+      const length = Math.min(remaining, body.length)
+      let end = length
+      while (end < body.length && (body[end]! & 0xc0) === 0x80) end -= 1
+      writeSync(handle, body, 0, end)
+      if (end < length) writeSync(handle, Buffer.alloc(length - end, 32))
+    }
     writeSync(handle, Buffer.from('\n'))
   } finally {
     closeSync(handle)

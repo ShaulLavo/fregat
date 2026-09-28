@@ -7,7 +7,10 @@ import { useLanguageServerPlugin } from '@/features/editor/hooks/use-lsp-plugin'
 import { createMatchedLanguageServerPlugin } from '@/features/editor/utils/language-server-plugin'
 
 const dependencies = vi.hoisted(() => ({
-  runtime: {} as { documentStore: ReturnType<typeof createEditorDocumentStore> },
+  runtime: {} as {
+    documentStore: ReturnType<typeof createEditorDocumentStore>
+    languageServerDocuments: { setLimit: (limit: number) => void }
+  },
   configuration: { generation: 1 },
   fileOpenIntent: { service: { prepare: vi.fn() } },
   controller: {},
@@ -34,6 +37,13 @@ vi.mock('@/lib/diagnostic-ai/hooks/use-diagnostic-fix', () => ({
   useDiagnosticFix: () => ({ available: true, mutation: { mutateAsync: dependencies.apply } }),
 }))
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => null }))
+vi.mock('@/features/editor/hooks/use-document-feature-tier', () => ({
+  useDocumentFeatureTier: () => ({
+    analysisAllowed: true,
+    analysisLimitMiCodeUnits: 10,
+    minimapAllowed: true,
+  }),
+}))
 vi.mock('@/lib/environments/state/query-clients', () => ({
   originForQueryClient: () => 'http://localhost:3001',
 }))
@@ -44,7 +54,7 @@ vi.mock('@/features/editor/utils/language-server-plugin', () => ({
 describe('useLanguageServerPlugin', () => {
   it('replaces the plugin when its buffer is replaced, but retains it for edits and other files', () => {
     const store = createEditorDocumentStore()
-    dependencies.runtime = { documentStore: store }
+    dependencies.runtime = { documentStore: store, languageServerDocuments: { setLimit: vi.fn() } }
     const path = filesystemPath('/repo/a.ts')
     const file = { path, content: 'const value = 1', version: 'v1', mtimeMs: 1, size: 15 }
     const firstDocument = store.getState().ensureLiveEditorDocument(file)

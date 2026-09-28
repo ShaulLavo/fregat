@@ -1108,8 +1108,11 @@ class FileOpenIntentServiceState {
       const snapshotError = this.queryClient.getQueryState(
         fileSnapshotQueryOptions(path).queryKey,
       )?.error
-      if (snapshotError === error && toClientError(error).category === 'not_found') {
-        this.finishIntent(path, 'rejected', { reason: 'file-missing' })
+      const category = toClientError(error).category
+      if (snapshotError === error && (category === 'not_found' || category === 'too_large')) {
+        this.finishIntent(path, 'rejected', {
+          reason: category === 'not_found' ? 'file-missing' : 'file-too-large',
+        })
         return
       }
       event.error(error)

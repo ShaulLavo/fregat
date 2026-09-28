@@ -27,17 +27,20 @@ export function EditorStateProvider({
   useLanguageCensus(runtime)
   const { appliedThemeContentHash, appliedThemeId, selectedThemeId } = useEditorColorTheme()
   const syntaxHighlightingEnabled = useSettingValue('editor.syntaxHighlighting.enabled')
+  const analysisLimitMiCodeUnits = useSettingValue('editor.largeFile.analysisLimitMiCodeUnits')
   const tabSize = useSettingValue('editor.tabSize')
   const languageServerMatchConfiguration = useLanguageServerMatchConfiguration()
   const { fileOpenIntentOwner, queryClient } = runtime
 
   useLayoutEffect(() => {
+    runtime.languageServerDocuments.setLimit(analysisLimitMiCodeUnits)
     fileOpenIntentOwner.setEnvironment(
       createPlatformFileOpenPreparer({
         appliedThemeContentHash,
         appliedThemeId,
         selectedThemeId,
         syntaxHighlightingEnabled,
+        analysisLimitMiCodeUnits,
         tabSize,
       }),
     )
@@ -45,8 +48,10 @@ export function EditorStateProvider({
     appliedThemeContentHash,
     appliedThemeId,
     fileOpenIntentOwner,
+    runtime,
     selectedThemeId,
     syntaxHighlightingEnabled,
+    analysisLimitMiCodeUnits,
     tabSize,
   ])
 

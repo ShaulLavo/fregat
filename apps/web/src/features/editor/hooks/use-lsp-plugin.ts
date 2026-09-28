@@ -1,3 +1,4 @@
+import { useDocumentFeatureTier } from '@/features/editor/hooks/use-document-feature-tier'
 import { useDiagnosticFix } from '@/lib/diagnostic-ai/hooks/use-diagnostic-fix'
 import { diagnosticHoverActions } from '@/features/editor/utils/diagnostic-hover-actions'
 import { useLanguageServerMatchConfiguration } from '@/features/editor/providers/language-server-match-context'
@@ -12,7 +13,7 @@ import type {
   LanguageServerDiagnosticMarkerEvent,
   LanguageServerReferencesResult,
 } from '@singapore-editor/lsp-plugin'
-import { useMemo } from 'react'
+import { useLayoutEffect, useMemo } from 'react'
 import { useStore } from 'zustand'
 
 import { useFileOpenIntent } from '@/lib/file-open-intent/providers/context'
@@ -57,6 +58,12 @@ export function useLanguageServerPlugin({
   const buffer = useStore(documentStore, (state) =>
     documentKey === null ? null : (state.liveDocumentsByKey[documentKey]?.buffer ?? null),
   )
+  const { analysisAllowed, analysisLimitMiCodeUnits } = useDocumentFeatureTier(buffer)
+  // Child layout effects run before the provider: update the limit before plugin activation.
+  useLayoutEffect(() => {
+    languageServerDocuments.setLimit(analysisLimitMiCodeUnits)
+  }, [languageServerDocuments, analysisLimitMiCodeUnits])
+  const analysisEnabled = enabled && analysisAllowed
   const origin = originForQueryClient(useQueryClient())
   const {
     available,
@@ -79,7 +86,11 @@ export function useLanguageServerPlugin({
     () => languageServerTarget ?? { matchPath: filePath },
     [filePath, languageServerTarget],
   )
-  const matches = useLanguageServerMatches(rootPath, target.matchPath, enabled && document !== null)
+  const matches = useLanguageServerMatches(
+    rootPath,
+    target.matchPath,
+    analysisEnabled && document !== null,
+  )
 
   const languageServer = useMemo(() => {
     return createMatchedLanguageServerPlugin({
@@ -88,7 +99,7 @@ export function useLanguageServerPlugin({
           ? { key: documentKey, uri: documentUri }
           : null,
       origin,
-      enabled,
+      enabled: analysisEnabled,
       documentSyncController,
       documents: languageServerDocuments,
       configurationGeneration,
@@ -114,7 +125,7 @@ export function useLanguageServerPlugin({
     documentKey,
     documentUri,
     origin,
-    enabled,
+    analysisEnabled,
     documentSyncController,
     languageServerDocuments,
     configurationGeneration,

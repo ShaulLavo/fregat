@@ -195,6 +195,7 @@ import { markdownAuthoring } from './markdown-authoring'
 import { markdownPreviewClobber } from './markdown-preview-clobber'
 import { gitOpenAllDiffsSpam } from './git-open-all-diffs-spam'
 import { gitStageSettles } from './git-stage-settles'
+import { gitExternalCommit } from './git-external-commit'
 import { gitChangesScroll } from './git-changes-scroll'
 import { gitDiscardConfirm } from './git-discard-confirm'
 import { baseComponents } from './base-components'
@@ -568,6 +569,7 @@ export const scenarios: readonly Scenario[] = [
   markdownPreviewClobber,
   gitOpenAllDiffsSpam,
   gitStageSettles,
+  gitExternalCommit,
   gitChangesScroll,
   gitDiscardConfirm,
   baseComponents,

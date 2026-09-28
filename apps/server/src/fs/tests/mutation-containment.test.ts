@@ -15,6 +15,8 @@ import { WorkspaceEditController } from '../workspace-edit'
 import { WorkspaceEditJournal } from '../workspace-edit-journal'
 import { expect } from 'vitest'
 import { test, workspaceRequest as request } from '../../../test/factories/workspace-address'
+import { readTextResponse, textWriteRequest } from '../../../test/file-transport'
+import type { createTestApp } from '../../../test/server'
 
 const escapingMutations = [
   {
@@ -102,7 +104,11 @@ for (const scenario of escapingMutations) {
     const beforeOutside = await snapshotTree(outside)
     const beforeWorkspace = await snapshotTree(workspace.root)
 
-    const response = await request(workspace.openApp(), `/fs/${scenario.route}`, scenario.body)
+    const app = workspace.openApp()
+    const response =
+      scenario.route === 'write'
+        ? await write(app, scenario.body)
+        : await request(app, `/fs/${scenario.route}`, scenario.body)
 
     expect.soft(await snapshotTree(outside)).toEqual(beforeOutside)
     expect.soft(await snapshotTree(workspace.root)).toEqual(beforeWorkspace)
@@ -167,9 +173,7 @@ test('mutates internal file and directory aliases without replacing the links', 
   await symlink('real/note.txt', path.join(workspace.root, 'file-link'))
   const app = workspace.openApp()
 
-  expect((await request(app, '/fs/write', { path: 'file-link', content: 'saved' })).status).toBe(
-    200,
-  )
+  expect((await write(app, { path: 'file-link', content: 'saved' })).status).toBe(200)
   expect(await readFile(path.join(realDirectory, 'note.txt'), 'utf8')).toBe('saved')
   expect(
     (
@@ -227,9 +231,7 @@ test('uses the physical boundary when the configured root is itself a link', asy
   await symlink('root', rootAlias)
   const app = workspace.openApp(rootAlias)
 
-  expect((await request(app, '/fs/write', { path: 'inside.txt', content: 'inside' })).status).toBe(
-    200,
-  )
+  expect((await write(app, { path: 'inside.txt', content: 'inside' })).status).toBe(200)
   expect(await readFile(path.join(workspace.root, 'inside.txt'), 'utf8')).toBe('inside')
   const beforeOutside = await snapshotTree(outside)
   const beforeWorkspace = await snapshotTree(workspace.root)
@@ -255,7 +257,7 @@ test('opening a nested project keeps sibling files inside the manual mutation bo
   expect(opened.status).toBe(200)
   expect(await opened.json()).toMatchObject({ entry: { path: 'project' } })
 
-  const written = await request(app, '/fs/write', { path: 'sibling.txt', content: 'after' })
+  const written = await write(app, { path: 'sibling.txt', content: 'after' })
 
   expect(written.status).toBe(200)
   expect(await readFile(path.join(workspace.root, 'sibling.txt'), 'utf8')).toBe('after')
@@ -270,7 +272,7 @@ for (const route of ['write', 'create-file']) {
     await chmod(target, 0o751)
     await symlink('script.sh', path.join(workspace.root, 'link'))
 
-    const response = await request(workspace.openApp(), `/fs/${route}`, {
+    const response = await mutateFile(workspace.openApp(), route, {
       path: 'link',
       content: 'after',
       overwrite: true,
@@ -289,7 +291,7 @@ for (const route of ['write', 'create-file']) {
     const beforeOutside = await snapshotTree(outside)
     const beforeWorkspace = await snapshotTree(workspace.root)
 
-    const response = await request(workspace.openApp(), `/fs/${route}`, {
+    const response = await mutateFile(workspace.openApp(), route, {
       path: 'link',
       content: 'changed',
       overwrite: true,
@@ -311,11 +313,11 @@ test('refuses a stale save through an internal link before creating temporary fi
   const app = workspace.openApp()
   const opened = await request(app, '/fs/read?path=link')
   expect(opened.status).toBe(200)
-  const { version } = await opened.json()
+  const { version } = await readTextResponse(opened)
   await writeFile(target, 'changed externally')
   const before = await snapshotTree(workspace.root)
 
-  const response = await request(app, '/fs/write', {
+  const response = await write(app, {
     path: 'link',
     content: 'stale editor contents',
     baseVersion: version,
@@ -455,4 +457,26 @@ async function recordTree(root: string, prefix: string, snapshot: Record<string,
     }
     snapshot[name] = `file:${await readFile(absolutePath, 'utf8')}`
   }
+}
+
+function write(
+  app: ReturnType<typeof createTestApp>,
+  body: Parameters<typeof textWriteRequest>[1]['body'],
+) {
+  return app.handle(
+    textWriteRequest('http://local/fs/write', {
+      method: 'POST',
+      headers: { origin: 'http://localhost:5173' },
+      body,
+    }),
+  )
+}
+
+function mutateFile(
+  app: ReturnType<typeof createTestApp>,
+  route: string,
+  body: { path: string; content: string; overwrite: boolean },
+) {
+  if (route === 'write') return write(app, body)
+  return request(app, `/fs/${route}`, body)
 }

@@ -213,6 +213,11 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
             applyReady(controller.signal, rootPath, eventsScope, gitInvalidation.maybeExecute)
             return
           }
+          if (message.type === 'git') {
+            eventsScope.increment('subscription.gitStateCount')
+            gitInvalidation.maybeExecute()
+            return
+          }
           if (message.type === 'error') {
             eventsScope.increment('subscription.errorCount')
             eventsScope.warn(message.message, {

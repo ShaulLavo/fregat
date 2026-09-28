@@ -111,7 +111,7 @@ export function createEditorRuntime({
     fileOpenIntentOwner,
   )
   const documentSyncController = new LanguageServerDocumentSyncController()
-  const languageServerDocuments = new LanguageServerDocuments()
+  const languageServerDocuments = new LanguageServerDocuments(preparation.analysisLimitMiCodeUnits)
   // One dictionary worker for every editor on the page; it starts on the first word checked.
   const spellcheck = new SpellcheckService()
   spellcheck.onDidChangeAcceptedWords(() => {

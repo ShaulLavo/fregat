@@ -1,4 +1,4 @@
-# Plan 201: The existing TUI runs on bubli
+# Plan 202: The existing TUI runs on bubli
 
 Status: proposed implementation plan, requested by the owner on 2026-09-28. This PR contains planning and roadmap documentation only. No renderer, backend, application code, dependency pin, deployed service or release changes here.
 
@@ -19,7 +19,7 @@ Owner decisions carried into the implementation: replace Marked in bubli with `t
 | bubli | [PR 1](https://github.com/ShaulLavo/bubli/pull/1) | Toolkit units B0-B7, full capability catalog, reference specification and validation |
 | tree-sitter-md | [PR 5](https://github.com/ShaulLavo/tree-sitter-md/pull/5) | Semantic API, compatibility, streaming and package handoff, units M0-M4 |
 | Singapore | [PR 62](https://github.com/ShaulLavo/singapore/pull/62) | Existing editor consumer, authoring/worker compatibility and paired pins, units S0-S4 |
-| Fregat | This PR / Plan 201 | TUI adoption and cross-project roadmap, units F0-F5 |
+| Fregat | This PR / Plan 202 | TUI adoption and cross-project roadmap, units F0-F5 |
 
 The [coordination index](https://github.com/ShaulLavo/bubli/blob/docs/bubli-plans-2026-09-28/docs/bubli/README.md) records reciprocal PR links and producer/consumer order. The [reference specification](https://github.com/ShaulLavo/bubli/blob/docs/bubli-plans-2026-09-28/docs/bubli/reference-spec.md) consolidates the source-backed research, 30 relevant dependency/support modules, 41 original file references, palette/interaction rules, 32 measured-from-source constants and validation cases. The [83-capability catalog](https://github.com/ShaulLavo/bubli/blob/docs/bubli-plans-2026-09-28/docs/bubli/component-catalog.md) separates reusable building blocks from Fregat compositions. These capabilities are not 83 new widgets to write.
 
@@ -27,13 +27,13 @@ Review-branch links allow navigation before merge. Preserve PR links and normali
 
 ## Existing owners and boundaries
 
-| Existing work | Boundary retained by Plan 201 |
+| Existing work | Boundary retained by Plan 202 |
 | --- | --- |
 | [176 Markdown parser](176-markdown-parser.md), [189 improvements](189-tree-sitter-md-improvement.md) | Initial integration and ongoing correctness/extensions remain with those owners. Reconcile the new parser release evidence before repeating old blockers. The new parser plan specifies renderer-facing semantic work. |
 | [108 Markdown modes](108-markdown-modes.md), [111 decorations](111-editor-decorations.md) | Browser authoring and live preview keep their scopes; shared semantics do not force terminal presentation rules into the editor. |
 | [171 composer](171-composer-on-our-editor.md) | Its browser composer migration stays there. The terminal composer continues on the native terminal editor primitive; this plan does not port the DOM editor. |
 | [099 contributions](099-document-contributions.md), [198 document analysis](198-document-owned-editor-analysis.md) | Reuse their publication/acquisition/revision/retention guarantees where a consumer needs them. Do not create another document or analysis owner. Unrelated gated units are not prerequisites. |
-| [197 highlighting](197-editor-highlighting-service.md), [200 content views](200-document-backed-content-views.md) | Standalone highlighting/diff analysis and document-backed browser content retain their owners. Plan 201 consumes relevant released contracts and owns terminal presentation. |
+| [197 highlighting](197-editor-highlighting-service.md), [200 content views](200-document-backed-content-views.md) | Standalone highlighting/diff analysis and document-backed browser content retain their owners. Plan 202 consumes relevant released contracts and owns terminal presentation. |
 | [179 foreign content](179-isolating-foreign-content.md) | Browser isolation and safe content policy remain authoritative for any shared rendered-Markdown adoption. Terminal control handling needs its own explicit host policy. |
 | [181 timeline anchoring](181-chat-timeline-end-anchoring.md), [182 search](182-search-view-rendering.md) | Keep their web/search implementation ownership. Terminal anchoring tests may share scenarios, not DOM assumptions or a second backend model. |
 | [192 subject switching](192-no-swap-flash.md) | Preserve subject identity with content through asynchronous switches; stale results cannot repaint a new subject. |
@@ -124,7 +124,7 @@ Exit: producer/consumer contract and pins agree, with no silent renderer/parser 
 - [ ] Benchmark parsing, semantic conversion, React, layout/output and memory separately. Record cold/warm history and before/after counters; do not infer a performance win from parser-only figures.
 - [ ] Verify clean installation and CI build with intended fork/editor/runtime assets. No credentials, paid model requests, backend migration, data reset or deployment is needed for the planning PR.
 - [ ] Check every catalog disposition, source/profile deviation, reciprocal PR link and release handoff. Record exact implementation commits, fixtures and skipped platform checks before marking a unit complete.
-- [ ] Update Plan 201 status and root PLAN.md with delivered units/dependencies. Preserve permanent contracts and evidence before retiring completed execution text under repository policy.
+- [ ] Update Plan 202 status and root PLAN.md with delivered units/dependencies. Preserve permanent contracts and evidence before retiring completed execution text under repository policy.
 
 Exit: paired release/consumer evidence, no lost app behavior and an accurate roadmap. Planning merge is not implementation completion.
 

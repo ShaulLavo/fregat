@@ -20,6 +20,7 @@ test('settings reach the latency dial, machines and spellcheck without a React t
       appliedThemeId: null,
       selectedThemeId: 'dark',
       syntaxHighlightingEnabled: false,
+      analysisLimitMiCodeUnits: 10,
       tabSize: 4,
     },
   })

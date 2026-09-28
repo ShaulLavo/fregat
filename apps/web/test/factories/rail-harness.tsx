@@ -153,6 +153,7 @@ export async function createRailHarness(
       appliedThemeId: null,
       selectedThemeId: 'dark-plus',
       syntaxHighlightingEnabled: false,
+      analysisLimitMiCodeUnits: 10,
       tabSize: 4,
     },
   })

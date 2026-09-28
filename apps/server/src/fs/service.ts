@@ -710,7 +710,10 @@ export class FileSystemService {
     const release =
       !onlyFiles && paths.length <= 1 ? this.acquireWorkspaceIndex(paths[0] ?? '') : null
     try {
-      yield* observedWatchEvents(this.changes.stream(paths, signal, { files, onlyFiles }), paths)
+      yield* observedWatchEvents(
+        this.changes.stream(paths, signal, { files, onlyFiles, git: !onlyFiles }),
+        paths,
+      )
     } finally {
       release?.()
     }

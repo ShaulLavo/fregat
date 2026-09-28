@@ -1,5 +1,6 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { renderHook } from '@testing-library/react'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { createElement, type ReactNode } from 'react'
 
 import { useDiffLanguageContext } from '@/features/editor/hooks/use-diff-language-context'
@@ -9,6 +10,7 @@ import {
 } from '@/features/editor/state/document-state'
 import { testDiffLanguageHost } from '../../../../../test/factories/diff-language-host'
 import { expect, test } from '../../../../../test/fixtures'
+import { createTestQueryClient } from '../../../../../test/render'
 
 test('fails loudly when Platform document state is absent', () => {
   expect(() =>
@@ -32,8 +34,13 @@ test('publishes live Platform text and explicit host capabilities', () => {
     size: 16,
     version: 'v1',
   })
+  const queryClient = createTestQueryClient()
   const wrapper = ({ children }: { readonly children: ReactNode }) =>
-    createElement(EditorDocumentStateContext.Provider, { value: store }, children)
+    createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(EditorDocumentStateContext.Provider, { value: store }, children),
+    )
 
   const { result } = renderHook(
     () =>

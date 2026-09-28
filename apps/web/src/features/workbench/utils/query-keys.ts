@@ -8,3 +8,14 @@ export const projectMenuQueryKeys = {
   canonicalRoots: (paths: readonly string[]) => ['project-menu', 'canonical-roots', paths] as const,
   checkouts: (path: string) => ['project-menu', 'checkouts', path] as const,
 }
+
+export const pagedFileQueryKeys = {
+  limits: (path: string) => ['workbench', 'file-limit', path] as const,
+  instance: (instance: string, path: string, generation: number) =>
+    ['workbench', 'paged-file', instance, path, generation] as const,
+  resource: (instance: string, path: string, generation: number) =>
+    [...pagedFileQueryKeys.instance(instance, path, generation), 'resource'] as const,
+  index: (id: string) => ['workbench', 'paged-index', id] as const,
+  pages: (id: string) => ['workbench', 'paged-page', id] as const,
+  page: (id: string, line: number) => ['workbench', 'paged-page', id, line] as const,
+}

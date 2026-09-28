@@ -105,6 +105,7 @@
     "@singapore-editor/lsp-plugin": "link:@singapore-editor/lsp-plugin",
     "@singapore-editor/markdown": "link:@singapore-editor/markdown",
     "@singapore-editor/minimap": "link:@singapore-editor/minimap",
+    "@singapore-editor/paged": "link:@singapore-editor/paged",
     "@singapore-editor/panes": "link:@singapore-editor/panes",
     "@singapore-editor/plugin-ui": "link:@singapore-editor/plugin-ui",
     "@singapore-editor/react": "link:@singapore-editor/react",

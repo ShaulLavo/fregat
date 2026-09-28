@@ -1,3 +1,4 @@
+import { useDocumentFeatureTier } from '@/features/editor/hooks/use-document-feature-tier'
 import { fileDocumentKey } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { workspaceDocumentPath } from '@/features/editor/utils/diff-language-context'
@@ -24,9 +25,13 @@ export function useDiffLanguageContext(
   const revision = useEditorDocumentState((state) =>
     key ? (state.documentContentRevisions[key] ?? '') : '',
   )
-  const snapshot = { revision, text: buffer?.materializeFullText() ?? null }
+  const { analysisAllowed } = useDocumentFeatureTier(buffer)
+  const snapshot = {
+    revision,
+    text: analysisAllowed ? (buffer?.materializeFullText() ?? null) : null,
+  }
 
-  if (!path) return null
+  if (!path || !analysisAllowed) return null
 
   return {
     documentPath,

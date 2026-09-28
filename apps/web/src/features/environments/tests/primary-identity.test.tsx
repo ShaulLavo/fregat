@@ -24,6 +24,7 @@ test('a descriptor confirms storage ownership before runtime creation and identi
       appliedThemeId: null,
       selectedThemeId: 'dark-plus',
       syntaxHighlightingEnabled: false,
+      analysisLimitMiCodeUnits: 10,
       tabSize: 4,
     },
   })

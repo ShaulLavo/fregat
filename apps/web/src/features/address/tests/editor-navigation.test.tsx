@@ -241,3 +241,24 @@ test('opening a chat file reveals the previously hidden editor tool', async ({
   })
   expect(harness.workspace.getState().chatModePanels.toolPaneOpen).toBe(true)
 })
+
+test('a change row that outlived its change keeps the current view', async ({ client, server }) => {
+  const workspace = await navigationWorkspace(client, server)
+  await initializeNavigationGitWorkspace(server)
+  seedWorkspaceCache({ ...workspace, tabPaths: ['repo/a.ts'] })
+  const { harness, navigation } = await renderAddressHarness({
+    initialEntries: [`${workspace.base}/f/a.ts`],
+  })
+  await waitForNavigation(navigation)
+  const result = await navigation.openDiff({
+    owner: harness.workspace,
+    row: {
+      file: { path: 'repo/a.ts', status: 'modified', index: 'modified', worktree: 'unmodified' },
+      section: 'staged',
+      status: 'modified',
+    },
+  })
+  expect(result).toEqual({ status: 'applied' })
+  expect(navigation.getSnapshot().status).toBe('applied')
+  expect(harness.workspace.getState().selectedTabContent).toEqual(testTabContent('repo/a.ts'))
+})

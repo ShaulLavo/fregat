@@ -61,6 +61,7 @@ test('an offline Git mutation resumes on A while its provider is unmounted and B
       appliedThemeId: null,
       selectedThemeId: 'dark-plus',
       syntaxHighlightingEnabled: false,
+      analysisLimitMiCodeUnits: 10,
       tabSize: 4,
     },
   })

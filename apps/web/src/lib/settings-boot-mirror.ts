@@ -50,6 +50,7 @@ const MIRRORED_KEYS = [
   'editor.inputRoute',
   'editor.guides.indentation',
   'editor.minimap.enabled',
+  'editor.largeFile.analysisLimitMiCodeUnits',
   'editor.retainedTextBudget',
   'editor.history.retainedStates',
   'editor.history.persist',

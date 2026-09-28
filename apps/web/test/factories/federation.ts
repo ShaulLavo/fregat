@@ -62,6 +62,7 @@ export async function createFederationHarness(serverA: TestServer, remote?: Test
       appliedThemeId: null,
       selectedThemeId: 'dark-plus',
       syntaxHighlightingEnabled: false,
+      analysisLimitMiCodeUnits: 10,
       tabSize: 4,
     },
   })

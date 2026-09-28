@@ -722,8 +722,12 @@ export function createNavigation(
         const diffs = await queryClient.query(diffQueryOptions(path, staged))
         const diff = diffs.find((entry) => entry.path === path || entry.oldPath === path)
         const document = diff ? snapshotDocument(diff) : null
-        if (!document)
-          throw createClientInvariantError('The requested change has no available file snapshot.')
+        // The row outlived its change (committed or discarded before status refreshed): drop the row, stay put.
+        if (!document) {
+          endPressPaint('diffs', path, 'change-gone')
+          void queryClient.invalidateQueries({ queryKey: gitKeys.statuses() })
+          return { address, replace: true, preserveTransient: true }
+        }
         const blobCached =
           listCached &&
           queryClient.getQueryData(diffDocumentQueryKey(document.source)) !== undefined

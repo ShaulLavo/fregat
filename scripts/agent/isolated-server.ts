@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import type { SettingsValues } from '../../packages/contracts/src/settings/keys'
 
 import {
   DEFAULT_PROVIDER_INSTANCES,
@@ -47,8 +48,15 @@ export async function startIsolatedServer(
     pathPrefix,
     realProviders = false,
     webRoot,
+    settings = {},
     scratchRoot = defaultScratchRoot,
-  }: { pathPrefix?: string; realProviders?: boolean; scratchRoot?: string; webRoot?: string } = {},
+  }: {
+    pathPrefix?: string
+    realProviders?: boolean
+    scratchRoot?: string
+    webRoot?: string
+    settings?: Partial<SettingsValues>
+  } = {},
 ): Promise<IsolatedServer> {
   const directory = mkdtempSync(path.join(scratchRoot, 'fregat-agent-'))
   const home = path.join(directory, 'home')
@@ -59,15 +67,20 @@ export async function startIsolatedServer(
   mkdirSync(path.join(directory, 'served', 'web'), { recursive: true })
   // Scenarios install their own fixture drivers; only an owner's --real-providers run keeps the
   // built-in accounts on.
-  if (!realProviders)
+  if (!realProviders || Object.keys(settings).length > 0)
     writeFileSync(
       path.join(home, 'settings.json'),
       JSON.stringify({
+        ...settings,
         'workbench.wallpaper': { enabled: false, source: { kind: 'desktop' } },
-        'providers.instances': DEFAULT_PROVIDER_INSTANCES.map((provider) => ({
-          ...provider,
-          enabled: false,
-        })),
+        ...(!realProviders
+          ? {
+              'providers.instances': DEFAULT_PROVIDER_INSTANCES.map((provider) => ({
+                ...provider,
+                enabled: false,
+              })),
+            }
+          : {}),
       }),
     )
   const port = await prepareHome(home, webOrigin).catch((error: unknown) => {
