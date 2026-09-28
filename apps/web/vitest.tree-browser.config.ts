@@ -11,6 +11,8 @@ const alias = {
   '@': path.resolve(import.meta.dirname, './src'),
 }
 
+const TOUCH_TESTS = 'src/features/workspace/tests/tree-parity-touch.browser.tsx'
+
 type Point = { readonly x: number; readonly y: number }
 
 /** The test iframe's offset in the page, so in-frame client coordinates become page ones. */
@@ -128,14 +130,11 @@ const treeCommands = {
 export default defineConfig({
   plugins: [react({ compiler: true }), tailwindcss()],
   resolve: { alias, dedupe: ['react', 'react-dom'] },
+  // Found mid-run, a dependency reloads the page and fails the file that found it.
+  optimizeDeps: { include: ['@workspace/ui > @base-ui/react/context-menu'] },
   test: {
-    name: 'tree-browser',
     // Chromium's native drag and touch state must not overlap another file's input.
     fileParallelism: false,
-    include: [
-      'src/features/workspace/tests/tree-view*.browser.tsx',
-      'src/features/workspace/tests/tree-parity-*.browser.tsx',
-    ],
     browser: {
       enabled: true,
       headless: true,
@@ -144,5 +143,29 @@ export default defineConfig({
       commands: treeCommands,
       instances: [{ browser: 'chromium', viewport: { height: 600, width: 560 } }],
     },
+    // A page that has seen touch input matches `(hover: none)` for the rest of the run, which
+    // turns off every `hover:` style, so touch runs last, in its own project.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'tree-browser',
+          include: [
+            'src/features/workspace/tests/tree-view*.browser.tsx',
+            'src/features/workspace/tests/tree-parity-*.browser.tsx',
+          ],
+          exclude: [TOUCH_TESTS],
+          sequence: { groupOrder: 0 },
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'tree-browser-touch',
+          include: [TOUCH_TESTS],
+          sequence: { groupOrder: 1 },
+        },
+      },
+    ],
   },
 })

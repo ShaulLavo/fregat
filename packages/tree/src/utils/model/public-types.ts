@@ -1,13 +1,6 @@
 // Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
-import type { FileTreePreparedInput } from '../preparedInput'
-import type { ContextMenuAnchorRect, GitStatusEntry } from '../publicTypes'
-import type { FileTreeDensity } from './density'
-
-/**
- * Public tree identity is path-first so render and model callers never depend
- * on the underlying path-store numeric IDs.
- */
-export type FileTreePublicId = string
+import type { FileTreePreparedInput } from '../prepared-input'
+import type { GitStatusEntry } from '../public-types'
 
 // The types below intentionally duplicate private path-store shapes
 // (PathStoreCompareEntry, PathStorePathComparator, PathStoreInitialExpansion,
@@ -29,13 +22,13 @@ interface FileTreeSortEntry {
   basename: string
   depth: number
   isDirectory: boolean
-  path: FileTreePublicId
+  path: string
   segments: readonly string[]
 }
 
 export type FileTreeSortComparator = (left: FileTreeSortEntry, right: FileTreeSortEntry) => number
 
-export type FileTreeInitialExpansion = 'closed' | 'open' | number
+type FileTreeInitialExpansion = 'closed' | 'open' | number
 
 export interface FileTreeRemoveOptions {
   recursive?: boolean
@@ -48,16 +41,16 @@ export interface FileTreeMoveOptions {
 }
 
 export type FileTreeBatchOperation =
-  | { path: FileTreePublicId; type: 'add' }
-  | ({ path: FileTreePublicId; type: 'remove' } & FileTreeRemoveOptions)
+  | { path: string; type: 'add' }
+  | ({ path: string; type: 'remove' } & FileTreeRemoveOptions)
   | ({
-      from: FileTreePublicId
-      to: FileTreePublicId
+      from: string
+      to: string
       type: 'move'
     } & FileTreeMoveOptions)
 
 export interface FileTreeGitStatusPatch {
-  remove?: readonly FileTreePublicId[]
+  remove?: readonly string[]
   set?: readonly GitStatusEntry[]
 }
 
@@ -66,18 +59,17 @@ export interface FileTreeGitStatusPatch {
 interface FileTreeStoreOptions {
   flattenEmptyDirectories?: boolean
   initialExpansion?: FileTreeInitialExpansion
-  initialExpandedPaths?: readonly FileTreePublicId[]
-  presorted?: boolean
+  initialExpandedPaths?: readonly string[]
   sort?: 'default' | FileTreeSortComparator
 }
 
 type FileTreeInputOptions =
   | {
-      paths: readonly FileTreePublicId[]
+      paths: readonly string[]
       preparedInput?: FileTreePreparedInput
     }
   | {
-      paths?: readonly FileTreePublicId[]
+      paths?: readonly string[]
       preparedInput: FileTreePreparedInput
     }
 
@@ -85,7 +77,7 @@ type FileTreeControllerBehaviorOptions = FileTreeStoreOptions & {
   dragAndDrop?: boolean | FileTreeDragAndDropConfig
   fileTreeSearchMode?: FileTreeSearchMode
   initialSearchQuery?: string | null
-  initialSelectedPaths?: readonly FileTreePublicId[]
+  initialSelectedPaths?: readonly string[]
   onSearchChange?: FileTreeSearchChangeListener
   renaming?: boolean | FileTreeRenamingConfig
 }
@@ -95,11 +87,11 @@ export type FileTreeControllerOptions = FileTreeControllerBehaviorOptions & File
 interface FileTreeVisibleSegment {
   isTerminal: boolean
   name: string
-  path: FileTreePublicId
+  path: string
 }
 
 export interface FileTreeVisibleRow {
-  ancestorPaths: readonly FileTreePublicId[]
+  ancestorPaths: readonly string[]
   depth: number
   flattenedSegments?: readonly FileTreeVisibleSegment[]
   hasChildren: boolean
@@ -111,7 +103,7 @@ export interface FileTreeVisibleRow {
   kind: 'directory' | 'file'
   level: number
   name: string
-  path: FileTreePublicId
+  path: string
   posInSet: number
   setSize: number
 }
@@ -119,7 +111,7 @@ export interface FileTreeVisibleRow {
 interface FileTreeItemHandleBase {
   deselect(): void
   focus(): void
-  getPath(): FileTreePublicId
+  getPath(): string
   isFocused(): boolean
   isDirectory(): boolean
   isSelected(): boolean
@@ -144,10 +136,6 @@ export type FileTreeItemHandle = FileTreeDirectoryHandle | FileTreeFileHandle
 export interface FileTreeRenderOptions {
   initialScrollTop?: number
   onScrollTopChange?: (scrollTop: number) => void
-  // Hint how many rows should fit in the first render before the browser can
-  // measure the real scroll viewport. Fractional values are allowed when the
-  // desired first-render budget is not an exact multiple of itemHeight.
-  initialVisibleRowCount?: number
   itemHeight?: number
   overscan?: number
   stickyFolders?: boolean
@@ -180,7 +168,7 @@ export interface FileTreeSearchSessionHandle {
   closeSearch(): void
   focusNextSearchMatch(): void
   focusPreviousSearchMatch(): void
-  getSearchMatchingPaths(): readonly FileTreePublicId[]
+  getSearchMatchingPaths(): readonly string[]
   getSearchValue(): string
   isSearchOpen(): boolean
   openSearch(initialValue?: string): void
@@ -188,14 +176,14 @@ export interface FileTreeSearchSessionHandle {
 }
 
 export interface FileTreeDropTarget {
-  directoryPath: FileTreePublicId | null
-  flattenedSegmentPath: FileTreePublicId | null
-  hoveredPath: FileTreePublicId | null
+  directoryPath: string | null
+  flattenedSegmentPath: string | null
+  hoveredPath: string | null
   kind: 'directory' | 'root'
 }
 
 export interface FileTreeDropContext {
-  draggedPaths: readonly FileTreePublicId[]
+  draggedPaths: readonly string[]
   target: FileTreeDropTarget
 }
 
@@ -204,7 +192,7 @@ export interface FileTreeDropResult extends FileTreeDropContext {
 }
 
 export interface FileTreeDragAndDropConfig {
-  canDrag?: (paths: readonly FileTreePublicId[]) => boolean
+  canDrag?: (paths: readonly string[]) => boolean
   canDrop?: (event: FileTreeDropContext) => boolean
   onDropComplete?: (event: FileTreeDropResult) => void
   onDropError?: (error: string, event: FileTreeDropContext) => void
@@ -213,13 +201,13 @@ export interface FileTreeDragAndDropConfig {
 
 interface FileTreeRenamingItem {
   isFolder: boolean
-  path: FileTreePublicId
+  path: string
 }
 
 export interface FileTreeRenameEvent {
-  destinationPath: FileTreePublicId
+  destinationPath: string
   isFolder: boolean
-  sourcePath: FileTreePublicId
+  sourcePath: string
 }
 
 export interface FileTreeRenamingConfig {
@@ -229,19 +217,10 @@ export interface FileTreeRenamingConfig {
 }
 
 type FileTreeOptionSurface = FileTreeRenderOptions & {
-  composition?: FileTreeCompositionOptions
-  density?: FileTreeDensity
   gitStatus?: readonly GitStatusEntry[]
   onSelectionChange?: FileTreeSelectionChangeListener
   renderRowDecoration?: FileTreeRowDecorationRenderer
   search?: boolean
-  // When `true`, renders the search input with a synthetic focus ring so the
-  // input looks focused even though no browser focus is attached. The ring is
-  // dismissed automatically on the first real interaction with the input
-  // (focus, pointer down, or input). Intended for demos and marketing pages
-  // that pre-populate an `initialSearchQuery` and want the visual to match a
-  // focused state without stealing real focus from siblings.
-  searchFakeFocus?: boolean
   searchBlurBehavior?: FileTreeSearchBlurBehavior
   searchPlaceholder?: string
 }
@@ -256,19 +235,19 @@ interface FileTreeMutationEventInvalidation {
 
 interface FileTreeAddEvent extends FileTreeMutationEventInvalidation {
   operation: 'add'
-  path: FileTreePublicId
+  path: string
 }
 
 interface FileTreeRemoveEvent extends FileTreeMutationEventInvalidation {
   operation: 'remove'
-  path: FileTreePublicId
+  path: string
   recursive: boolean
 }
 
 interface FileTreeMoveEvent extends FileTreeMutationEventInvalidation {
-  from: FileTreePublicId
+  from: string
   operation: 'move'
-  to: FileTreePublicId
+  to: string
 }
 
 export interface FileTreeResetEvent extends FileTreeMutationEventInvalidation {
@@ -301,64 +280,31 @@ export interface FileTreeResetOptions {
   // time. Useful when the caller is swapping in a dramatically different path
   // list (e.g. upgrading from an SSR preview to a full dataset) and wants the
   // fresh store to start with expansion state that reflects the new paths.
-  initialExpandedPaths?: readonly FileTreePublicId[]
+  initialExpandedPaths?: readonly string[]
   // Must describe the same path list passed to resetPaths(paths, ...).
   preparedInput?: FileTreePreparedInput
 }
 
 export interface FileTreeMutationHandle {
-  add(path: FileTreePublicId): void
+  add(path: string): void
   batch(operations: readonly FileTreeBatchOperation[]): void
-  move(fromPath: FileTreePublicId, toPath: FileTreePublicId, options?: FileTreeMoveOptions): void
+  move(fromPath: string, toPath: string, options?: FileTreeMoveOptions): void
   onMutation<TType extends FileTreeMutationEventType | '*'>(
     type: TType,
     handler: (event: FileTreeMutationEventForType<TType>) => void,
   ): () => void
-  remove(path: FileTreePublicId, options?: FileTreeRemoveOptions): void
-  resetPaths(paths: readonly FileTreePublicId[], options?: FileTreeResetOptions): void
+  remove(path: string, options?: FileTreeRemoveOptions): void
+  resetPaths(paths: readonly string[], options?: FileTreeResetOptions): void
 }
 
 export type FileTreeListener = () => void
 
-export type FileTreeSelectionChangeListener = (selectedPaths: readonly FileTreePublicId[]) => void
+export type FileTreeSelectionChangeListener = (selectedPaths: readonly string[]) => void
 
 export interface FileTreeContextMenuItem {
   kind: 'directory' | 'file'
   name: string
-  path: FileTreePublicId
-}
-
-export interface FileTreeContextMenuOpenContext {
-  anchorElement: HTMLElement
-  anchorRect: ContextMenuAnchorRect
-  /**
-   * Closes the current context menu. Pass `{ restoreFocus: false }` when the
-   * caller is about to transfer focus into another owned surface, such as the
-   * inline rename input, so the menu close path does not steal focus back to
-   * the row first.
-   */
-  close: (options?: { restoreFocus?: boolean }) => void
-  restoreFocus: () => void
-}
-
-export type FileTreeContextMenuTriggerMode = 'both' | 'button' | 'right-click'
-export type FileTreeContextMenuButtonVisibility = 'always' | 'when-needed'
-
-interface FileTreeContextMenuCompositionOptions {
-  enabled?: boolean
-  triggerMode?: FileTreeContextMenuTriggerMode
-  buttonVisibility?: FileTreeContextMenuButtonVisibility
-  onOpen?: (item: FileTreeContextMenuItem, context: FileTreeContextMenuOpenContext) => void
-  onClose?: () => void
-  /** The menu element, mounted inside the row's menu anchor. */
-  render?: (
-    item: FileTreeContextMenuItem,
-    context: FileTreeContextMenuOpenContext,
-  ) => HTMLElement | null
-}
-
-export interface FileTreeCompositionOptions {
-  contextMenu?: FileTreeContextMenuCompositionOptions
+  path: string
 }
 
 /** A small button after the decoration text, such as "Fix with AI" beside an error. */

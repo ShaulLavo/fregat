@@ -25,74 +25,13 @@ export function createDirectoryChildIndex(): DirectoryChildIndex {
   }
 }
 
-// Presorted bulk-ingest path skips position-map population because positions
-// are only needed for mutations and sibling lookups, never for the initial
-// visible-window projection.  The map is rebuilt lazily on first use.
-export function createPresortedDirectoryChildIndex(): DirectoryChildIndex {
-  return {
-    childIdByNameId: null,
-    childIds: [],
-    childPositionById: null,
-    childVisibleChunkSums: null,
-    totalChildSubtreeNodeCount: 0,
-    totalChildVisibleSubtreeCount: 0,
-  }
-}
-
-// Lazily rebuilds the child-name-id lookup map from the childIds array and
-// the stored nameId on each node.  Called on first path lookup or mutation
-// after presorted bulk ingest, which defers map population to avoid per-child
-// Map.set overhead during construction.
-export function ensureChildIdByNameId(
-  nodes: readonly PathStoreNode[],
-  index: DirectoryChildIndex,
-): Map<SegmentId, NodeId> {
-  if (index.childIdByNameId != null) {
-    return index.childIdByNameId
-  }
-
-  const map = new Map<SegmentId, NodeId>()
-  for (const childId of index.childIds) {
-    const childNode = nodes[childId]
-    if (childNode != null) {
-      map.set(childNode.nameId, childId)
-    }
-  }
-
-  index.childIdByNameId = map
-  return map
-}
-
-export function ensureChildPositions(index: DirectoryChildIndex): Map<NodeId, number> {
-  if (index.childPositionById != null) {
-    return index.childPositionById
-  }
-
-  const positions = new Map<NodeId, number>()
-  for (let i = 0; i < index.childIds.length; i++) {
-    const childId = index.childIds[i]
-    if (childId != null) {
-      positions.set(childId, i)
-    }
-  }
-
-  index.childPositionById = positions
-  return positions
-}
-
 export function appendChildReference(index: DirectoryChildIndex, childId: NodeId): void {
-  if (index.childPositionById != null) {
-    index.childPositionById.set(childId, index.childIds.length)
-  }
+  index.childPositionById.set(childId, index.childIds.length)
   index.childIds.push(childId)
 }
 
 // Rebuilds the child-position map from the first changed index after a splice.
 export function updateChildPositionsFrom(index: DirectoryChildIndex, startIndex: number): void {
-  if (index.childPositionById == null) {
-    return
-  }
-
   for (let position = startIndex; position < index.childIds.length; position++) {
     const childId = index.childIds[position]
     if (childId != null) {
@@ -138,7 +77,7 @@ export function applyChildAggregateDelta(
     return
   }
 
-  const childPosition = ensureChildPositions(index).get(childId)
+  const childPosition = index.childPositionById.get(childId)
   if (childPosition === undefined) {
     return
   }

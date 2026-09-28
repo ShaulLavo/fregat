@@ -1,6 +1,6 @@
 import { PathStore } from './path-store/store'
 
-import type { FileTreeSortComparator } from './model/publicTypes'
+import type { FileTreeSortComparator } from './model/public-types'
 
 declare const FILE_TREE_PREPARED_INPUT: unique symbol
 
@@ -20,9 +20,4 @@ export function prepareFileTreeInput(
   } = {},
 ): FileTreePreparedInput {
   return PathStore.prepareInput(paths, options) as FileTreePreparedInput
-}
-
-// Marks already-sorted input so FileTree can skip both sorting and reparsing work.
-export function preparePresortedFileTreeInput(paths: readonly string[]): FileTreePreparedInput {
-  return PathStore.preparePresortedInput(paths) as FileTreePreparedInput
 }

@@ -1,5 +1,4 @@
 // Modified for Platform from Pierre. Apache-2.0; see packages/tree/LICENSE-pierre and UPSTREAM.md.
-import { type FileTreeDensityPreset, resolveFileTreeDensity } from '@workspace/tree'
 import { FileTreeController } from '@workspace/tree'
 import { arePathSetsEqual } from '@workspace/tree'
 import {
@@ -10,7 +9,6 @@ import {
 import type { TreeViewProps } from '@/features/workspace/utils/tree-view-props'
 import type {
   FileTreeBatchOperation,
-  FileTreeCompositionOptions,
   FileTreeGitStatusPatch,
   FileTreeItemHandle,
   FileTreeListener,
@@ -19,7 +17,6 @@ import type {
   FileTreeMutationEventType,
   FileTreeMutationHandle,
   FileTreeOptions,
-  FileTreePublicId,
   FileTreeRemoveOptions,
   FileTreeResetOptions,
   FileTreeRowDecorationRenderer,
@@ -27,25 +24,16 @@ import type {
   FileTreeSearchSessionHandle,
   FileTreeSelectionChangeListener,
 } from '@workspace/tree'
-import { FILE_TREE_DEFAULT_ITEM_HEIGHT, FILE_TREE_DEFAULT_VIEWPORT_HEIGHT } from '@workspace/tree'
 import { TreeRowElements, type TreeRowElement } from '@/features/workspace/state/tree-row-elements'
-
-// Translates the public row-budget hint into the pixel height the first render uses before the
-// DOM can report a measured scroll viewport.
-function resolveInitialViewportHeight({
-  initialVisibleRowCount,
-  itemHeight,
-}: Pick<FileTreeOptions, 'initialVisibleRowCount' | 'itemHeight'>): number {
-  return initialVisibleRowCount == null
-    ? FILE_TREE_DEFAULT_VIEWPORT_HEIGHT
-    : Math.max(0, initialVisibleRowCount) * (itemHeight ?? FILE_TREE_DEFAULT_ITEM_HEIGHT)
-}
+import { TREE_DEFAULT_ITEM_HEIGHT } from '@/features/workspace/utils/tree-view-layout'
 
 /** What the view renders from the model; its identity changes with every view-visible setter. */
-export type TreeViewModelProps = Omit<TreeViewProps, 'instanceId'>
+export type TreeViewModelProps = Omit<
+  TreeViewProps,
+  'instanceId' | 'menuPath' | 'onCloseMenu' | 'onOpenMenu'
+>
 
 export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSessionHandle {
-  #composition: FileTreeCompositionOptions | undefined
   readonly #controller: FileTreeController
   readonly #onSelectionChange: FileTreeSelectionChangeListener | undefined
   readonly #rowDecorationSource: FileTreeRowDecorationRenderer | undefined
@@ -53,33 +41,24 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
   readonly #renamingEnabled: boolean
   readonly #searchBlurBehavior: FileTreeOptions['searchBlurBehavior']
   readonly #searchEnabled: boolean
-  readonly #searchFakeFocus: boolean
   readonly #searchPlaceholder: string | undefined
   readonly #rowElements = new TreeRowElements()
-  #density: FileTreeDensityPreset
+  #itemHeight: number
   readonly #viewOptions: Pick<
     FileTreeOptions,
-    | 'initialVisibleRowCount'
-    | 'itemHeight'
-    | 'overscan'
-    | 'stickyFolders'
-    | 'initialScrollTop'
-    | 'onScrollTopChange'
+    'overscan' | 'stickyFolders' | 'initialScrollTop' | 'onScrollTopChange'
   >
   #gitStatusState: FileTreeGitStatusState | null
   #loadingPaths: ReadonlySet<string> = new Set()
-  readonly #densityListeners = new Set<FileTreeListener>()
-  #densityVersion = 0
+  readonly #itemHeightListeners = new Set<FileTreeListener>()
+  #itemHeightVersion = 0
   readonly #viewListeners = new Set<FileTreeListener>()
   #viewVersion = 0
   #viewProps: TreeViewModelProps | null = null
   #selectionVersion: number
-  #selectionSubscription: (() => void) | null = null
 
   public constructor(options: FileTreeOptions) {
     const {
-      composition,
-      density,
       fileTreeSearchMode,
       gitStatus,
       initialSearchQuery,
@@ -91,15 +70,12 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
       renaming,
       search,
       searchBlurBehavior,
-      searchFakeFocus,
       searchPlaceholder,
       stickyFolders,
-      initialVisibleRowCount,
       initialScrollTop,
       onScrollTopChange,
       ...controllerOptions
     } = options
-    this.#composition = composition
     this.#gitStatusState = resolveFileTreeGitStatusState(gitStatus)
     this.#onSelectionChange = onSelectionChange
     this.#rowDecorationSource = renderRowDecoration
@@ -107,14 +83,11 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
     this.#renamingEnabled = renaming != null && renaming !== false
     this.#searchBlurBehavior = searchBlurBehavior
     this.#searchEnabled = search === true
-    this.#searchFakeFocus = searchFakeFocus === true
     this.#searchPlaceholder = searchPlaceholder
-    this.#density = resolveFileTreeDensity(density, itemHeight)
+    this.#itemHeight = itemHeight ?? TREE_DEFAULT_ITEM_HEIGHT
     this.#viewOptions = {
-      itemHeight: this.#density.itemHeight,
       overscan,
       stickyFolders,
-      initialVisibleRowCount,
       initialScrollTop,
       onScrollTopChange,
     }
@@ -126,25 +99,29 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
       renaming,
     })
     this.#selectionVersion = this.#controller.getSelectionVersion()
-    this.#selectionSubscription =
-      this.#onSelectionChange == null
-        ? null
-        : this.subscribe(() => {
-            this.#emitSelectionChange()
-          })
   }
 
-  public cleanUp(): void {
-    this.#selectionSubscription?.()
-    this.#selectionSubscription = null
-    this.#densityListeners.clear()
-    this.#viewListeners.clear()
-    this.#controller.destroy()
+  /**
+   * Reports selection changes to `onSelectionChange` while connected; the host connects it for as
+   * long as the tree is mounted. A change made before connecting is reported on connect.
+   */
+  public connectSelectionChange(): () => void {
+    if (this.#onSelectionChange == null) return () => {}
+
+    const disconnect = this.subscribe(() => {
+      this.#emitSelectionChange()
+    })
+    this.#emitSelectionChange()
+    return disconnect
   }
 
   /** The rows mounted right now, sticky ones included; changes arrive through `subscribeRowElements`. */
   public getRowElements(): readonly TreeRowElement[] {
     return this.#rowElements.rows()
+  }
+
+  public getRowElement(path: string): HTMLElement | null {
+    return this.#rowElements.element(path)
   }
 
   public subscribeRowElements(listener: () => void): () => void {
@@ -167,46 +144,29 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
     return this.#controller.getSelectedPaths()
   }
 
-  public getComposition(): FileTreeCompositionOptions | undefined {
-    return this.#composition
-  }
-
   public getItemHeight(): number {
-    return this.#density.itemHeight
+    return this.#itemHeight
   }
 
-  public getDensityFactor(): number {
-    return this.#density.factor
+  public getItemHeightVersion(): number {
+    return this.#itemHeightVersion
   }
 
-  public getDensityVersion(): number {
-    return this.#densityVersion
-  }
+  public setItemHeight(itemHeight: number | undefined): void {
+    const nextItemHeight = itemHeight ?? TREE_DEFAULT_ITEM_HEIGHT
+    if (nextItemHeight === this.#itemHeight) return
 
-  public setDensity(
-    density: FileTreeOptions['density'],
-    itemHeight: FileTreeOptions['itemHeight'],
-  ): void {
-    const nextDensity = resolveFileTreeDensity(density, itemHeight)
-    if (
-      nextDensity.factor === this.#density.factor &&
-      nextDensity.itemHeight === this.#density.itemHeight
-    ) {
-      return
-    }
-
-    this.#density = nextDensity
-    this.#viewOptions.itemHeight = nextDensity.itemHeight
-    this.#densityVersion += 1
+    this.#itemHeight = nextItemHeight
+    this.#itemHeightVersion += 1
     this.#invalidateView()
-    for (const listener of this.#densityListeners) listener()
+    for (const listener of this.#itemHeightListeners) listener()
   }
 
-  public subscribeDensity(listener: FileTreeListener): () => void {
-    this.#densityListeners.add(listener)
+  public subscribeItemHeight(listener: FileTreeListener): () => void {
+    this.#itemHeightListeners.add(listener)
 
     return () => {
-      this.#densityListeners.delete(listener)
+      this.#itemHeightListeners.delete(listener)
     }
   }
 
@@ -256,7 +216,7 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
     this.#controller.requestFocus()
   }
 
-  public scrollToPath(path: FileTreePublicId, options?: FileTreeScrollToPathOptions): void {
+  public scrollToPath(path: string, options?: FileTreeScrollToPathOptions): void {
     this.#controller.scrollToPath(path, options)
   }
 
@@ -337,14 +297,6 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
     this.#controller.resetPaths(paths, options)
   }
 
-  // Deliberately rerenders even when the same object reference is passed again.
-  // Callers can reuse one composition object while changing what its render
-  // callbacks return, so identity alone is not a reliable no-op signal.
-  public setComposition(composition?: FileTreeCompositionOptions): void {
-    this.#composition = composition
-    this.#invalidateView()
-  }
-
   public setGitStatus(gitStatus?: FileTreeOptions['gitStatus']): void {
     const nextGitStatusState = resolveFileTreeGitStatusState(gitStatus, this.#gitStatusState)
     if (nextGitStatusState === this.#gitStatusState) {
@@ -367,7 +319,7 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
     this.#invalidateView()
   }
 
-  public setLoadingPaths(paths: readonly FileTreePublicId[]): void {
+  public setLoadingPaths(paths: readonly string[]): void {
     if (arePathSetsEqual(this.#loadingPaths, paths)) return
 
     this.#loadingPaths = new Set(paths)
@@ -382,7 +334,6 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
 
   #createViewProps(): TreeViewModelProps {
     return {
-      composition: this.#composition,
       controller: this.#controller,
       gitStatusByPath: this.#gitStatusState?.statusByPath,
       ignoredGitDirectories: this.#gitStatusState?.ignoredDirectoryPaths,
@@ -393,15 +344,10 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
       rowElements: this.#rowElements,
       searchBlurBehavior: this.#searchBlurBehavior,
       searchEnabled: this.#searchEnabled,
-      searchFakeFocus: this.#searchFakeFocus,
       searchPlaceholder: this.#searchPlaceholder,
       initialScrollTop: this.#viewOptions.initialScrollTop,
       onScrollTopChange: this.#viewOptions.onScrollTopChange,
-      initialViewportHeight: resolveInitialViewportHeight({
-        initialVisibleRowCount: this.#viewOptions.initialVisibleRowCount,
-        itemHeight: this.#viewOptions.itemHeight,
-      }),
-      itemHeight: this.#viewOptions.itemHeight,
+      itemHeight: this.#itemHeight,
       overscan: this.#viewOptions.overscan,
       stickyFolders: this.#viewOptions.stickyFolders,
     }

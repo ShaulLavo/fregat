@@ -6,7 +6,7 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./model": "./src/utils/model/FileTreeController.ts"
+    "./model": "./src/utils/model/controller.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",

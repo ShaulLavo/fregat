@@ -20,7 +20,6 @@ export function useTreeRowClick({
   claimDomFocus,
   controller,
   isSearchOpen,
-  noteContextMenuInteraction,
   revealCanonicalRowAtStickyOffset,
   searchBlurBehavior,
   setActiveItemPath,
@@ -31,7 +30,6 @@ export function useTreeRowClick({
   readonly claimDomFocus: () => void
   readonly controller: FileTreeController
   readonly isSearchOpen: boolean
-  readonly noteContextMenuInteraction: () => void
   readonly revealCanonicalRowAtStickyOffset: TreeStickyReveal
   readonly searchBlurBehavior: FileTreeSearchBlurBehavior
   readonly setActiveItemPath: Dispatch<SetStateAction<string | null>>
@@ -81,7 +79,7 @@ export function useTreeRowClick({
 
       const clickedElement = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
       const clickedRowIsVisible = row.index >= visibleStartIndex && row.index <= visibleEndIndex
-      const shouldExposeFocusedTrigger =
+      const claimsRowFocus =
         mode === 'flow' &&
         clickedRowIsVisible &&
         clickedElement != null &&
@@ -91,12 +89,11 @@ export function useTreeRowClick({
         suppressNextPointerFocusScroll(actionTargetPath)
       }
       controller.focusMountedPathFromInput(actionTargetPath)
-      if (shouldExposeFocusedTrigger) {
+      if (claimsRowFocus) {
         claimDomFocus()
         setActiveItemPath((previousPath) =>
           previousPath === actionTargetPath ? previousPath : actionTargetPath,
         )
-        noteContextMenuInteraction()
       }
       if (shouldToggleDirectory) {
         controller.toggleMountedDirectoryFromInput(actionTargetPath)
@@ -116,7 +113,6 @@ export function useTreeRowClick({
       isSearchOpen,
       visibleEndIndex,
       visibleStartIndex,
-      noteContextMenuInteraction,
       revealCanonicalRowAtStickyOffset,
       searchBlurBehavior,
       setActiveItemPath,

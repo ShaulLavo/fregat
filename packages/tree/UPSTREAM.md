@@ -57,14 +57,14 @@ The workspace file navigator now uses the package for:
 
 Prepared-input reuse is measured with `apps/web/scripts/file-tree-prepared-input-benchmark.ts`. The
 50k-path gate requires at least a 20% cached-remount speedup and no more than 15% cold slowdown.
-Presorted input remains an intentional future fast path only; the app's path ordering has not been
-proven comparator-compatible, so no dummy caller is maintained for it.
+Pierre's presorted input and its bulk-ingest fast path were removed: nothing called them, and the
+app's path ordering was never proven comparator-compatible.
 
 ## API policy
 
-Local product intent defines the public API. High-level capabilities above and the opaque
-prepared/presorted input contract are retained through the single `@workspace/tree` root entry
-point. Local consumers do not import package subpaths. Controller, path-store, renderer, layout,
+Local product intent defines the public API. High-level capabilities above and the opaque prepared
+input contract are retained through the `@workspace/tree` root entry point; the TUI reads the
+controller through `@workspace/tree/model`. No other subpath is imported. Controller, path-store, renderer, layout,
 virtualization, DOM, and state details remain implementation concerns even when Pierre exposes an
 equivalent symbol.
 

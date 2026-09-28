@@ -205,16 +205,6 @@
     "reason": "A chart legend swatch in a categorical chart fill (chartFill), keyed to a bar segment. It marks a series, not a status, so StatusDot's status tones cannot draw it."
   },
   {
-    "file": "apps/web/src/features/workspace/components/tree-menu-trigger.tsx",
-    "class": "<button>",
-    "reason": "The file tree's own row machinery, moved into the app unchanged by Plan 178 app-owned-state; the rows and chrome sub-plans rebuild it on ListRow, InputGroup and the app's truncation, and delete this entry."
-  },
-  {
-    "file": "apps/web/src/features/workspace/components/tree-menu-trigger.tsx",
-    "class": "missing Tooltip",
-    "reason": "The file tree's own row machinery, moved into the app unchanged by Plan 178 app-owned-state; the rows and chrome sub-plans rebuild it on ListRow, InputGroup and the app's truncation, and delete this entry."
-  },
-  {
     "file": "apps/web/src/features/workspace/components/tree-row.tsx",
     "class": "role=\"button\"",
     "reason": "The file tree's own row machinery, moved into the app unchanged by Plan 178 app-owned-state; the rows and chrome sub-plans rebuild it on ListRow, InputGroup and the app's truncation, and delete this entry."

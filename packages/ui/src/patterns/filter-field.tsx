@@ -24,7 +24,6 @@ type FilterFieldProps = Omit<
   onArrowDown: () => void
   blurBehavior: 'retain' | 'clear'
   clearLabel: string
-  fakeFocus?: boolean
 }
 
 export function FilterField({
@@ -35,7 +34,6 @@ export function FilterField({
   onArrowDown,
   blurBehavior,
   clearLabel,
-  fakeFocus,
   onKeyDown,
   ...inputProps
 }: FilterFieldProps) {
@@ -56,7 +54,6 @@ export function FilterField({
     <PaneBar data-slot='filter-field'>
       <InputGroup
         className='h-(--density-control-height-sm) min-w-0 flex-1'
-        data-focus-within={fakeFocus || undefined}
         onBlur={(event) => {
           if (event.currentTarget.contains(event.relatedTarget)) return
           if (blurBehavior === 'clear') onValueChange('')

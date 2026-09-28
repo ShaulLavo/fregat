@@ -89,6 +89,8 @@ export function treeRowMenu(context: TreeRowMenuContext): Menu {
         id: 'newFile',
         label: 'New File',
         run: context.createFile,
+        // Each opens an inline name field, which keeps the focus the closing menu would take back.
+        takesFocus: true,
       }),
       actionItem({
         disabled: unresolved || mutationsDisabled,
@@ -96,6 +98,7 @@ export function treeRowMenu(context: TreeRowMenuContext): Menu {
         id: 'newFolder',
         label: 'New Folder',
         run: context.createFolder,
+        takesFocus: true,
       }),
     ]),
     // Omitted entirely for unchanged rows: staging a file with nothing to
@@ -142,6 +145,7 @@ export function treeRowMenu(context: TreeRowMenuContext): Menu {
         label: 'Rename',
         run: context.rename,
         shortcut: 'F2',
+        takesFocus: true,
       }),
       actionItem({
         disabled: unresolved || mutationsDisabled,

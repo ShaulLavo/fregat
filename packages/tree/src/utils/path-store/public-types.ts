@@ -28,7 +28,6 @@ export interface PathStoreConstructorOptions extends PathStoreOptions {
   initialExpandedPaths?: readonly string[]
   paths?: readonly string[]
   preparedInput?: PathStorePreparedInput
-  presorted?: boolean
 }
 
 interface PathStoreFlattenedRowSegment {

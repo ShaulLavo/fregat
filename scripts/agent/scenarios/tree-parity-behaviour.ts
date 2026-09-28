@@ -37,6 +37,8 @@ export const treeParityBehaviour: Scenario = {
       await step('mod-f')
       await folderHoverPrefetch(page)
       await step('folder-hover')
+      await menuFocusHandoffs(page)
+      await step('menu-focus-handoffs')
       await focusAfterDelete(page)
       await step('after-delete')
       await deferredCreate(page)
@@ -56,6 +58,47 @@ async function files(root: string, entries: Record<string, string>) {
     await mkdir(path.dirname(path.join(root, name)), { recursive: true })
     await writeFile(path.join(root, name), content)
   }
+}
+
+async function menuFocusHandoffs(page: Page) {
+  const folder = treeRow(page, 'docs/')
+  await folder.click()
+  const file = treeRow(page, 'docs/guide.md')
+  await file.focus()
+  await page.keyboard.press('Shift+F10')
+  await selectors.popupMenu(page).waitFor()
+  await page.keyboard.press('Escape')
+  await selectors.popupMenu(page).waitFor({ state: 'hidden' })
+  strictEqual(await file.evaluate((node) => node === document.activeElement), true)
+
+  for (const action of ['Rename', 'New File', 'New Folder']) {
+    const target = action === 'Rename' ? file : folder
+    await target.click({ button: 'right' })
+    const menuItem =
+      action === 'Rename' ? selectors.treeRenameMenuItem(page) : selectors.menuItem(page, action)
+    await menuItem.click()
+    const input = selectors.treeRenameInput(page)
+    await input.waitFor()
+    strictEqual(
+      await input.evaluate((node) => node === document.activeElement),
+      true,
+      `${action} focuses the inline name field`,
+    )
+    await page.keyboard.press('Escape')
+    await input.waitFor({ state: 'hidden' })
+  }
+
+  await file.click({ button: 'right' })
+  await selectors.menuItem(page, 'Delete').click()
+  const confirm = selectors.confirmTreeDelete(page)
+  await confirm.waitFor()
+  await page.waitForFunction(
+    (node) => node?.closest('[role="dialog"]')?.contains(document.activeElement),
+    await confirm.elementHandle(),
+    { timeout: 3_000 },
+  )
+  await page.keyboard.press('Escape')
+  await confirm.waitFor({ state: 'hidden' })
 }
 
 async function modFOpensFilter(page: Page) {
@@ -142,6 +185,8 @@ async function deferredCreate(page: Page) {
 
 /** A reload restores expansion, selection and scroll when the active file is the same. */
 async function reloadRestores(page: Page) {
+  if ((await treeRow(page, 'src/').getAttribute('aria-expanded')) !== 'true')
+    await treeRow(page, 'src/').click()
   await treeRow(page, 'src/list/').click()
   await treeRow(page, 'src/list/item-0.ts').waitFor()
   await treeRow(page, 'src/app.ts').click()

@@ -4,8 +4,6 @@ import { createTreeError } from '../structured-errors'
 import {
   applyChildAggregateDelta,
   createDirectoryChildIndex,
-  ensureChildIdByNameId,
-  ensureChildPositions,
   rebuildDirectoryChildAggregates,
   rebuildVisibleChildChunks,
   updateChildPositionsFrom,
@@ -172,10 +170,9 @@ export function movePath(
     throw createTreeError('Cannot move a directory into one of its descendants')
   }
 
-  const siblingCollisionId = ensureChildIdByNameId(
-    state.snapshot.nodes,
-    getDirectoryIndex(state, moveTarget.parentId),
-  ).get(targetNameId)
+  const siblingCollisionId = getDirectoryIndex(state, moveTarget.parentId).childIdByNameId.get(
+    targetNameId,
+  )
   const collisionNodeId = moveTarget.existingNodeId ?? siblingCollisionId ?? null
   if (collisionNodeId != null && collisionNodeId !== sourceNodeId) {
     const resolvedCollision = handleMoveCollision(
@@ -337,7 +334,7 @@ function findNodeIdBySegments(
     }
 
     const currentIndex = getDirectoryIndex(state, currentNodeId)
-    const nextNodeId = ensureChildIdByNameId(state.snapshot.nodes, currentIndex).get(segmentId)
+    const nextNodeId = currentIndex.childIdByNameId.get(segmentId)
     if (nextNodeId === undefined) {
       return null
     }
@@ -447,7 +444,7 @@ function ensureDirectoryChain(
   for (const segment of directorySegments) {
     const segmentId = internSegment(state.snapshot.segmentTable, segment)
     const currentIndex = getDirectoryIndex(state, currentDirectoryId)
-    const existingChildId = ensureChildIdByNameId(state.snapshot.nodes, currentIndex).get(segmentId)
+    const existingChildId = currentIndex.childIdByNameId.get(segmentId)
 
     if (existingChildId !== undefined) {
       const existingChild = requireNode(state, existingChildId)
@@ -484,10 +481,6 @@ function createDirectoryNode(state: PathStoreState, parentId: NodeId, nameId: nu
   })
   state.snapshot.directories.set(nodeId, createDirectoryChildIndex())
   insertChildReference(state, parentId, nodeId)
-  if (state.collapseNewDirectoriesByDefault) {
-    state.collapsedDirectoryIds.add(nodeId)
-    state.hasCollapsedDirectoryOverrides = true
-  }
   state.activeNodeCount++
   return nodeId
 }
@@ -495,7 +488,7 @@ function createDirectoryNode(state: PathStoreState, parentId: NodeId, nameId: nu
 function createFileNode(state: PathStoreState, parentId: NodeId, basename: string): NodeId {
   const nameId = internSegment(state.snapshot.segmentTable, basename)
   const parentIndex = getDirectoryIndex(state, parentId)
-  if (ensureChildIdByNameId(state.snapshot.nodes, parentIndex).has(nameId)) {
+  if (parentIndex.childIdByNameId.has(nameId)) {
     throw createTreeError(`Path already exists: "${buildPathPreview(state, parentId, basename)}"`)
   }
 
@@ -543,7 +536,7 @@ function findChildInsertIndex(
 function insertChildReference(state: PathStoreState, parentId: NodeId, childId: NodeId): void {
   const parentIndex = getDirectoryIndex(state, parentId)
   const childNode = requireNode(state, childId)
-  ensureChildIdByNameId(state.snapshot.nodes, parentIndex).set(childNode.nameId, childId)
+  parentIndex.childIdByNameId.set(childNode.nameId, childId)
   applyChildAggregateDelta(
     parentIndex,
     childId,
@@ -564,9 +557,9 @@ function removeChildReference(
   childNameId: number,
 ): void {
   const parentIndex = getDirectoryIndex(state, parentId)
-  const positions = ensureChildPositions(parentIndex)
+  const positions = parentIndex.childPositionById
   const childIndex = positions.get(childId) ?? -1
-  ensureChildIdByNameId(state.snapshot.nodes, parentIndex).delete(childNameId)
+  parentIndex.childIdByNameId.delete(childNameId)
   positions.delete(childId)
   const childNode = state.snapshot.nodes[childId]
   if (childNode != null) {
@@ -792,10 +785,7 @@ function findDeepestExistingDirectoryId(
       break
     }
 
-    const nextNodeId = ensureChildIdByNameId(
-      state.snapshot.nodes,
-      getDirectoryIndex(state, currentDirectoryId),
-    ).get(segmentId)
+    const nextNodeId = getDirectoryIndex(state, currentDirectoryId).childIdByNameId.get(segmentId)
     if (nextNodeId == null) {
       break
     }

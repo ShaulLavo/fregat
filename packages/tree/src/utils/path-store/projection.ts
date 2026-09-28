@@ -9,11 +9,7 @@ import {
   recomputeCountsUpwardFrom,
   requireNode,
 } from './canonical'
-import {
-  ensureChildPositions,
-  getVisibleChildPrefixCount,
-  selectChildIndexByVisibleIndex,
-} from './child-index'
+import { getVisibleChildPrefixCount, selectChildIndexByVisibleIndex } from './child-index'
 import { createCollapseEvent, createExpandEvent } from './events'
 import {
   collectFlattenedDirectoryChainIds,
@@ -330,7 +326,7 @@ export function getVisibleIndexByPath(state: PathStoreState, path: string): numb
     const currentNode = requireNode(state, currentNodeId)
     const parentId = currentNode.parentId
     const parentIndex = getDirectoryIndex(state, parentId)
-    const childPosition = ensureChildPositions(parentIndex).get(currentNodeId)
+    const childPosition = parentIndex.childPositionById.get(currentNodeId)
     if (childPosition == null) {
       throw createTreeError(`Child ${String(currentNodeId)} was not found in its parent index`)
     }
@@ -540,7 +536,7 @@ function getNextVisibleRowCursor(
 
     const parentId = currentNode.parentId
     const parentIndex = getDirectoryIndex(state, parentId)
-    const siblingIndex = ensureChildPositions(parentIndex).get(currentNodeId) ?? -1
+    const siblingIndex = parentIndex.childPositionById.get(currentNodeId) ?? -1
     if (siblingIndex < 0) {
       throw createTreeError(`Child ${String(currentNodeId)} was not found in its parent index`)
     }

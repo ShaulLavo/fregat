@@ -65,12 +65,11 @@ function measureRound(paths: readonly string[]): TimingSample {
 
   const preparedColdStartedAt = performance.now()
   const preparedInput = prepareFileTreeInput(paths, { flattenEmptyDirectories: true })
-  const preparedColdTree = new TreeViewModel({
+  new TreeViewModel({
     flattenEmptyDirectories: true,
     preparedInput,
   })
   const preparedColdMs = performance.now() - preparedColdStartedAt
-  preparedColdTree.cleanUp()
 
   const preparedRemount = measureConstruction({ preparedInput })
 
@@ -84,10 +83,8 @@ function measureRound(paths: readonly string[]): TimingSample {
 
 function measureConstruction(options: ConstructorParameters<typeof TreeViewModel>[0]): number {
   const startedAt = performance.now()
-  const tree = new TreeViewModel({ flattenEmptyDirectories: true, ...options })
-  const elapsedMs = performance.now() - startedAt
-  tree.cleanUp()
-  return elapsedMs
+  new TreeViewModel({ flattenEmptyDirectories: true, ...options })
+  return performance.now() - startedAt
 }
 
 function deterministicPaths(pathCount: number): readonly string[] {

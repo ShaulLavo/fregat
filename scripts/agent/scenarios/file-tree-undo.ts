@@ -6,6 +6,7 @@ import type { Page } from 'playwright'
 import type { Scenario } from './index'
 import { openFixtureWorkspace, releaseFixture, waitForFileContent } from '../fixture-workspace'
 import { focusEditor, openFileFromTree, selectors, waitForApp } from '../selectors'
+import { openWiredContextPage } from '../wired-context'
 
 const FIXTURE = scratchPath('plan136-undo')
 const UNSAVED = '// unsaved edit'
@@ -17,15 +18,12 @@ export const fileTreeUndo: Scenario = {
   async run(page, { step }) {
     const originalUrl = page.url()
     await rm(FIXTURE, { force: true, recursive: true })
-    const browser = page.context().browser()
-    ok(browser, 'The scenario browser is unavailable')
-    // Its own context: tabs of one profile share six HTTP/1.1 connections, and each tab holds four streams.
-    const secondContext = await browser.newContext({ viewport: page.viewportSize() })
+    const secondWindow = await openWiredContextPage(page)
     try {
       await seedFixture()
       await openFixtureWorkspace(page, FIXTURE)
       // Opened while the history is empty, so its cached list must follow the first window.
-      const second = await secondContext.newPage()
+      const second = secondWindow.page
       await second.goto(page.url())
       await waitForApp(second)
       await waitForWritable(second)
@@ -90,7 +88,7 @@ export const fileTreeUndo: Scenario = {
       await selectors.treeItem(page, 'doomed').waitFor({ timeout: 15_000 })
       await step('undo-from-second-window')
     } finally {
-      await secondContext.close()
+      await secondWindow.close()
       await page.goto(originalUrl)
       await releaseFixture(FIXTURE)
     }
@@ -143,7 +141,10 @@ async function deleteFromMenu(page: Page, name: string, onDialog?: () => Promise
   await onDialog?.()
   await selectors.confirmTreeDelete(page).click({ timeout: 5_000 })
   await waitForPath(path.join(FIXTURE, name), false)
-  await selectors.toast(page, `Delete ${name}`).waitFor({ timeout: 15_000 })
+  await selectors
+    .toast(page, `Delete ${name}`)
+    .getByText(`Delete ${name}`, { exact: true })
+    .waitFor({ timeout: 15_000 })
 }
 
 /** The user sees the result: the toast names what was reversed and the tree shows it back. */

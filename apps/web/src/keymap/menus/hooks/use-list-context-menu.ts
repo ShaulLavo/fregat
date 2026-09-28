@@ -15,10 +15,13 @@ import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
 /** Owns a list's menu target and lifetime; each list decides which target a row represents. */
 export function useListContextMenu<T>({
   containerRef,
+  focusTargetOf,
   isTargetPresent,
   touchPolicy = 'suppress',
 }: {
   readonly containerRef: RefObject<HTMLElement | null>
+  /** Where focus returns for a target; the list container when absent or null. */
+  readonly focusTargetOf?: (target: T) => HTMLElement | null
   readonly isTargetPresent: (target: T) => boolean
   /** Standalone phone lists keep their native long-press context-menu gesture. */
   readonly touchPolicy?: 'suppress' | 'context-menu'
@@ -28,7 +31,8 @@ export function useListContextMenu<T>({
   const pointerType = useRef('mouse')
 
   function returnFocusTo() {
-    return containerRef.current
+    const element = target === null ? null : (focusTargetOf?.(target) ?? null)
+    return element ?? containerRef.current
   }
 
   function onOpenChange(open: boolean) {

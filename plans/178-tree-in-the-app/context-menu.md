@@ -1,6 +1,6 @@
 # Plan 178: context menu
 
-- Status: IN PROGRESS. Git/search and session rail share menu ownership; tree remains. Size S–M. After [app-owned-state](app-owned-state.md).
+- Status: DONE 2026-09-27. Git/search, the session rail and the tree share `useListContextMenu`. Size S–M. After [app-owned-state](app-owned-state.md).
 - Owns: one list-level context menu pattern, adopted by the tree first.
 
 ## Incremental delivery
@@ -73,3 +73,40 @@ the rail's per-row menu roots.
 
 Harness menu tests; `copy-feedback`, `file-tree-undo`, `search-file-actions` scenarios; git and rail
 menu scenarios.
+
+## Landed: the tree, 2026-09-27
+
+- `TreeHost` owns one `useListContextMenu` over the tree and renders the caller's menu with its
+  handle (`anchor`, `onOpenChange`, `returnFocusTo`); `TreeRowMenu` is a plain `MenuSurface` on it.
+  Rows and the tree's keyboard ask the host to open (`openTreeRowMenu`, which still keeps a sticky
+  row in place and focuses the row first); the view only reports the open row for its hover fill.
+- Deleted: `use-tree-context-menu.ts` (435 lines), `tree-menu-trigger.tsx`, `use-tree-menu-trigger.ts`,
+  the trigger zustand store, `tree-menu-trigger-style.ts`, `tree-context-menu-wash.tsx`, the tree's
+  document Escape and outside-mousedown listeners, `markTreeOwnedEvent`, the button trigger mode
+  (`triggerMode`, `buttonVisibility`, the `…` button, its hover tracking and action lane, the
+  ellipsis glyph), the package's `composition` option and `FileTreeContextMenuOpenContext`,
+  `CONTEXT_MENU_TRIGGER_TYPE`, and the menu-anchor CSS. The app ran right-click mode, so none of
+  it drew.
+- `useListContextMenu` takes `focusTargetOf`, so a closing tree menu gives focus to its row, not
+  the list wrapper. Rows are keyed by slot, so a removed row's element can stay mounted: the host
+  watches the model while a menu is open and closes it when its row goes.
+- Rename, New File and New Folder are `takesFocus` items, run after the menu closes; the
+  `close({ restoreFocus: false })` handoff is gone.
+- Decided behaviour (Work 1): wheel input over the tree closes the menu and the list stays put;
+  removing the row closes it. The parity tests say so now. Base UI ignores an outside press for
+  500ms after a controlled open (`MenuRoot`); the outside-click test waits it out, as every app
+  menu already behaves.
+- Verification: tree browser 82 (the parity harness now renders a real Base UI context menu),
+  `tree-pane.browser` 5, `use-list-context-menu` 11, workspace node/dom, gates. The
+  `copy-feedback`, `file-tree-undo` and `search-file-actions` scenarios and the `menu-open` pixel
+  capture were not run: `agent:browser` cannot open a workspace in this container (see
+  app-owned-state, step 8 notes).
+
+## Local review, 2026-09-28
+
+The row-menu capture matches fresh main exactly in all four density/theme combinations. The
+committed baseline was stale from the shared filter-field change, so it was refreshed from main
+along with the other states; no menu-anchor exception was needed. The local behavior scenario now
+checks Shift+F10 and Escape, Rename/New File/New Folder inline focus, and Delete dialog focus.
+Copy feedback uses a mock response in its fresh test home. Undo uses a correctly wired second
+window and completes through cross-window undo. See [local-review.md](local-review.md).

@@ -4,61 +4,30 @@ import { cn } from '@workspace/ui/lib/utils'
 import '@/features/workspace/components/tree-view.css'
 
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react'
-import { useCallback, useId, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useEffectEvent, useId, useRef, useSyncExternalStore } from 'react'
 
 import { TreeView } from '@/features/workspace/components/tree-view'
-import { markTreeOwnedEvent } from '@/features/workspace/utils/tree-context-menu-anchor'
-import type {
-  FileTreeCompositionOptions,
-  FileTreeContextMenuItem,
-  FileTreeContextMenuOpenContext,
-} from '@workspace/tree'
+import { TREE_DENSITY_FACTOR } from '@/features/workspace/utils/tree-view-layout'
+import type { FileTreeContextMenuItem } from '@workspace/tree'
 import type { TreeViewModel } from '@/features/workspace/state/tree-model'
-
-interface ActiveContextMenuState {
-  context: FileTreeContextMenuOpenContext
-  item: FileTreeContextMenuItem
-}
-
-function resolveComposition(
-  baselineComposition: FileTreeCompositionOptions | undefined,
-  hasContextMenu: boolean,
-  onClose: () => void,
-  onOpen: (item: FileTreeContextMenuItem, context: FileTreeContextMenuOpenContext) => void,
-): FileTreeCompositionOptions | undefined {
-  if (!hasContextMenu) return baselineComposition
-
-  const baselineContextMenu = baselineComposition?.contextMenu
-  const contextMenu = {
-    ...baselineContextMenu,
-    enabled: true,
-    onClose: () => {
-      baselineContextMenu?.onClose?.()
-      onClose()
-    },
-    onOpen: (item: FileTreeContextMenuItem, context: FileTreeContextMenuOpenContext) => {
-      onOpen(item, context)
-      baselineContextMenu?.onOpen?.(item, context)
-    },
-  }
-  delete contextMenu.render
-  return { ...baselineComposition, contextMenu }
-}
+import type {
+  TreeMenuTrigger,
+  TreeRowMenuHandle,
+} from '@/features/workspace/utils/tree-row-menu-open'
+import { useListContextMenu } from '@/keymap/menus/hooks/use-list-context-menu'
 
 export interface TreeHostProps extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   model: TreeViewModel
-  renderContextMenu?: (
-    item: FileTreeContextMenuItem,
-    context: FileTreeContextMenuOpenContext,
-  ) => ReactNode
+  /** The open row's menu; the host owns its target, anchor and dismissal. */
+  renderContextMenu?: (item: FileTreeContextMenuItem, menu: TreeRowMenuHandle) => ReactNode
 }
 
 /**
- * Paints the model's resolved density onto the wrapper so callers don't have to set
- * `--trees-item-height` and `--trees-density-override` themselves; caller `style` keys still win.
+ * Paints the model's row height and the density factor onto the wrapper; caller `style` keys
+ * still win.
  *
- * `version` is the cache key, and it is why this is a function: the model changes its density in
- * place, so its identity cannot report the change and a memo keyed on it would serve stale sizes.
+ * `version` is the cache key, and it is why this is a function: the model changes its row height
+ * in place, so its identity cannot report the change and a memo keyed on it would serve stale sizes.
  */
 function densityStyle(
   model: TreeViewModel,
@@ -67,7 +36,7 @@ function densityStyle(
 ): CSSProperties {
   return {
     ['--trees-item-height' as string]: `${String(model.getItemHeight())}px`,
-    ['--trees-density-override' as string]: model.getDensityFactor(),
+    ['--trees-density-override' as string]: TREE_DENSITY_FACTOR,
     display: 'flex',
     ...style,
   }
@@ -93,23 +62,25 @@ export function TreeHost({
   ...hostProps
 }: TreeHostProps): React.JSX.Element {
   const instanceId = useId()
-  const [activeContextMenu, setActiveContextMenu] = useState<ActiveContextMenuState | null>(null)
-  const [baseline, setBaseline] = useState(() => ({
-    composition: model.getComposition(),
-    model,
-  }))
-  if (baseline.model !== model) setBaseline({ composition: model.getComposition(), model })
+  const hostRef = useRef<HTMLDivElement>(null)
+  const menu = useListContextMenu<FileTreeContextMenuItem>({
+    containerRef: hostRef,
+    focusTargetOf: (item) =>
+      model.getRowElement(item.path) ?? model.getRowElement(model.getFocusedPath() ?? ''),
+    isTargetPresent: (item) => model.getItem(item.path) != null,
+  })
   // Identity is load-bearing: useSyncExternalStore resubscribes when these change.
-  const subscribeToDensity = useCallback(
-    (listener: () => void) => model.subscribeDensity(listener),
+  const subscribeToItemHeight = useCallback(
+    (listener: () => void) => model.subscribeItemHeight(listener),
     [model],
   )
-  const getDensitySnapshot = useCallback(() => model.getDensityVersion(), [model])
-  const densityVersion = useSyncExternalStore(
-    subscribeToDensity,
-    getDensitySnapshot,
-    getDensitySnapshot,
+  const getItemHeightSnapshot = useCallback(() => model.getItemHeightVersion(), [model])
+  const itemHeightVersion = useSyncExternalStore(
+    subscribeToItemHeight,
+    getItemHeightSnapshot,
+    getItemHeightSnapshot,
   )
+  useEffect(() => model.connectSelectionChange(), [model])
   // Identity is load-bearing: useSyncExternalStore resubscribes when these change.
   const subscribeToView = useCallback(
     (listener: () => void) => model.subscribeView(listener),
@@ -118,43 +89,56 @@ export function TreeHost({
   const getViewSnapshot = useCallback(() => model.getViewVersion(), [model])
   const viewVersion = useSyncExternalStore(subscribeToView, getViewSnapshot, getViewSnapshot)
 
-  const hasContextMenu = renderContextMenu != null
-  const composition = resolveComposition(
-    baseline.composition,
-    hasContextMenu,
-    () => setActiveContextMenu(null),
-    (item, context) => setActiveContextMenu({ context, item }),
-  )
+  // Rows are keyed by slot, so a removed row's element can stay mounted for another path: the list
+  // menu cannot see the removal in the DOM, so the model reports it.
+  const menuPath = menu.target?.path ?? null
+  const closeMenuIfGone = useEffectEvent(() => {
+    if (menuPath == null || model.getItem(menuPath) != null) return
+    menu.onOpenChange(false)
+    menu.returnFocusTo()?.focus({ preventScroll: true })
+  })
+  useEffect(() => {
+    if (menuPath == null) return
+    return model.subscribe(closeMenuIfGone)
+  }, [menuPath, model])
 
-  // Dropped during render, not in an effect: a menu whose renderer just went away must not
-  // survive into the commit that removes it.
-  if (!hasContextMenu && activeContextMenu !== null) setActiveContextMenu(null)
+  function openMenu(item: FileTreeContextMenuItem, trigger: TreeMenuTrigger) {
+    if (trigger.kind === 'pointer') {
+      menu.openAtEvent(item, trigger.event)
+      return
+    }
+    menu.openOnMenuKey(trigger.event, item, trigger.element)
+  }
 
   const viewProps = model.getViewProps(viewVersion)
 
   return (
     <div
       {...hostProps}
+      {...menu.containerProps}
+      ref={hostRef}
       className={cn('group/tree group/listbox', hostProps.className)}
       data-file-tree=''
       data-file-tree-virtualized='true'
       id={id}
-      onMouseDownCapture={(event) => {
-        hostProps.onMouseDownCapture?.(event)
-        markTreeOwnedEvent(event.nativeEvent)
-      }}
-      style={densityStyle(model, densityVersion, hostProps.style)}
+      style={densityStyle(model, itemHeightVersion, hostProps.style)}
     >
       <div data-file-tree-virtualized-wrapper='true'>
         <TreeView
           {...viewProps}
-          composition={composition}
           instanceId={instanceId}
           key={modelKey(model)}
+          menuPath={menuPath}
+          onCloseMenu={() => menu.onOpenChange(false)}
+          onOpenMenu={renderContextMenu == null ? undefined : openMenu}
         />
       </div>
-      {renderContextMenu != null && activeContextMenu != null
-        ? renderContextMenu(activeContextMenu.item, activeContextMenu.context)
+      {renderContextMenu != null && menu.anchor != null && menu.target != null
+        ? renderContextMenu(menu.target, {
+            anchor: menu.anchor,
+            onOpenChange: menu.onOpenChange,
+            returnFocusTo: menu.returnFocusTo,
+          })
         : null}
     </div>
   )

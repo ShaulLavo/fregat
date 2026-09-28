@@ -3,8 +3,8 @@ import { createTreeError } from '../structured-errors'
 
 import { PathStore } from '../path-store/store'
 
-import type { FileTreePreparedInput } from '../preparedInput'
-import type { FileTreeControllerOptions } from './publicTypes'
+import type { FileTreePreparedInput } from '../prepared-input'
+import type { FileTreeControllerOptions } from './public-types'
 
 function haveMatchingPaths(
   currentPaths: readonly string[],
