@@ -1,6 +1,6 @@
 # The large-file ceiling: what we can actually open, and who gets to decide
 
-Status: **Phase 1 in progress 2026-09-28; research and owner decisions complete.** Requested
+Status: **Done 2026-09-28.** All five phases shipped; see the execution checklist. Requested
 2026-09-13. Measurements: [docs/large-file-ceiling/](../docs/large-file-ceiling/README.md).
 
 Decided 2026-09-25: owner — this plan and Editor
@@ -319,8 +319,11 @@ after the first independently shippable change. Decision trail:
       (Platform e4a13fa9a, Editor 560d35db): two-byte 10/100/200 MiB open, edit and save exact
       bytes, 200 MiB typing p95 27 ms, save 9.8 s (`/work/tmp/fregat-evidence/112-unicode-committed-20260928/`);
       `editor-paged-readonly` opens a 300 MiB file read-only, jumps to line 3000 and copies.
-- [ ] Independently review the final diffs and evidence, commit/push both repositories,
-      update the Editor pin and deploy the verified result.
+- [x] Independently review the final diffs and evidence, commit/push both repositories,
+      update the Editor pin and deploy the verified result. Review fixes: the read-only viewer
+      opens only over a too-large error with no buffer content, a refetched paged resource releases
+      the one it replaced, stale paged codes share the reopen message. Shipped e4a13fa9a,
+      fa8708e36, 8d49903bc (Editor pin 560d35db) as release `20260928T193219Z-8d49903b-main`.
 
 Done means repeatable measurements support each tier; 200 MiB files can open and save;
 large-file typing meets the measured target or a documented, reproduced constraint remains;
