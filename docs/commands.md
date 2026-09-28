@@ -6,6 +6,18 @@ each id starting with the plugin name and a dot.
 
 | Id | Title | Category | Changes the document | VS Code |
 | --- | --- | --- | --- | --- |
+| `markdown.bold` | Toggle Markdown bold | markdown | yes |  |
+| `markdown.italic` | Toggle Markdown italic | markdown | yes |  |
+| `markdown.strikethrough` | Toggle Markdown strikethrough | markdown | yes |  |
+| `markdown.code` | Toggle Markdown inline code | markdown | yes |  |
+| `markdown.link` | Insert Markdown link | markdown | yes |  |
+| `markdown.heading` | Toggle Markdown heading | markdown | yes |  |
+| `markdown.bulletList` | Toggle Markdown bullet list | markdown | yes |  |
+| `markdown.orderedList` | Toggle Markdown numbered list | markdown | yes |  |
+| `markdown.taskList` | Toggle Markdown task list | markdown | yes |  |
+| `markdown.toggleTask` | Toggle Markdown task completion | markdown | yes |  |
+| `markdown.quote` | Toggle Markdown quote | markdown | yes |  |
+| `markdown.codeBlock` | Insert Markdown code block | markdown | yes |  |
 | `undo` | Undo | text-editing | yes | `undo` |
 | `redo` | Redo | text-editing | yes | `redo` |
 | `jumpBack` | Go back | text-editing | no | `workbench.action.navigateBack` |

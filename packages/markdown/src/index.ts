@@ -7,6 +7,7 @@ import { markdownInlineReplacements } from './replacements'
 import './style.css'
 
 export { markdownInlineReplacements } from './replacements'
+export { createMarkdownAuthoringPlugin } from './authoringPlugin'
 
 export type MarkdownPreviewPluginOptions = {
   /** Language ids this applies to. Defaults to markdown only, so other files render as source. */

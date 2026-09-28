@@ -11,7 +11,7 @@ import {
   type EditorSyntaxSession,
 } from '@singapore-editor/core/syntax'
 import { init, MarkdownDocument } from 'tree-sitter-md'
-import { createMarkdownPreviewPlugin } from '../src/index'
+import { createMarkdownAuthoringPlugin, createMarkdownPreviewPlugin } from '../src/index'
 
 const DOCUMENT = '# Title\na **bold** b'
 
@@ -70,7 +70,9 @@ describe('markdown preview plugin', () => {
     setEditorSyntaxSessionFactory(() => markdownSyntaxSession())
     container = document.createElement('div')
     document.body.appendChild(container)
-    editor = new Editor(container, { plugins: [createMarkdownPreviewPlugin()] })
+    editor = new Editor(container, {
+      plugins: [createMarkdownPreviewPlugin(), createMarkdownAuthoringPlugin()],
+    })
     const view: unknown = Reflect.get(editor, 'view')
     // happy-dom has no layout, so deliver the first visible viewport measurement explicitly.
     if (view instanceof VirtualizedTextView) view.setScrollMetrics(0, 240, 640)
@@ -89,6 +91,78 @@ describe('markdown preview plugin', () => {
     await openMarkdown()
 
     expect(rowTexts()).toEqual(['Title', 'a bold b'])
+  })
+
+  it('authors through a plain Editor with one undo entry and restores the selection', () => {
+    editor.setText('hello', { languageId: 'markdown' })
+    editor.setSelection(0, 5)
+    expect(editor.dispatchCommand('markdown.bold')).toBe(true)
+    expect(editor.materializeFullText()).toBe('**hello**')
+    expect(editor.getSelections()[0]).toMatchObject({ anchorOffset: 2, headOffset: 7 })
+    editor.dispatchCommand('undo')
+    expect(editor.materializeFullText()).toBe('hello')
+    expect(editor.getSelections()[0]).toMatchObject({ anchorOffset: 0, headOffset: 5 })
+    editor.dispatchCommand('redo')
+    expect(editor.materializeFullText()).toBe('**hello**')
+  })
+
+  it('declines Markdown commands in a different language', () => {
+    editor.setText('hello', { languageId: 'typescript' })
+    editor.setSelection(0, 5)
+    expect(editor.dispatchCommand('markdown.bold')).toBe(false)
+    expect(editor.materializeFullText()).toBe('hello')
+  })
+
+  it('refuses authoring in a read-only editor even through direct command dispatch', () => {
+    editor.setText('hello', { languageId: 'markdown' })
+    editor.setSelection(0, 5)
+    editor.setEditability('readonly')
+    expect(editor.dispatchCommand('markdown.bold')).toBe(false)
+    expect(editor.materializeFullText()).toBe('hello')
+  })
+
+  it('indents a list item from its text and outdents it with Shift+Tab', () => {
+    editor.setText('- first\n- second', { languageId: 'markdown' })
+    editor.setSelection(16)
+    editor
+      .getInputElement()
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }))
+    expect(editor.materializeFullText()).toMatch(/^- first\n\s+- second$/)
+    editor.getInputElement().dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Tab',
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    )
+    expect(editor.materializeFullText()).toBe('- first\n- second')
+  })
+
+  it('uses current parser records to remove a mark around the caret', async () => {
+    await openMarkdown()
+    editor.setSelection(13)
+    expect(editor.dispatchCommand('markdown.bold')).toBe(true)
+    expect(editor.materializeFullText()).toBe('# Title\na bold b')
+    expect(editor.getSelections()[0]).toMatchObject({ anchorOffset: 11, headOffset: 11 })
+  })
+
+  it('selects an existing link destination without changing the document or adding undo', async () => {
+    editor.setText('[docs](https://example.com/a(b) "Title")', { languageId: 'markdown' })
+    await flush()
+    editor.setSelection(3)
+    expect(editor.dispatchCommand('markdown.link')).toBe(true)
+    expect(editor.getSelections()[0]).toMatchObject({ anchorOffset: 7, headOffset: 31 })
+    expect(editor.materializeFullText()).toBe('[docs](https://example.com/a(b) "Title")')
+  })
+
+  it('removes code delimiters and their semantic padding at the caret', async () => {
+    editor.setText('`` `literal` ``', { languageId: 'markdown' })
+    await flush()
+    editor.setSelection(6)
+    expect(editor.dispatchCommand('markdown.code')).toBe(true)
+    expect(editor.materializeFullText()).toBe('`literal`')
+    expect(editor.getSelections()[0]).toMatchObject({ anchorOffset: 3, headOffset: 3 })
   })
 
   it('brings the source back under the caret', async () => {

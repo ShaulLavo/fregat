@@ -1,19 +1,22 @@
 # @singapore-editor/markdown
 
-Markdown live preview for the Singapore editor. Markdown text stays the document — this renders it as
+Markdown authoring and live preview for the Singapore editor. Markdown text stays the document — this renders it as
 formatted text without ever converting it into another model.
 
 ```ts
-import { createMarkdownPreviewPlugin } from '@singapore-editor/markdown'
+import {
+  createMarkdownAuthoringPlugin,
+  createMarkdownPreviewPlugin,
+} from '@singapore-editor/markdown'
 import '@singapore-editor/markdown/style.css'
 
 new Editor(container, {
-  plugins: [markdown(), createMarkdownPreviewPlugin()],
+  plugins: [markdown(), createMarkdownAuthoringPlugin(), createMarkdownPreviewPlugin()],
 })
 ```
 
 The plugin's presence is the switch. It needs a markdown language plugin alongside it (for example
-`markdown()` from `@singapore-editor/tree-sitter-languages`), because it reads that grammar's captures.
+`markdown()` from `@singapore-editor/tree-sitter-languages`), because it reads that grammar's current syntax records.
 
 ## What it does
 
@@ -41,3 +44,16 @@ back, so it stays editable as plain text.
 
 `markdownInlineReplacements(text, captures)` is exported on its own if you want the derivation
 without the plugin.
+
+## Authoring
+
+`createMarkdownAuthoringPlugin()` works in plain source and live preview. It registers
+commands for bold, italic, strikethrough, inline code, links, level-two headings,
+bullet and numbered lists, tasks, quotes and fenced code. The default keymap binds
+Mod+B, Mod+I and Mod+Shift+K to bold, italic and links. Tab and Shift+Tab indent
+and outdent list items. Commands operate on one selection in a writable Markdown
+document and preserve the source buffer's undo history.
+
+Current parser records let a command remove the surrounding mark at the caret or
+select an existing link destination. Each command edits source directly; rich-text
+editing with permanently hidden syntax remains a separate interaction policy.

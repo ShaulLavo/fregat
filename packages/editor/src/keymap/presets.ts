@@ -67,6 +67,7 @@ export const defaultEditorCommandPacks = [
   'lsp-navigation',
   'lsp-editing',
   'inline-suggest',
+  'markdown',
   // Last, so it outranks every other layer: its keys are the arrows, Enter, Tab and Escape.
   'suggest',
 ] as const satisfies readonly EditorCommandPack[]
@@ -160,6 +161,7 @@ function editorKeyBindingsForCommandPack(
   if (pack === 'lsp-editing') return lspEditingBindings(platform)
   if (pack === 'inline-suggest') return inlineSuggestBindings(platform)
   if (pack === 'suggest') return suggestBindings()
+  if (pack === 'markdown') return markdownBindings(platform)
 
   return []
 }
@@ -179,6 +181,19 @@ function editorCommandInPacks(
  * Escape closes the list, the next the hint. A command that finds nothing to do declines, so Enter
  * with no item accepted still types a newline.
  */
+function markdownBindings(platform: EditorPlatform): readonly EditorKeyBinding[] {
+  const modifier = platform === 'mac' ? { meta: true } : { ctrl: true }
+  return [
+    { chord: [key('B', modifier)], command: 'markdown.bold', when: ['markdown'] },
+    { chord: [key('I', modifier)], command: 'markdown.italic', when: ['markdown'] },
+    {
+      chord: [key('K', { ...modifier, shift: true })],
+      command: 'markdown.link',
+      when: ['markdown'],
+    },
+  ]
+}
+
 function suggestBindings(): readonly EditorKeyBinding[] {
   const list = ['suggestWidgetVisible']
   const hints = ['parameterHintsVisible', 'parameterHintsMultipleSignatures']

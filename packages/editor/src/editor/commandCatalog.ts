@@ -11,6 +11,7 @@ export type EditorCommandPack =
   | 'lsp-editing'
   | 'inline-suggest'
   | 'suggest'
+  | 'markdown'
 
 /**
  * What a command is for, as a keymap groups it: the command packs, plus merge conflicts, whose
@@ -41,6 +42,79 @@ function declare<const Id extends string>(
 
 /** Every built-in command, once. The command id union, readonly policy and packs derive from it. */
 export const EDITOR_COMMANDS = [
+  declare({
+    id: 'markdown.bold',
+    title: 'Toggle Markdown bold',
+    category: 'markdown',
+    mutates: true,
+  }),
+  declare({
+    id: 'markdown.italic',
+    title: 'Toggle Markdown italic',
+    category: 'markdown',
+    mutates: true,
+  }),
+  declare({
+    id: 'markdown.strikethrough',
+    title: 'Toggle Markdown strikethrough',
+    category: 'markdown',
+    mutates: true,
+  }),
+  declare({
+    id: 'markdown.code',
+    title: 'Toggle Markdown inline code',
+    category: 'markdown',
+    mutates: true,
+  }),
+  declare({
+    id: 'markdown.link',
+    title: 'Insert Markdown link',
+    category: 'markdown',
+    mutates: true,
+  }),
+  declare({
+    id: 'markdown.heading',
+    title: 'Toggle Markdown heading',
+    category: 'markdown',
+    mutates: true,
+  }),
+  declare({
+    id: 'markdown.bulletList',
+    title: 'Toggle Markdown bullet list',
+    category: 'markdown',
+    mutates: true,
+  }),
+  declare({
+    id: 'markdown.orderedList',
+    title: 'Toggle Markdown numbered list',
+    category: 'markdown',
+    mutates: true,
+  }),
+  declare({
+    id: 'markdown.taskList',
+    title: 'Toggle Markdown task list',
+    category: 'markdown',
+    mutates: true,
+  }),
+  declare({
+    id: 'markdown.toggleTask',
+    title: 'Toggle Markdown task completion',
+    category: 'markdown',
+    mutates: true,
+  }),
+  declare({
+    id: 'markdown.quote',
+    title: 'Toggle Markdown quote',
+    category: 'markdown',
+    mutates: true,
+  }),
+  declare({
+    id: 'markdown.codeBlock',
+    title: 'Insert Markdown code block',
+    category: 'markdown',
+    mutates: true,
+  }),
+
   declare({
     id: 'undo',
     title: 'Undo',

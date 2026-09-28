@@ -1381,6 +1381,11 @@ export class Editor {
     this.refreshInlineMap('rerun')
   }
 
+  /** Parsed records for this exact text revision; absent while analysis catches up. */
+  getSyntaxRecords(): EditorSyntaxRecords | null {
+    return this.syntaxCapturesVersion === this.textVersion ? (this.syntaxRecords ?? null) : null
+  }
+
   private setSyntaxCaptures(
     captures: readonly EditorSyntaxCapture[],
     records?: EditorSyntaxRecords,
