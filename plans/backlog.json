@@ -717,7 +717,7 @@
       "id": "E058",
       "file": "e058-spellcheck.md",
       "title": "Spellcheck for text the editor paints itself",
-      "status": "Proposed",
+      "status": "In progress",
       "owner": "Cross-repo",
       "kind": "Implementation",
       "priority": "P2",
@@ -725,6 +725,19 @@
       "dependsOn": [],
       "topics": ["Spellcheck for painted text"],
       "baseline": "74e76bef2af674ad80b3c13024fa47f692e2bb7c"
+    },
+    {
+      "id": "E062",
+      "reference": "../docs/editing/e062-spellcheck-hardening.md",
+      "title": "Spellcheck hardening: bounded tokenization, settled worker failures, cheaper underline masks",
+      "status": "Completed",
+      "owner": "Cross-repo",
+      "kind": "Implementation",
+      "priority": "P2",
+      "effort": "M",
+      "dependsOn": ["E058"],
+      "topics": ["Spellcheck for painted text"],
+      "baseline": "b27dbb90aa0a69efedd10be58bc9a1d931600c32"
     },
     {
       "id": "E063",

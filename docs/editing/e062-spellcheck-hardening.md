@@ -1,4 +1,7 @@
-# Spellcheck hardening, issue 58
+# E062: Spellcheck hardening: bounded tokenization, settled worker failures, cheaper underline masks
+
+Completed 2026-09-27 (Editor `dab87329`, Platform `c1391065a`), from GitHub issue 58. Builds on
+[E058](../../plans/e058-spellcheck.md).
 
 Scope: retain cspell and the worker/plugin architecture. Fix bounded tokenization and worker
 failure settlement; measure rendering before deciding on changes. Keep file defaults unchanged.
@@ -52,12 +55,12 @@ Chromium, 2,000 lines, 300 edits. The corrected sparse case has exactly one mark
 the previous benchmark accidentally retained about 70% of marks. Values below are median/p95 ms.
 Highlight time is included in controller time; token adoption measures the earlier overlay refresh.
 
-| Case | Before total | After total | Before controller | After controller | Before highlight | After highlight | Before adoption | After adoption |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Off | 18.4/39.0 | 16.9/23.3 | 0/0 | 0/0 | 0/0 | 0/0 | 0.1/0.2 | 0.1/0.2 |
-| No marks | 19.7/40.4 | 18.5/28.3 | 1.2/2.8 | 1.2/2.2 | 0/0 | 0/0 | 0.1/0.2 | 0.1/0.2 |
-| Dense | 32.9/63.3 | 25.5/46.6 | 6.2/11.1 | 3.8/8.2 | 4.7/8.4 | 2.4/5.1 | 4.4/8.1 | 2.3/4.6 |
-| Sparse | 24.4/44.6 | 21.7/31.1 | 2.9/5.4 | 2.3/4.0 | 1.5/2.8 | 1.0/2.0 | 1.5/2.6 | 1.0/1.7 |
+| Case     | Before total | After total | Before controller | After controller | Before highlight | After highlight | Before adoption | After adoption |
+| -------- | ------------ | ----------- | ----------------- | ---------------- | ---------------- | --------------- | --------------- | -------------- |
+| Off      | 18.4/39.0    | 16.9/23.3   | 0/0               | 0/0              | 0/0              | 0/0             | 0.1/0.2         | 0.1/0.2        |
+| No marks | 19.7/40.4    | 18.5/28.3   | 1.2/2.8           | 1.2/2.2          | 0/0              | 0/0             | 0.1/0.2         | 0.1/0.2        |
+| Dense    | 32.9/63.3    | 25.5/46.6   | 6.2/11.1          | 3.8/8.2          | 4.7/8.4          | 2.4/5.1         | 4.4/8.1         | 2.3/4.6        |
+| Sparse   | 24.4/44.6    | 21.7/31.1   | 2.9/5.4           | 2.3/4.0          | 1.5/2.8          | 1.0/2.0         | 1.5/2.6         | 1.0/1.7        |
 
 These are local single runs with background test activity, not a controlled latency guarantee.
 The off baseline also varies. The improvement in both overlay paths supports removing repeated
@@ -92,7 +95,6 @@ The log contains connection-abort warnings during fixture navigation; no spellch
 A repeated browser run exposed a test readiness race: the failure test sometimes typed before
 first layout had requested a check. It now waits for the injected worker factory to run before
 asserting that further typing causes no retry. All 67 tests pass with that wait.
-
 
 ## Shipped
 

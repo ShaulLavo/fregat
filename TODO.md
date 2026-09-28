@@ -640,6 +640,14 @@ element, and EditContext makes the browser's spellcheck unreachable, so no missp
 marked. The chat composer keeps Lexical until the editor marks misspelled prose itself, offers
 suggestions and learns words, using permissively licensed dictionaries only.
 
+## Tree-sitter query features
+
+Added 2026-09-28. Singapore ships three query kinds per language (highlights, folds, injections).
+Zed builds most of its language-aware features from more query files per language. Each new kind
+is a file per language plus one consumer, reusing the parse the worker already keeps: outlines for
+breadcrumbs and sticky scroll, syntax-error squiggles, and similar features without a language
+server.
+
 ## One highlight pipeline for tokens and range highlights
 
 Added 2026-09-29. Syntax tokens and range highlights (find, diagnostics, spellcheck, links,

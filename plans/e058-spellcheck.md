@@ -1,6 +1,6 @@
 # E058: Spellcheck for text the editor paints itself
 
-- Status: Proposed
+- Status: In progress
 - PR preparation: plain-text paint regression fails before the fix in WebKit, with zero
   spelling-colour pixels. The overlay base now uses priority zero and is ordered below syntax
   and semantic producers. The regression checks range offsets before and after typing too.
