@@ -13,6 +13,8 @@ import {
   type EditorSyntaxSession,
 } from '@singapore-editor/core/syntax'
 import { createDecodePlugin } from '@singapore-editor/decode'
+import { createMinimapPlugin } from '@singapore-editor/minimap'
+import '@singapore-editor/minimap/style.css'
 import '@singapore-editor/decode/style.css'
 import { createMarkdownPreviewPlugin } from '@singapore-editor/markdown'
 import '@singapore-editor/markdown/style.css'
@@ -23,7 +25,7 @@ import { createInputLatencyProbe } from './inputLatency.ts'
 
 // E033's workload: fixed content above a filler whose length alone grows, so every size shows the
 // same viewport, captures, caret and conflict. The probe types on row 8, inside the conflict.
-export type BoundaryConfig = 'plain' | 'contributions'
+export type BoundaryConfig = 'plain' | 'contributions' | 'minimap' | 'folds'
 
 type Diagnostic = { readonly name: string; readonly detail?: Readonly<Record<string, unknown>> }
 type Reads = { fullReads: number; units: number; chunkWalks: number }
@@ -50,6 +52,7 @@ const HEAD = [
 ].join('\n')
 const BOLD = HEAD.indexOf('**bold**')
 const FILLER = 'filler line of plain text\n'
+const INDENTED_FILLER = 'function value() {\n  return 123\n}\n'
 const REPLACEMENTS = 32
 
 let source = ''
@@ -78,9 +81,10 @@ function check(value: unknown, message: string): asserts value {
 }
 
 /** A document of `size` units: the fixed head, then filler rewritten by 32 real replacements. */
-function fragmentedBuffer(size: number): EditorTextBuffer {
-  const lines = Math.floor((size - HEAD.length) / FILLER.length)
-  source = `${HEAD}${FILLER.repeat(lines)}`
+function fragmentedBuffer(size: number, config: BoundaryConfig): EditorTextBuffer {
+  const filler = config === 'minimap' || config === 'folds' ? INDENTED_FILLER : FILLER
+  const lines = Math.floor((size - HEAD.length) / filler.length)
+  source = `${HEAD}${filler.repeat(lines)}`
   const buffer = createEditorTextBuffer(source)
   const session = createEditorBufferSession(buffer)
   const stride = Math.floor((source.length - HEAD.length) / REPLACEMENTS)
@@ -116,7 +120,8 @@ function markdownCaptures(): EditorPlugin {
 }
 
 function plugins(config: BoundaryConfig): EditorPlugin[] {
-  if (config === 'plain') return []
+  if (config === 'plain' || config === 'folds') return []
+  if (config === 'minimap') return [createMinimapPlugin()]
   return [
     markdownCaptures(),
     createMarkdownPreviewPlugin(),
@@ -134,14 +139,14 @@ function createHost(index: number): HTMLElement {
   return host
 }
 
-function open(size: number, config: BoundaryConfig, diagnostics: boolean) {
+function open(size: number, config: BoundaryConfig, diagnostics: boolean, viewCount = 2) {
   reads = { fullReads: 0, units: 0, chunkWalks: 0 }
   setDiagnosticSink(diagnostics ? record : null)
-  const buffer = fragmentedBuffer(size)
+  const buffer = fragmentedBuffer(size, config)
   const start = performance.now()
   const editors: Editor[] = []
   active = { buffer, editors }
-  for (let index = 0; index < 2; index++) {
+  for (let index = 0; index < viewCount; index++) {
     const editor = new Editor(createHost(index), {
       lineHeight: 20,
       tabSize: 2,
@@ -155,7 +160,7 @@ function open(size: number, config: BoundaryConfig, diagnostics: boolean) {
     editors.push(editor)
     editor.attachSession(createEditorBufferSession(buffer), {
       documentId: 'boundary.md',
-      languageId: config === 'plain' ? null : 'markdown',
+      languageId: config === 'contributions' ? 'markdown' : null,
     })
   }
   return { length: source.length, openMs: performance.now() - start, reads: takeReads() }

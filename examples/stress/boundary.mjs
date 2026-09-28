@@ -7,6 +7,7 @@ import { chromium } from '@playwright/test'
 import { build } from 'vite'
 import { loadCorePackage } from './core-package.mjs'
 import { fail } from './errors.mjs'
+import { workerHeaps } from './worker-memory.mjs'
 
 // E033's acceptance workload: two views over a fragmented document, plain or with Markdown,
 // scope-lines, decode and a conflict already present, typed into and undone inside that conflict.
@@ -19,6 +20,8 @@ const { values } = parseArgs({
     configs: { type: 'string', default: 'plain,contributions' },
     operations: { type: 'string', default: '200' },
     warmups: { type: 'string', default: '20' },
+    'key-delay': { type: 'string', default: '0' },
+    views: { type: 'string', default: '2' },
     'core-directory': { type: 'string', default: resolve(root, '../../packages/editor') },
   },
 })
@@ -27,10 +30,14 @@ const sizes = values.sizes.split(',').map(Number)
 const configs = values.configs.split(',')
 const operations = Number(values.operations)
 const warmups = Number(values.warmups)
+const keyDelay = Number(values['key-delay'])
+const viewCount = Number(values.views)
+if (viewCount !== 1 && viewCount !== 2) fail('views must be 1 or 2')
+if (!Number.isFinite(keyDelay) || keyDelay < 0) fail('Invalid key-delay')
 if (![...sizes, operations, warmups].every((value) => Number.isSafeInteger(value) && value > 0))
   fail('Invalid sizes/operations/warmups')
-if (!configs.every((config) => config === 'plain' || config === 'contributions'))
-  fail('Configs are plain and contributions')
+if (!configs.every((config) => ['plain', 'contributions', 'minimap', 'folds'].includes(config)))
+  fail('Configs are plain, contributions, minimap and folds')
 
 await mkdir('/work/tmp', { recursive: true })
 const directory = await mkdtemp('/work/tmp/editor-e033-build-')
@@ -47,6 +54,8 @@ const result = {
   diagnostics: values.diagnostics,
   operations,
   warmups,
+  keyDelay,
+  viewCount,
   sizes,
   configs,
   viewport: { width: 1000, height: 1000 },
@@ -104,8 +113,9 @@ async function sample(config, size) {
     const cdp = await context.newCDPSession(page)
     const emptyHeap = await heap(cdp)
     const open = await page.evaluate(
-      ({ size, config, diagnostics }) => __boundary.open(size, config, diagnostics),
-      { size, config, diagnostics: values.diagnostics },
+      ({ size, config, diagnostics, viewCount }) =>
+        __boundary.open(size, config, diagnostics, viewCount),
+      { size, config, diagnostics: values.diagnostics, viewCount },
     )
     await page.evaluate(() => __boundary.settle())
     // The contributions must be doing their work, or their cost is not in the measurement. Decode's
@@ -115,8 +125,13 @@ async function sample(config, size) {
       await page.locator('#view-0 .editor-merge-conflict-lens').first().waitFor({ timeout: 10_000 })
       await page.screenshot({ path: `${values.output}.${config}.${size}.png` })
     }
+    if (config === 'minimap' || config === 'folds') {
+      await page.waitForTimeout(5_000)
+      await page.screenshot({ path: `${values.output}.${config}.${size}.png` })
+    }
     open.settleReads = await page.evaluate(() => __boundary.takeReads())
     const openHeap = await heap(cdp)
+    const openWorkers = await workerHeaps(browser)
 
     await burst(page, 'typing', warmups)
     const typing = await burst(page, 'typing', operations)
@@ -124,6 +139,7 @@ async function sample(config, size) {
     const undo = await burst(page, 'undo', operations)
     const exported = await page.evaluate(() => __boundary.exportText())
     const liveHeap = await heap(cdp)
+    const liveWorkers = await workerHeaps(browser)
 
     await page.evaluate(() => __boundary.dispose())
     await page.evaluate(() => __boundary.settle())
@@ -136,6 +152,7 @@ async function sample(config, size) {
       size,
       length: open.length,
       heap: { emptyHeap, openHeap, liveHeap, disposedHeap },
+      workers: { open: openWorkers, live: liveWorkers },
       open,
       typing,
       undo,
@@ -172,7 +189,7 @@ async function burst(page, scenario, count) {
   await page.evaluate(() => __boundary.takeReads())
   await page.evaluate(() => __boundary.probe.start())
   const inserted = scenario === 'typing' ? 'x'.repeat(count) : ''
-  if (scenario === 'typing') await page.keyboard.type(inserted)
+  if (scenario === 'typing') await page.keyboard.type(inserted, { delay: keyDelay })
   for (let index = 0; scenario === 'undo' && index < count; index++)
     await page.keyboard.press('Control+z')
   await page.evaluate(() => new Promise(requestAnimationFrame))

@@ -125,6 +125,7 @@ export function createEditorSecondaryViewProjection(
   snapshot: EditorViewSnapshot,
   options: EditorSecondaryViewProjectionOptions = {},
 ): EditorSecondaryViewProjection {
+  let foldSummaries: readonly EditorSecondaryViewFoldSummary[] | undefined
   return {
     documentId: snapshot.documentId,
     textVersion: snapshot.textVersion,
@@ -143,7 +144,10 @@ export function createEditorSecondaryViewProjection(
     },
     selections: snapshot.selections,
     decorations: options.decorations ?? [],
-    foldSummaries: snapshot.foldMarkers.map(foldSummaryFromMarker),
+    get foldSummaries() {
+      foldSummaries ??= snapshot.foldMarkers.map(foldSummaryFromMarker)
+      return foldSummaries
+    },
   }
 }
 

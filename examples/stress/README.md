@@ -50,6 +50,14 @@ export and disposal heap, and export time. `--diagnostics` adds read counters, t
 probe's own full-text correctness check. Run the same files from a worktree of the control commit and
 alternate the two; `--configs` and `--sizes` narrow a rerun.
 
+For large-file minimap work, `--configs minimap,folds` uses repeating indented functions, with
+and without minimaps. `--key-delay 80` lets the minimap's delayed updates run during typing;
+an unpaced burst can end before the first update. `--views 1` measures a single view, and the
+default remains two shared views. These configurations wait five seconds after opening and
+capture a screenshot before input. Their results also report each worker's post-GC CDP heap,
+separately from the main renderer. Worker `backingStorageSize` includes ArrayBuffers and
+external strings; it is not a measurement of live WASM trees alone.
+
 ## Row geometry workload (E036)
 
 `node geometry.mjs --output /work/tmp/editor-e036/run.json` opens one 900x600 view over 3,000-line

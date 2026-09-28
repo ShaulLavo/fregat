@@ -13,6 +13,23 @@ import {
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
 
 describe('secondary view projections', () => {
+  it('reads fold summaries only when a consumer requests them and reuses the result', () => {
+    const snapshot = editorViewSnapshot('alpha\nbeta')
+    const markers = snapshot.foldMarkers
+    const readMarkers = vi.fn(() => markers)
+    Object.defineProperty(snapshot, 'foldMarkers', { get: readMarkers })
+
+    const projection = createEditorSecondaryViewProjection(snapshot)
+    expect(projection.text.length).toBe(10)
+    expect(projection.selections).toBe(snapshot.selections)
+    expect(readMarkers).not.toHaveBeenCalled()
+
+    const summaries = projection.foldSummaries
+    expect(summaries).toHaveLength(1)
+    expect(projection.foldSummaries).toBe(summaries)
+    expect(readMarkers).toHaveBeenCalledTimes(1)
+  })
+
   it('projects snapshot-owned view data without reading any text', () => {
     const sourceText = 'alpha\nbeta'
     const snapshot = editorViewSnapshot(sourceText)
