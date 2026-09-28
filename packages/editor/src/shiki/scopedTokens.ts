@@ -58,16 +58,37 @@ export function createScopedLineTokenizer(
 }
 
 function scopedToken(line: string, start: number, end: number, style: ScopeStyle): ThemedToken {
-  return {
-    content: line.slice(start, end),
-    offset: start,
-    get color() {
-      return style.color
-    },
-    get fontStyle() {
-      return style.fontStyle
-    },
+  return new ScopedToken(line.slice(start, end), start, style)
+}
+
+class ScopedToken implements ThemedToken {
+  readonly #style: ScopeStyle
+
+  constructor(
+    readonly content: string,
+    readonly offset: number,
+    style: ScopeStyle,
+  ) {
+    this.#style = style
+    Object.defineProperties(this, TOKEN_STYLE_PROPERTIES)
   }
+
+  get color() {
+    return this.#style.color
+  }
+
+  get fontStyle() {
+    return this.#style.fontStyle
+  }
+}
+
+// Shared getters keep a stable object shape while preserving enumerable public token fields.
+const TOKEN_STYLE_PROPERTIES = {
+  color: { ...Object.getOwnPropertyDescriptor(ScopedToken.prototype, 'color'), enumerable: true },
+  fontStyle: {
+    ...Object.getOwnPropertyDescriptor(ScopedToken.prototype, 'fontStyle'),
+    enumerable: true,
+  },
 }
 
 function statesEqual(left: unknown, right: unknown): boolean {

@@ -41,12 +41,25 @@ async function verifyLanguage(
     code,
   })
   const parse = vi.spyOn(highlighter.getLanguage(lang), 'tokenizeLine')
+  const tokens = tokenizer.getTokens().flat()
+  const first = tokens[0]!
+  const second = tokens[1]!
+  expect(Object.keys(first).sort()).toEqual(['color', 'content', 'fontStyle', 'offset'])
+  expect(Object.getOwnPropertyDescriptor(first, 'color')?.get).toBe(
+    Object.getOwnPropertyDescriptor(second, 'color')?.get,
+  )
   for (const theme of themes) {
     parse.mockClear()
     tokenizer.setTheme(theme)
     expect(parse).not.toHaveBeenCalled()
     const expected = highlighter.codeToTokensBase(code, { lang, theme, tokenizeTimeLimit: 0 })
     expect(paintedCharacters(tokenizer.getTokens())).toEqual(paintedCharacters(expected))
+    expect(JSON.parse(JSON.stringify(first))).toEqual({
+      content: first.content,
+      offset: first.offset,
+      color: first.color,
+      fontStyle: first.fontStyle,
+    })
   }
   const edited = code.replace('42', 'value + 1')
   tokenizer.applyEdit({ from: code.indexOf('42'), to: code.indexOf('42') + 2, text: 'value + 1' })
