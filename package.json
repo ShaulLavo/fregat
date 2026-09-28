@@ -14,6 +14,7 @@
     "format:check": "turbo format:check",
     "health": "bun run check:full-text && bun scripts/command-reference.ts --check && bun scripts/architecture-health.mjs",
     "commands:reference": "bun scripts/command-reference.ts",
+    "tree-sitter-x:update": "bun scripts/update-tree-sitter-x.ts",
     "check:full-text": "bun scripts/check-full-text-boundary.mjs --self-test && bun scripts/check-full-text-boundary.mjs",
     "health:write": "bun scripts/architecture-health.mjs --write",
     "publish:packages": "bun scripts/publish-packages.ts",

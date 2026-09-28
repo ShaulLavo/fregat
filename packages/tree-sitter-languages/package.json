@@ -69,7 +69,7 @@
     "tree-sitter-cli": "0.27.0",
     "typescript": "~6.0.3",
     "vitest": "^5.0.2",
-    "web-tree-sitter": "^0.27.0"
+    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#e2985e0"
   },
   "peerDependencies": {
     "@singapore-editor/core": "workspace:*",

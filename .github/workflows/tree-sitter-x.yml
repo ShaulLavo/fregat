@@ -1,0 +1,50 @@
+name: tree-sitter-x
+
+# Keeps web-tree-sitter on the newest tree-sitter-x build: when the fork's web-tree-sitter branch
+# moves, this opens (or updates) a pull request with the new pin. Pull requests opened with the
+# workflow token do not trigger `pull_request` runs, so it starts CI on the branch itself.
+
+on:
+  schedule:
+    - cron: '17 */3 * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: tree-sitter-x-update
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Pin the newest build
+        run: bun run tree-sitter-x:update
+
+      - name: Open a pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet; then exit 0; fi
+          pin=$(grep -oh 'tree-sitter-x#[0-9a-f]*' packages/tree-sitter/package.json | cut -d'#' -f2)
+          branch="tree-sitter-x/update"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$branch"
+          git commit -qam "Update tree-sitter-x to $pin"
+          git push -qf origin "$branch"
+          title="Update tree-sitter-x to $pin"
+          body="Pins web-tree-sitter to [tree-sitter-x@$pin](https://github.com/ShaulLavo/tree-sitter-x/commit/$pin), the newest build of the fork's master."
+          if gh pr view "$branch" --json state -q .state 2>/dev/null | grep -q OPEN; then
+            gh pr edit "$branch" --title "$title" --body "$body"
+          else
+            gh pr create --head "$branch" --title "$title" --body "$body"
+          fi
+          gh workflow run ci.yml --ref "$branch"

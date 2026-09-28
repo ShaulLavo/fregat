@@ -725,6 +725,19 @@
       "dependsOn": [],
       "topics": ["Spellcheck for painted text"],
       "baseline": "74e76bef2af674ad80b3c13024fa47f692e2bb7c"
+    },
+    {
+      "id": "E063",
+      "file": "e063-tree-sitter-queries.md",
+      "title": "More editor features from tree-sitter queries",
+      "status": "Proposed",
+      "owner": "Editor",
+      "kind": "Implementation",
+      "priority": "P2",
+      "effort": "M",
+      "dependsOn": [],
+      "topics": ["Tree-sitter query features"],
+      "baseline": "8def2ec2163b15f3ad02779515841eb94305c55c"
     }
   ]
 }
