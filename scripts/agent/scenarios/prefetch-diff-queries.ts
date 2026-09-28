@@ -163,9 +163,11 @@ async function verifyHistoryIntent(page: Page) {
     1,
     'the cursor prefetches its next neighbour',
   )
-  let blobReads = 0
+  // Foresight also prepares rows a trajectory crosses, so reads are counted per file.
+  const blobReads: string[] = []
   page.on('request', (request) => {
-    if (new URL(request.url()).pathname === '/git/diff/blob') blobReads++
+    const url = new URL(request.url())
+    if (url.pathname === '/git/diff/blob') blobReads.push(url.searchParams.get('path') ?? '')
   })
   const blank = await countBlankFrames(page, selectors.historyFileSelector, async () => {
     await last.click()
@@ -178,10 +180,12 @@ async function verifyHistoryIntent(page: Page) {
     'selection reuses the neighbour read',
   )
   const file = selectors.historyFiles(page).first()
+  const filePath = (await file.getAttribute('data-history-file')) ?? ''
+  const readsOf = () => blobReads.filter((path) => path === filePath).length
   await file.hover()
   await page.waitForTimeout(650)
-  equal(blobReads, 1, 'a commit file hover prepares its blob pair')
+  equal(readsOf(), 1, 'a commit file hover prepares its blob pair')
   await file.click()
   await page.locator(diffContentRowSelector).first().waitFor()
-  equal(blobReads, 1, 'opening the commit file reuses its prepared blob pair')
+  equal(readsOf(), 1, 'opening the commit file reuses its prepared blob pair')
 }

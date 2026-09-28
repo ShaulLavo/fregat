@@ -5,10 +5,9 @@ import { useLanguageCensus } from '@/features/editor/hooks/use-language-census'
 import {
   bindLanguageCensus,
   workspacePreloadLanguages,
+  workspaceWarmLanguages,
 } from '@/features/editor/state/language-census'
-import { disposeEditorTreeSitterSyntaxProvider } from '@/features/editor/state/syntax-highlighting'
 import { createEditorWorkspaceStore } from '@/features/editor/state/workspace-state'
-import { editorMutationKeys } from '@/features/editor/utils/mutation-keys'
 import { languageCensusQueryOptions } from '@/features/editor/utils/language-census-query'
 import { EDITOR_SHIKI_PRELOAD_LANGUAGES } from '@/features/editor/utils/shiki-languages'
 import { filesystemPath } from '@/lib/documents/utils/identity'
@@ -16,14 +15,6 @@ import { openWorkspaceRootPath } from '@/lib/file-server'
 import { expect, test } from '../../../../../test/fixtures'
 import { watchFilesystem } from '../../../../../test/factories/filesystem-events'
 import { createTestQueryClient, renderHookWithProviders } from '../../../../../test/render'
-import type { QueryClient } from '@tanstack/react-query'
-
-function warmedLanguageSets(queryClient: QueryClient) {
-  return queryClient
-    .getMutationCache()
-    .findAll({ mutationKey: editorMutationKeys.treeSitterWarmUp(), status: 'success' })
-    .map((mutation) => mutation.state.variables)
-}
 
 test('the hook loads the census the preload getter reads for the bound root and machine', async ({
   client,
@@ -54,20 +45,22 @@ test('the hook loads the census the preload getter reads for the bound root and 
   let unbind = bindLanguageCensus({ queryClient, root })
   const getter = workspacePreloadLanguages
   expect(getter()).toBe(EDITOR_SHIKI_PRELOAD_LANGUAGES)
+  expect(workspaceWarmLanguages()).toEqual([])
   act(() =>
     workspaceStore.getState().switchWorkspace({ ...one.entry, name: 'one', type: 'directory' }),
   )
   await waitFor(() => expect(queryClient.getQueryData(first)?.readiness).toBe('ready'))
   expect(getter()).toEqual(['typescript'])
-  await waitFor(() => expect(warmedLanguageSets(queryClient)).toEqual([['typescript']]))
+  expect(workspaceWarmLanguages()).toEqual(['typescript'])
 
   act(() =>
     queryClient.setQueryData(first, { readiness: 'stale', scanRoot: null, counts: { '.tsx': 20 } }),
   )
   expect(getter()).toEqual(['tsx'])
-  await waitFor(() => expect(warmedLanguageSets(queryClient)).toEqual([['typescript'], ['tsx']]))
+  expect(workspaceWarmLanguages()).toEqual(['tsx'])
   act(() => queryClient.setQueryData(first, { readiness: 'failed', scanRoot: null, counts: {} }))
   expect(getter()).toBe(EDITOR_SHIKI_PRELOAD_LANGUAGES)
+  expect(workspaceWarmLanguages()).toEqual([])
 
   const two = await openWorkspaceRootPath(
     filesystemPath('two'),
@@ -78,9 +71,7 @@ test('the hook loads the census the preload getter reads for the bound root and 
     workspaceStore.getState().switchWorkspace({ ...two.entry, name: 'two', type: 'directory' }),
   )
   await waitFor(() => expect(getter()).toEqual(['python']))
-  await waitFor(() =>
-    expect(warmedLanguageSets(queryClient)).toEqual([['typescript'], ['tsx'], ['python']]),
-  )
+  expect(workspaceWarmLanguages()).toEqual(['python'])
   act(() => queryClient.setQueryData(second, { readiness: 'ready', scanRoot: null, counts: {} }))
   expect(getter()).toEqual([])
 
@@ -94,7 +85,6 @@ test('the hook loads the census the preload getter reads for the bound root and 
   expect(getter()).toBe(EDITOR_SHIKI_PRELOAD_LANGUAGES)
   queryClient.clear()
   otherMachine.clear()
-  await disposeEditorTreeSitterSyntaxProvider()
   await watchOne.stop()
   await watchTwo.stop()
 })

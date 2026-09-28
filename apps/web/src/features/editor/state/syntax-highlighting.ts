@@ -13,7 +13,10 @@ import {
 } from '@singapore-editor/tree-sitter'
 import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '@singapore-editor/tree-sitter-languages'
 
-import { workspacePreloadLanguages } from '@/features/editor/state/language-census'
+import {
+  workspacePreloadLanguages,
+  workspaceWarmLanguages,
+} from '@/features/editor/state/language-census'
 import { clearPreparedDiffSyntax } from '@/features/editor/state/prepared-diff-syntax'
 import {
   activeEditorThemeUsesShiki,
@@ -116,7 +119,10 @@ export function editorTreeSitterSyntaxProvider(): TreeSitterSyntaxProvider {
   if (treeSitterSyntaxProvider) return treeSitterSyntaxProvider
 
   const backend = createTreeSitterWorkerBackend()
-  const provider = createTreeSitterSyntaxProvider({ backend })
+  const provider = createTreeSitterSyntaxProvider({
+    backend,
+    warmLanguages: workspaceWarmLanguages,
+  })
   for (const contribution of TREE_SITTER_LANGUAGE_CONTRIBUTIONS) {
     provider.registerLanguage(contribution, { replace: true })
   }

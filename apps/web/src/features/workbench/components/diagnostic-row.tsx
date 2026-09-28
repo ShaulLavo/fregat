@@ -6,6 +6,9 @@ import { diagnosticRuleClass } from '@/features/workbench/utils/diagnostic-style
 import type { DiagnosticItemRow } from '@/features/workbench/utils/diagnostic-rows'
 import { diagnosticSeverityLabel } from '@/lib/diagnostic'
 import { FixDiagnosticButton } from '@/features/workbench/components/fix-diagnostic-button'
+import { useForesight } from '@/hooks/use-foresight'
+import { FILE_SNAPSHOT_STALE_MS } from '@/lib/file-snapshot-query-cache'
+import { INTENT_PREFETCH_HIT_SLOP_PX } from '@/lib/intent-prefetch-options'
 
 /** One diagnostic: severity and line on the row, then its complete message beneath. */
 export function DiagnosticRow({
@@ -13,7 +16,7 @@ export function DiagnosticRow({
   row,
   rowProps,
   onFix,
-  onHover,
+  onIntent,
   onOpen,
 }: {
   /** Absent where there is no chat to open. */
@@ -21,10 +24,17 @@ export function DiagnosticRow({
   readonly row: DiagnosticItemRow
   readonly rowProps: ReturnType<ReturnType<typeof useListbox>['rowProps']>
   readonly onFix: () => void
-  readonly onHover: () => void
+  /** Foresight predicts a press on the row. */
+  readonly onIntent: () => void
   readonly onOpen: () => void
 }) {
   const line = row.target.range.start.line + 1
+  const { elementRef } = useForesight<HTMLButtonElement>({
+    callback: onIntent,
+    hitSlop: INTENT_PREFETCH_HIT_SLOP_PX,
+    name: `diagnostic:${row.id}`,
+    reactivateAfter: FILE_SNAPSHOT_STALE_MS,
+  })
   return (
     <div className={cn('border-l-2', diagnosticRuleClass(row.diagnostic.severity))}>
       <ListRow
@@ -39,7 +49,7 @@ export function DiagnosticRow({
           rowProps.onClick(event)
           onOpen()
         }}
-        onPointerEnter={onHover}
+        ref={elementRef}
       >
         <span className='text-muted-foreground'>
           {diagnosticSeverityLabel(row.diagnostic.severity)}

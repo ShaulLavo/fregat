@@ -10,7 +10,6 @@ export const editorMutationKeys = {
   historyRestore: (key: DocumentKey) => ['editor', 'history', 'restore', key] as const,
   save: (key: DocumentKey) => ['editor', 'save', key] as const,
   saves: () => ['editor', 'save'] as const,
-  treeSitterWarmUp: () => ['editor', 'tree-sitter', 'warm-up'] as const,
   diffSyntaxPrepare: () => ['editor', 'diff-syntax', 'prepare'] as const,
 }
 

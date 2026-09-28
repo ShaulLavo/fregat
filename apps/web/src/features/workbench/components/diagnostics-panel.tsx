@@ -153,7 +153,7 @@ export function DiagnosticsPanel() {
               rowProps={list.rowProps(row.id)}
               onFix={() => fix.mutation.mutate(diagnosticFixRequest(row))}
               onOpen={() => openDiagnostic(row.target)}
-              onHover={() => prepareFile(filesystemPath(row.target.path), 'hover')}
+              onIntent={() => prepareFile(filesystemPath(row.target.path), 'trajectory')}
             />
           ),
         )}

@@ -336,27 +336,31 @@ The final web build also passes against the new Editor pin. No deployment was pe
 
 ## Phase 4 implementation (2026-09-27)
 
-Editor `9d611f7` (branch `claude/wizardly-bardeen-f8nsv1` on singapore, pinned as `editor-ref`
-together with Plan 177's diff API in `199ba7e`):
+Editor `9d611f7` and `f7ebab6` ([singapore#60](https://github.com/ShaulLavo/singapore/pull/60)); `editor-ref` is
+pinned to `f7ebab6`, which also carries Plan 177's diff API:
 
-- [x] `TreeSitterSyntaxProvider.warmLanguages(ids)` starts the worker, resolves each id with its
-      injection closure (`resolveTreeSitterLanguageClosure`, shared with the session), registers
-      the descriptors and posts `warmLanguages`. The worker compiles each grammar and its highlight,
-      fold and injection queries, one language per macrotask, skipping any language that already
-      has a runtime. The client skips a language it already warmed, and warms it again after a
-      changed registration. It never rejects: unknown ids and load or worker failures are skipped,
-      and the language's first document reports them.
+- [x] `createTreeSitterSyntaxProvider({ warmLanguages: () => ids })` takes the host's languages as a
+      getter, like Shiki's `preloadLanguages`. The Editor reads it after each document's first
+      parse answers, so a warm-up never runs ahead of a paint, and a changed set (after a workspace
+      switch) warms on the next document. An unchanged set is skipped. Each language is resolved
+      with its injection closure (`resolveTreeSitterLanguageClosure`, shared with the session) and
+      registered. The worker then compiles its grammar and highlight, fold and injection queries,
+      one language per macrotask. A language is warmed once, and again after its registration
+      changes. Unknown ids and load or worker failures are skipped.
+      Changed 2026-09-28 (owner review): the first cut exposed `warmLanguages(ids)` and Platform
+      fired it from a mutation when the census landed. The getter hands scheduling back to the
+      Editor, as Plan 197 wants.
 - [x] Platform: `treeSitterLanguagesForCensus(counts)` applies the same 0.5% share floor as
       `shikiGrammarsForCensus` (`utils/census-languages.ts`). It aggregates aliases through the
       bundled tree-sitter metadata and drops keys that have no tree-sitter grammar.
-- [x] `useLanguageCensus` runs the `editor.tree-sitter.warm-up` mutation once per distinct language
-      set, when the census is `ready` or `stale`, and not while syntax is disabled. A census that is
-      not ready warms nothing, which is the behaviour before this phase.
+      `workspaceWarmLanguages()` is the getter. It returns nothing while the census is not
+      `ready` or `stale`, which is the behaviour before this phase.
 - [x] Tests:
   - worker-client dedupe and re-warm (EchoWorker);
   - closure, unknown-id and failure handling at the provider;
   - a real-worker browser test that warms TypeScript beside a broken grammar, then parses;
-  - the hook test, which asserts the warmed sets through the mutation cache.
+  - the census hook test, which checks the getter across ready, stale and failed censuses, a root
+    switch and a machine switch.
 
 ### Phase 5 measurements (2026-09-27, cloud container)
 

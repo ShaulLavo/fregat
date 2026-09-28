@@ -235,7 +235,7 @@ is the measured diff press latency, not overall CPU use.
 
 ### Phase 3 — Prepared diff syntax (L, Editor and Platform)
 
-Done 2026-09-27. The Editor change is in singapore `199ba7e`, which is the pinned `editor-ref`.
+Done 2026-09-27. The Editor change is in singapore `199ba7e` ([singapore#60](https://github.com/ShaulLavo/singapore/pull/60)); `editor-ref` pins that branch's head.
 
 - **Editor API.**
   - `prepareDiffSyntax(file, { backend, side, signal })` returns a `PreparedDiffSyntaxSource` per
@@ -245,6 +245,8 @@ Done 2026-09-27. The Editor change is in singapore `199ba7e`, which is the pinne
   - `releasePreparedSyntax()` hands the current file's streams back to the host when the view
     leaves it.
 - **Store.** Platform keeps prepared diff syntax in `features/editor/state/prepared-diff-syntax.ts`.
+  This is interim: [Plan 197](197-editor-highlighting-service.md) moves the store into the Editor's
+  highlighting service (owner review, 2026-09-28).
   - It is keyed per source side by syntax source, language and an FNV-1a fingerprint of that side's
     lines, with line count and length. Keying on the drawn text means a checkpoint's rewritten old
     side can never match a blob's.
@@ -297,7 +299,8 @@ Done 2026-09-27.
   `lib/file-open-intent/hooks/`, feed:
   - quick open's highlighted file and `edt `'s highlighted editor (through `HighlightReporter`);
   - the sidebar search's and the search editor's active result;
-  - Problems and References, by active row and hover;
+  - Problems, by active row and Foresight; References, by active row and its existing hover
+    preview;
   - chat file chips and stack frames on hover. A chat link resolves against the chat's own root,
     so a link under another project's root is rejected, as the plan expected.
 - **Tree focus.** Arrow-key focus in the tree prefetches the focused row with trigger `focus`: a
@@ -332,6 +335,12 @@ The files preparer gains sources, each feeding its already-tracked active target
 - Chat file and stack-frame links (hover).
 
 The cap keeps a held arrow key from flooding: a guess is skipped while four are in flight.
+
+- **Foresight** (owner review, 2026-09-28). Git change, commit and turn file rows start their diff
+  read when Foresight predicts a press; pointer-enter no longer starts one. Leaving the row holds
+  the read for 2 s. Problems rows prepare their file through Foresight as well. Only chat links
+  prepare on a plain hover. `prefetch-diff-queries` now counts blob reads per file, because a
+  Foresight trajectory also prepares rows it crosses.
 
 ### Phase 5 — Chats (S)
 
