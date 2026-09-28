@@ -51,7 +51,7 @@ export function sampleMemory(root: number) {
   return {
     read() {
       sample()
-      return { ...peaks }
+      return process.platform === 'linux' ? { ...peaks } : null
     },
     reset() {
       peaks = { browserBytes: 0, rendererBytes: 0, serverTreeBytes: 0, totalBytes: 0 }

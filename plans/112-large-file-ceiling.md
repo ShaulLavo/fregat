@@ -279,8 +279,8 @@ Phase 1 continues in independently verified changes.
 
 - [x] Separate Git comparison and revision-read budgets with a machine setting, default 50 MiB.
 - [x] Verify the boundary and ordinary file reads, refresh the settings reference, and ship.
-- [ ] Remove retained save text while preserving saved-snapshot consumers.
-- [ ] Land `bench:large-file`, including the 150 MiB save case.
+- [x] Remove retained save text while preserving saved-snapshot consumers.
+- [x] Land `bench:large-file`, including the 150 MiB save case.
 
 Verification: `src/git/tests/service.test.ts` passes 27 tests, including exact-boundary,
 live budget changes, untracked files and an HTTP read above the configured diff limit.
@@ -302,9 +302,9 @@ after the first independently shippable change. Decision trail:
 [execution.tsv](../docs/large-file-ceiling/execution.tsv).
 
 - [x] Read the execution principles and reconcile scope with E015.
-- [ ] Review the delivered budget and fix misleading oversized-file results.
-- [ ] Land a reproducible production-browser benchmark and capture the current baseline.
-- [ ] Remove saved-text retention with cache and compare-with-saved evidence.
+- [x] Review the delivered budget and fix misleading oversized-file results.
+- [x] Land a reproducible production-browser benchmark and capture the current baseline.
+- [x] Remove saved-text retention with cache and compare-with-saved evidence.
 - [ ] Ship raw-byte read/write transport, shared decoding and byte-hash versions.
 - [ ] Measure current Editor work per worker, remove whole-document edit work and compare.
 - [ ] Set feature tiers from the new measurements and verify switching, saving and refusal.

@@ -360,7 +360,8 @@ export async function writeFileContent(
     async () => {
       const body = writeFileContentBody(path, content, writeOptions)
       const { content: text, ...query } = body
-      const response = await client.fs.write.post(text, { query })
+      // Eden scans its argument for file fields, enumerating every character of a string.
+      const response = await client.fs.write.post('', { query, fetch: { body: text } })
 
       if (response.error) throw createRpcError(response.error)
 

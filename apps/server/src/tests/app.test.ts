@@ -1278,7 +1278,7 @@ describe('git rpc', () => {
     ])
   })
 
-  it('skips snapshot refs for binary and large live diffs', async () => {
+  it('pins large live diffs without materializing their content', async () => {
     const root = await fixtureRoot()
     await initGitRepository(root)
     await writeFile(path.join(root, 'binary.dat'), new Uint8Array([0, 1, 2]))
@@ -1320,7 +1320,7 @@ describe('git rpc', () => {
     expect(largeDiff.hunks).toEqual([])
     expect(largeDiff.omitted).toBe('size')
     expect(largeDiff.oldObjectId).toEqual(expect.any(String))
-    expect(largeDiff.newObjectId).toBeUndefined()
+    expect(largeDiff.newObjectId).toEqual(expect.any(String))
     expect(largeDiff.oldText).toBeUndefined()
     expect(largeDiff.newText).toBeUndefined()
   })

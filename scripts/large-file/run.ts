@@ -8,6 +8,7 @@ import { selectors } from '../agent/selectors'
 import { createScriptError } from '../structured-errors'
 import { expectedEditedHash, fileHash, MARKER, writeFixture } from './fixture'
 import { sampleMemory } from './memory'
+import { workerHeaps } from './workers'
 
 export type CaseOptions = {
   readonly sizeMiB: number
@@ -88,9 +89,10 @@ async function exercise(
   const openPeak = memory.read()
   await page.waitForTimeout(options.settleMs)
   const heapAfterOpen = await heapBytes(cdp)
+  const workersAfterOpen = await workerHeaps(page.context().browser()!)
   await writeFile(
     path.join(options.output, 'measurements.json'),
-    JSON.stringify({ openToTextMs, openPeak, heapBeforeOpen, heapAfterOpen }),
+    JSON.stringify({ openToTextMs, openPeak, heapBeforeOpen, heapAfterOpen, workersAfterOpen }),
   )
   await page.screenshot({ path: path.join(options.output, 'opened.png') })
   memory.reset()
@@ -112,6 +114,7 @@ async function exercise(
       keyLatencyMs,
       heapBeforeOpen,
       heapAfterOpen,
+      workersAfterOpen,
       heapAfterTyping,
       openPeak,
       typingPeak,
@@ -135,6 +138,7 @@ async function exercise(
   )
   await page.waitForTimeout(1500)
   const heapAfterSave = await heapBytes(cdp)
+  const workersAfterSave = await workerHeaps(page.context().browser()!)
   await page.screenshot({ path: path.join(options.output, 'saved.png') })
   return {
     openToTextMs,
@@ -145,6 +149,8 @@ async function exercise(
     heapAfterOpen,
     heapAfterTyping,
     heapAfterSave,
+    workersAfterOpen,
+    workersAfterSave,
     openPeak,
     typingPeak,
     savePeak: memory.read(),
@@ -156,7 +162,8 @@ export async function runCase(options: CaseOptions) {
   const fixture = path.join(options.output, 'fixture')
   await mkdir(fixture)
   const file = path.join(fixture, `big.${options.extension}`)
-  writeFixture(file, options.sizeMiB * 1024 * 1024, options.twoByte)
+  const initialBytes = options.sizeMiB * 1024 * 1024 - options.keys
+  writeFixture(file, initialBytes, options.twoByte)
   const server = await startIsolatedServer(new URL('http://localhost:5297'), {
     scratchRoot: options.output,
     webRoot: options.webRoot,
@@ -168,6 +175,7 @@ export async function runCase(options: CaseOptions) {
   page.on('pageerror', (error) => errors.push(error.message))
   const metadata = {
     ...options,
+    initialBytes,
     browser: browser.version(),
     runtime: Bun.version,
     timestamp: new Date().toISOString(),

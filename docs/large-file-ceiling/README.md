@@ -168,6 +168,8 @@ animation frame. Save passes only when the disk's SHA-256 equals the original by
 30 characters prepended. Main-isolate heap and external backing storage are reported separately;
 RSS samples include the benchmark process's descendants, grouped into Chromium and server trees.
 RSS is unavailable off Linux. A failed/crashed case is a failure even when earlier phases passed.
+The fixture reserves one byte per typed key, so the saved result reaches the named size exactly;
+the 200 MiB case therefore exercises the configured boundary without exceeding it.
 
 Evidence includes `source.json`, one `result.json` per size, screenshots, server logs, and optional
 `typing.cpuprofile`. Fixtures and isolated state are removed after each completed case. Browser
@@ -190,3 +192,5 @@ Chromium 153, Bun 1.4.2. CPU profiling was enabled. The 150 MiB saved screenshot
 The 200 MiB failure peaked at 3.55 GB renderer RSS. The initial harness did not persist its
 preceding phase metrics; later runs now write them before starting save. An earlier smoke case
 used a single-line corpus and is not comparable to this table.
+The baseline also started at exactly the named size: its 200 MiB save would have exceeded the
+configured limit by 30 bytes had the renderer survived. The corrected harness reserves those bytes.
