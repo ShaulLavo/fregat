@@ -6,7 +6,7 @@ import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 export type PrefetchSurface = 'files' | 'folders' | 'diffs'
 
 // A long list raises an intent for every row a pointer path or a held arrow key passes over.
-const SPECULATIVE_PREFETCH_LIMIT = 4
+export const SPECULATIVE_PREFETCH_LIMIT = 4
 
 /** Whether guesses for `surface` may start; each surface has a switch under `prefetch.enabled`. */
 export function prefetchSurfaceEnabled(surface: PrefetchSurface): boolean {

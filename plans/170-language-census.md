@@ -337,7 +337,7 @@ The final web build also passes against the new Editor pin. No deployment was pe
 ## Phase 4 implementation (2026-09-27)
 
 Editor `9d611f7` and `f7ebab6` ([singapore#60](https://github.com/ShaulLavo/singapore/pull/60)); `editor-ref` is
-pinned to `f7ebab6`, which also carries Plan 177's diff API:
+pinned to `27fe9c7`, which also carries Plan 177's diff API:
 
 - [x] `createTreeSitterSyntaxProvider({ warmLanguages: () => ids })` takes the host's languages as a
       getter, like Shiki's `preloadLanguages`. The Editor reads it after each document's first

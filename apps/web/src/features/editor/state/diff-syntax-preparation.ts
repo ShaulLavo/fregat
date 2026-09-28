@@ -3,10 +3,10 @@ import { mutationOptions, type QueryClient } from '@tanstack/react-query'
 import type { GitFileDiff } from '@workspace/contracts'
 import { editorDiffFiles, renderableDiffFile } from '@workspace/client-core/git/diff-files'
 import {
+  diffSyntaxPreparationKey,
   hasPreparedDiffSyntax,
   isDiffSyntaxViewed,
   storePreparedDiffSyntax,
-  trackDiffSyntaxPreparation,
 } from '@/features/editor/state/prepared-diff-syntax'
 import {
   editorDiffSyntaxConfiguration,
@@ -38,19 +38,16 @@ export function prepareDiffSyntaxForDiffs(
       mutationKey: editorMutationKeys.diffSyntaxPrepare(),
       // One parse at a time: the syntax workers also serve the files on screen.
       scope: { id: 'editor.diff-syntax-prepare' },
-      mutationFn: async () => {
-        if (hasPreparedDiffSyntax(file, source)) return 0
+      // Rechecked when the scope lets it run: the view may have opened, or kept a parse, since.
+      mutationFn: async (_key: string) => {
+        if (hasPreparedDiffSyntax(file, source) || isDiffSyntaxViewed(file, source)) return 0
         const started = performance.now()
         const { backend } = editorDiffSyntaxConfiguration(source)
-        const work = prepareDiffSyntax(file, { backend }).then((sources) =>
-          storePreparedDiffSyntax(file, source, sources),
-        )
-        trackDiffSyntaxPreparation(file, source, work)
-        await work
+        storePreparedDiffSyntax(file, source, await prepareDiffSyntax(file, { backend }))
         return performance.now() - started
       },
       retry: false,
     }),
-    undefined,
+    diffSyntaxPreparationKey(file, source),
   )
 }

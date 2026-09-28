@@ -22,11 +22,16 @@ export function watchAdjacentTabIntents(
       cancel()
       let current = true
       const timer = setTimeout(() => {
-        void awaitEditorSyntaxWorkerIdleFences().then(() => {
-          if (!current) return
-          for (const intent of adjacentTabIntents(workspaceStore.getState()))
-            service.prepare(intent)
-        })
+        // A worker that failed its fence has nothing to prepare into.
+        void awaitEditorSyntaxWorkerIdleFences().then(
+          () => {
+            if (!current) return
+            for (const intent of adjacentTabIntents(workspaceStore.getState())) {
+              service.prepare(intent)
+            }
+          },
+          () => undefined,
+        )
       }, ADJACENT_TAB_SETTLE_MS)
       cancel = () => {
         current = false

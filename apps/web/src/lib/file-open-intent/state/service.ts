@@ -19,7 +19,11 @@ import {
   fileSnapshotQueryOptions,
   fileSnapshotReads,
 } from '@/lib/file-snapshot-query-cache'
-import { hasPrefetchRoom, prefetchSurfaceEnabled } from '@/lib/intent-prefetch/state/scheduler'
+import {
+  hasPrefetchRoom,
+  prefetchSurfaceEnabled,
+  SPECULATIVE_PREFETCH_LIMIT,
+} from '@/lib/intent-prefetch/state/scheduler'
 import type {
   PreparedCleanFileOpenClaim,
   PreparedFileOpenClaim,
@@ -34,7 +38,6 @@ const MAX_PREPARED_OPENS = 8
 const MAX_PREPARED_BYTES = 32 * 1024 * 1024
 const PREPARED_OPEN_TTL_MS = 30_000
 const MAX_PREPARED_FILE_BYTES = 1024 * 1024
-const QUEUED_INTENT_LIMIT = 4
 const PROMOTION_PAINT_TIMEOUT_MS = 10_000
 
 export type FileOpenIntentLiveDocument = {
@@ -715,7 +718,7 @@ class FileOpenIntentServiceState {
 
   // A held arrow key raises a guess per row; only the newest keep their place in the queue.
   private dropOverflowingQueue(): void {
-    while (this.queuedPaths.length > QUEUED_INTENT_LIMIT) {
+    while (this.queuedPaths.length > SPECULATIVE_PREFETCH_LIMIT) {
       const dropped = this.queuedPaths.shift()!
       this.queuedPathSet.delete(dropped)
       this.finishIntent(dropped, 'skipped-budget')

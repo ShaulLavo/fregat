@@ -5,6 +5,7 @@ import {
   type DiffPlugin,
   type DiffRenderRow,
 } from '@singapore-editor/diff'
+import { useQueryClient } from '@tanstack/react-query'
 import { useLayoutEffect, useState } from 'react'
 import {
   claimPreparedDiffSyntax,
@@ -39,19 +40,23 @@ export function useDiffRows(
 ): DiffRowsState {
   const [rows, setRows] = useState<readonly DiffRenderRow[]>(() => plugin.getRows())
   const [tokensRevision, setTokensRevision] = useState(0)
+  const queryClient = useQueryClient()
 
   useLayoutEffect(() => {
     if (!file || syntaxSource === null) {
       plugin.setFile(file)
       return
     }
-    plugin.setFile(file, claimPreparedDiffSyntax(file, side, syntaxSource))
+    let current = true
+    const claim = claimPreparedDiffSyntax(queryClient, file, side, syntaxSource, () => current)
+    plugin.setFile(file, claim)
     const leave = viewDiffSyntax(file, syntaxSource)
     return () => {
+      current = false
       leave()
       storePreparedDiffSyntax(file, syntaxSource, plugin.releasePreparedSyntax())
     }
-  }, [file, plugin, side, syntaxSource])
+  }, [file, plugin, queryClient, side, syntaxSource])
 
   useLayoutEffect(() => {
     const pull = () => setRows(plugin.getRows())

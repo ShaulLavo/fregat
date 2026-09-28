@@ -5,6 +5,8 @@ import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { vi } from 'vitest'
 
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
 import { expect, test } from '../../../../../test/fixtures'
 import { testTabContent } from '../../../../../test/factories/document-targets'
 import { createMarkdownWorkspace, renderMarkdown } from '../../../../../test/factories/markdown'
@@ -50,4 +52,20 @@ test('a path outside the server root opens nothing and says why', async ({ clien
   } finally {
     warning.mockRestore()
   }
+})
+
+test('hovering a link in the chat workspace prepares its file for the press', async ({
+  client,
+  server,
+}) => {
+  const { application, editor } = await createMarkdownWorkspace(client, server)
+  const view = renderMarkdown('See [foo](src/foo.ts).', {
+    application,
+    workspaceRoot: { canonicalPath: path.join(server.root, 'repo'), path: 'repo' },
+  })
+
+  await userEvent.hover(view.getByRole('link', { name: /foo\.ts/u }))
+
+  const { queryKey } = fileSnapshotQueryOptions(filesystemPath('repo/src/foo.ts'))
+  await waitFor(() => expect(editor.queryClient.getQueryData(queryKey)).toBeDefined())
 })

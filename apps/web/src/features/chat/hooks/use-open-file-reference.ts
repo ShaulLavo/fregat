@@ -23,11 +23,14 @@ export function useOpenFileReference() {
   const workspacePath = chatWorkspace?.path ?? editorRoot
   const prepare = useFileIntent('chat-link')
 
-  /** A hovered link prepares its file; one under another project's root is not the editor's. */
+  /**
+   * A hovered link prepares its file. The intent names the chat's workspace in server form, the
+   * form the editor root takes, so a link under another project is rejected.
+   */
   function prepareFileReference(source: MarkdownFileReference) {
     const path = markdownServerFilePath(source.path, rootPath, workspacePath)
-    if (path === null || rootPath === null) return
-    prepare(filesystemPath(path), 'hover', { rootPath: filesystemPath(rootPath) })
+    if (path === null || workspacePath === null) return
+    prepare(filesystemPath(path), 'hover', { rootPath: filesystemPath(workspacePath) })
   }
 
   function openFileReference(source: MarkdownFileReference) {
