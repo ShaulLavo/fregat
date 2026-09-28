@@ -29,7 +29,8 @@ export default defineConfig({
         // rect empty, so these assertions are meaningless anywhere else.
         // Discovered mid-run, these make Vite reload and strand the browser test that was loading.
         optimizeDeps: {
-          exclude: ['web-tree-sitter'],
+          // tree-sitter-md is plain ESM over web-tree-sitter; served as-is, it is never discovered.
+          exclude: ['web-tree-sitter', 'tree-sitter-md'],
           include: [
             '@shikijs/engine-oniguruma',
             '@shikijs/engine-oniguruma/wasm-inlined',
