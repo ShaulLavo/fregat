@@ -1,5 +1,10 @@
 import { expect, test } from 'vitest'
-import { PagedDocument, PAGED_PROOF_OPTIONS, type RangeSource } from '../src/document'
+import {
+  PagedDocument,
+  PagedSourceInvalidatedError,
+  PAGED_PROOF_OPTIONS,
+  type RangeSource,
+} from '../src/document'
 
 const small = {
   ...PAGED_PROOF_OPTIONS,
@@ -150,6 +155,65 @@ test('revision mismatch invalidates cached pages and every viewer', async () => 
   expect(doc.stats.state).toBe('stale')
   expect(doc.stats.cachedBytes).toBe(0)
   await expect(view.readLines(3, 1)).rejects.toThrow('stale')
+  view.dispose()
+  doc.dispose()
+})
+
+test('source invalidation clears cached pages and prevents reads from every viewer', async () => {
+  const underlying = textSource('one\ntwo\nthree\nfour\n')
+  let invalid = false
+  const source: RangeSource = {
+    ...underlying,
+    async readBytes(start, end, signal) {
+      if (invalid) throw new PagedSourceInvalidatedError()
+      return underlying.readBytes(start, end, signal)
+    },
+  }
+  const doc = new PagedDocument(source, { ...small, cacheBytes: 7 })
+  const first = doc.createView()
+  const second = doc.createView()
+  await doc.initialize()
+  expect(doc.stats.cachedBytes).toBeGreaterThan(0)
+  invalid = true
+  await expect(first.readLines(0, 1)).rejects.toMatchObject({ code: 'PAGED_DOCUMENT_STALE' })
+  expect(doc.stats.state).toBe('stale')
+  expect(doc.stats.cachedBytes).toBe(0)
+  expect(doc.stats.checkpoints).toBe(0)
+  await expect(second.readLines(3, 1)).rejects.toThrow('stale')
+  first.dispose()
+  second.dispose()
+  doc.dispose()
+})
+
+test('late invalidation from an aborted source read leaves the document reusable', async () => {
+  const underlying = textSource('one\ntwo\nthree\nfour\n')
+  let delayed = false
+  let release = () => {}
+  const source: RangeSource = {
+    ...underlying,
+    async readBytes(start, end, signal) {
+      if (!delayed) return underlying.readBytes(start, end, signal)
+      await new Promise<void>((resolve) => {
+        release = resolve
+      })
+      throw new PagedSourceInvalidatedError()
+    },
+  }
+  const doc = new PagedDocument(source, { ...small, cacheBytes: 7 })
+  const view = doc.createView()
+  await doc.initialize()
+  delayed = true
+  const controller = new AbortController()
+  const pending = view.readLines(0, 1, controller.signal)
+  const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+  await Promise.resolve()
+  await Promise.resolve()
+  controller.abort()
+  delayed = false
+  release()
+  await rejected
+  expect(doc.stats.state).toBe('ready')
+  expect((await view.readLines(0, 1)).rows[0]?.text).toBe('one')
   view.dispose()
   doc.dispose()
 })

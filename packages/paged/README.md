@@ -22,6 +22,10 @@ await source.dispose?.()
 Ranges are half-open byte ranges. Every response must match the opening revision and exact
 requested byte count. Changed revisions invalidate every view and clear retained pages. The host
 should create a new source/document after a change or session expiry; it must not splice revisions.
+If the source rejects a read because its revision or session is no longer available, throw
+`new PagedSourceInvalidatedError(cause)`. The document becomes stale, aborts pending work and clears
+cached pages and checkpoints. Other source failures propagate to the caller. An aborted request's
+late failure cannot invalidate the document.
 
 Positions are global raw-decoded UTF-16 offsets. UTF-8 BOMs are preserved, CRLF contributes both
 characters, and LF defines rows. Row text includes a trailing CR when present; the host may omit

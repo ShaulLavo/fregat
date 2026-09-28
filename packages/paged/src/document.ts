@@ -1,6 +1,13 @@
 import { createError } from '@singapore-editor/core/logging/evlog'
 import { LineWindow } from './window'
 
+export class PagedSourceInvalidatedError extends Error {
+  constructor(cause?: unknown) {
+    super('The paged source revision is no longer available', { cause })
+    this.name = 'PagedSourceInvalidatedError'
+  }
+}
+
 export type RangeSource = {
   readonly id: string
   readonly revision: string
@@ -288,7 +295,7 @@ export class PagedDocument {
     await this.acquire(combined)
     try {
       const end = Math.min(start + this.#options.pageBytes, this.#source.byteLength)
-      const result = await this.#source.readBytes(start, end, combined)
+      const result = await this.readSource(start, end, combined)
       this.#bytesRead += result.bytes.byteLength
       combined.throwIfAborted()
       if (result.revision !== this.#source.revision) this.invalidate()
@@ -307,6 +314,16 @@ export class PagedDocument {
     } finally {
       this.#active--
       this.#waiters.shift()?.run()
+    }
+  }
+
+  private async readSource(start: number, end: number, signal: AbortSignal) {
+    try {
+      return await this.#source.readBytes(start, end, signal)
+    } catch (error) {
+      signal.throwIfAborted()
+      if (error instanceof PagedSourceInvalidatedError) this.invalidate()
+      throw error
     }
   }
 
