@@ -34,7 +34,15 @@ import type {
   EditorViewContributionUpdateKind,
   EditorViewSnapshot,
 } from '@singapore-editor/core/extensions'
-import { batch, createEffect, createSignal, onCleanup, untrack, type Accessor } from 'solid-js'
+import {
+  batch,
+  createEffect,
+  createSignal,
+  onCleanup,
+  onMount,
+  untrack,
+  type Accessor,
+} from 'solid-js'
 
 export type SolidEditorReactiveValue<T> = T | Accessor<T>
 
@@ -110,7 +118,8 @@ export type SolidEditorCommands = {
 }
 
 export type SolidEditorController = {
-  mount(element: HTMLElement): void
+  /** Pass as a JSX ref; creates the editor after Solid mounts and disposes it with its owner. */
+  element(element: HTMLElement): void
   editor: Accessor<Editor | null>
   state: Accessor<EditorState | null>
   snapshot: Accessor<EditorViewSnapshot | null>
@@ -160,7 +169,11 @@ export function createEditor(options: SolidEditorOptions = {}): SolidEditorContr
   const documentState = createDocumentState()
   const optionSync = createEditorOptionSync()
 
+  let lifecycle: 'pending' | 'ready' | 'disposed' = 'pending'
+  let pendingHost: HTMLElement | null = null
+
   const dispose = (): void => {
+    pendingHost = null
     disposeEditor(runtime)
     fullText.clear()
     documentState.clear()
@@ -168,15 +181,27 @@ export function createEditor(options: SolidEditorOptions = {}): SolidEditorContr
   }
 
   const mount = (element: HTMLElement): void => {
+    if (lifecycle === 'disposed') return
+    if (lifecycle === 'pending') {
+      pendingHost = element
+      return
+    }
     dispose()
     mountEditor(element, options, runtime, documentState, optionSync)
   }
 
+  onMount(() => {
+    lifecycle = 'ready'
+    if (pendingHost) mount(pendingHost)
+  })
   createReactiveEffects(options, runtime, documentState, optionSync)
-  onCleanup(dispose)
+  onCleanup(() => {
+    lifecycle = 'disposed'
+    dispose()
+  })
 
   return {
-    mount,
+    element: mount,
     editor,
     state,
     snapshot,

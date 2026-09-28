@@ -12,11 +12,9 @@ npm install @singapore-editor/core @singapore-editor/solid solid-js
 
 ```tsx
 import { createEditor } from '@singapore-editor/solid'
-import { onMount } from 'solid-js'
 import '@singapore-editor/core/style.css'
 
 export function EditorPanel() {
-  let host!: HTMLDivElement
   const controller = createEditor({
     document: {
       documentId: 'example.ts',
@@ -25,11 +23,12 @@ export function EditorPanel() {
     },
   })
 
-  onMount(() => controller.mount(host))
-
-  return <div ref={host} />
+  return <div ref={controller.element} />
 }
 ```
+
+`element` is a ref callback. The binding creates the editor after Solid mounts the component and
+disposes it when the Solid owner is cleaned up. Call `createEditor` inside a component or Solid root.
 
 ## Exports
 

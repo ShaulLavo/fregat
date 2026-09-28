@@ -32,5 +32,7 @@ export default defineConfig({
   },
   test: {
     environment: 'happy-dom',
+    // Keep solid-js/web on the same browser runtime and owner as solid-js.
+    server: { deps: { inline: ['solid-js'] } },
   },
 })

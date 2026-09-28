@@ -1,6 +1,7 @@
 import { setFlagsFromString } from 'node:v8'
 import { runInNewContext } from 'node:vm'
 import { createRoot, createSignal } from 'solid-js'
+import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Editor } from '@singapore-editor/core/editor'
 import {
@@ -38,6 +39,63 @@ afterEach(() => {
 })
 
 describe('createEditor', () => {
+  it('accepts a ref callback and waits until its host is attached', () => {
+    const container = document.createElement('div')
+    document.body.append(container)
+    let controller!: SolidEditorController
+    let connectedAtActivation = false
+    const dispose = render(() => {
+      const host = document.createElement('div')
+      controller = createEditor({
+        document: { text: 'alpha' },
+        plugins: [
+          {
+            name: 'attachment-check',
+            activate: () => {
+              connectedAtActivation = host.isConnected
+            },
+          },
+        ],
+      })
+      controller.element(host)
+      expect(controller.editor()).toBeNull()
+      expect(host.childElementCount).toBe(0)
+      return host
+    }, container)
+
+    expect(connectedAtActivation).toBe(true)
+    expect(controller.materializeFullText()).toBe('alpha')
+    dispose()
+    expect(controller.editor()).toBeNull()
+    container.remove()
+  })
+
+  it('cancels a pending mount when explicitly disposed', () => {
+    const host = document.createElement('div')
+    let disposeRoot!: () => void
+    createRoot((dispose) => {
+      disposeRoot = dispose
+      const controller = createEditor()
+      controller.element(host)
+      controller.dispose()
+    })
+    expect(host.childElementCount).toBe(0)
+    disposeRoot()
+  })
+
+  it('never mounts after its Solid owner is disposed', () => {
+    const host = document.createElement('div')
+    let controller!: SolidEditorController
+    createRoot((dispose) => {
+      controller = createEditor()
+      controller.element(host)
+      dispose()
+    })
+    controller.element(host)
+    expect(controller.editor()).toBeNull()
+    expect(host.childElementCount).toBe(0)
+  })
+
   it('mounts, initializes signals, and disposes with the Solid owner', () => {
     const mounted = mountInRoot({
       document: () => ({ text: 'alpha', documentId: 'a.ts', revision: 1 }),
@@ -243,7 +301,7 @@ function mountInRoot(
   createRoot((dispose) => {
     disposeRoot = dispose
     controller = typeof create === 'function' ? create() : createEditor(create)
-    controller.mount(host)
+    controller.element(host)
   })
 
   return {
