@@ -36,11 +36,11 @@
     "@singapore-editor/lsp": "workspace:*",
     "@singapore-editor/markdown": "workspace:*",
     "@singapore-editor/minimap": "workspace:*",
+    "@singapore-editor/paged": "workspace:*",
     "@singapore-editor/scope-lines": "workspace:*",
     "@singapore-editor/tree-sitter": "workspace:*",
     "@singapore-editor/tree-sitter-languages": "workspace:*",
-    "evlog": "^2.29.0",
-    "@singapore-editor/paged": "workspace:*"
+    "evlog": "^2.29.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
