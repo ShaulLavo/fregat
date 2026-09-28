@@ -60,4 +60,27 @@ describe('rapid input secondary work', () => {
       expect(options.maxDelayMs).toBeGreaterThan(options.delayMs!)
     }
   })
+  it('keeps a pending parse current when the user selects text after typing', () => {
+    editor.getInputElement().dispatchEvent(
+      new InputEvent('beforeinput', {
+        bubbles: true,
+        cancelable: true,
+        data: 'x',
+        inputType: 'insertText',
+      }),
+    )
+    const syntax = scheduled.find((work) => work.key === 'editor.syntaxRefresh')!
+    expect(syntax.isCurrent?.(syntax.version!)).toBe(true)
+    editor.setSelection(0, 2)
+    expect(syntax.isCurrent?.(syntax.version!)).toBe(true)
+    editor.getInputElement().dispatchEvent(
+      new InputEvent('beforeinput', {
+        bubbles: true,
+        cancelable: true,
+        data: 'y',
+        inputType: 'insertText',
+      }),
+    )
+    expect(syntax.isCurrent?.(syntax.version!)).toBe(false)
+  })
 })

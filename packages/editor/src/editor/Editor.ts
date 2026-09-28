@@ -4334,7 +4334,14 @@ export class Editor {
       if (!this.isCurrentSecondaryDocument(documentVersion)) return
       const recorded = pending === flush.latest ? finalChange : pending.change
       this.logSessionChange(recorded, pending.totalName)
-      this.sessionChangeVersion += 1
+      // Selection and save notifications must not invalidate a parse queued by typing.
+      if (
+        recorded.kind !== 'selection' &&
+        recorded.kind !== 'synchronize' &&
+        recorded.kind !== 'none'
+      ) {
+        this.sessionChangeVersion += 1
+      }
       this.scheduleSecondarySessionChangeWork(
         recorded,
         pending.totalName,

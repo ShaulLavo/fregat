@@ -1,5 +1,7 @@
 import type { TextEdit, TextReadSnapshot } from '@singapore-editor/core/document'
 import type { EditorSelectionRange } from '@singapore-editor/core/extensions'
+import { Kind } from 'tree-sitter-md'
+import { markEdit } from './markEdit'
 import { semanticMarkdownEdit } from './semanticEdit'
 
 export const MARKDOWN_AUTHORING_COMMANDS = [
@@ -31,13 +33,17 @@ export function planMarkdownEdit(
   command: MarkdownAuthoringCommand,
   records?: Uint32Array,
 ): MarkdownEdit | null {
+  if (requiresMarkdownRecords(command) && !records) return null
+  if (command === 'markdown.bold')
+    return records ? markEdit(source, selection, Kind.Strong, '**', records) : null
+  if (command === 'markdown.italic')
+    return records ? markEdit(source, selection, Kind.Emphasis, '*', records) : null
+  if (command === 'markdown.strikethrough')
+    return records ? markEdit(source, selection, Kind.Strikethrough, '~~', records) : null
   const semantic = semanticMarkdownEdit(source, selection, command, records)
   if (semantic) return semantic
   const start = Math.min(selection.anchor, selection.head)
   const end = Math.max(selection.anchor, selection.head)
-  if (command === 'markdown.bold') return inlineEdit(source, selection, '**')
-  if (command === 'markdown.italic') return inlineEdit(source, selection, '_')
-  if (command === 'markdown.strikethrough') return inlineEdit(source, selection, '~~')
   if (command === 'markdown.code') return codeEdit(source, selection)
   if (command === 'markdown.link') return linkEdit(source, start, end)
   const first = source.lineAt(start)
@@ -49,32 +55,14 @@ export function planMarkdownEdit(
   return linesEdit(selection, from, text, command)
 }
 
-function inlineEdit(
-  source: TextReadSnapshot,
-  selection: EditorSelectionRange,
-  marker: string,
-): MarkdownEdit {
-  let start = Math.min(selection.anchor, selection.head)
-  let end = Math.max(selection.anchor, selection.head)
-  const selected = source.readRange(start, end)
-  const leading = selected.match(/^\s*/)?.[0].length ?? 0
-  const trailing = selected.match(/\s*$/)?.[0].length ?? 0
-  if (selected.trim()) {
-    start += leading
-    end -= trailing
-  }
-  const text = source.readRange(start, end)
-  const before = source.readRange(Math.max(0, start - marker.length), start)
-  const after = source.readRange(end, Math.min(source.length, end + marker.length))
-  if (before === marker && after === marker) {
-    return replace(selection, start - marker.length, end + marker.length, text, 0, text.length)
-  }
-  if (text.length >= marker.length * 2 && text.startsWith(marker) && text.endsWith(marker)) {
-    const content = text.slice(marker.length, -marker.length)
-    return replace(selection, start, end, content, 0, content.length)
-  }
-  const content = text || 'text'
-  return replace(selection, start, end, marker + content + marker, marker.length, content.length)
+export function requiresMarkdownRecords(command: MarkdownAuthoringCommand): boolean {
+  return (
+    command === 'markdown.bold' ||
+    command === 'markdown.italic' ||
+    command === 'markdown.strikethrough' ||
+    command === 'markdown.code' ||
+    command === 'markdown.link'
+  )
 }
 
 function codeEdit(source: TextReadSnapshot, selection: EditorSelectionRange): MarkdownEdit {
@@ -123,7 +111,7 @@ function longestBackticks(text: string): number {
 
 function linkEdit(source: TextReadSnapshot, start: number, end: number): MarkdownEdit {
   const selected = source.readRange(start, end) || 'link text'
-  const label = selected.replace(/([\[\]])/g, '\\$1')
+  const label = selected.replace(/([\\[\]])/g, '\\$1')
   const target = 'https://'
   return replace(
     { anchor: start, head: end },
@@ -191,12 +179,12 @@ function hasStyle(line: string, command: LineCommand): boolean {
   if (command === 'markdown.bulletList') return /^\s*[-+*]\s+(?!\[[ xX]\]\s)/.test(line)
   if (command === 'markdown.orderedList') return /^\s*\d+[.)]\s/.test(line)
   if (command === 'markdown.taskList') return /^\s*[-+*]\s+\[[ xX]\]\s/.test(line)
-  return /^\s*[-+*]\s+\[[xX]\]/.test(line)
+  return /^\s*(?:[-+*]|\d+[.)])\s+\[[xX]\]/.test(line)
 }
 
 function formatLine(line: string, command: LineCommand, remove: boolean, number: number): string {
   if (command === 'markdown.toggleTask') {
-    return line.replace(/^(\s*[-+*]\s+\[)[ xX](\])/, `$1${remove ? ' ' : 'x'}$2`)
+    return line.replace(/^(\s*(?:[-+*]|\d+[.)])\s+\[)[ xX](\])/, `$1${remove ? ' ' : 'x'}$2`)
   }
   if (!line.trim() && remove) return line
   const indentation = line.match(/^\s*/)?.[0] ?? ''

@@ -60,6 +60,21 @@ describe('retained document analysis', () => {
     analysis.dispose()
   })
 
+  it('clips retained viewport demand when an edit shortens the document', async () => {
+    const buffer = createEditorTextBuffer('alpha beta gamma')
+    const view = createEditorBufferSession(buffer)
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'shorter.md' })
+    const parser = provider()
+    const lease = analysis.borrowStructural({ provider: parser.provider, languageId: 'markdown' })!
+    await lease.queryRange!({ startIndex: 0, endIndex: 16 })
+    const change = view.applyEdits([{ from: 0, to: 16, text: 'docs' }])
+    const result = await lease.applyChange(change)
+    expect(parser.ranges).toHaveBeenLastCalledWith({ startIndex: 0, endIndex: 4 })
+    expect(await lease.queryRange!({ startIndex: 0, endIndex: 4 })).toBe(result)
+    expect(lease.read({ startIndex: 0, endIndex: 16 })).toMatchObject({ kind: 'ready', result })
+    analysis.dispose()
+  })
+
   it('cancels hover interest immediately while a view still waits for the same parser', async () => {
     const buffer = createEditorTextBuffer('alpha')
     const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'hover.md' })

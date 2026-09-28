@@ -1,5 +1,14 @@
-import { createPlugin, type EditorPlugin } from '@singapore-editor/core/extensions'
-import { MARKDOWN_AUTHORING_COMMANDS, planMarkdownEdit } from './authoring'
+import {
+  createPlugin,
+  type EditorPlugin,
+  type EditorViewScope,
+} from '@singapore-editor/core/extensions'
+import {
+  MARKDOWN_AUTHORING_COMMANDS,
+  planMarkdownEdit,
+  requiresMarkdownRecords,
+  type MarkdownAuthoringCommand,
+} from './authoring'
 import { Kind } from 'tree-sitter-md'
 
 export function createMarkdownAuthoringPlugin(): EditorPlugin {
@@ -36,33 +45,7 @@ export function createMarkdownAuthoringPlugin(): EditorPlugin {
         )
         return 'consume'
       })
-      for (const command of MARKDOWN_AUTHORING_COMMANDS) {
-        scope.handle(command, () => {
-          const selections = scope.getSelections()
-          const selected = selections[0]
-          if (
-            !isMarkdown() ||
-            !scope.editor.getKeymapContext().writable ||
-            !selected ||
-            selections.length !== 1
-          )
-            return false
-          const edit = planMarkdownEdit(
-            scope.editor.getTextSnapshot(),
-            {
-              anchor: selected.anchorOffset,
-              head: selected.headOffset,
-            },
-            command,
-            scope.editor.getSyntaxRecords()?.data,
-          )
-          if (!edit) return false
-          if (edit.edits.length) scope.applyEdits(edit.edits, edit.selection)
-          else scope.editor.setSelection(edit.selection.anchor, edit.selection.head)
-          scope.view.focusEditor()
-          return true
-        })
-      }
+      installAuthoringCommands(scope, isMarkdown)
     },
   })
 }
@@ -78,4 +61,97 @@ function insideCodeBlock(records: Uint32Array | undefined, offset: number): bool
       return true
   }
   return false
+}
+
+function installAuthoringCommands(scope: EditorViewScope, isMarkdown: () => boolean): void {
+  type Pending = {
+    command: MarkdownAuthoringCommand
+    source: ReturnType<typeof scope.editor.getTextSnapshot>
+    documentId: string | null
+    anchor: number
+    head: number
+  }
+  let pending: Pending | null = null
+  let disposed = false
+  const matches = (request: Pending): boolean => {
+    const selected = scope.getSelections()[0]
+    return (
+      !disposed &&
+      isMarkdown() &&
+      scope.editor.getKeymapContext().writable &&
+      scope.view.getSnapshot().documentId === request.documentId &&
+      scope.editor.getTextSnapshot() === request.source &&
+      scope.getSelections().length === 1 &&
+      selected?.anchorOffset === request.anchor &&
+      selected.headOffset === request.head
+    )
+  }
+  const apply = (request: Pending): boolean => {
+    if (!matches(request)) return false
+    const edit = planMarkdownEdit(
+      request.source,
+      request,
+      request.command,
+      scope.editor.getSyntaxRecords()?.data,
+    )
+    if (!edit) return false
+    if (edit.edits.length) scope.applyEdits(edit.edits, edit.selection)
+    else scope.editor.setSelection(edit.selection.anchor, edit.selection.head)
+    return true
+  }
+  scope.watch(
+    {
+      id: 'markdown.authoring.readiness',
+      kinds: ['tokens', 'content', 'selection'],
+      read: (snapshot) => ({ snapshot, records: scope.editor.getSyntaxRecords() }),
+    },
+    () => {
+      if (!pending) return
+      if (!matches(pending)) {
+        pending = null
+        return
+      }
+      // Apply after the contribution pass; recheck the document and selection at execution.
+      queueMicrotask(() => {
+        const request = pending
+        if (!request || disposed) return
+        if (!scope.editor.getSyntaxRecords() && scope.editor.getTextSnapshot() === request.source)
+          return
+        pending = null
+        apply(request)
+      })
+    },
+  )
+  scope.onDispose(() => {
+    disposed = true
+    pending = null
+  })
+  for (const command of MARKDOWN_AUTHORING_COMMANDS) {
+    scope.handle(command, () => {
+      const selected = scope.getSelections()[0]
+      if (
+        !isMarkdown() ||
+        !scope.editor.getKeymapContext().writable ||
+        !selected ||
+        scope.getSelections().length !== 1
+      )
+        return false
+      pending = null
+      const request: Pending = {
+        command,
+        source: scope.editor.getTextSnapshot(),
+        documentId: scope.view.getSnapshot().documentId,
+        anchor: selected.anchorOffset,
+        head: selected.headOffset,
+      }
+      if (requiresMarkdownRecords(command) && !scope.editor.getSyntaxRecords()) {
+        pending = request
+        scope.view.focusEditor()
+        return true
+      }
+      const handled = apply(request)
+      if (handled) scope.view.focusEditor()
+      return handled
+    })
+  }
 }

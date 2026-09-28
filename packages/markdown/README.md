@@ -57,3 +57,10 @@ document and preserve the source buffer's undo history.
 Current parser records let a command remove the surrounding mark at the caret or
 select an existing link destination. Each command edits source directly; rich-text
 editing with permanently hidden syntax remains a separate interaction policy.
+
+Semantic commands wait for current parser records. A pending command is canceled if
+its document, source, selection or writability changes. Toggling a nonempty selection
+removes intersecting marks within that selection while preserving formatting outside
+it; an unmarked selection receives marks on each nonblank line. Italics use asterisks
+so partial-word selections remain valid Markdown. Numbered tasks support the same
+completion command as bulleted tasks.

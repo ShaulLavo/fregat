@@ -205,6 +205,7 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
   readRange(range?: EditorSyntaxRange): EditorAnalysisRead<EditorSyntaxResult> {
     const state = this.read()
     if (!range || state.kind !== 'ready') return state
+    range = boundedRange(range, state.snapshot.length)
     const cached =
       this.ranges.get(rangeKey(range)) ??
       [...this.ranges.values()].find(
@@ -218,6 +219,7 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
   }
 
   range(range: EditorSyntaxRange): Promise<EditorSyntaxResult> {
+    range = boundedRange(range, this.buffer.getTextSnapshot().length)
     if (!this.structuralSession.queryRange) return this.current()
     const state = this.readRange(range)
     if (state.kind === 'ready') return Promise.resolve(state.result)
@@ -481,4 +483,9 @@ function sameStructuralRequest(
     (left.includeHighlights ?? true) === (right.includeHighlights ?? true) &&
     (left.syntaxMode ?? 'full') === (right.syntaxMode ?? 'full')
   )
+}
+
+function boundedRange(range: EditorSyntaxRange, length: number): EditorSyntaxRange {
+  const startIndex = Math.max(0, Math.min(length, range.startIndex))
+  return { startIndex, endIndex: Math.max(startIndex, Math.min(length, range.endIndex)) }
 }

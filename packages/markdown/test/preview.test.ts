@@ -93,9 +93,10 @@ describe('markdown preview plugin', () => {
     expect(rowTexts()).toEqual(['Title', 'a bold b'])
   })
 
-  it('authors through a plain Editor with one undo entry and restores the selection', () => {
+  it('authors through a plain Editor with one undo entry and restores the selection', async () => {
     editor.setText('hello', { languageId: 'markdown' })
     editor.setSelection(0, 5)
+    await flush()
     expect(editor.dispatchCommand('markdown.bold')).toBe(true)
     expect(editor.materializeFullText()).toBe('**hello**')
     expect(editor.getSelections()[0]).toMatchObject({ anchorOffset: 2, headOffset: 7 })
@@ -104,6 +105,33 @@ describe('markdown preview plugin', () => {
     expect(editor.getSelections()[0]).toMatchObject({ anchorOffset: 0, headOffset: 5 })
     editor.dispatchCommand('redo')
     expect(editor.materializeFullText()).toBe('**hello**')
+  })
+
+  it('defers link editing until current records arrive', async () => {
+    editor.setText('[docs](https://example.com)', { languageId: 'markdown' })
+    editor.setSelection(3)
+    expect(editor.getSyntaxRecords()).toBeNull()
+    expect(editor.dispatchCommand('markdown.link')).toBe(true)
+    expect(editor.materializeFullText()).toBe('[docs](https://example.com)')
+    await flush()
+    expect(editor.getSelections()[0]).toMatchObject({ anchorOffset: 7, headOffset: 26 })
+    expect(editor.materializeFullText()).toBe('[docs](https://example.com)')
+  })
+
+  it('cancels deferred formatting when the selection or document changes', async () => {
+    editor.setText('**hello**', { languageId: 'markdown' })
+    editor.setSelection(4)
+    editor.dispatchCommand('markdown.bold')
+    editor.setSelection(0)
+    editor.setSelection(4)
+    await flush()
+    expect(editor.materializeFullText()).toBe('**hello**')
+    editor.setText('**other**', { languageId: 'markdown' })
+    editor.setSelection(4)
+    editor.dispatchCommand('markdown.bold')
+    editor.setText('next', { languageId: 'markdown' })
+    await flush()
+    expect(editor.materializeFullText()).toBe('next')
   })
 
   it('declines Markdown commands in a different language', () => {

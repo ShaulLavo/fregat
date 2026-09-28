@@ -1,9 +1,20 @@
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
+import { init, MarkdownDocument, Kind } from 'tree-sitter-md'
 import { createStringTextSnapshot } from '@singapore-editor/core/document'
 import { planMarkdownEdit, type MarkdownAuthoringCommand } from '../src/authoring'
 
+beforeAll(() => init())
+
 function apply(text: string, anchor: number, head: number, command: MarkdownAuthoringCommand) {
-  const plan = planMarkdownEdit(createStringTextSnapshot(text), { anchor, head }, command)
+  const doc = new MarkdownDocument()
+  doc.setText(text)
+  const plan = planMarkdownEdit(
+    createStringTextSnapshot(text),
+    { anchor, head },
+    command,
+    doc.decorations(0, text.length),
+  )
+  doc.dispose()
   if (!plan) return { text, anchor, head }
   let result = text
   for (const edit of plan.edits.toReversed())
@@ -28,7 +39,7 @@ describe('Markdown authoring', () => {
 
   it('inserts selected placeholder text at a caret', () => {
     expect(apply('hello ', 6, 6, 'markdown.italic')).toEqual({
-      text: 'hello _text_',
+      text: 'hello *text*',
       anchor: 7,
       head: 11,
     })
@@ -44,7 +55,7 @@ describe('Markdown authoring', () => {
 
   it('quotes literal backticks with a longer code delimiter', () => {
     expect(apply('a`b', 0, 3, 'markdown.code').text).toBe('``a`b``')
-    expect(apply('`a`', 0, 3, 'markdown.code').text).toBe('`` `a` ``')
+    expect(apply('`a', 0, 2, 'markdown.code').text).toBe('`` `a ``')
   })
 
   it('does not include a following line when selection ends at its start', () => {
@@ -85,7 +96,81 @@ describe('Markdown authoring', () => {
   })
 
   it('toggles code containing backticks without leaving padding', () => {
-    const code = apply('`a`', 0, 3, 'markdown.code')
-    expect(apply(code.text, code.anchor, code.head, 'markdown.code').text).toBe('`a`')
+    const code = apply('`a', 0, 2, 'markdown.code')
+    expect(apply(code.text, code.anchor, code.head, 'markdown.code').text).toBe('`a')
   })
+})
+
+function parsedSpans(text: string, kind: number): string[] {
+  const doc = new MarkdownDocument()
+  doc.setText(text)
+  const records = doc.decorations(0, text.length)
+  const spans: string[] = []
+  for (let i = 0; i < records.length; i += 4) {
+    if (records[i + 2] === kind) spans.push(text.slice(records[i], records[i + 1]))
+  }
+  doc.dispose()
+  return spans
+}
+
+it('requires current records for semantic commands instead of guessing', () => {
+  const source = createStringTextSnapshot('[docs](https://example.com)')
+  expect(planMarkdownEdit(source, { anchor: 3, head: 3 }, 'markdown.link')).toBeNull()
+  expect(planMarkdownEdit(source, { anchor: 3, head: 3 }, 'markdown.bold')).toBeNull()
+})
+
+it('removes independent marks without pairing unrelated delimiters', () => {
+  const text = '**one** and **two**'
+  const result = apply(text, 0, text.length, 'markdown.bold')
+  expect(result.text).toBe('one and two')
+  expect(parsedSpans(result.text, Kind.Strong)).toEqual([])
+})
+
+it('removes only the selected part of an enclosing mark', () => {
+  const result = apply('**hello world**', 2, 7, 'markdown.bold')
+  expect(result).toEqual({ text: 'hello **world**', anchor: 0, head: 5 })
+  expect(parsedSpans(result.text, Kind.Strong)).toEqual(['**world**'])
+  const backwards = apply('**hello world**', 7, 2, 'markdown.bold')
+  expect(backwards).toEqual({ text: 'hello **world**', anchor: 5, head: 0 })
+  expect(apply('**hello world**', 4, 6, 'markdown.bold').text).toBe('**he**ll**o world**')
+})
+
+it('formats each selected paragraph and preserves blank lines and CRLF', () => {
+  for (const newline of ['\n', '\r\n']) {
+    const source = 'one' + newline + newline + 'two'
+    const result = apply(source, 0, source.length, 'markdown.bold')
+    expect(result.text).toBe('**one**' + newline + newline + '**two**')
+    expect(parsedSpans(result.text, Kind.Strong)).toEqual(['**one**', '**two**'])
+  }
+})
+
+it('uses intraword-compatible italic delimiters', () => {
+  const result = apply('foobar', 0, 3, 'markdown.italic')
+  expect(result.text).toBe('*foo*bar')
+  expect(parsedSpans(result.text, Kind.Emphasis)).toEqual(['*foo*'])
+  expect(apply(result.text, result.anchor, result.head, 'markdown.italic').text).toBe('foobar')
+})
+
+it('escapes link labels including trailing backslashes', () => {
+  for (const label of ['folder\\', 'a[b]\\', 'a\\[b]']) {
+    const result = apply(label, 0, label.length, 'markdown.link')
+    expect(parsedSpans(result.text, Kind.Link)).toEqual([result.text])
+    expect(result.text.slice(result.anchor, result.head)).toBe('https://')
+  }
+})
+
+it('checks and unchecks numbered tasks while retaining numbering', () => {
+  const source = '1. [ ] one\n2) [x] two'
+  const checked = apply(source, 0, source.length, 'markdown.toggleTask')
+  expect(checked.text).toBe('1. [x] one\n2) [x] two')
+  expect(apply(checked.text, checked.anchor, checked.head, 'markdown.toggleTask').text).toBe(
+    '1. [ ] one\n2) [ ] two',
+  )
+  expect(parsedSpans(checked.text, Kind.Task)).toHaveLength(2)
+})
+
+it('preserves unselected inline code when removing code from a partial selection', () => {
+  const result = apply('`hello world`', 1, 6, 'markdown.code')
+  expect(result).toEqual({ text: 'hello` world`', anchor: 0, head: 5 })
+  expect(parsedSpans(result.text, Kind.CodeSpan)).toEqual(['` world`'])
 })
