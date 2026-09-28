@@ -26,6 +26,14 @@ first after [wave 2](docs/next-wave.md), before starting other post-wave work. T
 implementation order; the current change is planning only and does not interrupt wave 2.
 The separate shared highlighting service in Plan 197 has no dependency on this plan.
 
+[Plan 200, shared documents behind content views](plans/200-document-backed-content-views.md),
+was requested as planning work on 2026-09-28. Its production cutover follows the relevant landed
+099 publication and 198 acquisition/attachment contracts; comparison analysis integration follows
+197's diff service ownership. It does not change 198's priority or authorize gated 099 units.
+Plan 182 retains search multibuffer/rendering/editing, 171 retains the composer migration, and
+156 retains richer file formats. Plan 200 supplies shared content ownership and their integration
+boundaries; baseline research may proceed before those dependencies land.
+
 ## Verified completed foundations
 
 - Platform's one-document representation and deterministic file-sync cutover are live. Completed

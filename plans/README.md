@@ -19,6 +19,7 @@ a bare root `bun run verify`.
 
 | Plan                                                                                    | State                                                                               |
 | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| [200 — shared documents behind content views](200-document-backed-content-views.md)     | **PROPOSED 2026-09-28 — PLAN ONLY; BUILDS ON 099/198/197, SEARCH STAYS IN 182**     |
 | [199 — one store library](199-one-store-library.md)                                     | **DONE 2026-09-27 — WEB AND TUI MIGRATED; GATE DROPPED**                            |
 | [198 — keep editor analysis with the document](198-document-owned-editor-analysis.md)   | **SCHEDULED 2026-09-27 — FIRST AFTER WAVE 2; IMPLEMENTATION NOT STARTED**           |
 | [197 — Editor-owned highlighting service](197-editor-highlighting-service.md)           | **PROPOSED 2026-09-27 — PLAN ONLY; IMPLEMENTATION NOT STARTED**                     |
