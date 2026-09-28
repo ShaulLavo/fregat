@@ -1,5 +1,11 @@
 # Editor decorations: learn from CodeMirror and Lexical, then beat what we have
 
+Owner direction, 2026-09-28: [Markdown experiences](../docs/markdown-experiences.md)
+defines the shared target for visual authoring, source-revealing authoring, rich
+composition, static pages, split editing and streaming chat. Block layout and
+editing semantics must support both authoring policies. Composer parity alone
+does not complete that target.
+
 Status: **Phase 1 implemented 2026-09-26** (wave 2 lane E2, Editor `6544b02`); phases 2–3 are
 Plan 171's, phases 4–5 wave 3. Research done 2026-09-25. Requested 2026-09-13.
 

@@ -1,5 +1,11 @@
 # Two markdown modes: split view and live preview
 
+Owner direction, 2026-09-28: support both visual rich-text authoring and
+source-revealing authoring, selected by the host, alongside source and split
+views. [Markdown experiences](../docs/markdown-experiences.md) defines the product
+target and acceptance checks. The earlier exclusion of always-visual editing
+below is superseded by this direction; that behavior still needs implementation.
+
 Status: Phase 1 done (completion wave, lane L8, 2026-09-25): the mode setting
 `editor.markdownView` (default live preview, the behaviour before this plan; source; split),
 Cycle markdown view (per-document, in the palette and the editor title), the rendered pane

@@ -1,5 +1,11 @@
 # Plan 176: One markdown parser
 
+Owner direction, 2026-09-28: [Markdown experiences](../docs/markdown-experiences.md)
+extends the target to visual and source-revealing authoring, rich composition and
+streaming chat on our parser. Keeping remark for chat and split rendering was
+the scope of the completed integration below. Migrating those consumers remains
+required future work, with streaming and rendering acceptance checks.
+
 ## Status and authorization
 
 - Status: **IMPLEMENTED**, refreshed 2026-09-28.

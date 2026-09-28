@@ -2,10 +2,13 @@
 
 ## Status and authorization
 
-- Status: PHASE 1 IMPLEMENTED 2026-09-26 (wave 2 lane E2, with Plan 111 Phase 1: rows 1a–1e, 5, 8, 11,
-  12 label, 15, 19). Phase 2 (prose wrap) and Editor E058 are next, then phase 3. Research done 2026-09-25;
-  Plan 111's three owner questions are answered (2026-09-26).
-- Priority: P2. The composer works today; this removes a second editor framework.
+- Status: FOUNDATIONS IMPLEMENTED; AUTHORING MILESTONE NEXT, refreshed 2026-09-28.
+  Phase 1 landed 2026-09-26. Word-boundary and proportional-font wrap landed in
+  [E052](../../Editor/plans/e052-proportional-font-extents.md#as-landed-2026-09-26).
+  Spellcheck exists in the Editor and Platform file editor; composer wiring remains.
+  List continuation also exists. The historical inventory below predates these changes.
+  Authoring acceptance now precedes the composer swap.
+- Priority: P2. The composer works today; improve authoring before replacing it.
 - Planned at: Platform `9f343825`, Editor `e2fd299`, 2026-09-25. Origin: Plan 126
   [INTERACTION-11](126-t3code-alignment/interaction.md) owner ruling.
 - Depends on: [Plan 111](111-editor-decorations.md) (decorations, question 7) first, and the Editor
@@ -13,9 +16,36 @@
 
 ## Outcome
 
+Product direction: [Markdown experiences](../docs/markdown-experiences.md), adopted
+2026-09-28. Support visual rich-text authoring, source-revealing authoring, a rich
+prompt composer, streaming chat, static pages and StackEdit-style split editing,
+all ultimately using our Markdown parser.
+This plan's composer migration is one part of that direction.
+
+### Authoring milestone (authorized 2026-09-28)
+
+The owner wants both source-revealing and visual editing, chosen by the host. Keep
+one Markdown buffer and undo history across presentations. Lexical remains until
+the composer acceptance checks pass. File-editor authoring can ship first.
+
+- [ ] Add reusable selection formatting, links, block formatting and task commands.
+- [ ] Expose authoring through the file editor's commands and context menu.
+- [ ] Support host-selected source-revealing and visual presentation; verify switching
+      preserves text, selection and undo history.
+- [ ] Verify formatting, lists, tasks, links, fences, copy/paste and undo through real
+      user interactions, in source and preview presentations.
+- [ ] Run focused checks, inspect browser evidence, commit, push and deploy.
+
+The composer swap additionally requires mention interaction, draft restoration,
+attachments, IME, narrow widths and spellcheck in the actual composer. Rendered
+tables and image blocks remain Plan 111/108 work; inline visual presentation does
+not complete that work or establish full rich-text parity.
+
 Lexical is deleted from `apps/web`. The chat composer is one more host of `@singapore-editor/*`
 (the Editor repo), and it does everything it does today. Lexical stays until that editor covers
-every row below. Then `composerRichTextEnabled` lands for upstream parity (INTERACTION-11).
+every row below and the authoring and composer acceptance checks above. Rich-text
+behavior is proved before removal; `composerRichTextEnabled` exposes the host's
+presentation choice for upstream parity (INTERACTION-11).
 
 ## What exists today
 
@@ -190,7 +220,9 @@ word-boundary wrap, so wrap work is on the path in every option.
 
 ### Proposed phases
 
-Numbers are the coordinator's.
+Historical sequence from 2026-09-25. The 2026-09-28 authoring milestone above
+supersedes the ordering of phases 3 and 4: develop and prove rich authoring before
+removing Lexical. Keep the original breakdown here for its implementation details.
 
 1. **Editor: atomic replacements for hosts** (Plan 111 Phase 1, S–M), extended with atomic logical
    and word motion, the overshoot fix, scroll-past-end off, surround pairs apart from auto-close,

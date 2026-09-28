@@ -411,12 +411,19 @@ CodeMirror 6 decorations and Lexical's decorator nodes, and gates Plan 108 Phase
 Obsidian mode, and the question of whether the chat composer still needs Lexical.
 Decided 2026-09-25: owner — 111's research is authorized with the composer as its first consumer,
 and runs before the next wave.
+[Markdown experiences](docs/markdown-experiences.md) records the owner direction of
+2026-09-28: visual rich-text and Obsidian-style source-revealing authoring, a T3-style
+composer, ChatGPT-style streaming, static pages and StackEdit-style split editing,
+all ultimately on our `tree-sitter-md` parser. Each experience has its own acceptance
+checks. Rich authoring is a prerequisite of the composer swap; Lexical stays until
+that experience and composer parity are proved.
 [Plan 176](plans/176-markdown-parser.md) replaces Plan 108 D5 (decided 2026-09-26: owner): it
 adopts `tree-sitter-md` for the source-backed Editor's live preview, colours, folds and fence
-injections. Refreshed 2026-09-28: its C rewrite and tree-sitter-x extension are complete; release
-correctness gates and document integration remain. Plan 108 Phase 2 waits on that integration
-and Plan 111's block layout. Align parser lifetime with Plan 198. Chat and split rendering keep
-remark; the parsing/UX contract is in `docs/markdown-parser/editor-behaviour.md`.
+injections. Refreshed 2026-09-28: release correctness gates and document integration
+have passed; the plan records the evidence. Plan 108 Phase 2 still needs Plan 111's
+block layout and editing behavior. Parser lifetime follows Plan 198. Chat and split
+rendering currently keep remark; moving them to our parser remains part of the
+product direction. The parsing/UX contract is in `docs/markdown-parser/editor-behaviour.md`.
 [Plan 171](plans/171-composer-on-our-editor.md) is that composer migration: it inventories what
 the composer uses Lexical for and orders the Editor gaps to close, with 111 first (decided
 2026-09-25: owner — delete Lexical; the replacement is our own editor).
