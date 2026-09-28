@@ -12,7 +12,7 @@ exist; it does not duplicate status summaries that drift when a plan changes.
 | [088](088-native-code-intelligence.md)       | Build native code intelligence for agents and the editor                      |
 | [099](099-document-contributions.md)         | Route document consumers through one contribution runtime                     |
 | [108](108-markdown-modes.md)                 | Two markdown modes: split view and live preview                               |
-| [110](110-workspace-indexing.md)             | Workspace indexing: what we index, and who should index us                   |
+| [110](110-workspace-indexing.md)             | Workspace indexing: what we index, and what should index us                   |
 | [111](111-editor-decorations.md)             | Editor decorations: learn from CodeMirror and Lexical, then beat what we have |
 | [112](112-large-file-ceiling.md)             | The large-file ceiling: what we can actually open, and who gets to decide     |
 | [114](114-polaron-shell.md)                  | Polaron, a desktop shell we own                                               |
