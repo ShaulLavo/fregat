@@ -1,5 +1,7 @@
 import { chmod, mkdir, mkdtemp, rename, rm, symlink, writeFile } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
 import { tmpdir } from 'node:os'
+import { promisify } from 'node:util'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -9,6 +11,7 @@ import { NativeWatchHost } from '../native-watch-host'
 import { FileChangeHub } from '../watch'
 
 const roots: string[] = []
+const execFileAsync = promisify(execFile)
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
@@ -195,6 +198,38 @@ describe.runIf(process.platform === 'linux')('native watch structure changes', (
       await rm(path.join(root, 'renamed'), { recursive: true })
       await mkdir(path.join(root, 'renamed/deep'), { recursive: true })
       await expectWrite('renamed/deep/again.txt')
+    } finally {
+      abort.abort()
+      await hub.close()
+    }
+  })
+})
+
+describe.runIf(process.platform === 'linux')('git state changes', () => {
+  // A commit made outside the app writes only under `.git`, which the file stream drops.
+  it('reports a commit to the repository that contains it', async () => {
+    const base = await fixtureRoot()
+    const root = path.join(base, 'root')
+    const repo = path.join(root, 'repo')
+    await mkdir(repo, { recursive: true })
+    await mkdir(path.join(root, 'other'))
+    await writeFile(path.join(repo, 'a.txt'), 'a')
+    const git = (...args: string[]) =>
+      execFileAsync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: repo })
+    await git('init', '-q')
+    await git('add', 'a.txt')
+    const hub = new FileChangeHub(createWorkspacePaths(root), { enabled: true })
+    const abort = new AbortController()
+    const inside = collect(hub.stream(['repo'], abort.signal))
+    const elsewhere = collect(hub.stream(['other'], abort.signal))
+    try {
+      await expect.poll(() => inside.length > 0 && elsewhere.length > 0).toBe(true)
+      await git('commit', '-q', '-m', 'first')
+      await expect
+        .poll(() => inside.filter((event) => event.type === 'git'), { timeout: 3000 })
+        .toContainEqual(expect.objectContaining({ type: 'git', path: 'repo' }))
+      expect(elsewhere.filter((event) => event.type === 'git')).toEqual([])
+      expect(paths(inside).filter((relative) => relative.includes('.git'))).toEqual([])
     } finally {
       abort.abort()
       await hub.close()

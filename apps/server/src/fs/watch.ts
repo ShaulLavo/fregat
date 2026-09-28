@@ -665,7 +665,11 @@ export class FileChangeHub {
     filename: string,
     attachedAtMs: number,
   ) {
-    if (filename && watcherIgnores(normalizeWatchFilename(filename))) return
+    if (filename && watcherIgnores(normalizeWatchFilename(filename))) {
+      const repository = gitStateRepository(watchEventPath(relativeRoot, filename))
+      if (repository !== null) this.emit({ type: 'git', path: repository })
+      return
+    }
     runDetached(() => this.handleNodeEvent(relativeRoot, event, filename, attachedAtMs), {
       area: 'fs',
       backend: 'node',
@@ -840,6 +844,26 @@ function watcherIgnores(relativePath: string) {
   return isIgnoredPath(relativePath, watcherIgnoredNames)
 }
 
+/**
+ * The repository whose status a change to this ignored path moves, or null. A commit, stage or
+ * checkout made outside the app touches only these files under `.git`.
+ */
+function gitStateRepository(relativePath: string): string | null {
+  const parts = relativePath.split('/')
+  const git = parts.indexOf('.git')
+  if (git < 0 || parts.includes('node_modules')) return null
+  const name = parts[git + 1]
+  if (!name) return null
+  const tracked =
+    name === 'HEAD' ||
+    name === 'index' ||
+    name === 'index.lock' ||
+    name === 'packed-refs' ||
+    name === 'refs' ||
+    name.endsWith('_HEAD')
+  return tracked ? parts.slice(0, git).join('/') : null
+}
+
 /** Whether a recursive watcher misses part of this subtree; `node_modules` is watched one level deep. */
 function watcherHides(relativePath: string) {
   return (
@@ -927,6 +951,11 @@ function deliverWatchEvent(
 ) {
   if (event.type === 'error' || event.type === 'coverage')
     return concernsStream(event.path, roots, files)
+  if (event.type === 'git')
+    return (
+      !onlyFiles &&
+      (concernsStream(event.path, roots, files) || isSubscribedPath(event.path, roots))
+    )
   if (!isFilesystemEvent(event)) return true
   if (files.has(event.path)) return true
   if (event.type === 'renamed' && files.has(event.oldPath)) return true

@@ -51,6 +51,8 @@ export type WatchServerMessage =
       version?: string
       writeId?: string
     }
+  /** Git state (HEAD, index, refs) changed in the repository at `path`; its files are not streamed. */
+  | { type: 'git'; path: string; sequence?: number }
   /** A root's watch changed after `ready`, as when a limited root found room to watch everything. */
   | { type: 'coverage'; path: string; watch: WatchCoverage; sequence?: number }
   | {
