@@ -1,8 +1,11 @@
+import { FileSyncService } from '@/features/editor/state/file-sync-service'
+import { createFileSyncPorts } from '@/features/editor/utils/file-sync-ports'
+import { createEditorBufferSession } from '@singapore-editor/core/document'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import { screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 
 import { CompareSavedView } from '@/features/editor/components/compare-saved-view'
 import {
@@ -45,6 +48,34 @@ test('a buffer that matches disk says there is nothing to compare', async ({ cli
   await renderCompare(server.root, { buffer: SAVED })
 
   expect(await screen.findByText('No unsaved changes.')).toBeInTheDocument()
+})
+
+test('a save updates the saved side while later edits keep their own text', async ({
+  client,
+  server,
+}) => {
+  stubEditorViewport()
+  const { store, queryClient } = await renderCompare(server.root, { buffer: SAVED })
+  await screen.findByText('No unsaved changes.')
+  const ports = createFileSyncPorts(client)
+  const file = await ports.readFileContent(filesystemPath(FILE), new AbortController().signal)
+  act(() => store.getState().forceReplaceLiveEditorDocument(file))
+  const document = store.getState().ensureLiveEditorDocument(file)
+  const session = createEditorBufferSession(document.buffer)
+  act(() => session.applyText('first edit'))
+  await waitFor(() => expect(diffRowTexts().join(' ')).toContain('first edit'))
+  await act(() =>
+    new FileSyncService(store, queryClient, ports).save(
+      store.getState().getLiveEditorDocument(document.key)!,
+    ),
+  )
+  expect(await screen.findByText('No unsaved changes.')).toBeInTheDocument()
+  act(() => session.applyText(' second edit'))
+  await waitFor(() =>
+    expect(diffRowTexts()).toEqual(
+      expect.arrayContaining(['first edit', 'first edit second edit']),
+    ),
+  )
 })
 
 test('a file that was never opened asks for it to be opened', async ({ client, server }) => {
@@ -93,7 +124,7 @@ async function renderCompare(root: string, { buffer }: { buffer: string | null }
 
   // One provider, not the app's whole `EditorStateProvider`: the store has to be reachable from
   // here to stand a buffer up in it, and that provider builds its own.
-  return renderWithProviders(
+  const rendered = renderWithProviders(
     <EditorDocumentStateContext.Provider value={store}>
       <CompareSavedView
         languageHost={testDiffLanguageHost}
@@ -102,6 +133,7 @@ async function renderCompare(root: string, { buffer }: { buffer: string | null }
       />
     </EditorDocumentStateContext.Provider>,
   )
+  return { ...rendered, store }
 }
 
 function diffRowTexts() {

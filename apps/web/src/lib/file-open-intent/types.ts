@@ -1,7 +1,7 @@
 import type { DocumentKey, FilesystemPath } from '@/lib/documents/utils/types'
 import type { EditorTextBuffer, PieceTableSnapshot } from '@singapore-editor/core/document'
 import type { EditorPreparedDocument } from '@singapore-editor/core/editor'
-import type { FileResult } from '@/lib/file-system-types'
+import type { FileSnapshot } from '@/lib/file-snapshot'
 
 type PreparedOpenClaimBase = {
   readonly buffer: EditorTextBuffer
@@ -10,7 +10,7 @@ type PreparedOpenClaimBase = {
 }
 
 export type PreparedCleanFileOpenClaim = PreparedOpenClaimBase & {
-  readonly file: FileResult
+  readonly file: FileSnapshot
   readonly fileVersion: string
   readonly kind: 'clean'
   readonly preparedDocument: EditorPreparedDocument

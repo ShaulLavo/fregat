@@ -1,3 +1,4 @@
+import { materializeFileSnapshotText } from '@/lib/file-snapshot'
 import { isRecord } from '@workspace/utils/objects'
 import { markEditorOpenBenchmark } from '@/lib/editor-open-benchmark-mark'
 import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
@@ -12,7 +13,7 @@ import {
   type EditorScrollPosition,
 } from '@singapore-editor/core/editor'
 
-import type { FileResult } from '@/lib/file-system-types'
+import type { FileSnapshot } from '@/lib/file-snapshot'
 import {
   ensureFileSnapshotQuery,
   FILE_SNAPSHOT_STALE_MS,
@@ -271,7 +272,7 @@ type FileOpenIntentOperation = {
   readonly rootPath: FilesystemPath
 }
 
-type FileResultIdentity = Pick<FileResult, 'path' | 'version'>
+type FileSnapshotIdentity = Pick<FileSnapshot, 'path' | 'version'>
 
 type PostActivationWorkCounters = {
   readonly bufferBuilds: number
@@ -875,7 +876,7 @@ class FileOpenIntentServiceState {
 
   reconcileFileSnapshot(
     path: FilesystemPath,
-    file: FileResultIdentity | null,
+    file: FileSnapshotIdentity | null,
     removed: boolean,
   ): void {
     const canonical = canonicalPath(path)
@@ -999,7 +1000,7 @@ class FileOpenIntentServiceState {
       }
 
       const queryStartedAt = this.runtime.now()
-      const queryState = this.queryClient.getQueryState<FileResult>(
+      const queryState = this.queryClient.getQueryState<FileSnapshot>(
         fileSnapshotQueryOptions(path).queryKey,
       )
       event.set({
@@ -1472,7 +1473,7 @@ class FileOpenIntentServiceState {
 
   private cleanPreparationRejection(
     path: FilesystemPath,
-    file: FileResult,
+    file: FileSnapshot,
     lifecycleGeneration: number,
     abortSignal: AbortSignal,
   ): string | null {
@@ -1486,7 +1487,7 @@ class FileOpenIntentServiceState {
 
   private cleanPreparedSourceRejection(
     path: FilesystemPath,
-    file: FileResult,
+    file: FileSnapshot,
     lifecycleGeneration: number,
     abortSignal: AbortSignal,
   ): string | null {
@@ -1501,9 +1502,9 @@ class FileOpenIntentServiceState {
    * Age is not checked: an old record still paints, and the opened tab's own snapshot query
    * refetches once stale and replaces a clean document whose version moved.
    */
-  private cleanFileMatchesCachedQuery(file: FileResultIdentity): boolean {
+  private cleanFileMatchesCachedQuery(file: FileSnapshotIdentity): boolean {
     const queryKey = fileSnapshotQueryOptions(file.path).queryKey
-    const state = this.queryClient.getQueryState<FileResult>(queryKey)
+    const state = this.queryClient.getQueryState<FileSnapshot>(queryKey)
     if (state?.status !== 'success' || !state.data) return false
 
     return state.data.path === file.path && state.data.version === file.version
@@ -1900,7 +1901,7 @@ function preparationStageProgress(record: PreparedOpenRecord) {
 function freshFileQueryState(
   state:
     | {
-        readonly data?: FileResult
+        readonly data?: FileSnapshot
         readonly dataUpdatedAt: number
         readonly status: string
       }
@@ -2037,11 +2038,11 @@ function diagnosticCount(
 }
 
 function createCleanBuffer(
-  file: FileResult,
+  file: FileSnapshot,
   createBuffer: (text: string) => EditorTextBuffer,
 ): EditorTextBuffer {
   markEditorOpenBenchmark('editor.file_open.buffer_built', file.path)
-  const buffer = createBuffer(file.content)
+  const buffer = createBuffer(materializeFileSnapshotText(file))
   buffer.markClean()
   return buffer
 }
@@ -2061,12 +2062,12 @@ function defaultStructuralRange(
 
 function cleanFileIdentityMatches(
   claim: PreparedCleanFileOpenClaim,
-  file: FileResultIdentity,
+  file: FileSnapshotIdentity,
 ): boolean {
   return claim.path === file.path && claim.fileVersion === file.version
 }
 
-function fileResultIdentity(value: unknown): FileResultIdentity | null {
+function fileResultIdentity(value: unknown): FileSnapshotIdentity | null {
   if (!isRecord(value)) return null
   if (typeof value.path !== 'string') return null
   if (typeof value.version !== 'string') return null

@@ -1,3 +1,4 @@
+import { materializeFileSnapshotText } from '@/lib/file-snapshot'
 import { scrollPositionsEqual } from '@/lib/scroll-positions'
 import { markEditorOpenBenchmark } from '@/lib/editor-open-benchmark-mark'
 import { createHistoryBuffer } from '@/features/editor/state/history-buffer'
@@ -20,7 +21,7 @@ import type {
   UnsyncedDocumentRef,
 } from '@/lib/documents/utils/types'
 
-import type { FileResult } from '@/lib/file-system-types'
+import type { FileSnapshot } from '@/lib/file-snapshot'
 import {
   createEditorViewSession,
   acquireDocumentMutationLease,
@@ -363,7 +364,7 @@ export class WorkspaceDocumentService {
   }
 
   ensureLiveDocument(
-    file: FileResult,
+    file: FileSnapshot,
     claim: PreparedFileOpenClaim | null = null,
   ): LiveEditorDocument {
     this.assertPathsAvailable([file.path])
@@ -388,7 +389,7 @@ export class WorkspaceDocumentService {
 
   ensureView(
     tabId: TabId,
-    file: FileResult,
+    file: FileSnapshot,
     claim: PreparedFileOpenClaim | null = null,
   ): LiveEditorViewDocument {
     const document = this.ensureLiveDocument(file, claim)
@@ -480,12 +481,14 @@ export class WorkspaceDocumentService {
     return true
   }
 
-  forceReplaceLiveDocument(file: FileResult): { changed: boolean; wasDirty: boolean } {
+  forceReplaceLiveDocument(file: FileSnapshot): { changed: boolean; wasDirty: boolean } {
     this.assertPathsAvailable([file.path])
     const wasDirty = this.isDirtyDocument(fileDocumentKey(file.path))
     const existing = this.liveDocumentsByKey.get(fileDocumentKey(file.path))
     if (existing && !wasDirty && fileSyncVersion(existing) === file.version) {
-      if (textSnapshotEqualsText(existing.buffer.getTextSnapshot(), file.content)) {
+      if (
+        textSnapshotEqualsText(existing.buffer.getTextSnapshot(), materializeFileSnapshotText(file))
+      ) {
         return { changed: false, wasDirty: false }
       }
     }
@@ -1174,11 +1177,11 @@ export class WorkspaceDocumentService {
   }
 
   private createFileDocument(
-    file: FileResult,
+    file: FileSnapshot,
     claim: Extract<PreparedFileOpenClaim, { readonly kind: 'clean' }> | null = null,
   ): LiveEditorDocument {
     if (!claim) markEditorOpenBenchmark('editor.file_open.buffer_built', file.path)
-    const buffer = claim?.buffer ?? createHistoryBuffer(file.content)
+    const buffer = claim?.buffer ?? createHistoryBuffer(materializeFileSnapshotText(file))
     const target = fileDocument({ path: file.path })
     buffer.markClean()
 
@@ -1217,12 +1220,14 @@ export class WorkspaceDocumentService {
   }
 
   private replacementDocument(
-    file: FileResult,
+    file: FileSnapshot,
     existing: LiveEditorDocument | undefined,
     claim: Extract<PreparedFileOpenClaim, { readonly kind: 'clean' }> | null = null,
   ): LiveEditorDocument {
     if (!existing) return this.createFileDocument(file, claim)
-    if (!textSnapshotEqualsText(existing.buffer.getTextSnapshot(), file.content)) {
+    if (
+      !textSnapshotEqualsText(existing.buffer.getTextSnapshot(), materializeFileSnapshotText(file))
+    ) {
       return this.createFileDocument(file, claim)
     }
 
@@ -1540,7 +1545,7 @@ function fileSyncVersion(document: LiveEditorDocument | undefined) {
 
 function cleanClaimForFile(
   claim: PreparedFileOpenClaim | null,
-  file: FileResult,
+  file: FileSnapshot,
 ): Extract<PreparedFileOpenClaim, { readonly kind: 'clean' }> | null {
   if (claim?.kind !== 'clean') return null
   if (claim.path !== file.path) return null

@@ -1,3 +1,9 @@
+import {
+  materializeFileSnapshot,
+  materializeFileSnapshotText,
+  type FileSnapshot,
+} from '@/lib/file-snapshot'
+import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { decodedAsText } from '@workspace/contracts'
@@ -14,12 +20,45 @@ import type { FileResult, TreeEntry, WorkspaceEditPrepareRequest } from '@/lib/f
 import { fileSystemKeys, gitKeys } from '@/lib/query-keys'
 import { treeModel } from '@/lib/tree-model'
 import { createEditorBufferSession } from '@singapore-editor/core/document'
-import { QueryClient } from '@tanstack/react-query'
-import { describe } from 'vitest'
+import { QueryClient, QueryObserver } from '@tanstack/react-query'
+import { describe, vi } from 'vitest'
 import { expect, test as it } from '../../../../test/fixtures'
 import type { WorkspaceEditResult, WorkspaceEditTransitionRequest } from '@workspace/contracts'
 
 describe('FileSyncService', () => {
+  it('retains the captured saved snapshot without retaining a joined save string', async ({
+    client,
+    server,
+  }) => {
+    const path = filesystemPath('saved.txt')
+    await writeFile(join(server.root, path), 'original')
+    const ports = createFileSyncPorts(client)
+    const store = createEditorDocumentStore()
+    const queryClient = new QueryClient()
+    const original = await ports.readFileContent(path, new AbortController().signal)
+    queryClient.setQueryData(fileSystemKeys.fileSnapshot(path), original)
+    const document = store.getState().ensureLiveEditorDocument(original)
+    createEditorBufferSession(document.buffer).applyText('!')
+    const snapshot = document.buffer.getTextSnapshot()
+    const materialize = vi.spyOn(snapshot, 'materializeFullText')
+    const observer = new QueryObserver(queryClient, fileSnapshotQueryOptions(path))
+    const unsubscribe = observer.subscribe(() => {})
+    await new FileSyncService(store, queryClient, ports).save(
+      store.getState().getLiveEditorDocument(document.key)!,
+    )
+    const cached = queryClient.getQueryData<FileSnapshot>(fileSystemKeys.fileSnapshot(path))!
+    expect(cached).not.toHaveProperty('content')
+    expect(cached).toHaveProperty('textSnapshot', snapshot)
+    expect(await readFile(join(server.root, path), 'utf8')).toBe('original!')
+    expect(observer.getCurrentResult().data).toBe(cached)
+    store.getState().ensureLiveEditorDocument(cached)
+    expect(materialize).toHaveBeenCalledTimes(1)
+    createEditorBufferSession(document.buffer).applyText('?')
+    expect(materializeFileSnapshotText(cached)).toBe('original!')
+    expect(document.buffer.materializeFullText()).toBe('original!?')
+    unsubscribe()
+  })
+
   it('retains an orphaned buffer and recreates its deleted parent on save', async ({
     client,
     server,
@@ -46,9 +85,11 @@ describe('FileSyncService', () => {
     expect(store.getState().getLiveEditorDocument(document.key)?.sync).toMatchObject({
       orphaned: false,
     })
-    expect(queryClient.getQueryData(fileSystemKeys.fileSnapshot(path))).toMatchObject({
-      content: 'original',
-    })
+    expect(
+      materializeFileSnapshotText(
+        queryClient.getQueryData<FileSnapshot>(fileSystemKeys.fileSnapshot(path))!,
+      ),
+    ).toBe('original')
   })
 
   it('refuses to recreate over a file another process has restored', async ({ client, server }) => {
@@ -106,7 +147,11 @@ describe('FileSyncService', () => {
     expect(saved.buffer.isDirty()).toBe(false)
     expect(store.getState().dirtyDocumentKeys.has(document.key)).toBe(false)
     expect(
-      queryClient.getQueryData(fileSystemKeys.fileSnapshot(filesystemPath('src/app.ts'))),
+      materializeFileSnapshot(
+        queryClient.getQueryData<FileSnapshot>(
+          fileSystemKeys.fileSnapshot(filesystemPath('src/app.ts')),
+        )!,
+      ),
     ).toEqual(file('src/app.ts', 'old!', 200))
   })
 
@@ -136,8 +181,38 @@ describe('FileSyncService', () => {
     expect(afterSave.buffer.isDirty()).toBe(true)
     expect(store.getState().dirtyDocumentKeys.has(document.key)).toBe(true)
     expect(
-      queryClient.getQueryData(fileSystemKeys.fileSnapshot(filesystemPath('src/app.ts'))),
+      materializeFileSnapshot(
+        queryClient.getQueryData<FileSnapshot>(
+          fileSystemKeys.fileSnapshot(filesystemPath('src/app.ts')),
+        )!,
+      ),
     ).toEqual(file('src/app.ts', 'old!', 200))
+  })
+
+  it('cancels a pre-save read before publishing the saved snapshot', async ({ client, server }) => {
+    const path = filesystemPath('saved.txt')
+    await writeFile(join(server.root, path), 'original')
+    const ports = createFileSyncPorts(client)
+    const store = createEditorDocumentStore()
+    const queryClient = new QueryClient()
+    const original = await ports.readFileContent(path, new AbortController().signal)
+    const document = store.getState().ensureLiveEditorDocument(original)
+    createEditorBufferSession(document.buffer).applyText('!')
+    const pending = Promise.withResolvers<FileResult>()
+    const read = queryClient.query(
+      fileSnapshotQueryOptions(path, { fetcher: () => pending.promise }),
+    )
+    const cancelled = read.catch(() => null)
+    await new FileSyncService(store, queryClient, ports).save(
+      store.getState().getLiveEditorDocument(document.key)!,
+    )
+    pending.resolve(original)
+    await cancelled
+    expect(
+      materializeFileSnapshotText(
+        queryClient.getQueryData<FileSnapshot>(fileSystemKeys.fileSnapshot(path))!,
+      ),
+    ).toBe('original!')
   })
 
   it('reads an abortable unopened text snapshot without creating a live document', async () => {

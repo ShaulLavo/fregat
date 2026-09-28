@@ -1,3 +1,4 @@
+import { materializeFileSnapshotText } from '@/lib/file-snapshot'
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import type { AgentReviewFinding, AgentReviewRequest, EnvironmentId } from '@workspace/contracts'
 import { toast } from 'sonner'
@@ -45,6 +46,8 @@ async function citedLines(queryClient: QueryClient, finding: AgentReviewFinding)
     .query({ ...fileSnapshotQueryOptions(path), staleTime: 0 })
     .catch(() => null)
   if (!file) return null
-  const lines = file.content.split(/\r?\n/).slice(finding.startLine - 1, finding.endLine)
+  const lines = materializeFileSnapshotText(file)
+    .split(/\r?\n/)
+    .slice(finding.startLine - 1, finding.endLine)
   return lines.length === finding.endLine - finding.startLine + 1 ? lines : null
 }

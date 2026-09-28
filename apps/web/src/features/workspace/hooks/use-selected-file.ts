@@ -1,7 +1,8 @@
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { clientErrorMessage } from '@/lib/client-error-taxonomy'
 import { statPath } from '@/lib/file-server'
-import type { FileResult, StatResult } from '@/lib/file-system-types'
+import type { FileSnapshot } from '@/lib/file-snapshot'
+import type { StatResult } from '@/lib/file-system-types'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { fileStatVersion } from '@/features/workspace/utils/file-version'
@@ -13,7 +14,7 @@ import { useMemo } from 'react'
 
 export function useSelectedFile(filePath: FilesystemPath | null) {
   const queryClient = useQueryClient()
-  const query = useQuery<FileResult>({
+  const query = useQuery<FileSnapshot>({
     ...fileSnapshotQueryOptions(filePath ?? filesystemPath('')),
     enabled: Boolean(filePath),
     placeholderData: (previousFile) => previousFile,
@@ -50,7 +51,7 @@ export function useSelectedFile(filePath: FilesystemPath | null) {
 
 function selectedFileVersion(
   filePath: FilesystemPath | null,
-  fileState: LoadState<FileResult>,
+  fileState: LoadState<FileSnapshot>,
   metadata: StatResult | undefined,
 ): string | null {
   if (!filePath) return null
@@ -62,13 +63,13 @@ function selectedFileVersion(
 
 export function fileLoadState(
   query: {
-    data: FileResult | undefined
+    data: FileSnapshot | undefined
     error: Error | null
     isError: boolean
     isPending: boolean
   },
   selectedFilePath: FilesystemPath,
-): LoadState<FileResult> {
+): LoadState<FileSnapshot> {
   if (query.data?.path === selectedFilePath) {
     return { status: 'ready', data: query.data }
   }

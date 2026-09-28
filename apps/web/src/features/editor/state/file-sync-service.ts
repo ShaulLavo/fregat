@@ -1,3 +1,4 @@
+import { materializeFileSnapshotText, type FileSnapshot } from '@/lib/file-snapshot'
 import { createClientInvariantError } from '@/lib/structured-errors'
 import { decodedAsText } from '@workspace/contracts'
 
@@ -130,7 +131,7 @@ type QueryProjection<T> = {
 export type WorkspaceMutationProjectionReceipt = {
   readonly afterContents: ReadonlyMap<string, string>
   readonly beforeContents: ReadonlyMap<string, string>
-  readonly files: readonly QueryProjection<FileResult>[]
+  readonly files: readonly QueryProjection<FileSnapshot>[]
   readonly operationId: string
   phase: 'provisional' | 'sealed'
   readonly renames: readonly WorkspaceEditTreeRename[]
@@ -205,7 +206,7 @@ export class FileSyncService {
     }
   }
 
-  async save(document: LiveEditorDocument): Promise<FileResult> {
+  async save(document: LiveEditorDocument): Promise<void> {
     if (document.sync.kind !== 'file' || document.target.kind !== 'file') {
       throw createClientInvariantError(`Cannot save unsynced editor document ${document.key}`)
     }
@@ -214,7 +215,8 @@ export class FileSyncService {
 
     const sync = document.sync
     const path = document.target.resource.path
-    const text = document.buffer.materializeFullText()
+    const textSnapshot = document.buffer.getTextSnapshot()
+    const text = textSnapshot.materializeFullText()
     const savedContentRevision = document.contentRevision
     // Issued, not random, so the watcher echo of this write classifies as ours.
     const writeId = this.issueWriteId()
@@ -226,7 +228,18 @@ export class FileSyncService {
           expectedMtimeMs: sync.mtimeMs,
           ...identity,
         })
-    const file = fileResultForSavedDocument(path, text, entry)
+    const file: FileSnapshot = {
+      ...decodedAsText,
+      path,
+      textSnapshot,
+      mtimeMs: entry.mtimeMs,
+      size: entry.size,
+      version: entry.version,
+    }
+    await this.queryClient.cancelQueries({
+      exact: true,
+      queryKey: fileSystemKeys.fileSnapshot(path),
+    })
 
     this.documentStore.getState().markLiveEditorDocumentSaved({
       documentKey: document.key,
@@ -236,7 +249,6 @@ export class FileSyncService {
       savedText: text,
     })
     setFileSnapshotQueryData(this.queryClient, file)
-    return file
   }
 
   async prepareWorkspaceMutation(
@@ -544,13 +556,13 @@ export class FileSyncService {
 
   private projectFileSnapshots(
     request: WorkspaceMutationProjectionRequest,
-  ): readonly QueryProjection<FileResult>[] {
+  ): readonly QueryProjection<FileSnapshot>[] {
     const candidates = this.fileProjectionCandidates(request)
-    const projections: QueryProjection<FileResult>[] = []
+    const projections: QueryProjection<FileSnapshot>[] = []
     notifyManager.batch(() => {
       for (const entry of request.entries) {
         const queryKey = fileSystemKeys.fileSnapshot(entry.path)
-        const before = this.querySnapshot<FileResult>(queryKey)
+        const before = this.querySnapshot<FileSnapshot>(queryKey)
         const candidate = entry.exists ? candidates.get(entry.path) : undefined
         if (!before.data && !candidate) continue
         this.installFileProjection(queryKey, entry, candidate)
@@ -565,10 +577,11 @@ export class FileSyncService {
   ): Map<string, string> {
     const candidates = new Map(request.afterContents)
     for (const rename of request.renames) {
-      const cached = this.queryClient.getQueryData<FileResult>(
+      const cached = this.queryClient.getQueryData<FileSnapshot>(
         fileSystemKeys.fileSnapshot(rename.from),
       )
-      if (cached && !candidates.has(rename.to)) candidates.set(rename.to, cached.content)
+      if (cached && !candidates.has(rename.to))
+        candidates.set(rename.to, materializeFileSnapshotText(cached))
       candidates.delete(rename.from)
     }
     return candidates
@@ -684,21 +697,6 @@ function ownedFileSyncPorts(queryClient: QueryClient): FileSyncPorts {
   return {
     ...createFileSyncPorts(clientForQueryClient(queryClient)),
     assertWritable: () => assertEnvironmentWritable(origin),
-  }
-}
-
-function fileResultForSavedDocument(
-  path: FilesystemPath,
-  content: string,
-  entry: StatResult,
-): FileResult {
-  return {
-    ...decodedAsText,
-    content,
-    mtimeMs: entry.mtimeMs,
-    path,
-    size: entry.size,
-    version: entry.version,
   }
 }
 

@@ -1,3 +1,4 @@
+import { materializeFileSnapshot, type FileSnapshot } from '@/lib/file-snapshot'
 import { parentPath } from '@/lib/path-formatters'
 import { startWorkspaceEventStreams } from '@/features/workspace/state/event-streams'
 import { startPageSubscription } from '@/lib/state/page-subscription'
@@ -673,8 +674,8 @@ async function applyRefreshOpenFileOperation({
   await settlePendingSaves(queryClient, fileDocumentKey(filesystemPath(path)), signal)
   if (signal.aborted) return
 
-  const cached = queryClient.getQueryData<FileResult>(fileSystemKeys.fileSnapshot(path))
-  const file = await queryClient
+  const cached = queryClient.getQueryData<FileSnapshot>(fileSystemKeys.fileSnapshot(path))
+  const snapshot = await queryClient
     .query({
       ...fileSnapshotQueryOptions(filesystemPath(path), {
         fetcher: (path, signal) => {
@@ -693,10 +694,11 @@ async function applyRefreshOpenFileOperation({
       markDeletedFilesystemDocument(filesystemPath(path), conflictContext)
       return null
     })
-  if (signal.aborted || !file) return
+  if (signal.aborted || !snapshot) return
+  const file = materializeFileSnapshot(snapshot)
   conflictContext.setFileOrphaned(fileDocumentKey(filesystemPath(path)), false)
 
-  setFileSnapshotQueryData(queryClient, file)
+  setFileSnapshotQueryData(queryClient, snapshot)
   const operation = planFetchedOpenFileRefresh({
     baseVersion: liveDocumentVersion(path, conflictContext),
     isDirty: isDirtyLiveDocument(path, dirtyDocumentKeys, conflictContext),

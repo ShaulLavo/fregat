@@ -1,3 +1,4 @@
+import { editorSavedSnapshot } from './editor-saved-snapshot'
 import { sessionNoFlicker } from './session-no-flicker'
 import { restNoFlicker } from './rest-no-flicker'
 import { deferredDialogs } from './deferred-dialogs'
@@ -398,6 +399,7 @@ import { demoWallpaperStartup } from './demo-wallpaper-startup'
 export const scenarios: readonly Scenario[] = [
   diffNoFlicker,
   savedComparisonNoFlicker,
+  editorSavedSnapshot,
   historyComparisonNoFlicker,
   terminalHistory,
   responseDelivery,

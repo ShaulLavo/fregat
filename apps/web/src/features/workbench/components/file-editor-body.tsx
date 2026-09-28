@@ -22,7 +22,7 @@ import { useEditorSurfaceActions } from '@/features/workbench/hooks/use-editor-s
 import { useEditorVisibleSnapshot } from '@/features/workbench/hooks/use-editor-visible-snapshot'
 import { useFileOpenIntent } from '@/lib/file-open-intent/providers/context'
 import { notePressPaint } from '@/lib/intent-prefetch/state/press-paint'
-import type { FileResult } from '@/lib/file-system-types'
+import type { FileSnapshot } from '@/lib/file-snapshot'
 import type { LoadState } from '@/lib/load-state'
 import type { EditorInitialPaintEvent } from '@singapore-editor/core/extensions'
 import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
@@ -44,7 +44,7 @@ export function FileEditorBody({
   liveDocument: EditorRenderDocument | null
   definitionTarget: LanguageServerDefinitionTarget | null
 
-  fileState: LoadState<FileResult>
+  fileState: LoadState<FileSnapshot>
   fileVersion: string | null
   languageServerReferences: LanguageServerReferencesResult | null
   target: StandaloneDocumentRef

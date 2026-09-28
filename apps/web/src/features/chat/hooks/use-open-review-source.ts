@@ -1,3 +1,4 @@
+import { materializeFileSnapshotText } from '@/lib/file-snapshot'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { EnvironmentId, SessionId } from '@workspace/contracts'
 import type {
@@ -62,7 +63,7 @@ export function useOpenReviewSource(hostSessionId: SessionId) {
       .query({ ...fileSnapshotQueryOptions(filesystemPath(path)), staleTime: 0 })
       .catch(() => null)
     if (!file) return 'missing'
-    if (!linesMatch(file.content, range, expected)) return 'changed'
+    if (!linesMatch(materializeFileSnapshotText(file), range, expected)) return 'changed'
     openDefinition(
       fileReferenceDefinitionTarget({ column: 1, label: path, line: range.start, path }),
     )

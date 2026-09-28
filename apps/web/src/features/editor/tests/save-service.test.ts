@@ -51,6 +51,10 @@ describe('EditorSaveService', () => {
         .getMutationCache()
         .findAll({ mutationKey: editorMutationKeys.save(document.key) }),
     ).toHaveLength(3)
+    for (const mutation of queryClient.getMutationCache().getAll()) {
+      expect(mutation.state.variables).toBe(document.key)
+      expect(mutation.state.data).toBe(true)
+    }
   })
 
   it('writes again when an edit lands between two queued saves', async ({ client }) => {

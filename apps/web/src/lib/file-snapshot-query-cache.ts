@@ -1,3 +1,4 @@
+import type { FileSnapshot } from '@/lib/file-snapshot'
 import { markEditorOpenBenchmark } from '@/lib/editor-open-benchmark-mark'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
@@ -28,7 +29,13 @@ export function fileSnapshotQueryOptions(
 ) {
   return {
     gcTime: FILE_SNAPSHOT_QUERY_GC_TIME_MS,
-    queryFn: ({ client, signal }: { client: QueryClient; signal: AbortSignal }) => {
+    queryFn: ({
+      client,
+      signal,
+    }: {
+      client: QueryClient
+      signal: AbortSignal
+    }): Promise<FileSnapshot> => {
       markEditorOpenBenchmark('editor.file_open.file_read', path)
       if (config.fetcher) return config.fetcher(path, signal)
       return fetchFile(path, signal, clientForQueryClient(client))
@@ -40,13 +47,13 @@ export function fileSnapshotQueryOptions(
 
 export function setFileSnapshotQueryData(
   queryClient: QueryClient,
-  file: FileResult,
+  file: FileSnapshot,
   options: { readonly updatedAt?: number } = {},
 ) {
   const queryKey = fileSystemKeys.fileSnapshot(file.path)
   const query = queryClient
     .getQueryCache()
-    .build<FileResult, unknown, FileResult, typeof queryKey>(
+    .build<FileSnapshot, unknown, FileSnapshot, typeof queryKey>(
       queryClient,
       queryClient.defaultQueryOptions(fileSnapshotQueryOptions(file.path)),
     )
@@ -61,7 +68,7 @@ export function moveFileSnapshotQueryData(
   to: FilesystemPath,
 ) {
   const queryKey = fileSystemKeys.fileSnapshot(from)
-  const file = queryClient.getQueryData<FileResult>(queryKey)
+  const file = queryClient.getQueryData<FileSnapshot>(queryKey)
   queryClient.removeQueries({ exact: true, queryKey })
   if (!file) return
 

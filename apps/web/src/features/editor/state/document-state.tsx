@@ -1,5 +1,5 @@
 import { createStoreContext } from '@/lib/store-context'
-import type { FileResult } from '@/lib/file-system-types'
+import type { FileSnapshot } from '@/lib/file-snapshot'
 import { type EditorScrollPosition } from '@singapore-editor/core/editor'
 import { subscribeWithSelector } from 'zustand/middleware'
 import { createStore, type Mutate, type StoreApi } from 'zustand/vanilla'
@@ -51,7 +51,7 @@ type EditorDocumentStoreActions = {
   deleteLiveEditorDocument: (documentKey: DocumentKey) => DeleteLiveEditorDocumentResult
   ensureEditorView: (
     tabId: TabId,
-    file: FileResult,
+    file: FileSnapshot,
     claim?: PreparedFileOpenClaim | null,
   ) => LiveEditorViewDocument
   ensureEditorViewForDocument: (
@@ -60,7 +60,7 @@ type EditorDocumentStoreActions = {
     claim?: PreparedFileOpenClaim | null,
   ) => LiveEditorViewDocument
   ensureLiveEditorDocument: (
-    file: FileResult,
+    file: FileSnapshot,
     claim?: PreparedFileOpenClaim | null,
   ) => LiveEditorDocument
   ensureUnsyncedEditorDocument: (input: UnsyncedLiveEditorDocumentInput) => LiveEditorDocument
@@ -68,7 +68,7 @@ type EditorDocumentStoreActions = {
     target: SettingsDocumentRef,
     snapshot: { readonly content: string; readonly revision: string },
   ) => LiveEditorDocument
-  forceReplaceLiveEditorDocument: (file: FileResult) => { wasDirty: boolean }
+  forceReplaceLiveEditorDocument: (file: FileSnapshot) => { wasDirty: boolean }
   /** Retained text size per live document; the only input to the retention budget. */
   editorDocumentSizes: () => ReadonlyMap<DocumentKey, number>
   /** Documents `retain` keeps whatever the keep set says; their text is unavoidable. */

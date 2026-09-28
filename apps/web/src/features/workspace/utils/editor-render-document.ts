@@ -1,9 +1,9 @@
 import type { DocumentKey, DocumentRef } from '@/lib/documents/utils/types'
 import type { EditorRenderDocument } from '@/features/editor/utils/render-document'
-import type { FileResult } from '@/lib/file-system-types'
+import type { FileSnapshot } from '@/lib/file-snapshot'
 import type { LoadState } from '@/lib/load-state'
 
-export function readyFile(fileState: LoadState<FileResult>) {
+export function readyFile(fileState: LoadState<FileSnapshot>) {
   if (fileState.status !== 'ready') return null
 
   return fileState.data

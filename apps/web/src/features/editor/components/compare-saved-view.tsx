@@ -1,3 +1,4 @@
+import { materializeFileSnapshotText } from '@/lib/file-snapshot'
 import { CompareSavedLoading } from '@/features/editor/components/compare-saved-loading'
 import { fileDocumentKey } from '@/lib/documents/utils/identity'
 import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
@@ -42,7 +43,8 @@ export function CompareSavedView({
   // server — the file's own uri names exactly this text, and joining it is a no-op on the wire.
   const languageServer = useDiffLanguageContext(path, rootPath, true, languageHost)
 
-  const savedText = fileState.status === 'ready' ? fileState.data.content : null
+  const savedText =
+    fileState.status === 'ready' ? materializeFileSnapshotText(fileState.data) : null
   // Keep the text tied to the revision that materialized it. The mutable buffer object does not
   // change identity as edits arrive.
   const snapshot = { revision, text: buffer?.materializeFullText() ?? null }
