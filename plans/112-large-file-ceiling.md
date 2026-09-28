@@ -1,6 +1,6 @@
 # The large-file ceiling: what we can actually open, and who gets to decide
 
-Status: **research done 2026-09-25; owner decided, phases proposed.** Requested
+Status: **Phase 1 in progress 2026-09-28; research and owner decisions complete.** Requested
 2026-09-13. Measurements: [docs/large-file-ceiling/](../docs/large-file-ceiling/README.md).
 
 Decided 2026-09-25: owner — this plan and Editor
@@ -259,8 +259,9 @@ In the order a user meets them:
    saves (`src/tests/request-body-limit.test.ts`: every worst-case JSON encoding of a max-size file
    fits the limit, and the app is built with it; a 129 MiB POST returned 413 before); the
    client write log counts characters instead of copying the text into a `Blob`. Still open in
-   this phase: the saved text outliving the save in the query cache, the git-diff budget, and
-   `bench:large-file`.
+   this phase after 2026-09-28: the saved text outliving the save in the query cache and
+   `bench:large-file`. Git now uses the machine setting `git.maxDiffFileSizeMiB`, default 50,
+   independently of the 200 MiB file-open limit.
 2. **Raw-bytes transport** for read and write: shared decoder with the decoded-length check,
    byte-hash `version`, metadata in headers.
 3. **Raise the thresholds.** Remove per-edit whole-document work, starting with the minimap
@@ -277,7 +278,7 @@ In the order a user meets them:
 Phase 1 continues in independently verified changes.
 
 - [x] Separate Git comparison and revision-read budgets with a machine setting, default 50 MiB.
-- [ ] Verify the boundary and ordinary file reads, refresh the settings reference, and ship.
+- [x] Verify the boundary and ordinary file reads, refresh the settings reference, and ship.
 - [ ] Remove retained save text while preserving saved-snapshot consumers.
 - [ ] Land `bench:large-file`, including the 150 MiB save case.
 
@@ -286,3 +287,10 @@ live budget changes, untracked files and an HTTP read above the configured diff 
 Repository typecheck passes. The `git-diff-budget` browser scenario confirms the 50 MiB
 default and persistence after reload; its saved-setting screenshot was read at
 `/tmp/fregat-evidence/20260928T174147Z-scenario-git-diff-budget/`.
+
+Shipped `c4af13ca2` as mesh release `20260928T174327Z-c4af13ca-main`; candidate boot
+and production live check passed. Pre-commit gates, full typecheck and 153 settings tests
+passed. App health screenshot read at
+`/work/tmp/fregat-evidence/20260928T174250Z-look-1440x1000/`.
+The shared selectors file included another session's Markdown verification helper.
+No new large-file performance measurement is claimed by this budget change.
