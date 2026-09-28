@@ -47,6 +47,7 @@
         "@singapore-editor/lsp": "workspace:*",
         "@singapore-editor/markdown": "workspace:*",
         "@singapore-editor/minimap": "workspace:*",
+        "@singapore-editor/paged": "workspace:*",
         "@singapore-editor/scope-lines": "workspace:*",
         "@singapore-editor/tree-sitter": "workspace:*",
         "@singapore-editor/tree-sitter-languages": "workspace:*",
@@ -217,6 +218,20 @@
         "@typescript/native-preview": "7.0.0-dev.20260707.2",
         "@vitest/browser-playwright": "^5.0.2",
         "happy-dom": "^20.14.5",
+        "oxfmt": "0.70.0",
+        "oxlint": "1.85.0",
+        "typescript": "~6.0.3",
+        "vitest": "^5.0.2",
+      },
+    },
+    "packages/paged": {
+      "name": "@singapore-editor/paged",
+      "version": "0.1.0",
+      "dependencies": {
+        "@singapore-editor/core": "workspace:*",
+      },
+      "devDependencies": {
+        "@typescript/native-preview": "7.0.0-dev.20260707.2",
         "oxfmt": "0.70.0",
         "oxlint": "1.85.0",
         "typescript": "~6.0.3",
@@ -693,6 +708,8 @@
     "@singapore-editor/markdown": ["@singapore-editor/markdown@workspace:packages/markdown"],
 
     "@singapore-editor/minimap": ["@singapore-editor/minimap@workspace:packages/minimap"],
+
+    "@singapore-editor/paged": ["@singapore-editor/paged@workspace:packages/paged"],
 
     "@singapore-editor/panes": ["@singapore-editor/panes@workspace:packages/panes"],
 

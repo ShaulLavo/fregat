@@ -25,7 +25,8 @@
     "input:proof": "node test/verify-input-results.mjs results/input-latency",
     "bench:reclamation-live": "node reclamation-live.mjs",
     "bench:geometry": "node geometry.mjs",
-    "bench:blink": "node blink.mjs"
+    "bench:blink": "node blink.mjs",
+    "bench:paged": "node paged.mjs"
   },
   "dependencies": {
     "@singapore-editor/core": "workspace:*",
@@ -38,7 +39,8 @@
     "@singapore-editor/scope-lines": "workspace:*",
     "@singapore-editor/tree-sitter": "workspace:*",
     "@singapore-editor/tree-sitter-languages": "workspace:*",
-    "evlog": "^2.29.0"
+    "evlog": "^2.29.0",
+    "@singapore-editor/paged": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

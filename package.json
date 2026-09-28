@@ -20,7 +20,7 @@
     "publish:packages": "bun scripts/publish-packages.ts",
     "publish:packages:dry-run": "bun scripts/publish-packages.ts --dry-run",
     "test": "turbo test",
-    "stress:build": "turbo build --filter=@singapore-editor/core --filter=@singapore-editor/decode --filter=@singapore-editor/find --filter=@singapore-editor/lsp --filter=@singapore-editor/markdown --filter=@singapore-editor/minimap --filter=@singapore-editor/scope-lines --filter=@singapore-editor/tree-sitter-languages",
+    "stress:build": "turbo build --filter=@singapore-editor/core --filter=@singapore-editor/decode --filter=@singapore-editor/find --filter=@singapore-editor/lsp --filter=@singapore-editor/markdown --filter=@singapore-editor/minimap --filter=@singapore-editor/scope-lines --filter=@singapore-editor/tree-sitter-languages --filter=@singapore-editor/paged",
     "bench:stress": "bun run stress:build && bun run --cwd examples/stress bench",
     "bench:input": "bun run stress:build && bun run --cwd examples/stress bench:input"
   },
