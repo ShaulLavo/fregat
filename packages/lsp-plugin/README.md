@@ -14,24 +14,17 @@ npm install @singapore-editor/core @singapore-editor/lsp @singapore-editor/lsp-p
 ## Usage
 
 ```ts
-import {
-  createLanguageServerAdapterPlugin,
-  createWebSocketLspTransportFactory,
-} from '@singapore-editor/lsp-plugin'
+import { createLanguageServerPlugin } from '@singapore-editor/lsp-plugin'
 
-const plugin = createLanguageServerAdapterPlugin({
-  name: 'typescript-lsp',
-  createTransport: createWebSocketLspTransportFactory('ws://localhost:3000/lsp'),
-  documentSync: {
-    shouldSyncLanguageId: (languageId) => languageId === 'typescript',
-  },
+const plugin = createLanguageServerPlugin({
+  webSocketRoute: 'ws://localhost:3000/lsp',
 })
 ```
 
 ## Exports
 
-- `createLanguageServerAdapterPlugin` creates the full editor integration.
-- `createLanguageServerPlugin` exposes a lower-level plugin factory.
+- `createLanguageServerPlugin` connects the editor to a language server or shared document session.
+- `createLanguageServerAdapterPlugin` supports custom transport factories and adapter configuration.
 - `createWebSocketLspTransportFactory` and `createWorkerLspTransportFactory` create transport
   factories.
 - Diagnostic, path, markdown tooltip, completion, and document-sync helpers are available through
