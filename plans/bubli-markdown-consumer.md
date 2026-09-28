@@ -1,6 +1,6 @@
 # Shared Markdown semantics for Editor and bubli
 
-Status: proposed cross-repository integration work package, requested by the owner on 2026-09-28. Documentation only; no editor, dependency, worker or build changes are made in this PR. This is part of Fregat Plan 201, coordinated with existing Plans 176/189/099/197/198, not a second independent Editor roadmap or a replacement for the numbered backlog.
+Status: proposed cross-repository integration work package, requested by the owner on 2026-09-28. Documentation only; no editor, dependency, worker or build changes are made in this PR. This is part of Fregat Plan 202, coordinated with existing Plans 176/189/099/197/198, not a second independent Editor roadmap or a replacement for the numbered backlog.
 
 ## Outcome
 
@@ -10,7 +10,7 @@ Singapore and bubli consume the same owned Markdown engine and renderer-neutral 
 
 - [bubli toolkit and research PR](https://github.com/ShaulLavo/bubli/pull/1), including the [coordination page](https://github.com/ShaulLavo/bubli/blob/docs/bubli-plans-2026-09-28/docs/bubli/README.md).
 - [tree-sitter-md semantic API and compatibility PR](https://github.com/ShaulLavo/tree-sitter-md/pull/5).
-- [Fregat adoption plan](https://github.com/ShaulLavo/fregat/blob/docs/bubli-plans-2026-09-28/plans/201-bubli-tui.md); its [root roadmap](https://github.com/ShaulLavo/fregat/blob/docs/bubli-plans-2026-09-28/PLAN.md) owns cross-project ordering.
+- [Fregat adoption plan](https://github.com/ShaulLavo/fregat/blob/docs/bubli-plans-2026-09-28/plans/202-bubli-tui.md); its [root roadmap](https://github.com/ShaulLavo/fregat/blob/docs/bubli-plans-2026-09-28/PLAN.md) owns cross-project ordering.
 - Existing Fregat plans: [176 parser](https://github.com/ShaulLavo/fregat/blob/4f587e90091cb0a74b314276a038b45685da572b/plans/176-markdown-parser.md), [189 parser improvements](https://github.com/ShaulLavo/fregat/blob/4f587e90091cb0a74b314276a038b45685da572b/plans/189-tree-sitter-md-improvement.md), [099 publication/contributions](https://github.com/ShaulLavo/fregat/blob/4f587e90091cb0a74b314276a038b45685da572b/plans/099-document-contributions.md), [197 highlighting](https://github.com/ShaulLavo/fregat/blob/4f587e90091cb0a74b314276a038b45685da572b/plans/197-editor-highlighting-service.md), [198 retained analysis](https://github.com/ShaulLavo/fregat/blob/4f587e90091cb0a74b314276a038b45685da572b/plans/198-document-owned-editor-analysis.md).
 
 Planning baseline: Singapore `79895646ec626d03e88aca148b60b8a05d884970`; parser `5dd917ae70eea5f6a38a2ba8825ce6d3baca697d`. Recheck current source and package pins before execution.
