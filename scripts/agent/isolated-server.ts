@@ -46,8 +46,9 @@ export async function startIsolatedServer(
   {
     pathPrefix,
     realProviders = false,
+    webRoot,
     scratchRoot = defaultScratchRoot,
-  }: { pathPrefix?: string; realProviders?: boolean; scratchRoot?: string } = {},
+  }: { pathPrefix?: string; realProviders?: boolean; scratchRoot?: string; webRoot?: string } = {},
 ): Promise<IsolatedServer> {
   const directory = mkdtempSync(path.join(scratchRoot, 'fregat-agent-'))
   const home = path.join(directory, 'home')
@@ -82,6 +83,7 @@ export async function startIsolatedServer(
     realProviders,
     scratchRoot,
     webOrigin,
+    webRoot,
   })
   const spawn = () =>
     Bun.spawn({
@@ -161,6 +163,7 @@ export function isolatedServerEnv(input: {
   realProviders: boolean
   scratchRoot: string
   webOrigin: URL
+  webRoot?: string
 }) {
   const { home, logs, pathPrefix, port, productionRoot, webOrigin } = input
   const env: Record<string, string | undefined> = {
@@ -176,7 +179,7 @@ export function isolatedServerEnv(input: {
     [HARNESS_FIXTURE_ROOT_ENV]: input.scratchRoot,
     PLATFORM_HOME: home,
     PLATFORM_PRODUCTION_ROOT: productionRoot,
-    WEB_ROOT: path.join(home, '..', 'served', 'web'),
+    WEB_ROOT: input.webRoot ?? path.join(home, '..', 'served', 'web'),
     PORT: String(port),
     SERVER_ALLOWED_ORIGINS: allowedOriginsForWebPort(
       undefined,

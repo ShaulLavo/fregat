@@ -26,6 +26,7 @@
     }
   },
   "scripts": {
+    "bench:large-file": "bun scripts/large-file/bench.ts",
     "build": "bun scripts/prod.ts build",
     "deploy": "bun scripts/deploy/mesh.ts",
     "pair": "bun scripts/pair.ts",

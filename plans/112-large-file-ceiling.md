@@ -294,3 +294,31 @@ passed. App health screenshot read at
 `/work/tmp/fregat-evidence/20260928T174250Z-look-1440x1000/`.
 The shared selectors file included another session's Markdown verification helper.
 No new large-file performance measurement is claimed by this budget change.
+
+### Full execution checklist, 2026-09-28
+
+Owner clarified that this run must finish the full plan and linked E015 work, not stop
+after the first independently shippable change. Decision trail:
+[execution.tsv](../docs/large-file-ceiling/execution.tsv).
+
+- [x] Read the execution principles and reconcile scope with E015.
+- [ ] Review the delivered budget and fix misleading oversized-file results.
+- [ ] Land a reproducible production-browser benchmark and capture the current baseline.
+- [ ] Remove saved-text retention with cache and compare-with-saved evidence.
+- [ ] Ship raw-byte read/write transport, shared decoding and byte-hash versions.
+- [ ] Measure current Editor work per worker, remove whole-document edit work and compare.
+- [ ] Set feature tiers from the new measurements and verify switching, saving and refusal.
+- [ ] Compare resident, streamed and paged read-only contracts; build and verify E015 proof.
+- [ ] Re-run 1/10/50/100/150/200 MiB open-edit-save, Unicode and above-limit cases.
+- [ ] Independently review the final diffs and evidence, commit/push both repositories,
+      update the Editor pin and deploy the verified result.
+
+Done means repeatable measurements support each tier; 200 MiB files can open and save;
+large-file typing meets the measured target or a documented, reproduced constraint remains;
+raw transport preserves encoding, byte counts, revisions and write conflict safety; E015
+has a bounded read-only proof and an explicit capability/go-no-go decision. Each unchecked
+item remains work, including when an intermediate commit ships.
+
+Execution uses isolated worktrees for transport and Editor changes. The main lane owns
+the benchmark, budget review, integration, final checks and deployment. Cache ownership is
+reviewed independently before edits because saved snapshots also serve comparisons.

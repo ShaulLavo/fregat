@@ -151,3 +151,42 @@ rises by one document per first save (100 MiB: 372 → 473 MiB; two-byte: 472 �
 default `maxRequestBodySize` is 128 MiB (bun-types `serve.d.ts:676`; a 129 MiB POST returns 413
 on Bun 1.4.0) and `apps/server/src/index.ts:63` does not raise it, so a 128–200 MiB file opens
 under the default limit and cannot be saved.
+
+## Repeating the full-app measurement
+
+`bun run bench:large-file` builds the production web client and opens, types into and saves
+1, 10, 50, 100, 150 and 200 MiB files. Each size gets a fresh Chromium instance and isolated
+API/state home. On Linux each case runs in an 8 GiB systemd memory scope with swap disabled.
+Use `--sizes 1,10`, `--ext ts`, `--two-byte`, `--profile`, or `--web-root <built-web>` to select
+cases, add a non-Latin character, record a CPU profile, or compare against an existing build.
+`--out` defaults to a dated directory under `/work/tmp/fregat-evidence/`.
+
+The deterministic corpus has nested function/loop/conditional folds. A case waits ten seconds
+after first visible text before typing 30 keys, 80 ms apart. This spacing matters because a
+fast burst can finish before the minimap's delayed update. Key latency is keydown to the next
+animation frame. Save passes only when the disk's SHA-256 equals the original bytes with those
+30 characters prepended. Main-isolate heap and external backing storage are reported separately;
+RSS samples include the benchmark process's descendants, grouped into Chromium and server trees.
+RSS is unavailable off Linux. A failed/crashed case is a failure even when earlier phases passed.
+
+Evidence includes `source.json`, one `result.json` per size, screenshots, server logs, and optional
+`typing.cpuprofile`. Fixtures and isolated state are removed after each completed case. Browser
+crashes keep earlier phase measurements in `measurements.json`; a killed process may leave only
+its exit code and stderr. The parent removes remaining fixture files after the case exits.
+
+Current-build baseline on 2026-09-28, before transport, cache and minimap fixes:
+`/work/tmp/fregat-evidence/112-baseline-v2-20260928/`. Platform `8ca59fd7d`, Editor `ad59752e`,
+Chromium 153, Bun 1.4.2. CPU profiling was enabled. The 150 MiB saved screenshot was inspected.
+
+| MiB |              Open to text ms | Key p95 ms | Save ms | Main heap after save MiB |
+| --- | ---------------------------: | ---------: | ------: | -----------------------: |
+| 1   |                          330 |         17 |      73 |                       33 |
+| 10  |                          365 |         75 |     254 |                      119 |
+| 50  |                         1408 |        529 |    1462 |                      499 |
+| 100 |                         2574 |       1026 |    3338 |                      972 |
+| 150 |                         3325 |       1739 |    5920 |                     1454 |
+| 200 | Renderer crashed during save |          — |       — |                        — |
+
+The 200 MiB failure peaked at 3.55 GB renderer RSS. The initial harness did not persist its
+preceding phase metrics; later runs now write them before starting save. An earlier smoke case
+used a single-line corpus and is not comparable to this table.
