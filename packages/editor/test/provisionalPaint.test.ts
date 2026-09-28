@@ -2,12 +2,8 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { Editor } from '../src/editor/Editor'
 import { VirtualizedTextView } from '../src/virtualization'
 import { createEditorBufferSession, createEditorTextBuffer } from '../src/public/document'
-import type {
-  EditorHighlightResult,
-  EditorInitialPaintEvent,
-  EditorPlugin,
-  EditorViewSnapshot,
-} from '../src/plugins'
+import type { EditorInitialPaintEvent, EditorPlugin, EditorViewSnapshot } from '../src/plugins'
+import type { EditorHighlightResult } from '../src/syntax/highlighter'
 import { setHighlightRegistry } from '../src/public/testing'
 import { EditorTokenStore } from '../src/syntax/tokenStore'
 import { createError } from '../src/logging/evlog'

@@ -1,4 +1,5 @@
-import type { EditorCommandHandler, EditorDisposable } from '../plugins'
+import type { EditorCommandHandler } from '../plugins'
+import type { EditorDisposable } from './disposables'
 import type { EditorCommandContext, EditorCommandId } from './commands'
 import { isEditorCommandId, type EditorAnyCommandId } from './commandCatalog'
 import {

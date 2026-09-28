@@ -3,13 +3,13 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createEditorLoggingPlugin } from '../logging'
 import type {
   EditorCapabilityToken,
-  EditorDisposable,
   EditorGutterContribution,
   EditorInjectedTextRowProvider,
   EditorLogEvent,
   EditorPlugin,
   EditorPluginContext,
 } from '../plugins'
+import type { EditorDisposable } from './disposables'
 import { createEditorCapabilityToken, EditorPluginHost } from '../plugins'
 import type { EditorOptions } from './types'
 import { EditorDisposableStore, MutableEditorDisposable } from './disposables'

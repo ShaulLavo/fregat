@@ -1,4 +1,4 @@
-import type { EditorDisposable } from '../plugins'
+import type { EditorDisposable } from './disposables'
 
 /**
  * Per-language editing rules, as data.

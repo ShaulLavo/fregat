@@ -3629,7 +3629,7 @@
         {
           "kind": "type",
           "name": "EditorDisposable",
-          "source": "packages/editor/src/plugins.ts",
+          "source": "packages/editor/src/editor/disposables.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {
@@ -3725,25 +3725,25 @@
         {
           "kind": "type",
           "name": "EditorHighlighterProvider",
-          "source": "packages/editor/src/plugins.ts",
+          "source": "packages/editor/src/syntax/highlighter.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {
           "kind": "type",
           "name": "EditorHighlighterSession",
-          "source": "packages/editor/src/plugins.ts",
+          "source": "packages/editor/src/syntax/highlighter.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {
           "kind": "type",
           "name": "EditorHighlighterSessionOptions",
-          "source": "packages/editor/src/plugins.ts",
+          "source": "packages/editor/src/syntax/highlighter.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {
           "kind": "type",
           "name": "EditorHighlightResult",
-          "source": "packages/editor/src/plugins.ts",
+          "source": "packages/editor/src/syntax/highlighter.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {
@@ -4667,7 +4667,7 @@
         {
           "kind": "type",
           "name": "EditorDisposable",
-          "source": "packages/editor/src/plugins.ts",
+          "source": "packages/editor/src/editor/disposables.ts",
           "via": "packages/editor/src/public/extensions.ts"
         },
         {
@@ -4727,25 +4727,25 @@
         {
           "kind": "type",
           "name": "EditorHighlighterProvider",
-          "source": "packages/editor/src/plugins.ts",
+          "source": "packages/editor/src/syntax/highlighter.ts",
           "via": "packages/editor/src/public/extensions.ts"
         },
         {
           "kind": "type",
           "name": "EditorHighlighterSession",
-          "source": "packages/editor/src/plugins.ts",
+          "source": "packages/editor/src/syntax/highlighter.ts",
           "via": "packages/editor/src/public/extensions.ts"
         },
         {
           "kind": "type",
           "name": "EditorHighlighterSessionOptions",
-          "source": "packages/editor/src/plugins.ts",
+          "source": "packages/editor/src/syntax/highlighter.ts",
           "via": "packages/editor/src/public/extensions.ts"
         },
         {
           "kind": "type",
           "name": "EditorHighlightResult",
-          "source": "packages/editor/src/plugins.ts",
+          "source": "packages/editor/src/syntax/highlighter.ts",
           "via": "packages/editor/src/public/extensions.ts"
         },
         {
@@ -5837,8 +5837,8 @@
         {
           "kind": "type",
           "name": "EditorEvlogErrorOptions",
-          "source": "packages/editor/src/logging/evlog.ts",
-          "via": "packages/editor/src/logging/evlog.ts"
+          "source": "packages/editor/src/logging/errors.ts",
+          "via": "packages/editor/src/logging/evlog.ts -> packages/editor/src/logging/errors.ts"
         },
         {
           "kind": "type",
@@ -5867,8 +5867,8 @@
         {
           "kind": "unknown",
           "name": "createEvlogError",
-          "source": "packages/editor/src/logging/evlog.ts",
-          "via": "packages/editor/src/logging/evlog.ts"
+          "source": "packages/editor/src/logging/errors.ts",
+          "via": "packages/editor/src/logging/evlog.ts -> packages/editor/src/logging/errors.ts"
         },
         {
           "kind": "value",
@@ -5891,14 +5891,14 @@
         {
           "kind": "value",
           "name": "createError",
-          "source": "packages/editor/src/logging/evlog.ts",
-          "via": "packages/editor/src/logging/evlog.ts"
+          "source": "packages/editor/src/logging/errors.ts",
+          "via": "packages/editor/src/logging/evlog.ts -> packages/editor/src/logging/errors.ts"
         },
         {
           "kind": "value",
           "name": "EditorEvlogError",
-          "source": "packages/editor/src/logging/evlog.ts",
-          "via": "packages/editor/src/logging/evlog.ts"
+          "source": "packages/editor/src/logging/errors.ts",
+          "via": "packages/editor/src/logging/evlog.ts -> packages/editor/src/logging/errors.ts"
         }
       ],
       "source": "packages/editor/src/logging/evlog.ts",

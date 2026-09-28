@@ -2,14 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Editor } from '../src/editor/Editor'
 import type {
-  EditorHighlightResult,
-  EditorHighlighterSession,
   EditorInitialPaintEvent,
   EditorLogEvent,
   EditorPlugin,
   EditorInitialHighlightStatus,
   EditorViewContributionUpdateKind,
 } from '../src/plugins'
+import type { EditorHighlightResult, EditorHighlighterSession } from '../src/syntax/highlighter'
 import { createEditorLoggingPlugin } from '../src/logging'
 import type { EditorTheme } from '../src/theme'
 import {

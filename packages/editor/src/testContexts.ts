@@ -1,15 +1,15 @@
 import { createStringTextSnapshot, type TextReadSnapshot } from './documentTextSnapshot'
-import { createError } from './logging/evlog'
+import { createError } from './logging/errors'
 import { LineStartsView } from './virtualization/lineStartIndex'
 import type {
   EditorCapabilityContributionContext,
-  EditorDisposable,
   EditorEditContributionContext,
   EditorPluginContext,
   EditorLineStartsView,
   EditorInternalViewContributionContext,
   EditorViewSnapshot,
 } from './plugins'
+import type { EditorDisposable } from './editor/disposables'
 
 // The hand-written contexts every test double is built from. Each default object is typed as the
 // whole context, so a member added to a context fails to compile here instead of in every test.

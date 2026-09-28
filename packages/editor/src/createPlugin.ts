@@ -5,11 +5,10 @@ import {
 } from './editor/commandCatalog'
 import type { Editor } from './editor/Editor'
 import { EditorDisposableStore } from './editor/disposables'
-import { createError } from './logging/evlog'
+import { createError } from './logging/errors'
 import type {
   EditorCommandHandler,
   EditorCursorStyle,
-  EditorDisposable,
   EditorKeyParticipant,
   EditorInternalPluginContext,
   EditorInternalViewContributionContext,
@@ -24,6 +23,7 @@ import type {
   EditorViewSnapshot,
   EditorVisibleRowSnapshot,
 } from './plugins'
+import type { EditorDisposable } from './editor/disposables'
 import type { EditorTheme } from './theme'
 import type { EditorTokenStore } from './syntax/tokenStore'
 import type { TextReadSnapshot } from './documentTextSnapshot'

@@ -1,4 +1,4 @@
-import { createError } from '../logging/evlog'
+import { createError } from '../logging/errors'
 import type { DocumentSessionChange } from '../documentSession'
 import type {
   EditorViewContribution,

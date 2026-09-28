@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createEditorBufferSession, createEditorTextBuffer } from '../src/documentSession'
 import { createEditorDocumentAnalysis } from '../src/editor/documentAnalysis'
 import { EditorTokenStore } from '../src/syntax/tokenStore'
-import type { EditorHighlighterProvider } from '../src/plugins'
+import type { EditorHighlighterProvider } from '../src/syntax/highlighter'
 import {
   createEmptySyntaxResult,
   type EditorSyntaxProvider,

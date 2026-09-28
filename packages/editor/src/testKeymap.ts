@@ -1,5 +1,6 @@
 import type { EditorAnyCommandId } from './editor/commandCatalog'
-import type { EditorCommandHandler, EditorDisposable } from './plugins'
+import type { EditorCommandHandler } from './plugins'
+import type { EditorDisposable } from './editor/disposables'
 import { editorKeyConditionMatches, type EditorKeymapContext } from './keymap/conditions'
 import { defaultEditorKeyBindings, type EditorKeyBinding } from './keymap/presets'
 import { createKeymapRuntime } from './keymap/runtime'

@@ -4,7 +4,7 @@ import type {
   EditorHighlighterProvider,
   EditorHighlighterSession,
   EditorHighlightResult,
-} from '../plugins'
+} from '../syntax/highlighter'
 import {
   createEditorRuntimeSessionId,
   createEmptySyntaxResult,

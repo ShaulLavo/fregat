@@ -3,18 +3,26 @@ import type { EditorPointHit, EditorMarkerHit } from './pointQueries'
 import type { TextContent } from './textContent'
 import type { EditorDecorationRange, EditorDecorationStore } from './editor/decorationStore'
 import type { DocumentSessionChange } from './documentSession'
-import type { DocumentTextSnapshot, TextReadSnapshot } from './documentTextSnapshot'
+import type { TextReadSnapshot } from './documentTextSnapshot'
 import type { EditorCommandContext } from './editor/commands'
 import type {
   EditorAnyCommandId,
   EditorContributedCommandDeclaration,
 } from './editor/commandCatalog'
-import { EditorDisposableStore, MutableEditorDisposable } from './editor/disposables'
-import type { PieceTableSnapshot } from '@singapore-editor/textbuffer'
+import {
+  EditorDisposableStore,
+  MutableEditorDisposable,
+  type EditorDisposable,
+} from './editor/disposables'
 import type { SnippetMirrorRange, SnippetSessionStop } from './editor/snippetSession'
 import type { EditorSyntaxThemeColor, EditorTheme, EditorThemeType } from './theme'
 import type { EditorTokenStore } from './syntax/tokenStore'
 import type { TextEdit } from './tokens'
+import type {
+  EditorHighlighterSessionOptions,
+  EditorHighlighterSession,
+  EditorHighlighterProvider,
+} from './syntax/highlighter'
 import type { DisplayTextRowSource, InjectedTextRow } from './displayTransforms'
 import {
   type BracketInfo,
@@ -44,10 +52,6 @@ import type {
   VirtualizedTextHighlightStyle,
   VirtualizedTextRowDecoration,
 } from './virtualization/virtualizedTextViewTypes'
-
-export type EditorDisposable = {
-  dispose(): void
-}
 
 export type EditorCapabilityToken<T> = {
   readonly id: string
@@ -159,32 +163,6 @@ export type EditorMinimapFeature = {
 
 export const EDITOR_MINIMAP_FEATURE =
   createEditorCapabilityToken<EditorMinimapFeature>(EDITOR_MINIMAP_FEATURE_ID)
-
-export type EditorHighlightResult = {
-  readonly tokens: EditorTokenStore
-  readonly theme?: EditorTheme | null
-}
-
-// A highlighter is a protocol adapter: it owns the full immutable source and decides when a
-// transport needs the whole text.
-export type EditorHighlighterSessionOptions = {
-  readonly documentId: string
-  readonly runtimeSessionId?: string
-  readonly languageId: EditorSyntaxLanguageId | null
-  readonly textSnapshot: DocumentTextSnapshot
-  readonly snapshot: PieceTableSnapshot
-}
-
-export type EditorHighlighterSession = EditorDisposable & {
-  onDidChangeTheme?(listener: () => void): (() => void) | void
-  refresh(textSnapshot: DocumentTextSnapshot): Promise<EditorHighlightResult>
-  applyChange(change: DocumentSessionChange): Promise<EditorHighlightResult>
-}
-
-export type EditorHighlighterProvider = {
-  loadTheme?(): Promise<EditorTheme | null | undefined>
-  createSession(options: EditorHighlighterSessionOptions): EditorHighlighterSession | null
-}
 
 /**
  * A change as a contribution receives it: the same object the document produced, typed so that its

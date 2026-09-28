@@ -169,7 +169,6 @@ import {
   type EditorDecorationContribution,
   type EditorDecorationContributionContext,
   type EditorDecorationContributionProvider,
-  type EditorDisposable,
   type EditorEditContribution,
   type EditorEditContributionContext,
   type EditorEditContributionProvider,
@@ -199,6 +198,7 @@ import {
   type EditorVisibleRowSnapshot,
   type EditorViewportSnapshot,
 } from '../plugins'
+import { type EditorDisposable } from './disposables'
 import { lastAddedSelectionIndex, markSelectionSetDirty, resolveSelection } from '../selections'
 import { type EditorSyntaxLanguageId } from '../syntax/session'
 import type { EditorSyntaxRange } from '../syntax/session'
@@ -236,7 +236,7 @@ import {
   type BrowserTextMetrics,
 } from '../virtualization/browserMetrics'
 import { EditorDisposableStore } from './disposables'
-import { createError } from '../logging/evlog'
+import { createError } from '../logging/errors'
 import type { EditorPreparedDocumentPayload } from './preparedDocument'
 
 const RAPID_INPUT_SECONDARY_WORK_DELAY_MS = 150

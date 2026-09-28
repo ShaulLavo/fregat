@@ -13,7 +13,7 @@ import type {
   EditorHighlightResult,
   EditorHighlighterSession,
   EditorHighlighterSessionOptions,
-} from '../plugins'
+} from '../syntax/highlighter'
 import { createEditorRuntimeSessionId } from '../syntax/session'
 import type { EditorTheme } from '../theme'
 import type {

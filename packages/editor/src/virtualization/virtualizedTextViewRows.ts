@@ -1,5 +1,5 @@
 import { completeRowPresentation, invalidateRowPresentations } from '../rowPresentation'
-import { createError } from '../logging/evlog'
+import { createError } from '../logging/errors'
 import { pointViewport } from './pointViewport'
 import type { SavedPaint, SavedPaintRow } from '../editor/paintSnapshot'
 import type { MeasuredText } from '../textMeasurements'

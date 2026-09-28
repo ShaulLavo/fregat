@@ -99,14 +99,9 @@ export type {
   EditorEditContribution,
   EditorEditContributionContext,
   EditorEditContributionProvider,
-  EditorDisposable,
   EditorGutterContribution,
   EditorGutterRowContext,
   EditorGutterWidthContext,
-  EditorHighlighterProvider,
-  EditorHighlighterSession,
-  EditorHighlighterSessionOptions,
-  EditorHighlightResult,
   EditorInitialHighlightStatus,
   EditorInitialPaintEvent,
   EditorInjectedTextRow,
@@ -170,6 +165,13 @@ export type {
   EditorVisibleSnapshot,
   EditorVisibleSnapshotJSON,
 } from '../plugins'
+export type { EditorDisposable } from '../editor/disposables'
+export type {
+  EditorHighlighterProvider,
+  EditorHighlighterSession,
+  EditorHighlighterSessionOptions,
+  EditorHighlightResult,
+} from '../syntax/highlighter'
 export { registerWheelScrollTarget } from '../virtualization/wheelScrollTarget'
 export { parseSnippet, snippetInitialSelection } from '../editor/snippet'
 export { serializeEditorViewSnapshot } from '../editor/viewSnapshot'

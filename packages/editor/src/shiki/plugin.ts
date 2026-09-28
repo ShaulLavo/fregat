@@ -1,8 +1,8 @@
+import type { EditorPlugin } from '../plugins'
 import type {
   EditorHighlighterProvider,
   EditorHighlighterSessionOptions,
-  EditorPlugin,
-} from '../plugins'
+} from '../syntax/highlighter'
 import type { EditorSyntaxLanguageId } from '../syntax/session'
 import {
   createShikiWorkerOwner,

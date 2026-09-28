@@ -5,7 +5,7 @@ import type {
 } from './documentAnalysis'
 import type { EditorTextBuffer } from '../documentSession'
 import type { PieceTableSnapshot } from '@singapore-editor/textbuffer'
-import type { EditorHighlighterProvider, EditorHighlightResult } from '../plugins'
+import type { EditorHighlighterProvider, EditorHighlightResult } from '../syntax/highlighter'
 import {
   createEmptySyntaxResult,
   type EditorSyntaxLanguageId,

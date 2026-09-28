@@ -1,5 +1,5 @@
 import { EditorDisposableStore, MutableEditorDisposable } from '../editor/disposables'
-import type { EditorDisposable } from '../plugins'
+import type { EditorDisposable } from '../editor/disposables'
 import { clearGlyphAdvancesCache } from './glyphAdvances'
 
 export type BrowserTextMetrics = {

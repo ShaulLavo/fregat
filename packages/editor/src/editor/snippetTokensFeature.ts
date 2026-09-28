@@ -1,12 +1,11 @@
 import { createDocumentTextSnapshot } from '../documentTextSnapshot'
+import { createEditorCapabilityToken, type EditorPluginHost } from '../plugins'
+import { type EditorDisposable } from './disposables'
 import {
-  createEditorCapabilityToken,
-  type EditorDisposable,
   type EditorHighlighterProvider,
   type EditorHighlighterSession,
   type EditorHighlighterSessionOptions,
-  type EditorPluginHost,
-} from '../plugins'
+} from '../syntax/highlighter'
 import { createPieceTableSnapshot } from '@singapore-editor/textbuffer'
 import { toEditorTokenStore } from '../syntax/tokenStore'
 import type {

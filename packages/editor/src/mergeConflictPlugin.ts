@@ -8,7 +8,6 @@ import {
 } from './mergeConflicts'
 import type {
   EditorContributionChange,
-  EditorDisposable,
   EditorFeatureContribution,
   EditorFeatureContributionContext,
   EditorInjectedTextRow,
@@ -22,6 +21,7 @@ import type {
   EditorViewContributionUpdateKind,
   EditorViewSnapshot,
 } from './plugins'
+import type { EditorDisposable } from './editor/disposables'
 import { createEditorCapabilityToken, EDITOR_MINIMAP_FEATURE } from './plugins'
 import type { TextEdit } from './tokens'
 import type { DocumentChangesSinceSyncPoint, DocumentSyncPoint } from './editor/editChain'

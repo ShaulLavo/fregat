@@ -8,12 +8,12 @@ import {
 } from '../src/documentSession'
 import { createVisibleEditor } from './factories/visibleEditor'
 import { createEditorPreparedDocument } from '../src/editor/preparedDocument'
+import type { EditorPlugin } from '../src/plugins'
 import type {
   EditorHighlightResult,
   EditorHighlighterProvider,
   EditorHighlighterSession,
-  EditorPlugin,
-} from '../src/plugins'
+} from '../src/syntax/highlighter'
 import { createPieceTableSnapshot } from '@singapore-editor/textbuffer'
 import {
   createEmptySyntaxResult,

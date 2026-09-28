@@ -1,11 +1,11 @@
 import { projectDecorationRangeThroughEdits } from './editor/decorationStore'
 import type {
-  EditorDisposable,
   EditorTrackedRanges,
   EditorViewContributionContext,
   EditorViewContributionUpdateKind,
   EditorViewSnapshot,
 } from './plugins'
+import type { EditorDisposable } from './editor/disposables'
 import {
   createSemanticTokenStyles,
   type SemanticTokenDropReason,

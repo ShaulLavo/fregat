@@ -137,16 +137,11 @@ export type {
   EditorEditContribution,
   EditorEditContributionContext,
   EditorEditContributionProvider,
-  EditorDisposable,
   EditorGutterContribution,
   EditorGutterRowContext,
   EditorGutterWidthContext,
-  EditorHighlightResult,
   EditorInitialHighlightStatus,
   EditorInitialPaintEvent,
-  EditorHighlighterProvider,
-  EditorHighlighterSession,
-  EditorHighlighterSessionOptions,
   EditorInjectedTextRow,
   EditorInjectedTextRowProvider,
   EditorInjectedTextRowProviderContext,
@@ -187,6 +182,13 @@ export type {
   EditorVisibleSnapshot,
   EditorVisibleSnapshotJSON,
 } from './plugins'
+export type { EditorDisposable } from './editor/disposables'
+export type {
+  EditorHighlightResult,
+  EditorHighlighterProvider,
+  EditorHighlighterSession,
+  EditorHighlighterSessionOptions,
+} from './syntax/highlighter'
 
 export type { JumpCause } from './editor/jumpHistory'
 

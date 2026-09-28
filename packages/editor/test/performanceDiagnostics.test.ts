@@ -6,7 +6,7 @@ import {
   type DocumentSessionChange,
 } from '../src/documentSession'
 import type { Editor, EditorOptions } from '../src/editor'
-import type { EditorHighlightResult } from '../src/plugins'
+import type { EditorHighlightResult } from '../src/syntax/highlighter'
 import {
   recordEditorPerformanceDiagnostic,
   type EditorPerformanceDiagnostic,

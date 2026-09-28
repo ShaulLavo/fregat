@@ -1,9 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import type {
-  EditorDisposable,
-  EditorInjectedTextRowProvider,
-  EditorPluginHostEvents,
-} from '../src/plugins'
+import type { EditorInjectedTextRowProvider, EditorPluginHostEvents } from '../src/plugins'
+import type { EditorDisposable } from '../src/editor/disposables'
 import { EditorPluginHost } from '../src/plugins'
 
 describe('editor plugin host teardown', () => {

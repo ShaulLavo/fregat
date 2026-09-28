@@ -8,13 +8,12 @@ import type { DocumentEditChain, DocumentSyncPoint } from './editChain'
 import type { DocumentTextSnapshot } from '../documentTextSnapshot'
 import type { PieceTableSnapshot } from '@singapore-editor/textbuffer'
 import type {
-  EditorHighlightResult,
-  EditorHighlighterSession,
   EditorInitialHighlightStatus,
   EditorInitialPaintEvent,
   EditorLogInput,
   EditorPluginHost,
 } from '../plugins'
+import type { EditorHighlightResult, EditorHighlighterSession } from '../syntax/highlighter'
 import { createEmptySyntaxResult } from '../syntax/session'
 import type {
   BracketInfo,

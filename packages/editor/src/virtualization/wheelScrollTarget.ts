@@ -1,4 +1,5 @@
-import type { EditorDisposable, EditorViewContributionContext } from '../plugins'
+import type { EditorViewContributionContext } from '../plugins'
+import type { EditorDisposable } from '../editor/disposables'
 
 /** Native access is supplied by the scroll owner, before it exposes logical DOM offsets. */
 export type NativeWheelScrollOptions = {

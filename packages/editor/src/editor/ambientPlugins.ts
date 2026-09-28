@@ -2,10 +2,10 @@ import {
   ambientEditorPlugins,
   subscribeAmbientEditorPlugins,
   type AmbientEditorPlugin,
-  type EditorDisposable,
   type EditorLanguageFeatureRegistry,
   type EditorPlugin,
 } from '../plugins'
+import { type EditorDisposable } from './disposables'
 
 type Installed = {
   generation: number

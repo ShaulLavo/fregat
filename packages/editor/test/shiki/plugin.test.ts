@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTestPluginContext } from '../../src/testContexts'
 
 import { createDocumentTextSnapshot, createPieceTableSnapshot } from '../../src'
-import type { EditorDisposable, EditorHighlighterProvider, EditorPlugin } from '../../src/plugins'
+import type { EditorPlugin } from '../../src/plugins'
+import type { EditorDisposable } from '../../src/editor/disposables'
+import type { EditorHighlighterProvider } from '../../src/syntax/highlighter'
 import {
   createShikiHighlighterPlugin,
   createShikiHighlighterProvider,
