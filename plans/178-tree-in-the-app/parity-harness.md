@@ -109,3 +109,15 @@ Verification on 2026-09-26, through the wave-heavy runner:
 The visual matrix remains an explicit local scenario, so this PR adds no matrix work to CI. The
 existing browser CI job has a 15-minute cap; local tree browser runs take about 10–12s with serial
 input. Every polling wait and animation wait remains bounded.
+
+## Follow-up, 2026-09-27: the hover flake
+
+"holds row hover until the scroll settles" failed in about half of full `test:tree-browser` runs.
+Cause: once a page has seen CDP touch input, Chromium matches `(hover: none)` and
+`(pointer: coarse)` for the rest of the run, and no CDP call restores it (disabling touch emulation,
+a fresh session, a mouse event and an emulated-media override were each tried). Tailwind's `hover:`
+applies only under `(hover: hover)`, so whenever the drag file's touch tests ran before the menu
+file, no row could show hover. The touch tests moved to `tree-parity-touch.browser.tsx`, which
+`vitest.tree-browser.config.ts` runs as a second project after the rest. Six full runs in a row
+passed afterwards; the drag, touch and menu files together, which failed every time before, passed
+twice.
