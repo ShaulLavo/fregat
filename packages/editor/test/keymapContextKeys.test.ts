@@ -91,6 +91,7 @@ test('every condition the presets use names a key the editor or a bundled plugin
     'suggestWidgetVisible', // @singapore-editor/lsp-plugin, completion
     'parameterHintsVisible', // @singapore-editor/lsp-plugin, signature help
     'parameterHintsMultipleSignatures',
+    'markdown', // @singapore-editor/markdown, authoring
   ])
   const platforms = ['mac', 'windows', 'linux'] as const
   const conditions = platforms.flatMap((platform) =>

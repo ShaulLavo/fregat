@@ -62,6 +62,21 @@
       "when": ["parameterHintsVisible", "parameterHintsMultipleSignatures"]
     },
     {
+      "chord": [{ "key": "B", "ctrl": true }],
+      "command": "markdown.bold",
+      "when": ["markdown", "writable"]
+    },
+    {
+      "chord": [{ "key": "I", "ctrl": true }],
+      "command": "markdown.italic",
+      "when": ["markdown", "writable"]
+    },
+    {
+      "chord": [{ "key": "K", "ctrl": true, "shift": true }],
+      "command": "markdown.link",
+      "when": ["markdown", "writable"]
+    },
+    {
       "chord": [{ "key": ".", "alt": true, "shift": true }],
       "command": "editor.action.autoFix",
       "when": ["writable"]
@@ -574,6 +589,21 @@
       "when": ["!tabFocusMode", "writable", "inlineSuggestionVisible"]
     },
     {
+      "chord": [{ "key": "B", "ctrl": true }],
+      "command": "markdown.bold",
+      "when": ["markdown", "writable"]
+    },
+    {
+      "chord": [{ "key": "I", "ctrl": true }],
+      "command": "markdown.italic",
+      "when": ["markdown", "writable"]
+    },
+    {
+      "chord": [{ "key": "K", "ctrl": true, "shift": true }],
+      "command": "markdown.link",
+      "when": ["markdown", "writable"]
+    },
+    {
       "chord": [{ "key": ".", "alt": true, "shift": true }],
       "command": "editor.action.autoFix",
       "when": ["writable"]
@@ -969,6 +999,21 @@
       "chord": [{ "key": "ArrowUp" }],
       "command": "showPrevParameterHint",
       "when": ["parameterHintsVisible", "parameterHintsMultipleSignatures"]
+    },
+    {
+      "chord": [{ "key": "B", "meta": true }],
+      "command": "markdown.bold",
+      "when": ["markdown", "writable"]
+    },
+    {
+      "chord": [{ "key": "I", "meta": true }],
+      "command": "markdown.italic",
+      "when": ["markdown", "writable"]
+    },
+    {
+      "chord": [{ "key": "K", "meta": true, "shift": true }],
+      "command": "markdown.link",
+      "when": ["markdown", "writable"]
     },
     {
       "chord": [{ "key": "ArrowRight", "mod": true, "alt": true }],
@@ -1491,6 +1536,21 @@
       "when": ["!tabFocusMode", "writable", "inlineSuggestionVisible"]
     },
     {
+      "chord": [{ "key": "B", "meta": true }],
+      "command": "markdown.bold",
+      "when": ["markdown", "writable"]
+    },
+    {
+      "chord": [{ "key": "I", "meta": true }],
+      "command": "markdown.italic",
+      "when": ["markdown", "writable"]
+    },
+    {
+      "chord": [{ "key": "K", "meta": true, "shift": true }],
+      "command": "markdown.link",
+      "when": ["markdown", "writable"]
+    },
+    {
       "chord": [{ "key": "ArrowRight", "mod": true, "alt": true }],
       "command": "editor.action.inlineSuggest.acceptNextWord",
       "when": ["writable", "inlineSuggestionVisible"]
@@ -1894,6 +1954,21 @@
       "chord": [{ "key": "ArrowUp" }],
       "command": "showPrevParameterHint",
       "when": ["parameterHintsVisible", "parameterHintsMultipleSignatures"]
+    },
+    {
+      "chord": [{ "key": "B", "ctrl": true }],
+      "command": "markdown.bold",
+      "when": ["markdown", "writable"]
+    },
+    {
+      "chord": [{ "key": "I", "ctrl": true }],
+      "command": "markdown.italic",
+      "when": ["markdown", "writable"]
+    },
+    {
+      "chord": [{ "key": "K", "ctrl": true, "shift": true }],
+      "command": "markdown.link",
+      "when": ["markdown", "writable"]
     },
     {
       "chord": [{ "key": ".", "alt": true, "shift": true }],
@@ -2404,6 +2479,21 @@
       "chord": [{ "key": "Tab" }],
       "command": "editor.action.inlineSuggest.commit",
       "when": ["!tabFocusMode", "writable", "inlineSuggestionVisible"]
+    },
+    {
+      "chord": [{ "key": "B", "ctrl": true }],
+      "command": "markdown.bold",
+      "when": ["markdown", "writable"]
+    },
+    {
+      "chord": [{ "key": "I", "ctrl": true }],
+      "command": "markdown.italic",
+      "when": ["markdown", "writable"]
+    },
+    {
+      "chord": [{ "key": "K", "ctrl": true, "shift": true }],
+      "command": "markdown.link",
+      "when": ["markdown", "writable"]
     },
     {
       "chord": [{ "key": ".", "alt": true, "shift": true }],
