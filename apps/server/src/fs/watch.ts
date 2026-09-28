@@ -951,11 +951,10 @@ function deliverWatchEvent(
 ) {
   if (event.type === 'error' || event.type === 'coverage')
     return concernsStream(event.path, roots, files)
-  if (event.type === 'git')
-    return (
-      !onlyFiles &&
-      (concernsStream(event.path, roots, files) || isSubscribedPath(event.path, roots))
-    )
+  if (event.type === 'git') {
+    if (onlyFiles) return false
+    return concernsStream(event.path, roots, files) || isSubscribedPath(event.path, roots)
+  }
   if (!isFilesystemEvent(event)) return true
   if (files.has(event.path)) return true
   if (event.type === 'renamed' && files.has(event.oldPath)) return true
