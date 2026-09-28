@@ -42,6 +42,16 @@ contracts a consumer needs:
   authoring/parser work before scheduling their remaining parts. [189](plans/189-tree-sitter-md-improvement.md)
   owns subsequent parser correctness and performance work.
 
+## Unified workspace proposal
+
+[202](plans/202-unified-workspace.md) plans a shared chat/code workspace with independently
+collapsible Sessions and project-tools columns. It reuses the delivered document/tab domain
+and existing splits. Plan 200 keeps diff content ownership; 171 keeps the composer migration.
+The shell work does not wait for their unrelated units. Keyboard and session-ownership
+contracts precede desktop mode removal; phone and TUI keep their own presentation contracts.
+This is plan-only, awaiting design review and separate implementation authorization. It does
+not change the closeout queue above or authorize terminal/sidebar behavior still under review.
+
 ## Other work and boundaries
 
 The [plan index](plans/README.md) lists the remaining numbered plans without duplicating their
