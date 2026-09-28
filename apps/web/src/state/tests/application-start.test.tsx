@@ -33,6 +33,7 @@ test('the editor-open benchmark control is reachable once the application starts
       appliedThemeId: null,
       selectedThemeId: 'dark',
       syntaxHighlightingEnabled: false,
+      analysisLimitMiCodeUnits: 10,
       tabSize: 4,
     },
   })

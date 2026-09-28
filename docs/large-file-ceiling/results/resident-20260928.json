@@ -1,0 +1,919 @@
+{
+  "baseline": {
+    "evidenceDirectory": "/work/tmp/fregat-evidence/112-baseline-v2-20260928",
+    "source": {
+      "platform": "8ca59fd7df915cccae0f3b920b8746c7a7651956",
+      "editor": "ad59752ea540bd8d4490563fc1fa2a2d5c2fd78d"
+    },
+    "results": [
+      {
+        "sizeMiB": 1,
+        "extension": "txt",
+        "twoByte": false,
+        "keys": 30,
+        "settleMs": 10000,
+        "profile": true,
+        "output": "/work/tmp/fregat-evidence/112-baseline-v2-20260928/txt-1",
+        "webRoot": "/work/tmp/fregat-evidence/112-baseline-20260928/web",
+        "browser": "153.0.8010.12",
+        "runtime": "1.4.2",
+        "timestamp": "2026-09-28T18:02:14.417Z",
+        "status": "passed",
+        "metrics": {
+          "openToTextMs": 330.0423250000001,
+          "keyLatencyMs": {
+            "count": 30,
+            "p50": 14.700000047683716,
+            "p95": 16.799999952316284,
+            "max": 17.199999809265137
+          },
+          "saveMs": 72.77648799999952,
+          "diskBytes": 1048606,
+          "heapBeforeOpen": {
+            "usedBytes": 16396628,
+            "backingBytes": 6144487
+          },
+          "heapAfterOpen": {
+            "usedBytes": 27459936,
+            "backingBytes": 7625381
+          },
+          "heapAfterTyping": {
+            "usedBytes": 33463404,
+            "backingBytes": 7626633
+          },
+          "heapAfterSave": {
+            "usedBytes": 34954244,
+            "backingBytes": 7632968
+          },
+          "openPeak": {
+            "browserBytes": 770277376,
+            "rendererBytes": 279666688,
+            "serverTreeBytes": 280248320,
+            "totalBytes": 1050525696
+          },
+          "typingPeak": {
+            "browserBytes": 846979072,
+            "rendererBytes": 357576704,
+            "serverTreeBytes": 252743680,
+            "totalBytes": 1098215424
+          },
+          "savePeak": {
+            "browserBytes": 785809408,
+            "rendererBytes": 294445056,
+            "serverTreeBytes": 262402048,
+            "totalBytes": 1046212608
+          }
+        },
+        "errors": []
+      },
+      {
+        "sizeMiB": 10,
+        "extension": "txt",
+        "twoByte": false,
+        "keys": 30,
+        "settleMs": 10000,
+        "profile": true,
+        "output": "/work/tmp/fregat-evidence/112-baseline-v2-20260928/txt-10",
+        "webRoot": "/work/tmp/fregat-evidence/112-baseline-20260928/web",
+        "browser": "153.0.8010.12",
+        "runtime": "1.4.2",
+        "timestamp": "2026-09-28T18:02:31.069Z",
+        "status": "passed",
+        "metrics": {
+          "openToTextMs": 364.93381699999986,
+          "keyLatencyMs": {
+            "count": 30,
+            "p50": 13.600000143051147,
+            "p95": 75.20000004768372,
+            "max": 80.89999985694885
+          },
+          "saveMs": 253.99716100000114,
+          "diskBytes": 10485790,
+          "heapBeforeOpen": {
+            "usedBytes": 17000348,
+            "backingBytes": 6145408
+          },
+          "heapAfterOpen": {
+            "usedBytes": 71301420,
+            "backingBytes": 11557374
+          },
+          "heapAfterTyping": {
+            "usedBytes": 113807700,
+            "backingBytes": 11558662
+          },
+          "heapAfterSave": {
+            "usedBytes": 124656360,
+            "backingBytes": 11562703
+          },
+          "openPeak": {
+            "browserBytes": 802611200,
+            "rendererBytes": 313511936,
+            "serverTreeBytes": 327921664,
+            "totalBytes": 1094606848
+          },
+          "typingPeak": {
+            "browserBytes": 1368637440,
+            "rendererBytes": 900435968,
+            "serverTreeBytes": 252047360,
+            "totalBytes": 1618747392
+          },
+          "savePeak": {
+            "browserBytes": 1114939392,
+            "rendererBytes": 596881408,
+            "serverTreeBytes": 328073216,
+            "totalBytes": 1404502016
+          }
+        },
+        "errors": []
+      },
+      {
+        "sizeMiB": 50,
+        "extension": "txt",
+        "twoByte": false,
+        "keys": 30,
+        "settleMs": 10000,
+        "profile": true,
+        "output": "/work/tmp/fregat-evidence/112-baseline-v2-20260928/txt-50",
+        "webRoot": "/work/tmp/fregat-evidence/112-baseline-20260928/web",
+        "browser": "153.0.8010.12",
+        "runtime": "1.4.2",
+        "timestamp": "2026-09-28T18:02:48.289Z",
+        "status": "passed",
+        "metrics": {
+          "openToTextMs": 1408.1918369999999,
+          "keyLatencyMs": {
+            "count": 30,
+            "p50": 11.099999904632568,
+            "p95": 529.2000000476837,
+            "max": 541.5999999046326
+          },
+          "saveMs": 1462.0789149999982,
+          "diskBytes": 52428830,
+          "heapBeforeOpen": {
+            "usedBytes": 18020024,
+            "backingBytes": 6702974
+          },
+          "heapAfterOpen": {
+            "usedBytes": 266394340,
+            "backingBytes": 24140316
+          },
+          "heapAfterTyping": {
+            "usedBytes": 470454668,
+            "backingBytes": 24141264
+          },
+          "heapAfterSave": {
+            "usedBytes": 523224860,
+            "backingBytes": 24147352
+          },
+          "openPeak": {
+            "browserBytes": 1315700736,
+            "rendererBytes": 843853824,
+            "serverTreeBytes": 541986816,
+            "totalBytes": 1611939840
+          },
+          "typingPeak": {
+            "browserBytes": 3355152384,
+            "rendererBytes": 2886688768,
+            "serverTreeBytes": 252563456,
+            "totalBytes": 3606122496
+          },
+          "savePeak": {
+            "browserBytes": 2433130496,
+            "rendererBytes": 1718362112,
+            "serverTreeBytes": 569204736,
+            "totalBytes": 3001733120
+          }
+        },
+        "errors": []
+      },
+      {
+        "sizeMiB": 100,
+        "extension": "txt",
+        "twoByte": false,
+        "keys": 30,
+        "settleMs": 10000,
+        "profile": true,
+        "output": "/work/tmp/fregat-evidence/112-baseline-v2-20260928/txt-100",
+        "webRoot": "/work/tmp/fregat-evidence/112-baseline-20260928/web",
+        "browser": "153.0.8010.12",
+        "runtime": "1.4.2",
+        "timestamp": "2026-09-28T18:03:11.685Z",
+        "status": "passed",
+        "metrics": {
+          "openToTextMs": 2573.598867,
+          "keyLatencyMs": {
+            "count": 30,
+            "p50": 10.5,
+            "p95": 1026.2000000476837,
+            "max": 1295
+          },
+          "saveMs": 3337.624269,
+          "diskBytes": 104857630,
+          "heapBeforeOpen": {
+            "usedBytes": 17703268,
+            "backingBytes": 6702971
+          },
+          "heapAfterOpen": {
+            "usedBytes": 513122588,
+            "backingBytes": 40917568
+          },
+          "heapAfterTyping": {
+            "usedBytes": 914303276,
+            "backingBytes": 40918611
+          },
+          "heapAfterSave": {
+            "usedBytes": 1019529476,
+            "backingBytes": 40922865
+          },
+          "openPeak": {
+            "browserBytes": 1759477760,
+            "rendererBytes": 1285533696,
+            "serverTreeBytes": 791085056,
+            "totalBytes": 2016190464
+          },
+          "typingPeak": {
+            "browserBytes": 4548902912,
+            "rendererBytes": 4065976320,
+            "serverTreeBytes": 248631296,
+            "totalBytes": 4795506688
+          },
+          "savePeak": {
+            "browserBytes": 4157018112,
+            "rendererBytes": 3284865024,
+            "serverTreeBytes": 776192000,
+            "totalBytes": 4589744128
+          }
+        },
+        "errors": []
+      },
+      {
+        "sizeMiB": 150,
+        "extension": "txt",
+        "twoByte": false,
+        "keys": 30,
+        "settleMs": 10000,
+        "profile": true,
+        "output": "/work/tmp/fregat-evidence/112-baseline-v2-20260928/txt-150",
+        "webRoot": "/work/tmp/fregat-evidence/112-baseline-20260928/web",
+        "browser": "153.0.8010.12",
+        "runtime": "1.4.2",
+        "timestamp": "2026-09-28T18:03:42.250Z",
+        "status": "passed",
+        "metrics": {
+          "openToTextMs": 3324.8236989999996,
+          "keyLatencyMs": {
+            "count": 30,
+            "p50": 15.100000143051147,
+            "p95": 1739,
+            "max": 1758
+          },
+          "saveMs": 5920.237995000003,
+          "diskBytes": 157286430,
+          "heapBeforeOpen": {
+            "usedBytes": 18758916,
+            "backingBytes": 7068114
+          },
+          "heapAfterOpen": {
+            "usedBytes": 758807640,
+            "backingBytes": 74472230
+          },
+          "heapAfterTyping": {
+            "usedBytes": 1366653188,
+            "backingBytes": 74473276
+          },
+          "heapAfterSave": {
+            "usedBytes": 1524269692,
+            "backingBytes": 74479371
+          },
+          "openPeak": {
+            "browserBytes": 2368032768,
+            "rendererBytes": 1899446272,
+            "serverTreeBytes": 892915712,
+            "totalBytes": 2627977216
+          },
+          "typingPeak": {
+            "browserBytes": 5129707520,
+            "rendererBytes": 4663365632,
+            "serverTreeBytes": 251461632,
+            "totalBytes": 5379121152
+          },
+          "savePeak": {
+            "browserBytes": 5158907904,
+            "rendererBytes": 4154081280,
+            "serverTreeBytes": 1191763968,
+            "totalBytes": 5539721216
+          }
+        },
+        "errors": []
+      },
+      {
+        "sizeMiB": 200,
+        "extension": "txt",
+        "twoByte": false,
+        "keys": 30,
+        "settleMs": 10000,
+        "profile": true,
+        "output": "/work/tmp/fregat-evidence/112-baseline-v2-20260928/txt-200",
+        "webRoot": "/work/tmp/fregat-evidence/112-baseline-20260928/web",
+        "browser": "153.0.8010.12",
+        "runtime": "1.4.2",
+        "timestamp": "2026-09-28T18:04:21.794Z",
+        "status": "failed",
+        "error": "Error: press: Target crashed ",
+        "errors": [],
+        "peak": {
+          "browserBytes": 4040032256,
+          "rendererBytes": 3548950528,
+          "serverTreeBytes": 249249792,
+          "totalBytes": 4289040384
+        }
+      }
+    ]
+  },
+  "final": {
+    "evidenceDirectory": "/work/tmp/fregat-evidence/112-final-resident-20260928",
+    "source": {
+      "platform": "4f587e90091cb0a74b314276a038b45685da572b",
+      "editor": "fcb3fb5ecb390ddb7698a7bfae321807e15659e7",
+      "builtWebSource": {
+        "platform": "4f587e90091cb0a74b314276a038b45685da572b",
+        "editor": "fcb3fb5ecb390ddb7698a7bfae321807e15659e7"
+      }
+    },
+    "results": [
+      {
+        "sizeMiB": 1,
+        "extension": "txt",
+        "highlighting": "default",
+        "twoByte": false,
+        "keys": 30,
+        "settleMs": 10000,
+        "profile": true,
+        "output": "/work/tmp/fregat-evidence/112-final-resident-20260928/txt-1",
+        "webRoot": "/work/tmp/fregat-evidence/112-final-resident-20260928/web",
+        "initialBytes": 1048546,
+        "corpus": "folded-functions-v1",
+        "browser": "153.0.8010.12",
+        "runtime": "1.4.2",
+        "timestamp": "2026-09-28T18:42:53.350Z",
+        "status": "passed",
+        "metrics": {
+          "openToTextMs": 338.12060700000006,
+          "keyLatencyMs": {
+            "count": 30,
+            "p50": 11.599999904632568,
+            "p95": 16.09999990463257,
+            "max": 16.200000047683716
+          },
+          "saveMs": 72.92046300000038,
+          "diskBytes": 1048576,
+          "heapBeforeOpen": {
+            "usedBytes": 17441840,
+            "backingBytes": 6735232
+          },
+          "heapAfterOpen": {
+            "usedBytes": 27203500,
+            "backingBytes": 8707150
+          },
+          "heapAfterTyping": {
+            "usedBytes": 28451088,
+            "backingBytes": 8708402
+          },
+          "heapAfterSave": {
+            "usedBytes": 28811216,
+            "backingBytes": 8712516
+          },
+          "workersAfterOpen": [
+            {
+              "url": "http://localhost:34370/assets/minimap.worker-i4S59IOV-Cp47ANe4.js",
+              "heap": {
+                "usedSize": 4149456,
+                "totalSize": 4653056,
+                "embedderHeapUsedSize": 58368,
+                "backingStorageSize": 328128
+              }
+            },
+            {
+              "url": "http://localhost:34370/assets/shiki.worker-C8XUL36p-BOf5zIXX.js",
+              "heap": {
+                "usedSize": 734380,
+                "totalSize": 1314816,
+                "embedderHeapUsedSize": 20240,
+                "backingStorageSize": 1836934
+              }
+            }
+          ],
+          "workersAfterSave": [
+            {
+              "url": "http://localhost:34370/assets/minimap.worker-i4S59IOV-Cp47ANe4.js",
+              "heap": {
+                "usedSize": 4318904,
+                "totalSize": 5255168,
+                "embedderHeapUsedSize": 58368,
+                "backingStorageSize": 328128
+              }
+            },
+            {
+              "url": "http://localhost:34370/assets/shiki.worker-C8XUL36p-BOf5zIXX.js",
+              "heap": {
+                "usedSize": 734380,
+                "totalSize": 1314816,
+                "embedderHeapUsedSize": 20240,
+                "backingStorageSize": 1836934
+              }
+            }
+          ],
+          "openPeak": {
+            "browserBytes": 765812736,
+            "rendererBytes": 292913152,
+            "serverTreeBytes": 266977280,
+            "totalBytes": 1032065024
+          },
+          "typingPeak": {
+            "browserBytes": 827838464,
+            "rendererBytes": 326389760,
+            "serverTreeBytes": 253378560,
+            "totalBytes": 1081077760
+          },
+          "savePeak": {
+            "browserBytes": 822583296,
+            "rendererBytes": 324665344,
+            "serverTreeBytes": 261246976,
+            "totalBytes": 1081319424
+          }
+        },
+        "errors": []
+      },
+      {
+        "sizeMiB": 10,
+        "extension": "txt",
+        "highlighting": "default",
+        "twoByte": false,
+        "keys": 30,
+        "settleMs": 10000,
+        "profile": true,
+        "output": "/work/tmp/fregat-evidence/112-final-resident-20260928/txt-10",
+        "webRoot": "/work/tmp/fregat-evidence/112-final-resident-20260928/web",
+        "initialBytes": 10485730,
+        "corpus": "folded-functions-v1",
+        "browser": "153.0.8010.12",
+        "runtime": "1.4.2",
+        "timestamp": "2026-09-28T18:43:11.018Z",
+        "status": "passed",
+        "metrics": {
+          "openToTextMs": 472.33476300000007,
+          "keyLatencyMs": {
+            "count": 30,
+            "p50": 7.6000001430511475,
+            "p95": 31.700000047683716,
+            "max": 40.30000019073486
+          },
+          "saveMs": 300.85837600000013,
+          "diskBytes": 10485760,
+          "heapBeforeOpen": {
+            "usedBytes": 17830240,
+            "backingBytes": 6953307
+          },
+          "heapAfterOpen": {
+            "usedBytes": 72054364,
+            "backingBytes": 11590042
+          },
+          "heapAfterTyping": {
+            "usedBytes": 71311944,
+            "backingBytes": 11591330
+          },
+          "heapAfterSave": {
+            "usedBytes": 71673636,
+            "backingBytes": 11595426
+          },
+          "workersAfterOpen": [
+            {
+              "url": "http://localhost:34370/assets/minimap.worker-i4S59IOV-Cp47ANe4.js",
+              "heap": {
+                "usedSize": 37352424,
+                "totalSize": 38109184,
+                "embedderHeapUsedSize": 58368,
+                "backingStorageSize": 328128
+              }
+            },
+            {
+              "url": "http://localhost:34370/assets/shiki.worker-C8XUL36p-BOf5zIXX.js",
+              "heap": {
+                "usedSize": 734380,
+                "totalSize": 1314816,
+                "embedderHeapUsedSize": 20240,
+                "backingStorageSize": 1836934
+              }
+            }
+          ],
+          "workersAfterSave": [
+            {
+              "url": "http://localhost:34370/assets/minimap.worker-i4S59IOV-Cp47ANe4.js",
+              "heap": {
+                "usedSize": 37486476,
+                "totalSize": 38154240,
+                "embedderHeapUsedSize": 58368,
+                "backingStorageSize": 328128
+              }
+            },
+            {
+              "url": "http://localhost:34370/assets/shiki.worker-C8XUL36p-BOf5zIXX.js",
+              "heap": {
+                "usedSize": 734380,
+                "totalSize": 1314816,
+                "embedderHeapUsedSize": 20240,
+                "backingStorageSize": 1836934
+              }
+            }
+          ],
+          "openPeak": {
+            "browserBytes": 830767104,
+            "rendererBytes": 341319680,
+            "serverTreeBytes": 285753344,
+            "totalBytes": 1104945152
+          },
+          "typingPeak": {
+            "browserBytes": 950157312,
+            "rendererBytes": 441282560,
+            "serverTreeBytes": 266711040,
+            "totalBytes": 1202073600
+          },
+          "savePeak": {
+            "browserBytes": 1052475392,
+            "rendererBytes": 513478656,
+            "serverTreeBytes": 320794624,
+            "totalBytes": 1373270016
+          }
+        },
+        "errors": []
+      },
+      {
+        "sizeMiB": 50,
+        "extension": "txt",
+        "highlighting": "default",
+        "twoByte": false,
+        "keys": 30,
+        "settleMs": 10000,
+        "profile": true,
+        "output": "/work/tmp/fregat-evidence/112-final-resident-20260928/txt-50",
+        "webRoot": "/work/tmp/fregat-evidence/112-final-resident-20260928/web",
+        "initialBytes": 52428770,
+        "corpus": "folded-functions-v1",
+        "browser": "153.0.8010.12",
+        "runtime": "1.4.2",
+        "timestamp": "2026-09-28T18:43:29.397Z",
+        "status": "passed",
+        "metrics": {
+          "openToTextMs": 451.01964599999997,
+          "keyLatencyMs": {
+            "count": 30,
+            "p50": 10.900000095367432,
+            "p95": 23,
+            "max": 23.40000009536743
+          },
+          "saveMs": 1917.7545059999993,
+          "diskBytes": 52428800,
+          "heapBeforeOpen": {
+            "usedBytes": 17827288,
+            "backingBytes": 6953256
+          },
+          "heapAfterOpen": {
+            "usedBytes": 87106416,
+            "backingBytes": 24173015
+          },
+          "heapAfterTyping": {
+            "usedBytes": 76803576,
+            "backingBytes": 24174266
+          },
+          "heapAfterSave": {
+            "usedBytes": 77164284,
+            "backingBytes": 24180093
+          },
+          "workersAfterOpen": [
+            {
+              "url": "http://localhost:34370/assets/shiki.worker-C8XUL36p-BOf5zIXX.js",
+              "heap": {
+                "usedSize": 734380,
+                "totalSize": 1576960,
+                "embedderHeapUsedSize": 20240,
+                "backingStorageSize": 1836934
+              }
+            },
+            {
+              "url": "http://localhost:34370/assets/minimap.worker-i4S59IOV-Cp47ANe4.js",
+              "heap": {
+                "usedSize": 184906128,
+                "totalSize": 185532416,
+                "embedderHeapUsedSize": 58368,
+                "backingStorageSize": 328128
+              }
+            }
+          ],
+          "workersAfterSave": [
+            {
+              "url": "http://localhost:34370/assets/shiki.worker-C8XUL36p-BOf5zIXX.js",
+              "heap": {
+                "usedSize": 734380,
+                "totalSize": 1576960,
+                "embedderHeapUsedSize": 20240,
+                "backingStorageSize": 1836934
+              }
+            },
+            {
+              "url": "http://localhost:34370/assets/minimap.worker-i4S59IOV-Cp47ANe4.js",
+              "heap": {
+                "usedSize": 185367608,
+                "totalSize": 186163200,
+                "embedderHeapUsedSize": 58368,
+                "backingStorageSize": 328128
+              }
+            }
+          ],
+          "openPeak": {
+            "browserBytes": 948981760,
+            "rendererBytes": 458809344,
+            "serverTreeBytes": 371773440,
+            "totalBytes": 1266749440
+          },
+          "typingPeak": {
+            "browserBytes": 1358635008,
+            "rendererBytes": 857591808,
+            "serverTreeBytes": 256655360,
+            "totalBytes": 1612238848
+          },
+          "savePeak": {
+            "browserBytes": 1472479232,
+            "rendererBytes": 941932544,
+            "serverTreeBytes": 449093632,
+            "totalBytes": 1836007424
+          }
+        },
+        "errors": []
+      },
+      {
+        "sizeMiB": 100,
+        "extension": "txt",
+        "highlighting": "default",
+        "twoByte": false,
+        "keys": 30,
+        "settleMs": 10000,
+        "profile": true,
+        "output": "/work/tmp/fregat-evidence/112-final-resident-20260928/txt-100",
+        "webRoot": "/work/tmp/fregat-evidence/112-final-resident-20260928/web",
+        "initialBytes": 104857570,
+        "corpus": "folded-functions-v1",
+        "browser": "153.0.8010.12",
+        "runtime": "1.4.2",
+        "timestamp": "2026-09-28T18:43:49.420Z",
+        "status": "passed",
+        "metrics": {
+          "openToTextMs": 621.614219,
+          "highlighting": {
+            "state": "plain"
+          },
+          "keyLatencyMs": {
+            "count": 30,
+            "p50": 4.5,
+            "p95": 16.59999990463257,
+            "max": 18.300000190734863
+          },
+          "saveMs": 2906.4049480000012,
+          "diskBytes": 104857600,
+          "heapBeforeOpen": {
+            "usedBytes": 18381028,
+            "backingBytes": 7511637
+          },
+          "heapAfterOpen": {
+            "usedBytes": 127635908,
+            "backingBytes": 40950029
+          },
+          "heapAfterTyping": {
+            "usedBytes": 129069688,
+            "backingBytes": 40951280
+          },
+          "heapAfterSave": {
+            "usedBytes": 129431224,
+            "backingBytes": 40957130
+          },
+          "workersAfterOpen": [
+            {
+              "url": "http://localhost:34370/assets/shiki.worker-C8XUL36p-BOf5zIXX.js",
+              "heap": {
+                "usedSize": 734380,
+                "totalSize": 1314816,
+                "embedderHeapUsedSize": 20240,
+                "backingStorageSize": 1836934
+              }
+            }
+          ],
+          "workersAfterSave": [
+            {
+              "url": "http://localhost:34370/assets/shiki.worker-C8XUL36p-BOf5zIXX.js",
+              "heap": {
+                "usedSize": 734380,
+                "totalSize": 1314816,
+                "embedderHeapUsedSize": 20240,
+                "backingStorageSize": 1836934
+              }
+            }
+          ],
+          "openPeak": {
+            "browserBytes": 1090162688,
+            "rendererBytes": 602120192,
+            "serverTreeBytes": 475832320,
+            "totalBytes": 1457487872
+          },
+          "typingPeak": {
+            "browserBytes": 916496384,
+            "rendererBytes": 420876288,
+            "serverTreeBytes": 252252160,
+            "totalBytes": 1167175680
+          },
+          "savePeak": {
+            "browserBytes": 1912606720,
+            "rendererBytes": 1317048320,
+            "serverTreeBytes": 676532224,
+            "totalBytes": 2409074688
+          }
+        },
+        "errors": []
+      },
+      {
+        "sizeMiB": 150,
+        "extension": "txt",
+        "highlighting": "default",
+        "twoByte": false,
+        "keys": 30,
+        "settleMs": 10000,
+        "profile": true,
+        "output": "/work/tmp/fregat-evidence/112-final-resident-20260928/txt-150",
+        "webRoot": "/work/tmp/fregat-evidence/112-final-resident-20260928/web",
+        "initialBytes": 157286370,
+        "corpus": "folded-functions-v1",
+        "browser": "153.0.8010.12",
+        "runtime": "1.4.2",
+        "timestamp": "2026-09-28T18:44:10.147Z",
+        "status": "passed",
+        "metrics": {
+          "openToTextMs": 825.385959,
+          "highlighting": {
+            "state": "plain"
+          },
+          "keyLatencyMs": {
+            "count": 30,
+            "p50": 12.5,
+            "p95": 23.699999809265137,
+            "max": 31.200000047683716
+          },
+          "saveMs": 4929.618057999998,
+          "diskBytes": 157286400,
+          "heapBeforeOpen": {
+            "usedBytes": 18316128,
+            "backingBytes": 7509465
+          },
+          "heapAfterOpen": {
+            "usedBytes": 180112644,
+            "backingBytes": 74504536
+          },
+          "heapAfterTyping": {
+            "usedBytes": 181527300,
+            "backingBytes": 74505787
+          },
+          "heapAfterSave": {
+            "usedBytes": 181825580,
+            "backingBytes": 74511742
+          },
+          "workersAfterOpen": [
+            {
+              "url": "http://localhost:34370/assets/shiki.worker-C8XUL36p-BOf5zIXX.js",
+              "heap": {
+                "usedSize": 734380,
+                "totalSize": 1314816,
+                "embedderHeapUsedSize": 20240,
+                "backingStorageSize": 1836934
+              }
+            }
+          ],
+          "workersAfterSave": [
+            {
+              "url": "http://localhost:34370/assets/shiki.worker-C8XUL36p-BOf5zIXX.js",
+              "heap": {
+                "usedSize": 734380,
+                "totalSize": 1314816,
+                "embedderHeapUsedSize": 20240,
+                "backingStorageSize": 1836934
+              }
+            }
+          ],
+          "openPeak": {
+            "browserBytes": 1281495040,
+            "rendererBytes": 787943424,
+            "serverTreeBytes": 578428928,
+            "totalBytes": 1701208064
+          },
+          "typingPeak": {
+            "browserBytes": 985931776,
+            "rendererBytes": 486170624,
+            "serverTreeBytes": 253157376,
+            "totalBytes": 1238155264
+          },
+          "savePeak": {
+            "browserBytes": 2616242176,
+            "rendererBytes": 1789739008,
+            "serverTreeBytes": 676392960,
+            "totalBytes": 3029872640
+          }
+        },
+        "errors": []
+      },
+      {
+        "sizeMiB": 200,
+        "extension": "txt",
+        "highlighting": "default",
+        "twoByte": false,
+        "keys": 30,
+        "settleMs": 10000,
+        "profile": true,
+        "output": "/work/tmp/fregat-evidence/112-final-resident-20260928/txt-200",
+        "webRoot": "/work/tmp/fregat-evidence/112-final-resident-20260928/web",
+        "initialBytes": 209715170,
+        "corpus": "folded-functions-v1",
+        "browser": "153.0.8010.12",
+        "runtime": "1.4.2",
+        "timestamp": "2026-09-28T18:44:33.538Z",
+        "status": "passed",
+        "metrics": {
+          "openToTextMs": 1236.5368169999997,
+          "highlighting": {
+            "state": "plain"
+          },
+          "keyLatencyMs": {
+            "count": 30,
+            "p50": 11.599999904632568,
+            "p95": 15.5,
+            "max": 15.799999952316284
+          },
+          "saveMs": 7472.141146999998,
+          "diskBytes": 209715200,
+          "heapBeforeOpen": {
+            "usedBytes": 19676020,
+            "backingBytes": 6219781
+          },
+          "heapAfterOpen": {
+            "usedBytes": 232554320,
+            "backingBytes": 74504521
+          },
+          "heapAfterTyping": {
+            "usedBytes": 233959304,
+            "backingBytes": 74505772
+          },
+          "heapAfterSave": {
+            "usedBytes": 234321884,
+            "backingBytes": 74511718
+          },
+          "workersAfterOpen": [
+            {
+              "url": "http://localhost:34370/assets/shiki.worker-C8XUL36p-BOf5zIXX.js",
+              "heap": {
+                "usedSize": 734380,
+                "totalSize": 1576960,
+                "embedderHeapUsedSize": 20240,
+                "backingStorageSize": 1836934
+              }
+            }
+          ],
+          "workersAfterSave": [
+            {
+              "url": "http://localhost:34370/assets/shiki.worker-C8XUL36p-BOf5zIXX.js",
+              "heap": {
+                "usedSize": 734380,
+                "totalSize": 1314816,
+                "embedderHeapUsedSize": 20240,
+                "backingStorageSize": 1836934
+              }
+            }
+          ],
+          "openPeak": {
+            "browserBytes": 1405124608,
+            "rendererBytes": 906862592,
+            "serverTreeBytes": 678838272,
+            "totalBytes": 1662574592
+          },
+          "typingPeak": {
+            "browserBytes": 1046798336,
+            "rendererBytes": 549830656,
+            "serverTreeBytes": 249483264,
+            "totalBytes": 1296277504
+          },
+          "savePeak": {
+            "browserBytes": 3218771968,
+            "rendererBytes": 2297794560,
+            "serverTreeBytes": 865484800,
+            "totalBytes": 3682201600
+          }
+        },
+        "errors": []
+      }
+    ]
+  }
+}

@@ -12,6 +12,7 @@ import {
   type EditorPreparedTagValue,
 } from '@singapore-editor/core/editor'
 
+import { documentAnalysisAllowed } from '@/features/editor/utils/large-file-policy'
 import { languageIdForFilePath } from '@/lib/file-language'
 import {
   editorShikiHighlighterProvider,
@@ -30,6 +31,7 @@ export type EditorPreparedEnvironment = {
   readonly appliedThemeContentHash: string | null
   readonly appliedThemeId: string | null
   readonly selectedThemeId: string
+  readonly analysisLimitMiCodeUnits: number
   readonly syntaxHighlightingEnabled: boolean
   /** Must equal the mounted editor's `tabSize`, or the editor declines the prepared document. */
   readonly tabSize: number
@@ -68,6 +70,7 @@ export function createPlatformFileOpenPreparer(
         preparedDocument,
         ...preparedDocumentConfiguration(
           preparedDocument,
+          buffer,
           path,
           environment,
           abortSignal,
@@ -77,9 +80,10 @@ export function createPlatformFileOpenPreparer(
         ),
       }
     },
-    reconfigure: (preparedDocument, _buffer, _documentId, path, abortSignal, structuralRange) =>
+    reconfigure: (preparedDocument, buffer, _documentId, path, abortSignal, structuralRange) =>
       preparedDocumentConfiguration(
         preparedDocument,
+        buffer,
         path,
         environment,
         abortSignal,
@@ -92,15 +96,17 @@ export function createPlatformFileOpenPreparer(
 
 export function editorPreparedDocumentTags(
   path: string,
-  environment: Omit<EditorPreparedEnvironment, 'tabSize'>,
+  environment: Omit<EditorPreparedEnvironment, 'tabSize' | 'analysisLimitMiCodeUnits'>,
+  analysisAllowed: boolean,
   languageId = languageIdForFilePath(path),
 ): EditorPreparedDocumentTags {
-  const source = environment.syntaxHighlightingEnabled
-    ? editorSyntaxHighlightingSource(environment.selectedThemeId, languageId)
-    : 'disabled'
+  const source =
+    environment.syntaxHighlightingEnabled && analysisAllowed
+      ? editorSyntaxHighlightingSource(environment.selectedThemeId, languageId)
+      : 'disabled'
   const captures = languageId === 'markdown'
   return {
-    documentConfigurationTag: ['platform-editor', languageId, source],
+    documentConfigurationTag: ['platform-editor', languageId, source, analysisAllowed],
     highlighterConfigurationTag: [
       'platform-shiki',
       source,
@@ -120,12 +126,17 @@ function prepareEditorDocument(
   analysis: EditorDocumentAnalysis = createEditorDocumentAnalysis({ buffer, documentId }),
 ): EditorPreparedDocument {
   const languageId = languageIdForFilePath(path)
-  const tags = editorPreparedDocumentTags(path, environment)
+  const analysisAllowed = documentAnalysisAllowed(
+    buffer.getSnapshot().length,
+    environment.analysisLimitMiCodeUnits,
+  )
+  const tags = editorPreparedDocumentTags(path, environment, analysisAllowed)
   return createEditorPreparedDocument({
     analysis,
     buffer,
     configuredTabSize: environment.tabSize,
-    tabSizePolicy: 'detect-indentation',
+    folding: analysisAllowed,
+    tabSizePolicy: analysisAllowed ? 'detect-indentation' : 'fixed',
     documentConfigurationTag: tags.documentConfigurationTag,
     documentId,
     languageId,
@@ -134,6 +145,7 @@ function prepareEditorDocument(
 
 function preparedDocumentConfiguration(
   prepared: EditorPreparedDocument,
+  buffer: EditorTextBuffer,
   path: string,
   environment: EditorPreparedEnvironment,
   abortSignal: AbortSignal,
@@ -142,10 +154,15 @@ function preparedDocumentConfiguration(
   structuralProvider: EditorSyntaxProvider | null,
 ): FileOpenIntentPreparationConfiguration {
   const languageId = languageIdForFilePath(path)
-  const source = environment.syntaxHighlightingEnabled
-    ? editorSyntaxHighlightingSource(environment.selectedThemeId, languageId)
-    : 'disabled'
-  const tags = editorPreparedDocumentTags(path, environment)
+  const analysisAllowed = documentAnalysisAllowed(
+    buffer.getSnapshot().length,
+    environment.analysisLimitMiCodeUnits,
+  )
+  const source =
+    environment.syntaxHighlightingEnabled && analysisAllowed
+      ? editorSyntaxHighlightingSource(environment.selectedThemeId, languageId)
+      : 'disabled'
+  const tags = editorPreparedDocumentTags(path, environment, analysisAllowed)
   const highlighter = highlighterPreparationStage(
     prepared,
     source,
@@ -240,5 +257,7 @@ function preparedEnvironmentConfigurationTag(
     environment.appliedThemeContentHash,
     environment.selectedThemeId,
     environment.syntaxHighlightingEnabled,
+    environment.analysisLimitMiCodeUnits,
+    environment.tabSize,
   ]
 }

@@ -97,6 +97,7 @@ export function AppProviders({
           appliedThemeId: null,
           selectedThemeId: 'dark',
           syntaxHighlightingEnabled: false,
+          analysisLimitMiCodeUnits: 10,
           tabSize: 4,
         },
       })

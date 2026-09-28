@@ -43,6 +43,7 @@ test('the active editor serves its census without a React tree, and a machine sw
       appliedThemeId: null,
       selectedThemeId: 'dark-plus',
       syntaxHighlightingEnabled: false,
+      analysisLimitMiCodeUnits: 10,
       tabSize: 4,
     },
   })
@@ -121,6 +122,7 @@ test('a machine refused before its first handshake keeps its editor suspended un
       appliedThemeId: null,
       selectedThemeId: 'dark-plus',
       syntaxHighlightingEnabled: false,
+      analysisLimitMiCodeUnits: 10,
       tabSize: 4,
     },
   })

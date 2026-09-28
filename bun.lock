@@ -142,6 +142,7 @@
         "@singapore-editor/lsp-plugin": "0.1.1",
         "@singapore-editor/markdown": "0.1.0",
         "@singapore-editor/minimap": "0.1.1",
+        "@singapore-editor/paged": "0.1.0",
         "@singapore-editor/plugin-ui": "0.1.0",
         "@singapore-editor/react": "0.1.1",
         "@singapore-editor/scope-lines": "0.1.1",
@@ -435,6 +436,7 @@
     "@singapore-editor/lsp-plugin": "link:@singapore-editor/lsp-plugin",
     "@singapore-editor/markdown": "link:@singapore-editor/markdown",
     "@singapore-editor/minimap": "link:@singapore-editor/minimap",
+    "@singapore-editor/paged": "link:@singapore-editor/paged",
     "@singapore-editor/panes": "link:@singapore-editor/panes",
     "@singapore-editor/plugin-ui": "link:@singapore-editor/plugin-ui",
     "@singapore-editor/react": "link:@singapore-editor/react",
@@ -1190,6 +1192,8 @@
     "@singapore-editor/markdown": ["@singapore-editor/markdown@link:@singapore-editor/markdown", {}],
 
     "@singapore-editor/minimap": ["@singapore-editor/minimap@link:@singapore-editor/minimap", {}],
+
+    "@singapore-editor/paged": ["@singapore-editor/paged@link:@singapore-editor/paged", {}],
 
     "@singapore-editor/plugin-ui": ["@singapore-editor/plugin-ui@link:@singapore-editor/plugin-ui", {}],
 

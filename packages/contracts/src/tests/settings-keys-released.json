@@ -49,6 +49,8 @@
     "editor.history.persistDays",
     "editor.history.retainedStates",
     "editor.inputRoute",
+    "editor.largeFile.analysisLimitMiCodeUnits",
+    "editor.largeFile.minimapLimitMiCodeUnits",
     "editor.lineHeight",
     "editor.markdownRenderedPane",
     "editor.markdownView",

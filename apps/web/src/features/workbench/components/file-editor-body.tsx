@@ -1,3 +1,4 @@
+import { PagedFileViewer } from '@/features/workbench/components/paged-file-viewer'
 import { useMemo, useState } from 'react'
 import { documentKey } from '@/lib/documents/utils/identity'
 import { MarkdownPreviewPane } from '@/features/workbench/components/markdown-preview-pane'
@@ -51,6 +52,7 @@ export function FileEditorBody({
   rootPath: FilesystemPath
   tabId: TabId
 }) {
+  const [pagedKey, setPagedKey] = useState<string | null>(null)
   const { storage } = useEditorRuntime()
   const actions = useEditorSurfaceActions()
   const { service: fileOpenIntent } = useFileOpenIntent()
@@ -128,6 +130,9 @@ export function FileEditorBody({
     )
   }
 
+  if (resource && pagedKey === key && active && fileState.status === 'error')
+    return <PagedFileViewer path={resource.path} />
+
   return (
     <div className={fileBodyGridClass(splitMarkdown, currentReferences !== null)}>
       <div className='relative flex min-h-0 min-w-0 flex-col overflow-hidden'>
@@ -162,6 +167,7 @@ export function FileEditorBody({
             path={resource.path}
             message={fileState.message}
             hasContent={editorDocument !== null}
+            onOpenReadOnly={() => setPagedKey(key)}
           />
         ) : null}
         {!editorDocument && fileState.status !== 'error' ? (

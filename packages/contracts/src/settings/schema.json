@@ -354,6 +354,20 @@
       "markdownDescription": "How typed text reaches the editor. EditContext (Chromium) hands IME, autocorrect and dictation edits to the editor with their exact ranges. Other browsers use a hidden textarea.\n\nIn the editor-edit-context-input scenario, an IME correction over the first word yields Hello日本 on EditContext and hello日本Hello on the textarea. EditContext is Chromium-only; Firefox and Safari use the textarea whatever this says.",
       "type": "string"
     },
+    "editor.largeFile.analysisLimitMiCodeUnits": {
+      "default": 10,
+      "description": "Pause syntax, language services, folding and document analysis above this size in Mi UTF-16 code units (1,048,576 units).",
+      "maximum": 1024,
+      "minimum": 0,
+      "type": "number"
+    },
+    "editor.largeFile.minimapLimitMiCodeUnits": {
+      "default": 50,
+      "description": "Pause the minimap above this size in Mi UTF-16 code units (1,048,576 units).",
+      "maximum": 1024,
+      "minimum": 0,
+      "type": "number"
+    },
     "editor.lineHeight": {
       "default": 24,
       "description": "Editor row height in pixels.",

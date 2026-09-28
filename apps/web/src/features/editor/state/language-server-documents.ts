@@ -1,3 +1,4 @@
+import { MI_CODE_UNITS } from '@/features/editor/utils/large-file-policy'
 import type { EditorTextBuffer } from '@singapore-editor/core/document'
 import type { LanguageServerDocument } from '@singapore-editor/lsp-plugin'
 import type { EditorLanguageServerStatusSource } from '@/features/editor/state/language-server-status-source'
@@ -12,18 +13,40 @@ export type LanguageServerDocumentEntry = {
 type RetainedDocument = LanguageServerDocumentEntry & {
   readonly buffer: EditorTextBuffer
   readonly configuration: string
+  readonly unsubscribe: () => void
 }
 
 export class LanguageServerDocuments {
   private configurationGeneration = 0
   private readonly entries = new Map<string, RetainedDocument>()
 
+  private maxLength: number
+
+  constructor(limitMiCodeUnits: number) {
+    this.maxLength = limitMiCodeUnits * MI_CODE_UNITS
+  }
+
+  accepts(buffer: EditorTextBuffer): boolean {
+    return buffer.getSnapshot().length <= this.maxLength
+  }
+
+  setLimit(limitMiCodeUnits: number): void {
+    this.maxLength = limitMiCodeUnits * MI_CODE_UNITS
+    for (const [key, entry] of this.entries) {
+      if (!this.accepts(entry.buffer)) this.delete(key)
+    }
+  }
+
   getOrCreate(
     key: string,
     buffer: EditorTextBuffer,
     configuration: string,
     create: () => LanguageServerDocumentEntry,
-  ): LanguageServerDocumentEntry {
+  ): LanguageServerDocumentEntry | null {
+    if (!this.accepts(buffer)) {
+      this.delete(key)
+      return null
+    }
     const current = this.entries.get(key)
     if (
       current?.buffer === buffer &&
@@ -31,10 +54,19 @@ export class LanguageServerDocuments {
       current.document.lanes.every((lane) => lane.status !== 'error')
     )
       return current
-    current?.document.dispose()
-    const entry = { ...create(), buffer, configuration }
-    this.entries.set(key, entry)
-    return entry
+    this.delete(key)
+    // Subscribe before the LSP document so a growth crossing closes it before didChange.
+    const unsubscribe = buffer.subscribe(() => {
+      if (!this.accepts(buffer)) this.delete(key)
+    })
+    try {
+      const entry = { ...create(), buffer, configuration, unsubscribe }
+      this.entries.set(key, entry)
+      return entry
+    } catch (error) {
+      unsubscribe()
+      throw error
+    }
   }
 
   configure(generation: number): void {
@@ -44,20 +76,20 @@ export class LanguageServerDocuments {
   }
 
   delete(key: string): void {
-    this.entries.get(key)?.document.dispose()
+    const entry = this.entries.get(key)
+    entry?.unsubscribe()
+    entry?.document.dispose()
     this.entries.delete(key)
   }
 
   retain(buffers: ReadonlyMap<string, EditorTextBuffer>): void {
     for (const [key, entry] of this.entries) {
       if (buffers.get(key) === entry.buffer) continue
-      entry.document.dispose()
-      this.entries.delete(key)
+      this.delete(key)
     }
   }
 
   dispose(): void {
-    for (const entry of this.entries.values()) entry.document.dispose()
-    this.entries.clear()
+    for (const key of this.entries.keys()) this.delete(key)
   }
 }

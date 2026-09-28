@@ -1,7 +1,20 @@
 # Large-file ceiling: measurements (Plan 112)
 
-Measured 2026-09-25 for [Plan 112](../../plans/112-large-file-ceiling.md). Raw rows are in
-[`results/`](results/); every table below is read from those files.
+The **2026-09-28 dirty integration candidate** opens, edits and saves all six plain-text sizes through
+200 MiB with exact-byte verification. At 200 MiB, measured typing p95 is 15.5ms and main heap after
+save is 223.5 MiB; the save takes 7.47s and still has substantial transient memory costs.
+
+See the [resident, tiers and E015 results report](results/resident-20260928.md), its
+[raw captured rows](results/resident-20260928.json), and the
+[200 MiB trace comparison](results/trace-200-comparison.md). Analysis and minimap use separate
+10/50 Mi UTF-16-unit budgets; 10 Mi is the largest TypeScript size where both Shiki and Tree-sitter
+pass inside an 8 GiB scope. The paged capability is
+read-only. This report does not claim deployment of the integrated candidate.
+
+The sections below preserve the **2026-09-25 investigation** for
+[Plan 112](../../plans/112-large-file-ceiling.md), followed by the 2026-09-28 baseline. They describe
+the measured code at those dates, including save and transport failures fixed in the candidate.
+Raw rows are in [`results/`](results/).
 
 ## Setup
 

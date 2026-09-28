@@ -1,3 +1,4 @@
+import { materializeFileSnapshotText, type FileSnapshot } from '@/lib/file-snapshot'
 import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
 import { documentTab } from '@/lib/documents/utils/tabs'
 import type { StandaloneDocumentRef } from '@/lib/documents/utils/types'
@@ -25,6 +26,7 @@ const preparation = {
   appliedThemeId: null,
   selectedThemeId: 'dark',
   syntaxHighlightingEnabled: false,
+  analysisLimitMiCodeUnits: 10,
   tabSize: 4,
 }
 
@@ -264,9 +266,11 @@ test('finishes every A save and cache update on A after its first write is delay
     expect(deferredB.writePaths).toEqual([])
     for (const path of pathsA) {
       expect(await readFile(join(server.root, path), 'utf8')).toBe('A savededited ')
-      expect(queriesA.getQueryData(fileSystemKeys.fileSnapshot(path))).toMatchObject({
-        content: 'A savededited ',
-      })
+      expect(
+        materializeFileSnapshotText(
+          queriesA.getQueryData<FileSnapshot>(fileSystemKeys.fileSnapshot(path))!,
+        ),
+      ).toBe('A savededited ')
       expect(queriesB.getQueryData(fileSystemKeys.fileSnapshot(path))).toBeUndefined()
     }
     expect(await readFile(join(serverB.root, pathB), 'utf8')).toBe('B saved')

@@ -1,4 +1,4 @@
-import { createEditorTextBuffer } from '@singapore-editor/core/document'
+import { createEditorBufferSession, createEditorTextBuffer } from '@singapore-editor/core/document'
 import { createLanguageServerDocument } from '@singapore-editor/lsp-plugin'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -22,7 +22,7 @@ function entry(buffer = createEditorTextBuffer('')): LanguageServerDocumentEntry
 
 describe('open LSP documents', () => {
   it('reuses a session across views and releases it when its last open reference disappears', () => {
-    const documents = new LanguageServerDocuments()
+    const documents = new LanguageServerDocuments(20)
     const buffer = createEditorTextBuffer('')
     const created = entry(buffer)
     const dispose = vi.spyOn(created.document, 'dispose')
@@ -39,7 +39,7 @@ describe('open LSP documents', () => {
   })
 
   it('releases retained sessions on a settings generation change, once per generation', () => {
-    const documents = new LanguageServerDocuments()
+    const documents = new LanguageServerDocuments(20)
     const buffer = createEditorTextBuffer('')
     const first = entry(buffer)
     const dispose = vi.spyOn(first.document, 'dispose')
@@ -50,14 +50,14 @@ describe('open LSP documents', () => {
     documents.configure(2)
     expect(dispose).toHaveBeenCalledOnce()
     const next = entry(buffer)
-    expect(documents.getOrCreate('a', buffer, 'typescript', () => next).document).toBe(
+    expect(documents.getOrCreate('a', buffer, 'typescript', () => next)?.document).toBe(
       next.document,
     )
     documents.dispose()
   })
 
   it('replaces sessions for a new buffer or server configuration and drops a renamed key', () => {
-    const documents = new LanguageServerDocuments()
+    const documents = new LanguageServerDocuments(20)
     const firstBuffer = createEditorTextBuffer('old')
     const secondBuffer = createEditorTextBuffer('new')
     const first = entry(firstBuffer)
@@ -74,4 +74,26 @@ describe('open LSP documents', () => {
     documents.retain(new Map([['renamed', secondBuffer]]))
     expect(thirdDispose).toHaveBeenCalledOnce()
   })
+})
+
+it('drops a retained document synchronously when edits cross the budget and resumes after undo', () => {
+  const buffer = createEditorTextBuffer('1234')
+  const documents = new LanguageServerDocuments(4 / 1_048_576)
+  const create = vi.fn(() => entry(buffer))
+  const first = documents.getOrCreate('a', buffer, 'ts', create)!
+  const dispose = vi.spyOn(first.document, 'dispose')
+  const session = createEditorBufferSession(buffer)
+  session.applyText('5')
+  expect(dispose).toHaveBeenCalledOnce()
+  expect(documents.getOrCreate('a', buffer, 'ts', create)).toBeNull()
+  expect(create).toHaveBeenCalledOnce()
+  buffer.undo()
+  expect(documents.getOrCreate('a', buffer, 'ts', create)).not.toBe(first)
+  expect(create).toHaveBeenCalledTimes(2)
+  const current = documents.getOrCreate('a', buffer, 'ts', create)!
+  const secondDispose = vi.spyOn(current.document, 'dispose')
+  documents.setLimit(3 / 1_048_576)
+  expect(secondDispose).toHaveBeenCalledOnce()
+  expect(documents.accepts(buffer)).toBe(false)
+  documents.dispose()
 })

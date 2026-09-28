@@ -917,6 +917,27 @@ export const SETTINGS_REGISTRY = {
       'Characters allowed without Unicode highlighting. Paste the characters here, for example an en dash.',
     keywords: ['unicode', 'allowed', 'exclude', 'characters'],
   }),
+  'editor.largeFile.analysisLimitMiCodeUnits': defineSetting({
+    title: 'Analysis size limit',
+    schema: v.pipe(v.number(), v.minValue(0), v.maxValue(1024)),
+    default: 10,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Editor',
+    description:
+      'Pause syntax, language services, folding and document analysis above this size in Mi UTF-16 code units (1,048,576 units).',
+    keywords: ['large files', 'performance', 'analysis', 'memory'],
+  }),
+  'editor.largeFile.minimapLimitMiCodeUnits': defineSetting({
+    title: 'Minimap size limit',
+    schema: v.pipe(v.number(), v.minValue(0), v.maxValue(1024)),
+    default: 50,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Editor',
+    description: 'Pause the minimap above this size in Mi UTF-16 code units (1,048,576 units).',
+    keywords: ['large files', 'performance', 'minimap', 'memory'],
+  }),
   'editor.minimap.enabled': defineSetting({
     schema: v.boolean(),
     default: true,
