@@ -4,6 +4,7 @@ import {
   createPieceTableSnapshot,
   createDocumentTextSnapshot,
 } from '@singapore-editor/core/document'
+import { createTreeSitterSyntaxProvider } from '../src/index.ts'
 import { TreeSitterSyntaxSession } from '../src/session.ts'
 import type { TreeSitterLanguageDescriptor } from '../src/treeSitter/registry.ts'
 import type { TreeSitterBackend } from '../src/treeSitter/workerClient.ts'
@@ -185,3 +186,116 @@ it('shares a delayed language load with the newer document version', async () =>
   expect(registered).toEqual([['markdown', 'markdown_inline', 'html'], ['astro']])
   session.dispose()
 })
+
+describe('provider warm-up', () => {
+  it('warms the host languages with their injection closures after a first parse', async () => {
+    const warm = warmingProvider(() => ['markdown', 'html', 'unknown'])
+
+    expect(warm.warmed).toEqual([])
+    await warm.openDocument('html')
+    await flushPromises()
+
+    expect(warm.warmed).toEqual([['markdown', 'markdown_inline', 'html']])
+  })
+
+  it('reads the host set again for each new document and skips an unchanged one', async () => {
+    let languages = ['html']
+    const warm = warmingProvider(() => languages)
+
+    await warm.openDocument('html')
+    await warm.openDocument('html')
+    languages = ['markdown']
+    await warm.openDocument('html')
+    await flushPromises()
+
+    expect(warm.warmed).toEqual([['html'], ['markdown', 'markdown_inline', 'html']])
+  })
+
+  it('warms replaced registrations even when the host language list is unchanged', async () => {
+    const warmedUrls: string[][] = []
+    const warm = warmingProvider(
+      () => ['html'],
+      async (languages) => {
+        warmedUrls.push(languages.map((language) => language.wasmUrl))
+      },
+    )
+    await warm.openDocument('html')
+    await flushPromises()
+    const replacement = warm.provider.registerLanguage(
+      { ...descriptor('html'), wasmUrl: '/replacement.wasm' },
+      { replace: true },
+    )
+    await warm.openDocument('html')
+    await flushPromises()
+    replacement.dispose()
+    await warm.openDocument('html')
+    await flushPromises()
+
+    expect(warmedUrls).toEqual([
+      [descriptor('html').wasmUrl],
+      ['/replacement.wasm'],
+      [descriptor('html').wasmUrl],
+    ])
+  })
+
+  it('skips a grammar that fails to load and survives a worker that cannot start', async () => {
+    const warm = warmingProvider(() => ['broken', 'html'])
+    warm.provider.registerLanguage({
+      id: 'broken',
+      load: () => Promise.reject(new Error('offline')),
+    })
+
+    await warm.openDocument('html')
+    await flushPromises()
+    expect(warm.warmed).toEqual([['html']])
+
+    const failing = warmingProvider(
+      () => ['html'],
+      () => Promise.reject(new Error('down')),
+    )
+    await failing.openDocument('html')
+    await flushPromises()
+  })
+})
+
+function warmingProvider(
+  languages: () => readonly string[],
+  warmLanguages?: TreeSitterBackend['warmLanguages'],
+) {
+  const warmed: string[][] = []
+  const provider = createTreeSitterSyntaxProvider({
+    backend: {
+      ...recordingBackend([]),
+      parse: async (payload) => ({
+        documentId: payload.documentId,
+        languageId: payload.languageId,
+        snapshotVersion: payload.snapshotVersion,
+        status: 'parsed',
+        changedRanges: [],
+        timings: [],
+      }),
+      warmLanguages:
+        warmLanguages ??
+        (async (descriptors) => {
+          warmed.push(descriptors.map((language) => language.id))
+        }),
+    },
+    warmLanguages: languages,
+  })
+  for (const language of Object.values(DESCRIPTORS)) provider.registerLanguage(language)
+  const openDocument = async (languageId: string) => {
+    const snapshot = createPieceTableSnapshot('<p>hi</p>')
+    const session = provider.createSession({
+      documentId: `doc-${languageId}`,
+      languageId,
+      snapshot,
+      textSnapshot: createDocumentTextSnapshot(snapshot),
+    })
+    await session?.refresh(createDocumentTextSnapshot(snapshot))
+  }
+  return { openDocument, provider, warmed }
+}
+
+async function flushPromises(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0))
+}

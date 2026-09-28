@@ -66,3 +66,55 @@ describe('tree-sitter worker client language registration', () => {
     expect(registrations()).toHaveLength(3)
   })
 })
+
+describe('tree-sitter worker client warm-up', () => {
+  afterEach(() => {
+    EchoWorker.requests.length = 0
+    vi.unstubAllGlobals()
+  })
+
+  const warms = () =>
+    EchoWorker.requests.flatMap((request) =>
+      request.payload.type === 'warmLanguages' ? [request.payload.languageIds] : [],
+    )
+
+  it('starts the worker with nothing to compile', async () => {
+    vi.stubGlobal('Worker', EchoWorker)
+    const client = new TreeSitterWorkerClient()
+
+    await client.warmLanguages([])
+
+    expect(EchoWorker.requests.map((request) => request.payload.type)).toEqual(['init'])
+  })
+
+  it('registers before compiling and compiles each language once', async () => {
+    vi.stubGlobal('Worker', EchoWorker)
+    const client = new TreeSitterWorkerClient()
+    const fixture = descriptor('data:one')
+    const other = { ...descriptor('data:other'), id: 'other' }
+
+    await client.warmLanguages([fixture])
+    await client.warmLanguages([fixture, other])
+    await client.warmLanguages([other])
+
+    expect(EchoWorker.requests.map((request) => request.payload.type)).toEqual([
+      'init',
+      'registerLanguages',
+      'warmLanguages',
+      'registerLanguages',
+      'warmLanguages',
+    ])
+    expect(warms()).toEqual([['fixture'], ['other']])
+  })
+
+  it('compiles a language again after its registration changes', async () => {
+    vi.stubGlobal('Worker', EchoWorker)
+    const client = new TreeSitterWorkerClient()
+
+    await client.warmLanguages([descriptor('data:one')])
+    await client.registerLanguages([descriptor('data:two')])
+    await client.warmLanguages([descriptor('data:two')])
+
+    expect(warms()).toEqual([['fixture'], ['fixture']])
+  })
+})

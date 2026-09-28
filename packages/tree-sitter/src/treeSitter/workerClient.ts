@@ -110,6 +110,8 @@ export type TreeSitterWorkerOwnerSnapshot = {
 
 export type TreeSitterBackend = {
   registerLanguages(languages: readonly TreeSitterLanguageDescriptor[]): Promise<void>
+  /** Starts the worker, then registers and compiles `languages` ahead of their first document. */
+  warmLanguages?(languages: readonly TreeSitterLanguageDescriptor[]): Promise<void>
   parse(
     payload: TreeSitterBackendParsePayload,
   ): Promise<TreeSitterParseResult | TreeSitterParseAckResult | undefined>
@@ -146,6 +148,7 @@ export class TreeSitterWorkerClient implements TreeSitterBackend {
     TreeSitterLanguageId,
     TreeSitterLanguageDescriptor
   >()
+  private readonly warmedLanguages = new Set<TreeSitterLanguageId>()
 
   public inspect(): TreeSitterWorkerOwnerSnapshot {
     return {
@@ -176,7 +179,29 @@ export class TreeSitterWorkerClient implements TreeSitterBackend {
     await this.postRequest({ type: 'registerLanguages', languages: nextLanguages })
     for (const language of nextLanguages) {
       this.registeredLanguages.set(language.id, language)
+      // A changed registration drops the worker's compiled runtime for that id.
+      this.warmedLanguages.delete(language.id)
     }
+  }
+
+  public warmLanguages(languages: readonly TreeSitterLanguageDescriptor[]): Promise<void> {
+    return this.trackClientTask(this.finishWarmLanguages(languages))
+  }
+
+  private async finishWarmLanguages(
+    languages: readonly TreeSitterLanguageDescriptor[],
+  ): Promise<void> {
+    const handle = await this.ensureWorkerReady()
+    if (!handle) return
+
+    await this.finishRegisterLanguages(languages)
+    const languageIds = [...new Set(languages.map((language) => language.id))].filter(
+      (languageId) => !this.warmedLanguages.has(languageId),
+    )
+    if (languageIds.length === 0) return
+
+    for (const languageId of languageIds) this.warmedLanguages.add(languageId)
+    await this.postRequest({ type: 'warmLanguages', languageIds })
   }
 
   public parse(
@@ -578,6 +603,7 @@ export class TreeSitterWorkerClient implements TreeSitterBackend {
     this.lifecycle = lifecycle
     this.initPromise = null
     this.registeredLanguages.clear()
+    this.warmedLanguages.clear()
     this.sourceChunkRetention.clear()
   }
 }

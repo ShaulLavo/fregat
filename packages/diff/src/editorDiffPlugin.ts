@@ -18,7 +18,11 @@ import { EDITOR_SNIPPET_TOKENS_FEATURE } from '@singapore-editor/core/extensions
 import type { EditorToken } from '@singapore-editor/core/syntax'
 import { createDiffGutterContribution } from './diffGutter'
 import { diffInlineHighlightRanges, diffRowDecorations } from './diffRows'
-import { DiffSyntaxController } from './diffSyntax'
+import {
+  DiffSyntaxController,
+  type PreparedDiffSyntaxInput,
+  type PreparedDiffSyntaxSource,
+} from './diffSyntax'
 import {
   diffGutterDigits,
   type DiffGutterDigits,
@@ -55,8 +59,14 @@ export type DiffPluginOptions = {
 }
 
 export type DiffPlugin = EditorPlugin & {
-  /** `document` mode: the file to project. The host owns the editor's text — §C3. */
-  setFile(file: DiffFile | null): void
+  /**
+   * `document` mode: the file to project. The host owns the editor's text — §C3. `prepared`
+   * streams from `prepareDiffSyntax` for this file paint with the first rows, and a preparation
+   * still running is awaited in place of a second parse; the plugin owns them.
+   */
+  setFile(file: DiffFile | null, prepared?: PreparedDiffSyntaxInput): void
+  /** The current file's parsed streams, handed to the caller; empty while a parse is running. */
+  releasePreparedSyntax(): readonly PreparedDiffSyntaxSource[]
   getRows(): readonly DiffRenderRow[]
   /** Both sides in row order. Cached until the file or expansion state changes. */
   getStackedRows(): readonly DiffRenderRow[]
@@ -129,7 +139,8 @@ export function createDiffPlugin(options: DiffPluginOptions): DiffPlugin {
     activate(context) {
       return runtime.activate(context)
     },
-    setFile: (file) => runtime.setFile(file),
+    setFile: (file, prepared) => runtime.setFile(file, prepared),
+    releasePreparedSyntax: () => runtime.releasePreparedSyntax(),
     getRows: () => runtime.getRows(),
     getStackedRows: () => runtime.getStackedRows(),
     getTokens: () => runtime.getTokens(),
@@ -248,16 +259,28 @@ class DiffPluginRuntime {
 
   // ---------------------------------------------------------------- document mode (§C3, §C5)
 
-  setFile(file: DiffFile | null): void {
-    if (this.mode !== 'document') return
+  setFile(file: DiffFile | null, prepared: PreparedDiffSyntaxInput = []): void {
+    if (this.mode !== 'document') {
+      void Promise.resolve(prepared).then(
+        (sources) => {
+          for (const source of sources) source.dispose()
+        },
+        () => undefined,
+      )
+      return
+    }
 
     this.file = file
     // The store decides whether this counts as the same diff, and drops expansion if not. Both
     // sides of a split share it, so both are told once.
     this.regions.setFile(file)
     this.rebuildRows()
-    this.syntax.setFile(file, this.rows)
+    this.syntax.setFile(file, this.rows, prepared)
     this.notifyRows()
+  }
+
+  releasePreparedSyntax(): readonly PreparedDiffSyntaxSource[] {
+    return this.syntax.release()
   }
 
   getRows(): readonly DiffRenderRow[] {

@@ -223,7 +223,7 @@
       "file": "packages/editor/src/virtualization/virtualizedTextView.ts",
       "id": "packages/editor/src/virtualization/virtualizedTextView.ts:requestIdleCallback:14458bc40c",
       "justification": "Measuring every row's width is the work the horizontal scroll extent needs and nothing on screen is waiting for, so it is deliberately given whatever the frame has left rather than a place in the queue. `cancelContentWidthMeasurement` withdraws it when the content it would measure has already changed.",
-      "line": 1670,
+      "line": 1702,
       "snippet": "const handle = win.requestIdleCallback(run)"
     },
     {
@@ -231,7 +231,7 @@
       "file": "packages/editor/src/virtualization/virtualizedTextView.ts",
       "id": "packages/editor/src/virtualization/virtualizedTextView.ts:setTimeout:25021385fc",
       "justification": "The same deferral for an engine with no idle callback. Zero rather than a delay, because the point is only to leave the current frame, and the same cancel withdraws it.",
-      "line": 1679,
+      "line": 1711,
       "snippet": "const handle = win.setTimeout(run, 0)"
     },
     {
@@ -239,7 +239,7 @@
       "file": "packages/editor/src/virtualization/virtualizedTextViewRows.ts",
       "id": "packages/editor/src/virtualization/virtualizedTextViewRows.ts:setTimeout:3bd76fd727",
       "justification": "Leaving the current frame is the entire content of this delay: it is what keeps the repaint out of the resize delivery and out of the row paint that ask for it. The one outstanding handle per view makes a second request in the same frame a no-op, and `cancelInlineWidgetRepaint` withdraws it when the view goes away.",
-      "line": 1572,
+      "line": 1574,
       "snippet": "const handle = win.setTimeout(() => {"
     },
     {
@@ -397,9 +397,17 @@
     {
       "api": "setTimeout",
       "file": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts",
+      "id": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts:setTimeout:00a37bab4d",
+      "justification": "Yields one macrotask between warm-up compiles so a parse or edit message queued meanwhile runs before the next language; worker-task tracking keeps idle fences behind warm-up.",
+      "line": 223,
+      "snippet": "const yieldToMessages = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))"
+    },
+    {
+      "api": "setTimeout",
+      "file": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts",
       "id": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts:setTimeout:74252f76bf",
       "justification": "Runs once after the parse answer is posted; it re-checks that the document is still cached and idle, so a late or stale callback does nothing.",
-      "line": 430,
+      "line": 455,
       "snippet": "setTimeout(() => reparseIdleDocument(runtimeSessionId, document, runtime), 0)"
     },
     {

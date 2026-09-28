@@ -113,6 +113,11 @@ type TreeSitterRegisterLanguagesRequest = {
   readonly languages: readonly TreeSitterLanguageDescriptor[]
 }
 
+type TreeSitterWarmLanguagesRequest = {
+  readonly type: 'warmLanguages'
+  readonly languageIds: readonly TreeSitterLanguageId[]
+}
+
 export type TreeSitterParseRequest = {
   readonly type: 'parse'
   readonly documentId: string
@@ -203,6 +208,7 @@ type TreeSitterDisposeRequest = {
 export type TreeSitterWorkerRequestPayload =
   | TreeSitterInitRequest
   | TreeSitterRegisterLanguagesRequest
+  | TreeSitterWarmLanguagesRequest
   | TreeSitterParseRequest
   | TreeSitterEditRequest
   | TreeSitterRangeRequest
