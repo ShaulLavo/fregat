@@ -36,6 +36,20 @@
   static, holding the viewport's line window. `search-view-all-matches` (808 matches of `fixture` in one
   file): the view was 5,634 px and ended at the 200th match (line 684); it is 22,658 px and ends at the
   file's last match (line 2536).
+- P1 done 2026-09-27: the editor pool is keyed by position. Only files with lines in view take a slot, a
+  freed slot goes to the next file entering (the same `Editor`, an `openDocument`), and slots render in
+  slot order. A parked slot keeps its `Editor` under `content-visibility: hidden` and releases its
+  document: parked editors that kept theirs doubled the page's live highlight ranges and made the
+  dense tier 12% slower. Production builds, three interleaved traces each, on a 4-core VM about three
+  times slower than the research machine:
+  - broad wheel-fast: busy 5,292–5,808 → 3,931–4,339 ms, layouts 304–309 → 75–84, editors built
+    229–231 → 5–6 (the pool settles at 21 slots). Long tasks stay at 21–23: on this machine each
+    wheel step is still over 50 ms.
+  - pathological (now `a` in `apps/server/src/fs/tests/**`, 17,475 matches in 32 files, the same on
+    every run): neutral, 2,100–2,333 → 2,052–2,475 ms, as the research found.
+  - What remains per opened file: `setViewportSize` re-reads the scroll element's padding
+    (`getComputedStyle`) whenever an `openDocument` changes the editor's height, about 490 ms of the
+    broad fling; the unfocused caret's next-frame geometry read, about 100 ms. Both are Editor work.
 - Planned at: Platform `d5a901726`, 2026-09-26. Researched at Platform `c130dd35a`, Editor `74e76be`;
   second pass at Platform `4c78266f8`, Editor `74e76be`, Zed `933d8d9`, VS Code `90da900128e`; third
   pass at Platform `e04c94271`, Editor `860f861`, Zed `933d8d9`.
@@ -365,7 +379,7 @@ Phases 1, 1b, 2 and 3 stand on their own and can ship any time.
      `getBoundingClientRect` and `getComputedStyle`), and focusing it places the caret.
    - **Proof:** with Phase 1, today's broad fling went from 1,767 to 1,405 ms and from 15 long tasks to
      2 in the research build. `trace research-search-view` before and after.
-3. **Selection without a full rebuild** (M, shared search state: `state/buffer-state.tsx` `selectResult`,
+3. **Done 2026-09-27.** **Selection without a full rebuild** (M, shared search state: `state/buffer-state.tsx` `selectResult`,
    `utils/result-items.ts`). Keep an id → index map per result set and update only the active id.
    Proof: `trace` of 20 ArrowDown presses in the sidebar on the pathological set (175 ms in
    `result-items` today).
@@ -488,7 +502,7 @@ block) → { update?, dispose }`), shaped as building blocks of Plan 122's `crea
     - an edit over a stale line is refused
   - **New scenario:** `search-edit-in-place`, which edits two results and then reads the files from
     disk after save.
-- **P1. Only if Q3 = A: recycled editor pool** (M; `components/result-editor-virtual-window.tsx`,
+- **P1. Done 2026-09-27.** **Only if Q3 = A: recycled editor pool** (M; `components/result-editor-virtual-window.tsx`,
   `result-file-editor-pool-slot.tsx`, `result-file-editor.tsx`, `state/result-editor-pool.ts`).
   - Slots keyed by position, taken only by files whose line window is non-empty, rendered in slot order.
   - A freed slot parks its editor under `content-visibility: hidden` until the next file takes it.
