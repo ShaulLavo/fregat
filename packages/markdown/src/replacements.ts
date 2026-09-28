@@ -1,15 +1,19 @@
 import type { TextReadSnapshot } from '@singapore-editor/core/document'
 import type { InlineReplacementSpec } from '@singapore-editor/core/rendering'
 import { Kind } from 'tree-sitter-md'
+import { markdownLinkDestination } from './linkDestination'
+import { renderMarkdownLinks, type MarkdownLink, type MarkdownLinkOptions } from './linkRender'
 
 type Span = { readonly start: number; readonly end: number }
 
 export function markdownInlineReplacements(
   text: TextReadSnapshot,
   records: Uint32Array,
+  options: MarkdownLinkOptions = {},
 ): readonly InlineReplacementSpec[] {
   const specs: InlineReplacementSpec[] = []
-  const links: Span[] = []
+  const links: (Span & { readonly kind: number })[] = []
+  const renderedLinks: MarkdownLink[] = []
   const containers = containerSpans(records)
   for (let index = 0; index < records.length; index += 4) {
     const start = records[index]!,
@@ -17,17 +21,63 @@ export function markdownInlineReplacements(
     const kind = records[index + 2]!,
       extra = records[index + 3]!
     if (end <= start) continue
-    if (kind === Kind.Link || kind === Kind.Image) links.push({ start, end })
+    if (kind === Kind.Link || kind === Kind.Image) links.push({ start, end, kind })
     if (kind === Kind.LinkText) {
       while (links.length && (links.at(-1)!.start > start || links.at(-1)!.end < end)) links.pop()
-      appendLink(specs, text, links.pop(), { start, end })
+      const link = links.pop()
+      const href =
+        link?.kind === Kind.Link
+          ? markdownLinkDestination(text, link, { start, end }, records)
+          : null
+      if (link?.kind === Kind.Image || href !== null) appendLink(specs, text, link, { start, end })
+      if (link && href !== null) renderedLinks.push({ span: link, label: { start, end }, href })
     }
     const before = specs.length
     appendMarker(specs, text, { start, end }, kind, extra)
     const owner = markerOwner(containers, { start, end }, kind)
     if (owner) applyRevealRange(specs, before, owner)
   }
-  return specs
+  renderMarkdownLinks(specs, text, renderedLinks, options)
+  return preserveTableWidths(specs, text, containers)
+}
+
+function preserveTableWidths(
+  specs: readonly InlineReplacementSpec[],
+  source: TextReadSnapshot,
+  containers: readonly Container[],
+): readonly InlineReplacementSpec[] {
+  const tables = containers.filter((container) => container.kind === Kind.Table)
+  return specs.map((spec) => {
+    if (!tables.some((table) => table.start <= spec.startIndex && table.end >= spec.endIndex))
+      return spec
+    const width = source.readRange(spec.startIndex, spec.endIndex).length
+    const padding = ' '.repeat(Math.max(0, width - spec.text.length))
+    if (!padding) return spec
+    const render = spec.render
+    return {
+      ...spec,
+      text: spec.text + padding,
+      className: 'editor-markdown-text',
+      render: paddedRender(render, spec.text, padding),
+    }
+  })
+}
+
+function paddedRender(
+  render: InlineReplacementSpec['render'],
+  text: string,
+  padding: string,
+): InlineReplacementSpec['render'] {
+  return (container) => {
+    const disposable = render?.(container)
+    if (!render) container.append(text)
+    const spacer = container.ownerDocument.createElement('span')
+    spacer.className = 'editor-markdown-padding'
+    spacer.textContent = padding
+    spacer.ariaHidden = 'true'
+    container.append(spacer)
+    return disposable
+  }
 }
 
 function appendMarker(
@@ -144,6 +194,7 @@ function containerSpans(records: Uint32Array): readonly Container[] {
     const kind = records[i + 2]!
     if (
       kind === Kind.Heading ||
+      kind === Kind.Table ||
       kind === Kind.CodeBlock ||
       kind === Kind.BlockQuote ||
       kind === Kind.ListItem

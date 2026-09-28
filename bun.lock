@@ -195,6 +195,8 @@
       "version": "0.1.0",
       "dependencies": {
         "@singapore-editor/core": "workspace:*",
+        "micromark-util-decode-string": "2.0.1",
+        "micromark-util-normalize-identifier": "2.0.1",
         "tree-sitter-md": "0.1.0",
       },
       "devDependencies": {

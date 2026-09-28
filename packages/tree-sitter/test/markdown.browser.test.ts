@@ -65,6 +65,24 @@ it('resolves tables, multiline spans, and EOF definitions beyond 300 paragraphs'
   expect(result?.statistics?.layers).toBe(0)
 })
 
+it('carries EOF reference definitions with visible link records', async () => {
+  const text = '[label][ref]\n\n' + 'Paragraph\n\n'.repeat(310) + '[ref]: /destination\n'
+  await client.parse({
+    ...identity,
+    snapshotVersion: 1,
+    snapshot: createPieceTableSnapshot(text),
+    resultMode: 'parseOnly',
+  })
+  const result = await client.queryRange({
+    ...identity,
+    snapshotVersion: 1,
+    includeHighlights: true,
+    range: { startIndex: 0, endIndex: 20 },
+  })
+  expect(spans(result, Kind.Link)).toEqual([[0, 12]])
+  expect(spans(result, Kind.Definition)).toContainEqual([text.indexOf('[ref]:'), text.length - 1])
+})
+
 it('edits and undoes EOF definitions and moving fences with all outputs matching a fresh document', async () => {
   let text = '[label][ref]\n\n```javascript\nconst value = 1\n```\n\n[ref]: /url\n'
   let snapshot = createPieceTableSnapshot(text)

@@ -137,7 +137,7 @@ describe('record coverage', () => {
 
   it('decorates tables and task markers', () => {
     expect(rows('| head | other |\n| --- | --- |\n| **bold** | `code` |')[2]).toBe(
-      '| bold | code |',
+      '|   bold   |  code  |',
     )
     expect(preview('- [x] done')).toBe('• ☑ done')
     expect(preview('- [ ] todo')).toBe('• ☐ todo')
@@ -147,6 +147,23 @@ describe('record coverage', () => {
     const lines = rows(Array.from({ length: 320 }, (_, i) => `**paragraph ${i}**`).join('\n\n'))
     expect(lines[638]).toBe('paragraph 319')
   })
+})
+
+it('keeps each table pipe at its source column when links and formatting collapse', () => {
+  const source = [
+    '| Work                                   | Detail          |',
+    '| -------------------------------------- | --------------- |',
+    '| [plan](plans/one.md)                    | **bold** `code` |',
+    '| [longer label](plans/longer-name.md)     | plain           |',
+  ].join('\n')
+  const specs = markdownInlineReplacements(createStringTextSnapshot(source), parseMarkdown(source))
+  const map = createInlineMap(createPieceTableSnapshot(source), specs)
+  const pipes = (line: string) => Array.from(line.matchAll(/\|/g), (match) => match.index)
+  for (const [row, line] of source.split('\n').entries()) {
+    const rendered = inlineRowForBufferRow(map, row, line).text
+    expect(pipes(rendered)).toEqual(pipes(line))
+    expect(rendered).not.toContain('](')
+  }
 })
 
 it('hides multiline link targets while preserving source lines and whole-link reveal', () => {

@@ -228,6 +228,52 @@ describe('markdown preview plugin', () => {
     expect(editor.materializeFullText()).toBe(DOCUMENT)
   })
 
+  it('renders clickable link labels with their resolved destination and unchanged source', async () => {
+    const opened: string[] = []
+    editor.setPlugins([createMarkdownPreviewPlugin({ openLink: (href) => opened.push(href) })])
+    const source =
+      'start\n\n[**docs**](https://example.com/a(b)?x=1&amp;y=2 "Docs")\n\n[reference][ref]\n\n[ref]: /guide.md\n'
+    editor.setText(source, { languageId: 'markdown' })
+    await flush()
+    const links = [...container.querySelectorAll('a')]
+    expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['docs', 'https://example.com/a(b)?x=1&y=2'],
+      ['reference', '/guide.md'],
+    ])
+    links[0]!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    links[1]!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    expect(opened).toEqual(['https://example.com/a(b)?x=1&y=2', '/guide.md'])
+    expect(editor.materializeFullText()).toBe(source)
+    editor.setSelection(source.indexOf('docs'), source.indexOf('docs'))
+    expect(rowTexts()).toContain('[**docs**](https://example.com/a(b)?x=1&amp;y=2 "Docs")')
+    editor.setSelection(0, 0)
+    expect(container.querySelector('a')?.textContent).toBe('docs')
+  })
+
+  it('leaves unsafe destinations as source without an active anchor', async () => {
+    editor.setText('start\n\n[label](javascript:alert%281%29)', { languageId: 'markdown' })
+    await flush()
+    editor.setSelection(0, 0)
+    expect(container.querySelector('a')).toBeNull()
+    expect(rowTexts()).toContain('[label](javascript:alert%281%29)')
+  })
+
+  for (const [source, label, href] of [
+    ['[angle](<https://example.com/a b>)', 'angle', 'https://example.com/a b'],
+    ['[escaped](docs/a\\(b\\).md)', 'escaped', 'docs/a(b).md'],
+    ['[Mixed Case][]\n\n[mixed case]: /first\n[mixed case]: /second', 'Mixed Case', '/first'],
+    ['[label](< javascript:alert(1)>)', null, null],
+  ] as const) {
+    it(`resolves the parsed destination for ${source}`, async () => {
+      editor.setText(`start\n\n${source}`, { languageId: 'markdown' })
+      await flush()
+      editor.setSelection(0, 0)
+      const anchor = container.querySelector('a')
+      expect(anchor?.textContent ?? null).toBe(label)
+      expect(anchor?.getAttribute('href') ?? null).toBe(href)
+    })
+  }
+
   it('leaves non-markdown documents as source', async () => {
     await openMarkdown('typescript')
 

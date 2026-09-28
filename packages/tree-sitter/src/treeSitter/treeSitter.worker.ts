@@ -21,6 +21,7 @@ import {
   editMarkdown,
   markdownCaptures,
   markdownRecords,
+  markdownDefinitions,
   markdownFolds,
   markdownRange,
   markdownMdxSource,
@@ -85,6 +86,7 @@ type ParsedLayer = {
 
 type ParsedDocument = {
   readonly markdown?: MarkdownDocument
+  markdownDefinitions?: Uint32Array
   readonly snapshotVersion: number
   readonly languageId: TreeSitterLanguageId
   readonly source: TreeSitterPieceTableInput
@@ -518,7 +520,18 @@ const appendMarkdownResult = (
   range: TreeSitterSyntaxRange,
 ): void => {
   if (!document.markdown) return
-  result.records = { languageId: 'markdown', data: markdownRecords(document.markdown, range) }
+  const markdown = document.markdown
+  result.records = {
+    languageId: 'markdown',
+    data: markdownRecords(markdown, range, (links) => {
+      const hasReference = links.some(
+        (link) =>
+          readTreeSitterInputRange(document.source, link.endIndex - 1, link.endIndex) === ']',
+      )
+      if (!hasReference) return new Uint32Array()
+      return (document.markdownDefinitions ??= markdownDefinitions(markdown, document.size))
+    }),
+  }
   appendItems(result.captures, markdownCaptures(document.markdown, range))
   appendItems(result.folds, markdownFolds(document.markdown, range))
 }

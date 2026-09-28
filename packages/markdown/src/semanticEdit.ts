@@ -1,4 +1,5 @@
 import { Kind } from 'tree-sitter-md'
+import { destinationEnd } from './linkDestination'
 import type { TextReadSnapshot } from '@singapore-editor/core/document'
 import type { EditorSelectionRange } from '@singapore-editor/core/extensions'
 import type { MarkdownAuthoringCommand, MarkdownEdit } from './authoring'
@@ -81,23 +82,6 @@ function selectLinkTarget(
     return { edits: [], selection: { anchor: end + from, head: end + to } }
   }
   return null
-}
-
-function destinationEnd(text: string, start: number, angle: boolean): number {
-  let depth = 0
-  for (let index = start; index < text.length; index++) {
-    const character = text[index]
-    if (character === '\\') {
-      index++
-      continue
-    }
-    if (angle && character === '>') return index
-    if (angle) continue
-    if ((character === ')' && depth === 0) || /\s/.test(character!)) return index
-    if (character === '(') depth++
-    if (character === ')') depth--
-  }
-  return text.length
 }
 
 function quoteCode(text: string, marker: string): string {

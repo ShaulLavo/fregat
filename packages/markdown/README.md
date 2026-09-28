@@ -30,7 +30,10 @@ The plugin's presence is the switch. It needs a markdown language plugin alongsi
 | `![alt](img.png)`       | `alt`           |
 | `- item`                | `• item`        |
 
-Ordered lists, block quotes, escapes, and fenced code blocks are deliberately left as written.
+Formatted links are anchors with their destination and a tooltip. `openLink` on
+`createMarkdownPreviewPlugin` lets a host open workspace paths through its own navigation.
+Pipe tables retain the width of hidden syntax as spacing, so formatted cells keep their columns.
+Moving the caret into a link reveals its source for editing.
 
 ## How it works
 

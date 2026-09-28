@@ -119,6 +119,7 @@ export function markdownMdxSource(text: string, root: Node, offset = 0): string 
 export function markdownRecords(
   document: MarkdownDocument,
   range: TreeSitterSyntaxRange,
+  definitions?: (links: readonly TreeSitterSyntaxRange[]) => Uint32Array,
 ): Uint32Array {
   const records = document.decorations(range.startIndex, range.endIndex)
   const links: TreeSitterSyntaxRange[] = []
@@ -139,5 +140,24 @@ export function markdownRecords(
     if (!companion && (start >= range.endIndex || end <= range.startIndex)) continue
     visible.push(start, end, kind, records[index + 3]!)
   }
+  if (links.length && definitions) {
+    const references = definitions(links)
+    for (let index = 0; index < references.length; index += 4) {
+      const start = references[index]!,
+        end = references[index + 1]!
+      if (start < range.endIndex && end > range.startIndex) continue
+      visible.push(start, end, Kind.Definition, references[index + 3]!)
+    }
+  }
   return Uint32Array.from(visible)
+}
+
+export function markdownDefinitions(document: MarkdownDocument, size: number): Uint32Array {
+  const records = document.decorations(0, size)
+  const definitions: number[] = []
+  for (let index = 0; index < records.length; index += 4) {
+    if (records[index + 2] !== Kind.Definition) continue
+    definitions.push(records[index]!, records[index + 1]!, Kind.Definition, records[index + 3]!)
+  }
+  return Uint32Array.from(definitions)
 }
