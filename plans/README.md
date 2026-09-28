@@ -54,7 +54,7 @@ exist; it does not duplicate status summaries that drift when a plan changes.
 | [197](197-editor-highlighting-service.md)    | Editor-owned highlighting service                                             |
 | [198](198-document-owned-editor-analysis.md) | Keep editor analysis with the document                                        |
 | [200](200-document-backed-content-views.md)  | Shared documents behind content views                                         |
-| [201](201-cheap-overlay-marks.md)            | Cheap underlines, and typing that stays fast with analysis on                 |
+| [201](201-cheap-overlay-marks.md)            | One-frame typing in large files, starting with cheap underlines               |
 
 ## Supporting work
 

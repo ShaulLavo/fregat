@@ -1,4 +1,4 @@
-# Plan 201: Cheap underlines, and typing that stays fast with analysis on
+# Plan 201: One-frame typing in large files, starting with cheap underlines
 
 Status: proposed 2026-09-28, requested by the owner after [Plan 112](112-large-file-ceiling.md)
 closed. Implementation has not started. Owners: Editor for overlay painting and the text-snapshot
@@ -6,8 +6,9 @@ diagnostics hook; Platform for the benchmark, the tier thresholds and the langua
 
 ## Why
 
-Plan 112 made plain text fast (10 MiB two-byte text types at 16 ms p95, 200 MiB at 27 ms) and set
-the analysis tier to 10 Mi code units. With analysis on, typing is still slow with **either**
+Plan 112 made plain text usable (10 MiB two-byte text reads 16 ms p95, 200 MiB 27 ms, on a metric
+that cannot go below one 60 Hz frame; see step 0) and set the analysis tier to 10 Mi code units.
+With analysis on, typing is still slow with **either**
 highlighter, so the highlighter is not the cause:
 
 | TypeScript file | Shiki key p95 | Tree-sitter key p95 | Plain text, same size |
@@ -43,23 +44,37 @@ and 4–5.6 GB at 15 MiB, and Shiki's worker holds 258 MB at 10 MiB against Tree
 
 ## Goal
 
-Overlay marks cost what the other highlight kinds cost: work proportional to the rows on screen
-and to the ranges that changed, never to the whole document per keystroke. Then raise the
-analysis tier as far as the measurements allow.
+A keystroke fits in one frame. Owner direction, 2026-09-28: 10 MiB is a small file, and the bar is
+a 120 Hz frame (8.3 ms), with a 60 Hz frame (16.7 ms) as the floor that must never be missed.
 
-Targets, on the same benchmark and fixture:
+Targets, on the same benchmark and fixture, with the frame-accurate metric from step 0:
 
-- 10 MiB TypeScript with analysis on types at p95 under 50 ms with both engines.
-- A keystroke's main-thread overlay work does not grow with the number of diagnostics or
-  misspellings outside the mounted rows (a profile at 1 and 10 MiB shows the same order of cost).
-- The analysis tier moves up from 10 Mi to the largest size that passes the scope with the new
-  numbers; 20 Mi is the aim.
+- 10 MiB TypeScript with analysis on, both engines: main-thread work per keystroke p95 under
+  8.3 ms; no keystroke over 16.7 ms.
+- Plain text meets the same budget at every size up to the 200 MiB open limit.
+- A keystroke's work does not grow with the number of diagnostics, misspellings or tokens outside
+  the mounted rows: profiles at 1 and 10 MiB show the same cost.
+- 10 MiB is the floor for the analysis tier, not its ceiling. Raise it to the largest size that
+  still meets the frame budget and the memory scope.
+
+Overlay marks are the first and largest cost to remove. Whatever the step 0 profiles show next in
+the per-keystroke path belongs to this plan too, until the budget holds.
 
 ## Steps
 
-### 0. Attribute before changing (Platform)
+### 0. A metric that can see under one frame, then attribution (Platform)
 
-Re-run 10 MiB TypeScript with, in turn, the language server off, spellcheck off, and both off,
+Today's metric cannot show a 120 Hz result. `scripts/large-file/run.ts` times `keydown.timeStamp`
+to the next `requestAnimationFrame` in headless Chromium, which runs at 60 Hz, so every keystroke
+reads 8–17 ms however little work it does. Plain text's 16 ms p95 is that interval, not the
+editor's cost. Replace it with the main-thread time a keystroke causes: input event processing
+plus the rAF and style/layout/paint it triggers, taken from the trace (Event Timing
+`processingEnd`, the frame's main-thread tasks), and run Chromium unthrottled
+(`--disable-frame-rate-limit`, `--disable-gpu-vsync`) so frames are not quantized. Keep the old
+number in the rows for comparison, and prove the new metric on plain text first: a 1 MiB file
+should read well under 8.3 ms.
+
+Then re-run 10 MiB TypeScript with, in turn, the language server off, spellcheck off, and both off,
 for both engines. This splits the typing cost between LSP overlays, spelling overlays and
 everything else, and checks that the overlay path is the one worth fixing first. Record the rows
 in the results report. Add the switches to `scripts/large-file` if the benchmark cannot select
@@ -108,9 +123,10 @@ numbers to the owner before choosing.
 
 ### 5. Re-measure and raise the tier (Platform)
 
-Re-run `bench:large-file` at 1/5/10/15/20 MiB TypeScript for both engines on a clean committed
-build. Set `editor.largeFile.analysisLimitMiCodeUnits` from the new rows, update the results
-report, and ship.
+Re-run `bench:large-file` at 1/10/20/50 MiB TypeScript for both engines, and plain text through
+200 MiB, on a clean committed build. Set `editor.largeFile.analysisLimitMiCodeUnits` to the
+largest size that meets the frame budget and the memory scope, update the results report, and
+ship. If the language server's memory is what stops the tier, step 3's split applies.
 
 ## Out of scope
 
