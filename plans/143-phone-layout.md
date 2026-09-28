@@ -141,7 +141,7 @@ pairingUrl` flow in its `AGENTS.md`. Record what we copy: the link or QR format,
 6. **The native app's technology.** SwiftUI (`apps/mac` is already a native Swift client) or
    Expo / React Native (Paseo, Orca and T3 all use React Native). Decided later; recorded now
    because it shapes which server contracts the phone shell settles first.
-7. Two clients opening one workspace at once: see [Plan 173](173-two-devices-one-workspace.md).
+7. Two clients opening one workspace at once: see [Plan 173](../docs/workspace-indexing.md).
 
 Deliverable: the surface list and navigation model, added to this plan (the direction is already above). After the owner approves it, this plan is split into executable plans
 (likely: phone shell, per-surface adaptations, touch input, and a later companion-app plan).

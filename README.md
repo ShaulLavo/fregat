@@ -39,6 +39,7 @@ with [mesh](https://github.com/ShaulLavo/mesh), `bun run dev:serve` registers on
 
 ## more
 
+- [documentation](docs/README.md), architecture, plans, research and delivery records
 - [development](docs/development.md), repo layout, linked checkouts, checks, deploys
 - [filesystem boundaries](docs/filesystem-boundaries.md), what the editor can reach vs what agents can
 - [settings reference](docs/settings-reference.md), generated from the registry

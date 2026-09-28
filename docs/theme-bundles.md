@@ -111,3 +111,13 @@ so production logs were checked separately under `/work/platform-production/logs
 The reload-time log errors recorded above were addressed by the subsequent
 [page-subscription cleanup](page-subscriptions.md). The production verification for that change
 had no warnings or errors in its structured log window.
+
+## Appearance settings and the studio
+
+Appearance settings expose each theme part as a regular setting. The studio provides draft,
+preview and Apply over the same values; it owns no exclusive setting. A part edit customizes the
+selected theme and mode, and Reset returns that part to the theme's value.
+
+The [completed appearance repair](https://github.com/ShaulLavo/fregat/blob/8ca59fd7df915cccae0f3b920b8746c7a7651956/plans/194-appearance-back-in-settings.md)
+records the shared controls, owner decisions, deployment and follow-up verification. Its executable
+plan is retired; the [generated settings reference](settings-reference.md) lists current keys.

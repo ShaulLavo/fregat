@@ -1,6 +1,6 @@
 # Plan 170: Language census for grammar and theme prefetch
 
-Status: **Phases 1–4 done (Phase 4 2026-09-27); the Phase 5 matrix is partly measured, and the vscode, production-byte and worker-busy rows remain** (wave 2 lane W: `GET /fs/workspace-index/languages?root=`, on the per-root indexes of [Plan 173](173-two-devices-one-workspace.md)); research done 2026-09-25 (findings below; the in-app before/after paint measurement belongs to the implementation phases). Split out of [Plan 110](110-workspace-indexing.md) question 7. Decided 2026-09-25: owner — split the language census into its own small plan. Amended 2026-09-26: tree-sitter warm-up joins the scope (see "Tree-sitter has no warm-up"). [Root PLAN.md](../PLAN.md) owns scheduling.
+Status: **Phases 1–4 done (Phase 4 2026-09-27); the Phase 5 matrix is partly measured, and the vscode, production-byte and worker-busy rows remain** (wave 2 lane W: `GET /fs/workspace-index/languages?root=`, on the per-root indexes of [Plan 173](../docs/workspace-indexing.md)); research done 2026-09-25 (findings below; the in-app before/after paint measurement belongs to the implementation phases). Split out of [Plan 110](110-workspace-indexing.md) question 7. Decided 2026-09-25: owner — split the language census into its own small plan. Amended 2026-09-26: tree-sitter warm-up joins the scope (see "Tree-sitter has no warm-up"). [Root PLAN.md](../PLAN.md) owns scheduling.
 
 Editor fix (owner question 1, answer (a)) done 2026-09-26 in wave 2, lane E1:
 [singapore#41](https://github.com/ShaulLavo/singapore/pull/41), in `editor-ref` `ec3fc15`. A Shiki
@@ -32,7 +32,7 @@ measurable win (110 questions 4 and 7).
    languages the workspace contains. When the census is not `ready`, it falls back to today's
    behaviour (110 question 6).
 3. **The measurement.** Before and after, on a real repository: grammars loaded, bytes fetched and
-   time to first highlighted paint, per [AGENTS.md § Optimization](../AGENTS.md#optimization-and-performance-work).
+   time to first highlighted paint, per [AGENTS.md § Optimization](../AGENTS.md#code-style).
 
 ## Open questions
 

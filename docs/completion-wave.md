@@ -1,5 +1,9 @@
 # Completion wave
 
+Historical coordination record from 2026-09-25. Preserve its owner decisions and delivery
+references. For current scheduling use [PLAN.md](../PLAN.md); for checkout, checks and deployment
+use [AGENTS.md](../AGENTS.md). The old lane and merge instructions below are no longer active.
+
 Started 2026-09-25. Goal: finish every executable plan in Platform and Editor, using parallel
 agents in separate git worktrees. Each **lane** is one long-running agent that owns a set of
 files and works through an ordered queue. Lanes are chosen so that two of them rarely edit the

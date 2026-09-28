@@ -1,5 +1,16 @@
 # External edits and language-server freshness
 
+## TypeScript backend ownership
+
+Platform uses the server TypeScript/JavaScript backend. The browser TypeScript worker is an
+optional Editor-package feature and has no Platform setting, route or bundle. The server-exit
+notification contract remains shared. This is the owner's 2026-09-26 decision, recorded in the
+[retired backend plan](https://github.com/ShaulLavo/fregat/blob/8ca59fd7df915cccae0f3b920b8746c7a7651956/plans/188-server-typescript-only.md).
+[Plan 153's closed record](https://github.com/ShaulLavo/fregat/blob/8ca59fd7df915cccae0f3b920b8746c7a7651956/plans/153-typescript-worker-backend.md)
+keeps the earlier integration history.
+
+## Investigation record
+
 Verified on 2026-09-21. The question is whether someone can edit an ordinary project in another tool and return to correct source text and diagnostics in Platform.
 
 The ordinary-file check passed, but two broader checks failed. The diagnostic replay fix does not address these failures.

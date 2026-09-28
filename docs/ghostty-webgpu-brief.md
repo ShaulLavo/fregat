@@ -396,4 +396,5 @@ on registry `ghostty-webgpu@0.1.0`.
 
 Plans 066 and 067 were dropped on 2026-09-09 despite the successful proof. `ghostty-webgpu` must
 never read disk. Any future file loading would belong to Platform, which would pass data to the
-package. No replacement is planned. See the [decision](../PLAN.md#ghostty-appearance-integration-dropped).
+package. No replacement is planned. Platform owns any filesystem/configuration reads and passes resolved data to the package;
+`ghostty-webgpu` does not read disk. The appearance-inheritance integration remains dropped.
