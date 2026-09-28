@@ -1,230 +1,95 @@
-import type { SearchResultId } from '@/features/search/utils/result-items'
 import type {
-  SearchResultFileEditorPoolEntry,
-  SearchResultFileEditorPoolState,
+  SearchResultFileEditorSlot,
   SearchResultRenderedFileResultItem,
 } from '@/features/search/utils/result-editor-types'
+import {
+  equalSearchResultFileEditorLineWindow,
+  searchResultFileEditorLineWindow,
+  type SearchResultFileEditorLineWindow,
+} from '@/features/search/utils/result-editor'
+import type { SearchResultId } from '@/features/search/utils/result-items'
+import type { SearchResultVirtualListViewport } from '@/features/search/utils/result-virtual-list'
 
-const SEARCH_RESULT_FILE_EDITOR_POOL_RECENT_SIZE = 1
-
-export function createSearchResultFileEditorPoolState(): SearchResultFileEditorPoolState {
-  return {
-    entries: [],
-    items: new Map(),
-    keys: [],
-  }
+type ShownFile = {
+  readonly item: SearchResultRenderedFileResultItem
+  readonly lineWindow: SearchResultFileEditorLineWindow
 }
 
-export function nextSearchResultFileEditorPoolKeys(
-  currentKeys: readonly SearchResultId[],
-  visibleKeys: readonly SearchResultId[],
-  prewarmEditorPool: boolean,
-) {
-  if (!prewarmEditorPool) return stableSearchResultFileEditorPoolKeys(currentKeys, visibleKeys)
-  if (visibleKeys.length === 0) {
-    return stableSearchResultFileEditorPoolKeys(
-      currentKeys,
-      currentKeys.slice(0, SEARCH_RESULT_FILE_EDITOR_POOL_RECENT_SIZE),
-    )
-  }
-
-  const visibleKeySet = new Set(visibleKeys)
-  const nextKeys: SearchResultId[] = []
-  let retainedHiddenCount = 0
-  for (const key of currentKeys) {
-    if (visibleKeySet.has(key)) {
-      nextKeys.push(key)
+/**
+ * Editor slots keyed by position, so a file scrolling in takes a freed slot's editor and opens its
+ * document there. Only files with lines in view take a slot; a freed slot parks until reused.
+ */
+export function syncSearchResultFileEditorSlots(
+  slots: readonly SearchResultFileEditorSlot[],
+  items: readonly SearchResultRenderedFileResultItem[],
+  viewport: SearchResultVirtualListViewport,
+): readonly SearchResultFileEditorSlot[] {
+  const shown = shownFiles(items, viewport)
+  const next: SearchResultFileEditorSlot[] = []
+  const free: number[] = []
+  for (const slot of slots) {
+    const file = shown.get(slot.item.row.file.id)
+    if (!file) {
+      free.push(next.length)
+      next.push(parkedSlot(slot))
       continue
     }
-    if (retainedHiddenCount >= SEARCH_RESULT_FILE_EDITOR_POOL_RECENT_SIZE) continue
 
-    retainedHiddenCount += 1
-    nextKeys.push(key)
+    shown.delete(slot.item.row.file.id)
+    next.push(shownSlot(slot, file))
   }
-  const nextKeySet = new Set(nextKeys)
-  for (const key of visibleKeys) {
-    if (nextKeySet.has(key)) continue
+  let freeIndex = 0
+  for (const file of shown.values()) {
+    const index = free[freeIndex]
+    freeIndex += 1
+    const slot = index === undefined ? undefined : next[index]
+    if (index === undefined || !slot) {
+      next.push({ key: `slot:${next.length}`, ...file, visible: true })
+      continue
+    }
 
-    nextKeys.push(key)
-  }
-
-  return stableSearchResultFileEditorPoolKeys(currentKeys, nextKeys)
-}
-
-function searchResultFileEditorPoolKeysEqual(
-  left: readonly SearchResultId[],
-  right: readonly SearchResultId[],
-) {
-  if (left.length !== right.length) return false
-
-  return left.every((key, index) => key === right[index])
-}
-
-function searchResultFileEditorPoolItemKey(item: SearchResultRenderedFileResultItem) {
-  return item.row.file.id
-}
-
-export function syncSearchResultFileEditorPoolEntries(
-  state: SearchResultFileEditorPoolState,
-  visibleItems: readonly SearchResultRenderedFileResultItem[],
-  prewarmEditorPool: boolean,
-): SearchResultFileEditorPoolState {
-  const visibleKeys = visibleItems.map(searchResultFileEditorPoolItemKey)
-  const keys = nextSearchResultFileEditorPoolKeys(state.keys, visibleKeys, prewarmEditorPool)
-  const items = syncSearchResultFileEditorPoolCache(state.items, keys, visibleItems)
-  const entries = searchResultFileEditorPoolEntries(state.entries, keys, visibleItems, items)
-  if (state.keys === keys && state.items === items && state.entries === entries) return state
-
-  return { entries, items, keys }
-}
-
-function searchResultFileEditorPoolEntries(
-  currentEntries: readonly SearchResultFileEditorPoolEntry[],
-  poolKeys: readonly SearchResultId[],
-  visibleItems: readonly SearchResultRenderedFileResultItem[],
-  cachedItems: ReadonlyMap<SearchResultId, SearchResultRenderedFileResultItem>,
-): readonly SearchResultFileEditorPoolEntry[] {
-  const visibleByKey = searchResultFileEditorPoolVisibleItemsByKey(visibleItems)
-  const currentByKey = searchResultFileEditorPoolEntriesByKey(currentEntries)
-  const entries = nextSearchResultFileEditorPoolEntries(
-    poolKeys,
-    visibleByKey,
-    cachedItems,
-    currentByKey,
-  )
-  if (searchResultFileEditorPoolEntriesEqual(currentEntries, entries)) return currentEntries
-
-  return entries
-}
-
-function nextSearchResultFileEditorPoolEntries(
-  poolKeys: readonly SearchResultId[],
-  visibleByKey: ReadonlyMap<SearchResultId, SearchResultRenderedFileResultItem>,
-  cachedItems: ReadonlyMap<SearchResultId, SearchResultRenderedFileResultItem>,
-  currentByKey: ReadonlyMap<SearchResultId, SearchResultFileEditorPoolEntry>,
-) {
-  const entries: SearchResultFileEditorPoolEntry[] = []
-  for (const key of poolKeys) {
-    const entry = searchResultFileEditorPoolEntry(key, visibleByKey, cachedItems, currentByKey)
-    if (!entry) continue
-
-    entries.push(entry)
+    next[index] = shownSlot(slot, file)
   }
 
-  return entries
+  return sameSlots(slots, next) ? slots : next
 }
 
-function searchResultFileEditorPoolEntry(
-  key: SearchResultId,
-  visibleByKey: ReadonlyMap<SearchResultId, SearchResultRenderedFileResultItem>,
-  cachedItems: ReadonlyMap<SearchResultId, SearchResultRenderedFileResultItem>,
-  currentByKey: ReadonlyMap<SearchResultId, SearchResultFileEditorPoolEntry>,
+function shownFiles(
+  items: readonly SearchResultRenderedFileResultItem[],
+  viewport: SearchResultVirtualListViewport,
 ) {
-  const visibleItem = visibleByKey.get(key)
-  const item = canonicalSearchResultFileEditorPoolItem(visibleItem, cachedItems.get(key))
-  if (!item) return null
+  const shown = new Map<SearchResultId, ShownFile>()
+  for (const item of items) {
+    const lineWindow = searchResultFileEditorLineWindow({
+      lineCount: item.row.file.excerpts.length,
+      virtualItem: item.virtualItem,
+      viewport,
+    })
+    if (lineWindow.end <= lineWindow.start) continue
 
-  const visible = visibleItem !== undefined
-  const current = currentByKey.get(key)
-  if (current?.item === item && current.visible === visible) return current
-
-  return { item, key, visible }
-}
-
-function searchResultFileEditorPoolEntriesByKey(
-  entries: readonly SearchResultFileEditorPoolEntry[],
-) {
-  const byKey = new Map<SearchResultId, SearchResultFileEditorPoolEntry>()
-  for (const entry of entries) {
-    byKey.set(entry.key, entry)
+    shown.set(item.row.file.id, { item, lineWindow })
   }
 
-  return byKey
+  return shown
 }
 
-function searchResultFileEditorPoolEntriesEqual(
-  left: readonly SearchResultFileEditorPoolEntry[],
-  right: readonly SearchResultFileEditorPoolEntry[],
-) {
-  if (left.length !== right.length) return false
+function shownSlot(slot: SearchResultFileEditorSlot, file: ShownFile): SearchResultFileEditorSlot {
+  const item = sameItem(slot.item, file.item) ? slot.item : file.item
+  const lineWindow = equalSearchResultFileEditorLineWindow(slot.lineWindow, file.lineWindow)
+    ? slot.lineWindow
+    : file.lineWindow
+  if (slot.visible && item === slot.item && lineWindow === slot.lineWindow) return slot
 
-  return left.every((entry, index) => entry === right[index])
+  return { key: slot.key, item, lineWindow, visible: true }
 }
 
-function searchResultFileEditorPoolVisibleItemsByKey(
-  visibleItems: readonly SearchResultRenderedFileResultItem[],
-) {
-  const visibleByKey = new Map<SearchResultId, SearchResultRenderedFileResultItem>()
-  for (const item of visibleItems) {
-    visibleByKey.set(searchResultFileEditorPoolItemKey(item), item)
-  }
+function parkedSlot(slot: SearchResultFileEditorSlot): SearchResultFileEditorSlot {
+  if (!slot.visible) return slot
 
-  return visibleByKey
+  return { ...slot, visible: false }
 }
 
-function syncSearchResultFileEditorPoolCache(
-  current: ReadonlyMap<SearchResultId, SearchResultRenderedFileResultItem>,
-  poolKeys: readonly SearchResultId[],
-  visibleItems: readonly SearchResultRenderedFileResultItem[],
-) {
-  const poolKeySet = new Set(poolKeys)
-  let next: ReadonlyMap<SearchResultId, SearchResultRenderedFileResultItem> | null = null
-  for (const item of visibleItems) {
-    next = syncSearchResultFileEditorPoolCacheItem(next ?? current, item)
-  }
-  for (const key of current.keys()) {
-    if (poolKeySet.has(key)) continue
-
-    const mutableNext = next instanceof Map ? next : new Map(next ?? current)
-    mutableNext.delete(key)
-    next = mutableNext
-  }
-
-  return next ?? current
-}
-
-function syncSearchResultFileEditorPoolCacheItem(
-  current: ReadonlyMap<SearchResultId, SearchResultRenderedFileResultItem>,
-  item: SearchResultRenderedFileResultItem,
-) {
-  const key = searchResultFileEditorPoolItemKey(item)
-  const cachedItem = current.get(key)
-  const nextItem = stableSearchResultFileEditorPoolItem(item, cachedItem)
-  if (cachedItem === nextItem) return current
-
-  const next = new Map(current)
-  next.set(key, nextItem)
-  return next
-}
-
-function stableSearchResultFileEditorPoolKeys(
-  currentKeys: readonly SearchResultId[],
-  nextKeys: readonly SearchResultId[],
-) {
-  if (searchResultFileEditorPoolKeysEqual(currentKeys, nextKeys)) return currentKeys
-
-  return nextKeys
-}
-
-function canonicalSearchResultFileEditorPoolItem(
-  visibleItem: SearchResultRenderedFileResultItem | undefined,
-  cachedItem: SearchResultRenderedFileResultItem | undefined,
-) {
-  if (!visibleItem) return cachedItem ?? null
-
-  return stableSearchResultFileEditorPoolItem(visibleItem, cachedItem)
-}
-
-function stableSearchResultFileEditorPoolItem(
-  item: SearchResultRenderedFileResultItem,
-  cachedItem: SearchResultRenderedFileResultItem | undefined,
-) {
-  if (cachedItem && searchResultFileEditorPoolItemsEqual(cachedItem, item)) return cachedItem
-
-  return item
-}
-
-function searchResultFileEditorPoolItemsEqual(
+function sameItem(
   left: SearchResultRenderedFileResultItem,
   right: SearchResultRenderedFileResultItem,
 ) {
@@ -233,4 +98,13 @@ function searchResultFileEditorPoolItemsEqual(
     left.row === right.row &&
     left.virtualItem === right.virtualItem
   )
+}
+
+function sameSlots(
+  left: readonly SearchResultFileEditorSlot[],
+  right: readonly SearchResultFileEditorSlot[],
+) {
+  if (left.length !== right.length) return false
+
+  return left.every((slot, index) => slot === right[index])
 }

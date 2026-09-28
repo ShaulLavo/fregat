@@ -49,7 +49,6 @@ type SearchResultEditorSurfaceProps = {
   displayedResultsQuery: string | null
   groups: readonly WorkspaceSearchFileGroup[]
 
-  prewarmEditorPool?: boolean
   replaceVisible: boolean
   resultsQuery: string
   rootPath: string
@@ -66,7 +65,6 @@ export const SearchResultEditorSurface = memo(
     displayedResultsQuery,
     groups,
 
-    prewarmEditorPool = true,
     replaceVisible,
     resultsQuery,
     rootPath,
@@ -210,7 +208,6 @@ export const SearchResultEditorSurface = memo(
               editorTheme={editorTheme}
               initialViewport={initialViewport}
               parentRef={parentRef}
-              prewarmEditorPool={prewarmEditorPool}
               replaceVisible={replaceVisible}
               rows={rows}
               scrollToIndexRef={scrollToIndexRef}

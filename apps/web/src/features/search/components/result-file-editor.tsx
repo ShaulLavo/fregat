@@ -58,6 +58,8 @@ type SearchResultFileEditorProps = {
   file: SearchResultFileBlock
 
   lineWindow: SearchResultFileEditorLineWindow
+  /** Waiting in the pool for the next file: the editor stays built, its document is released. */
+  parked: boolean
   replaceVisible: boolean
 }
 
@@ -69,6 +71,7 @@ export const SearchResultFileEditor = memo(
     file,
 
     lineWindow,
+    parked,
     replaceVisible,
   }: SearchResultFileEditorProps) => {
     const { openTarget, replaceMatch, selectResultWithoutReveal } = useSearchResultActions()
@@ -93,7 +96,9 @@ export const SearchResultFileEditor = memo(
       text: visibleDocument.text,
       textSyncMode: 'open' as const,
     }
-    const rangeDecorations = searchResultFileRangeDecorations(visibleDocument, activeResultId)
+    const rangeDecorations = parked
+      ? []
+      : searchResultFileRangeDecorations(visibleDocument, activeResultId)
     const syntaxPlugins = [
       createSearchResultSyntaxHighlightingPlugin(editorTreeSitterSyntaxProvider()),
     ]
@@ -101,7 +106,8 @@ export const SearchResultFileEditor = memo(
     const editorStyle = searchResultFileEditorStyle(visibleDocument)
     const controller = useEditor({
       cursorLineHighlight: SEARCH_RESULT_CURSOR_LINE_HIGHLIGHT,
-      document,
+      // A parked editor's syntax and match ranges stay live in the page and slow every DOM write.
+      document: parked ? null : document,
       editability: 'readonly',
       fontFamily,
       fontSize: EXCERPT_EDITOR_FONT_SIZE,
@@ -232,7 +238,12 @@ export const SearchResultFileEditor = memo(
           style={{ transform: `translateY(${lineWindow.offsetY}px)` }}
         >
           <div className='grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start'>
-            <SearchResultSourceLineGutter document={visibleDocument} minDigits={sourceLineDigits} />
+            {parked ? null : (
+              <SearchResultSourceLineGutter
+                document={visibleDocument}
+                minDigits={sourceLineDigits}
+              />
+            )}
             <div className='min-w-0' ref={editorHostRef}>
               <EditorHost
                 className='app-editor-host search-result-file-editor-host'
@@ -241,14 +252,16 @@ export const SearchResultFileEditor = memo(
               />
             </div>
           </div>
-          <SearchResultFileLineActions
-            canReplace={canReplace}
-            document={visibleDocument}
-            lineActionRowsRef={lineActionRowsRef}
-            replaceVisible={replaceVisible}
-            onOpenLine={handleOpenLine}
-            onReplaceLine={handleReplaceLine}
-          />
+          {parked ? null : (
+            <SearchResultFileLineActions
+              canReplace={canReplace}
+              document={visibleDocument}
+              lineActionRowsRef={lineActionRowsRef}
+              replaceVisible={replaceVisible}
+              onOpenLine={handleOpenLine}
+              onReplaceLine={handleReplaceLine}
+            />
+          )}
         </div>
       </div>
     )

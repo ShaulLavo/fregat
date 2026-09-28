@@ -291,6 +291,7 @@ import { gitHistorySearchNoFlicker } from './git-history-search-no-flicker'
 import { logsSearchNoFlicker } from './logs-search-no-flicker'
 import { searchTypeDelete } from './search-type-delete'
 import { searchResultLinePick } from './search-result-line-pick'
+import { searchResultRecycleFocus } from './search-result-recycle-focus'
 import { paneRenderCrash } from './pane-render-crash'
 import type { Page } from 'playwright'
 import type { IsolatedServer } from '../isolated-server'
@@ -628,6 +629,7 @@ export const scenarios: readonly Scenario[] = [
   logsSearchNoFlicker,
   searchTypeDelete,
   searchResultLinePick,
+  searchResultRecycleFocus,
   paneRenderCrash,
   wallpaperModeToggle,
   wallpaperLibrary,
