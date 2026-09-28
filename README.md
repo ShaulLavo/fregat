@@ -58,3 +58,4 @@ bun run build
 - [progress](PROGRESS.md), what's implemented vs designed
 - [piece table](docs/storage/piece-table.md), [positions](docs/positions/types-and-conversions.md), [anchors](docs/positions/anchors.md), [selections and undo](docs/editing/selections-and-undo.md), [transforms](docs/display/transforms.md), [virtualization](docs/display/browser-virtualization.md), [tree-sitter](docs/syntax/tree-sitter.md)
 - [fregat's roadmap](https://github.com/ShaulLavo/fregat/blob/main/PLAN.md) sets execution order across both repos
+- [shared Markdown semantics for Editor and bubli](plans/bubli-markdown-consumer.md), a proposed cross-repository integration work package; implementation has not started
