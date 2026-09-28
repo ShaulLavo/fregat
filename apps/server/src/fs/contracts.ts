@@ -55,6 +55,10 @@ export const appWriteQuerySchema = v.object({
   version: v.pipe(v.string(), v.maxLength(128)),
 })
 
+export const readSessionParamsSchema = v.object({ id: v.pipe(v.string(), v.uuid()) })
+const rangeOffsetSchema = v.pipe(v.string(), v.toNumber(), v.safeInteger(), v.minValue(0))
+export const readRangeQuerySchema = v.object({ start: rangeOffsetSchema, end: rangeOffsetSchema })
+
 export const readQuerySchema = v.object({
   path: v.optional(pathSchema, ''),
   acceptTextOnly: v.optional(booleanQueryValueSchema),

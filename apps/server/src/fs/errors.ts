@@ -24,6 +24,9 @@ export type FsErrorCode =
   | 'NOT_A_DIRECTORY'
   | 'PERMISSION_DENIED'
   | 'FILE_TOO_LARGE'
+  | 'READ_SESSION_EXPIRED'
+  | 'READ_SESSION_LIMIT'
+  | 'READ_RANGE_INVALID'
   | 'FILE_IS_BINARY'
   | 'LOSSY_WRITE_BLOCKED'
   | 'WORKSPACE_EDIT_INVALID'
@@ -54,6 +57,9 @@ const statusByCode: Record<FsErrorCode, number> = {
   NOT_A_DIRECTORY: 400,
   PERMISSION_DENIED: 403,
   FILE_TOO_LARGE: 413,
+  READ_SESSION_EXPIRED: 410,
+  READ_SESSION_LIMIT: 429,
+  READ_RANGE_INVALID: 416,
   FILE_IS_BINARY: 415,
   LOSSY_WRITE_BLOCKED: 409,
   WORKSPACE_EDIT_INVALID: 400,
@@ -85,6 +91,9 @@ const messageByCode: Record<FsErrorCode, string> = {
   NOT_A_DIRECTORY: 'path is not a directory',
   PERMISSION_DENIED: 'Permission denied',
   FILE_TOO_LARGE: 'file is too large',
+  READ_SESSION_EXPIRED: 'The file read session has expired.',
+  READ_SESSION_LIMIT: 'File reading capacity is busy.',
+  READ_RANGE_INVALID: 'The requested file range is invalid.',
   FILE_IS_BINARY: 'file seems to be binary and was not decoded as text',
   LOSSY_WRITE_BLOCKED: 'refusing to overwrite a file whose bytes do not round-trip as UTF-8 text',
   WORKSPACE_EDIT_INVALID: 'workspace edit is invalid',

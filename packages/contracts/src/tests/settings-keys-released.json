@@ -60,6 +60,7 @@
     "editor.unicodeHighlight.allowedCharacters",
     "editor.unicodeHighlight.ambiguousCharacters",
     "editor.unicodeHighlight.invisibleCharacters",
+    "environments.devicePairing",
     "environments.machines",
     "files.autoSave",
     "files.autoSaveDelay",
@@ -67,6 +68,9 @@
     "files.picker.pinnedLocations",
     "files.picker.view",
     "files.previewKilobytes",
+    "files.readRangeSizeKiB",
+    "files.readSessionIdleMinutes",
+    "files.readSessionLimit",
     "files.searchIndexIdleMinutes",
     "files.searchIndexLimit",
     "files.showHidden",
@@ -137,7 +141,6 @@
     "workbench.wallpaper.downloadTimeoutMs",
     "workbench.wallpaper.enabled",
     "workbench.wallpaper.omarchyCatalog",
-    "workbench.wallpaper.previewCloud",
-    "environments.devicePairing"
+    "workbench.wallpaper.previewCloud"
   ]
 }

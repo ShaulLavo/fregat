@@ -251,6 +251,14 @@ export function createApp(options: AppOptions) {
   // app was given — in tests that is the in-memory database, which is what
   // keeps a test run from writing into the developer's real settings.
   const settings = new SettingsStore({ ...options.settings, workspaceRoot: fs.paths.workspaceRoot })
+  fs.readSessionLimits = () => {
+    const values = settings.snapshot().values
+    return {
+      maxSessions: values['files.readSessionLimit'],
+      maxRangeBytes: values['files.readRangeSizeKiB'] * 1024,
+      idleMs: values['files.readSessionIdleMinutes'] * 60_000,
+    }
+  }
   fs.watchDirectoryLimit = () => settings.snapshot().values['files.watchDirectoryLimit']
   fs.searchIndexSettings = () => {
     const values = settings.snapshot().values
@@ -530,6 +538,7 @@ export function createApp(options: AppOptions) {
           'x-fs-path',
           'x-fs-size',
           'x-fs-version',
+          'x-fs-revision',
         ],
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
         origin: (request) => isCorsOriginAllowed(auth, request.headers.get('origin')),

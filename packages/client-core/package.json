@@ -127,7 +127,8 @@
     "./chat/worktrees/actions": "./src/chat/worktrees/actions.ts",
     "./chat/worktrees/confirmation": "./src/chat/worktrees/confirmation.ts",
     "./chat/earlier-pages": "./src/chat/earlier-pages.ts",
-    "./history/undo-stack": "./src/history/undo-stack.ts"
+    "./history/undo-stack": "./src/history/undo-stack.ts",
+    "./files/read-session": "./src/files/read-session.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",

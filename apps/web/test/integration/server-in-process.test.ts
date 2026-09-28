@@ -1,3 +1,4 @@
+import { openFileReadSession } from '@workspace/client-core/files/read-session'
 import { readFilePreview } from '@workspace/client-core/files/read'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -32,6 +33,32 @@ test('reads a file written to the real workspace', async ({ client, server }) =>
     signal: new AbortController().signal,
   })
   expect(JSON.stringify(data)).toContain('export const greeting')
+})
+
+test('reads raw ranges and invalidates a changed file through the client adapter', async ({
+  client,
+  server,
+}) => {
+  await writeFile(path.join(server.root, 'range.txt'), '\uFEFFfirst\nsecond')
+  const source = await openFileReadSession({
+    client,
+    path: 'range.txt',
+    signal: new AbortController().signal,
+  })
+  try {
+    const page = await source.readBytes(0, 8, new AbortController().signal)
+    expect(page.revision).toBe(source.revision)
+    expect([...page.bytes]).toEqual([...new TextEncoder().encode('\uFEFFfirst')])
+    await writeFile(path.join(server.root, 'range.txt'), 'changed')
+    await expect(source.readBytes(0, 4, new AbortController().signal)).rejects.toMatchObject({
+      code: 'FILE_CHANGED',
+    })
+  } finally {
+    await source.dispose()
+  }
+  await expect(source.readBytes(0, 1, new AbortController().signal)).rejects.toMatchObject({
+    code: 'READ_SESSION_EXPIRED',
+  })
 })
 
 test('quick-open file search reuses the workspace search index', async ({ client }) => {

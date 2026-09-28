@@ -526,6 +526,27 @@
       "minimum": 4,
       "type": "integer"
     },
+    "files.readRangeSizeKiB": {
+      "default": 1024,
+      "description": "Maximum byte range in KiB returned by one large-file read request. Each simultaneous read holds at most one range in memory.",
+      "maximum": 8192,
+      "minimum": 64,
+      "type": "integer"
+    },
+    "files.readSessionIdleMinutes": {
+      "default": 5,
+      "description": "Minutes a large-file read session remains open after its last page request. Reopening an expired view starts a new session.",
+      "maximum": 60,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "files.readSessionLimit": {
+      "default": 8,
+      "description": "Maximum number of open large-file read sessions and simultaneous page reads on this machine. Lowering the limit applies to new reads and sessions.",
+      "maximum": 64,
+      "minimum": 1,
+      "type": "integer"
+    },
     "files.searchIndexIdleMinutes": {
       "default": 15,
       "description": "Minutes a folder keeps its file index after the last window showing it closes, so reopening it searches at full speed at once.",

@@ -13,6 +13,8 @@ import {
   pathQuerySchema,
   headQuerySchema,
   readQuerySchema,
+  readSessionParamsSchema,
+  readRangeQuerySchema,
   recordRecentBodySchema,
   recentsQuerySchema,
   registerWorkspaceAddressBodySchema,
@@ -58,6 +60,34 @@ export function fsRoutes(fs: FileSystemService) {
         {
           query: readQuerySchema,
         },
+      )
+      .post(
+        '/read-session',
+        ({ query, request }) => fs.readSessions.open(query.path, request.signal),
+        { query: pathQuerySchema },
+      )
+      .get(
+        '/read-session/:id',
+        async ({ params, query, request }) => {
+          const page = await fs.readSessions.read(params.id, query.start, query.end, request.signal)
+          return new Response(page.bytes, {
+            headers: {
+              'content-type': 'application/octet-stream',
+              'content-length': String(page.bytes.length),
+              'x-fs-revision': page.revision,
+              'cache-control': 'no-store',
+            },
+          })
+        },
+        { params: readSessionParamsSchema, query: readRangeQuerySchema },
+      )
+      .delete(
+        '/read-session/:id',
+        async ({ params }) => {
+          await fs.readSessions.dispose(params.id)
+          return { closed: true }
+        },
+        { params: readSessionParamsSchema },
       )
       .get('/blob', async ({ query }) => fileResponse(await fs.blob(query.path)), {
         query: pathQuerySchema,

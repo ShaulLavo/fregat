@@ -1,3 +1,4 @@
+import { FileReadSessions, defaultReadSessionLimits, type ReadSessionLimits } from './read-sessions'
 import { workspaceIndexForSearch } from './search-shared'
 import { elapsedMs } from '@workspace/utils/timing'
 import { homedir } from 'node:os'
@@ -144,6 +145,8 @@ export class FileSystemService {
   private readonly workspaceEditJournalRoot
   private readonly workspaceEditReady
   private readonly workspaceEdits
+  readonly readSessions: FileReadSessions
+  readSessionLimits: () => ReadSessionLimits = defaultReadSessionLimits
   private readonly workspaceIndexes: WorkspaceIndexScopes
   private readSearchIndexSettings: () => SearchIndexSettings = () => ({
     idleMinutes: DEFAULT_SETTING_VALUES['files.searchIndexIdleMinutes'],
@@ -162,6 +165,7 @@ export class FileSystemService {
       excludedAbsolutePaths: [this.workspaceEditJournalRoot],
       excludedNames: [driveJournalName(process.getuid?.() ?? 0)],
     })
+    this.readSessions = new FileReadSessions(this.paths, () => this.readSessionLimits())
     this.homePath = resolveHomePath(this.paths, homeDirectory)
     this.placeSources = {
       configDirectory: options.configDirectory ?? defaultConfigDirectory(options.homeDirectory),
@@ -770,6 +774,7 @@ export class FileSystemService {
   }
 
   async close() {
+    await this.readSessions.close()
     await this.workspaceIndexes.close()
     await this.workspaceEditReady
     await this.workspaceEdits.close()

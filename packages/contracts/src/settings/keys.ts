@@ -1309,6 +1309,42 @@ export const SETTINGS_REGISTRY = {
     description: 'Show dot-prefixed files and folders in file pickers.',
     keywords: ['files', 'folders', 'hidden', 'dotfiles', 'picker'],
   }),
+  'files.readSessionLimit': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(64)),
+    default: 8,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Files',
+    title: 'Open large-file read sessions',
+    description:
+      'Maximum number of open large-file read sessions and simultaneous page reads on this machine. Lowering the limit applies to new reads and sessions.',
+    visibility: 'advanced',
+    keywords: ['files', 'large', 'pages', 'memory', 'limit'],
+  }),
+  'files.readRangeSizeKiB': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(64), v.maxValue(8192)),
+    default: 1024,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Files',
+    title: 'Large-file page size limit',
+    description:
+      'Maximum byte range in KiB returned by one large-file read request. Each simultaneous read holds at most one range in memory.',
+    visibility: 'advanced',
+    keywords: ['files', 'large', 'pages', 'memory', 'limit'],
+  }),
+  'files.readSessionIdleMinutes': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(60)),
+    default: 5,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Files',
+    title: 'Large-file read session idle time',
+    description:
+      'Minutes a large-file read session remains open after its last page request. Reopening an expired view starts a new session.',
+    visibility: 'advanced',
+    keywords: ['files', 'large', 'pages', 'memory', 'limit'],
+  }),
   'files.watchDirectoryLimit': defineSetting({
     // Each watched directory is one inotify watch from the machine's per-user pool, which every
     // other watcher on the box shares; a workspace file must never raise it.
