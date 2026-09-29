@@ -79,9 +79,9 @@ export function WorkspaceEditPreviewDialog() {
         showCloseButton={false}
       >
         <DialogHeader>
-          <DialogTitle>{preview?.label ?? 'Preparing workspace edit'}</DialogTitle>
+          <DialogTitle>{preview?.label ?? 'Preparing changes'}</DialogTitle>
           <DialogDescription>
-            Review one atomic change across live buffers and workspace files.
+            Review every file this edit changes. It changes all of them together, or none.
           </DialogDescription>
         </DialogHeader>
 
@@ -91,9 +91,11 @@ export function WorkspaceEditPreviewDialog() {
           <div className='min-h-0 overflow-y-auto pr-1'>
             <div className='text-muted-foreground mb-3 flex items-center justify-between text-xs'>
               <span className='tabular-nums'>
-                {preview.operationCount} {preview.operationCount === 1 ? 'operation' : 'operations'}
+                {preview.operationCount} {preview.operationCount === 1 ? 'change' : 'changes'}
               </span>
-              <span>{preview.undoCategory === 'editor' ? 'Editor undo' : 'Workspace undo'}</span>
+              <span>
+                {preview.undoCategory === 'editor' ? 'Undo in this file' : 'Undo across all files'}
+              </span>
             </div>
 
             {preview.annotations.length > 0 ? (
@@ -104,7 +106,7 @@ export function WorkspaceEditPreviewDialog() {
                     <span>
                       <span className='font-medium'>{annotation.label}</span>
                       {annotation.description ? ` — ${annotation.description}` : ''}
-                      {annotation.needsConfirmation ? ' — confirmation required' : ''}
+                      {annotation.needsConfirmation ? ' — check before applying' : ''}
                     </span>
                   </div>
                 ))}
@@ -114,8 +116,8 @@ export function WorkspaceEditPreviewDialog() {
             {preview.rows.length === 0 ? (
               <EmptyState
                 align='start'
-                description='The server returned no file or buffer operations to apply.'
-                title='No workspace changes'
+                description='This edit contains no changes.'
+                title='Nothing to change'
               />
             ) : (
               <ol className='grid gap-2'>
@@ -129,7 +131,7 @@ export function WorkspaceEditPreviewDialog() {
                       {rowIcon(row)}
                       <span className='truncate font-medium'>{operationLabel(row)}</span>
                       <span className='text-muted-foreground ml-auto shrink-0'>
-                        {row.ignored ? 'ignored / no-op' : targetLabel(row)}
+                        {row.ignored ? 'No change' : targetLabel(row)}
                       </span>
                     </div>
                     <div className='text-muted-foreground text-2xs mt-1 truncate font-mono'>
@@ -152,10 +154,11 @@ export function WorkspaceEditPreviewDialog() {
 
             <div className='text-muted-foreground mt-3 grid gap-1 text-xs'>
               <p>
-                Open buffers remain unsaved. Unopened files and resource operations are written.
+                Open files get the change as unsaved edits. Closed files, and files created, renamed
+                or deleted, are saved to disk right away.
               </p>
               {preview.undoCategory === 'workspace' ? (
-                <p>Undo this group with Undo workspace edit, or from the file's History tab.</p>
+                <p>To undo it, use Undo multi-file edit or the file's History tab.</p>
               ) : null}
             </div>
           </div>
@@ -165,7 +168,8 @@ export function WorkspaceEditPreviewDialog() {
           <Alert variant='warning'>
             <WarningCircleIcon />
             <AlertDescription>
-              {state.message ?? 'This preview is stale. Request the edit again.'}
+              {state.message ??
+                'The files changed after this preview was made. Run the edit again.'}
             </AlertDescription>
           </Alert>
         ) : null}
@@ -173,7 +177,7 @@ export function WorkspaceEditPreviewDialog() {
         {processing ? (
           <div className='text-muted-foreground flex items-center gap-2 text-xs' role='status'>
             <Spinner size='sm' aria-hidden='true' />
-            {state.phase === 'finalizing' ? 'Finalizing atomic change…' : 'Applying atomic change…'}
+            {state.phase === 'finalizing' ? 'Finishing…' : 'Changing files…'}
           </div>
         ) : null}
 
@@ -191,7 +195,7 @@ export function WorkspaceEditPreviewDialog() {
             ) : (
               <ArrowsClockwiseIcon data-icon='inline-start' />
             )}
-            Apply all
+            Make these changes
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -200,8 +204,9 @@ export function WorkspaceEditPreviewDialog() {
 }
 
 function targetLabel(row: WorkspaceEditPreviewRow): string {
-  if (row.targetKind) return row.targetKind
-  return row.kind
+  if (row.targetKind === 'dirty') return 'Open, has unsaved edits'
+  if (row.targetKind === 'open') return 'Open, left unsaved'
+  return 'Saved to disk'
 }
 
 function operationLabel(row: WorkspaceEditPreviewRow): string {

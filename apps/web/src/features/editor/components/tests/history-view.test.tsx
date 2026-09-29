@@ -34,10 +34,10 @@ test('lists every retained state and diffs a focused one against the current tex
   const user = userEvent.setup()
   const rendered = await renderHistory({ edits: ['one', 'two'] })
   const buffer = requireBuffer(rendered.buffer)
-  const states = screen.getByRole('listbox', { name: 'History states' })
+  const states = screen.getByRole('listbox', { name: 'Versions' })
   const options = await screen.findAllByRole('option')
   expect(options).toHaveLength(3)
-  expect(screen.getByText('This is the current state.')).toBeInTheDocument()
+  expect(screen.getByText('This is the current version.')).toBeInTheDocument()
 
   await user.click(options[1]!)
   await waitFor(() => {
@@ -45,9 +45,9 @@ test('lists every retained state and diffs a focused one against the current tex
   })
   expect(states).toHaveAttribute('aria-activedescendant', options[1]!.id)
 
-  await user.click(screen.getByRole('button', { name: 'Restore' }))
+  await user.click(screen.getByRole('button', { name: 'Use this version' }))
   await waitFor(() => expect(buffer.materializeFullText()).toBe('alphaone\nbeta\n'))
-  expect(await screen.findByText('This is the current state.')).toBeInTheDocument()
+  expect(await screen.findByText('This is the current version.')).toBeInTheDocument()
 })
 
 test('retains the editor when arrows turn a focused diff into a selected-pair comparison', async () => {
@@ -59,12 +59,12 @@ test('retains the editor when arrows turn a focused diff into a selected-pair co
   await waitFor(() => expect(diffRowTexts()).toContain('alphaonetwothree'))
   const host = document.querySelector('.editor-diff-pane .editor-virtualized')
   expect(host).not.toBeNull()
-  const states = screen.getByRole('listbox', { name: 'History states' })
+  const states = screen.getByRole('listbox', { name: 'Versions' })
   states.focus()
   await user.keyboard('{Shift>}{ArrowRight}{/Shift}')
   await waitFor(() => expect(diffRowTexts()).toContain('alphaone'))
   expect(document.querySelector('.editor-diff-pane .editor-virtualized')).toBe(host)
-  expect(screen.queryByRole('status', { name: 'Comparing states' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('status', { name: 'Comparing versions' })).not.toBeInTheDocument()
 })
 
 test('clears history after confirmation and leaves the text alone', async () => {
@@ -92,7 +92,7 @@ test('keeps the focused history state when its tab moves into another group', as
   rendered.remount()
 
   await waitFor(() => {
-    expect(screen.getByRole('listbox', { name: 'History states' })).toHaveAttribute(
+    expect(screen.getByRole('listbox', { name: 'Versions' })).toHaveAttribute(
       'aria-activedescendant',
       screen.getAllByRole('option')[1]!.id,
     )
@@ -104,7 +104,7 @@ test('focuses the history graph or its diff without registering competing tab ta
   stubEditorViewport()
   const user = userEvent.setup()
   const { focus } = await renderHistory({ edits: ['one'] })
-  await screen.findByText('This is the current state.')
+  await screen.findByText('This is the current version.')
   const destination = {
     kind: 'match' as const,
     matches: (target: { id: { kind: string; tabId?: string; side?: string } }) =>
@@ -132,11 +132,11 @@ test('the barrier before a workspace edit is a state of its own', async () => {
   const committed = commitHistoryBarrier(buffer, [{ from: 0, to: 1, text: 'A' }])
   expect(committed.status).toBe('committed')
 
-  const barrier = await screen.findByRole('option', { name: /Workspace edit/ })
+  const barrier = await screen.findByRole('option', { name: /Multi-file edit/ })
   await user.click(barrier)
-  expect(await screen.findByText('Earlier history is behind a workspace edit.')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Restore' })).toBeDisabled()
-  expect(screen.queryByRole('button', { name: 'Undo workspace edit' })).not.toBeInTheDocument()
+  expect(await screen.findByText('A multi-file edit blocks earlier versions.')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Use this version' })).toBeDisabled()
+  expect(screen.queryByRole('button', { name: 'Undo multi-file edit' })).not.toBeInTheDocument()
 })
 
 test('moving into a group with another history tab preserves the selected barrier', async () => {
@@ -173,17 +173,17 @@ test('moving into a group with another history tab preserves the selected barrie
   const user = userEvent.setup()
   const source = within(await screen.findByRole('region', { name: 'Source group' }))
   const destination = within(screen.getByRole('region', { name: 'Destination group' }))
-  await user.click(await source.findByRole('option', { name: /Workspace edit/ }))
-  expect(source.getByText('Earlier history is behind a workspace edit.')).toBeInTheDocument()
+  await user.click(await source.findByRole('option', { name: /Multi-file edit/ }))
+  expect(source.getByText('A multi-file edit blocks earlier versions.')).toBeInTheDocument()
 
   rendered.rerender(body(true))
 
   expect(
-    await destination.findByText('Earlier history is behind a workspace edit.'),
+    await destination.findByText('A multi-file edit blocks earlier versions.'),
   ).toBeInTheDocument()
   rendered.rerender(body(false))
-  expect(await destination.findByText('This is the current state.')).toBeInTheDocument()
-  expect(await source.findByText('Earlier history is behind a workspace edit.')).toBeInTheDocument()
+  expect(await destination.findByText('This is the current version.')).toBeInTheDocument()
+  expect(await source.findByText('A multi-file edit blocks earlier versions.')).toBeInTheDocument()
 })
 
 async function renderHistory({ edits }: { edits: readonly string[] | null }) {

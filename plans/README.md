@@ -4,6 +4,9 @@
 its current status, scope, authorization and acceptance checks. This index lists the files that
 exist; it does not duplicate status summaries that drift when a plan changes.
 
+A plan the owner asks for is approved work: write its status as `APPROVED` and write it for
+execution. `IDEA` is only for a plan the owner explicitly calls an idea or is unsure about.
+
 ## Current plan files
 
 | Plan                                         | Topic                                                                         |
@@ -55,7 +58,15 @@ exist; it does not duplicate status summaries that drift when a plan changes.
 | [198](198-document-owned-editor-analysis.md) | Keep editor analysis with the document                                        |
 | [200](200-document-backed-content-views.md)  | Shared documents behind content views                                         |
 | [201](201-cheap-overlay-marks.md)            | One-frame typing in large files, starting with cheap underlines               |
-| [202](202-unified-workspace.md)              | One workspace for chat and code                                               |
+| [202](202-tui-ui.md)                         | App-local Charm-inspired terminal UI on upstream OpenTUI                      |
+| [203](203-fregat-hotkeys.md)                 | @fregat/hotkeys, our fork of TanStack Hotkeys                                 |
+| [204](204-editor-on-fregat-hotkeys.md)       | The Editor on @fregat/hotkeys                                                 |
+| [205](205-ghostty-on-fregat-hotkeys.md)      | ghostty-webgpu on @fregat/hotkeys                                             |
+| [206](206-platform-one-keymap.md)            | Platform owns one keymap                                                      |
+| [207](207-one-repo-with-mirrors.md)          | One repo, with mirrors for the flagship packages                              |
+| [208](208-all-text-in-json.md)               | All app text in JSON for localization and shared copy editing                 |
+
+| [209](209-unified-workspace.md) | One workspace for chat and code; design review with implementation gates |
 
 ## Supporting work
 

@@ -29,7 +29,7 @@ it('contains a crash to the pane body and keeps the header and siblings', () => 
   expect(mounted.container.querySelector('header')?.textContent).toBe('Git')
   expect(mounted.container.querySelector('[data-sibling]')?.textContent).toBe('still here')
   const body = mounted.container.querySelector('[data-slot="tool-pane-body"]')
-  expect(body?.textContent).toContain('Git hit a render error')
+  expect(body?.textContent).toContain('Git could not be shown')
   expect(body?.textContent).toContain('row exploded')
 })
 
@@ -46,7 +46,7 @@ it('recovers on retry and when a reset key changes', () => {
     </RenderErrorBoundary>,
   )
   cleanups.push(mounted.unmount)
-  expect(mounted.container.textContent).toContain('This tab hit a render error')
+  expect(mounted.container.textContent).toContain('This tab could not be shown')
 
   broken = false
   act(() => mounted.container.querySelector('button')?.click())
@@ -58,7 +58,7 @@ it('recovers on retry and when a reset key changes', () => {
       <Flaky key='again' />
     </RenderErrorBoundary>,
   )
-  expect(mounted.container.textContent).toContain('This tab hit a render error')
+  expect(mounted.container.textContent).toContain('This tab could not be shown')
   broken = false
   mounted.render(
     <RenderErrorBoundary label='This tab' resetKeys={['b']}>

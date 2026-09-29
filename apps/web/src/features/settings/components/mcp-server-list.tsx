@@ -25,8 +25,8 @@ export function McpServerList({
   const [adding, setAdding] = useState(false)
   const applies =
     instance.driverKind === 'codex'
-      ? 'Running sessions reload a change.'
-      : 'A change applies to sessions started after it.'
+      ? 'Running sessions pick up a change right away.'
+      : 'Sessions you start after a change use it.'
 
   return (
     <section aria-label={`${instance.displayLabel} MCP servers`} className='flex flex-col gap-2'>

@@ -2,8 +2,7 @@
 
 ## Status and authorization
 
-- Status: PROPOSED, a plan of plans. Research done and Q1–Q5 answered 2026-09-26 (owner). Nothing
-  here authorizes implementation.
+- Status: APPROVED, a plan of plans. Research done and Q1–Q5 answered 2026-09-26 (owner).
 - Planned at: Platform `bfc48ef17`, 2026-09-26. Rewritten the same day from a single four-phase
   plan after the owner widened it (below).
 - Effort: thirteen sub-plans, S to L. Each ships and deploys on its own and leaves the tree working.

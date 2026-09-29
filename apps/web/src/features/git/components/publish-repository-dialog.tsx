@@ -64,7 +64,7 @@ export function PublishRepositoryDialog({
         <DialogHeader>
           <DialogTitle>Publish repository</DialogTitle>
           <DialogDescription>
-            Create the repository on a forge, add it as a remote and push this branch.
+            Create a new repository on GitHub or another Git host, then push this branch to it.
           </DialogDescription>
         </DialogHeader>
         <form
@@ -74,7 +74,7 @@ export function PublishRepositoryDialog({
             if (ready) submit()
           }}
         >
-          <DialogField id={`${id}-forge`} label='Forge'>
+          <DialogField id={`${id}-forge`} label='Service'>
             <Select value={forge} onValueChange={(next) => next && setForge(next as GitForgeKind)}>
               <SelectTrigger id={`${id}-forge`}>
                 <SelectValue>{option.label}</SelectValue>
@@ -126,7 +126,7 @@ export function PublishRepositoryDialog({
                 </SelectContent>
               </Select>
             </DialogField>
-            <DialogField id={`${id}-protocol`} label='Remote address'>
+            <DialogField id={`${id}-protocol`} label='Connect with'>
               <Select
                 value={protocol}
                 onValueChange={(next) => next && setProtocol(next as 'ssh' | 'https')}
@@ -150,7 +150,7 @@ export function PublishRepositoryDialog({
             </Button>
             <Button type='submit' disabled={!ready}>
               {publish.isPending ? <Spinner /> : null}
-              Publish
+              Create and push
             </Button>
           </DialogFooter>
         </form>

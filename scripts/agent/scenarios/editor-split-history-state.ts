@@ -8,8 +8,8 @@ import type { Page } from 'playwright'
 import { openFileFromTree, runPaletteCommand, selectors, waitForApp } from '../selectors'
 import type { Scenario } from './index'
 
-const barrierText = 'Earlier history is behind a workspace edit.'
-const currentText = 'This is the current state.'
+const barrierText = 'A multi-file edit blocks earlier versions.'
+const currentText = 'This is the current version.'
 const observations = new WeakMap<Page, { phases: string[]; movedTabId: string | null }>()
 
 export const editorSplitHistoryState: Scenario = {
@@ -51,7 +51,7 @@ export const editorSplitHistoryState: Scenario = {
       await runPaletteCommand(page, 'Show history')
       await selectors
         .editorGroupHistoryStates(page, 0)
-        .getByRole('option', { name: /Workspace edit/ })
+        .getByRole('option', { name: /Multi-file edit/ })
         .click()
       await selectors.editorGroupEmptyText(page, 0, barrierText).waitFor()
       await selectors.editorGroupEmptyText(page, 1, currentText).waitFor()

@@ -17,6 +17,7 @@ export function watchServerMessage(data: unknown): WatchServerMessage | null {
   if (data.type === 'coverage' && hasString(data, 'path') && 'watch' in data) {
     return data as WatchServerMessage
   }
+  if (data.type === 'git' && hasString(data, 'path')) return data as WatchServerMessage
   if (isBasicFilesystemMessage(data)) return data
   if (data.type === 'renamed' && hasString(data, 'path') && hasString(data, 'oldPath')) {
     return data as WatchServerMessage

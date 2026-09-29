@@ -135,10 +135,10 @@ test('draft choices, shared chips and dirty worktree cleanup survive deletion an
   useWorktreeManagerStore.getState().openManager(harness.projectRef)
   const manager = renderWithProviders(<WorktreeManager />)
   expect(await screen.findByText('Working changes retained')).toBeInTheDocument()
-  await userEvent.click(screen.getByRole('button', { name: 'Discard changes…' }))
-  const confirmation = await screen.findByRole('dialog', { name: 'Discard changes and remove' })
+  await userEvent.click(screen.getByRole('button', { name: 'Delete changes and remove…' }))
+  const confirmation = await screen.findByRole('dialog', { name: 'Delete changes and remove' })
   await writeFile(path.join(managed.canonicalPath, 'ignored.txt'), 'Changed after confirmation\n')
-  holdToConfirm(within(confirmation).getByRole('button', { name: 'Discard changes and remove' }))
+  holdToConfirm(within(confirmation).getByRole('button', { name: 'Delete changes and remove' }))
   await waitFor(async () => {
     const next = await harness.worktree(managedId)
     expect(next.lifecycle).toMatchObject({
@@ -147,9 +147,9 @@ test('draft choices, shared chips and dirty worktree cleanup survive deletion an
     })
   })
   expect(await screen.findByText('Changes need a new confirmation')).toBeInTheDocument()
-  await userEvent.click(screen.getByRole('button', { name: 'Discard changes…' }))
-  const renewed = await screen.findByRole('dialog', { name: 'Discard changes and remove' })
-  holdToConfirm(within(renewed).getByRole('button', { name: 'Discard changes and remove' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Delete changes and remove…' }))
+  const renewed = await screen.findByRole('dialog', { name: 'Delete changes and remove' })
+  holdToConfirm(within(renewed).getByRole('button', { name: 'Delete changes and remove' }))
   await waitFor(async () =>
     expect((await harness.worktree(managedId)).lifecycle).toEqual({
       state: 'removed',
@@ -197,7 +197,7 @@ test('failed and missing zero-session checkouts remain actionable in the manager
   await runGit(harness.repository, ['worktree', 'unlock', managed.canonicalPath], {
     cwdMode: 'option',
   })
-  await userEvent.click(screen.getByRole('button', { name: 'Retain checkout' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Keep worktree' }))
   await waitFor(async () =>
     expect((await harness.worktree(managed.id)).lifecycle.state).toBe('ready'),
   )
@@ -210,11 +210,11 @@ test('failed and missing zero-session checkouts remain actionable in the manager
   await harness.refresh()
   const missingManager = renderWithProviders(<WorktreeManager />)
   expect(await screen.findByText('Checkout missing')).toBeInTheDocument()
-  await userEvent.click(screen.getByRole('button', { name: 'Resolve missing checkout…' }))
-  const confirmation = await screen.findByRole('dialog', { name: 'Confirm checkout is absent' })
-  expect(within(confirmation).getByText(/No files will be deleted/)).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Forget missing worktree…' }))
+  const confirmation = await screen.findByRole('dialog', { name: 'Forget missing worktree' })
+  expect(within(confirmation).getByText(/deletes no files/)).toBeInTheDocument()
   await userEvent.click(
-    within(confirmation).getByRole('button', { name: 'Confirm checkout is absent' }),
+    within(confirmation).getByRole('button', { name: 'Forget missing worktree' }),
   )
   await waitFor(async () =>
     expect((await harness.worktree(managed.id)).lifecycle.state).toBe('removed'),
@@ -254,7 +254,7 @@ test('Retry safely removes a previously dirty checkout once its changes are reso
     expect((await harness.worktree(managed.id)).lifecycle.state).toBe('removed'),
   )
   expect(
-    await screen.findByText('Checkout removed. Its branch and commits were retained.'),
+    await screen.findByText('Worktree removed. Its branch and commits were kept.'),
   ).toBeInTheDocument()
   await act(async () => useWorktreeManagerStore.getState().closeManager())
   manager.unmount()

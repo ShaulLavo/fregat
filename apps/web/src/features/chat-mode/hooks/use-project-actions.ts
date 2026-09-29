@@ -70,7 +70,7 @@ export function useProjectActions() {
       const unavailable = request.members.filter((member) => !member.available)
       if (unavailable.length) {
         failDelete(
-          `Unavailable machines: ${unavailable.map((member) => member.label).join(', ')}. Reconnect and reopen this confirmation.`,
+          `Cannot reach ${unavailable.map((member) => member.label).join(', ')}. Reconnect, then delete the project again.`,
         )
         return
       }

@@ -58,7 +58,7 @@ async function rewind(
     )
     if (drafts.getDraft(target).attachments.length + images.length > MAX_CHAT_ATTACHMENTS)
       throw createClientInvariantError(
-        'The draft changed while preparing rewind. Remove images and retry.',
+        'The message box has too many attachments to take back this message’s images. Remove some and try again.',
       )
     const command = createCheckpointRevertCommand({
       sessionId: target.draftKey,

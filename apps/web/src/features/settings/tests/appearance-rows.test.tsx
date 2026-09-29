@@ -121,7 +121,7 @@ test(
     expect(settingsWrites()).toHaveLength(before + 1)
 
     await userEvent.click(await screen.findByRole('button', { name: `Actions for ${KEY}` }))
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Reset setting' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Reset to default' }))
     await waitFor(async () => expect((await userLayer()).halves).toBeUndefined())
     await waitFor(async () =>
       expect(await contentSlider()).toHaveAttribute('aria-valuenow', String(themed)),
@@ -151,7 +151,7 @@ function UpdateThemeButton({ contentOpacity }: { readonly contentOpacity: number
 
 async function resetFromMenu(key: string) {
   await userEvent.click(await screen.findByRole('button', { name: `Actions for ${key}` }))
-  await userEvent.click(await screen.findByRole('menuitem', { name: 'Reset setting' }))
+  await userEvent.click(await screen.findByRole('menuitem', { name: 'Reset to default' }))
 }
 
 test(
@@ -379,7 +379,7 @@ test(
     expect(modifiedMarker(KEY)).not.toBeNull()
 
     await userEvent.click(await screen.findByRole('button', { name: `Actions for ${KEY}` }))
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Reset setting' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Reset to default' }))
 
     await waitFor(async () => {
       const snapshot = await fetchSettings(undefined, getClient())

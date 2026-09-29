@@ -110,10 +110,10 @@ export function createChatNavigation(coordinator: ReturnType<typeof createNaviga
             worktree.lifecycle.state !== 'ready')
         )
           throw createClientInvariantError(
-            'The draft worktree is unavailable. Restore that worktree before opening this draft.',
+            'The worktree this draft was started in is gone. Recreate it to open this draft.',
           )
         if (!worktree)
-          throw createClientInvariantError('The conversation workspace is unavailable.')
+          throw createClientInvariantError('The folder for this conversation is not available.')
         if (projectId && worktree.projectId !== projectId)
           throw createClientInvariantError('The conversation does not belong to this project.')
         const editorWorktree = availableEditorWorktree(slice, worktree)

@@ -55,10 +55,12 @@ export function RawConflictBanner({ documentKey }: { readonly documentKey: Docum
           weight='fill'
         />
         <div className='min-w-0 flex-1'>
-          <p className='text-foreground text-sm font-medium'>settings.json changed elsewhere</p>
+          <p className='text-foreground text-sm font-medium'>
+            settings.json changed somewhere else
+          </p>
           <p className='text-muted-foreground text-xs'>
-            Your local text is still intact. Reload it, compare both versions, or overwrite the
-            latest confirmed file.
+            Something else changed your settings while you had unsaved edits here. Keep yours to
+            save over it, or use the latest version and drop yours.
           </p>
         </div>
       </div>
@@ -69,7 +71,7 @@ export function RawConflictBanner({ documentKey }: { readonly documentKey: Docum
           size='sm'
           variant='outline'
         >
-          Reload
+          Use the latest version
         </Button>
         <Button
           disabled={awaitingConfirmed}
@@ -88,23 +90,23 @@ export function RawConflictBanner({ documentKey }: { readonly documentKey: Docum
           {overwriting ? (
             <Spinner aria-hidden='true' data-icon='inline-start' role='presentation' />
           ) : null}
-          Overwrite
+          Keep my changes
         </Button>
       </div>
       {awaitingConfirmed ? (
-        <p className='text-warning text-xs'>Waiting for the latest confirmed file…</p>
+        <p className='text-warning text-xs'>Loading the latest version…</p>
       ) : null}
       {error ? <p className='text-destructive text-xs'>{error}</p> : null}
       {compareOpen ? (
         <div className='grid gap-2 lg:grid-cols-2'>
           <div className='min-w-0'>
-            <p className='text-muted-foreground mb-1 text-xs font-medium'>Local edits</p>
+            <p className='text-muted-foreground mb-1 text-xs font-medium'>Your edits</p>
             <pre className='bg-background-solid max-h-48 overflow-auto overscroll-contain rounded-lg p-2 text-xs whitespace-pre-wrap'>
               {localText}
             </pre>
           </div>
           <div className='min-w-0'>
-            <p className='text-muted-foreground mb-1 text-xs font-medium'>Confirmed file</p>
+            <p className='text-muted-foreground mb-1 text-xs font-medium'>Latest version</p>
             <pre className='bg-background-solid max-h-48 overflow-auto overscroll-contain rounded-lg p-2 text-xs whitespace-pre-wrap'>
               {confirmedText ?? ''}
             </pre>

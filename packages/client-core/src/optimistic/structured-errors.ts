@@ -12,9 +12,9 @@ export function acknowledgementTimeoutError({
   return createClientError({
     code: 'client.OPTIMISTIC_ACK_TIMEOUT',
     status: 504,
-    message: `Intent ${intentId} was not acknowledged within ${timeoutMs}ms`,
-    why: 'The request succeeded but the confirmed data never reflected it, so the optimistic value was withdrawn.',
-    fix: 'Check that the server publishes the change on the stream the acknowledgement predicate reads, or raise the timeout for this intent.',
+    message: 'Your change was sent but never showed up',
+    why: 'The server accepted the change, but the app did not see it arrive in time, so it shows the old value again.',
+    fix: 'Check whether the change took effect. If it did not, make it again.',
     internal: { intentId, resources, timeoutMs },
   })
 }

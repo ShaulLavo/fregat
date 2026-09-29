@@ -1,0 +1,65 @@
+{
+  "name": "@fregat/react-hotkeys",
+  "version": "0.0.0",
+  "description": "React hooks for @fregat/hotkeys. A fork of TanStack React Hotkeys.",
+  "keywords": [
+    "hotkeys",
+    "keyboard",
+    "react",
+    "shortcuts"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ShaulLavo/fregat.git",
+    "directory": "hotkeys/packages/react-hotkeys"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target browser --format esm --packages external --tsconfig-override tsconfig.build.json && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fregat/hotkeys": "workspace:*",
+    "@tanstack/react-store": "^0.11.1"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.3",
+    "@types/react": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "happy-dom": "^20.14.5",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "typescript": "^7.0.2",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

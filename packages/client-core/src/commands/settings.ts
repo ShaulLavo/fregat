@@ -29,7 +29,7 @@ export const settingsCommandMetadata = {
   'settings.editRaw': defineMetadata({
     id: 'settings.editRaw',
     title: 'Edit settings JSON',
-    description: 'Edit the current settings scope in the built-in editor with revision protection.',
+    description: 'Open the settings file in the editor to change it as JSON.',
     category: 'Settings',
     execution: 'async',
     target: 'workspace',

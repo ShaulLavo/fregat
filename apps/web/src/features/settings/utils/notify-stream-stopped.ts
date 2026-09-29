@@ -4,7 +4,7 @@ import { clientErrorDescription } from '@/lib/client-error-taxonomy'
 import { toastError } from '@/lib/toast-error'
 
 const SETTINGS_STREAM_STOPPED_TOAST = 'settings-stream-stopped'
-const SETTINGS_STREAM_STOPPED_TITLE = 'Settings stopped syncing'
+const SETTINGS_STREAM_STOPPED_TITLE = 'Settings changes stopped reaching this tab'
 
 /** Stays up until acted on: without it, changes from the server silently stop reaching this tab. */
 export function notifySettingsStreamStopped(stop: SettingsStreamStop, retry: () => void) {
@@ -16,7 +16,7 @@ export function notifySettingsStreamStopped(stop: SettingsStreamStop, retry: () 
       })
     : clientErrorDescription({
         message: `The server did not answer ${stop.failureCount} reconnect attempts`,
-        fix: 'Retry to reconnect and load the changes made meanwhile.',
+        fix: 'Retry to reconnect and load the changes made in the meantime.',
       })
   toastError(
     SETTINGS_STREAM_STOPPED_TITLE,
@@ -25,7 +25,7 @@ export function notifySettingsStreamStopped(stop: SettingsStreamStop, retry: () 
       description,
       duration: Infinity,
       action: unreadable
-        ? { label: 'Reload', onClick: () => window.location.reload() }
+        ? { label: 'Reload page', onClick: () => window.location.reload() }
         : { label: 'Retry', onClick: retry },
     },
     { code: stop.code, why: stop.why, fix: stop.fix },

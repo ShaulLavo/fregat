@@ -223,8 +223,8 @@ export class ChatOwner {
           code: 'CHAT_HISTORY_STALLED',
           status: 502,
           message: 'Session history stopped before its first message.',
-          why: 'The server reported earlier rows without returning any.',
-          fix: 'Retry the export and inspect the session pagination response.',
+          why: 'The server said there were earlier messages but sent none.',
+          fix: 'Try the export again.',
         })
     }
     const session = selectChatSessionById(projection, sessionId)
@@ -233,7 +233,7 @@ export class ChatOwner {
       code: 'CHAT_SESSION_MISSING',
       status: 404,
       message: 'The session is no longer available.',
-      why: 'Its project or checkout was removed while reading its transcript.',
+      why: 'Its project or folder was removed while the chat was loading.',
       fix: 'Refresh the session list.',
     })
   }

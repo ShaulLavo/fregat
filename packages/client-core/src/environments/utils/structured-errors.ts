@@ -17,12 +17,12 @@ export function createEnvironmentProtocolMismatchError(
 function protocolMismatchGuidance(origin: string, serverOlder: boolean) {
   if (serverOlder)
     return {
-      why: 'That server runs an older Platform version than this client.',
-      fix: `Update the Platform server at ${origin} to this client’s version, then Retry.`,
+      why: 'That server runs an older version of Platform than this page.',
+      fix: `Update the Platform server at ${origin} to this page’s version, then press Retry.`,
     }
   return {
-    why: 'That server runs a newer Platform version than this client.',
-    fix: 'Reload this page; if the mismatch remains, update the Platform that serves it.',
+    why: 'That server runs a newer version of Platform than this page.',
+    fix: 'Reload this page. If the message stays, update Platform on the machine that serves this page.',
   }
 }
 
@@ -34,9 +34,9 @@ export function createEnvironmentIdentityDriftError(
   return createClientError({
     code: 'ENVIRONMENT_IDENTITY_DRIFT',
     status: 403,
-    message: `The server at ${origin} has a different environment identity.`,
-    why: 'This origin answered with a different database identity than the one already recorded.',
-    fix: 'Trust replacement connects to the new database and clears what this browser cached for the old one.',
+    message: `The server at ${origin} is a different installation than before.`,
+    why: 'The same address now answers with different app data, for example after Platform was reinstalled there.',
+    fix: 'If you replaced that server on purpose, trust the new one to connect. This browser then forgets what it saved from the old one.',
     internal: { origin, expected, received },
   })
 }
@@ -45,9 +45,9 @@ export function createQueryClientOwnerMissingError() {
   return createClientError({
     code: 'QUERY_CLIENT_OWNER_MISSING',
     status: 500,
-    message: 'The query client has no owning environment.',
-    why: 'A server query used a QueryClient without an associated HTTP client and origin.',
-    fix: 'Create the query client with queryClientFor, or register its environment before use.',
+    message: 'The app does not know which machine to ask for this data.',
+    why: 'A request ran before its machine connection was set up.',
+    fix: 'Reload the app and try again.',
   })
 }
 
@@ -58,9 +58,9 @@ export function createQueryClientOwnerConflictError(
   return createClientError({
     code: 'QUERY_CLIENT_OWNER_CONFLICT',
     status: 500,
-    message: 'The query client already belongs to an environment.',
-    why: 'Replacing its HTTP client could populate an existing environment cache from another server.',
-    fix: 'Use a separate QueryClient for the other environment.',
+    message: 'This data already belongs to another machine.',
+    why: "Mixing two machines in one place would show one machine's data as the other's.",
+    fix: 'Reload the app and try again.',
     internal: { expectedOrigin, receivedOrigin },
   })
 }

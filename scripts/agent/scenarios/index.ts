@@ -129,6 +129,8 @@ import { claudeSessionTools, codexSessionTools } from './session-tools'
 import { claudeSessionFork, codexSessionFork } from './session-fork'
 import { searchFileActions } from './search-file-actions'
 import { settingsStaleDiagnostics } from './settings-stale-diagnostics'
+import { settingsEnumLabels } from './settings-enum-labels'
+import { settingsRawConflict } from './settings-raw-conflict'
 import { fontPicker } from './font-picker'
 import { fontPickerHover } from './font-picker-hover'
 import { settingsSaveRejected } from './settings-save-rejected'
@@ -195,6 +197,7 @@ import { markdownAuthoring } from './markdown-authoring'
 import { markdownPreviewClobber } from './markdown-preview-clobber'
 import { gitOpenAllDiffsSpam } from './git-open-all-diffs-spam'
 import { gitStageSettles } from './git-stage-settles'
+import { gitExternalCommit } from './git-external-commit'
 import { gitChangesScroll } from './git-changes-scroll'
 import { gitDiscardConfirm } from './git-discard-confirm'
 import { baseComponents } from './base-components'
@@ -505,6 +508,8 @@ export const scenarios: readonly Scenario[] = [
   filePickerNavigation,
   gitHistoryScroll,
   settingsStaleDiagnostics,
+  settingsEnumLabels,
+  settingsRawConflict,
   settingsResponsive,
   settingsSaveRejected,
   searchResults,
@@ -568,6 +573,7 @@ export const scenarios: readonly Scenario[] = [
   markdownPreviewClobber,
   gitOpenAllDiffsSpam,
   gitStageSettles,
+  gitExternalCommit,
   gitChangesScroll,
   gitDiscardConfirm,
   baseComponents,

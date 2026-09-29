@@ -83,7 +83,7 @@ test('rejects another checkout and non-Claude providers before spawning', async 
     await wrongProvider.open()
     expect(wrongProvider.messages).toContainEqual({
       type: 'error',
-      message: 'Terminal resume requires an enabled Claude provider',
+      message: 'Only Claude sessions can open in a terminal',
     })
     expect(unsupported.pty.spawns).toHaveLength(0)
   } finally {
@@ -302,7 +302,7 @@ test('failed CLI history remains visible and reconnect retries synchronization w
       .toEqual({
         type: 'error',
         message:
-          'Provider history is unavailable Reconnect this terminal to retry synchronization.',
+          'Provider history is unavailable Reopen this terminal to copy the conversation again.',
       })
     await expect(fixture.turn()).rejects.toMatchObject({
       code: 'provider.TERMINAL_HISTORY_PENDING',
@@ -409,7 +409,7 @@ test('an unresponsive history reader times out with recoverable ownership instea
       .toEqual({
         type: 'error',
         message:
-          'The provider operation timed out Reconnect this terminal to retry synchronization.',
+          'The agent took too long to answer Reopen this terminal to copy the conversation again.',
       })
     await expect(fixture.turn()).rejects.toMatchObject({
       code: 'provider.TERMINAL_HISTORY_PENDING',

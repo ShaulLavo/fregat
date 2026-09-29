@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: PROPOSED 2026-09-26, ready. Owner direction: permissive licences only and as few
+- Status: APPROVED 2026-09-26. Owner direction: permissive licences only and as few
   dependencies as possible. Source: the round-2 audit, [dependency licences](../docs/dependency-licences.md) §3.
 - Amended 2026-09-26: web push stays. Decided 2026-09-26: owner — "Web push: KEEP. Rewrite Plan 184
   so web push is never dropped. If a permissive-only dependency set is wanted, isolate the MPL-2.0

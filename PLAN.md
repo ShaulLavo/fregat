@@ -1,6 +1,6 @@
 # Execution roadmap
 
-Updated 2026-09-28. This file owns cross-project ordering. Each [plan](plans/README.md)
+Updated 2026-09-29. This file owns cross-project ordering. Each [plan](plans/README.md)
 owns its scope, decisions, status and acceptance checks. [AGENTS.md](AGENTS.md) owns execution
 rules; [docs](docs/README.md) holds architecture, research and delivery evidence.
 
@@ -42,15 +42,51 @@ contracts a consumer needs:
   authoring/parser work before scheduling their remaining parts. [189](plans/189-tree-sitter-md-improvement.md)
   owns subsequent parser correctness and performance work.
 
-## Unified workspace proposal
+## TUI UI workstream
 
-[202](plans/202-unified-workspace.md) plans a shared chat/code workspace with independently
-collapsible Sessions and project-tools columns. It reuses the delivered document/tab domain
-and existing splits. Plan 200 keeps diff content ownership; 171 keeps the composer migration.
-The shell work does not wait for their unrelated units. Keyboard and session-ownership
-contracts precede desktop mode removal; phone and TUI keep their own presentation contracts.
-This is plan-only, awaiting design review and separate implementation authorization. It does
-not change the closeout queue above or authorize terminal/sidebar behavior still under review.
+[202: terminal UI in Fregat](plans/202-tui-ui.md) owns the Charm-inspired experience in
+`apps/tui/src/ui/` on upstream OpenTUI. The owner's 2026-09-29 decision supersedes the bubli
+name, standalone toolkit and permanent renderer-fork assumption. Keep the existing backend and
+shared React/TypeScript logic. The wave-2 queue above is unchanged.
+
+- Prove upstream package/runtime resolution and the risky Markdown, focus and scrolling seams
+  first. Use public composition and extension points; carry only demonstrated, version-pinned
+  patches with regression tests and removal conditions. A maintained fork needs a separate
+  evidence-backed decision. No toolkit package or native-release pipeline is scheduled.
+- Keep tree-sitter-md + tree-sitter-x and Singapore's semantic work. Parser semantic,
+  conformance, streaming and package gates precede the app's production Markdown cutover;
+  local controls can proceed in parallel. The app's Markdown path does not use Marked or its
+  token types; removal of Marked from upstream's own package is not a prerequisite.
+- Plan 202 owns local React Markdown overrides and terminal profile/copy/lifecycle tests.
+  Plans 176/189 retain parser ownership and required extensions; 171/179/197/198/200 keep their
+  existing scope. Only exact consumed contracts are prerequisites, not unrelated whole plans.
+- Plans 203/206 own keymap infrastructure. Plan 202's controls integrate with that dispatcher;
+  they do not introduce a second one. Respect 207's canonical Editor source when it moves.
+- The [coordination and research index](docs/tui-research/ui-plan-links.md) links the retained
+  catalog, source evidence, companion plans and implementation handoffs. These are plans, not
+  delivered package changes; the existing fork overrides remain until the verified cutover.
+
+## Keymap workstream
+
+[Keymap architecture](docs/keymap/architecture.md) records the owner's 2026-09-29 decisions.
+[203: @fregat/hotkeys](plans/203-fregat-hotkeys.md) comes first. [204: Editor](plans/204-editor-on-fregat-hotkeys.md)
+and [205: ghostty-webgpu](plans/205-ghostty-on-fregat-hotkeys.md) then run in parallel, and
+[206: Platform owns one keymap](plans/206-platform-one-keymap.md) adopts both. 206's TUI step is
+infrastructure only and takes OpenTUI key events through the integration owned by 202.
+This workstream does not reorder the wave-2 queue above.
+
+[207: one repo with mirrors](plans/207-one-repo-with-mirrors.md) moves the Editor and
+ghostty-webgpu into Fregat and mirrors them (and `hotkeys/`) to their public repos. Run it before
+204 and 205 so their work lands in Fregat; 203 does not wait for it.
+
+## Unified workspace design
+
+[209: one workspace for chat and code](plans/209-unified-workspace.md) is Approved
+for design review. Resolve its D1–D6 gates before the affected implementation units;
+production implementation retains its separate owner authorization. Use the existing
+tab/group and session owners. Schedule command changes against 206, preserve 200
+content ownership, and apply 208 catalogs to new copy. It follows the package cutover
+for implementation; its design work can proceed during the scoped freeze.
 
 ## Other work and boundaries
 

@@ -117,7 +117,7 @@ test('two transports dispatch and read snapshots from their owning servers after
       code: 'ORCHESTRATION_RPC_CLOSED',
     })
     expect(() => transportA.retainSessionDetail(SESSION_ID)).toThrow(
-      'The chat transport is closed.',
+      'The chat connection is closed.',
     )
   } finally {
     transportA.close()

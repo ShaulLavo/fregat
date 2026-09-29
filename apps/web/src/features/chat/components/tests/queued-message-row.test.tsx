@@ -15,15 +15,17 @@ test('uncertain delivery offers an idempotent retry and explains why Restore is 
   renderWithProviders(
     <QueuedMessageRow message={message} disabled={false} onSendNow={retry} onRestore={restore} />,
   )
-  expect(screen.getByText('Delivery unconfirmed')).toBeInTheDocument()
-  const restoreButton = screen.getByRole('button', { name: 'Restore queued message' })
+  expect(screen.getByText('May have been sent')).toBeInTheDocument()
+  const restoreButton = screen.getByRole('button', {
+    name: 'Move queued message back to the message box',
+  })
   expect(restoreButton).toHaveAttribute('aria-disabled', 'true')
   await userEvent.click(restoreButton)
   expect(restore).not.toHaveBeenCalled()
   await userEvent.hover(restoreButton)
   expect(
     await screen.findByText(
-      'Retry delivery to confirm whether this message was sent before restoring it.',
+      'This message may already have been sent. Retry delivery to find out before you edit it.',
     ),
   ).toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'Retry queued message delivery' }))
@@ -44,7 +46,9 @@ test('an ordinary queued message retains Send now and can return to the composer
   expect(screen.getByRole('button', { name: 'Send queued message now' })).toHaveTextContent(
     'Send now',
   )
-  await userEvent.click(screen.getByRole('button', { name: 'Restore queued message' }))
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Move queued message back to the message box' }),
+  )
   expect(restore).toHaveBeenCalledExactlyOnceWith(message.id)
 })
 

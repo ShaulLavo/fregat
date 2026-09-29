@@ -51,7 +51,7 @@ export function ClientUpdate() {
       duration: Infinity,
       closeButton: false,
       dismissible: false,
-      action: { label: 'Refresh', onClick: () => window.location.reload() },
+      action: { label: 'Reload app', onClick: () => window.location.reload() },
     })
     return () => {
       toast.dismiss(id)

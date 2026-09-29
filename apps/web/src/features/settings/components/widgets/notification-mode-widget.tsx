@@ -48,7 +48,7 @@ export function NotificationModeWidget({
       )}
       {native && !supported && (
         <span className='text-muted-foreground text-xs'>
-          Native notifications are unavailable in this browser.
+          System notifications are unavailable in this browser.
         </span>
       )}
       {request.isError && (

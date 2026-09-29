@@ -18,9 +18,9 @@ const DEFAULT_PROVIDER_ORDER = ['codex', 'claude', 'cursor', 'grok', 'opencode',
 const errors = defineErrorCatalog('session-title', {
   INVALID_RESPONSE: {
     status: 502,
-    message: 'The provider returned an invalid session title.',
-    why: 'A title must be a nonempty JSON title string.',
-    fix: 'Retry title generation.',
+    message: 'The agent did not come up with a usable session title.',
+    why: 'Its answer was empty or not in the expected form.',
+    fix: 'Generate the title again.',
   },
 })
 

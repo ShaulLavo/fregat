@@ -4,7 +4,7 @@ const pathWidths = ['w-3/5', 'w-2/5', 'w-1/2'] as const
 
 export function WorkspaceEditPreviewLoading() {
   return (
-    <LoadingState className='py-2' label='Preparing workspace edit preview'>
+    <LoadingState className='py-2' label='Preparing the preview'>
       <div aria-hidden='true' className='grid gap-2'>
         {pathWidths.map((width) => (
           <div className='bg-card rounded-lg p-3' key={width}>

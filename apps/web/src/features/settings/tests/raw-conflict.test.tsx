@@ -20,7 +20,7 @@ import { createTestQueryClient, renderWithProviders } from '../../../../test/ren
 const DOCUMENT_ID = documentKey(settingsJsonDocument('user'))
 const LOCAL_TEXT = '{ "editor.fontSize": 18 }\n'
 
-test('raw conflict keeps local text through Compare, intervening writes, Overwrite, and Reload', async ({
+test('raw conflict keeps local text through Compare, intervening writes, Keep my changes, and Use the latest version', async ({
   client,
 }) => {
   expect(client).toBeDefined()
@@ -42,27 +42,27 @@ test('raw conflict keeps local text through Compare, intervening writes, Overwri
 
   renderWithProviders(<RawConflictHarness documentStore={documentStore} />, { queryClient })
   const user = userEvent.setup()
-  expect(screen.getByText('settings.json changed elsewhere')).toBeDefined()
+  expect(screen.getByText('settings.json changed somewhere else')).toBeDefined()
   expect(screen.queryByText('Could not save settings')).toBeNull()
 
   const beforeCompare = await fetchSettings(undefined, getClient())
   await user.click(screen.getByRole('button', { name: 'Compare' }))
-  expect(screen.getByText('Local edits')).toBeDefined()
-  expect(screen.getByText('Confirmed file')).toBeDefined()
+  expect(screen.getByText('Your edits')).toBeDefined()
+  expect(screen.getByText('Latest version')).toBeDefined()
   expect(screen.getByText(LOCAL_TEXT.trim(), { selector: 'pre' })).toBeDefined()
   expect((await fetchSettings(undefined, getClient())).serverVersion).toEqual(
     beforeCompare.serverVersion,
   )
   expect(currentText(documentStore)).toBe(LOCAL_TEXT)
 
-  await user.click(screen.getByRole('button', { name: 'Reload' }))
-  expect(screen.getByRole('dialog', { name: 'Discard local settings edits?' })).toBeDefined()
+  await user.click(screen.getByRole('button', { name: 'Use the latest version' }))
+  expect(screen.getByRole('dialog', { name: 'Drop your unsaved edits?' })).toBeDefined()
   expect(currentText(documentStore)).toBe(LOCAL_TEXT)
   await user.click(screen.getByRole('button', { name: 'Cancel' }))
   expect(screen.queryByRole('dialog')).toBeNull()
   expect(currentText(documentStore)).toBe(LOCAL_TEXT)
 
-  await user.click(screen.getByRole('button', { name: 'Overwrite' }))
+  await user.click(screen.getByRole('button', { name: 'Keep my changes' }))
   await waitFor(() =>
     expect(settingsSync(documentStore)?.state, 'first overwrite settles').toBe('idle'),
   )
@@ -84,7 +84,7 @@ test('raw conflict keeps local text through Compare, intervening writes, Overwri
     'raw-conflict-external-three',
     '{ "editor.lineHeight": 33 }\n',
   )
-  await user.click(screen.getByRole('button', { name: 'Overwrite' }))
+  await user.click(screen.getByRole('button', { name: 'Keep my changes' }))
   await waitFor(() => {
     expect(settingsSync(documentStore)).toMatchObject({
       revision: rawRevision(thirdExternal),
@@ -95,7 +95,7 @@ test('raw conflict keeps local text through Compare, intervening writes, Overwri
   expect(documentStore.getState().dirtyDocumentKeys.has(DOCUMENT_ID)).toBe(true)
   expect(screen.queryByText('Could not save settings')).toBeNull()
 
-  await user.click(screen.getByRole('button', { name: 'Overwrite' }))
+  await user.click(screen.getByRole('button', { name: 'Keep my changes' }))
   await waitFor(() =>
     expect(settingsSync(documentStore)?.state, 'second overwrite settles').toBe('idle'),
   )
@@ -113,9 +113,9 @@ test('raw conflict keeps local text through Compare, intervening writes, Overwri
   expectConflict(documentStore, finalExternal)
   expect(currentText(documentStore)).toBe(LOCAL_TEXT)
 
-  await user.click(screen.getByRole('button', { name: 'Reload' }))
+  await user.click(screen.getByRole('button', { name: 'Use the latest version' }))
   expect(currentText(documentStore)).toBe(LOCAL_TEXT)
-  await user.click(screen.getByRole('button', { name: 'Discard and reload' }))
+  await user.click(screen.getByRole('button', { name: 'Drop my edits' }))
   expect(settingsSync(documentStore)).toMatchObject({
     revision: rawRevision(finalExternal),
     state: 'idle',

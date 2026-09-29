@@ -37,7 +37,7 @@ test('offers to publish a branch that has no upstream, and pushes it', async ({
 
   // Nothing is ahead, and publishing is still the thing to offer: a plain push
   // fails on a branch with no upstream, which is every branch a session makes.
-  await userEvent.click(await screen.findByRole('button', { name: 'Publish' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Push branch' }))
 
   await waitFor(
     () => {
@@ -126,12 +126,14 @@ test('a second publish dialog observes the checkout publish already in flight', 
   )
   try {
     await userEvent.type(await screen.findByRole('textbox', { name: 'Repository' }), 'acme/repo')
-    expect(screen.getByRole('button', { name: /Publish$/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Create and push$/ })).toBeDisabled()
     await act(async () => {
       barrier.resolve()
       await executing
     })
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled())
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Create and push' })).toBeEnabled(),
+    )
   } finally {
     barrier.resolve()
     await executing
@@ -228,7 +230,7 @@ test('retains the previous worktree actions while the next worktree loads', asyn
     rendered.rerender(<BranchActions pullRequestTitle='Second' rootPath='second/repo' />)
     expect(screen.getByRole('button', { name: 'Push 1' })).toBeDisabled()
     expect(screen.getByRole('status', { name: 'Loading branch actions' })).toBeVisible()
-    expect(screen.queryByRole('button', { name: 'Publish' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Push branch' })).toBeNull()
     await act(async () => {
       barrier.resolve()
     })
@@ -240,7 +242,7 @@ test('retains the previous worktree actions while the next worktree loads', asyn
     await act(async () => {
       forgeBarrier.resolve()
     })
-    await screen.findByRole('button', { name: 'Publish' })
+    await screen.findByRole('button', { name: 'Push branch' })
     expect(screen.queryByRole('link', { name: '#17' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Push 1' })).toBeNull()
   } finally {

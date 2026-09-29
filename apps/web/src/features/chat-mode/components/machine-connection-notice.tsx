@@ -87,7 +87,7 @@ export function MachineConnectionNotice({
 }
 
 function noticeActionLabel(phase: EnvironmentPhase) {
-  if (phase === 'identity-drift') return 'Trust replacement'
+  if (phase === 'identity-drift') return 'Trust the new server'
   if (phase === 'idle') return 'Connect'
   return 'Retry'
 }

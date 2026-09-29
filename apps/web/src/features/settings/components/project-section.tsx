@@ -18,8 +18,8 @@ export function ProjectSection({ project }: { readonly project: SettingsProject 
     <section className='mb-6' aria-label={`${project.title} settings`}>
       <h2 className='text-foreground mb-1 text-sm font-semibold'>{project.title}</h2>
       <p className='text-muted-foreground text-xs'>
-        Overrides for this project on the machine that owns it. Default follows that machine's
-        setting.
+        Settings for this project only, saved on the machine that has it. Default uses that
+        machine's own setting.
       </p>
       {origin ? (
         <SettingsOwnerProvider queryClient={queryClientFor(origin)}>

@@ -158,8 +158,8 @@ function toolTextLooksLikeFailure(text: string) {
 function activityTitle(activity: OrchestrationSessionActivity, payload: Record<string, unknown>) {
   if (activity.kind === 'approval.requested') return 'Approval requested'
   if (activity.kind === 'approval.resolved') return approvalReceiptTitle(payload)
-  if (activity.kind === 'user-input.requested') return 'User input requested'
-  if (activity.kind === 'user-input.resolved') return 'User input resolved'
+  if (activity.kind === 'user-input.requested') return 'Question asked'
+  if (activity.kind === 'user-input.resolved') return 'Question answered'
   if (activity.kind === 'runtime.warning' || activity.kind === 'runtime.error') {
     return firstStringValue(payload, ['message', 'detail']) ?? activity.summary
   }

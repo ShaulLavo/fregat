@@ -110,7 +110,7 @@ export function ChatView({
   const handleRevertToCheckpoint = (turnCount: number, messageId: string) => {
     if (!currentDetail || !session || revertingCheckpoint) return
     if (busy) {
-      setSendError('Interrupt the current turn before reverting checkpoints.')
+      setSendError('Stop the agent before rewinding.')
       return
     }
     setPendingCheckpoint({ turnCount, messageId })

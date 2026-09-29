@@ -94,7 +94,7 @@ export function ShortcutRecorder({
         </div>
         {keyboardSeen ? null : (
           <p className='text-muted-foreground text-xs'>
-            Recording needs a keyboard. Remove and Reset work from the row menu.
+            Recording needs a keyboard. Remove shortcut and Reset to default are in the row menu.
           </p>
         )}
         {checked && checked.takes.length > 0 ? (

@@ -12,6 +12,7 @@ import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
 import { useWorkingMachines } from '@/lib/environments/hooks/use-working-machines'
 import { InlineError } from '@/components/inline-error'
 import { MachineValues } from '@/features/settings/components/machine-values'
+import { machinePhaseLabel } from '@/features/settings/utils/machine-phase-label'
 
 export function MachineRow({
   name,
@@ -67,7 +68,7 @@ export function MachineRow({
       <div className='flex items-center gap-2' title={detail}>
         <Phase label={machine.label ?? name} phase={phase} />
         <span className='min-w-0 flex-1 truncate text-sm font-medium'>{machine.label ?? name}</span>
-        <span className='text-muted-foreground text-xs'>{phase}</span>
+        <span className='text-muted-foreground text-xs'>{machinePhaseLabel(phase)}</span>
       </div>
       <MachineValues machine={machine} name={name} />
       {/* Always mounted: the reconnect loop clears and restores lastError on
@@ -112,7 +113,7 @@ export function MachineRow({
             disabled={working}
             onClick={() => void run(() => connections.trustMachine(name))}
           >
-            Trust replacement
+            Trust the new server
           </Button>
         ) : null}
         {phase !== 'idle' && phase !== 'live' && phase !== 'identity-drift' ? (

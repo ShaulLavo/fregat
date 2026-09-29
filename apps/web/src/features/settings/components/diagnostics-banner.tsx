@@ -39,8 +39,8 @@ export function DiagnosticsBanner({ diagnostics }: { diagnostics: readonly Setti
           diagnostics={carried}
           summary={
             carried.length === 1
-              ? '1 setting moved since it was written, and your value was carried over'
-              : `${carried.length} settings moved since they were written, and your values were carried over`
+              ? '1 setting was renamed in an update, and your value was carried over'
+              : `${carried.length} settings were renamed in an update, and your values were carried over`
           }
           tone='info'
         />

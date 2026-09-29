@@ -14,7 +14,7 @@ import type { Scenario } from './index'
 export const gitDiscardConfirm: Scenario = {
   name: 'git-discard-confirm',
   description:
-    'Discard asks first: Cancel keeps the change, holding Discard restores it, holding Delete removes a new file.',
+    'Discard asks first: Cancel keeps the change, holding Discard changes restores it, holding Delete file removes a new file.',
   async run(page, { step }) {
     // Never the dev workspace: confirming a discard there destroys real work.
     const fixture = await mkdtemp(scratchPath('fregat-git-discard-'))
@@ -54,7 +54,7 @@ export const gitDiscardConfirm: Scenario = {
       await selectors.gitFileRowAction(page, 'tracked.txt', 'Discard file').click()
       await holdToConfirm(
         page,
-        discardDialog.getByRole('button', { name: 'Discard', exact: true }),
+        discardDialog.getByRole('button', { name: 'Discard changes', exact: true }),
         () => discardDialog.waitFor({ state: 'hidden' }),
       )
       await tracked.waitFor({ state: 'detached' })
@@ -70,7 +70,7 @@ export const gitDiscardConfirm: Scenario = {
       await step('delete-asks')
       await holdToConfirm(
         page,
-        deleteDialog.getByRole('button', { name: 'Delete', exact: true }),
+        deleteDialog.getByRole('button', { name: 'Delete file', exact: true }),
         // The modal hides the rows behind it, so the row reads as gone before anything happened.
         () => deleteDialog.waitFor({ state: 'hidden' }),
       )

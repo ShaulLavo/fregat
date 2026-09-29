@@ -104,7 +104,7 @@ export function chatMessageMenu(context: ChatMessageMenuContext): Menu {
           disabled: context.revertPending,
           icon: ArrowCounterClockwiseIcon,
           id: 'revertCheckpoint',
-          label: 'Revert to Checkpoint Before This',
+          label: 'Rewind to Before This Message',
           run: context.revertToCheckpoint,
         }),
     ]),

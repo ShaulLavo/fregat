@@ -10,9 +10,9 @@ export const gitCheckpointErrors = defineErrorCatalog('git', {
   },
   CHECKPOINT_REF_UNAVAILABLE: {
     status: 404,
-    message: ({ ref }: { ref: string }) => `Checkpoint ref cannot be resolved: ${ref}`,
-    why: 'The checkpoint ref was never captured, was deleted by a revert, or was garbage collected, so there is no commit to diff against.',
-    fix: 'Diff against a turn whose checkpoint is still ready, or pass fallbackFromToHead to compare against HEAD instead.',
+    message: ({ ref }: { ref: string }) => `This checkpoint no longer exists: ${ref}`,
+    why: 'It was never saved, was removed by a revert, or was cleaned up by Git, so there is nothing to compare against.',
+    fix: 'Compare against a turn whose checkpoint still exists.',
   },
   CHECKPOINT_TREE_EMPTY: {
     status: 500,

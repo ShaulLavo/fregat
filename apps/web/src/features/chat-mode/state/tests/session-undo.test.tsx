@@ -94,17 +94,25 @@ test('forgetting one row of a bulk action lowers the count its notice shows', ()
   expect(screen.getByText('1 archived')).toBeTruthy()
 })
 
-test('evicting an old batch closes its notice', async () => {
+test('evicting an old batch closes its notice', () => {
+  // Fifty notices render slowly enough on CI to outrun a wall-clock waitFor.
+  vi.useFakeTimers({
+    toFake: ['setTimeout', 'clearTimeout', 'requestAnimationFrame', 'cancelAnimationFrame'],
+  })
   renderWithProviders(<Toaster />)
   act(() =>
     offerSessionUndo({ kind: 'archive', entries: [entry('old')], detail: '', shortcut: null }),
   )
-  await screen.findByText('1 archived')
+  act(() => vi.advanceTimersByTime(0))
+  expect(screen.getByText('1 archived')).toBeTruthy()
   act(() => {
     for (let i = 0; i < 50; i++)
       offerSessionUndo({ kind: 'settle', entries: [entry(String(i))], detail: '', shortcut: null })
   })
-  await waitFor(() => expect(screen.queryByText('1 archived')).toBeNull())
+  // Separate acts: the dismissal must commit before Sonner schedules its exit delay.
+  act(() => vi.advanceTimersByTime(50))
+  act(() => vi.advanceTimersByTime(250))
+  expect(screen.queryByText('1 archived')).toBeNull()
   expect(useSessionUndoStore.getState().undo).toHaveLength(50)
 })
 

@@ -15,6 +15,7 @@ import {
 import type { Scenario } from './index'
 
 const INITIAL = '# Authoring\n\nalpha beta\n'
+const LINKED = 'see [label](https://example.com) z'
 
 export const markdownAuthoring: Scenario = {
   name: 'markdown-authoring',
@@ -160,6 +161,20 @@ export const markdownAuthoring: Scenario = {
       await step('numbered-tasks')
       await saveAndCheck(page, file, '1. [x] first\n2. [x] second')
 
+      await replaceContent(page, LINKED)
+      await caretAt(page, 7)
+      await boldAndSave(page, file, 'see [la**text**bel](https://example.com) z')
+      await step('bold-in-link-label')
+      await boldAndSave(page, file, 'see [latextbel](https://example.com) z')
+      await step('bold-in-link-label-toggled-off')
+
+      await replaceContent(page, LINKED)
+      await caretAt(page, 20)
+      await boldAndSave(page, file, 'see **[label](https://example.com)** z')
+      await step('bold-from-link-destination')
+      await boldAndSave(page, file, LINKED)
+      await step('bold-from-link-destination-toggled-off')
+
       await runPaletteCommand(page, 'Toggle Markdown rendered pane')
       await selectors.markdownRenderedPane(page).waitFor({ state: 'detached' })
       await step('editor-alone')
@@ -174,6 +189,18 @@ async function replaceContent(page: Page, text: string) {
   await page.keyboard.press('Control+a')
   await page.keyboard.insertText(text)
   await page.keyboard.press('Control+a')
+}
+
+async function caretAt(page: Page, offset: number) {
+  await page.keyboard.press('Control+Home')
+  for (let index = 0; index < offset; index++) await page.keyboard.press('ArrowRight')
+}
+
+// Bold waits for fresh syntax records after an edit, so saving before the row changes races it.
+async function boldAndSave(page: Page, file: string, text: string) {
+  await page.keyboard.press('Control+b')
+  await selectors.editorRows(page).filter({ hasText: text }).first().waitFor()
+  await saveAndCheck(page, file, text)
 }
 
 async function saveAndCheck(page: Page, file: string, text: string) {

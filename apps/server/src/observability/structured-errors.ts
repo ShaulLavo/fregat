@@ -8,8 +8,8 @@ export const serverErrors = defineErrorCatalog('server', {
   INTERNAL_ERROR: {
     status: 500,
     message: ({ message }: { message: string }) => message,
-    why: 'A server-side invariant failed while handling internal application state.',
-    fix: 'Inspect the server logs and fix the invariant at the throwing call site.',
+    why: 'The server reached a state it does not expect while handling this request.',
+    fix: 'Try again. If it keeps failing, open the Logs panel to see what went wrong.',
   },
   LOOPBACK_HOST_REQUIRED: {
     status: 500,
@@ -23,15 +23,16 @@ export const orchestrationErrors = defineErrorCatalog('orchestration', {
   TERMINAL_LEASE_UNPERSISTED: {
     status: 503,
     message: ({ command, attempts }: { command: string; attempts: number }) =>
-      `${command} was not persisted after ${attempts} attempts`,
-    why: 'The orchestration store refused the terminal lease write on every attempt.',
+      `${command} could not be saved after ${attempts} attempts`,
+    why: 'The server could not record which terminal runs this session.',
     fix: 'Check that the disk has free space and no other Platform server holds the database, then open the terminal again.',
   },
   COMMAND_PREVIOUSLY_REJECTED: {
     status: 409,
-    message: ({ commandId }: { commandId: string }) => `Command previously rejected: ${commandId}`,
-    why: 'The command receipt was already marked as rejected.',
-    fix: 'Inspect the stored rejection and dispatch a new command when retrying.',
+    message: ({ commandId }: { commandId: string }) =>
+      `This request was already turned down: ${commandId}`,
+    why: 'The server refused this same request earlier.',
+    fix: 'Reload the app and try again.',
   },
   EVENT_JSON_INVALID: {
     status: 500,
@@ -52,26 +53,26 @@ export const orchestrationErrors = defineErrorCatalog('orchestration', {
     message: ({ workspaceRoot }: { workspaceRoot: string }) =>
       `Workspace root could not be created: ${workspaceRoot}`,
     why: 'The project asked for its workspace root to be created and the filesystem refused.',
-    fix: 'Check the parent directory exists and is writable, then dispatch the command again.',
+    fix: 'Check that the parent folder exists and you can write to it, then try again.',
   },
   PROJECT_ALREADY_EXISTS: {
     status: 409,
     message: ({ projectId }: { projectId: string }) => `Project already exists: ${projectId}`,
-    why: 'The project id is already present in the orchestration stream.',
-    fix: 'Use a new project id or load the existing project.',
+    why: 'A project with this ID already exists.',
+    fix: 'Open the existing project.',
   },
   PROJECT_NOT_EMPTY: {
     status: 409,
     message: ({ projectId, sessionCount }: { projectId: string; sessionCount: number }) =>
       `Project ${projectId} still has ${sessionCount} live session(s)`,
-    why: 'Deleting a project cascades to every session it owns, so it is not a silent operation.',
-    fix: 'Delete the sessions first, or resend the command with force set to true.',
+    why: 'Deleting a project also deletes every session in it, so the app asks first.',
+    fix: 'Delete its sessions first, or confirm deleting the project together with its sessions.',
   },
   PROJECT_NOT_FOUND: {
     status: 404,
     message: ({ projectId }: { projectId: string }) => `Project not found: ${projectId}`,
-    why: 'The requested project is missing or has been deleted.',
-    fix: 'Refresh the orchestration shell and select an existing project.',
+    why: 'The project is missing or was deleted.',
+    fix: 'Reload the app and pick a project that still exists.',
   },
   PROJECT_WORKSPACE_ROOT_TAKEN: {
     status: 409,
@@ -83,14 +84,14 @@ export const orchestrationErrors = defineErrorCatalog('orchestration', {
   SESSION_ALREADY_EXISTS: {
     status: 409,
     message: ({ sessionId }: { sessionId: string }) => `Session already exists: ${sessionId}`,
-    why: 'The session id is already present in the orchestration stream.',
-    fix: 'Use a new session id or load the existing session.',
+    why: 'A session with this ID already exists.',
+    fix: 'Open the existing session.',
   },
   SESSION_ARCHIVED: {
     status: 409,
     message: ({ commandType, sessionId }: { commandType: string; sessionId: string }) =>
       `Session ${sessionId} is archived and cannot handle ${commandType}`,
-    why: 'An archived session is parked: accepting work on it would resurrect it invisibly.',
+    why: 'An archived session is put away, and working in it would bring it back without you seeing it.',
     fix: 'Unarchive the session before sending this command.',
   },
   SESSION_BRANCH_CONFLICT: {
@@ -105,26 +106,26 @@ export const orchestrationErrors = defineErrorCatalog('orchestration', {
       sessionId: string
     }) =>
       `Session ${sessionId} is on branch ${actualBranch ?? 'none'}; the update expected ${expectedBranch ?? 'none'}`,
-    why: 'The compare-and-swap guard failed: the session moved branches since the client read it.',
-    fix: 'Reload the session and reissue the update against its current branch.',
+    why: 'The session switched branches after this page last loaded it.',
+    fix: 'Reload the session and make the change again.',
   },
   SESSION_NOT_ARCHIVED: {
     status: 409,
     message: ({ sessionId }: { sessionId: string }) => `Session is not archived: ${sessionId}`,
     why: 'Unarchiving only applies to a session that is currently archived.',
-    fix: 'Refresh the orchestration shell; the session is already active.',
+    fix: 'Reload the app. The session is already active.',
   },
   SESSION_NOT_FOUND: {
     status: 404,
     message: ({ sessionId }: { sessionId: string }) => `Session not found: ${sessionId}`,
-    why: 'The requested session is missing or has been deleted.',
-    fix: 'Refresh the orchestration shell and select an existing session.',
+    why: 'The session is missing or was deleted.',
+    fix: 'Reload the app and pick a session that still exists.',
   },
   SOURCE_PLAN_NOT_ACTIONABLE: {
     status: 409,
     message: ({ planSessionId }: { planSessionId: string }) =>
       `Session ${planSessionId} has no actionable proposed plan to implement`,
-    why: 'A turn cited a proposed plan that the read model does not hold as actionable — the plan was already implemented, was reverted away, or the client is working from a stale shell.',
+    why: 'The plan this turn points to cannot be carried out any more: it was already carried out, it was rewound, or this page shows an old copy.',
     fix: 'Reload the session and start the turn from the plan the timeline currently shows.',
   },
 })
@@ -134,21 +135,21 @@ export const providerErrors = defineErrorCatalog('provider', {
     status: 404,
     message: ({ providerInstanceId }: { providerInstanceId: string }) =>
       `Provider instance not found: ${providerInstanceId}`,
-    why: 'The requested provider instance is not registered in the adapter registry.',
-    fix: 'Reload the provider list and address a registered provider instance.',
+    why: 'This provider is not set up on the server.',
+    fix: 'Reload the provider list and pick a provider from it.',
   },
   LOGIN_ATTEMPT_NOT_FOUND: {
     status: 404,
     message: ({ attemptId }: { attemptId: string }) => `Login attempt not found: ${attemptId}`,
-    why: 'The sign-in attempt has been superseded by a newer one or the server restarted.',
-    fix: 'Start a new sign-in and poll the attempt id it returns.',
+    why: 'A newer sign-in replaced it, or the server restarted.',
+    fix: 'Start the sign-in again.',
   },
   SIGN_IN_UNSUPPORTED: {
     status: 400,
     message: ({ providerInstanceId }: { providerInstanceId: string }) =>
       `Provider does not support in-app sign-in: ${providerInstanceId}`,
-    why: 'The provider adapter does not implement the optional sign-in members.',
-    fix: 'Check `supportsSignIn` on the provider snapshot before offering sign-in.',
+    why: 'This provider cannot sign in from the app.',
+    fix: 'Sign in with the provider’s own command line.',
   },
 })
 
@@ -156,8 +157,8 @@ export const lspErrors = defineErrorCatalog('lsp', {
   PACKAGE_INSTALL_FAILED: {
     status: 500,
     message: ({ packageName }: { packageName: string }) => `Failed to install ${packageName}`,
-    why: 'The language server package installer exited with a non-zero status.',
-    fix: 'Review the installer output and retry the language server install.',
+    why: 'The installer for this language server failed.',
+    fix: 'Try the install again. If it keeps failing, open the Logs panel to see the installer output.',
   },
   SERVER_EXITED: {
     status: 502,

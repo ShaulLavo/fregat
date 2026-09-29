@@ -20,11 +20,8 @@ export function settingDependencyNote(id: SettingId, values: SettingsValues): st
 }
 
 export function settingOptionTitle(id: SettingId, value: string): string {
-  if (id === 'keybindings.preset') return value === 'vscode' ? 'VS Code' : 'Platform'
-  if (id === 'editor.markdownView') return markdownViewTitle(value)
-  if (id !== 'workbench.colorTheme') return value
-
-  return value.charAt(0).toUpperCase() + value.slice(1)
+  const titles: Readonly<Record<string, string>> | undefined = descriptorFor(id).optionTitles
+  return titles?.[value] ?? value
 }
 
 // Keep qualifiers after the namespace: Wallpaper enabled distinguishes generic enabled leaves.
@@ -49,9 +46,4 @@ const DIAGNOSTIC_LABELS: Record<SettingsDiagnostic['kind'], string> = {
 
 export function settingsDiagnosticLabel(kind: SettingsDiagnostic['kind']) {
   return DIAGNOSTIC_LABELS[kind]
-}
-
-function markdownViewTitle(value: string) {
-  if (value === 'source') return 'Plain source'
-  return 'Live preview'
 }

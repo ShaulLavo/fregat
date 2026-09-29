@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: PROPOSED 2026-09-26, ready. Follow-up to Plan 126 LIFE-14 (lane L9), from the
+- Status: APPROVED 2026-09-26. Follow-up to Plan 126 LIFE-14 (lane L9), from the
   2026-09-26 direction audit, item 3.
 - Decided 2026-09-26: owner — "PR poller (L9, LIFE-14): add an off switch (a setting) and a
   smarter poll rate. Poll only worktrees with an open or unknown PR, back off when idle or hidden,

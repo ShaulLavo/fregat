@@ -489,12 +489,12 @@ export class WorkspaceEditService {
       sourceKind,
     })
     if (this.externalMutationReservation) {
-      const result = failedResult('workspace-edit-busy', 'Another workspace mutation is active')
+      const result = failedResult('workspace-edit-busy', 'Another file change is still running')
       event.end(workspaceOperationSettlement(result))
       return result
     }
     if (this.active?.commitStarted) {
-      const result = failedResult('workspace-edit-busy', 'Workspace is busy')
+      const result = failedResult('workspace-edit-busy', 'Another multi-file edit is still running')
       event.end(workspaceOperationSettlement(result))
       return result
     }
@@ -617,7 +617,7 @@ export class WorkspaceEditService {
     void this.flushPendingWorkspaceMutationCleanup()
     const reservation = this.acquireWorkspaceMutationReservation()
     if (!reservation) {
-      throw workspaceEditError('workspace-edit-busy', 'Another workspace mutation is active')
+      throw workspaceEditError('workspace-edit-busy', 'Another file change is still running')
     }
 
     const reportedPaths = new Set<FilesystemPath>()
@@ -796,7 +796,7 @@ export class WorkspaceEditService {
     await this.reconcileRecoveryProjection(current)
     this.publish({
       code: 'workspace-edit-recovery-required',
-      message: 'A workspace transaction needs recovery.',
+      message: 'A multi-file edit stopped partway and some files need to be put back.',
       phase: 'recovery-required',
       preview: null,
       recovery: recoveryResult(current, current.affectedPaths, current),
@@ -1002,7 +1002,7 @@ export class WorkspaceEditService {
     this.recoveryServer = result
     this.publish({
       code: 'workspace-edit-cleanup-failed',
-      message: 'The workspace recovered, but transaction cleanup did not finish.',
+      message: 'The files were put back, but cleanup did not finish.',
       phase: 'failed',
       preview: null,
     })
@@ -1019,7 +1019,7 @@ export class WorkspaceEditService {
     const recovery = recoveryResult(result, result.affectedPaths, result)
     this.publish({
       code: 'workspace-edit-recovery-required',
-      message: 'Some workspace paths still need recovery.',
+      message: 'Some files still need to be put back.',
       phase: 'recovery-required',
       preview: null,
       recovery,
@@ -1086,7 +1086,7 @@ export class WorkspaceEditService {
     this.ownOperationIds.delete(current.operationId)
     this.publish({
       code: null,
-      message: 'Recovery data was discarded. Affected live buffers remain conflicted.',
+      message: 'The saved copies were deleted. Open files the edit touched may not match the disk.',
       phase: 'released',
       preview: null,
       recovery: recoveryResult(current, current.affectedPaths, current),
@@ -1742,7 +1742,7 @@ class WorkspaceEditPreparationBuilder {
       if (!evidence) throw workspaceEditError('invalid-source', 'Text source is missing')
       assertSourceCurrent(this.options, evidence)
       if (evidence.kind === 'disk' && evidence.snapshot.version !== node.snapshot?.version) {
-        throw workspaceEditError('snapshot-drift', 'File changed since replacement planning')
+        throw workspaceEditError('snapshot-drift', 'The file changed after the edit was prepared')
       }
     } else {
       validateDirtyTargetProvenance(this.request, operation, target)
@@ -1860,7 +1860,10 @@ class WorkspaceEditPreparationBuilder {
     const ignored = node === null
     if (node) await this.ensureResourceSnapshot(node, path)
     if (node && (node.pendingText || node.target?.dirtyInitially)) {
-      throw workspaceEditError('dirty-destructive-target', 'Delete would discard unsaved text')
+      throw workspaceEditError(
+        'dirty-destructive-target',
+        'Deleting this file would lose its unsaved changes',
+      )
     }
     if (node) this.nodesByPath.delete(path)
     this.operations.push({
@@ -1929,7 +1932,10 @@ class WorkspaceEditPreparationBuilder {
     })
     const stamp = this.options.documentStore.getState().prepareWorkspaceDocumentTarget(document.key)
     if (!stamp)
-      throw workspaceEditError('snapshot-drift', 'Live document changed during preparation')
+      throw workspaceEditError(
+        'snapshot-drift',
+        'An open file changed while the edit was being prepared',
+      )
     const target: PreparedTarget = {
       buffer: document.buffer,
       currentPath: document.target.resource.path,
@@ -1981,7 +1987,7 @@ class WorkspaceEditPreparationBuilder {
 
   private assertNotDestructiveLiveTarget(node: VirtualNode): void {
     if (!node.target?.liveStamp) return
-    throw workspaceEditError('open-overwrite-target', 'Cannot overwrite an open document')
+    throw workspaceEditError('open-overwrite-target', 'Cannot replace a file that is open')
   }
 
   private resolveUri(uri: string): FilesystemPath {
@@ -2140,7 +2146,10 @@ class TextChangeSources implements TextChangePreparation {
     if (live) {
       const stamp = state.prepareWorkspaceDocumentTarget(live.key)
       if (!stamp || live.target.kind !== 'file')
-        throw workspaceEditError('snapshot-drift', 'Text source changed')
+        throw workspaceEditError(
+          'snapshot-drift',
+          'A file changed while the edit was being prepared',
+        )
       const source = issueTextSource(path, live.buffer)
       this.issued.set(source, { kind: 'live', buffer: live.buffer, pathRequest, source, stamp })
       return source
@@ -2236,7 +2245,7 @@ function assertCapturedRootCurrent(
   signal.throwIfAborted()
   const current = options.getRoot()
   if (current && sameWorkspaceEditRoot(current, root)) return
-  throw workspaceEditError('workspace-root-changed', 'Workspace changed after operation started')
+  throw workspaceEditError('workspace-root-changed', 'The folder changed after the edit started')
 }
 
 function assertSourceCurrent(options: WorkspaceEditServiceOptions, evidence: SourceEvidence): void {
@@ -2251,7 +2260,7 @@ function assertSourceCurrent(options: WorkspaceEditServiceOptions, evidence: Sou
     evidence.buffer.getTextSnapshot() === evidence.source.textSnapshot
   )
     return
-  throw workspaceEditError('snapshot-drift', 'Text source changed since planning')
+  throw workspaceEditError('snapshot-drift', 'A file changed after the edit was prepared')
 }
 
 function collapseImmediateTextOperations(
@@ -2727,10 +2736,10 @@ function workspaceEditError(code: string, message: string, cause?: unknown) {
   return createClientError({
     cause,
     code,
-    fix: 'Request the workspace edit again after resolving the reported conflict.',
+    fix: 'Run the edit again.',
     message,
     status: 409,
-    why: 'The workspace edit could not be applied as one guarded transaction.',
+    why: 'The edit changes several files as one step, and one of them was busy or had changed.',
   })
 }
 
@@ -2747,7 +2756,7 @@ function assertPreparedRequestCurrent(
   for (const target of prepared.targets) {
     if (!target.liveStamp) continue
     if (!state.isWorkspaceDocumentTargetCurrent(target.liveStamp)) {
-      throw workspaceEditError('snapshot-drift', 'A live document changed after preparation')
+      throw workspaceEditError('snapshot-drift', 'An open file changed after the edit was prepared')
     }
   }
   for (const request of prepared.pathRequests) {
@@ -3145,7 +3154,7 @@ function workspaceEditPrepareRequest(
 ): Promise<WorkspaceEditPrepareRequest> {
   return workspaceEditPrepareBody({
     category: 'workspace-edit',
-    label: prepared.preview.label || 'Workspace edit',
+    label: prepared.preview.label || 'Multi-file edit',
     operationId: prepared.operationId,
     operations: prepared.persistence,
     origin: 'workspace-edit',
@@ -3202,7 +3211,7 @@ function assertWorkspaceServerState(
 ): void {
   if (!server || expected.includes(server.state)) return
   if (server.state === 'partial') {
-    throw workspaceEditError('workspace-edit-partial', 'Filesystem transaction needs recovery')
+    throw workspaceEditError('workspace-edit-partial', 'Some files need to be put back')
   }
   throw workspaceEditError(
     'workspace-edit-state',

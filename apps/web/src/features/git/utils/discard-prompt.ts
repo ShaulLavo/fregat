@@ -3,7 +3,7 @@ import type { ChangeRow, DiscardRequest, PanelSection } from '@/features/git/uti
 export type DiscardPrompt = {
   readonly title: string
   readonly description: string
-  readonly confirm: 'Delete' | 'Discard'
+  readonly confirm: 'Delete file' | 'Discard changes'
 }
 
 const IRREVERSIBLE = 'This cannot be undone.'
@@ -22,11 +22,13 @@ export function discardPrompt(request: DiscardRequest, name: string): DiscardPro
   if (request.paths.length === 1) return singleFilePrompt(request, name, staged)
 
   const count = request.paths.length
-  const lost = staged ? 'Staged and unstaged changes to these files are lost. ' : ''
+  const lost = staged
+    ? 'These files go back to their last commit, and their staged and unstaged changes are deleted. '
+    : 'The changes you have not staged are deleted from these files. '
   return {
     title: `Discard all ${staged ? 'staged ' : ''}changes in ${count} files?`,
     description: `${lost}${newFilesSentence(request.newFiles)}${IRREVERSIBLE}`,
-    confirm: 'Discard',
+    confirm: 'Discard changes',
   }
 }
 
@@ -34,19 +36,23 @@ function singleFilePrompt(request: DiscardRequest, name: string, staged: boolean
   if (request.newFiles === 1) {
     return {
       title: `Delete ${name}?`,
-      description: `Git does not track this file yet, so discarding it deletes it. ${IRREVERSIBLE}`,
-      confirm: 'Delete',
+      description: `This file is new and has never been committed, so discarding it deletes the file. ${IRREVERSIBLE}`,
+      confirm: 'Delete file',
     }
   }
   if (staged) {
     return {
       title: `Discard staged changes in ${name}?`,
-      description: `Its staged and unstaged changes are both lost. ${IRREVERSIBLE}`,
-      confirm: 'Discard',
+      description: `The file goes back to its last commit, and its staged and unstaged changes are deleted. ${IRREVERSIBLE}`,
+      confirm: 'Discard changes',
     }
   }
 
-  return { title: `Discard changes in ${name}?`, description: IRREVERSIBLE, confirm: 'Discard' }
+  return {
+    title: `Discard changes in ${name}?`,
+    description: `The changes you have not staged are deleted from the file. ${IRREVERSIBLE}`,
+    confirm: 'Discard changes',
+  }
 }
 
 function newFilesSentence(count: number) {

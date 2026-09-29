@@ -1,13 +1,19 @@
-# Plan 202: One workspace for chat and code
+# Plan 209: One workspace for chat and code
 
-Status: proposed for design review. Planning and a plan-only PR were requested on
-2026-09-28. No implementation, dependency changes, state resets or deployment are
+Status: APPROVED for design review, reconciled 2026-09-29. Planning and a plan-only PR
+were requested on 2026-09-28. No implementation, dependency changes, state resets or deployment are
 authorized by this document. Merging this plan records direction; implementation
 requires a separate owner decision.
 
 Scope: the wide web workspace and desktop clients that use it. The phone shell,
 native client and TUI keep their own presentation contracts. Execution order and
 cross-plan dependencies remain in [PLAN.md](../PLAN.md).
+
+Current scheduling: [207](207-one-repo-with-mirrors.md) owns package relocation;
+[202](202-tui-ui.md) owns the separate app-local terminal UI. Align command changes
+with [206](206-platform-one-keymap.md), and add new app copy through
+[208](208-all-text-in-json.md) as its catalogs land. Preserve the design decisions
+and implementation authorization below; merging this documentation resolves neither.
 
 Source baseline: Fregat `794a6414e0b9c753a9ce79d5eb26d4da0d0af75c`, inspected on
 2026-09-28. Source links below are pinned to this revision. Reconcile main and open
@@ -62,17 +68,17 @@ the regular editor experience.
 
 ## 2. Existing work: reuse it, and distinguish the two meanings of document
 
-| Existing owner | Verified boundary | Relationship to this plan |
-| --- | --- | --- |
-| [Plan 098 delivery](../docs/document-and-tab-domain.md) | Implemented typed documents, resource identity, tab instances, save capabilities and comparison targets. | Reuse the delivered tab/document domain. Do not repeat the synthetic-path refactor. |
-| [Plan 200](200-document-backed-content-views.md) | Proposed shared content acquisition and attachment for comparisons, conflicts and previews. | Owns the deeper diff-buffer work. Moving an existing diff tab or hosting chat does not depend on all of 200. |
-| [Plan 099](099-document-contributions.md), [198](198-document-owned-editor-analysis.md), [197](197-editor-highlighting-service.md) | Existing owners of contribution publication, retained analysis and highlighting. | Coordinate only the contracts a view consumes. Do not introduce a second analysis/cache owner or bypass their execution gates. |
-| [Plan 171](171-composer-on-our-editor.md) | Authoring work has landed; visual editing and the composer migration remain. | Composer text ownership is separate from hosting a conversation in a workspace tab. Preserve the current composer while moving its host. |
-| [Plan 182](182-search-view-rendering.md) | Owns search rendering and its composite editing work. | Reuse the existing search tab; do not make the shell project depend on a new search renderer. |
-| [Plan 156](156-documents-in-the-editor.md) | Rich document formats and their viewing/editing requirements. | Independent of this shell change. New view kinds must not accidentally become saveable files. |
-| [Plan 126](126-t3code-alignment.md), [139](139-acting-on-agent-diffs.md), [169](169-agent-review-mode.md) | Existing chat/provider, agent-diff and review responsibilities. | Preserve their behavior and provenance. A full Git/PR host is not authorization for new review/backend features. |
-| [Plan 143](143-phone-layout.md) | Phone presentation. | Keep the responsive shell boundary; shared state changes require phone regression coverage. |
-| [Plan 183](183-claude-ide-in-terminals.md) | Agent CLI/IDE integration. | Separate work. This plan does not replace chat with an agent terminal. |
+| Existing owner                                                                                                                     | Verified boundary                                                                                        | Relationship to this plan                                                                                                                |
+| ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| [Plan 098 delivery](../docs/document-and-tab-domain.md)                                                                            | Implemented typed documents, resource identity, tab instances, save capabilities and comparison targets. | Reuse the delivered tab/document domain. Do not repeat the synthetic-path refactor.                                                      |
+| [Plan 200](200-document-backed-content-views.md)                                                                                   | Approved shared content acquisition and attachment for comparisons, conflicts and previews.              | Owns the deeper diff-buffer work. Moving an existing diff tab or hosting chat does not depend on all of 200.                             |
+| [Plan 099](099-document-contributions.md), [198](198-document-owned-editor-analysis.md), [197](197-editor-highlighting-service.md) | Existing owners of contribution publication, retained analysis and highlighting.                         | Coordinate only the contracts a view consumes. Do not introduce a second analysis/cache owner or bypass their execution gates.           |
+| [Plan 171](171-composer-on-our-editor.md)                                                                                          | Authoring work has landed; visual editing and the composer migration remain.                             | Composer text ownership is separate from hosting a conversation in a workspace tab. Preserve the current composer while moving its host. |
+| [Plan 182](182-search-view-rendering.md)                                                                                           | Owns search rendering and its composite editing work.                                                    | Reuse the existing search tab; do not make the shell project depend on a new search renderer.                                            |
+| [Plan 156](156-documents-in-the-editor.md)                                                                                         | Rich document formats and their viewing/editing requirements.                                            | Independent of this shell change. New view kinds must not accidentally become saveable files.                                            |
+| [Plan 126](126-t3code-alignment.md), [139](139-acting-on-agent-diffs.md), [169](169-agent-review-mode.md)                          | Existing chat/provider, agent-diff and review responsibilities.                                          | Preserve their behavior and provenance. A full Git/PR host is not authorization for new review/backend features.                         |
+| [Plan 143](143-phone-layout.md)                                                                                                    | Phone presentation.                                                                                      | Keep the responsive shell boundary; shared state changes require phone regression coverage.                                              |
+| [Plan 183](183-claude-ide-in-terminals.md)                                                                                         | Agent CLI/IDE integration.                                                                               | Separate work. This plan does not replace chat with an agent terminal.                                                                   |
 
 **What was found about chat documents:** the current `TabContent` supports document
 content and Settings. `DocumentRef` includes Git diffs, search, history and other
@@ -82,7 +88,7 @@ tool output on lightweight rendering, with a later acquisition boundary for rich
 content. Plan 171 concerns composer drafts. These inspected plans do not establish
 an implemented conversation-as-workspace-tab feature. [S1] [S2] [S3]
 
-For 202, a chat tab means a view of an existing session resource. It does not mean
+For 209, a chat tab means a view of an existing session resource. It does not mean
 turning the transcript into a writable source buffer, publishing it to LSP, giving
 it file-save semantics or replacing the chat renderer. Extend `TabContent` with
 explicit non-file variants or the equivalent existing domain abstraction. Retain
@@ -90,17 +96,17 @@ explicit non-file variants or the equivalent existing domain abstraction. Retain
 
 ### Current integration points
 
-| Area | Current evidence | Work here |
-| --- | --- | --- |
-| Desktop shell | `workbench-shell.tsx` branches on `uiMode` into chat or editor surfaces. [S4] | Replace the mutually exclusive desktop layouts with one composition. |
-| Chat layout | Sessions, a fixed ChatStage and one selected tool pane. [S5] | Reuse Sessions independently; move the stage's content into a tab host. |
-| Editor layout | Sidebar, shared editor groups and a dedicated bottom panel. [S6] | Retain the useful regions and add an independently controlled Sessions column. |
-| Split model | `EditorGroups`, `GroupNode`, stable group/tab IDs and move/copy placement already exist. [S7] | Extend capabilities and renderer dispatch, not the geometry model. |
-| Chat ownership | ChatStage reads one selected-session context and draft generation. [S8] | Explicit per-tab session scope is required before two chat tabs can be visible. |
-| Tool root | `useSessionToolRoot` resolves a confirmed checkout and refuses an unknown owner. [S9] | Preserve that guarantee when removing the single-stage assumption. |
-| Terminal lifetime | A KeepAliveProvider sits above the shell switch. [S10] | Reuse its lifetime boundary for view handoffs; do not tie a PTY to a column. |
-| Panel state | WorkbenchPanels owns editor groups, terminal records, bottom/tool selection and sidebar flags. [S11] | Evolve the existing owner without keeping old/new durable layout copies. |
-| Commands | Several defaults and handlers distinguish chat mode from workbench mode. [S12] | Make the command target explicit; retain applicable bindings deliberately. |
+| Area              | Current evidence                                                                                     | Work here                                                                       |
+| ----------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Desktop shell     | `workbench-shell.tsx` branches on `uiMode` into chat or editor surfaces. [S4]                        | Replace the mutually exclusive desktop layouts with one composition.            |
+| Chat layout       | Sessions, a fixed ChatStage and one selected tool pane. [S5]                                         | Reuse Sessions independently; move the stage's content into a tab host.         |
+| Editor layout     | Sidebar, shared editor groups and a dedicated bottom panel. [S6]                                     | Retain the useful regions and add an independently controlled Sessions column.  |
+| Split model       | `EditorGroups`, `GroupNode`, stable group/tab IDs and move/copy placement already exist. [S7]        | Extend capabilities and renderer dispatch, not the geometry model.              |
+| Chat ownership    | ChatStage reads one selected-session context and draft generation. [S8]                              | Explicit per-tab session scope is required before two chat tabs can be visible. |
+| Tool root         | `useSessionToolRoot` resolves a confirmed checkout and refuses an unknown owner. [S9]                | Preserve that guarantee when removing the single-stage assumption.              |
+| Terminal lifetime | A KeepAliveProvider sits above the shell switch. [S10]                                               | Reuse its lifetime boundary for view handoffs; do not tie a PTY to a column.    |
+| Panel state       | WorkbenchPanels owns editor groups, terminal records, bottom/tool selection and sidebar flags. [S11] | Evolve the existing owner without keeping old/new durable layout copies.        |
+| Commands          | Several defaults and handlers distinguish chat mode from workbench mode. [S12]                       | Make the command target explicit; retain applicable bindings deliberately.      |
 
 ## 3. The shell and its visible states
 
@@ -140,18 +146,18 @@ responsive alternative is approved. The phone shell does not receive two columns
 
 ### 3.2 Required journeys
 
-| Journey | User action | Required resulting layout and behavior |
-| --- | --- | --- |
-| Classic editing | Open an editor-first workspace with no saved arrangement. | Files left, existing document area above, multi-session terminal panel below. Sessions can remain collapsed. |
-| Chat-first entry | Open a session from Sessions. | A conversation is visible in a workspace group, with Sessions still available. Do not open a separate desktop shell. |
-| Inspect a file while chatting | Reveal Files and select a file. | Files, file and chat coexist; Sessions remains visible if it was already visible. |
-| Review session output | Select a session's changes, then a changed file. | Changes list, the correctly scoped diff and the conversation coexist. |
-| Review the checkout | Explicitly select working-tree/staged scope. | Show checkout changes, not only the currently discussed session. Existing open session diffs retain their identity. |
-| Review a branch/PR | Open an available comparison or PR view. | It can be another tab beside chat or a diff. Missing backend capabilities remain separately scoped work. |
-| Run a quick command | Reveal the compact terminal and select a session. | Existing shell is revealed; a new process is created only by a creation command or explicit empty-state action. |
-| Work in a large terminal | Open a terminal session as a workspace tab or beside code. | Same session, correct checkout, stable output and focus; other terminal sessions stay available. |
-| Concentrate | Maximize a workspace view, then restore. | Restore the prior topology, sizes, tabs and selection without restarting resources. |
-| Switch project/environment | Select a session under another owner. | Reuse existing switching/parking behavior and restore that owner's workspace; no unscoped retargeting. |
+| Journey                       | User action                                                | Required resulting layout and behavior                                                                               |
+| ----------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Classic editing               | Open an editor-first workspace with no saved arrangement.  | Files left, existing document area above, multi-session terminal panel below. Sessions can remain collapsed.         |
+| Chat-first entry              | Open a session from Sessions.                              | A conversation is visible in a workspace group, with Sessions still available. Do not open a separate desktop shell. |
+| Inspect a file while chatting | Reveal Files and select a file.                            | Files, file and chat coexist; Sessions remains visible if it was already visible.                                    |
+| Review session output         | Select a session's changes, then a changed file.           | Changes list, the correctly scoped diff and the conversation coexist.                                                |
+| Review the checkout           | Explicitly select working-tree/staged scope.               | Show checkout changes, not only the currently discussed session. Existing open session diffs retain their identity.  |
+| Review a branch/PR            | Open an available comparison or PR view.                   | It can be another tab beside chat or a diff. Missing backend capabilities remain separately scoped work.             |
+| Run a quick command           | Reveal the compact terminal and select a session.          | Existing shell is revealed; a new process is created only by a creation command or explicit empty-state action.      |
+| Work in a large terminal      | Open a terminal session as a workspace tab or beside code. | Same session, correct checkout, stable output and focus; other terminal sessions stay available.                     |
+| Concentrate                   | Maximize a workspace view, then restore.                   | Restore the prior topology, sizes, tabs and selection without restarting resources.                                  |
+| Switch project/environment    | Select a session under another owner.                      | Reuse existing switching/parking behavior and restore that owner's workspace; no unscoped retargeting.               |
 
 ### 3.3 Fast access to the regular editor feeling
 
@@ -176,14 +182,14 @@ group exits the temporary focus presentation and reveals the real layout.
 
 ### 4.1 Proposed view membership
 
-| View | Identity / content authority | Important capability |
-| --- | --- | --- |
-| File, diff, search, history, conflict, Settings | Existing document/tab domain. | Keep its existing save, copy, close and retention contracts. |
-| Conversation | Explicit environment and session identity; draft views also have a stable draft identity. | Session-backed; no ordinary file Save and no duplicate composer for the same session by default. |
-| Terminal | Environment, confirmed checkout and terminal session identity. | Session-backed; moving a view never creates a PTY. |
-| Full Git view | Environment, checkout and explicit review scope. | Navigation/review view; opens actual diffs through existing document requests. |
-| Full Problems view | Environment and checkout plus display filters. | Diagnostic navigation; opening a location uses the common document destination. |
-| PR view | Existing provider/repository/PR identity when a reader is available. | Review content, not a synthetic filesystem path. |
+| View                                            | Identity / content authority                                                              | Important capability                                                                             |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| File, diff, search, history, conflict, Settings | Existing document/tab domain.                                                             | Keep its existing save, copy, close and retention contracts.                                     |
+| Conversation                                    | Explicit environment and session identity; draft views also have a stable draft identity. | Session-backed; no ordinary file Save and no duplicate composer for the same session by default. |
+| Terminal                                        | Environment, confirmed checkout and terminal session identity.                            | Session-backed; moving a view never creates a PTY.                                               |
+| Full Git view                                   | Environment, checkout and explicit review scope.                                          | Navigation/review view; opens actual diffs through existing document requests.                   |
+| Full Problems view                              | Environment and checkout plus display filters.                                            | Diagnostic navigation; opening a location uses the common document destination.                  |
+| PR view                                         | Existing provider/repository/PR identity when a reader is available.                      | Review content, not a synthetic filesystem path.                                                 |
 
 Use stable `TabId` and `GroupId` for presentation identity. A session ID, path or
 tree position is not a replacement for a view ID. Add capabilities only where an
@@ -335,23 +341,23 @@ list, and next-item behavior also depends on mode. [S12]
 `Mod` below means the platform modifier resolved by the existing keymap. Preserve
 platform/preset distinctions; do not rewrite all chords from memory of VS Code.
 
-| Existing command/behavior | Proposed unified meaning | Verification / decision |
-| --- | --- | --- |
-| `workspace.toggleSidebarVisibility`, `Mod+B` | Toggle project tools only. Sessions has its own toggle. | Intentional change from chat-mode behavior; requires owner review, visible hints and override handling. |
-| Sessions collapse/focus | Independently show/hide or focus Sessions. | Reuse an applicable existing command; choose a nonconflicting default only after auditing all presets. |
-| `workspace.togglePanel`, `Mod+J` | Preserve bottom-panel behavior in the core release. | Sidebar-home extension must explicitly choose panel-identity versus bottom-region semantics; do not silently substitute one. |
-| `workspace.revealTerminal` | Reveal the requested/recent compatible terminal at its existing home. | No session creation merely because its view is elsewhere. |
-| `workspace.newTerminal` | Create a new scoped terminal session. | Current metadata binds `Mod+backtick` to New Terminal; do not incorrectly describe it as the existing toggle shortcut. |
-| `workspace.killTerminal` | Terminate the explicitly targeted session. | Distinct from panel hiding and workspace-tab close. |
-| Next/previous terminal | Traverse terminal sessions within the resolved terminal scope. | Decide and document traversal across panel/workspace homes; no cross-environment jumps. |
-| `workspace.nextItem` / previous and numbered tab navigation | Workspace tab navigation when a workspace group owns focus. | Sessions traversal remains an explicit rail/session operation. Audit held-modifier badges and preset-specific group keys. |
-| `workspace.focusFirstEditorGroup` and peers | Focus the corresponding workspace group, regardless of view kind. | Keep structural order stable. Review labels and alias behavior in the VS Code preset. |
-| `workspace.splitEditorRight` / Down | Preserve document-copy behavior for supported document views. | Chat and terminal must not clone sessions implicitly; Move Tab and New Terminal are separate actions. |
-| `workspace.closeCurrentTab` and close-many | Dispatch the view's actual close capability. | Preserve dirty-document prompts; never kill agents or terminals as a side effect of generic close. |
-| `workspace.addSelectionToChat`, `Mod+L` in editor | Attach to an explicitly resolved conversation and focus its composer. | Capture source selection/revision and destination session before async work. |
-| `workspace.showQuickAccess`, `Mod+P` | Search files in the explicit active workspace. | Opening from chat uses companion rules and the correct environment. |
-| `workspace.toggleUiMode`, `Mod+Shift+M`, show-mode actions | Desktop modes disappear after cutover. | Remove or replace with reviewed presentation/focus commands. Do not retain dead IDs or silently recycle the shortcut. |
-| Find, Save, Undo, Redo, Enter, Escape, terminal control keys | Respect the focused view and existing text-entry rules. | Composer send/IME, terminal SIGINT and editor save cannot be intercepted by unrelated pane commands. |
+| Existing command/behavior                                    | Proposed unified meaning                                              | Verification / decision                                                                                                      |
+| ------------------------------------------------------------ | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `workspace.toggleSidebarVisibility`, `Mod+B`                 | Toggle project tools only. Sessions has its own toggle.               | Intentional change from chat-mode behavior; requires owner review, visible hints and override handling.                      |
+| Sessions collapse/focus                                      | Independently show/hide or focus Sessions.                            | Reuse an applicable existing command; choose a nonconflicting default only after auditing all presets.                       |
+| `workspace.togglePanel`, `Mod+J`                             | Preserve bottom-panel behavior in the core release.                   | Sidebar-home extension must explicitly choose panel-identity versus bottom-region semantics; do not silently substitute one. |
+| `workspace.revealTerminal`                                   | Reveal the requested/recent compatible terminal at its existing home. | No session creation merely because its view is elsewhere.                                                                    |
+| `workspace.newTerminal`                                      | Create a new scoped terminal session.                                 | Current metadata binds `Mod+backtick` to New Terminal; do not incorrectly describe it as the existing toggle shortcut.       |
+| `workspace.killTerminal`                                     | Terminate the explicitly targeted session.                            | Distinct from panel hiding and workspace-tab close.                                                                          |
+| Next/previous terminal                                       | Traverse terminal sessions within the resolved terminal scope.        | Decide and document traversal across panel/workspace homes; no cross-environment jumps.                                      |
+| `workspace.nextItem` / previous and numbered tab navigation  | Workspace tab navigation when a workspace group owns focus.           | Sessions traversal remains an explicit rail/session operation. Audit held-modifier badges and preset-specific group keys.    |
+| `workspace.focusFirstEditorGroup` and peers                  | Focus the corresponding workspace group, regardless of view kind.     | Keep structural order stable. Review labels and alias behavior in the VS Code preset.                                        |
+| `workspace.splitEditorRight` / Down                          | Preserve document-copy behavior for supported document views.         | Chat and terminal must not clone sessions implicitly; Move Tab and New Terminal are separate actions.                        |
+| `workspace.closeCurrentTab` and close-many                   | Dispatch the view's actual close capability.                          | Preserve dirty-document prompts; never kill agents or terminals as a side effect of generic close.                           |
+| `workspace.addSelectionToChat`, `Mod+L` in editor            | Attach to an explicitly resolved conversation and focus its composer. | Capture source selection/revision and destination session before async work.                                                 |
+| `workspace.showQuickAccess`, `Mod+P`                         | Search files in the explicit active workspace.                        | Opening from chat uses companion rules and the correct environment.                                                          |
+| `workspace.toggleUiMode`, `Mod+Shift+M`, show-mode actions   | Desktop modes disappear after cutover.                                | Remove or replace with reviewed presentation/focus commands. Do not retain dead IDs or silently recycle the shortcut.        |
+| Find, Save, Undo, Redo, Enter, Escape, terminal control keys | Respect the focused view and existing text-entry rules.               | Composer send/IME, terminal SIGINT and editor save cannot be intercepted by unrelated pane commands.                         |
 
 Audit `workspace-commands.ts`, metadata, effective bindings, command enablement,
 focus registration, pane-host actions, menus, Settings rows, command palette,
@@ -518,32 +524,32 @@ an action to the wrong session, root or hidden surface.
 
 ## 10. Acceptance matrix
 
-| ID | Scenario | Required observation |
-| --- | --- | --- |
-| A01 | Sessions/tools visible, then collapse either or both | Other regions and selected tabs remain; every hidden column has a reachable restore action. |
-| A02 | Collapse the currently focused navigator | Focus moves to a valid target; reopen restores width and list state. |
-| A03 | Chat only, open Files, click A then B | Chat and tree remain; one document destination is reused; A's kept/dirty state is protected. |
-| A04 | Two chats visible; type, attach, send and stream in each | No cross-session draft, attachment, request, unread or transcript-position leakage. |
-| A05 | Draft starts while another chat gains focus | The original draft tab becomes its session; the new focus is not hijacked. |
-| A06 | Session changes + selected diff + chat | Explicit scope/owner, correct diff; selecting another file preserves review layout. |
-| A07 | Change Git scope while a prior diff remains open | Prior tab retains its original scope; new open uses the selected scope. |
-| A08 | Multiple sessions in one checkout contribute changes | Checkout scope shows the checkout, not just the focused chat's checkpoint. |
-| A09 | Switch project, worktree or environment during an open | Stale result is rejected or delivered to its captured owner; no cross-root writes or display. |
-| A10 | Open Search/Git/Problems in a workspace split | Other tabs survive; commands target the visible resource and correct checkout. |
-| A11 | Default classic entry and terminal reveal/new | Files left, code above, terminals below; reveal does not act as New Terminal. |
-| A12 | Server terminal in panel, another moved to workspace | Stable session IDs and connection/process counts; output and resize continue correctly. |
-| A13 | Close terminal/chat view, then reopen | Running work survives under approved close policy; explicit kill/stop still ends the target only. |
-| A14 | Sidebar terminal home, when approved | Multiple sessions remain navigable; Sessions column unaffected; move panel and move session are distinguishable. |
-| A15 | Nested horizontal/vertical and three-way splits | Existing placement invariants hold for mixed view kinds; no implicit chat/PTY copies. |
-| A16 | Maximize/Classic presentation then restore | Prior topology, sizes, selected tabs, bottom location and column visibility return. |
-| A17 | Reload, Back/Forward, copied deep links | Scoped resources and valid layout restore without duplicate tabs, sessions or wrong-root selection. |
-| A18 | Dirty file close-many, diff edits, Settings save | Existing document safety and capability behavior preserved. |
-| A19 | All keymap contexts/presets/platforms | No chord collisions or unintended send/save/kill; numbered hints match actual targets. |
-| A20 | Small desktop, 60% tool width, hidden columns | Constraints remain usable; no unsolicited group removal; recovery controls remain visible. |
-| A21 | Deleted session/worktree, offline environment, module error | Explicit scoped error state; other views continue; retry does not duplicate work. |
-| A22 | Phone/TUI and current external entry points | Their existing navigation/command contracts remain; no forced desktop-column UI. |
-| A23 | Sustained output, resize, moves and hidden views | No accumulating hosts/subscriptions; measured input/scroll behavior stays within project limits. |
-| A24 | Click a Git row after its change was committed/discarded | Refresh stale status and keep the current view; no empty replacement tab or destructive navigation error. |
+| ID  | Scenario                                                    | Required observation                                                                                             |
+| --- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| A01 | Sessions/tools visible, then collapse either or both        | Other regions and selected tabs remain; every hidden column has a reachable restore action.                      |
+| A02 | Collapse the currently focused navigator                    | Focus moves to a valid target; reopen restores width and list state.                                             |
+| A03 | Chat only, open Files, click A then B                       | Chat and tree remain; one document destination is reused; A's kept/dirty state is protected.                     |
+| A04 | Two chats visible; type, attach, send and stream in each    | No cross-session draft, attachment, request, unread or transcript-position leakage.                              |
+| A05 | Draft starts while another chat gains focus                 | The original draft tab becomes its session; the new focus is not hijacked.                                       |
+| A06 | Session changes + selected diff + chat                      | Explicit scope/owner, correct diff; selecting another file preserves review layout.                              |
+| A07 | Change Git scope while a prior diff remains open            | Prior tab retains its original scope; new open uses the selected scope.                                          |
+| A08 | Multiple sessions in one checkout contribute changes        | Checkout scope shows the checkout, not just the focused chat's checkpoint.                                       |
+| A09 | Switch project, worktree or environment during an open      | Stale result is rejected or delivered to its captured owner; no cross-root writes or display.                    |
+| A10 | Open Search/Git/Problems in a workspace split               | Other tabs survive; commands target the visible resource and correct checkout.                                   |
+| A11 | Default classic entry and terminal reveal/new               | Files left, code above, terminals below; reveal does not act as New Terminal.                                    |
+| A12 | Server terminal in panel, another moved to workspace        | Stable session IDs and connection/process counts; output and resize continue correctly.                          |
+| A13 | Close terminal/chat view, then reopen                       | Running work survives under approved close policy; explicit kill/stop still ends the target only.                |
+| A14 | Sidebar terminal home, when approved                        | Multiple sessions remain navigable; Sessions column unaffected; move panel and move session are distinguishable. |
+| A15 | Nested horizontal/vertical and three-way splits             | Existing placement invariants hold for mixed view kinds; no implicit chat/PTY copies.                            |
+| A16 | Maximize/Classic presentation then restore                  | Prior topology, sizes, selected tabs, bottom location and column visibility return.                              |
+| A17 | Reload, Back/Forward, copied deep links                     | Scoped resources and valid layout restore without duplicate tabs, sessions or wrong-root selection.              |
+| A18 | Dirty file close-many, diff edits, Settings save            | Existing document safety and capability behavior preserved.                                                      |
+| A19 | All keymap contexts/presets/platforms                       | No chord collisions or unintended send/save/kill; numbered hints match actual targets.                           |
+| A20 | Small desktop, 60% tool width, hidden columns               | Constraints remain usable; no unsolicited group removal; recovery controls remain visible.                       |
+| A21 | Deleted session/worktree, offline environment, module error | Explicit scoped error state; other views continue; retry does not duplicate work.                                |
+| A22 | Phone/TUI and current external entry points                 | Their existing navigation/command contracts remain; no forced desktop-column UI.                                 |
+| A23 | Sustained output, resize, moves and hidden views            | No accumulating hosts/subscriptions; measured input/scroll behavior stays within project limits.                 |
+| A24 | Click a Git row after its change was committed/discarded    | Refresh stale status and keep the current view; no empty replacement tab or destructive navigation error.        |
 
 Implementation verification should extend existing pure group/domain tests,
 command/focus/dispatch tests, navigation/restore tests and browser scenarios. The
@@ -554,14 +560,14 @@ Never claim a feature is complete from a type, a mocked reducer or a plan checkb
 
 ## 11. Decisions to settle before the affected unit
 
-| Decision | Recommended prototype | Gate |
-| --- | --- | --- |
-| D1: session open behavior | One open tab per session; new sessions get their own tabs; no global-stage replacement. | P1/P3 |
-| D2: compact terminal in sidebar | Bottom remains default; one optional sidebar home; persistent launcher; distinguish panel move from session move. | Optional part of P5, not shell composition |
-| D3: terminal close/traversal | Closing a workspace view retains a discoverable session; Kill is explicit; define traversal across homes. | P5 and related bindings |
-| D4: full Git diff destination | Use ordinary companion document groups first; no nested editor owner. | P4/P6 |
-| D5: two-column keys and former mode keys | Mod+B controls project tools; Sessions gets its own audited shortcut; review mode-key replacement and overrides. | P2/P7 |
-| D6: Classic Editing and maximize | One reversible presentation snapshot; never destroy the underlying arrangement. | P3 presentation actions |
+| Decision                                 | Recommended prototype                                                                                             | Gate                                       |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| D1: session open behavior                | One open tab per session; new sessions get their own tabs; no global-stage replacement.                           | P1/P3                                      |
+| D2: compact terminal in sidebar          | Bottom remains default; one optional sidebar home; persistent launcher; distinguish panel move from session move. | Optional part of P5, not shell composition |
+| D3: terminal close/traversal             | Closing a workspace view retains a discoverable session; Kill is explicit; define traversal across homes.         | P5 and related bindings                    |
+| D4: full Git diff destination            | Use ordinary companion document groups first; no nested editor owner.                                             | P4/P6                                      |
+| D5: two-column keys and former mode keys | Mod+B controls project tools; Sessions gets its own audited shortcut; review mode-key replacement and overrides.  | P2/P7                                      |
+| D6: Classic Editing and maximize         | One reversible presentation snapshot; never destroy the underlying arrangement.                                   | P3 presentation actions                    |
 
 The entire plan remains awaiting implementation authorization. Resolving a design
 question does not itself authorize starting that phase.

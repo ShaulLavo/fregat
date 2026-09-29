@@ -292,9 +292,9 @@ function staleToastError(
 
   return createClientError({
     code: 'file-operation-unavailable',
-    fix: 'Nothing to do: the files are as they are now.',
+    fix: 'The files stay as they are.',
     internal: { direction, operationId },
-    message: `This operation can no longer be ${direction === 'undo' ? 'undone' : 'redone'}`,
+    message: `This file change can no longer be ${direction === 'undo' ? 'undone' : 'redone'}`,
     status: 409,
     why: 'A later change touched the same files, or the undo history expired.',
   })
@@ -307,6 +307,6 @@ function newerOperationError(entry: WorkspaceEditHistoryEntry, direction: 'redo'
     internal: { headOperationId: entry.operationId },
     message: `"${entry.label}" is newer and has to be ${direction === 'undo' ? 'undone' : 'redone'} first`,
     status: 409,
-    why: 'File operations reverse newest first, so an older one never runs under a newer change.',
+    why: 'File changes are undone and redone newest first.',
   })
 }

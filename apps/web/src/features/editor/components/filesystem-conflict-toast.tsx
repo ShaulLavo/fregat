@@ -18,7 +18,7 @@ type FilesystemConflictToastProps = {
 
 /**
  * VS Code's save-conflict notification: the file on disk is newer than the buffer, so compare the
- * two, overwrite the disk with the buffer, or revert the buffer to the disk.
+ * two, save the buffer over the disk, or load the disk version into the buffer.
  */
 export function FilesystemConflictToast({
   conflict,
@@ -55,7 +55,7 @@ export function FilesystemConflictToast({
       <div className='mt-(--density-section-gap) flex flex-wrap justify-end gap-(--density-control-gap)'>
         <Button disabled={busy} size='sm' type='button' variant='ghost' onClick={onOverrideRemote}>
           {pending === 'remote' ? <Spinner /> : null}
-          Revert
+          {conflict.eventType === 'deleted' ? 'Discard my changes' : 'Use the disk version'}
         </Button>
         <Button
           disabled={busy}
@@ -65,7 +65,7 @@ export function FilesystemConflictToast({
           onClick={onOverrideLocal}
         >
           {pending === 'local' ? <Spinner /> : null}
-          Overwrite
+          Keep my changes
         </Button>
         <Button size='sm' type='button' onClick={onOpenDiff}>
           Compare
@@ -84,11 +84,11 @@ function conflictTitle(conflict: FilesystemConflict) {
 
 function conflictDescription(conflict: FilesystemConflict) {
   if (conflict.eventType === 'deleted') {
-    return 'Your unsaved changes are the only copy. Overwrite recreates the file with them; Revert closes the buffer.'
+    return 'Something else deleted this file while you had unsaved changes. Keep them to save the file again.'
   }
   if (conflict.eventType === 'renamed') {
-    return `It is now ${displayPath(conflict.remotePath)}. Compare your unsaved changes with it, overwrite it with them, or revert to it.`
+    return `Something else renamed this file to ${displayPath(conflict.remotePath)} while you had unsaved changes. Keep them to save over it.`
   }
 
-  return 'Compare your unsaved changes with the file, overwrite the file with them, or revert to what is on disk.'
+  return 'Something else changed this file while you had unsaved changes. Keep yours to save over it, or use the disk version and drop yours.'
 }

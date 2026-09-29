@@ -75,7 +75,10 @@ export const gitAutoPull: Scenario = {
       }
       if ((await revParse(checkout, 'HEAD')) !== target)
         throw createScriptError('The clean checkout did not fast-forward to its upstream')
-      await selectors.gitPanel(page).getByText('Working tree clean').waitFor({ timeout: 10_000 })
+      await selectors
+        .gitPanel(page)
+        .getByText('No changes', { exact: true })
+        .waitFor({ timeout: 10_000 })
       // The header's behind count must follow the pull without a manual refresh.
       await page.waitForFunction(() => !document.body.textContent?.includes('↓'), undefined, {
         timeout: 15_000,

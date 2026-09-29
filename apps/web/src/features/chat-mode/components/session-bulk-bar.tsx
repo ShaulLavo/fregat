@@ -56,7 +56,7 @@ export function SessionBulkBar() {
               onClick={() => void actions.applyLifecycleToSessions(refs, { type: 'settle' })}
             >
               <CheckIcon />
-              Settle
+              Mark as settled
             </DropdownMenuItem>
           ) : null}
           {lifecycle.snooze ? (

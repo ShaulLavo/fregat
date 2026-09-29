@@ -41,7 +41,7 @@ export function UnsavedChangesDialog({
   const resource = content?.kind === 'document' ? filesystemResource(content.document) : null
   const description = canSave
     ? `Save changes to ${name} before closing?`
-    : `${name} has unsaved changes that cannot be saved directly.`
+    : `${name} has unsaved changes this tab cannot save. Closing it drops them.`
   const { ref: dialogFocusTargetRef } = useFocusTarget<HTMLDivElement>({
     area: 'dialog',
     capabilities: { overlay: true },
@@ -71,7 +71,7 @@ export function UnsavedChangesDialog({
       >
         <Button disabled={saving} onClick={onDiscard} type='button' variant='destructive'>
           <TrashIcon data-icon='inline-start' />
-          Discard
+          Close without saving
         </Button>
         {canSave ? (
           <Button disabled={saving} onClick={onSave} type='button'>

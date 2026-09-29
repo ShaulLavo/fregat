@@ -2,8 +2,8 @@
 
 ## Status and authorization
 
-- Status: PROPOSED — research done 2026-09-25 (findings and proposed phases below). Owner questions answered
-  2026-09-26; the phone layout waits on Plan 143. Nothing here authorizes implementation.
+- Status: APPROVED — research done 2026-09-25 (findings and proposed phases below). Owner questions answered
+  2026-09-26; the phone layout waits on Plan 143.
 - Priority: P3. The site is not live.
 - Planned at: Platform `9c1c45d1`, 2026-09-25. Origin: the UI library survey
   ([docs/ui-research/brainless.md](../docs/ui-research/brainless.md)).

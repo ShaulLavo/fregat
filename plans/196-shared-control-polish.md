@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: PROPOSED 2026-09-27. Planning and push authorized; implementation has not started.
+- Status: APPROVED 2026-09-27. Implementation has not started.
 - Planned at: Platform `9c08916bf`, 2026-09-27.
 - Priority: P2. Effort: M. Risk: LOW for styling, MED for toggle composition and keyboard behavior.
 - Dependencies: none. Reconcile overlapping appearance work before execution.

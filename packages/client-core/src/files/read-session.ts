@@ -45,9 +45,9 @@ export async function openFileReadSession({
         throw createClientError({
           code: 'FILE_RANGE_INCOMPLETE',
           status: 502,
-          message: 'The file page could not be read completely.',
-          why: 'The returned bytes or revision differ from the requested file page.',
-          fix: 'Reopen the file to start a new read session.',
+          message: 'Part of this file could not be read.',
+          why: 'The file changed on disk while it was loading, or the server sent a different part than asked for.',
+          fix: 'Close and reopen the file.',
           internal: {
             start,
             end,

@@ -18,9 +18,10 @@ export function notifyUndoBarrier(runtime: WorkspaceCommandRuntime, target: Focu
   if (!document || document.buffer.canUndo()) return
   if (!runtime.workspaceEdits.hasHistoryBarrier(document.buffer)) return
 
-  toast('Undo stopped at a workspace edit', {
-    action: { label: 'Undo workspace edit', onClick: () => void runtime.workspaceEdits.undo() },
-    description: 'The editor history before it is restored when the workspace edit is undone.',
+  toast('Undo stopped at a multi-file edit', {
+    action: { label: 'Undo multi-file edit', onClick: () => void runtime.workspaceEdits.undo() },
+    description:
+      'A rename or other edit changed several files at once. Undo it to keep undoing in this file.',
     id: UNDO_BARRIER_TOAST_ID,
   })
 }

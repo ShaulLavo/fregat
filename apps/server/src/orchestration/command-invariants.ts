@@ -29,15 +29,15 @@ const sessionLifecycleErrors = defineErrorCatalog('orchestration', {
   SESSION_NOT_SETTLED: {
     status: 409,
     message: 'The session is no longer settled.',
-    why: 'New activity superseded the provider release requested by settlement.',
-    fix: 'Keep the active provider attached; a later settlement can release it.',
+    why: 'New activity started in the session before it could be put to rest.',
+    fix: 'Nothing to do. The session is active again.',
   },
   SESSION_BLOCKING_REQUEST: {
     status: 409,
     message: ({ commandType, sessionId }: { commandType: string; sessionId: string }) =>
       `Session ${sessionId} has an open approval or user-input request and cannot handle ${commandType}`,
-    why: 'An open request is the agent waiting on the user; parking the session would hide the very question it is asking.',
-    fix: 'Answer or dismiss the pending request, then retry.',
+    why: 'The agent is waiting for your answer, and putting the session away would hide its question.',
+    fix: 'Answer or dismiss the request, then try again.',
   },
   SESSION_NOT_ACTIVE: {
     status: 409,
@@ -49,28 +49,28 @@ const sessionLifecycleErrors = defineErrorCatalog('orchestration', {
     status: 409,
     message: ({ sessionId }: { sessionId: string }) => `Session is not pinned: ${sessionId}`,
     why: 'Only a pinned session holds a slot in the arranged order, so there is nothing to reorder.',
-    fix: 'Pin the session first, or drop the reorder — a raced reorder after an unpin must not resurrect the pin.',
+    fix: 'Pin the session first, then move it.',
   },
   SESSION_QUEUED_TURN_START: {
     status: 409,
     message: ({ commandType, sessionId }: { commandType: string; sessionId: string }) =>
       `Session ${sessionId} has a queued turn start and cannot handle ${commandType}`,
-    why: 'A user message no turn has adopted yet is work in flight with no session and no pending flags to show for it.',
-    fix: 'Wait for the turn to start (or fail), then retry.',
+    why: 'A message you sent has not started its turn yet.',
+    fix: 'Wait for the turn to start or fail, then try again.',
   },
   SESSION_RUNTIME_ACTIVE: {
     status: 409,
     message: ({ commandType, sessionId }: { commandType: string; sessionId: string }) =>
       `Session ${sessionId} has an active session and cannot handle ${commandType}`,
-    why: 'The provider session is starting or running, so the session is working — settling it would park live work.',
-    fix: 'Stop or interrupt the session first, or wait for the turn to finish.',
+    why: 'The agent is starting or working, and putting the session away would hide live work.',
+    fix: 'Stop the session first, or wait for the turn to finish.',
   },
   SESSION_SNOOZE_NOT_FUTURE: {
     status: 400,
     message: ({ snoozedUntil, sessionId }: { snoozedUntil: string; sessionId: string }) =>
       `Session ${sessionId} snooze wake time ${snoozedUntil} is not in the future`,
-    why: 'A wake time already past would leave the session carrying snooze state it can never be woken out of.',
-    fix: 'Send an ISO timestamp strictly after the current server time.',
+    why: 'A snooze that ends in the past would never wake the session.',
+    fix: 'Pick a wake time in the future.',
   },
 })
 

@@ -27,16 +27,16 @@ export const checkpointErrors = defineErrorCatalog('checkpoint', {
   },
   WORKSPACE_NOT_ISOLATED: {
     status: 409,
-    message: 'File restore requires an isolated worktree.',
-    why: 'Restoring this checkout could overwrite another session or the main workspace.',
-    fix: 'Rewind the conversation without restoring files.',
+    message: 'Rewinding files needs a session with its own worktree.',
+    why: 'Rewinding files in this folder could undo work from another session or the main checkout.',
+    fix: 'Rewind only the conversation and leave the files as they are.',
   },
   RANGE_INVALID: {
     status: 400,
     message: ({ fromTurnCount, toTurnCount }: { fromTurnCount: number; toTurnCount: number }) =>
       `Checkpoint diff range is inverted: fromTurnCount ${fromTurnCount} is after toTurnCount ${toTurnCount}`,
     why: 'A diff range must run forwards; the caller asked for a range that ends before it starts.',
-    fix: 'Send fromTurnCount less than or equal to toTurnCount. Retrying the same range cannot succeed.',
+    fix: 'Reload the turn changes and try again.',
   },
   RANGE_EXCEEDS_TURN_COUNT: {
     status: 404,
@@ -48,15 +48,15 @@ export const checkpointErrors = defineErrorCatalog('checkpoint', {
       requestedTurnCount: number
     }) =>
       `Checkpoint diff range exceeds current turn count: requested ${requestedTurnCount}, current ${availableTurnCount}`,
-    why: 'The session has no checkpoint that far along — the turn either never completed or was reverted away.',
-    fix: 'Reload the session and request a range within its current checkpoint count.',
+    why: 'The session has no checkpoint that far along: the turn never finished, or it was rewound.',
+    fix: 'Reload the session and pick a turn it still shows.',
   },
   REF_UNAVAILABLE: {
     status: 404,
     message: ({ turnCount }: { turnCount: number }) =>
       `Checkpoint ref is unavailable for turn ${turnCount}`,
-    why: 'The checkpoint for this turn is missing, errored, or its git ref is gone from the workspace.',
-    fix: 'Reopen the diff after the turn finishes capturing, or pick a turn whose checkpoint is ready.',
+    why: 'The checkpoint for this turn is missing or failed to save.',
+    fix: 'Wait for the turn to finish saving its checkpoint and reopen the diff, or pick another turn.',
   },
 })
 
@@ -78,8 +78,8 @@ export const sessionDomainErrors = defineErrorCatalog('orchestration', {
     status: 409,
     message: ({ number }: { number: number }) =>
       `The worktree for pull request #${number} could not be created.`,
-    why: 'The session was started, but its worktree failed to provision; the session shows why.',
-    fix: 'Open the session and retry its worktree.',
+    why: 'The session started, but its worktree could not be created. The session shows why.',
+    fix: 'Open the session and try creating its worktree again.',
   },
   AUTO_SETTLE_STALE: {
     status: 409,
@@ -127,20 +127,20 @@ export const sessionDomainErrors = defineErrorCatalog('orchestration', {
   LIFECYCLE_RESTORE_UNAVAILABLE: {
     status: 409,
     message: 'The original session action is unavailable.',
-    why: 'Restore requires an accepted lifecycle action for this session.',
-    fix: 'Change the session from its current state.',
+    why: 'The app has no record of the session change to undo.',
+    fix: 'Change the session by hand from where it is now.',
   },
   LIFECYCLE_CONFLICT: {
     status: 409,
     message: 'The session changed after this action.',
-    why: 'Undo and redo require the lifecycle revision produced by the original action.',
-    fix: 'Review the current session state before changing it.',
+    why: 'Undo and redo only work while the session is still as that change left it.',
+    fix: 'Check the session and change it by hand.',
   },
   STEER_TURN_NOT_ACTIVE: {
     status: 409,
     message: 'The turn has finished or is waiting for a response. Your message was not sent.',
-    why: 'A correction must name the currently running turn and cannot bypass a pending request.',
-    fix: 'Answer the pending request or send the message as a new turn.',
+    why: 'A message sent mid-turn only reaches a turn that is running and not waiting on your answer.',
+    fix: 'Answer the waiting request, or send your message as a new turn.',
   },
   SOURCE_PLAN_PROJECT_MISMATCH: {
     status: 409,
@@ -151,72 +151,74 @@ export const sessionDomainErrors = defineErrorCatalog('orchestration', {
   WORKTREE_NOT_FOUND: {
     status: 404,
     message: ({ worktreeId }: { worktreeId: string }) => `Worktree not found: ${worktreeId}`,
-    why: 'Sessions and terminal processes require a registered, live checkout.',
-    fix: 'Register the checkout before starting a session.',
+    why: 'Sessions and terminals need a folder the app has added.',
+    fix: 'Add the folder as a project, then start the session.',
   },
   IDENTITY_COLLISION: {
     status: 409,
-    message: ({ id }: { id: string }) => `Repository or checkout identity collision: ${id}`,
-    why: 'A deterministic identifier is already assigned to different registration facts.',
-    fix: 'Inspect the existing registration and repository identity before retrying.',
+    message: ({ id }: { id: string }) =>
+      `This repository or folder clashes with one already added: ${id}`,
+    why: 'Its ID is already taken by a different project or folder.',
+    fix: 'Reload the project list and try again. If it keeps failing, open the Logs panel to see what went wrong.',
   },
   WORKTREE_PATH_TAKEN: {
     status: 409,
     message: ({ worktreeId }: { worktreeId: string }) =>
-      `Checkout is already registered: ${worktreeId}`,
-    why: 'One canonical checkout path cannot belong to two live worktree registrations.',
-    fix: 'Use the existing checkout registration.',
+      `This folder is already added: ${worktreeId}`,
+    why: 'A folder can be added only once.',
+    fix: 'Use the folder already in the list.',
   },
   PROVIDER_INSTANCE_IMMUTABLE: {
     status: 409,
     message: ({ sessionId }: { sessionId: string }) =>
-      `Session provider cannot change: ${sessionId}`,
-    why: 'A durable session belongs to one provider instance and account.',
-    fix: 'Create another session to use a different provider instance.',
+      `A session cannot switch providers: ${sessionId}`,
+    why: 'A session stays with the provider and account it started with.',
+    fix: 'Start a new session to use another provider.',
   },
   SESSION_REPARENT_CONFLICT: {
     status: 409,
     message: ({ sessionId }: { sessionId: string }) =>
-      `Session checkout cannot change: ${sessionId}`,
-    why: 'Discovered metadata names a different checkout for an existing session UUID.',
-    fix: 'Verify the discovery directory and existing worktree registration.',
+      `A session cannot move to another folder: ${sessionId}`,
+    why: 'A saved session names a different folder than the one it already belongs to.',
+    fix: 'Open the session from its original folder.',
   },
   START_STATE_CONFLICT: {
     status: 409,
-    message: ({ sessionId }: { sessionId: string }) => `Provider start changed: ${sessionId}`,
-    why: 'The observed turn generation or start sequence no longer matches the durable state.',
-    fix: 'Read the current turn and retry its permitted transition.',
+    message: ({ sessionId }: { sessionId: string }) =>
+      `The session changed while it was starting: ${sessionId}`,
+    why: 'Another start or stop reached this session first.',
+    fix: 'Try again.',
   },
   SERVER_RESTARTING: {
     status: 503,
     message: 'The server is restarting.',
-    why: 'A restart into a new release is under way, and it admits no new provider starts or rewinds.',
+    why: 'The server is restarting into a new version and starts no new agent work or rewinds until it is back.',
     fix: 'Wait for it to reconnect, then try again.',
   },
   REGISTRATION_BUSY: {
     status: 409,
     message: ({ projectId }: { projectId: string }) =>
-      `Project still has provider ownership: ${projectId}`,
-    why: 'A deleted session has not completed provider stop or still has a live adapter.',
-    fix: 'Finish session cleanup before reviving the project or checkout.',
+      `A deleted session in this project is still stopping: ${projectId}`,
+    why: 'A session you deleted is still shutting down its agent.',
+    fix: 'Wait a moment, then add the project or folder again.',
   },
   REPOSITORY_IDENTITY_UNAVAILABLE: {
     status: 409,
-    message: 'Git repository has no machine-independent identity',
-    why: 'The checkout has neither a supported origin remote nor a reachable root commit.',
-    fix: 'Configure an origin remote or create the initial commit, then register again.',
+    message: 'This repository cannot be recognised across machines',
+    why: 'It has no origin remote and no first commit, so nothing identifies it the same way everywhere.',
+    fix: 'Add an origin remote or make the first commit, then add the project again.',
   },
   COMMAND_ID_COLLISION: {
     status: 409,
     message: ({ commandId }: { commandId: string }) => `Command ID was reused: ${commandId}`,
-    why: 'The durable receipt belongs to a different command type or wire intent.',
-    fix: 'Reuse the original intent for a retry, or create a new command ID.',
+    why: 'The app sent a request with an ID already used by a different request.',
+    fix: 'Reload the app and try again.',
   },
   CLEANUP_FAILED: {
     status: 503,
     message: ({ sessionId }: { sessionId: string }) =>
-      `Session cleanup needs a retry: ${sessionId}`,
-    why: 'The provider stop or attachment cleanup failed or exceeded its operation timeout.',
-    fix: 'Retry cleanup after resolving the reported provider or filesystem failure.',
+      `The session did not finish shutting down: ${sessionId}`,
+    why: 'Stopping its agent or removing its attachments failed or took too long.',
+    fix: 'Try again. If it keeps failing, open the Logs panel to see what went wrong.',
   },
 })

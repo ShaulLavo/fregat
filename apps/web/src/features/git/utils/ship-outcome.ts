@@ -1,10 +1,10 @@
 import type { GitPullRequestSupport, GitShipResult } from '@workspace/contracts'
 
 const SUPPORT_DETAIL: Record<GitPullRequestSupport, string> = {
-  ready: 'The forge did not answer.',
-  'cli-missing': "The forge's command-line tool is not installed.",
-  unauthenticated: 'Sign in to the forge from a terminal.',
-  'no-forge': 'No remote points at a known forge.',
+  ready: 'The Git host did not answer.',
+  'cli-missing': "The Git host's command-line tool, such as gh, is not installed.",
+  unauthenticated: 'Sign in to the Git host from a terminal, for example with gh auth login.',
+  'no-forge': 'No remote points at GitHub, GitLab or another known Git host.',
 }
 
 /** A push-and-open in toast words: the push can land while the pull request does not. */
@@ -16,7 +16,7 @@ export function shipOutcome(result: GitShipResult, label: string) {
     return {
       tone: 'error' as const,
       title: `Pushed, ${label.toLowerCase()} failed`,
-      detail: pullRequest?.message ?? 'The forge did not answer.',
+      detail: pullRequest?.message ?? 'The Git host did not answer.',
     }
   if (pullRequest.kind === 'unsupported')
     return {

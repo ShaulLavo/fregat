@@ -53,7 +53,7 @@ test('rejects an in-flight response after the session is disposed', async () => 
   session.dispose()
   answer.resolve('late answer')
 
-  await expect(request).rejects.toThrow('Diff language session closed')
+  await expect(request).rejects.toThrow('The diff lost its connection to the language server')
 })
 
 test('routes diff hover and navigation through independent capable lanes', async () => {

@@ -14,6 +14,7 @@ import { AsyncQueue } from '../async-queue'
 import { countDirectories } from './directory-count'
 import { NativeWatchHost, WATCH_WORKER_FAILED, type NativeWatchError } from './native-watch-host'
 import { OpenFileWatches } from './open-file-watches'
+import { GitStateWatches } from './git-state-watches'
 import { FsError } from './errors'
 import {
   isIgnoredPath,
@@ -112,6 +113,8 @@ export type WatchStreamOptions = {
   files?: readonly string[]
   /** Watch each input's own entries only, never its subtree. */
   shallow?: boolean
+  /** Also report `git` messages for the repository each input belongs to. */
+  git?: boolean
 }
 
 export class FileChangeHub {
@@ -127,6 +130,7 @@ export class FileChangeHub {
   private readonly writeResultMarkers = new Map<string, WriteResultMarker>()
   private readonly watchEnabled: boolean
   private readonly native: NativeWatchHost
+  private readonly gitState: GitStateWatches
   private nextSequence = 1
   private reservedDirectories = 0
   private upgrades = Promise.resolve()
@@ -139,6 +143,7 @@ export class FileChangeHub {
     this.directoryLimit =
       options.directoryLimit ?? (() => DEFAULT_SETTING_VALUES['files.watchDirectoryLimit'])
     this.native = options.native ?? new NativeWatchHost()
+    this.gitState = new GitStateWatches(this.native, paths, (event) => this.emit(event))
     this.openFiles = new OpenFileWatches(
       paths,
       (alias) =>
@@ -300,6 +305,7 @@ export class FileChangeHub {
   async close() {
     this.closing = true
     this.openFiles.close()
+    this.gitState.close()
     const releases = (
       await Promise.all(
         [...this.nativeWatchers.values(), ...this.shallowWatchers.values()].map(
@@ -718,6 +724,7 @@ export class FileChangeHub {
   ) {
     const queue = new AsyncQueue<WatchServerMessage>({ signal })
     const listener = (event: WatchServerMessage) => {
+      if (event.type === 'git' && !options.git) return
       const visible = streamEvent(event, files, options.includeIgnored ?? false)
       if (!visible || !deliverWatchEvent(visible, subscribed, files, options.onlyFiles)) return
 
@@ -738,6 +745,7 @@ export class FileChangeHub {
           : this.retainWatcher(input))
         releases.push(retained.release)
         coverages.push(retained.coverage)
+        if (options.git && this.watchEnabled) releases.push(await this.gitState.retain(input))
       }
       if (this.watchEnabled) {
         for (const file of files) releases.push(await this.retainOpenFile(file, roots))
@@ -927,6 +935,7 @@ function deliverWatchEvent(
 ) {
   if (event.type === 'error' || event.type === 'coverage')
     return concernsStream(event.path, roots, files)
+  if (event.type === 'git') return !onlyFiles && concernsStream(event.path, roots, files)
   if (!isFilesystemEvent(event)) return true
   if (files.has(event.path)) return true
   if (event.type === 'renamed' && files.has(event.oldPath)) return true

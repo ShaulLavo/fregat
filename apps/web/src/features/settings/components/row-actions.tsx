@@ -50,7 +50,7 @@ export function RowActions({
       />
       <DropdownMenuContent align='end' className='w-56'>
         <DropdownMenuItem disabled={!isModified} onClick={() => resetSetting(id, scope)}>
-          Reset setting
+          Reset to default
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => void copyTextToClipboard(id, 'setting ID')}>

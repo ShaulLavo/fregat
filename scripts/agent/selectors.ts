@@ -67,12 +67,13 @@ export const selectors = {
   manageWorktrees: (page: Page) =>
     page.getByRole('button', { name: 'Manage worktrees', exact: true }),
   worktreeManager: (page: Page) => page.getByRole('dialog', { name: 'Worktrees', exact: true }),
-  releaseWorktree: (page: Page) => page.getByRole('button', { name: 'Release…', exact: true }),
+  releaseWorktree: (page: Page) =>
+    page.getByRole('button', { name: 'Stop managing…', exact: true }),
   releaseWorktreeDialog: (page: Page) =>
-    page.getByRole('dialog', { name: 'Release worktree', exact: true }),
+    page.getByRole('dialog', { name: 'Stop managing worktree', exact: true }),
   cancelWorktreeRelease: (page: Page) =>
     page
-      .getByRole('dialog', { name: 'Release worktree', exact: true })
+      .getByRole('dialog', { name: 'Stop managing worktree', exact: true })
       .getByRole('button', { name: 'Cancel', exact: true }),
   completedWorkGroup: (page: Page) => page.getByRole('button', { name: /^Worked for / }),
   reasoningDetail: (page: Page) => page.getByRole('region', { name: 'Reasoning', exact: true }),
@@ -486,10 +487,7 @@ export const selectors = {
         }),
       ),
   editorGroupHistoryStates: (page: Page, index: number) =>
-    page
-      .locator('[data-editor-group-id]')
-      .nth(index)
-      .getByRole('listbox', { name: 'History states' }),
+    page.locator('[data-editor-group-id]').nth(index).getByRole('listbox', { name: 'Versions' }),
   editorGroupDiffRows: (page: Page, index: number) =>
     page
       .locator('[data-editor-group-id]')
@@ -601,7 +599,8 @@ export const selectors = {
   projectSettingOption: (page: Page, name: string | RegExp) =>
     page.getByRole('option', { name, exact: true }),
   settingsFeel: (page: Page) => page.getByRole('combobox', { name: 'Feel', exact: true }),
-  feelOption: (page: Page, name: string) => page.getByRole('option', { name, exact: true }),
+  feelOption: (page: Page, feel: string) =>
+    page.getByRole('option', { name: feel.charAt(0).toUpperCase() + feel.slice(1), exact: true }),
   physicalGallery: (page: Page) => page.locator('[data-physical-gallery]'),
   physicalButton: (page: Page, name: string) => page.getByRole('button', { name, exact: true }),
   physicalSwitch: (page: Page, name: string) => page.getByRole('switch', { name, exact: true }),
@@ -643,11 +642,15 @@ export const selectors = {
   settingsDensity: (page: Page) =>
     page.getByRole('combobox', { name: 'Interface density', exact: true }),
   settingsDensityOption: (page: Page, density: 'compact' | 'cozy') =>
-    page.getByRole('option', { name: density, exact: true }),
+    page.getByRole('option', { name: density === 'compact' ? 'Compact' : 'Cozy', exact: true }),
   settingsJsonView: (page: Page) => page.getByRole('tab', { name: 'settings.json', exact: true }),
   settingsScopeTab: (page: Page, name: 'User' | 'Workspace' | 'Defaults', selected?: boolean) =>
     page.getByRole('tab', { name, exact: true, selected }),
   settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),
+  settingsEnum: (page: Page, title: string) =>
+    page.getByRole('combobox', { name: title, exact: true }),
+  settingsRawConflictBanner: (page: Page) =>
+    page.getByText('settings.json changed somewhere else', { exact: true }),
   gitSizeLimitNotice: (page: Page) =>
     page.getByText(
       'File exceeds the Git diff size limit. Adjust Diff file size limit in Settings to compare it.',
@@ -662,7 +665,7 @@ export const selectors = {
   settingsRowActions: (page: Page, id: string) =>
     page.getByRole('button', { name: `Actions for ${id}`, exact: true }),
   settingsResetMenuItem: (page: Page) =>
-    page.getByRole('menuitem', { name: 'Reset setting', exact: true }),
+    page.getByRole('menuitem', { name: 'Reset to default', exact: true }),
   pushSection: (page: Page) =>
     page.getByRole('region', { name: 'Push notifications', exact: true }),
   pushTurnOn: (page: Page) =>
@@ -712,13 +715,11 @@ export const selectors = {
   commandOption: (page: Page, name: string) => page.getByRole('option', { name, exact: false }),
   renameInput: (page: Page) => page.getByRole('textbox', { name: 'New name', exact: true }),
   historyPane: (page: Page) => page.locator('[data-history-pane]'),
-  historyStates: (page: Page) => page.getByRole('listbox', { name: 'History states', exact: true }),
+  historyStates: (page: Page) => page.getByRole('listbox', { name: 'Versions', exact: true }),
   historyState: (page: Page, index: number) =>
-    page
-      .getByRole('listbox', { name: 'History states', exact: true })
-      .getByRole('option')
-      .nth(index),
-  historyRestore: (page: Page) => page.getByRole('button', { name: 'Restore', exact: true }),
+    page.getByRole('listbox', { name: 'Versions', exact: true }).getByRole('option').nth(index),
+  historyRestore: (page: Page) =>
+    page.getByRole('button', { name: 'Use this version', exact: true }),
   comparisonRowsSelector: '.editor-diff-pane [data-editor-virtual-row]',
   selectedComparisonTabSelector: '[data-editor-tab-id][aria-selected="true"]',
   diffRows: (page: Page) => page.locator('.editor-diff-pane [data-editor-virtual-row]'),
@@ -737,7 +738,7 @@ export const selectors = {
   editorTabNamed: (page: Page, label: RegExp) =>
     page.locator('[data-editor-tab-path]').filter({ hasText: label }),
   workspaceEditApplyAll: (page: Page) =>
-    page.getByRole('button', { name: 'Apply all', exact: true }),
+    page.getByRole('button', { name: 'Make these changes', exact: true }),
   toast: (page: Page, title: string) => page.locator('[data-sonner-toast]', { hasText: title }),
   /** Every element on the page whose own text contains `text`, for counting how often a message shows. */
   textAnywhere: (page: Page, text: string) => page.getByText(text),
@@ -830,13 +831,14 @@ export const selectors = {
   replaceToggle: (page: Page) => page.getByRole('button', { name: 'Replace', exact: true }),
   searchResults: (page: Page) => page.getByRole('region', { name: 'Search results', exact: true }),
   chatRewind: (page: Page) =>
-    page.getByRole('button', { name: 'Revert to checkpoint before this turn', exact: true }),
+    page.getByRole('button', { name: 'Rewind to before this message', exact: true }),
   rewindConversation: (page: Page) =>
-    page.getByRole('button', { name: 'Rewind conversation only', exact: true }),
+    page.getByRole('button', { name: 'Rewind chat only', exact: true }),
   rewindFiles: (page: Page) =>
-    page.getByRole('button', { name: 'Rewind and restore files', exact: true }),
+    page.getByRole('button', { name: 'Rewind chat and files', exact: true }),
   rewindDialog: (page: Page) => page.getByRole('alertdialog'),
-  clientUpdateRefresh: (page: Page) => page.getByRole('button', { name: 'Refresh', exact: true }),
+  clientUpdateRefresh: (page: Page) =>
+    page.getByRole('button', { name: 'Reload app', exact: true }),
   serverUpdate: (page: Page) => page.locator('[data-server-update]'),
   serverUpdateRestarting: (page: Page) => page.locator('[data-server-update="restarting"]'),
   serverUpdateRestart: (page: Page) =>
@@ -905,7 +907,7 @@ export const selectors = {
   chatSendQueued: (page: Page) =>
     page.getByRole('button', { name: 'Send queued message now', exact: true }),
   chatRestoreQueued: (page: Page) =>
-    page.getByRole('button', { name: 'Restore queued message', exact: true }),
+    page.getByRole('button', { name: 'Move queued message back to the message box', exact: true }),
   chatTerminalContext: (page: Page) =>
     page
       .locator('form')
@@ -1184,11 +1186,11 @@ export const selectors = {
   logsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search logs' }),
   logsTab: (page: Page) => page.getByRole('button', { name: 'Logs', exact: true }),
   renderErrorState: (page: Page) =>
-    page.locator('[data-slot="empty-state"]').filter({ hasText: 'hit a render error' }),
+    page.locator('[data-slot="empty-state"]').filter({ hasText: 'could not be shown' }),
   renderErrorRetry: (page: Page) =>
     page
       .locator('[data-slot="empty-state"]')
-      .filter({ hasText: 'hit a render error' })
+      .filter({ hasText: 'could not be shown' })
       .getByRole('button', { name: 'Retry' }),
   historyRows: (page: Page) => page.locator('[data-history-commit]'),
   historyCircles: (page: Page) => page.locator('[data-history-commit] svg circle'),

@@ -35,8 +35,8 @@ export function HistoryClearDialog({
           <DialogTitle>Clear history?</DialogTitle>
           <DialogDescription className='tabular-nums'>
             {stateCount === 1
-              ? 'The one earlier state of this file, and any text only it still holds, will be gone.'
-              : `All ${stateCount} earlier states of this file, and any text only they still hold, will be gone.`}
+              ? 'Deletes the earlier version of this file. Text that exists only in it is gone for good.'
+              : `Deletes all ${stateCount} earlier versions of this file. Text that exists only in them is gone for good.`}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

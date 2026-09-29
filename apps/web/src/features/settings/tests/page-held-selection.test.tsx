@@ -155,7 +155,7 @@ for (const control of ['Workspace', 'Settings']) {
   })
 }
 
-for (const action of ['Enter', 'Reset setting', 'Reset all workspace settings']) {
+for (const action of ['Enter', 'Reset to default', 'Reset all workspace settings']) {
   test(`${action} writes the held Workspace form during a Defaults request`, async ({
     client,
     server,
@@ -187,7 +187,7 @@ for (const action of ['Enter', 'Reset setting', 'Reset all workspace settings'])
     })
     try {
       const input = await screen.findByRole('spinbutton', { name: 'Font size' })
-      if (action === 'Reset setting')
+      if (action === 'Reset to default')
         await userEvent.click(screen.getByRole('button', { name: 'Actions for editor.fontSize' }))
       if (action === 'Reset all workspace settings')
         await userEvent.click(screen.getByRole('button', { name: 'Settings actions' }))

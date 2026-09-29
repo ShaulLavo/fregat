@@ -114,7 +114,7 @@ function catalogError(reason: string) {
     code: 'provider.PRICE_CATALOG_UNAVAILABLE',
     status: 502,
     message: `Could not refresh model prices: ${reason}`,
-    why: 'The catalog did not return usable pricing data; local prices remain available.',
+    why: 'The price list from models.dev could not be read. Prices already saved on this machine still apply.',
     fix: 'Check connectivity to models.dev. The next usage lookup retries automatically.',
   })
 }

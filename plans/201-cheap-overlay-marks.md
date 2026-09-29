@@ -1,6 +1,6 @@
 # Plan 201: One-frame typing in large files, starting with cheap underlines
 
-Status: proposed 2026-09-28, requested by the owner after [Plan 112](112-large-file-ceiling.md)
+Status: approved 2026-09-28, requested by the owner after [Plan 112](112-large-file-ceiling.md)
 closed. Implementation has not started. Owners: Editor for overlay painting and the text-snapshot
 diagnostics hook; Platform for the benchmark, the tier thresholds and the language-server policy.
 

@@ -17,7 +17,7 @@ export function syncChangesLabel(repository: GitRepositoryInfo) {
   const parts: string[] = []
   if (repository.behind > 0) parts.push(`${repository.behind}↓`)
   if (repository.ahead > 0) parts.push(`${repository.ahead}↑`)
-  if (parts.length === 0) return 'Sync Changes'
+  if (parts.length === 0) return 'Pull and push'
 
-  return `Sync Changes ${parts.join(' ')}`
+  return `Pull and push ${parts.join(' ')}`
 }

@@ -106,7 +106,7 @@ export const settingsKeybindings: Scenario = {
 
     await showOnly(page, 'workspace.toggleCheckpointChange')
     await selectors.shortcutRow(page, 'workspace.toggleCheckpointChange').dblclick()
-    const checkpointRecorder = selectors.shortcutRecorder(page, 'Undo or reapply turn change')
+    const checkpointRecorder = selectors.shortcutRecorder(page, 'Undo or redo an agent file change')
     await checkpointRecorder.press('Control+Z')
     await page.getByText('Used by 1 command', { exact: true }).waitFor()
     await page.getByText('Undo session action', { exact: true }).waitFor()

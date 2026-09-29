@@ -13,11 +13,11 @@ export function createRpcError(error: unknown) {
   return createClientError({
     cause: error,
     code: errorStringField(payload, 'code') ?? 'client.RPC_FAILED',
-    message: errorStringField(payload, 'message') ?? 'Remote procedure call failed.',
+    message: errorStringField(payload, 'message') ?? 'The server request failed.',
     status: errorNumberField(error, 'status') ?? errorNumberField(payload, 'status') ?? 502,
-    why: errorStringField(payload, 'why') ?? 'The server returned an error response.',
+    why: errorStringField(payload, 'why') ?? 'The server answered with an error.',
     fix:
       errorStringField(payload, 'fix') ??
-      'Inspect the server error and retry once the issue is resolved.',
+      'Try again. If it keeps failing, open the Logs panel to see what went wrong.',
   })
 }

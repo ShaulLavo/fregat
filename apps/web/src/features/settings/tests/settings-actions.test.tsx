@@ -205,7 +205,7 @@ test('exhausted retries remove only their intent and Retry reuses its mutation i
 
   const user = userEvent.setup()
   const retry = await screen.findByRole('button', { name: 'Retry' })
-  expect(screen.getByRole('button', { name: 'Discard' })).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Undo change' })).toBeVisible()
   await user.click(retry)
 
   await controller.waitForSettingsWriteRequest(4)
@@ -271,7 +271,7 @@ test('WRITE_CONTENDED does not retry and leaves unrelated projection active', as
   expect(projectedValue(confirmed, 'workbench.colorTheme')).toBe('system')
   expect(projectedValue(confirmed, 'editor.fontSize')).toBe(18)
   expect(await screen.findByRole('button', { name: 'Retry' })).toBeVisible()
-  expect(screen.getByRole('button', { name: 'Discard' })).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Undo change' })).toBeVisible()
 
   actions.unmount()
   cleanup(queryClient)
@@ -397,7 +397,9 @@ test('derives targets from the projected layers without crossing application sco
   cleanup(queryClient)
 })
 
-test('a deterministic rejection exposes same-id Retry and explicit Discard', async ({ client }) => {
+test('a deterministic rejection exposes same-id Retry and explicit Undo change', async ({
+  client,
+}) => {
   expect(client).toBeDefined()
   resetSettingsIntentStore()
   const queryClient = createTestQueryClient()

@@ -54,8 +54,7 @@ export function prepareAddressChat(
     }
   const slice = selectChatProjectionSlice(useChatProjectionStore.getState(), environmentId)
   const addressed = selectWorktreeAtPath(slice, rootPath)
-  if (!addressed)
-    return { kind: 'unavailable', reason: 'The addressed workspace has no chat project.' }
+  if (!addressed) return { kind: 'unavailable', reason: 'This folder has no chat project.' }
   const main = scopedSelection(intent.mainChat, environmentId, addressed.projectId)
   const sidebar = scopedSelection(intent.sidebarChat, environmentId, addressed.projectId)
   const mainOwner =
@@ -65,14 +64,14 @@ export function prepareAddressChat(
   if (main?.kind === 'session' && mainOwner?.project.id !== addressed.projectId)
     return {
       kind: 'unavailable',
-      reason: 'The conversation does not belong to this workspace project.',
+      reason: 'This conversation belongs to a different project.',
     }
   if (sidebar?.kind === 'session') {
     const owner = selectSessionOwnership(slice, sidebar.sessionId)
     if (owner?.project.id !== addressed.projectId)
       return {
         kind: 'unavailable',
-        reason: 'The sidebar conversation does not belong to this workspace project.',
+        reason: 'The sidebar conversation belongs to a different project.',
       }
   }
   const sessionWorktree =
