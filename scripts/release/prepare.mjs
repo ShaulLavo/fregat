@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict'
 import { readFile, writeFile } from 'node:fs/promises'
+import { dirname, isAbsolute } from 'node:path'
 import { Glob } from 'bun'
 
+const repository = 'ShaulLavo/fregat'
+assert.equal(
+  process.env.GITHUB_REPOSITORY ?? repository,
+  repository,
+  'Publishing repository must match package provenance',
+)
 const root = JSON.parse(await readFile('package.json', 'utf8'))
 const patterns = Array.isArray(root.workspaces) ? root.workspaces : root.workspaces.packages
 const files = new Set()
@@ -38,6 +45,16 @@ function publishedRange(name, range, section) {
 
 function prepare({ file, manifest }) {
   if (manifest.private) return null
+  const directory = dirname(file)
+  assert(
+    !isAbsolute(directory) && !directory.split('/').includes('..'),
+    `Public package directory must be inside the publishing repository: ${manifest.name}`,
+  )
+  manifest.repository = {
+    type: 'git',
+    url: `git+https://github.com/${repository}.git`,
+    directory,
+  }
   for (const section of [
     'dependencies',
     'optionalDependencies',

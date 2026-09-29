@@ -3,8 +3,56 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
+import { withWorkspace } from './fixture.mjs'
 
 const prepare = new URL('./prepare.mjs', import.meta.url).pathname
+
+test('rejects a different publishing repository before writing any manifests', async () => {
+  await withWorkspace(async ({ root, put, read }) => {
+    await put('', { private: true, workspaces: ['packages/*'] })
+    const manifest = { name: 'public', version: '1.0.0' }
+    await put('packages/public', manifest)
+    const result = spawnSync('bun', [prepare], {
+      cwd: root,
+      encoding: 'utf8',
+      env: { ...process.env, GITHUB_REPOSITORY: 'owner/other' },
+    })
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('Publishing repository must match package provenance')
+    expect(await read('packages/public')).toEqual(manifest)
+  })
+})
+
+test.each([
+  ['editor/packages/editor', '@singapore-editor/core', undefined],
+  [
+    'ghostty-webgpu',
+    'ghostty-webgpu',
+    { type: 'git', url: 'git+https://github.com/ShaulLavo/ghostty-webgpu.git' },
+  ],
+])('packs Fregat provenance metadata for %s', async (directory, name, repository) => {
+  await withWorkspace(async ({ root, put }) => {
+    await put('', { private: true, workspaces: ['editor/packages/*', 'ghostty-webgpu'] })
+    await put(directory, { name, version: '0.2.1', repository })
+    const prepared = spawnSync('bun', [prepare], { cwd: root, encoding: 'utf8' })
+    expect(prepared.status, prepared.stderr).toBe(0)
+    const packed = spawnSync('npm', ['pack', '--ignore-scripts', '--json', `./${directory}`], {
+      cwd: root,
+      encoding: 'utf8',
+    })
+    expect(packed.status, packed.stderr).toBe(0)
+    const filename = JSON.parse(packed.stdout)[0].filename
+    const extracted = spawnSync('tar', ['-xOf', join(root, filename), 'package/package.json'], {
+      encoding: 'utf8',
+    })
+    expect(extracted.status, extracted.stderr).toBe(0)
+    expect(JSON.parse(extracted.stdout).repository).toEqual({
+      type: 'git',
+      url: 'git+https://github.com/ShaulLavo/fregat.git',
+      directory,
+    })
+  })
+})
 
 test('prepares npm manifests while preserving private workspace consumers', async () => {
   const root = await mkdtemp(join(tmpdir(), 'release-prepare-'))
