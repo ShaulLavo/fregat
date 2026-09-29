@@ -6,7 +6,9 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true
+    "noUnusedParameters": true,
+    // The core's exports name its build; the workspace checks against its source.
+    "paths": { "@fregat/hotkeys": ["../hotkeys/src/index.ts"] }
   },
   "include": ["src", "tests"]
 }
