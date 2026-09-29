@@ -155,7 +155,7 @@ export const editorExternalEdit: Scenario = {
       await step('unsaved-edit-protected')
       await selectors
         .fileConflict(page, filename)
-        .getByRole('button', { name: 'Revert', exact: true })
+        .getByRole('button', { name: 'Use the disk version', exact: true })
         .click()
       await selectors.editorRows(page).filter({ hasText: 'EXTERNAL_CONFLICT' }).waitFor()
       await step('reverted-to-disk')
