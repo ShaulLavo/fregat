@@ -88,7 +88,7 @@ source: 'default' | 'pack' | 'user' }`. Removal copies Zed: `command: null` supp
 
 - [x] Import TanStack's core and React packages under `hotkeys/`, renamed; CI green.
 - [x] Add `KeyInput` and the browser adapter; move the pure functions onto it.
-- [ ] Port the Editor's trie and runtime tests into the library before porting the code
+- [x] Port the Editor's trie and runtime tests into the library before porting the code
       (`packages/editor/src/keymap/trie.test.ts`, the runtime contract tests behind Plan 057's
       "20 runtime contract tests").
 - [ ] Port the trie and chord runtime; add focus-bound pending state and replay.
@@ -132,4 +132,16 @@ Branch `plan-203-hotkeys` (worktree `/work/worktrees/platform/plan-203-hotkeys`)
   `keyInputFromKeyboardEvent`, `parseKeyboardEvent`, `normalizeHotkeyFromEvent`). Matching and
   parsing run on `KeyInput` (`matchesKeyInput`, `parseKeyInput`, `normalizeHotkeyFromKeyInput`);
   the KeyboardEvent functions convert then call them. `NormalizedKeyboardEvent` is gone. 606 tests.
-- Next: step 3 (port the Editor's trie and runtime tests).
+- Step 3 done, step 4 half done. Editor `54e1e648`: `trie.test.ts` and every
+  `keymap-runtime.test.ts` case ported to `tests/chords/`, except the Alt+Arrow column-selection
+  case, which tests the Editor's preset contents (the library ships no keymap). The browser
+  suite's held-prefix and replacement cases are ported as synthetic-event tests. Written first,
+  seen red, then the code: `src/chords/{types,trie,runtime}.ts` (DOM-free
+  `createChordRuntime` over `KeyInput`; the host applies `KeyEffects`) and
+  `src/adapters/browser-keymap.ts` (`createKeymapRuntime`, the Editor's API: listeners,
+  per-event idempotence, capture while pending). Trie on `KeyInput`; AltGr strokes match the
+  produced glyph. 645 tests.
+- Next: rest of step 4, Zed corrections: pending state tied to the focus it started under; a
+  timeout only when the prefix is itself bound (then the timeout runs the prefix binding);
+  replay of buffered keys on mismatch or timeout. Expect to change the ported tests
+  "conditional candidates survive exact matches" and "real scheduled timer" accordingly.

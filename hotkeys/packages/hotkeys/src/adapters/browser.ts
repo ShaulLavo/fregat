@@ -15,6 +15,8 @@ export interface KeyboardEventLike {
   metaKey: boolean
   repeat?: boolean
   isComposing?: boolean
+  /** 229 marks a key the IME is processing in browsers that leave `isComposing` false. */
+  keyCode?: number
   getModifierState?: (modifier: string) => boolean
 }
 
@@ -35,7 +37,7 @@ export function keyInputFromKeyboardEvent(
       altGraph: readAltGraph(event, platform),
     },
     repeat: Boolean(event.repeat),
-    composing: Boolean(event.isComposing),
+    composing: Boolean(event.isComposing) || event.keyCode === 229,
   })
 }
 
