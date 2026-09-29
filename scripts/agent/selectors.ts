@@ -647,6 +647,10 @@ export const selectors = {
   settingsScopeTab: (page: Page, name: 'User' | 'Workspace' | 'Defaults', selected?: boolean) =>
     page.getByRole('tab', { name, exact: true, selected }),
   settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),
+  settingsEnum: (page: Page, title: string) =>
+    page.getByRole('combobox', { name: title, exact: true }),
+  settingsRawConflictBanner: (page: Page) =>
+    page.getByText('settings.json changed somewhere else', { exact: true }),
   gitSizeLimitNotice: (page: Page) =>
     page.getByText(
       'File exceeds the Git diff size limit. Adjust Diff file size limit in Settings to compare it.',
