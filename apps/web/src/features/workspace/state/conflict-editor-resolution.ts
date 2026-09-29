@@ -161,7 +161,9 @@ export class ConflictEditorResolutionCoordinator {
       )
       retry = outcome === 'retry'
       if (outcome === 'unresolved')
-        toast.warning('The conflict changed while saving. Review the remaining conflict.')
+        toast.warning(
+          'The file changed on disk again while your version was saving. Check the comparison again.',
+        )
     } catch {
     } finally {
       this.resolving.delete(key)

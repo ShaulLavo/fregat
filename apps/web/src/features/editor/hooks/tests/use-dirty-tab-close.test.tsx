@@ -200,7 +200,7 @@ test('discarding a dirty close focuses the successor editor target', async () =>
 
   fireEvent.click(screen.getByRole('button', { name: 'Request dirty close' }))
   await waitFor(() => expect(screen.getByRole('dialog')).toContainElement(activeHtmlElement()))
-  fireEvent.click(screen.getByRole('button', { name: 'Discard' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Close without saving' }))
 
   const successor = await screen.findByRole('button', { name: 'Active /repo/src/next.ts' })
   await waitFor(() => expect(document.activeElement).toBe(successor))

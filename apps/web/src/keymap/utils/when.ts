@@ -42,7 +42,7 @@ export const commandWhenDisabledReasons = {
   editorTarget: 'No text editor is active.',
   editorWritable: 'The active editor is read-only.',
   editorMarkdown: 'Select a Markdown editor.',
-  fileBackedTab: 'No file-backed surface is active.',
+  fileBackedTab: 'No file is open here.',
   fileOperationRedoable: 'No file operation can be redone.',
   fileOperationUndoable: 'No file operation can be undone.',
   saveableTab: 'Nothing here can be saved.',
@@ -50,9 +50,9 @@ export const commandWhenDisabledReasons = {
   sessionActionRedoable: 'No session action can be redone.',
   tabOpen: 'No editor tab is open.',
   workspaceOpen: 'No workspace open.',
-  workspaceEditRedoable: 'No workspace edit can be redone.',
-  workspaceEditUndoable: 'No workspace edit can be undone.',
-  workspaceMutable: 'Workspace files are locked by a transaction.',
+  workspaceEditRedoable: 'No multi-file edit can be redone.',
+  workspaceEditUndoable: 'No multi-file edit can be undone.',
+  workspaceMutable: 'Files are locked while a multi-file edit is saved.',
 } as const satisfies Record<CommandWhen, string>
 
 export function commandWhenDisabledReason(

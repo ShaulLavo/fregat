@@ -153,8 +153,8 @@ export function PagedFileViewer({ path }: { path: string }) {
           role='status'
           className='bg-info/10 text-foreground p-(--density-section-padding) text-xs'
         >
-          This section reaches the display limit. The final line is shown in part. Copy displayed
-          text includes the visible portion.
+          This section is too long to show in full. Its last line is cut off, and Copy displayed
+          text copies only what you see.
         </p>
       ) : null}
       {shown ? <PagedFileRows rows={shown.rows} /> : null}

@@ -14,7 +14,7 @@ export function directoryLoadState(
   if (query.isError)
     return {
       status: 'error',
-      message: errorMessage(query.error, 'The file server did not return a usable response.'),
+      message: errorMessage(query.error, 'The folder could not be read.'),
     }
   if (query.isPlaceholderData && query.data) {
     return loadingLoadState({ status: 'ready', data: query.data.entries })
@@ -33,7 +33,7 @@ export function entriesLoadState(
   if (query.isError)
     return {
       status: 'error',
-      message: errorMessage(query.error, 'The file server did not return a usable response.'),
+      message: errorMessage(query.error, 'The folder could not be read.'),
     }
   if (query.data) return { status: 'ready', data: query.data }
   if (query.isPending) return { status: 'loading' }

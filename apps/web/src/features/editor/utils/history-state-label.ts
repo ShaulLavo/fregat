@@ -9,7 +9,7 @@ const INTENT_LABELS: Record<string, string> = {
   'programmatic-edit': 'Edit',
   undo: 'Undo',
   redo: 'Redo',
-  checkout: 'Restore',
+  checkout: 'Went back',
 }
 
 export function historyStateSummary(node: EditorHistoryGraphNode): string {

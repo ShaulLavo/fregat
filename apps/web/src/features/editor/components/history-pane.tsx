@@ -200,7 +200,7 @@ export function HistoryPane({
           <PaneBar className='justify-between gap-(--density-control-gap)'>
             {barrierActive ? (
               <div className='flex min-w-0 flex-1 items-center gap-(--density-control-gap) text-xs'>
-                <span className='shrink-0 font-medium'>Workspace edit</span>
+                <span className='shrink-0 font-medium'>Multi-file edit</span>
                 <span className='text-muted-foreground shrink-0 tabular-nums'>
                   {affectedFilesLabel(barrierGroup)}
                 </span>
@@ -208,10 +208,10 @@ export function HistoryPane({
             ) : focused ? (
               <HistoryStateRow node={focused} now={now} />
             ) : (
-              <span className='text-muted-foreground text-xs'>No state focused</span>
+              <span className='text-muted-foreground text-xs'>No version selected</span>
             )}
             <div className='flex shrink-0 items-center gap-(--density-control-gap)'>
-              {comparisonPending ? <Spinner size='xs' label='Comparing states' /> : null}
+              {comparisonPending ? <Spinner size='xs' label='Comparing versions' /> : null}
               <Button
                 disabled={!canRestore}
                 size='sm'
@@ -220,7 +220,7 @@ export function HistoryPane({
                 onClick={() => focused && restore.mutate(focused.id)}
               >
                 {restoring ? <Spinner /> : <ArrowCounterClockwiseIcon data-icon='inline-start' />}
-                Restore
+                Use this version
               </Button>
               <Button
                 disabled={graph.nodes.length < 2}
@@ -297,7 +297,7 @@ function BarrierBody({
     onUndo && group ? (
       <Button disabled={!group.undoable || undoing} size='sm' type='button' onClick={onUndo}>
         {undoing ? <Spinner /> : <ArrowCounterClockwiseIcon data-icon='inline-start' />}
-        Undo workspace edit
+        Undo multi-file edit
       </Button>
     ) : null
   return (
@@ -305,21 +305,22 @@ function BarrierBody({
       action={action}
       className='h-full'
       hint={hint}
-      title='Earlier history is behind a workspace edit.'
+      title='A multi-file edit blocks earlier versions.'
     />
   )
 }
 
 function barrierHint(group: HistoryBarrierGroup | null): string {
-  if (!group) return 'Undoing that edit restores it; the undo also touches its other files.'
+  if (!group) return 'Undo that edit to reach them. The undo also changes its other files.'
   const files = group.affectedPaths.slice(0, MAX_LISTED_FILES).map((path) => basename(path))
   const more = group.affectedPaths.length - files.length
   const listed = more > 0 ? `${files.join(', ')} and ${more} more` : files.join(', ')
   if (group.laterGroupCount > 0) {
-    return `It changed ${listed}. Undo the ${group.laterGroupCount} later workspace edits first.`
+    return `It changed ${listed}. Undo the ${group.laterGroupCount} later multi-file edits first.`
   }
-  if (!group.undoable) return `It changed ${listed}. Workspace undo is busy right now.`
-  return `It changed ${listed}. Undoing it restores every one of them.`
+  if (!group.undoable)
+    return `It changed ${listed}. Another undo is running. Try again in a moment.`
+  return `It changed ${listed}. Undoing it puts all of them back.`
 }
 
 function affectedFilesLabel(group: HistoryBarrierGroup | null): string {
@@ -328,7 +329,7 @@ function affectedFilesLabel(group: HistoryBarrierGroup | null): string {
 }
 
 function barrierAriaLabel(group: HistoryBarrierGroup | null): string {
-  const base = 'Workspace edit, earlier history behind it'
+  const base = 'Multi-file edit, earlier versions behind it'
   return group ? `${base}, ${affectedFilesLabel(group)}` : base
 }
 
@@ -365,7 +366,7 @@ function HistoryComparisonBody({
 }) {
   if (comparison === null || comparison?.status === 'pending') {
     return (
-      <LoadingState className='flex h-full flex-col gap-3 p-4' label='Comparing states'>
+      <LoadingState className='flex h-full flex-col gap-3 p-4' label='Comparing versions'>
         <div className='skeleton-sweep h-4 w-3/4 rounded-md' />
         <div className='skeleton-sweep h-4 w-1/2 rounded-md' />
         <div className='skeleton-sweep h-4 w-2/3 rounded-md' />
@@ -373,14 +374,14 @@ function HistoryComparisonBody({
     )
   }
   if (comparison?.status === 'failed') {
-    return <EmptyState className='h-full' title='Could not compare these states.' tone='error' />
+    return <EmptyState className='h-full' title='Could not compare these versions.' tone='error' />
   }
   if (comparison?.status === 'ready') {
     return (
       <DiffBody
         file={comparison.result}
         mode={mode}
-        sameText='These states have the same text.'
+        sameText='These versions have the same text.'
         tabId={tabId}
       />
     )
@@ -389,8 +390,8 @@ function HistoryComparisonBody({
     return (
       <EmptyState
         className='h-full'
-        hint='Retention pruned it. Pick another state.'
-        title='That state is no longer retained.'
+        hint='History keeps a limited number of versions. Pick another one.'
+        title='That version was deleted.'
       />
     )
   }
@@ -398,13 +399,13 @@ function HistoryComparisonBody({
     return (
       <EmptyState
         className='h-full'
-        hint='Pick an earlier state to see what changed. Shift+click or Shift+arrow selects two states to compare.'
-        title='This is the current state.'
+        hint='Pick an earlier version to see what changed. Shift+click or Shift+arrow selects two versions to compare.'
+        title='This is the current version.'
       />
     )
   }
   return (
-    <DiffBody file={diff} mode={mode} sameText='Same text as the current state.' tabId={tabId} />
+    <DiffBody file={diff} mode={mode} sameText='Same text as the current version.' tabId={tabId} />
   )
 }
 

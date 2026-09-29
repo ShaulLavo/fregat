@@ -41,13 +41,13 @@ test('shows ordered diffs and dirty open unopened and resource labels', () => {
     'Create file',
   ]
   const targetLabels = [
-    'dirty',
-    'open',
-    'unopened',
-    'create',
-    'rename',
-    'delete',
-    'ignored / no-op',
+    'Open, has unsaved edits',
+    'Open, left unsaved',
+    'Saved to disk',
+    'Saved to disk',
+    'Saved to disk',
+    'Saved to disk',
+    'No change',
   ]
 
   expect(rows).toHaveLength(operationLabels.length)
@@ -62,12 +62,12 @@ test('shows ordered diffs and dirty open unopened and resource labels', () => {
   expect(rows[2]).toHaveTextContent('unopened before')
   expect(rows[2]).toHaveTextContent('unopened after')
   expect(rows[4]).toHaveTextContent('/repo/src/old.ts → /repo/src/renamed.ts')
-  expect(within(dialog).getByText('7 operations')).toHaveClass('tabular-nums')
+  expect(within(dialog).getByText('7 changes')).toHaveClass('tabular-nums')
   expect(dialog).toHaveTextContent(
-    'Open buffers remain unsaved. Unopened files and resource operations are written.',
+    'Open files get the change as unsaved edits. Closed files, and files created, renamed or deleted, are saved to disk right away.',
   )
   expect(dialog).toHaveTextContent(
-    "Undo this group with Undo workspace edit, or from the file's History tab.",
+    "To undo it, use Undo multi-file edit or the file's History tab.",
   )
 })
 
@@ -99,9 +99,9 @@ test('groups and confirms needsConfirmation annotations', () => {
   expect(annotationGroup).not.toBeNull()
   expect(annotationGroup).toContainElement(safe)
   expect(safe.parentElement).toHaveTextContent('Format imports — Safe mechanical rewrite')
-  expect(safe.parentElement).not.toHaveTextContent('confirmation required')
+  expect(safe.parentElement).not.toHaveTextContent('check before applying')
   expect(guarded.parentElement).toHaveTextContent(
-    'Security-sensitive edit — Updates package metadata — confirmation required',
+    'Security-sensitive edit — Updates package metadata — check before applying',
   )
 })
 
@@ -114,7 +114,7 @@ test('offers only all-or-nothing confirmation with no file or hunk selectors', (
     .getAllByRole('button')
     .map((button) => button.textContent?.trim())
 
-  expect(buttons).toEqual(['Cancel', 'Apply all'])
+  expect(buttons).toEqual(['Cancel', 'Make these changes'])
   expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument()
   expect(within(dialog).queryByRole('radio')).not.toBeInTheDocument()
   expect(dialog.querySelectorAll('input, select')).toHaveLength(0)
@@ -157,14 +157,14 @@ test('apply uses Spinner and disables cancel after commit begins', async () => {
   const harness = new DialogServiceHarness(awaitingSnapshot())
   renderDialogs(harness)
 
-  await user.click(screen.getByRole('button', { name: 'Apply all' }))
+  await user.click(screen.getByRole('button', { name: 'Make these changes' }))
 
-  const apply = screen.getByRole('button', { name: 'Apply all' })
+  const apply = screen.getByRole('button', { name: 'Make these changes' })
   expect(harness.confirmPreview).toHaveBeenCalledWith('10000000-0000-4000-8000-000000000063')
   expect(apply).toBeDisabled()
   expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
   expect(apply.querySelector('[data-slot="spinner"]')).not.toBeNull()
-  expect(screen.getByText('Applying atomic change…')).toBeInTheDocument()
+  expect(screen.getByText('Changing files…')).toBeInTheDocument()
 })
 
 test('a stale preview disables apply and explains rerun', () => {
@@ -173,21 +173,23 @@ test('a stale preview disables apply and explains rerun', () => {
   )
   renderDialogs(harness)
 
-  expect(screen.getByText('This preview is stale. Request the edit again.')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Apply all' })).toBeDisabled()
+  expect(
+    screen.getByText('The files changed after this preview was made. Run the edit again.'),
+  ).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Make these changes' })).toBeDisabled()
 })
 
 test('partial recovery lists exact relative paths and no undo action', () => {
   const harness = new DialogServiceHarness(recoverySnapshot())
   renderDialogs(harness)
 
-  const dialog = screen.getByRole('dialog', { name: 'Workspace recovery required' })
+  const dialog = screen.getByRole('dialog', { name: 'Some files could not be put back' })
   const paths = within(dialog)
     .getAllByRole('listitem')
     .map((item) => item.textContent)
 
   expect(paths).toEqual(['src/remaining.ts', 'package.json'])
-  expect(within(dialog).getByText('2 unrecovered paths')).toHaveClass('tabular-nums')
+  expect(within(dialog).getByText('2 files not put back')).toHaveClass('tabular-nums')
   expect(within(dialog).queryByRole('button', { name: /undo/i })).not.toBeInTheDocument()
   expect(within(dialog).queryByText(/workspace undo/i)).not.toBeInTheDocument()
 })
@@ -197,14 +199,14 @@ test('restores the recovery surface after reload and retries only remaining comp
   const harness = new DialogServiceHarness(recoverySnapshot())
   renderDialogs(harness)
 
-  const dialog = screen.getByRole('dialog', { name: 'Workspace recovery required' })
+  const dialog = screen.getByRole('dialog', { name: 'Some files could not be put back' })
   expect(within(dialog).queryByText('src/already-restored.ts')).not.toBeInTheDocument()
   expect(within(dialog).getByText('src/remaining.ts')).toBeInTheDocument()
 
-  await user.click(within(dialog).getByRole('button', { name: 'Retry recovery' }))
+  await user.click(within(dialog).getByRole('button', { name: 'Try again' }))
 
   expect(harness.retryRecovery).toHaveBeenCalledOnce()
-  expect(screen.getByText('Retrying exact recovery…')).toBeInTheDocument()
+  expect(screen.getByText('Putting files back…')).toBeInTheDocument()
 })
 
 test('requires separate exact-path confirmation before discarding partial recovery data', async () => {
@@ -212,12 +214,12 @@ test('requires separate exact-path confirmation before discarding partial recove
   const harness = new DialogServiceHarness(recoverySnapshot())
   renderDialogs(harness)
 
-  await user.click(screen.getByRole('button', { name: 'Discard recovery data' }))
+  await user.click(screen.getByRole('button', { name: 'Delete saved copies' }))
   expect(harness.discardRecoveryData).not.toHaveBeenCalled()
 
-  const confirmation = screen.getByRole('dialog', { name: 'Discard rollback data?' })
+  const confirmation = screen.getByRole('dialog', { name: 'Delete the saved copies?' })
   expect(confirmation).toHaveTextContent(
-    'Files may remain changed. This only deletes the rollback data and cannot prove that the workspace was restored.',
+    'These files may still hold part of the failed edit. Once the copies are gone, they cannot be put back.',
   )
   expect(
     within(confirmation)
@@ -225,7 +227,7 @@ test('requires separate exact-path confirmation before discarding partial recove
       .map((item) => item.textContent),
   ).toEqual(['src/remaining.ts', 'package.json'])
 
-  await user.click(within(confirmation).getByRole('button', { name: 'Discard exact paths' }))
+  await user.click(within(confirmation).getByRole('button', { name: 'Delete copies' }))
   expect(harness.discardRecoveryData).toHaveBeenCalledWith(['src/remaining.ts', 'package.json'])
 })
 
@@ -234,20 +236,20 @@ test('discard warns then leaves affected live buffers in recovery conflict with 
   const harness = new DialogServiceHarness(recoverySnapshot(), { retainRecoveryAfterDiscard: true })
   renderDialogs(harness)
 
-  await user.click(screen.getByRole('button', { name: 'Discard recovery data' }))
-  const confirmation = screen.getByRole('dialog', { name: 'Discard rollback data?' })
-  expect(confirmation).toHaveTextContent('Files may remain changed.')
-  await user.click(within(confirmation).getByRole('button', { name: 'Discard exact paths' }))
+  await user.click(screen.getByRole('button', { name: 'Delete saved copies' }))
+  const confirmation = screen.getByRole('dialog', { name: 'Delete the saved copies?' })
+  expect(confirmation).toHaveTextContent('These files may still hold part of the failed edit.')
+  await user.click(within(confirmation).getByRole('button', { name: 'Delete copies' }))
 
-  expect(await screen.findByText('Recovery conflict')).toBeInTheDocument()
+  expect(await screen.findByText('Some files may be wrong')).toBeInTheDocument()
   expect(screen.getByText('src/remaining.ts')).toBeInTheDocument()
-  expect(screen.getByText(/Save and resource operations are disabled/)).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Save affected buffers' })).toBeDisabled()
+  expect(screen.getByText(/Saving is off for these files/)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Save these files' })).toBeDisabled()
 
-  await user.click(screen.getByRole('button', { name: 'Continue with conflicted buffers' }))
+  await user.click(screen.getByRole('button', { name: 'Close' }))
 
   expect(harness.dismissResult).toHaveBeenCalledOnce()
-  expect(screen.queryByRole('dialog', { name: 'Recovery conflict' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('dialog', { name: 'Some files may be wrong' })).not.toBeInTheDocument()
 })
 
 test('dismissal never releases a partial journal', async () => {
@@ -257,7 +259,9 @@ test('dismissal never releases a partial journal', async () => {
 
   await user.keyboard('{Escape}')
 
-  expect(screen.getByRole('dialog', { name: 'Workspace recovery required' })).toBeInTheDocument()
+  expect(
+    screen.getByRole('dialog', { name: 'Some files could not be put back' }),
+  ).toBeInTheDocument()
   expect(harness.discardRecoveryData).not.toHaveBeenCalled()
   expect(harness.retryRecovery).not.toHaveBeenCalled()
   expect(harness.getSnapshot().recovery).toEqual(RECOVERY)
@@ -267,20 +271,18 @@ test('uses distinct loading and empty verdict states', () => {
   const harness = new DialogServiceHarness(workspaceSnapshot({ phase: 'preparing' }))
   renderDialogs(harness)
 
-  expect(screen.getByRole('status', { name: 'Preparing workspace edit preview' })).toHaveAttribute(
+  expect(screen.getByRole('status', { name: 'Preparing the preview' })).toHaveAttribute(
     'data-slot',
     'loading-state',
   )
-  expect(screen.queryByText('No workspace changes')).not.toBeInTheDocument()
+  expect(screen.queryByText('Nothing to change')).not.toBeInTheDocument()
 
   act(() => {
     harness.setSnapshot(awaitingSnapshot({ operationCount: 0, rows: [] }))
   })
 
-  expect(
-    screen.queryByRole('status', { name: 'Preparing workspace edit preview' }),
-  ).not.toBeInTheDocument()
-  expect(screen.getByText('No workspace changes')).toBeInTheDocument()
+  expect(screen.queryByRole('status', { name: 'Preparing the preview' })).not.toBeInTheDocument()
+  expect(screen.getByText('Nothing to change')).toBeInTheDocument()
 })
 
 type DialogHarnessOptions = {
@@ -375,7 +377,7 @@ function awaitingSnapshot(
 function recoverySnapshot(): WorkspaceEditServiceSnapshot {
   return workspaceSnapshot({
     code: 'workspace-edit-recovery-required',
-    message: 'Some workspace paths still need recovery.',
+    message: 'Some files still need to be put back.',
     phase: 'recovery-required',
     recovery: RECOVERY,
   })

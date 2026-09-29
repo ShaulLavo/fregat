@@ -285,7 +285,7 @@ function expectState(result: WorkspaceEditResult, expected: WorkspaceEditState, 
   if (result.state === 'partial') {
     throw createClientError({
       code: 'workspace-edit-recovery-required',
-      fix: 'Open the recovery prompt to finish or discard the interrupted change.',
+      fix: 'Use the dialog that opened to put the files back, or to keep them as they are.',
       internal: { expected, operationId: result.operationId, state: result.state },
       message: `${label} was interrupted part way`,
       status: 409,

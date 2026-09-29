@@ -36,8 +36,8 @@ test.each([
   ['   ', 'Enter a folder name.'],
   ['.', 'Choose a folder name other than “.” or “..”.'],
   ['..', 'Choose a folder name other than “.” or “..”.'],
-  ['nested/name', 'Folder names cannot contain path separators.'],
-  ['nested\\name', 'Folder names cannot contain path separators.'],
+  ['nested/name', 'Folder names cannot contain / or \\.'],
+  ['nested\\name', 'Folder names cannot contain / or \\.'],
   ['bad\0name', 'Folder names cannot contain null characters.'],
   ['a'.repeat(256), 'Folder names cannot exceed 255 bytes.'],
 ])('validates unsafe folder name %j', (name, expected) => {
