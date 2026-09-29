@@ -1,0 +1,17 @@
+# Public package releases
+
+Run `bun run changeset` for a public package change and commit the resulting Markdown file.
+The Editor packages share one version; the two hotkeys packages share another.
+`ghostty-webgpu` releases independently. Private workspaces are excluded from versioning and tags.
+The Editor and ghostty groups become active when their folders join the root workspaces.
+
+On main, `release.yml` opens or updates the version PR, including the Bun lockfile.
+After the owner configures every npm trusted publisher and sets the Fregat repository variable
+`NPM_TRUSTED_PUBLISHING=true`, merging the version PR also publishes the new versions.
+See [Plan 207](../plans/207-one-repo-with-mirrors.md#publishing) for setup and first-publication steps.
+
+`bun run release` builds the public packages, prepares their manifests, and runs Changesets
+under Node. Changesets uses `npm publish` with npm OIDC authentication. Manifest preparation
+resolves `workspace:*`, `workspace:^`, `workspace:~` and catalog references for npm consumers.
+Run this command only in a disposable CI checkout: preparation changes public manifests.
+Keep `workspace:` references in committed source and in the version PR.
