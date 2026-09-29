@@ -71,8 +71,9 @@ layer is Zed's, with an opt-in shell-keys pack.
 - **TUI, infrastructure only.** Replace `apps/tui/src/commands/state/keymap.ts` with the library
   core and its terminal-input adapter. Keep the TUI's current bindings and rules
   (`apps/tui/src/commands/utils/bindings.ts`); if the new overrides shape breaks TUI overrides,
-  that is accepted until the TUI redesign. Take key events from whichever renderer
-  [202](202-bubli-tui.md) has landed (bubli or OpenTUI).
+  that is accepted until the TUI redesign. Take OpenTUI key events through
+  [202](202-tui-ui.md)'s integration. Its app-local controls use this dispatcher; the former
+  standalone toolkit and renderer-fork workstream is superseded.
 - **Delete** `keymap-session.ts`, the trie/runtime imports from `@singapore-editor/core/keymap`,
   `presetConflict`/`lostChords` machinery the library's report replaces,
   `docs/keymap/matcher-baseline.json` and `verification.json`; retire `delivery.md` and

@@ -8,9 +8,10 @@
   [203](203-fregat-hotkeys.md)) each keep a public repo that CI fills with an exact copy of their
   folder on every push to Fregat's main, and publish to npm from Fregat. Laravel and Symfony use
   this pattern (read-only split repos per component).
-- Out of scope: forks we merge upstream into stay separate (bubli, pending the owner's review of
-  [202](202-bubli-tui.md)). tree-sitter-md, tree-sitter-x, mesh and the file tree are not
-  mirrored or moved by this plan.
+- Out of scope: tree-sitter-md, tree-sitter-x, mesh and the file tree are not mirrored or moved
+  by this plan. The owner's revised [202](202-tui-ui.md) keeps terminal UI in `apps/tui/src/ui/`
+  on upstream OpenTUI; it creates no toolkit package or mirror. The former bubli fork is not a
+  pending relocation or release workstream.
 - Needs the owner: freezing the Editor and ghostty-webgpu checkouts for the cutover (other
   sessions work in them), npm trusted-publishing setup
   for the three families, and approval before any force-push to `singapore` or `ghostty-webgpu`.
