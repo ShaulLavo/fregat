@@ -69,6 +69,14 @@ fregat/
   `@singapore-editor/core` depends on a published `@fregat/hotkeys`.
 - Publishing runs from Fregat CI with npm trusted publishing; release notes land on the mirrors'
   GitHub releases.
+- Owner checklist for trusted publishing (no token, no 2FA prompt in CI):
+  - [ ] Publish `@fregat/hotkeys` and `@fregat/react-hotkeys` once by hand (npm needs the package
+        to exist before a trusted publisher can be set).
+  - [ ] For each of the 20 `@singapore-editor/*` packages, `ghostty-webgpu` and the two
+        `@fregat/*` packages: npmjs.com → package → Settings → Trusted Publisher → GitHub Actions,
+        repo `ShaulLavo/fregat`, workflow `release.yml`.
+  - The workflow job needs `permissions: id-token: write` and npm CLI ≥ 11.5; changesets calls
+    `npm publish`. Do not rely on `bun publish` for this.
 
 ## Steps
 
