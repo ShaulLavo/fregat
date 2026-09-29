@@ -127,7 +127,7 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
 
 ## Publishing
 
-- Changesets at Fregat's root. Fixed version groups: all `@singapore-editor/*` packages release
+- Changesets at Fregat's root. Fixed version groups: the 20 public `@singapore-editor/*` packages release
   together (they are on independent `0.1.x`/`0.2.0` versions today; the first grouped release
   aligns them), `@fregat/hotkeys` with `@fregat/react-hotkeys`, and `ghostty-webgpu` alone.
 - Built at the root: `@changesets/cli` 3.0.3, `.changeset/config.json` and the `changeset`
@@ -137,7 +137,9 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
   builds public packages, then `scripts/release/prepare.mjs` resolves workspace references
   against package versions and catalog references against the root catalogs. It validates all
   public manifests before writing them in the disposable CI checkout; private manifests stay
-  unchanged. Committed source and version PRs keep their workspace references.
+  unchanged. Preparation sets each public manifest's repository to `ShaulLavo/fregat` and its
+  package directory for npm provenance, and verifies the publishing repository before writing.
+  Committed source and version PRs keep their workspace references.
 - Dry run in a scratch copy: a patch changeset for `@fregat/react-hotkeys` versioned both
   hotkeys packages from `0.0.0` to `0.0.1`. After building and preparation,
   `npm pack --dry-run --json ./hotkeys/packages/react-hotkeys` listed 18 files, including
@@ -149,8 +151,9 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
   No package was published. Regression tests cover workspace shorthand,
   explicit ranges, both catalog forms, private consumers and invalid public-to-private dependencies.
 - `.github/workflows/release.yml` uses Changesets action v2.1.2 to open/update a version PR
-  and refresh the Bun lockfile. Publishing stays disabled until the Fregat repository variable
-  `NPM_TRUSTED_PUBLISHING` equals `true`; version PRs work before that switch is enabled.
+  and refresh the Bun lockfile in a version job with no OIDC permission. A separate publish job
+  requires no pending changesets and the Fregat repository variable
+  `NPM_TRUSTED_PUBLISHING` equal to `true`; version PRs work before that switch is enabled.
   After the switch, merging the version PR runs `bun run release`. Changesets runs under Node
   and invokes `npm publish`, using npm 11.19.0 and `id-token: write` on a GitHub-hosted runner.
   The workflow needs no `NPM_TOKEN`. npm's supported minimum is 11.5.1 with Node 22.14.0 or
@@ -166,7 +169,8 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
         Confirm every package exists before enabling the CI publishing switch.
   - [ ] For each of the 20 `@singapore-editor/*` packages, `ghostty-webgpu` and the two
         `@fregat/*` packages: npmjs.com → package → Settings → Trusted Publisher → GitHub Actions,
-        repo `ShaulLavo/fregat`, workflow `release.yml`.
+        repo `ShaulLavo/fregat`, workflow `release.yml`. In **Allowed actions**, enable direct
+        `npm publish`; this workflow publishes packages directly.
   - [ ] Enable Actions → General → "Allow GitHub Actions to create and approve pull requests"
         in `ShaulLavo/fregat`. The workflow uses its built-in GitHub token for version PRs.
         GitHub does not automatically run PR CI for that token's commits; run CI manually for
