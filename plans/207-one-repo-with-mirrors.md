@@ -12,7 +12,7 @@
   [202](202-bubli-tui.md)). tree-sitter-md, tree-sitter-x, mesh and the file tree are not
   mirrored or moved by this plan.
 - Needs the owner: freezing the Editor and ghostty-webgpu checkouts for the cutover (other
-  sessions work in them), creating the `@fregat` npm organisation, npm trusted-publishing setup
+  sessions work in them), npm trusted-publishing setup
   for the three families, and approval before any force-push to `singapore` or `ghostty-webgpu`.
 
 ## Why
@@ -70,6 +70,7 @@ fregat/
 - Publishing runs from Fregat CI with npm trusted publishing; release notes land on the mirrors'
   GitHub releases.
 - Owner checklist for trusted publishing (no token, no 2FA prompt in CI):
+  - [x] `@fregat` npm organisation created (2026-09-29).
   - [ ] Publish `@fregat/hotkeys` and `@fregat/react-hotkeys` once by hand (npm needs the package
         to exist before a trusted publisher can be set).
   - [ ] For each of the 20 `@singapore-editor/*` packages, `ghostty-webgpu` and the two
