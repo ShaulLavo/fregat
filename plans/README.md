@@ -64,7 +64,7 @@ execution. `IDEA` is only for a plan the owner explicitly calls an idea or is un
 | [205](205-ghostty-on-fregat-hotkeys.md)      | ghostty-webgpu on @fregat/hotkeys                                             |
 | [206](206-platform-one-keymap.md)            | Platform owns one keymap                                                      |
 | [207](207-one-repo-with-mirrors.md)          | One repo, with mirrors for the flagship packages                              |
-| [208](208-all-text-in-json.md)               | All app text in JSON for localization and shared copy editing                 |
+| [208](208-all-text-in-json.md)               | All app text in JSON with Paraglide                                           |
 
 | [209](209-unified-workspace.md) | One workspace for chat and code; design review with implementation gates |
 

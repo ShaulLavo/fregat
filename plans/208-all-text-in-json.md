@@ -2,12 +2,17 @@
 
 Status: APPROVED 2026-09-29. Implementation has not started.
 
+Decision: [Paraglide JS](https://paraglidejs.com/) (`@inlang/paraglide-js`) with
+[inlang's JSON message format](https://inlang.com/m/reootnfj/plugin-inlang-messageFormat).
+
 - [ ] Make English JSON catalogs the source of truth for all app-authored user-facing text
       across every client, site, CLI, shared package, Editor and ghostty-webgpu. Include
       accessibility text, settings, commands, notifications and error `message`/`why`/`fix`.
       Preserve user, agent, file and third-party content verbatim.
-- [ ] Add stable semantic keys, typed keys and parameters, translator context, and whole-message
-      interpolation/plurals through `packages/i18n`. Standalone packages ship their own catalogs.
+- [ ] Keep the shared inlang project and JSON catalogs in `packages/i18n`; compile Paraglide's
+      typed `m.*` functions [per JS consumer](https://paraglidejs.com/monorepo) with Vite or CLI.
+      Use flat semantic keys, translator context and whole-message interpolation/plurals.
+      Standalone packages ship their catalogs; native clients consume the format through an adapter.
 - [ ] Resolve text in the consuming client's locale; transport errors as codes, message keys and
       parameters. Add a registry-backed display language, English fallback, locale-aware
       dates/numbers and RTL support. Keep machine identifiers stable.
