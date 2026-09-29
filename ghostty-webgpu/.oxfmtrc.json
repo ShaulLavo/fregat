@@ -1,0 +1,29 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "semi": false,
+  "singleQuote": true,
+  "jsxSingleQuote": true,
+  "trailingComma": "all",
+  "printWidth": 100,
+  "tabWidth": 2,
+  "useTabs": false,
+  "sortPackageJson": true,
+  "ignorePatterns": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "bun.lock",
+    "docs/config-resolver-feasibility.json",
+    "docs/config-resolver-feasibility.md",
+    "docs/xterm-parity.json",
+    "docs/xterm-parity.md",
+    "native/config-resolver/**/*.json",
+    "scripts/config-resolver-native/build-recipe.json",
+    "scripts/config-resolver-native/fixtures/native-protocol/canonical-ready.json",
+    "scripts/config-resolver-native/native-inputs.json",
+    "scripts/config-resolver-proof/proof-recipe.json",
+    "src/xterm/css/xterm.css",
+    "references/xterm.js",
+    "*.tsbuildinfo"
+  ]
+}
