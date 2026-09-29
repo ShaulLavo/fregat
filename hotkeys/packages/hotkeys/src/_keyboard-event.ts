@@ -1,37 +1,4 @@
-import { PUNCTUATION_CODE_MAP, normalizeKeyName } from './constants'
-import type { NormalizedKeyboardEvent } from './key.types'
-
-/** Normalizes Unicode key names and modifier flags while retaining physical code and IME state. */
-export function normalizeKeyboardEvent(
-  event: KeyboardEvent,
-  platform?: 'mac' | 'windows' | 'linux',
-): NormalizedKeyboardEvent {
-  let altGraph = false
-  try {
-    // WebKit reports AltGraph for Option on some macOS keyboard layouts. Option
-    // remains a normal Alt shortcut modifier there, so only use this signal on
-    // Windows/Linux where AltGraph synthesizes Control+Alt.
-    altGraph =
-      platform !== 'mac' &&
-      typeof event.getModifierState === 'function' &&
-      event.getModifierState('AltGraph')
-  } catch {
-    // Synthetic events and older browsers may not implement this reliably.
-  }
-
-  const key = (event.key || '').normalize('NFC')
-  return {
-    key: normalizeKeyName(key),
-    code: event.code || '',
-    ctrl: Boolean(event.ctrlKey),
-    shift: Boolean(event.shiftKey),
-    alt: Boolean(event.altKey),
-    meta: Boolean(event.metaKey),
-    altGraph,
-    location: event.location,
-    isComposing: Boolean(event.isComposing) || key === 'Process' || key === 'Unidentified',
-  }
-}
+import { PUNCTUATION_CODE_MAP } from './constants'
 
 /**
  * Maps familiar positions to compatibility fallback keys for the logical matcher.

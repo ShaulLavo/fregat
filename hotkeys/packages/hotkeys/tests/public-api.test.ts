@@ -2,7 +2,7 @@ import { expect, expectTypeOf, it } from 'vitest'
 import * as hotkeys from '../src'
 import type {
   KeyboardEventMatch,
-  NormalizedKeyboardEvent,
+  KeyInput,
   NonPunctuationKey,
   SingleModifierHotkey,
   DisplayHotkey,
@@ -13,7 +13,7 @@ import type {
 
 it('exports shared types without exposing internal runtime helpers', () => {
   expectTypeOf<KeyboardEventMatch['score']>().toEqualTypeOf<0 | 1 | 2 | 3>()
-  expectTypeOf<NormalizedKeyboardEvent['code']>().toBeString()
+  expectTypeOf<KeyInput['code']>().toBeString()
   expectTypeOf<'F24'>().toExtend<NonPunctuationKey>()
   expectTypeOf<'Mod+[KeyS]'>().toExtend<SingleModifierHotkey>()
   expectTypeOf<'Mod+[KeyS]'>().toExtend<DisplayHotkey>()
@@ -22,6 +22,7 @@ it('exports shared types without exposing internal runtime helpers', () => {
   for (const name of [
     'chordRejection',
     'matchKeyboardEvent',
+    'matchKeyInput',
     'normalizeKeyboardEvent',
     'beginRecording',
     'hotkeyChordFromKeydown',

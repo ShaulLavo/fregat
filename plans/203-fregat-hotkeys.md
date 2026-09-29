@@ -87,7 +87,7 @@ source: 'default' | 'pack' | 'user' }`. Removal copies Zed: `command: null` supp
 ## Steps
 
 - [x] Import TanStack's core and React packages under `hotkeys/`, renamed; CI green.
-- [ ] Add `KeyInput` and the browser adapter; move the pure functions onto it.
+- [x] Add `KeyInput` and the browser adapter; move the pure functions onto it.
 - [ ] Port the Editor's trie and runtime tests into the library before porting the code
       (`packages/editor/src/keymap/trie.test.ts`, the runtime contract tests behind Plan 057's
       "20 runtime contract tests").
@@ -127,4 +127,9 @@ Branch `plan-203-hotkeys` (worktree `/work/worktrees/platform/plan-203-hotkeys`)
   Decision: source exports point at `src/` for workspace consumers; `publishConfig.exports`
   points at `dist/`. The React hooks' render-time ref writes moved into `useLayoutEffect` and
   the recorders into lazy `useState`, so the repo's React Compiler lint passes.
-- Next: step 2 (`KeyInput` and the browser adapter).
+- Step 2 done. `src/key-input.ts` (`KeyInput`, `KeyModifiers`, `createKeyInput`) and
+  `src/adapters/browser.ts` (`KeyboardEventLike`, structural, so no DOM lib types;
+  `keyInputFromKeyboardEvent`, `parseKeyboardEvent`, `normalizeHotkeyFromEvent`). Matching and
+  parsing run on `KeyInput` (`matchesKeyInput`, `parseKeyInput`, `normalizeHotkeyFromKeyInput`);
+  the KeyboardEvent functions convert then call them. `NormalizedKeyboardEvent` is gone. 606 tests.
+- Next: step 3 (port the Editor's trie and runtime tests).

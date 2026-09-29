@@ -5,39 +5,34 @@ import {
   isLatinLetter,
   isPrintableKey,
   keysEqual,
-  normalizeKeyboardEvent,
 } from './_keyboard-event'
 import { parseHotkey } from './parse'
 import type { KeyboardEventMatch } from './match'
 import type { Hotkey, ParsedHotkey } from './hotkey.types'
+import type { KeyInput, KeyModifiers } from './key-input'
 
-/** Matches an event and reports the winning candidate and release identity. */
-export function matchKeyboardEvent(
-  event: KeyboardEvent,
+/** Matches a key input and reports the winning candidate and release identity. */
+export function matchKeyInput(
+  input: KeyInput,
   hotkey: Hotkey | ParsedHotkey,
   platform: 'mac' | 'windows' | 'linux' = detectPlatform(),
 ): KeyboardEventMatch {
   const parsed = typeof hotkey === 'string' ? parseHotkey(hotkey, platform) : hotkey
-  const normalized = normalizeKeyboardEvent(event, platform)
   const noMatch: KeyboardEventMatch = { matched: false, score: 0 }
 
-  if (normalized.isComposing && (parsed.code !== undefined || isPrintableKey(parsed.key)))
-    return noMatch
-  if (normalized.altGraph && (parsed.ctrl || parsed.alt)) return noMatch
+  if (input.composing && (parsed.code !== undefined || isPrintableKey(parsed.key))) return noMatch
+  if (input.modifiers.altGraph && (parsed.ctrl || parsed.alt)) return noMatch
 
   if (parsed.code !== undefined) {
-    if (!modifiersMatch(normalized, parsed, false)) return noMatch
-    return normalized.code === parsed.code ? matched('code', 3) : noMatch
+    if (!modifiersMatch(input.modifiers, parsed, false)) return noMatch
+    return input.code === parsed.code ? matched('code', 3) : noMatch
   }
 
-  const direct = keysEqual(normalized.key, parsed.key)
+  const direct = keysEqual(input.key, parsed.key)
   const implicitShift =
-    direct &&
-    isPrintableKey(normalized.key) &&
-    !/^\p{Letter}$/u.test(normalized.key) &&
-    !parsed.shift
+    direct && isPrintableKey(input.key) && !/^\p{Letter}$/u.test(input.key) && !parsed.shift
 
-  if (direct && modifiersMatch(normalized, parsed, implicitShift)) {
+  if (direct && modifiersMatch(input.modifiers, parsed, implicitShift)) {
     return matched('key', implicitShift ? 2 : 3)
   }
 
@@ -45,14 +40,14 @@ export function matchKeyboardEvent(
   // Native Latin letters are also authoritative on Key* positions; Alt is the
   // exception because macOS Option commonly transforms a shortcut's glyph.
   if (
-    isAsciiLetter(normalized.key) ||
-    (isLatinLetter(normalized.key) && normalized.code.startsWith('Key') && !normalized.alt)
+    isAsciiLetter(input.key) ||
+    (isLatinLetter(input.key) && input.code.startsWith('Key') && !input.modifiers.alt)
   ) {
     return noMatch
   }
 
-  if (!modifiersMatch(normalized, parsed, false)) return noMatch
-  const fallbackKey = codeToLogicalKey(normalized.code)
+  if (!modifiersMatch(input.modifiers, parsed, false)) return noMatch
+  const fallbackKey = codeToLogicalKey(input.code)
   return fallbackKey !== undefined && keysEqual(fallbackKey, parsed.key)
     ? matched('fallback', 1)
     : noMatch
@@ -63,14 +58,14 @@ export function matchKeyboardEvent(
       matched: true,
       score,
       source,
-      identity: { key: normalized.key, code: normalized.code },
+      identity: { key: input.key, code: input.code },
     }
   }
 }
 
 /** Compares modifiers, excluding synthetic AltGr flags and optionally allowing Shift used to type a glyph. */
 function modifiersMatch(
-  event: ReturnType<typeof normalizeKeyboardEvent>,
+  event: KeyModifiers,
   parsed: ParsedHotkey,
   allowImplicitShift: boolean,
 ): boolean {

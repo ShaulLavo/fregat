@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { normalizeKeyName } from '../src/constants'
 import { hotkeyChordFromKeydown } from '../src/_recorder-chord'
+import { normalizeHotkeyFromEvent } from '../src/adapters/browser'
 import {
   isModifierKey,
   normalizeHotkey,
-  normalizeHotkeyFromEvent,
   normalizeHotkeyFromParsed,
   normalizeRegisterableHotkey,
   parseHotkey,

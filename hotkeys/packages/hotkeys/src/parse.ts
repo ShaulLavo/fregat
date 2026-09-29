@@ -1,7 +1,8 @@
-import { assertLogicalKey, normalizeKeyboardEvent, splitHotkeyParts } from './_keyboard-event'
+import { assertLogicalKey, splitHotkeyParts } from './_keyboard-event'
 import { MODIFIER_ALIASES, MODIFIER_ORDER, normalizeKeyName } from './constants'
 import { detectPlatform, resolveModifier } from './platform'
 import type { CanonicalModifier, Key } from './key.types'
+import type { KeyInput } from './key-input'
 import type { Hotkey, ParsedHotkey, RawHotkey, RegisterableHotkey } from './hotkey.types'
 
 /**
@@ -227,63 +228,33 @@ export function isModifierKey(key: Key | (string & {})): key is keyof typeof MOD
 }
 
 /**
- * Parses a KeyboardEvent into a ParsedHotkey object.
- *
- * This function extracts the key and modifier state from a keyboard event
- * and converts it into the same format used by `parseHotkey()`.
- *
- * @param event - The KeyboardEvent to parse
- * @param platform - The target platform for resolving modifiers (defaults to auto-detection)
- * @returns A ParsedHotkey object representing the keyboard event
- *
- * @example
- * ```ts
- * document.addEventListener('keydown', (event) => {
- *   const parsed = parseKeyboardEvent(event)
- *   console.log(parsed) // { key: 'S', ctrl: true, shift: false, ... }
- * })
- * ```
+ * Parses a key input into a ParsedHotkey, in the same shape `parseHotkey()` returns.
+ * AltGraph's synthetic Control+Alt is dropped: the produced glyph is the key.
  */
-export function parseKeyboardEvent(
-  event: KeyboardEvent,
-  platform?: 'mac' | 'windows' | 'linux',
-): ParsedHotkey {
-  const normalized = normalizeKeyboardEvent(event, platform)
-  // AltGraph is a character-production modifier, not an ordinary Control+Alt
-  // shortcut. Record the produced glyph instead of a synthetic Ctrl+Alt chord.
-  const ctrl = normalized.altGraph ? false : normalized.ctrl
-  const alt = normalized.altGraph ? false : normalized.alt
-  // Shift is a real modifier even during AltGraph input; preserve it for replay.
-  const shift = normalized.shift
+export function parseKeyInput(input: KeyInput): ParsedHotkey {
+  const { altGraph, shift, meta } = input.modifiers
+  const ctrl = altGraph ? false : input.modifiers.ctrl
+  const alt = altGraph ? false : input.modifiers.alt
 
-  // Build modifiers array in canonical order
   const modifiers: Array<CanonicalModifier> = []
   if (ctrl) modifiers.push('Control')
   if (alt) modifiers.push('Alt')
   if (shift) modifiers.push('Shift')
-  if (normalized.meta) modifiers.push('Meta')
+  if (meta) modifiers.push('Meta')
 
-  return {
-    key: normalized.key,
-    ctrl,
-    shift,
-    alt,
-    meta: normalized.meta,
-    modifiers,
-  }
+  return { key: input.key, ctrl, shift, alt, meta, modifiers }
 }
 
 /**
- * Normalizes a keyboard event to the same canonical hotkey string as {@link normalizeHotkey}.
+ * Normalizes a key input to the same canonical hotkey string as {@link normalizeHotkey}.
  *
- * @param event - The keyboard event (typically `keydown`)
  * @param platform - Target platform for `Mod` eligibility
  */
-export function normalizeHotkeyFromEvent(
-  event: KeyboardEvent,
+export function normalizeHotkeyFromKeyInput(
+  input: KeyInput,
   platform: 'mac' | 'windows' | 'linux' = detectPlatform(),
 ): Hotkey {
-  return normalizedHotkeyStringFromParsed(parseKeyboardEvent(event, platform), platform)
+  return normalizedHotkeyStringFromParsed(parseKeyInput(input), platform)
 }
 
 /**

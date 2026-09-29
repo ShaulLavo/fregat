@@ -1,6 +1,6 @@
 import { normalizeKeyName } from './constants'
-import { normalizeKeyboardEvent } from './_keyboard-event'
-import { isModifierKey, normalizeHotkeyFromParsed, parseKeyboardEvent } from './parse'
+import { keyInputFromKeyboardEvent } from './adapters/browser'
+import { isModifierKey, normalizeHotkeyFromParsed, parseKeyInput } from './parse'
 import type { RecorderKeyMode, RecorderOptions, RecorderRejection } from './recorder-options'
 import type { Hotkey } from './hotkey.types'
 
@@ -14,21 +14,17 @@ export function hotkeyChordFromKeydown(
   platform: 'mac' | 'windows' | 'linux',
   recordBy: RecorderKeyMode = 'code',
 ): Hotkey | null {
-  const normalized = normalizeKeyboardEvent(event, platform)
-  if (
-    normalized.isComposing ||
-    isModifierKey(normalizeKeyName(event.key)) ||
-    event.key === 'AltGraph'
-  )
+  const input = keyInputFromKeyboardEvent(event, platform)
+  if (input.composing || isModifierKey(normalizeKeyName(event.key)) || event.key === 'AltGraph')
     return null
   if (
     recordBy === 'code' &&
     (!/^[A-Za-z][A-Za-z0-9]*$/.test(event.code) ||
       event.code === 'Unidentified' ||
-      normalized.altGraph)
+      input.modifiers.altGraph)
   )
     return null
-  const parsed = parseKeyboardEvent(event, platform)
+  const parsed = parseKeyInput(input)
   if (recordBy === 'code') {
     // Remove logical identity rather than placing a physical code in the key field.
     const { key: _key, code: _code, ...modifiers } = parsed
@@ -47,7 +43,7 @@ export function chordRejection(
 ): RecorderRejection | undefined {
   if (options.recordBy === 'key') return undefined
   // AltGr is character entry, often reported as synthetic Ctrl+Alt; macOS Option is handled separately.
-  if (normalizeKeyboardEvent(event, options.platform).altGraph)
+  if (keyInputFromKeyboardEvent(event, options.platform).modifiers.altGraph)
     return {
       reason: 'alt-graph',
       message:

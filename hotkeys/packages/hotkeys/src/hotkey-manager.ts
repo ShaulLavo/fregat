@@ -5,7 +5,8 @@ import { detectPlatform } from './platform'
 import { normalizeKeyName } from './constants'
 import { formatHotkey } from './format'
 import { parseHotkey, rawHotkeyToParsedHotkey } from './parse'
-import { matchKeyboardEvent } from './_match'
+import { matchKeyInput } from './_match'
+import { keyInputFromKeyboardEvent } from './adapters/browser'
 import {
   defaultHotkeyOptions,
   getDefaultIgnoreInputs,
@@ -483,7 +484,7 @@ export class HotkeyManager {
       return
     }
 
-    const matches = new Map<string, ReturnType<typeof matchKeyboardEvent>>()
+    const matches = new Map<string, ReturnType<typeof matchKeyInput>>()
     let bestScore = 0
 
     // Exact logical/explicit-code matches outrank compatibility fallbacks.
@@ -499,8 +500,8 @@ export class HotkeyManager {
       ) {
         continue
       }
-      const result = matchKeyboardEvent(
-        event,
+      const result = matchKeyInput(
+        keyInputFromKeyboardEvent(event, registration.options.platform),
         registration.parsedHotkey,
         registration.options.platform,
       )

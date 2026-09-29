@@ -5,8 +5,8 @@ import { detectPlatform } from './platform'
 import { normalizeKeyName } from './constants'
 import { isModifierKey, parseHotkey } from './parse'
 import { areHotkeysEqual, matchesKeyboardEvent } from './match'
-import { matchKeyboardEvent } from './_match'
-import { normalizeKeyboardEvent } from './_keyboard-event'
+import { matchKeyInput } from './_match'
+import { keyInputFromKeyboardEvent } from './adapters/browser'
 import {
   defaultHotkeyOptions,
   getDefaultIgnoreInputs,
@@ -422,7 +422,7 @@ export class SequenceManager {
       }
       return
     }
-    if ((event.type === 'keydown' && event.repeat) || normalizeKeyboardEvent(event).isComposing) {
+    if ((event.type === 'keydown' && event.repeat) || keyInputFromKeyboardEvent(event).composing) {
       return
     }
     // Skip modifier-only events so pressing e.g. Shift before Shift+C does not reset the sequence.
@@ -479,11 +479,15 @@ export class SequenceManager {
         continue
       }
 
-      let match = matchKeyboardEvent(event, expectedHotkey, registration.options.platform)
+      let match = matchKeyInput(
+        keyInputFromKeyboardEvent(event, registration.options.platform),
+        expectedHotkey,
+        registration.options.platform,
+      )
       let nextIndex = registration.currentIndex + 1
       if (!match.matched && registration.currentIndex > 0) {
-        match = matchKeyboardEvent(
-          event,
+        match = matchKeyInput(
+          keyInputFromKeyboardEvent(event, registration.options.platform),
           registration.parsedSequence[0]!,
           registration.options.platform,
         )
@@ -675,7 +679,7 @@ export function createSequenceMatcher(
       // These events are not sequence steps and must not refresh the timeout.
       if (
         (event.type === 'keydown' && event.repeat) ||
-        normalizeKeyboardEvent(event, platform).isComposing ||
+        keyInputFromKeyboardEvent(event, platform).composing ||
         isModifierKey(normalizeKeyName(event.key))
       ) {
         return false

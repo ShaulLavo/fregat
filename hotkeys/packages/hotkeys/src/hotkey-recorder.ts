@@ -2,7 +2,7 @@ import { Store } from '@tanstack/store'
 import { findHotkeyConflicts } from './conflicts'
 import { beginRecording, captureRecordingEvent, endRecording } from './_recording-guard'
 import { chordRejection, hotkeyChordFromKeydown } from './_recorder-chord'
-import { normalizeKeyboardEvent } from './_keyboard-event'
+import { keyInputFromKeyboardEvent } from './adapters/browser'
 import { isModifierKey, parseHotkey } from './parse'
 import { validateHotkey } from './validate'
 import { detectPlatform } from './platform'
@@ -149,7 +149,7 @@ export class HotkeyRecorder {
         return
 
       const platform = this.#options.platform ?? this.#platform
-      if (normalizeKeyboardEvent(event, platform).isComposing) return
+      if (keyInputFromKeyboardEvent(event, platform).composing) return
       captureRecordingEvent(event)
       event.preventDefault()
       event.stopPropagation()

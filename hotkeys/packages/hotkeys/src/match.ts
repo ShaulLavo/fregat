@@ -1,4 +1,5 @@
-import { matchKeyboardEvent } from './_match'
+import { matchKeyInput } from './_match'
+import { keyInputFromKeyboardEvent } from './adapters/browser'
 import { parseHotkey, parseRegisterableHotkey } from './parse'
 import { detectPlatform } from './platform'
 import { keysEqual } from './_keyboard-event'
@@ -9,6 +10,7 @@ import type {
   ParsedHotkey,
   RegisterableHotkey,
 } from './hotkey.types'
+import type { KeyInput } from './key-input'
 
 export interface KeyboardEventMatch {
   matched: boolean
@@ -51,7 +53,16 @@ export function matchesKeyboardEvent(
   hotkey: Hotkey | ParsedHotkey,
   platform: 'mac' | 'windows' | 'linux' = detectPlatform(),
 ): boolean {
-  return matchKeyboardEvent(event, hotkey, platform).matched
+  return matchKeyInput(keyInputFromKeyboardEvent(event, platform), hotkey, platform).matched
+}
+
+/** Checks if a key input matches a hotkey, with the same rules as {@link matchesKeyboardEvent}. */
+export function matchesKeyInput(
+  input: KeyInput,
+  hotkey: Hotkey | ParsedHotkey,
+  platform: 'mac' | 'windows' | 'linux' = detectPlatform(),
+): boolean {
+  return matchKeyInput(input, hotkey, platform).matched
 }
 
 /**

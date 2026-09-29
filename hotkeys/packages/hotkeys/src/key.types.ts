@@ -235,16 +235,3 @@ export type Key = LogicalKey | PhysicalKey
  * Includes both modifier keys and regular keys.
  */
 export type IndividualKey = CanonicalModifier | Key
-
-/** Keyboard event properties normalized for internal matching and recording. */
-export interface NormalizedKeyboardEvent {
-  key: string
-  code: string
-  ctrl: boolean
-  shift: boolean
-  alt: boolean
-  meta: boolean
-  altGraph: boolean
-  location: number
-  isComposing: boolean
-}
