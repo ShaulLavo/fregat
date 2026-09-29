@@ -15,7 +15,7 @@ repo, and they are the ones that are painful to retrofit.
 
 ### The editor is already CRDT-shaped
 
-`packages/editor-core/src/pieceTable/` has the structural preconditions:
+`editor/packages/editor/src/pieceTable/` has the structural preconditions:
 
 | Property              | Where                                                                    | Why it matters                                                                      |
 | --------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |

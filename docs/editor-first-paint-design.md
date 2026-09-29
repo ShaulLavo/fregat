@@ -87,7 +87,7 @@ The React adapter distinguishes initial waiting from an explicit clear so a null
 
 ## Native paint and replacement
 
-The existing [native view](../../Editor/packages/editor/src/virtualization/virtualizedTextView.ts) already batches updates through runAtomicRender. Its [row painter](../../Editor/packages/editor/src/virtualization/virtualizedTextViewRows.ts) owns row pooling, chunk reuse, gutters, and same-line patches. Build the restore path at that boundary.
+The existing [native view](../editor/packages/editor/src/virtualization/virtualizedTextView.ts) already batches updates through runAtomicRender. Its [row painter](../editor/packages/editor/src/virtualization/virtualizedTextViewRows.ts) owns row pooling, chunk reuse, gutters, and same-line patches. Build the restore path at that boundary.
 
 Decode saved text/control parts, projected styles, and geometry into the inputs needed by native drawing helpers. Reuse the existing row/chunk DOM and highlight ownership rules. Extract the smallest helpers needed by both sources. Preserve the live projector and incremental update algorithm.
 
@@ -192,7 +192,7 @@ Set performance tolerances from the baseline before implementation. A repeatable
 
 ## Implementation handoff
 
-Implement this design across `/work/projects/Editor` and `/work/projects/platform`. Scope is editor snapshot restoration and Platform integration, not the other milestones in Plan 085. Reconcile current source, package links, both worktrees, and the build served by the existing app before editing. Preserve unrelated work and use the running server. Store browser/profile artifacts under `/work/tmp/editor-provisional-paint/`.
+Implement this design inside `/work/projects/platform`, including `editor/`. Scope is editor snapshot restoration and Platform integration, not the other milestones in Plan 085. Reconcile current source, the workspace install, the worktree, and the build served by the existing app before editing. Preserve unrelated work and use the running server. Store browser/profile artifacts under `/work/tmp/editor-provisional-paint/`.
 
 Start by recording the immediate-document/delayed-highlights browser case and ordinary startup/typing baseline. Then establish the native presentation boundary and implement in the order above. Keep provisional data out of document/session/line-index state, preserve synchronous construction and incremental rendering, and replace paint in one commit based on render-data readiness. Do not use a separate preview owner, second editor text tree, or document arrival as the completion signal.
 

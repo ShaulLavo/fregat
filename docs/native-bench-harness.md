@@ -22,7 +22,7 @@ A native path ships when it meets or beats the web editor's number **for the sam
 
 Two harnesses of different shapes, and they answer different questions. Conflating them is how "5.8 ms typing" turns into folklore.
 
-### 2.1 Bun microbenches — `../Editor/packages/*/bench/*.ts`
+### 2.1 Bun microbenches — `editor/packages/*/bench/*.ts`
 
 Plain scripts, run by name (`bun run bench:piece-table`). Conventions worth porting, and ported:
 
@@ -101,23 +101,23 @@ Tier 3 numbers are in the table because they are the real bar. They are marked t
 
 ### 4.2 Document — the paths the port reimplements
 
-| metric                          | corpus                                   | web (2026-05-24; no calibration) | web (paired repair run)   | CPU calibration | reproduce                                                   |
-| ------------------------------- | ---------------------------------------- | -------------------------------- | ------------------------- | --------------- | ----------------------------------------------------------- |
-| `piecetable.insert.append`      | 2,000 × 1 KiB appends                    | 0.0048 ms/ins                    | **0.0038 ms/ins**         | 85.99 ms        | `cd ../Editor/packages/editor && bun run bench:piece-table` |
-| `piecetable.insert.growth`      | last 3 / first 3 batches                 | 0.64x                            | 0.55x                     | 85.99 ms        | same                                                        |
-| `piecetable.walk.sequential`    | 30.7K chars, 3,856 pieces                | —                                | 0.2587 ms (historical)    | not recorded    | `bun run bench:walker`                                      |
-| `piecetable.seek.random`        | 5,000 seeks + 64-char reads              | —                                | 3.2545 ms (historical)    | not recorded    | same                                                        |
-| `piecetable.snapshot.build`     | 100K lines, incremental index            | —                                | 72.0484 ms (historical)   | not recorded    | `bun run bench:anchors`                                     |
-| `piecetable.anchor.resolve`     | 100K lines, 1,089 anchors                | —                                | 0.0003 ms (historical)    | not recorded    | same                                                        |
-| `foldmap.create`                | 100K lines, 100 folds                    | 6.8320 ms                        | 6.6460 ms (historical)    | not recorded    | `bun run bench:fold-map`                                    |
-| `foldmap.roundtrip.p95`         | 100 points, 1,000 iterations             | 0.1229 ms                        | 0.0556 ms (historical)    | not recorded    | same                                                        |
-| `virtualization.mount.large`    | 100K lines, 44 mounted rows              | 45.2990 ms                       | **53.476 ms**             | 85.99 ms        | `bun run bench:virtualization`                              |
-| `virtualization.mount.longline` | 50K-char line                            | 2.9140 ms                        | **2.016 ms**              | 85.99 ms        | same                                                        |
-| `syntax.edit.total.10k`         | TypeScript 10K lines, parse + query      | 145.3300 ms                      | 115.6800 ms (historical)  | not recorded    | `cd ../Editor/packages/tree-sitter && bun run bench:syntax` |
-| `syntax.edit.parse.100k`        | TypeScript 100K lines, incremental parse | —                                | 8.7200 ms (historical)    | not recorded    | same                                                        |
-| `syntax.edit.total.100k`        | TypeScript 100K lines, parse + query     | 1732.8900 ms                     | 1183.6000 ms (historical) | not recorded    | same                                                        |
-| `minimap.update.mean`           | 100K lines, 50 renderer patches          | 0.7487 ms                        | **0.6178 ms**             | 85.71 ms        | `cd ../Editor/packages/minimap && bun run bench:update`     |
-| `minimap.update.p95`            | same                                     | —                                | **1.1431 ms**             | 85.71 ms        | same                                                        |
+| metric                          | corpus                                   | web (2026-05-24; no calibration) | web (paired repair run)   | CPU calibration | reproduce                                                |
+| ------------------------------- | ---------------------------------------- | -------------------------------- | ------------------------- | --------------- | -------------------------------------------------------- |
+| `piecetable.insert.append`      | 2,000 × 1 KiB appends                    | 0.0048 ms/ins                    | **0.0038 ms/ins**         | 85.99 ms        | `cd editor/packages/editor && bun run bench:piece-table` |
+| `piecetable.insert.growth`      | last 3 / first 3 batches                 | 0.64x                            | 0.55x                     | 85.99 ms        | same                                                     |
+| `piecetable.walk.sequential`    | 30.7K chars, 3,856 pieces                | —                                | 0.2587 ms (historical)    | not recorded    | `bun run bench:walker`                                   |
+| `piecetable.seek.random`        | 5,000 seeks + 64-char reads              | —                                | 3.2545 ms (historical)    | not recorded    | same                                                     |
+| `piecetable.snapshot.build`     | 100K lines, incremental index            | —                                | 72.0484 ms (historical)   | not recorded    | `bun run bench:anchors`                                  |
+| `piecetable.anchor.resolve`     | 100K lines, 1,089 anchors                | —                                | 0.0003 ms (historical)    | not recorded    | same                                                     |
+| `foldmap.create`                | 100K lines, 100 folds                    | 6.8320 ms                        | 6.6460 ms (historical)    | not recorded    | `bun run bench:fold-map`                                 |
+| `foldmap.roundtrip.p95`         | 100 points, 1,000 iterations             | 0.1229 ms                        | 0.0556 ms (historical)    | not recorded    | same                                                     |
+| `virtualization.mount.large`    | 100K lines, 44 mounted rows              | 45.2990 ms                       | **53.476 ms**             | 85.99 ms        | `bun run bench:virtualization`                           |
+| `virtualization.mount.longline` | 50K-char line                            | 2.9140 ms                        | **2.016 ms**              | 85.99 ms        | same                                                     |
+| `syntax.edit.total.10k`         | TypeScript 10K lines, parse + query      | 145.3300 ms                      | 115.6800 ms (historical)  | not recorded    | `cd editor/packages/tree-sitter && bun run bench:syntax` |
+| `syntax.edit.parse.100k`        | TypeScript 100K lines, incremental parse | —                                | 8.7200 ms (historical)    | not recorded    | same                                                     |
+| `syntax.edit.total.100k`        | TypeScript 100K lines, parse + query     | 1732.8900 ms                     | 1183.6000 ms (historical) | not recorded    | same                                                     |
+| `minimap.update.mean`           | 100K lines, 50 renderer patches          | 0.7487 ms                        | **0.6178 ms**             | 85.71 ms        | `cd editor/packages/minimap && bun run bench:update`     |
+| `minimap.update.p95`            | same                                     | —                                | **1.1431 ms**             | 85.71 ms        | same                                                     |
 
 The repaired rows establish three different causes:
 

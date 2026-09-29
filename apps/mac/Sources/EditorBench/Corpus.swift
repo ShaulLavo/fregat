@@ -1,7 +1,7 @@
 import Foundation
 
 /// Deterministic corpora. The LCG is the same one the web benches use
-/// (`../Editor/packages/editor/bench/pieceTable-walker.ts`,
+/// (`editor/packages/editor/bench/pieceTable-walker.ts`,
 /// `apps/web/scripts/generate-bench-fixture.mjs`) so a fixture generated on
 /// either side is the same document.
 struct BenchRandom {

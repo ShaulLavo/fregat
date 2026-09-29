@@ -156,6 +156,8 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
 
 PR #199 uses one root workspace install, including ghostty's demo and site. Editor-specific Turbo tasks run from the root; root typecheck builds library exports first. Imported-family Knip entries preserve Fregat's existing checks. Protocol-only ABI enums remain available for the native contract.
 
+Editor keeps its standalone lint policy in `editor/.oxlintrc.json`; Fregat's compiler lint policy covers Fregat workspaces. The bundle gate's Editor owner is now `editor`, carrying its existing byte budget.
+
 Family formatter options match Fregat; generated-file exclusions remain with each family for standalone installs. Fregat applies the sole Vitest patch at the root. Standalone family CI runs plain `bun install` and uses upstream Vitest.
 
 Editor and ghostty sites join Fregat's existing Pages artifact at `editor/` and `ghostty-webgpu/`, sharing one deployment. Native config-resolver workflows remain manual dispatches. The integration regenerates ghostty's bootstrap input closure after removing its family lockfile and uses repository-relative Git object paths for a nested checkout.

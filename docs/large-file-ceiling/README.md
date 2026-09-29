@@ -146,8 +146,8 @@ typing window is one path, the minimap's edit update:
 markerSource().all()` materializes and sorts every fold marker in the document.
 
 `createEditorSecondaryViewProjection` builds `foldSummaries` eagerly
-([Editor `packages/editor/src/public/secondaryViews.ts:147`](../../../Editor/packages/editor/src/public/secondaryViews.ts)),
-and `documentEditPayload` ([`packages/minimap/src/workerClient.ts:674`](../../../Editor/packages/minimap/src/workerClient.ts))
+([Editor `packages/editor/src/public/secondaryViews.ts:147`](../../editor/packages/editor/src/public/secondaryViews.ts)),
+and `documentEditPayload` ([`packages/minimap/src/workerClient.ts:674`](../../editor/packages/minimap/src/workerClient.ts))
 needs only selections and a summary patch. Every flushed minimap update pays O(folds in the
 document).
 

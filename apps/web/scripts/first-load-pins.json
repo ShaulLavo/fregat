@@ -4,7 +4,7 @@
   "phoneScriptGzip": 1421202,
   "owners": {
     "node_modules": 505079,
-    "Editor": 350240,
+    "editor": 350240,
     "apps/web/src/features/chat": 183480,
     "apps/web/src/features/editor": 91781,
     "apps/web/src/features/workspace": 64433,
