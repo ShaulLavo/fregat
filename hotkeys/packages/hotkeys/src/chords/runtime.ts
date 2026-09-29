@@ -23,11 +23,21 @@ export type ChordRuntimeOptions<Payload, Context, Source> = {
   readonly enabled?: boolean
   readonly effects: KeyEffects<Source>
   readonly captureContext: (source: Source) => Context
-  readonly isAvailable: (
+  /** Filters candidates for the default {@link ChordRuntimeOptions.select}. */
+  readonly isAvailable?: (
     binding: KeymapBinding<Payload>,
     context: Context,
     source: Source,
   ) => boolean
+  /**
+   * Chooses what a trie node offers for this key: the bindings to run, in order, and how many
+   * longer bindings keep a chord pending. Defaults to available candidates in table order.
+   */
+  readonly select?: (
+    node: KeymapNode<Payload>,
+    context: Context,
+    source: Source,
+  ) => KeymapSelection<Payload>
   /** Returns false to decline; the next available candidate then gets the key. */
   readonly dispatch: (binding: KeymapBinding<Payload>, context: Context, source: Source) => boolean
   readonly onPendingChange?: (pending: PendingChordLabel | null) => void
@@ -63,6 +73,11 @@ export type ChordRuntime<Payload, Source> = {
   readonly pending: () => PendingChordLabel | null
 }
 
+export type KeymapSelection<Payload> = {
+  readonly bindings: readonly KeymapBinding<Payload>[]
+  /** Count of longer bindings still reachable; nonzero keeps the chord pending. */
+  readonly pending: number
+}
 type Ownership = 'binding' | 'chord'
 type DispatchResult<Payload> =
   | { readonly kind: 'claimed'; readonly binding: KeymapBinding<Payload> }
@@ -92,6 +107,21 @@ export function createChordRuntime<Payload, Context, Source>(
   let pending: Pending<Payload, Source> | null = null
   let timer: ReturnType<typeof setTimeout> | undefined
   const claimedKeys = new Map<string, Ownership>()
+  const isAvailable = options.isAvailable ?? (() => true)
+  const select = options.select ?? selectAvailable
+
+  function selectAvailable(
+    node: KeymapNode<Payload>,
+    context: Context,
+    source: Source,
+  ): KeymapSelection<Payload> {
+    const bindings = node.candidates.filter((binding) => isAvailable(binding, context, source))
+    let count = 0
+    for (const binding of node.descendants) {
+      if (isAvailable(binding, context, source)) count += 1
+    }
+    return { bindings, pending: count }
+  }
 
   function hasChordOwnership() {
     for (const owner of claimedKeys.values()) {
@@ -173,7 +203,7 @@ export function createChordRuntime<Payload, Context, Source>(
         continue
       }
       const last = buffer[end.index]!
-      const result = execute(end.node.candidates, context, last.source)
+      const result = execute(end.bindings, context, last.source)
       if (result.kind === 'claimed') claimed ??= result.binding
       if (result.kind === 'declined' || result.kind === 'unavailable')
         options.replay?.(last.input, last.source)
@@ -185,28 +215,26 @@ export function createChordRuntime<Payload, Context, Source>(
     buffer: readonly Buffered<Source>[],
     start: number,
     context: Context,
-  ): { index: number; node: KeymapNode<Payload> } | null {
+  ): { index: number; bindings: readonly KeymapBinding<Payload>[] } | null {
     let node = trie
-    let found: { index: number; node: KeymapNode<Payload> } | null = null
+    let found: { index: number; bindings: readonly KeymapBinding<Payload>[] } | null = null
     for (let index = start; index < buffer.length; index += 1) {
       const entry = buffer[index]!
       const edge = trieStep(node, entry.input)
       if (!edge) break
       node = edge.node
-      if (availableCount(node.candidates, context, entry.source)) found = { index, node }
+      const { bindings } = select(node, context, entry.source)
+      if (bindings.length) found = { index, bindings }
     }
     return found
   }
   function execute(
-    candidates: readonly KeymapBinding<Payload>[],
+    bindings: readonly KeymapBinding<Payload>[],
     context: Context,
     source: Source,
   ): DispatchResult<Payload> {
-    let eligible = false
     let handled = false
-    for (const binding of candidates) {
-      if (!options.isAvailable(binding, context, source)) continue
-      eligible = true
+    for (const binding of bindings) {
       const result = dispatchBinding(binding, context, source)
       const claimed = result.kind === 'claimed'
       if (binding.preventDefault === true || (claimed && binding.preventDefault !== false))
@@ -216,7 +244,7 @@ export function createChordRuntime<Payload, Context, Source>(
       if (binding.preventDefault === true || binding.stopPropagation === true) handled = true
       if (result.kind !== 'declined') return result
     }
-    if (!eligible) return { kind: 'unavailable' }
+    if (!bindings.length) return { kind: 'unavailable' }
     return { kind: handled ? 'handled' : 'declined' }
   }
   function dispatchBinding(
@@ -236,17 +264,6 @@ export function createChordRuntime<Payload, Context, Source>(
     if (operation.cancellation) return { kind: 'cancelled', outcome: operation.cancellation }
     return { kind: 'declined' }
   }
-  function availableCount(
-    candidates: readonly KeymapBinding<Payload>[],
-    context: Context,
-    source: Source,
-  ) {
-    let count = 0
-    for (const binding of candidates) {
-      if (options.isAvailable(binding, context, source)) count += 1
-    }
-    return count
-  }
   function ownChord(source: Source): Ownership {
     effects.swallow(source)
     return 'chord'
@@ -263,17 +280,17 @@ export function createChordRuntime<Payload, Context, Source>(
     }
     const edge = trieStep(trie, input)
     if (!edge) return null
-    return resolve(edge, input, source, options.captureContext(source), false)
+    const context = options.captureContext(source)
+    return resolve(edge, input, source, context, select(edge.node, context, source), false)
   }
   /** Returns undefined when the key does not continue the chord; the chord then replays. */
   function continueChord(input: KeyInput, source: Source): Ownership | null | undefined {
     const edge = trieStep(pending!.node, input)
     if (edge) {
       const context = options.captureContext(source)
-      const reachable =
-        availableCount(edge.node.candidates, context, source) ||
-        availableCount(edge.node.descendants, context, source)
-      if (reachable) return resolve(edge, input, source, context, true)
+      const selection = select(edge.node, context, source)
+      if (selection.bindings.length || selection.pending)
+        return resolve(edge, input, source, context, selection, true)
     }
     const ended = endPending()
     report(ended, 'unmatched', flush(ended.buffer))
@@ -284,17 +301,16 @@ export function createChordRuntime<Payload, Context, Source>(
     input: KeyInput,
     source: Source,
     context: Context,
+    selection: KeymapSelection<Payload>,
     fromChord: boolean,
   ): Ownership | null {
-    const deeper = availableCount(edge.node.descendants, context, source)
-    if (deeper) {
+    if (selection.pending) {
       if (input.repeat) return null
       effects.swallow(source)
-      const bound = availableCount(edge.node.candidates, context, source) > 0
-      arm(edge, { input, source }, deeper, bound)
+      arm(edge, { input, source }, selection.pending, selection.bindings.length > 0)
       return 'chord'
     }
-    const result = execute(edge.node.candidates, context, source)
+    const result = execute(selection.bindings, context, source)
     const owned =
       result.kind === 'claimed' || result.kind === 'handled' || result.kind === 'cancelled'
     if (fromChord && owned) effects.swallow(source)

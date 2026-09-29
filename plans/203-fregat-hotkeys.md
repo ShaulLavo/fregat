@@ -153,6 +153,16 @@ Branch `plan-203-hotkeys` (worktree `/work/worktrees/platform/plan-203-hotkeys`)
   rewritten, four added. 650 tests.
   Decision: no Zed-style timeout for printable prefixes in text fields (`text_input_requires_timeout`);
   hosts forbid plain-letter chord starts today. Revisit if a keymap needs one.
-- Next: step 5 (predicates, focus nodes, resolution, Zed keymap fixtures). The dispatcher can
-  sort each edge's candidates by context depth and source before `execute`; the trie keeps table
-  order.
+- Step 5, first half. `src/context/` ports Zed's `KeyContext` (`parseKeyContext`) and predicate
+  language (`parseContextPredicate`, `evaluatePredicate`, `predicateDepth`), identifiers without
+  Zed's vim-operator characters. `src/dispatch/keymap.ts`: `Binding`/`Unbinding` entries,
+  `compileKeymap` (trie of `CompiledBinding` payloads), `resolveKeymapNode` (Zed's
+  `bindings_for_input`: rank by depth, then source, then later-first; `command: null` suppresses
+  equal and weaker sources ranked after it; `unbind` removes one pair; pending chords defined
+  before the winning exact binding are shadowed), `bindingsForInput` for settings and tests. The
+  chord runtime takes a `select(node, context, source)` hook so the dispatcher plugs this in.
+  Zed's context and keymap tests translated in `tests/context/` and `tests/dispatch/keymap.test.ts`.
+- Next: focus nodes and the dispatcher (`src/dispatch/dispatcher.ts`): node tree, focus path →
+  context stack, commands dispatched deepest node first with `false` passing on, browser attach
+  sharing the listener code of `adapters/browser-keymap.ts`; then pending/replay cases from
+  `key_dispatch.rs` as fixtures.
