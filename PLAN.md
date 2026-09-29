@@ -79,6 +79,15 @@ This workstream does not reorder the wave-2 queue above.
 ghostty-webgpu into Fregat and mirrors them (and `hotkeys/`) to their public repos. Run it before
 204 and 205 so their work lands in Fregat; 203 does not wait for it.
 
+## Unified workspace design
+
+[209: one workspace for chat and code](plans/209-unified-workspace.md) is Approved
+for design review. Resolve its D1–D6 gates before the affected implementation units;
+production implementation retains its separate owner authorization. Use the existing
+tab/group and session owners. Schedule command changes against 206, preserve 200
+content ownership, and apply 208 catalogs to new copy. It follows the package cutover
+for implementation; its design work can proceed during the scoped freeze.
+
 ## Other work and boundaries
 
 The [plan index](plans/README.md) lists the remaining numbered plans without duplicating their

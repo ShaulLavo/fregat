@@ -66,6 +66,8 @@ execution. `IDEA` is only for a plan the owner explicitly calls an idea or is un
 | [207](207-one-repo-with-mirrors.md)          | One repo, with mirrors for the flagship packages                              |
 | [208](208-all-text-in-json.md)               | All app text in JSON for localization and shared copy editing                 |
 
+| [209](209-unified-workspace.md) | One workspace for chat and code; design review with implementation gates |
+
 ## Supporting work
 
 - [Tree implementation sub-plans](178-tree-in-the-app.md) and [T3 alignment records](126-t3code-alignment.md)
