@@ -34,6 +34,10 @@ editor-grade chord handling. The core never touches the DOM.
 
 ## Repository and packaging
 
+Open owner decision (2026-09-29): its own repo (below) or `packages/hotkeys` in the Editor
+monorepo. Not the Fregat monorepo: the Editor and ghostty-webgpu would then depend on Fregat while
+Fregat pins them, a pin cycle.
+
 - Fork `TanStack/hotkeys` (MIT) to the owner's GitHub account as `hotkeys`; clone to
   `/work/projects/hotkeys`. Keep upstream history and an `upstream` remote for reading; there is
   no obligation to merge upstream.
