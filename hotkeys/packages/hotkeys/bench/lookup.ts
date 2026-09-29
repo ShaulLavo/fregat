@@ -1,7 +1,13 @@
-// Plan 203 benchmark: plain-key lookup over a 255-binding table and table construction.
-// Run: bun bench/lookup.ts
-import { buildKeymapTrie, compileKeymap, createDispatcher, createKeyInput, trieStep } from '../src'
-import type { KeymapBinding, KeymapEntry, RawHotkey } from '../src'
+// Per-keyboard-event lookup over a 255-binding table, against the Editor trie when its checkout is
+// linked at packages/editor-core, and table construction. Run: bun bench/lookup.ts
+import {
+  buildKeymapTrie,
+  compileKeymap,
+  createDispatcher,
+  keyInputFromKeyboardEvent,
+  trieStep,
+} from '../src'
+import type { KeyboardEventLike, KeymapBinding, KeymapEntry, RawHotkey } from '../src'
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 const NAMED = [
@@ -39,13 +45,52 @@ function editorShapedTable(size: number): RawHotkey[][] {
   return chords
 }
 
-function time(label: string, iterations: number, run: () => void) {
-  for (let index = 0; index < iterations / 10; index += 1) run()
-  const start = performance.now()
-  for (let index = 0; index < iterations; index += 1) run()
-  const perCall = ((performance.now() - start) * 1000) / iterations
-  console.log(`${label.padEnd(52)} ${perCall.toFixed(3)} µs`)
-  return perCall
+const ROUNDS = 3
+// Results feed this sink so the JIT cannot drop the timed call.
+let sink = 0
+
+/** Prints the per-call range over {@link ROUNDS} rounds; returns the fastest round. */
+function time(label: string, iterations: number, run: () => unknown) {
+  for (let index = 0; index < iterations / 10; index += 1) sink += run() ? 1 : 0
+  const rounds: number[] = []
+  for (let round = 0; round < ROUNDS; round += 1) {
+    const start = performance.now()
+    for (let index = 0; index < iterations; index += 1) sink += run() ? 1 : 0
+    rounds.push(((performance.now() - start) * 1000) / iterations)
+  }
+  const low = Math.min(...rounds)
+  const high = Math.max(...rounds)
+  console.log(`${label.padEnd(58)} ${low.toFixed(3)}–${high.toFixed(3)} µs`)
+  return low
+}
+
+function keydown(key: string, code: string, ctrlKey = false): KeyboardEventLike {
+  return {
+    type: 'keydown',
+    key,
+    code,
+    ctrlKey,
+    shiftKey: false,
+    altKey: false,
+    metaKey: false,
+    repeat: false,
+    isComposing: false,
+    getModifierState: () => false,
+  }
+}
+
+type EditorTrie = {
+  readonly buildKeymapTrie: (bindings: readonly unknown[], platform: 'linux') => unknown
+  readonly trieStep: (node: unknown, event: KeyboardEventLike) => unknown
+}
+
+async function loadEditorTrie(): Promise<EditorTrie | null> {
+  const path = new URL('../../../../packages/editor-core/src/keymap/trie.ts', import.meta.url)
+  try {
+    return (await import(path.href)) as EditorTrie
+  } catch {
+    return null
+  }
 }
 
 const table = editorShapedTable(255)
@@ -54,12 +99,26 @@ const bindings: KeymapBinding<number>[] = table.map((chord, payload) => ({
   payload,
 }))
 const trie = buildKeymapTrie(bindings, 'linux')
-const plain = createKeyInput({ key: 'q', code: 'KeyQ' })
-const bound = createKeyInput({ key: 'e', code: 'KeyE', modifiers: { ctrl: true } })
+const plain = keydown('q', 'KeyQ')
+const bound = keydown('e', 'KeyE', true)
 
-console.log(`bindings: ${bindings.length}`)
-time('trieStep, plain q (unbound)', 2_000_000, () => void trieStep(trie, plain))
-time('trieStep, Control+E (bound)', 2_000_000, () => void trieStep(trie, bound))
+console.log(`bindings: ${bindings.length}; per keyboard event, event → edge`)
+time('fork: keyInputFromKeyboardEvent + trieStep, plain q', 2_000_000, () =>
+  trieStep(trie, keyInputFromKeyboardEvent(plain, 'linux')),
+)
+time('fork: keyInputFromKeyboardEvent + trieStep, Control+E', 2_000_000, () =>
+  trieStep(trie, keyInputFromKeyboardEvent(bound, 'linux')),
+)
+const editor = await loadEditorTrie()
+if (editor) {
+  const editorTrie = editor.buildKeymapTrie(bindings, 'linux')
+  time('Editor: trieStep(event), plain q', 2_000_000, () => editor.trieStep(editorTrie, plain))
+  time('Editor: trieStep(event), Control+E', 2_000_000, () => editor.trieStep(editorTrie, bound))
+} else {
+  console.log('Editor trie: packages/editor-core is not linked; comparison skipped')
+}
+const plainInput = keyInputFromKeyboardEvent(plain, 'linux')
+time('fork: trieStep on a prebuilt KeyInput, plain q', 2_000_000, () => trieStep(trie, plainInput))
 
 const entries: KeymapEntry[] = table.map((chord, index) => ({
   keys: chord as unknown as readonly [RawHotkey, ...RawHotkey[]],
@@ -69,15 +128,11 @@ const entries: KeymapEntry[] = table.map((chord, index) => ({
 const dispatcher = createDispatcher<null>({ platform: 'linux', keymap: entries })
 const workspace = dispatcher.createNode({ context: 'Workspace' })
 dispatcher.createNode({ parent: workspace, context: 'Editor extension=md' }).focus()
-time(
-  'dispatcher.handleKey, plain q (unbound)',
-  1_000_000,
-  () => void dispatcher.handleKey(plain, null),
+time('dispatcher.handleKey(event), plain q (unbound)', 1_000_000, () =>
+  dispatcher.handleKey(keyInputFromKeyboardEvent(plain, 'linux'), null),
 )
-time(
-  'dispatcher.handleKey, Control+E (bound, no handler)',
-  200_000,
-  () => void dispatcher.handleKey(bound, null),
+time('dispatcher.handleKey(event), Control+E (bound, no handler)', 200_000, () =>
+  dispatcher.handleKey(keyInputFromKeyboardEvent(bound, 'linux'), null),
 )
 
 console.log('construction (compileKeymap):')
@@ -87,10 +142,8 @@ for (const size of [255, 2_550, 25_500]) {
     keys: chord as unknown as readonly [RawHotkey, ...RawHotkey[]],
     command: `command.${index}`,
   }))
-  const perCall = time(
-    `  ${size} bindings`,
-    size > 3_000 ? 20 : 200,
-    () => void compileKeymap(sized, 'linux'),
+  const perCall = time(`  ${size} bindings`, size > 3_000 ? 20 : 200, () =>
+    compileKeymap(sized, 'linux'),
   )
   const perBinding = perCall / size
   console.log(
@@ -98,3 +151,4 @@ for (const size of [255, 2_550, 25_500]) {
   )
   previous = perBinding
 }
+console.log(`sink ${sink}`)
