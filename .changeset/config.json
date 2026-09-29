@@ -1,0 +1,41 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@4.0.1/schema.json",
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "fixed": [
+    [
+      "@singapore-editor/core",
+      "@singapore-editor/decode",
+      "@singapore-editor/diff",
+      "@singapore-editor/find",
+      "@singapore-editor/gutters",
+      "@singapore-editor/lsp",
+      "@singapore-editor/lsp-plugin",
+      "@singapore-editor/markdown",
+      "@singapore-editor/minimap",
+      "@singapore-editor/paged",
+      "@singapore-editor/panes",
+      "@singapore-editor/plugin-ui",
+      "@singapore-editor/react",
+      "@singapore-editor/scope-lines",
+      "@singapore-editor/solid",
+      "@singapore-editor/spellcheck",
+      "@singapore-editor/textbuffer",
+      "@singapore-editor/tree-sitter",
+      "@singapore-editor/tree-sitter-languages",
+      "@singapore-editor/typescript-lsp"
+    ],
+    ["@fregat/hotkeys", "@fregat/react-hotkeys"],
+    ["ghostty-webgpu"]
+  ],
+  "linked": [],
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": [],
+  "privatePackages": {
+    "version": false,
+    "tag": false
+  },
+  "format": "oxfmt"
+}
