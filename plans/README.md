@@ -1,6 +1,6 @@
 # Editor backlog
 
-56 stable entries cover all 29 topics in the original [wishlist](../TODO.md).
+60 stable entries cover all 32 topics in the [wishlist](../TODO.md), including later additions.
 Executable plans include source evidence, scope, delivery steps, and acceptance checks.
 Completed entries link to permanent implementation references and measured results.
 The original inspected Editor baseline is `9abb944f3a2b8d6516953fdec75e8df5e1a94811` (2026-09-05).
@@ -16,8 +16,8 @@ E054 was inspected at `ed5b2e20b9cdd3492ab33ae4e9676a133817b79d` (2026-09-25).
 E058 was inspected at `74e76bef2af674ad80b3c13024fa47f692e2bb7c` (2026-09-26).
 Recheck source before execution; these dates record planning, not feature completion.
 
-There are **45 Editor-owned entries, 10 requiring both repositories, and 1 Platform-owned entry**.
-By deliverable, there are **42 implementation entries, 11 research entries, and 3 design entries**.
+There are **47 Editor-owned entries, 12 requiring both repositories, and 1 Platform-owned entry**.
+By deliverable, there are **45 implementation entries, 11 research entries, and 4 design entries**.
 Editor ownership describes where the work lands; dependencies can still include shared work.
 [Platform's roadmap](../../platform/PLAN.md) remains the execution scheduler.
 [E002](../docs/performance/input-latency.md) is complete, with a verified local latency gate.
@@ -139,6 +139,8 @@ E050): 39 entries are complete, 2 moved to Platform, and 14 execution plans rema
   platform-agnostic core") is renumbered to **E056** and parked. E047 is already the completed
   point-query plan. The branch conflicts with `main` and its docs were not edited; renumber its plan
   file, backlog entry and index row to E056 when it is next rebased.
+  Reconciled 2026-09-29: the plan, research and inventory now use E056. Its status is Approved
+  and its parked schedule is retained. Package relocation and cutover follow Fregat Plan 207.
 
 ## How to read the plans
 
@@ -338,6 +340,15 @@ Added 2026-09-28.
 | ----------------------------------------------------------------------------------- | -------------- | ------ | -------- | ---- | ----- |
 | [E063 — More editor features from tree-sitter queries](e063-tree-sitter-queries.md) | Implementation | Editor | P2       | M    | —     |
 
+## Portability
+
+E056 is approved and parked by the owner's 2026-09-25 decision. Package relocation and cutover
+follow Fregat Plan 207; the cross-project roadmap schedules the units.
+
+| Plan                                                                                                  | Kind           | Owner      | Priority | Size | Needs      |
+| ----------------------------------------------------------------------------------------------------- | -------------- | ---------- | -------- | ---- | ---------- |
+| [E056 — Extract a platform-agnostic core and prove a Strict DOM host](e056-platform-agnostic-core.md) | Implementation | Cross-repo | P3       | XL   | E001, E002 |
+
 ## Original wishlist coverage
 
 Every original second-level heading appears below. A topic can map to several independently
@@ -376,6 +387,7 @@ verifiable plans. This table preserves the source wording; current behavior is r
 | Spellcheck for painted text                                           | [E058](e058-spellcheck.md), [E062](../docs/editing/e062-spellcheck-hardening.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | One highlight pipeline for tokens and range highlights                | [E064](e064-one-highlight-pipeline.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Tree-sitter query features                                            | [E063](e063-tree-sitter-queries.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Platform-agnostic core and React Strict DOM                           | [E056](e056-platform-agnostic-core.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 ## Maintaining the backlog
 

@@ -701,6 +701,19 @@
       "baseline": "50a2e5baee62647b41985b1e4c6ec98dc4c72d3d"
     },
     {
+      "id": "E056",
+      "file": "e056-platform-agnostic-core.md",
+      "title": "Extract a platform-agnostic core and prove a Strict DOM host",
+      "status": "Approved",
+      "owner": "Cross-repo",
+      "kind": "Implementation",
+      "priority": "P3",
+      "effort": "XL",
+      "dependsOn": ["E001", "E002"],
+      "topics": ["Platform-agnostic core and React Strict DOM"],
+      "baseline": "45e22a495902c577243334586bc391f04201a827"
+    },
+    {
       "id": "E057",
       "reference": "../docs/performance/sab-transport-2026-09-12.md",
       "title": "Delete the SAB text transport",

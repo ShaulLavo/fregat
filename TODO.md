@@ -1,7 +1,7 @@
 # TODO
 
-The original wishlist. All 22 topics now have scoped proposals in the
-[Editor backlog](plans/README.md): 30 plans with dependencies, ownership, and acceptance checks.
+The original wishlist and later additions are covered in the
+[Editor backlog](plans/README.md): 60 entries with dependencies, ownership, and acceptance checks.
 
 > These notes preserve the ideas and their original context. Some missing-feature and performance
 > claims below are historical; each plan's **Current code** section records the checked baseline.
@@ -654,3 +654,15 @@ Added 2026-09-29. Syntax tokens and range highlights (find, diagnostics, spellch
 semantic tokens and the rest) paint through two separate pipelines. Only tokens use `StaticRange`
 and know about edits; range highlights rebuild live `Range`s and are never projected through an
 edit. Whatever we do with highlights should be reusable across every painter.
+
+## Platform-agnostic core and React Strict DOM
+
+Requested on 2026-09-20. Extract existing document and editing behavior from DOM and browser
+execution dependencies, preserve the DOM editor and Fregat's consumer contracts, and prove a
+Strict DOM native host before claiming editable native support.
+[E056](plans/e056-platform-agnostic-core.md) owns this approved work, parked by the owner on
+2026-09-25. [Detailed research](docs/architecture/e056-platform-agnostic-core.md) and the
+[pinned source ledger](docs/architecture/e056-platform-agnostic-core-sources.json) preserve its
+input, geometry, lifecycle, packaging and performance evidence. Implementation has not started.
+Plan 207 establishes the canonical Fregat source before relocation or package cutover; the
+cross-project roadmap schedules the remaining units. Native macOS keeps its existing roadmap.
