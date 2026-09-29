@@ -24,4 +24,5 @@ The original licence is in [LICENSE](LICENSE) and in each package.
 bun run --filter '@fregat/*' test
 bun run --filter '@fregat/*' typecheck
 bun run --cwd hotkeys/packages/hotkeys build
+bun hotkeys/packages/hotkeys/bench/lookup.ts
 ```

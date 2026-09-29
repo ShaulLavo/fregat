@@ -97,7 +97,7 @@ source: 'default' | 'pack' | 'user' }`. Removal copies Zed: `command: null` supp
       `test_disable_deeper`, pending/replay cases in `key_dispatch.rs`).
 - [x] Add the terminal-input adapter with tests from the TUI's key cases.
 - [x] Rebuild the convenience API on the dispatcher; delete the old managers.
-- [ ] Benchmark and document.
+- [x] Benchmark and document.
 
 ## Acceptance
 
@@ -191,5 +191,15 @@ Branch `plan-203-hotkeys` (worktree `/work/worktrees/platform/plan-203-hotkeys`)
   targets must be in the document. Trie fix: physical bindings (`[KeyQ]`) now match their code
   on any layout. Test setup stubs happy-dom's `getModifierState`, which reports AltGraph for
   any Alt. 576 core + 44 React tests.
-- Next: step 8, benchmark (`bench/` in the package: 255-binding plain-key lookup against the
-  Editor trie's 0.04 µs, construction linearity) and the README examples.
+- Step 8 done. `bench/lookup.ts` (`bun bench/lookup.ts`, knip entry): editor-shaped
+  255-binding table; `trieStep` plain `q` 0.005–0.010 µs against the Editor trie's 0.007–0.018 µs
+  on the same table (scratch comparison, same process; JIT noise about ±50%);
+  `dispatcher.handleKey` plain `q` 0.046 µs, bound `Control+E` with context resolution 0.11 µs;
+  `compileKeymap` 0.69 / 1.05 / 0.83 µs per binding at 255 / 2,550 / 25,500 bindings (linear).
+  `packages/hotkeys/README.md` shows a standalone dispatcher, nested focus contexts, a chord, a
+  declining handler, the terminal adapter, one-call hotkeys and the numbers.
+- All steps done. Left for later plans or review: `@tanstack/store` stays (registry views,
+  recorders, `KeyStateTracker`); `KeyStateTracker` external reset (core item 1) is not added yet;
+  composition helpers beyond `bindingsForInput` (item 8's layer-by-layer shadow report) are not
+  built; declaration output keeps extensionless imports, fine for bundler resolution (207 decides
+  the publish build).
