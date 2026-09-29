@@ -52,6 +52,11 @@ jobs:
           MIRROR_REPOSITORY: ${{ matrix.repository }}
         run: |
           set -euo pipefail
+          git fetch --no-tags origin main
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse FETCH_HEAD)" ]; then
+            echo '::notice::Mirror skipped: a newer main snapshot is available.'
+            exit 0
+          fi
           if [ ! -d "$FAMILY_FOLDER" ]; then
             echo "::notice::Mirror skipped: $FAMILY_FOLDER has not landed yet."
             exit 0
