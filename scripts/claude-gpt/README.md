@@ -18,7 +18,7 @@ The install uses CLIProxyAPI v8.0.4, with the published archive SHA256 checked. 
 
 The runtime configuration lists existing Codex `auth.json` paths in `authSources`. Before GPT requests, current access tokens are copied to the proxy auth directory, with file permissions `0600`. Codex keeps ownership of refreshing those logins. The proxy never receives those refresh tokens. If an access token expires, use the corresponding Codex login to refresh it, then retry.
 
-Both accounts are connected. The original account remains a Codex-owned access-token mirror; the second completed a separate proxy-owned device login. For another independent proxy login, run:
+Both accounts are connected. The original account remains a Codex-owned access-token mirror; the second completed a separate proxy-owned device login. Its verification request returned `429 usage_limit_reached`, so its inference quota must reset before it can contribute capacity. The original account passed the native Sol agent check. For another independent proxy login, run:
 
 ```bash
 cli-proxy-login
