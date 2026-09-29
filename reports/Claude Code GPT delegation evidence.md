@@ -11,3 +11,7 @@ This proves actual Sol model delegation and a tool operation within Claude Code'
 Claude Code emitted an `unrecognized_model` warning for `gpt-6.1-sol`; execution nevertheless succeeded. Its displayed provider/cost metadata described GPT as `firstParty` with unknown cost basis. That display is not evidence of an Anthropic invoice or accurate cross-provider billing attribution.
 
 The raw session-scoped transcript was captured at `.scratch/claude-gpt/native-check.jsonl`. This summary preserves the relevant evidence without publishing full conversation or environment contents.
+
+Both accounts completed independent OpenAI device authentication. The proxy auth directory contains exactly two credentials with different account IDs and permissions `0600`. CLIProxyAPI owns their refresh lifecycle, with no dependency on `~/.codex/auth.json`. Remote login uses the `-no-browser` device flow.
+
+An isolated, access-only second-account Sol request returned `429 usage_limit_reached`. No refresh token was shared with that verification process. Forced failover and quota-reset recovery were not tested. After the final service restart, authenticated model discovery succeeded locally and through mesh, with `gpt-6.1-sol` available. Unauthenticated model discovery returned `401`, and the disabled management endpoint returned `404`.

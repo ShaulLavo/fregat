@@ -2,7 +2,6 @@ type GatewayOptions = {
   anthropicUrl: string
   proxyUrl: string
   apiKey: string
-  syncCredentials: () => Promise<void>
 }
 
 const messagePaths = new Set(['/v1/messages', '/v1/messages/count_tokens'])
@@ -53,7 +52,6 @@ export function createGateway(options: GatewayOptions) {
     const headers = new Headers(request.headers)
     for (const name of hopHeaders) headers.delete(name)
     if (isGpt) {
-      await options.syncCredentials()
       // Claude OAuth and API keys belong only on requests to Anthropic.
       headers.delete('x-api-key')
       headers.delete('cookie')
