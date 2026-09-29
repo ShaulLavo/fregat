@@ -1,8 +1,10 @@
+import { createStringTextSnapshot } from '@singapore-editor/core/document'
 import type {
   EditorViewContributionContext,
   EditorViewSnapshot,
 } from '@singapore-editor/core/extensions'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createTestViewContributionContext } from '@singapore-editor/core/testing'
 
 import { createHoverController } from '../src/hoverController'
 import type { EditorHoverParticipant, HoverPart } from '../src/hoverParticipant'
@@ -163,22 +165,24 @@ function mount(participants: readonly EditorHoverParticipant[]) {
   const snapshot = {
     documentId: 'index.ts',
     languageId: 'typescript',
-    fullText: TEXT,
+    textSnapshot: createStringTextSnapshot(TEXT),
     textVersion: 1,
     tokens: [],
     selections: [{ anchorOffset: 6, headOffset: 6, startOffset: 6, endOffset: 6 }],
   } as unknown as EditorViewSnapshot
-  const context = {
+  const context = createTestViewContributionContext({
     container: element,
     scrollElement: element,
     contentElement: element,
     hasDocument: () => true,
     getSnapshot: () => snapshot,
-    getProviders: () => participants,
+    getProviders: (() => participants) as EditorViewContributionContext['getProviders'],
     focusEditor: vi.fn(),
+    rowAtPoint: () => null,
+    markerAtPoint: () => null,
     textOffsetFromPoint: () => pointerOffset,
     getRangeClientRect: () => new DOMRect(10, 20, 40, 18),
-  } as unknown as EditorViewContributionContext
+  })
   const controller = createHoverController({ context, classNamespace: 'test' })
   return {
     controller,

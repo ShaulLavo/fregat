@@ -30,7 +30,6 @@ export const HTML_TREE_SITTER_LANGUAGE = contribution('html')
 export const CSS_TREE_SITTER_LANGUAGE = contribution('css')
 export const JSON_TREE_SITTER_LANGUAGE = contribution('json')
 export const MARKDOWN_TREE_SITTER_LANGUAGE = contribution('markdown')
-export const MARKDOWN_INLINE_TREE_SITTER_LANGUAGE = contribution('markdown_inline')
 export const ASTRO_TREE_SITTER_LANGUAGE = contribution('astro')
 
 function contribution(id: string): TreeSitterLanguageContribution {
@@ -68,13 +67,10 @@ export function json(options?: TreeSitterLanguagePluginOptions): EditorPlugin {
 }
 
 export function markdown(options: TreeSitterLanguagePluginOptions = {}): EditorPlugin {
-  return createTreeSitterLanguagePlugin(
-    [MARKDOWN_TREE_SITTER_LANGUAGE, MARKDOWN_INLINE_TREE_SITTER_LANGUAGE],
-    {
-      ...options,
-      name: options.name ?? 'tree-sitter-markdown',
-    },
-  )
+  return createTreeSitterLanguagePlugin([MARKDOWN_TREE_SITTER_LANGUAGE], {
+    ...options,
+    name: options.name ?? 'tree-sitter-markdown',
+  })
 }
 
 function createLanguagePlugin(

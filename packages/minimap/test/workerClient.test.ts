@@ -1,6 +1,9 @@
+import { documentRow } from './visibleRows'
+import { createTestViewSnapshotSource } from '@singapore-editor/core/testing'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createStringTextSnapshot,
+  type TextSnapshot,
   type DocumentSessionChange,
   type TextEdit,
 } from '@singapore-editor/core/document'
@@ -317,7 +320,7 @@ describe('MinimapWorkerClient', () => {
     const runtime = installMinimapRuntime()
     try {
       const host = createHost()
-      const initialSnapshot = snapshotWithThrowingFullText('line 1\nline 2\nline 3')
+      const initialSnapshot = snapshotRejectingFlattening('line 1\nline 2\nline 3')
       const client = new MinimapWorkerClient({
         host,
         options: resolveMinimapOptions(),
@@ -357,7 +360,7 @@ describe('MinimapWorkerClient', () => {
       const client = new MinimapWorkerClient({
         host,
         options: resolveMinimapOptions({ maxColumn: 5 }),
-        snapshot: snapshot({}, { fullText: 'abcdefghi\nshort' }),
+        snapshot: snapshot({}, { text: 'abcdefghi\nshort' }),
         decorations: [],
         onLayoutWidth: vi.fn(),
         reservedLane: () => 0,
@@ -553,7 +556,7 @@ describe('MinimapWorkerClient', () => {
 
       const edit: TextEdit = { from: 6, to: 6, text: 'x' }
       client.update(
-        snapshot({ scrollWidth: 168 }, { fullText: 'line 1x\nline 2\nline 3', contentWidth: 168 }),
+        snapshot({ scrollWidth: 168 }, { text: 'line 1x\nline 2\nline 3', contentWidth: 168 }),
         'content',
         documentEdit(edit, 'line 1x\nline 2\nline 3'),
       )
@@ -639,7 +642,7 @@ describe('MinimapWorkerClient', () => {
 
       const requests = worker.postMessage.mock.calls.map((call) => call[0])
       expect(requests.some((request) => request.type === 'updateTokenRange')).toBe(true)
-      expect(host.slider.style.transform).not.toBe('translate3d(0, 0px, 0)')
+      expect(host.slider.style.transform).toBe('translate3d(0, 0px, 0)')
     } finally {
       client.dispose()
       host.root.remove()
@@ -668,13 +671,13 @@ describe('MinimapWorkerClient', () => {
       client.update(
         snapshot(
           { scrollTop: 120, visibleRange: { start: 6, end: 18 } },
-          { fullText: 'line 1x\nline 2\nline 3' },
+          { text: 'line 1x\nline 2\nline 3', visibleRows: [documentRow(2, 120)] },
         ),
         'content',
         documentEdit(edit, 'line 1x\nline 2\nline 3'),
       )
 
-      expect(host.slider.style.transform).toBe('translate3d(0, 32px, 0)')
+      expect(host.slider.style.transform).toBe('translate3d(0, 4px, 0)')
       runtime.flushFrames()
       expect(worker.postMessage).not.toHaveBeenCalled()
 
@@ -717,7 +720,7 @@ describe('MinimapWorkerClient', () => {
         snapshot(
           { scrollWidth: 168 },
           {
-            fullText: 'line 1x\nline 2\nline 3',
+            text: 'line 1x\nline 2\nline 3',
             contentWidth: 168,
             tokens: [{ start: 0, end: 7, style: { color: '#ff0000' } }],
           },
@@ -756,7 +759,7 @@ describe('MinimapWorkerClient', () => {
       const client = new MinimapWorkerClient({
         host,
         options: resolveMinimapOptions(),
-        snapshot: snapshotWithThrowingFullText('line 1\nline 2\nline 3'),
+        snapshot: snapshotRejectingFlattening('line 1\nline 2\nline 3'),
         decorations: [],
         onLayoutWidth: vi.fn(),
         reservedLane: () => 0,
@@ -767,7 +770,7 @@ describe('MinimapWorkerClient', () => {
 
       const edit: TextEdit = { from: 6, to: 6, text: 'x' }
       client.update(
-        snapshotWithThrowingFullText('line 1x\nline 2\nline 3'),
+        snapshotRejectingFlattening('line 1x\nline 2\nline 3'),
         'content',
         documentEdit(edit, 'line 1x\nline 2\nline 3'),
       )
@@ -797,7 +800,7 @@ describe('MinimapWorkerClient', () => {
       const client = new MinimapWorkerClient({
         host,
         options: resolveMinimapOptions(),
-        snapshot: snapshot({}, { fullText: 'abc' }),
+        snapshot: snapshot({}, { text: 'abc' }),
         decorations: [],
         onLayoutWidth: vi.fn(),
         reservedLane: () => 0,
@@ -807,7 +810,7 @@ describe('MinimapWorkerClient', () => {
       worker.postMessage.mockClear()
 
       const edit: TextEdit = { from: 2, to: 3, text: '' }
-      client.update(snapshot({}, { fullText: 'ab' }), 'content', documentEdit(edit, 'ab'))
+      client.update(snapshot({}, { text: 'ab' }), 'content', documentEdit(edit, 'ab'))
       runtime.flushAnimationFrames()
 
       const requests = worker.postMessage.mock.calls.map((call) => call[0] as { type: string })
@@ -833,7 +836,7 @@ describe('MinimapWorkerClient', () => {
       const client = new MinimapWorkerClient({
         host,
         options: resolveMinimapOptions(),
-        snapshot: snapshot({}, { fullText: 'line 1\nline 2\nline 3' }),
+        snapshot: snapshot({}, { text: 'line 1\nline 2\nline 3' }),
         decorations: [],
         onLayoutWidth: vi.fn(),
         reservedLane: () => 0,
@@ -844,7 +847,7 @@ describe('MinimapWorkerClient', () => {
 
       const edit: TextEdit = { from: 6, to: 7, text: '' }
       client.update(
-        snapshot({}, { fullText: 'line 1line 2\nline 3' }),
+        snapshot({}, { text: 'line 1line 2\nline 3' }),
         'content',
         documentEdit(edit, 'line 1line 2\nline 3'),
       )
@@ -873,7 +876,7 @@ describe('MinimapWorkerClient', () => {
       const client = new MinimapWorkerClient({
         host,
         options: resolveMinimapOptions(),
-        snapshot: snapshot({}, { fullText: 'a\nb' }),
+        snapshot: snapshot({}, { text: 'a\nb' }),
         decorations: [],
         onLayoutWidth: vi.fn(),
         reservedLane: () => 0,
@@ -884,7 +887,7 @@ describe('MinimapWorkerClient', () => {
 
       const edit: TextEdit = { from: 2, to: 2, text: 'x\ny\n' }
       client.update(
-        snapshot({}, { fullText: 'a\nx\ny\nb' }),
+        snapshot({}, { text: 'a\nx\ny\nb' }),
         'content',
         documentEdit(edit, 'a\nx\ny\nb'),
       )
@@ -932,7 +935,7 @@ describe('MinimapWorkerClient', () => {
 
       const firstEdit: TextEdit = { from: 6, to: 6, text: 'x' }
       client.update(
-        snapshot({}, { fullText: 'line 1x\nline 2\nline 3' }),
+        snapshot({}, { text: 'line 1x\nline 2\nline 3' }),
         'content',
         documentEdit(firstEdit, 'line 1x\nline 2\nline 3'),
       )
@@ -943,12 +946,12 @@ describe('MinimapWorkerClient', () => {
       const secondEdit: TextEdit = { from: 7, to: 7, text: 'y' }
       const thirdEdit: TextEdit = { from: 8, to: 8, text: 'z' }
       client.update(
-        snapshot({}, { fullText: 'line 1xy\nline 2\nline 3' }),
+        snapshot({}, { text: 'line 1xy\nline 2\nline 3' }),
         'content',
         documentEdit(secondEdit, 'line 1xy\nline 2\nline 3'),
       )
       client.update(
-        snapshot({}, { fullText: 'line 1xyz\nline 2\nline 3' }),
+        snapshot({}, { text: 'line 1xyz\nline 2\nline 3' }),
         'content',
         documentEdit(thirdEdit, 'line 1xyz\nline 2\nline 3'),
       )
@@ -989,7 +992,7 @@ describe('MinimapWorkerClient', () => {
       const client = new MinimapWorkerClient({
         host,
         options: resolveMinimapOptions(),
-        snapshot: snapshotWithThrowingFullText('line 1\nline 2\nline 3'),
+        snapshot: snapshotRejectingFlattening('line 1\nline 2\nline 3'),
         decorations: [],
         onLayoutWidth: vi.fn(),
         reservedLane: () => 0,
@@ -999,12 +1002,12 @@ describe('MinimapWorkerClient', () => {
       worker.postMessage.mockClear()
 
       client.update(
-        snapshotWithThrowingFullText('line 1x\nline 2\nline 3'),
+        snapshotRejectingFlattening('line 1x\nline 2\nline 3'),
         'content',
         documentEdit({ from: 6, to: 6, text: 'x' }, 'line 1x\nline 2\nline 3'),
       )
       client.update(
-        snapshotWithThrowingFullText('line 1xy\nline 2\nline 3'),
+        snapshotRejectingFlattening('line 1xy\nline 2\nline 3'),
         'content',
         documentEdit({ from: 7, to: 7, text: 'y' }, 'line 1xy\nline 2\nline 3'),
       )
@@ -1049,7 +1052,7 @@ describe('MinimapWorkerClient', () => {
       const client = new MinimapWorkerClient({
         host,
         options: resolveMinimapOptions(),
-        snapshot: snapshot({}, { fullText: 'abc def ghi' }),
+        snapshot: snapshot({}, { text: 'abc def ghi' }),
         decorations: [],
         onLayoutWidth: vi.fn(),
         reservedLane: () => 0,
@@ -1063,7 +1066,7 @@ describe('MinimapWorkerClient', () => {
         { from: 4, to: 4, text: 'y' },
       ]
       client.update(
-        snapshot({}, { fullText: 'xabc ydef ghi' }),
+        snapshot({}, { text: 'xabc ydef ghi' }),
         'content',
         documentEdits(edits, 'xabc ydef ghi'),
       )
@@ -1129,12 +1132,12 @@ describe('MinimapWorkerClient', () => {
       ]
       const edit: TextEdit = { from: 6, to: 6, text: 'x' }
       client.update(
-        snapshot({}, { fullText: 'line 1x\nline 2\nline 3', tokens: projectedTokens }),
+        snapshot({}, { text: 'line 1x\nline 2\nline 3', tokens: projectedTokens }),
         'content',
         documentEdit(edit, 'line 1x\nline 2\nline 3'),
       )
       client.update(
-        snapshot({}, { fullText: 'line 1x\nline 2\nline 3', tokens: refreshedTokens }),
+        snapshot({}, { text: 'line 1x\nline 2\nline 3', tokens: refreshedTokens }),
         'tokens',
       )
       runtime.flushAnimationFrames()
@@ -1275,7 +1278,7 @@ describe('MinimapWorkerClient', () => {
         { start: 13, end: 19, style: { color: '#0000ff' } },
       ]
       client.update(
-        snapshot({}, { fullText: 'line 1x\nline 2\nline 3', tokens: projectedTokens }),
+        snapshot({}, { text: 'line 1x\nline 2\nline 3', tokens: projectedTokens }),
         'content',
         documentEdit(edit, 'line 1x\nline 2\nline 3'),
       )
@@ -1287,7 +1290,7 @@ describe('MinimapWorkerClient', () => {
         snapshot(
           {},
           {
-            fullText: 'line 1x\nline 2\nline 3',
+            text: 'line 1x\nline 2\nline 3',
             tokens: [
               projectedTokens[0]!,
               { start: 8, end: 12, style: { color: '#ffffff' } },
@@ -1333,7 +1336,7 @@ describe('MinimapWorkerClient', () => {
       const client = new MinimapWorkerClient({
         host,
         options: resolveMinimapOptions(),
-        snapshot: snapshot({}, { fullText: text, tokens: original }),
+        snapshot: snapshot({}, { text: text, tokens: original }),
         decorations: [],
         onLayoutWidth: vi.fn(),
         reservedLane: () => 0,
@@ -1375,7 +1378,7 @@ describe('MinimapWorkerClient', () => {
       )
       const editedText = `${text.slice(0, lineEnd)}x${text.slice(lineEnd)}`
       client.update(
-        snapshot({}, { fullText: editedText, tokens: projected }),
+        snapshot({}, { text: editedText, tokens: projected }),
         'content',
         documentEdit({ from: lineEnd, to: lineEnd, text: 'x' }, editedText),
       )
@@ -1383,7 +1386,7 @@ describe('MinimapWorkerClient', () => {
       worker.send(renderedResponse(lastRenderSequence(worker)))
       worker.postMessage.mockClear()
 
-      client.update(snapshot({}, { fullText: editedText, tokens: refreshed }), 'tokens')
+      client.update(snapshot({}, { text: editedText, tokens: refreshed }), 'tokens')
       runtime.flushAnimationFrames()
 
       const requests = worker.postMessage.mock.calls.map((call) => call[0] as MinimapWorkerRequest)
@@ -1490,18 +1493,18 @@ function setElementBox(
 
 function snapshot(
   viewport: Partial<EditorViewSnapshot['viewport']> = {},
-  overrides: Partial<Pick<EditorViewSnapshot, 'contentWidth' | 'fullText'>> & {
+  overrides: Partial<Pick<EditorViewSnapshot, 'contentWidth' | 'visibleRows'>> & {
+    readonly text?: string
     readonly tokens?: EditorTokenInput
   } = {},
 ): EditorViewSnapshot {
-  const text = overrides.fullText ?? 'line 1\nline 2\nline 3'
+  const text = overrides.text ?? 'line 1\nline 2\nline 3'
   const starts = lineStarts(text)
   const contentWidth = overrides.contentWidth ?? 160
   return {
     documentId: 'minimap-test',
     languageId: 'typescript',
-    textSnapshot: createStringTextSnapshot(text),
-    fullText: text,
+    ...createTestViewSnapshotSource(text),
     textVersion: 1,
     initialHighlightStatus: 'painted',
     syntaxStatus: 'ready',
@@ -1521,10 +1524,10 @@ function snapshot(
     contentWidth,
     totalHeight: 60,
     gutterWidth: 0,
-    gutterLayout: { fixedWidth: 0, lanes: [] },
+    gutterLayout: { leadingInset: 0, fixedWidth: 0, lanes: [] },
     tabSize: 4,
     foldMarkers: [],
-    visibleRows: [],
+    visibleRows: overrides.visibleRows ?? [],
     viewport: {
       scrollTop: 0,
       scrollRow: (viewport.scrollTop ?? 0) / 20,
@@ -1538,30 +1541,34 @@ function snapshot(
       visibleRange: { start: 0, end: 3 },
       ...viewport,
     },
-    toJSON() {
-      throw new Error('not used by this fixture')
-    },
     toVisibleSnapshot() {
       return null
     },
   }
 }
 
-function snapshotWithThrowingFullText(text: string): EditorViewSnapshot {
-  const initialSnapshot = snapshot({}, { fullText: text })
-  Object.defineProperty(initialSnapshot, 'textSnapshot', {
-    configurable: true,
-    enumerable: true,
-    value: createStringTextSnapshot(text),
-  })
-  Object.defineProperty(initialSnapshot, 'fullText', {
-    configurable: true,
-    enumerable: true,
-    get: () => {
-      throw new Error('fullText should not be read')
+// Calibrated against the source, not a getter: any whole-document read throws.
+function snapshotRejectingFlattening(text: string): EditorViewSnapshot {
+  const source = createStringTextSnapshot(text)
+  const flattened = () => {
+    throw new Error('the document should not be flattened')
+  }
+  const textSnapshot: TextSnapshot = {
+    get length() {
+      return source.length
     },
-  })
-  return initialSnapshot
+    get lineCount() {
+      return source.lineCount
+    },
+    lineStart: (row) => source.lineStart(row),
+    lineRange: (row) => source.lineRange(row),
+    lineAt: (offset) => source.lineAt(offset),
+    readRange: (start, end) =>
+      start === 0 && end === source.length ? flattened() : source.readRange(start, end),
+    forEachTextChunk: flattened,
+    materializeFullText: flattened,
+  }
+  return { ...snapshot({}, { text }), textSnapshot }
 }
 
 function documentEdit(edit: TextEdit, _fullText: string): DocumentSessionChange {

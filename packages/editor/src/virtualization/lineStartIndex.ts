@@ -1,9 +1,9 @@
-import type { TextSnapshot } from '../documentTextSnapshot'
+import type { TextReadSnapshot } from '../documentTextSnapshot'
 
 export class LineStartsView {
   private materialized: readonly number[] | null = null
 
-  public constructor(private readonly snapshot: TextSnapshot) {}
+  public constructor(private readonly snapshot: TextReadSnapshot) {}
 
   public get length(): number {
     return this.snapshot.lineCount

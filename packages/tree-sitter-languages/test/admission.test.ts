@@ -1,3 +1,4 @@
+import { init, MarkdownDocument, CAPTURES } from 'tree-sitter-md'
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { beforeAll, expect, it } from 'vitest'
@@ -123,6 +124,20 @@ it('captures Astro markup and discovers all embedded regions with the real parse
 })
 
 it.each(NATIVE_FIXTURES)('checks curated categories and malformed $id source', async (fixture) => {
+  if (fixture.id === 'markdown') {
+    await init()
+    const document = new MarkdownDocument()
+    document.setText(fixture.text)
+    const highlights = document.highlights(0, fixture.text.length)
+    const names = [...highlights]
+      .filter((_, index) => index % 3 === 2)
+      .map((index) => CAPTURES[index])
+    for (const name of fixture.captures) expect(names).toContain(name)
+    document.setText(fixture.text.slice(0, -5))
+    expect(() => document.highlights(0, fixture.text.length - 5)).not.toThrow()
+    document.dispose()
+    return
+  }
   const contribution = TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find(
     (language) => language.id === fixture.id,
   )!

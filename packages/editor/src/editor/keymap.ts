@@ -17,7 +17,7 @@ export * from '../keymap/presets'
 export type EditorKeymapControllerOptions = {
   readonly target: HTMLElement
   readonly keymap?: EditorKeymapOptions
-  readonly input: HTMLTextAreaElement
+  readonly input: HTMLElement
   readonly captureContext: () => EditorKeymapContext
   readonly dispatch: (command: EditorCommandId, context: EditorCommandContext) => boolean
 }
@@ -61,7 +61,7 @@ export class EditorKeymapController {
   }
 }
 
-function isLocalInput(event: KeyboardEvent, input: HTMLTextAreaElement): boolean {
+function isLocalInput(event: KeyboardEvent, input: HTMLElement): boolean {
   const target = event.target
   if (!(target instanceof HTMLElement)) return false
   const textEntry = target.closest('input, textarea, [contenteditable="true"]')

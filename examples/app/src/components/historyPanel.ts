@@ -222,7 +222,8 @@ async function compareStates(
   if (left.snapshot.length > MAX_COMPARE_LENGTH || right.snapshot.length > MAX_COMPARE_LENGTH) {
     return 'too-large'
   }
-  // Yield once so a burst of selections settles before any text is materialized.
+  // @justification Yields once so a burst of selections settles before any text is materialized;
+  // it only resolves a promise, and the abort signal is checked right after.
   await new Promise((resolve) => setTimeout(resolve, 0))
   signal.throwIfAborted()
   return createTextDiff({

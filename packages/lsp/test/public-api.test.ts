@@ -42,7 +42,6 @@ describe('public API facade', () => {
     const workspace = new LspWorkspace()
     const textSnapshot: LspTextSnapshot = {
       length: 3,
-      materializeFullText: () => 'one',
       readRange: (start, end) => 'one'.slice(start, end),
       forEachTextChunk: (visit) => visit('one', 0, 3),
     }

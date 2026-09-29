@@ -1,0 +1,158 @@
+{
+  "browser": "153.0.8010.12",
+  "bundleHash": "7cbf9732dc7fe26a707b04967969ea3b1f797ae8084ebe0fff9a4ec7735c9bb4",
+  "measuredAt": "2026-09-23T15:21:31.092Z",
+  "options": {
+    "observe-only": true,
+    "workloads": "survivors",
+    "cycles": "500,1000",
+    "repetitions": "1",
+    "typing-samples": "0"
+  },
+  "workloadDefinitions": {
+    "aligned": "16,384 UTF-16 unit inserts, deleted whole",
+    "survivors": "1,024 unit inserts retaining 64 units each",
+    "mixed": "1,024 unit inserts; three of four deleted whole",
+    "paragraph": "replace the same 1,024 unit paragraph each cycle",
+    "original": "delete 4,194,304 units from original text; release session and external owners separately",
+    "paste-tail": "paste 4,194,368 units, retain the 64-unit writable tail, reset sync-chain payload, release history and external owners"
+  },
+  "failure": null,
+  "note": "Two mounted editors; automatic maintenance; actual GC heap. Churn heapBefore uses the second explicit timer-task and GC with maintenance suspended; the immediate CDP-GC reading is preserved separately because weak targets/finalizer bookkeeping may remain until a task boundary. A WeakRef-only sentinel created in the churn job must be absent after both task/GC rounds. Registry backingUnits sum page backing lengths with duplicates and are not physical retained bytes. Maintenance resumes after the calibrated capture. Heap peaks are 10ms CDP samples, not an exact maximum. Input probes measure trusted keydown to the second animation frame on identical text in the same browser before/after maintenance; observational paired timings, not the E002 calibrated regression gate. Original deletion checks history/clean and external-reader release separately; undo is excluded there because DocumentEditChain legitimately retains the restored insertion payload.",
+  "samples": [
+    {
+      "workload": "survivors",
+      "cycles": 500,
+      "churnMs": 1028.7000000476837,
+      "registryEntriesAtChurnEnd": 250852,
+      "deletedUnits": 480000,
+      "revision": 1001,
+      "dirty": true,
+      "liveUnits": 32014,
+      "heapBefore": 4689756,
+      "heapAfter": 4487548,
+      "heapBeforeAbsolute": 7533264,
+      "heapBeforeImmediateAbsolute": 43981656,
+      "heapCalibration": {
+        "immediateAbsolute": 43981656,
+        "firstTaskGcAbsolute": 7527192,
+        "secondTaskGcAbsolute": 7533264,
+        "stabilityDeltaBytes": 6072,
+        "immediateRegistry": {
+          "registryEntries": 503
+        },
+        "firstRegistry": {
+          "registryEntries": 503,
+          "sentinelAlive": false,
+          "livePages": 503,
+          "logicalUnits": 32014,
+          "backingUnits": 8146975
+        },
+        "secondRegistry": {
+          "registryEntries": 503,
+          "sentinelAlive": false,
+          "livePages": 503,
+          "logicalUnits": 32014,
+          "backingUnits": 8146975
+        }
+      },
+      "heapAfterAbsolute": 7331056,
+      "sampledPeakHeap": 8483180,
+      "heapSamples": 29,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 25,
+        "codeUnits": 384000,
+        "snapshots": 202,
+        "maxSliceMs": 0.40000009536743164
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 0
+    },
+    {
+      "workload": "survivors",
+      "cycles": 1000,
+      "churnMs": 2567.600000143051,
+      "registryEntriesAtChurnEnd": 1001821,
+      "deletedUnits": 960000,
+      "revision": 2001,
+      "dirty": true,
+      "liveUnits": 64014,
+      "heapBefore": 6160012,
+      "heapAfter": 5502632,
+      "heapBeforeAbsolute": 9003456,
+      "heapBeforeImmediateAbsolute": 146487024,
+      "heapCalibration": {
+        "immediateAbsolute": 146487024,
+        "firstTaskGcAbsolute": 9079424,
+        "secondTaskGcAbsolute": 9003456,
+        "stabilityDeltaBytes": -75968,
+        "immediateRegistry": {
+          "registryEntries": 1003
+        },
+        "firstRegistry": {
+          "registryEntries": 1003,
+          "sentinelAlive": false,
+          "livePages": 1003,
+          "logicalUnits": 64014,
+          "backingUnits": 16326691
+        },
+        "secondRegistry": {
+          "registryEntries": 1003,
+          "sentinelAlive": false,
+          "livePages": 1003,
+          "logicalUnits": 64014,
+          "backingUnits": 16326691
+        }
+      },
+      "heapAfterAbsolute": 8346076,
+      "sampledPeakHeap": 9779384,
+      "heapSamples": 30,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 56,
+        "codeUnits": 860160,
+        "snapshots": 202,
+        "maxSliceMs": 0.5
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 0
+    }
+  ],
+  "heapSummary": [
+    {
+      "workload": "survivors/500",
+      "samples": 1,
+      "medianReduction": 0.04311695533840143
+    },
+    {
+      "workload": "survivors/1000",
+      "samples": 1,
+      "medianReduction": 0.1067173245766404
+    }
+  ]
+}

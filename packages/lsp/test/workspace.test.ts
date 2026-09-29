@@ -96,7 +96,7 @@ describe('LspWorkspace snapshot attachments', () => {
     for (const logicalRevisionCount of [-1, 0.5, 0]) {
       expectInvalidLogicalRevisionCount(workspace, sourceSegment, logicalRevisionCount)
     }
-    expect(workspace.getDocument(URI)?.text).toBe('one')
+    expect(workspace.getDocument(URI)?.textSnapshot.readRange(0, 3)).toBe('one')
   })
 
   it('rejects unsafe source metadata and version overflow before mutating the document', () => {
@@ -356,7 +356,6 @@ function openOptions(
 function snapshot(text: string): LspTextSnapshot {
   return {
     length: text.length,
-    materializeFullText: () => text,
     readRange: (start, end) => text.slice(start, end),
     forEachTextChunk: (visit) => {
       if (text.length === 0) return
@@ -368,7 +367,7 @@ function snapshot(text: string): LspTextSnapshot {
 function syncCall(kind: SyncCall['kind'], document: LspDocument): SyncCall {
   return {
     kind,
-    text: document.textSnapshot.materializeFullText(),
+    text: document.textSnapshot.readRange(0, document.textSnapshot.length),
     uri: document.uri,
     version: document.version,
   }

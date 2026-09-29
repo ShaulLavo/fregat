@@ -1,6 +1,12 @@
+import {
+  acquireRowPresentation,
+  invalidateRowPresentations,
+} from '../../editor/dist/rowPresentation'
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
+import { createTestViewSnapshotSource } from '@singapore-editor/core/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
+  EditorRowPresentation,
   EditorPluginContext,
   EditorViewContribution,
   EditorViewContributionContext,
@@ -12,6 +18,10 @@ import { tokenizeLengths } from '../src/tokenize'
 import { collectRevealRows } from '../src/rows'
 import { RangeText } from '../../editor/dist/textContent'
 import { measureString } from '../../editor/dist/textMeasurements'
+import {
+  createTestPluginContext,
+  createTestViewContributionContext,
+} from '@singapore-editor/core/testing'
 
 const SAMPLE = 'function f() {\n  if (x) {\n    y()\n  }\n}\n'
 const TEST_DOCUMENT_SYNC_SEGMENT = Object.freeze(
@@ -79,21 +89,84 @@ describe('createDecodePlugin', () => {
     expect(registerViewContribution).toHaveBeenCalledOnce()
   })
 
-  it('hides the real rows on open but waits for tokens before revealing', () => {
+  it.each([{ scrollTop: 40, scrollRow: 2 }, { scrollLeft: 8 }, { scrollTop: 1 }])(
+    'cancels an active reveal on viewport change %j',
+    (change) => {
+      const { context, contribution } = mount()
+      contribution.update(snapshot({ tokens: someTokens() }), 'document')
+      expect(rowAnimations().length).toBeGreaterThan(0)
+      contribution.updateViewport?.({ ...snapshot().viewport, ...change })
+      expect(context.scrollElement.classList.contains('editor-decode-active')).toBe(false)
+      expect(rowAnimations().every((animation) => animation.cancel.mock.calls.length > 0)).toBe(
+        true,
+      )
+    },
+  )
+
+  it('keeps a pending reveal through viewport restoration until highlighting settles', () => {
+    const { context, contribution } = mount()
+    contribution.update(loading(), 'document')
+    contribution.updateViewport?.({ ...snapshot().viewport, scrollTop: 40, scrollRow: 2 })
+    contribution.update(snapshot({ tokens: someTokens() }), 'tokens')
+    expect(rowAnimations().length).toBeGreaterThan(0)
+    expect(context.scrollElement.classList.contains('editor-decode-active')).toBe(true)
+    contribution.dispose()
+  })
+
+  it.each(['autoregressive', 'diffusion'] as const)(
+    'cancels %s on real row invalidation and releases every handle',
+    (mode) => {
+      const { context, contribution, presentations } = mount({ mode })
+      contribution.update(snapshot({ tokens: someTokens() }), 'document')
+      expect(presentations.length).toBeGreaterThan(0)
+      invalidateRowPresentations(presentations[0]!.element)
+      expect(context.scrollElement.classList.contains('editor-decode-active')).toBe(false)
+      expect(caretLayer(context)).toBeNull()
+      expect(context.scrollElement.querySelector('.editor-decode-glyph-layer')).toBeNull()
+      expect(recorded.every((entry) => entry.cancel.mock.calls.length > 0)).toBe(true)
+      expect(
+        presentations.every((handle) => vi.mocked(handle.dispose).mock.calls.length === 1),
+      ).toBe(true)
+      contribution.dispose()
+      expect(
+        presentations.every((handle) => vi.mocked(handle.dispose).mock.calls.length === 1),
+      ).toBe(true)
+    },
+  )
+
+  it.each(['viewport', 'input', 'dispose', 'document'] as const)(
+    'releases row handles on %s cancellation',
+    (reason) => {
+      const { context, contribution, presentations } = mount()
+      contribution.update(snapshot({ tokens: someTokens() }), 'document')
+      const initial = [...presentations]
+      expect(initial.length).toBeGreaterThan(0)
+      if (reason === 'viewport') contribution.updateViewport?.(snapshot().viewport)
+      if (reason === 'input') context.scrollElement.dispatchEvent(new Event('keydown'))
+      if (reason === 'dispose') contribution.dispose()
+      if (reason === 'document') contribution.update(snapshot({ documentId: 'next' }), 'document')
+      expect(initial.every((handle) => vi.mocked(handle.dispose).mock.calls.length === 1)).toBe(
+        true,
+      )
+      contribution.dispose()
+    },
+  )
+
+  it('hides the real rows on open but waits for the highlight to settle before revealing', () => {
     const { context, contribution } = mount()
 
-    contribution.update(snapshot({ tokens: EditorTokenStore.empty() }), 'document')
+    contribution.update(loading(), 'document')
 
     expect(context.scrollElement.classList.contains('editor-decode-active')).toBe(true)
     expect(rowAnimations()).toHaveLength(0)
     expect(caretLayer(context)).toBeNull()
   })
 
-  it('reveals each real row with a caret once tokens arrive', () => {
+  it('reveals each real row with a caret once the highlight settles', () => {
     const { context, contribution } = mount()
     const withTokens = snapshot({ tokens: someTokens() })
 
-    contribution.update(snapshot({ tokens: EditorTokenStore.empty() }), 'document')
+    contribution.update(loading(), 'document')
     contribution.update(withTokens, 'tokens')
 
     const expected = withTokens.visibleRows.filter((r) => r.kind === 'text' && r.text.length > 0)
@@ -110,6 +183,45 @@ describe('createDecodePlugin', () => {
 
     expect(rowAnimations().length).toBeGreaterThan(0)
     expect(caretElements(context).length).toBe(rowAnimations().length)
+  })
+
+  it('starts on the settled status alone, with no timer behind it', () => {
+    vi.useFakeTimers()
+    try {
+      const { context, contribution } = mount()
+      contribution.update(loading(), 'document')
+
+      vi.advanceTimersByTime(60_000)
+      expect(rowAnimations()).toHaveLength(0)
+      expect(context.scrollElement.classList.contains('editor-decode-active')).toBe(true)
+
+      contribution.update(loading(), 'tokens')
+      expect(rowAnimations()).toHaveLength(0)
+
+      // A highlight that ended in error settles too; the reveal starts uncoloured.
+      contribution.update(snapshot({ initialHighlightStatus: 'error' }), 'tokens')
+      expect(rowAnimations().length).toBeGreaterThan(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('starts at once for a document that has no highlighter', () => {
+    const { contribution } = mount()
+    contribution.update(snapshot({ initialHighlightStatus: 'plain' }), 'document')
+
+    expect(rowAnimations().length).toBeGreaterThan(0)
+  })
+
+  it('shows the document at once on input while it waits', () => {
+    const { context, contribution } = mount()
+    contribution.update(loading(), 'document')
+
+    context.scrollElement.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    contribution.update(snapshot({ tokens: someTokens() }), 'tokens')
+
+    expect(context.scrollElement.classList.contains('editor-decode-active')).toBe(false)
+    expect(rowAnimations()).toHaveLength(0)
   })
 
   it('schedules autoregressive sequentially and parallel with jittered starts', () => {
@@ -179,7 +291,7 @@ describe('createDecodePlugin', () => {
     )
 
     const empty = mount()
-    empty.contribution.update(snapshot({ fullText: '', visibleRows: [] }), 'document')
+    empty.contribution.update(snapshot({ text: '', visibleRows: [] }), 'document')
     expect(empty.context.scrollElement.classList.contains('editor-decode-active')).toBe(false)
   })
 
@@ -275,10 +387,18 @@ describe('createDecodePlugin diffusion', () => {
   })
 
   it('converges and hands off to the real rows', () => {
-    const { context, contribution } = mount({ mode: 'diffusion', maxDurationMs: 1000 })
+    const { context, contribution, presentations } = mount({
+      mode: 'diffusion',
+      maxDurationMs: 1000,
+    })
     contribution.update(snapshot({ tokens: someTokens() }), 'document')
 
     vi.advanceTimersByTime(2000)
+    expect(presentations.length).toBeGreaterThan(0)
+    expect(presentations.every((handle) => vi.mocked(handle.dispose).mock.calls.length === 1)).toBe(
+      true,
+    )
+    expect(presentations.every((handle) => !handle.signal.aborted)).toBe(true)
 
     expect(glyphLayer(context)).toBeNull()
     expect(context.scrollElement.classList.contains('editor-decode-active')).toBe(false)
@@ -341,13 +461,15 @@ it('animates only mounted long-line text at its horizontal position', () => {
 function mount(options: DecodePluginOptions = {}): {
   context: EditorViewContributionContext
   contribution: EditorViewContribution
+  presentations: EditorRowPresentation[]
 } {
   const provider = registeredProvider(createDecodePlugin(options))
-  const context = viewContext()
+  const presentations: EditorRowPresentation[] = []
+  const context = viewContext(presentations)
   populateRows(context.contentElement, snapshot())
   const contribution = provider?.createContribution(context)
   if (!contribution) throw new Error('decode contribution was not created')
-  return { context, contribution }
+  return { context, contribution, presentations }
 }
 
 /** Stand in for the editor's already-rendered, highlight-painted row elements. */
@@ -380,7 +502,7 @@ function registeredProvider(
 function pluginContext(
   registerViewContribution: EditorPluginContext['registerViewContribution'],
 ): EditorPluginContext {
-  return {
+  return createTestPluginContext({
     registerHighlighter: vi.fn(() => ({ dispose: vi.fn() })),
     registerSyntaxProvider: vi.fn(() => ({ dispose: vi.fn() })),
     registerViewContribution,
@@ -390,42 +512,44 @@ function pluginContext(
     registerDecorationContribution: vi.fn(() => ({ dispose: vi.fn() })),
     registerGutterContribution: vi.fn(() => ({ dispose: vi.fn() })),
     registerInjectedTextRowProvider: vi.fn(() => ({ dispose: vi.fn() })),
-  }
+  })
 }
 
-function viewContext(): EditorViewContributionContext {
+function viewContext(presentations: EditorRowPresentation[] = []): EditorViewContributionContext {
   const container = document.createElement('div')
   const scrollElement = document.createElement('div')
   const contentElement = document.createElement('div')
   scrollElement.appendChild(contentElement)
   container.appendChild(scrollElement)
-  return {
+  return createTestViewContributionContext({
     container,
     scrollElement,
     contentElement,
-    log: vi.fn(),
-    hasDocument: () => true,
+    getRowPresentation(index) {
+      const element = scrollElement.querySelector<HTMLElement>(
+        `[data-editor-virtual-row="${index}"]`,
+      )
+      if (!element) return null
+      const handle = acquireRowPresentation(element)
+      if (!handle) return null
+      vi.spyOn(handle, 'dispose')
+      presentations.push(handle)
+      return handle
+    },
     getSnapshot: () => snapshot({ tokens: someTokens() }),
-    requestViewUpdate: vi.fn(),
-    reserveOverlayWidth: vi.fn(),
-    revealLine: vi.fn(),
-    focusEditor: vi.fn(),
-    setSelection: vi.fn(),
-    setSelections: vi.fn(),
-    setScrollTop: vi.fn(),
-    textOffsetFromPoint: vi.fn(() => null),
-    getRangeClientRect: vi.fn(() => null),
-  }
+  })
 }
 
-function snapshot(overrides: Partial<EditorViewSnapshot> = {}): EditorViewSnapshot {
-  const text = overrides.fullText ?? SAMPLE
+function snapshot({
+  text = SAMPLE,
+  ...overrides
+}: Partial<EditorViewSnapshot> & { readonly text?: string } = {}): EditorViewSnapshot {
   return {
     documentId: 'decode-test',
     languageId: 'typescript',
     syntaxStatus: 'ready',
     paintLayers: [],
-    fullText: text,
+    ...createTestViewSnapshotSource(text),
     textVersion: 1,
     lineStarts: lineStarts(text),
     tokens: EditorTokenStore.empty(),
@@ -453,12 +577,7 @@ function snapshot(overrides: Partial<EditorViewSnapshot> = {}): EditorViewSnapsh
     ...overrides,
     initialHighlightStatus: overrides.initialHighlightStatus ?? 'painted',
     gutterWidth: overrides.gutterWidth ?? 0,
-    gutterLayout: overrides.gutterLayout ?? { fixedWidth: 0, lanes: [] },
-    toJSON:
-      overrides.toJSON ??
-      (() => {
-        throw new Error('not used by this fixture')
-      }),
+    gutterLayout: overrides.gutterLayout ?? { leadingInset: 0, fixedWidth: 0, lanes: [] },
     toVisibleSnapshot: overrides.toVisibleSnapshot ?? (() => null),
     documentSyncPoint: overrides.documentSyncPoint ?? {
       revision: overrides.textVersion ?? 1,
@@ -467,6 +586,10 @@ function snapshot(overrides: Partial<EditorViewSnapshot> = {}): EditorViewSnapsh
     },
     changesSinceDocumentSyncPoint: overrides.changesSinceDocumentSyncPoint ?? (() => null),
   }
+}
+
+function loading(): EditorViewSnapshot {
+  return snapshot({ tokens: EditorTokenStore.empty(), initialHighlightStatus: 'loading' })
 }
 
 function someTokens(): EditorViewSnapshot['tokens'] {

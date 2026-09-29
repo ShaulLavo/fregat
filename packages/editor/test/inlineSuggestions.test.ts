@@ -311,9 +311,13 @@ describe('inline suggestions', () => {
     for (const platform of ['mac', 'windows', 'linux'] as const) {
       // Tab stays where it was: the whole suggestion is taken through the key that already indents,
       // which is the only way that key can still indent when nothing is on offer.
+      // The completion list's accept outranks it only while a list is open.
       const tab = defaultEditorKeyBindings(platform).find(
-        ({ chord: [hotkey] }) =>
-          typeof hotkey !== 'string' && hotkey.key === 'Tab' && !hotkey.shift,
+        ({ chord: [hotkey], when }) =>
+          typeof hotkey !== 'string' &&
+          hotkey.key === 'Tab' &&
+          !hotkey.shift &&
+          !when?.includes('suggestWidgetVisible'),
       )
       expect(tab?.command).toBe('indentSelection')
     }

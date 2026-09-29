@@ -52,7 +52,6 @@ test('shows TypeScript LSP diagnostics for a source file', async ({ page }) => {
     path: 'src/index.ts',
     text: 'const value: string = 1;\n',
   }
-  await mockTypeScriptLibs(page)
   await mockGitHubSource(page, file.path, file.text)
   await page.addInitScript((path) => {
     localStorage.clear()
@@ -69,10 +68,10 @@ test('shows TypeScript LSP diagnostics for a source file', async ({ page }) => {
 
   const hoverRect = await textRectFor(page, 'value', 0)
   await page.mouse.move(hoverRect.x + 2, hoverRect.y + hoverRect.height / 2)
-  await expect(page.locator('.editor-typescript-lsp-hover')).toContainText('value', {
+  await expect(page.getByRole('dialog', { name: 'Editor hover' })).toContainText('value', {
     timeout: 15000,
   })
-  const tooltipRect = await page.locator('.editor-typescript-lsp-hover').boundingBox()
+  const tooltipRect = await page.getByRole('dialog', { name: 'Editor hover' }).boundingBox()
   expect(tooltipRect?.y ?? 0).toBeGreaterThan(hoverRect.y)
 })
 
@@ -105,7 +104,6 @@ test('shows TypeScript hover hints and jumps to definitions', async ({ page }) =
       text: 'export const answer = 42;\n',
     },
   ]
-  await mockTypeScriptLibs(page)
   await mockGitHubSourceFiles(page, files)
   await page.addInitScript((path) => {
     localStorage.clear()
@@ -120,19 +118,23 @@ test('shows TypeScript hover hints and jumps to definitions', async ({ page }) =
 
   const hoverRect = await textRectFor(page, 'value', 0)
   await page.mouse.move(hoverRect.x + 2, hoverRect.y + hoverRect.height / 2)
-  await expect(page.locator('.editor-typescript-lsp-hover')).toContainText('value', {
+  await expect(page.getByRole('dialog', { name: 'Editor hover' })).toContainText('value', {
     timeout: 15000,
   })
-  await expect(page.locator('.editor-typescript-lsp-hover')).toContainText(
+  await expect(page.getByRole('dialog', { name: 'Editor hover' })).toContainText(
     /Type 'number' is not assignable to type 'string'|number/,
   )
 
+  // The hover opens above its word and stays while the pointer is inside it, and above `value` is
+  // the import line: leave first, or the move to `answer` lands inside the old hover.
+  await page.mouse.move(0, 0)
+  await expect(page.getByRole('dialog', { name: 'Editor hover' })).toBeHidden()
   const definitionRect = await textRectFor(page, 'answer', 0)
   await page.mouse.move(definitionRect.x + 2, definitionRect.y + definitionRect.height / 2)
-  await expect(page.locator('.editor-typescript-lsp-hover')).toContainText('answer', {
+  await expect(page.getByRole('dialog', { name: 'Editor hover' })).toContainText('answer', {
     timeout: 15000,
   })
-  const tooltipRect = await page.locator('.editor-typescript-lsp-hover').boundingBox()
+  const tooltipRect = await page.getByRole('dialog', { name: 'Editor hover' }).boundingBox()
   expect(tooltipRect?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(definitionRect.y)
 
   await page.keyboard.down('Control')
@@ -147,6 +149,95 @@ test('shows TypeScript hover hints and jumps to definitions', async ({ page }) =
     timeout: 15000,
   })
   await expect(page.locator('.entry.active')).toContainText('other.ts')
+})
+
+test('fixes, formats, renames across files and outlines with no language server', async ({
+  page,
+}) => {
+  const files = [
+    {
+      path: 'src/index.ts',
+      text: [
+        "import { Circle, area } from './shapes'",
+        '',
+        'const circle = new Circle(2)',
+        'const   total   =   area(circl)',
+        'console.log(total)',
+        '',
+      ].join('\n'),
+    },
+    {
+      path: 'src/shapes.ts',
+      text: [
+        'export class Circle {',
+        '  constructor(readonly radius: number) {}',
+        '}',
+        '',
+        'export function area(circle: Circle): number {',
+        '  return Math.PI * circle.radius ** 2',
+        '}',
+        '',
+      ].join('\n'),
+    },
+  ]
+  await page.route('https://playgroundcdn.typescriptlang.org/**', (route) => route.abort())
+  await mockGitHubSourceFiles(page, files)
+  await page.addInitScript((path) => {
+    localStorage.clear()
+    localStorage.setItem('editor-selected-file', path)
+  }, 'src/index.ts')
+  const editor = page.locator('.editor-virtualized')
+
+  await page.goto('/')
+  await expect(editor).toContainText('area(circl)')
+  await expect
+    .poll(() => diagnosticHighlightRangeCount(page), { timeout: 20000 })
+    .toBeGreaterThan(0)
+
+  // Quick fix: the preferred fix for the misspelling, applied from the caret.
+  const misspelled = await textRectFor(page, 'circl)', 0)
+  await page.mouse.click(misspelled.x + 4, misspelled.y + misspelled.height / 2)
+  await expect
+    .poll(
+      async () => {
+        await page.keyboard.press('Alt+Shift+Period')
+        return editor.textContent()
+      },
+      { timeout: 15000, intervals: [300] },
+    )
+    .toContain('area(circle)')
+
+  // Format Document with the editor's indentation.
+  await page.keyboard.press('Alt+Shift+F')
+  await expect(editor).toContainText('const total = area(circle)', { timeout: 15000 })
+
+  // Rename from the declaration, which reaches the file that imports it.
+  await page.locator('.entry.file', { hasText: 'shapes.ts' }).click()
+  await expect(editor).toContainText('export class Circle')
+  const declaration = await textRectFor(page, 'Circle', 0)
+  await page.mouse.click(declaration.x + 4, declaration.y + declaration.height / 2)
+  await page.keyboard.press('F2')
+  const renameInput = page.getByRole('textbox', { name: 'New name' })
+  await expect(renameInput).toHaveValue('Circle', { timeout: 15000 })
+  await renameInput.fill('Round')
+  await renameInput.press('Enter')
+  await expect(editor).toContainText('export class Round')
+  await expect(editor).toContainText('area(circle: Round)')
+
+  // The outline lists the file's symbols and jumps to one.
+  await page.getByRole('button', { name: 'Outline' }).click()
+  const outline = page.getByRole('tree', { name: 'Outline' })
+  await expect(outline).toContainText('Round', { timeout: 15000 })
+  await expect(outline).toContainText('radius')
+  await outline.getByRole('treeitem').filter({ hasText: 'area' }).click()
+  await expect(page.locator('#status-cursor')).toContainText('Ln 5')
+
+  // The importing file took the rename, and kept the fix and the formatting.
+  await page.locator('.entry.file', { hasText: 'index.ts' }).click()
+  await expect(editor).toContainText("import { Round, area } from './shapes'")
+  await expect(editor).toContainText('const circle = new Round(2)')
+  await expect(editor).toContainText('const total = area(circle)')
+  await expect.poll(() => diagnosticHighlightRangeCount(page), { timeout: 15000 }).toBe(0)
 })
 
 async function tokenHighlightRangeCount(page: import('@playwright/test').Page): Promise<number> {
@@ -252,26 +343,6 @@ async function textRectFor(
   )
   if (!rect) throw new Error(`Unable to find text rect for ${query}`)
   return rect
-}
-
-async function mockTypeScriptLibs(page: import('@playwright/test').Page): Promise<void> {
-  await page.route('https://playgroundcdn.typescriptlang.org/cdn/**/typescript/lib/**', (route) =>
-    route.fulfill({
-      body: [
-        'interface Array<T> {}',
-        'interface Boolean {}',
-        'interface CallableFunction extends Function {}',
-        'interface Function {}',
-        'interface IArguments {}',
-        'interface NewableFunction extends Function {}',
-        'interface Number {}',
-        'interface Object {}',
-        'interface RegExp {}',
-        'interface String {}',
-      ].join('\n'),
-      contentType: 'text/plain',
-    }),
-  )
 }
 
 async function mockGitHubSource(

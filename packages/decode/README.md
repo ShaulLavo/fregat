@@ -16,14 +16,19 @@ createDecodePlugin({ mode: 'autoregressive' }) // or 'parallel'
 - `autoregressive` — writes line by line from the top (classic typewriter), a caret riding the edge.
 - `parallel` — every line writes itself left→right at once, with a short top-down cascade.
 
-`diffusion` (words bloom mid-screen out of order, glyphs settling from scrambled → correct) is the
-next mode to land on this same scaffold.
+- `token` reveals one token at a time.
+- `diffusion` fills a glyph overlay until the real text takes over.
 
 ## How it works
 
-The reveal never touches the editor's real, recycled rows. It hides them with one CSS rule, paints a
-self-owned overlay of clone lines positioned from the editor's own geometry (`visibleRows`,
-`--editor-gutter-width`), and reveals each line with a GPU `clip-path` sweep (WAAPI). Because syntax
-color is painted by the CSS Custom Highlight API over the real text, the finish is a blur-masked
-crossfade where the highlighted text "blooms" in. Any keypress, click, or scroll cancels instantly —
-the editor underneath was live the whole time. Honors `prefers-reduced-motion` (no animation).
+The plugin acquires row presentation handles and animates the mounted text with a WAAPI
+`clip-path` reveal. Carets and diffusion glyphs live in plugin-owned overlays. Row invalidation
+cancels the reveal before the editor replaces or recycles the text. Keypresses, clicks, wheel input,
+and every viewport update cancel an active reveal, including horizontal and sub-row scrolling.
+All completion and cancellation paths release the row handles. Reduced motion disables animation.
+
+Rows stay hidden from document open until the initial highlight settles. A viewport restoration
+while highlighting is pending preserves that wait; the reveal acquires the current visible rows
+when highlighting settles. A document without a highlighter settles as `plain` at once; a failed
+highlight settles as `error` and reveals uncoloured. Input during the wait shows the document
+straight away.

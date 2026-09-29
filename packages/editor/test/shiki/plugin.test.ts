@@ -1,15 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createTestPluginContext } from '../../src/testContexts'
 
-import { createPieceTableSnapshot } from '../../src'
-import type {
-  EditorDisposable,
-  EditorHighlighterProvider,
-  EditorPlugin,
-  EditorPluginContext,
-} from '../../src/plugins'
+import { createDocumentTextSnapshot, createPieceTableSnapshot } from '../../src'
+import type { EditorPlugin } from '../../src/plugins'
+import type { EditorDisposable } from '../../src/editor/disposables'
+import type { EditorHighlighterProvider } from '../../src/syntax/highlighter'
 import {
   createShikiHighlighterPlugin,
   createShikiHighlighterProvider,
+  shikiLanguageForDocument,
   type ShikiHighlighterPluginOptions,
   type ShikiHighlighterSessionOptions,
   type ShikiWorkerOwner,
@@ -48,7 +47,7 @@ describe('createShikiHighlighterPlugin', () => {
     provider.createSession({
       documentId: 'App.tsx',
       languageId: 'typescript',
-      fullText: text,
+      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
       snapshot: createPieceTableSnapshot(text),
     })
 
@@ -66,7 +65,7 @@ describe('createShikiHighlighterPlugin', () => {
     provider.createSession({
       documentId: 'App.tsx#diff-old',
       languageId: 'typescript',
-      fullText: text,
+      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
       snapshot: createPieceTableSnapshot(text),
     })
 
@@ -80,7 +79,7 @@ describe('createShikiHighlighterPlugin', () => {
     provider.createSession({
       documentId: 'index.ts',
       languageId: 'typescript',
-      fullText: text,
+      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
       snapshot: createPieceTableSnapshot(text),
     })
 
@@ -94,7 +93,7 @@ describe('createShikiHighlighterPlugin', () => {
     provider.createSession({
       documentId: 'App.jsx',
       languageId: 'javascript',
-      fullText: text,
+      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
       snapshot: createPieceTableSnapshot(text),
     })
 
@@ -114,7 +113,7 @@ describe('createShikiHighlighterPlugin', () => {
     provider.createSession({
       documentId: 'App.tsx',
       languageId: 'typescript',
-      fullText: text,
+      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
       snapshot: createPieceTableSnapshot(text),
     })
 
@@ -162,7 +161,7 @@ describe('createShikiHighlighterPlugin', () => {
     provider.createSession({
       documentId: 'index.ts',
       languageId: 'typescript',
-      fullText: text,
+      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
       snapshot: createPieceTableSnapshot(text),
     })
 
@@ -203,7 +202,7 @@ describe('createShikiHighlighterPlugin', () => {
     provider.createSession({
       documentId: 'index.ts',
       languageId: 'typescript',
-      fullText: text,
+      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
       snapshot: createPieceTableSnapshot(text),
     })
 
@@ -217,6 +216,75 @@ describe('createShikiHighlighterPlugin', () => {
     })
   })
 
+  it('sends a session its own grammar only, even after the preload set has loaded', async () => {
+    const provider = activateHighlighterProvider({ preloadLanguages: ['json', 'css'] })
+    const text = 'const value = 1'
+    const openSession = (documentId: string, languageId: string) => {
+      provider.createSession({
+        documentId,
+        languageId,
+        textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
+        snapshot: createPieceTableSnapshot(text),
+      })
+      const call = workerOwner.createSession.mock.calls.at(-1) as unknown as [
+        ShikiHighlighterSessionOptions,
+      ]
+      return call[0]
+    }
+
+    const first = openSession('first.ts', 'typescript')
+    const preload = first.preloadRegistrations
+    if (typeof preload !== 'function') throw new Error('expected a lazy preload')
+    await expect(preload()).resolves.toMatchObject({
+      languageRegistrations: [{ name: 'typescript' }, { name: 'json' }, { name: 'css' }],
+    })
+
+    const second = openSession('second.html', 'html')
+    const registrations = await second.registrations
+    expect(registrations.languageRegistrations.map((registration) => registration.name)).toEqual([
+      'html',
+    ])
+  })
+
+  it('reads a preload getter when the preload runs, after the session opened', async () => {
+    let wanted: readonly string[] = []
+    const provider = activateHighlighterProvider({ preloadLanguages: () => wanted })
+    const text = 'const value = 1'
+    provider.createSession({
+      documentId: 'first.ts',
+      languageId: 'typescript',
+      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
+      snapshot: createPieceTableSnapshot(text),
+    })
+    const [options] = workerOwner.createSession.mock.calls.at(-1) as unknown as [
+      ShikiHighlighterSessionOptions,
+    ]
+    wanted = ['json']
+
+    const preload = options.preloadRegistrations
+    if (typeof preload !== 'function') throw new Error('expected a lazy preload')
+    await expect(preload()).resolves.toMatchObject({
+      languageRegistrations: [{ name: 'typescript' }, { name: 'json' }],
+    })
+  })
+
+  it('answers the grammar a document would use without opening it', () => {
+    expect(shikiLanguageForDocument({ documentId: 'App.tsx', languageId: 'typescript' }, {})).toBe(
+      'tsx',
+    )
+    expect(
+      shikiLanguageForDocument(
+        { documentId: 'notes.md', languageId: 'markdown' },
+        {
+          markdown: 'mdc',
+        },
+      ),
+    ).toBe('mdc')
+    expect(shikiLanguageForDocument({ documentId: 'a.css', languageId: 'css' }, undefined)).toBe(
+      'css',
+    )
+  })
+
   it('requires a non-empty name on resolved theme registrations', async () => {
     const provider = activateHighlighterProvider({
       resolveTheme: async () => ({ name: '' }),
@@ -226,7 +294,7 @@ describe('createShikiHighlighterPlugin', () => {
     provider.createSession({
       documentId: 'index.ts',
       languageId: 'typescript',
-      fullText: text,
+      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
       snapshot: createPieceTableSnapshot(text),
     })
 
@@ -244,14 +312,14 @@ function activateHighlighterProvider(
   options: Partial<ShikiHighlighterPluginOptions> = {},
 ): EditorHighlighterProvider {
   let provider: EditorHighlighterProvider | null = null
-  const context: Partial<EditorPluginContext> = {
+  const context = createTestPluginContext({
     registerHighlighter: (nextProvider) => {
       provider = nextProvider
       return { dispose: () => undefined }
     },
-  }
+  })
 
-  createShikiHighlighterPlugin(pluginOptions(options)).activate(context as EditorPluginContext)
+  createShikiHighlighterPlugin(pluginOptions(options)).activate(context)
   if (!provider) throw new Error('Expected Shiki plugin to register a highlighter')
   return provider
 }
@@ -259,12 +327,8 @@ function activateHighlighterProvider(
 function activateWithDisposables(
   options: Partial<ShikiHighlighterPluginOptions> = {},
 ): readonly EditorDisposable[] {
-  const context: Partial<EditorPluginContext> = {
-    registerHighlighter: () => ({ dispose: () => undefined }),
-  }
-
   return toDisposables(
-    createShikiHighlighterPlugin(pluginOptions(options)).activate(context as EditorPluginContext),
+    createShikiHighlighterPlugin(pluginOptions(options)).activate(createTestPluginContext()),
   )
 }
 

@@ -1,66 +1,3 @@
-.editor-diff-view,
-.editor-diff-row,
-.editor-diff-gutter-row {
-  --editor-diff-added: #5ecc71;
-  --editor-diff-deleted: #ff6762;
-  --editor-diff-modified: #69b1ff;
-  --editor-diff-added-bg: color-mix(
-    in srgb,
-    var(--editor-diff-background, var(--editor-background, #1e1e1e)) 78%,
-    var(--editor-diff-added)
-  );
-  --editor-diff-deleted-bg: color-mix(
-    in srgb,
-    var(--editor-diff-background, var(--editor-background, #1e1e1e)) 78%,
-    var(--editor-diff-deleted)
-  );
-  --editor-diff-hunk-bg: color-mix(
-    in srgb,
-    var(--editor-diff-background, var(--editor-background, #1e1e1e)) 84%,
-    var(--editor-diff-modified)
-  );
-  --editor-diff-placeholder-bg: color-mix(
-    in srgb,
-    var(--editor-diff-background, var(--editor-background, #1e1e1e)) 92%,
-    #ffffff
-  );
-  --editor-diff-border: #3f3f46;
-  --editor-diff-split-handle: #71717a;
-  --editor-diff-muted: #a1a1aa;
-  --editor-diff-hunk-foreground: #9cdcfe;
-}
-
-/*
- * A diff editor is a real `Editor`, so it carries `.editor` (Editor.ts:428) and the whole
- * `--editor-*` block that comes with it (editor/style.css:20-60). These three are declared at
- * (0,2,0) with `!important` so the diff's own background wins; everything the block does not name —
- * caret colour, cursor-line colours, every `--editor-syntax-*` — is deliberately left to `.editor`,
- * which is where a diff should read them from. See §C10.
- *
- * `!important` here is doing something sharper than winning a specificity contest, and that is the
- * reason to name as few properties as possible: `applyEditorTheme` writes the `--editor-*` colours
- * as INLINE declarations (theme.ts:318), and a stylesheet `!important` outranks a normal inline
- * one. So every variable listed here stops tracking the editor colour theme entirely. The three
- * that remain mean to — a diff paints its own surface. The gutter *foreground* did not: it pinned
- * every diff's line numbers to `#71717a` whatever theme was loaded, while the same numbers in an
- * ordinary editor followed it. It is off this list and resolved on the cell instead.
- *
- * `.editor-diff-view` is stamped by the HOST, on the element it mounts the editor into. Nothing in
- * this package puts it there any more — `DiffView`, which used to, is gone. A host that omits it
- * still renders, but loses every `--editor-diff-*` theming hook; the README says so.
- *
- * The selector is `.editor-virtualized` and not also `.editor`: both classes land on the same
- * scroll element, so naming both buys nothing and only widens what an `!important` rule catches.
- */
-.editor-diff-view .editor-virtualized {
-  --editor-background: var(--editor-diff-background, #1e1e1e) !important;
-  --editor-foreground: var(--editor-diff-foreground, #d4d4d4) !important;
-  --editor-gutter-background: var(
-    --editor-diff-gutter-background,
-    var(--editor-diff-background, #1e1e1e)
-  ) !important;
-}
-
 /*
  * No caret. A diff is a real `Editor`, so it brings one — and a caret is an insertion point, which
  * a diff does not have: the document is a synthetic projection, `editability` is readonly and the
@@ -70,9 +7,8 @@
  * running rather than animating something invisible. Selection is untouched — it paints from its
  * own range highlight, so a reader can still select and copy.
  *
- * Scoped to `.editor-diff-view`, which is the host's element (see the note above): a host that
- * wants the caret back simply does not stamp the class, and loses the `--editor-diff-*` block with
- * it.
+ * Scoped to the host's `.editor-diff-view` class. Base colors come from EditorTheme;
+ * `createDiffPlugin` registers the `diff.*` palette used below.
  */
 .editor-diff-view .editor-virtualized-caret-layer {
   display: none;
@@ -166,23 +102,44 @@
 
 /*
  * The gutter band's own tint, which the canvas used to fill. This *is* per pane — a split old pane
- * shows no tint behind an addition — so it keys off the row tone rather than the lane tone.
+ * shows no tint behind an addition, because that row is a placeholder there.
  *
- * These replace `.editor-diff-gutter-row-*  { background: inherit }`, which was inert: it inherited
- * from `.editor-virtualized-gutter` rather than from the row tint (§2.3).
+ * In document mode the diff gutter is the pane's whole gutter, so the tint is the gutter row's own
+ * background (`editor-diff-gutter-band-*`, from the row decoration). The row spans the gutter's
+ * leading inset as well as the lanes, so a tinted row runs from the pane's edge to its text.
  */
-.editor-diff-gutter[data-diff-row-tone='added'] {
+.editor-diff-gutter-band-addition {
   background: var(--editor-diff-added-bg);
 }
 
-.editor-diff-gutter[data-diff-row-tone='deleted'] {
+.editor-diff-gutter-band-deletion {
   background: var(--editor-diff-deleted-bg);
 }
 
-.editor-diff-gutter[data-diff-row-tone='hunk'] {
+.editor-diff-gutter-band-hunk {
   background: var(--editor-diff-hunk-bg);
 }
 
-.editor-diff-gutter[data-diff-row-type='placeholder'] {
+.editor-diff-gutter-band-placeholder {
+  background: var(--editor-diff-placeholder-bg);
+}
+
+/*
+ * In overlay mode the diff lane shares the gutter with the host's own lanes, so only its cell is
+ * tinted. The tone comes from `diffGutterRowTone`.
+ */
+.editor-diff-gutter-tinted[data-diff-row-tone='added'] {
+  background: var(--editor-diff-added-bg);
+}
+
+.editor-diff-gutter-tinted[data-diff-row-tone='deleted'] {
+  background: var(--editor-diff-deleted-bg);
+}
+
+.editor-diff-gutter-tinted[data-diff-row-tone='hunk'] {
+  background: var(--editor-diff-hunk-bg);
+}
+
+.editor-diff-gutter-tinted[data-diff-row-type='placeholder'] {
   background: var(--editor-diff-placeholder-bg);
 }

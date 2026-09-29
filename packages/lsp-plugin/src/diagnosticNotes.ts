@@ -1,4 +1,8 @@
-import type { TooltipNote, TooltipNoteLink } from '@singapore-editor/plugin-ui'
+import type {
+  TooltipAction,
+  TooltipNote,
+  TooltipNoteLink,
+} from '@singapore-editor/plugin-ui/tooltip'
 import type * as lsp from 'vscode-languageserver-protocol'
 
 import { documentUriToFileName } from './paths'
@@ -10,12 +14,20 @@ export type OpenLocation = (target: LanguageServerDefinitionTarget) => void
 export function diagnosticNotes(
   diagnostics: readonly lsp.Diagnostic[],
   openLocation: OpenLocation,
+  actionsForDiagnostic?: (diagnostic: lsp.Diagnostic) => readonly TooltipAction[],
 ): readonly TooltipNote[] {
-  return diagnostics.map((diagnostic) => diagnosticNote(diagnostic, openLocation))
+  return diagnostics.map((diagnostic) =>
+    diagnosticNote(diagnostic, openLocation, actionsForDiagnostic?.(diagnostic)),
+  )
 }
 
-function diagnosticNote(diagnostic: lsp.Diagnostic, openLocation: OpenLocation): TooltipNote {
+function diagnosticNote(
+  diagnostic: lsp.Diagnostic,
+  openLocation: OpenLocation,
+  actions?: readonly TooltipAction[],
+): TooltipNote {
   return {
+    actions,
     text: typeof diagnostic.message === 'string' ? diagnostic.message : diagnostic.message.value,
     source: diagnostic.source,
     code: diagnostic.code === undefined ? undefined : String(diagnostic.code),

@@ -71,6 +71,7 @@ export type TreeSitterParseResult = {
   readonly snapshotVersion: number
   readonly languageId: TreeSitterLanguageId
   readonly captures: readonly TreeSitterCapture[]
+  readonly records?: { readonly languageId: string; readonly data: Uint32Array }
   readonly folds: readonly FoldRange[]
   readonly brackets: readonly BracketInfo[]
   readonly errors: readonly TreeSitterError[]
@@ -111,6 +112,11 @@ type TreeSitterInitRequest = {
 type TreeSitterRegisterLanguagesRequest = {
   readonly type: 'registerLanguages'
   readonly languages: readonly TreeSitterLanguageDescriptor[]
+}
+
+type TreeSitterWarmLanguagesRequest = {
+  readonly type: 'warmLanguages'
+  readonly languageIds: readonly TreeSitterLanguageId[]
 }
 
 export type TreeSitterParseRequest = {
@@ -203,6 +209,7 @@ type TreeSitterDisposeRequest = {
 export type TreeSitterWorkerRequestPayload =
   | TreeSitterInitRequest
   | TreeSitterRegisterLanguagesRequest
+  | TreeSitterWarmLanguagesRequest
   | TreeSitterParseRequest
   | TreeSitterEditRequest
   | TreeSitterRangeRequest

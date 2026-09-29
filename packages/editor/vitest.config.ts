@@ -27,7 +27,16 @@ export default defineConfig({
         // Geometry that only a real engine can answer: caret rects, hit tests
         // and measured advances under a CSS transform. happy-dom reports every
         // rect empty, so these assertions are meaningless anywhere else.
-        optimizeDeps: { exclude: ['web-tree-sitter'] },
+        // Discovered mid-run, these make Vite reload and strand the browser test that was loading.
+        optimizeDeps: {
+          // tree-sitter-md is plain ESM over web-tree-sitter; served as-is, it is never discovered.
+          exclude: ['web-tree-sitter', 'tree-sitter-md'],
+          include: [
+            '@shikijs/engine-oniguruma',
+            '@shikijs/engine-oniguruma/wasm-inlined',
+            'shiki/core',
+          ],
+        },
         test: {
           name: 'browser',
           // Keep browser timing probes clear of Node/DOM workers and other browser files.
@@ -40,6 +49,19 @@ export default defineConfig({
             fileParallelism: false,
             provider: playwright(),
             commands: {
+              proofClipboardPermissions: async ({ page }) => {
+                await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+              },
+              proofPointerDrag: async (
+                { page },
+                start: { x: number; y: number },
+                end: { x: number; y: number },
+              ) => {
+                await page.mouse.move(start.x, start.y)
+                await page.mouse.down()
+                await page.mouse.move(end.x, end.y, { steps: 5 })
+                await page.mouse.up()
+              },
               proofKeyPress: async ({ page }, key: string) => {
                 await page.keyboard.press(key)
               },
@@ -48,6 +70,32 @@ export default defineConfig({
               },
               proofKeyUp: async ({ page }, key: string) => {
                 await page.keyboard.up(key)
+              },
+              proofType: async ({ page }, text: string) => {
+                await page.keyboard.type(text)
+              },
+              // What an IME sends: a candidate over an optional replacement range, then a commit.
+              proofImeComposition: async (
+                { page },
+                text: string,
+                replacement: readonly [number, number] | null = null,
+              ) => {
+                const cdp = await page.context().newCDPSession(page)
+                const range = replacement
+                  ? { replacementStart: replacement[0], replacementEnd: replacement[1] }
+                  : {}
+                await cdp.send('Input.imeSetComposition', {
+                  text,
+                  selectionStart: text.length,
+                  selectionEnd: text.length,
+                  ...range,
+                })
+                await cdp.detach()
+              },
+              proofInsertText: async ({ page }, text: string) => {
+                const cdp = await page.context().newCDPSession(page)
+                await cdp.send('Input.insertText', { text })
+                await cdp.detach()
               },
               proofRowScreenshot: async ({ iframe }, hostId: string) => {
                 const row = iframe.locator(`#${hostId} [data-editor-virtual-row="0"]`)
@@ -64,6 +112,34 @@ export default defineConfig({
             instances: [{ browser: 'chromium' }],
           },
           include: ['test/**/*.browser.test.ts'],
+          exclude: ['test/highlightPaint.browser.test.ts'],
+        },
+      },
+      {
+        test: {
+          name: 'highlight-paint',
+          sequence: { groupOrder: 2 },
+          include: ['test/highlightPaint.browser.test.ts'],
+          browser: {
+            enabled: true,
+            headless: true,
+            viewport: { width: 800, height: 600 },
+            fileParallelism: false,
+            provider: playwright(),
+            commands: {
+              proofHighlightPaintScreenshot: async ({ iframe }, hostId: string) => {
+                const image = await iframe
+                  .locator(`#${hostId} [data-editor-virtual-row="0"]`)
+                  .screenshot({ animations: 'disabled' })
+                return image.toString('base64')
+              },
+            },
+            instances: [
+              { browser: 'chromium', name: 'highlight-paint-chromium' },
+              { browser: 'firefox', name: 'highlight-paint-firefox' },
+              { browser: 'webkit', name: 'highlight-paint-webkit' },
+            ],
+          },
         },
       },
     ],

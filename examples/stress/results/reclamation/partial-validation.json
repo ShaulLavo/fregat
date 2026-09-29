@@ -1,0 +1,32 @@
+{
+  "baselineCommit": "b31e22eb18c240d04ade431e44a80fa60e694aa4",
+  "focusedTests": {
+    "textbuffer": 138,
+    "core": 180,
+    "treeSitterUnit": 90,
+    "treeSitterBrowser": 57,
+    "platformWorkspaceEditAndRetention": 73
+  },
+  "mountedHeapSamples": 30,
+  "validatedInputSamplesPerRun": 108,
+  "typechecksPassed": ["textbuffer", "core", "tree-sitter", "stress"],
+  "lintPassed": ["textbuffer", "core (two existing warnings)", "tree-sitter", "stress"],
+  "rootFormatCheck": "passed",
+  "fullCoreBaselineFailures": [
+    "Three Shiki worker-client cache tests (also three disposed-worker unhandled errors).",
+    "BiDi 6,000-character click/drag performance ratio; clean baseline click ratio 6.5 exceeded limit 5."
+  ],
+  "workspaceTypecheckBaselineFailures": {
+    "tree-sitter-languages": [
+      "../editor/src/editor/indentationGuess.ts(83,56): error TS2532: Object is possibly 'undefined'."
+    ],
+    "typescript-lsp": [
+      "test/markdownTooltip.test.ts(21,50): error TS2741: Property 'addSource' is missing in type '{ tokenize: (_text: string, languageId: string) => Promise<({ start: number; end: number; style: { color: string; fontStyle?: undefined; }; } | { start: number; end: number; style: { color: string; fontStyle: \"italic\"; }; })[]>; }' but required in type 'EditorSnippetTokensFeature'."
+    ]
+  },
+  "limits": [
+    "The fixed experimental 10% median heap target remains unmet for survivors/mixed/paragraph at 500 cycles. All 30 final samples release actual heap.",
+    "Input comparison uses one clean baseline and one final run on Chromium 153, not an E002 calibration. Multi-view long-line composition-commit p95 rises3.2ms\u21924.9ms while median remains 1.7 ms.",
+    "Tombstones, reverse-index slots, buffer-ID mappings and newline metadata remain outside this text-reclamation milestone."
+  ]
+}

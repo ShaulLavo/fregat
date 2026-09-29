@@ -1,4 +1,6 @@
+import { registerDiffColors } from './theme'
 import type {
+  EditorContributionChange,
   EditorDecorationContribution,
   EditorDecorationContributionContext,
   EditorDisposable,
@@ -6,21 +8,21 @@ import type {
   EditorInjectedTextRow,
   EditorPlugin,
   EditorPluginContext,
+  EditorSnippetTokenSource,
   EditorViewContribution,
   EditorViewContributionContext,
   EditorViewContributionUpdateKind,
   EditorViewSnapshot,
 } from '@singapore-editor/core/extensions'
-import type { DocumentSessionChange } from '@singapore-editor/core/document'
+import { EDITOR_SNIPPET_TOKENS_FEATURE } from '@singapore-editor/core/extensions'
 import type { EditorToken } from '@singapore-editor/core/syntax'
 import { createDiffGutterContribution } from './diffGutter'
+import { diffInlineHighlightRanges, diffRowDecorations } from './diffRows'
 import {
-  diffInlineHighlightRanges,
-  diffRowDecorations,
-  documentModeViolations,
-  type DiffDocumentModeViolation,
-} from './diffRows'
-import { DiffSyntaxController } from './diffSyntax'
+  DiffSyntaxController,
+  type PreparedDiffSyntaxInput,
+  type PreparedDiffSyntaxSource,
+} from './diffSyntax'
 import {
   diffGutterDigits,
   type DiffGutterDigits,
@@ -57,39 +59,54 @@ export type DiffPluginOptions = {
 }
 
 export type DiffPlugin = EditorPlugin & {
-  /** `document` mode: the file to project. The host owns the editor's text — §C3. */
-  setFile(file: DiffFile | null): void
-  getRows(): readonly DiffRenderRow[]
   /**
-   * Projected syntax tokens for the current rows. `Editor.setText` clears tokens — via
-   * `resetOwnedDocument` -> `setDocument` -> `setContent`, which calls `setTokens([])` — so the
-   * host applies these immediately after every `setText`, or an expansion toggle repaints
-   * uncoloured (§C10).
+   * `document` mode: the file to project. The host owns the editor's text — §C3. `prepared`
+   * streams from `prepareDiffSyntax` for this file paint with the first rows, and a preparation
+   * still running is awaited in place of a second parse; the plugin owns them.
    */
+  setFile(file: DiffFile | null, prepared?: PreparedDiffSyntaxInput): void
+  /** The current file's parsed streams, handed to the caller; empty while a parse is running. */
+  releasePreparedSyntax(): readonly PreparedDiffSyntaxSource[]
+  getRows(): readonly DiffRenderRow[]
+  /** Both sides in row order. Cached until the file or expansion state changes. */
+  getStackedRows(): readonly DiffRenderRow[]
+  /**
+   * Projected syntax tokens for the current rows. The host passes them with the rows' text,
+   * `setText(text, { tokens })`, or an expansion toggle repaints uncoloured (§C10).
+   */
+  isSyntaxReady(): boolean
   getTokens(): readonly EditorToken[]
   onDidChangeRows(listener: () => void): EditorDisposable
   onDidChangeTokens(listener: () => void): EditorDisposable
   /** §C5. Hosts must not mirror this. */
   getExpandedRegions(): ReadonlySet<string>
   toggleRegion(key: string): void
-  /** The exact counts and violations from the latest row-index identity check. */
-  getDocumentModeStatus(): DiffDocumentModeStatus
 
   /** `overlay` mode: the buffer the live editor text is diffed against. */
   setBaseFile(file: DiffTextFile | null): void
   setEnabled(enabled: boolean): void
 }
 
-export type DiffDocumentModeStatus = {
-  readonly lineCount: number
-  readonly rowCount: number
-  readonly violations: readonly DiffDocumentModeViolation[]
+/** The diff row under a pointer: which pane, that pane's rows, and the index into them. */
+export type DiffRowHit = {
+  readonly side: DiffGutterSide
+  readonly rowIndex: number
+  readonly rows: readonly DiffRenderRow[]
 }
 
-const EMPTY_DOCUMENT_MODE_STATUS: DiffDocumentModeStatus = {
-  lineCount: 0,
-  rowCount: 0,
-  violations: [],
+// How a pointer event finds the plugin that owns the pane under it, so a host never reads row
+// attributes or pane classes to work out where a press landed.
+const viewsByScrollElement = new WeakMap<Element, DiffViewContribution>()
+
+/** `null` outside a `document`-mode diff pane, or over something that is not a diff row. */
+export function diffRowAtEvent(event: MouseEvent): DiffRowHit | null {
+  const target = event.target
+  if (!(target instanceof Element)) return null
+
+  const scrollElement = target.closest('[data-editor-diff-side]')
+  if (!scrollElement) return null
+
+  return viewsByScrollElement.get(scrollElement)?.rowHitAt(event) ?? null
 }
 
 const EMPTY_PROJECTION: LiveDiffProjection = {
@@ -114,6 +131,7 @@ let nextDiffPluginId = 0
  * it.
  */
 export function createDiffPlugin(options: DiffPluginOptions): DiffPlugin {
+  registerDiffColors()
   const runtime = new DiffPluginRuntime(options)
 
   return {
@@ -121,14 +139,16 @@ export function createDiffPlugin(options: DiffPluginOptions): DiffPlugin {
     activate(context) {
       return runtime.activate(context)
     },
-    setFile: (file) => runtime.setFile(file),
+    setFile: (file, prepared) => runtime.setFile(file, prepared),
+    releasePreparedSyntax: () => runtime.releasePreparedSyntax(),
     getRows: () => runtime.getRows(),
+    getStackedRows: () => runtime.getStackedRows(),
     getTokens: () => runtime.getTokens(),
+    isSyntaxReady: () => runtime.isSyntaxReady(),
     onDidChangeRows: (listener) => runtime.onDidChangeRows(listener),
     onDidChangeTokens: (listener) => runtime.onDidChangeTokens(listener),
     getExpandedRegions: () => runtime.getExpandedRegions(),
     toggleRegion: (key) => runtime.toggleRegion(key),
-    getDocumentModeStatus: () => runtime.getDocumentModeStatus(),
     setBaseFile: (file) => runtime.setBaseFile(file),
     setEnabled: (enabled) => runtime.setEnabled(enabled),
   }
@@ -145,10 +165,10 @@ class DiffPluginRuntime {
   private readonly regions: DiffRegionStore
   private file: DiffFile | null = null
   private rows: readonly DiffRenderRow[] = []
+  private stackedRows: readonly DiffRenderRow[] | null = null
   private digits: DiffGutterDigits = { old: 0, new: 0 }
   private hunkRows = false
   private expandableRows = false
-  private documentModeStatus = EMPTY_DOCUMENT_MODE_STATUS
 
   private baseFile: DiffTextFile | null = null
   private enabled: boolean
@@ -209,6 +229,7 @@ class DiffPluginRuntime {
       context.registerGutterContribution(
         createDiffGutterContribution({
           side: this.side,
+          tint: this.mode === 'document' ? 'row' : 'cell',
           getDigits: () => this.gutterDigits(),
           resolveRow: (row) => this.resolveGutterRow(row),
           isEnabled: () => this.enabled,
@@ -238,21 +259,44 @@ class DiffPluginRuntime {
 
   // ---------------------------------------------------------------- document mode (§C3, §C5)
 
-  setFile(file: DiffFile | null): void {
-    if (this.mode !== 'document') return
+  setFile(file: DiffFile | null, prepared: PreparedDiffSyntaxInput = []): void {
+    if (this.mode !== 'document') {
+      void Promise.resolve(prepared).then(
+        (sources) => {
+          for (const source of sources) source.dispose()
+        },
+        () => undefined,
+      )
+      return
+    }
 
     this.file = file
     // The store decides whether this counts as the same diff, and drops expansion if not. Both
     // sides of a split share it, so both are told once.
     this.regions.setFile(file)
     this.rebuildRows()
-    this.syntax.setFile(file, this.rows)
+    this.syntax.setFile(file, this.rows, prepared)
     this.notifyRows()
+  }
+
+  releasePreparedSyntax(): readonly PreparedDiffSyntaxSource[] {
+    return this.syntax.release()
   }
 
   getRows(): readonly DiffRenderRow[] {
     if (this.mode === 'overlay') return this.liveProjection.rows
     return this.rows
+  }
+
+  getStackedRows(): readonly DiffRenderRow[] {
+    if (this.mode === 'overlay') return this.liveProjection.rows
+    if (this.side === 'stacked') return this.rows
+    this.stackedRows ??= projectRows(this.file, 'stacked', this.regions.getExpandedRegions())
+    return this.stackedRows
+  }
+
+  isSyntaxReady(): boolean {
+    return this.syntax.isReady()
   }
 
   getTokens(): readonly EditorToken[] {
@@ -283,10 +327,6 @@ class DiffPluginRuntime {
     this.notifyRows()
   }
 
-  getDocumentModeStatus(): DiffDocumentModeStatus {
-    return this.documentModeStatus
-  }
-
   onDidChangeRows(listener: () => void): EditorDisposable {
     this.rowListeners.add(listener)
     return { dispose: () => this.rowListeners.delete(listener) }
@@ -298,6 +338,7 @@ class DiffPluginRuntime {
   }
 
   private rebuildRows(): void {
+    this.stackedRows = null
     this.rows = projectRows(this.file, this.side, this.regions.getExpandedRegions())
     // Both derived once here rather than per gutter-width recompute and per mousemove.
     this.digits = diffGutterDigits(this.rows)
@@ -406,7 +447,7 @@ class DiffPluginRuntime {
       oldFile: this.baseFile,
       newFile: {
         path: this.baseFile.path,
-        text: context.materializeFullText(),
+        text: liveDiffDocumentText(context),
         languageId: this.baseFile.languageId,
       },
     })
@@ -424,13 +465,14 @@ class DiffPluginRuntime {
       hasHunkRows: () => this.hunkRows,
       hasExpandableRows: () => this.expandableRows,
       toggleRegion: (key) => this.toggleRegion(key),
-      reportStatus: (status) => {
-        this.documentModeStatus = status
-      },
       detach: (disposed) => {
+        lentSyntax?.dispose()
         if (this.view === disposed) this.view = null
       },
     })
+    const lentSyntax = context
+      .getFeature(EDITOR_SNIPPET_TOKENS_FEATURE)
+      ?.addSource(snippetTokenSource(this.options.syntaxBackend))
     this.view = contribution
     if (this.lastGutterLayout) contribution.applyGutterLayout(this.lastGutterLayout)
     return contribution
@@ -455,6 +497,11 @@ class DiffPluginRuntime {
       onDidChangeTokens: () => this.notifyTokens(),
     })
   }
+}
+
+// A live diff compares whole documents, and the diff library takes strings: an explicit extraction.
+function liveDiffDocumentText(context: EditorDecorationContributionContext): string {
+  return context.materializeFullText()
 }
 
 function projectRows(
@@ -490,18 +537,18 @@ class DiffDecorationContribution {
    *
    * Rebuilding an overlay projection materializes the whole document and runs `structuredPatch`
    * over it, synchronously. `handleEditorChange` also fires for selection-only changes —
-   * `DocumentSessionChange.kind` is one of edit/selection/undo/redo/none — and a caret move cannot
+   * `EditorContributionChange.kind` is one of edit/selection/undo/redo/none — and a caret move cannot
    * alter the diff, so paying for one is pure waste on the typing path. Text-snapshot identity is
    * the second guard, for the notification paths that carry no change object at all.
    *
    * Plugin-state changes (`setBaseFile`, `setEnabled`) call `refresh()` directly and are never
    * skipped: the text is the same but the diff it produces is not.
    */
-  handleEditorChange(change: DocumentSessionChange | null): void {
+  handleEditorChange(change: EditorContributionChange | null): void {
     if (this.options.mode === 'overlay') {
       if (change?.kind === 'selection') return
 
-      const snapshot = this.context.getTextSnapshot?.() ?? null
+      const snapshot = this.context.getTextSnapshot()
       if (snapshot !== null && snapshot === this.lastTextSnapshot) return
     }
 
@@ -509,7 +556,7 @@ class DiffDecorationContribution {
   }
 
   refresh(): void {
-    this.lastTextSnapshot = this.context.getTextSnapshot?.() ?? null
+    this.lastTextSnapshot = this.context.getTextSnapshot()
     if (this.options.mode === 'document') {
       this.context.setRowDecorations(
         ROW_DECORATION_SOURCE,
@@ -552,35 +599,26 @@ type DiffViewOptions = {
   readonly hasHunkRows: () => boolean
   readonly hasExpandableRows: () => boolean
   readonly toggleRegion: (key: string) => void
-  readonly reportStatus: (status: DiffDocumentModeStatus) => void
   readonly detach: (contribution: DiffViewContribution) => void
 }
 
-/**
- * Pointer handling and inline word-diff highlights.
- *
- * The pointer half is not optional decoration — see §3.4. A click in the gutter band cannot be
- * resolved with `closest('[data-editor-virtual-row]')`: `.editor-virtualized-gutter` is
- * `pointer-events: none` (editor/style.css:132) so the click lands on the scroll element, gutter
- * rows carry `data-editor-virtual-gutter-row` rather than the text row's attribute
- * (virtualizedTextViewRows.ts:1845 vs :580), and text rows start at `left: var(--editor-gutter-width)`
- * so none of them sits under the band. Expanding a region by clicking its gutter — the half of an
- * expandable separator users actually aim at — needs the Y hit-test, and so does the pointer cursor.
- */
+/** Pointer handling and inline word-diff highlights. */
 class DiffViewContribution implements EditorViewContribution {
+  readonly snapshotKey = 'diff-inline-v1'
+  private readonly pressParticipant: EditorDisposable
+  private readonly separatorRows: EditorDisposable
   private snapshot: EditorViewSnapshot | null = null
   private lastHighlightRows: readonly DiffRenderRow[] | null = null
+  private lastHighlightTextVersion = -1
 
   constructor(
     private readonly context: EditorViewContributionContext,
     private readonly options: DiffViewOptions,
   ) {
     this.context.scrollElement.dataset.editorDiffSide = options.side
-    // Registration order puts this ahead of the editor's own mousedown handler
-    // (Editor.ts:580 creates view contributions, :633 installs input handling), which is what lets
-    // a gutter-toggle click suppress caret placement. `stopImmediatePropagation` in the handler is
-    // what makes that ordering actually decisive.
-    this.context.scrollElement.addEventListener('mousedown', this.handleMouseDown)
+    viewsByScrollElement.set(this.context.scrollElement, this)
+    this.pressParticipant = this.context.registerPressParticipant(this.claimSeparatorPress)
+    this.separatorRows = this.context.registerNonCaretRows(this.isSeparatorRow)
     this.context.scrollElement.addEventListener('click', this.handleClick)
     this.context.scrollElement.addEventListener('mousemove', this.handleMouseMove)
     this.context.scrollElement.addEventListener('mouseleave', this.handleMouseLeave)
@@ -591,22 +629,41 @@ class DiffViewContribution implements EditorViewContribution {
    * derived jobs below are not per-frame work.
    *
    * `update` is called for `'viewport'` too, which `Editor.handleViewportChange` fires on every
-   * scroll frame. Running the §C4 self-check there allocated a `Set`, spread it into an array and
-   * walked every mounted row on the exact path the Aug-2026 scroll work hardened — to answer a
-   * question that can only change when the rows or the projection do.
+   * scroll frame, and the highlights can only change when the rows or the text do.
    */
   update(snapshot: EditorViewSnapshot, kind: EditorViewContributionUpdateKind): void {
     this.snapshot = snapshot
     if (this.options.mode !== 'document') return
     if (kind === 'viewport' || kind === 'selection') return
 
-    const rows = this.options.getRows()
-    this.options.reportStatus({
-      lineCount: snapshot.lineCount,
-      rowCount: rows.length,
-      violations: documentModeViolations(snapshot, rows),
-    })
     this.applyInlineHighlights()
+  }
+
+  captureVisiblePaint(snapshot: EditorViewSnapshot) {
+    const viewport = this.context.scrollElement.getBoundingClientRect()
+    const rows = this.options.getRows()
+    const ranges = snapshot.visibleRows.flatMap((visible) => {
+      const row = rows[visible.bufferRow]
+      if (!row) return []
+      const start = snapshot.lineStartsView.at(visible.bufferRow) ?? visible.startOffset
+      return diffInlineHighlightRanges([row]).map((range) => ({
+        start: range.start + start,
+        end: range.end + start,
+      }))
+    })
+    const rectangles = []
+    for (const range of ranges) {
+      const rect = this.context.getRangeClientRect(range.start, range.end)
+      if (!rect || rect.width <= 0 || rect.height <= 0) continue
+      rectangles.push({
+        left: rect.left - viewport.left + snapshot.viewport.scrollLeft,
+        top: rect.top - viewport.top + snapshot.viewport.scrollTop,
+        width: rect.width,
+        height: rect.height,
+        backgroundColor: INLINE_HIGHLIGHT_STYLE.backgroundColor,
+      })
+    }
+    return { id: `diff-inline-${this.options.side}`, status: 'ready' as const, rectangles }
   }
 
   refreshRows(): void {
@@ -624,43 +681,40 @@ class DiffViewContribution implements EditorViewContribution {
   }
 
   dispose(): void {
-    this.context.scrollElement.removeEventListener('mousedown', this.handleMouseDown)
+    this.pressParticipant.dispose()
+    this.separatorRows.dispose()
     this.context.scrollElement.removeEventListener('click', this.handleClick)
     this.context.scrollElement.removeEventListener('mousemove', this.handleMouseMove)
     this.context.scrollElement.removeEventListener('mouseleave', this.handleMouseLeave)
     this.context.scrollElement.style.cursor = ''
-    this.context.clearRangeHighlight?.(this.options.highlightName)
+    // A replacement view on the same element may already have registered itself.
+    if (viewsByScrollElement.get(this.context.scrollElement) === this) {
+      viewsByScrollElement.delete(this.context.scrollElement)
+    }
+    this.context.clearRangeHighlight(this.options.highlightName)
     // Or the runtime keeps writing highlights and gutter geometry through a torn-down context,
     // and holds its scroll element alive for the plugin's lifetime.
     this.options.detach(this)
   }
 
-  /**
-   * Inline word-diff tint, isolated from everything else this contribution does.
-   *
-   * `EditorViewContributionController` responds to a throw out of `update()` by disposing and
-   * unregistering the whole contribution — which would take the pointer handling with it, and the
-   * comment on this class is a long argument that the pointer half is *not* optional: a gutter
-   * click is the only way to expand a region. `setRangeHighlight` reaches an unguarded
-   * `new Highlight()` whenever there are ranges to paint, so on any engine without the CSS Custom
-   * Highlight API the first diff carrying word-diff ranges would silently disable expansion.
-   *
-   * Losing the tint is a cosmetic degradation. Losing expansion is not, so they do not share a
-   * `try` boundary.
-   */
+  // A highlight failure must not dispose the contribution and disable gutter expansion.
   private applyInlineHighlights(): void {
     const rows = this.options.getRows()
-    if (rows === this.lastHighlightRows) return
+    const textVersion = this.snapshot?.textVersion ?? -1
+    // Rows alone cannot key this: the view clamps ranges to the text it holds when they are set,
+    // and the host pushes the new text only after the rows notification that first lands here.
+    if (rows === this.lastHighlightRows && textVersion === this.lastHighlightTextVersion) return
 
     this.lastHighlightRows = rows
+    this.lastHighlightTextVersion = textVersion
     try {
-      this.context.setRangeHighlight?.(
+      this.context.setRangeHighlight(
         this.options.highlightName,
         diffInlineHighlightRanges(rows),
         INLINE_HIGHLIGHT_STYLE,
       )
     } catch (error) {
-      this.context.log?.({
+      this.context.log({
         action: 'editor.diff.inline_highlight_failed',
         level: 'warn',
         error: { message: error instanceof Error ? error.message : String(error) },
@@ -674,24 +728,21 @@ class DiffViewContribution implements EditorViewContribution {
    * A separator is chrome, not content — but its label is real buffer text, because the host's
    * document is `joinRenderLines(rows)` and there is nowhere else for the label to live. So the
    * editor will happily rest a caret in the middle of `Show 12 unmodified lines`, and a collapsed
-   * caret copies its own line: Cmd+C would put that sentence on the clipboard. Refusing the
-   * mousedown is the whole of what can be done from here. A drag that *crosses* a separator still
+   * caret copies its own line: Cmd+C would put that sentence on the clipboard. The mousedown is
+   * refused here, and arrow keys step over the row (`isSeparatorRow`). A drag that *crosses* a separator still
    * covers it, and always will while the label occupies offsets — giving these rows an offset
    * space of their own is the parallel coordinate system §C2 rules out.
    *
-   * Every click count, not just the first. `InputSelectionController.handleMouseDown` branches on
-   * `event.detail` before it looks at anything else — 2 selects a word, 3 selects the line, 4 or
-   * more selects the whole document — and it yields only to `defaultPrevented`. Letting the second
-   * press of a double-click through therefore selects a word of `Show 12 unmodified lines`, which
-   * is the same defect one press further in.
+   * Every click count, not just the first: a second press would select a word of the label, a
+   * third its line and a fourth the whole document.
    */
-  private readonly handleMouseDown = (event: MouseEvent): void => {
-    if (event.button !== 0) return
-    if (!this.hunkRowAt(event)) return
+  private readonly claimSeparatorPress = (event: MouseEvent): boolean =>
+    event.button === 0 && this.hunkRowAt(event) !== null
 
-    // Beats the editor's own mousedown, which would otherwise place a caret on the separator.
-    event.preventDefault()
-    event.stopImmediatePropagation()
+  /** The keyboard half of the same rule: arrow keys step over a separator. */
+  private readonly isSeparatorRow = (bufferRow: number): boolean => {
+    if (this.options.mode !== 'document' || !this.options.hasHunkRows()) return false
+    return this.options.getRows()[bufferRow]?.type === 'hunk'
   }
 
   private readonly handleClick = (event: MouseEvent): void => {
@@ -701,7 +752,6 @@ class DiffViewContribution implements EditorViewContribution {
     if (!row?.expandKey) return
 
     event.preventDefault()
-    event.stopImmediatePropagation()
     this.options.toggleRegion(row.expandKey)
   }
 
@@ -719,10 +769,7 @@ class DiffViewContribution implements EditorViewContribution {
   }
 
   private expandableRowAt(event: MouseEvent): DiffRenderRow | null {
-    // A diff with no skipped ranges has no expandable separator anywhere, so the answer is
-    // structurally null and the hit-test below is pure cost. This runs on every mousemove, and over
-    // the gutter band `closest()` misses by construction — that is this class's whole premise — so
-    // every one of those events would otherwise fall through to a forced layout read.
+    // Avoid a point query on every mousemove when no separator can expand.
     if (!this.options.hasExpandableRows()) return null
 
     const row = this.hunkRowAt(event)
@@ -735,48 +782,23 @@ class DiffViewContribution implements EditorViewContribution {
    * open them, and those are still not somewhere a caret belongs.
    */
   private hunkRowAt(event: MouseEvent): DiffRenderRow | null {
-    if (this.options.mode !== 'document') return null
     if (!this.options.hasHunkRows()) return null
 
-    const index = this.rowIndexAt(event)
-    if (index === null) return null
-
-    const row = this.options.getRows()[index]
+    const hit = this.rowHitAt(event)
+    const row = hit?.rows[hit.rowIndex]
     return row?.type === 'hunk' ? row : null
   }
 
-  private rowIndexAt(event: MouseEvent): number | null {
-    const target = event.target
-    if (target instanceof Element) {
-      const rowElement = target.closest<HTMLElement>('[data-editor-virtual-row]')
-      if (rowElement) return Number(rowElement.dataset.editorVirtualRow)
-    }
+  /** Only `document` mode has an answer: there a buffer row is an index into `getRows()`. */
+  rowHitAt(event: MouseEvent): DiffRowHit | null {
+    if (this.options.mode !== 'document') return null
 
-    return this.rowIndexFromPoint(event.clientY)
-  }
+    const hit = this.context.rowAtPoint(event.clientX, event.clientY)
+    if (hit?.source !== 'document') return null
+    const rowIndex = hit.bufferRow
 
-  /** Ported from `DiffView.paneRowIndexFromPoint` (DiffView.ts:849-862) — see the class comment. */
-  private rowIndexFromPoint(clientY: number): number | null {
-    const snapshot = this.snapshot
-    if (!snapshot) return null
-
-    // `getBoundingClientRect` forces a style and layout flush, and the render pass writes
-    // `--editor-gutter-width` and the spacer sizes every frame — so a mousemove interleaved with
-    // scrolling would synchronously lay out the editor subtree. The callers gate it: a mousemove
-    // reaches here only on a diff with an expandable separator, a press only on one with a
-    // separator at all.
-    const bounds = this.context.scrollElement.getBoundingClientRect()
-    if (clientY < bounds.top || clientY > bounds.bottom) return null
-
-    const y = clientY - bounds.top + snapshot.viewport.scrollTop
-    for (const row of snapshot.visibleRows) {
-      if (row.source !== 'document') continue
-      if (row.startOffset !== snapshot.lineStarts[row.bufferRow]) continue
-      if (y < row.top || y >= row.top + row.height) continue
-      return row.bufferRow
-    }
-
-    return null
+    const rows = this.options.getRows()
+    return rows[rowIndex] ? { side: this.options.side, rowIndex, rows } : null
   }
 }
 
@@ -784,4 +806,9 @@ function injectedDiffRow(row: EditorGutterRowContext): DiffRenderRow | null {
   const metadata = row.metadata
   if (!metadata || typeof metadata !== 'object') return null
   return 'type' in metadata && 'text' in metadata ? (metadata as DiffRenderRow) : null
+}
+
+function snippetTokenSource(backend: DiffSyntaxBackend | undefined): EditorSnippetTokenSource {
+  if (backend?.kind === 'highlighter') return { highlighter: backend.provider }
+  return { syntax: backend?.provider }
 }

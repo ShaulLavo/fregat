@@ -64,8 +64,6 @@ describe('piece tree inspection', () => {
       subtreeVisibleLength: 2,
       subtreePieces: 2,
       subtreeLineBreaks: 1,
-      subtreeMinOrder: 1,
-      subtreeMaxOrder: 2,
       subtreeMinBuffer: 0,
     })
     // Both pieces are original text, which the reverse index does not hold.
@@ -80,8 +78,6 @@ describe('piece tree inspection', () => {
     'subtreeVisibleLength',
     'subtreePieces',
     'subtreeLineBreaks',
-    'subtreeMinOrder',
-    'subtreeMaxOrder',
     'subtreeMinBuffer',
   ] as const)('identifies a corrupt %s independently of child caches', (field) => {
     const snapshot = control()
@@ -226,23 +222,28 @@ describe('piece tree inspection', () => {
     expect(formatPieceTree(deep, { maxRows: 2 }).split('\n')).toHaveLength(4)
   })
 
-  it('validates recorded line-index text, ignoring unused capacity and other branch text', () => {
-    const snapshot = createPieceTableSnapshot('abc')
+  it('validates retained line-index offsets and ignores unused capacity across isolated branches', () => {
+    const original = createPieceTableSnapshot('base')
+    const snapshot = insertIntoPieceTable(original, 0, 'x\ny')
+    const sibling = insertIntoPieceTable(original, 0, 'abc')
+    const buffer = snapshot.buffers.nextBufferSequence - 1
     const index = {
       offsets: new Uint32Array([1, 99, 99]),
       count: 1,
       scannedLength: 3,
-      text: 'x\ny',
     }
     const cached = {
       ...snapshot,
-      buffers: { ...snapshot.buffers, lineIndexes: new Map([[snapshot.buffers.original, index]]) },
+      buffers: { ...snapshot.buffers, lineIndexes: new Map([[buffer, index]]) },
     }
     expect(validatePieceTreeInvariants(cached).issues).toEqual([])
+    expect(validatePieceTreeInvariants(sibling).issues).toEqual([])
     index.offsets[0] = 2
     expect(validatePieceTreeInvariants(cached).issues).toContainEqual(
       expect.objectContaining({ kind: 'line-index', field: 'offsets[0]', expected: 1, actual: 2 }),
     )
+    expect(validatePieceTreeInvariants(sibling).issues).toEqual([])
+    index.offsets[0] = 1
     index.count = 0
     expect(validatePieceTreeInvariants(cached).issues).toContainEqual(
       expect.objectContaining({ field: 'count', expected: 1, actual: 0 }),

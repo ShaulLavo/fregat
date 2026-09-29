@@ -9,13 +9,13 @@
  * factory, a host-built `capabilities` block, the shipped `decodeSemanticTokens`, and a layer the
  * plugin created and handed over through its `semanticTokens` block.
  *
- * Two things here are not the real article, and neither of them sits on that path. The lib files
- * come off disk rather than the TypeScript playground CDN — Milestone 2's seam, because no suite of
- * ours may depend on the network — and the transport is a stub socket that hands the worker module's
- * own message handler the bytes a WebSocket would have carried, because a `Worker` needs a bundler
- * and the narrow factory speaks WebSocket only.
+ * One thing here is not the real article, and it does not sit on that path: the transport is a
+ * stub socket that hands the worker module's own message handler the bytes a WebSocket would have
+ * carried, because a `Worker` needs a bundler and the narrow factory speaks WebSocket only. The lib
+ * files are the worker's bundled ones, so nothing reaches the network.
  */
 
+import { createStringTextSnapshot } from '@singapore-editor/core/document'
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
 import type {
   DocumentChangesSinceSyncPoint,
@@ -25,7 +25,6 @@ import type {
   TextEdit,
 } from '@singapore-editor/core/document'
 import type {
-  EditorPluginContext,
   EditorViewContribution,
   EditorViewContributionContext,
   EditorViewContributionProvider,
@@ -44,31 +43,10 @@ import { semanticTokensClientCapability } from '@singapore-editor/lsp'
 import { createLanguageServerPlugin, decodeSemanticTokens } from '@singapore-editor/lsp-plugin'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type * as lsp from 'vscode-languageserver-protocol'
-import { typeScriptLibraryFilesFromDisk } from './realTypeScriptService'
-
-/**
- * Milestone 2's seam, reached from outside.
- *
- * The worker's own `createService()` takes no argument, so the lib map is swapped where it is built
- * rather than where it is used: on disk in `node_modules/typescript/lib` instead of over the
- * playground CDN. Everything else in `@typescript/vfs` — and all of `typescript` — is the real
- * thing.
- *
- * The reader is reached through a holder rather than called in the factory. `vi.mock` factories are
- * hoisted above the imports, and the helper that reads the libs imports `@typescript/vfs` itself, so
- * a factory that imported the helper would be waiting on the module it is standing in for.
- */
-const libraries = vi.hoisted(() => ({ read: null as null | (() => ReadonlyMap<string, string>) }))
-
-vi.mock('@typescript/vfs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@typescript/vfs')>()
-  return {
-    ...actual,
-    createDefaultMapFromCDN: () => Promise.resolve(new Map(libraries.read?.())),
-  }
-})
-
-libraries.read = typeScriptLibraryFilesFromDisk
+import {
+  createTestPluginContext,
+  createTestViewContributionContext,
+} from '@singapore-editor/core/testing'
 
 /**
  * A real TypeScript file, chosen so the fixture legend's three awkward shapes are all reachable.
@@ -318,20 +296,12 @@ class EditorFixture {
     this.#textNode = document.createTextNode(this.text)
     container.appendChild(this.#textNode)
 
-    this.context = {
+    this.context = createTestViewContributionContext({
       container,
       scrollElement: container as unknown as HTMLDivElement,
       contentElement: container,
       highlightPrefix: 'editor-test-',
-      hasDocument: () => true,
       getSnapshot: () => this.snapshot(),
-      requestViewUpdate: vi.fn(),
-      revealLine: vi.fn(),
-      focusEditor: vi.fn(),
-      setSelection: vi.fn(),
-      setSelections: vi.fn(),
-      setScrollTop: vi.fn(),
-      reserveOverlayWidth: vi.fn(),
       textOffsetFromPoint: vi.fn(() => 0),
       getRangeClientRect: () => new DOMRect(0, 0, 1, 1),
       // Every edit this fixture makes is an insertion at offset zero, so a tracked set follows the
@@ -357,7 +327,7 @@ class EditorFixture {
       clearRangeHighlight: (name) => {
         this.painted.delete(name)
       },
-    }
+    })
   }
 
   /** One character typed at the top of the file, which moves every span in it. */
@@ -382,6 +352,7 @@ class EditorFixture {
 
   public snapshot(): EditorViewSnapshot {
     const lineStarts = this.lineStarts()
+    const textSnapshot = createStringTextSnapshot(this.text)
     const rows: EditorVisibleRowSnapshot[] = lineStarts.map((startOffset, index) => ({
       index,
       bufferRow: index,
@@ -406,12 +377,22 @@ class EditorFixture {
     return {
       documentId: DOCUMENT_ID,
       languageId: 'typescript' as EditorViewSnapshot['languageId'],
-      fullText: this.text,
+      textSnapshot,
       textVersion: this.textVersion,
       initialHighlightStatus: 'painted',
       syntaxStatus: 'ready',
       paintLayers: [],
       lineStarts,
+      lineStartsView: {
+        length: lineStarts.length,
+        at: (index) => lineStarts[index],
+        indexForOffset: (offset) => textSnapshot.lineAt(offset),
+        firstIndexAtOrAfter: (offset) => {
+          const index = lineStarts.findIndex((start) => start >= offset)
+          return index === -1 ? lineStarts.length : index
+        },
+        toArray: () => lineStarts,
+      },
       documentSyncPoint: this.#chain.point(this.textVersion),
       changesSinceDocumentSyncPoint: (point, scope) =>
         this.#chain.changesSince(point, scope, this.textVersion),
@@ -425,7 +406,7 @@ class EditorFixture {
       contentWidth: 0,
       totalHeight: rows.length * ROW_HEIGHT,
       gutterWidth: 0,
-      gutterLayout: { fixedWidth: 0, lanes: [] },
+      gutterLayout: { leadingInset: 0, fixedWidth: 0, lanes: [] },
       tabSize: 2,
       foldMarkers: [],
       visibleRows: rows,
@@ -441,9 +422,6 @@ class EditorFixture {
           start: 0,
           end: rows.length,
         } as EditorViewSnapshot['viewport']['visibleRange'],
-      },
-      toJSON() {
-        throw new Error('not used by this fixture')
       },
       toVisibleSnapshot() {
         return null
@@ -898,20 +876,14 @@ function activate(
   const captured: { provider: EditorViewContributionProvider | null } = { provider: null }
   const disposable = { dispose: () => undefined }
 
-  plugin.activate({
-    registerHighlighter: () => disposable,
-    registerSyntaxProvider: () => disposable,
-    registerViewContribution: (value) => {
-      captured.provider = value
-      return disposable
-    },
-    registerCommandContribution: () => disposable,
-    registerCapabilityContribution: () => disposable,
-    registerEditContribution: () => disposable,
-    registerDecorationContribution: () => disposable,
-    registerGutterContribution: () => disposable,
-    registerInjectedTextRowProvider: () => disposable,
-  } satisfies EditorPluginContext)
+  plugin.activate(
+    createTestPluginContext({
+      registerViewContribution: (value) => {
+        captured.provider = value
+        return disposable
+      },
+    }),
+  )
 
   const provider = captured.provider
   if (!provider) throw new Error('the plugin registered no view contribution provider')

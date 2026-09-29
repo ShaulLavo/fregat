@@ -1,0 +1,324 @@
+{
+  "commit": "4c03e0d379bf6a0844bdf3537eed78d8c96027df",
+  "diff": "",
+  "diagnostics": true,
+  "consumers": true,
+  "repetitions": 5,
+  "sizes": [65536, 4194304, 50331648],
+  "samples": [
+    {
+      "size": 65536,
+      "emptyHeap": 1543824,
+      "openHeap": 3707328,
+      "liveHeap": 5743396,
+      "disposedHeap": 5288832,
+      "retained": 0,
+      "open": {
+        "state": {
+          "documentId": "consumers",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": "typescript",
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "painted",
+          "cursor": {
+            "row": 16,
+            "column": 0
+          },
+          "length": 65536,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "totals": {
+          "textSnapshot.materializeFullText": {
+            "count": 3,
+            "units": 196608
+          }
+        }
+      },
+      "edited": {
+        "state": {
+          "documentId": "consumers",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": "typescript",
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "painted",
+          "cursor": {
+            "row": 16,
+            "column": 20
+          },
+          "length": 65556,
+          "canUndo": true,
+          "canRedo": false,
+          "isDirty": true
+        },
+        "totals": {
+          "snapshot-incremental": {
+            "count": 20,
+            "units": 0
+          }
+        }
+      },
+      "undone": {
+        "state": {
+          "documentId": "consumers",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": "typescript",
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "painted",
+          "cursor": {
+            "row": 16,
+            "column": 0
+          },
+          "length": 65536,
+          "canUndo": false,
+          "canRedo": true,
+          "isDirty": false
+        },
+        "totals": {
+          "snapshot-incremental": {
+            "count": 21,
+            "units": 0
+          }
+        }
+      },
+      "find": {
+        "state": {
+          "documentId": "consumers",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": "typescript",
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "painted",
+          "cursor": {
+            "row": 5,
+            "column": 6
+          },
+          "length": 65536,
+          "canUndo": false,
+          "canRedo": true,
+          "isDirty": false
+        },
+        "totals": {
+          "snapshot-incremental": {
+            "count": 21,
+            "units": 0
+          }
+        }
+      }
+    },
+    {
+      "size": 4194304,
+      "emptyHeap": 1543824,
+      "openHeap": 8168552,
+      "liveHeap": 10612408,
+      "disposedHeap": 5415724,
+      "retained": 0,
+      "open": {
+        "state": {
+          "documentId": "consumers",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": "typescript",
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "painted",
+          "cursor": {
+            "row": 1024,
+            "column": 0
+          },
+          "length": 4194304,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "totals": {
+          "textSnapshot.materializeFullText": {
+            "count": 3,
+            "units": 12582912
+          }
+        }
+      },
+      "edited": {
+        "state": {
+          "documentId": "consumers",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": "typescript",
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "painted",
+          "cursor": {
+            "row": 1024,
+            "column": 20
+          },
+          "length": 4194324,
+          "canUndo": true,
+          "canRedo": false,
+          "isDirty": true
+        },
+        "totals": {
+          "snapshot-incremental": {
+            "count": 20,
+            "units": 0
+          }
+        }
+      },
+      "undone": {
+        "state": {
+          "documentId": "consumers",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": "typescript",
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "painted",
+          "cursor": {
+            "row": 1024,
+            "column": 0
+          },
+          "length": 4194304,
+          "canUndo": false,
+          "canRedo": true,
+          "isDirty": false
+        },
+        "totals": {
+          "snapshot-incremental": {
+            "count": 21,
+            "units": 0
+          }
+        }
+      },
+      "find": {
+        "state": {
+          "documentId": "consumers",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": "typescript",
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "painted",
+          "cursor": {
+            "row": 5,
+            "column": 6
+          },
+          "length": 4194304,
+          "canUndo": false,
+          "canRedo": true,
+          "isDirty": false
+        },
+        "totals": {
+          "snapshot-incremental": {
+            "count": 21,
+            "units": 0
+          }
+        }
+      }
+    },
+    {
+      "size": 50331648,
+      "emptyHeap": 1543824,
+      "openHeap": 54848068,
+      "liveHeap": 58475444,
+      "disposedHeap": 5450196,
+      "retained": 0,
+      "open": {
+        "state": {
+          "documentId": "consumers",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": "typescript",
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "painted",
+          "cursor": {
+            "row": 12288,
+            "column": 0
+          },
+          "length": 50331648,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "totals": {
+          "textSnapshot.materializeFullText": {
+            "count": 3,
+            "units": 150994944
+          }
+        }
+      },
+      "edited": {
+        "state": {
+          "documentId": "consumers",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": "typescript",
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "painted",
+          "cursor": {
+            "row": 12288,
+            "column": 20
+          },
+          "length": 50331668,
+          "canUndo": true,
+          "canRedo": false,
+          "isDirty": true
+        },
+        "totals": {
+          "snapshot-incremental": {
+            "count": 20,
+            "units": 0
+          }
+        }
+      },
+      "undone": {
+        "state": {
+          "documentId": "consumers",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": "typescript",
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "painted",
+          "cursor": {
+            "row": 12288,
+            "column": 0
+          },
+          "length": 50331648,
+          "canUndo": false,
+          "canRedo": true,
+          "isDirty": false
+        },
+        "totals": {
+          "snapshot-incremental": {
+            "count": 21,
+            "units": 0
+          }
+        }
+      },
+      "find": {
+        "state": {
+          "documentId": "consumers",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": "typescript",
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "painted",
+          "cursor": {
+            "row": 5,
+            "column": 6
+          },
+          "length": 50331648,
+          "canUndo": false,
+          "canRedo": true,
+          "isDirty": false
+        },
+        "totals": {
+          "snapshot-incremental": {
+            "count": 21,
+            "units": 0
+          }
+        }
+      }
+    }
+  ],
+  "memoryBoundary": "main-renderer CDP heap after forced GC; excludes worker heap",
+  "browser": "153.0.8010.12"
+}

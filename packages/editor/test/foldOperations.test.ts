@@ -108,7 +108,7 @@ function logCollectorPlugin(events: EditorLogEvent[]): EditorPlugin {
   return {
     name: 'test.fold-command-log',
     activate: (context) =>
-      context.registerLogger?.((event) => {
+      context.registerLogger((event) => {
         events.push(event)
       }) ?? [],
   }

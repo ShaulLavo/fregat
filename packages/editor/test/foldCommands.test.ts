@@ -498,6 +498,27 @@ describe('fold commands', () => {
     expect(editor.dispatchCommand('editor.removeManualFoldingRanges')).toBe(false)
   })
 
+  it('offers no region to fold with folding off', async () => {
+    editor.dispose()
+    editor = createVisibleEditor(container, {
+      folding: false,
+      plugins: [lineGutterPlugin(), foldGutterPlugin()],
+    })
+    await openTree(2)
+
+    expect(visibleFoldToggles()).toHaveLength(0)
+    for (const command of FOLD_COMMAND_IDS) {
+      expect(editor.dispatchCommand(command), command).toBe(false)
+    }
+    editor.setSelection(rowStart(TREE_TEXT, 9), rowEnd(TREE_TEXT, 11))
+    expect(editor.dispatchCommand('editor.createFoldingRangeFromSelection')).toBe(false)
+
+    editor.openDocument({ documentId: 'plain', languageId: null, text: TREE_TEXT })
+    await flushMicrotasks()
+    expect(editor.dispatchCommand('editor.foldAll')).toBe(false)
+    expect(visibleText()).toContain('    inner()')
+  })
+
   it('gives a hand-drawn region a level alongside the parsed ones', async () => {
     await openTree()
     editor.setSelection(rowStart(TREE_TEXT, 9), rowEnd(TREE_TEXT, 11))

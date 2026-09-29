@@ -9,7 +9,16 @@ import type {
   PieceTableReverseTail,
   PieceTreeNode,
 } from './pieceTableTypes'
-import { ORIGINAL_BUFFER } from './node'
+import { isStandIn, ORIGINAL_BUFFER } from './node'
+import {
+  emptyStandInTable,
+  isStandInRef,
+  moveStandIn,
+  standInOfRef,
+  standInOrder,
+  standInRef,
+  type StandInTable,
+} from './standIns'
 
 const BITS = 4
 const WIDTH = 1 << BITS
@@ -44,10 +53,11 @@ const reverseIndexOf = (
   shift: number,
   root: PieceTableReverseIndex['root'],
   tail: PieceTableReverseTail,
-): PieceTableReverseIndex => ({ count, shift, root, tail })
+  standIns: StandInTable,
+): PieceTableReverseIndex => ({ count, shift, root, tail, standIns })
 
 const createReverseIndex = (): PieceTableReverseIndex =>
-  reverseIndexOf(0, BITS, null, { slots: emptySlots(), used: 0 })
+  reverseIndexOf(0, BITS, null, { slots: emptySlots(), used: 0 }, emptyStandInTable)
 
 // Where the tail begins. A full tail stays the tail until the next append.
 const tailOffset = (count: number): number => (count < WIDTH ? 0 : ((count - 1) >>> BITS) << BITS)
@@ -197,15 +207,17 @@ const appendPastFullTail = (
   const tail = { slots, used: 1 }
   const count = index.count + 1
   const root = index.root as PieceTableReverseBranch | null
-  if (!root) return reverseIndexOf(count, BITS, [leaf], tail)
+  if (!root) return reverseIndexOf(count, BITS, [leaf], tail, index.standIns)
   if (index.count >>> BITS > 1 << index.shift) {
-    return reverseIndexOf(count, index.shift + BITS, [root, pathTo(index.shift, leaf)], tail)
+    const grown = [root, pathTo(index.shift, leaf)]
+    return reverseIndexOf(count, index.shift + BITS, grown, tail, index.standIns)
   }
   return reverseIndexOf(
     count,
     index.shift,
     pushLeaf(root, index.shift, index.count - 1, leaf),
     tail,
+    index.standIns,
   )
 }
 
@@ -223,7 +235,7 @@ const appendSlot = (
     index.tail.used === length ? index.tail : { slots: privateTail(index, length), used: length }
   tail.slots[length] = slot
   tail.used = length + 1
-  return reverseIndexOf(index.count + 1, index.shift, index.root, tail)
+  return reverseIndexOf(index.count + 1, index.shift, index.root, tail, index.standIns)
 }
 
 const replaceInBranch = (
@@ -255,10 +267,11 @@ const replaceSlot = (
     const length = index.count - offset
     const slots = privateTail(index, length)
     slots[at - offset] = slot
-    return reverseIndexOf(index.count, index.shift, index.root, { slots, used: length })
+    const tail = { slots, used: length }
+    return reverseIndexOf(index.count, index.shift, index.root, tail, index.standIns)
   }
   const root = replaceInBranch(index.root as PieceTableReverseBranch, index.shift, at, slot)
-  return reverseIndexOf(index.count, index.shift, root, index.tail)
+  return reverseIndexOf(index.count, index.shift, root, index.tail, index.standIns)
 }
 
 const addPiece = (index: PieceTableReverseIndex, piece: Piece): PieceTableReverseIndex => {
@@ -300,30 +313,193 @@ const balancedSplit = (
 }
 
 // Start and order pairs per buffer. A buffer's pieces keep their buffer order
-// in the document, so walking the tree in order leaves each list sorted.
+// in the document, so walking the tree in order leaves each list sorted. A
+// stand-in's buffer is a threshold, and its entries belong to other buffers.
 const collectEntries = (node: PieceTreeNode | null, buffers: (number[] | undefined)[]): void => {
   if (!node) return
   collectEntries(node.left, buffers)
   const piece = node.piece
-  if (piece.buffer !== ORIGINAL_BUFFER) {
+  if (piece.buffer !== ORIGINAL_BUFFER && !isStandIn(piece)) {
     const entries = (buffers[piece.buffer - 1] ??= [])
     entries.push(piece.start, piece.order)
   }
   collectEntries(node.right, buffers)
 }
 
+const slotOf = (entries: readonly number[] | undefined): PieceTableReverseSlot => {
+  if (!entries) return undefined
+  if (entries.length === 2) return entries[1]
+  return balancedSplit(entries, 0, entries.length >>> 1)!
+}
+
+const indexOf = (buffers: readonly (number[] | undefined)[]): PieceTableReverseIndex => {
+  let index = createReverseIndex()
+  for (let at = 0; at < buffers.length; at += 1) index = appendSlot(index, slotOf(buffers[at]))
+  return index
+}
+
 export const buildReverseIndex = (root: PieceTreeNode | null): PieceTableReverseIndex => {
   const buffers: (number[] | undefined)[] = []
   collectEntries(root, buffers)
+  return indexOf(buffers)
+}
 
-  let index = createReverseIndex()
-  for (let at = 0; at < buffers.length; at += 1) {
-    const entries = buffers[at]
-    if (!entries) index = appendSlot(index, undefined)
-    else if (entries.length === 2) index = appendSlot(index, entries[1])
-    else index = appendSlot(index, balancedSplit(entries, 0, entries.length >>> 1)!)
+// The entry holding `unit`, the one keyed at or before it, set to `value`.
+const withSplitValue = (
+  node: PieceTableReverseSplitNode,
+  unit: number,
+  value: number,
+): PieceTableReverseSplitNode => {
+  if (node.start > unit) {
+    return splitNode(node.start, node.order, withSplitValue(node.left!, unit, value), node.right)
   }
-  return index
+  if (node.right && lowestStart(node.right) <= unit) {
+    return splitNode(node.start, node.order, node.left, withSplitValue(node.right, unit, value))
+  }
+  return splitNode(node.start, value, node.left, node.right)
+}
+
+const lowestStart = (node: PieceTableReverseSplitNode): number => {
+  let lowest = node
+  while (lowest.left) lowest = lowest.left
+  return lowest.start
+}
+
+const withValue = (
+  slot: PieceTableReverseSlot,
+  unit: number,
+  value: number,
+): PieceTableReverseSlot => (typeof slot === 'object' ? withSplitValue(slot, unit, value) : value)
+
+// Buffer index to the values its entries take, keyed by a unit each covers.
+type SlotUpdates = Map<number, number[]>
+
+const updatedSlot = (slot: PieceTableReverseSlot, values: readonly number[]) => {
+  let next = slot
+  for (let at = 0; at < values.length; at += 2) next = withValue(next, values[at]!, values[at + 1]!)
+  return next
+}
+
+// Copies each node on the way to an updated slot once, however many share it.
+const updatedBranch = (
+  node: PieceTableReverseBranch,
+  level: number,
+  indices: readonly number[],
+  from: number,
+  to: number,
+  updates: SlotUpdates,
+): PieceTableReverseBranch => {
+  const next = node.slice()
+  for (let at = from; at < to;) {
+    const child = (indices[at]! >>> level) & MASK
+    let end = at
+    while (end < to && ((indices[end]! >>> level) & MASK) === child) end++
+    next[child] =
+      level === BITS
+        ? updatedLeaf(node[child] as Leaf, indices, at, end, updates)
+        : updatedBranch(
+            node[child] as PieceTableReverseBranch,
+            level - BITS,
+            indices,
+            at,
+            end,
+            updates,
+          )
+    at = end
+  }
+  return next
+}
+
+const updatedLeaf = (
+  leaf: Leaf,
+  indices: readonly number[],
+  from: number,
+  to: number,
+  updates: SlotUpdates,
+): Leaf => {
+  const next = leaf.slice()
+  for (let at = from; at < to; at++) {
+    const index = indices[at]!
+    next[index & MASK] = updatedSlot(next[index & MASK], updates.get(index)!)
+  }
+  return next
+}
+
+const updateSlots = (
+  index: PieceTableReverseIndex,
+  updates: SlotUpdates,
+  standIns: StandInTable,
+): PieceTableReverseIndex => {
+  const indices = [...updates.keys()].sort((left, right) => left - right)
+  const offset = tailOffset(index.count)
+  const inTail = indices.findIndex((at) => at >= offset)
+  const split = inTail < 0 ? indices.length : inTail
+  const root =
+    split > 0
+      ? updatedBranch(
+          index.root as PieceTableReverseBranch,
+          index.shift,
+          indices,
+          0,
+          split,
+          updates,
+        )
+      : index.root
+  if (split === indices.length)
+    return reverseIndexOf(index.count, index.shift, root, index.tail, standIns)
+  const length = index.count - offset
+  const slots = privateTail(index, length)
+  for (let at = split; at < indices.length; at++) {
+    const at2 = indices[at]! - offset
+    slots[at2] = updatedSlot(slots[at2], updates.get(indices[at]!)!)
+  }
+  return reverseIndexOf(index.count, index.shift, root, { slots, used: length }, standIns)
+}
+
+const addUpdate = (updates: SlotUpdates, buffer: number, unit: number, value: number): void => {
+  const values = updates.get(buffer - 1) ?? []
+  values.push(unit, value)
+  updates.set(buffer - 1, values)
+}
+
+// After a relabel: each live inserted piece's entry takes its new order, and
+// each stand-in's identity its stand-in's. `pieces` holds buffer, start and
+// order triples, `standIns` identity and order pairs. Old insertions' entries
+// name identities, so none of them is touched.
+export const relabelReverseIndex = (
+  index: PieceTableReverseIndex,
+  pieces: readonly number[],
+  standIns: readonly number[],
+): PieceTableReverseIndex => {
+  const updates: SlotUpdates = new Map()
+  for (let at = 0; at < pieces.length; at += 3) {
+    addUpdate(updates, pieces[at]!, pieces[at + 1]!, pieces[at + 2]!)
+  }
+  let table = index.standIns
+  for (let at = 0; at < standIns.length; at += 2) {
+    table = moveStandIn(table, standIns[at]!, standIns[at + 1]!)
+  }
+  return updateSlots(index, updates, table)
+}
+
+// Compacted tombstones' entries name their stand-ins' identities: `entries`
+// holds buffer, start and identity triples. Written in batches between yields.
+export function* redirectReverseIndex(
+  index: PieceTableReverseIndex,
+  entries: readonly number[],
+  standIns: StandInTable,
+): Generator<void, PieceTableReverseIndex> {
+  let next = updateSlots(index, new Map(), standIns)
+  for (let from = 0; from < entries.length; from += 3 * 1024) {
+    const updates: SlotUpdates = new Map()
+    const to = Math.min(entries.length, from + 3 * 1024)
+    for (let at = from; at < to; at += 3) {
+      addUpdate(updates, entries[at]!, entries[at + 1]!, standInRef(entries[at + 2]!))
+    }
+    next = updateSlots(next, updates, standIns)
+    yield
+  }
+  return next
 }
 
 const orderOfPieceStartingAtOrBefore = (
@@ -356,9 +532,13 @@ export const lookupReverseIndex = (
   unit: number,
 ): number | undefined => {
   const slot = reverseIndexSlot(index, buffer - 1)
-  if (slot === undefined || typeof slot === 'number') return slot
-  return orderOfPieceStartingAtOrBefore(slot, unit)
+  const value = typeof slot === 'object' ? orderOfPieceStartingAtOrBefore(slot, unit) : slot
+  return value === undefined ? undefined : resolved(index, value)
 }
+
+// An identity leads to its stand-in's order; any other value is an order.
+const resolved = (index: PieceTableReverseIndex, value: number): number =>
+  isStandInRef(value) ? standInOrder(index.standIns, standInOfRef(value)) : value
 
 export type ReverseIndexEntry = {
   readonly buffer: PieceBufferId
@@ -367,25 +547,26 @@ export type ReverseIndexEntry = {
 }
 
 const collectSplitEntries = (
+  index: PieceTableReverseIndex,
   node: PieceTableReverseSplitNode | null,
   buffer: PieceBufferId,
   entries: ReverseIndexEntry[],
 ): void => {
   if (!node) return
-  collectSplitEntries(node.left, buffer, entries)
-  entries.push({ buffer, start: node.start, order: node.order })
-  collectSplitEntries(node.right, buffer, entries)
+  collectSplitEntries(index, node.left, buffer, entries)
+  entries.push({ buffer, start: node.start, order: resolved(index, node.order) })
+  collectSplitEntries(index, node.right, buffer, entries)
 }
 
-// Every entry in key order, for inspection. A buffer's first entry reads
-// start 0 whatever its piece's start is.
+// Every entry in key order, for inspection, with identities led to orders. A
+// buffer's first entry reads start 0 whatever its piece's start is.
 export const reverseIndexEntries = (index: PieceTableReverseIndex): ReverseIndexEntry[] => {
   const entries: ReverseIndexEntry[] = []
   for (let at = 0; at < index.count; at += 1) {
     const slot = reverseIndexSlot(index, at)
     const buffer = (at + 1) as PieceBufferId
-    if (typeof slot === 'number') entries.push({ buffer, start: 0, order: slot })
-    else if (slot) collectSplitEntries(slot, buffer, entries)
+    if (typeof slot === 'number') entries.push({ buffer, start: 0, order: resolved(index, slot) })
+    else if (slot) collectSplitEntries(index, slot, buffer, entries)
   }
   return entries
 }

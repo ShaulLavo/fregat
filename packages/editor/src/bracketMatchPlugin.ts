@@ -3,13 +3,9 @@ import {
   findBracketMatchAtCaret,
   type BracketMatch,
 } from './editor/bracketMatching'
-import type {
-  EditorPlugin,
-  EditorViewContribution,
-  EditorViewContributionContext,
-  EditorViewContributionUpdateKind,
-  EditorViewSnapshot,
-} from './plugins'
+import { createPlugin, derive, selectionInput, type EditorInput } from './createPlugin'
+import type { EditorPlugin, EditorResolvedSelection } from './plugins'
+import type { BracketInfo } from './syntax/session'
 import type { VirtualizedTextHighlightStyle } from './virtualization'
 
 export const EDITOR_BRACKET_MATCH_PLUGIN_ID = 'editor.bracketMatch'
@@ -17,14 +13,6 @@ export const EDITOR_BRACKET_MATCH_PLUGIN_ID = 'editor.bracketMatch'
 const DEFAULT_BRACKET_MATCH_STYLE: VirtualizedTextHighlightStyle = {
   backgroundColor: 'rgba(128, 128, 128, 0.28)',
 }
-
-/** Updates that can change which bracket the caret touches, or which brackets exist. */
-const RECOMPUTE_KINDS: ReadonlySet<EditorViewContributionUpdateKind> = new Set([
-  'content',
-  'document',
-  'selection',
-  'tokens',
-])
 
 export type EditorBracketMatchPluginOptions = {
   /** Paint applied to both brackets of the pair. */
@@ -41,118 +29,67 @@ export type EditorBracketMatchPluginOptions = {
 export function createBracketMatchPlugin(
   options: EditorBracketMatchPluginOptions = {},
 ): EditorPlugin {
-  let controller: BracketMatchController | null = null
-
-  return {
+  const style = options.style ?? DEFAULT_BRACKET_MATCH_STYLE
+  return createPlugin({
     name: EDITOR_BRACKET_MATCH_PLUGIN_ID,
-    activate(context) {
-      return [
-        context.registerViewContribution({
-          createContribution(contributionContext) {
-            controller = new BracketMatchController(
-              contributionContext,
-              options.style ?? DEFAULT_BRACKET_MATCH_STYLE,
-            )
-            return controller
-          },
-        }),
-        context.registerCommandContribution({
-          createContribution(commandContext) {
-            // Resolved on invoke, not on registration: contribution creation order between the
-            // view and command registries is not guaranteed.
-            return commandContext.registerCommand('editor.action.jumpToBracket', () =>
-              controller ? controller.jumpToMatch() : false,
-            )
-          },
-        }),
-      ]
+    view(scope) {
+      const name = `${scope.view.highlightPrefix}-bracket-match`
+      let painted: BracketMatch | null = null
+      const paint = (match: BracketMatch | null) => {
+        if (sameMatch(painted, match)) return
+        painted = match
+        if (!match) {
+          scope.view.clearRangeHighlight(name)
+          return
+        }
+        scope.view.setRangeHighlight(
+          name,
+          [
+            { end: match.openOffset + 1, start: match.openOffset },
+            { end: match.closeOffset + 1, start: match.closeOffset },
+          ],
+          style,
+        )
+      }
+
+      scope.watch(matchInput, paint)
+      scope.handle('editor.action.jumpToBracket', () => {
+        const caret = caretOffset(scope.read(selectionInput))
+        if (caret === null) return false
+
+        const target = bracketJumpTargetOffset(scope.read(bracketsInput), caret)
+        if (target === null) return false
+
+        scope.view.setSelection(target, target, 'editor.jumpToBracket', { revealOffset: target })
+        return true
+      })
+      scope.onDispose(() => paint(null))
     },
-  }
+  })
 }
 
-class BracketMatchController implements EditorViewContribution {
-  private readonly highlightName: string
-  private painted: BracketMatch | null = null
-
-  constructor(
-    private readonly context: EditorViewContributionContext,
-    private readonly style: VirtualizedTextHighlightStyle,
-  ) {
-    this.highlightName = `${context.highlightPrefix ?? 'editor'}-bracket-match`
-  }
-
-  update(snapshot: EditorViewSnapshot, kind: EditorViewContributionUpdateKind): void {
-    if (kind === 'clear') {
-      this.clear()
-      return
-    }
-    if (!RECOMPUTE_KINDS.has(kind)) return
-
-    this.apply(matchForSnapshot(snapshot))
-  }
-
-  jumpToMatch(): boolean {
-    const snapshot = this.context.getSnapshot()
-    const caret = caretOffset(snapshot)
-    if (caret === null) return false
-
-    const target = bracketJumpTargetOffset(snapshot.brackets, caret)
-    if (target === null) return false
-
-    this.context.setSelection(target, target, 'editor.jumpToBracket', {
-      revealOffset: target,
-    })
-    return true
-  }
-
-  dispose(): void {
-    this.clear()
-  }
-
-  private apply(match: BracketMatch | null): void {
-    if (sameMatch(this.painted, match)) return
-
-    this.painted = match
-    if (!match) {
-      this.context.clearRangeHighlight?.(this.highlightName)
-      return
-    }
-
-    this.context.setRangeHighlight?.(
-      this.highlightName,
-      [
-        { end: match.openOffset + 1, start: match.openOffset },
-        { end: match.closeOffset + 1, start: match.closeOffset },
-      ],
-      this.style,
-    )
-  }
-
-  private clear(): void {
-    if (!this.painted) return
-
-    this.painted = null
-    this.context.clearRangeHighlight?.(this.highlightName)
-  }
+// The parse delivers the bracket list; a new one arrives with content and with tokens.
+const bracketsInput: EditorInput<readonly BracketInfo[]> = {
+  id: 'brackets',
+  kinds: ['content', 'tokens'],
+  read: (snapshot) => snapshot.brackets,
 }
+
+const matchInput = derive([selectionInput, bracketsInput], (selections, brackets) => {
+  const caret = caretOffset(selections)
+  return caret === null ? null : findBracketMatchAtCaret(brackets, caret)
+})
 
 /**
  * Caret of the primary selection, or null when there is no single caret to match against. A
  * non-empty selection is skipped so that selecting a region does not paint an unrelated pair.
  */
-function caretOffset(snapshot: EditorViewSnapshot): number | null {
-  const primary = snapshot.selections[0]
+function caretOffset(selections: readonly EditorResolvedSelection[]): number | null {
+  const primary = selections[0]
   if (!primary) return null
   if (primary.startOffset !== primary.endOffset) return null
 
   return primary.headOffset
-}
-
-function matchForSnapshot(snapshot: EditorViewSnapshot): BracketMatch | null {
-  const caret = caretOffset(snapshot)
-  if (caret === null) return null
-
-  return findBracketMatchAtCaret(snapshot.brackets, caret)
 }
 
 function sameMatch(left: BracketMatch | null, right: BracketMatch | null): boolean {

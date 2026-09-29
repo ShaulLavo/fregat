@@ -22,6 +22,40 @@ export class LspResponseError extends Error {
   }
 }
 
+/**
+ * Sent just before a server's transport closes, by the server or on its behalf, saying why. A bare
+ * close reads the same as a healthy idle one, so without this a dead server looks like a quiet one.
+ * `$/` because it is implementation-defined, which the protocol permits clients to ignore.
+ */
+export const LSP_SERVER_EXITED = '$/serverExited'
+
+export type LspServerExitedParams = {
+  /** How the server ended: `crashed` for a worker that threw, a process outcome otherwise. */
+  readonly outcome: string
+  readonly serverId?: string
+  readonly exitCode?: number | null
+  readonly exitSignal?: string | null
+  readonly stderrTail?: string
+  /** Guidance for the user; absent when the host closed the server on purpose. */
+  readonly error?: {
+    readonly code?: string
+    readonly message: string
+    readonly why?: string
+    readonly fix?: string
+  }
+}
+
+/** A transport that closed after the server said why; the close is reported as this. */
+export class LspServerExitedError extends Error {
+  public readonly params: LspServerExitedParams
+
+  public constructor(params: LspServerExitedParams) {
+    super(params.error?.message ?? `Language server ${params.outcome}`)
+    this.name = 'LspServerExitedError'
+    this.params = params
+  }
+}
+
 export class LspRequestCancelledError extends Error {
   public readonly code = REQUEST_CANCELLED
 

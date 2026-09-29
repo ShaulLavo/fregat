@@ -124,8 +124,8 @@ function scrollPair(pair: RasterPair, scrollTop: number): void {
     ...pair.viewport,
     scrollTop,
     scrollRow: scrollTop / pair.metrics.rowHeight,
-    visibleStart: Math.floor(scrollTop / pair.metrics.rowHeight),
-    visibleEnd: Math.ceil((scrollTop + pair.viewport.clientHeight) / pair.metrics.rowHeight),
+    visibleStart: scrollTop / pair.metrics.rowHeight,
+    visibleEnd: (scrollTop + pair.viewport.clientHeight) / pair.metrics.rowHeight,
   }
   pair.actual.renderer.updateViewport(pair.viewport)
   pair.expected.renderer.updateViewport(pair.viewport)
@@ -328,7 +328,7 @@ function verifySnappedFrames(pair: RasterPair, result: PixelOracleResult): void 
     const shift = Math.round(codeDelta)
     const pixelRatio = layout.canvasInnerHeight / layout.canvasOuterHeight
     const continuousOffset =
-      pair.viewport.scrollRow * layout.lineHeight - frame.sliderTop * pixelRatio
+      pair.viewport.visibleStart * layout.lineHeight - frame.sliderTop * pixelRatio
     if (Math.abs(codeDelta + continuousOffset) > 0.500001)
       throw oracleError(`Snapped code exceeded half-pixel position error at ${scrollTop}px`)
     if (Math.abs(codeDelta - shift) > 0.000001 || Math.abs(codeDelta - markerDelta) > 0.000001)

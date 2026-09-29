@@ -84,6 +84,7 @@ export function createFoldGutterContribution(
 
   return {
     id: 'fold-gutter',
+    interactive: true,
     snapshotRenderer: createFoldSnapshotRenderer(options, renderOptions, width),
     createCell(document) {
       const cell = document.createElement('span')

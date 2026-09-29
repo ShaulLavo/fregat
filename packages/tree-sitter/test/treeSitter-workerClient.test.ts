@@ -70,7 +70,6 @@ describe('tree-sitter worker client language registration cache', () => {
     currentClient = null
     fakeWorkers.length = 0
     vi.unstubAllGlobals()
-    vi.resetModules()
   })
 
   it('does not post duplicate language descriptors', async () => {
@@ -412,7 +411,6 @@ describe('tree-sitter worker client language registration cache', () => {
 })
 
 async function loadWorkerClient(): Promise<WorkerClient> {
-  vi.resetModules()
   fakeWorkers.length = 0
   vi.stubGlobal('Worker', FakeWorker)
   const workerClientModule = await import('../src/treeSitter/workerClient.ts')

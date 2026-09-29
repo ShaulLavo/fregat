@@ -1,3 +1,7 @@
+import type { ScheduledFrame } from '../editor/scheduleFrame'
+import type { WrapAdvance, WrapBreak } from './displayProjectionTypes'
+import type { GlyphAdvances } from './glyphAdvances'
+import type { HighlightOverlayRange } from './highlightOverlay'
 import type { ScrollViewport } from './scrollViewport'
 import type { FoldMarkerSource } from './foldMarkerSource'
 import type { InlineMap } from '../inlineMap'
@@ -18,9 +22,12 @@ import type {
   VirtualizedTextViewRowPositioning,
   VirtualizedTextViewScrollMode,
   VirtualizedTextRowDecoration,
+  VirtualizedTextHighlightStyle,
 } from './virtualizedTextViewTypes'
 
-export type RevealBlock = 'nearest' | 'center' | 'end'
+// 'center-if-outside' leaves a target already on screen where the reader is looking
+// at it, and centres one that is not: a jump lands with context on both sides.
+export type RevealBlock = 'nearest' | 'center' | 'end' | 'center-if-outside'
 
 export type CreateRangeOptions = {
   readonly scrollIntoView?: boolean
@@ -44,15 +51,7 @@ export type VirtualizedTextHighlightRange = {
   readonly end: number
 }
 
-export type VirtualizedTextHighlightStyle = {
-  readonly backgroundColor?: string
-  readonly color?: string
-  readonly textDecoration?: string
-  // Stacking against other highlight groups, highest paints last. Without it
-  // the CSS highlight registry falls back to registration order, which shifts
-  // as groups scroll in and out of the mounted window.
-  readonly zIndex?: number
-}
+export type { VirtualizedTextHighlightStyle } from './virtualizedTextViewTypes'
 
 export type VirtualizedTextHighlightGroup = {
   readonly name: string
@@ -61,6 +60,8 @@ export type VirtualizedTextHighlightGroup = {
   style: VirtualizedTextHighlightStyle
   registered: boolean
   signature: string
+  paintRanges?: readonly VirtualizedTextHighlightRange[]
+  twins?: Map<string, VirtualizedTextHighlightGroup>
 }
 
 export type SameLineTokenEdit = {
@@ -74,14 +75,18 @@ export interface VirtualizedTextViewInternal {
   readonly scrollElement: HTMLDivElement
   readonly viewport: ScrollViewport
   readonly contentElement: HTMLDivElement
-  readonly inputElement: HTMLTextAreaElement
+  readonly inputElement: HTMLElement
   readonly spacer: HTMLDivElement
   readonly gutterElement: HTMLDivElement
   gutterContributions: readonly EditorGutterContribution[]
   readonly gutterWidthProvider: ((context: EditorGutterWidthContext) => number) | null
+  /** Configured; the gutter applies it only while it is shown. */
+  gutterLeadingInset: number
   readonly caretLayerElement: HTMLDivElement
   readonly caretElement: HTMLDivElement
   readonly secondaryCaretElements: HTMLDivElement[]
+  /** A caret render waiting for the next frame because the editor does not hold focus. */
+  deferredCaret: ScheduledFrame | null
   readonly styleEl: HTMLStyleElement
   readonly highlightScope: string
   readonly virtualizer: FixedRowVirtualizer
@@ -99,6 +104,9 @@ export interface VirtualizedTextViewInternal {
   readonly selectionHighlightName: string
   readonly selectionHighlight: Highlight | null
   readonly rangeHighlightGroups: Map<string, VirtualizedTextHighlightGroup>
+  highlightOverlaySnapshot: VirtualizedTextViewModelState['textSnapshot'] | null
+  highlightOverlayMask: readonly HighlightOverlayRange[]
+  readonly overlayBaseGroups: Map<string, VirtualizedTextHighlightGroup>
   // A range rule depends only on a group's name and style, so a repaint that moves ranges around
   // cannot change the rule set. Counting the changes that *can* — a group added, removed, or
   // restyled — is what keeps `rebuildStyleRules` off the O(groups^2) path a per-keystroke repaint
@@ -120,6 +128,11 @@ export interface VirtualizedTextViewInternal {
   foldMarkerByStartRow: ReadonlyMap<number, VirtualizedFoldMarker>
   foldMarkerByKey: ReadonlyMap<string, VirtualizedFoldMarker>
   wrapEnabled: boolean
+  wrapBreak: WrapBreak
+  /** The measured-width wrap in the projection's config, when the face is proportional. */
+  wrapAdvance: WrapAdvance | null
+  /** The face's glyph advances while it is proportional; null keeps every estimate on columns. */
+  glyphs: GlyphAdvances | null
   tabSize: number
   tokenGroups: Map<string, TokenGroup>
   rowTokenSignatures: Map<number, string>
@@ -137,6 +150,8 @@ export interface VirtualizedTextViewInternal {
   gutterContributionWidths: ReadonlyMap<string, number>
   gutterWidthDirty: boolean
   currentGutterWidth: number
+  /** The inset `currentGutterWidth` includes. */
+  currentGutterLeadingInset: number
   contentWidth: number
   maxVisualColumnsSeen: number
   lastWidthScanStart: number
@@ -145,6 +160,8 @@ export interface VirtualizedTextViewInternal {
   lineHeightOverride: number | null
   rowGap: number
   metrics: BrowserTextMetrics
+  /** False when the font's glyph advances differ, which retires calculated row geometry. */
+  monospace: boolean
   textMetrics: BrowserTextMetrics | null
   hiddenCharacters: HiddenCharactersMode
   suspiciousCharacters: SuspiciousCharacterSettings

@@ -18,15 +18,55 @@ type Mounted = {
   dispose(): void
 }
 
-it('keeps 6,000-character BiDi operations within 5x an equal-length Latin control', () => {
+it('keeps 6,000-character BiDi operations bounded against an equal-length Latin control', () => {
   resetRowGeometrySweepCount()
   const result = measureLength(6_000)
   const measurements = JSON.stringify(result)
   expect(result.mountRatio, measurements).toBeLessThan(5)
-  expect(result.clickRatio, measurements).toBeLessThan(5)
-  expect(result.dragRatio, measurements).toBeLessThan(5)
+  // A Latin click or drag on this row is column arithmetic, microseconds each, so a time ratio
+  // against it measures that arithmetic: it doubled when Latin got faster with RTL unchanged. What
+  // an RTL operation may cost is its layout reads, and those do not vary with the machine.
+  // A click is one native hit test, with the odd boundary disambiguation; a drag step is that plus
+  // the selection segment and the caret. None of it may grow with the 6,000-character line.
+  const reads = rtlOperationReads('א'.repeat(6_000))
+  const readings = `${measurements} ${JSON.stringify(reads)}`
+  expect(reads.clickHits, readings).toBeLessThanOrEqual(CLICKS * 1.1)
+  expect(reads.clickRanges, readings).toBeLessThanOrEqual(CLICKS * 0.1)
+  expect(reads.dragHits, readings).toBeLessThanOrEqual(DRAG_STEPS * 1.1)
+  expect(reads.dragRanges, readings).toBeLessThanOrEqual(DRAG_STEPS * 2.1)
   expect(getRowGeometrySweepCount()).toBe(0)
 })
+
+const CLICKS = 100
+const DRAG_STEPS = 200
+
+/** Native reads over the same clicks and drag steps the timing samples make. */
+function rtlOperationReads(text: string) {
+  const mounted = mountMeasured(text)
+  const row = mounted.view.getState().mountedRows[0]!
+  const rect = row.element.getBoundingClientRect()
+  const y = rect.top + rect.height / 2
+  const xAt = (index: number) => rect.left + 1 + ((index * 2.75) % Math.max(2, rect.width - 2))
+  let clickRanges = 0
+  const clickHits = countCaretHitReads(() => {
+    clickRanges = countRangeReads(() => {
+      for (let index = 0; index < CLICKS; index += 1)
+        mounted.view.textOffsetFromPoint(xAt(index), y)
+    })
+  })
+  const anchor = mounted.view.textOffsetFromPoint(rect.right - 1, y) ?? 0
+  let dragRanges = 0
+  const dragHits = countCaretHitReads(() => {
+    dragRanges = countRangeReads(() => {
+      for (let index = 0; index < DRAG_STEPS; index += 1) {
+        const head = mounted.view.textOffsetFromPoint(xAt(index), y)
+        if (head !== null) mounted.view.setSelection(anchor, head)
+      }
+    })
+  })
+  mounted.dispose()
+  return { clickHits, clickRanges, dragHits, dragRanges }
+}
 
 it('bounds cold visual-arrow probes on 6,000-character RTL rows', () => {
   const middle = 3_000

@@ -1,3 +1,5 @@
+export type { EditorRowPresentation } from '../rowPresentation'
+export type { EditorPointHit, EditorMarkerHit } from '../pointQueries'
 export {
   createEditorCapabilityToken,
   createEditorLanguageFeatureToken,
@@ -35,6 +37,14 @@ export type {
 export { EDITOR_FIND_FEATURE, EDITOR_FIND_FEATURE_ID } from '../editor/findFeature'
 export type { EditorFindFeature } from '../editor/findFeature'
 export {
+  EDITOR_SNIPPET_TOKENS_FEATURE,
+  EDITOR_SNIPPET_TOKENS_FEATURE_ID,
+} from '../editor/snippetTokensFeature'
+export type {
+  EditorSnippetTokenSource,
+  EditorSnippetTokensFeature,
+} from '../editor/snippetTokensFeature'
+export {
   editorLanguageConfiguration,
   registerEditorLanguageConfiguration,
 } from '../editor/languageConfiguration'
@@ -50,6 +60,28 @@ export type {
   EditorOnEnterRule,
 } from '../editor/languageConfiguration'
 export type { EditorSnippetMirror, EditorSnippetStop } from '../plugins'
+// Experimental: the one authoring model for plugins (Plan 122 phase 3).
+export {
+  createChannel,
+  createPlugin,
+  derive,
+  documentInput,
+  selectionInput,
+  textInput,
+  themeInput,
+  tokensInput,
+  viewportInput,
+  visibleRowsInput,
+} from '../createPlugin'
+export type { EditorCursorStyle, EditorKeyDecision, EditorKeyParticipant } from '../plugins'
+export type {
+  EditorChannel,
+  EditorChannelPolicy,
+  EditorInput,
+  EditorPluginDefinition,
+  EditorViewScope,
+  EditorViewState,
+} from '../createPlugin'
 export { reindentEditsForRanges } from '../editor/reindent'
 export type { EditorReindentOptions } from '../editor/reindent'
 export type {
@@ -67,14 +99,9 @@ export type {
   EditorEditContribution,
   EditorEditContributionContext,
   EditorEditContributionProvider,
-  EditorDisposable,
   EditorGutterContribution,
   EditorGutterRowContext,
   EditorGutterWidthContext,
-  EditorHighlighterProvider,
-  EditorHighlighterSession,
-  EditorHighlighterSessionOptions,
-  EditorHighlightResult,
   EditorInitialHighlightStatus,
   EditorInitialPaintEvent,
   EditorInjectedTextRow,
@@ -82,6 +109,8 @@ export type {
   EditorInjectedTextRowProviderContext,
   EditorInlineReplacementContext,
   EditorInlineReplacementProvider,
+  EditorInlineReplacementProviderOptions,
+  EditorInlineReplacementTrigger,
   EditorLanguageFeatureSelector,
   EditorLanguageFeatureToken,
   EditorLogEditorContext,
@@ -114,8 +143,10 @@ export type {
   EditorTokenStyleJSON,
   EditorViewContribution,
   EditorViewContributionContext,
+  EditorPressParticipant,
   EditorViewContributionProvider,
   EditorViewContributionUpdateKind,
+  EditorViewContributionInput,
   EditorViewportSnapshot,
   EditorViewportSnapshotJSON,
   EditorViewSnapshot,
@@ -134,4 +165,16 @@ export type {
   EditorVisibleSnapshot,
   EditorVisibleSnapshotJSON,
 } from '../plugins'
+export type { EditorDisposable } from '../editor/disposables'
+export type {
+  EditorHighlighterProvider,
+  EditorHighlighterSession,
+  EditorHighlighterSessionOptions,
+  EditorHighlightResult,
+} from '../syntax/highlighter'
 export { registerWheelScrollTarget } from '../virtualization/wheelScrollTarget'
+export { parseSnippet, snippetInitialSelection } from '../editor/snippet'
+export { serializeEditorViewSnapshot } from '../editor/viewSnapshot'
+export type { TextReadSnapshot } from '../documentTextSnapshot'
+export type { EditorContributionChange, EditorLineStartsView } from '../plugins'
+export type { ParsedSnippet, SnippetRange } from '../editor/snippet'

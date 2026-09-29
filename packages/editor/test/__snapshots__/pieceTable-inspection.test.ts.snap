@@ -2,39 +2,39 @@
 
 exports[`piece tree inspection > prints stable empty, split, deleted and normalized snapshots with bounded opt-in text > deleted 1`] = `
 "piece tree length=7 pieces=5 nodes=6
-root n1 pieces tombstone buffer=1 start=0 length=1 order=1536 lineBreaks=0 height=3 left=n2 right=n3 subtreeOriginalLength=11 subtreeVisibleLength=7 subtreePieces=5 subtreeLineBreaks=1 subtreeMinOrder=1024 subtreeMaxOrder=3072 subtreeMinBuffer=0
-  left n2 pieces visible buffer=0 start=0 length=2 order=1024 lineBreaks=0 height=2 left=- right=n4 subtreeOriginalLength=3 subtreeVisibleLength=2 subtreePieces=2 subtreeLineBreaks=0 subtreeMinOrder=1024 subtreeMaxOrder=1280 subtreeMinBuffer=0
-    right n4 pieces tombstone buffer=0 start=2 length=1 order=1280 lineBreaks=0 height=1 left=- right=- subtreeOriginalLength=1 subtreeVisibleLength=0 subtreePieces=1 subtreeLineBreaks=0 subtreeMinOrder=1280 subtreeMaxOrder=1280 subtreeMinBuffer=0
-  right n3 pieces tombstone buffer=0 start=3 length=3 order=2048 lineBreaks=0 height=2 left=- right=n5 subtreeOriginalLength=8 subtreeVisibleLength=5 subtreePieces=2 subtreeLineBreaks=1 subtreeMinOrder=2048 subtreeMaxOrder=3072 subtreeMinBuffer=0
-    right n5 pieces visible buffer=0 start=6 length=5 order=3072 lineBreaks=1 height=1 left=- right=- subtreeOriginalLength=5 subtreeVisibleLength=5 subtreePieces=1 subtreeLineBreaks=1 subtreeMinOrder=3072 subtreeMaxOrder=3072 subtreeMinBuffer=0
+root n1 pieces tombstone buffer=1 start=0 length=1 order=1536 lineBreaks=0 height=3 left=n2 right=n3 subtreeOriginalLength=11 subtreeVisibleLength=7 subtreePieces=5 subtreeLineBreaks=1 subtreeMinBuffer=0
+  left n2 pieces visible buffer=0 start=0 length=2 order=1024 lineBreaks=0 height=2 left=- right=n4 subtreeOriginalLength=3 subtreeVisibleLength=2 subtreePieces=2 subtreeLineBreaks=0 subtreeMinBuffer=0
+    right n4 pieces tombstone buffer=0 start=2 length=1 order=1280 lineBreaks=0 height=1 left=- right=- subtreeOriginalLength=1 subtreeVisibleLength=0 subtreePieces=1 subtreeLineBreaks=0 subtreeMinBuffer=0
+  right n3 pieces tombstone buffer=0 start=3 length=3 order=2048 lineBreaks=0 height=2 left=- right=n5 subtreeOriginalLength=8 subtreeVisibleLength=5 subtreePieces=2 subtreeLineBreaks=1 subtreeMinBuffer=0
+    right n5 pieces visible buffer=0 start=6 length=5 order=3072 lineBreaks=1 height=1 left=- right=- subtreeOriginalLength=5 subtreeVisibleLength=5 subtreePieces=1 subtreeLineBreaks=1 subtreeMinBuffer=0
 root reverse 1/0 reverse tombstone buffer=1 start=0 length=1 order=1536 lineBreaks=0 height=1 left=- right=- buffer=1 start=0 order=1536"
 `;
 
 exports[`piece tree inspection > prints stable empty, split, deleted and normalized snapshots with bounded opt-in text > initial 1`] = `
 "piece tree length=11 pieces=1 nodes=1
-root n1 pieces visible buffer=0 start=0 length=11 order=1024 lineBreaks=1 height=1 left=- right=- subtreeOriginalLength=11 subtreeVisibleLength=11 subtreePieces=1 subtreeLineBreaks=1 subtreeMinOrder=1024 subtreeMaxOrder=1024 subtreeMinBuffer=0"
+root n1 pieces visible buffer=0 start=0 length=11 order=1024 lineBreaks=1 height=1 left=- right=- subtreeOriginalLength=11 subtreeVisibleLength=11 subtreePieces=1 subtreeLineBreaks=1 subtreeMinBuffer=0"
 `;
 
 exports[`piece tree inspection > prints stable empty, split, deleted and normalized snapshots with bounded opt-in text > normalized 1`] = `
 "piece tree length=7 pieces=5 nodes=6
-root n1 pieces tombstone buffer=1 start=0 length=1 order=2148 lineBreaks=0 height=3 left=n2 right=n3 subtreeOriginalLength=11 subtreeVisibleLength=7 subtreePieces=5 subtreeLineBreaks=1 subtreeMinOrder=100 subtreeMaxOrder=4196 subtreeMinBuffer=0
-  left n2 pieces visible buffer=0 start=0 length=2 order=100 lineBreaks=0 height=2 left=- right=n4 subtreeOriginalLength=3 subtreeVisibleLength=2 subtreePieces=2 subtreeLineBreaks=0 subtreeMinOrder=100 subtreeMaxOrder=1124 subtreeMinBuffer=0
-    right n4 pieces tombstone buffer=0 start=2 length=1 order=1124 lineBreaks=0 height=1 left=- right=- subtreeOriginalLength=1 subtreeVisibleLength=0 subtreePieces=1 subtreeLineBreaks=0 subtreeMinOrder=1124 subtreeMaxOrder=1124 subtreeMinBuffer=0
-  right n3 pieces tombstone buffer=0 start=3 length=3 order=3172 lineBreaks=0 height=2 left=- right=n5 subtreeOriginalLength=8 subtreeVisibleLength=5 subtreePieces=2 subtreeLineBreaks=1 subtreeMinOrder=3172 subtreeMaxOrder=4196 subtreeMinBuffer=0
-    right n5 pieces visible buffer=0 start=6 length=5 order=4196 lineBreaks=1 height=1 left=- right=- subtreeOriginalLength=5 subtreeVisibleLength=5 subtreePieces=1 subtreeLineBreaks=1 subtreeMinOrder=4196 subtreeMaxOrder=4196 subtreeMinBuffer=0
+root n1 pieces tombstone buffer=1 start=0 length=1 order=2148 lineBreaks=0 height=3 left=n2 right=n3 subtreeOriginalLength=11 subtreeVisibleLength=7 subtreePieces=5 subtreeLineBreaks=1 subtreeMinBuffer=0
+  left n2 pieces visible buffer=0 start=0 length=2 order=100 lineBreaks=0 height=2 left=- right=n4 subtreeOriginalLength=3 subtreeVisibleLength=2 subtreePieces=2 subtreeLineBreaks=0 subtreeMinBuffer=0
+    right n4 pieces tombstone buffer=0 start=2 length=1 order=1124 lineBreaks=0 height=1 left=- right=- subtreeOriginalLength=1 subtreeVisibleLength=0 subtreePieces=1 subtreeLineBreaks=0 subtreeMinBuffer=0
+  right n3 pieces tombstone buffer=0 start=3 length=3 order=3172 lineBreaks=0 height=2 left=- right=n5 subtreeOriginalLength=8 subtreeVisibleLength=5 subtreePieces=2 subtreeLineBreaks=1 subtreeMinBuffer=0
+    right n5 pieces visible buffer=0 start=6 length=5 order=4196 lineBreaks=1 height=1 left=- right=- subtreeOriginalLength=5 subtreeVisibleLength=5 subtreePieces=1 subtreeLineBreaks=1 subtreeMinBuffer=0
 root reverse 1/0 reverse tombstone buffer=1 start=0 length=1 order=2148 lineBreaks=0 height=1 left=- right=- buffer=1 start=0 order=2148"
 `;
 
 exports[`piece tree inspection > prints stable empty, split, deleted and normalized snapshots with bounded opt-in text > split 1`] = `
 "piece tree length=12 pieces=3 nodes=4
-root n1 pieces visible buffer=1 start=0 length=1 order=1536 lineBreaks=0 height=2 left=n2 right=n3 subtreeOriginalLength=11 subtreeVisibleLength=12 subtreePieces=3 subtreeLineBreaks=1 subtreeMinOrder=1024 subtreeMaxOrder=2048 subtreeMinBuffer=0
-  left n2 pieces visible buffer=0 start=0 length=3 order=1024 lineBreaks=0 height=1 left=- right=- subtreeOriginalLength=3 subtreeVisibleLength=3 subtreePieces=1 subtreeLineBreaks=0 subtreeMinOrder=1024 subtreeMaxOrder=1024 subtreeMinBuffer=0
-  right n3 pieces visible buffer=0 start=3 length=8 order=2048 lineBreaks=1 height=1 left=- right=- subtreeOriginalLength=8 subtreeVisibleLength=8 subtreePieces=1 subtreeLineBreaks=1 subtreeMinOrder=2048 subtreeMaxOrder=2048 subtreeMinBuffer=0
+root n1 pieces visible buffer=1 start=0 length=1 order=1536 lineBreaks=0 height=2 left=n2 right=n3 subtreeOriginalLength=11 subtreeVisibleLength=12 subtreePieces=3 subtreeLineBreaks=1 subtreeMinBuffer=0
+  left n2 pieces visible buffer=0 start=0 length=3 order=1024 lineBreaks=0 height=1 left=- right=- subtreeOriginalLength=3 subtreeVisibleLength=3 subtreePieces=1 subtreeLineBreaks=0 subtreeMinBuffer=0
+  right n3 pieces visible buffer=0 start=3 length=8 order=2048 lineBreaks=1 height=1 left=- right=- subtreeOriginalLength=8 subtreeVisibleLength=8 subtreePieces=1 subtreeLineBreaks=1 subtreeMinBuffer=0
 root reverse 1/0 reverse visible buffer=1 start=0 length=1 order=1536 lineBreaks=0 height=1 left=- right=- buffer=1 start=0 order=1536"
 `;
 
 exports[`piece tree inspection > prints stable empty, split, deleted and normalized snapshots with bounded opt-in text 1`] = `
 "piece tree length=2 pieces=2 nodes=2
-root n1 pieces tombstone buffer=0 start=2 length=2 order=2 lineBreaks=1 height=2 left=n2 right=- subtreeOriginalLength=4 subtreeVisibleLength=2 subtreePieces=2 subtreeLineBreaks=1 subtreeMinOrder=1 subtreeMaxOrder=2 subtreeMinBuffer=0
-  left n2 pieces visible buffer=0 start=0 length=2 order=1 lineBreaks=1 height=1 left=- right=- subtreeOriginalLength=2 subtreeVisibleLength=2 subtreePieces=1 subtreeLineBreaks=1 subtreeMinOrder=1 subtreeMaxOrder=1 subtreeMinBuffer=0"
+root n1 pieces tombstone buffer=0 start=2 length=2 order=2 lineBreaks=1 height=2 left=n2 right=- subtreeOriginalLength=4 subtreeVisibleLength=2 subtreePieces=2 subtreeLineBreaks=1 subtreeMinBuffer=0
+  left n2 pieces visible buffer=0 start=0 length=2 order=1 lineBreaks=1 height=1 left=- right=- subtreeOriginalLength=2 subtreeVisibleLength=2 subtreePieces=1 subtreeLineBreaks=1 subtreeMinBuffer=0"
 `;

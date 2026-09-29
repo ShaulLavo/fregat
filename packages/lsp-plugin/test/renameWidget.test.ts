@@ -32,6 +32,42 @@ describe('the rename input', () => {
     controller.dispose()
   })
 
+  it('gives focus back to the editor when Escape or Enter closes it, not after a click away', async () => {
+    const editor = document.createElement('textarea')
+    document.body.append(editor)
+    let returned = 0
+    const controller = createRenameWidgetController({
+      document,
+      themeSource: document.body,
+      returnFocus: () => {
+        returned += 1
+        editor.focus()
+      },
+    })
+    const anchor = new DOMRect(10, 20, 40, 18)
+    const signal = new AbortController().signal
+
+    for (const key of ['Escape', 'Enter']) {
+      const settled = controller.prompt({ anchor, currentName: 'name', signal })
+      renameInput().dispatchEvent(
+        new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
+      )
+      await settled
+    }
+    expect(returned).toBe(2)
+    expect(document.activeElement).toBe(editor)
+
+    const clickedAway = controller.prompt({ anchor, currentName: 'name', signal })
+    const elsewhere = document.createElement('button')
+    document.body.append(elsewhere)
+    elsewhere.focus()
+    await clickedAway
+
+    expect(returned).toBe(2)
+    expect(document.activeElement).toBe(elsewhere)
+    controller.dispose()
+  })
+
   it('does not show an already-aborted prompt', async () => {
     const controller = createRenameWidgetController({ document, themeSource: document.body })
     const abort = new AbortController()

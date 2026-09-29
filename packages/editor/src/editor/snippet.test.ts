@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { createStringTextSnapshot } from '../documentTextSnapshot'
 import { parseSnippet, snippetInitialSelection } from './snippet'
 
 describe('parseSnippet', () => {
@@ -219,7 +220,10 @@ describe('parseSnippet indentation', () => {
 
   it("re-indents continuation lines to the caret's depth and the file's own unit", () => {
     const parsed = parseSnippet('if (${1:cond}) {\n\t$0\n}', {
-      insertion: { documentText: twoSpaceFile, offset: insideTwoSpaceFile },
+      insertion: {
+        textSnapshot: createStringTextSnapshot(twoSpaceFile),
+        offset: insideTwoSpaceFile,
+      },
     })
 
     expect(parsed.text).toBe('if (cond) {\n      \n    }')
@@ -227,7 +231,10 @@ describe('parseSnippet indentation', () => {
 
   it('moves the stops with the text they name', () => {
     const parsed = parseSnippet('if (${1:cond}) {\n\t$0\n}', {
-      insertion: { documentText: twoSpaceFile, offset: insideTwoSpaceFile },
+      insertion: {
+        textSnapshot: createStringTextSnapshot(twoSpaceFile),
+        offset: insideTwoSpaceFile,
+      },
     })
 
     expect(parsed.stops).toEqual([
@@ -240,7 +247,10 @@ describe('parseSnippet indentation', () => {
 
   it('keeps tabs when the line it lands on is indented with them', () => {
     const parsed = parseSnippet('if ($1) {\n  $0\n}', {
-      insertion: { documentText: 'function outer() {\n\tif (ready) {\n\t}\n}\n', offset: 21 },
+      insertion: {
+        textSnapshot: createStringTextSnapshot('function outer() {\n\tif (ready) {\n\t}\n}\n'),
+        offset: 21,
+      },
     })
 
     expect(parsed.text).toBe('if () {\n\t\t\n\t}')
@@ -248,7 +258,10 @@ describe('parseSnippet indentation', () => {
 
   it('scales a snippet written in four spaces down to the file it lands in', () => {
     const parsed = parseSnippet('try {\n    ${1:body}\n} catch {}', {
-      insertion: { documentText: twoSpaceFile, offset: insideTwoSpaceFile },
+      insertion: {
+        textSnapshot: createStringTextSnapshot(twoSpaceFile),
+        offset: insideTwoSpaceFile,
+      },
     })
 
     expect(parsed.text).toBe('try {\n      body\n    } catch {}')
@@ -258,7 +271,10 @@ describe('parseSnippet indentation', () => {
   // rewriting it at another width would move it off whatever it was lined up with.
   it('carries left-over alignment across at the width it was written', () => {
     const parsed = parseSnippet('call(\n\t   arg,\n)', {
-      insertion: { documentText: twoSpaceFile, offset: insideTwoSpaceFile },
+      insertion: {
+        textSnapshot: createStringTextSnapshot(twoSpaceFile),
+        offset: insideTwoSpaceFile,
+      },
     })
 
     expect(parsed.text).toBe('call(\n         arg,\n    )')
@@ -266,7 +282,10 @@ describe('parseSnippet indentation', () => {
 
   it('adds nothing to a line the snippet left empty', () => {
     const parsed = parseSnippet('start\n\nend', {
-      insertion: { documentText: twoSpaceFile, offset: insideTwoSpaceFile },
+      insertion: {
+        textSnapshot: createStringTextSnapshot(twoSpaceFile),
+        offset: insideTwoSpaceFile,
+      },
     })
 
     expect(parsed.text).toBe('start\n\n    end')
@@ -274,7 +293,9 @@ describe('parseSnippet indentation', () => {
 
   // Rewriting on no evidence would be worse than leaving what the server sent.
   it('keeps the snippet as written when the document indents nothing', () => {
-    const parsed = parseSnippet('a\n\tb', { insertion: { documentText: 'x\ny\n', offset: 2 } })
+    const parsed = parseSnippet('a\n\tb', {
+      insertion: { textSnapshot: createStringTextSnapshot('x\ny\n'), offset: 2 },
+    })
 
     expect(parsed.text).toBe('a\n\tb')
   })

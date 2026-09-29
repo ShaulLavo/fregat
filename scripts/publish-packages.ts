@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url'
 const PACKAGE_DIRS = [
   'packages/textbuffer',
   'packages/editor',
+  'packages/decode',
+  'packages/markdown',
   'packages/panes',
   'packages/lsp',
   'packages/gutters',
@@ -20,6 +22,7 @@ const PACKAGE_DIRS = [
   'packages/lsp-plugin',
   'packages/typescript-lsp',
   'packages/diff',
+  'packages/spellcheck',
 ] as const
 
 interface PackageManifest {

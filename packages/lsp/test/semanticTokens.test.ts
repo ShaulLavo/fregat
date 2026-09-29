@@ -32,12 +32,13 @@ describe('defaultClientCapabilities', () => {
     expect(defaultClientCapabilities().textDocument?.semanticTokens).toBeUndefined()
   })
 
-  it('declares document pull diagnostics and server refresh support', () => {
+  it('declares document pull diagnostics with tags and server refresh support', () => {
     const capabilities = defaultClientCapabilities()
 
     expect(capabilities.textDocument?.diagnostic).toEqual({
       dynamicRegistration: false,
       relatedDocumentSupport: false,
+      tagSupport: { valueSet: [1, 2] },
     })
     expect(capabilities.workspace?.diagnostics?.refreshSupport).toBe(true)
   })

@@ -34,6 +34,22 @@ export function setCompositionPreedit(view: VirtualizedTextViewInternal, text: s
   positionCompositionPreedit(view, element)
 }
 
+/** Where each character of the drawn candidate sits, for an IME placing its candidate window. */
+export function compositionCharacterRects(view: VirtualizedTextViewInternal): DOMRect[] {
+  const node = compositionPreedits.get(view)?.firstChild
+  if (!node || node.nodeType !== Node.TEXT_NODE) return []
+
+  const range = view.scrollElement.ownerDocument.createRange()
+  const rects: DOMRect[] = []
+  const length = node.textContent?.length ?? 0
+  for (let index = 0; index < length; index += 1) {
+    range.setStart(node, index)
+    range.setEnd(node, index + 1)
+    rects.push(range.getBoundingClientRect())
+  }
+  return rects
+}
+
 /**
  * The composition has not touched the document, so the caret still marks where its text will go —
  * which is also the left edge of what is being composed.

@@ -1,12 +1,14 @@
+import { LspConnectionPool } from '../src/lspConnectionPool'
+import type { LspReconnectOptions } from '../src/lspConnection'
+import { createLanguageServerDocument } from '../src/document'
+import { createEditorTextBuffer, createEditorBufferSession } from '@singapore-editor/core/document'
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
-import type { EditorCommandId } from '@singapore-editor/core/editor'
-import { createStringTextSnapshot } from '@singapore-editor/core/document'
+import type { EditorAnyCommandId } from '@singapore-editor/core/editor'
 import {
   createEditorCapabilityToken,
   type EditorCommandContributionContext,
   type EditorCommandHandler,
   type EditorEditContributionContext,
-  type EditorPluginContext,
   type EditorViewContributionContext,
   type EditorViewContributionProvider,
   type EditorViewSnapshot,
@@ -32,11 +34,21 @@ import { createLanguageServerAdapterPlugin, createLanguageServerPlugin } from '.
 import type {
   ApplyWorkspaceEditRequest,
   ApplyWorkspaceEditResult,
+  LanguageServerDiagnosticSummary,
   LanguageServerPlugin,
   LanguageServerRenamePrompt,
 } from '../src/types'
 import { connectedEditor, DOCUMENT_URI } from './connectedEditor'
-import { documentSyncSnapshotFields, viewSnapshotStructuralFields } from './documentSyncSnapshot'
+import {
+  documentSyncSnapshotFields,
+  viewSnapshotStructuralFields,
+  viewTextFields,
+} from './documentSyncSnapshot'
+import {
+  createTestEditContributionContext,
+  createTestPluginContext,
+  createTestViewContributionContext,
+} from '@singapore-editor/core/testing'
 
 type JsonMessage = Record<string, unknown>
 type Listener = (event: Event) => void
@@ -134,6 +146,56 @@ describe('createLanguageServerAdapterPlugin', () => {
     document.body.replaceChildren()
   })
 
+  it('repaints existing unnecessary diagnostics when the editor theme changes', async () => {
+    const transport = new FakeTransport()
+    const { features, provider } = activatePlugin(
+      createLanguageServerAdapterPlugin({
+        name: 'test.theme',
+        createTransport: () => transport,
+      }),
+      { applyEdits: vi.fn() },
+    )
+    const context = viewContributionContext(editorSnapshot(), { features })
+    const contribution = provider.createContribution(context)!
+    const computed = vi
+      .spyOn(window, 'getComputedStyle')
+      .mockReturnValue({ color: 'rgba(0, 0, 0, 0.25)' } as CSSStyleDeclaration)
+    try {
+      transport.receive(initializeResponse(jsonMessage(transport.sent[0])))
+      await flushPromises()
+      transport.receive({
+        jsonrpc: '2.0',
+        method: 'textDocument/publishDiagnostics',
+        params: {
+          uri: 'file:///README.md',
+          diagnostics: [
+            {
+              range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+              message: 'unused',
+              severity: 4,
+              tags: [1],
+            },
+          ],
+        },
+      })
+      expect(context.setRangeHighlight).toHaveBeenCalledWith(
+        expect.stringContaining('unnecessary'),
+        [{ start: 0, end: 1 }],
+        { overlay: { dim: 0.25 } },
+      )
+      computed.mockReturnValue({ color: 'rgba(0, 0, 0, 0.75)' } as CSSStyleDeclaration)
+      contribution.update({ ...editorSnapshot(), theme: { type: 'light' } }, 'tokens')
+      expect(context.setRangeHighlight).toHaveBeenCalledWith(
+        expect.stringContaining('unnecessary'),
+        [{ start: 0, end: 1 }],
+        { overlay: { dim: 0.75 } },
+      )
+    } finally {
+      computed.mockRestore()
+      contribution.dispose()
+    }
+  })
+
   it('owns generic LSP document sync, diagnostics, and adapter naming', async () => {
     const transport = new FakeTransport()
     const completionToken = createEditorCapabilityToken<LanguageServerCompletionEditFeature>(
@@ -144,7 +206,6 @@ describe('createLanguageServerAdapterPlugin', () => {
       createLanguageServerAdapterPlugin({
         name: 'editor.test-lsp',
         createTransport: () => transport,
-        defaultHighlightPrefix: 'editor-test',
         diagnostics: {
           minimapSourceId: 'editor.test-lsp.diagnostics',
           highlightNameNamespace: 'test-lsp',
@@ -206,7 +267,7 @@ describe('createLanguageServerAdapterPlugin', () => {
 
   // A formatter answers with the whole file even when one line moved, and applying that verbatim
   // retires every anchor, decoration, fold and selection inside it.
-  it('applies a whole-document formatting reply as the one edit that differs', async () => {
+  it.each([0, 22])('formats a smaller document with the caret at %s', async (caret) => {
     const transport = new FakeTransport()
     const applyEdits = vi.fn<EditorEditContributionContext['applyEdits']>()
     const text = '# Notes\n\n- one\n-  two\n'
@@ -214,13 +275,26 @@ describe('createLanguageServerAdapterPlugin', () => {
       createLanguageServerAdapterPlugin({
         name: 'editor.test-lsp',
         createTransport: () => transport,
-        defaultHighlightPrefix: 'editor-test',
         completion: { acceptTimingName: 'testLsp.completion.accept' },
       }),
       { applyEdits },
     )
     const contribution = provider.createContribution(
-      viewContributionContext(editorSnapshot(text), { features }),
+      viewContributionContext(
+        {
+          ...editorSnapshot(text),
+          selections: [
+            {
+              anchorOffset: caret,
+              headOffset: caret,
+              startOffset: caret,
+              endOffset: caret,
+              affinity: 'after',
+            },
+          ],
+        },
+        { features },
+      ),
     )
     if (!contribution) throw new Error('missing contribution')
 
@@ -248,7 +322,7 @@ describe('createLanguageServerAdapterPlugin', () => {
     expect(applyEdits).toHaveBeenCalledWith(
       [{ from: 17, text: '', to: 18 }],
       'testLsp.completion.accept',
-      { anchor: 0, head: 0 },
+      { anchor: Math.min(caret, text.length - 1), head: Math.min(caret, text.length - 1) },
     )
   })
 
@@ -285,6 +359,26 @@ describe('createLanguageServerAdapterPlugin', () => {
       text: '# Notes',
     })
     expect(statuses).toEqual(['loading', 'ready'])
+  })
+
+  // The editor refuses a second handler for an id, so `commands` is how a second plugin in the same
+  // editor stays out of the first one's way; the completion list's keys are commands like any other.
+  it('registers every command it has, list and hint keys included, only from `commands`', () => {
+    const applyEdits = vi.fn<EditorEditContributionContext['applyEdits']>()
+    const plugin = (commands?: []) =>
+      createLanguageServerAdapterPlugin({
+        name: 'editor.test-lsp',
+        createTransport: () => new FakeTransport(),
+        commands,
+      })
+
+    const defaults = activatePlugin(plugin(), { applyEdits }).commands
+    const none = activatePlugin(plugin([]), { applyEdits }).commands
+
+    expect([...defaults.keys()]).toEqual(
+      expect.arrayContaining(['editor.action.triggerSuggest', 'closeParameterHints']),
+    )
+    expect(none.size).toBe(0)
   })
 })
 
@@ -638,7 +732,6 @@ describe('connectionProvider', () => {
       name: 'editor.test-lsp',
       createTransport: () => transport,
       connectionProvider: provider,
-      defaultHighlightPrefix: 'editor-test',
       completion: { acceptTimingName: 'testLsp.completion.accept' },
     })
   }
@@ -714,7 +807,6 @@ describe('connectionProvider', () => {
         name: 'editor.test-lsp',
         createTransport: () => transport,
         connectionProvider,
-        defaultHighlightPrefix: 'editor-test',
         completion: { acceptTimingName: 'testLsp.completion.accept' },
         onConnected,
       }),
@@ -729,44 +821,376 @@ describe('connectionProvider', () => {
   })
 })
 
+describe('shared language-server documents', () => {
+  it('advertises document-owned workspace edits before any view attaches', async () => {
+    const onApplyWorkspaceEdit = vi.fn(async () => ({ status: 'applied' as const }))
+    const document = createLanguageServerDocument({
+      buffer: createEditorTextBuffer('# Notes'),
+      uri: 'file:///README.md',
+      languageId: 'markdown',
+      onApplyWorkspaceEdit,
+      lanes: [
+        {
+          id: 'test',
+          features: { diagnostics: 0 },
+          webSocketRoute: 'ws://localhost/lsp',
+          webSocketTransportOptions: { WebSocketCtor: FakeWebSocket },
+        },
+      ],
+    })
+    const socket = FakeWebSocket.instances.at(-1)!
+    socket.open()
+    await flushPromises()
+    expect(jsonMessage(socket.sent[0])).toMatchObject({
+      method: 'initialize',
+      params: {
+        capabilities: {
+          workspace: {
+            workspaceEdit: {
+              documentChanges: true,
+              resourceOperations: ['create', 'rename', 'delete'],
+            },
+          },
+        },
+      },
+    })
+    expect(document.lanes[0]!.options.onApplyWorkspaceEdit).toBe(onApplyWorkspaceEdit)
+    document.dispose()
+  })
+
+  it('retains diagnostics and synchronization without a view, then paints synchronously on reattachment', async () => {
+    const buffer = createEditorTextBuffer('# Notes')
+    const document = createLanguageServerDocument({
+      buffer,
+      uri: 'file:///README.md',
+      languageId: 'markdown',
+      lanes: [
+        {
+          id: 'test',
+          features: { diagnostics: 0 },
+          webSocketRoute: 'ws://localhost/lsp',
+          webSocketTransportOptions: { WebSocketCtor: FakeWebSocket },
+        },
+      ],
+    })
+    const socket = FakeWebSocket.instances.at(-1)!
+    socket.open()
+    await flushPromises()
+    socket.receive(initializeResponse(jsonMessage(socket.sent[0])))
+    await document.lanes[0]!.connection.ready
+    const mount = () => {
+      const { provider, features } = activatePlugin(createLanguageServerPlugin({ document }), {
+        applyEdits: vi.fn(),
+      })
+      const context = viewContributionContext(editorSnapshot(buffer.materializeFullText()), {
+        features,
+      })
+      const view = provider.createContribution(context)!
+      return { context, view }
+    }
+    const first = mount()
+    socket.receive(publishDiagnosticsMessage())
+    expect(first.context.setRangeHighlight).toHaveBeenCalledWith(
+      'editor-test-lsp-plugin-error',
+      [{ start: 0, end: 1 }],
+      expect.any(Object),
+    )
+    first.view.dispose()
+    expect(socket.sent.filter(hasMethod('textDocument/didClose'))).toHaveLength(0)
+
+    const edit = createEditorBufferSession(buffer)
+    edit.applyEdits([{ from: 7, to: 7, text: '!' }])
+    await flushPromises()
+    expect(socket.sent.filter(hasMethod('textDocument/didChange'))).toHaveLength(1)
+    const diagnostic = {
+      ...publishDiagnosticsMessage(),
+      params: {
+        uri: 'file:///README.md',
+        version: 1,
+        diagnostics: [
+          {
+            severity: 1,
+            message: 'updated while hidden',
+            range: { start: { line: 0, character: 2 }, end: { line: 0, character: 3 } },
+          },
+        ],
+      },
+    }
+    socket.receive(diagnostic)
+    socket.receive(publishDiagnosticsMessage())
+    const second = mount()
+    expect(second.context.setRangeHighlight).toHaveBeenCalledWith(
+      'editor-test-lsp-plugin-error',
+      [{ start: 2, end: 3 }],
+      expect.any(Object),
+    )
+    expect(socket.sent.filter(hasMethod('textDocument/didOpen'))).toHaveLength(1)
+    const split = mount()
+    second.view.dispose()
+    expect(socket.sent.filter(hasMethod('textDocument/didClose'))).toHaveLength(0)
+    split.view.dispose()
+    document.dispose()
+    document.dispose()
+    await flushPromises()
+    expect(socket.sent.filter(hasMethod('textDocument/didClose'))).toHaveLength(1)
+    const sent = socket.sent.length
+    edit.applyEdits([{ from: 8, to: 8, text: '?' }])
+    await flushPromises()
+    expect(socket.sent).toHaveLength(sent)
+  })
+  it('marks a retired pooled connection unusable and clears its diagnostics', async () => {
+    const pool = new LspConnectionPool()
+    const document = createLanguageServerDocument({
+      buffer: createEditorTextBuffer('# Notes'),
+      uri: 'file:///README.md',
+      languageId: 'markdown',
+      lanes: [
+        {
+          id: 'test',
+          features: { diagnostics: 0 },
+          webSocketRoute: 'ws://localhost/lsp',
+          connectionProvider: pool.provider('test'),
+          webSocketTransportOptions: { WebSocketCtor: FakeWebSocket },
+        },
+      ],
+    })
+    const socket = FakeWebSocket.instances.at(-1)!
+    socket.open()
+    await flushPromises()
+    socket.receive(initializeResponse(jsonMessage(socket.sent[0])))
+    await document.lanes[0]!.connection.ready
+    socket.receive(publishDiagnosticsMessage())
+    expect(document.lanes[0]!.sync.diagnostics).toHaveLength(1)
+    socket.close()
+    expect(document.lanes[0]!.status).toBe('error')
+    expect(document.lanes[0]!.sync.diagnostics).toHaveLength(0)
+    document.dispose()
+    pool.dispose()
+  })
+
+  it('reconnects after the server goes away and re-opens the document on the new one', async () => {
+    vi.useFakeTimers()
+    const pool = new LspConnectionPool()
+    const freshness: string[] = []
+    const document = freshnessDocument(pool, (summary) => freshness.push(summary.freshness), {
+      delaysMs: [100],
+    })
+    const first = FakeWebSocket.instances.at(-1)!
+    first.open()
+    await flushPromises()
+    first.receive(initializeResponse(jsonMessage(first.sent[0])))
+    await document.lanes[0]!.connection.ready
+    first.receive(publishDiagnosticsMessage())
+    expect(freshness.at(-1)).toBe('current')
+
+    first.close()
+    expect(document.lanes[0]!.sync.diagnostics).toHaveLength(0)
+    expect(freshness.at(-1)).toBe('unavailable')
+    expect(document.lanes[0]!.status).toBe('loading')
+    await vi.advanceTimersByTimeAsync(100)
+
+    const second = FakeWebSocket.instances.at(-1)!
+    expect(second).not.toBe(first)
+    second.open()
+    await flushPromises()
+    second.receive(initializeResponse(jsonMessage(second.sent[0])))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(sentMethods(second)).toContain('textDocument/didOpen')
+    expect(document.lanes[0]!.status).toBe('ready')
+    expect(freshness.at(-1)).toBe('silent')
+    second.receive(publishDiagnosticsMessage())
+    expect(freshness.at(-1)).toBe('current')
+    document.dispose()
+    pool.dispose()
+    vi.useRealTimers()
+  })
+
+  it('gives up once its reconnect attempts run out', async () => {
+    vi.useFakeTimers()
+    const pool = new LspConnectionPool()
+    const document = freshnessDocument(pool, () => undefined, { delaysMs: [100] })
+    const created = FakeWebSocket.instances.length
+    const first = FakeWebSocket.instances.at(-1)!
+    first.open()
+    await flushPromises()
+    first.receive(initializeResponse(jsonMessage(first.sent[0])))
+    await document.lanes[0]!.connection.ready
+
+    first.close()
+    await vi.advanceTimersByTimeAsync(100)
+    FakeWebSocket.instances.at(-1)!.close()
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(document.lanes[0]!.status).toBe('error')
+    expect(document.lanes[0]!.diagnosticsFreshness).toBe('unavailable')
+    // One reconnect for the one delay, then nothing more.
+    expect(FakeWebSocket.instances.length - created).toBe(1)
+    document.dispose()
+    pool.dispose()
+    vi.useRealTimers()
+  })
+
+  it('says a push server that has not published is silent, never pending', async () => {
+    const pool = new LspConnectionPool()
+    const freshness: string[] = []
+    const document = freshnessDocument(pool, (summary) => freshness.push(summary.freshness))
+    const socket = FakeWebSocket.instances.at(-1)!
+    socket.open()
+    await flushPromises()
+    socket.receive(initializeResponse(jsonMessage(socket.sent[0])))
+    await document.lanes[0]!.connection.ready
+
+    expect(document.lanes[0]!.diagnosticsFreshness).toBe('silent')
+    socket.receive(publishDiagnosticsMessage())
+    expect(freshness.at(-1)).toBe('current')
+    socket.close()
+    expect(freshness.at(-1)).toBe('unavailable')
+    document.dispose()
+    pool.dispose()
+  })
+
+  it('tells a pending pull apart from its answer, first and on refresh', async () => {
+    const pool = new LspConnectionPool()
+    const summaries: { freshness: string; total: number }[] = []
+    const document = freshnessDocument(pool, (summary) =>
+      summaries.push({ freshness: summary.freshness, total: summary.counts.total }),
+    )
+    const socket = FakeWebSocket.instances.at(-1)!
+    socket.open()
+    await flushPromises()
+    socket.receive(
+      initializeResponse(jsonMessage(socket.sent[0]), {
+        diagnosticProvider: { interFileDependencies: true, workspaceDiagnostics: false },
+      }),
+    )
+    await document.lanes[0]!.connection.ready
+    await flushPromises()
+
+    expect(summaries.at(-1)).toEqual({ freshness: 'awaiting', total: 0 })
+    socket.receive(pullAnswer(socket, [diagnosticItem()]))
+    await flushPromises()
+    expect(summaries.at(-1)).toEqual({ freshness: 'current', total: 1 })
+
+    socket.receive({ jsonrpc: '2.0', method: 'workspace/diagnostic/refresh' })
+    await flushPromises()
+    // The earlier answer stays on screen, marked as being re-asked rather than as current.
+    expect(summaries.at(-1)).toEqual({ freshness: 'refreshing', total: 1 })
+    socket.receive(pullAnswer(socket, []))
+    await flushPromises()
+    expect(summaries.at(-1)).toEqual({ freshness: 'current', total: 0 })
+    document.dispose()
+    pool.dispose()
+  })
+
+  it('reports freshness without a LanguageServerDocument', async () => {
+    const transport = new FakeTransport()
+    const freshness: string[] = []
+    const { features, provider } = activatePlugin(
+      createLanguageServerAdapterPlugin({
+        name: 'editor.test-lsp',
+        createTransport: () => transport,
+        onDiagnostics: (summary) => freshness.push(summary.freshness),
+        diagnostics: {
+          minimapSourceId: 'editor.test-lsp.diagnostics',
+          highlightNameNamespace: 'test-lsp',
+          markerTimingNamePrefix: 'testLsp.marker',
+        },
+        completion: {
+          editFeature: createEditorCapabilityToken<LanguageServerCompletionEditFeature>(
+            'test.lsp-plugin.freshness',
+          ),
+          acceptTimingName: 'testLsp.completion.accept',
+        },
+        hoverDefinition: {
+          linkHighlightNameNamespace: 'test-lsp',
+          tooltipClassNamespace: 'test-lsp',
+          navigationTimingNamePrefix: 'testLsp',
+        },
+      }),
+      { applyEdits: vi.fn() },
+    )
+    provider.createContribution(viewContributionContext(editorSnapshot(), { features }))
+    transport.receive(initializeResponse(jsonMessage(transport.sent[0])))
+    await flushPromises()
+
+    transport.receive(publishDiagnosticsMessage())
+    expect(freshness.at(-1)).toBe('current')
+  })
+})
+
+function freshnessDocument(
+  pool: LspConnectionPool,
+  onDiagnostics: (summary: LanguageServerDiagnosticSummary) => void,
+  reconnect?: LspReconnectOptions,
+) {
+  return createLanguageServerDocument({
+    buffer: createEditorTextBuffer('# Notes'),
+    uri: 'file:///README.md',
+    languageId: 'markdown',
+    lanes: [
+      {
+        id: 'test',
+        features: { diagnostics: 0 },
+        webSocketRoute: 'ws://localhost/lsp',
+        connectionProvider: pool.provider('test'),
+        webSocketTransportOptions: { WebSocketCtor: FakeWebSocket },
+        onDiagnostics,
+        reconnect,
+      },
+    ],
+  })
+}
+
+function pullAnswer(socket: FakeWebSocket, items: lsp.Diagnostic[]): JsonMessage {
+  const request = socket.sent.map(jsonMessage).findLast((message) => {
+    return message.method === 'textDocument/diagnostic'
+  })
+  if (!request) throw new Error('no pull request was sent')
+  return { jsonrpc: '2.0', id: request.id, result: { kind: 'full', items } }
+}
+
+function diagnosticItem(): lsp.Diagnostic {
+  return {
+    severity: 1,
+    message: 'heading',
+    range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+  }
+}
+
 function activatePlugin(
   plugin: LanguageServerPlugin,
   options: ActivationOptions,
 ): {
   readonly provider: EditorViewContributionProvider
-  readonly commands: ReadonlyMap<EditorCommandId, EditorCommandHandler>
+  readonly commands: ReadonlyMap<EditorAnyCommandId, EditorCommandHandler>
   readonly features: ReadonlyMap<unknown, unknown>
 } {
   let provider: EditorViewContributionProvider | null = null
-  const commands = new Map<EditorCommandId, EditorCommandHandler>()
+  const commands = new Map<EditorAnyCommandId, EditorCommandHandler>()
   const features = new Map<unknown, unknown>()
-  plugin.activate({
-    registerHighlighter: () => ({ dispose: () => undefined }),
-    registerSyntaxProvider: () => ({ dispose: () => undefined }),
-    registerViewContribution: (value) => {
-      provider = value
-      return { dispose: () => undefined }
-    },
-    registerCommandContribution: (value) => {
-      value.createContribution(commandContributionContext(commands))
-      return { dispose: () => undefined }
-    },
-    registerCapabilityContribution: () => ({ dispose: () => undefined }),
-    registerEditContribution: (value) => {
-      value.createContribution(editContributionContext(features, options.applyEdits))
-      return { dispose: () => undefined }
-    },
-    registerDecorationContribution: () => ({ dispose: () => undefined }),
-    registerGutterContribution: () => ({ dispose: () => undefined }),
-    registerInjectedTextRowProvider: () => ({ dispose: () => undefined }),
-  } satisfies EditorPluginContext)
+  plugin.activate(
+    createTestPluginContext({
+      registerViewContribution: (value) => {
+        provider = value
+        return { dispose: () => undefined }
+      },
+      registerCommandContribution: (value) => {
+        value.createContribution(commandContributionContext(commands))
+        return { dispose: () => undefined }
+      },
+      registerEditContribution: (value) => {
+        value.createContribution(editContributionContext(features, options.applyEdits))
+        return { dispose: () => undefined }
+      },
+    }),
+  )
 
   if (!provider) throw new Error('missing provider')
   return { provider, commands, features }
 }
 
 function commandContributionContext(
-  commands: Map<EditorCommandId, EditorCommandHandler>,
+  commands: Map<EditorAnyCommandId, EditorCommandHandler>,
 ): EditorCommandContributionContext {
   return {
     registerCommand: (commandId, handler) => {
@@ -780,23 +1204,19 @@ function editContributionContext(
   features: Map<unknown, unknown>,
   applyEdits: EditorEditContributionContext['applyEdits'],
 ): EditorEditContributionContext {
-  return {
-    hasDocument: () => true,
+  return createTestEditContributionContext({
     materializeFullText: () => '',
-    getTextSnapshot: () => null,
-    getSelections: () => [],
-    focusEditor: vi.fn(),
     applyEdits,
     registerFeature: (id, feature) => {
       features.set(id, feature)
       return { dispose: () => features.delete(id) }
     },
-  }
+  })
 }
 
 function command(
-  commands: ReadonlyMap<EditorCommandId, EditorCommandHandler>,
-  commandId: EditorCommandId,
+  commands: ReadonlyMap<EditorAnyCommandId, EditorCommandHandler>,
+  commandId: EditorAnyCommandId,
 ): EditorCommandHandler {
   const handler = commands.get(commandId)
   if (!handler) throw new Error(`missing command ${commandId}`)
@@ -812,26 +1232,18 @@ function viewContributionContext(
     const feature = options.features.get(token)
     return feature === undefined ? null : feature
   }) as EditorViewContributionContext['getFeature']
-  return {
+  return createTestViewContributionContext({
     container: element,
     scrollElement: element,
     contentElement: element,
     highlightPrefix: 'editor-test',
-    hasDocument: () => true,
     getSnapshot: () => snapshot,
-    requestViewUpdate: vi.fn(),
     getFeature,
-    revealLine: vi.fn(),
-    focusEditor: vi.fn(),
     setSelection: vi.fn(),
-    setSelections: vi.fn(),
-    setScrollTop: vi.fn(),
-    reserveOverlayWidth: vi.fn(),
     textOffsetFromPoint: vi.fn(() => 0),
     getRangeClientRect: vi.fn(() => new DOMRect(10, 20, 40, 18)),
     setRangeHighlight: vi.fn(),
-    clearRangeHighlight: vi.fn(),
-  }
+  })
 }
 
 function editorSnapshot(fullText = '# Notes', documentId = 'README.md'): EditorViewSnapshot {
@@ -844,10 +1256,8 @@ function editorSnapshot(fullText = '# Notes', documentId = 'README.md'): EditorV
     ...viewSnapshotStructuralFields(),
     documentId,
     languageId: 'markdown',
-    fullText,
+    ...viewTextFields(fullText),
     textVersion: 1,
-    lineStarts,
-    textSnapshot: createStringTextSnapshot(fullText),
     tokens: EditorTokenStore.empty(),
     brackets: [],
     selections: [

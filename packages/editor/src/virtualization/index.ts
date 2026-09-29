@@ -1,5 +1,6 @@
 export { VirtualizedTextView } from './virtualizedTextView'
 export type { BrowserTextMetrics } from './browserMetrics'
+export type { EditorInputKind, EditorInputRoute, EditorWrapBreak } from './virtualizedTextViewTypes'
 
 export type {
   EditorCursorLineHighlightOptions,
@@ -10,5 +11,4 @@ export type {
   VirtualizedTextHighlightStyle,
   VirtualizedTextRowDecoration,
   VirtualizedTextViewOptions,
-  VirtualizedTextViewState,
 } from './virtualizedTextViewTypes'

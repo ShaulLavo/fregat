@@ -1,4 +1,6 @@
+import { type AtomicRanges, atomicDeleteRange, widenOverAtomicRanges } from '../atomicRanges'
 import type { DocumentSessionEditSelection } from '../documentSession'
+import type { TextReadSnapshot } from '../documentTextSnapshot'
 import { normalizeTabSize } from '../displayTransforms'
 import {
   selectionOffsetsWithAffinity,
@@ -25,6 +27,14 @@ import {
   type EditorBlockCommentTokens,
   type EditorCommentTokens,
 } from './languageConfiguration'
+import {
+  createLineMap,
+  mergeRowRanges,
+  type LineGeometry,
+  type LineMap,
+  type RowRange,
+} from './lineMap'
+import { rangeInRowWindow } from './rowWindow'
 
 export type EditorEditActionCommandId =
   | 'deleteWordLeft'
@@ -51,6 +61,12 @@ export type EditorEditActionCommandId =
   | 'editor.action.transformToLowercase'
   | 'editor.action.transformToTitlecase'
 
+/** Actions that read the rows and words they touch; trimming reads the whole document. */
+export type EditorBoundedEditActionCommandId = Exclude<
+  EditorEditActionCommandId,
+  'editor.action.trimTrailingWhitespace'
+>
+
 export type EditorEditActionResult = {
   readonly edits: readonly TextEdit[]
   readonly selections?: readonly DocumentSessionEditSelection[]
@@ -69,6 +85,8 @@ export type EditorEditActionOptions = {
   readonly injections?: readonly EditorSyntaxInjection[]
   readonly tabSize?: number
   readonly indentText?: string
+  /** Replacements a word delete takes whole instead of cutting into. */
+  readonly atomicRanges?: AtomicRanges
 }
 
 /** One row's text, without its terminator, together with the offset the row starts at. */
@@ -109,15 +127,7 @@ type BlockUncommentParts = {
   readonly close: OffsetRange
 }
 
-type RowGroup = {
-  readonly startRow: number
-  readonly endRow: number
-}
-
-type LineMap = {
-  readonly text: string
-  readonly starts: readonly number[]
-}
+type RowGroup = RowRange
 
 type RelativePoint = {
   readonly row: number
@@ -130,6 +140,9 @@ type LineSelectionDescriptor = {
   readonly affinity: SelectionAffinity
   readonly head: RelativePoint
 }
+
+const TAB = 0x09
+const SPACE = 0x20
 
 /**
  * What a language nobody has described gets.
@@ -174,81 +187,88 @@ export function isEditorEditActionCommand(
 }
 
 export function editActionForCommand(
-  command: EditorEditActionCommandId,
-  text: string,
+  command: EditorBoundedEditActionCommandId,
+  source: TextReadSnapshot,
   selections: readonly ResolvedSelection[],
   options: EditorEditActionOptions = {},
 ): EditorEditActionResult {
   if (command === 'deleteWordLeft') {
-    return deleteWordAction(text, selections, 'left', 'word', options)
+    return deleteWordAction(source, selections, 'left', 'word', options)
   }
   if (command === 'deleteWordRight') {
-    return deleteWordAction(text, selections, 'right', 'word', options)
+    return deleteWordAction(source, selections, 'right', 'word', options)
   }
   if (command === 'deleteWordPartLeft') {
-    return deleteWordAction(text, selections, 'left', 'wordPart', options)
+    return deleteWordAction(source, selections, 'left', 'wordPart', options)
   }
   if (command === 'deleteWordPartRight') {
-    return deleteWordAction(text, selections, 'right', 'wordPart', options)
-  }
-  if (command === 'editor.action.commentLine') return commentLineAction(text, selections, options)
-  if (command === 'editor.action.blockComment') {
-    return blockCommentAction(text, selections, options)
-  }
-  if (command === 'editor.action.indentLines') {
-    return indentLinesAction(text, selections, 'indent', options)
-  }
-  if (command === 'editor.action.outdentLines') {
-    return indentLinesAction(text, selections, 'outdent', options)
-  }
-  if (command === 'editor.action.trimTrailingWhitespace') {
-    return trimTrailingWhitespaceAction(text)
-  }
-  if (command === 'editor.action.sortLinesAscending') {
-    return sortLinesAction(text, selections, 'ascending')
-  }
-  if (command === 'editor.action.sortLinesDescending') {
-    return sortLinesAction(text, selections, 'descending')
-  }
-  if (command === 'editor.action.joinLines') return joinLinesAction(text, selections)
-  if (command === 'editor.action.duplicateSelection') {
-    return duplicateSelectionAction(text, selections)
+    return deleteWordAction(source, selections, 'right', 'wordPart', options)
   }
   if (command === 'editor.action.transformToUppercase') {
-    return transformCaseAction(text, selections, 'upper')
+    return transformCaseAction(source, selections, 'upper')
   }
   if (command === 'editor.action.transformToLowercase') {
-    return transformCaseAction(text, selections, 'lower')
+    return transformCaseAction(source, selections, 'lower')
   }
   if (command === 'editor.action.transformToTitlecase') {
-    return transformCaseAction(text, selections, 'title')
+    return transformCaseAction(source, selections, 'title')
   }
-  if (command === 'editor.action.deleteLines') return deleteLinesAction(text, selections)
-  if (command === 'editor.action.copyLinesUpAction') return copyLinesAction(text, selections, 'up')
+
+  return lineActionForCommand(command, createLineMap(source, selections), selections, options)
+}
+
+function lineActionForCommand(
+  command: EditorBoundedEditActionCommandId,
+  map: LineMap,
+  selections: readonly ResolvedSelection[],
+  options: EditorEditActionOptions,
+): EditorEditActionResult {
+  if (command === 'editor.action.commentLine') return commentLineAction(map, selections, options)
+  if (command === 'editor.action.blockComment') return blockCommentAction(map, selections, options)
+  if (command === 'editor.action.indentLines') {
+    return indentLinesAction(map, selections, 'indent', options)
+  }
+  if (command === 'editor.action.outdentLines') {
+    return indentLinesAction(map, selections, 'outdent', options)
+  }
+  if (command === 'editor.action.sortLinesAscending') {
+    return sortLinesAction(map, selections, 'ascending')
+  }
+  if (command === 'editor.action.sortLinesDescending') {
+    return sortLinesAction(map, selections, 'descending')
+  }
+  if (command === 'editor.action.joinLines') return joinLinesAction(map, selections)
+  if (command === 'editor.action.duplicateSelection') {
+    return duplicateSelectionAction(map, selections)
+  }
+  if (command === 'editor.action.deleteLines') return deleteLinesAction(map, selections)
+  if (command === 'editor.action.copyLinesUpAction') return copyLinesAction(map, selections, 'up')
   if (command === 'editor.action.copyLinesDownAction') {
-    return copyLinesAction(text, selections, 'down')
+    return copyLinesAction(map, selections, 'down')
   }
-  if (command === 'editor.action.moveLinesUpAction') return moveLinesAction(text, selections, 'up')
+  if (command === 'editor.action.moveLinesUpAction') return moveLinesAction(map, selections, 'up')
   if (command === 'editor.action.moveLinesDownAction') {
-    return moveLinesAction(text, selections, 'down')
+    return moveLinesAction(map, selections, 'down')
   }
   if (command === 'editor.action.insertLineBefore') {
-    return insertLineAction(text, selections, 'before')
+    return insertLineAction(map, selections, 'before')
   }
-  return insertLineAction(text, selections, 'after')
+  return insertLineAction(map, selections, 'after')
 }
 
 function deleteWordAction(
-  text: string,
+  source: TextReadSnapshot,
   selections: readonly ResolvedSelection[],
   direction: 'left' | 'right',
   granularity: WordDeleteGranularity,
   options: EditorEditActionOptions,
 ): EditorEditActionResult {
   const separators = wordSeparatorsForLanguage(options.languageId)
+  const atomic = options.atomicRanges ?? []
   const ranges = selections
-    .map((selection) => wordDeleteRange(text, selection, direction, granularity, separators))
+    .map((selection) => wordDeleteRange(source, selection, direction, granularity, separators))
     .filter((range) => range.start !== range.end)
+    .map((range) => widenOverAtomicRanges(atomic, range))
   const merged = mergeOffsetRanges(ranges)
   const edits = merged.map((range) => rangeToEdit(range, ''))
   const collapsedSelections = collapseSelectionsAfterRanges(merged)
@@ -263,34 +283,117 @@ function deleteWordAction(
 }
 
 /**
+ * Backspace or Delete where a selection meets an atomic replacement, which then goes whole. Null when
+ * no selection touches one, so the ordinary delete paths keep every other case.
+ */
+export function atomicDeleteAction(
+  source: TextReadSnapshot,
+  selections: readonly ResolvedSelection[],
+  direction: 'backward' | 'forward',
+  atomic: AtomicRanges,
+): EditorEditActionResult | null {
+  if (atomic.length === 0) return null
+  const spans = selections.map((selection) =>
+    atomicSelectionDeleteSpan(atomic, selection, direction),
+  )
+  if (spans.every((span) => span === null)) return null
+
+  const ranges = selections
+    .map((selection, index) => spans[index] ?? plainDeleteSpan(source, selection, direction))
+    .filter((range) => range.start !== range.end)
+  const merged = mergeOffsetRanges(ranges)
+  const collapsedSelections = collapseSelectionsAfterRanges(merged)
+  return {
+    edits: merged.map((range) => rangeToEdit(range, '')),
+    selections: collapsedSelections,
+    revealOffset: collapsedSelections[0]?.head,
+    timingName: direction === 'backward' ? 'input.backspace' : 'input.delete',
+  }
+}
+
+function atomicSelectionDeleteSpan(
+  atomic: AtomicRanges,
+  selection: ResolvedSelection,
+  direction: 'backward' | 'forward',
+): OffsetRange | null {
+  if (selection.collapsed) return atomicDeleteRange(atomic, selection.headOffset, direction)
+
+  const span = { start: selection.startOffset, end: selection.endOffset }
+  const widened = widenOverAtomicRanges(atomic, span)
+  return widened === span ? null : widened
+}
+
+function plainDeleteSpan(
+  source: TextReadSnapshot,
+  selection: ResolvedSelection,
+  direction: 'backward' | 'forward',
+): OffsetRange {
+  if (!selection.collapsed) return { start: selection.startOffset, end: selection.endOffset }
+
+  return rangeInRowWindow(source, selection.headOffset, (text, head) =>
+    direction === 'backward'
+      ? { start: previousCodePointOffset(text, head), end: head }
+      : { start: head, end: nextCodePointOffset(text, head) },
+  )
+}
+
+/**
  * Trims trailing spaces and tabs from every line of the document, selection or not.
  *
  * One edit per affected line rather than one whole-document edit, so untouched lines keep their
  * piece-table sharing and every anchor outside the trimmed runs survives.
  */
-function trimTrailingWhitespaceAction(text: string): EditorEditActionResult {
-  const map = createLineMap(text)
-  const edits: TextEdit[] = []
+export function trimTrailingWhitespaceAction(source: TextReadSnapshot): EditorEditActionResult {
+  const scan = new TrailingWhitespaceScan()
+  source.forEachTextChunk((text, start) => scan.feed(text, start))
 
-  for (let row = 0; row <= lastRow(map); row += 1) {
-    const start = lineStart(map, row)
-    const end = lineEnd(map, row)
-    const line = text.slice(start, end)
-    const trimmed = line.replace(/[ \t]+$/, '')
-    if (trimmed.length === line.length) continue
+  return { edits: scan.finish(source.length), timingName: 'editor.trimTrailingWhitespace' }
+}
 
-    edits.push({ from: start + trimmed.length, text: '', to: end })
+/** Streams chunks, carrying a run of spaces and tabs that reaches a chunk's end into the next. */
+class TrailingWhitespaceScan {
+  readonly #edits: TextEdit[] = []
+  #runStart = -1
+
+  feed(text: string, start: number): void {
+    let lineStart = 0
+    for (let end = text.indexOf('\n'); end !== -1; end = text.indexOf('\n', end + 1)) {
+      this.#runStart = this.runStartBefore(text, start, lineStart, end)
+      this.endRow(start + end)
+      lineStart = end + 1
+    }
+    this.#runStart = this.runStartBefore(text, start, lineStart, text.length)
   }
 
-  return { edits, timingName: 'editor.trimTrailingWhitespace' }
+  finish(length: number): readonly TextEdit[] {
+    this.endRow(length)
+    return this.#edits
+  }
+
+  /** Where the run ending at `end` starts in the document, or -1 when there is none. */
+  private runStartBefore(text: string, start: number, lineStart: number, end: number): number {
+    let index = end
+    while (index > lineStart && isBlank(text.charCodeAt(index - 1))) index -= 1
+    // The run began in an earlier chunk when it fills everything this chunk had before `end`.
+    if (index === 0 && this.#runStart !== -1) return this.#runStart
+    return index < end ? start + index : -1
+  }
+
+  private endRow(end: number): void {
+    if (this.#runStart !== -1) this.#edits.push({ from: this.#runStart, text: '', to: end })
+    this.#runStart = -1
+  }
+}
+
+function isBlank(code: number): boolean {
+  return code === SPACE || code === TAB
 }
 
 function sortLinesAction(
-  text: string,
+  map: LineMap,
   selections: readonly ResolvedSelection[],
   direction: 'ascending' | 'descending',
 ): EditorEditActionResult {
-  const map = createLineMap(text)
   const edits: TextEdit[] = []
 
   for (const group of rowGroupsForSelections(map, selections)) {
@@ -299,16 +402,16 @@ function sortLinesAction(
 
     const rows: string[] = []
     for (let row = group.startRow; row <= group.endRow; row += 1) {
-      rows.push(text.slice(lineStart(map, row), lineEnd(map, row)))
+      rows.push(lineContentText(map, row))
     }
 
     const sorted = rows.toSorted((left, right) => left.localeCompare(right))
     if (direction === 'descending') sorted.reverse()
 
     edits.push({
-      from: lineStart(map, group.startRow),
+      from: map.lineStart(group.startRow),
       text: sorted.join('\n'),
-      to: lineEnd(map, group.endRow),
+      to: map.lineEnd(group.endRow),
     })
   }
 
@@ -317,20 +420,19 @@ function sortLinesAction(
 
 /** Joins each selected line with the next, collapsing the break and surrounding indentation. */
 function joinLinesAction(
-  text: string,
+  map: LineMap,
   selections: readonly ResolvedSelection[],
 ): EditorEditActionResult {
-  const map = createLineMap(text)
   const edits: TextEdit[] = []
 
   for (const group of rowGroupsForSelections(map, selections)) {
     const lastJoinRow = group.startRow === group.endRow ? group.startRow : group.endRow - 1
     for (let row = group.startRow; row <= lastJoinRow; row += 1) {
-      if (row >= lastRow(map)) break
+      if (row >= map.lastRow) break
 
-      const from = lineEnd(map, row)
-      const nextStart = lineStart(map, row + 1)
-      const nextLine = text.slice(nextStart, lineEnd(map, row + 1))
+      const from = map.lineEnd(row)
+      const nextStart = map.lineStart(row + 1)
+      const nextLine = lineContentText(map, row + 1)
       const indent = nextLine.length - nextLine.trimStart().length
       // A single space, unless the joined line is empty — then the lines simply meet.
       const separator = nextLine.trim().length === 0 ? '' : ' '
@@ -343,23 +445,21 @@ function joinLinesAction(
 
 /** Duplicates the selected text, or the whole line when the caret is collapsed. */
 function duplicateSelectionAction(
-  text: string,
+  map: LineMap,
   selections: readonly ResolvedSelection[],
 ): EditorEditActionResult {
-  const map = createLineMap(text)
   const edits: TextEdit[] = []
 
   for (const selection of selections) {
     if (selection.startOffset !== selection.endOffset) {
-      const slice = text.slice(selection.startOffset, selection.endOffset)
+      const slice = map.slice(selection.startOffset, selection.endOffset)
       edits.push({ from: selection.endOffset, text: slice, to: selection.endOffset })
       continue
     }
 
-    const row = rowAtOffset(map, selection.headOffset)
-    const start = lineStart(map, row)
-    const end = lineFullEnd(map, row)
-    const line = text.slice(start, end)
+    const row = map.rowAtOffset(selection.headOffset)
+    const end = map.lineFullEnd(row)
+    const line = lineText(map, row)
     edits.push({ from: end, text: line.endsWith('\n') ? line : `\n${line}`, to: end })
   }
 
@@ -367,7 +467,7 @@ function duplicateSelectionAction(
 }
 
 function transformCaseAction(
-  text: string,
+  source: TextReadSnapshot,
   selections: readonly ResolvedSelection[],
   kind: 'upper' | 'lower' | 'title',
 ): EditorEditActionResult {
@@ -378,7 +478,7 @@ function transformCaseAction(
     // different command, and guessing between them is worse than doing nothing.
     if (selection.startOffset === selection.endOffset) continue
 
-    const slice = text.slice(selection.startOffset, selection.endOffset)
+    const slice = source.readRange(selection.startOffset, selection.endOffset)
     const transformed = transformCase(slice, kind)
     if (transformed === slice) continue
 
@@ -399,10 +499,9 @@ function transformCase(text: string, kind: 'upper' | 'lower' | 'title'): string 
 }
 
 function deleteLinesAction(
-  text: string,
+  map: LineMap,
   selections: readonly ResolvedSelection[],
 ): EditorEditActionResult {
-  const map = createLineMap(text)
   const groups = rowGroupsForSelections(map, selections)
   const ranges = groups
     .map((group) => deleteRangeForGroup(map, group))
@@ -420,17 +519,15 @@ function deleteLinesAction(
 }
 
 function copyLinesAction(
-  text: string,
+  map: LineMap,
   selections: readonly ResolvedSelection[],
   direction: 'up' | 'down',
 ): EditorEditActionResult {
-  const map = createLineMap(text)
   const groups = rowGroupsForSelections(map, selections)
   const descriptors = lineSelectionDescriptors(map, selections, groups)
   const edits = groups.map((group) => copyLineEdit(map, group, direction))
   const targetRows = copyTargetRows(groups, direction)
-  const nextText = applyTextEdits(text, edits)
-  const nextMap = createLineMap(nextText)
+  const nextMap = map.afterEdits(edits)
   const nextSelections = selectionsForTargetRows(nextMap, descriptors, targetRows)
 
   return {
@@ -442,18 +539,16 @@ function copyLinesAction(
 }
 
 function moveLinesAction(
-  text: string,
+  map: LineMap,
   selections: readonly ResolvedSelection[],
   direction: 'up' | 'down',
 ): EditorEditActionResult {
-  const map = createLineMap(text)
   const groups = rowGroupsForSelections(map, selections)
   const descriptors = lineSelectionDescriptors(map, selections, groups)
   const movableGroups = groups.filter((group) => canMoveGroup(map, group, direction))
   const edits = movableGroups.map((group) => moveLineEdit(map, group, direction))
   const targetRows = groups.map((group) => moveTargetRow(map, group, direction))
-  const nextText = applyTextEdits(text, edits)
-  const nextMap = createLineMap(nextText)
+  const nextMap = map.afterEdits(edits)
   const nextSelections = selectionsForTargetRows(nextMap, descriptors, targetRows)
 
   return {
@@ -465,15 +560,13 @@ function moveLinesAction(
 }
 
 function insertLineAction(
-  text: string,
+  map: LineMap,
   selections: readonly ResolvedSelection[],
   direction: 'before' | 'after',
 ): EditorEditActionResult {
-  const map = createLineMap(text)
   const groups = rowGroupsForSelections(map, selections)
   const edits = groups.map((group) => insertLineEdit(map, group, direction))
-  const nextText = applyTextEdits(text, edits)
-  const nextMap = createLineMap(nextText)
+  const nextMap = map.afterEdits(edits)
   const nextSelections = insertedLineSelections(nextMap, groups, direction)
 
   return {
@@ -485,13 +578,12 @@ function insertLineAction(
 }
 
 function commentLineAction(
-  text: string,
+  map: LineMap,
   selections: readonly ResolvedSelection[],
   options: EditorEditActionOptions,
 ): EditorEditActionResult {
-  const map = createLineMap(text)
   const tokens = commentTokensAtCaret(map, selections, options)
-  if (!tokens.line && tokens.block) return blockCommentLinesAction(text, selections, tokens.block)
+  if (!tokens.line && tokens.block) return blockCommentLinesAction(map, selections, tokens.block)
 
   const rows = rowsForSelections(map, selections)
   const lineToken = tokens.line ?? DEFAULT_COMMENT_TOKENS.line!
@@ -500,24 +592,22 @@ function commentLineAction(
 }
 
 function blockCommentAction(
-  text: string,
+  map: LineMap,
   selections: readonly ResolvedSelection[],
   options: EditorEditActionOptions,
 ): EditorEditActionResult {
-  const map = createLineMap(text)
   const tokens =
     commentTokensAtCaret(map, selections, options).block ?? DEFAULT_COMMENT_TOKENS.block!
   const ranges = selections.map((selection) => blockCommentRangeForSelection(map, selection))
-  return blockCommentRangesAction(text, selections, ranges, tokens, 'input.blockComment')
+  return blockCommentRangesAction(map, selections, ranges, tokens, 'input.blockComment')
 }
 
 function indentLinesAction(
-  text: string,
+  map: LineMap,
   selections: readonly ResolvedSelection[],
   direction: 'indent' | 'outdent',
   options: EditorEditActionOptions,
 ): EditorEditActionResult {
-  const map = createLineMap(text)
   const rows = rowsForSelections(map, selections)
   const edits =
     direction === 'indent'
@@ -659,7 +749,7 @@ function renumberedItemEdits(
  * offset: the break is then the thing the caret is against, and the thing to take.
  */
 function wordDeleteRange(
-  text: string,
+  source: TextReadSnapshot,
   selection: ResolvedSelection,
   direction: 'left' | 'right',
   granularity: WordDeleteGranularity,
@@ -669,7 +759,19 @@ function wordDeleteRange(
     return { start: selection.startOffset, end: selection.endOffset }
   }
 
-  const head = selection.headOffset
+  // The row's window carries the break on either side, which a delete at the row's edge takes.
+  return rangeInRowWindow(source, selection.headOffset, (text, head) =>
+    wordDeleteRangeInText(text, head, direction, granularity, separators),
+  )
+}
+
+function wordDeleteRangeInText(
+  text: string,
+  head: number,
+  direction: 'left' | 'right',
+  granularity: WordDeleteGranularity,
+  separators: string,
+): OffsetRange {
   const boundary = wordDeleteOffset(text, head, direction, granularity, separators)
   if (direction === 'left') {
     return { start: boundary === head ? previousCodePointOffset(text, head) : boundary, end: head }
@@ -707,22 +809,11 @@ function wordDeleteOffset(
   )
 }
 
-function createLineMap(text: string): LineMap {
-  const starts = [0]
-
-  for (let index = 0; index < text.length; index += 1) {
-    if (text[index] !== '\n') continue
-    starts.push(index + 1)
-  }
-
-  return { text, starts }
-}
-
 function rowGroupsForSelections(
   map: LineMap,
   selections: readonly ResolvedSelection[],
 ): readonly RowGroup[] {
-  return mergeRowGroups(selections.map((selection) => rowGroupForSelection(map, selection)))
+  return mergeRowRanges(selections.map((selection) => rowGroupForSelection(map, selection)))
 }
 
 function rowsForSelections(
@@ -743,7 +834,7 @@ function rowsForGroups(groups: readonly RowGroup[]): readonly number[] {
 }
 
 function rowGroupForSelection(map: LineMap, selection: ResolvedSelection): RowGroup {
-  const startRow = rowAtOffset(map, selection.startOffset)
+  const startRow = map.rowAtOffset(selection.startOffset)
   if (selection.collapsed) return { startRow, endRow: startRow }
 
   const endRow = endRowForSelection(map, selection, startRow)
@@ -751,30 +842,10 @@ function rowGroupForSelection(map: LineMap, selection: ResolvedSelection): RowGr
 }
 
 function endRowForSelection(map: LineMap, selection: ResolvedSelection, startRow: number): number {
-  const endRow = rowAtOffset(map, selection.endOffset)
+  const endRow = map.rowAtOffset(selection.endOffset)
   if (endRow <= startRow) return endRow
-  if (selection.endOffset !== lineStart(map, endRow)) return endRow
+  if (selection.endOffset !== map.lineStart(endRow)) return endRow
   return endRow - 1
-}
-
-function mergeRowGroups(groups: readonly RowGroup[]): readonly RowGroup[] {
-  const sorted = groups.toSorted((left, right) => left.startRow - right.startRow)
-  const merged: RowGroup[] = []
-
-  for (const group of sorted) {
-    const previous = merged[merged.length - 1]
-    if (!previous || group.startRow > previous.endRow + 1) {
-      merged.push(group)
-      continue
-    }
-
-    merged[merged.length - 1] = {
-      startRow: previous.startRow,
-      endRow: Math.max(previous.endRow, group.endRow),
-    }
-  }
-
-  return merged
 }
 
 function lineCommentEdits(
@@ -793,7 +864,7 @@ function lineCommentEdits(
   const column = sharedIndentationLength(map, targets)
 
   return targets.map((row) => {
-    const offset = lineStart(map, row) + column
+    const offset = map.lineStart(row) + column
     return { from: offset, to: offset, text: `${lineToken} ` }
   })
 }
@@ -822,7 +893,7 @@ function sharedIndentationLength(map: LineMap, rows: readonly number[]): number 
   let length = Number.MAX_SAFE_INTEGER
 
   for (const row of rows) {
-    length = Math.min(length, firstNonWhitespaceOffset(map, row) - lineStart(map, row))
+    length = Math.min(length, firstNonWhitespaceOffset(map, row) - map.lineStart(row))
   }
 
   return length === Number.MAX_SAFE_INTEGER ? 0 : length
@@ -840,22 +911,21 @@ function shouldUncommentLineComments(
 
 function lineCommentDeleteRange(map: LineMap, row: number, lineToken: string): OffsetRange | null {
   const start = firstNonWhitespaceOffset(map, row)
-  if (!map.text.startsWith(lineToken, start)) return null
+  if (!map.startsWith(lineToken, start)) return null
 
   const tokenEnd = start + lineToken.length
-  const end = map.text[tokenEnd] === ' ' ? tokenEnd + 1 : tokenEnd
+  const end = map.charAt(tokenEnd) === ' ' ? tokenEnd + 1 : tokenEnd
   return { start, end }
 }
 
 function blockCommentLinesAction(
-  text: string,
+  map: LineMap,
   selections: readonly ResolvedSelection[],
   tokens: EditorBlockCommentTokens,
 ): EditorEditActionResult {
-  const map = createLineMap(text)
   const rows = commentedRows(map, rowsForSelections(map, selections))
   const ranges = rows.map((row) => lineContentRange(map, row))
-  const uncommentParts = ranges.map((range) => blockUncommentParts(text, range, tokens))
+  const uncommentParts = ranges.map((range) => blockUncommentParts(map, range, tokens))
   const edits = shouldUncommentBlockRanges(uncommentParts)
     ? uncommentParts
         .filter((part): part is BlockUncommentParts => part !== null)
@@ -865,13 +935,13 @@ function blockCommentLinesAction(
 }
 
 function blockCommentRangesAction(
-  text: string,
+  map: LineMap,
   selections: readonly ResolvedSelection[],
   ranges: readonly OffsetRange[],
   tokens: EditorBlockCommentTokens,
   timingName: string,
 ): EditorEditActionResult {
-  const uncommentParts = ranges.map((range) => blockUncommentParts(text, range, tokens))
+  const uncommentParts = ranges.map((range) => blockUncommentParts(map, range, tokens))
   if (shouldUncommentBlockRanges(uncommentParts)) {
     return uncommentBlockRangesAction(selections, ranges, uncommentParts, timingName)
   }
@@ -939,30 +1009,30 @@ function blockCommentEditsForRange(
 }
 
 function blockUncommentParts(
-  text: string,
+  map: LineMap,
   range: OffsetRange,
   tokens: EditorBlockCommentTokens,
 ): BlockUncommentParts | null {
   return (
-    blockUncommentPartsInsideRange(text, range, tokens) ??
-    blockUncommentPartsAroundRange(text, range, tokens)
+    blockUncommentPartsInsideRange(map, range, tokens) ??
+    blockUncommentPartsAroundRange(map, range, tokens)
   )
 }
 
 function blockUncommentPartsInsideRange(
-  text: string,
+  map: LineMap,
   range: OffsetRange,
   tokens: EditorBlockCommentTokens,
 ): BlockUncommentParts | null {
-  if (!text.startsWith(tokens.open, range.start)) return null
+  if (!map.startsWith(tokens.open, range.start)) return null
 
   const closeStart = range.end - tokens.close.length
   if (closeStart < range.start + tokens.open.length) return null
-  if (!text.startsWith(tokens.close, closeStart)) return null
+  if (!map.startsWith(tokens.close, closeStart)) return null
 
   const openEnd = range.start + tokens.open.length
-  const openDeleteEnd = text[openEnd] === ' ' ? openEnd + 1 : openEnd
-  const closeDeleteStart = blockCloseDeleteStart(text, closeStart, openDeleteEnd)
+  const openDeleteEnd = map.charAt(openEnd) === ' ' ? openEnd + 1 : openEnd
+  const closeDeleteStart = blockCloseDeleteStart(map, closeStart, openDeleteEnd)
   return {
     open: { start: range.start, end: openDeleteEnd },
     close: { start: closeDeleteStart, end: range.end },
@@ -970,7 +1040,7 @@ function blockUncommentPartsInsideRange(
 }
 
 function blockUncommentPartsAroundRange(
-  text: string,
+  map: LineMap,
   range: OffsetRange,
   tokens: EditorBlockCommentTokens,
 ): BlockUncommentParts | null {
@@ -978,8 +1048,8 @@ function blockUncommentPartsAroundRange(
   const closeText = blockCommentCloseText(tokens)
   const openStart = range.start - openText.length
   if (openStart < 0) return null
-  if (!text.startsWith(openText, openStart)) return null
-  if (!text.startsWith(closeText, range.end)) return null
+  if (!map.startsWith(openText, openStart)) return null
+  if (!map.startsWith(closeText, range.end)) return null
 
   return {
     open: { start: openStart, end: range.start },
@@ -987,9 +1057,9 @@ function blockUncommentPartsAroundRange(
   }
 }
 
-function blockCloseDeleteStart(text: string, closeStart: number, openDeleteEnd: number): number {
+function blockCloseDeleteStart(map: LineMap, closeStart: number, openDeleteEnd: number): number {
   if (closeStart <= openDeleteEnd) return closeStart
-  if (text[closeStart - 1] === ' ') return closeStart - 1
+  if (map.charAt(closeStart - 1) === ' ') return closeStart - 1
   return closeStart
 }
 
@@ -1038,12 +1108,12 @@ function selectionForRange(
 function blockCommentRangeForSelection(map: LineMap, selection: ResolvedSelection): OffsetRange {
   if (!selection.collapsed) return { start: selection.startOffset, end: selection.endOffset }
 
-  const row = rowAtOffset(map, selection.headOffset)
+  const row = map.rowAtOffset(selection.headOffset)
   return lineContentRange(map, row)
 }
 
 function lineContentRange(map: LineMap, row: number): OffsetRange {
-  return { start: firstNonWhitespaceOffset(map, row), end: lineEnd(map, row) }
+  return { start: firstNonWhitespaceOffset(map, row), end: map.lineEnd(row) }
 }
 
 function blockCommentOpenText(tokens: EditorBlockCommentTokens): string {
@@ -1063,7 +1133,7 @@ function indentLineEdits(
 ): readonly TextEdit[] {
   if (indentText.length === 0) return []
   return rows.map((row) => {
-    const start = lineStart(map, row)
+    const start = map.lineStart(row)
     return { from: start, to: start, text: indentText }
   })
 }
@@ -1079,11 +1149,11 @@ function outdentLineEdits(
 }
 
 function outdentLineEdit(map: LineMap, row: number, tabSize: number): TextEdit | null {
-  const start = lineStart(map, row)
-  const end = lineEnd(map, row)
+  const start = map.lineStart(row)
+  const end = map.lineEnd(row)
   if (start >= end) return null
 
-  const prefix = map.text.slice(start, Math.min(end, start + tabSize))
+  const prefix = map.slice(start, Math.min(end, start + tabSize))
   const length = outdentLength(prefix, tabSize)
   if (length === 0) return null
   return { from: start, to: start + length, text: '' }
@@ -1099,18 +1169,18 @@ function outdentLength(text: string, tabSize: number): number {
 
 function deleteRangeForGroup(map: LineMap, group: RowGroup): OffsetRange {
   if (group.startRow === 0) return { start: 0, end: blockEnd(map, group) }
-  if (group.endRow !== lastRow(map)) {
+  if (group.endRow !== map.lastRow) {
     return { start: blockStart(map, group), end: blockEnd(map, group) }
   }
 
   return {
-    start: lineEnd(map, group.startRow - 1),
-    end: map.text.length,
+    start: map.lineEnd(group.startRow - 1),
+    end: map.length,
   }
 }
 
 function copyLineEdit(map: LineMap, group: RowGroup, direction: 'up' | 'down'): TextEdit {
-  const atDocumentEnd = group.endRow === lastRow(map)
+  const atDocumentEnd = group.endRow === map.lastRow
   if (direction === 'up') {
     return {
       from: blockStart(map, group),
@@ -1150,7 +1220,7 @@ function copyTargetRow(
 
 function canMoveGroup(map: LineMap, group: RowGroup, direction: 'up' | 'down'): boolean {
   if (direction === 'up') return group.startRow > 0
-  return group.endRow < lastRow(map)
+  return group.endRow < map.lastRow
 }
 
 function moveTargetRow(map: LineMap, group: RowGroup, direction: 'up' | 'down'): number {
@@ -1166,7 +1236,7 @@ function moveLineEdit(map: LineMap, group: RowGroup, direction: 'up' | 'down'): 
 function moveLineUpEdit(map: LineMap, group: RowGroup): TextEdit {
   const previousRow = group.startRow - 1
   return {
-    from: lineStart(map, previousRow),
+    from: map.lineStart(previousRow),
     to: blockEnd(map, group),
     text: moveUpReplacementText(map, group, previousRow),
   }
@@ -1176,29 +1246,28 @@ function moveLineDownEdit(map: LineMap, group: RowGroup): TextEdit {
   const nextRow = group.endRow + 1
   return {
     from: blockStart(map, group),
-    to: lineFullEnd(map, nextRow),
+    to: map.lineFullEnd(nextRow),
     text: moveDownReplacementText(map, group, nextRow),
   }
 }
 
 function moveUpReplacementText(map: LineMap, group: RowGroup, previousRow: number): string {
-  if (group.endRow !== lastRow(map)) return `${blockText(map, group)}${lineText(map, previousRow)}`
+  if (group.endRow !== map.lastRow) return `${blockText(map, group)}${lineText(map, previousRow)}`
   return `${blockContentText(map, group)}\n${lineContentText(map, previousRow)}`
 }
 
 function moveDownReplacementText(map: LineMap, group: RowGroup, nextRow: number): string {
-  if (nextRow !== lastRow(map)) return `${lineText(map, nextRow)}${blockText(map, group)}`
+  if (nextRow !== map.lastRow) return `${lineText(map, nextRow)}${blockText(map, group)}`
   return `${lineContentText(map, nextRow)}\n${blockContentText(map, group)}`
 }
 
 function insertLineEdit(map: LineMap, group: RowGroup, direction: 'before' | 'after'): TextEdit {
-  const offset =
-    direction === 'before' ? lineStart(map, group.startRow) : lineEnd(map, group.endRow)
+  const offset = direction === 'before' ? map.lineStart(group.startRow) : map.lineEnd(group.endRow)
   return { from: offset, to: offset, text: '\n' }
 }
 
 function insertedLineSelections(
-  map: LineMap,
+  map: LineGeometry,
   groups: readonly RowGroup[],
   direction: 'before' | 'after',
 ): readonly DocumentSessionEditSelection[] {
@@ -1210,7 +1279,7 @@ function insertedLineSelections(
       direction === 'before'
         ? group.startRow + insertedRowsBefore
         : group.endRow + 1 + insertedRowsBefore
-    const offset = lineStart(map, targetRow)
+    const offset = map.lineStart(targetRow)
     selections.push({ anchor: offset, affinity: 'after', head: offset })
     insertedRowsBefore += 1
   }
@@ -1257,7 +1326,7 @@ function groupIndexForSelection(
 }
 
 function selectionsForTargetRows(
-  map: LineMap,
+  map: LineGeometry,
   descriptors: readonly LineSelectionDescriptor[],
   targetRows: readonly number[],
 ): readonly DocumentSessionEditSelection[] {
@@ -1272,20 +1341,20 @@ function selectionsForTargetRows(
 }
 
 function relativePointForOffset(map: LineMap, offset: number, startRow: number): RelativePoint {
-  const row = rowAtOffset(map, offset)
+  const row = map.rowAtOffset(offset)
   return {
     row: row - startRow,
-    column: offset - lineStart(map, row),
+    column: offset - map.lineStart(row),
   }
 }
 
 function offsetForRelativePoint(
-  map: LineMap,
+  map: LineGeometry,
   targetStartRow: number,
   point: RelativePoint,
 ): number {
-  const row = clamp(targetStartRow + point.row, 0, lastRow(map))
-  return Math.min(lineStart(map, row) + point.column, lineEnd(map, row))
+  const row = clamp(targetStartRow + point.row, 0, map.lastRow)
+  return Math.min(map.lineStart(row) + point.column, map.lineEnd(row))
 }
 
 function collapseSelectionsAfterRanges(
@@ -1325,17 +1394,6 @@ function mergeOffsetRanges(ranges: readonly OffsetRange[]): readonly OffsetRange
 
 function rangeToEdit(range: OffsetRange, text: string): TextEdit {
   return { from: range.start, to: range.end, text }
-}
-
-function applyTextEdits(text: string, edits: readonly TextEdit[]): string {
-  let next = text
-  const sorted = edits.toSorted((left, right) => right.from - left.from || right.to - left.to)
-
-  for (const edit of sorted) {
-    next = `${next.slice(0, edit.from)}${edit.text}${next.slice(edit.to)}`
-  }
-
-  return next
 }
 
 function editActionResultFromEdits(
@@ -1407,7 +1465,7 @@ function commentTokensAtCaret(
   selections: readonly ResolvedSelection[],
   options: EditorEditActionOptions,
 ): EditorCommentTokens {
-  const caretRow = rowAtOffset(map, selections[0]?.headOffset ?? 0)
+  const caretRow = map.rowAtOffset(selections[0]?.headOffset ?? 0)
   const languageIds = injectedLanguageIdsAtOffset(
     options.injections ?? [],
     firstNonWhitespaceOffset(map, caretRow),
@@ -1422,74 +1480,43 @@ function commentTokensAtCaret(
   return DEFAULT_COMMENT_TOKENS
 }
 
-function rowAtOffset(map: LineMap, offset: number): number {
-  const clamped = clamp(offset, 0, map.text.length)
-  let row = 0
-
-  for (let index = 1; index < map.starts.length; index += 1) {
-    const start = map.starts[index] ?? 0
-    if (start > clamped) break
-    row = index
-  }
-
-  return row
-}
-
-function lastRow(map: LineMap): number {
-  return map.starts.length - 1
-}
-
-function lineStart(map: LineMap, row: number): number {
-  return map.starts[clamp(row, 0, lastRow(map))] ?? map.text.length
-}
-
-function lineEnd(map: LineMap, row: number): number {
-  if (row < lastRow(map)) return lineStart(map, row + 1) - 1
-  return map.text.length
-}
-
-function lineFullEnd(map: LineMap, row: number): number {
-  if (row < lastRow(map)) return lineStart(map, row + 1)
-  return map.text.length
-}
-
 function lineText(map: LineMap, row: number): string {
-  return map.text.slice(lineStart(map, row), lineFullEnd(map, row))
+  return map.slice(map.lineStart(row), map.lineFullEnd(row))
 }
 
 function lineContentText(map: LineMap, row: number): string {
-  return map.text.slice(lineStart(map, row), lineEnd(map, row))
+  return map.slice(map.lineStart(row), map.lineEnd(row))
 }
 
 function firstNonWhitespaceOffset(map: LineMap, row: number): number {
-  const end = lineEnd(map, row)
+  const line = lineContentText(map, row)
 
-  for (let offset = lineStart(map, row); offset < end; offset += 1) {
-    const char = map.text[offset]
-    if (char !== ' ' && char !== '\t') return offset
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index]
+    if (char !== ' ' && char !== '\t') return map.lineStart(row) + index
   }
 
-  return end
+  return map.lineEnd(row)
 }
 
 function isBlankLine(map: LineMap, row: number): boolean {
-  return firstNonWhitespaceOffset(map, row) === lineEnd(map, row)
+  return firstNonWhitespaceOffset(map, row) === map.lineEnd(row)
 }
 
 function blockStart(map: LineMap, group: RowGroup): number {
-  return lineStart(map, group.startRow)
+  return map.lineStart(group.startRow)
 }
 
 function blockEnd(map: LineMap, group: RowGroup): number {
-  return lineFullEnd(map, group.endRow)
+  return map.lineFullEnd(group.endRow)
 }
 
 function blockText(map: LineMap, group: RowGroup): string {
-  return map.text.slice(blockStart(map, group), blockEnd(map, group))
+  return map.slice(blockStart(map, group), blockEnd(map, group))
 }
 
 function blockContentText(map: LineMap, group: RowGroup): string {
-  return map.text.slice(blockStart(map, group), lineEnd(map, group.endRow))
+  return map.slice(blockStart(map, group), map.lineEnd(group.endRow))
 }
 
 function clamp(value: number, min: number, max: number): number {

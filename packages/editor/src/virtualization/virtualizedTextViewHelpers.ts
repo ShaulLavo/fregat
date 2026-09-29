@@ -1,11 +1,13 @@
 import type { TextContent } from '../textContent'
-import type { FoldMap, FoldPoint } from '../foldMap'
+import type { FoldMap } from '../foldMap'
 import type { InlineMap } from '../inlineMap'
 import type { RowInlineMapping } from './virtualizedTextViewInlineMapping'
 import type { EditorTokenStyle } from '../tokens'
 import { clamp } from '../style-utils'
 import type { FixedRowVirtualizerOptions, FixedRowVirtualizerSnapshot } from './fixedRowVirtualizer'
 import type {
+  EditorInputKind,
+  EditorInputRoute,
   DocumentWithCaretHitTesting,
   HighlightRegistry,
   MountedVirtualizedTextRow,
@@ -38,6 +40,12 @@ export function normalizeRowHeight(rowHeight: number): number {
 export function normalizeRowGap(rowGap: number | undefined): number {
   if (!Number.isFinite(rowGap) || rowGap === undefined || rowGap < 0) return 0
   return rowGap
+}
+
+/** Whole pixels, like the lane widths, so the gutter's edge stays on the pixel grid. */
+export function normalizeGutterLeadingInset(inset: number | undefined): number {
+  if (!Number.isFinite(inset) || inset === undefined || inset <= 0) return 0
+  return Math.ceil(inset)
 }
 
 export function normalizeChunkSize(size: number | undefined): number {
@@ -127,6 +135,7 @@ export function createVirtualizerOptions(
   overscan: number,
   rowGap?: number,
   scrollMode?: VirtualizedTextViewScrollMode,
+  scrollPastEnd = true,
 ): FixedRowVirtualizerOptions {
   return {
     count: 1,
@@ -135,6 +144,7 @@ export function createVirtualizerOptions(
     overscan,
     enabled: true,
     scrollMode: normalizeScrollMode(scrollMode),
+    scrollPastEnd,
   }
 }
 
@@ -159,14 +169,40 @@ export function createScrollElement(
   return scrollElement
 }
 
-export function createInputElement(container: HTMLElement): HTMLTextAreaElement {
+export function createInputElement(
+  container: HTMLElement,
+  route: EditorInputRoute,
+  label = 'Editor input',
+  kind: EditorInputKind = 'code',
+): HTMLElement {
+  const view = container.ownerDocument.defaultView
+  const input =
+    route === 'edit-context' && view && 'EditContext' in view
+      ? createEditContextInput(container)
+      : createTextareaInput(container)
+  input.setAttribute('aria-label', label)
+  // Attributes rather than properties: the EditContext host is a div, and keyboards read both.
+  input.setAttribute('autocapitalize', kind === 'prose' ? 'sentences' : 'off')
+  input.setAttribute('autocorrect', kind === 'prose' ? 'on' : 'off')
+  return input
+}
+
+function createEditContextInput(container: HTMLElement): HTMLDivElement {
+  const input = container.ownerDocument.createElement('div')
+  input.className = 'editor-virtualized-input'
+  input.tabIndex = 0
+  input.setAttribute('role', 'textbox')
+  input.setAttribute('aria-multiline', 'true')
+  input.setAttribute('aria-readonly', 'true')
+  return input
+}
+
+function createTextareaInput(container: HTMLElement): HTMLTextAreaElement {
   const input = container.ownerDocument.createElement('textarea')
   input.className = 'editor-virtualized-input'
-  input.autocapitalize = 'off'
   input.autocomplete = 'off'
   input.readOnly = true
   input.spellcheck = false
-  input.setAttribute('aria-label', 'Editor input')
   // Said out loud because the element carries a window of the document rather than a line of it: a
   // reader told this is a multi-line text box navigates it by line, which is how code is read.
   input.setAttribute('role', 'textbox')
@@ -576,7 +612,7 @@ function restoreElement(element: HTMLElement, parent: HTMLDivElement): void {
   element.hidden = false
 }
 
-function markRowRetired(row: MountedVirtualizedTextRow): void {
+export function markRowRetired(row: MountedVirtualizedTextRow): void {
   const mutable = row as {
     index: number
     textRevision: number
@@ -586,12 +622,31 @@ function markRowRetired(row: MountedVirtualizedTextRow): void {
   clearRowGeometryCache(row)
 }
 
-export function scrollElementPadding(element: HTMLElement): {
+type ScrollElementPadding = {
   readonly left: number
   readonly right: number
   readonly top: number
   readonly bottom: number
-} {
+}
+
+const scrollElementPaddings = new WeakMap<HTMLElement, ScrollElementPadding>()
+
+// Reading computed style forces a style pass, once per editor open. The view sets the padding
+// itself (reserved overlay widths), so it drops the reading whenever it may have changed.
+export function scrollElementPadding(element: HTMLElement): ScrollElementPadding {
+  const cached = scrollElementPaddings.get(element)
+  if (cached) return cached
+
+  const padding = readScrollElementPadding(element)
+  scrollElementPaddings.set(element, padding)
+  return padding
+}
+
+export function invalidateScrollElementPadding(element: HTMLElement): void {
+  scrollElementPaddings.delete(element)
+}
+
+function readScrollElementPadding(element: HTMLElement): ScrollElementPadding {
   const style = element.ownerDocument.defaultView?.getComputedStyle(element)
   return {
     left: parseCssPixels(style?.paddingLeft) ?? 0,
@@ -604,6 +659,37 @@ export function scrollElementPadding(element: HTMLElement): {
 export function setElementHidden(element: HTMLElement, hidden: boolean): void {
   if (element.hidden === hidden) return
   element.hidden = hidden
+}
+
+/**
+ * The host's font goes in as the variables the stylesheet sizes rows with and the editor's popups
+ * copy, so a hover opened over the editor reads the same face. Null hands the choice back to CSS.
+ * Reports whether the element changed.
+ */
+export function setFontVariable(
+  element: HTMLElement,
+  property: '--editor-font-size' | '--editor-font-family',
+  value: string | null,
+): boolean {
+  const current = element.style.getPropertyValue(property)
+  if (value === null) {
+    if (current === '') return false
+    element.style.removeProperty(property)
+    return true
+  }
+  if (current === value) return false
+  element.style.setProperty(property, value)
+  return true
+}
+
+export function fontSizeValue(fontSize: number | undefined): string | null {
+  if (fontSize === undefined || !Number.isFinite(fontSize) || fontSize <= 0) return null
+  return `${fontSize}px`
+}
+
+export function fontFamilyValue(fontFamily: string | undefined): string | null {
+  const trimmed = fontFamily?.trim() ?? ''
+  return trimmed === '' ? null : trimmed
 }
 
 export function setStyleValue(element: HTMLElement, property: string, value: string): void {
@@ -645,10 +731,6 @@ export function foldMapMatchesText(foldMap: FoldMap | null, textLength: number):
 export function inlineMapMatchesText(inlineMap: InlineMap | null, textLength: number): boolean {
   if (!inlineMap) return false
   return inlineMap.snapshot.length === textLength
-}
-
-export function asFoldPoint(point: { readonly row: number; readonly column: number }): FoldPoint {
-  return point as FoldPoint
 }
 
 export function getDefaultHighlightRegistry(): HighlightRegistry | null {

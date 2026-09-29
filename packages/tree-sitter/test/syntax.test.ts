@@ -5,6 +5,7 @@ import {
   createDocumentSession,
   createPieceTableSnapshot,
   diffPieceTableSnapshots,
+  createDocumentTextSnapshot,
 } from '@singapore-editor/core/document'
 import {
   styleForTreeSitterCapture,
@@ -135,7 +136,7 @@ describe('Tree-sitter syntax capture conversion', () => {
         documentId: 'query.sql',
         languageId: 'sql',
         includeHighlights: true,
-        fullText: 'select 1;',
+        textSnapshot: createDocumentTextSnapshot(snapshot),
         snapshot,
       }),
     ).not.toBeNull()
@@ -147,7 +148,7 @@ describe('Tree-sitter syntax capture conversion', () => {
         documentId: 'query.sql',
         languageId: 'sql',
         includeHighlights: true,
-        fullText: 'select 1;',
+        textSnapshot: createDocumentTextSnapshot(snapshot),
         snapshot,
       }),
     ).toBeNull()
@@ -240,7 +241,7 @@ describe('Tree-sitter syntax capture conversion', () => {
 
   it('keeps worker parse and edit requests source-based', () => {
     const snapshot = createPieceTableSnapshot('const a = 1;\n')
-    const source = createTreeSitterSourceDescriptor(snapshot, { useSharedBuffers: false })
+    const source = createTreeSitterSourceDescriptor(snapshot)
     const parseRequest: TreeSitterParseRequest = {
       type: 'parse',
       documentId: 'file.ts',
@@ -377,6 +378,7 @@ describe('Tree-sitter syntax capture conversion', () => {
         documentId: 'config.js',
         languageId: 'javascript',
         snapshot,
+        textSnapshot: createDocumentTextSnapshot(snapshot),
         backend: createCapturingTreeSitterBackend(),
         languageResolver: {
           resolveTreeSitterLanguage: async () => {
@@ -391,7 +393,7 @@ describe('Tree-sitter syntax capture conversion', () => {
           },
         },
       })
-      const result = session.refresh(snapshot)
+      const result = session.refresh(createDocumentTextSnapshot(snapshot))
       expect(session.foldingSupport).toBe('pending')
       registration.resolve()
       await result
@@ -420,10 +422,12 @@ describe('Tree-sitter syntax capture conversion', () => {
       includeCaptures: false,
       languageId: 'typescript',
       snapshot: createPieceTableSnapshot(text),
-      fullText: text,
+      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text)),
     })
 
-    const result = await session.refresh(createPieceTableSnapshot(text), text)
+    const result = await session.refresh(
+      createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
+    )
 
     expect(parsePayloads[0]?.includeCaptures).toBe(false)
     expect(result.captures).toEqual([])
@@ -445,10 +449,10 @@ describe('Tree-sitter syntax capture conversion', () => {
       documentId: 'file.ts',
       languageId: 'typescript',
       snapshot,
-      fullText: text,
+      textSnapshot: createDocumentTextSnapshot(snapshot),
     })
 
-    const result = await session.refresh(snapshot, text)
+    const result = await session.refresh(createDocumentTextSnapshot(snapshot, text))
 
     expect(result.degraded).toBeNull()
     expect(result.projection).toEqual({
@@ -489,10 +493,10 @@ describe('Tree-sitter syntax capture conversion', () => {
         resolveTreeSitterLanguage: async () => null,
       },
       snapshot,
-      fullText: text,
+      textSnapshot: createDocumentTextSnapshot(snapshot),
     })
 
-    const result = await session.refresh(snapshot, text)
+    const result = await session.refresh(createDocumentTextSnapshot(snapshot, text))
 
     expect(parseCount).toBe(0)
     expect(result.degraded).toMatchObject({
@@ -528,10 +532,12 @@ describe('Tree-sitter syntax capture conversion', () => {
       documentId: 'file.ts',
       languageId: 'typescript',
       snapshot: createPieceTableSnapshot(text),
-      fullText: text,
+      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text)),
     })
 
-    const result = await session.refresh(createPieceTableSnapshot(text), text)
+    const result = await session.refresh(
+      createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
+    )
 
     expect(parsePayloads[0]?.includeCaptures).toBe(true)
     expect(result.captures).toEqual(captures)
@@ -563,10 +569,12 @@ describe('Tree-sitter syntax capture conversion', () => {
       languageId: 'typescript',
       snapshot: createPieceTableSnapshot(text),
       syntaxMode: 'range',
-      fullText: text,
+      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text)),
     })
 
-    const refreshed = await session.refresh(createPieceTableSnapshot(text), text)
+    const refreshed = await session.refresh(
+      createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
+    )
     const ranged = await session.queryRange({ startIndex: 0, endIndex: 6 })
 
     expect(parsePayloads[0]?.resultMode).toBe('parseOnly')
@@ -610,10 +618,12 @@ describe('Tree-sitter syntax capture conversion', () => {
       languageId: 'typescript',
       snapshot: createPieceTableSnapshot(text),
       syntaxMode: 'range',
-      fullText: text,
+      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text)),
     })
 
-    const result = await session.refresh(createPieceTableSnapshot(text), text)
+    const result = await session.refresh(
+      createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
+    )
 
     expect(result.degraded).toEqual({
       kind: 'optional-phase-failed',
@@ -650,10 +660,10 @@ describe('Tree-sitter syntax capture conversion', () => {
       languageId: 'typescript',
       snapshot,
       syntaxMode: 'range',
-      fullText: text,
+      textSnapshot: createDocumentTextSnapshot(snapshot),
     })
 
-    await session.refresh(snapshot, text)
+    await session.refresh(createDocumentTextSnapshot(snapshot, text))
     await session.queryRange({ startIndex: 1_000, endIndex: 2_000 })
 
     expect(parsePayloads[0]?.resultMode).toBe('parseOnly')
@@ -686,10 +696,10 @@ describe('Tree-sitter syntax capture conversion', () => {
       languageId: 'typescript',
       snapshot,
       syntaxMode: 'range',
-      fullText: text,
+      textSnapshot: createDocumentTextSnapshot(snapshot),
     })
 
-    const refresh = session.refresh(snapshot, text)
+    const refresh = session.refresh(createDocumentTextSnapshot(snapshot, text))
     const pendingRange = await session.queryRange({ startIndex: 0, endIndex: 6 })
 
     expect(session.canQueryRange()).toBe(false)
@@ -726,10 +736,10 @@ describe('Tree-sitter syntax capture conversion', () => {
       languageId: 'typescript',
       snapshot: createPieceTableSnapshot(text),
       syntaxMode: 'range',
-      fullText: text,
+      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text)),
     })
 
-    await session.refresh(createPieceTableSnapshot(text), text)
+    await session.refresh(createDocumentTextSnapshot(createPieceTableSnapshot(text), text))
     const result = await session.queryRange({ startIndex: 0, endIndex: 6 })
 
     expect(tokenObjects(result.tokens)).toEqual([])
@@ -756,12 +766,16 @@ describe('Tree-sitter syntax capture conversion', () => {
       documentId: 'file.ts',
       languageId: 'typescript',
       snapshot: createPieceTableSnapshot('const a = 1;'),
-      fullText: 'const a = 1;',
+      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot('const a = 1;')),
     })
 
-    const firstRefresh = session.refresh(createPieceTableSnapshot('const a = 1;'), 'const a = 1;')
+    const firstRefresh = session.refresh(
+      createDocumentTextSnapshot(createPieceTableSnapshot('const a = 1;'), 'const a = 1;'),
+    )
     await Promise.resolve()
-    const secondRefresh = session.refresh(createPieceTableSnapshot('const b = 2;'), 'const b = 2;')
+    const secondRefresh = session.refresh(
+      createDocumentTextSnapshot(createPieceTableSnapshot('const b = 2;'), 'const b = 2;'),
+    )
     await Promise.resolve()
 
     const second = parses[1]!
@@ -792,9 +806,11 @@ describe('Tree-sitter syntax capture conversion', () => {
       documentId: 'file.ts',
       languageId: 'typescript',
       snapshot: document.getSnapshot(),
-      fullText: text,
+      textSnapshot: createDocumentTextSnapshot(document.getSnapshot()),
     })
-    await session.refresh(document.getSnapshot(), document.materializeFullText())
+    await session.refresh(
+      createDocumentTextSnapshot(document.getSnapshot(), document.materializeFullText()),
+    )
 
     const change = document.applyEdits([
       { from: text.length, text: '\nconst b = 2;', to: text.length },
@@ -814,9 +830,9 @@ describe('Tree-sitter syntax capture conversion', () => {
       documentId: 'file.ts',
       languageId: 'typescript',
       snapshot: createPieceTableSnapshot('abc'),
-      fullText: 'abc',
+      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot('abc')),
     })
-    await session.refresh(createPieceTableSnapshot('abc'), 'abc')
+    await session.refresh(createDocumentTextSnapshot(createPieceTableSnapshot('abc'), 'abc'))
 
     const staleDocument = createDocumentSession('abc!')
     const change = staleDocument.applyEdits([{ from: 4, text: '?', to: 4 }])
@@ -835,10 +851,12 @@ describe('Tree-sitter syntax capture conversion', () => {
       documentId: 'file.ts',
       languageId: 'typescript',
       snapshot: document.getSnapshot(),
-      fullText: initialText,
+      textSnapshot: createDocumentTextSnapshot(document.getSnapshot()),
     })
 
-    await session.refresh(document.getSnapshot(), document.materializeFullText())
+    await session.refresh(
+      createDocumentTextSnapshot(document.getSnapshot(), document.materializeFullText()),
+    )
 
     const firstChange = document.applyEdits([
       { from: initialText.length, text: '!', to: initialText.length },
@@ -900,7 +918,7 @@ describe('Tree-sitter syntax capture conversion', () => {
       documentId: 'file.ts',
       languageId: 'typescript',
       snapshot: document.getSnapshot(),
-      fullText: initialText,
+      textSnapshot: createDocumentTextSnapshot(document.getSnapshot()),
     })
 
     const change = document.applyEdits([
@@ -942,10 +960,12 @@ describe('Tree-sitter syntax capture conversion', () => {
       documentId: 'file.ts',
       languageId: 'typescript',
       snapshot: document.getSnapshot(),
-      fullText: initialText,
+      textSnapshot: createDocumentTextSnapshot(document.getSnapshot()),
     })
 
-    await session.refresh(document.getSnapshot(), document.materializeFullText())
+    await session.refresh(
+      createDocumentTextSnapshot(document.getSnapshot(), document.materializeFullText()),
+    )
     const change = document.applyEdits([
       { from: initialText.length, text: '\nconst b = 2;', to: initialText.length },
     ])
@@ -979,10 +999,12 @@ describe('Tree-sitter syntax capture conversion', () => {
       documentId: 'file.ts',
       languageId: 'typescript',
       snapshot: document.getSnapshot(),
-      fullText: document.materializeFullText(),
+      textSnapshot: createDocumentTextSnapshot(document.getSnapshot()),
     })
     const initialResult = session.getResult()
-    const refresh = session.refresh(document.getSnapshot(), document.materializeFullText())
+    const refresh = session.refresh(
+      createDocumentTextSnapshot(document.getSnapshot(), document.materializeFullText()),
+    )
 
     session.dispose()
     parse.resolve(
@@ -1023,10 +1045,12 @@ describe('Tree-sitter syntax capture conversion', () => {
       documentId: 'file.ts',
       languageId: 'typescript',
       snapshot: document.getSnapshot(),
-      fullText: initialText,
+      textSnapshot: createDocumentTextSnapshot(document.getSnapshot()),
     })
 
-    await session.refresh(document.getSnapshot(), document.materializeFullText())
+    await session.refresh(
+      createDocumentTextSnapshot(document.getSnapshot(), document.materializeFullText()),
+    )
     const change = document.applyEdits([
       { from: initialText.length, text: '\nconst b = 2;', to: initialText.length },
     ])
@@ -1068,10 +1092,12 @@ describe('Tree-sitter syntax capture conversion', () => {
       documentId: 'file.ts',
       languageId: 'typescript',
       snapshot: document.getSnapshot(),
-      fullText: initialText,
+      textSnapshot: createDocumentTextSnapshot(document.getSnapshot()),
     })
 
-    await session.refresh(document.getSnapshot(), document.materializeFullText())
+    await session.refresh(
+      createDocumentTextSnapshot(document.getSnapshot(), document.materializeFullText()),
+    )
     const firstChange = document.applyEdits([
       { from: initialText.length, text: '!', to: initialText.length },
     ])
@@ -1222,7 +1248,7 @@ function createSqlSyntaxSession(host: EditorPluginHost) {
     documentId: 'query.sql',
     languageId: 'sql',
     includeHighlights: true,
-    fullText: text,
+    textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text)),
     snapshot: createPieceTableSnapshot(text),
   })
 }

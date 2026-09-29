@@ -5,7 +5,7 @@ import {
   createLineGutterContribution,
 } from '../../gutters/src/index.ts'
 
-import { createEditorViewSnapshot } from '../src/editor/viewSnapshot'
+import { createEditorViewSnapshot, serializeEditorViewSnapshot } from '../src/editor/viewSnapshot'
 import { EditorViewContributionController } from '../src/editor/viewContributions'
 import { MAX_VISIBLE_PAINT_RECTANGLES } from '../src/editor/visiblePaint'
 import { createInlineMap } from '../src/inlineMap'
@@ -42,9 +42,8 @@ describe('editor view snapshot serialization', () => {
     ])
     const harness = snapshotHarness({ tokens })
 
-    expect(Object.keys(harness.snapshot)).not.toContain('toJSON')
+    expect(harness.snapshot).not.toHaveProperty('toJSON')
     expect(Object.keys(harness.snapshot)).not.toContain('toVisibleSnapshot')
-    expect(Object.getOwnPropertyDescriptor(harness.snapshot, 'toJSON')?.enumerable).toBe(false)
 
     const visible = harness.snapshot.toVisibleSnapshot()
 
@@ -70,9 +69,10 @@ describe('editor view snapshot serialization', () => {
     expect(visible!.toJSON()).toEqual(visibleJSON)
     expect(() => structuredClone(visibleJSON)).not.toThrow()
 
-    const fullJSON = harness.snapshot.toJSON()
+    const fullJSON = serializeEditorViewSnapshot(harness.snapshot)
     expect(fullJSON.viewport.scrollRow).toBe(harness.snapshot.viewport.scrollRow)
-    expect(harness.materializeFullText).toHaveBeenCalledTimes(1)
+    expect(harness.materializeFullText).not.toHaveBeenCalled()
+    expect(harness.readRange).toHaveBeenLastCalledWith(0, TEXT.length)
     expect(harness.readLineStarts).toHaveBeenCalledTimes(1)
     expect(harness.lineStartsViewToArray).not.toHaveBeenCalled()
     expect(fullJSON).not.toHaveProperty('documentSyncPoint')
@@ -150,14 +150,21 @@ describe('editor view snapshot serialization', () => {
     ])
   })
 
-  it('delegates JSON.stringify and materializes each full-document field once', () => {
+  it('reads the captured text once through the named serializer and never on spread or stringify', () => {
     const harness = snapshotHarness()
 
-    const parsed = JSON.parse(JSON.stringify(harness.snapshot))
+    const spread = { ...harness.snapshot }
+    JSON.stringify(harness.snapshot)
+    expect(spread.textSnapshot).toBe(harness.snapshot.textSnapshot)
+    expect(harness.readRange).not.toHaveBeenCalled()
+    expect(harness.materializeFullText).not.toHaveBeenCalled()
+
+    const parsed = JSON.parse(JSON.stringify(serializeEditorViewSnapshot(harness.snapshot)))
 
     expect(parsed).toMatchObject({ kind: 'editor-view', schemaVersion: 1, fullText: TEXT })
-    expect(harness.materializeFullText).toHaveBeenCalledTimes(1)
-    expect(harness.readLineStarts).toHaveBeenCalledTimes(1)
+    expect(harness.readRange).toHaveBeenCalledTimes(1)
+    expect(harness.readRange).toHaveBeenCalledWith(0, TEXT.length)
+    expect(harness.materializeFullText).not.toHaveBeenCalled()
     expect(harness.lineStartsViewToArray).not.toHaveBeenCalled()
   })
 
@@ -170,7 +177,7 @@ describe('editor view snapshot serialization', () => {
     ])
     const harness = snapshotHarness({ tokens })
 
-    const json = JSON.parse(JSON.stringify(harness.snapshot)).tokens
+    const json = JSON.parse(JSON.stringify(serializeEditorViewSnapshot(harness.snapshot))).tokens
     expect(json).toEqual({
       starts: [0, 6, 14],
       ends: [5, 11, 15],
@@ -198,7 +205,7 @@ describe('editor view snapshot serialization', () => {
       ]),
     })
 
-    expect(() => harness.snapshot.toJSON()).toThrow(/fontWeight.*finite/)
+    expect(() => serializeEditorViewSnapshot(harness.snapshot)).toThrow(/fontWeight.*finite/)
   })
 
   it('checks same-length transformed paint before token work and keeps all fallbacks zero-work', () => {
@@ -229,14 +236,11 @@ describe('editor view snapshot serialization', () => {
 
   it('bounds token reads to the mounted exact chunk', () => {
     const text = 'x'.repeat(100_000)
-    const source = Array.from(
-      { length: 10_000 },
-      (_value, index): EditorToken => ({
-        start: index * 10,
-        end: index * 10 + 5,
-        style: { color: `#${index.toString(16).padStart(6, '0').slice(-6)}` },
-      }),
-    )
+    const source = Array.from({ length: 10_000 }, (_value, index): EditorToken => ({
+      start: index * 10,
+      end: index * 10 + 5,
+      style: { color: `#${index.toString(16).padStart(6, '0').slice(-6)}` },
+    }))
     const tokens = EditorTokenStore.fromTokens(source)
     const tokenReads = watchTokenReads(tokens)
     const harness = snapshotHarness({
@@ -256,14 +260,11 @@ describe('editor view snapshot serialization', () => {
     const red = { color: 'red' }
     const blue = { color: 'blue' }
     const tokens = EditorTokenStore.fromTokens(
-      Array.from(
-        { length: count },
-        (_value, index): EditorToken => ({
-          start: index,
-          end: index + 1,
-          style: index % 2 === 0 ? red : blue,
-        }),
-      ),
+      Array.from({ length: count }, (_value, index): EditorToken => ({
+        start: index,
+        end: index + 1,
+        style: index % 2 === 0 ? red : blue,
+      })),
     )
     const harness = snapshotHarness({
       text,
@@ -276,14 +277,11 @@ describe('editor view snapshot serialization', () => {
 
   it('reads each token once across many exact chunks', () => {
     const text = 'x'.repeat(2_000)
-    const source = Array.from(
-      { length: 200 },
-      (_value, index): EditorToken => ({
-        start: index * 10,
-        end: index * 10 + 5,
-        style: { color: 'red' },
-      }),
-    )
+    const source = Array.from({ length: 200 }, (_value, index): EditorToken => ({
+      start: index * 10,
+      end: index * 10 + 5,
+      style: { color: 'red' },
+    }))
     const tokens = EditorTokenStore.fromTokens(source)
     const tokenReads = watchTokenReads(tokens)
     const chunks = source.map((token) =>
@@ -525,8 +523,10 @@ describe('editor view snapshot serialization', () => {
     const visible = harness.snapshot.toVisibleSnapshot()!
     const visibleJSON = visible.toJSON()
 
-    expect(() => harness.snapshot.toJSON()).not.toThrow()
-    expect(harness.snapshot.toJSON().visibleRows[0]).not.toHaveProperty('metadata')
+    expect(() => serializeEditorViewSnapshot(harness.snapshot)).not.toThrow()
+    expect(serializeEditorViewSnapshot(harness.snapshot).visibleRows[0]).not.toHaveProperty(
+      'metadata',
+    )
     expect(JSON.parse(JSON.stringify(visible))).toEqual(visible.toJSON())
     expect(visible.rows).not.toBe(harness.snapshot.visibleRows)
     expect(visible.rows[0]?.chunks).not.toBe(harness.snapshot.visibleRows[0]?.chunks)
@@ -624,6 +624,121 @@ describe('editor view snapshot serialization', () => {
 })
 
 describe('visible contribution paint snapshots', () => {
+  it('delivers an update triggered from inside update() to every contribution after the pass', () => {
+    const snapshot = snapshotHarness().snapshot
+    const seen: string[] = []
+    const writer = {
+      update: vi.fn((_snapshot: EditorViewSnapshot, kind: string) => {
+        seen.push(`writer:${kind}`)
+        // Stands in for a contribution that moves the selection while tokens are being painted.
+        if (kind === 'tokens') controller.notify('selection')
+      }),
+      dispose: vi.fn(),
+    }
+    const reader = {
+      update: vi.fn((_snapshot: EditorViewSnapshot, kind: string) => seen.push(`reader:${kind}`)),
+      dispose: vi.fn(),
+    }
+    const controller = new EditorViewContributionController([writer, reader], () => snapshot)
+    seen.length = 0
+
+    controller.notify('tokens')
+
+    expect(seen).toEqual(['writer:tokens', 'reader:tokens', 'writer:selection', 'reader:selection'])
+    controller.dispose()
+  })
+
+  it('blames the contribution that keeps the cycle going, not the next one in the queue', () => {
+    const snapshot = snapshotHarness().snapshot
+    // Asks once for tokens after each selection, which on its own always settles.
+    const reacting = {
+      update: vi.fn((_snapshot: EditorViewSnapshot, kind: string) => {
+        if (kind === 'selection') controller.notify('tokens')
+      }),
+      dispose: vi.fn(),
+    }
+    const looping = {
+      update: vi.fn((_snapshot: EditorViewSnapshot, kind: string) => {
+        if (kind === 'selection') controller.notify('selection')
+      }),
+      dispose: vi.fn(),
+    }
+    const onFailure = vi.fn()
+    const controller = new EditorViewContributionController(
+      [reacting, looping],
+      () => snapshot,
+      onFailure,
+    )
+
+    controller.notify('selection')
+
+    expect(onFailure).toHaveBeenCalledExactlyOnceWith(
+      looping,
+      'update',
+      expect.objectContaining({ code: 'EDITOR_VIEW_UPDATE_LOOP' }),
+    )
+    expect(looping.dispose).toHaveBeenCalledOnce()
+    expect(reacting.dispose).not.toHaveBeenCalled()
+    controller.dispose()
+  })
+
+  it('delivers a large one-off burst of re-entrant updates without calling it a loop', () => {
+    const snapshot = snapshotHarness().snapshot
+    const bursting = {
+      update: vi.fn((_snapshot: EditorViewSnapshot, kind: string) => {
+        if (kind !== 'tokens') return
+        for (let index = 0; index < 100; index += 1) controller.notify('selection')
+      }),
+      dispose: vi.fn(),
+    }
+    const reader = { update: vi.fn(), dispose: vi.fn() }
+    const onFailure = vi.fn()
+    const controller = new EditorViewContributionController(
+      [bursting, reader],
+      () => snapshot,
+      onFailure,
+    )
+
+    controller.notify('tokens')
+
+    expect(onFailure).not.toHaveBeenCalled()
+    const selections = reader.update.mock.calls.filter(([, kind]) => kind === 'selection')
+    expect(selections).toHaveLength(100)
+    controller.dispose()
+  })
+
+  it('removes a contribution that keeps re-notifying and keeps serving the rest', () => {
+    const snapshot = snapshotHarness().snapshot
+    const looping = {
+      update: vi.fn((_snapshot: EditorViewSnapshot, kind: string) => {
+        if (kind === 'selection') controller.notify('selection')
+      }),
+      dispose: vi.fn(),
+    }
+    const healthy = { update: vi.fn(), dispose: vi.fn() }
+    const onFailure = vi.fn()
+    const controller = new EditorViewContributionController(
+      [looping, healthy],
+      () => snapshot,
+      onFailure,
+    )
+
+    controller.notify('selection')
+
+    expect(onFailure).toHaveBeenCalledExactlyOnceWith(
+      looping,
+      'update',
+      expect.objectContaining({ code: 'EDITOR_VIEW_UPDATE_LOOP' }),
+    )
+    expect(looping.dispose).toHaveBeenCalledOnce()
+    looping.update.mockClear()
+    healthy.update.mockClear()
+    controller.notify('tokens')
+    expect(looping.update).not.toHaveBeenCalled()
+    expect(healthy.update).toHaveBeenCalledExactlyOnceWith(snapshot, 'tokens', null)
+    controller.dispose()
+  })
+
   it('defers reentrant layout work and prevents recursive continuous viewport delivery', () => {
     const snapshot = snapshotHarness().snapshot
     const createSnapshot = vi.fn(() => snapshot)
@@ -1020,9 +1135,6 @@ function snapshotHarness(
     languageId: 'typescript' as const,
     theme: options.theme ?? { foregroundColor: '#ffffff', syntax: { keyword: '#ff0000' } },
     textSnapshot,
-    get fullText() {
-      return materializeFullText()
-    },
     textVersion: 4,
     initialHighlightStatus: 'painted' as const,
     syntaxStatus: options.syntaxStatus ?? 'ready',
@@ -1053,6 +1165,7 @@ function snapshotHarness(
     totalHeight: 20,
     gutterWidth: options.gutterWidth ?? 32,
     gutterLayout: options.gutterLayout ?? {
+      leadingInset: 0,
       fixedWidth: 0,
       lanes: [{ id: 'line-gutter', width: 32 }],
     },

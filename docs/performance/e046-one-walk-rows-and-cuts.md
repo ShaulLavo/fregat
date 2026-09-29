@@ -219,7 +219,7 @@ walks at 0.06 to 0.08 ms, too short to read anything into.
   seven. Collecting the text on the walk from the landing to the row's end would remove it.
 - A document that once held an emoji pays the batch path's two descents per range for the rest
   of its history. Clearing the flag belongs to
-  [E006](../../plans/e006-tombstone-reclamation.md).
+  [E006](../storage/e006-tombstone-compaction.md).
 - `findOriginalPiece` is 54% of `anchor-density` and reads a piece per node on its path; the two
   modes above say the lane is bound by memory, not by instructions.
 - A multi-edit batch still snaps up front. Folding it would need the sibling rules inside the

@@ -322,6 +322,40 @@ describe('drop', () => {
     expect(opened.text()).toBe('alpha bXravo')
     expect(caretTransform()).toBe('translate(64px, 0px)')
   })
+
+  it('asks the paste handlers what a drop means, at the caret the drop placed', () => {
+    const asked: { source: string; targets: readonly { start: number; end: number }[] }[] = []
+    const opened = open('alpha bravo', 'typescript', [
+      pasteHandlerPlugin({
+        handlePaste: (context) => {
+          asked.push({ source: context.source, targets: context.targets })
+          return context.targets.map(() => `@${context.text}`)
+        },
+        mimeTypes: ['text/plain'],
+      }),
+    ])
+    mockEditorViewport(editorRoot(), 200, 200)
+    opened.select({ anchor: 0, head: 0 })
+
+    editorRoot().dispatchEvent(
+      dragEvent('drop', transferDouble(new Map([['text/plain', 'src/a.ts']]), []), 56),
+    )
+
+    expect(asked).toEqual([{ source: 'drop', targets: [{ end: 7, start: 7, text: '' }] }])
+    expect(opened.text()).toBe('alpha b@src/a.tsravo')
+  })
+
+  it('hands a handler a dropped file that carries no text', () => {
+    const opened = open('alpha', 'typescript', [pasteHandlerPlugin(constantHandler('[file]'))])
+    mockEditorViewport(editorRoot(), 200, 200)
+    opened.select({ anchor: 0, head: 0 })
+
+    editorRoot().dispatchEvent(
+      dragEvent('drop', transferDouble(new Map(), [imageFile('shot.png')]), 0),
+    )
+
+    expect(opened.text()).toBe('[file]alpha')
+  })
 })
 
 function constantHandler(text: string): EditorPasteHandler {
@@ -340,7 +374,7 @@ function pasteHandlerPlugin(
     activate: (context) =>
       context.registerCapabilityContribution({
         createContribution: (contributed) =>
-          contributed.registerProvider?.(EDITOR_PASTE_HANDLER, selector, handler) ?? null,
+          contributed.registerProvider(EDITOR_PASTE_HANDLER, selector, handler),
       }),
   }
 }

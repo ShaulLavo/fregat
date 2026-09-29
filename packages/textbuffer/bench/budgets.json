@@ -290,6 +290,7 @@
         "reads.splitsSurrogatePair.calls": 3052,
         "reverseIndex.appendSlot.calls": 1902,
         "reverseIndex.copyBranch.calls": 210,
+        "reverseIndex.privateTail.calls": 1,
         "reverseIndex.splitNode.calls": 21,
         "tree.normalizePieceOrders.calls": 1538
       },
@@ -306,6 +307,7 @@
         "node.own.calls": 25562,
         "reverseIndex.appendSlot.calls": 1710,
         "reverseIndex.copyBranch.calls": 181,
+        "reverseIndex.privateTail.calls": 1,
         "reverseIndex.splitNode.calls": 15,
         "tree.normalizePieceOrders.calls": 5324
       },
@@ -376,6 +378,7 @@
         "node.own.calls": 25562,
         "reverseIndex.appendSlot.calls": 1710,
         "reverseIndex.copyBranch.calls": 181,
+        "reverseIndex.privateTail.calls": 1,
         "reverseIndex.splitNode.calls": 15,
         "tree.normalizePieceOrders.calls": 5324
       },

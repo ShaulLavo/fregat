@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createTestViewSnapshotSource } from '@singapore-editor/core/testing'
 import { EditorTokenStore, type BracketInfo } from '@singapore-editor/core/syntax'
 import {
   applyEditorTheme,
@@ -11,6 +12,10 @@ import type {
   EditorViewSnapshot,
 } from '@singapore-editor/core/extensions'
 import { createBracketColorsPlugin, createScopeLinesPlugin } from '../src/index'
+import {
+  createTestPluginContext,
+  createTestViewContributionContext,
+} from '@singapore-editor/core/testing'
 
 type PaintedHighlight = {
   readonly name: string
@@ -30,7 +35,7 @@ afterEach(() => {
 describe('createBracketColorsPlugin', () => {
   it('paints nesting depth through the level palette', () => {
     const text = '{ a([1, 2]) }'
-    const testContext = context(snapshot({ fullText: text, brackets: bracketsFor(text) }))
+    const testContext = context(snapshot({ text: text, brackets: bracketsFor(text) }))
 
     contribution(createBracketColorsPlugin(), testContext)
 
@@ -50,7 +55,7 @@ describe('createBracketColorsPlugin', () => {
 
   it('paints each level with its own registered colour', () => {
     const text = '{ a([1, 2]) }'
-    const testContext = context(snapshot({ fullText: text, brackets: bracketsFor(text) }))
+    const testContext = context(snapshot({ text: text, brackets: bracketsFor(text) }))
 
     contribution(createBracketColorsPlugin(), testContext)
 
@@ -64,7 +69,7 @@ describe('createBracketColorsPlugin', () => {
 
   it('outranks the colour the grammar gave the bracket', () => {
     const text = 'a) { b }'
-    const testContext = context(snapshot({ fullText: text, brackets: bracketsFor(text) }))
+    const testContext = context(snapshot({ text: text, brackets: bracketsFor(text) }))
 
     contribution(createBracketColorsPlugin(), testContext)
 
@@ -93,7 +98,7 @@ describe('createBracketColorsPlugin', () => {
 
   it('rotates back to the first colour once the palette runs out', () => {
     const text = '((((((()))))))'
-    const testContext = context(snapshot({ fullText: text, brackets: bracketsFor(text) }))
+    const testContext = context(snapshot({ text: text, brackets: bracketsFor(text) }))
 
     contribution(createBracketColorsPlugin(), testContext)
 
@@ -107,7 +112,7 @@ describe('createBracketColorsPlugin', () => {
 
   it('leaves brackets below the level cap alone', () => {
     const text = '{ [ ( ) ] }'
-    const testContext = context(snapshot({ fullText: text, brackets: bracketsFor(text) }))
+    const testContext = context(snapshot({ text: text, brackets: bracketsFor(text) }))
 
     contribution(createBracketColorsPlugin({ maxLevel: 2 }), testContext)
 
@@ -120,7 +125,7 @@ describe('createBracketColorsPlugin', () => {
 
   it('leaves a document with more brackets than the cap uncoloured', () => {
     const text = '{ [ ( ) ] }'
-    const testContext = context(snapshot({ fullText: text, brackets: bracketsFor(text) }))
+    const testContext = context(snapshot({ text: text, brackets: bracketsFor(text) }))
 
     contribution(createBracketColorsPlugin({ maxBrackets: 5 }), testContext)
 
@@ -129,7 +134,7 @@ describe('createBracketColorsPlugin', () => {
 
   it('marks a closer with nothing to close instead of colouring it by depth', () => {
     const text = 'a) fn(b)'
-    const testContext = context(snapshot({ fullText: text, brackets: bracketsFor(text) }))
+    const testContext = context(snapshot({ text: text, brackets: bracketsFor(text) }))
 
     contribution(createBracketColorsPlugin(), testContext)
 
@@ -145,7 +150,7 @@ describe('createBracketColorsPlugin', () => {
 
   it('repaints when a parse ships new brackets and not when the caret moves', () => {
     const text = 'fn(a)'
-    const first = snapshot({ fullText: text, brackets: bracketsFor(text) })
+    const first = snapshot({ text: text, brackets: bracketsFor(text) })
     const testContext = context(first)
     const live = contribution(createBracketColorsPlugin(), testContext)
     const paintedOnMount = testContext.painted.length
@@ -153,7 +158,7 @@ describe('createBracketColorsPlugin', () => {
     live?.update(first, 'selection')
     expect(testContext.painted).toHaveLength(paintedOnMount)
 
-    live?.update(snapshot({ fullText: '{fn(a)}', brackets: bracketsFor('{fn(a)}') }), 'content')
+    live?.update(snapshot({ text: '{fn(a)}', brackets: bracketsFor('{fn(a)}') }), 'content')
     expect(rangesFor(testContext, 'editor-bracket-level-1')).toEqual([
       { start: 3, end: 4 },
       { start: 5, end: 6 },
@@ -162,7 +167,7 @@ describe('createBracketColorsPlugin', () => {
 
   it('clears every level group when it is disposed', () => {
     const text = 'fn(a)'
-    const testContext = context(snapshot({ fullText: text, brackets: bracketsFor(text) }))
+    const testContext = context(snapshot({ text: text, brackets: bracketsFor(text) }))
     const live = contribution(createBracketColorsPlugin(), testContext)
 
     live?.dispose()
@@ -179,7 +184,7 @@ describe('createBracketColorsPlugin', () => {
 
   it('is not part of the scope guides, which paint no bracket colours of their own', () => {
     const text = '{ a([1, 2]) }'
-    const testContext = context(snapshot({ fullText: text, brackets: bracketsFor(text) }))
+    const testContext = context(snapshot({ text: text, brackets: bracketsFor(text) }))
 
     contribution(createScopeLinesPlugin(), testContext)
 
@@ -235,7 +240,7 @@ function levelColorDefaults(): string[] {
 function createPluginContext(
   registerViewContribution: EditorPluginContext['registerViewContribution'],
 ): EditorPluginContext {
-  return {
+  return createTestPluginContext({
     registerHighlighter: vi.fn(() => ({ dispose: vi.fn() })),
     registerSyntaxProvider: vi.fn(() => ({ dispose: vi.fn() })),
     registerViewContribution,
@@ -245,55 +250,40 @@ function createPluginContext(
     registerDecorationContribution: vi.fn(() => ({ dispose: vi.fn() })),
     registerGutterContribution: vi.fn(() => ({ dispose: vi.fn() })),
     registerInjectedTextRowProvider: vi.fn(() => ({ dispose: vi.fn() })),
-  }
+  })
 }
 
 function context(viewSnapshot = snapshot()) {
-  const container = document.createElement('div')
-  const scrollElement = document.createElement('div')
-  container.appendChild(scrollElement)
   const painted: PaintedHighlight[] = []
   const cleared: string[] = []
 
   return {
-    container,
-    scrollElement,
-    contentElement: scrollElement,
+    ...createTestViewContributionContext({
+      highlightPrefix: 'editor',
+      getSnapshot: () => viewSnapshot,
+      setRangeHighlight: (name, ranges, style) => {
+        if (ranges.length === 0) return
+        painted.push({ name, ranges: [...ranges], style })
+      },
+      clearRangeHighlight: (name) => {
+        cleared.push(name)
+      },
+    }),
     painted,
     cleared,
-    hasDocument: () => true,
-    getSnapshot: () => viewSnapshot,
-    requestViewUpdate: vi.fn(),
-    reserveOverlayWidth: vi.fn(),
-    revealLine: vi.fn(),
-    focusEditor: vi.fn(),
-    setSelection: vi.fn(),
-    setSelections: vi.fn(),
-    setScrollTop: vi.fn(),
-    textOffsetFromPoint: vi.fn(() => null),
-    getRangeClientRect: vi.fn(() => null),
-    setRangeHighlight: (
-      name: string,
-      ranges: readonly { readonly start: number; readonly end: number }[],
-      style: VirtualizedTextHighlightStyle,
-    ) => {
-      if (ranges.length === 0) return
-      painted.push({ name, ranges: [...ranges], style })
-    },
-    clearRangeHighlight: (name: string) => {
-      cleared.push(name)
-    },
   }
 }
 
-function snapshot(overrides: Partial<EditorViewSnapshot> = {}): EditorViewSnapshot {
-  const text = overrides.fullText ?? 'fn(a)'
+function snapshot({
+  text = 'fn(a)',
+  ...overrides
+}: Partial<EditorViewSnapshot> & { readonly text?: string } = {}): EditorViewSnapshot {
   return {
     documentId: 'bracket-colors-test',
     languageId: 'typescript',
     syntaxStatus: 'ready',
     paintLayers: [],
-    fullText: text,
+    ...createTestViewSnapshotSource(text),
     textVersion: 1,
     lineStarts: [0],
     tokens: EditorTokenStore.empty(),
@@ -342,12 +332,7 @@ function snapshot(overrides: Partial<EditorViewSnapshot> = {}): EditorViewSnapsh
     ...overrides,
     initialHighlightStatus: overrides.initialHighlightStatus ?? 'painted',
     gutterWidth: overrides.gutterWidth ?? 0,
-    gutterLayout: overrides.gutterLayout ?? { fixedWidth: 0, lanes: [] },
-    toJSON:
-      overrides.toJSON ??
-      (() => {
-        throw new Error('not used by this fixture')
-      }),
+    gutterLayout: overrides.gutterLayout ?? { leadingInset: 0, fixedWidth: 0, lanes: [] },
     toVisibleSnapshot: overrides.toVisibleSnapshot ?? (() => null),
     documentSyncPoint: overrides.documentSyncPoint ?? {
       revision: overrides.textVersion ?? 1,

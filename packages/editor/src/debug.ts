@@ -22,3 +22,4 @@ export {
   formatPieceInspectionNode,
 } from '@singapore-editor/textbuffer/debug'
 export { getPieceTreeSnapshot } from './documentTextSnapshot'
+export { forEachBufferSpan } from '@singapore-editor/textbuffer/internal/buffers'

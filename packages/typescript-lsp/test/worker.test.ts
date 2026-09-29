@@ -1,92 +1,126 @@
+/*
+ * The session's own protocol, driven raw: a client here is whatever the test sends, so it can be one
+ * that never declares pull diagnostics, or one that answers the worker's own requests by hand.
+ */
+
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type * as lsp from 'vscode-languageserver-protocol'
+import {
+  DELETE_WORKSPACE_FILES,
+  LIBRARY_FILES_REQUEST,
+  SET_WORKSPACE_FILES,
+  UPSERT_WORKSPACE_FILES,
+} from '../src/worker/customMethods'
+import { createTypeScriptLanguageSession } from '../src/worker/session'
+import { libraryFilesFromDisk } from './realTypeScriptService'
 
-const createDefaultMapFromCDN = vi.hoisted(() => vi.fn())
-const createSystem = vi.hoisted(() => vi.fn())
-const createVirtualTypeScriptEnvironment = vi.hoisted(() => vi.fn())
-const fakeTs = vi.hoisted(() => ({
-  version: '5.9.3',
-  ScriptTarget: { ES2023: 10 },
-  ModuleKind: { ESNext: 99 },
-  ModuleResolutionKind: { Bundler: 100 },
-  JsxEmit: { ReactJSX: 4 },
-  DiagnosticCategory: {
-    Warning: 0,
-    Error: 1,
-    Suggestion: 2,
-    Message: 3,
-  },
-  flattenDiagnosticMessageText: (message: string) => message,
-  displayPartsToString: (parts: readonly { readonly text: string }[] = []) =>
-    parts.map((part) => part.text).join(''),
-  parseConfigFileTextToJson: (_fileName: string, text: string) => ({ config: JSON.parse(text) }),
-  parseJsonConfigFileContent: (
-    config: { readonly compilerOptions?: Record<string, unknown> },
-    host: { readDirectory(rootDir: string, extensions: readonly string[]): string[] },
-    basePath: string,
-  ) => ({
-    options: config.compilerOptions ?? {},
-    fileNames: host.readDirectory(basePath, ['.ts', '.tsx', '.mts', '.cts']),
-    errors: [],
-  }),
-}))
+type Message = Record<string, unknown>
 
-vi.mock('@typescript/vfs', () => ({
-  createDefaultMapFromCDN,
-  createSystem,
-  createVirtualTypeScriptEnvironment,
-}))
-vi.mock('typescript', () => ({ default: fakeTs }))
+type RawSession = {
+  readonly posted: Message[]
+  send(message: Message): void
+  request<T>(method: string, params?: unknown): Promise<T>
+  notify(method: string, params?: unknown): void
+  dispose(): void
+}
 
-describe('TypeScript LSP worker', () => {
-  afterEach(() => {
-    vi.restoreAllMocks()
-    vi.resetModules()
-    globalThis.onmessage = null
-    createDefaultMapFromCDN.mockReset()
-    createSystem.mockReset()
-    createVirtualTypeScriptEnvironment.mockReset()
+const sessions: RawSession[] = []
+
+afterEach(() => {
+  for (const session of sessions.splice(0)) session.dispose()
+})
+
+function rawSession(options: { readonly disk?: boolean } = {}): RawSession {
+  const posted: Message[] = []
+  const session = createTypeScriptLanguageSession({
+    post: (message) => posted.push(message as Message),
+    ...(options.disk === false
+      ? {}
+      : { readLibraryFiles: (names) => Promise.resolve(libraryFilesFromDisk(names)) }),
   })
+  let nextId = 1
+  const raw: RawSession = {
+    posted,
+    send: (message) => session.receive(message),
+    notify: (method, params) => session.receive({ jsonrpc: '2.0', method, params }),
+    request: async <T>(method: string, params?: unknown) => {
+      const id = nextId++
+      session.receive({ jsonrpc: '2.0', id, method, params })
+      const response = await waitFor(() => posted.find((message) => message.id === id))
+      if (response.error) throw new Error(JSON.stringify(response.error))
+      return response.result as T
+    },
+    dispose: () => session.dispose(),
+  }
+  sessions.push(raw)
+  return raw
+}
 
-  it('initializes, accepts workspace files, and publishes TypeScript diagnostics', async () => {
-    const postMessage = vi.spyOn(globalThis, 'postMessage').mockImplementation(() => undefined)
-    const sourceFiles = new Map<string, string>()
-    installVfsMocks(sourceFiles)
-    await import('../src/typescriptLsp.worker')
+async function initialize(
+  session: RawSession,
+  initializationOptions: Record<string, unknown> = {},
+): Promise<void> {
+  await session.request('initialize', {
+    capabilities: {},
+    initializationOptions: { diagnosticDelayMs: 0, ...initializationOptions },
+  })
+}
 
-    send({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'initialize',
-      params: { initializationOptions: { diagnosticDelayMs: 0 } },
+function open(session: RawSession, uri: string, text: string, version = 0): void {
+  session.notify('textDocument/didOpen', {
+    textDocument: { uri, languageId: 'typescript', version, text },
+  })
+}
+
+function diagnosticCodes(session: RawSession, uri: string): Promise<unknown[]> {
+  return session
+    .request<lsp.FullDocumentDiagnosticReport>('textDocument/diagnostic', {
+      textDocument: { uri },
     })
-    send({
-      jsonrpc: '2.0',
-      method: 'editor/typescript/setWorkspaceFiles',
-      params: { files: [{ path: 'src/other.ts', text: 'export const other = 1;' }] },
-    })
-    send({
-      jsonrpc: '2.0',
-      method: 'textDocument/didOpen',
-      params: {
-        textDocument: {
-          uri: 'file:///src/index.ts',
-          languageId: 'typescript',
-          version: 0,
-          text: 'const value: string = 1;',
-        },
-      },
-    })
+    .then((report) => report.items.map((item) => item.code))
+}
 
-    await waitFor(() => postMessage.mock.calls.some(([message]) => isPublishDiagnostics(message)))
+describe('TypeScript worker session', () => {
+  it('uses a dirty logical package document as the canonical symbol for rename and diagnostics', async () => {
+    const session = rawSession()
+    const canonical = '/repo/src/lib.ts'
+    const alias = '/repo/node_modules/pkg/index.ts'
+    await initialize(session, {
+      canonicalPaths: { [alias]: canonical },
+      compilerOptions: { noLib: true, preserveSymlinks: false, moduleResolution: 2 },
+    })
+    session.notify(SET_WORKSPACE_FILES, {
+      files: [
+        { path: canonical, text: 'export const value = 1' },
+        { path: alias, text: 'export const value = 1' },
+        { path: '/repo/node_modules/pkg/package.json', text: '{"types":"index.ts"}' },
+        { path: '/repo/main.ts', text: 'import { value } from "pkg"; value' },
+      ],
+    })
+    open(session, `file://${alias}`, 'export const value: string = "dirty"', 4)
+    const edits = await session.request<lsp.WorkspaceEdit>('textDocument/rename', {
+      textDocument: { uri: `file://${alias}` },
+      position: { line: 0, character: 14 },
+      newName: 'next',
+    })
+    expect(JSON.stringify(edits)).toContain('file:///repo/main.ts')
+    session.notify(UPSERT_WORKSPACE_FILES, {
+      files: [
+        { path: '/repo/main.ts', text: 'import { value } from "pkg"; const n: number = value' },
+      ],
+    })
+    expect(await diagnosticCodes(session, 'file:///repo/main.ts')).toContain(2322)
+  })
+  it('pushes diagnostics to a client that does not pull', async () => {
+    const session = rawSession()
+    await initialize(session)
+    open(session, 'file:///src/index.ts', 'const value: string = 1;')
 
-    expect(createVirtualTypeScriptEnvironment).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.arrayContaining(['/src/other.ts', '/src/index.ts']),
-      fakeTs,
-      expect.anything(),
+    const published = await waitFor(() =>
+      session.posted.find((message) => message.method === 'textDocument/publishDiagnostics'),
     )
-    expect(publishedDiagnostics(postMessage.mock.calls)).toMatchObject({
+
+    expect(published.params).toMatchObject({
       uri: 'file:///src/index.ts',
       version: 0,
       diagnostics: [
@@ -94,469 +128,293 @@ describe('TypeScript LSP worker', () => {
           severity: 1,
           code: 2322,
           source: 'typescript',
-          message: 'bad assignment',
+          range: { start: { line: 0, character: 6 }, end: { line: 0, character: 11 } },
         },
       ],
     })
-  }, 20_000)
-
-  it('reads compiler options from workspace tsconfig files', async () => {
-    vi.spyOn(globalThis, 'postMessage').mockImplementation(() => undefined)
-    const sourceFiles = new Map<string, string>()
-    installVfsMocks(sourceFiles)
-    await import('../src/typescriptLsp.worker')
-
-    send({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'initialize',
-      params: { initializationOptions: { diagnosticDelayMs: 0 } },
-    })
-    send({
-      jsonrpc: '2.0',
-      method: 'editor/typescript/setWorkspaceFiles',
-      params: {
-        files: [
-          {
-            path: 'tsconfig.json',
-            text: JSON.stringify({
-              compilerOptions: { strict: false, lib: ['lib.es2024.d.ts'] },
-            }),
-          },
-          { path: 'src/index.ts', text: 'const value: string = 1;' },
-        ],
-      },
-    })
-    send({
-      jsonrpc: '2.0',
-      method: 'textDocument/didOpen',
-      params: {
-        textDocument: {
-          uri: 'file:///src/index.ts',
-          languageId: 'typescript',
-          version: 0,
-          text: 'const value: string = 1;',
-        },
-      },
-    })
-
-    await waitFor(() => createDefaultMapFromCDN.mock.calls.length > 0)
-
-    expect(createDefaultMapFromCDN.mock.calls.at(-1)?.[0]).toMatchObject({
-      lib: ['es2024'],
-      strict: false,
-    })
   })
 
-  it('mirrors workspace packages into node_modules for package export resolution', async () => {
-    vi.spyOn(globalThis, 'postMessage').mockImplementation(() => undefined)
-    const sourceFiles = new Map<string, string>()
-    installVfsMocks(sourceFiles)
-    await import('../src/typescriptLsp.worker')
+  it('reads compiler options from the workspace tsconfig', async () => {
+    const session = rawSession()
+    await initialize(session)
+    session.notify(SET_WORKSPACE_FILES, {
+      files: [
+        { path: 'tsconfig.json', text: JSON.stringify({ compilerOptions: { strict: false } }) },
+        { path: 'src/index.ts', text: 'export function take(value) { return value }' },
+      ],
+    })
 
-    send({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'initialize',
-      params: { initializationOptions: { diagnosticDelayMs: 0 } },
-    })
-    send({
-      jsonrpc: '2.0',
-      method: 'editor/typescript/setWorkspaceFiles',
-      params: {
-        files: [
-          {
-            path: 'packages/editor/package.json',
-            text: JSON.stringify({
-              name: '@singapore-editor/core',
-              exports: { './editor': './src/editor.ts' },
-            }),
-          },
-          {
-            path: 'packages/editor/src/editor.ts',
-            text: 'export class Editor {}',
-          },
-          {
-            path: 'examples/app/src/app.ts',
-            text: 'import { Editor } from "@singapore-editor/core/editor";',
-          },
-        ],
-      },
-    })
-    send({
-      jsonrpc: '2.0',
-      method: 'textDocument/didOpen',
-      params: {
-        textDocument: {
-          uri: 'file:///examples/app/src/app.ts',
-          languageId: 'typescript',
-          version: 0,
-          text: 'import { Editor } from "@singapore-editor/core/editor";',
+    expect(await diagnosticCodes(session, 'file:///src/index.ts')).not.toContain(7006)
+  })
+
+  it('resolves a workspace package through its mirror and answers with the workspace path', async () => {
+    const session = rawSession()
+    await initialize(session)
+    session.notify(SET_WORKSPACE_FILES, {
+      files: [
+        {
+          path: 'packages/core/package.json',
+          text: JSON.stringify({ name: '@repo/core', exports: { '.': './src/index.ts' } }),
         },
-      },
+        { path: 'packages/core/src/index.ts', text: 'export const answer = 42;' },
+      ],
+    })
+    open(session, 'file:///app/main.ts', "import { answer } from '@repo/core'\nanswer\n")
+
+    const definition = await session.request<lsp.Location[]>('textDocument/definition', {
+      textDocument: { uri: 'file:///app/main.ts' },
+      position: { line: 1, character: 1 },
     })
 
-    await waitFor(() => sourceFiles.has('/node_modules/@singapore-editor/core/package.json'))
+    expect(definition).toEqual([
+      {
+        uri: 'file:///packages/core/src/index.ts',
+        range: { start: { line: 0, character: 13 }, end: { line: 0, character: 19 } },
+      },
+    ])
+  })
 
-    expect(sourceFiles.get('/node_modules/@singapore-editor/core/package.json')).toContain(
-      '@singapore-editor/core',
+  it('applies upserted and deleted files to the running program', async () => {
+    const session = rawSession()
+    await initialize(session)
+    session.notify(SET_WORKSPACE_FILES, {
+      files: [{ path: 'src/shape.ts', text: 'export const size = 1' }],
+    })
+    open(
+      session,
+      'file:///src/main.ts',
+      "import { size } from './shape'\nconst text: string = size\n",
     )
-    expect(sourceFiles.get('/node_modules/@singapore-editor/core/src/editor.ts')).toBe(
-      'export class Editor {}',
+    const codes = () => diagnosticCodes(session, 'file:///src/main.ts')
+
+    expect(await codes()).toEqual([2322, 6133])
+
+    session.notify(UPSERT_WORKSPACE_FILES, {
+      files: [{ path: 'src/shape.ts', text: "export const size = 'one'" }],
+    })
+    expect(await codes()).toEqual([6133])
+
+    session.notify(DELETE_WORKSPACE_FILES, { paths: ['src/shape.ts'] })
+    expect(await codes()).toContain(2307)
+
+    session.notify(UPSERT_WORKSPACE_FILES, {
+      files: [{ path: 'src/shape.ts', text: 'export const size = 2' }],
+    })
+    expect(await codes()).toEqual([2322, 6133])
+  })
+
+  it('carries an upsert inside a workspace package to the package its importers resolve', async () => {
+    const session = rawSession()
+    await initialize(session)
+    session.notify(SET_WORKSPACE_FILES, {
+      files: [
+        {
+          path: 'packages/core/package.json',
+          text: JSON.stringify({ name: '@repo/core', exports: { '.': './src/index.ts' } }),
+        },
+        { path: 'packages/core/src/index.ts', text: 'export const answer = 42' },
+      ],
+    })
+    open(
+      session,
+      'file:///app/main.ts',
+      "import { answer } from '@repo/core'\nexport const text: string = answer\n",
     )
+    expect(await diagnosticCodes(session, 'file:///app/main.ts')).toEqual([2322])
+
+    session.notify(UPSERT_WORKSPACE_FILES, {
+      files: [{ path: 'packages/core/src/index.ts', text: "export const answer = 'forty-two'" }],
+    })
+
+    expect(await diagnosticCodes(session, 'file:///app/main.ts')).toEqual([])
   })
 
-  it('returns hover quick info from the TypeScript language service', async () => {
-    const postMessage = vi.spyOn(globalThis, 'postMessage').mockImplementation(() => undefined)
-    const sourceFiles = new Map<string, string>()
-    installVfsMocks(sourceFiles)
-    await import('../src/typescriptLsp.worker')
-
-    openDocumentWithInitializedWorker('const value = 1;')
-    send({
-      jsonrpc: '2.0',
-      id: 2,
-      method: 'textDocument/hover',
-      params: {
-        textDocument: { uri: 'file:///src/index.ts' },
-        position: { line: 0, character: 6 },
-      },
+  it('rebuilds the program when an upsert changes the tsconfig', async () => {
+    const session = rawSession()
+    await initialize(session)
+    session.notify(SET_WORKSPACE_FILES, {
+      files: [
+        { path: 'tsconfig.json', text: JSON.stringify({ compilerOptions: { strict: true } }) },
+        { path: 'src/index.ts', text: 'export function take(value) { return value }' },
+      ],
     })
-    await waitFor(() => responseForId(postMessage.mock.calls, 2) !== null)
+    expect(await diagnosticCodes(session, 'file:///src/index.ts')).toContain(7006)
 
-    expect(responseForId(postMessage.mock.calls, 2)).toMatchObject({
-      result: {
-        contents: {
-          kind: 'markdown',
-          value: expect.stringContaining('const value: number'),
-        },
-        range: {
-          start: { line: 0, character: 6 },
-          end: { line: 0, character: 11 },
-        },
-      },
+    session.notify(UPSERT_WORKSPACE_FILES, {
+      files: [
+        { path: 'tsconfig.json', text: JSON.stringify({ compilerOptions: { strict: false } }) },
+      ],
     })
+
+    expect(await diagnosticCodes(session, 'file:///src/index.ts')).not.toContain(7006)
   })
 
-  it('returns TypeScript completions with replacement edits', async () => {
-    const postMessage = vi.spyOn(globalThis, 'postMessage').mockImplementation(() => undefined)
-    const sourceFiles = new Map<string, string>()
-    installVfsMocks(sourceFiles)
-    await import('../src/typescriptLsp.worker')
+  it('asks the host for library files when the host supplies them', async () => {
+    const session = rawSession({ disk: false })
+    await initialize(session, { libraryFiles: 'host' })
+    open(session, 'file:///src/index.ts', 'export const count: number = [1].length')
+    const asked: string[] = []
+    const answered = new Set<unknown>()
+    const answerLibraryRequests = setInterval(() => {
+      for (const message of session.posted) {
+        if (message.method !== LIBRARY_FILES_REQUEST || answered.has(message.id)) continue
+        answered.add(message.id)
+        const names = (message.params as { names: string[] }).names
+        asked.push(...names)
+        session.send({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: { files: Object.fromEntries(libraryFilesFromDisk(names)) },
+        })
+      }
+    }, 0)
 
-    openDocumentWithInitializedWorker('const va = value;')
-    send({
-      jsonrpc: '2.0',
-      id: 2,
-      method: 'textDocument/completion',
-      params: {
-        textDocument: { uri: 'file:///src/index.ts' },
-        position: { line: 0, character: 8 },
-        context: { triggerKind: 1 },
-      },
-    })
-    await waitFor(() => responseForId(postMessage.mock.calls, 2) !== null)
+    const codes = await diagnosticCodes(session, 'file:///src/index.ts')
+    clearInterval(answerLibraryRequests)
 
-    expect(responseForId(postMessage.mock.calls, 1)).toMatchObject({
-      result: {
-        capabilities: {
-          completionProvider: {
-            triggerCharacters: expect.arrayContaining(['.']),
-          },
-        },
-      },
-    })
-    expect(responseForId(postMessage.mock.calls, 2)).toMatchObject({
-      result: {
-        isIncomplete: false,
-        items: [
-          {
-            label: 'value',
-            kind: 6,
-            sortText: '0',
-            labelDetails: { description: ': number' },
-            textEdit: {
-              range: {
-                start: { line: 0, character: 6 },
-                end: { line: 0, character: 8 },
-              },
-              newText: 'value',
-            },
-          },
-        ],
-      },
-    })
+    expect(codes).toEqual([])
+    expect(asked).toContain('lib.es2023.full.d.ts')
+    expect(asked).toContain('lib.es5.d.ts')
+    expect(asked.length).toBeLessThan(108)
   })
 
-  it('returns workspace definition locations and demirrors node_modules package paths', async () => {
-    const postMessage = vi.spyOn(globalThis, 'postMessage').mockImplementation(() => undefined)
-    const sourceFiles = new Map<string, string>()
-    installVfsMocks(sourceFiles)
-    await import('../src/typescriptLsp.worker')
+  it('fails with a reason when the host answers the library request without files', async () => {
+    const session = rawSession({ disk: false })
+    await initialize(session, { libraryFiles: 'host' })
+    open(session, 'file:///src/index.ts', 'export const count = 1')
+    const pending = session.request('textDocument/hover', {
+      textDocument: { uri: 'file:///src/index.ts' },
+      position: { line: 0, character: 14 },
+    })
+    const asked = await waitFor(() =>
+      session.posted.find((message) => message.method === LIBRARY_FILES_REQUEST),
+    )
 
-    send({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'initialize',
-      params: { initializationOptions: { diagnosticDelayMs: 0 } },
-    })
-    send({
-      jsonrpc: '2.0',
-      method: 'editor/typescript/setWorkspaceFiles',
-      params: {
-        files: [
-          { path: 'packages/core/package.json', text: JSON.stringify({ name: '@repo/core' }) },
-          { path: 'packages/core/src/index.ts', text: 'export const answer = 42;' },
-        ],
-      },
-    })
-    send({
-      jsonrpc: '2.0',
-      method: 'textDocument/didOpen',
-      params: {
-        textDocument: {
-          uri: 'file:///src/index.ts',
-          languageId: 'typescript',
-          version: 0,
-          text: 'answer;',
-        },
-      },
-    })
-    send({
-      jsonrpc: '2.0',
-      id: 2,
-      method: 'textDocument/definition',
-      params: {
-        textDocument: { uri: 'file:///src/index.ts' },
-        position: { line: 0, character: 1 },
-      },
-    })
-    await waitFor(() => responseForId(postMessage.mock.calls, 2) !== null)
+    session.send({ jsonrpc: '2.0', id: asked.id, result: null })
 
-    expect(responseForId(postMessage.mock.calls, 2)).toMatchObject({
-      result: [
-        {
-          uri: 'file:///packages/core/src/index.ts',
-          range: {
-            start: { line: 0, character: 13 },
-            end: { line: 0, character: 19 },
-          },
-        },
-      ],
-    })
+    await expect(pending).rejects.toThrow(/answered editor\/typescript\/libraryFiles without files/)
   })
 
-  it('returns references, implementations, and type definition locations', async () => {
-    const postMessage = vi.spyOn(globalThis, 'postMessage').mockImplementation(() => undefined)
-    const sourceFiles = new Map<string, string>()
-    installVfsMocks(sourceFiles)
-    await import('../src/typescriptLsp.worker')
+  it('gives up on a host that never answers and asks again on the next request', async () => {
+    vi.useFakeTimers()
+    try {
+      const posted: Message[] = []
+      const session = createTypeScriptLanguageSession({
+        post: (message) => posted.push(message as Message),
+      })
+      session.receive({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: { initializationOptions: { libraryFiles: 'host' } },
+      })
+      const hover = (id: number) =>
+        session.receive({
+          jsonrpc: '2.0',
+          id,
+          method: 'textDocument/hover',
+          params: {
+            textDocument: { uri: 'file:///src/a.ts' },
+            position: { line: 0, character: 0 },
+          },
+        })
+      session.receive({
+        jsonrpc: '2.0',
+        method: 'textDocument/didOpen',
+        params: {
+          textDocument: {
+            uri: 'file:///src/a.ts',
+            languageId: 'typescript',
+            version: 0,
+            text: 'x',
+          },
+        },
+      })
+      const libraryRequests = () =>
+        posted.filter((message) => message.method === LIBRARY_FILES_REQUEST)
 
-    openDocumentWithInitializedWorker('const value = typed;\ninterface Typed {}')
-    send({
-      jsonrpc: '2.0',
-      id: 2,
-      method: 'textDocument/references',
-      params: {
-        textDocument: { uri: 'file:///src/index.ts' },
-        position: { line: 0, character: 6 },
-        context: { includeDeclaration: true },
-      },
-    })
-    send({
-      jsonrpc: '2.0',
-      id: 3,
-      method: 'textDocument/implementation',
-      params: {
-        textDocument: { uri: 'file:///src/index.ts' },
-        position: { line: 0, character: 6 },
-      },
-    })
-    send({
-      jsonrpc: '2.0',
-      id: 4,
-      method: 'textDocument/typeDefinition',
-      params: {
-        textDocument: { uri: 'file:///src/index.ts' },
-        position: { line: 0, character: 14 },
-      },
-    })
-    await waitFor(() => responseForId(postMessage.mock.calls, 4) !== null)
+      hover(2)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(libraryRequests()).toHaveLength(1)
+      await vi.advanceTimersByTimeAsync(30_000)
+      expect(posted.find((message) => message.id === 2)).toMatchObject({
+        error: { message: 'The host did not answer editor/typescript/libraryFiles' },
+      })
 
-    expect(responseForId(postMessage.mock.calls, 2)).toMatchObject({
-      result: [
-        {
-          uri: 'file:///src/index.ts',
-          range: {
-            start: { line: 0, character: 6 },
-            end: { line: 0, character: 11 },
-          },
-        },
-        {
-          uri: 'file:///src/index.ts',
-          range: {
-            start: { line: 0, character: 14 },
-            end: { line: 0, character: 19 },
-          },
-        },
-      ],
-    })
-    expect(responseForId(postMessage.mock.calls, 3)).toMatchObject({
-      result: [
-        {
-          uri: 'file:///src/index.ts',
-          range: {
-            start: { line: 1, character: 9 },
-            end: { line: 1, character: 14 },
-          },
-        },
-      ],
-    })
-    expect(responseForId(postMessage.mock.calls, 4)).toMatchObject({
-      result: [
-        {
-          uri: 'file:///src/index.ts',
-          range: {
-            start: { line: 1, character: 9 },
-            end: { line: 1, character: 14 },
-          },
-        },
-      ],
-    })
+      hover(3)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(libraryRequests()).toHaveLength(2)
+      session.dispose()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
-function installVfsMocks(sourceFiles: Map<string, string>): void {
-  createDefaultMapFromCDN.mockResolvedValue(new Map([['/lib.d.ts', '']]))
-  createSystem.mockImplementation((files: Map<string, string>) => ({ files }))
-  createVirtualTypeScriptEnvironment.mockImplementation(
-    (system: { files: Map<string, string> }) => {
-      sourceFiles.clear()
-      for (const [fileName, text] of system.files) sourceFiles.set(fileName, text)
-      return createEnvironment(sourceFiles)
-    },
-  )
-}
-
-function createEnvironment(sourceFiles: Map<string, string>): unknown {
-  return {
-    getSourceFile: (fileName: string) => sourceFiles.get(fileName),
-    createFile: (fileName: string, text: string) => sourceFiles.set(fileName, text),
-    updateFile: (fileName: string, text: string) => sourceFiles.set(fileName, text),
-    deleteFile: (fileName: string) => sourceFiles.delete(fileName),
-    languageService: {
-      getSyntacticDiagnostics: () => [],
-      getSemanticDiagnostics: (fileName: string) => [
-        {
-          file: { text: sourceFiles.get(fileName) ?? '' },
-          start: 22,
-          length: 1,
-          category: fakeTs.DiagnosticCategory.Error,
-          code: 2322,
-          messageText: 'bad assignment',
-        },
-      ],
-      getSuggestionDiagnostics: () => [],
-      getQuickInfoAtPosition: () => ({
-        displayParts: [{ text: 'const value: number' }],
-        documentation: [{ text: 'The current value.' }],
-        textSpan: { start: 6, length: 5 },
-      }),
-      getCompletionsAtPosition: () => ({
-        isGlobalCompletion: true,
-        isMemberCompletion: false,
-        isNewIdentifierLocation: true,
-        optionalReplacementSpan: { start: 6, length: 2 },
-        entries: [
-          {
-            name: 'value',
-            kind: 'const',
-            sortText: '0',
-            labelDetails: { description: ': number' },
-          },
-        ],
-      }),
-      getDefinitionAndBoundSpan: () => ({
-        textSpan: { start: 0, length: 6 },
-        definitions: [
-          {
-            fileName: '/node_modules/@repo/core/src/index.ts',
-            textSpan: { start: 13, length: 6 },
-          },
-        ],
-      }),
-      getDefinitionAtPosition: () => [],
-      getReferencesAtPosition: () => [
-        { fileName: '/src/index.ts', textSpan: { start: 6, length: 5 } },
-        { fileName: '/src/index.ts', textSpan: { start: 14, length: 5 } },
-      ],
-      getImplementationAtPosition: () => [
-        { fileName: '/src/index.ts', textSpan: { start: 30, length: 5 } },
-      ],
-      getTypeDefinitionAtPosition: () => [
-        { fileName: '/src/index.ts', textSpan: { start: 30, length: 5 } },
-      ],
-    },
-  }
-}
-
-function openDocumentWithInitializedWorker(text: string): void {
-  send({
-    jsonrpc: '2.0',
-    id: 1,
-    method: 'initialize',
-    params: { initializationOptions: { diagnosticDelayMs: 0 } },
-  })
-  send({
-    jsonrpc: '2.0',
-    method: 'textDocument/didOpen',
-    params: {
-      textDocument: {
-        uri: 'file:///src/index.ts',
-        languageId: 'typescript',
-        version: 0,
-        text,
-      },
-    },
-  })
-}
-
-function send(message: lsp.RequestMessage | lsp.NotificationMessage): void {
-  const target = globalThis as unknown as {
-    onmessage?: (event: MessageEvent) => void
-  }
-  target.onmessage?.(new MessageEvent('message', { data: message }))
-}
-
-function isPublishDiagnostics(message: unknown): boolean {
-  if (!isRecord(message)) return false
-  return message.method === 'textDocument/publishDiagnostics'
-}
-
-function publishedDiagnostics(calls: readonly (readonly unknown[])[]): unknown {
-  const message = calls.map(([item]) => item).find(isPublishDiagnostics)
-  if (!isRecord(message)) return null
-  return message.params
-}
-
-function responseForId(calls: readonly (readonly unknown[])[], id: number): unknown {
-  return calls.map(([item]) => item).find((message) => isResponseForId(message, id)) ?? null
-}
-
-function isResponseForId(message: unknown, id: number): boolean {
-  if (!isRecord(message)) return false
-  return message.id === id
-}
-
-async function waitFor(predicate: () => boolean): Promise<void> {
-  const deadline = Date.now() + 1000
+async function waitFor<T>(find: () => T | undefined): Promise<T> {
+  const deadline = Date.now() + 10_000
   while (Date.now() < deadline) {
-    if (predicate()) return
+    const found = find()
+    if (found !== undefined) return found
     await new Promise((resolve) => setTimeout(resolve, 0))
   }
-  throw new Error('Timed out waiting for worker diagnostics')
+  throw new Error('Timed out waiting for the session')
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
-}
+it.each(['file:///repo/src/lib.ts', 'file:///repo/node_modules/pkg/index.ts'])(
+  'keeps the surviving open URI and canonical disk source after closing %s',
+  async (closed) => {
+    const session = rawSession()
+    const canonical = '/repo/src/lib.ts'
+    const alias = '/repo/node_modules/pkg/index.ts'
+    await initialize(session, {
+      canonicalPaths: { [alias]: canonical },
+      compilerOptions: { noLib: true, moduleResolution: 2 },
+    })
+    session.notify(SET_WORKSPACE_FILES, {
+      files: [
+        { path: canonical, text: 'export const value = 1' },
+        { path: alias, text: 'export const value = 1' },
+        {
+          path: '/repo/main.ts',
+          text: 'import { value } from "./src/lib"; const n: number = value',
+        },
+      ],
+    })
+    open(session, `file://${canonical}`, 'export const value: string = "dirty"')
+    open(session, `file://${alias}`, 'export const value: string = "dirty"')
+    expect(await diagnosticCodes(session, 'file:///repo/main.ts')).toContain(2322)
+    session.notify('textDocument/didClose', { textDocument: { uri: closed } })
+    expect(await diagnosticCodes(session, 'file:///repo/main.ts')).toContain(2322)
+    const remaining = closed === `file://${canonical}` ? `file://${alias}` : `file://${canonical}`
+    session.notify('textDocument/didClose', { textDocument: { uri: remaining } })
+    expect(await diagnosticCodes(session, 'file:///repo/main.ts')).not.toContain(2322)
+    session.notify(DELETE_WORKSPACE_FILES, { paths: [alias] })
+    expect(await diagnosticCodes(session, 'file:///repo/main.ts')).not.toContain(2307)
+  },
+)
+
+it('invalidates an existing package import after its alias is deleted and resolves it after re-creation', async () => {
+  const session = rawSession()
+  const canonical = '/repo/src/lib.ts'
+  const alias = '/repo/node_modules/pkg/index.ts'
+  await initialize(session, {
+    canonicalPaths: { [alias]: canonical },
+    compilerOptions: { noLib: true, moduleResolution: 2 },
+  })
+  session.notify(SET_WORKSPACE_FILES, {
+    files: [
+      { path: canonical, text: 'export const value = 1' },
+      { path: alias, text: 'export const value = 1' },
+      { path: '/repo/node_modules/pkg/package.json', text: '{"types":"index.ts"}' },
+      { path: '/repo/main.ts', text: 'import { value } from "pkg"; value' },
+    ],
+  })
+  expect(await diagnosticCodes(session, 'file:///repo/main.ts')).not.toContain(2307)
+  session.notify(DELETE_WORKSPACE_FILES, { paths: [alias] })
+  expect(await diagnosticCodes(session, 'file:///repo/main.ts')).toContain(2307)
+  session.notify(UPSERT_WORKSPACE_FILES, {
+    files: [{ path: alias, text: 'export const value = 1' }],
+  })
+  expect(await diagnosticCodes(session, 'file:///repo/main.ts')).not.toContain(2307)
+})

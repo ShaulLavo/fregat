@@ -21,7 +21,7 @@ import type { EditorTokenStore } from '../syntax/tokenStore'
 import type { EditorToken, EditorTokenStyle } from '../tokens'
 import { copyEditorVisiblePaintLayers } from './visiblePaint'
 
-type RuntimeViewSnapshot = Omit<EditorViewSnapshot, 'toJSON' | 'toVisibleSnapshot' | 'paintLayers'>
+type RuntimeViewSnapshot = Omit<EditorViewSnapshot, 'toVisibleSnapshot' | 'paintLayers'>
 
 type VisiblePaintState = {
   layers: readonly EditorVisiblePaintLayer[] | null
@@ -76,10 +76,6 @@ export function createEditorViewSnapshot(
       enumerable: false,
       get: () => readVisiblePaint(runtime),
     },
-    toJSON: {
-      enumerable: false,
-      value: () => editorViewSnapshotToJSON(runtime),
-    },
     toVisibleSnapshot: {
       enumerable: false,
       value: () => editorViewSnapshotToVisible(runtime),
@@ -114,14 +110,19 @@ function readVisiblePaint(snapshot: EditorViewSnapshot): readonly EditorVisibleP
   return state.layers
 }
 
-function editorViewSnapshotToJSON(snapshot: EditorViewSnapshot): EditorViewSnapshotJSON {
+/**
+ * The whole view at the revision `snapshot` captured, text included: O(document length) by design.
+ * Never the editor's latest text, so a later edit cannot change what is serialized.
+ */
+export function serializeEditorViewSnapshot(snapshot: EditorViewSnapshot): EditorViewSnapshotJSON {
+  const source = snapshot.textSnapshot
   return {
     kind: 'editor-view',
     schemaVersion: 1,
     documentId: snapshot.documentId,
     languageId: snapshot.languageId,
     theme: copyTheme(snapshot.theme),
-    fullText: snapshot.fullText,
+    fullText: source.readRange(0, source.length),
     textVersion: finite('textVersion', snapshot.textVersion),
     initialHighlightStatus: snapshot.initialHighlightStatus,
     lineStarts: snapshot.lineStarts.map((value) => finite('lineStarts', value)),
@@ -572,6 +573,7 @@ function copyMetrics(metrics: EditorViewSnapshot['metrics']): EditorViewSnapshot
 
 function copyGutterLayout(layout: EditorViewSnapshot['gutterLayout']) {
   return {
+    leadingInset: finite('gutterLayout.leadingInset', layout.leadingInset),
     fixedWidth: finite('gutterLayout.fixedWidth', layout.fixedWidth),
     lanes: layout.lanes.map((lane) => ({
       id: lane.id,

@@ -1,29 +1,39 @@
-import { describe, expect, it } from 'vitest'
-import { createStringTextSnapshot } from '@singapore-editor/core/document'
+import { describe, expect, it, vi } from 'vitest'
+import { snapshotText } from './factories/snapshotText'
 import type { EditorViewSnapshot } from '@singapore-editor/core/extensions'
 import {
   TEST_DOCUMENT_SYNC_POINT,
   unchangedChangesSinceDocumentSyncPoint,
 } from './factories/documentSync'
 import {
+  createEditorSecondaryTextView,
   createEditorSecondaryViewProjection,
-  EditorSecondaryTextView,
   EditorSecondaryViewScheduler,
 } from '@singapore-editor/core/secondary-views'
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
 
 describe('secondary view projections', () => {
-  it('projects snapshot-owned view data without reading lazy fullText when a text snapshot exists', () => {
+  it('reads fold summaries only when a consumer requests them and reuses the result', () => {
+    const snapshot = editorViewSnapshot('alpha\nbeta')
+    const markers = snapshot.foldMarkers
+    const readMarkers = vi.fn(() => markers)
+    Object.defineProperty(snapshot, 'foldMarkers', { get: readMarkers })
+
+    const projection = createEditorSecondaryViewProjection(snapshot)
+    expect(projection.text.length).toBe(10)
+    expect(projection.selections).toBe(snapshot.selections)
+    expect(readMarkers).not.toHaveBeenCalled()
+
+    const summaries = projection.foldSummaries
+    expect(summaries).toHaveLength(1)
+    expect(projection.foldSummaries).toBe(summaries)
+    expect(readMarkers).toHaveBeenCalledTimes(1)
+  })
+
+  it('projects snapshot-owned view data without reading any text', () => {
     const sourceText = 'alpha\nbeta'
     const snapshot = editorViewSnapshot(sourceText)
-
-    Object.defineProperty(snapshot, 'fullText', {
-      configurable: true,
-      enumerable: true,
-      get: () => {
-        throw new Error('fullText should not be read')
-      },
-    })
+    const readRange = vi.spyOn(snapshot.textSnapshot, 'readRange')
 
     const projection = createEditorSecondaryViewProjection(snapshot)
 
@@ -31,7 +41,8 @@ describe('secondary view projections', () => {
     expect(projection.textVersion).toBe(7)
     expect(projection.text.length).toBe(sourceText.length)
     expect(projection.text.lineStarts).toEqual([0, 6])
-    expect(projection.text.materializeFullText()).toBe(sourceText)
+    expect(projection.text.snapshot).toBe(snapshot.textSnapshot)
+    expect(readRange).not.toHaveBeenCalled()
     expect(projection.syntaxColors.tokens.toTokens()).toEqual([
       { start: 0, end: 5, style: { color: '#ff0000' } },
     ])
@@ -51,9 +62,23 @@ describe('secondary view projections', () => {
     expect(projection.visibleLineModel.rows.map((row) => row.text)).toEqual(['alpha'])
   })
 
-  it('exposes the secondary text view and scheduler entry points', () => {
-    expect(EditorSecondaryTextView).toBeTypeOf('function')
+  it('creates a read-only text view outside the tab order that sizes itself', () => {
+    const host = document.createElement('div')
+    document.body.append(host)
+    const view = createEditorSecondaryTextView(host, { scrollMode: 'static', overscan: 0 })
+
+    view.setText('alpha')
+    view.setHeight(40)
+
+    const scrollElement = host.querySelector<HTMLElement>('.editor-virtualized')
+    const inputElement = host.querySelector('textarea')
+    expect(scrollElement?.style.height).toBe('40px')
+    expect(scrollElement?.tabIndex).toBe(-1)
+    expect(inputElement?.tabIndex).toBe(-1)
+    expect(inputElement?.readOnly).toBe(true)
     expect(EditorSecondaryViewScheduler).toBeTypeOf('function')
+    view.dispose()
+    host.remove()
   })
 })
 
@@ -63,8 +88,7 @@ function editorViewSnapshot(text: string): EditorViewSnapshot {
     documentId: 'secondary-test',
     documentSyncPoint: TEST_DOCUMENT_SYNC_POINT,
     languageId: 'typescript',
-    textSnapshot: createStringTextSnapshot(text),
-    fullText: text,
+    ...snapshotText(text),
     textVersion: 7,
     initialHighlightStatus: 'painted',
     syntaxStatus: 'ready',
@@ -81,7 +105,7 @@ function editorViewSnapshot(text: string): EditorViewSnapshot {
     contentWidth: 80,
     totalHeight: 40,
     gutterWidth: 0,
-    gutterLayout: { fixedWidth: 0, lanes: [] },
+    gutterLayout: { leadingInset: 0, fixedWidth: 0, lanes: [] },
     tabSize: 4,
     foldMarkers: [
       {
@@ -126,9 +150,6 @@ function editorViewSnapshot(text: string): EditorViewSnapshot {
       borderBoxHeight: 20,
       borderBoxWidth: 80,
       visibleRange: { start: 0, end: 1 },
-    },
-    toJSON() {
-      throw new Error('not used by this fixture')
     },
     toVisibleSnapshot() {
       return null

@@ -18,9 +18,10 @@ import type { EditorViewSnapshot } from '@singapore-editor/core/extensions'
 import {
   LspWorkspace,
   type LspDocumentChange,
+  type LspTextSnapshot,
   type LspWorkspaceSyncTarget,
 } from '@singapore-editor/lsp'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type * as lsp from 'vscode-languageserver-protocol'
 
 import {
@@ -34,6 +35,33 @@ import type { LanguageServerDocumentSyncOptions } from '../src/types'
 type TestLineStartsView = NonNullable<EditorViewSnapshot['lineStartsView']>
 
 describe('DocumentSync', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('reports a full-sync fallback after the retained edit chain is exhausted', () => {
+    const workspace = new LspWorkspace()
+    const recorder = new SyncTargetRecorder()
+    workspace.attachClient(recorder)
+    const scope = createDocumentLogicalRevisionScope()
+    const harness = new BufferHarness('abc')
+    const sync = createSync(workspace, scope)
+    sync.sync(harness.snapshot(), null)
+    for (let index = 0; index < 129; index++)
+      harness.ordinary([{ from: 3 + index, to: 3 + index, text: 'x' }])
+    const record = vi.fn()
+    vi.stubGlobal('__EDITOR_PERFORMANCE_DIAGNOSTICS__', record)
+    sync.sync(harness.snapshot(), null)
+    expect(recorder.changes).toEqual([
+      { editCount: 0, text: 'abc' + 'x'.repeat(129), version: 129 },
+    ])
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'lsp.documentSync.editChain',
+        detail: expect.objectContaining({ chained: 'null', logicalRevisionCount: 129 }),
+      }),
+    )
+    sync.close()
+  })
+
   it('syncs an opaque native identity at the resolved URI and protocol language', () => {
     const workspace = new LspWorkspace()
     const recorder = new SyncTargetRecorder()
@@ -518,7 +546,7 @@ class SyncTargetRecorder implements LspWorkspaceSyncTarget {
   public readonly events: string[] = []
 
   public didOpenDocument(document: Parameters<LspWorkspaceSyncTarget['didOpenDocument']>[0]): void {
-    this.events.push(`open:${document.uri}:${document.version}:${document.text}`)
+    this.events.push(`open:${document.uri}:${document.version}:${documentText(document)}`)
   }
 
   public didChangeDocument(
@@ -527,7 +555,7 @@ class SyncTargetRecorder implements LspWorkspaceSyncTarget {
   ): void {
     this.changes.push({
       editCount: change.edits.length,
-      text: document.text,
+      text: documentText(document),
       version: document.version,
     })
     this.events.push(`change:${document.uri}:${document.version}:${editsText(change)}`)
@@ -540,7 +568,7 @@ class SyncTargetRecorder implements LspWorkspaceSyncTarget {
   public didCloseDocument(
     document: Parameters<LspWorkspaceSyncTarget['didCloseDocument']>[0],
   ): void {
-    this.events.push(`close:${document.uri}:${document.version}:${document.text}`)
+    this.events.push(`close:${document.uri}:${document.version}:${documentText(document)}`)
   }
 }
 
@@ -635,4 +663,8 @@ function diagnostic(severity: lsp.DiagnosticSeverity, start: number, end: number
       end: { line: 0, character: end },
     },
   }
+}
+
+function documentText(document: { readonly textSnapshot: LspTextSnapshot }): string {
+  return document.textSnapshot.readRange(0, document.textSnapshot.length)
 }

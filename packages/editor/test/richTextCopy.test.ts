@@ -17,12 +17,11 @@ const FONT: RichTextFont = {
 const copy = (
   text: string,
   tokens: readonly EditorToken[],
-  overrides: Partial<Parameters<typeof richTextForCopy>[0]> = {},
+  overrides: Partial<Parameters<typeof richTextForCopy>[0]> & { startOffset?: number } = {},
 ): string | null =>
   richTextForCopy({
     font: FONT,
-    startOffset: 0,
-    text,
+    fragments: [{ startOffset: overrides.startOffset ?? 0, text, separator: '' }],
     theme: { backgroundColor: '#1e1e1e', foregroundColor: '#d4d4d4' },
     tokens: EditorTokenStore.fromTokens(tokens),
     ...overrides,
@@ -126,3 +125,62 @@ describe('rich text for copy', () => {
 function styleOf(html: string | null): string {
   return /<div style="([^"]*)"/.exec(html ?? '')?.[1] ?? ''
 }
+
+it('bounds total source length across fragments', () => {
+  const fragments = [
+    { startOffset: 0, text: 'x'.repeat(40000), separator: '\n' },
+    { startOffset: 0, text: 'x'.repeat(40000), separator: '' },
+  ]
+  expect(copy('', [token(0, 1, 'red')], { fragments })).toBeNull()
+})
+
+it('bounds UTF-8 output bytes independently of source length across fragments', () => {
+  const tokens = Array.from({ length: 30000 }, (_, offset) => token(offset, offset + 1, 'red'))
+  const fragmentsFor = (character: string) => [
+    { startOffset: 0, text: character.repeat(15000), separator: '\n' },
+    { startOffset: 15000, text: character.repeat(15000), separator: '' },
+  ]
+  const ascii = copy('', tokens, { fragments: fragmentsFor('x') })
+  expect(ascii).not.toBeNull()
+  expect(new TextEncoder().encode(ascii!).byteLength).toBeLessThanOrEqual(1024 * 1024)
+  expect(copy('', tokens, { fragments: fragmentsFor('界') })).toBeNull()
+})
+
+it('keeps fragment order, separators, escaping and unhighlighted portions', () => {
+  const fragments = [
+    { startOffset: 10, text: '<b>', separator: '\n' },
+    { startOffset: 30, text: '&plain', separator: '' },
+  ]
+  const html = copy('', [token(10, 13, 'red')], { fragments })
+  expect(html).toContain('<span style="color: red;">&lt;b&gt;</span>\n&amp;plain')
+  expect(html?.match(/<div/g)).toHaveLength(1)
+})
+
+it('bounds token visits across disjoint fragments with overlapping syntax tokens', () => {
+  const fragments = Array.from({ length: 1000 }, (_, i) => ({
+    startOffset: i * 2,
+    text: 'x',
+    separator: '\n',
+  }))
+  const tokens = [
+    token(0, 2000, 'red'),
+    ...fragments.map((fragment) => token(fragment.startOffset, fragment.startOffset + 1, 'blue')),
+  ]
+  expect(copy('', tokens, { fragments })).toBeNull()
+})
+
+it('keeps many fragments styled just below the cumulative token-visit limit', () => {
+  const fragments = Array.from({ length: 361 }, (_, i) => ({
+    startOffset: i * 2,
+    text: 'x',
+    separator: '\n',
+  }))
+  const tokens = [
+    token(0, 722, 'red'),
+    ...fragments.map((fragment) => token(fragment.startOffset, fragment.startOffset + 1, 'blue')),
+  ]
+  const html = copy('', tokens, { fragments: fragments.slice(0, 360) })
+  expect(html).toContain('<span style="color: blue;">x</span>\n')
+  expect(html?.match(/<span style="color: red;">x<\/span>\n/g)).toHaveLength(359)
+  expect(copy('', tokens, { fragments })).toBeNull()
+})

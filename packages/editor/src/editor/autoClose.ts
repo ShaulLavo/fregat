@@ -1,4 +1,5 @@
 import {
+  DEFAULT_AUTO_CLOSING_PAIRS,
   editorLanguageConfiguration,
   type EditorAutoClosingPair,
   type EditorBlockCommentTokens,
@@ -17,24 +18,24 @@ const AUTO_CLOSE_BEFORE = new Set([';', ':', '.', ',', '=', '}', ']', ')', '>', 
 /** Stand-ins for the character being typed, in the order the probe below prefers them. */
 const NEUTRAL_CHARACTERS = '0123456789abcdefghijklmnopqrstuvwxyz'
 
-function autoClosingPairsForLanguage(
+export function autoClosingPairsForLanguage(
   languageId: string | null | undefined,
 ): readonly EditorAutoClosingPair[] {
-  return editorLanguageConfiguration(languageId)?.autoClosingPairs ?? []
+  return editorLanguageConfiguration(languageId)?.autoClosingPairs ?? DEFAULT_AUTO_CLOSING_PAIRS
 }
 
 export function autoClosingPairForOpen(
-  languageId: string | null | undefined,
+  pairs: readonly EditorAutoClosingPair[],
   typed: string,
 ): EditorAutoClosingPair | null {
-  return autoClosingPairsForLanguage(languageId).find((pair) => pair.open === typed) ?? null
+  return pairs.find((pair) => pair.open === typed) ?? null
 }
 
 export function autoClosingPairForClose(
-  languageId: string | null | undefined,
+  pairs: readonly EditorAutoClosingPair[],
   typed: string,
 ): EditorAutoClosingPair | null {
-  return autoClosingPairsForLanguage(languageId).find((pair) => pair.close === typed) ?? null
+  return pairs.find((pair) => pair.close === typed) ?? null
 }
 
 /**
@@ -162,7 +163,7 @@ function literalDelimiters(configuration: EditorLanguageConfiguration | null): L
   return {
     block: block && block.open.length > 0 && block.close.length > 0 ? block : null,
     line: line && line.length > 0 ? line : null,
-    quotes: (configuration?.autoClosingPairs ?? [])
+    quotes: (configuration?.autoClosingPairs ?? DEFAULT_AUTO_CLOSING_PAIRS)
       .filter((pair) => pair.quote === true && pair.open.length > 0)
       .map((pair) => pair.open),
   }

@@ -5,8 +5,11 @@ import type {
   EditorViewContributionContext,
   EditorViewSnapshot,
 } from '@singapore-editor/core/extensions'
-import { setHighlightRegistry } from '@singapore-editor/core/testing'
-import { EditorSecondaryTextView } from '@singapore-editor/core/secondary-views'
+import {
+  createTestCapabilityContributionContext,
+  setHighlightRegistry,
+  VirtualizedTextView,
+} from '@singapore-editor/core/testing'
 import {
   createEditorFindContributionProviders,
   createEditorFindPlugin,
@@ -188,23 +191,6 @@ describe('find inside a real editor', () => {
     })
   })
 
-  it('stands in for the views a snapshot lacks once, not once per search', () => {
-    const probe = editorProbe(LONG_TEXT)
-    const materialized = { fullText: 0, lineStarts: 0 }
-    const snapshot = countedSnapshot(withoutTextViews(probe.context.getSnapshot()), materialized)
-    const find = attachFind({ ...probe.context, getSnapshot: () => snapshot })
-
-    // Opening searches once and each press searches again, against a host that
-    // carries neither view: the copy and the line array cost what they cost once.
-    find.typeSearch('foo')
-
-    expect({ count: find.count(), ...materialized }).toEqual({
-      count: `1 of ${MATCH_LINES}`,
-      fullText: 1,
-      lineStarts: 1,
-    })
-  })
-
   it('has the document carry only the matches on screen through a keystroke', () => {
     const probe = editorProbe(LONG_TEXT)
     const carried: number[] = []
@@ -280,7 +266,7 @@ function editorProbe(text: string, plugins: readonly EditorPlugin[] = []): Edito
   const editor = new Editor(container, { defaultText: text, plugins: [...plugins, capture] })
   const view: unknown = Reflect.get(editor, 'view')
   // happy-dom has no layout, so deliver the first visible viewport measurement explicitly.
-  if (view instanceof EditorSecondaryTextView) view.setScrollMetrics(0, 24)
+  if (view instanceof VirtualizedTextView) view.setScrollMetrics(0, 24)
   openProbes.push(() => {
     editor.dispose()
     container.remove()
@@ -298,12 +284,14 @@ function attachFind(context: EditorViewContributionContext): FindAttachment {
   })
   const view = providers.view.createContribution(context)
   const features: EditorFindFeature[] = []
-  const capability = providers.capability.createContribution({
-    registerFeature: (_token, feature) => {
-      features.push(feature as EditorFindFeature)
-      return { dispose: () => {} }
-    },
-  })
+  const capability = providers.capability.createContribution(
+    createTestCapabilityContributionContext({
+      registerFeature: (_token, feature) => {
+        features.push(feature as EditorFindFeature)
+        return { dispose: () => {} }
+      },
+    }),
+  )
   openProbes.push(() => {
     capability?.dispose()
     view?.dispose()
@@ -334,23 +322,20 @@ function countedSnapshot(
   snapshot: EditorViewSnapshot,
   materialized: Materializations,
 ): EditorViewSnapshot {
+  // The runtime source can still materialize; a read type only hides it, so count the call.
+  const textSnapshot = new Proxy(snapshot.textSnapshot, {
+    get: (target, property) => {
+      if (property === 'materializeFullText') materialized.fullText += 1
+      const value: unknown = Reflect.get(target, property)
+      return typeof value === 'function' ? value.bind(target) : value
+    },
+  })
   return new Proxy(snapshot, {
     get: (target, property) => {
-      if (property === 'fullText') materialized.fullText += 1
+      if (property === 'textSnapshot') return textSnapshot
       if (property === 'lineStarts') materialized.lineStarts += 1
       return Reflect.get(target, property)
     },
-  })
-}
-
-// A host handing find a plain projection of its document, carrying neither of the
-// views an editor snapshot does.
-function withoutTextViews(snapshot: EditorViewSnapshot): EditorViewSnapshot {
-  return new Proxy(snapshot, {
-    get: (target, property) =>
-      property === 'textSnapshot' || property === 'lineStartsView'
-        ? undefined
-        : Reflect.get(target, property),
   })
 }
 

@@ -240,13 +240,13 @@ describe('clusters longer than one search window', () => {
 
   it('walks a run of flags back to where walking forward put it', () => {
     const forward: number[] = []
-    for (let offset = 0; offset < FLAGS.length; ) {
+    for (let offset = 0; offset < FLAGS.length;) {
       offset = nextGraphemeBoundary(FLAGS, offset)
       forward.push(offset)
     }
 
     const backward: number[] = []
-    for (let offset = FLAGS.length; offset > 0; ) {
+    for (let offset = FLAGS.length; offset > 0;) {
       offset = previousGraphemeBoundary(FLAGS, offset)
       backward.push(offset)
     }

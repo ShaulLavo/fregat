@@ -104,9 +104,7 @@ function paintingContext(
   return {
     ...context,
     getSnapshot: () => context.getSnapshot(),
-    trackRanges: context.trackRanges
-      ? (ranges, bias) => context.trackRanges!(ranges, bias)
-      : undefined,
+    trackRanges: (ranges, bias) => context.trackRanges(ranges, bias),
     setRangeHighlight: (name, ranges) => {
       groups.set(
         name,

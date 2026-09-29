@@ -38,9 +38,9 @@ describe('piece table snapshots', () => {
     expect(snapshot.pieceCount).toBe(1)
   })
 
-  it('normalizes piece orders and rebuilds the reverse index from them', () => {
+  it('normalizes piece orders and relabels the reverse index to them', () => {
     const edited = insertIntoPieceTable(createPieceTableSnapshot('abc'), 1, 'X')
-    const snapshot = createNormalizedSnapshot(edited.buffers, edited.root)
+    const snapshot = createNormalizedSnapshot(edited.buffers, edited.root, edited.reverseIndex, [])
     const pieces = flattenNodes(snapshot.root, []).map((node) => node.piece)
 
     expect(pieces.map((piece) => piece.order)).toEqual([1, 2, 3].map((n) => n * PIECE_ORDER_STEP))

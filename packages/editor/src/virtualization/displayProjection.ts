@@ -46,7 +46,6 @@ import type {
 export type {
   DisplayProjectionConfig,
   DisplayProjectionInput,
-  DisplayProjectionTransition,
   DisplayRowMetrics,
 } from './displayProjectionTypes'
 
@@ -77,6 +76,13 @@ export class DisplayProjection {
       this.counters,
     )
     this.root = buildSpan(this.context, 0, input.textSnapshot.lineCount)
+  }
+
+  get supportsIncrementalRowPatch(): boolean {
+    const { foldMap, inlineMap, injectedTextRows, wrapColumn } = this.config
+    return (
+      foldMap === null && inlineMap === null && injectedTextRows.length === 0 && wrapColumn === null
+    )
   }
 
   get rowCount(): number {
@@ -222,8 +228,9 @@ export class DisplayProjection {
     return this.rowForBufferRow(Math.max(0, location.sourceStart - 1))
   }
 
-  bufferRowForRow(index: number): number {
-    return this.getRowMetrics(clamp(index, this.rowCount - 1))?.bufferRow ?? 0
+  /** Null for a row the projection does not have; a caller that wants a nearest row clamps first. */
+  bufferRowForRow(index: number): number | null {
+    return this.getRowMetrics(index)?.bufferRow ?? null
   }
 
   rowForOffset(offset: number, bias: TransformBias = 'nearest'): number {
@@ -462,6 +469,8 @@ function validConfig(
 ): DisplayProjectionConfig {
   return {
     wrapColumn: config.wrapColumn,
+    wrapBreak: config.wrapBreak ?? 'character',
+    wrapAdvance: config.wrapAdvance ?? null,
     tabSize: config.tabSize,
     injectedTextRows: config.injectedTextRows,
     foldMap: config.foldMap?.snapshot.length === snapshot.length ? config.foldMap : null,
@@ -473,7 +482,12 @@ function globalMetricsChanged(
   before: DisplayProjectionConfig,
   after: DisplayProjectionConfig,
 ): boolean {
-  return before.wrapColumn !== after.wrapColumn || before.tabSize !== after.tabSize
+  return (
+    before.wrapColumn !== after.wrapColumn ||
+    before.wrapBreak !== after.wrapBreak ||
+    before.wrapAdvance !== after.wrapAdvance ||
+    before.tabSize !== after.tabSize
+  )
 }
 
 function changedSparseRanges(

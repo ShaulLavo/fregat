@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { snapshotText } from './factories/snapshotText'
 
 import type {
   EditorViewContributionContext,
@@ -16,6 +17,7 @@ import {
 } from '../src/semanticTokenLayer'
 import { createSemanticTokenStyles, EditorTokenStore, type SemanticTokenSpan } from '../src/syntax'
 import type { VirtualizedTextHighlightStyle } from '../src/virtualization'
+import { createTestViewContributionContext } from '../src/testContexts'
 
 const LINE_COUNT = 12
 // Long enough that a test can lay out a hundred distinct spans without them clamping into each
@@ -45,29 +47,20 @@ function harness(options: Partial<SemanticTokenLayerOptions> = {}): Harness {
   const resyncs: string[] = []
   let snapshot = baseSnapshot()
 
-  const context: EditorViewContributionContext = {
+  const context: EditorViewContributionContext = createTestViewContributionContext({
     container: document.createElement('div'),
     scrollElement: document.createElement('div') as HTMLDivElement,
     contentElement: document.createElement('div'),
     highlightPrefix: 'test-',
-    hasDocument: () => true,
     getSnapshot: () => snapshot,
-    requestViewUpdate: () => undefined,
-    revealLine: vi.fn(),
-    focusEditor: vi.fn(),
-    setSelection: vi.fn(),
-    setSelections: vi.fn(),
-    setScrollTop: vi.fn(),
-    reserveOverlayWidth: vi.fn(),
     textOffsetFromPoint: vi.fn(() => 0),
-    getRangeClientRect: vi.fn(() => null),
     setRangeHighlight: (name, ranges, style) => {
       groups.set(name, { ranges: ranges.map((range) => ({ ...range })), style })
     },
     clearRangeHighlight: (name) => {
       groups.delete(name)
     },
-  }
+  })
 
   const layer = createSemanticTokenLayer(context, {
     name: 'semantic',
@@ -95,7 +88,7 @@ function baseSnapshot(): EditorViewSnapshot {
     documentId: 'src/index.ts',
     documentSyncPoint: TEST_DOCUMENT_SYNC_POINT,
     languageId: 'typescript',
-    fullText: TEXT,
+    ...snapshotText(TEXT),
     textVersion: 7,
     initialHighlightStatus: 'painted',
     syntaxStatus: 'ready',
@@ -109,7 +102,7 @@ function baseSnapshot(): EditorViewSnapshot {
     contentWidth: 0,
     totalHeight: 0,
     gutterWidth: 0,
-    gutterLayout: { fixedWidth: 0, lanes: [] },
+    gutterLayout: { leadingInset: 0, fixedWidth: 0, lanes: [] },
     tabSize: 4,
     foldMarkers: [],
     visibleRows: visibleRows(0, 2),
@@ -122,9 +115,6 @@ function baseSnapshot(): EditorViewSnapshot {
       clientHeight: 0,
       clientWidth: 0,
       visibleRange: { start: 0, end: LINE_COUNT } as EditorViewSnapshot['viewport']['visibleRange'],
-    },
-    toJSON() {
-      throw new Error('not used by this fixture')
     },
     toVisibleSnapshot() {
       return null
@@ -350,31 +340,16 @@ describe('painting', () => {
     ])
   })
 
-  /**
-   * `fullText` is a lazy getter that walks the piece table and joins the whole document into a
-   * string, and `Editor.getSnapshot()` rebuilds the snapshot object — and so the memo — on every
-   * call. Reading `.length` off it cost one whole-document serialisation per push. `textSnapshot`
-   * carries the same number for free, so a snapshot that has one must never be asked for its text.
-   */
-  it('reads the document length without materialising the document', () => {
+  // A source that can report only its length proves a push reads no text.
+  it('reads the document length without reading the document', () => {
     const test = harness()
-    let materialised = 0
     test.setSnapshot({
       textSnapshot: { length: TEXT.length } as EditorViewSnapshot['textSnapshot'],
-    })
-    const snapshot = test.snapshot()
-    Object.defineProperty(snapshot, 'fullText', {
-      configurable: true,
-      get: () => {
-        materialised += 1
-        return TEXT
-      },
     })
 
     const result = test.layer.push(payload([span(0, 5, 'keyword')]))
 
     expect(result.status).toBe('painted')
-    expect(materialised).toBe(0)
   })
 
   /**

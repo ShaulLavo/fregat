@@ -1,3 +1,5 @@
+import type { EditorViewContributionContext } from '@singapore-editor/core/extensions'
+import { visibleDocumentLineRange } from '../src/layout'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Editor } from '@singapore-editor/core/editor'
 import '@singapore-editor/core/style.css'
@@ -27,6 +29,50 @@ describe.skipIf(!canUseMinimapWorker())('minimap wheel delegation', () => {
       await waitFor(() => editor.getScrollPosition().top >= 120)
       expect(editor.getScrollPosition().top).toBe(120)
     }
+  })
+
+  it('maps wrapped document lines through clicks and keeps a slider-centre click stationary', async () => {
+    const { editor, host, context } = await mount(true)
+    editor.setScrollPosition({ top: 1000 })
+    await waitFor(() => context().getSnapshot().viewport.scrollTop === 1000)
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    )
+    const root = host.querySelector<HTMLElement>('.editor-minimap')!
+    const slider = root.querySelector<HTMLElement>('.editor-minimap-slider')!
+    const before = context().getSnapshot()
+    const range = visibleDocumentLineRange(before, before.viewport)
+    expect(range.start).toBeLessThan(before.viewport.scrollRow)
+    const rect = slider.getBoundingClientRect()
+    root.dispatchEvent(
+      new PointerEvent('pointerdown', {
+        bubbles: true,
+        button: 0,
+        clientY: rect.top + rect.height / 2,
+      }),
+    )
+    expect(editor.getScrollPosition().top).toBe(1000)
+    const lineHeight =
+      (root.getBoundingClientRect().height - rect.height) /
+      (before.lineCount - (range.end - range.start))
+    const target = range.start + 60
+    root.dispatchEvent(
+      new PointerEvent('pointerdown', {
+        bubbles: true,
+        button: 0,
+        clientY: rect.top + rect.height / 2 + 60.25 * lineHeight,
+      }),
+    )
+    await waitFor(() => {
+      const snapshot = context().getSnapshot()
+      return visibleDocumentLineRange(snapshot, snapshot.viewport).start === target
+    })
+    await waitFor(() => {
+      const after = slider.getBoundingClientRect()
+      const clickedY = rect.top + rect.height / 2 + 60.25 * lineHeight
+      return Math.abs(after.top + after.height / 2 - clickedY) < 2
+    })
+    expect(context().getSnapshot().selections).toEqual(before.selections)
   })
 
   it('preserves click-to-reveal and slider dragging', async () => {
@@ -77,14 +123,31 @@ describe.skipIf(!canUseMinimapWorker())('minimap wheel delegation', () => {
   })
 })
 
-async function mount() {
+async function mount(wordWrap = false) {
+  let contributionContext: EditorViewContributionContext | undefined
   const host = document.createElement('div')
   host.style.cssText = 'display:flex;position:relative;width:640px;height:260px'
   document.body.append(host)
   const editor = new Editor(host, {
     defaultText: Array.from({ length: 1000 }, (_, line) => `${line} ${'x'.repeat(120)}`).join('\n'),
     lineHeight: 20,
-    plugins: [createMinimapPlugin({ showSlider: 'always' })],
+    wordWrap,
+    plugins: [
+      createMinimapPlugin({ showSlider: 'always' }),
+      {
+        name: 'capture-minimap-context',
+        activate(context) {
+          return [
+            context.registerViewContribution({
+              createContribution(current) {
+                contributionContext = current
+                return { update() {}, dispose() {} }
+              },
+            }),
+          ]
+        },
+      },
+    ],
   })
   disposables.push(() => {
     editor.dispose()
@@ -101,7 +164,7 @@ async function mount() {
   await new Promise<void>((resolve) =>
     requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
   )
-  return { editor, host, element }
+  return { editor, host, element, context: () => contributionContext! }
 }
 
 function nativeTop(element: HTMLElement): number {

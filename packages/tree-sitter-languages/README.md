@@ -3,7 +3,7 @@
 Bundled Tree-sitter language contributions for Singapore.
 
 The catalog includes JavaScript with JSX, TypeScript, TSX, HTML, CSS, JSON, Markdown and its inline
-parser, Astro, Python, shell scripts, Rust, Go, YAML, TOML, C, C++, C#, Java, PHP, Lua and Svelte.
+parser, Astro, Python, shell scripts, Rust, Go, YAML, TOML, C, C++, C#, Java, PHP, Lua, Svelte and SQL.
 
 ## Install
 
@@ -47,12 +47,12 @@ Generation validates all input files before writing outputs. The lock includes n
 source revisions where published, source and query hashes, parser ABI, emitted WASM hashes and
 mapped-query hashes. `NOTICE` retains upstream licenses. npm sources are exact versions. Their
 compiler provenance is explicitly unknown when the upstream package does not publish it.
-Astro is built from the revision in `languages.json` with tree-sitter 0.26.13 and wasi-sdk 29.
+Astro is built from the revision in `languages.json` with tree-sitter 0.27.0 and wasi-sdk 34.
 `astro-build.lock.json` records that build's inputs and output; `languages:build -- --check`
 rebuilds it and compares the lock. Set `TMPDIR` for build scratch on machines without `/work`.
 Updating revisions is an explicit manifest edit, followed by regeneration and verification.
 
-The 22 parser entries include Markdown's internal inline parser. Every entry has a curated
+The 23 parser entries include Markdown's internal inline parser. Every entry has a curated
 capture fixture and a browser-worker edit comparison. These establish partial support, not
 complete language parity. Platform's `bun run syntax:coverage` compares this catalog with its
 installed Shiki release and records every canonical ID separately.
@@ -77,6 +77,29 @@ consumed and its `offset!` directive was never evaluated here. Regex and JSDoc r
 unavailable dependencies. Existing JavaScript/TypeScript `is-not? local` predicates are a recorded
 legacy gap, not an admitted new semantic feature. New query bundles using unsupported predicates
 must not be added to that exception. Ruby and Kotlin have not been admitted for this reason.
+
+SQL is built from DerekStride/tree-sitter-sql at the revision in `languages.json`.
+`bun run languages:build:sql` regenerates its parser, WASM, adapted highlight query, notice and
+`sql-build.lock.json`; add `-- --check` to reproduce and compare those outputs.
+The adaptation replaces Lua numeric patterns with JavaScript regexes, excludes numbers from
+string captures, and removes the redundant spell-check marker on comments. `storageclass`
+maps to `keyword.storage`. Fixtures cover generic statements and lazy Markdown fences.
+Dialect parity, PL/SQL, uppercase exponent literals and SQL folds are not established.
+
+MDX is built from srazzak/tree-sitter-mdx at the pinned revision in `languages.json`.
+`WASI_SDK_PATH=/work/cache/tree-sitter/wasi-sdk bun run languages:build:mdx` regenerates the
+WASM, adapted query, notice and source lock. Add `-- --check` to compare a reproducible build.
+`patches/mdx-inline.patch` permits JSX and expressions inside paragraphs and headings, and fixes
+an incorrectly indexed scanner table that read past its bounds during paragraph interruption.
+The five upstream corpus cases still pass. Admission checks assert UTF-16 node ranges and final
+worker paint for mixed prose, JSX, expressions, nested Markdown and lazy SQL fences.
+
+The highlight adaptation omits both complete locals-dependent builtin-name rules. Those names
+retain ordinary variable or call categories, including when shadowed. It adds JSX and comment
+captures and paints only fence info strings, leaving embedded code to its injected grammar.
+The local injection query uses Markdown inline nodes, Markdown inside JSX text and dynamic fences.
+Frontmatter, emphasis spanning JSX/expression boundaries, tagged templates, builtin-name
+specialization and folds remain unsupported. MDX support is partial.
 
 ### Runtime loading and diagnostics
 

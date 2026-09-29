@@ -1,14 +1,22 @@
 import type {
   Piece,
+  PieceBufferId,
   PieceBufferLineIndex,
   PieceTableReverseSplitNode,
   PieceTableSnapshot,
   PieceTreeNode,
 } from './pieceTableTypes'
 import { createInspectionLabels, walkInspectionTree } from './inspectionWalk'
-import { reverseIndexEntries, reverseIndexSlot } from './reverseIndex'
-import { bufferStoreExtent, chunkOfBuffer } from './buffers'
-import { ORIGINAL_BUFFER } from './node'
+import { lookupReverseIndex, reverseIndexEntries, reverseIndexSlot } from './reverseIndex'
+import {
+  bufferLength,
+  bufferSpanAt,
+  bufferStoreExtent,
+  chunkOfBuffer,
+  retiredBufferLength,
+} from './buffers'
+import { isStandIn, ORIGINAL_BUFFER } from './node'
+import { liveStandIn, standInOrder } from './standIns'
 
 export type PieceTreeIssueKind =
   | 'cycle'
@@ -46,25 +54,24 @@ type Report = (
   expected: PieceTreeIssue['expected'],
   actual: PieceTreeIssue['actual'],
 ) => void
-type Totals = Pick<
+type Stored = Pick<
   PieceTreeNode,
   | 'subtreeOriginalLength'
   | 'subtreeVisibleLength'
   | 'subtreePieces'
   | 'subtreeLineBreaks'
-  | 'subtreeMinOrder'
-  | 'subtreeMaxOrder'
   | 'subtreeMinBuffer'
 >
-const empty: Totals = {
+// Order bounds are not stored on nodes; they are recomputed to check ordering.
+type Totals = Stored & { readonly minOrder: number; readonly maxOrder: number }
+const stored: Stored = {
   subtreeOriginalLength: 0,
   subtreeVisibleLength: 0,
   subtreePieces: 0,
   subtreeLineBreaks: 0,
-  subtreeMinOrder: Infinity,
-  subtreeMaxOrder: -Infinity,
   subtreeMinBuffer: Infinity,
 }
+const empty: Totals = { ...stored, minOrder: Infinity, maxOrder: -Infinity }
 export const inspectionPieceFields = [
   'buffer',
   'start',
@@ -111,9 +118,11 @@ function checkPiece(
   report: Report,
 ): number {
   const piece = node.piece
+  if (isStandIn(piece)) return checkStandIn(snapshot, piece, id, report)
   const text = snapshot.buffers.chunks.get(piece.buffer)
-  if (text === undefined)
-    report('buffer-bounds', id, 'piece.buffer', 'existing buffer', piece.buffer)
+  const retiredLength = retiredBufferLength(snapshot.buffers, piece.buffer)
+  if (retiredLength !== undefined) return checkRetiredPiece(piece, retiredLength, id, report)
+  if (text === undefined) return checkSparsePiece(snapshot, piece, id, report)
   const validStart =
     Number.isSafeInteger(piece.start) && piece.start >= 0 && piece.start <= (text?.length ?? 0)
   const validLength =
@@ -138,7 +147,174 @@ function checkPiece(
   const chunk = chunkOfBuffer(snapshot.buffers, piece.buffer)
   const before = chunkBreaksBefore(chunkBreaks, chunk, text, piece.start)
   report('line-breaks', id, 'piece.firstLineBreak', before, piece.firstLineBreak)
+  const index = snapshot.buffers.lineIndexes.get(chunk)
+  if (index && index.scannedLength > piece.start) {
+    const end = Math.min(piece.start + piece.length, index.scannedLength)
+    const indexedBreaks = checkSpanBreaks(text, piece.start, end, 0, index, before, id, report)
+    checkIndexedRange(index, piece.start, end, indexedBreaks, id, report)
+  }
   return breaks
+}
+
+function checkSparsePiece(
+  snapshot: PieceTableSnapshot,
+  piece: Piece,
+  id: string,
+  report: Report,
+): number {
+  let length: number
+  try {
+    length = bufferLength(snapshot.buffers, piece.buffer)
+  } catch {
+    report('buffer-bounds', id, 'piece.buffer', 'existing buffer', piece.buffer)
+    return NaN
+  }
+  if (!piece.visible) return checkRetiredPiece(piece, length, id, report)
+  const validRange =
+    Number.isSafeInteger(piece.start) &&
+    Number.isSafeInteger(piece.length) &&
+    piece.start >= 0 &&
+    piece.length > 0 &&
+    piece.start + piece.length <= length
+  report('buffer-bounds', id, 'piece.range', true, validRange)
+  report('ordering', id, 'piece.order.finite', true, Number.isFinite(piece.order))
+  if (!validRange) return NaN
+  try {
+    return checkSparseBreaks(snapshot, piece, id, report)
+  } catch {
+    report('buffer-bounds', id, 'retained.visible', true, false)
+    return NaN
+  }
+}
+
+function checkSparseBreaks(
+  snapshot: PieceTableSnapshot,
+  piece: Piece,
+  id: string,
+  report: Report,
+): number {
+  const index = snapshot.buffers.lineIndexes.get(chunkOfBuffer(snapshot.buffers, piece.buffer))
+  let breaks = 0
+  let at = piece.start
+  const end = at + piece.length
+  while (at < end) {
+    const span = bufferSpanAt(snapshot.buffers, piece.buffer, at)
+    const stop = Math.min(end, span.end)
+    breaks += checkSpanBreaks(
+      span.text,
+      at - span.start,
+      stop - span.start,
+      span.start,
+      index,
+      piece.firstLineBreak + breaks,
+      id,
+      report,
+    )
+    at = stop
+  }
+  report('line-breaks', id, 'piece.lineBreaks', breaks, piece.lineBreaks)
+  if (index) {
+    checkIndexedRange(index, piece.start, end, breaks, id, report)
+    report(
+      'line-breaks',
+      id,
+      'piece.firstLineBreak',
+      lineIndexBefore(index, piece.start),
+      piece.firstLineBreak,
+    )
+  }
+  return breaks
+}
+
+function checkIndexedRange(
+  index: PieceBufferLineIndex,
+  start: number,
+  end: number,
+  breaks: number,
+  id: string,
+  report: Report,
+): void {
+  const count = lineIndexBefore(index, end) - lineIndexBefore(index, start)
+  report('line-index', id, 'count', breaks, count)
+}
+
+function lineIndexBefore(index: PieceBufferLineIndex, at: number): number {
+  let low = 0
+  let high = index.count
+  while (low < high) {
+    const middle = (low + high) >>> 1
+    if (index.offsets[middle]! < at) low = middle + 1
+    else high = middle
+  }
+  return low
+}
+
+function checkSpanBreaks(
+  text: string,
+  from: number,
+  to: number,
+  base: number,
+  index: PieceBufferLineIndex | undefined,
+  ordinal: number,
+  id: string,
+  report: Report,
+): number {
+  let count = 0
+  for (let at = text.indexOf('\n', from); at !== -1 && at < to; at = text.indexOf('\n', at + 1)) {
+    report(
+      'line-index',
+      id,
+      `offsets[${ordinal + count}]`,
+      base + at,
+      index && ordinal + count < index.count ? index.offsets[ordinal + count] : undefined,
+    )
+    count++
+  }
+  return count
+}
+
+// A stand-in holds no text; its buffer is a threshold, which may exceed every
+// id, and its start a live identity that leads back to its own order.
+function checkStandIn(
+  snapshot: PieceTableSnapshot,
+  piece: Piece,
+  id: string,
+  report: Report,
+): number {
+  const table = snapshot.reverseIndex.standIns
+  report('buffer-bounds', id, 'standIn.visible', false, piece.visible)
+  const known = Number.isSafeInteger(piece.start) && piece.start >= 0 && piece.start < table.size
+  report('reverse-index', id, 'standIn.identity', true, known)
+  if (known) {
+    report('reverse-index', id, 'standIn.live', piece.start, liveStandIn(table, piece.start))
+    report('reverse-index', id, 'standIn.order', piece.order, standInOrder(table, piece.start))
+  }
+  report('line-breaks', id, 'standIn.lineBreaks', 0, piece.lineBreaks)
+  report('ordering', id, 'piece.order.finite', true, Number.isFinite(piece.order))
+  const validThreshold = Number.isSafeInteger(piece.buffer) && piece.buffer > ORIGINAL_BUFFER
+  report('buffer-bounds', id, 'standIn.threshold', true, validThreshold)
+  return 0
+}
+
+function checkRetiredPiece(piece: Piece, length: number, id: string, report: Report): number {
+  report('buffer-bounds', id, 'retired.visible', false, piece.visible)
+  const validRange =
+    Number.isSafeInteger(piece.start) &&
+    Number.isSafeInteger(piece.length) &&
+    piece.start >= 0 &&
+    piece.length > 0 &&
+    piece.start + piece.length <= length
+  report('buffer-bounds', id, 'retired.range', true, validRange)
+  report('ordering', id, 'piece.order.finite', true, Number.isFinite(piece.order))
+  const validBreaks =
+    Number.isSafeInteger(piece.lineBreaks) &&
+    piece.lineBreaks >= 0 &&
+    piece.lineBreaks <= piece.length &&
+    Number.isSafeInteger(piece.firstLineBreak) &&
+    piece.firstLineBreak >= 0
+  report('line-breaks', id, 'retired.lineBreaks', true, validBreaks)
+  // The retired text cannot be recounted; invisible pieces contribute zero breaks.
+  return piece.lineBreaks
 }
 
 function checkTotals(
@@ -159,16 +335,15 @@ function checkTotals(
       left.subtreeVisibleLength + (p.visible ? p.length : 0) + right.subtreeVisibleLength,
     subtreePieces: left.subtreePieces + 1 + right.subtreePieces,
     subtreeLineBreaks: left.subtreeLineBreaks + (p.visible ? breaks : 0) + right.subtreeLineBreaks,
-    subtreeMinOrder: Math.min(left.subtreeMinOrder, p.order, right.subtreeMinOrder),
-    subtreeMaxOrder: Math.max(left.subtreeMaxOrder, p.order, right.subtreeMaxOrder),
     subtreeMinBuffer: Math.min(left.subtreeMinBuffer, p.buffer, right.subtreeMinBuffer),
+    minOrder: Math.min(left.minOrder, p.order, right.minOrder),
+    maxOrder: Math.max(left.maxOrder, p.order, right.maxOrder),
   }
-  for (const field of Object.keys(empty) as Array<keyof Totals>)
+  for (const field of Object.keys(stored) as Array<keyof Stored>)
     report('aggregate', id, field, result[field], node[field])
-  if (left.subtreeMaxOrder >= p.order)
-    report('ordering', id, 'left.order', `< ${p.order}`, left.subtreeMaxOrder)
-  if (right.subtreeMinOrder <= p.order)
-    report('ordering', id, 'right.order', `> ${p.order}`, right.subtreeMinOrder)
+  if (left.maxOrder >= p.order) report('ordering', id, 'left.order', `< ${p.order}`, left.maxOrder)
+  if (right.minOrder <= p.order)
+    report('ordering', id, 'right.order', `> ${p.order}`, right.minOrder)
   return result
 }
 
@@ -197,24 +372,31 @@ function checkSplitBalance(
 }
 
 function checkLineIndex(index: PieceBufferLineIndex, id: string, report: Report): void {
-  report('line-index', id, 'scannedLength', index.text.length, index.scannedLength)
+  report(
+    'line-index',
+    id,
+    'scannedLength.valid',
+    true,
+    Number.isSafeInteger(index.scannedLength) && index.scannedLength >= 0,
+  )
   const countValid =
     Number.isSafeInteger(index.count) && index.count >= 0 && index.count <= index.offsets.length
-  if (!countValid)
+  if (!countValid) {
     report('line-index', id, 'count', `integer in [0, ${index.offsets.length}]`, index.count)
-  let count = 0
-  for (let at = 0; at < index.text.length; at++) {
-    if (index.text.charCodeAt(at) !== 10) continue
+    return
+  }
+  let previous = -1
+  for (let at = 0; at < index.count; at++) {
+    const offset = index.offsets[at]!
     report(
       'line-index',
       id,
-      `offsets[${count}]`,
-      at,
-      count < index.count ? index.offsets[count] : undefined,
+      `offsets[${at}].valid`,
+      true,
+      offset > previous && offset < index.scannedLength,
     )
-    count++
+    previous = offset
   }
-  report('line-index', id, 'count', count, index.count)
 }
 
 // The store is shared with newer snapshots; the extent is what this snapshot
@@ -236,9 +418,11 @@ function checkStoreExtent(snapshot: PieceTableSnapshot, report: Report): void {
 
 // What anchor resolution takes for granted about the document order: a
 // buffer's pieces appear in buffer order with nothing missing between them,
-// and whatever sits between two of them is newer than they are.
+// and whatever sits between two of them is newer than they are. Only a
+// compacted tombstone may be missing, and its entry leads to a stand-in.
 function checkBufferOrder(
   pieces: readonly PieceTreeNode[],
+  leadsToStandIn: (buffer: number, unit: number) => boolean,
   label: (node: PieceTreeNode) => string,
   report: Report,
 ): void {
@@ -247,8 +431,10 @@ function checkBufferOrder(
   const closed = new Set<number>()
   for (const node of pieces) {
     const { buffer, start, length } = node.piece
+    if (isStandIn(node.piece)) continue
     const expected = ends.get(buffer) ?? (buffer === ORIGINAL_BUFFER ? 0 : start)
-    report('ordering', label(node), 'piece.start', expected, start)
+    const compacted = start > expected && leadsToStandIn(buffer, expected)
+    if (!compacted) report('ordering', label(node), 'piece.start', expected, start)
     ends.set(buffer, start + length)
 
     while (open.length > 0 && open[open.length - 1]! > buffer) closed.add(open.pop()!)
@@ -259,10 +445,13 @@ function checkBufferOrder(
 }
 
 // One entry per inserted piece, keyed by its start, or by 0 for a buffer's
-// first piece, and holding its order.
+// first piece, and holding its order. The other entries belong to compacted
+// tombstones and lead to stand-ins; a buffer whose first piece was compacted
+// keys its first remaining piece by start.
 function checkReverseIndex(
   snapshot: PieceTableSnapshot,
   pieces: readonly PieceTreeNode[],
+  byOrder: ReadonlyMap<number, PieceTreeNode>,
   label: (node: PieceTreeNode) => string,
   report: Report,
 ): number {
@@ -271,19 +460,34 @@ function checkReverseIndex(
   for (const entry of entries) orders.set(inspectionPieceKey(entry), entry.order)
   if (orders.size !== entries.length)
     report('reverse-index', 'reverse', 'keys', 'unique buffer/start', 'duplicate')
+  const leadsToStandIn = (order: number | undefined): boolean => {
+    const node = order === undefined ? undefined : byOrder.get(order)
+    return node !== undefined && isStandIn(node.piece)
+  }
 
   const seen = new Set<number>()
   let expected = 0
   for (const node of pieces) {
     const piece = node.piece
-    if (piece.buffer === ORIGINAL_BUFFER) continue
+    if (piece.buffer === ORIGINAL_BUFFER || isStandIn(piece)) continue
     expected++
-    const key = inspectionPieceKey({
-      buffer: piece.buffer,
-      start: seen.has(piece.buffer) ? piece.start : 0,
-    })
+    const first =
+      !seen.has(piece.buffer) &&
+      !leadsToStandIn(orders.get(inspectionPieceKey({ ...piece, start: 0 })))
+    const key = inspectionPieceKey({ buffer: piece.buffer, start: first ? 0 : piece.start })
     seen.add(piece.buffer)
     report('reverse-index', label(node), `reverseEntry ${key}`, piece.order, orders.get(key))
+  }
+  for (const entry of entries) {
+    if (leadsToStandIn(entry.order)) expected++
+    else if (!byOrder.has(entry.order))
+      report(
+        'reverse-index',
+        'reverse',
+        `entry ${inspectionPieceKey(entry)}`,
+        'a piece',
+        entry.order,
+      )
   }
   report('reverse-index', 'reverse', 'entries', expected, entries.length)
 
@@ -319,6 +523,7 @@ export function validatePieceTreeInvariants(
       const id = label(node)
       breaks.set(node, checkPiece(snapshot, node, id, chunkBreaks, report))
       checkBalance(node, id, report)
+      if (isStandIn(node.piece)) return
       const key = inspectionPieceKey(node.piece)
       if (pieces.has(key)) report('structure', id, 'piece.key', 'unique buffer/start', key)
       pieces.set(key, node)
@@ -345,8 +550,14 @@ export function validatePieceTreeInvariants(
   }
   // Document order is the order of the orders; a cyclic tree cannot be walked for it.
   const ordered = visited.toSorted((a, b) => a.piece.order - b.piece.order)
-  checkBufferOrder(ordered, label, report)
-  counts.reverseEntries = checkReverseIndex(snapshot, ordered, label, report)
+  const byOrder = new Map(ordered.map((node) => [node.piece.order, node]))
+  const leadsToStandIn = (buffer: number, unit: number): boolean => {
+    const order = lookupReverseIndex(snapshot.reverseIndex, buffer as PieceBufferId, unit)
+    const node = order === undefined ? undefined : byOrder.get(order)
+    return node !== undefined && isStandIn(node.piece)
+  }
+  checkBufferOrder(ordered, leadsToStandIn, label, report)
+  counts.reverseEntries = checkReverseIndex(snapshot, ordered, byOrder, label, report)
   for (const [chunk, index] of snapshot.buffers.lineIndexes) {
     counts.lineIndexes++
     checkLineIndex(index, `chunk ${chunk}`, report)

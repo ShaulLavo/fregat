@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
+import { createStringTextSnapshot } from '../src/documentTextSnapshot'
 import {
-  editActionForCommand,
+  editActionForCommand as editActionForSnapshot,
   isEditorEditActionCommand,
   listItemLineBreak,
+  trimTrailingWhitespaceAction,
   type EditorEditActionCommandId,
   type EditorEditActionOptions,
 } from '../src/editor/editActions'
@@ -30,6 +32,19 @@ function selection(
     reversed,
     startOffset: start,
   } as ResolvedSelection
+}
+
+/** Any edit action over a plain string, the way the editor routes it. */
+function editActionForCommand(
+  command: EditorEditActionCommandId,
+  text: string,
+  selections: ResolvedSelection[],
+  options?: EditorEditActionOptions,
+) {
+  const source = createStringTextSnapshot(text)
+  if (command === 'editor.action.trimTrailingWhitespace')
+    return trimTrailingWhitespaceAction(source)
+  return editActionForSnapshot(command, source, selections, options)
 }
 
 /** Applies an action's edits to `text`, so tests assert the resulting document, not edit shapes. */
@@ -230,6 +245,35 @@ describe('line comments', () => {
     } finally {
       registration.dispose()
     }
+  })
+})
+
+describe('line actions on rows read apart', () => {
+  const text = Array.from({ length: 20 }, (_, row) => `row${row}`).join('\n')
+  const carets = [selection(text.indexOf('row2') + 1), selection(text.indexOf('row12') + 1)]
+
+  it('lands each caret on its own copy', () => {
+    const action = editActionForCommand('editor.action.copyLinesDownAction', text, carets)
+
+    expect(run('editor.action.copyLinesDownAction', text, carets)).toBe(
+      text.replace('row2\n', 'row2\nrow2\n').replace('row12\n', 'row12\nrow12\n'),
+    )
+    expect(action.selections).toEqual([
+      { anchor: 16, affinity: 'after', head: 16 },
+      { anchor: 74, affinity: 'after', head: 74 },
+    ])
+  })
+
+  it('keeps each caret on its moved row', () => {
+    const action = editActionForCommand('editor.action.moveLinesUpAction', text, carets)
+
+    expect(run('editor.action.moveLinesUpAction', text, carets)).toBe(
+      text.replace('row1\nrow2', 'row2\nrow1').replace('row11\nrow12', 'row12\nrow11'),
+    )
+    expect(action.selections).toEqual([
+      { anchor: 6, affinity: 'after', head: 6 },
+      { anchor: 57, affinity: 'after', head: 57 },
+    ])
   })
 })
 

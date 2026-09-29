@@ -4,7 +4,7 @@ import {
   createEditorTextBuffer,
   createEditorViewSession,
 } from '../src/documentSession'
-import type { TextSnapshot } from '../src/documentTextSnapshot'
+import type { TextReadSnapshot } from '../src/documentTextSnapshot'
 import type { Editor, EditorOptions } from '../src/editor'
 import type { DocumentSyncPoint } from '../src/editor/editChain'
 import type { EditorViewSnapshot } from '../src/plugins'
@@ -38,7 +38,7 @@ function mountEditor(options: EditorOptions = {}): Editor {
 
 test('shared-view snapshots publish text, selections and synchronization from one generation', () => {
   const buffer = createEditorTextBuffer('alpha\nbeta\ngamma')
-  const committedPoints = new Map<TextSnapshot, DocumentSyncPoint>()
+  const committedPoints = new Map<TextReadSnapshot, DocumentSyncPoint>()
   buffer.subscribe(({ change }) =>
     committedPoints.set(change.textSnapshot, buffer.getDocumentSyncPoint()),
   )
@@ -83,13 +83,13 @@ test('shared-view snapshots publish text, selections and synchronization from on
 
   expect(snapshots.length).toBeGreaterThan(0)
   for (const snapshot of snapshots) {
-    expect(snapshot.documentSyncPoint).toEqual(committedPoints.get(snapshot.textSnapshot!))
+    expect(snapshot.documentSyncPoint).toEqual(committedPoints.get(snapshot.textSnapshot))
     expect(snapshot.changesSinceDocumentSyncPoint(initialPoint, null)?.syncPointAfter).toEqual(
       snapshot.documentSyncPoint,
     )
     expect(
       snapshot.selections.every(
-        (selection) => selection.headOffset <= snapshot.textSnapshot!.length,
+        (selection) => selection.headOffset <= snapshot.textSnapshot.length,
       ),
     ).toBe(true)
   }

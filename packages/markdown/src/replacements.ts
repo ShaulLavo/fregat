@@ -1,220 +1,229 @@
-import type { EditorSyntaxCapture } from '@singapore-editor/core/syntax'
+import type { TextReadSnapshot } from '@singapore-editor/core/document'
 import type { InlineReplacementSpec } from '@singapore-editor/core/rendering'
+import { Kind } from 'tree-sitter-md'
+import { markdownLinkDestination } from './linkDestination'
+import { renderMarkdownLinks, type MarkdownLink, type MarkdownLinkOptions } from './linkRender'
 
-/**
- * Turns Tree-sitter markdown captures into the inline replacements a live-preview view renders.
- *
- * The `markdown` and `markdown_inline` highlight queries already mark every piece of syntax this
- * needs, but they name things generically — `punctuation.delimiter` covers both emphasis fences and
- * link brackets. So constructs are recovered structurally instead: by containment for emphasis and
- * code spans, and by adjacency for links and images. Anything that does not match its expected shape
- * is left alone, so malformed markdown renders as plain text rather than losing characters.
- */
+type Span = { readonly start: number; readonly end: number }
+
 export function markdownInlineReplacements(
-  text: string,
-  captures: readonly EditorSyntaxCapture[],
+  text: TextReadSnapshot,
+  records: Uint32Array,
+  options: MarkdownLinkOptions = {},
 ): readonly InlineReplacementSpec[] {
-  const sorted = captures
-    .filter((capture) => capture.endIndex > capture.startIndex)
-    .toSorted((left, right) => left.startIndex - right.startIndex || right.endIndex - left.endIndex)
-
-  const index = createCaptureIndex(sorted)
   const specs: InlineReplacementSpec[] = []
-  appendDelimitedSpanReplacements(specs, text, sorted, index)
-  appendBlockMarkerReplacements(specs, text, sorted)
-  appendLinkReplacements(specs, sorted, index)
-  return specs
-}
-
-type CaptureIndex = {
-  readonly delimitersByStart: ReadonlyMap<number, EditorSyntaxCapture>
-  readonly delimitersByEnd: ReadonlyMap<number, EditorSyntaxCapture>
-  readonly urisByStart: ReadonlyMap<number, EditorSyntaxCapture>
-  readonly delimiters: readonly EditorSyntaxCapture[]
-}
-
-const DELIMITED_SPAN_CAPTURES = new Set(['text.strong', 'text.emphasis', 'text.literal'])
-const HEADING_MARKER = /^#{1,6}$/
-const BULLET_MARKER = /^[-*+](\s*)$/
-const QUOTE_MARKER = /^>(\s*)$/
-
-const createCaptureIndex = (captures: readonly EditorSyntaxCapture[]): CaptureIndex => {
-  const delimitersByStart = new Map<number, EditorSyntaxCapture>()
-  const delimitersByEnd = new Map<number, EditorSyntaxCapture>()
-  const urisByStart = new Map<number, EditorSyntaxCapture>()
-  const delimiters: EditorSyntaxCapture[] = []
-
-  for (const capture of captures) {
-    if (capture.captureName === 'text.uri') {
-      if (!urisByStart.has(capture.startIndex)) urisByStart.set(capture.startIndex, capture)
-      continue
+  const links: (Span & { readonly kind: number })[] = []
+  const renderedLinks: MarkdownLink[] = []
+  const containers = containerSpans(records)
+  for (let index = 0; index < records.length; index += 4) {
+    const start = records[index]!,
+      end = records[index + 1]!
+    const kind = records[index + 2]!,
+      extra = records[index + 3]!
+    if (end <= start) continue
+    if (kind === Kind.Link || kind === Kind.Image) links.push({ start, end, kind })
+    if (kind === Kind.LinkText) {
+      while (links.length && (links.at(-1)!.start > start || links.at(-1)!.end < end)) links.pop()
+      const link = links.pop()
+      const href =
+        link?.kind === Kind.Link
+          ? markdownLinkDestination(text, link, { start, end }, records)
+          : null
+      if (link?.kind === Kind.Image || href !== null) appendLink(specs, text, link, { start, end })
+      if (link && href !== null) renderedLinks.push({ span: link, label: { start, end }, href })
     }
-
-    if (capture.captureName !== 'punctuation.delimiter') continue
-    delimiters.push(capture)
-    if (!delimitersByStart.has(capture.startIndex))
-      delimitersByStart.set(capture.startIndex, capture)
-    if (!delimitersByEnd.has(capture.endIndex)) delimitersByEnd.set(capture.endIndex, capture)
+    const before = specs.length
+    appendMarker(specs, text, { start, end }, kind, extra)
+    const owner = markerOwner(containers, { start, end }, kind)
+    if (owner) applyRevealRange(specs, before, owner)
   }
-
-  return { delimitersByStart, delimitersByEnd, urisByStart, delimiters }
+  renderMarkdownLinks(specs, text, renderedLinks, options)
+  return preserveTableWidths(specs, text, containers)
 }
 
-/**
- * `**bold**`, `*em*`, and `` `code` ``: the span capture wraps the whole construct and its fences are
- * the `punctuation.delimiter` captures inside it. Containment gives the grouping for free, so both
- * fences reveal together when the caret lands anywhere between them.
- *
- * Multi-line spans are skipped: `text.literal` also covers fenced and indented code blocks, whose
- * "delimiters" are whole fence lines that must not collapse to nothing.
- */
-const appendDelimitedSpanReplacements = (
+function preserveTableWidths(
+  specs: readonly InlineReplacementSpec[],
+  source: TextReadSnapshot,
+  containers: readonly Container[],
+): readonly InlineReplacementSpec[] {
+  const tables = containers.filter((container) => container.kind === Kind.Table)
+  return specs.map((spec) => {
+    if (!tables.some((table) => table.start <= spec.startIndex && table.end >= spec.endIndex))
+      return spec
+    const width = source.readRange(spec.startIndex, spec.endIndex).length
+    const padding = ' '.repeat(Math.max(0, width - spec.text.length))
+    if (!padding) return spec
+    const render = spec.render
+    return {
+      ...spec,
+      text: spec.text + padding,
+      className: 'editor-markdown-text',
+      render: paddedRender(render, spec.text, padding),
+    }
+  })
+}
+
+function paddedRender(
+  render: InlineReplacementSpec['render'],
+  text: string,
+  padding: string,
+): InlineReplacementSpec['render'] {
+  return (container) => {
+    const disposable = render?.(container)
+    if (!render) container.append(text)
+    const spacer = container.ownerDocument.createElement('span')
+    spacer.className = 'editor-markdown-padding'
+    spacer.textContent = padding
+    spacer.ariaHidden = 'true'
+    container.append(spacer)
+    return disposable
+  }
+}
+
+function appendMarker(
   specs: InlineReplacementSpec[],
-  text: string,
-  captures: readonly EditorSyntaxCapture[],
-  index: CaptureIndex,
-): void => {
-  for (const span of captures) {
-    if (!DELIMITED_SPAN_CAPTURES.has(span.captureName)) continue
-    if (spansMultipleLines(text, span)) continue
-
-    const groupId = `span:${span.startIndex}:${span.endIndex}`
-    for (const delimiter of delimitersWithin(index.delimiters, span)) {
-      specs.push(hidden(delimiter.startIndex, delimiter.endIndex, 'marker', groupId))
-    }
+  text: TextReadSnapshot,
+  span: Span,
+  kind: number,
+  extra: number,
+): void {
+  const group = `${kind}:${span.start}:${span.end}`
+  if (
+    kind === Kind.Emphasis ||
+    kind === Kind.Strong ||
+    kind === Kind.Strikethrough ||
+    kind === Kind.CodeSpan
+  ) {
+    const count = delimiterLength(text, span, kind)
+    specs.push(replacement(span.start, span.start + count, '', 'marker', group))
+    specs.push(replacement(span.end - count, span.end, '', 'marker', group))
+    return
+  }
+  if (kind === Kind.HeadingMark) {
+    const end = span.end + leadingSpaces(text, span.end)
+    specs.push(replacement(span.start, end, '', `heading-marker-${extra}`, group))
+    return
+  }
+  if (kind === Kind.FenceMark || kind === Kind.CodeInfo) {
+    specs.push(replacement(span.start, span.end, '', 'fence-marker', group))
+    return
+  }
+  if (kind === Kind.Task) {
+    specs.push(replacement(span.start, span.end, extra ? '☑' : '☐', 'task-marker', group))
+    return
+  }
+  if (kind !== Kind.ListMark && kind !== Kind.QuoteMark) return
+  const source = text.readRange(span.start, span.end)
+  if (kind === Kind.ListMark && /^[-*+]/.test(source)) {
+    specs.push(replacement(span.start, span.end, `•${source.slice(1)}`, 'list-marker', group))
+  }
+  if (kind === Kind.QuoteMark) {
+    specs.push(replacement(span.start, span.end, `│${source.slice(1)}`, 'quote-marker', group))
   }
 }
 
-/**
- * `punctuation.special` is shared by heading markers, list bullets, thematic breaks, setext
- * underlines, and block-quote markers, so they are told apart by their own text. Heading markers hide
- * along with the space that follows them, and their kind carries the level (`heading-marker-2`) so
- * the row class the editor derives from it can size each level; bullets and quote markers are
- * substituted width-for-width so nothing shifts.
- */
-const appendBlockMarkerReplacements = (
+function delimiterLength(text: TextReadSnapshot, span: Span, kind: number): number {
+  if (kind === Kind.Strong) return 2
+  if (kind === Kind.Emphasis) return 1
+  if (kind === Kind.Strikethrough)
+    return text.readRange(span.start, span.start + 2) === '~~' ? 2 : 1
+  let count = 0
+  while (
+    span.start + count < span.end &&
+    text.readRange(span.start + count, span.start + count + 1) === '`'
+  )
+    count++
+  return count
+}
+
+function appendLink(
   specs: InlineReplacementSpec[],
-  text: string,
-  captures: readonly EditorSyntaxCapture[],
-): void => {
-  for (const capture of captures) {
-    if (capture.captureName !== 'punctuation.special') continue
-
-    const markerText = text.slice(capture.startIndex, capture.endIndex)
-    if (HEADING_MARKER.test(markerText)) {
-      const end = capture.endIndex + leadingSpaceCount(text, capture.endIndex)
-      const kind = `heading-marker-${markerText.length}`
-      specs.push(hidden(capture.startIndex, end, kind, `heading:${capture.startIndex}`))
-      continue
-    }
-
-    const bullet = BULLET_MARKER.exec(markerText)
-    if (bullet) {
-      specs.push(
-        substituted(capture, `•${bullet[1] ?? ''}`, 'list-marker', `bullet:${capture.startIndex}`),
-      )
-      continue
-    }
-
-    const quote = QUOTE_MARKER.exec(markerText)
-    if (!quote) continue
-    specs.push(
-      substituted(capture, `│${quote[1] ?? ''}`, 'quote-marker', `quote:${capture.startIndex}`),
-    )
-  }
+  text: TextReadSnapshot,
+  link: Span | undefined,
+  label: Span,
+): void {
+  if (!link) return
+  const group = `link:${link.start}:${link.end}`
+  appendHiddenLines(specs, text, link.start, label.start, 'link-marker', group, link)
+  appendHiddenLines(specs, text, label.end, link.end, 'link-target', group, link)
 }
 
-const substituted = (
-  capture: EditorSyntaxCapture,
-  text: string,
+function appendHiddenLines(
+  specs: InlineReplacementSpec[],
+  text: TextReadSnapshot,
+  start: number,
+  end: number,
   kind: string,
-  groupId: string,
-): InlineReplacementSpec => ({
-  id: groupId,
-  startIndex: capture.startIndex,
-  endIndex: capture.endIndex,
-  text,
-  kind,
-  groupId,
-})
-
-/**
- * `[label](target)` and `![alt](target)`. The queries capture each bracket separately and never mark
- * the link node itself, so the construct is rebuilt outwards from its label by adjacency. A link only
- * collapses when every expected piece is touching its neighbour.
- */
-const appendLinkReplacements = (
-  specs: InlineReplacementSpec[],
-  captures: readonly EditorSyntaxCapture[],
-  index: CaptureIndex,
-): void => {
-  for (const label of captures) {
-    if (label.captureName !== 'text.reference') continue
-
-    const open = index.delimitersByEnd.get(label.startIndex)
-    const close = index.delimitersByStart.get(label.endIndex)
-    if (!open || !close) continue
-
-    const groupId = `link:${label.startIndex}:${label.endIndex}`
-    const bang = index.delimitersByEnd.get(open.startIndex)
-    specs.push(hidden(bang?.startIndex ?? open.startIndex, open.endIndex, 'link-marker', groupId))
-    specs.push(
-      hidden(
-        close.startIndex,
-        linkTargetEnd(index, close.endIndex) ?? close.endIndex,
-        'link-target',
-        groupId,
-      ),
-    )
+  group: string,
+  owner: Span,
+): void {
+  const source = text.readRange(start, end)
+  let offset = start
+  for (const line of source.split(/(\r?\n)/)) {
+    if (line && !line.includes('\n'))
+      specs.push({
+        ...replacement(offset, offset + line.length, '', kind, group),
+        revealRange: owner,
+      })
+    offset += line.length
   }
 }
 
-/** End of the `(target)` run following a label's closing bracket, or null when it is not one. */
-const linkTargetEnd = (index: CaptureIndex, closeEnd: number): number | null => {
-  const open = index.delimitersByStart.get(closeEnd)
-  if (!open) return null
-
-  const destination = index.urisByStart.get(open.endIndex)
-  if (!destination) return null
-
-  return index.delimitersByStart.get(destination.endIndex)?.endIndex ?? null
-}
-
-const delimitersWithin = (
-  delimiters: readonly EditorSyntaxCapture[],
-  span: EditorSyntaxCapture,
-): readonly EditorSyntaxCapture[] => {
-  const within: EditorSyntaxCapture[] = []
-
-  for (const delimiter of delimiters) {
-    if (delimiter.startIndex >= span.endIndex) break
-    if (delimiter.startIndex < span.startIndex) continue
-    if (delimiter.endIndex > span.endIndex) continue
-    within.push(delimiter)
-  }
-
-  return within
-}
-
-const hidden = (
+function replacement(
   startIndex: number,
   endIndex: number,
+  text: string,
   kind: string,
   groupId: string,
-): InlineReplacementSpec => ({
-  id: `${kind}:${startIndex}:${endIndex}`,
-  startIndex,
-  endIndex,
-  text: '',
-  kind,
-  groupId,
-})
+): InlineReplacementSpec {
+  return { id: `${kind}:${startIndex}:${endIndex}`, startIndex, endIndex, text, kind, groupId }
+}
 
-const spansMultipleLines = (text: string, capture: EditorSyntaxCapture): boolean =>
-  text.slice(capture.startIndex, capture.endIndex).includes('\n')
-
-const leadingSpaceCount = (text: string, offset: number): number => {
+function leadingSpaces(text: TextReadSnapshot, offset: number): number {
   let count = 0
-  while (text[offset + count] === ' ') count += 1
+  while (offset + count < text.length && text.readRange(offset + count, offset + count + 1) === ' ')
+    count++
   return count
+}
+
+type Container = Span & { readonly kind: number }
+
+function containerSpans(records: Uint32Array): readonly Container[] {
+  const containers: Container[] = []
+  for (let i = 0; i < records.length; i += 4) {
+    const kind = records[i + 2]!
+    if (
+      kind === Kind.Heading ||
+      kind === Kind.Table ||
+      kind === Kind.CodeBlock ||
+      kind === Kind.BlockQuote ||
+      kind === Kind.ListItem
+    ) {
+      containers.push({ start: records[i]!, end: records[i + 1]!, kind })
+    }
+  }
+  return containers
+}
+
+function markerOwner(containers: readonly Container[], span: Span, kind: number): Span | undefined {
+  const parent = markerParentKind(kind)
+  if (!parent) return undefined
+  return containers.findLast(
+    (container) =>
+      container.kind === parent && container.start <= span.start && container.end >= span.end,
+  )
+}
+
+function markerParentKind(kind: number): number | undefined {
+  if (kind === Kind.HeadingMark) return Kind.Heading
+  if (kind === Kind.FenceMark || kind === Kind.CodeInfo) return Kind.CodeBlock
+  if (kind === Kind.QuoteMark) return Kind.BlockQuote
+  if (kind === Kind.ListMark || kind === Kind.Task) return Kind.ListItem
+  return undefined
+}
+
+function applyRevealRange(specs: InlineReplacementSpec[], from: number, owner: Span): void {
+  for (let i = from; i < specs.length; i++) {
+    specs[i] = { ...specs[i]!, revealRange: owner }
+  }
 }

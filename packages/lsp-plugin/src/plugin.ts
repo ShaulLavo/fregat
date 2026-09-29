@@ -1,6 +1,8 @@
+import { LanguageServerDocument, type DocumentLanguageServerLane } from './document'
+import type { LanguageServerDocumentPluginOptions } from './types'
 import type { EditorCommandId } from '@singapore-editor/core/editor'
-import type { DocumentSessionChange } from '@singapore-editor/core/document'
 import type {
+  EditorContributionChange,
   EditorCapabilityToken,
   EditorCommandContributionContext,
   EditorDisposable,
@@ -11,7 +13,11 @@ import type {
   EditorViewContributionUpdateKind,
   EditorViewSnapshot,
 } from '@singapore-editor/core/extensions'
-import type { LspClient, LspNotificationHandler } from '@singapore-editor/lsp'
+import type {
+  LspClient,
+  LspNotificationHandler,
+  LspServerRequestHandler,
+} from '@singapore-editor/lsp'
 import type * as lsp from 'vscode-languageserver-protocol'
 
 import {
@@ -21,13 +27,19 @@ import {
 } from './completion'
 import {
   anchoredSurfaceFollowsUpdate,
-  EDITOR_HOVER_PARTICIPANT,
-  hoverControllerFor,
   isInsideEditorPopup,
-} from '@singapore-editor/plugin-ui'
+} from '@singapore-editor/plugin-ui/anchored-surface'
+import { EDITOR_HOVER_PARTICIPANT } from '@singapore-editor/plugin-ui/hover-participant'
+import { hoverControllerFor } from '@singapore-editor/plugin-ui/hover-registry'
 import { CodeActionController } from './codeActions'
-import type { OffsetRange } from '@singapore-editor/plugin-ui'
+import type { OffsetRange } from '@singapore-editor/plugin-ui/offset-range'
 import { CompletionController } from './completionController'
+import {
+  COMPLETION_KEY_COMMANDS,
+  SIGNATURE_HELP_KEY_COMMANDS,
+  type CompletionKeyCommand,
+  type SignatureHelpKeyCommand,
+} from './keyCommands'
 import {
   createLanguageServerCompletionSource,
   LanguageServerCompletionSources,
@@ -37,7 +49,11 @@ import { activeDocumentForSnapshot, DocumentSync } from './documentSync'
 import { FormatOnTypeController } from './formatOnType'
 import { DefinitionLinkController } from './definitionLinkController'
 import { createLanguageServerHoverParticipant } from './hoverParticipant'
-import { SignatureHelpController } from './signatureHelpController'
+import type {
+  SignatureHelpController,
+  SignatureHelpControllerOptions,
+} from './signatureHelpController'
+import { signatureHelpTriggerFromTypedText } from './signatureHelp'
 import { DocumentHighlightController } from './documentHighlightController'
 import {
   SemanticTokenLayerOwner,
@@ -48,14 +64,15 @@ import {
 import { createRenameWidgetController, type RenameWidgetController } from './renameWidget'
 import { parseWorkspaceEdit } from './workspaceEdit'
 import { currentWorkspaceEditOrigin } from './workspaceEditProvenance'
-import { wordRangeAtOffset } from '@singapore-editor/core/internal'
-import { lspPositionToOffset, offsetToLspPosition } from '@singapore-editor/lsp'
-import type { LspConnectionProvider, LspConnectionTransportFactory } from './lspConnection'
+import { wordRangeAtOffset } from '@singapore-editor/core/document'
 import {
-  acquireResolvedLanguageServerLane,
-  resolveLanguageServerLaneOptions,
-  type LanguageServerResolvedLaneOptions,
-} from './lane'
+  lspPositionToOffsetInSnapshot,
+  offsetToLspPositionInSnapshot,
+  type LspTextDocumentSnapshot,
+} from '@singapore-editor/lsp'
+import { rangeAroundOffset } from './sourceText'
+import type { LspConnectionProvider, LspConnectionTransportFactory } from './lspConnection'
+import { resolveLanguageServerLaneOptions, type LanguageServerResolvedLaneOptions } from './lane'
 import {
   allLanguageServerFeatures,
   captureWorkspaceEditOriginGuard,
@@ -68,12 +85,12 @@ import type {
   DiagnosticMarkerDirection,
   LanguageServerNavigationCommand,
 } from './pluginTypes'
-import { PullDiagnosticsController } from './pullDiagnostics'
 import { formattingChangesText, formattingOptions, prepareFormattingEdits } from './formatting'
 import type { TextEdit } from '@singapore-editor/core'
 import type {
   LanguageServerConnectionContext,
   LanguageServerDefinitionTarget,
+  LanguageServerDiagnosticActions,
   LanguageServerDiagnosticMarkerClaim,
   LanguageServerDiagnosticMarkerEvent,
   LanguageServerDiagnosticSummary,
@@ -97,7 +114,6 @@ export type { LanguageServerConnectionContext } from './types'
 export type { LanguageServerResolvedOptions } from './pluginTypes'
 
 const DEFAULT_PLUGIN_NAME = 'editor.lsp-plugin'
-const DEFAULT_HIGHLIGHT_PREFIX = 'editor-lsp-plugin'
 const DEFAULT_NAMESPACE = 'lsp-plugin'
 const DEFAULT_TIMING_PREFIX = 'lspPlugin'
 const DEFAULT_DIAGNOSTICS_SOURCE_ID = 'editor.lsp-plugin.diagnostics'
@@ -110,6 +126,8 @@ export type LanguageServerCommandTarget = {
   formatDocument(): boolean
   renameSymbol(): boolean
   applyAutoFix(): boolean
+  completionCommand(command: CompletionKeyCommand): boolean
+  signatureHelpCommand(command: SignatureHelpKeyCommand): boolean
 }
 
 export type LanguageServerCommandSpec = {
@@ -133,10 +151,11 @@ export type LanguageServerAdapterPluginOptions = LanguageServerLaneHostOptions &
   readonly clientInfo?: lsp.InitializeParams['clientInfo']
   /** See LanguageServerPluginOptions.notificationHandlers. Merged, never replacing. */
   readonly notificationHandlers?: Readonly<Record<string, LspNotificationHandler<LspClient>>>
+  /** See LanguageServerPluginOptions.serverRequestHandlers. */
+  readonly serverRequestHandlers?: Readonly<Record<string, LspServerRequestHandler<LspClient>>>
   createTransport(): ReturnType<LspConnectionTransportFactory>
   /** Borrows the connection instead of constructing one per view. See LspConnectionProvider. */
   readonly connectionProvider?: LspConnectionProvider
-  readonly defaultHighlightPrefix?: string
   readonly documentSync?: LanguageServerDocumentSyncOptions
   readonly diagnostics?: {
     readonly minimapSourceId?: string
@@ -175,6 +194,7 @@ export type LanguageServerAdapterPluginOptions = LanguageServerLaneHostOptions &
   onConnected?(context: LanguageServerConnectionContext): void
   readonly onStatusChange?: (status: LanguageServerStatus) => void
   readonly onDiagnostics?: (summary: LanguageServerDiagnosticSummary) => void
+  readonly getDiagnosticActions?: LanguageServerDiagnosticActions
   readonly onDidNavigateDiagnostic?: (
     event: LanguageServerDiagnosticMarkerEvent,
   ) => LanguageServerDiagnosticMarkerClaim
@@ -191,9 +211,9 @@ export type LanguageServerAdapterPluginOptions = LanguageServerLaneHostOptions &
 
 type LanguageServerResolvedAdapterOptions = {
   readonly name: string
+  readonly document?: LanguageServerDocument
   readonly onRequestRenameName?: (prompt: LanguageServerRenamePrompt) => Promise<string | null>
   readonly lanes: readonly LanguageServerResolvedLaneOptions[]
-  readonly defaultHighlightPrefix: string
   readonly documentSync: LanguageServerDocumentSyncOptions
   readonly diagnostics: {
     readonly minimapSourceId: string
@@ -215,6 +235,7 @@ type LanguageServerResolvedAdapterOptions = {
   readonly commands: readonly LanguageServerCommandSpec[]
   readonly semanticTokens?: LanguageServerSemanticTokensFactory
   readonly onDiagnostics?: (summary: LanguageServerDiagnosticSummary) => void
+  readonly getDiagnosticActions?: LanguageServerDiagnosticActions
   readonly onDidNavigateDiagnostic?: (
     event: LanguageServerDiagnosticMarkerEvent,
   ) => LanguageServerDiagnosticMarkerClaim
@@ -232,7 +253,14 @@ type LanguageServerResolvedAdapterOptions = {
 
 export function createLanguageServerPlugin(
   options: LanguageServerPluginOptions,
+): LanguageServerPlugin
+export function createLanguageServerPlugin(
+  options: LanguageServerDocumentPluginOptions,
+): LanguageServerPlugin
+export function createLanguageServerPlugin(
+  options: LanguageServerPluginOptions | LanguageServerDocumentPluginOptions,
 ): LanguageServerPlugin {
+  if ('document' in options) return createLanguageServerSetPlugin(options)
   return createLanguageServerSetPlugin({
     lanes: [languageServerLaneFromPluginOptions(options)],
     onApplyWorkspaceEdit: options.onApplyWorkspaceEdit,
@@ -240,6 +268,7 @@ export function createLanguageServerPlugin(
     semanticTokens: options.semanticTokens ? () => options.semanticTokens! : undefined,
     onDiagnostics: options.onDiagnostics,
     onDidNavigateDiagnostic: options.onDidNavigateDiagnostic,
+    getDiagnosticActions: options.getDiagnosticActions,
     onDefinitionLinkHover: options.onDefinitionLinkHover,
     onOpenDefinition: options.onOpenDefinition,
     onOpenReferences: options.onOpenReferences,
@@ -263,19 +292,20 @@ export function createLanguageServerAdapterPlugin(
 function createResolvedLanguageServerPlugin(
   resolved: LanguageServerResolvedAdapterOptions,
 ): LanguageServerPlugin {
-  const state = new LanguageServerPluginState()
-
   return {
     name: resolved.name,
     activate(context) {
+      // This editor's views only: a command reached this editor's router, so a rename or a list
+      // open in another editor sharing the plugin is not what it is about.
+      const views = new LanguageServerViews()
       return [
         context.registerViewContribution({
           createContribution: (contributionContext) =>
-            new LanguageServerContribution(contributionContext, state, resolved),
+            new LanguageServerContribution(contributionContext, views, resolved),
         }),
         context.registerCommandContribution({
           createContribution: (contributionContext) =>
-            new LanguageServerCommandContribution(contributionContext, state, resolved.commands),
+            new LanguageServerCommandContribution(contributionContext, views, resolved.commands),
         }),
         context.registerEditContribution({
           createContribution: (contributionContext) =>
@@ -286,61 +316,54 @@ function createResolvedLanguageServerPlugin(
   }
 }
 
-class LanguageServerPluginState implements LanguageServerCommandTarget {
-  private readonly contributions = new Set<LanguageServerContribution>()
+/** The views of one editor, answering its commands: the first view that acts claims the key. */
+class LanguageServerViews implements LanguageServerCommandTarget {
+  private readonly views = new Set<LanguageServerContribution>()
 
-  public register(contribution: LanguageServerContribution): void {
-    this.contributions.add(contribution)
+  public register(view: LanguageServerContribution): void {
+    this.views.add(view)
   }
 
-  public unregister(contribution: LanguageServerContribution): void {
-    this.contributions.delete(contribution)
+  public unregister(view: LanguageServerContribution): void {
+    this.views.delete(view)
   }
 
   public goToDefinitionFromSelection(): boolean {
-    return this.runNavigationCommand({
-      kind: 'definition',
-      openMode: 'default',
-    })
+    return this.runNavigationCommand({ kind: 'definition', openMode: 'default' })
   }
 
   public runNavigationCommand(command: LanguageServerNavigationCommand): boolean {
-    for (const contribution of this.contributions) {
-      if (contribution.runNavigationCommand(command)) return true
-    }
-
-    return false
+    return this.some((view) => view.runNavigationCommand(command))
   }
 
   public moveDiagnosticMarker(direction: DiagnosticMarkerDirection): boolean {
-    for (const contribution of this.contributions) {
-      if (contribution.moveDiagnosticMarker(direction)) return true
-    }
-
-    return false
+    return this.some((view) => view.moveDiagnosticMarker(direction))
   }
 
   public formatDocument(): boolean {
-    for (const contribution of this.contributions) {
-      if (contribution.formatDocument()) return true
-    }
-
-    return false
+    return this.some((view) => view.formatDocument())
   }
 
   public renameSymbol(): boolean {
-    for (const contribution of this.contributions) {
-      if (contribution.renameSymbol()) return true
-    }
-
-    return false
+    return this.some((view) => view.renameSymbol())
   }
 
   public applyAutoFix(): boolean {
-    for (const contribution of this.contributions) {
-      if (contribution.applyAutoFix()) return true
-    }
+    return this.some((view) => view.applyAutoFix())
+  }
 
+  public completionCommand(command: CompletionKeyCommand): boolean {
+    return this.some((view) => view.completionCommand(command))
+  }
+
+  public signatureHelpCommand(command: SignatureHelpKeyCommand): boolean {
+    return this.some((view) => view.signatureHelpCommand(command))
+  }
+
+  private some(run: (view: LanguageServerContribution) => boolean): boolean {
+    for (const view of this.views) {
+      if (run(view)) return true
+    }
     return false
   }
 }
@@ -350,11 +373,11 @@ class LanguageServerCommandContribution implements EditorDisposable {
 
   public constructor(
     context: EditorCommandContributionContext,
-    private readonly state: LanguageServerPluginState,
+    views: LanguageServerViews,
     commands: readonly LanguageServerCommandSpec[],
   ) {
     this.commands = commands.map((command) =>
-      context.registerCommand(command.id, () => command.run(this.state)),
+      context.registerCommand(command.id, () => command.run(views)),
     )
   }
 
@@ -382,8 +405,7 @@ class LanguageServerCompletionEditContribution implements EditorEditContribution
 }
 
 type ViewLanguageServerLane = LanguageServerSetLane & {
-  readonly documentSyncRegistration: EditorDisposable | null
-  readonly pullDiagnostics: PullDiagnosticsController | null
+  readonly subscription: EditorDisposable
   readonly sync: DocumentSync
 }
 
@@ -398,6 +420,7 @@ type RenameWorkspaceEditDispatch = {
 }
 
 class LanguageServerContribution implements EditorViewContribution {
+  private readonly document: LanguageServerDocument
   private readonly lanes: readonly ViewLanguageServerLane[]
   private readonly servers: LanguageServerSet
   private readonly diagnostics: CompositeDiagnosticsPresenter
@@ -405,7 +428,15 @@ class LanguageServerContribution implements EditorViewContribution {
   private readonly completion: CompletionController
   private readonly definitionLink: DefinitionLinkController
   private readonly hoverParticipantRegistration: EditorDisposable | null
-  private readonly signatureHelp: SignatureHelpController
+  /**
+   * Loaded on the first `(` or `,` typed, not at boot. The surface it shares with the hover carries
+   * a Markdown renderer and its parser, which an editor that never opens an argument list has no
+   * reason to download.
+   */
+  private readonly signatureHelpOptions: SignatureHelpControllerOptions
+  private signatureHelp: SignatureHelpController | null = null
+  private signatureHelpLoad: Promise<SignatureHelpController> | null = null
+  private readonly typedTextRegistration: EditorDisposable | null
   private readonly documentHighlights: DocumentHighlightController
   private readonly codeActions: CodeActionController
   /** Absent rather than idle when switched off, so nothing watches the typing at all. */
@@ -424,11 +455,10 @@ class LanguageServerContribution implements EditorViewContribution {
 
   public constructor(
     private readonly context: EditorViewContributionContext,
-    private readonly state: LanguageServerPluginState,
+    private readonly views: LanguageServerViews,
     private readonly options: LanguageServerResolvedAdapterOptions,
   ) {
-    const prefix = context.highlightPrefix ?? options.defaultHighlightPrefix
-    const presenter = new DiagnosticsPresenter(context, prefix, {
+    const presenter = new DiagnosticsPresenter(context, context.highlightPrefix, {
       ...options.diagnostics,
       onDidNavigateDiagnostic: options.onDidNavigateDiagnostic,
       onError: options.onError,
@@ -438,7 +468,15 @@ class LanguageServerContribution implements EditorViewContribution {
       rankedLanguageServerLanes(options.lanes, 'diagnostics').map((lane) => lane.id),
       options.onDiagnostics,
     )
-    this.lanes = options.lanes.map((lane) => this.createLane(lane))
+    this.document =
+      options.document ??
+      new LanguageServerDocument(
+        {
+          getSnapshot: () => context.getSnapshot(),
+        },
+        { lanes: options.lanes, documentSync: options.documentSync },
+      )
+    this.lanes = this.document.lanes.map((lane) => this.createLane(lane))
     this.servers = new LanguageServerSet(this.lanes)
     this.completionSources = new LanguageServerCompletionSources(
       context,
@@ -471,7 +509,6 @@ class LanguageServerContribution implements EditorViewContribution {
     this.definitionLink = new DefinitionLinkController({
       context,
       router: this.servers,
-      defaultHighlightPrefix: options.defaultHighlightPrefix,
       linkHighlightNameNamespace: options.hoverDefinition.linkHighlightNameNamespace,
       navigationTimingNamePrefix: options.hoverDefinition.navigationTimingNamePrefix,
       getActiveDocument: () => this.activeDocument(),
@@ -482,7 +519,7 @@ class LanguageServerContribution implements EditorViewContribution {
     })
     // Every document: which server answers is the router's call, not the selector's.
     this.hoverParticipantRegistration =
-      context.registerProvider?.(
+      context.registerProvider(
         EDITOR_HOVER_PARTICIPANT,
         { language: '*' },
         createLanguageServerHoverParticipant({
@@ -491,6 +528,7 @@ class LanguageServerContribution implements EditorViewContribution {
             this.servers.requestHover(params, requestOptions, onUpdate),
           getActiveDocument: () => this.activeDocument(),
           getDiagnostics: () => this.diagnostics.diagnostics,
+          getDiagnosticActions: options.getDiagnosticActions,
           openLocation: (target) => {
             options.onOpenDefinition?.(target)
           },
@@ -498,19 +536,20 @@ class LanguageServerContribution implements EditorViewContribution {
           onRequestError: (error) => this.handleRequestError(error),
         }),
       ) ?? null
-    this.signatureHelp = new SignatureHelpController({
+    this.typedTextRegistration = context.onDidType((text) => this.handleTypedText(text))
+    this.signatureHelpOptions = {
       router: this.servers,
       context,
       getActiveDocument: () => this.activeDocument(),
       onRequestError: (error) => this.handleRequestError(error),
       onRequestSuccess: () => options.onInteractiveReady?.(),
       tooltipClassNamespace: options.hoverDefinition.tooltipClassNamespace,
-    })
+    }
     this.documentHighlights = new DocumentHighlightController({
       router: this.servers,
       context,
       getActiveDocument: () => this.activeDocument(),
-      highlightName: `${context.highlightPrefix ?? options.defaultHighlightPrefix}-document-highlight`,
+      highlightName: `${context.highlightPrefix}-document-highlight`,
       onRequestError: (error) => this.handleRequestError(error),
     })
     this.codeActions = new CodeActionController({
@@ -523,14 +562,14 @@ class LanguageServerContribution implements EditorViewContribution {
     this.formatOnType = options.formatOnType
       ? new FormatOnTypeController({ context, editFeature: options.completion.editFeature })
       : null
-    this.state.register(this)
+    this.views.register(this)
     this.update(context.getSnapshot(), 'document', null)
   }
 
   public update(
     snapshot: EditorViewSnapshot,
     kind: EditorViewContributionUpdateKind,
-    change?: DocumentSessionChange | null,
+    change?: EditorContributionChange | null,
   ): void {
     if (this.disposed) return
 
@@ -538,38 +577,32 @@ class LanguageServerContribution implements EditorViewContribution {
     this.abortRenameOnDocumentDrift()
     this.definitionLink.update(snapshot, kind)
     if (anchoredSurfaceFollowsUpdate(kind)) this.reanchorRenamePrompt()
-    for (const lane of this.lanes) {
-      if (!lane.connection.isReady()) continue
-      if (!lane.sync.shouldSync(kind, snapshot)) continue
-
-      lane.sync.sync(snapshot, change ?? null)
-      lane.pullDiagnostics?.synchronize()
-    }
+    if (!this.options.document) this.document.synchronize(change ?? null, kind)
     this.completion.update(snapshot, kind, change ?? null)
-    this.signatureHelp.update(snapshot, kind, change ?? null)
+    this.signatureHelp?.update(snapshot, kind)
     this.documentHighlights.update(snapshot, kind)
     this.codeActions.update(kind)
     this.formatOnType?.update(snapshot, kind, change ?? null)
     this.syncSemanticTokens(snapshot, kind)
+    if (kind === 'tokens') this.diagnostics.updateTheme(snapshot.theme ?? null)
   }
 
   public dispose(): void {
     if (this.disposed) return
 
     this.disposed = true
-    this.state.unregister(this)
+    this.views.unregister(this)
     this.definitionLink.dispose()
     this.hoverParticipantRegistration?.dispose()
     this.completion.hide()
-    for (const lane of this.lanes) {
-      lane.documentSyncRegistration?.dispose()
-      lane.pullDiagnostics?.dispose()
-      lane.sync.close()
-    }
+    for (const lane of this.lanes) lane.subscription.dispose()
+    if (!this.options.document) this.document.dispose()
     this.diagnostics.clear()
     this.completionSources.dispose()
     this.completion.dispose()
-    this.signatureHelp.dispose()
+    this.typedTextRegistration?.dispose()
+    // Disposing twice is a no-op, so a load still in flight is safe to settle into.
+    void this.signatureHelpLoad?.then((controller) => controller.dispose())
     this.documentHighlights.dispose()
     this.codeActions.dispose()
     this.formatOnType?.dispose()
@@ -579,7 +612,6 @@ class LanguageServerContribution implements EditorViewContribution {
     this.semanticTokensOwner = null
     this.cancelRename()
     this.rename?.dispose()
-    for (const lane of this.lanes) lane.connection.release()
   }
 
   public goToDefinitionFromSelection(): boolean {
@@ -591,6 +623,15 @@ class LanguageServerContribution implements EditorViewContribution {
 
   public runNavigationCommand(command: LanguageServerNavigationCommand): boolean {
     return this.definitionLink.runNavigationCommand(command)
+  }
+
+  public completionCommand(command: CompletionKeyCommand): boolean {
+    return this.completion.runKeyCommand(command)
+  }
+
+  /** Before the first `(` there is no controller, and so no hint for these to act on. */
+  public signatureHelpCommand(command: SignatureHelpKeyCommand): boolean {
+    return this.signatureHelp?.runKeyCommand(command) ?? false
   }
 
   public moveDiagnosticMarker(direction: DiagnosticMarkerDirection): boolean {
@@ -637,64 +678,30 @@ class LanguageServerContribution implements EditorViewContribution {
     return this.codeActions.applyAutoFix()
   }
 
-  private createLane(options: LanguageServerResolvedLaneOptions): ViewLanguageServerLane {
-    let lane: ViewLanguageServerLane | null = null
-    const diagnostics = this.diagnostics.forLane(options.id, options.onDiagnostics)
-    const connection = acquireResolvedLanguageServerLane(options, {
-      onDiagnosticRefresh: () => lane?.pullDiagnostics?.refresh(),
-      onPublishDiagnostics: (params) => {
-        if (options.features.diagnostics === undefined) return
-        if (!lane) return
-
-        lane.sync.publishDiagnostics(params)
-        this.codeActions.diagnosticsChanged()
+  private createLane(documentLane: DocumentLanguageServerLane): ViewLanguageServerLane {
+    const options = documentLane.options
+    const diagnostics = this.diagnostics.forLane(options.id)
+    const subscription = documentLane.attach(
+      {
+        clear: () => diagnostics.clear(),
+        render: (document, items) => diagnostics.render(document, items),
+        publishSummary: (uri, version, items, freshness) => {
+          diagnostics.publishSummary(uri, version, items, freshness)
+          this.codeActions?.diagnosticsChanged()
+        },
       },
-      onReady: () => {
-        if (lane) this.syncReadyLane(lane)
-      },
-      onUnavailable: () => {
-        if (!lane) return
-
-        lane.pullDiagnostics?.cancel()
-        lane.sync.clearDiagnostics()
+      () => {
+        if (this.disposed) return
+        this.completion?.hide()
         this.syncSemanticTokens(this.context.getSnapshot(), 'document')
       },
-    })
-    const sync = new DocumentSync(connection.workspace, diagnostics, {
-      ...this.options.documentSync,
-      logicalRevisionScope: connection.logicalRevisionScope,
-      onDocumentClosed: () => this.completion.hide(),
-    })
-    const pullDiagnostics =
-      options.features.diagnostics === undefined
-        ? null
-        : new PullDiagnosticsController({
-            client: connection.client,
-            getDocument: () => {
-              const active = sync.activeDocument
-              return active ? { uri: active.uri, version: active.lspVersion } : null
-            },
-            publish: (document, items) => {
-              sync.pullDiagnostics(document.uri, document.version, items)
-              this.codeActions.diagnosticsChanged()
-            },
-            onRequestError: (error) => {
-              if (options.onRequestError) options.onRequestError('textDocument/diagnostic', error)
-              else this.options.onRequestError?.(options.id, 'textDocument/diagnostic', error)
-            },
-          })
-    const documentSyncRegistration = this.options.documentSync.controller?.register({
-      getSnapshot: () => this.context.getSnapshot(),
-      sync,
-      workspace: connection.workspace,
-    })
-    lane = {
-      connection,
-      documentSyncRegistration: documentSyncRegistration ?? null,
+    )
+    return {
+      connection: documentLane.connection,
+      subscription,
       features: options.features,
       id: options.id,
-      onApplyWorkspaceEdit: options.onApplyWorkspaceEdit,
-      pullDiagnostics,
+      onApplyWorkspaceEdit: this.options.onApplyWorkspaceEdit ?? options.onApplyWorkspaceEdit,
       onRequestError: (method, error) => {
         if (options.onRequestError) options.onRequestError(method, error)
         else this.options.onRequestError?.(options.id, method, error)
@@ -703,20 +710,34 @@ class LanguageServerContribution implements EditorViewContribution {
         if (options.onInteractiveReady) options.onInteractiveReady()
         else this.options.onInteractiveReady?.()
       },
-      sync,
+      sync: documentLane.sync,
     }
-    void connection.ready.catch(() => undefined)
-    return lane
   }
 
-  private syncReadyLane(lane: ViewLanguageServerLane): void {
-    if (this.disposed) return
+  /**
+   * Nothing is on screen before the controller exists, so `)` closes a signature that was never
+   * shown and loads nothing. An opening `(` or a `,` is the first keystroke that needs it.
+   */
+  private handleTypedText(text: string): void {
+    if (this.signatureHelp) {
+      this.signatureHelp.handleTypedText(text)
+      return
+    }
 
-    const snapshot = this.context.getSnapshot()
-    if (!lane.sync.shouldSync('document', snapshot)) return
-    lane.sync.sync(snapshot, null)
-    lane.pullDiagnostics?.synchronize()
-    this.syncSemanticTokens(snapshot, 'document')
+    const trigger = signatureHelpTriggerFromTypedText(text)
+    if (!trigger || trigger.kind === 'close') return
+
+    void this.loadSignatureHelp().then((controller) => controller.handleTypedText(text))
+  }
+
+  private loadSignatureHelp(): Promise<SignatureHelpController> {
+    this.signatureHelpLoad ??= import('./signatureHelpController').then((module) => {
+      const controller = new module.SignatureHelpController(this.signatureHelpOptions)
+      this.signatureHelp = controller
+      if (this.disposed) controller.dispose()
+      return controller
+    })
+    return this.signatureHelpLoad
   }
 
   private syncSemanticTokens(
@@ -802,7 +823,7 @@ class LanguageServerContribution implements EditorViewContribution {
         'textDocument/rename',
         {
           newName: nextName,
-          position: offsetToLspPosition(active.fullText, offset),
+          position: offsetToLspPositionInSnapshot(active, offset),
           textDocument: { uri: active.uri },
         },
         { signal: abort.signal },
@@ -831,10 +852,10 @@ class LanguageServerContribution implements EditorViewContribution {
     owner: LanguageServerSetLane,
     signal: AbortSignal,
   ): Promise<{ readonly range: OffsetRange; readonly currentName: string } | null> {
-    const fallback = wordRangeAtOffset(active.fullText, offset)
+    const fallback = rangeAroundOffset(active, offset, wordRangeAtOffset)
     const provider = owner.connection.client.serverCapabilities?.renameProvider
     const supportsPrepare = typeof provider === 'object' && provider.prepareProvider === true
-    if (!supportsPrepare) return renameTarget(active.fullText, fallback)
+    if (!supportsPrepare) return renameTarget(active, fallback)
 
     const result = await this.servers.requestSingle<
       lsp.TextDocumentPositionParams,
@@ -843,21 +864,21 @@ class LanguageServerContribution implements EditorViewContribution {
       owner,
       'textDocument/prepareRename',
       {
-        position: offsetToLspPosition(active.fullText, offset),
+        position: offsetToLspPositionInSnapshot(active, offset),
         textDocument: { uri: active.uri },
       },
       { signal },
       null,
     )
     if (!result) return null
-    if ('defaultBehavior' in result) return renameTarget(active.fullText, fallback)
+    if ('defaultBehavior' in result) return renameTarget(active, fallback)
 
     const protocolRange = 'range' in result ? result.range : result
     const range = {
-      start: lspPositionToOffset(active.fullText, protocolRange.start),
-      end: lspPositionToOffset(active.fullText, protocolRange.end),
+      start: lspPositionToOffsetInSnapshot(active, protocolRange.start),
+      end: lspPositionToOffsetInSnapshot(active, protocolRange.end),
     }
-    const target = renameTarget(active.fullText, range)
+    const target = renameTarget(active, range)
     if (!target || !('placeholder' in result)) return target
 
     return { ...target, currentName: result.placeholder }
@@ -895,6 +916,7 @@ class LanguageServerContribution implements EditorViewContribution {
       classNamespace: this.options.hoverDefinition.tooltipClassNamespace ?? 'lsp-plugin',
       document: this.context.container.ownerDocument,
       themeSource: this.context.scrollElement,
+      returnFocus: () => this.context.focusEditor(),
     })
     return this.rename
   }
@@ -992,11 +1014,11 @@ class LanguageServerContribution implements EditorViewContribution {
       // The document can change while the formatter runs; its edits describe the text it was given.
       if (active !== this.activeDocument()) return
 
-      const converted = prepareFormattingEdits(active.fullText, edits)
+      const converted = prepareFormattingEdits(active, edits)
       if (converted.length === 0) return
-      if (!formattingChangesText(active.fullText, converted)) return
+      if (!formattingChangesText(active.textSnapshot, converted)) return
 
-      this.applyFormattingEdits(converted)
+      this.applyFormattingEdits(converted, active.textSnapshot.length)
     } catch (error) {
       this.handleRequestError(error)
     }
@@ -1010,11 +1032,15 @@ class LanguageServerContribution implements EditorViewContribution {
    * wholesale, and an offset that survives is closer to where the user was looking than a position
    * mapped through a rewrite of the whole file.
    */
-  private applyFormattingEdits(edits: readonly TextEdit[]): void {
-    const feature = this.context.getFeature?.(this.options.completion.editFeature)
+  private applyFormattingEdits(edits: readonly TextEdit[], previousLength: number): void {
+    const feature = this.context.getFeature(this.options.completion.editFeature)
     if (!feature) return
 
-    const head = this.context.getSnapshot().selections[0]?.headOffset ?? 0
+    const length = edits.reduce(
+      (size, edit) => size + edit.text.length - (edit.to - edit.from),
+      previousLength,
+    )
+    const head = Math.min(this.context.getSnapshot().selections[0]?.headOffset ?? 0, length)
     feature.applyCompletion({ edits, selection: { anchor: head, head } })
   }
 
@@ -1025,10 +1051,11 @@ class LanguageServerContribution implements EditorViewContribution {
 }
 
 function renameTarget(
-  text: string,
+  document: LspTextDocumentSnapshot,
   range: OffsetRange,
 ): { readonly range: OffsetRange; readonly currentName: string } | null {
-  const currentName = text.slice(range.start, range.end)
+  if (range.end <= range.start) return null
+  const currentName = document.textSnapshot.readRange(range.start, range.end)
   if (currentName.length === 0) return null
   return { currentName, range }
 }
@@ -1039,7 +1066,6 @@ function resolveAdapterOptions(
   return {
     name: options.name,
     lanes: [resolvedLaneFromAdapterOptions(options)],
-    defaultHighlightPrefix: options.defaultHighlightPrefix ?? DEFAULT_HIGHLIGHT_PREFIX,
     documentSync: options.documentSync ?? {},
     diagnostics: resolveDiagnosticsOptions(options),
     completion: resolveCompletionOptions(options),
@@ -1049,6 +1075,7 @@ function resolveAdapterOptions(
     semanticTokens: options.semanticTokens ? () => options.semanticTokens! : undefined,
     onDiagnostics: options.onDiagnostics,
     onDidNavigateDiagnostic: options.onDidNavigateDiagnostic,
+    getDiagnosticActions: options.getDiagnosticActions,
     onDefinitionLinkHover: options.onDefinitionLinkHover,
     onOpenDefinition: options.onOpenDefinition,
     onOpenReferences: options.onOpenReferences,
@@ -1064,14 +1091,19 @@ function resolveLanguageServerSetOptions(
 ): LanguageServerResolvedAdapterOptions {
   return {
     name: DEFAULT_PLUGIN_NAME,
-    lanes: options.lanes.map((lane) =>
-      resolveLanguageServerLaneOptions({
-        ...lane,
-        onApplyWorkspaceEdit: options.onApplyWorkspaceEdit,
-      }),
-    ),
-    defaultHighlightPrefix: DEFAULT_HIGHLIGHT_PREFIX,
-    documentSync: options.documentSync ?? {},
+    document: options.document,
+    lanes: options.document
+      ? options.document.lanes.map((lane) => lane.options)
+      : options.lanes.map((lane) =>
+          resolveLanguageServerLaneOptions({
+            ...lane,
+            onApplyWorkspaceEdit: options.onApplyWorkspaceEdit ?? lane.onApplyWorkspaceEdit,
+            onRequestError:
+              lane.onRequestError ??
+              ((method, error) => options.onRequestError?.(lane.id, method, error)),
+          }),
+        ),
+    documentSync: options.document?.syncOptions ?? options.documentSync ?? {},
     diagnostics: resolveDiagnosticsOptions(),
     completion: resolveCompletionOptions(),
     formatOnType: true,
@@ -1080,6 +1112,7 @@ function resolveLanguageServerSetOptions(
     semanticTokens: options.semanticTokens,
     onDiagnostics: options.onDiagnostics,
     onDidNavigateDiagnostic: options.onDidNavigateDiagnostic,
+    getDiagnosticActions: options.getDiagnosticActions,
     onInteractiveReady: options.onInteractiveReady,
     onDefinitionLinkHover: options.onDefinitionLinkHover,
     onOpenDefinition: options.onOpenDefinition,
@@ -1102,6 +1135,7 @@ function languageServerLaneFromPluginOptions(
     capabilities: options.capabilities,
     clientInfo: options.clientInfo,
     notificationHandlers: options.notificationHandlers,
+    serverRequestHandlers: options.serverRequestHandlers,
     webSocketRoute: options.webSocketRoute,
     webSocketTransportOptions: options.webSocketTransportOptions,
     connectionProvider: options.connectionProvider,
@@ -1126,6 +1160,7 @@ function resolvedLaneFromAdapterOptions(
     capabilities: options.capabilities,
     clientInfo: options.clientInfo,
     notificationHandlers: options.notificationHandlers,
+    serverRequestHandlers: options.serverRequestHandlers,
     createTransport: options.createTransport,
     connectionProvider: options.connectionProvider,
     onApplyWorkspaceEdit: options.onApplyWorkspaceEdit,
@@ -1235,7 +1270,22 @@ const LANGUAGE_SERVER_COMMANDS: readonly LanguageServerCommandSpec[] = [
     id: 'editor.action.marker.prev',
     run: (state) => state.moveDiagnosticMarker('previous'),
   },
+  ...keyCommandSpecs(COMPLETION_KEY_COMMANDS, (target, command) =>
+    target.completionCommand(command),
+  ),
+  ...keyCommandSpecs(SIGNATURE_HELP_KEY_COMMANDS, (target, command) =>
+    target.signatureHelpCommand(command),
+  ),
 ]
+
+/** The completion list and signature hint, driven by the keymap rather than by raw keys. */
+function keyCommandSpecs<Command extends string>(
+  ids: Readonly<Record<Command, EditorCommandId>>,
+  run: (target: LanguageServerCommandTarget, command: Command) => boolean,
+): readonly LanguageServerCommandSpec[] {
+  const commands = Object.keys(ids) as Command[]
+  return commands.map((command) => ({ id: ids[command], run: (target) => run(target, command) }))
+}
 
 function isAbortError(error: unknown): boolean {
   if (error instanceof DOMException && error.name === 'AbortError') return true

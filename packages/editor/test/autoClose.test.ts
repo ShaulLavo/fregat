@@ -472,12 +472,21 @@ describe('auto-closing pairs', () => {
     expect(editor.materializeFullText()).toBe('"\nbar"')
   })
 
-  it('does not auto-close in a language with no pairs', () => {
+  it('auto-closes in a language with no entry of its own', () => {
     editor.openDocument({ documentId: 'notes.txt', languageId: null, text: '' })
 
     type('(')
 
-    expect(editor.materializeFullText()).toBe('(')
+    expect(editor.materializeFullText()).toBe('()')
+  })
+
+  // The reason quotes used to be left out of the unknown-language set, handled where it belongs.
+  it('keeps an apostrophe after a word in a language with no entry of its own', () => {
+    editor.openDocument({ documentId: 'notes.txt', languageId: null, text: '' })
+
+    for (const character of "don't") type(character)
+
+    expect(editor.materializeFullText()).toBe("don't")
   })
 
   it('undoes the whole pair in one step', () => {

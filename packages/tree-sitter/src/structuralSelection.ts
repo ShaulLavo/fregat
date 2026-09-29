@@ -6,7 +6,7 @@ import {
   type PieceTableAnchor,
   resolveSelection,
   type SelectionSet,
-} from '@singapore-editor/core/internal'
+} from '@singapore-editor/core/document'
 import type { TreeSitterBackend } from './treeSitter/workerClient'
 import type {
   TreeSitterLanguageId,

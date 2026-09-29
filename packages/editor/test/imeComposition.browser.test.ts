@@ -125,7 +125,8 @@ describe.skipIf(typeof globalThis.Highlight === 'undefined')(
       const offset = 40 * (line.length + 1) + 36
       view.setText(text)
       view.setScrollMetrics(760, 120, 360, 160)
-      const { inputElement: input, scrollElement: scroller } = view
+      const { scrollElement: scroller } = view
+      const input = view.inputElement as HTMLTextAreaElement
       scroller.scrollLeft = 160
       view.setSelection(offset, offset)
       await browserFrames(2)
@@ -178,7 +179,7 @@ describe.skipIf(typeof globalThis.Highlight === 'undefined')(
       expect(nativeScrollTop).toBeGreaterThan(0)
       expect(nativeScrollTop).toBeLessThan(10_000_000)
       expect(document.activeElement).toBe(view.inputElement)
-      const input = expectInputAtCaret(container, view.inputElement)
+      const input = expectInputAtCaret(container, view.inputElement as HTMLTextAreaElement)
       expect(
         Math.abs(input.top - view.scrollElement.getBoundingClientRect().top),
       ).toBeLessThanOrEqual(1)

@@ -1,23 +1,21 @@
+import type { SelectionAffinity, TextEdit } from '@singapore-editor/core/document'
 import type {
-  DocumentSessionChange,
-  SelectionAffinity,
-  TextEdit,
-} from '@singapore-editor/core/document'
-import type {
+  EditorContributionChange,
   EditorEditContributionContext,
   EditorSelectionRange,
 } from '@singapore-editor/core/extensions'
 import { createEditorCapabilityToken } from '@singapore-editor/core/extensions'
-import { lspPositionToOffset } from '@singapore-editor/lsp'
+import { lspPositionToOffsetInSnapshot, type LspTextDocumentSnapshot } from '@singapore-editor/lsp'
 import type * as lsp from 'vscode-languageserver-protocol'
 import {
   parseSnippet,
   snippetInitialSelection,
   type ParsedSnippet,
   type SnippetRange,
-} from '@singapore-editor/core/internal'
+} from '@singapore-editor/core/extensions'
 
-import { createAnchoredSurface } from '@singapore-editor/plugin-ui'
+import { createAnchoredSurface } from '@singapore-editor/plugin-ui/anchored-surface'
+import { rangeAroundOffset, textReadSnapshotOf } from './sourceText'
 import { fuzzyMatch, looseFuzzyMatch, type FuzzyMatch } from './fuzzyMatch'
 
 export const LANGUAGE_SERVER_COMPLETION_EDIT_FEATURE_ID = 'editor.lsp-plugin.completion-edit'
@@ -101,6 +99,7 @@ const COMPLETION_WIDGET_CLASS_NAMESPACE = 'lsp-plugin'
 const COMPLETION_TRIGGER_CHARACTERS = new Set(['.', '"', "'", '`', '/', '@', '<', '#'])
 const COMPLETION_THEME_VARIABLES = [
   '--editor-background',
+  '--editor-popup-background',
   '--editor-foreground',
   '--editor-caret-color',
 ] as const
@@ -225,7 +224,7 @@ export function completionListResult(
 }
 
 export function completionTriggerFromChange(
-  change: DocumentSessionChange | null,
+  change: EditorContributionChange | null,
 ): LanguageServerCompletionTrigger | null {
   if (!change || change.kind !== 'edit') return null
   if (change.edits.length !== 1) return null
@@ -263,15 +262,15 @@ function typedCharacter(edit: TextEdit): string | null {
 
 /** The text a request went out with, which is the frame every range on an item is read in. */
 export type CompletionApplicationDocument = {
-  readonly text: string
+  readonly document: LspTextDocumentSnapshot
   readonly offset: number
 }
 
 /**
  * The document an accepted item is applied against.
  *
- * `text` and `offset` are what the request went out with, and the item's ranges are positions in
- * that text. `caretOffset` and `caretAffinity` are where the caret has reached since — rarely the
+ * `document` and `offset` are what the request went out with, and the item's ranges are positions
+ * in that text. `caretOffset` and `caretAffinity` are where the caret has reached since — rarely the
  * same position, because the widget stays up while the user keeps typing.
  */
 export type CompletionApplicationRequest = CompletionApplicationDocument & {
@@ -343,7 +342,7 @@ export function createCompletionEditFeature(
       context.applyEdits(application.edits, timingName, application.selection)
       // Started after the edit so the ranges refer to the text now in the document. A host without
       // the hook simply leaves the caret on the first placeholder.
-      if (application.snippetStops) context.startSnippetSession?.(application.snippetStops)
+      if (application.snippetStops) context.startSnippetSession(application.snippetStops)
       context.focusEditor()
       return true
     },
@@ -370,7 +369,7 @@ function createCompletionWidgetElement(
     borderRadius: '6px',
     boxSizing: 'border-box',
     background:
-      'color-mix(in srgb, var(--editor-background, #18181b) 96%, var(--editor-foreground, #e4e4e7) 4%)',
+      'var(--editor-popup-background, color-mix(in srgb, var(--editor-background, #18181b) 96%, var(--editor-foreground, #e4e4e7) 4%))',
     color: 'var(--editor-foreground, #e4e4e7)',
     boxShadow: '0 12px 30px color-mix(in srgb, var(--editor-background, #000000) 60%, transparent)',
     font: '12px/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
@@ -547,7 +546,11 @@ function syncEditorThemeVariables(element: HTMLElement, source: HTMLElement): vo
 
   for (const variable of COMPLETION_THEME_VARIABLES) {
     const value = style.getPropertyValue(variable)
-    if (value) element.style.setProperty(variable, value)
+    if (value) {
+      element.style.setProperty(variable, value)
+      continue
+    }
+    element.style.removeProperty(variable)
   }
 }
 
@@ -564,7 +567,7 @@ function completionPrimaryEdit(
   const textEdit = completionTextEdit(item)
   const range = textEdit
     ? completionEditRange(request, textEdit.range)
-    : defaultCompletionReplacementRange(request.text, request.offset)
+    : defaultCompletionReplacementRange(request.document, request.offset)
   if (!range) return null
 
   const source = textEdit ? textEdit.newText : (item.insertText ?? item.label)
@@ -573,7 +576,9 @@ function completionPrimaryEdit(
   // placeholder it is meant to select.
   const snippet =
     item.insertTextFormat === 2
-      ? parseSnippet(source, { insertion: { documentText: request.text, offset: range.start } })
+      ? parseSnippet(source, {
+          insertion: { textSnapshot: textReadSnapshotOf(request.document), offset: range.start },
+        })
       : null
 
   return {
@@ -609,8 +614,8 @@ function completionEditRange(
 ): { readonly start: number; readonly end: number } | null {
   if (range.start.line !== range.end.line) return null
 
-  const start = lspPositionToOffset(request.text, range.start)
-  const end = lspPositionToOffset(request.text, range.end)
+  const start = lspPositionToOffsetInSnapshot(request.document, range.start)
+  const end = lspPositionToOffsetInSnapshot(request.document, range.end)
   if (start > request.offset || end < request.offset) return null
 
   return { start, end }
@@ -621,8 +626,8 @@ function additionalCompletionEdits(
   edits: readonly lsp.TextEdit[],
 ): readonly TextEdit[] {
   return edits.map((edit) => {
-    const from = lspPositionToOffset(request.text, edit.range.start)
-    const to = lspPositionToOffset(request.text, edit.range.end)
+    const from = lspPositionToOffsetInSnapshot(request.document, edit.range.start)
+    const to = lspPositionToOffsetInSnapshot(request.document, edit.range.end)
     // An import edit above the caret is unmoved; one below it addresses text the typing has already
     // pushed along.
     const shift = from < request.offset ? 0 : request.caretOffset - request.offset
@@ -640,13 +645,18 @@ function completionSelectionHead(primary: TextEdit, additional: readonly TextEdi
 }
 
 function defaultCompletionReplacementRange(
-  text: string,
+  document: LspTextDocumentSnapshot,
   offset: number,
 ): { readonly start: number; readonly end: number } {
-  let start = Math.max(0, Math.min(offset, text.length))
+  const clamped = Math.max(0, Math.min(offset, document.textSnapshot.length))
+  return rangeAroundOffset(document, clamped, identifierRunAt)
+}
+
+function identifierRunAt(text: string, offset: number): { start: number; end: number } {
+  let start = offset
   while (start > 0 && isIdentifierCharacter(text[start - 1] ?? '')) start -= 1
 
-  let end = Math.max(0, Math.min(offset, text.length))
+  let end = offset
   while (end < text.length && isIdentifierCharacter(text[end] ?? '')) end += 1
   return { start, end }
 }

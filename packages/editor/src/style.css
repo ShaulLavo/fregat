@@ -50,8 +50,9 @@
 
   flex: 1;
   overflow: auto;
-  font-size: 13px;
-  font-family: monospace;
+  /* Written by the editor from its `fontSize` and `fontFamily` options. */
+  font-size: var(--editor-font-size, 13px);
+  font-family: var(--editor-font-family, monospace);
   white-space: pre;
   tab-size: var(--editor-tab-size, 4);
   color: var(--editor-foreground);
@@ -95,13 +96,16 @@
   --editor-syntax-variable: #e4e4e7;
   --editor-syntax-variable-builtin: #fdba74;
   --editor-gutter-width: 0px;
+  /* Written by the editor from `gutterLeadingInset`; part of `--editor-gutter-width`. */
+  --editor-gutter-inset: 0px;
   --editor-row-height: 24px;
 
   flex: 1;
   position: relative;
   overflow: auto;
-  font-size: 13px;
-  font-family: monospace;
+  /* Written by the editor from its `fontSize` and `fontFamily` options. */
+  font-size: var(--editor-font-size, 13px);
+  font-family: var(--editor-font-family, monospace);
   line-height: var(--editor-row-height);
   white-space: pre;
   tab-size: var(--editor-tab-size, 4);
@@ -180,12 +184,19 @@
   justify-content: flex-start;
   line-height: var(--editor-row-height);
   left: 0;
+  /* Lanes start after the leading inset; the row's own background still covers it. */
+  padding-left: var(--editor-gutter-inset);
   position: absolute;
   right: 0;
   /* Same WebKit highlight-invalidation workaround as .editor-virtualized-row. */
   will-change: transform;
   top: 0;
   user-select: none;
+}
+
+/* `display: flex` above beats the UA [hidden] rule, and a retired row keeps its old position. */
+.editor-virtualized-gutter-row[hidden] {
+  display: none;
 }
 
 .editor-virtualized-gutter-cell {
@@ -204,8 +215,24 @@
   line-height: inherit;
 }
 
+/* The gutter passes presses through to the text; an interactive contribution's cell takes them. */
+.editor-virtualized-gutter-cell[data-editor-gutter-interactive] {
+  pointer-events: auto;
+}
+
 .editor-virtualized-gutter-cell.editor-virtualized-cursor-line-gutter {
   background: var(--editor-cursor-line-gutter-background);
+}
+
+/* With every lane highlighted, the band reaches the gutter's edge through the leading inset. */
+.editor-virtualized-cursor-line-gutter-band::before {
+  background: var(--editor-cursor-line-gutter-background);
+  bottom: 0;
+  content: '';
+  left: 0;
+  position: absolute;
+  top: 0;
+  width: var(--editor-gutter-inset);
 }
 
 .editor-virtualized-gutter-cell.editor-virtualized-cursor-line-gutter[hidden] {
@@ -295,7 +322,7 @@
 }
 
 .editor-virtualized-selection-range {
-  background-color: rgba(56, 189, 248, 0.35);
+  background-color: var(--editor-selection-background, rgba(56, 189, 248, 0.35));
   height: calc(var(--editor-row-height) - 1px);
   position: absolute;
   top: 0.5px;
@@ -368,6 +395,8 @@
   resize: none;
   top: 0;
   -webkit-text-fill-color: transparent;
+  /* An EditContext host shows the window as text; its breaks are the document's lines. */
+  white-space: pre;
   width: 1px;
 }
 
@@ -484,7 +513,6 @@
 .editor-merge-conflict-lens-layer {
   height: 0;
   left: 0;
-  pointer-events: none;
   position: absolute;
   right: 0;
   top: 0;
@@ -499,7 +527,6 @@
   height: var(--editor-row-height);
   left: var(--editor-gutter-width);
   line-height: var(--editor-row-height);
-  pointer-events: auto;
   position: absolute;
   top: 0;
   user-select: none;
@@ -528,4 +555,23 @@
 
 .editor-merge-conflict-lens-separator {
   padding: 0 0.5em;
+}
+
+.editor:not(:focus-within) .editor-virtualized-selection-range {
+  background-color: var(
+    --editor-selection-inactive-background,
+    var(--editor-selection-background, rgba(56, 189, 248, 0.35))
+  );
+}
+
+/* A modal editor's caret: the block covers one cell, the underline sits under it. */
+.editor-virtualized[data-editor-cursor-style='block'] .editor-virtualized-caret {
+  opacity: 0.6;
+  width: 1ch;
+}
+
+.editor-virtualized[data-editor-cursor-style='underline'] .editor-virtualized-caret {
+  height: 2px !important;
+  margin-top: calc(var(--editor-row-height) - 2px);
+  width: 1ch;
 }

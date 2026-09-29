@@ -227,7 +227,7 @@ function grammarSelectionRangePlugin(): EditorPlugin {
   return {
     name: 'test.grammar-selection-ranges',
     activate: (context) =>
-      context.registerSelectionRangeProvider?.(({ folds }) =>
+      context.registerSelectionRangeProvider(({ folds }) =>
         folds.map((fold) => ({ start: fold.startIndex, end: fold.endIndex })),
       ),
   }

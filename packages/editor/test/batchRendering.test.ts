@@ -8,6 +8,7 @@ import {
 import type { Editor, EditorOptions } from '../src/editor'
 import type { EditorPlugin, EditorViewSnapshot } from '../src/plugins'
 import { setHighlightRegistry } from '../src/public/testing'
+import { readAll } from './factories/snapshotText'
 import { createVisibleEditor } from './factories/visibleEditor'
 
 const editors: Editor[] = []
@@ -70,8 +71,9 @@ test('a batch refreshes injected row providers against the final snapshot throug
     activate: (context) =>
       context.registerInjectedTextRowProvider({
         getInjectedTextRows: (provider) => {
-          providerTexts.push(provider.text)
-          const anchorBufferRow = provider.text.split('\n').indexOf('body')
+          const text = readAll(provider.textSnapshot)
+          providerTexts.push(text)
+          const anchorBufferRow = text.split('\n').indexOf('body')
           if (anchorBufferRow < 0) return []
           return [
             {
@@ -195,7 +197,7 @@ test('batch contributions see matching final text, tokens, folds and mounted row
   expect(changes).toEqual([2])
   expect(snapshots.length).toBeGreaterThan(0)
   for (const snapshot of snapshots) {
-    expect(snapshot.fullText).toBe(`X${text}Y`)
+    expect(readAll(snapshot.textSnapshot)).toBe(`X${text}Y`)
     expect(snapshot.tokens.toTokens()).toEqual([{ start: 6, end: 10, style: { color: 'red' } }])
     expect(snapshot.visibleRows[0]?.text).toBe('Xhead')
   }

@@ -4,13 +4,14 @@ import type {
 } from '@singapore-editor/core/extensions'
 import {
   lspPositionToOffsetInSnapshot,
-  offsetToLspPosition,
+  offsetToLspPositionInSnapshot,
   type LspTextDocumentSnapshot,
 } from '@singapore-editor/lsp'
 import type * as lsp from 'vscode-languageserver-protocol'
 
-import type { OffsetRange } from '@singapore-editor/plugin-ui'
+import type { OffsetRange } from '@singapore-editor/plugin-ui/offset-range'
 import type { ActiveDocument } from './pluginTypes'
+import { characterAt, rowBounds } from './sourceText'
 import {
   type LanguageServerCodeActionProvenance,
   type LanguageServerCodeActionRouter,
@@ -73,20 +74,21 @@ export function preferredQuickFix(
  * indented. A drawn selection always asks, because the user pointed at something.
  */
 export function codeActionAutoTriggerRange(
-  text: string,
+  document: LspTextDocumentSnapshot,
   start: number,
   end: number,
 ): OffsetRange | null {
   if (start !== end) return { start, end }
 
-  const lineStart = text.lastIndexOf('\n', start - 1) + 1
-  const lineBreak = text.indexOf('\n', start)
-  const lineEnd = lineBreak === -1 ? text.length : lineBreak
-  if (lineEnd === lineStart) return null
-  if (start === lineStart) return isWhitespace(text[lineStart]) ? null : { start, end }
-  if (start === lineEnd) return isWhitespace(text[lineEnd - 1]) ? null : { start, end }
+  const line = rowBounds(document, start)
+  if (line.end === line.start) return null
+  if (start === line.start)
+    return isWhitespace(characterAt(document, start)) ? null : { start, end }
+  if (start === line.end)
+    return isWhitespace(characterAt(document, start - 1)) ? null : { start, end }
 
-  return isWhitespace(text[start - 1]) && isWhitespace(text[start]) ? null : { start, end }
+  const around = document.textSnapshot.readRange(start - 1, start + 1)
+  return isWhitespace(around[0]) && isWhitespace(around[1]) ? null : { start, end }
 }
 
 export type CodeActionControllerOptions = {
@@ -206,11 +208,7 @@ export class CodeActionController {
     const selection = this.options.context.getSnapshot().selections[0]
     if (!selection) return
 
-    const range = codeActionAutoTriggerRange(
-      active.fullText,
-      selection.startOffset,
-      selection.endOffset,
-    )
+    const range = codeActionAutoTriggerRange(active, selection.startOffset, selection.endOffset)
     if (!range) return
 
     const abort = new AbortController()
@@ -230,8 +228,8 @@ export class CodeActionController {
             triggerKind: CODE_ACTION_TRIGGER_AUTOMATIC,
           },
           range: {
-            end: offsetToLspPosition(active.fullText, range.end),
-            start: offsetToLspPosition(active.fullText, range.start),
+            end: offsetToLspPositionInSnapshot(active, range.end),
+            start: offsetToLspPositionInSnapshot(active, range.start),
           },
           textDocument: { uri: active.uri },
         },

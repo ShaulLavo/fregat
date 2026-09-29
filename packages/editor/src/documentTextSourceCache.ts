@@ -1,25 +1,50 @@
-import type { PieceBufferId } from '@singapore-editor/textbuffer'
-import type { PieceTableBuffers } from '@singapore-editor/textbuffer/internal/pieceTableTypes'
-import { TextSourceIndex } from './textMeasurements'
+import type { TextPageOwner } from '@singapore-editor/textbuffer/internal/textPages'
+import { TextSourceIndex, type MeasuredTextRange } from './textMeasurements'
 
-// One cache per document lineage, not per version. Editing and undo keep reuse intact.
-const sourceIndexes = new WeakMap<object, Map<PieceBufferId, TextSourceIndex>>()
+const SOURCE_PAGE_LENGTH = 16 * 1024
+type CachedRange = {
+  readonly start: number
+  readonly end: number
+  readonly source: TextSourceIndex
+}
+const sourcePages = new WeakMap<object, Map<number, CachedRange[]>>()
 
-export function getDocumentTextSourceIndex(
-  buffers: PieceTableBuffers,
-  buffer: PieceBufferId,
+// Pages borrow until storage maintenance retires their backing; sparse spans already own it.
+export function appendDocumentTextMeasurements(
+  ranges: MeasuredTextRange[],
+  owner: TextPageOwner,
   text: string,
+  start: number,
+  end: number,
+): void {
+  let pages = sourcePages.get(owner)
+  if (!pages) {
+    pages = new Map()
+    sourcePages.set(owner, pages)
+  }
+  for (let offset = start; offset < end;) {
+    const pageStart = Math.floor(offset / SOURCE_PAGE_LENGTH) * SOURCE_PAGE_LENGTH
+    const to = Math.min(end, pageStart + SOURCE_PAGE_LENGTH)
+    const cached = pages.get(pageStart) ?? []
+    const source = measuredSource(cached, owner, text, offset, to)
+    pages.set(pageStart, cached)
+    ranges.push({ source, start: 0, end: to - offset })
+    offset = to
+  }
+}
+
+function measuredSource(
+  cached: CachedRange[],
+  owner: TextPageOwner,
+  text: string,
+  start: number,
+  end: number,
 ): TextSourceIndex {
-  let indexes = sourceIndexes.get(buffers.identity)
-  if (!indexes) {
-    indexes = new Map()
-    sourceIndexes.set(buffers.identity, indexes)
-  }
-  let source = indexes.get(buffer)
-  // Undo branches may reuse a buffer ID for different text. Retained ranges keep the old index.
-  if (source?.text !== text) {
-    source = new TextSourceIndex(text)
-    indexes.set(buffer, source)
-  }
+  const found = cached.find((range) => range.start === start && range.end === end)
+  if (found) return found.source
+  const source = new TextSourceIndex(owner.page(text, start, end))
+  // An insertion splits one original page into two reusable ranges; cap boundary variants.
+  if (cached.length === 2) cached.shift()
+  cached.push({ start, end, source })
   return source
 }

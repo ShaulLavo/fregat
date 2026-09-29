@@ -1,8 +1,9 @@
 # Editor backlog plan contract
 
-These plans began with proposals commissioned on 2026-09-05. They authorize planning, not implementation
-or publication. Platform's [cross-project roadmap](../../platform/PLAN.md) remains the execution
-scheduler. The Editor backlog index recommends an order without scheduling work.
+These plans began with proposals commissioned on 2026-09-05. A plan the owner asks for is approved
+work: its status is `Approved` and it is written for execution. `Idea` is only for a plan the
+owner explicitly calls an idea or is unsure about. Platform's [cross-project roadmap](../../platform/PLAN.md)
+remains the execution scheduler. The Editor backlog index recommends an order without scheduling work.
 
 ## Write a plan another engineer can execute
 
@@ -57,9 +58,10 @@ and the verifier. Plan authors edit only their assigned plan files and report an
 changes to the root author. Run the backlog verifier after changes to the inventory or plans.
 
 Schema version 2 keeps executable entries under `file`. Only an entry with status `Completed`
-uses `reference` instead, pointing to a Markdown document outside `plans/` with a relative path
-such as `../docs/performance/input-latency.md`. A completed entry must not contain `file`;
-other statuses must not contain `reference` and retain every executable-plan check.
+or `Moved` uses `reference` instead, pointing to a Markdown document outside `plans/` with a
+relative path such as `../docs/performance/input-latency.md`. A `Moved` entry's reference is the
+plan that owns the work now, such as a Platform plan. Neither may contain `file`; other statuses
+must not contain `reference` and retain every executable-plan check.
 
 After the completion checks pass, move lasting contracts and evidence into the reference document
 and delete the executable plan. Preserve its ID, metadata, dependencies, and original topics in

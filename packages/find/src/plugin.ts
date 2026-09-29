@@ -1,10 +1,8 @@
+import { compareTextOffsetRanges, type DocumentSyncPoint } from '@singapore-editor/core/document'
 import {
-  compareTextOffsetRanges,
-  createStringTextSnapshot,
-  type DocumentSessionChange,
-  type DocumentSyncPoint,
-} from '@singapore-editor/core/document'
-import { projectDecorationRangeThroughEdits } from '@singapore-editor/core/extensions'
+  type EditorContributionChange,
+  projectDecorationRangeThroughEdits,
+} from '@singapore-editor/core/extensions'
 import type {
   EditorCapabilityContribution,
   EditorCapabilityContributionContext,
@@ -41,12 +39,7 @@ import {
   type FindTrackedRanges,
 } from './findController'
 import { EditorFindWidget, type EditorFindWidgetOptions } from './findWidget'
-import {
-  arrayFindLineStartsView,
-  type FindLineStartsView,
-  type FindRange,
-  type FindTextSource,
-} from './search'
+import { type FindLineStartsView, type FindRange, type FindTextSource } from './search'
 import type { EditorFindOptions } from './types'
 
 export { EDITOR_FIND_FEATURE, EDITOR_FIND_FEATURE_ID }
@@ -96,9 +89,10 @@ export function createEditorFindContributionProviders(
 class EditorFindViewContribution implements EditorViewContribution {
   private readonly hostRegistration: EditorDisposable
   private readonly subscription: EditorDisposable
+  private readonly visibleKey: EditorDisposable
   private latestSnapshot: EditorViewSnapshot
   private widget: EditorFindWidget | null = null
-  private reservationObserver: MutationObserver | null = null
+  private reservationListener: EditorDisposable | null = null
   private paintedMatches: PaintedFindRanges | null = null
 
   public constructor(
@@ -108,15 +102,16 @@ class EditorFindViewContribution implements EditorViewContribution {
     this.latestSnapshot = context.getSnapshot()
     this.hostRegistration = controller.attachHost(
       createFindHost(context, () => this.latestSnapshot, this.trackPaintedRanges),
-      context.highlightPrefix ?? EDITOR_FIND_FEATURE_ID,
+      context.highlightPrefix,
     )
     this.subscription = controller.subscribe(this.handleUiEvent)
+    this.visibleKey = context.registerKeymapContextKey('findVisible', () => controller.isVisible())
   }
 
   public update(
     snapshot: EditorViewSnapshot,
     kind: EditorViewContributionUpdateKind,
-    change?: DocumentSessionChange | null,
+    change?: EditorContributionChange | null,
   ): void {
     if (
       kind === 'layout' ||
@@ -138,9 +133,10 @@ class EditorFindViewContribution implements EditorViewContribution {
   }
 
   public dispose(): void {
+    this.visibleKey.dispose()
     this.subscription.dispose()
-    this.reservationObserver?.disconnect()
-    this.reservationObserver = null
+    this.reservationListener?.dispose()
+    this.reservationListener = null
     this.widget?.dispose()
     this.widget = null
     this.paintedMatches = null
@@ -195,16 +191,10 @@ class EditorFindViewContribution implements EditorViewContribution {
     return this.widget
   }
 
-  // A claim staked while a layout pass is already running raises a reentrant
-  // notification the host discards, so a widget that re-read the reservation on
-  // notification alone would keep a stale inset until some unrelated layout
-  // disturbed it. Watching the surface that carries the claim makes the inset
-  // independent of the order contributions happen to run in.
   private observeReservedWidth(): void {
-    if (this.reservationObserver || typeof MutationObserver === 'undefined') return
-
-    this.reservationObserver = new MutationObserver(() => this.syncTrailingInset())
-    this.reservationObserver.observe(this.context.scrollElement, { attributeFilter: ['style'] })
+    this.reservationListener ??= this.context.onDidChangeReservedOverlayWidth((side) => {
+      if (side === 'right') this.syncTrailingInset()
+    })
   }
 
   private syncTrailingInset(): void {
@@ -217,7 +207,7 @@ class EditorFindViewContribution implements EditorViewContribution {
       scrollElement.getBoundingClientRect().left +
       scrollElement.clientLeft +
       scrollElement.clientWidth
-    const reservedWidth = this.context.getReservedOverlayWidth?.('right') ?? 0
+    const reservedWidth = this.context.getReservedOverlayWidth('right')
     this.widget.setTrailingInset(reservedWidth + Math.max(0, containerRight - viewportRight))
   }
 
@@ -300,7 +290,6 @@ class EditorFindEditContribution implements EditorEditContribution {
 
 function createFindFeature(controller: EditorFindController): EditorFindFeature {
   return {
-    isVisible: () => controller.isVisible(),
     openFind: () => controller.openFind(),
     toggleFind: () => controller.toggleFind(),
     openFindReplace: () => controller.openFindReplace(),
@@ -323,31 +312,31 @@ function createFindHost(
     hasDocument: () => context.hasDocument(),
     textSource: () => textSource(getSnapshot()),
     hasTextSnapshot: (snapshot) => getSnapshot().textSnapshot === snapshot,
-    trackRanges: (ranges) => context.trackRanges?.(ranges) ?? fixedFindRanges(ranges),
+    trackRanges: (ranges) => context.trackRanges(ranges),
     trackPaintedRanges,
     getSelections: () => findSelections(getSnapshot().selections),
     focusEditor: () => context.focusEditor(),
-    announce: (message) => context.announce?.(message),
+    announce: (message) => context.announce(message),
     setSelection: (anchor, head, timingName, options) =>
       context.setSelection(anchor, head, timingName, options),
     setSelections: (selections, timingName, revealOffset) =>
       context.setSelections(selections, timingName, revealOffset),
     setRangeHighlight: (name, ranges, style) => {
-      context.setRangeHighlight?.(name, ranges, style)
+      context.setRangeHighlight(name, ranges, style)
       minimapFeature(context)?.setDecorations(
         name,
         minimapBands(textSource(getSnapshot()).lineStartsView, ranges, style),
       )
     },
     clearRangeHighlight: (name) => {
-      context.clearRangeHighlight?.(name)
+      context.clearRangeHighlight(name)
       minimapFeature(context)?.clearDecorations(name)
     },
   }
 }
 
 function minimapFeature(context: EditorViewContributionContext): EditorMinimapFeature | null {
-  return context.getFeature?.(EDITOR_MINIMAP_FEATURE) ?? null
+  return context.getFeature(EDITOR_MINIMAP_FEATURE)
 }
 
 /**
@@ -393,13 +382,6 @@ function bandRows(
   }
 
   return { start: startIndex + 1, end: endIndex + 1 }
-}
-
-// A host that cannot follow its own edits — a static projection of a document,
-// a test double — keeps the ranges it was given, which is the best answer
-// available and one find does not have to ask about.
-function fixedFindRanges(ranges: readonly FindRange[]): FindTrackedRanges {
-  return { resolve: () => ranges }
 }
 
 /**
@@ -448,9 +430,6 @@ class PaintedFindRanges implements FindTrackedRanges {
 
   /** Answers whether the line moved, so a caller only re-reads the set when there is a reason to. */
   public repartition(snapshot: EditorViewSnapshot): boolean {
-    // A host that follows nothing has one answer for every row, so redrawing the
-    // line between them would only walk the set to reach it.
-    if (!this.context.trackRanges) return false
     return this.partition(snapshot)
   }
 
@@ -463,8 +442,7 @@ class PaintedFindRanges implements FindTrackedRanges {
     this.carryElsewhereForward(snapshot)
     const ranges = this.resolve()
     const painted = ranges.filter((range) => overlapsSpan(range, span))
-    const tracked =
-      painted.length === 0 ? null : (this.context.trackRanges?.(painted, MATCH_BIAS) ?? null)
+    const tracked = painted.length === 0 ? null : this.context.trackRanges(painted, MATCH_BIAS)
 
     this.span = span
     this.tracked = tracked
@@ -570,11 +548,11 @@ function snapshotTextSource(): (snapshot: EditorViewSnapshot) => FindTextSource 
 }
 
 function findTextSource(snapshot: EditorViewSnapshot): FindTextSource {
-  const text = snapshot.textSnapshot ?? createStringTextSnapshot(snapshot.fullText)
+  const text = snapshot.textSnapshot
   return {
     length: text.length,
     readRange: (start, end) => text.readRange(start, end),
-    lineStartsView: snapshot.lineStartsView ?? arrayFindLineStartsView(snapshot.lineStarts),
+    lineStartsView: snapshot.lineStartsView,
   }
 }
 

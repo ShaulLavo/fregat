@@ -1,6 +1,6 @@
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
-import { createStringTextSnapshot } from '@singapore-editor/core/document'
-import type { EditorCommandId } from '@singapore-editor/core/editor'
+import { createStringTextSnapshot, type TextReadSnapshot } from '@singapore-editor/core/document'
+import type { EditorAnyCommandId } from '@singapore-editor/core/editor'
 import type {
   DocumentSessionChange,
   DocumentSyncPoint,
@@ -14,7 +14,6 @@ import type {
   EditorLanguageFeatureSelector,
   EditorLanguageFeatureToken,
   EditorMinimapFeature,
-  EditorPluginContext,
   EditorViewContribution,
   EditorViewContributionContext,
   EditorViewContributionProvider,
@@ -23,7 +22,7 @@ import type {
 } from '@singapore-editor/core/extensions'
 import { EDITOR_MINIMAP_FEATURE } from '@singapore-editor/core/extensions'
 import type { LspClient, LspWebSocketLike, LspWorkerLike } from '@singapore-editor/lsp'
-import { semanticTokensClientCapability } from '@singapore-editor/lsp'
+import { LspServerExitedError, semanticTokensClientCapability } from '@singapore-editor/lsp'
 import {
   createHoverPlugin,
   HOVER_REQUEST_DEBOUNCE_MS,
@@ -31,8 +30,19 @@ import {
   type HoverPluginOptions,
 } from '@singapore-editor/plugin-ui'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { LspConnectionPool } from '@singapore-editor/lsp-plugin'
 import type * as lsp from 'vscode-languageserver-protocol'
-import { createTypeScriptLspPlugin, type TypeScriptLspDiagnosticSummary } from '../src'
+import {
+  createTypeScriptLspPlugin,
+  TypeScriptLspWorkspace,
+  type TypeScriptLspDiagnosticSummary,
+} from '../src'
+import {
+  createTestEditContributionContext,
+  createTestKeymap,
+  createTestPluginContext,
+  createTestViewContributionContext,
+} from '@singapore-editor/core/testing'
 
 type Listener = (event: Event) => void
 type JsonMessage = Record<string, unknown>
@@ -143,6 +153,116 @@ describe('createTypeScriptLspPlugin', () => {
   afterEach(() => {
     vi.useRealTimers()
     document.body.replaceChildren()
+  })
+
+  it.each([
+    { documentId: 'README.md', languageId: 'typescript' },
+    { documentId: 'src/index.ts', languageId: 'markdown' },
+  ])(
+    'keeps default document filters when options are explicitly undefined: $documentId/$languageId',
+    async (snapshot) => {
+      const worker = new FakeWorker()
+      const plugin = createTypeScriptLspPlugin({
+        workerFactory: () => worker,
+        documentSync: { shouldSyncUri: undefined, shouldSyncLanguageId: undefined },
+      })
+      const provider = activatePlugin(plugin)
+      const contribution = provider.createContribution(
+        viewContributionContext(editorSnapshot(snapshot)),
+      )
+      worker.receive(initializeResponse(message(worker.sent[0])))
+      await flushPromises()
+      expect(sentMethods(worker)).not.toContain('textDocument/didOpen')
+      contribution?.dispose()
+    },
+  )
+
+  it('borrows one worker connection across two document plugins', async () => {
+    const pool = new LspConnectionPool({ idleGraceMs: 0 })
+    const worker = new FakeWorker()
+    const workerFactory = vi.fn(() => worker)
+    const workspace = new TypeScriptLspWorkspace()
+    workspace.setWorkspaceFiles([{ path: '/a.ts', text: 'a' }])
+    const options = { workerFactory, workspace, connectionProvider: pool.provider('project') }
+    const first = activatePlugin(createTypeScriptLspPlugin(options)).createContribution(
+      viewContributionContext(editorSnapshot({ documentId: 'a.ts' })),
+    )
+    const second = activatePlugin(createTypeScriptLspPlugin(options)).createContribution(
+      viewContributionContext(editorSnapshot({ documentId: 'b.ts' })),
+    )
+    try {
+      expect(workerFactory).toHaveBeenCalledTimes(1)
+      worker.receive(initializeResponse(message(worker.sent[0])))
+      await flushPromises()
+      expect(
+        sentMethods(worker).filter((method) => method === 'editor/typescript/setWorkspaceFiles'),
+      ).toHaveLength(1)
+      first?.dispose()
+      expect(worker.terminated).toBe(false)
+      workspace.upsertWorkspaceFiles([{ path: '/a.ts', text: 'b' }])
+      await flushPromises()
+      expect(latestMessage(worker.sent, 'editor/typescript/upsertFiles').params).toEqual({
+        files: [{ path: '/a.ts', text: 'b' }],
+      })
+      second?.dispose()
+    } finally {
+      first?.dispose()
+      second?.dispose()
+      pool.dispose()
+    }
+  })
+
+  it('accepts explicit document filter functions', async () => {
+    const worker = new FakeWorker()
+    const plugin = createTypeScriptLspPlugin({
+      workerFactory: () => worker,
+      documentSync: { shouldSyncUri: () => true, shouldSyncLanguageId: () => true },
+    })
+    const provider = activatePlugin(plugin)
+    const contribution = provider.createContribution(
+      viewContributionContext(editorSnapshot({ documentId: 'README.md', languageId: 'markdown' })),
+    )
+    worker.receive(initializeResponse(message(worker.sent[0])))
+    await flushPromises()
+    expect(sentMethods(worker)).toContain('textDocument/didOpen')
+    contribution?.dispose()
+  })
+
+  it('uses the host document URI mapping for worker document synchronization', async () => {
+    const worker = new FakeWorker()
+    const plugin = createTypeScriptLspPlugin({
+      workerFactory: () => worker,
+      documentSync: { uriForDocument: () => 'file:///repo/mapped.ts' },
+    })
+    const provider = activatePlugin(plugin)
+    const contribution = provider.createContribution(viewContributionContext(editorSnapshot()))
+    worker.receive(initializeResponse(message(worker.sent[0])))
+    await flushPromises()
+    expect(textDocumentFor(worker.sent.find(hasMethod('textDocument/didOpen')))).toMatchObject({
+      uri: 'file:///repo/mapped.ts',
+    })
+    contribution?.dispose()
+  })
+
+  it.each([
+    ['tsx', 'typescriptreact'],
+    ['jsx', 'javascriptreact'],
+  ])('syncs native %s syntax ids using their protocol language', async (languageId, protocolId) => {
+    const worker = new FakeWorker()
+    const plugin = createTypeScriptLspPlugin({ workerFactory: () => worker })
+    const provider = activatePlugin(plugin)
+    const contribution = provider.createContribution(
+      viewContributionContext(
+        editorSnapshot({ languageId, documentId: `/src/index.${languageId}` }),
+      ),
+    )
+    worker.receive(initializeResponse(message(worker.sent[0])))
+    await flushPromises()
+    expect(sentMethods(worker)).toContain('textDocument/didOpen')
+    expect(textDocumentFor(worker.sent.find(hasMethod('textDocument/didOpen')))).toMatchObject({
+      languageId: protocolId,
+    })
+    contribution?.dispose()
   })
 
   it('syncs the active TypeScript document through a worker and renders diagnostics', async () => {
@@ -257,12 +377,14 @@ describe('createTypeScriptLspPlugin', () => {
     contribution.dispose()
   })
 
-  it('routes worker crashes through owned worker transport', () => {
+  it('reports a worker crash once, as an exit with its reason, and marks the server failed', () => {
     const worker = new FakeWorker()
     const errors: unknown[] = []
+    const statuses: string[] = []
     const plugin = createTypeScriptLspPlugin({
       workerFactory: () => worker,
       onError: (error) => errors.push(error),
+      onStatusChange: (status) => statuses.push(status),
     })
     const provider = activatePlugin(plugin)
     const contribution = provider.createContribution(viewContributionContext(editorSnapshot()))
@@ -270,7 +392,13 @@ describe('createTypeScriptLspPlugin', () => {
 
     worker.fail('worker crashed')
 
-    expect(errorMessage(errors[0])).toBe('worker crashed')
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toBeInstanceOf(LspServerExitedError)
+    expect(errors[0]).toMatchObject({
+      message: 'worker crashed',
+      params: { outcome: 'crashed', error: { code: 'LSP_SERVER_EXITED' } },
+    })
+    expect(statuses.at(-1)).toBe('error')
     expect(worker.terminated).toBe(true)
     expect(worker.listenerCount('message')).toBe(0)
     expect(worker.listenerCount('error')).toBe(0)
@@ -284,7 +412,7 @@ describe('createTypeScriptLspPlugin', () => {
       editorSnapshot({
         documentId: 'src/index.js',
         languageId: 'javascript',
-        fullText: 'const value = 1;',
+        text: 'const value = 1;',
       }),
     )
     const plugin = createTypeScriptLspPlugin({ workerFactory: () => worker })
@@ -311,7 +439,7 @@ describe('createTypeScriptLspPlugin', () => {
       editorSnapshot({
         documentId: 'README.md',
         languageId: 'markdown',
-        fullText: '# Notes',
+        text: '# Notes',
       }),
     )
     const plugin = createTypeScriptLspPlugin({ workerFactory: () => worker })
@@ -332,7 +460,7 @@ describe('createTypeScriptLspPlugin', () => {
     const minimap = minimapFeature()
     const context = viewContributionContext(
       editorSnapshot({
-        fullText: 'const value = 1;\nconst next: string = 2;\n',
+        text: 'const value = 1;\nconst next: string = 2;\n',
         lineCount: 3,
         lineStarts: [0, 17, 40],
       }),
@@ -473,7 +601,7 @@ describe('createTypeScriptLspPlugin', () => {
     const errors: unknown[] = []
     const context = viewContributionContext(
       editorSnapshot({
-        fullText: 'const va',
+        text: 'const va',
         selections: [collapsedSelection(8)],
       }),
     )
@@ -489,7 +617,7 @@ describe('createTypeScriptLspPlugin', () => {
     await flushPromises()
     contribution.update(
       editorSnapshot({
-        fullText: 'const val',
+        text: 'const val',
         textVersion: 2,
         selections: [collapsedSelection(9)],
       }),
@@ -501,7 +629,7 @@ describe('createTypeScriptLspPlugin', () => {
     const firstRequest = latestMessage(worker.sent, 'textDocument/completion')
     contribution.update(
       editorSnapshot({
-        fullText: 'const valu',
+        text: 'const valu',
         textVersion: 3,
         selections: [collapsedSelection(10)],
       }),
@@ -523,7 +651,7 @@ describe('createTypeScriptLspPlugin', () => {
     FakeWebSocket.instances.length = 0
     const worker = new FakeWorker()
     const workerContext = viewContributionContext(
-      editorSnapshot({ fullText: 'export const value = 1;' }),
+      editorSnapshot({ text: 'export const value = 1;' }),
     )
     const workerPlugin = createTypeScriptLspPlugin({
       compilerOptions: { strict: true },
@@ -537,7 +665,7 @@ describe('createTypeScriptLspPlugin', () => {
     await flushPromises()
 
     const socketContext = viewContributionContext(
-      editorSnapshot({ fullText: 'export const value = 1;' }),
+      editorSnapshot({ text: 'export const value = 1;' }),
     )
     const socketPlugin = createTypeScriptLspPlugin({
       compilerOptions: { strict: true },
@@ -642,7 +770,7 @@ describe('createTypeScriptLspPlugin', () => {
     worker.receive(initializeResponse(message(worker.sent[0])))
     await flushPromises()
     contribution.update(
-      editorSnapshot({ fullText: 'const value: string = 2;', textVersion: 2 }),
+      editorSnapshot({ text: 'const value: string = 2;', textVersion: 2 }),
       'content',
       documentChange([{ from: 22, to: 23, text: '2' }]),
     )
@@ -670,7 +798,7 @@ describe('createTypeScriptLspPlugin', () => {
     expect(context.setRangeHighlight).not.toHaveBeenCalled()
   })
 
-  it('syncs content updates from text snapshots without reading snapshot.fullText', async () => {
+  it('syncs content updates from text snapshots without reading the whole text', async () => {
     const worker = new FakeWorker()
     const context = viewContributionContext(editorSnapshot())
     const plugin = createTypeScriptLspPlugin({ workerFactory: () => worker })
@@ -704,9 +832,7 @@ describe('createTypeScriptLspPlugin', () => {
 
   it('optimistically shortens diagnostic highlights through local deletion', async () => {
     const worker = new FakeWorker()
-    const context = viewContributionContext(
-      editorSnapshot({ fullText: 'const value: string = 123;' }),
-    )
+    const context = viewContributionContext(editorSnapshot({ text: 'const value: string = 123;' }))
     const plugin = createTypeScriptLspPlugin({ workerFactory: () => worker })
     const provider = activatePlugin(plugin)
     const contribution = provider.createContribution(context)
@@ -724,7 +850,7 @@ describe('createTypeScriptLspPlugin', () => {
     )
 
     contribution.update(
-      editorSnapshot({ fullText: 'const value: string = 1;', textVersion: 2 }),
+      editorSnapshot({ text: 'const value: string = 1;', textVersion: 2 }),
       'content',
       documentChange([{ from: 23, to: 25, text: '' }]),
     )
@@ -736,9 +862,7 @@ describe('createTypeScriptLspPlugin', () => {
 
   it('optimistically clears diagnostic highlights when local deletion removes the range', async () => {
     const worker = new FakeWorker()
-    const context = viewContributionContext(
-      editorSnapshot({ fullText: 'const value: string = 123;' }),
-    )
+    const context = viewContributionContext(editorSnapshot({ text: 'const value: string = 123;' }))
     const plugin = createTypeScriptLspPlugin({ workerFactory: () => worker })
     const provider = activatePlugin(plugin)
     const contribution = provider.createContribution(context)
@@ -756,12 +880,46 @@ describe('createTypeScriptLspPlugin', () => {
     )
 
     contribution.update(
-      editorSnapshot({ fullText: 'const value: string = ;', textVersion: 2 }),
+      editorSnapshot({ text: 'const value: string = ;', textVersion: 2 }),
       'content',
       documentChange([{ from: 22, to: 25, text: '' }]),
     )
 
     expect(latestRangeHighlightRanges(context, 'editor-test-typescript-lsp-error')).toEqual([])
+  })
+
+  it('forwards diagnostic note actions with the active worker document identity', async () => {
+    vi.useFakeTimers()
+    const worker = new FakeWorker()
+    const context = viewContributionContext(editorSnapshot())
+    const run = vi.fn()
+    const getDiagnosticActions = vi.fn(() => [{ label: 'Inspect diagnostic', run }])
+    const plugin = createTypeScriptLspPlugin({ workerFactory: () => worker, getDiagnosticActions })
+    activatePlugin(plugin).createContribution(context)
+    worker.receive(initializeResponse(message(worker.sent[0])))
+    await flushPromises()
+    worker.receive(publishDiagnosticsMessage())
+    context.scrollElement.dispatchEvent(
+      new PointerEvent('pointermove', { clientX: 12, clientY: 16, buttons: 0 }),
+    )
+    await vi.advanceTimersByTimeAsync(260)
+    const request = message(worker.sent.toReversed().find(hasMethod('textDocument/hover')))
+    worker.receive({ jsonrpc: '2.0', id: request.id, result: null })
+    await flushPromises()
+    await finishHoverReveal()
+    expect(getDiagnosticActions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        documentUri: 'file:///src/index.ts',
+        textVersion: 1,
+        diagnostic: expect.objectContaining({ message: 'bad assignment' }),
+      }),
+    )
+    const button = Array.from(tooltipElement().querySelectorAll('button')).find(
+      (button) => button.textContent === 'Inspect diagnostic',
+    )
+    expect(button).toBeTruthy()
+    button!.click()
+    expect(run).toHaveBeenCalledOnce()
   })
 
   it('renders hover quick info with diagnostics at the pointer', async () => {
@@ -998,7 +1156,7 @@ describe('createTypeScriptLspPlugin', () => {
     vi.useFakeTimers()
     const worker = new FakeWorker()
     const context = viewContributionContext(
-      editorSnapshot({ fullText: 'const source = value; const value = 1;' }),
+      editorSnapshot({ text: 'const source = value; const value = 1;' }),
     )
     vi.mocked(context.textOffsetFromPoint).mockReturnValue(15)
     const plugin = createTypeScriptLspPlugin({ workerFactory: () => worker })
@@ -1059,7 +1217,7 @@ describe('createTypeScriptLspPlugin', () => {
     vi.useFakeTimers()
     const worker = new FakeWorker()
     const context = viewContributionContext(
-      editorSnapshot({ fullText: 'const source = value; const value = 1;' }),
+      editorSnapshot({ text: 'const source = value; const value = 1;' }),
     )
     vi.mocked(context.textOffsetFromPoint).mockReturnValue(15)
     const plugin = createTypeScriptLspPlugin({ workerFactory: () => worker })
@@ -1229,16 +1387,18 @@ describe('createTypeScriptLspPlugin', () => {
     const worker = new FakeWorker()
     const container = document.createElement('div')
     const applyEdits = vi.fn<EditorEditContributionContext['applyEdits']>()
-    const { provider, features } = activatePluginWithCommands(
+    const { provider, features, commands } = activatePluginWithCommands(
       createTypeScriptLspPlugin({ workerFactory: () => worker }),
       { container, applyEdits },
     )
+    // Enter reaches the list the way an editor delivers it: through the keymap to a command.
+    const keymap = createTestKeymap(container, commands)
     const context = viewContributionContext(
       editorSnapshot({
-        fullText: 'const va',
+        text: 'const va',
         selections: [collapsedSelection(8)],
       }),
-      { container, features },
+      { container, features, registerKeymapContextKey: keymap.registerKeymapContextKey },
     )
     const contribution = provider.createContribution(context)
     if (!contribution) throw new Error('missing contribution')
@@ -1247,7 +1407,7 @@ describe('createTypeScriptLspPlugin', () => {
     await flushPromises()
     contribution.update(
       editorSnapshot({
-        fullText: 'const val',
+        text: 'const val',
         textVersion: 2,
         selections: [collapsedSelection(9)],
       }),
@@ -1298,6 +1458,7 @@ describe('createTypeScriptLspPlugin', () => {
       'typescriptLsp.completion.accept',
       { affinity: 'after', anchor: 11, head: 11 },
     )
+    keymap.dispose()
     expect(completionElement().hidden).toBe(true)
   })
 
@@ -1344,7 +1505,7 @@ describe('createTypeScriptLspPlugin', () => {
     const worker = new FakeWorker()
     const context = viewContributionContext(
       editorSnapshot({
-        fullText: 'const value = 1; console.log(value);',
+        text: 'const value = 1; console.log(value);',
         selections: [
           { anchorOffset: 6, headOffset: 6, startOffset: 6, endOffset: 6, affinity: 'after' },
         ],
@@ -1491,23 +1652,38 @@ function activateViewProvider(plugin: {
   activate: ReturnType<typeof createTypeScriptLspPlugin>['activate']
 }): EditorViewContributionProvider {
   let provider: EditorViewContributionProvider | null = null
-  plugin.activate({
-    registerHighlighter: () => ({ dispose: () => undefined }),
-    registerSyntaxProvider: () => ({ dispose: () => undefined }),
-    registerViewContribution: (value) => {
-      provider = value
-      return { dispose: () => undefined }
-    },
-    registerCommandContribution: () => ({ dispose: () => undefined }),
-    registerCapabilityContribution: () => ({ dispose: () => undefined }),
-    registerEditContribution: () => ({ dispose: () => undefined }),
-    registerDecorationContribution: () => ({ dispose: () => undefined }),
-    registerGutterContribution: () => ({ dispose: () => undefined }),
-    registerInjectedTextRowProvider: () => ({ dispose: () => undefined }),
-  } satisfies EditorPluginContext)
+  plugin.activate(
+    createTestPluginContext({
+      registerViewContribution: (value) => {
+        provider = value
+        return { dispose: () => undefined }
+      },
+    }),
+  )
 
   if (!provider) throw new Error('missing provider')
-  return provider
+  return followingSnapshots(provider)
+}
+
+// A real context answers getSnapshot() with the snapshot of the update in flight, and the plugin's
+// document sync reads the text there rather than from the update's argument.
+const currentSnapshots = new WeakMap<EditorViewContributionContext, EditorViewSnapshot>()
+
+function followingSnapshots(
+  provider: EditorViewContributionProvider,
+): EditorViewContributionProvider {
+  return {
+    createContribution: (context) => {
+      const contribution = provider.createContribution(context)
+      if (!contribution) return null
+      const update = contribution.update.bind(contribution)
+      contribution.update = (snapshot, kind, change) => {
+        currentSnapshots.set(context, snapshot)
+        update(snapshot, kind, change)
+      }
+      return contribution
+    },
+  }
 }
 
 function activatePluginWithCommands(
@@ -1515,7 +1691,7 @@ function activatePluginWithCommands(
   options?: FeatureContributionContextOptions,
 ): {
   readonly provider: EditorViewContributionProvider
-  readonly commands: ReadonlyMap<EditorCommandId, EditorCommandHandler>
+  readonly commands: ReadonlyMap<EditorAnyCommandId, EditorCommandHandler>
   readonly features: ReadonlyMap<unknown, unknown>
 }
 function activatePluginWithCommands(
@@ -1523,35 +1699,31 @@ function activatePluginWithCommands(
   options?: FeatureContributionContextOptions,
 ): {
   readonly provider: EditorViewContributionProvider
-  readonly commands: ReadonlyMap<EditorCommandId, EditorCommandHandler>
+  readonly commands: ReadonlyMap<EditorAnyCommandId, EditorCommandHandler>
   readonly features: ReadonlyMap<unknown, unknown>
 } {
   let provider: EditorViewContributionProvider | null = null
-  const commands = new Map<EditorCommandId, EditorCommandHandler>()
+  const commands = new Map<EditorAnyCommandId, EditorCommandHandler>()
   const features = options?.features ?? new Map<string, unknown>()
-  plugin.activate({
-    registerHighlighter: () => ({ dispose: () => undefined }),
-    registerSyntaxProvider: () => ({ dispose: () => undefined }),
-    registerViewContribution: (value) => {
-      provider = value
-      return { dispose: () => undefined }
-    },
-    registerCommandContribution: (value) => {
-      value.createContribution(commandContributionContext(commands))
-      return { dispose: () => undefined }
-    },
-    registerCapabilityContribution: () => ({ dispose: () => undefined }),
-    registerDecorationContribution: () => ({ dispose: () => undefined }),
-    registerEditContribution: (value) => {
-      value.createContribution(editContributionContext({ ...options, features }))
-      return { dispose: () => undefined }
-    },
-    registerGutterContribution: () => ({ dispose: () => undefined }),
-    registerInjectedTextRowProvider: () => ({ dispose: () => undefined }),
-  } satisfies EditorPluginContext)
+  plugin.activate(
+    createTestPluginContext({
+      registerViewContribution: (value) => {
+        provider = value
+        return { dispose: () => undefined }
+      },
+      registerCommandContribution: (value) => {
+        value.createContribution(commandContributionContext(commands))
+        return { dispose: () => undefined }
+      },
+      registerEditContribution: (value) => {
+        value.createContribution(editContributionContext({ ...options, features }))
+        return { dispose: () => undefined }
+      },
+    }),
+  )
 
   if (!provider) throw new Error('missing provider')
-  return { provider: withHover(provider, {}), commands, features }
+  return { provider: withHover(followingSnapshots(provider), {}), commands, features }
 }
 
 /** The core registry, reduced to what a single-document harness needs: order of registration. */
@@ -1588,7 +1760,7 @@ type FeatureContributionContextOptions = {
 }
 
 function commandContributionContext(
-  commands: Map<EditorCommandId, EditorCommandHandler>,
+  commands: Map<EditorAnyCommandId, EditorCommandHandler>,
 ): EditorCommandContributionContext {
   return {
     registerCommand: (commandId, handler) => {
@@ -1601,23 +1773,19 @@ function commandContributionContext(
 function editContributionContext(
   options: FeatureContributionContextOptions = {},
 ): EditorEditContributionContext {
-  return {
-    hasDocument: () => true,
+  return createTestEditContributionContext({
     materializeFullText: () => '',
-    getTextSnapshot: () => null,
-    getSelections: () => [],
-    focusEditor: vi.fn(),
     applyEdits: options.applyEdits ?? vi.fn(),
     registerFeature: (id, feature) => {
       options.features?.set(id, feature)
       return { dispose: () => options.features?.delete(id) }
     },
-  }
+  })
 }
 
 function command(
-  commands: ReadonlyMap<EditorCommandId, EditorCommandHandler>,
-  commandId: EditorCommandId,
+  commands: ReadonlyMap<EditorAnyCommandId, EditorCommandHandler>,
+  commandId: EditorAnyCommandId,
 ): EditorCommandHandler {
   const handler = commands.get(commandId)
   if (!handler) throw new Error(`missing command ${commandId}`)
@@ -1629,34 +1797,33 @@ function viewContributionContext(
   options: {
     readonly container?: HTMLDivElement
     readonly features?: ReadonlyMap<unknown, unknown>
+    readonly registerKeymapContextKey?: EditorViewContributionContext['registerKeymapContextKey']
   } = {},
 ): EditorViewContributionContext {
   const element = options.container ?? document.createElement('div')
+  let context: EditorViewContributionContext | null = null
   const getFeature = vi.fn((token: unknown): unknown | null => {
     const feature = options.features?.get(token)
     return feature === undefined ? null : feature
   }) as EditorViewContributionContext['getFeature']
-  return {
+  context = createTestViewContributionContext({
     ...providerRegistry(),
     container: element,
     scrollElement: element,
     contentElement: element,
     highlightPrefix: 'editor-test',
-    hasDocument: () => true,
-    getSnapshot: () => snapshot,
-    requestViewUpdate: vi.fn(),
+    getSnapshot: () => (context && currentSnapshots.get(context)) ?? snapshot,
     getFeature,
-    revealLine: vi.fn(),
-    focusEditor: vi.fn(),
     setSelection: vi.fn(),
-    setSelections: vi.fn(),
-    setScrollTop: vi.fn(),
-    reserveOverlayWidth: vi.fn(),
     textOffsetFromPoint: vi.fn(() => 22),
     getRangeClientRect: vi.fn(() => new DOMRect(10, 20, 40, 18)),
     setRangeHighlight: vi.fn(),
     clearRangeHighlight: vi.fn(),
-  }
+    ...(options.registerKeymapContextKey
+      ? { registerKeymapContextKey: options.registerKeymapContextKey }
+      : {}),
+  })
+  return context
 }
 
 function minimapFeature(): EditorMinimapFeature {
@@ -1668,8 +1835,10 @@ function minimapFeature(): EditorMinimapFeature {
   }
 }
 
-function editorSnapshot(options: Partial<EditorViewSnapshot> = {}): EditorViewSnapshot {
-  const fullText = options.fullText ?? 'const value: string = 1;'
+type SnapshotOptions = Partial<EditorViewSnapshot> & { readonly text?: string }
+
+function editorSnapshot(options: SnapshotOptions = {}): EditorViewSnapshot {
+  const { text = 'const value: string = 1;', ...overrides } = options
   const textVersion = options.textVersion ?? 1
   const documentSyncPoint = options.documentSyncPoint ?? fixtureSyncPoint(textVersion)
   return {
@@ -1677,9 +1846,8 @@ function editorSnapshot(options: Partial<EditorViewSnapshot> = {}): EditorViewSn
     paintLayers: [],
     documentId: 'src/index.ts',
     languageId: 'typescript',
-    fullText,
+    ...textFields(createStringTextSnapshot(text)),
     textVersion,
-    lineStarts: [0],
     tokens: EditorTokenStore.empty(),
     brackets: [],
     selections: [],
@@ -1700,15 +1868,10 @@ function editorSnapshot(options: Partial<EditorViewSnapshot> = {}): EditorViewSn
       clientWidth: 0,
       visibleRange: { start: 0, end: 1 } as EditorViewSnapshot['viewport']['visibleRange'],
     },
-    ...options,
+    ...overrides,
     initialHighlightStatus: options.initialHighlightStatus ?? 'painted',
     gutterWidth: options.gutterWidth ?? 0,
-    gutterLayout: options.gutterLayout ?? { fixedWidth: 0, lanes: [] },
-    toJSON:
-      options.toJSON ??
-      (() => {
-        throw new Error('not used by this fixture')
-      }),
+    gutterLayout: options.gutterLayout ?? { leadingInset: 0, fixedWidth: 0, lanes: [] },
     toVisibleSnapshot: options.toVisibleSnapshot ?? (() => null),
     documentSyncPoint,
     changesSinceDocumentSyncPoint:
@@ -1758,36 +1921,48 @@ function fixtureChangesSince(
   }
 }
 
-function snapshotWithThrowingText(
-  text: string,
-  options: Partial<EditorViewSnapshot> = {},
-): EditorViewSnapshot {
-  const snapshot = editorSnapshot({
-    ...options,
-    fullText: text,
-    textSnapshot: createStringTextSnapshot(text),
-    lineStarts: lineStarts(text),
-  })
-  Object.defineProperty(snapshot, 'fullText', {
-    configurable: true,
-    enumerable: true,
-    get: () => {
-      throw new Error('unexpected snapshot.fullText materialization')
+/** Incremental sync reads ranges; a whole-document read of this snapshot throws. */
+function snapshotWithThrowingText(text: string, options: SnapshotOptions = {}): EditorViewSnapshot {
+  const source = createStringTextSnapshot(text)
+  const textSnapshot: TextReadSnapshot = {
+    length: source.length,
+    get lineCount() {
+      return source.lineCount
     },
-  })
-  return snapshot
+    lineStart: (index) => source.lineStart(index),
+    lineRange: (index) => source.lineRange(index),
+    lineAt: (offset) => source.lineAt(offset),
+    readRange: (start, end) => {
+      if (start === 0 && end === text.length) throw new Error('unexpected whole-text read')
+      return source.readRange(start, end)
+    },
+    forEachTextChunk: () => {
+      throw new Error('unexpected whole-text scan')
+    },
+  }
+  return editorSnapshot({ ...options, text, ...textFields(textSnapshot) })
 }
 
-function lineStarts(text: string): number[] {
-  const starts = [0]
-  let index = text.indexOf('\n')
-
-  while (index !== -1) {
-    starts.push(index + 1)
-    index = text.indexOf('\n', index + 1)
+function textFields(
+  textSnapshot: TextReadSnapshot,
+): Pick<EditorViewSnapshot, 'textSnapshot' | 'lineStarts' | 'lineStartsView'> {
+  const starts = Array.from({ length: textSnapshot.lineCount }, (_, index) =>
+    textSnapshot.lineStart(index),
+  )
+  return {
+    textSnapshot,
+    lineStarts: starts,
+    lineStartsView: {
+      length: starts.length,
+      at: (index) => starts[index],
+      indexForOffset: (offset) => textSnapshot.lineAt(offset),
+      firstIndexAtOrAfter: (offset) => {
+        const index = starts.findIndex((start) => start >= offset)
+        return index === -1 ? starts.length : index
+      },
+      toArray: () => starts,
+    },
   }
-
-  return starts
 }
 
 function collapsedSelection(offset: number): EditorViewSnapshot['selections'][number] {
@@ -1951,8 +2126,11 @@ function tooltipBody(): HTMLElement | null {
   return document.querySelector<HTMLElement>('.editor-typescript-lsp-hover-body')
 }
 
+/** The quick info's copy button; a diagnostic note above it carries its own. */
 function copyButton(): HTMLButtonElement {
-  const element = document.querySelector<HTMLButtonElement>('.editor-typescript-lsp-hover-copy')
+  const element = document.querySelector<HTMLButtonElement>(
+    '[data-hover-part-index] .editor-typescript-lsp-hover-copy',
+  )
   if (!element) throw new Error('missing copy button')
   return element
 }

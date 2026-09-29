@@ -1,4 +1,4 @@
-import { createError } from '../logging/evlog'
+import { createError } from '../logging/errors'
 import type { EditorToken, EditorTokenStyle } from '../tokens'
 import {
   createPackedEditorTokenWriter,

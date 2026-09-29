@@ -39,7 +39,7 @@ const SKIN_TONE_LAST = 0x1f3ff
  * ordinary text paying for the possibility.
  */
 const BOUNDARY_WINDOW = 8
-const MAX_BOUNDARY_WINDOW = 4096
+export const MAX_BOUNDARY_WINDOW = 4096
 
 const graphemeSegmenter = createGraphemeSegmenter()
 
@@ -140,7 +140,7 @@ function isSoloCodeUnit(code: number): boolean {
  * Both neighbours are checked, not just the one being stepped over: a joining character that
  * precedes a plain one pulls it into its own cluster, and only the character before reveals that.
  */
-function isSoloBefore(text: TextContent, offset: number): boolean {
+export function isSoloBefore(text: TextContent, offset: number): boolean {
   if (!isSoloCodeUnit(text.charCodeAt(offset - 1))) return false
   return offset < 2 || isSoloCodeUnit(text.charCodeAt(offset - 2))
 }

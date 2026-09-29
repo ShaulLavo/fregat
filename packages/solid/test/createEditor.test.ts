@@ -1,9 +1,11 @@
+import { setFlagsFromString } from 'node:v8'
+import { runInNewContext } from 'node:vm'
 import { createRoot, createSignal } from 'solid-js'
+import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Editor } from '@singapore-editor/core/editor'
 import {
   createEditor,
-  type SolidEditorCommands,
   type SolidEditorController,
   type SolidEditorDocument,
   type SolidEditorSelection,
@@ -19,6 +21,7 @@ type MountedEditor = {
 
 type Diagnostic = {
   readonly name: string
+  readonly detail?: { readonly fullTextReads?: number }
 }
 
 type DiagnosticGlobal = typeof globalThis & {
@@ -36,22 +39,79 @@ afterEach(() => {
 })
 
 describe('createEditor', () => {
+  it('accepts a ref callback and waits until its host is attached', () => {
+    const container = document.createElement('div')
+    document.body.append(container)
+    let controller!: SolidEditorController
+    let connectedAtActivation = false
+    const dispose = render(() => {
+      const host = document.createElement('div')
+      controller = createEditor({
+        document: { text: 'alpha' },
+        plugins: [
+          {
+            name: 'attachment-check',
+            activate: () => {
+              connectedAtActivation = host.isConnected
+            },
+          },
+        ],
+      })
+      controller.element(host)
+      expect(controller.editor()).toBeNull()
+      expect(host.childElementCount).toBe(0)
+      return host
+    }, container)
+
+    expect(connectedAtActivation).toBe(true)
+    expect(controller.materializeFullText()).toBe('alpha')
+    dispose()
+    expect(controller.editor()).toBeNull()
+    container.remove()
+  })
+
+  it('cancels a pending mount when explicitly disposed', () => {
+    const host = document.createElement('div')
+    let disposeRoot!: () => void
+    createRoot((dispose) => {
+      disposeRoot = dispose
+      const controller = createEditor()
+      controller.element(host)
+      controller.dispose()
+    })
+    expect(host.childElementCount).toBe(0)
+    disposeRoot()
+  })
+
+  it('never mounts after its Solid owner is disposed', () => {
+    const host = document.createElement('div')
+    let controller!: SolidEditorController
+    createRoot((dispose) => {
+      controller = createEditor()
+      controller.element(host)
+      dispose()
+    })
+    controller.element(host)
+    expect(controller.editor()).toBeNull()
+    expect(host.childElementCount).toBe(0)
+  })
+
   it('mounts, initializes signals, and disposes with the Solid owner', () => {
     const mounted = mountInRoot({
       document: () => ({ text: 'alpha', documentId: 'a.ts', revision: 1 }),
     })
 
     expect(mounted.controller.editor()).not.toBeNull()
-    expect(mounted.controller.fullText()).toBe('alpha')
+    expect(mounted.controller.materializeFullText()).toBe('alpha')
     expect(mounted.controller.state()?.length).toBe(5)
-    expect(mounted.controller.snapshot()?.fullText).toBe('alpha')
+    expect(viewText(mounted.controller)).toBe('alpha')
 
     mounted.dispose()
 
     expect(mounted.controller.editor()).toBeNull()
     expect(mounted.controller.state()).toBeNull()
     expect(mounted.controller.snapshot()).toBeNull()
-    expect(mounted.controller.fullText()).toBe('')
+    expect(mounted.controller.materializeFullText()).toBe('')
   })
 
   it('syncs state and last change after editor commands', () => {
@@ -61,10 +121,10 @@ describe('createEditor', () => {
 
     mounted.controller.commands.edit({ from: 5, to: 5, text: '!' })
 
-    expect(mounted.controller.fullText()).toBe('alpha!')
+    expect(mounted.controller.materializeFullText()).toBe('alpha!')
     expect(mounted.controller.state()?.length).toBe(6)
     expect(mounted.controller.lastChange()?.kind).toBe('edit')
-    expect(mounted.controller.snapshot()?.fullText).toBe('alpha!')
+    expect(viewText(mounted.controller)).toBe('alpha!')
 
     mounted.dispose()
   })
@@ -78,11 +138,14 @@ describe('createEditor', () => {
 
     mounted.controller.commands.edit({ from: 5, to: 5, text: '!' })
 
-    expect(textSnapshotReads(diagnostics)).toHaveLength(0)
+    expect(fullTextReads(diagnostics)).toHaveLength(0)
     expect(mounted.controller.textSnapshot()?.length).toBe(6)
-    expect(textSnapshotReads(diagnostics)).toHaveLength(0)
-    expect(mounted.controller.fullText()).toBe('alpha!')
-    expect(textSnapshotReads(diagnostics)).toHaveLength(1)
+    expect({ ...mounted.controller.snapshot() }.textSnapshot?.length).toBe(6)
+    JSON.stringify(mounted.controller.snapshot())
+    expect(fullTextReads(diagnostics)).toHaveLength(0)
+    expect(mounted.controller.materializeFullText()).toBe('alpha!')
+    expect(mounted.controller.materializeFullText()).toBe('alpha!')
+    expect(fullTextReads(diagnostics)).toHaveLength(1)
 
     mounted.dispose()
   })
@@ -109,18 +172,29 @@ describe('createEditor', () => {
     mounted.dispose()
   })
 
-  it('forwards the deprecated numeric selection reveal target', () => {
-    const mounted = mountInRoot({
-      document: () => ({ text: 'alpha', documentId: 'a.ts', revision: 1 }),
+  it.each([
+    ['replaced', { text: 'beta', documentId: 'b.ts', revision: 1 }],
+    ['closed', null],
+  ] as const)('lets go of a %s document once its text was read', async (_, next) => {
+    let setDocument!: (document: SolidEditorDocument | null) => void
+    const mounted = mountInRoot(() => {
+      const [document, nextDocument] = createSignal<SolidEditorDocument | null>({
+        text: 'alpha '.repeat(10_000),
+        documentId: 'a.ts',
+        revision: 1,
+      })
+      setDocument = nextDocument
+      return createEditor({ document })
     })
-    const instance = mounted.controller.editor()
-    if (!instance) throw new Error('editor did not mount')
-    const setSelection = vi.spyOn(instance, 'setSelection')
-    const selectionArgs: Parameters<SolidEditorCommands['setSelection']> = [1, 1, 4]
+    let source: WeakRef<object> | null = new WeakRef(mounted.controller.textSnapshot()!)
+    expect(mounted.controller.materializeFullText()).toHaveLength(60_000)
 
-    mounted.controller.commands.setSelection(...selectionArgs)
+    setDocument(next)
+    await flushEffects()
+    await expectCollected(source)
+    source = null
 
-    expect(setSelection).toHaveBeenLastCalledWith(1, 1, 4)
+    expect(mounted.controller.materializeFullText()).toBe(next?.text ?? '')
     mounted.dispose()
   })
 
@@ -140,12 +214,12 @@ describe('createEditor', () => {
     setDocument({ text: 'server alpha', documentId: 'a.ts', revision: 1 })
     await flushEffects()
 
-    expect(mounted.controller.fullText()).toBe('alpha!')
+    expect(mounted.controller.materializeFullText()).toBe('alpha!')
 
     setDocument({ text: 'server beta', documentId: 'a.ts', revision: 2 })
     await flushEffects()
 
-    expect(mounted.controller.fullText()).toBe('server beta')
+    expect(mounted.controller.materializeFullText()).toBe('server beta')
     expect(mounted.controller.snapshot()?.documentId).toBe('a.ts')
 
     mounted.dispose()
@@ -227,7 +301,7 @@ function mountInRoot(
   createRoot((dispose) => {
     disposeRoot = dispose
     controller = typeof create === 'function' ? create() : createEditor(create)
-    controller.mount(host)
+    controller.element(host)
   })
 
   return {
@@ -239,6 +313,22 @@ function mountInRoot(
 
 function editorElement(host: HTMLElement): HTMLElement | null {
   return host.querySelector<HTMLElement>('.editor')
+}
+
+// Only a real collection can tell a cache that pins a document from one that lets it go.
+const collectGarbage: () => void = (() => {
+  setFlagsFromString('--expose-gc')
+  return runInNewContext('gc') as () => void
+})()
+
+// `deref` keeps its target alive until the current job ends, so collect first and look after.
+async function expectCollected(reference: WeakRef<object>): Promise<void> {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    await flushEffects()
+    collectGarbage()
+    if (!reference.deref()) return
+  }
+  expect(reference.deref()).toBeUndefined()
 }
 
 function flushEffects(): Promise<void> {
@@ -253,6 +343,15 @@ function collectDiagnostics(): Diagnostic[] {
   return diagnostics
 }
 
-function textSnapshotReads(diagnostics: readonly Diagnostic[]): readonly Diagnostic[] {
-  return diagnostics.filter((diagnostic) => diagnostic.name === 'textSnapshot.materializeFullText')
+/** Whole-text reads of any kind: materialization, a full-range readRange, or a chunk walk. */
+function fullTextReads(diagnostics: readonly Diagnostic[]): readonly Diagnostic[] {
+  return diagnostics.filter(
+    (diagnostic) =>
+      diagnostic.name === 'textSnapshot.read' && diagnostic.detail?.fullTextReads === 1,
+  )
+}
+
+function viewText(controller: SolidEditorController): string | undefined {
+  const source = controller.snapshot()?.textSnapshot
+  return source?.readRange(0, source.length)
 }

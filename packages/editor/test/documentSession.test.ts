@@ -544,6 +544,22 @@ describe('DocumentSession', () => {
     expect(redone.transaction?.edits).toEqual([{ from: 1, to: 4, text: 'XYZ' }])
   })
 
+  it.each([64, 1024, 1025, 32768])(
+    'round-trips %i UTF-16 units of inverse text across the copy cutoff',
+    (length) => {
+      const removed = '\ud800a\udfff\t'.repeat(Math.ceil(length / 4)).slice(0, length)
+      const text = 'prefix' + removed + 'suffix'
+      const session = createDocumentSession(text)
+      const change = session.applyEdits([{ from: 6, to: 6 + removed.length, text: 'replacement' }])
+      expect(change.transaction?.inverseEdits).toEqual([{ from: 6, to: 17, text: removed }])
+      expect(session.materializeFullText()).toBe('prefixreplacementsuffix')
+      session.undo()
+      expect(session.materializeFullText()).toBe(text)
+      session.redo()
+      expect(session.materializeFullText()).toBe('prefixreplacementsuffix')
+    },
+  )
+
   // Whether a history can cap at all is a separate question from the depth a
   // real document ends up with, which is the one a user runs into.
   it('stops offering undo two hundred recorded edits back', () => {

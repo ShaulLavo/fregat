@@ -187,6 +187,55 @@ ul {
   color: #fff;
 }
 
+#outline {
+  width: 260px;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #444;
+  background: #252526;
+  color: #d4d4d4;
+  font-size: 12px;
+  overflow: hidden;
+}
+
+#outline[hidden] {
+  display: none;
+}
+
+#outline-header {
+  padding: 6px 10px;
+  border-bottom: 1px solid #444;
+}
+
+#outline-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 0;
+}
+
+#outline-list [role='treeitem'] {
+  display: flex;
+  gap: 6px;
+  padding-block: 2px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#outline-list [role='treeitem']:hover {
+  background: #37373d;
+}
+
+.outline-kind {
+  color: #888;
+}
+
+#outline-status {
+  padding: 4px 10px;
+  color: #aaa;
+}
+
 #history {
   width: 320px;
   min-width: 240px;

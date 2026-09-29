@@ -4,6 +4,8 @@ import remarkParse from 'remark-parse'
 import remarkStringify from 'remark-stringify'
 import { unified } from 'unified'
 
+import { paintCodeTokens, type TooltipCodeBlock, type TooltipCodeTokenizer } from './codeTokens'
+
 type MarkdownNode = {
   readonly type: string
   readonly value?: unknown
@@ -19,97 +21,54 @@ type MarkdownNode = {
 export type TooltipMarkdownRenderOptions = {
   readonly codeBackground?: boolean
   readonly classNamespace?: string
+  readonly codeTokenizer?: TooltipCodeTokenizer | null
 }
 
 type TooltipMarkdownRenderContext = {
   readonly classNamespace: string
+  readonly codeTokenizer: TooltipCodeTokenizer | null
   readonly inlineCodeBackgroundVariable: string
   readonly codeBlockBackgroundVariable: string
 }
 
-const TYPESCRIPT_LIKE_LANGUAGES = new Set(['javascript', 'js', 'jsx', 'ts', 'tsx', 'typescript'])
+// Built on first use, not at import: a host that never shows a markdown hover
+// should not pay for two unified pipelines while it boots.
+const createMarkdownParser = () => unified().use(remarkParse).use(remarkGfm)
+const createMarkdownStringifier = () =>
+  unified().use(remarkParse).use(remarkGfm).use(remarkStringify)
 
-const TYPESCRIPT_KEYWORDS = new Set([
-  'abstract',
-  'any',
-  'as',
-  'async',
-  'await',
-  'bigint',
-  'boolean',
-  'break',
-  'case',
-  'catch',
-  'class',
-  'const',
-  'constructor',
-  'continue',
-  'declare',
-  'default',
-  'delete',
-  'do',
-  'else',
-  'enum',
-  'export',
-  'extends',
-  'false',
-  'finally',
-  'for',
-  'from',
-  'function',
-  'get',
-  'if',
-  'implements',
-  'import',
-  'in',
-  'infer',
-  'instanceof',
-  'interface',
-  'is',
-  'keyof',
-  'let',
-  'module',
-  'namespace',
-  'never',
-  'new',
-  'null',
-  'number',
-  'object',
-  'of',
-  'private',
-  'protected',
-  'public',
-  'readonly',
-  'return',
-  'set',
-  'static',
-  'string',
-  'super',
-  'switch',
-  'symbol',
-  'this',
-  'throw',
-  'true',
-  'try',
-  'type',
-  'typeof',
-  'undefined',
-  'unknown',
-  'var',
-  'void',
-  'while',
-  'with',
-  'yield',
-])
+let parseProcessor: ReturnType<typeof createMarkdownParser> | null = null
+let stringifyProcessor: ReturnType<typeof createMarkdownStringifier> | null = null
 
-const TYPESCRIPT_TOKEN_PATTERN =
-  /\/\/[^\n]*|\/\*[\s\S]*?\*\/|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\b0x[\da-fA-F]+\b|\b\d+(?:\.\d+)?\b|\b[A-Za-z_$][\w$]*\b|[{}()[\].,;:?<>!=+\-*/%&|^~]+/g
+function markdownParser() {
+  parseProcessor ??= createMarkdownParser()
+  return parseProcessor
+}
 
-const parseProcessor = unified().use(remarkParse).use(remarkGfm)
-const stringifyProcessor = unified().use(remarkParse).use(remarkGfm).use(remarkStringify)
+function markdownStringifier() {
+  stringifyProcessor ??= createMarkdownStringifier()
+  return stringifyProcessor
+}
 
 export function normalizeTooltipMarkdown(markdown: string): string {
-  return String(stringifyProcessor.processSync(markdown))
+  return String(markdownStringifier().processSync(markdown))
+}
+
+/** The fenced blocks a render of this Markdown would ask tokens for. */
+export function tooltipCodeBlocks(markdown: string): readonly TooltipCodeBlock[] {
+  const blocks: TooltipCodeBlock[] = []
+  collectCodeBlocks(markdownParser().parse(markdown) as MarkdownNode, blocks)
+  return blocks
+}
+
+function collectCodeBlocks(node: MarkdownNode, blocks: TooltipCodeBlock[]): void {
+  const languageId = codeLanguage(node.lang)
+  if (node.type === 'code' && languageId) blocks.push({ text: stringValue(node.value), languageId })
+  for (const child of node.children ?? []) collectCodeBlocks(child, blocks)
+}
+
+function codeLanguage(lang: unknown): string {
+  return typeof lang === 'string' ? lang.toLowerCase() : ''
 }
 
 export function renderTooltipMarkdown(
@@ -127,7 +86,7 @@ export function renderTooltipMarkdown(
     display: 'block',
   })
 
-  const tree = parseProcessor.parse(markdown) as MarkdownNode
+  const tree = markdownParser().parse(markdown) as MarkdownNode
   appendChildren(root, document, tree.children ?? [], context)
   return root
 }
@@ -138,6 +97,7 @@ function tooltipMarkdownRenderContext(
   const classNamespace = options.classNamespace ?? 'plugin'
   return {
     classNamespace,
+    codeTokenizer: options.codeTokenizer ?? null,
     inlineCodeBackgroundVariable: `--editor-${classNamespace}-hover-inline-code-background`,
     codeBlockBackgroundVariable: `--editor-${classNamespace}-hover-code-block-background`,
   }
@@ -233,7 +193,7 @@ function codeBlockElement(
 ): HTMLElement {
   const pre = document.createElement('pre')
   const code = document.createElement('code')
-  const language = typeof lang === 'string' ? lang.toLowerCase() : ''
+  const language = codeLanguage(lang)
   renderCodeContent(document, code, value, language, context)
   if (language) code.dataset.language = language
 
@@ -282,63 +242,17 @@ function renderCodeContent(
   language: string,
   context: TooltipMarkdownRenderContext,
 ): void {
-  if (!TYPESCRIPT_LIKE_LANGUAGES.has(language)) {
-    code.textContent = value
-    return
-  }
+  code.textContent = value
+  const tokenizer = context.codeTokenizer
+  if (!tokenizer || !language) return
 
-  appendHighlightedTypeScript(document, code, value, context)
-}
+  const cached = tokenizer.cached(value, language)
+  if (cached) return paintCodeTokens(document, code, value, cached)
 
-function appendHighlightedTypeScript(
-  document: Document,
-  code: HTMLElement,
-  value: string,
-  context: TooltipMarkdownRenderContext,
-): void {
-  let cursor = 0
-  for (const match of value.matchAll(TYPESCRIPT_TOKEN_PATTERN)) {
-    const token = match[0]
-    const index = match.index ?? cursor
-    if (index > cursor) code.append(document.createTextNode(value.slice(cursor, index)))
-    code.append(typeScriptTokenElement(document, token, context))
-    cursor = index + token.length
-  }
-  if (cursor < value.length) code.append(document.createTextNode(value.slice(cursor)))
-}
-
-function typeScriptTokenElement(
-  document: Document,
-  token: string,
-  context: TooltipMarkdownRenderContext,
-): HTMLElement {
-  const element = document.createElement('span')
-  element.textContent = token
-  const tokenKind = typeScriptTokenKind(token)
-  if (!tokenKind) return element
-
-  element.className = tooltipClassName(context.classNamespace, `token-${tokenKind}`)
-  applyStyles(element, { color: typeScriptTokenColor(tokenKind) })
-  return element
-}
-
-function typeScriptTokenKind(token: string): string | null {
-  if (token.startsWith('//') || token.startsWith('/*')) return 'comment'
-  if (token.startsWith('"') || token.startsWith("'") || token.startsWith('`')) return 'string'
-  if (/^(?:0x[\da-fA-F]+|\d+(?:\.\d+)?)$/.test(token)) return 'number'
-  if (TYPESCRIPT_KEYWORDS.has(token)) return 'keyword'
-  if (/^[A-Z][\w$]*$/.test(token)) return 'type'
-  if (/^[{}()[\].,;:?<>!=+\-*/%&|^~]+$/.test(token)) return 'punctuation'
-  return null
-}
-
-function typeScriptTokenColor(tokenKind: string): string {
-  if (tokenKind === 'comment') return 'var(--editor-syntax-comment, #a1a1aa)'
-  if (tokenKind === 'string') return 'var(--editor-syntax-string, #86efac)'
-  if (tokenKind === 'number') return 'var(--editor-syntax-number, #fbbf24)'
-  if (tokenKind === 'keyword') return 'var(--editor-syntax-keyword, #93c5fd)'
-  if (tokenKind === 'type') return 'var(--editor-syntax-type, #67e8f9)'
-  return 'var(--editor-syntax-bracket, #d4d4d8)'
+  // Reached only when the hold ran out. Colour only, so the block keeps its size.
+  void tokenizer
+    .tokenize(value, language)
+    .then((tokens) => paintCodeTokens(document, code, value, tokens))
 }
 
 function linkElement(

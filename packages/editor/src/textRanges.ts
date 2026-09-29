@@ -87,7 +87,16 @@ export function codePointSizeAt(text: TextContent, offset: number): number {
 export function isWordCodePointAt(text: TextContent, offset: number): boolean {
   const codePoint = text.codePointAt(offset)
   if (codePoint === undefined) return false
+  // ASCII is answered from the code point: a whole-word search asks this twice per
+  // raw match, and a one-character string plus a property-class test is most of it.
+  if (codePoint < 0x80) return isAsciiWordCodePoint(codePoint)
   return WORD_PATTERN.test(String.fromCodePoint(codePoint))
+}
+
+function isAsciiWordCodePoint(codePoint: number): boolean {
+  if (codePoint >= 0x61) return codePoint <= 0x7a
+  if (codePoint >= 0x41) return codePoint <= 0x5a || codePoint === 0x5f
+  return codePoint >= 0x30 && codePoint <= 0x39
 }
 
 export function isWordCodePointBefore(text: TextContent, offset: number): boolean {
@@ -177,13 +186,12 @@ export function wordRangeAtOffset(text: TextContent, rawOffset: number): TextOff
 }
 
 export function isWholeWordRange(text: TextContent, range: TextOffsetRange): boolean {
-  const clamped = clampTextOffsetRange(text, range)
-  if (clamped.start > clamped.end) return false
+  const start = clampTextOffset(text, range.start)
+  const end = clampTextOffset(text, range.end)
+  if (start > end) return false
 
-  const length = clamped.end - clamped.start
-  return (
-    leftIsWordBoundary(text, clamped.start, length) && rightIsWordBoundary(text, clamped, length)
-  )
+  const length = end - start
+  return leftIsWordBoundary(text, start, length) && rightIsWordBoundary(text, end, length)
 }
 
 /**
@@ -250,11 +258,11 @@ function leftIsWordBoundary(text: TextContent, start: number, length: number): b
   return !isWordCodePointAt(text, start)
 }
 
-function rightIsWordBoundary(text: TextContent, range: TextOffsetRange, length: number): boolean {
-  if (range.end === text.length) return true
-  if (!isWordCodePointAt(text, range.end)) return true
+function rightIsWordBoundary(text: TextContent, end: number, length: number): boolean {
+  if (end === text.length) return true
+  if (!isWordCodePointAt(text, end)) return true
   if (length === 0) return false
-  return !isWordCodePointBefore(text, range.end)
+  return !isWordCodePointBefore(text, end)
 }
 
 /**

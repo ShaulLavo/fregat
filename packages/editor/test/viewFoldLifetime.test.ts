@@ -1,3 +1,4 @@
+import { createEditorDocumentAnalysis } from '../src/editor/documentAnalysis'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import {
   createEditorBufferSession,
@@ -73,13 +74,14 @@ test('restores a collapse when attachment adopts a prepared document', async () 
   initial.dispose()
   const prepared = createEditorPreparedDocument({
     buffer,
+    analysis: createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' }),
     configuredTabSize: 4,
     tabSizePolicy: 'detect-indentation',
     documentConfigurationTag: [],
     documentId: 'file.txt',
     languageId: null,
   })
-  const take = vi.spyOn(prepared, 'take')
+  const take = vi.spyOn(prepared, 'borrow')
   const restored = createFoldSessionEditor(session, {
     documentId: 'file.txt',
     preparedDocument: prepared,

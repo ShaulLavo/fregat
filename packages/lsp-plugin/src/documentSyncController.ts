@@ -1,5 +1,6 @@
+import type { LanguageServerDocumentSnapshot } from './types'
 import type { DocumentSyncPoint, TextSnapshot } from '@singapore-editor/core/document'
-import type { EditorDisposable, EditorViewSnapshot } from '@singapore-editor/core/extensions'
+import type { EditorDisposable } from '@singapore-editor/core/extensions'
 import type { LspWorkspace } from '@singapore-editor/lsp'
 import type * as lsp from 'vscode-languageserver-protocol'
 
@@ -13,7 +14,7 @@ export type LanguageServerDocumentUriTransition = {
 }
 
 export type LanguageServerDocumentSyncControllerRegistration = {
-  readonly getSnapshot: () => EditorViewSnapshot
+  readonly getSnapshot: () => LanguageServerDocumentSnapshot
   readonly sync: DocumentSync
   readonly workspace: LspWorkspace
 }

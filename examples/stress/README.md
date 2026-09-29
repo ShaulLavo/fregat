@@ -38,6 +38,41 @@ Without a directory argument, that command prints only the manifest. Generated d
 belong in Git. `results/manifest.json` pins the seed, generator version, UTF-8 bytes, UTF-16 length,
 normalized line count, longest line, search count, and SHA-256 for every fixture.
 
+## Full-text boundary workload (E033)
+
+`node boundary.mjs --output /work/tmp/editor-e033/boundary/run.json` opens two views over a
+document fragmented by 32 replacements at 65,536, 4,194,304 and 50,331,648 units. The content above
+the filler is fixed, so the viewport, captures, caret and conflict stay the same as the size grows.
+`plain` has no plugins. `contributions` adds Markdown (fixed captures), scope-lines, decode and the
+merge-conflict plugin, with a conflict present and the caret typing inside it. Each configuration
+runs 20 warm-up and 200 measured native keys, then the same for undo. It records open, steady-state,
+export and disposal heap, and export time. `--diagnostics` adds read counters, taken before the
+probe's own full-text correctness check. Run the same files from a worktree of the control commit and
+alternate the two; `--configs` and `--sizes` narrow a rerun.
+
+For large-file minimap work, `--configs minimap,folds` uses repeating indented functions, with
+and without minimaps. `--key-delay 80` lets the minimap's delayed updates run during typing;
+an unpaced burst can end before the first update. `--views 1` measures a single view, and the
+default remains two shared views. These configurations wait five seconds after opening and
+capture a screenshot before input. Their results also report each worker's post-GC CDP heap,
+separately from the main renderer. Worker `backingStorageSize` includes ArrayBuffers and
+external strings; it is not a measurement of live WASM trees alone.
+
+## Row geometry workload (E036)
+
+`node geometry.mjs --output /work/tmp/editor-e036/run.json` opens one 900x600 view over 3,000-line
+fixtures: Go indented with tabs and the same text with four spaces, both again padded to 180 columns,
+Markdown with inline replacements, and Unicode. Each fixture runs one counting pass (geometry
+diagnostics and rect-read counters on) and `--repetitions` timing passes (both off), each in a fresh
+context. Workloads are 60 clicks over three screens, 60 ArrowDown, 60 ArrowRight and 24 typed keys.
+The summary reports mounted rows per geometry path, builds and sweeps per operation, rect reads,
+CDP layout, script and task time, and dispatch-to-applied latency. `--font-check "a,b"` instead
+hit-tests every third column of the space-indented fixture in each font and times a monospace probe.
+
+`node blink.mjs --output /work/tmp/editor-e036/blink.json` measures whole-browser CPU from `/proc`
+while a focused view sits idle: CSS blink, a JS interval, and no blink, interleaved per round.
+Headless compositing is software; pass `--headed` for a GPU reading.
+
 ## Measurements and correctness
 
 Every fixture runs every scenario. The ordinary open also enables the real TypeScript Tree-sitter

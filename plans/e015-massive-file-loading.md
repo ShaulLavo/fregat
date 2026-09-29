@@ -1,12 +1,14 @@
 # E015: Design bounded loading for massive files
 
-- Status: Proposed
+- Status: Approved
 - Kind: Research
 - Owner: Cross-repo
 - Priority: P3
 - Effort: XL
-- Dependencies: [E001](../examples/stress/README.md), [E007](e007-chunked-document-consumers.md)
+- Dependencies: [E001](../examples/stress/README.md), [E007](../docs/performance/e007-consumer-copies.md)
 - Inspected baseline: `9abb944f3a2b8d6516953fdec75e8df5e1a94811`
+
+Decided 2026-09-25: owner — this plan and Platform [Plan 112](../../platform/plans/112-large-file-ceiling.md) run as one lane, 112 first. 112's benchmark sets the ceiling this plan's scope and exit are written against.
 
 ## Outcome
 

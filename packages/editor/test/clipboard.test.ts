@@ -131,9 +131,7 @@ describe('clipboard', () => {
       expect(clipboard.text()).toBe('const x')
     })
 
-    // Markup is one run of text with nowhere to say where a caret's share of it ended, which is
-    // exactly what the per-caret fragments beside it carry.
-    it('writes no markup for a copy taken off more than one selection', () => {
+    it('styles multiple selections with the same separators as plain text', () => {
       const clipboard = createClipboard()
       const session = createDocumentSession('const x = 1')
       session.setSelections([
@@ -145,8 +143,22 @@ describe('clipboard', () => {
 
       clipboard.copy()
 
-      expect(clipboard.html()).toBe('')
+      expect(clipboard.html()).toContain('<span style="color: #569cd6;">const</span>\nx')
       expect(clipboard.text()).toBe('const\nx')
+    })
+
+    it('omits projected syntax until current-revision tokens arrive', () => {
+      const clipboard = createClipboard()
+      editor.setText('const x = 1\nconst y = 2')
+      editor.setTokens([{ start: 0, end: 5, style: { color: '#569cd6' } }])
+      editor.edit({ from: 0, to: 0, text: '/*' })
+      editor.setSelection(2, 7)
+      clipboard.copy()
+      expect(clipboard.text()).toBe('const')
+      expect(clipboard.html()).toBe('')
+      editor.setTokens([{ start: 2, end: 7, style: { color: '#123456' } }])
+      clipboard.copy()
+      expect(clipboard.html()).toContain('color: #123456')
     })
 
     it('writes no markup for a payload past the size cap', () => {

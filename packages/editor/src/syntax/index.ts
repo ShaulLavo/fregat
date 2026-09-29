@@ -9,6 +9,7 @@ export {
   isEditorSyntaxLanguage,
   type BracketInfo,
   type EditorSyntaxCapture,
+  type EditorSyntaxRecords,
   type EditorSyntaxDegradedState,
   type EditorSyntaxEditSummary,
   type EditorSyntaxError,

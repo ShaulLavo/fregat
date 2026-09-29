@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { createPieceTableSnapshot } from '@singapore-editor/core/document'
+import {
+  createDocumentTextSnapshot,
+  createPieceTableSnapshot,
+} from '@singapore-editor/core/document'
 import type { EditorPluginContext } from '@singapore-editor/core/extensions'
 import type {
   TreeSitterLanguageAssets,
@@ -17,6 +20,7 @@ import {
   markdown,
   typeScript,
 } from '../src'
+import { createTestPluginContext } from '@singapore-editor/core/testing'
 
 describe('Tree-sitter language contributions', () => {
   it('exports the first-party language descriptors', () => {
@@ -28,7 +32,6 @@ describe('Tree-sitter language contributions', () => {
       'css',
       'json',
       'markdown',
-      'markdown_inline',
       'astro',
       'python',
       'shellscript',
@@ -43,6 +46,8 @@ describe('Tree-sitter language contributions', () => {
       'php',
       'lua',
       'svelte',
+      'sql',
+      'mdx',
     ])
     expect(TREE_SITTER_LANGUAGE_CONTRIBUTIONS.every((contribution) => 'load' in contribution)).toBe(
       true,
@@ -75,13 +80,14 @@ describe('Tree-sitter language contributions', () => {
     expect(registerSyntaxProvider).toHaveBeenCalledWith(
       expect.objectContaining({ createSession: expect.any(Function) }),
     )
+    const snapshot = createPieceTableSnapshot('const a = 1;')
     expect(
       registerSyntaxProvider.mock.calls[0]?.[0].createSession({
         documentId: 'main.ts',
         languageId: 'typescript',
         includeHighlights: true,
-        fullText: 'const a = 1;',
-        snapshot: createPieceTableSnapshot('const a = 1;'),
+        snapshot,
+        textSnapshot: createDocumentTextSnapshot(snapshot),
       }),
     ).not.toBeNull()
   })
@@ -118,7 +124,7 @@ async function loadAssets(
 }
 
 function pluginContext(): EditorPluginContext {
-  return {
+  return createTestPluginContext({
     registerHighlighter: vi.fn(() => ({ dispose: vi.fn() })),
     registerSyntaxProvider: vi.fn<EditorPluginContext['registerSyntaxProvider']>(() => ({
       dispose: vi.fn(),
@@ -130,5 +136,5 @@ function pluginContext(): EditorPluginContext {
     registerDecorationContribution: vi.fn(() => ({ dispose: vi.fn() })),
     registerGutterContribution: vi.fn(() => ({ dispose: vi.fn() })),
     registerInjectedTextRowProvider: vi.fn(() => ({ dispose: vi.fn() })),
-  }
+  })
 }

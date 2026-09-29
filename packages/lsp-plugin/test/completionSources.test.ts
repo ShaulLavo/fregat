@@ -2,9 +2,9 @@ import { EditorTokenStore } from '@singapore-editor/core/syntax'
 import type { DocumentSessionChange, TextEdit } from '@singapore-editor/core/document'
 import { createEditorLanguageFeatureToken } from '@singapore-editor/core/extensions'
 import type {
+  EditorCommandHandler,
   EditorDisposable,
   EditorEditContributionContext,
-  EditorPluginContext,
   EditorViewContributionContext,
   EditorViewContributionProvider,
   EditorViewSnapshot,
@@ -18,7 +18,19 @@ import {
   type EditorCompletionSource,
 } from '../src/completionProviders'
 import { createLanguageServerAdapterPlugin } from '../src/plugin'
-import { documentSyncSnapshotFields, viewSnapshotStructuralFields } from './documentSyncSnapshot'
+import { createTestKeymap, type TestKeymap } from '@singapore-editor/core/testing'
+import type { EditorAnyCommandId } from '@singapore-editor/core/editor'
+import {
+  documentSyncSnapshotFields,
+  viewSnapshotStructuralFields,
+  viewText,
+  viewTextFields,
+} from './documentSyncSnapshot'
+import {
+  createTestEditContributionContext,
+  createTestPluginContext,
+  createTestViewContributionContext,
+} from '@singapore-editor/core/testing'
 
 type JsonMessage = Record<string, unknown>
 
@@ -58,17 +70,23 @@ class FakeTransport implements LspManagedTransport {
   }
 }
 
+// Each harness's keymap listens on the document too, so it goes with the test that made it.
+const keymaps: TestKeymap[] = []
+
 describe('a completion list built from several sources', () => {
   afterEach(() => {
     vi.useRealTimers()
     document.body.replaceChildren()
+    for (const keymap of keymaps.splice(0)) keymap.dispose()
   })
 
   it('keeps ambient providers when the server set contributes no completion lane', () => {
     const ambient = itemSource([{ label: 'snippet' }])
     const getProviders = vi.fn(() => [ambient])
     const sources = new LanguageServerCompletionSources(
-      { getProviders } as unknown as EditorViewContributionContext,
+      createTestViewContributionContext({
+        getProviders: getProviders as EditorViewContributionContext['getProviders'],
+      }),
       [],
     )
 
@@ -206,30 +224,26 @@ async function connectedEditor(options: {
     channel.registerProvider(COMPLETION_SOURCES, { language: '*' }, source),
   )
 
-  const provider = activateProvider(transport, features, applyEdits, options.onError)
-  const contribution = provider.createContribution({
-    container: element,
-    scrollElement: element,
-    contentElement: element,
-    highlightPrefix: 'editor-test',
-    hasDocument: () => true,
-    getSnapshot: () => snapshot,
-    requestViewUpdate: vi.fn(),
-    getFeature: ((token: unknown) =>
-      features.get(token) ?? null) as EditorViewContributionContext['getFeature'],
-    getProviders: channel.getProviders,
-    registerProvider: channel.registerProvider,
-    revealLine: vi.fn(),
-    focusEditor: vi.fn(),
-    setSelection: vi.fn(),
-    setSelections: vi.fn(),
-    setScrollTop: vi.fn(),
-    reserveOverlayWidth: vi.fn(),
-    textOffsetFromPoint: vi.fn(() => 0),
-    getRangeClientRect: vi.fn(() => new DOMRect(10, 20, 40, 18)),
-    setRangeHighlight: vi.fn(),
-    clearRangeHighlight: vi.fn(),
-  })
+  const commands = new Map<EditorAnyCommandId, EditorCommandHandler>()
+  const provider = activateProvider(transport, features, applyEdits, commands, options.onError)
+  const keymap = createTestKeymap(element, commands)
+  keymaps.push(keymap)
+  const contribution = provider.createContribution(
+    createTestViewContributionContext({
+      registerKeymapContextKey: keymap.registerKeymapContextKey,
+      container: element,
+      scrollElement: element,
+      contentElement: element,
+      highlightPrefix: 'editor-test',
+      getSnapshot: () => snapshot,
+      getFeature: ((token: unknown) =>
+        features.get(token) ?? null) as EditorViewContributionContext['getFeature'],
+      getProviders: channel.getProviders,
+      registerProvider: channel.registerProvider,
+      textOffsetFromPoint: vi.fn(() => 0),
+      getRangeClientRect: vi.fn(() => new DOMRect(10, 20, 40, 18)),
+    }),
+  )
   if (!contribution) throw new Error('missing contribution')
 
   if (options.connect !== false) {
@@ -254,7 +268,7 @@ async function connectedEditor(options: {
     applyEdits,
     type: (character) => {
       const at = snapshot.selections[0]?.headOffset ?? 0
-      const next = `${snapshot.fullText.slice(0, at)}${character}${snapshot.fullText.slice(at)}`
+      const next = `${viewText(snapshot).slice(0, at)}${character}${viewText(snapshot).slice(at)}`
       snapshot = editorSnapshot(next, at + character.length, snapshot.textVersion + 1)
       contribution.update(
         snapshot,
@@ -319,6 +333,7 @@ function activateProvider(
   transport: LspManagedTransport,
   features: Map<unknown, unknown>,
   applyEdits: EditorEditContributionContext['applyEdits'],
+  commands: Map<EditorAnyCommandId, EditorCommandHandler>,
   onError?: (error: unknown) => void,
 ): EditorViewContributionProvider {
   let provider: EditorViewContributionProvider | null = null
@@ -326,40 +341,47 @@ function activateProvider(
   createLanguageServerAdapterPlugin({
     name: 'editor.test-lsp',
     createTransport: () => transport,
-    defaultHighlightPrefix: 'editor-test',
     completion: {
       acceptTimingName: COMPLETION_ACCEPT_TIMING_NAME,
       widgetClassNamespace: 'test-lsp',
     },
     onError,
-  }).activate({
-    registerHighlighter: () => disposable,
-    registerSyntaxProvider: () => disposable,
-    registerViewContribution: (value) => {
-      provider = value
-      return disposable
-    },
-    registerCommandContribution: () => disposable,
-    registerCapabilityContribution: () => disposable,
-    registerEditContribution: (value) => {
-      value.createContribution({
-        hasDocument: () => true,
-        materializeFullText: () => '',
-        getTextSnapshot: () => null,
-        getSelections: () => [],
-        focusEditor: vi.fn(),
-        applyEdits,
-        registerFeature: (id, feature) => {
-          features.set(id, feature)
-          return { dispose: () => features.delete(id) }
-        },
-      })
-      return disposable
-    },
-    registerDecorationContribution: () => disposable,
-    registerGutterContribution: () => disposable,
-    registerInjectedTextRowProvider: () => disposable,
-  } satisfies EditorPluginContext)
+  }).activate(
+    createTestPluginContext({
+      registerHighlighter: () => disposable,
+      registerSyntaxProvider: () => disposable,
+      registerViewContribution: (value) => {
+        provider = value
+        return disposable
+      },
+      registerCommandContribution: (value) => {
+        value.createContribution({
+          registerCommand: (commandId, handler) => {
+            commands.set(commandId, handler)
+            return { dispose: () => commands.delete(commandId) }
+          },
+        })
+        return disposable
+      },
+      registerCapabilityContribution: () => disposable,
+      registerEditContribution: (value) => {
+        value.createContribution(
+          createTestEditContributionContext({
+            materializeFullText: () => '',
+            applyEdits,
+            registerFeature: (id, feature) => {
+              features.set(id, feature)
+              return { dispose: () => features.delete(id) }
+            },
+          }),
+        )
+        return disposable
+      },
+      registerDecorationContribution: () => disposable,
+      registerGutterContribution: () => disposable,
+      registerInjectedTextRowProvider: () => disposable,
+    }),
+  )
 
   if (!provider) throw new Error('missing provider')
   return provider
@@ -375,9 +397,8 @@ function editorSnapshot(
     ...viewSnapshotStructuralFields(),
     documentId: 'src/index.ts',
     languageId: 'typescript',
-    fullText,
+    ...viewTextFields(fullText),
     textVersion,
-    lineStarts: [0],
     tokens: EditorTokenStore.empty(),
     brackets: [],
     selections: [

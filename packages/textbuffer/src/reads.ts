@@ -4,7 +4,7 @@ import type {
   PieceTableTreeSnapshot,
   PieceTreeNode,
 } from './pieceTableTypes'
-import { getBufferText } from './buffers'
+import { bufferUnitAt, readBufferRange } from './buffers'
 import { collectTextInRange, forEachTextInRange } from './tree'
 import { getPieceVisibleLength, getSubtreeVisibleLength } from './node'
 import { createPieceTableWalker } from './walker'
@@ -12,9 +12,6 @@ import { findLineRange, type LineRangeResult } from './positions'
 import { isHighSurrogate, isLowSurrogate } from './surrogates'
 
 export const getPieceTableLength = (snapshot: PieceTableTreeSnapshot): number => snapshot.length
-
-export const getPieceTableOriginalText = (snapshot: PieceTableTreeSnapshot): string =>
-  getBufferText(snapshot.buffers, snapshot.buffers.original)
 
 export const ensureValidRange = (snapshot: PieceTableTreeSnapshot, start: number, end: number) => {
   if (start < 0 || end < start || end > snapshot.length) {
@@ -45,7 +42,7 @@ export const readPieceTableLine = (snapshot: PieceTableTreeSnapshot, row: number
   const piece = range.piece
   if (!piece) return readPieceTableTextRange(snapshot, range.start, range.end)
   const from = piece.start - range.pieceOffset
-  return getBufferText(snapshot.buffers, piece.buffer).slice(from + range.start, from + range.end)
+  return readBufferRange(snapshot.buffers, piece.buffer, from + range.start, from + range.end)
 }
 
 export { isHighSurrogate, isLowSurrogate } from './surrogates'
@@ -70,8 +67,7 @@ export const codeUnitAt = (
 
     const pieceEnd = pieceStart + getPieceVisibleLength(node.piece)
     if (offset < pieceEnd) {
-      const text = getBufferText(buffers, node.piece.buffer)
-      return text.charCodeAt(node.piece.start + offset - pieceStart)
+      return bufferUnitAt(buffers, node.piece.buffer, node.piece.start + offset - pieceStart)
     }
 
     base = pieceEnd
@@ -104,10 +100,10 @@ export const splitsSurrogatePair = (snapshot: PieceTableTreeSnapshot, offset: nu
 
     const pieceEnd = pieceStart + getPieceVisibleLength(node.piece)
     if (offset < pieceEnd) {
-      const text = getBufferText(snapshot.buffers, node.piece.buffer)
       const at = node.piece.start + offset - pieceStart
-      if (!isLowSurrogate(text.charCodeAt(at))) return false
-      if (offset > pieceStart) return isHighSurrogate(text.charCodeAt(at - 1))
+      if (!isLowSurrogate(bufferUnitAt(snapshot.buffers, node.piece.buffer, at))) return false
+      if (offset > pieceStart)
+        return isHighSurrogate(bufferUnitAt(snapshot.buffers, node.piece.buffer, at - 1))
       return isHighSurrogate(codeUnitAt(snapshot.root, snapshot.buffers, offset - 1))
     }
 
@@ -138,8 +134,6 @@ export const streamPieceTableTextChunks = (
     offset = nextOffset
   })
 }
-
-export const forEachPieceTableTextChunk = streamPieceTableTextChunks
 
 export type PieceTablePieceStreamEntry = {
   readonly piece: Piece
@@ -226,10 +220,14 @@ const streamCurrentPiece = (
   const localEnd = Math.min(piece.length, end - pieceStart)
   if (localEnd <= localStart) return
 
-  const buffer = getBufferText(snapshot.buffers, piece.buffer)
   visit({
     piece,
-    text: buffer.slice(piece.start + localStart, piece.start + localEnd),
+    text: readBufferRange(
+      snapshot.buffers,
+      piece.buffer,
+      piece.start + localStart,
+      piece.start + localEnd,
+    ),
     start: pieceStart + localStart,
     end: pieceStart + localEnd,
   })

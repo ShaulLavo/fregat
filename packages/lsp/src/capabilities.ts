@@ -58,9 +58,11 @@ export const defaultClientCapabilities = (): lsp.ClientCapabilities => ({
       tagSupport: { valueSet: [DIAGNOSTIC_TAG_UNNECESSARY, DIAGNOSTIC_TAG_DEPRECATED] },
       versionSupport: true,
     },
+    // Pull diagnostics negotiate tags separately; TypeScript 7 sends none without this.
     diagnostic: {
       dynamicRegistration: false,
       relatedDocumentSupport: false,
+      tagSupport: { valueSet: [DIAGNOSTIC_TAG_UNNECESSARY, DIAGNOSTIC_TAG_DEPRECATED] },
     },
     hover: {
       contentFormat: ['markdown', 'plaintext'],

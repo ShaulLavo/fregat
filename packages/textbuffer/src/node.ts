@@ -12,11 +12,23 @@ export const getSubtreePieces = (node: PieceTreeNode | null): number =>
 export const getSubtreeLineBreaks = (node: PieceTreeNode | null): number =>
   node ? node.subtreeLineBreaks : 0
 
-export const getSubtreeMinOrder = (node: PieceTreeNode | null): number =>
-  node ? node.subtreeMinOrder : Number.POSITIVE_INFINITY
+// Orders rise in document order, so a subtree's bounds are its end pieces'.
+// Stored per node they were two boxed HeapNumbers, most of the tree's objects.
+export const firstOrder = (node: PieceTreeNode): number => {
+  while (node.left) node = node.left
+  return node.piece.order
+}
 
-export const getSubtreeMaxOrder = (node: PieceTreeNode | null): number =>
-  node ? node.subtreeMaxOrder : Number.NEGATIVE_INFINITY
+export const lastOrder = (node: PieceTreeNode): number => {
+  while (node.right) node = node.right
+  return node.piece.order
+}
+
+// A tombstone with no text, put in by compaction for inserted tombstones whose
+// deleted anchors resolve alike; their reverse-index entries lead here. Its
+// buffer is the threshold gap scans compare against, not a buffer id. Edits
+// never make one, which is how an order relabel tells them apart.
+export const isStandIn = (piece: Piece): boolean => piece.length === 0
 
 export const getPieceVisibleLength = (piece: Piece): number => (piece.visible ? piece.length : 0)
 
@@ -37,15 +49,13 @@ const cloneNode = (node: PieceTreeNode, epoch: number): PieceTreeNode => ({
   subtreeVisibleLength: node.subtreeVisibleLength,
   subtreePieces: node.subtreePieces,
   subtreeLineBreaks: node.subtreeLineBreaks,
-  subtreeMinOrder: node.subtreeMinOrder,
-  subtreeMaxOrder: node.subtreeMaxOrder,
   subtreeMinBuffer: node.subtreeMinBuffer,
 })
 
 export const own = (node: PieceTreeNode, epoch: number): PieceTreeNode =>
   node.epoch === epoch ? node : cloneNode(node, epoch)
 
-// One pass over the two children for the height and all seven summaries. This
+// One pass over the two children for the height and all five summaries. This
 // runs on every node an edit touches, so the children are read once each and
 // the bounds are compared inline rather than through Math.min.
 export const summarize = (node: PieceTreeNode): PieceTreeNode => {
@@ -57,8 +67,6 @@ export const summarize = (node: PieceTreeNode): PieceTreeNode => {
   let visible = piece.visible ? piece.length : 0
   let lineBreaks = piece.visible ? piece.lineBreaks : 0
   let pieces = 1
-  let minOrder = piece.order
-  let maxOrder = piece.order
   let minBuffer: number = piece.buffer
   if (left) {
     height = left.height
@@ -66,8 +74,6 @@ export const summarize = (node: PieceTreeNode): PieceTreeNode => {
     visible += left.subtreeVisibleLength
     lineBreaks += left.subtreeLineBreaks
     pieces += left.subtreePieces
-    if (left.subtreeMinOrder < minOrder) minOrder = left.subtreeMinOrder
-    if (left.subtreeMaxOrder > maxOrder) maxOrder = left.subtreeMaxOrder
     if (left.subtreeMinBuffer < minBuffer) minBuffer = left.subtreeMinBuffer
   }
   if (right) {
@@ -76,8 +82,6 @@ export const summarize = (node: PieceTreeNode): PieceTreeNode => {
     visible += right.subtreeVisibleLength
     lineBreaks += right.subtreeLineBreaks
     pieces += right.subtreePieces
-    if (right.subtreeMinOrder < minOrder) minOrder = right.subtreeMinOrder
-    if (right.subtreeMaxOrder > maxOrder) maxOrder = right.subtreeMaxOrder
     if (right.subtreeMinBuffer < minBuffer) minBuffer = right.subtreeMinBuffer
   }
   node.height = height + 1
@@ -85,8 +89,6 @@ export const summarize = (node: PieceTreeNode): PieceTreeNode => {
   node.subtreeVisibleLength = visible
   node.subtreePieces = pieces
   node.subtreeLineBreaks = lineBreaks
-  node.subtreeMinOrder = minOrder
-  node.subtreeMaxOrder = maxOrder
   node.subtreeMinBuffer = minBuffer
   return node
 }
@@ -107,7 +109,5 @@ export const createNode = (
     subtreeVisibleLength: 0,
     subtreePieces: 0,
     subtreeLineBreaks: 0,
-    subtreeMinOrder: 0,
-    subtreeMaxOrder: 0,
     subtreeMinBuffer: 0,
   })

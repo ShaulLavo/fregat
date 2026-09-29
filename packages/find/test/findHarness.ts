@@ -1,3 +1,4 @@
+import { createTestLineStartsView } from '@singapore-editor/core/testing'
 import { expect, it } from 'vitest'
 import {
   anchorAfter,
@@ -20,12 +21,12 @@ import {
   type FindTrackedRanges,
 } from '../src/findController'
 import { EditorFindWidget } from '../src/findWidget'
-import { arrayFindLineStartsView, type FindRange, type FindTextSource } from '../src/search'
+import { type FindRange, type FindTextSource } from '../src/search'
 import type { EditorFindOptions } from '../src/types'
 
 export type FindRangeTuple = readonly [number, number]
 
-export type FindSelectionFixture = {
+type FindSelectionFixture = {
   readonly anchor: number
   readonly head: number
   readonly affinity?: SelectionAffinity
@@ -43,7 +44,7 @@ export type FindFixture = {
  * it selected, and what the widget says. Asserted as one object so a case that
  * fixes the count but loses the highlight still fails.
  */
-export type FindObservedState = {
+type FindObservedState = {
   readonly matches: readonly FindRangeTuple[]
   readonly current: FindRangeTuple | null
   readonly scope: readonly FindRangeTuple[] | null
@@ -161,7 +162,7 @@ export function findTextSource(snapshot: TextSnapshot): FindTextSource {
   return {
     length: snapshot.length,
     readRange: (start, end) => snapshot.readRange(start, end),
-    lineStartsView: arrayFindLineStartsView(lineStartsIn(snapshot)),
+    lineStartsView: createTestLineStartsView(snapshot),
   }
 }
 
@@ -241,18 +242,6 @@ function trackedPieceTableRanges(
 // Streamed rather than taken off a materialized copy, so standing in for the
 // editor's line index does not hand a case the whole-document string that find
 // exists to avoid reading.
-function lineStartsIn(snapshot: TextSnapshot): readonly number[] {
-  const starts = [0]
-  snapshot.forEachTextChunk((text, start) => {
-    let index = text.indexOf('\n')
-    while (index !== -1) {
-      starts.push(start + index + 1)
-      index = text.indexOf('\n', index + 1)
-    }
-  })
-  return starts
-}
-
 function createFindHarness(fixture: FindFixture): FindHarness {
   const store = createFindTextStore(fixture.text)
   const container = document.createElement('div')
@@ -277,6 +266,7 @@ function createFindHarness(fixture: FindFixture): FindHarness {
     trackPaintedRanges: (ranges) => store.trackRanges(ranges),
     getSelections: () => selections,
     focusEditor: () => {},
+    announce: () => {},
     setSelection: (anchor, head, _timingName, options) => {
       selections = [resolveSelection({ anchor, head, affinity: options?.affinity })]
     },

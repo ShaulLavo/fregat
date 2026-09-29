@@ -6,7 +6,7 @@ import {
   type DocumentSessionChange,
 } from '../src/documentSession'
 import type { Editor, EditorOptions } from '../src/editor'
-import type { EditorHighlightResult } from '../src/plugins'
+import type { EditorHighlightResult } from '../src/syntax/highlighter'
 import {
   recordEditorPerformanceDiagnostic,
   type EditorPerformanceDiagnostic,
@@ -238,7 +238,7 @@ test('a native edit and undo correlate both affected views with the committed sh
 
   expect(first.materializeFullText()).toBe('aXbc')
   expect(second.materializeFullText()).toBe('aXbc')
-  expect(first.getInputElement().selectionStart).toBe(2)
+  expect((first.getInputElement() as HTMLTextAreaElement).selectionStart).toBe(2)
   const commits = records.filter((event) => event.name === 'editor.document.committed')
   const layouts = records.filter((event) => event.name === 'editor.view.updated')
   const input = records.find((event) => event.name === 'editor.input')
@@ -256,7 +256,7 @@ test('a native edit and undo correlate both affected views with the committed sh
   expect(first.dispatchCommand('undo')).toBe(true)
   expect(first.materializeFullText()).toBe('abc')
   expect(second.materializeFullText()).toBe('abc')
-  expect(first.getInputElement().selectionStart).toBe(1)
+  expect((first.getInputElement() as HTMLTextAreaElement).selectionStart).toBe(1)
   expect(records.find((event) => event.name === 'editor.input')).toMatchObject({
     operation: { input: 'undo' },
   })
@@ -267,7 +267,7 @@ test('composition preedit stays native and only its final text commits', () => {
   const editor = mountEditor()
   editor.openDocument({ documentId: 'composition.txt', text: 'abc' })
   editor.setSelection(1)
-  const input = editor.getInputElement()
+  const input = editor.getInputElement() as HTMLTextAreaElement
   records.length = 0
   input.dispatchEvent(new Event('compositionstart', { bubbles: true }))
   const update = new Event('compositionupdate', { bubbles: true })

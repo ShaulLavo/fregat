@@ -5,6 +5,7 @@ import type {
 } from '@singapore-editor/core/extensions'
 import type { LspClient } from '@singapore-editor/lsp'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createTestViewContributionContext } from '@singapore-editor/core/testing'
 import type * as lsp from 'vscode-languageserver-protocol'
 
 import {
@@ -24,11 +25,114 @@ import {
 } from '@singapore-editor/plugin-ui'
 import { connectedEditor, flushPromises, singleLineRange } from './connectedEditor'
 import { snapshotDocument } from './snapshotDocument'
+import { viewTextFields } from './documentSyncSnapshot'
 
 describe('hover timing and keyboard access', () => {
   afterEach(() => {
     vi.useRealTimers()
     document.body.replaceChildren()
+  })
+
+  it('passes document identity and version per diagnostic and refuses stale actions', () => {
+    let active = activeDocument()
+    const diagnostics: lsp.Diagnostic[] = [
+      { range: singleLineRange(6, 11), message: 'first warning', severity: 2 },
+      { range: singleLineRange(6, 11), message: 'second error', severity: 1 },
+    ]
+    const run = vi.fn()
+    const getDiagnosticActions = vi.fn((context) => [{ label: 'Inspect', run: () => run(context) }])
+    const participant = createLanguageServerHoverParticipant({
+      router: { hasReady: () => false } as never,
+      requestHover: async () => null,
+      getActiveDocument: () => active,
+      getDiagnostics: () => diagnostics,
+      getDiagnosticActions,
+      onRequestError: vi.fn(),
+    })
+    const parts = participant.computeSync!({
+      anchor: { offset: 8, range: { start: 6, end: 11 }, source: 'keyboard' },
+      snapshot: hoverSnapshot(active, 'const value = 1'),
+      signal: new AbortController().signal,
+    })
+    const action = parts[0]?.notes?.[1]?.actions?.[0]
+    expect(action).toBeDefined()
+    action!.run()
+    expect(run).toHaveBeenCalledExactlyOnceWith({
+      documentUri: active.uri,
+      textVersion: 1,
+      diagnostic: diagnostics[1],
+    })
+    active = { ...active, textVersion: 2 }
+    expect(() => action!.run()).toThrow('The diagnostic changed')
+    expect(run).toHaveBeenCalledTimes(1)
+  })
+
+  it('joins a running action across hovers and reports its failure to the host', async () => {
+    const active = activeDocument()
+    const diagnostics: lsp.Diagnostic[] = [
+      { range: singleLineRange(6, 11), message: 'slow warning', severity: 2 },
+    ]
+    let fail: (error: Error) => void = () => undefined
+    const run = vi.fn(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          fail = reject
+        }),
+    )
+    const onRequestError = vi.fn()
+    const participant = createLanguageServerHoverParticipant({
+      router: { hasReady: () => false } as never,
+      requestHover: async () => null,
+      getActiveDocument: () => active,
+      getDiagnostics: () => diagnostics,
+      getDiagnosticActions: () => [{ label: 'Fix', run }],
+      onRequestError,
+    })
+    const actionFromHover = () =>
+      participant.computeSync!({
+        anchor: { offset: 8, range: { start: 6, end: 11 }, source: 'pointer' },
+        snapshot: hoverSnapshot(active, 'const value = 1'),
+        signal: new AbortController().signal,
+      })[0]?.notes?.[0]?.actions?.[0]
+
+    const first = actionFromHover()!.run()
+    const second = actionFromHover()!.run()
+    expect(second).toBe(first)
+    expect(run).toHaveBeenCalledOnce()
+
+    const failure = new Error('fix failed')
+    fail(failure)
+    await expect(first).rejects.toBe(failure)
+    expect(onRequestError).toHaveBeenCalledExactlyOnceWith(failure)
+  })
+
+  it('runs an action after its diagnostic is republished unchanged', () => {
+    const active = activeDocument()
+    let diagnostics: lsp.Diagnostic[] = [
+      { range: singleLineRange(6, 11), message: 'warning', severity: 2 },
+    ]
+    const run = vi.fn()
+    const participant = createLanguageServerHoverParticipant({
+      router: { hasReady: () => false } as never,
+      requestHover: async () => null,
+      getActiveDocument: () => active,
+      getDiagnostics: () => diagnostics,
+      getDiagnosticActions: () => [{ label: 'Fix', run }],
+      onRequestError: vi.fn(),
+    })
+    const action = participant.computeSync!({
+      anchor: { offset: 8, range: { start: 6, end: 11 }, source: 'pointer' },
+      snapshot: hoverSnapshot(active, 'const value = 1'),
+      signal: new AbortController().signal,
+    })[0]?.notes?.[0]?.actions?.[0]
+
+    diagnostics = [{ range: singleLineRange(6, 11), message: 'warning', severity: 2 }]
+    action!.run()
+    expect(run).toHaveBeenCalledOnce()
+
+    diagnostics = [{ range: singleLineRange(6, 11), message: 'other warning', severity: 2 }]
+    expect(() => action!.run()).toThrow('The diagnostic changed')
+    expect(run).toHaveBeenCalledOnce()
   })
 
   it('starts semantic work halfway through the delay and paints only after the full delay', async () => {
@@ -374,7 +478,7 @@ function hoverController(
   const element = document.createElement('div')
   document.body.append(element)
   let active = activeDocument(text)
-  const snapshot = hoverSnapshot(active)
+  const snapshot = hoverSnapshot(active, text)
   const request = vi.fn<LspClient['request']>()
   const onDefinitionLinkHover =
     vi.fn<NonNullable<DefinitionLinkControllerOptions['onDefinitionLinkHover']>>()
@@ -396,20 +500,22 @@ function hoverController(
     getDiagnostics: () => [],
     onRequestError: vi.fn(),
   })
-  const context = {
+  const context = createTestViewContributionContext({
     container: element,
     scrollElement: element,
     contentElement: element,
     hasDocument: () => true,
     getSnapshot: () => snapshot,
-    getProviders: () => [participant],
+    getProviders: (() => [participant]) as EditorViewContributionContext['getProviders'],
     focusEditor: vi.fn(),
+    rowAtPoint: () => null,
+    markerAtPoint: () => null,
     textOffsetFromPoint: vi.fn(() => 6),
     getRangeClientRect: vi.fn(() => new DOMRect(10, 20, 40, 18)),
     setSelection: vi.fn(),
     setRangeHighlight: vi.fn(),
     clearRangeHighlight: vi.fn(),
-  } as unknown as EditorViewContributionContext
+  })
   const hover = createHoverController({ context, classNamespace: 'test' })
   const definitionLink = new DefinitionLinkController({
     context,
@@ -448,19 +554,17 @@ function activeDocument(text = 'const value = 1'): ActiveDocument {
     uri: 'file:///index.ts',
     languageId: 'typescript',
     ...snapshotDocument(text),
-    fullText: text,
     textVersion: 1,
     lspVersion: 1,
   }
 }
 
-function hoverSnapshot(active: ActiveDocument): EditorViewSnapshot {
+function hoverSnapshot(active: ActiveDocument, text: string): EditorViewSnapshot {
   return {
     documentId: 'index.ts',
     languageId: active.languageId,
-    fullText: active.fullText,
+    ...viewTextFields(text),
     textVersion: active.textVersion,
-    lineStarts: active.lineStarts.toArray(),
     tokens: [],
     selections: [{ anchorOffset: 6, headOffset: 6, startOffset: 6, endOffset: 6 }],
   } as unknown as EditorViewSnapshot

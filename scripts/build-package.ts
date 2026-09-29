@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -52,7 +53,7 @@ function entriesFromExports(exportsField: PackageManifest['exports']): Record<st
   for (const [exportPath, target] of Object.entries(exportsField)) {
     const source = sourceTarget(target)
     if (!source) continue
-    if (!source.endsWith('.ts')) continue
+    if (!source.endsWith('.ts') && !source.endsWith('.tsx')) continue
 
     entries[entryName(exportPath, source)] = path.resolve(packageDir, source)
   }
@@ -69,20 +70,26 @@ function sourceTargetFromRuntimeTarget(target: string | null): string | null {
   if (target.startsWith('./src/')) return target
   if (!target.startsWith('./dist/')) return target
 
-  return target.replace(/^\.\/dist\//, './src/').replace(/\.js$/, '.ts')
+  const source = target.replace(/^\.\/dist\//, './src/')
+  if (!source.endsWith('.js')) return source
+
+  const base = source.slice(0, -3)
+  return existsSync(path.resolve(packageDir, `${base}.ts`)) ? `${base}.ts` : `${base}.tsx`
 }
 
 function entryName(exportPath: string, source: string): string {
   if (exportPath === '.') return 'index'
 
-  const sourceName = source.replace(/^\.\/src\//, '').replace(/\.ts$/, '')
+  const sourceName = source.replace(/^\.\/src\//, '').replace(/\.tsx?$/, '')
   return sourceName.replaceAll(path.sep, '/')
 }
 
 async function buildJavaScript(): Promise<void> {
-  const inlineWorkerEntries = new Set<string>()
+  const workerReferences: string[] = []
   await build({
     assetsInclude: ['**/*.wasm'],
+    // Relative, so an emitted worker URL resolves from the module that constructs it.
+    base: './',
     build: {
       assetsInlineLimit: Number.MAX_SAFE_INTEGER,
       emptyOutDir: false,
@@ -107,7 +114,7 @@ async function buildJavaScript(): Promise<void> {
     },
     configFile: false,
     logLevel: 'warn',
-    plugins: [externalizeCssImports(), inlineModuleWorkers(inlineWorkerEntries)],
+    plugins: [externalizeCssImports(), canonicalModuleWorkers(workerReferences)],
     publicDir: false,
     root: packageDir,
     worker: {
@@ -117,7 +124,7 @@ async function buildJavaScript(): Promise<void> {
       },
     },
   })
-  await assertInlineWorkersHaveNoSiblingChunks(inlineWorkerEntries)
+  await assertWorkersAreCanonical(workerReferences)
 }
 
 function externalDependency(id: string, importer?: string): boolean {
@@ -171,93 +178,72 @@ function externalizeCssImports(): Plugin {
   }
 }
 
-function inlineModuleWorkers(inlineWorkerEntries: Set<string>): Plugin {
+// Vite emits a library worker as `new URL("" + new URL(x, import.meta.url).href, …)` behind a
+// vite-ignore, which a consumer's bundler reads as a plain asset. The canonical form gets bundled.
+function canonicalModuleWorkers(workerReferences: string[]): Plugin {
   return {
-    name: 'singapore-inline-module-workers',
-    enforce: 'pre',
-    transform(code, id) {
-      if (!isTypeScriptModule(id)) return null
+    name: 'singapore-canonical-module-workers',
+    enforce: 'post',
+    generateBundle(_options, bundle) {
+      for (const output of Object.values(bundle)) {
+        if (output.type !== 'chunk') continue
 
-      const transformed = inlineModuleWorkerImports(code)
-      if (!transformed) return null
-
-      for (const workerPath of moduleWorkerPaths(code)) {
-        inlineWorkerEntries.add(`${id} -> ${workerPath}`)
+        output.code = output.code.replace(emittedWorkerPattern(), (_match, workerPath: string) => {
+          const relativePath = explicitlyRelative(JSON.parse(workerPath) as string)
+          workerReferences.push(`${output.fileName} -> ${relativePath}`)
+          return `new Worker(new URL(${JSON.stringify(relativePath)}, import.meta.url), { type: "module" })`
+        })
       }
-      return transformed
     },
   }
 }
 
-async function assertInlineWorkersHaveNoSiblingChunks(
-  inlineWorkerEntries: ReadonlySet<string>,
-): Promise<void> {
-  if (manifest.name !== '@singapore-editor/core') return
-  if (inlineWorkerEntries.size === 0) return
+function explicitlyRelative(workerPath: string): string {
+  if (workerPath.startsWith('.')) return workerPath
+  return `./${workerPath}`
+}
 
-  const assetsDirectory = path.join(distRoot, 'assets')
-  const chunks = await readdir(assetsDirectory, { withFileTypes: true })
-    .then((entries) =>
-      entries
-        .filter((entry) => entry.isFile() && entry.name.endsWith('.js'))
-        .map((entry) => path.join('assets', entry.name))
-        .toSorted(),
-    )
-    .catch((error: unknown) => {
-      if (isMissingPathError(error)) return []
-      throw error
-    })
-  if (chunks.length === 0) return
+function emittedWorkerPattern(): RegExp {
+  return /new Worker\(\s*new URL\(\s*\/\* @vite-ignore \*\/\s*(?:"" \+ )?new URL\(("[^"]+"), import\.meta\.url\)\.href,\s*"" \+ import\.meta\.url\s*\),\s*\{\s*type: "module"\s*\}\s*\)/g
+}
 
-  const workers = Array.from(inlineWorkerEntries).toSorted()
+async function assertWorkersAreCanonical(workerReferences: readonly string[]): Promise<void> {
+  const sources = await moduleWorkerSources(sourceRoot)
+  if (sources.length === workerReferences.length) return
+
   throw new Error(
-    `Inline workers must be self-contained.\nWorkers:\n${workers.join('\n')}\nSibling chunks:\n${chunks.join('\n')}`,
+    `Every module worker must be emitted as new Worker(new URL(…, import.meta.url)).\nSource:\n${sources.join('\n')}\nEmitted:\n${workerReferences.join('\n')}`,
   )
 }
 
-function isMissingPathError(error: unknown): boolean {
-  return error instanceof Error && 'code' in error && error.code === 'ENOENT'
-}
+async function moduleWorkerSources(directory: string): Promise<readonly string[]> {
+  const entries = await readdir(directory, { recursive: true, withFileTypes: true })
+  const sources: string[] = []
+  for (const entry of entries) {
+    if (!entry.isFile()) continue
+    if (!isTypeScriptModule(entry.name)) continue
+    if (isTestModule(entry.name)) continue
 
-function isTypeScriptModule(id: string): boolean {
-  if (id.endsWith('.ts')) return true
-  return id.endsWith('.tsx')
-}
-
-function inlineModuleWorkerImports(
-  code: string,
-): { readonly code: string; readonly map: null } | null {
-  const imports = new Map<string, string>()
-  const transformed = code.replace(workerConstructorPattern(), (_match, workerPath: string) => {
-    const identifier = workerIdentifier(imports.size)
-    imports.set(workerPath, identifier)
-    return `new ${identifier}()`
-  })
-
-  if (imports.size === 0) return null
-
-  return {
-    code: `${workerImportBlock(imports)}\n${transformed}`,
-    map: null,
+    const file = path.join(entry.parentPath, entry.name)
+    const code = await readFile(file, 'utf8')
+    for (const match of code.matchAll(workerConstructorPattern())) {
+      sources.push(`${path.relative(packageDir, file)} -> ${match[1]}`)
+    }
   }
+  return sources.toSorted()
+}
+
+function isTypeScriptModule(name: string): boolean {
+  if (name.endsWith('.ts')) return true
+  return name.endsWith('.tsx')
+}
+
+function isTestModule(name: string): boolean {
+  return /\.test\.tsx?$/.test(name)
 }
 
 function workerConstructorPattern(): RegExp {
   return /new\s+Worker\s*\(\s*new\s+URL\s*\(\s*['"](\.\/[^'"]+\.worker\.ts)['"]\s*,\s*import\.meta\.url\s*\)\s*,\s*\{\s*type\s*:\s*['"]module['"]\s*,?\s*\}\s*\)/g
-}
-
-function moduleWorkerPaths(code: string): readonly string[] {
-  return Array.from(code.matchAll(workerConstructorPattern()), (match) => match[1]!).filter(Boolean)
-}
-
-function workerIdentifier(index: number): string {
-  return `__SingaporInlineWorker${index}`
-}
-
-function workerImportBlock(imports: ReadonlyMap<string, string>): string {
-  return Array.from(imports, ([workerPath, identifier]) => {
-    return `import ${identifier} from '${workerPath}?worker&inline'`
-  }).join('\n')
 }
 
 async function emitDeclarations(): Promise<void> {
@@ -280,6 +266,8 @@ function declarationTsconfig(): string {
         declaration: true,
         declarationMap: true,
         emitDeclarationOnly: true,
+        // Packages with `.tsx` sources; the root config omits it because most have none.
+        jsx: 'react-jsx',
         noEmit: false,
         outDir: distRoot,
         rootDir: sourceRoot,

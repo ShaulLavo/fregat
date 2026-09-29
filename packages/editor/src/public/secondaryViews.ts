@@ -1,4 +1,4 @@
-import type { TextSnapshot } from '../documentTextSnapshot'
+import type { TextReadSnapshot } from '../documentTextSnapshot'
 import type {
   EditorLineStartsView,
   EditorResolvedSelection,
@@ -8,11 +8,15 @@ import type {
 } from '../plugins'
 import type { EditorSyntaxLanguageId } from '../syntax'
 import type { EditorTheme } from '../theme'
-import type { EditorTokenStore } from '../syntax/tokenStore'
-import type { BrowserTextMetrics, VirtualizedFoldMarker } from '../virtualization'
+import type { EditorTokenInput, EditorTokenStore } from '../syntax/tokenStore'
+import {
+  VirtualizedTextView,
+  type BrowserTextMetrics,
+  type VirtualizedFoldMarker,
+  type VirtualizedTextViewOptions,
+} from '../virtualization'
 
 export { EditorWorkScheduler as EditorSecondaryViewScheduler } from '../editor/workScheduler'
-export { VirtualizedTextView as EditorSecondaryTextView } from '../virtualization'
 export type {
   EditorScheduleWorkOptions as EditorSecondaryScheduleWorkOptions,
   EditorScheduledWorkHandle as EditorSecondaryScheduledWorkHandle,
@@ -24,18 +28,51 @@ export type {
   EditorWorkTags as EditorSecondaryWorkTags,
   EditorWorkTaskClass as EditorSecondaryWorkTaskClass,
 } from '../editor/workScheduler'
-export type {
-  VirtualizedTextViewOptions as EditorSecondaryTextViewOptions,
-  VirtualizedTextViewState as EditorSecondaryTextViewState,
-} from '../virtualization'
+
+export type EditorSecondaryTextViewOptions = VirtualizedTextViewOptions
+
+/**
+ * A read-only view of rows the editor already shows elsewhere, such as a sticky-scroll stack. It
+ * stays out of the tab order because everything it repeats is already in the reading order.
+ */
+export type EditorSecondaryTextView = {
+  setText(text: string): void
+  setTokens(tokens: EditorTokenInput): void
+  setTheme(theme: EditorTheme | null): void
+  /** The mirrored view's metrics: its row height and character width together. */
+  setTextMetrics(metrics: BrowserTextMetrics): void
+  setHeight(height: number): void
+  dispose(): void
+}
+
+export function createEditorSecondaryTextView(
+  container: HTMLElement,
+  options: EditorSecondaryTextViewOptions,
+): EditorSecondaryTextView {
+  const view = new VirtualizedTextView(container, options)
+  view.setEditable(false)
+  view.scrollElement.tabIndex = -1
+  view.inputElement.tabIndex = -1
+  return {
+    setText: (text) => view.setText(text),
+    setTokens: (tokens) => view.setTokens(tokens),
+    setTheme: (theme) => view.setTheme(theme),
+    setTextMetrics: (metrics) => {
+      view.setTextMetrics(metrics)
+    },
+    setHeight: (height) => {
+      view.scrollElement.style.height = `${height}px`
+    },
+    dispose: () => view.dispose(),
+  }
+}
 
 export type EditorSecondaryViewTextProjection = {
-  readonly snapshot: TextSnapshot | null
-  readonly length: number | null
+  readonly snapshot: TextReadSnapshot
+  readonly length: number
   readonly lineStarts: readonly number[]
-  readonly lineStartsView?: EditorLineStartsView
+  readonly lineStartsView: EditorLineStartsView
   readonly lineCount: number
-  materializeFullText(): string
 }
 
 export type EditorSecondaryViewLineModel = {
@@ -88,6 +125,7 @@ export function createEditorSecondaryViewProjection(
   snapshot: EditorViewSnapshot,
   options: EditorSecondaryViewProjectionOptions = {},
 ): EditorSecondaryViewProjection {
+  let foldSummaries: readonly EditorSecondaryViewFoldSummary[] | undefined
   return {
     documentId: snapshot.documentId,
     textVersion: snapshot.textVersion,
@@ -106,36 +144,23 @@ export function createEditorSecondaryViewProjection(
     },
     selections: snapshot.selections,
     decorations: options.decorations ?? [],
-    foldSummaries: snapshot.foldMarkers.map(foldSummaryFromMarker),
+    get foldSummaries() {
+      foldSummaries ??= snapshot.foldMarkers.map(foldSummaryFromMarker)
+      return foldSummaries
+    },
   }
 }
 
 function createTextProjection(snapshot: EditorViewSnapshot): EditorSecondaryViewTextProjection {
-  const textSnapshot = snapshot.textSnapshot ?? null
-
   return {
-    snapshot: textSnapshot,
-    length: textProjectionLength(textSnapshot),
+    snapshot: snapshot.textSnapshot,
+    length: snapshot.textSnapshot.length,
     get lineStarts() {
       return snapshot.lineStarts
     },
     lineStartsView: snapshot.lineStartsView,
     lineCount: snapshot.lineCount,
-    materializeFullText: () => materializeProjectionText(snapshot, textSnapshot),
   }
-}
-
-function textProjectionLength(textSnapshot: TextSnapshot | null): number | null {
-  if (textSnapshot) return textSnapshot.length
-  return null
-}
-
-function materializeProjectionText(
-  snapshot: EditorViewSnapshot,
-  textSnapshot: TextSnapshot | null,
-): string {
-  if (textSnapshot) return textSnapshot.materializeFullText()
-  return snapshot.fullText
 }
 
 function foldSummaryFromMarker(marker: VirtualizedFoldMarker): EditorSecondaryViewFoldSummary {

@@ -5,7 +5,7 @@ two stacks. Undoing B and typing C keeps B: A has two children, redo follows the
 left or created, and any retained state can be checked out. The execution plan has been removed;
 [selections-and-undo.md](selections-and-undo.md) still describes selection ownership, and this
 document holds the contracts the graph adds. [undo-graph-viewer.md](undo-graph-viewer.md) is the
-browser built on it (E019); persistence is still [E018](../../plans/e018-persisted-undo.md).
+browser built on it (E019); persistence is [E018](e018-persisted-undo.md).
 
 The inspected baseline was `9abb944f3a2b8d6516953fdec75e8df5e1a94811`; the work landed on top of
 `b6a265a786b08c61318a3e02b666f17cb7ef50fc`.

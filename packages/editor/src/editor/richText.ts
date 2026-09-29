@@ -8,6 +8,7 @@ import type { EditorToken, EditorTokenStyle } from '../tokens'
  * plain text goes out either way, so a payload over the cap loses only its colours.
  */
 const MAX_RICH_TEXT_SOURCE_LENGTH = 65536
+const MAX_RICH_TEXT_OUTPUT_BYTES = 1024 * 1024
 
 /**
  * Characters that would let a font name end the attribute it is written into, or start something
@@ -31,10 +32,14 @@ export type RichTextFont = {
   readonly lineHeight: string
 }
 
-export type RichTextCopyInput = {
+export type RichTextCopyFragment = {
   readonly text: string
-  /** Where `text` begins in the document, which is what the token offsets are measured against. */
   readonly startOffset: number
+  readonly separator: string
+}
+
+export type RichTextCopyInput = {
+  readonly fragments: readonly RichTextCopyFragment[]
   readonly tokens: EditorTokenStore
   readonly theme: EditorTheme | null
   readonly font: RichTextFont
@@ -48,14 +53,29 @@ export type RichTextCopyInput = {
  * alongside, and the larger of the two payloads is the one it would prefer.
  */
 export function richTextForCopy(input: RichTextCopyInput): string | null {
-  const { font, startOffset, text, theme, tokens } = input
-  if (text.length === 0) return null
-  if (text.length > MAX_RICH_TEXT_SOURCE_LENGTH) return null
-
-  const styled = styledTokensInRange(tokens, startOffset, startOffset + text.length)
-  if (styled.length === 0) return null
-
-  return `<div style="${rootStyle(theme, font)}">${richTextBody(text, startOffset, styled)}</div>`
+  const { font, fragments, theme, tokens } = input
+  const length = fragments.reduce(
+    (total, fragment) => total + fragment.text.length + fragment.separator.length,
+    0,
+  )
+  if (length === 0 || length > MAX_RICH_TEXT_SOURCE_LENGTH) return null
+  const output = new BoundedMarkup()
+  if (!output.append(`<div style="${rootStyle(theme, font)}">`)) return null
+  let hasStyle = false
+  for (const fragment of fragments) {
+    const styled = styledTokensInRange(
+      tokens,
+      fragment.startOffset,
+      fragment.startOffset + fragment.text.length,
+      output,
+    )
+    if (!styled) return null
+    hasStyle ||= styled.length > 0
+    if (!richTextBody(fragment.text, fragment.startOffset, styled, output)) return null
+    if (!output.append(escapeHtmlText(fragment.separator))) return null
+  }
+  if (!hasStyle || !output.append('</div>')) return null
+  return output.toString()
 }
 
 /** Where the copy takes its typography from: whatever the element is being rendered with. */
@@ -70,25 +90,50 @@ export function readRichTextFont(element: Element): RichTextFont {
   }
 }
 
-function richTextBody(text: string, startOffset: number, styled: readonly EditorToken[]): string {
-  const parts: string[] = []
+class BoundedMarkup {
+  private readonly parts: string[] = []
+  private bytes = 0
+  private remainingTokenVisits = MAX_RICH_TEXT_SOURCE_LENGTH
+  private readonly encoder = new TextEncoder()
+
+  takeTokens(count: number): boolean {
+    this.remainingTokenVisits -= count
+    return this.remainingTokenVisits >= 0
+  }
+
+  append(text: string): boolean {
+    this.bytes += this.encoder.encode(text).byteLength
+    if (this.bytes > MAX_RICH_TEXT_OUTPUT_BYTES) return false
+    this.parts.push(text)
+    return true
+  }
+
+  toString(): string {
+    return this.parts.join('')
+  }
+}
+
+function richTextBody(
+  text: string,
+  startOffset: number,
+  styled: readonly EditorToken[],
+  output: BoundedMarkup,
+): boolean {
   let cursor = 0
   for (const token of styled) {
-    // Tokens may overlap, and the one that got there first already spoke for the characters they
-    // share; clamping to the cursor is what keeps a character from being emitted twice.
     const start = Math.max(token.start - startOffset, cursor)
     const end = Math.min(token.end - startOffset, text.length)
     if (end <= start) continue
-
-    if (start > cursor) parts.push(escapeHtmlText(text.slice(cursor, start)))
-    parts.push(`<span style="${inlineTokenStyle(token.style)}">`)
-    parts.push(escapeHtmlText(text.slice(start, end)))
-    parts.push('</span>')
+    if (start > cursor && !output.append(escapeHtmlText(text.slice(cursor, start)))) return false
+    if (
+      !output.append(
+        `<span style="${inlineTokenStyle(token.style)}">${escapeHtmlText(text.slice(start, end))}</span>`,
+      )
+    )
+      return false
     cursor = end
   }
-  if (cursor < text.length) parts.push(escapeHtmlText(text.slice(cursor)))
-
-  return parts.join('')
+  return cursor >= text.length || output.append(escapeHtmlText(text.slice(cursor)))
 }
 
 /** Tokens that overlap the range and have something to say about it, in document order. */
@@ -96,10 +141,13 @@ function styledTokensInRange(
   tokens: EditorTokenStore,
   start: number,
   end: number,
-): readonly EditorToken[] {
+  output: BoundedMarkup,
+): readonly EditorToken[] | null {
   const last = tokens.firstStartingAtOrAfter(end)
+  const first = tokens.firstEndingAfter(start, last)
+  if (!output.takeTokens(last - first)) return null
   const overlapping = tokens
-    .toTokens(tokens.firstEndingAfter(start, last), last)
+    .toTokens(first, last)
     .filter((token) => token.end > start && inlineTokenStyle(token.style).length > 0)
 
   return overlapping.sort((a, b) => a.start - b.start || a.end - b.end)

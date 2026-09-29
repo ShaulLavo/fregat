@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { serializeEditorViewSnapshot } from '../src/editor/viewSnapshot'
 import { createFoldGutterContribution } from '../../gutters/src/foldGutter'
 import { createDocumentTextSnapshot } from '../src/documentTextSnapshot'
 import type { Editor } from '../src/editor'
@@ -118,7 +119,7 @@ describe('visible fold marker batches', () => {
     expect(visible.rows[0]?.foldMarker).toEqual(original.visibleRows[0]?.foldMarker)
     expect(readRows).toHaveBeenCalledTimes(1)
     expect(all).not.toHaveBeenCalled()
-    expect(original.toJSON().visibleRows[2]?.foldMarker).toEqual(
+    expect(serializeEditorViewSnapshot(original).visibleRows[2]?.foldMarker).toEqual(
       original.visibleRows[2]?.foldMarker,
     )
     expect(original.foldMarkers.map((marker) => marker.startRow)).toEqual([0, 2])

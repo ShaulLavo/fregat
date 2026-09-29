@@ -33,12 +33,27 @@ const DOCUMENT = { text: 'alpha beta', documentId: 'a.ts', revision: 1 }
  * suite walks the descriptor list, so an option this binding never wires to a signal fails here.
  */
 const OPTION_SAMPLES: Record<EditorControlledOptionName, OptionSample> = {
+  detectIndentation: {
+    initial: true,
+    next: false,
+    method: 'setDetectIndentation',
+    applied: [false],
+  },
   editability: {
     initial: 'editable',
     next: 'readonly',
     method: 'setEditability',
     applied: ['readonly'],
   },
+  fontFamily: {
+    initial: 'monospace',
+    next: 'JetBrains Mono, monospace',
+    method: 'setFontFamily',
+    applied: ['JetBrains Mono, monospace'],
+  },
+  folding: { initial: true, next: false, method: 'setFolding', applied: [false] },
+  fontSize: { initial: 12, next: 15, method: 'setFontSize', applied: [15] },
+  gutterLeadingInset: { initial: 0, next: 12, method: 'setGutterLeadingInset', applied: [12] },
   hiddenCharacters: {
     initial: 'show-on-selection',
     next: 'hidden',
@@ -97,6 +112,7 @@ const OPTION_SAMPLES: Record<EditorControlledOptionName, OptionSample> = {
     method: 'setTabMovesFocus',
     applied: [true],
   },
+  tabSize: { initial: 2, next: 8, method: 'setTabSize', applied: [8] },
   theme: {
     initial: { backgroundColor: '#101010' },
     next: { backgroundColor: '#303030' },
@@ -153,9 +169,12 @@ describe('controlled options', () => {
     const mounted = mountInRoot(() =>
       createEditor({
         document: () => DOCUMENT,
+        fontFamily: () => OPTION_SAMPLES.fontFamily.initial as string,
+        fontSize: () => OPTION_SAMPLES.fontSize.initial as number,
         lineHeight: () => OPTION_SAMPLES.lineHeight.initial as number,
         suspiciousCharacters: () => ({ ambiguous: true, invisible: true }),
         tabMovesFocus: () => false,
+        tabSize: () => OPTION_SAMPLES.tabSize.initial as number,
         wordWrap,
       }),
     )
@@ -188,7 +207,7 @@ describe('controlled options', () => {
     const selectionSpy = vi.spyOn(Editor.prototype, 'setSelection')
     const scrollSpy = vi.spyOn(Editor.prototype, 'setScrollPosition')
 
-    mounted.controller.mount(document.createElement('div'))
+    mounted.controller.element(document.createElement('div'))
     await flushEffects()
 
     expect(mounted.controller.editor()).not.toBe(first)
@@ -233,7 +252,7 @@ describe('controlled options', () => {
       disposeRoot = dispose
       controller = createEditor({ document: () => DOCUMENT, rowGap })
       createReaction(() => undefined)(() => {
-        controller.mount(document.createElement('div'))
+        controller.element(document.createElement('div'))
       })
     })
 
@@ -259,7 +278,7 @@ function mountInRoot(create: () => SolidEditorController): MountedEditor {
   createRoot((dispose) => {
     disposeRoot = dispose
     controller = create()
-    controller.mount(host)
+    controller.element(host)
   })
 
   return {

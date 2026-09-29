@@ -1,6 +1,6 @@
 export type HistoryNodeId = number
 
-export type EditorHistoryEntry<TSnapshot, TSelectionState, TTransaction = never> = {
+type EditorHistoryEntry<TSnapshot, TSelectionState, TTransaction = never> = {
   readonly snapshot: TSnapshot
   readonly selections: TSelectionState
   readonly transaction?: TTransaction
@@ -57,7 +57,7 @@ export type EditorHistoryCommitOptions<TSelectionState> = {
 // Every retained node pins the snapshot it was taken from, and a pinned snapshot
 // keeps alive every piece the document has ever deleted. Unbounded history therefore
 // makes a long session monotonically slower rather than merely larger.
-export const DEFAULT_RETAINED_HISTORY_STATES = 200
+const DEFAULT_RETAINED_HISTORY_STATES = 200
 
 type Node<S, Sel, T> = EditorHistoryNode<S, Sel, T>
 type Nodes<S, Sel, T> = Map<HistoryNodeId, Node<S, Sel, T>>
@@ -101,6 +101,46 @@ export const createEditorHistory = <TSnapshot, TSelectionState, TTransaction = n
     retainedStates: options.retainedStates ?? DEFAULT_RETAINED_HISTORY_STATES,
     graphRevision: 0,
   })
+}
+
+export type RestoredEditorHistoryNode<TSnapshot, TSelectionState, TTransaction = never> = Omit<
+  EditorHistoryNode<TSnapshot, TSelectionState, TTransaction>,
+  'childIds' | 'revision'
+>
+
+export type RestoredEditorHistoryState = {
+  readonly rootId: HistoryNodeId
+  readonly currentId: HistoryNodeId
+  readonly nextId: HistoryNodeId
+  readonly clock: number
+  readonly retainedStates?: number
+}
+
+// Rebuilds a graph from nodes listed in creation order. Child lists are derived here,
+// so a caller cannot hand over a parent that disagrees with its children.
+export const restoreEditorHistory = <TSnapshot, TSelectionState, TTransaction = never>(
+  restored: readonly RestoredEditorHistoryNode<TSnapshot, TSelectionState, TTransaction>[],
+  state: RestoredEditorHistoryState,
+): EditorHistory<TSnapshot, TSelectionState, TTransaction> => {
+  const nodes: Nodes<TSnapshot, TSelectionState, TTransaction> = new Map()
+  for (const node of restored) nodes.set(node.id, { ...node, childIds: [], revision: 0 })
+  for (const node of restored) {
+    if (node.parentId === null) continue
+    const parent = nodes.get(node.parentId)!
+    nodes.set(parent.id, { ...parent, childIds: [...parent.childIds, node.id] })
+  }
+
+  const history: HistoryState<TSnapshot, TSelectionState, TTransaction> = {
+    nodes,
+    rootId: state.rootId,
+    currentId: state.currentId,
+    nextId: state.nextId,
+    clock: state.clock,
+    retainedStates: state.retainedStates ?? DEFAULT_RETAINED_HISTORY_STATES,
+    graphRevision: 0,
+  }
+  prune(history)
+  return finish(history)
 }
 
 export const commitEditorHistory = <TSnapshot, TSelectionState, TTransaction = never>(

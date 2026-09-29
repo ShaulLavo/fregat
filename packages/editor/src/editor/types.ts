@@ -1,3 +1,4 @@
+import type { EditorDocumentAnalysis } from './documentAnalysis'
 import type { DocumentSessionChange } from '../documentSession'
 import type {
   EditorSyntaxLanguageId,
@@ -17,9 +18,16 @@ import type {
   VirtualizedTextViewScrollMode,
 } from '../virtualization/virtualizedTextViewTypes'
 import type { BrowserTextMetrics } from '../virtualization/browserMetrics'
+import type {
+  EditorInputKind,
+  EditorInputRoute,
+  EditorWrapBreak,
+} from '../virtualization/virtualizedTextViewTypes'
 import type { EditorKeymapOptions } from './keymap'
+import type { EditorAutoClosingPair } from './languageConfiguration'
 import type { EditorSuspiciousCharactersOptions } from '../unicodeHighlight'
 import type { TextEdit } from '../tokens'
+import type { EditorTokenInput } from '../syntax/tokenStore'
 import type { SelectionAffinity } from '../selections'
 import type { EditorPreparedDocument, EditorPreparedTagValue } from './preparedDocument'
 
@@ -60,6 +68,7 @@ export type EditorScrollPosition = {
 }
 
 export type EditorSessionOptions = {
+  readonly analysis?: EditorDocumentAnalysis | null
   readonly documentId?: string | null
   readonly documentConfigurationTag?: readonly EditorPreparedTagValue[]
   readonly highlighterConfigurationTag?: readonly EditorPreparedTagValue[]
@@ -94,6 +103,8 @@ export type EditorChangeHandler = (state: EditorState, change: DocumentSessionCh
 export type EditorOptions = {
   readonly documentKey?: string | null
   readonly snapshot?: string | null
+  /** External projections may hold saved paint until their tokens and geometry are ready. */
+  readonly presentationReady?: boolean
   readonly onPresentationChange?: (state: 'provisional' | 'live' | 'empty') => void
   readonly defaultText?: string
   readonly documentMode?: EditorDocumentMode
@@ -105,8 +116,18 @@ export type EditorOptions = {
   readonly keymap?: EditorKeymapOptions
   readonly cursorLineHighlight?: EditorCursorLineHighlightOptions
   readonly hiddenCharacters?: HiddenCharactersMode
+  /** In pixels. Popups the editor opens follow it. Unset, the stylesheet decides (13px). */
+  readonly fontSize?: number
+  /** A CSS `font-family` list. Unset, the stylesheet decides (`monospace`). */
+  readonly fontFamily?: string
+  /** Row height in pixels, not a ratio; independent of `fontSize`. */
   readonly lineHeight?: number
   readonly rangeDecorations?: readonly EditorRangeDecoration[]
+  /**
+   * Empty pixels at the gutter's leading edge, before the first lane: room between a screen edge
+   * and the line numbers. Row decorations and diff tints cover it. Defaults to 0.
+   */
+  readonly gutterLeadingInset?: number
   readonly rowGap?: number
   readonly rowPositioning?: EditorRowPositioning
   /**
@@ -118,21 +139,60 @@ export type EditorOptions = {
   readonly selectionSyncMode?: EditorSelectionSyncMode
   /** Confusable and invisible characters to point out; both families report unless turned off. */
   readonly suspiciousCharacters?: EditorSuspiciousCharactersOptions
+  /**
+   * Columns a tab character spans, and the indentation width when `detectIndentation` is off or a
+   * document gives no sign of its own. Defaults to 4.
+   */
   readonly tabSize?: number
+  /**
+   * Guesses each document's indentation width from its text, falling back to `tabSize`. On by
+   * default; turn it off where the text is not a document's own, such as a diff projection.
+   */
+  readonly detectIndentation?: boolean
+  /**
+   * Offers fold regions: syntax, indentation, contributed and hand-drawn. On by default; off, the
+   * fold commands find nothing to fold, as a diff projection needs.
+   */
+  readonly folding?: boolean
   /**
    * Hands Tab back to the page instead of indenting with it, for a reader who would otherwise have
    * no key left to leave the editor by. Ctrl+M turns it on and off from inside.
    */
   readonly tabMovesFocus?: boolean
   readonly textMetrics?: BrowserTextMetrics
+  /**
+   * `'edit-context'` takes typed text through EditContext where the engine has it (Chromium), so
+   * IME, autocorrect and dictation edits arrive with their ranges instead of being diffed out of a
+   * textarea. Elsewhere, and by default, the textarea.
+   */
+  readonly inputRoute?: EditorInputRoute
+  /** The input's accessible name. Defaults to "Editor input". */
+  readonly inputLabel?: string
+  readonly inputKind?: EditorInputKind
+  /**
+   * Leaves room below the last row to scroll it to the top. On by default; a host that sizes itself
+   * to its text turns it off.
+   */
+  readonly scrollPastEnd?: boolean
   /** Soft-wraps long lines to the viewport width instead of scrolling horizontally. */
   readonly wordWrap?: boolean
+  /**
+   * Where a wrapped row ends: `'character'` (the default) at the column that fills it, `'word'` at
+   * the last word boundary, keeping every replacement on one row.
+   */
+  readonly wordWrapBreak?: EditorWrapBreak
+  /** Replaces every language's auto-closing pairs; an empty list turns auto-close off. */
+  readonly autoClosingPairs?: readonly EditorAutoClosingPair[]
+  /** What typing an opener over a selection wraps it with. Unset, the auto-closing pairs. */
+  readonly surroundingPairs?: readonly EditorAutoClosingPair[]
 }
 
 export type EditorSetTextOptions = {
   readonly documentMode?: EditorDocumentMode
   readonly languageId?: EditorSyntaxLanguageId | null
   readonly scrollPosition?: EditorScrollPosition
+  /** Painted with the text. Without them the text arrives uncoloured until a highlighter answers. */
+  readonly tokens?: EditorTokenInput
 }
 
 export type EditorOpenDocumentOptions = EditorSetTextOptions & {

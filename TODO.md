@@ -1,7 +1,7 @@
 # TODO
 
-The original wishlist and later additions. All 24 topics are covered in the
-[Editor backlog](plans/README.md): 47 entries with dependencies, ownership, and acceptance checks.
+The original wishlist and later additions are covered in the
+[Editor backlog](plans/README.md): 60 entries with dependencies, ownership, and acceptance checks.
 
 > These notes preserve the ideas and their original context. Some missing-feature and performance
 > claims below are historical; each plan's **Current code** section records the checked baseline.
@@ -574,13 +574,95 @@ and the input-latency gate's paste and undo groups do not regress. The Shiki wor
 browser tests from the same-day change stay as they are; they already assert a spliced answer
 equals a fresh full tokenization.
 
+## Workaround audit: ask the owner, do not model it
+
+Added 2026-09-21. Platform's diff line-comment layer found the clicked row by reading
+`data-editor-virtual-row` off the editor's DOM, treated that display-row index as a buffer row, and
+the diff package carried a runtime guard only to warn when the assumption broke. One small API
+(`diffRowAtEvent`) replaced all of it. A read-only audit of the plugins and the core the same day
+found the shape again:
+
+- a plugin or host reverse-engineering the core's DOM or row geometry instead of asking;
+- a display row used where a document line is meant (the minimap);
+- a miss answered with a quiet default instead of an error;
+- obligations every host must remember (`setTokens` after each `setText`, listener order, CSS
+  overrides) where the API should do the work;
+- fast paths with no test pinning them to the slow path they replace.
+
+Each is a backlog entry (E047 to E051). Platform's halves are Platform plans 130 to 133.
+
+## Edit commands without a whole-document string
+
+Left over from E033. Edit actions (delete/move/copy/join/sort lines, comment toggles, indent,
+case transforms, trim trailing whitespace) and the exact-occurrence commands (Ctrl+D, select all
+occurrences, cut of whole lines) still take the document as one string. They reach it through
+`commandDocumentText` in `packages/editor/src/editor/inputSelectionController.ts`, which is
+allowlisted in `scripts/full-text-boundary-allow.json`. Each run costs a full copy of the
+document; on a 48M-unit file that is tens of milliseconds per keypress of these commands.
+
+Most of them only need the lines around the selections: `createLineMap` and `applyTextEdits` in
+`packages/editor/src/editor/editActions.ts`, and the `indexOf` scans in `occurrences.ts`. Move them
+onto `TextReadSnapshot` line queries and bounded reads, like selection expansion and ghost text
+after E033. Occurrence search can scan chunks forward from the selection. Trim trailing whitespace
+is genuinely whole-document and can walk chunks. Once no caller is left, delete
+`commandDocumentText` and its allowlist entry, so `check:full-text` keeps it gone.
+
+## Proportional fonts: wrap and horizontal extent from measured advances
+
+Added 2026-09-24, from E036. A proportional editor font now places clicks and carets correctly,
+because rows whose font fails the monospace check are measured in the DOM. Everything the view
+estimates before a row is measured still multiplies a column count by one character width: soft
+wrap breaks, the left spacer of windowed long rows, and the horizontal scroll width. Measure glyph
+advances once per face and use them on those paths when the font is not monospace, without
+costing monospace fonts anything.
+
+## Unnecessary code: fade in each token's own colour
+
+Added 2026-09-24. Language servers tag unused code Unnecessary and deprecated code Deprecated; VS
+Code fades the first with `opacity` on an inline span and strikes the second. Highlights cannot set
+`opacity`, and the engines disagree about colourless highlights: Chromium resolves `currentColor`
+inside `color-mix()` to transparent, and Firefox and WebKit draw an uncoloured decoration in the
+element's colour, WebKit repainting the text too. Paint both marks as twins that carry each
+producer's own colour, and keep colourless layers below the tokens.
+
+## TypeScript worker at language-server parity
+
+Added 2026-09-25. `@singapore-editor/typescript-lsp` answers hover, completion, navigation and
+semantic tokens, but not rename, symbols, signature help, code actions, formatting or pull
+diagnostics (which it advertises). It also only knows the files the host pushes up front. A host with no server should
+get from the worker everything Platform gets from its server-side language servers for
+TypeScript.
+
+## Spellcheck for painted text
+
+Added 2026-09-26, from Platform Plans 111 and 171. The editor paints text outside its input
+element, and EditContext makes the browser's spellcheck unreachable, so no misspelling is ever
+marked. The chat composer keeps Lexical until the editor marks misspelled prose itself, offers
+suggestions and learns words, using permissively licensed dictionaries only.
+
+## Tree-sitter query features
+
+Added 2026-09-28. Singapore ships three query kinds per language (highlights, folds, injections).
+Zed builds most of its language-aware features from more query files per language. Each new kind
+is a file per language plus one consumer, reusing the parse the worker already keeps: outlines for
+breadcrumbs and sticky scroll, syntax-error squiggles, and similar features without a language
+server.
+
+## One highlight pipeline for tokens and range highlights
+
+Added 2026-09-29. Syntax tokens and range highlights (find, diagnostics, spellcheck, links,
+semantic tokens and the rest) paint through two separate pipelines. Only tokens use `StaticRange`
+and know about edits; range highlights rebuild live `Range`s and are never projected through an
+edit. Whatever we do with highlights should be reusable across every painter.
+
 ## Platform-agnostic core and React Strict DOM
 
 Requested on 2026-09-20. Extract existing document and editing behavior from DOM and browser
 execution dependencies, preserve the DOM editor and Fregat's consumer contracts, and prove a
 Strict DOM native host before claiming editable native support.
-[E047](plans/e047-platform-agnostic-core.md) owns the cross-repository migration proposal;
-[detailed research](docs/architecture/e047-platform-agnostic-core.md) and the
-[pinned source ledger](docs/architecture/e047-platform-agnostic-core-sources.json) preserve its
+[E056](plans/e056-platform-agnostic-core.md) owns this approved work, parked by the owner on
+2026-09-25. [Detailed research](docs/architecture/e056-platform-agnostic-core.md) and the
+[pinned source ledger](docs/architecture/e056-platform-agnostic-core-sources.json) preserve its
 input, geometry, lifecycle, packaging and performance evidence. Implementation has not started.
-This does not authorize a Fregat native-app rewrite or reorder the cross-project roadmap.
+Plan 207 establishes the canonical Fregat source before relocation or package cutover; the
+cross-project roadmap schedules the remaining units. Native macOS keeps its existing roadmap.

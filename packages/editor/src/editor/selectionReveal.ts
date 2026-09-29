@@ -1,29 +1,13 @@
+import type { JumpCause } from './jumpHistory'
 import type { SelectionAffinity } from '../selections'
 import type { RevealBlock } from '../virtualization/virtualizedTextViewInternals'
 
 export type EditorSetSelectionOptions = {
+  readonly jumpCause?: JumpCause
   readonly affinity?: SelectionAffinity
   readonly reveal?: boolean
   readonly revealBlock?: RevealBlock
   readonly revealOffset?: number
-}
-
-/** @deprecated Use {@link EditorSetSelectionOptions}. */
-export type EditorSelectionRevealOptions = {
-  readonly reveal?: boolean
-  readonly revealOffset?: number
-}
-
-/** @deprecated Pass an {@link EditorSetSelectionOptions} object instead. */
-export type EditorSelectionRevealTarget = number | EditorSelectionRevealOptions
-
-export type EditorSetSelectionInput = EditorSetSelectionOptions | number
-
-export function normalizeEditorSetSelectionOptions(
-  input: EditorSetSelectionInput | undefined,
-): EditorSetSelectionOptions | undefined {
-  if (typeof input === 'number') return { revealOffset: input }
-  return input
 }
 
 export function selectionRevealOffset(

@@ -1,3 +1,6 @@
+import type { TextLineRange, TextReadSnapshot } from '../documentTextSnapshot'
+import { TextBlockReader } from '../textWindows'
+
 /**
  * The indentation width a document is already written in, read off its own text.
  *
@@ -44,25 +47,25 @@ type IndentationDiff = {
 const NO_INDENTATION_DIFF: IndentationDiff = { spacesDiff: 0, looksLikeAlignment: false }
 
 /**
- * The indentation width `text` is written in, or `fallbackTabSize` when its content does not say.
+ * The indentation width `source` is written in, or `fallbackTabSize` when its content does not say.
  *
  * Every pair of consecutive lines that have content votes for the width of the step between them;
  * the width with the most votes wins. Text indented with tabs abstains entirely — a tab is one level
  * whatever its display width, so there is nothing in it to measure and the configured width remains
  * the only authority on how wide to draw one.
  *
- * Expects the line endings our ingestion guarantees, so a line ends at '\n' or at the text's end.
+ * Reads the sampled lines through bounded blocks, so a long line is never copied whole.
  */
-export function guessedTabSize(text: string, fallbackTabSize: number): number {
+export function guessedTabSize(source: TextReadSnapshot, fallbackTabSize: number): number {
+  const text = new TextBlockReader(source)
   const scores = Array.from<number>({ length: LARGEST_CANDIDATE_TAB_SIZE + 1 }).fill(0)
   let linesIndentedWithTabs = 0
   let linesIndentedWithSpaces = 0
   let previous: SampledLine | null = null
-  let lineStart = 0
+  const sampledLines = Math.min(SAMPLED_LINE_LIMIT, source.lineCount)
 
-  for (let sampled = 0; sampled < SAMPLED_LINE_LIMIT && lineStart <= text.length; sampled += 1) {
-    const line = sampleLine(text, lineStart)
-    lineStart = line.end + 1
+  for (let row = 0; row < sampledLines; row += 1) {
+    const line = sampleLine(text, source.lineRange(row))
     // A blank line is not a level, and it must not become the baseline the next line is measured
     // against either — the step is between lines that have content.
     if (line.indentEnd === line.end) continue
@@ -80,7 +83,9 @@ export function guessedTabSize(text: string, fallbackTabSize: number): number {
     if (diff.looksLikeAlignment && diff.spacesDiff !== fallbackTabSize) continue
 
     previous = line
-    if (diff.spacesDiff <= LARGEST_CANDIDATE_TAB_SIZE) scores[diff.spacesDiff] += 1
+    if (diff.spacesDiff <= LARGEST_CANDIDATE_TAB_SIZE) {
+      scores[diff.spacesDiff] = (scores[diff.spacesDiff] ?? 0) + 1
+    }
   }
 
   if (linesIndentedWithTabs > linesIndentedWithSpaces) return fallbackTabSize
@@ -97,9 +102,8 @@ export function guessedTabSize(text: string, fallbackTabSize: number): number {
   return bestTabSize
 }
 
-function sampleLine(text: string, start: number): SampledLine {
-  const lineBreak = text.indexOf('\n', start)
-  const end = lineBreak === -1 ? text.length : lineBreak
+function sampleLine(text: TextBlockReader, range: TextLineRange): SampledLine {
+  const { start, end } = range
   let spaces = 0
   let tabs = 0
   let index = start
@@ -121,7 +125,11 @@ function sampleLine(text: string, start: number): SampledLine {
  * spaces changed, the spaces are per tab: that is a file whose one level is a tab plus a part-level
  * of spaces, and the part is the width being looked for.
  */
-function indentationDiff(text: string, previous: SampledLine, line: SampledLine): IndentationDiff {
+function indentationDiff(
+  text: TextBlockReader,
+  previous: SampledLine,
+  line: SampledLine,
+): IndentationDiff {
   const shared = sharedIndentationLength(text, previous, line)
   const previousTail = indentationCounts(text, previous.start + shared, previous.indentEnd)
   const lineTail = indentationCounts(text, line.start + shared, line.indentEnd)
@@ -145,7 +153,11 @@ function indentationDiff(text: string, previous: SampledLine, line: SampledLine)
   return NO_INDENTATION_DIFF
 }
 
-function sharedIndentationLength(text: string, previous: SampledLine, line: SampledLine): number {
+function sharedIndentationLength(
+  text: TextBlockReader,
+  previous: SampledLine,
+  line: SampledLine,
+): number {
   const previousLength = previous.indentEnd - previous.start
   const lineLength = line.indentEnd - line.start
   let shared = 0
@@ -161,7 +173,7 @@ function sharedIndentationLength(text: string, previous: SampledLine, line: Samp
 }
 
 function indentationCounts(
-  text: string,
+  text: TextBlockReader,
   start: number,
   end: number,
 ): { readonly spaces: number; readonly tabs: number } {
@@ -186,7 +198,7 @@ function indentationCounts(
  * opens a nested block does not end mid-list.
  */
 function looksLikeAlignment(
-  text: string,
+  text: TextBlockReader,
   previous: SampledLine,
   line: SampledLine,
   spacesDiff: number,

@@ -136,7 +136,7 @@ class BracketColorsContribution implements EditorViewContribution {
   ) {
     this.context = context
     this.options = options
-    const prefix = context.highlightPrefix ?? 'editor'
+    const prefix = context.highlightPrefix
     this.levelPaints = BRACKET_LEVEL_STYLES.map((style, level) => ({
       name: `${prefix}-bracket-level-${level}`,
       style,
@@ -176,8 +176,8 @@ class BracketColorsContribution implements EditorViewContribution {
 
   private clear(): void {
     this.painted = null
-    for (const paint of this.levelPaints) this.context.clearRangeHighlight?.(paint.name)
-    this.context.clearRangeHighlight?.(this.unexpectedName)
+    for (const paint of this.levelPaints) this.context.clearRangeHighlight(paint.name)
+    this.context.clearRangeHighlight(this.unexpectedName)
   }
 
   private setHighlight(
@@ -185,7 +185,7 @@ class BracketColorsContribution implements EditorViewContribution {
     ranges: readonly BracketColorRange[],
     style: VirtualizedTextHighlightStyle,
   ): void {
-    this.context.setRangeHighlight?.(name, ranges, style)
+    this.context.setRangeHighlight(name, ranges, style)
   }
 }
 

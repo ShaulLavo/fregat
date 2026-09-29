@@ -1,19 +1,10 @@
-import { detectPlatform, type RawHotkey } from '@tanstack/hotkeys'
+import { detectPlatform, type RawHotkey, type RawModifiers } from '@tanstack/hotkeys'
 import { EDITOR_FOLD_LEVELS, type EditorCommandId } from '../editor/commands'
+import { editorCommandDeclaration, type EditorCommandPack } from '../editor/commandCatalog'
 import type { KeyChord } from './types'
 import { type EditorKeyCondition, editorCommandMutates } from './conditions'
 type EditorPlatform = ReturnType<typeof detectPlatform>
-export type EditorCommandPack =
-  | 'navigation'
-  | 'selection'
-  | 'find'
-  | 'text-editing'
-  | 'advanced-editing'
-  | 'multi-cursor'
-  | 'folding'
-  | 'lsp-navigation'
-  | 'lsp-editing'
-  | 'inline-suggest'
+export type { EditorCommandPack } from '../editor/commandCatalog'
 
 export type EditorKeymapLayerSource = 'core' | 'app'
 
@@ -76,6 +67,9 @@ export const defaultEditorCommandPacks = [
   'lsp-navigation',
   'lsp-editing',
   'inline-suggest',
+  'markdown',
+  // Last, so it outranks every other layer: its keys are the arrows, Enter, Tab and Escape.
+  'suggest',
 ] as const satisfies readonly EditorCommandPack[]
 
 export const readonlySafeEditorCommandPacks = [
@@ -148,18 +142,8 @@ export function filterEditorKeymapLayersByCommandPacks(
 }
 
 export function editorCommandPackForCommand(command: EditorCommandId): EditorCommandPack | null {
-  if (NAVIGATION_COMMANDS.has(command)) return 'navigation'
-  if (SELECTION_COMMANDS.has(command)) return 'selection'
-  if (FIND_COMMANDS.has(command)) return 'find'
-  if (TEXT_EDITING_COMMANDS.has(command)) return 'text-editing'
-  if (ADVANCED_EDITING_COMMANDS.has(command)) return 'advanced-editing'
-  if (MULTI_CURSOR_COMMANDS.has(command)) return 'multi-cursor'
-  if (FOLDING_COMMANDS.has(command)) return 'folding'
-  if (LSP_NAVIGATION_COMMANDS.has(command)) return 'lsp-navigation'
-  if (LSP_EDITING_COMMANDS.has(command)) return 'lsp-editing'
-  if (INLINE_SUGGEST_COMMANDS.has(command)) return 'inline-suggest'
-
-  return null
+  const category = editorCommandDeclaration(command).category
+  return category === 'merge-conflict' ? null : category
 }
 
 function editorKeyBindingsForCommandPack(
@@ -176,6 +160,8 @@ function editorKeyBindingsForCommandPack(
   if (pack === 'lsp-navigation') return lspNavigationBindings()
   if (pack === 'lsp-editing') return lspEditingBindings(platform)
   if (pack === 'inline-suggest') return inlineSuggestBindings(platform)
+  if (pack === 'suggest') return suggestBindings()
+  if (pack === 'markdown') return markdownBindings(platform)
 
   return []
 }
@@ -190,168 +176,56 @@ function editorCommandInPacks(
   return packs.has(pack)
 }
 
-const NAVIGATION_COMMANDS = new Set<EditorCommandId>([
-  'cursorLeft',
-  'cursorRight',
-  'cursorUp',
-  'cursorDown',
-  'cursorWordLeft',
-  'cursorWordRight',
-  'cursorWordPartLeft',
-  'cursorWordPartRight',
-  'cursorLineStart',
-  'cursorLineEnd',
-  'cursorPageUp',
-  'cursorPageDown',
-  'cursorDocumentStart',
-  'cursorDocumentEnd',
-  'editor.action.jumpToBracket',
-  // Soft wrap decides whether a long line is walked sideways or read down the page, which is a
-  // question for whoever is reading the document rather than whoever is writing it — so it is
-  // offered and withdrawn with the rest of the keys for getting through one.
-  'editor.action.toggleWordWrap',
-])
+/**
+ * The completion list before the signature hint, and both before whatever else owns the key: one
+ * Escape closes the list, the next the hint. A command that finds nothing to do declines, so Enter
+ * with no item accepted still types a newline.
+ */
+function markdownBindings(platform: EditorPlatform): readonly EditorKeyBinding[] {
+  const modifier = platform === 'mac' ? { meta: true } : { ctrl: true }
+  return [
+    { chord: [key('B', modifier)], command: 'markdown.bold', when: ['markdown'] },
+    { chord: [key('I', modifier)], command: 'markdown.italic', when: ['markdown'] },
+    {
+      chord: [key('K', { ...modifier, shift: true })],
+      command: 'markdown.link',
+      when: ['markdown'],
+    },
+  ]
+}
 
-const SELECTION_COMMANDS = new Set<EditorCommandId>([
-  'selectAll',
-  'editor.action.smartSelect.expand',
-  'editor.action.smartSelect.shrink',
-  'selectLeft',
-  'selectRight',
-  'selectUp',
-  'selectDown',
-  'selectWordLeft',
-  'selectWordRight',
-  'cursorWordPartLeftSelect',
-  'cursorWordPartRightSelect',
-  'selectLineStart',
-  'selectLineEnd',
-  'selectPageUp',
-  'selectPageDown',
-  'selectDocumentStart',
-  'selectDocumentEnd',
-  'cursorColumnSelectLeft',
-  'cursorColumnSelectRight',
-  'cursorColumnSelectUp',
-  'cursorColumnSelectDown',
-  'cursorColumnSelectPageUp',
-  'cursorColumnSelectPageDown',
-])
-
-const FIND_COMMANDS = new Set<EditorCommandId>([
-  'find',
-  'findNext',
-  'findPrevious',
-  'closeFind',
-  'toggleFindCaseSensitive',
-  'toggleFindWholeWord',
-  'toggleFindRegex',
-  'toggleFindInSelection',
-  'togglePreserveCase',
-])
-
-const TEXT_EDITING_COMMANDS = new Set<EditorCommandId>([
-  'undo',
-  'redo',
-  'cursorUndo',
-  'cursorRedo',
-  'deleteBackward',
-  'deleteForward',
-  'indentSelection',
-  'outdentSelection',
-  // Handing Tab back to the page belongs with the keys that took it, so a host cannot end up
-  // offering the trap without the way out of it.
-  'editor.action.toggleTabFocusMode',
-  'findReplace',
-  'replaceOne',
-  'replaceAll',
-])
-
-const ADVANCED_EDITING_COMMANDS = new Set<EditorCommandId>([
-  'deleteWordLeft',
-  'deleteWordRight',
-  'deleteWordPartLeft',
-  'deleteWordPartRight',
-  'editor.action.commentLine',
-  'editor.action.blockComment',
-  'editor.action.indentLines',
-  'editor.action.outdentLines',
-  'editor.action.reindentlines',
-  'editor.action.reindentselectedlines',
-  'editor.action.deleteLines',
-  'editor.action.copyLinesUpAction',
-  'editor.action.copyLinesDownAction',
-  'editor.action.moveLinesUpAction',
-  'editor.action.moveLinesDownAction',
-  'editor.action.insertLineBefore',
-  'editor.action.insertLineAfter',
-  'editor.action.trimTrailingWhitespace',
-  'editor.action.sortLinesAscending',
-  'editor.action.sortLinesDescending',
-  'editor.action.joinLines',
-  'editor.action.duplicateSelection',
-  'editor.action.transformToUppercase',
-  'editor.action.transformToLowercase',
-  'editor.action.transformToTitlecase',
-])
-
-const MULTI_CURSOR_COMMANDS = new Set<EditorCommandId>([
-  'addNextOccurrence',
-  'clearSecondarySelections',
-  'selectAllMatches',
-  'editor.action.insertCursorAbove',
-  'editor.action.insertCursorBelow',
-  'editor.action.selectHighlights',
-  'editor.action.changeAll',
-  'editor.action.moveSelectionToNextFindMatch',
-])
-
-const FOLDING_COMMANDS = new Set<EditorCommandId>([
-  'editor.fold',
-  'editor.unfold',
-  'editor.foldRecursively',
-  'editor.unfoldRecursively',
-  'editor.foldAll',
-  'editor.unfoldAll',
-  'editor.createFoldingRangeFromSelection',
-  'editor.removeManualFoldingRanges',
-  ...EDITOR_FOLD_LEVELS.map((level) => `editor.foldLevel${level}` as const),
-])
-
-const LSP_NAVIGATION_COMMANDS = new Set<EditorCommandId>([
-  'editor.action.showHover',
-  'goToDefinition',
-  'editor.action.goToDefinition',
-  'editor.action.goToReferences',
-  'editor.action.peekDefinition',
-  'editor.action.revealDefinitionAside',
-  'editor.action.goToImplementation',
-  'editor.action.goToTypeDefinition',
-  'editor.action.marker.next',
-  'editor.action.marker.prev',
-])
-
-const LSP_EDITING_COMMANDS = new Set<EditorCommandId>([
-  'editor.action.formatDocument',
-  'editor.action.rename',
-  'editor.action.autoFix',
-])
-
-const INLINE_SUGGEST_COMMANDS = new Set<EditorCommandId>([
-  'editor.action.inlineSuggest.commit',
-  'editor.action.inlineSuggest.acceptNextWord',
-])
+function suggestBindings(): readonly EditorKeyBinding[] {
+  const list = ['suggestWidgetVisible']
+  const hints = ['parameterHintsVisible', 'parameterHintsMultipleSignatures']
+  return [
+    { chord: [key('Space', { ctrl: true })], command: 'editor.action.triggerSuggest' },
+    { chord: [key('ArrowDown')], command: 'selectNextSuggestion', when: list },
+    { chord: [key('ArrowUp')], command: 'selectPrevSuggestion', when: list },
+    { chord: [key('PageDown')], command: 'selectNextPageSuggestion', when: list },
+    { chord: [key('PageUp')], command: 'selectPrevPageSuggestion', when: list },
+    { chord: [key('Enter')], command: 'acceptSelectedSuggestion', when: list },
+    { chord: [key('Tab')], command: 'acceptSelectedSuggestion', when: list },
+    // VS Code's alternative acceptance; this list has one way to accept, and Shift+Tab must not
+    // outdent the line under an open list.
+    { chord: [key('Enter', { shift: true })], command: 'acceptSelectedSuggestion', when: list },
+    { chord: [key('Tab', { shift: true })], command: 'acceptSelectedSuggestion', when: list },
+    { chord: [key('Escape')], command: 'hideSuggestWidget', when: list },
+    { chord: [key('Escape')], command: 'closeParameterHints', when: ['parameterHintsVisible'] },
+    { chord: [key('ArrowDown')], command: 'showNextParameterHint', when: hints },
+    { chord: [key('ArrowUp')], command: 'showPrevParameterHint', when: hints },
+  ]
+}
 
 function navigationBindings(platform: EditorPlatform): readonly EditorKeyBinding[] {
   return horizontalNavigationBindings(platform).concat(verticalNavigationBindings(platform))
 }
 
-const key = (keyName: string, modifiers: Omit<RawHotkey, 'key'> = {}): RawHotkey => ({
+const key = (keyName: string, modifiers: RawModifiers = {}): RawHotkey => ({
   key: keyName,
   ...modifiers,
 })
 
-const WORD_PART_MODIFIER: Omit<RawHotkey, 'key'> = { alt: true, ctrl: true }
+const WORD_PART_MODIFIER: RawModifiers = { alt: true, ctrl: true }
 
 function textEditingBindings(platform: EditorPlatform): readonly EditorKeyBinding[] {
   const platformBindings: readonly EditorKeyBinding[] =
@@ -370,6 +244,20 @@ function textEditingBindings(platform: EditorPlatform): readonly EditorKeyBindin
     { chord: [key('Enter', { mod: true, alt: true })], command: 'replaceAll' },
     { chord: [key('Z', { mod: true })], command: 'undo' },
     { chord: [key('Z', { mod: true, shift: true })], command: 'redo' },
+    {
+      chord: [platform === 'mac' ? key('-', { ctrl: true }) : key('ArrowLeft', { alt: true })],
+      command: 'jumpBack',
+      preventDefault: true,
+    },
+    {
+      chord: [
+        platform === 'mac'
+          ? key('-', { ctrl: true, shift: true })
+          : key('ArrowRight', { alt: true }),
+      ],
+      command: 'jumpForward',
+      preventDefault: true,
+    },
     { chord: [key('U', { mod: true })], command: 'cursorUndo' },
     { chord: [key('U', { mod: true, shift: true })], command: 'cursorRedo' },
     ...platformBindings,
@@ -459,7 +347,12 @@ function lspNavigationBindings(): readonly EditorKeyBinding[] {
 function lspEditingBindings(platform: EditorPlatform): readonly EditorKeyBinding[] {
   const autoFix = platform === 'mac' ? { mod: true, alt: true } : { alt: true, shift: true }
 
-  return [{ chord: [key('.', autoFix)], command: 'editor.action.autoFix' }]
+  return [
+    { chord: [key('.', autoFix)], command: 'editor.action.autoFix' },
+    { chord: [key('F2')], command: 'editor.action.rename' },
+    { chord: [key('F', { alt: true, shift: true })], command: 'editor.action.formatDocument' },
+    { chord: [key('F', { mod: true, shift: true })], command: 'editor.action.formatDocument' },
+  ]
 }
 
 function inlineSuggestBindings(platform: EditorPlatform): readonly EditorKeyBinding[] {
@@ -483,12 +376,10 @@ function foldingBindings(_platform: EditorPlatform): readonly EditorKeyBinding[]
     { chord: [prefix, key(']', { mod: true, shift: true })], command: 'editor.unfoldRecursively' },
     { chord: pair('0'), command: 'editor.foldAll' },
     { chord: pair('J'), command: 'editor.unfoldAll' },
-    ...EDITOR_FOLD_LEVELS.map(
-      (level): EditorKeyBinding => ({
-        chord: pair(String(level)),
-        command: `editor.foldLevel${level}`,
-      }),
-    ),
+    ...EDITOR_FOLD_LEVELS.map((level): EditorKeyBinding => ({
+      chord: pair(String(level)),
+      command: `editor.foldLevel${level}`,
+    })),
     { chord: pair(','), command: 'editor.createFoldingRangeFromSelection' },
     {
       chord: [prefix, key(',', { mod: true, shift: true })],
@@ -566,12 +457,19 @@ function selectionBindings(platform: EditorPlatform): readonly EditorKeyBinding[
 
 function columnSelectionBindings(platform: EditorPlatform): readonly EditorKeyBinding[] {
   const box = { mod: true, alt: true, shift: true }
-  const horizontal = platform === 'mac' ? box : { alt: true }
+  const horizontal = (arrow: string): KeyChord =>
+    platform === 'mac' ? [key(arrow, box)] : [key('K', { mod: true }), key(arrow, { alt: true })]
   const vertical = platform === 'linux' ? { mod: true } : box
 
   return [
-    { chord: [key('ArrowLeft', horizontal)], command: 'cursorColumnSelectLeft' },
-    { chord: [key('ArrowRight', horizontal)], command: 'cursorColumnSelectRight' },
+    {
+      chord: horizontal('ArrowLeft'),
+      command: 'cursorColumnSelectLeft',
+    },
+    {
+      chord: horizontal('ArrowRight'),
+      command: 'cursorColumnSelectRight',
+    },
     { chord: [key('ArrowUp', vertical)], command: 'cursorColumnSelectUp' },
     { chord: [key('ArrowDown', vertical)], command: 'cursorColumnSelectDown' },
     { chord: [key('PageUp', box)], command: 'cursorColumnSelectPageUp' },
@@ -736,7 +634,6 @@ export function vscodeEditorKeyBindings(
     { chord: [prefix, key('.', { mod: true })], command: 'editor.removeManualFoldingRanges' },
     { chord: [prefix, key('I', { mod: true })], command: 'editor.action.showHover' },
     { chord: [prefix, key('C', { mod: true })], command: 'editor.action.commentLine' },
-    { chord: [key('F2')], command: 'editor.action.rename' },
     { chord: [key('F12', { shift: true })], command: 'editor.action.goToReferences' },
     { chord: [key('F12', { alt: true })], command: 'editor.action.peekDefinition' },
     { chord: [key('F12', { mod: true })], command: 'editor.action.goToImplementation' },
@@ -752,8 +649,15 @@ export function vscodeEditorKeyBindings(
   const replaced = new Set(overrides.map((binding) => binding.command))
   // The line-comment single stroke remains an alias of its chord.
   replaced.delete('editor.action.commentLine')
+  const defaults = defaultEditorKeyBindings(platform).filter(
+    (binding) => !replaced.has(binding.command),
+  )
+  // The suggest pack outranks the overrides as it outranks every default layer.
+  const suggests = (binding: EditorKeyBinding) =>
+    editorCommandPackForCommand(binding.command) === 'suggest'
   return [
+    ...defaults.filter(suggests),
     ...overrides.map(withEditorConditions),
-    ...defaultEditorKeyBindings(platform).filter((binding) => !replaced.has(binding.command)),
+    ...defaults.filter((binding) => !suggests(binding)),
   ]
 }

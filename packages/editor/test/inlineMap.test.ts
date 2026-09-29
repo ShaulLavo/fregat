@@ -198,6 +198,29 @@ describe('InlineMap reveal', () => {
     expect(revealInlineMap(map, [{ start: 10, end: 10 }]).ranges).toEqual([])
     expect(revealInlineMap(map, [{ start: 12, end: 12 }]).ranges).toHaveLength(2)
   })
+
+  it('keeps a construct that reveals from inside hidden while the caret is on its edge', () => {
+    const snapshot = createPieceTableSnapshot(BOLD_LINE)
+    const map = createInlineMap(
+      snapshot,
+      boldSpecs().map((spec) => ({ ...spec, reveal: 'inside' as const })),
+    )
+
+    expect(revealInlineMap(map, [{ start: 2, end: 2 }]).ranges).toHaveLength(2)
+    expect(revealInlineMap(map, [{ start: 10, end: 10 }]).ranges).toHaveLength(2)
+    expect(revealInlineMap(map, [{ start: 5, end: 5 }]).ranges).toEqual([])
+    expect(revealInlineMap(map, [{ start: 0, end: 4 }]).ranges).toEqual([])
+  })
+
+  it('never reveals a replacement that asked not to be', () => {
+    const snapshot = createPieceTableSnapshot('see @src/a.ts now\n')
+    const map = createInlineMap(snapshot, [
+      { id: 'chip', startIndex: 4, endIndex: 13, text: 'a.ts', reveal: 'never' },
+    ])
+
+    expect(revealInlineMap(map, [{ start: 13, end: 13 }])).toBe(map)
+    expect(revealInlineMap(map, [{ start: 0, end: 17 }])).toBe(map)
+  })
 })
 
 describe('InlineMap insertions', () => {
@@ -366,5 +389,26 @@ describe('InlinePoint conversion', () => {
     const row = inlineRowForBufferRow(map, 1, 'a **bold** b')
 
     expect(bufferPointToInlinePoint(row, { row: 1, column: 6 }).row).toBe(1)
+  })
+})
+
+describe('explicit construct reveal ranges', () => {
+  it('reveals a leading marker when a caret enters the construct body', () => {
+    const snapshot = createPieceTableSnapshot('# heading\n')
+    const map = createInlineMap(snapshot, [
+      { id: 'heading', startIndex: 0, endIndex: 2, text: '', revealRange: { start: 0, end: 9 } },
+    ])
+    expect(revealInlineMap(map, [{ start: 5, end: 5 }]).ranges).toEqual([])
+  })
+
+  it('keeps reveal ranges anchored across source edits', () => {
+    const snapshot = createPieceTableSnapshot('before\n# heading\n')
+    const map = createInlineMap(snapshot, [
+      { id: 'heading', startIndex: 7, endIndex: 9, text: '', revealRange: { start: 7, end: 16 } },
+    ])
+    const next = insertIntoPieceTable(snapshot, 0, 'prefix\n')
+    const updated = updateInlineMapForEdit(map, { from: 0, to: 0, text: 'prefix\n' }, next)
+    expect(revealInlineMap(updated.map, [{ start: 20, end: 20 }]).ranges).toEqual([])
+    expect(revealInlineMap(updated.map, [{ start: 1, end: 1 }]).ranges).toHaveLength(1)
   })
 })

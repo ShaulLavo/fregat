@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { detectPlatform } from '@tanstack/hotkeys'
+import { detectPlatform, parseHotkey, rawHotkeyToParsedHotkey } from '@tanstack/hotkeys'
 import { createEditorFindPlugin } from '../../find/src/index.ts'
 import { createFoldGutterPlugin, createLineGutterPlugin } from '../../gutters/src/index.ts'
 import {
@@ -14,6 +14,10 @@ import {
   type EditorLogEvent,
   type EditorState,
 } from '../src/editor'
+import {
+  createEditorDocumentAnalysis,
+  type EditorDocumentAnalysis,
+} from '../src/editor/documentAnalysis'
 import { EDITOR_OPTION_DESCRIPTORS } from '../src/editor/optionDescriptors'
 import {
   acquireDocumentMutationLease,
@@ -55,6 +59,8 @@ import { createFoldMap } from '../src/foldMap'
 import { SelectionGoal, resolveSelection } from '../src/selections'
 import type { VirtualizedTextView } from '../src/virtualization'
 import { createVisibleEditor } from './factories/visibleEditor'
+import { readAll } from './factories/snapshotText'
+import { createStringTextSnapshot } from '../src/documentTextSnapshot'
 
 // Mock HighlightRegistry backed by a Map, used to assert highlight state.
 const highlightsMap = new Map<string, Highlight>()
@@ -244,8 +250,7 @@ class MockResizeObserver implements ResizeObserver {
 }
 
 async function flushMicrotasks(): Promise<void> {
-  await Promise.resolve()
-  await Promise.resolve()
+  await new Promise((resolve) => setTimeout(resolve, 0))
 }
 
 async function flushTimers(): Promise<void> {
@@ -588,18 +593,24 @@ function wordNavigationModifier(): KeyboardEventInit {
  */
 function dispatchDefaultKey(command: EditorCommandId): KeyboardEvent {
   const platform = detectPlatform()
-  const hotkey = defaultEditorKeyBindings(platform).find((binding) => binding.command === command)
-    ?.chord[0]
-  if (hotkey === undefined || typeof hotkey === 'string') {
-    throw new Error(`${command} has no default chord on ${platform}`)
-  }
-
-  return dispatchEditorKey(hotkey.key, {
-    altKey: hotkey.alt === true,
-    ctrlKey: hotkey.ctrl === true || (hotkey.mod === true && platform !== 'mac'),
-    metaKey: hotkey.meta === true || (hotkey.mod === true && platform === 'mac'),
-    shiftKey: hotkey.shift === true,
+  const chord = defaultEditorKeyBindings(platform).find(
+    (binding) => binding.command === command,
+  )?.chord
+  if (!chord) throw new Error(`${command} has no default chord on ${platform}`)
+  const events = chord.map((hotkey) => {
+    const parsed =
+      typeof hotkey === 'string'
+        ? parseHotkey(hotkey, platform)
+        : rawHotkeyToParsedHotkey(hotkey, platform)
+    if (parsed.key === undefined) throw new Error(`${command} has a physical-code chord`)
+    return dispatchEditorKey(parsed.key, {
+      altKey: parsed.alt,
+      ctrlKey: parsed.ctrl,
+      metaKey: parsed.meta,
+      shiftKey: parsed.shift,
+    })
   })
+  return events[events.length - 1]!
 }
 
 /**
@@ -887,6 +898,22 @@ function trackedDisposal(dispose: () => void, onDispose: () => void): () => void
 }
 
 describe('Editor', () => {
+  const analyses: EditorDocumentAnalysis[] = []
+
+  function openRetainedDocument(text: string): void {
+    const buffer = createEditorTextBuffer(text)
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'main.ts' })
+    analyses.push(analysis)
+    editor.attachSession(
+      createEditorBufferSession(buffer, createEditorViewSession(buffer, 'main')),
+      {
+        analysis,
+        documentId: 'main.ts',
+        languageId: 'typescript',
+      },
+    )
+  }
+
   let container: HTMLElement
   let editor: Editor
 
@@ -904,6 +931,7 @@ describe('Editor', () => {
   })
 
   afterEach(() => {
+    for (const analysis of analyses.splice(0)) analysis.dispose()
     editor.dispose()
     container.remove()
     setHighlightRegistry(undefined)
@@ -1075,7 +1103,7 @@ describe('Editor', () => {
       expect(editorRoot().style.getPropertyValue('--editor-foreground')).toBe('')
     })
 
-    it('hands the highlighter every edit the debounce skipped as one batch', async () => {
+    it('hands retained highlighters every committed edit once', async () => {
       const applied: DocumentSessionChange[] = []
       const highlighter = createMockHighlighterSession({
         applyChange: async (change) => {
@@ -1089,11 +1117,7 @@ describe('Editor', () => {
       })
       setEditorSyntaxSessionFactory(() => createMockSyntaxSession())
 
-      editor.openDocument({
-        documentId: 'main.ts',
-        languageId: 'typescript',
-        text: 'const a = 1;\nconst b = 2;',
-      })
+      openRetainedDocument('const a = 1;\nconst b = 2;')
       await flushMicrotasks()
       await flushSyntaxDebounce()
 
@@ -1105,12 +1129,9 @@ describe('Editor', () => {
       })
       await flushSyntaxDebounce()
 
-      // One request for the burst, carrying both edits in the coordinates of the last text the
-      // highlighter saw, rather than only the second edit against a document it never received.
-      expect(applied).toHaveLength(1)
-      expect([...applied[0]!.edits].sort((left, right) => left.from - right.from)).toEqual([
-        { from: 12, to: 12, text: '!' },
-        { from: 25, to: 25, text: '?' },
+      expect(applied.map((change) => change.edits)).toEqual([
+        [{ from: 12, to: 12, text: '!' }],
+        [{ from: 26, to: 26, text: '?' }],
       ])
     })
 
@@ -1185,6 +1206,35 @@ describe('Editor', () => {
       // impossible number is answered with the height the editor would have used on its own.
       descriptor.applyTo(editor, descriptor.validate(0))
       expect(editorRoot().style.getPropertyValue('--editor-row-height')).toBe('24px')
+    })
+  })
+
+  describe('font options', () => {
+    it('writes the size and face as the variables the stylesheet reads, and clears them', () => {
+      editor.setFontSize(15)
+      editor.setFontFamily('  Fira Code, monospace ')
+
+      expect(editorRoot().style.getPropertyValue('--editor-font-size')).toBe('15px')
+      expect(editorRoot().style.getPropertyValue('--editor-font-family')).toBe(
+        'Fira Code, monospace',
+      )
+
+      editor.setFontSize(undefined)
+      editor.setFontFamily(undefined)
+
+      expect(editorRoot().style.getPropertyValue('--editor-font-size')).toBe('')
+      expect(editorRoot().style.getPropertyValue('--editor-font-family')).toBe('')
+    })
+
+    it('hands an impossible size back to the stylesheet', () => {
+      const descriptor = EDITOR_OPTION_DESCRIPTORS.find((entry) => entry.name === 'fontSize')
+      if (!descriptor) throw new Error('fontSize is not in the option registry')
+
+      descriptor.applyTo(editor, descriptor.validate(18))
+      expect(editorRoot().style.getPropertyValue('--editor-font-size')).toBe('18px')
+
+      descriptor.applyTo(editor, descriptor.validate(0))
+      expect(editorRoot().style.getPropertyValue('--editor-font-size')).toBe('')
     })
   })
 
@@ -1762,7 +1812,8 @@ describe('Editor', () => {
       expect(events.some((event) => event.kind === 'content' && event.changeKind === 'edit')).toBe(
         true,
       )
-      expect(events.at(-1)?.snapshot?.fullText).toBe('const a = 1;!')
+      const last = events.at(-1)?.snapshot
+      expect(last && readAll(last.textSnapshot)).toBe('const a = 1;!')
     })
 
     it('reports a pass that ends on a caret move as the edit it made', () => {
@@ -1978,12 +2029,12 @@ describe('Editor', () => {
       editor = createVisibleEditor(container, { plugins: [plugin] })
       const context = requireViewContributionContext(contributionContext)
 
-      expect(context.getReservedOverlayWidth?.('right')).toBe(0)
+      expect(context.getReservedOverlayWidth('right')).toBe(0)
 
       context.reserveOverlayWidth('right', 96)
 
-      expect(context.getReservedOverlayWidth?.('right')).toBe(96)
-      expect(context.getReservedOverlayWidth?.('left')).toBe(0)
+      expect(context.getReservedOverlayWidth('right')).toBe(96)
+      expect(context.getReservedOverlayWidth('left')).toBe(0)
     })
 
     it('skips layout updates for unchanged overlay reservations', () => {
@@ -2043,7 +2094,80 @@ describe('Editor', () => {
 
       editor.setContent('abc')
 
-      expect(events).toEqual(['viewport', 'layout', 'tokens', 'layout', 'content', 'layout'])
+      // The tokens land in the same render as the text, so they arrive with its viewport update.
+      expect(events).toEqual(['viewport', 'layout', 'content', 'layout'])
+    })
+
+    it('reports each new scroll position to onDidScroll, both axes from a contribution', () => {
+      let requester: EditorViewContributionContext | null = null
+      const plugin: EditorPlugin = {
+        activate: (context) =>
+          context.registerViewContribution({
+            createContribution: (view) => {
+              requester = view
+              return { update: () => undefined, dispose: () => undefined }
+            },
+          }),
+      }
+      editor.dispose()
+      editor = createVisibleEditor(container, { plugins: [plugin] })
+      editor.setText(Array.from({ length: 400 }, (_value, row) => `${row} `.repeat(80)).join('\n'))
+      const positions: { readonly top: number; readonly left: number }[] = []
+      const subscription = editor.onDidScroll((position) => positions.push(position))
+
+      requireViewContributionContext(requester).setScrollPosition({ top: 300, left: 40 })
+      editor.setScrollPosition({ top: 300, left: 40 })
+      editor.setScrollPosition({ top: 120 })
+      subscription.dispose()
+      editor.setScrollPosition({ top: 0 })
+
+      expect(positions).toEqual([
+        { top: 300, left: 40 },
+        { top: 120, left: 40 },
+      ])
+    })
+
+    it('announces a reservation staked during a layout pass to width listeners', () => {
+      const layouts: number[] = []
+      const heard: number[] = []
+      let requester: EditorViewContributionContext | null = null
+      const plugin: EditorPlugin = {
+        activate: (context) => {
+          context.registerViewContribution({
+            createContribution: (view) => {
+              view.onDidChangeReservedOverlayWidth((side) => {
+                heard.push(view.getReservedOverlayWidth(side))
+              })
+              return {
+                update: (_snapshot, kind) => {
+                  if (kind === 'layout') layouts.push(view.getReservedOverlayWidth('right'))
+                },
+                dispose: () => undefined,
+              }
+            },
+          })
+          context.registerViewContribution({
+            createContribution: (view) => {
+              requester = view
+              return {
+                update: (_snapshot, kind) => {
+                  if (kind === 'layout') view.reserveOverlayWidth('right', 64)
+                },
+                dispose: () => undefined,
+              }
+            },
+          })
+        },
+      }
+      editor.dispose()
+      editor = createVisibleEditor(container, { plugins: [plugin] })
+      layouts.length = 0
+
+      requireViewContributionContext(requester).requestViewUpdate()
+
+      expect(heard).toEqual([64])
+      // The request re-ran only the contribution that asked; the width reached the other as an event.
+      expect(layouts).toEqual([])
     })
 
     it('disposes view contributions with the editor', () => {
@@ -2072,7 +2196,7 @@ describe('Editor', () => {
               providerContexts.push({
                 documentId: providerContext.documentId,
                 lineCount: providerContext.lineCount,
-                text: providerContext.text,
+                text: readAll(providerContext.textSnapshot),
               })
               return [
                 {
@@ -2210,7 +2334,7 @@ describe('Editor', () => {
             createContribution: () => ({
               handleEditorChange: (change) => {
                 if (change?.kind === 'edit')
-                  featureTexts.push(change.textSnapshot.materializeFullText())
+                  featureTexts.push(change.textSnapshot.readRange(0, change.textSnapshot.length))
               },
               dispose: () => undefined,
             }),
@@ -2252,7 +2376,7 @@ describe('Editor', () => {
             createContribution: () => ({
               handleEditorChange: (change) => {
                 if (change?.kind === 'edit')
-                  featureTexts.push(change.textSnapshot.materializeFullText())
+                  featureTexts.push(change.textSnapshot.readRange(0, change.textSnapshot.length))
               },
               dispose: () => undefined,
             }),
@@ -2361,9 +2485,12 @@ describe('Editor', () => {
       editor.setTokens([{ start: 4, end: 6, style: { color: '#ff0000' } }])
 
       // Insert "XX" at position 0 → delta = +2
-      editor.applyEdit({ from: 0, to: 0, text: 'XX' }, [
-        { start: 6, end: 8, style: { color: '#ff0000' } },
-      ])
+      const edit = { from: 0, to: 0, text: 'XX' }
+      editor.applyEdit(
+        edit,
+        [{ start: 6, end: 8, style: { color: '#ff0000' } }],
+        after('abcdef', edit),
+      )
 
       expect(editorRoot().textContent).toBe('XXabcdef')
     })
@@ -2374,10 +2501,8 @@ describe('Editor', () => {
       expect(highlightsMap.size).toBe(1)
 
       // Replace "cd" at positions 2-4 with "XY"
-      editor.applyEdit(
-        { from: 2, to: 4, text: 'XY' },
-        [], // No replacement tokens
-      )
+      const edit = { from: 2, to: 4, text: 'XY' }
+      editor.applyEdit(edit, [], after('abcdef', edit)) // No replacement tokens
 
       // The overlapping token should be removed, group cleaned up
       expect(highlightsMap.size).toBe(0)
@@ -2391,9 +2516,12 @@ describe('Editor', () => {
       ])
 
       // Edit in the middle (positions 2-4)
-      editor.applyEdit({ from: 2, to: 4, text: 'XX' }, [
-        { start: 2, end: 4, style: { color: '#0000ff' } },
-      ])
+      const edit = { from: 2, to: 4, text: 'XX' }
+      editor.applyEdit(
+        edit,
+        [{ start: 2, end: 4, style: { color: '#0000ff' } }],
+        after('abcdef', edit),
+      )
 
       // Token at 0-2 should be untouched, so its group persists
       expect(highlightsMap.size).toBeGreaterThanOrEqual(1)
@@ -2403,25 +2531,75 @@ describe('Editor', () => {
       editor.setContent('abcdef')
       editor.setTokens([])
 
-      editor.applyEdit({ from: 2, to: 4, text: 'XY' }, [
-        { start: 2, end: 4, style: { color: '#ff0000' } },
-      ])
+      const edit = { from: 2, to: 4, text: 'XY' }
+      editor.applyEdit(
+        edit,
+        [{ start: 2, end: 4, style: { color: '#ff0000' } }],
+        after('abcdef', edit),
+      )
 
       expect(highlightsMap.size).toBe(1)
     })
 
     it('updates text content correctly', () => {
       editor.setContent('hello world')
-      editor.applyEdit({ from: 5, to: 5, text: ' beautiful' }, [])
+      const edit = { from: 5, to: 5, text: ' beautiful' }
+      editor.applyEdit(edit, [], after('hello world', edit))
       expect(editorRoot().textContent).toBe('hello beautiful world')
     })
   })
 
   describe('attachSession', () => {
-    it('does not let public render APIs bypass an attached leased buffer', () => {
+    it('routes setContent through an attached buffer as one undoable edit', () => {
       const buffer = createEditorTextBuffer('abc')
       const session = createEditorBufferSession(buffer)
       editor.attachSession(session)
+
+      editor.setContent('replaced')
+
+      expect(buffer.materializeFullText()).toBe('replaced')
+      expect(editorRoot().textContent).toBe('replaced')
+      session.undo()
+      expect(buffer.materializeFullText()).toBe('abc')
+    })
+
+    it('routes applyEdit through an attached buffer', () => {
+      const buffer = createEditorTextBuffer('abc')
+      editor.attachSession(createEditorBufferSession(buffer))
+
+      editor.applyEdit({ from: 0, to: 1, text: 'X' }, [], createStringTextSnapshot('Xbc'))
+
+      expect(buffer.materializeFullText()).toBe('Xbc')
+      expect(editorRoot().textContent).toBe('Xbc')
+    })
+
+    it('refuses setDocument on an attached buffer', () => {
+      const buffer = createEditorTextBuffer('abc')
+      editor.attachSession(createEditorBufferSession(buffer))
+
+      expect(() => editor.setDocument({ text: 'replacement', tokens: [] })).toThrow(
+        expect.objectContaining({ code: 'EDITOR_SET_DOCUMENT_ON_BUFFER_SESSION' }),
+      )
+      expect(buffer.materializeFullText()).toBe('abc')
+    })
+
+    it('refuses routed edits through a read-only editor', () => {
+      editor.dispose()
+      editor = createVisibleEditor(container, { editability: 'readonly' })
+      const buffer = createEditorTextBuffer('abc')
+      editor.attachSession(createEditorBufferSession(buffer))
+
+      const notEditable = expect.objectContaining({ code: 'EDITOR_NOT_EDITABLE' })
+      expect(() => editor.setContent('bypass')).toThrow(notEditable)
+      expect(() =>
+        editor.applyEdit({ from: 0, to: 1, text: 'X' }, [], createStringTextSnapshot('Xbc')),
+      ).toThrow(notEditable)
+      expect(buffer.materializeFullText()).toBe('abc')
+    })
+
+    it('refuses routed edits while another writer leases the buffer', () => {
+      const buffer = createEditorTextBuffer('abc')
+      editor.attachSession(createEditorBufferSession(buffer))
       const acquired = acquireDocumentMutationLease(
         buffer,
         buffer.getRevision(),
@@ -2430,9 +2608,11 @@ describe('Editor', () => {
       )
       if (acquired.status !== 'acquired') throw new RangeError('expected lease')
 
-      editor.setContent('bypass')
-      editor.setDocument({ text: 'replacement', tokens: [] })
-      editor.applyEdit({ from: 0, to: 1, text: 'X' }, [])
+      const leased = expect.objectContaining({ code: 'EDITOR_BUFFER_LEASED' })
+      expect(() => editor.setContent('bypass')).toThrow(leased)
+      expect(() =>
+        editor.applyEdit({ from: 0, to: 1, text: 'X' }, [], createStringTextSnapshot('Xbc')),
+      ).toThrow(leased)
 
       expect(buffer.materializeFullText()).toBe('abc')
       expect(editorRoot().textContent).toBe('abc')
@@ -3489,6 +3669,7 @@ describe('Editor', () => {
       const session = createDocumentSession('abc\ndef')
       session.setSelections([{ anchor: 3 }, { anchor: 7 }])
       editor.attachSession(session)
+      editor.focus()
 
       dispatchEditorKey('ArrowLeft')
 
@@ -3543,6 +3724,7 @@ describe('Editor', () => {
       const session = createDocumentSession('abcdef')
       session.setSelections([{ anchor: 2 }, { anchor: 5 }])
       editor.attachSession(session)
+      editor.focus()
 
       dispatchEditorKey('ArrowRight', { shiftKey: true })
 
@@ -3798,6 +3980,7 @@ describe('Editor', () => {
       session.setSelection(1)
       session.addSelection(4)
       editor.attachSession(session)
+      editor.focus()
 
       dispatchEditorKey('Escape')
 
@@ -3894,6 +4077,7 @@ describe('Editor', () => {
       const session = createDocumentSession('foo bar foo')
       session.setSelection(1)
       editor.attachSession(session)
+      editor.focus()
 
       dispatchEditorKey('d', primaryModifier())
 
@@ -5879,9 +6063,9 @@ describe('Editor', () => {
           includeHighlights: true,
           languageId: 'typescript',
           syntaxMode: 'range',
-          fullText: 'const a = 1;',
         }),
       ])
+      expect(readAll(created[0]!.textSnapshot)).toBe('const a = 1;')
       expect(editor.getState().syntaxStatus).toBe('ready')
       expect(highlightsMap.size).toBe(1)
     })
@@ -6112,7 +6296,7 @@ describe('Editor', () => {
       await flushSyntaxDebounce()
       const rangeCountBeforeTeleport = ranges.length
 
-      requireViewContributionContext(contributionContext).setScrollTop(900_000)
+      requireViewContributionContext(contributionContext).setScrollPosition({ top: 900_000 })
       const urgentRange = ranges[rangeCountBeforeTeleport]
       await flushSyntaxDebounce()
       const postTeleportRanges = ranges.slice(rangeCountBeforeTeleport)
@@ -7183,7 +7367,7 @@ describe('Editor', () => {
       const createdTexts: string[] = []
       let disposeCount = 0
       setEditorSyntaxSessionFactory((options) => {
-        createdTexts.push(options.fullText)
+        createdTexts.push(readAll(options.textSnapshot))
         const isInitialSession = createdTexts.length === 1
 
         return createMockSyntaxSession({
@@ -7560,7 +7744,7 @@ describe('Editor', () => {
       expect(highlightsMap.size).toBe(1)
     })
 
-    it('debounces rapid edit plugin highlight requests to the latest text', async () => {
+    it('updates retained plugin highlights for every committed revision', async () => {
       const changes: string[] = []
       const highlighter = createMockHighlighterSession({
         refresh: async () => createHighlightResult([]),
@@ -7580,17 +7764,13 @@ describe('Editor', () => {
         }),
       )
 
-      editor.openDocument({
-        documentId: 'main.ts',
-        languageId: 'typescript',
-        text: 'const a = 1;',
-      })
+      openRetainedDocument('const a = 1;')
       await flushMicrotasks()
       editorRoot().dispatchEvent(createInsertEvent('!'))
       editorRoot().dispatchEvent(createInsertEvent('?'))
 
       await flushSyntaxDebounce()
-      expect(changes).toEqual(['const a = 1;!?'])
+      expect(changes).toEqual(['const a = 1;!', 'const a = 1;!?'])
       expect(tokenHighlightRanges()[0]?.startOffset).toBe(0)
     })
 
@@ -7601,7 +7781,7 @@ describe('Editor', () => {
         activate: (context) =>
           context.registerHighlighter({
             createSession: (options) => {
-              createdTexts.push(options.fullText)
+              createdTexts.push(readAll(options.textSnapshot))
               const isInitialSession = createdTexts.length === 1
 
               return createMockHighlighterSession({
@@ -7666,11 +7846,7 @@ describe('Editor', () => {
         }),
       )
 
-      editor.openDocument({
-        documentId: 'main.ts',
-        languageId: 'typescript',
-        text: 'const a = 1;',
-      })
+      openRetainedDocument('const a = 1;')
       await flushMicrotasks()
       editorRoot().dispatchEvent(createInsertEvent('!'))
       editorRoot().dispatchEvent(
@@ -7683,13 +7859,9 @@ describe('Editor', () => {
       )
 
       await flushSyntaxDebounce()
-      expect(changes).toHaveLength(1)
-      // The insert and its undo land in one debounce window, so the highlighter, which last saw
-      // the original text, receives the burst composed against that text: a no-op at the caret.
-      expect(changes[0]).toMatchObject({
-        kind: 'undo',
-        edits: [{ from: 12, to: 12, text: '' }],
-      })
+      expect(changes).toHaveLength(2)
+      expect(changes[0]).toMatchObject({ kind: 'edit', edits: [{ from: 12, to: 12, text: '!' }] })
+      expect(changes[1]).toMatchObject({ kind: 'undo', edits: [{ from: 12, to: 13, text: '' }] })
     })
 
     it('ignores stale plugin highlight results after a newer edit', async () => {
@@ -7711,11 +7883,7 @@ describe('Editor', () => {
         }),
       )
 
-      editor.openDocument({
-        documentId: 'main.ts',
-        languageId: 'typescript',
-        text: 'const a = 1;',
-      })
+      openRetainedDocument('const a = 1;')
       await flushMicrotasks()
       editorRoot().dispatchEvent(createInsertEvent('!'))
       await flushSyntaxDebounce()
@@ -7724,7 +7892,7 @@ describe('Editor', () => {
 
       secondEdit.resolve(createHighlightResult([{ start: 0, end: 5, style: { color: '#00ff00' } }]))
       await flushMicrotasks()
-      expect(tokenHighlightRanges()[0]?.startOffset).toBe(0)
+      expect(tokenHighlightRanges()).toHaveLength(0)
 
       firstEdit.resolve(createHighlightResult([{ start: 6, end: 7, style: { color: '#ff0000' } }]))
       await flushMicrotasks()
@@ -7872,3 +8040,8 @@ describe('Editor', () => {
     })
   })
 })
+
+/** The text `edit` leaves behind, which a detached `applyEdit` is handed alongside the edit. */
+function after(text: string, edit: { from: number; to: number; text: string }) {
+  return createStringTextSnapshot(text.slice(0, edit.from) + edit.text + text.slice(edit.to))
+}

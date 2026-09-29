@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createTestViewSnapshotSource } from '@singapore-editor/core/testing'
 import { Editor } from '@singapore-editor/core/editor'
-import { VirtualizedTextView } from '@singapore-editor/core/internal'
+import { VirtualizedTextView } from '@singapore-editor/core/testing'
 import type { VirtualizedFoldMarker } from '@singapore-editor/core/rendering'
 import { EditorTokenStore, type EditorToken } from '@singapore-editor/core/syntax'
 import type {
@@ -10,8 +11,12 @@ import type {
   EditorViewSnapshot,
   EditorVisibleRowSnapshot,
 } from '@singapore-editor/core/extensions'
-import { EditorSecondaryTextView } from '@singapore-editor/core/secondary-views'
-import { resetEditorInstanceCount, setHighlightRegistry } from '@singapore-editor/core/testing'
+import {
+  createTestPluginContext,
+  createTestViewContributionContext,
+  resetEditorInstanceCount,
+  setHighlightRegistry,
+} from '@singapore-editor/core/testing'
 import { createStickyScrollPlugin } from '../src/stickyScroll'
 
 const LINES = [
@@ -190,12 +195,12 @@ describe('createStickyScrollPlugin', () => {
     expect(mirroredLines(testContext)).toEqual(DEEP_LINES.slice(0, 5))
   })
 
-  it('re-renders for the viewport but not for a moved caret', () => {
+  it('re-renders for the viewport and does not ask for caret moves', () => {
     const registration = registeredProvider(createStickyScrollPlugin())
     const testContext = context(scrolledSnapshot(60))
     const contribution = registration?.createContribution(testContext)
-    contribution?.update(scrolledSnapshot(100), 'selection')
 
+    expect(contribution?.inputs).not.toContain('selection')
     expect(mirroredLines(testContext)).toEqual(['function outer() {', '  if (a) {'])
 
     contribution?.update(scrolledSnapshot(100), 'viewport')
@@ -241,7 +246,7 @@ describe('createStickyScrollPlugin', () => {
   })
 
   it('carries the tokens of the rows it mirrors, rewritten into the stack', () => {
-    const setTokens = vi.spyOn(EditorSecondaryTextView.prototype, 'setTokens')
+    const setTokens = vi.spyOn(VirtualizedTextView.prototype, 'setTokens')
     const registration = registeredProvider(createStickyScrollPlugin())
     const testContext = context({
       ...scrolledSnapshot(60),
@@ -378,7 +383,7 @@ function registeredProvider(plugin: ReturnType<typeof createStickyScrollPlugin>)
 function createPluginContext(
   registerViewContribution: EditorPluginContext['registerViewContribution'],
 ): EditorPluginContext {
-  return {
+  return createTestPluginContext({
     registerHighlighter: vi.fn(() => ({ dispose: vi.fn() })),
     registerSyntaxProvider: vi.fn(() => ({ dispose: vi.fn() })),
     registerViewContribution,
@@ -388,7 +393,7 @@ function createPluginContext(
     registerDecorationContribution: vi.fn(() => ({ dispose: vi.fn() })),
     registerGutterContribution: vi.fn(() => ({ dispose: vi.fn() })),
     registerInjectedTextRowProvider: vi.fn(() => ({ dispose: vi.fn() })),
-  }
+  })
 }
 
 function context(viewSnapshot = snapshot()): EditorViewContributionContext {
@@ -398,23 +403,13 @@ function context(viewSnapshot = snapshot()): EditorViewContributionContext {
   scrollElement.appendChild(contentElement)
   container.appendChild(scrollElement)
   document.body.appendChild(container)
-  return {
+  return createTestViewContributionContext({
     container,
     scrollElement,
     contentElement,
     highlightPrefix: 'sticky-test',
-    hasDocument: () => true,
     getSnapshot: () => viewSnapshot,
-    requestViewUpdate: vi.fn(),
-    reserveOverlayWidth: vi.fn(),
-    revealLine: vi.fn(),
-    focusEditor: vi.fn(),
-    setSelection: vi.fn(),
-    setSelections: vi.fn(),
-    setScrollTop: vi.fn(),
-    textOffsetFromPoint: vi.fn(() => null),
-    getRangeClientRect: vi.fn(() => null),
-  }
+  })
 }
 
 function stickyRoot(context: EditorViewContributionContext): HTMLElement | null {
@@ -449,7 +444,7 @@ function snapshot(): EditorViewSnapshot {
     languageId: 'typescript',
     syntaxStatus: 'ready',
     paintLayers: [],
-    fullText: TEXT,
+    ...createTestViewSnapshotSource(TEXT),
     textVersion: 1,
     initialHighlightStatus: 'painted',
     documentSyncPoint: {
@@ -467,7 +462,7 @@ function snapshot(): EditorViewSnapshot {
     contentWidth: 160,
     totalHeight: LINES.length * ROW_HEIGHT,
     gutterWidth: 0,
-    gutterLayout: { fixedWidth: 0, lanes: [] },
+    gutterLayout: { leadingInset: 0, fixedWidth: 0, lanes: [] },
     tabSize: 2,
     foldMarkers: foldMarkers(),
     visibleRows: visibleRows(0, LINES.length - 1),
@@ -482,9 +477,6 @@ function snapshot(): EditorViewSnapshot {
       borderBoxHeight: 100,
       borderBoxWidth: 320,
       visibleRange: { start: 0, end: LINES.length },
-    },
-    toJSON() {
-      throw new Error('not used by this fixture')
     },
     toVisibleSnapshot() {
       return null
@@ -583,7 +575,7 @@ function deepSnapshot(): EditorViewSnapshot {
 
   return {
     ...snapshot(),
-    fullText: DEEP_TEXT,
+    ...createTestViewSnapshotSource(DEEP_TEXT),
     lineStarts: starts,
     lineCount: DEEP_LINES.length,
     foldMarkers: Array.from({ length: DEEP_DEPTH }, (_, level) => ({

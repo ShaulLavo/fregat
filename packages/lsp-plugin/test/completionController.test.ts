@@ -1,8 +1,8 @@
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
 import type { DocumentSessionChange, TextEdit } from '@singapore-editor/core/document'
 import type {
+  EditorCommandHandler,
   EditorEditContributionContext,
-  EditorPluginContext,
   EditorViewContributionContext,
   EditorViewContributionProvider,
   EditorViewSnapshot,
@@ -10,12 +10,41 @@ import type {
 import type { LspManagedTransport, LspTransportHandler } from '@singapore-editor/lsp'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type * as lsp from 'vscode-languageserver-protocol'
+import type { EditorAnyCommandId } from '@singapore-editor/core/editor'
 
 import { LANGUAGE_SERVER_COMPLETION_EDIT_FEATURE } from '../src/completion'
 import { CompletionController } from '../src/completionController'
 import { createLanguageServerAdapterPlugin } from '../src/plugin'
+import { completionCommandHandlers } from './completionCommandHandlers'
+import { createTestKeymap, type TestKeymap } from '@singapore-editor/core/testing'
 import type { ActiveDocument } from '../src/pluginTypes'
-import { documentSyncSnapshotFields, viewSnapshotStructuralFields } from './documentSyncSnapshot'
+import {
+  documentSyncSnapshotFields,
+  viewSnapshotStructuralFields,
+  viewText,
+  viewTextFields,
+} from './documentSyncSnapshot'
+import { textDocument } from './snapshotDocument'
+import {
+  createTestEditContributionContext,
+  createTestPluginContext,
+  createTestViewContributionContext,
+} from '@singapore-editor/core/testing'
+
+// Each harness's keymap listens on the document too, so it goes with the test that made it.
+const keymaps: TestKeymap[] = []
+afterEach(() => {
+  for (const keymap of keymaps.splice(0)) keymap.dispose()
+})
+
+function testKeymap(
+  root: HTMLElement,
+  commands: ReadonlyMap<EditorAnyCommandId, EditorCommandHandler>,
+): TestKeymap {
+  const keymap = createTestKeymap(root, commands)
+  keymaps.push(keymap)
+  return keymap
+}
 
 type JsonMessage = Record<string, unknown>
 
@@ -644,10 +673,13 @@ async function standaloneCompletion(
   const applyCompletion = vi.fn(() => true)
   const snapshot = editorSnapshot('const val', 9, 2)
   let active = openDocument('file:///src/index.ts', 'const val')
+  const commands = new Map<EditorAnyCommandId, EditorCommandHandler>()
+  const keymap = testKeymap(element, commands)
 
   const controller = new CompletionController({
     context: viewContributionContext({
       element,
+      registerKeymapContextKey: keymap.registerKeymapContextKey,
       getSnapshot: () => snapshot,
       getRangeClientRect: () => new DOMRect(10, 20, 40, 18),
       getFeature: (token) =>
@@ -663,6 +695,7 @@ async function standaloneCompletion(
     onRequestError: () => undefined,
   })
 
+  for (const [id, handler] of completionCommandHandlers(controller)) commands.set(id, handler)
   controller.update(snapshot, 'content', documentChange([{ from: 8, to: 8, text: 'l' }]))
   await vi.advanceTimersByTimeAsync(90)
 
@@ -684,10 +717,10 @@ function openDocument(uri: string, fullText: string): ActiveDocument {
   return {
     uri,
     languageId: 'typescript',
-    fullText,
+    ...textDocument(fullText),
     textVersion: 2,
     lspVersion: 1,
-  } as ActiveDocument
+  }
 }
 
 function completionMatchRuns(): readonly string[] {
@@ -733,10 +766,13 @@ async function connectedEditor(
   let snapshot = editorSnapshot(text, caretOffset, 1)
   let anchorRect = new DOMRect(10, 20, 40, 18)
 
-  const provider = activateProvider(transport, features, applyEdits)
+  const commands = new Map<EditorAnyCommandId, EditorCommandHandler>()
+  const provider = activateProvider(transport, features, applyEdits, commands)
+  const keymap = testKeymap(element, commands)
   const contribution = provider.createContribution(
     viewContributionContext({
       element,
+      registerKeymapContextKey: keymap.registerKeymapContextKey,
       getSnapshot: () => snapshot,
       getRangeClientRect: () => anchorRect,
       getFeature: (token) => features.get(token) ?? null,
@@ -764,7 +800,7 @@ async function connectedEditor(
   }
 
   const applyChange = (edit: TextEdit, caretOffset: number): void => {
-    const next = `${snapshot.fullText.slice(0, edit.from)}${edit.text}${snapshot.fullText.slice(edit.to)}`
+    const next = `${viewText(snapshot).slice(0, edit.from)}${edit.text}${viewText(snapshot).slice(edit.to)}`
     snapshot = editorSnapshot(next, caretOffset, snapshot.textVersion + 1)
     contribution.update(snapshot, 'content', documentChange([edit]))
   }
@@ -785,11 +821,11 @@ async function connectedEditor(
     },
     editElsewhere: (edit) => applyChange(edit, caretOffsetOf(snapshot)),
     moveCaret: (offset) => {
-      snapshot = editorSnapshot(snapshot.fullText, offset, snapshot.textVersion)
+      snapshot = editorSnapshot(viewText(snapshot), offset, snapshot.textVersion)
       contribution.update(snapshot, 'selection', null)
     },
     selectRange: (start, end) => {
-      snapshot = editorSnapshot(snapshot.fullText, end, snapshot.textVersion, start)
+      snapshot = editorSnapshot(viewText(snapshot), end, snapshot.textVersion, start)
       contribution.update(snapshot, 'selection', null)
     },
     scroll: (by) => {
@@ -839,45 +875,47 @@ function activateProvider(
   transport: LspManagedTransport,
   features: Map<unknown, unknown>,
   applyEdits: EditorEditContributionContext['applyEdits'],
+  commands: Map<EditorAnyCommandId, EditorCommandHandler>,
 ): EditorViewContributionProvider {
   let provider: EditorViewContributionProvider | null = null
   const disposable = { dispose: () => undefined }
   createLanguageServerAdapterPlugin({
     name: 'editor.test-lsp',
     createTransport: () => transport,
-    defaultHighlightPrefix: 'editor-test',
     completion: {
       acceptTimingName: COMPLETION_ACCEPT_TIMING_NAME,
       widgetClassNamespace: 'test-lsp',
     },
-  }).activate({
-    registerHighlighter: () => disposable,
-    registerSyntaxProvider: () => disposable,
-    registerViewContribution: (value) => {
-      provider = value
-      return disposable
-    },
-    registerCommandContribution: () => disposable,
-    registerCapabilityContribution: () => disposable,
-    registerEditContribution: (value) => {
-      value.createContribution({
-        hasDocument: () => true,
-        materializeFullText: () => '',
-        getTextSnapshot: () => null,
-        getSelections: () => [],
-        focusEditor: vi.fn(),
-        applyEdits,
-        registerFeature: (id, feature) => {
-          features.set(id, feature)
-          return { dispose: () => features.delete(id) }
-        },
-      })
-      return disposable
-    },
-    registerDecorationContribution: () => disposable,
-    registerGutterContribution: () => disposable,
-    registerInjectedTextRowProvider: () => disposable,
-  } satisfies EditorPluginContext)
+  }).activate(
+    createTestPluginContext({
+      registerViewContribution: (value) => {
+        provider = value
+        return disposable
+      },
+      registerCommandContribution: (value) => {
+        value.createContribution({
+          registerCommand: (commandId, handler) => {
+            commands.set(commandId, handler)
+            return { dispose: () => commands.delete(commandId) }
+          },
+        })
+        return disposable
+      },
+      registerEditContribution: (value) => {
+        value.createContribution(
+          createTestEditContributionContext({
+            materializeFullText: () => '',
+            applyEdits,
+            registerFeature: (id, feature) => {
+              features.set(id, feature)
+              return { dispose: () => features.delete(id) }
+            },
+          }),
+        )
+        return disposable
+      },
+    }),
+  )
 
   if (!provider) throw new Error('missing provider')
   return provider
@@ -888,27 +926,19 @@ function viewContributionContext(options: {
   getSnapshot(): EditorViewSnapshot
   getRangeClientRect(): DOMRect
   getFeature(token: unknown): unknown
+  registerKeymapContextKey: EditorViewContributionContext['registerKeymapContextKey']
 }): EditorViewContributionContext {
-  return {
+  return createTestViewContributionContext({
+    registerKeymapContextKey: options.registerKeymapContextKey,
     container: options.element,
     scrollElement: options.element,
     contentElement: options.element,
     highlightPrefix: 'editor-test',
-    hasDocument: () => true,
     getSnapshot: options.getSnapshot,
-    requestViewUpdate: vi.fn(),
     getFeature: options.getFeature as EditorViewContributionContext['getFeature'],
-    revealLine: vi.fn(),
-    focusEditor: vi.fn(),
-    setSelection: vi.fn(),
-    setSelections: vi.fn(),
-    setScrollTop: vi.fn(),
-    reserveOverlayWidth: vi.fn(),
     textOffsetFromPoint: vi.fn(() => 0),
     getRangeClientRect: () => options.getRangeClientRect(),
-    setRangeHighlight: vi.fn(),
-    clearRangeHighlight: vi.fn(),
-  }
+  })
 }
 
 function editorSnapshot(
@@ -922,9 +952,8 @@ function editorSnapshot(
     ...viewSnapshotStructuralFields(),
     documentId: 'src/index.ts',
     languageId: 'typescript',
-    fullText,
+    ...viewTextFields(fullText),
     textVersion,
-    lineStarts: [0],
     tokens: EditorTokenStore.empty(),
     brackets: [],
     selections: [

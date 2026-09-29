@@ -1,6 +1,6 @@
-import { getDocumentTextSourceIndex } from './documentTextSourceCache'
+import { appendDocumentTextMeasurements } from './documentTextSourceCache'
 import {
-  forEachPieceTableTextChunk,
+  streamPieceTableTextChunks,
   materializePieceTableFullText,
   offsetToPoint,
   type PieceTableSnapshot,
@@ -10,6 +10,7 @@ import { getSubtreeLineBreaks } from '@singapore-editor/textbuffer/internal/node
 import { forEachTextInRange } from '@singapore-editor/textbuffer/internal/tree'
 import { lineRange, lineStartOffset } from '@singapore-editor/textbuffer/internal/positions'
 
+import { RangeText } from './textContent'
 import {
   measureString,
   TextMeasurements,
@@ -29,7 +30,8 @@ export type TextLineRange = {
   readonly end: number
 }
 
-export type TextSnapshot = {
+// What an ordinary consumer reads through: bounded ranges and line queries, never the whole text.
+export type TextReadSnapshot = {
   readonly length: number
   readonly lineCount: number
   lineStart(lineIndex: number): number
@@ -37,26 +39,40 @@ export type TextSnapshot = {
   lineRange(lineIndex: number): TextLineRange
   lineAt(offset: number): number
   readRange(start: number, end: number): string
-  materializeFullText(): string
   forEachTextChunk(visit: (text: string, start: number, end: number) => void): void
+}
+
+// O(document length) and not memoized; the caller owns the returned string.
+export type TextSnapshot = TextReadSnapshot & {
+  materializeFullText(): string
 }
 
 export type DocumentTextSnapshot = TextSnapshot & {
   readonly snapshot: PieceTableSnapshot
 }
 
-const rangeMeasurements = new WeakMap<TextSnapshot, Map<string, TextMeasurements>>()
+const rangeMeasurements = new WeakMap<
+  object,
+  WeakMap<TextReadSnapshot, Map<string, TextMeasurements>>
+>()
 const MAX_CACHED_MEASUREMENT_RANGES = 128
 
 export function measureTextSnapshotRange(
-  snapshot: TextSnapshot,
+  snapshot: TextReadSnapshot,
   start: number,
   end: number,
 ): TextMeasurements {
-  let ranges = rangeMeasurements.get(snapshot)
+  const storage =
+    snapshot instanceof PieceTableDocumentTextSnapshot ? snapshot.snapshot.buffers : snapshot
+  let snapshots = rangeMeasurements.get(storage)
+  if (!snapshots) {
+    snapshots = new WeakMap()
+    rangeMeasurements.set(storage, snapshots)
+  }
+  let ranges = snapshots.get(snapshot)
   if (!ranges) {
     ranges = new Map()
-    rangeMeasurements.set(snapshot, ranges)
+    snapshots.set(snapshot, ranges)
   }
   const key = `${start}:${end}`
   const cached = ranges.get(key)
@@ -71,7 +87,7 @@ export function measureTextSnapshotRange(
 }
 
 function measureSnapshotRange(
-  snapshot: TextSnapshot,
+  snapshot: TextReadSnapshot,
   start: number,
   end: number,
 ): TextMeasurements {
@@ -88,26 +104,10 @@ function measureDocumentRange(
   end: number,
 ): TextMeasurements {
   const ranges: MeasuredTextRange[] = []
-  forEachTextInRange(snapshot.root, snapshot.buffers, start, end, (text, from, to, buffer) => {
-    const source = getDocumentTextSourceIndex(snapshot.buffers, buffer, text)
-    ranges.push({ source, start: from, end: to })
+  forEachTextInRange(snapshot.root, snapshot.buffers, start, end, (text, from, to, owner) => {
+    appendDocumentTextMeasurements(ranges, owner, text, from, to)
   })
   return new TextMeasurements(ranges)
-}
-
-export function defineLazyFullTextProperty<
-  TTarget extends { readonly textSnapshot: Pick<TextSnapshot, 'materializeFullText'> },
->(target: TTarget): TTarget & { readonly fullText: string } {
-  let fullTextCache: string | undefined
-  Object.defineProperty(target, 'fullText', {
-    configurable: true,
-    enumerable: true,
-    get: () => {
-      fullTextCache ??= target.textSnapshot.materializeFullText()
-      return fullTextCache
-    },
-  })
-  return target as TTarget & { readonly fullText: string }
 }
 
 export function createDocumentTextSnapshot(
@@ -189,7 +189,7 @@ class PieceTableDocumentTextSnapshot implements DocumentTextSnapshot {
     const retainedText = this.#retainedText
     if (retainedText === undefined) {
       let chunks = 0
-      forEachPieceTableTextChunk(this.snapshot, (text, start, end) => {
+      streamPieceTableTextChunks(this.snapshot, (text, start, end) => {
         chunks += 1
         visit(text, start, end)
       })
@@ -316,6 +316,19 @@ function fullTextSnapshotDetail(
   }
 }
 
-export function getPieceTreeSnapshot(text: TextSnapshot): PieceTableSnapshot | null {
+/** A range as random-access text: characters come from the source on demand, not one copy. */
+export function textSnapshotRangeContent(
+  source: TextReadSnapshot,
+  start: number,
+  end: number,
+): RangeText {
+  return new RangeText(
+    end - start,
+    (from, to) => source.readRange(start + from, start + to),
+    measureTextSnapshotRange(source, start, end),
+  )
+}
+
+export function getPieceTreeSnapshot(text: TextReadSnapshot): PieceTableSnapshot | null {
   return text instanceof PieceTableDocumentTextSnapshot ? text.snapshot : null
 }

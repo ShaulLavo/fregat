@@ -1,3 +1,4 @@
+import type { EditorMarkerHit } from '../pointQueries'
 import type { TextContent } from '../textContent'
 import { measureWhitespaceDotGlyph, type WhitespaceDotGlyph } from './browserMetrics'
 import { setStyleValue } from './virtualizedTextViewHelpers'
@@ -109,6 +110,20 @@ export const DEFAULT_SUSPICIOUS_SETTINGS: SuspiciousCharacterSettings = {
   options: normalizeSuspiciousCharactersOptions(undefined),
   revision: 0,
 }
+const paintedMarkers = new WeakMap<HTMLElement, readonly HiddenCharacterMarker[]>()
+
+export function markerAtRowX(row: MountedVirtualizedTextRow, x: number): EditorMarkerHit | null {
+  // Invisible markers paint at least 2px, matching the layer's CSS minimum width.
+  const marker = paintedMarkers
+    .get(row.element)
+    ?.find(
+      (marker) =>
+        x >= marker.left &&
+        x < marker.left + (marker.kind === 'invisible' ? Math.max(2, marker.width) : marker.width),
+    )
+  return marker ? { kind: marker.kind, offset: marker.offset } : null
+}
+
 const hiddenCharacterInputs = new WeakMap<HTMLElement, HiddenCharacterInputs>()
 /** Bumped per change rather than per view, so a row's cached inputs can compare it as one number. */
 let suspiciousRevision = 0
@@ -187,6 +202,7 @@ function drawHiddenCharactersForRow(plan: HiddenCharacterRowPlan): void {
     return
   }
 
+  paintedMarkers.set(row.element, markers)
   const markerKey = hiddenCharacterMarkerKey(markers)
   if (row.hiddenCharactersKey !== markerKey) {
     setHiddenCharactersKey(row, markerKey)
@@ -466,6 +482,7 @@ function hiddenCharacterGlyph(context: HiddenCharacterRowContext, kind: Whitespa
 }
 
 export function clearHiddenCharactersForRow(row: MountedVirtualizedTextRow): void {
+  paintedMarkers.delete(row.element)
   setHiddenCharactersKey(row, '')
   row.hiddenCharactersLayerElement.replaceChildren()
   row.hiddenCharactersLayerElement.remove()

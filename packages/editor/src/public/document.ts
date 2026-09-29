@@ -8,7 +8,6 @@ export {
   createPieceTableWalker,
   deleteFromPieceTable,
   diffPieceTableSnapshots,
-  forEachPieceTableTextChunk,
   getPieceTableLength,
   insertIntoPieceTable,
   materializePieceTableFullText,
@@ -48,6 +47,12 @@ export {
   subscribeDocumentMutationLeaseState,
 } from '../documentSession'
 export { createHistoryViewer, layoutHistoryGraph } from '../historyViewer'
+export { SERIALIZED_EDITOR_HISTORY_VERSION } from '../historySerialization'
+export type {
+  SerializedEditorHistory,
+  SerializedEditorHistoryNode,
+  SerializedEditorHistorySelection,
+} from '../historySerialization'
 export type { EditorCollapsedRegion, EditorManualFold, EditorViewFoldState } from '../viewFolds'
 export type {
   HistoryComparison,
@@ -150,7 +155,22 @@ export type {
   DocumentTextRoundTripIssue,
   DocumentTextRoundTripStatus,
 } from '@singapore-editor/textbuffer/internal/lineEndings'
-export type { DocumentTextSnapshot, TextSnapshot } from '../documentTextSnapshot'
+export type {
+  DocumentTextSnapshot,
+  TextLineRange,
+  TextReadSnapshot,
+  TextSnapshot,
+} from '../documentTextSnapshot'
 export type { SelectionAffinity } from '../selections'
 export type { EditorDocument, TextEdit } from '../tokens'
 export type { TextCharacterClass, TextOffsetRange } from '../textRanges'
+
+export type { TextStorageMaintenanceStats } from '../textStorageMaintenance'
+export {
+  createAnchorSelection,
+  createSelectionSet,
+  normalizeSelectionSet,
+  resolveSelection,
+} from '../selections'
+export type { AnchorSelection, SelectionSet } from '../selections'
+export { documentSessionChangeTextSnapshot } from '../documentSession'

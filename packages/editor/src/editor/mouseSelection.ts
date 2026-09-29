@@ -6,7 +6,6 @@ import type {
   VirtualizedBidiSelectionAnchor,
   VirtualizedTextHitPosition,
 } from '../virtualization/virtualizedTextViewTypes'
-import { nowMs } from './timing'
 
 /**
  * What each end of a drag snaps to. `column` is the odd one out: it follows the pointer the same
@@ -141,20 +140,6 @@ export function mouseSelectionAutoScrollDelta(
     ),
     y: autoScrollAxisDelta(clientY, rect.top, rect.bottom, rect.height),
   }
-}
-
-export function requestFrame(callback: FrameRequestCallback): number {
-  if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(callback)
-  return setTimeout(() => callback(nowMs()), 0) as unknown as number
-}
-
-export function cancelFrame(handle: number): void {
-  if (typeof cancelAnimationFrame === 'function') {
-    cancelAnimationFrame(handle)
-    return
-  }
-
-  clearTimeout(handle)
 }
 
 /** A viewport under two zones wide would sit in both at once and only ever scroll one way. */

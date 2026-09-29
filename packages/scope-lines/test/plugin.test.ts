@@ -1,4 +1,5 @@
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
+import { createTestViewSnapshotSource } from '@singapore-editor/core/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { createStringTextSnapshot, type TextSnapshot } from '@singapore-editor/core/document'
 import type { VirtualizedFoldMarker } from '@singapore-editor/core/rendering'
@@ -9,6 +10,10 @@ import type {
   EditorViewSnapshot,
 } from '@singapore-editor/core/extensions'
 import { createScopeLinesPlugin } from '../src/index'
+import {
+  createTestPluginContext,
+  createTestViewContributionContext,
+} from '@singapore-editor/core/testing'
 
 const TEST_DOCUMENT_SYNC_SEGMENT = Object.freeze(
   {},
@@ -183,6 +188,36 @@ describe('createScopeLinesPlugin', () => {
     }
   })
 
+  it.each([true, false])(
+    'timer fallback defers and rechecks geometry committed=%s',
+    (committed) => {
+      vi.useFakeTimers()
+      vi.stubGlobal('requestAnimationFrame', undefined)
+      const testContext = context(snapshot())
+      const contribution =
+        registeredProvider(createScopeLinesPlugin())?.createContribution(testContext)
+      const latest = snapshot({ textVersion: 2, foldMarkers: [] })
+      try {
+        contribution?.update(latest, 'content')
+        expect(testContext.scrollElement.querySelectorAll('.editor-scope-line')).toHaveLength(2)
+        testContext.getSnapshot = () => snapshot({ geometryCommitted: committed })
+        vi.runAllTimers()
+        expect(testContext.scrollElement.querySelectorAll('.editor-scope-line')).toHaveLength(
+          committed ? 0 : 2,
+        )
+        expect(testContext.requestViewUpdate).toHaveBeenCalledTimes(committed ? 1 : 0)
+        contribution?.update(latest, 'content')
+        contribution?.dispose()
+        vi.runAllTimers()
+        expect(testContext.requestViewUpdate).toHaveBeenCalledTimes(committed ? 1 : 0)
+      } finally {
+        contribution?.dispose()
+        vi.useRealTimers()
+        vi.unstubAllGlobals()
+      }
+    },
+  )
+
   it('omits guide segments with no visible width or height', () => {
     const registration = registeredProvider(createScopeLinesPlugin())
     const viewSnapshot = snapshot()
@@ -243,7 +278,7 @@ describe('createScopeLinesPlugin', () => {
     const text = 'function f() {\n    if (x) {\n        y()\n    }\n}\n'
     const testContext = context(
       snapshot({
-        fullText: text,
+        text,
         lineStarts: lineStarts(text),
         lineCount: 6,
         tabSize: 4,
@@ -266,7 +301,7 @@ describe('createScopeLinesPlugin', () => {
     const starts = lineStarts(text)
     const testContext = context(
       snapshot({
-        fullText: text,
+        text,
         lineStarts: starts,
         lineCount: starts.length,
         foldMarkers: [
@@ -298,7 +333,7 @@ describe('createScopeLinesPlugin', () => {
     const readRows: number[] = []
     const testContext = context(
       snapshot({
-        fullText: text,
+        text,
         textSnapshot: countingTextSnapshot(text, starts, readRows),
         lineStarts: starts,
         foldMarkers: foldMarkers(),
@@ -318,7 +353,7 @@ describe('createScopeLinesPlugin', () => {
     const readRows: number[] = []
     const testContext = context(
       snapshot({
-        fullText: text,
+        text,
         textSnapshot: countingTextSnapshot(text, starts, readRows),
         lineStarts: starts,
         lineCount: starts.length,
@@ -390,6 +425,11 @@ describe('createScopeLinesPlugin', () => {
   })
 
   it('keeps scope line nodes when content edits leave guide geometry unchanged', () => {
+    const frames: FrameRequestCallback[] = []
+    const request = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback)
+      return frames.length
+    })
     const registration = registeredProvider(createScopeLinesPlugin())
     const testContext = context(
       snapshot({
@@ -414,11 +454,15 @@ describe('createScopeLinesPlugin', () => {
       'content',
     )
 
+    frames.shift()?.(0)
+    expect(testContext.requestViewUpdate).toHaveBeenCalledOnce()
+    request.mockRestore()
     const nextLines = [
       ...testContext.scrollElement.querySelectorAll<HTMLElement>('.editor-scope-line'),
     ]
     expect(nextLines[0]).toBe(originalLines[0])
     expect(nextLines[1]).toBe(originalLines[1])
+    contribution?.dispose()
   })
 
   it('renders only the nearest cursor scope in current mode', () => {
@@ -488,7 +532,7 @@ function registeredProvider(plugin: ReturnType<typeof createScopeLinesPlugin>) {
 function createContext(
   registerViewContribution: EditorPluginContext['registerViewContribution'],
 ): EditorPluginContext {
-  return {
+  return createTestPluginContext({
     registerHighlighter: vi.fn(() => ({ dispose: vi.fn() })),
     registerSyntaxProvider: vi.fn(() => ({ dispose: vi.fn() })),
     registerViewContribution,
@@ -498,7 +542,7 @@ function createContext(
     registerDecorationContribution: vi.fn(() => ({ dispose: vi.fn() })),
     registerGutterContribution: vi.fn(() => ({ dispose: vi.fn() })),
     registerInjectedTextRowProvider: vi.fn(() => ({ dispose: vi.fn() })),
-  }
+  })
 }
 
 function context(viewSnapshot = snapshot()): EditorViewContributionContext {
@@ -507,32 +551,25 @@ function context(viewSnapshot = snapshot()): EditorViewContributionContext {
   const contentElement = document.createElement('div')
   scrollElement.appendChild(contentElement)
   container.appendChild(scrollElement)
-  return {
+  return createTestViewContributionContext({
     container,
     scrollElement,
     contentElement,
-    hasDocument: () => true,
     getSnapshot: () => viewSnapshot,
     requestViewUpdate: vi.fn(),
-    reserveOverlayWidth: vi.fn(),
-    revealLine: vi.fn(),
-    focusEditor: vi.fn(),
-    setSelection: vi.fn(),
-    setSelections: vi.fn(),
-    setScrollTop: vi.fn(),
-    textOffsetFromPoint: vi.fn(() => null),
-    getRangeClientRect: vi.fn(() => null),
-  }
+  })
 }
 
-function snapshot(overrides: Partial<EditorViewSnapshot> = {}): EditorViewSnapshot {
-  const text = 'function f() {\n  if (x) {\n    y()\n  }\n}\n'
+function snapshot({
+  text = 'function f() {\n  if (x) {\n    y()\n  }\n}\n',
+  ...overrides
+}: Partial<EditorViewSnapshot> & { readonly text?: string } = {}): EditorViewSnapshot {
   return {
     documentId: 'scope-test',
     languageId: 'typescript',
     syntaxStatus: 'ready',
     paintLayers: [],
-    fullText: text,
+    ...createTestViewSnapshotSource(text),
     textVersion: 1,
     lineStarts: lineStarts(text),
     tokens: EditorTokenStore.empty(),
@@ -560,12 +597,7 @@ function snapshot(overrides: Partial<EditorViewSnapshot> = {}): EditorViewSnapsh
     ...overrides,
     initialHighlightStatus: overrides.initialHighlightStatus ?? 'painted',
     gutterWidth: overrides.gutterWidth ?? 0,
-    gutterLayout: overrides.gutterLayout ?? { fixedWidth: 0, lanes: [] },
-    toJSON:
-      overrides.toJSON ??
-      (() => {
-        throw new Error('not used by this fixture')
-      }),
+    gutterLayout: overrides.gutterLayout ?? { leadingInset: 0, fixedWidth: 0, lanes: [] },
     toVisibleSnapshot: overrides.toVisibleSnapshot ?? (() => null),
     documentSyncPoint: overrides.documentSyncPoint ?? {
       revision: overrides.textVersion ?? 1,

@@ -89,3 +89,18 @@ test('clamps centered jumps at the document boundaries', async () => {
     })
     .toBeLessThan(1)
 })
+
+test('centers a target that is off screen and leaves one on screen where it is', async () => {
+  const { container, editor, scroller } = await mountEditor()
+  editor.setSelection(targetOffset(120), targetOffset(120), { revealBlock: 'center-if-outside' })
+  await expectCentered(container, scroller, 120)
+
+  // Two lines down is still in view: a jump there must not move the page under
+  // the reader, which is what unconditional centering does on every step.
+  const settled = scroller.scrollTop
+  editor.setSelection(targetOffset(122), targetOffset(122), { revealBlock: 'center-if-outside' })
+  editor.focus()
+  await new Promise((resolve) => requestAnimationFrame(resolve))
+
+  expect(scroller.scrollTop).toBe(settled)
+})

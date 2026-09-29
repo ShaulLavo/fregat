@@ -42,4 +42,7 @@ snapshots because restoring them would require the source fold marker.
 - `createFoldGutterPlugin` adds fold controls for syntax fold markers.
 - `createLineGutterContribution` and `createFoldGutterContribution` expose the lower-level gutter
   contributions.
+- The gutter passes presses through to the text. A contribution whose cell handles them sets
+  `interactive: true`, as the fold gutter does; its cell then takes pointer events, and a press it
+  does not claim still places the caret.
 - `@singapore-editor/gutters/style.css` imports both gutter styles.

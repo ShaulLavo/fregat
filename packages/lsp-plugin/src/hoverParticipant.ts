@@ -1,9 +1,15 @@
+import type { LanguageServerDiagnosticActions } from './types'
+import type { TooltipAction } from '@singapore-editor/plugin-ui/tooltip'
 import {
   lspPositionToOffsetInSnapshot,
   offsetToLspPositionInSnapshot,
   type LspRequestOptions,
 } from '@singapore-editor/lsp'
-import type { EditorHoverParticipant, HoverPart, HoverRequest } from '@singapore-editor/plugin-ui'
+import type {
+  EditorHoverParticipant,
+  HoverPart,
+  HoverRequest,
+} from '@singapore-editor/plugin-ui/hover-participant'
 import type * as lsp from 'vscode-languageserver-protocol'
 
 import { diagnosticNotes, type OpenLocation } from './diagnosticNotes'
@@ -28,6 +34,7 @@ export type LanguageServerHoverParticipantOptions = {
   ): Promise<lsp.Hover | null>
   getActiveDocument(): ActiveDocument | null
   getDiagnostics(): readonly lsp.Diagnostic[]
+  readonly getDiagnosticActions?: LanguageServerDiagnosticActions
   /** Follows a diagnostic's related-information link. */
   openLocation?: OpenLocation
   onRequestSuccess?(): void
@@ -42,6 +49,8 @@ export function createLanguageServerHoverParticipant(
   options: LanguageServerHoverParticipantOptions,
 ): EditorHoverParticipant {
   let diagnosticIndex: { index: DiagnosticOffsetIndex; textVersion: number } | null = null
+  // Outlives the tooltip, so reopening a hover joins a run instead of starting a second one.
+  const runningActions = new Map<string, Promise<void>>()
 
   // Keyed on the published array and the text it was projected onto, so a pointer move pays for
   // the index only when either changes.
@@ -73,7 +82,11 @@ export function createLanguageServerHoverParticipant(
         {
           ordinal: DIAGNOSTIC_ORDINAL,
           range: request.anchor.range,
-          notes: diagnosticNotes(diagnostics, options.openLocation ?? (() => undefined)),
+          notes: diagnosticNotes(
+            diagnostics,
+            options.openLocation ?? (() => undefined),
+            (diagnostic) => diagnosticActions(options, runningActions, active, diagnostic),
+          ),
         },
       ]
     },
@@ -100,6 +113,90 @@ export function createLanguageServerHoverParticipant(
       }
     },
   }
+}
+
+function diagnosticActions(
+  options: LanguageServerHoverParticipantOptions,
+  runningActions: Map<string, Promise<void>>,
+  active: ActiveDocument,
+  diagnostic: lsp.Diagnostic,
+): readonly TooltipAction[] {
+  try {
+    const actions =
+      options.getDiagnosticActions?.({
+        documentUri: active.uri,
+        textVersion: active.textVersion,
+        diagnostic,
+      }) ?? []
+    return actions.map((action) => ({
+      ...action,
+      run: () => runDiagnosticAction(options, runningActions, active, diagnostic, action),
+    }))
+  } catch (error) {
+    options.onRequestError(error)
+    return []
+  }
+}
+
+function runDiagnosticAction(
+  options: LanguageServerHoverParticipantOptions,
+  runningActions: Map<string, Promise<void>>,
+  active: ActiveDocument,
+  diagnostic: lsp.Diagnostic,
+  action: TooltipAction,
+): void | Promise<void> {
+  const key = diagnosticKey(diagnostic)
+  const current = options.getActiveDocument()
+  if (
+    !current ||
+    current.uri !== active.uri ||
+    current.textVersion !== active.textVersion ||
+    !options.getDiagnostics().some((candidate) => diagnosticKey(candidate) === key)
+  )
+    throw new Error('The diagnostic changed. Reopen its hover.')
+
+  const runKey = JSON.stringify([active.uri, active.textVersion, key, action.label])
+  const running = runningActions.get(runKey)
+  if (running) return running
+
+  const result = reportActionFailure(options, action)
+  if (!result) return
+  const run = result.finally(() => runningActions.delete(runKey))
+  runningActions.set(runKey, run)
+  return run
+}
+
+// The tooltip may be gone by the time a slow action fails, so the host always hears about it.
+function reportActionFailure(
+  options: LanguageServerHoverParticipantOptions,
+  action: TooltipAction,
+): void | Promise<void> {
+  const report = (error: unknown): never => {
+    options.onRequestError(error)
+    throw error
+  }
+  let result: void | Promise<void>
+  try {
+    result = action.run()
+  } catch (error) {
+    return report(error)
+  }
+  return result ? result.catch(report) : undefined
+}
+
+// A republish replaces the diagnostic objects, so staleness compares what the user was shown.
+function diagnosticKey(diagnostic: lsp.Diagnostic): string {
+  const { range, severity, code, source, message } = diagnostic
+  return JSON.stringify([
+    range.start.line,
+    range.start.character,
+    range.end.line,
+    range.end.character,
+    severity,
+    code,
+    source,
+    typeof message === 'string' ? message : message.value,
+  ])
 }
 
 function hoverParts(

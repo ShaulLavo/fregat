@@ -136,6 +136,18 @@ export const DIAGNOSTIC_STYLES: Record<
   hint: { backgroundColor: DIAGNOSTIC_HINT_BACKGROUND },
 }
 
+export const UNNECESSARY_DIAGNOSTIC_OPACITY = registerEditorColor(
+  'lsp.diagnostic.unnecessaryOpacity',
+  {
+    dark: '#000a',
+    light: '#0007',
+  },
+)
+
+export const DEPRECATED_DIAGNOSTIC_STYLE: VirtualizedTextHighlightStyle = {
+  overlay: { textDecoration: 'line-through' },
+}
+
 // Opacity descends with severity, so a line carrying several diagnostics still reads as its worst
 // one once the marks overlap.
 const DIAGNOSTIC_MARKER_ALPHA = {

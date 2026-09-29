@@ -41,8 +41,10 @@ completion and are labeled upper bounds.
 
 Prepared revision and configuration matching remain exact. Late syntax results still pass the
 document, content, configuration, and runtime-session checks. A cached image is never document
-truth. E003 adds no retry loop; failure remains an observable terminal outcome, and the separate
-Platform Plan 071 remains responsible for any retry policy.
+truth. A failed highlighter refresh retries once on the same session and once on a reloaded one,
+then settles as `error` with one `editor.syntax.highlight_retries_exhausted` warning; a retry that
+paints logs `editor.syntax.highlight_recovered`. Failure stays an observable terminal outcome. Before any document the status is `idle`, so every other value
+except `loading` means settled.
 
 ## Verification references
 

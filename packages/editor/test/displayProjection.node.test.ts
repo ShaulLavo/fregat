@@ -88,6 +88,13 @@ describe('indexed display projection', () => {
     },
   )
 
+  test('answers no buffer row for a display row it does not have', () => {
+    const projection = new DisplayProjection(input('a\nb'))
+    expect(projection.bufferRowForRow(1)).toBe(1)
+    expect(projection.bufferRowForRow(2)).toBeNull()
+    expect(projection.bufferRowForRow(-1)).toBeNull()
+  })
+
   test('combines folds, atomic inline replacements and ordered injected wraps', () => {
     const text = 'a **bold** b\nhidden\nstill hidden\nlast\n'
     const piece = createPieceTableSnapshot(text)

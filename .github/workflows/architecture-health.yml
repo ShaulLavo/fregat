@@ -22,5 +22,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # check:full-text resolves each package's imports through its built exports.
+      - name: Build packages
+        run: bun run build -- --filter='./packages/*'
+
       - name: Check architecture health baselines
         run: bun run health

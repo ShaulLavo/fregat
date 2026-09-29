@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
+import { snapshotText } from './factories/snapshotText'
 
 import { createBracketMatchPlugin } from '../src/bracketMatchPlugin'
-import type { EditorCommandId } from '../src/editor/commands'
+import type { EditorAnyCommandId as EditorCommandId } from '../src/editor/commandCatalog'
 import type {
   EditorCommandContribution,
   EditorCommandContributionProvider,
-  EditorPluginContext,
   EditorViewContribution,
   EditorViewContributionContext,
   EditorViewSnapshot,
@@ -16,6 +16,7 @@ import {
 } from './factories/documentSync'
 import type { BracketInfo } from '../src/syntax/session'
 import { EditorTokenStore } from '../src/syntax/tokenStore'
+import { createTestPluginContext, createTestViewContributionContext } from '../src/testContexts'
 
 const TEXT = 'fn(a)'
 const BRACKETS: BracketInfo[] = [
@@ -85,7 +86,8 @@ describe('createBracketMatchPlugin', () => {
     const harness = activate()
 
     harness.update(snapshot({ caret: 3 }), 'selection')
-    harness.update(snapshot({ caret: 3 }), 'clear')
+    // A cleared view has no parse left to pair against.
+    harness.update(snapshot({ brackets: [], caret: 3 }), 'clear')
 
     expect(harness.view.clearRangeHighlight).toHaveBeenCalledWith('test-bracket-match')
   })
@@ -106,6 +108,17 @@ describe('createBracketMatchPlugin', () => {
     expect(harness.view.setSelection).toHaveBeenCalledWith(5, 5, 'editor.jumpToBracket', {
       revealOffset: 5,
     })
+  })
+
+  it('jumps within the editor whose command ran when one plugin object serves two editors', () => {
+    const plugin = createBracketMatchPlugin()
+    const first = activate({ caret: 3 }, plugin)
+    const second = activate({ brackets: [], caret: 3 }, plugin)
+
+    expect(first.runCommand('editor.action.jumpToBracket')).toBe(true)
+    expect(first.view.setSelection).toHaveBeenCalledTimes(1)
+    expect(second.view.setSelection).not.toHaveBeenCalled()
+    expect(second.runCommand('editor.action.jumpToBracket')).toBe(false)
   })
 
   it('reports the jump as unhandled when there is no match', () => {
@@ -130,11 +143,11 @@ function snapshot(options: SnapshotOptions = {}): EditorViewSnapshot {
     brackets: options.brackets ?? BRACKETS,
     contentWidth: 80,
     gutterWidth: 0,
-    gutterLayout: { fixedWidth: 0, lanes: [] },
+    gutterLayout: { leadingInset: 0, fixedWidth: 0, lanes: [] },
     documentId: 'bracket-test',
     documentSyncPoint: TEST_DOCUMENT_SYNC_POINT,
     foldMarkers: [],
-    fullText: TEXT,
+    ...snapshotText(TEXT),
     languageId: 'typescript',
     initialHighlightStatus: 'painted',
     syntaxStatus: 'ready',
@@ -166,9 +179,6 @@ function snapshot(options: SnapshotOptions = {}): EditorViewSnapshot {
       visibleRange: { end: 1, start: 0 },
     },
     visibleRows: [],
-    toJSON() {
-      throw new Error('not used by this fixture')
-    },
     toVisibleSnapshot() {
       return null
     },
@@ -179,12 +189,12 @@ function snapshot(options: SnapshotOptions = {}): EditorViewSnapshot {
  * Activates the plugin against a fake host and returns the pieces a test drives: the view
  * contribution (which owns painting) and the command table it registered.
  */
-function activate(snapshotOptions: SnapshotOptions = {}) {
-  const view = viewContext(() => snapshot(snapshotOptions))
+function activate(snapshotOptions: SnapshotOptions = {}, plugin = createBracketMatchPlugin()) {
   const commands = new Map<EditorCommandId, () => boolean>()
+  const view = viewContext(() => snapshot(snapshotOptions), commands)
   let contribution: EditorViewContribution | null = null
 
-  const context = {
+  const context = createTestPluginContext({
     registerCapabilityContribution: vi.fn(() => ({ dispose: vi.fn() })),
     registerCommandContribution: vi.fn((provider: EditorCommandContributionProvider) => {
       const created: EditorCommandContribution | null = provider.createContribution({
@@ -205,7 +215,7 @@ function activate(snapshotOptions: SnapshotOptions = {}) {
       contribution = provider.createContribution(view)
       return { dispose: vi.fn() }
     }),
-  } as unknown as EditorPluginContext
+  })
 
   // Read through a function: the assignment happens inside registerViewContribution's callback,
   // which control-flow analysis in this body does not see, so an inline read still narrows to the
@@ -215,7 +225,7 @@ function activate(snapshotOptions: SnapshotOptions = {}) {
     return contribution
   }
 
-  createBracketMatchPlugin().activate(context)
+  plugin.activate(context)
   const created = requireContribution()
 
   return {
@@ -226,28 +236,26 @@ function activate(snapshotOptions: SnapshotOptions = {}) {
   }
 }
 
-function viewContext(getSnapshot: () => EditorViewSnapshot): EditorViewContributionContext {
+function viewContext(
+  getSnapshot: () => EditorViewSnapshot,
+  commands: Map<EditorCommandId, () => boolean>,
+): EditorViewContributionContext {
   const container = document.createElement('div')
   const scrollElement = document.createElement('div')
   container.appendChild(scrollElement)
 
-  return {
+  return createTestViewContributionContext({
     clearRangeHighlight: vi.fn(),
     container,
-    focusEditor: vi.fn(),
-    getRangeClientRect: vi.fn(() => null),
     getSnapshot,
-    requestViewUpdate: vi.fn(),
-    hasDocument: () => true,
     highlightPrefix: 'test',
-    reserveOverlayWidth: vi.fn(),
-    revealLine: vi.fn(),
     scrollElement: scrollElement as HTMLDivElement,
     contentElement: scrollElement,
     setRangeHighlight: vi.fn(),
-    setScrollTop: vi.fn(),
     setSelection: vi.fn(),
-    setSelections: vi.fn(),
-    textOffsetFromPoint: vi.fn(() => null),
-  }
+    registerCommand: (command, handler) => {
+      commands.set(command, () => handler({}))
+      return { dispose: () => commands.delete(command) }
+    },
+  })
 }

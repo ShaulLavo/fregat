@@ -13,9 +13,9 @@ export type EditorDecorationSurface = 'text' | 'row' | 'minimap'
 
 export type EditorDecorationTextSurface = Omit<EditorRangeDecoration, 'end' | 'start'>
 
-export type EditorDecorationRowSurface = VirtualizedTextRowDecoration
+type EditorDecorationRowSurface = VirtualizedTextRowDecoration
 
-export type EditorDecorationMinimapSurface = Omit<
+type EditorDecorationMinimapSurface = Omit<
   EditorMinimapDecoration,
   'endColumn' | 'endLineNumber' | 'startColumn' | 'startLineNumber'
 >

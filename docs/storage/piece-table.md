@@ -4,6 +4,8 @@
 
 The editor's storage engine is a piece table on a persistent AVL tree (a treap until [E040](../performance/e040-balanced-tree.md)) with persistent immutable snapshots via structural sharing. Each mutation returns a new snapshot; previous snapshots remain valid and unmodified.
 
+What each piece costs the garbage collector, and the layouts measured against it, is in [Heap cost per piece](../performance/piece-heap-cost.md).
+
 **Implementation:** `packages/textbuffer/src/`
 **Types:** `packages/textbuffer/src/pieceTableTypes.ts`
 **Operations:** `packages/textbuffer/src/pieceTable.ts`

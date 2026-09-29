@@ -1,0 +1,786 @@
+{
+  "commit": "4c03e0d379bf6a0844bdf3537eed78d8c96027df",
+  "diff": "diff --git i/packages/editor/src/shiki/workerClient.ts w/packages/editor/src/shiki/workerClient.ts\nindex a6f3ae5..646cb4d 100644\n--- i/packages/editor/src/shiki/workerClient.ts\n+++ w/packages/editor/src/shiki/workerClient.ts\n@@ -2,6 +2,7 @@ import { documentSessionChangeTextSnapshot, type DocumentSessionChange } from '.\n import { createDocumentTextSnapshot, type DocumentTextSnapshot } from '../documentTextSnapshot'\n import {\n   applyBatchToPieceTable,\n+  diffPieceTableSnapshots,\n   type PieceTableSnapshot,\n   pieceTableSnapshotsHaveSameText,\n } from '@singapore-editor/textbuffer'\n@@ -356,12 +357,12 @@ class ShikiHighlighterSession implements EditorHighlighterSession {\n   public readonly onDidChangeTheme: ShikiHighlighterSessionOptions['onDidChangeTheme']\n   private readonly preloadRegistrations: ShikiPreloadRegistrationSource | null\n   private snapshot: PieceTableSnapshot\n-  private textSnapshot: DocumentTextSnapshot\n   // The whole document's tokens, kept packed so an edit answer only has to splice its lines in.\n   private store: EditorTokenStore | null = null\n   private currentTheme: EditorTheme | null | undefined\n   private preloadScheduled = false\n   private opened = false\n+  private workerGeneration = 0\n   private disposed = false\n   private task: Promise<void> = Promise.resolve()\n \n@@ -378,8 +379,6 @@ class ShikiHighlighterSession implements EditorHighlighterSession {\n     this.registrations = Promise.resolve(options.registrations)\n     this.preloadRegistrations = options.preloadRegistrations ?? null\n     this.snapshot = options.snapshot\n-    this.textSnapshot =\n-      options.textSnapshot ?? createDocumentTextSnapshot(options.snapshot, options.fullText)\n   }\n \n   public async refresh(\n@@ -410,8 +409,8 @@ class ShikiHighlighterSession implements EditorHighlighterSession {\n \n       this.schedulePreload()\n       this.snapshot = snapshot\n-      this.textSnapshot = textSnapshot\n       this.opened = true\n+      this.workerGeneration = this.owner.inspect().workerGeneration\n       this.disposed = false\n       this.store = result?.tokensPacked ? EditorTokenStore.fromPacked(result.tokensPacked) : null\n       this.currentTheme = result?.theme\n@@ -436,8 +435,8 @@ class ShikiHighlighterSession implements EditorHighlighterSession {\n \n       this.schedulePreload()\n       this.snapshot = change.snapshot\n-      this.textSnapshot = nextTextSnapshot\n       this.opened = true\n+      this.workerGeneration = this.owner.inspect().workerGeneration\n       this.disposed = false\n       this.adoptEditResult(result)\n       return { tokens: this.currentTokens(), theme: result?.theme }\n@@ -473,6 +472,10 @@ class ShikiHighlighterSession implements EditorHighlighterSession {\n   }\n \n   private async synchronizeTheme(): Promise<void> {\n+    const worker = this.owner.inspect()\n+    if (worker.lifecycle !== 'ready' || worker.workerGeneration !== this.workerGeneration) {\n+      this.opened = false\n+    }\n     const next = this.options.resolveTheme?.(this.theme)\n     if (!next || next.theme === this.theme) return\n \n@@ -527,12 +530,20 @@ class ShikiHighlighterSession implements EditorHighlighterSession {\n       }\n     }\n \n-    const text = nextTextSnapshot.materializeFullText()\n-    const fallbackEdit = createTextDiffEdit(this.textSnapshot.materializeFullText(), text)\n+    if (!this.opened) {\n+      return {\n+        type: 'open',\n+        ...(await this.documentOptions()),\n+        text: nextTextSnapshot.materializeFullText(),\n+      }\n+    }\n+\n+    const fallbackEdit = diffPieceTableSnapshots(this.snapshot, change.snapshot)\n     return {\n       type: 'edit',\n-      ...(await this.documentOptions(text)),\n-      edits: fallbackEdit ? [fallbackEdit] : undefined,\n+      ...(await this.documentOptions()),\n+      // Absent edits would send the worker's entire token store back for a no-op.\n+      edits: fallbackEdit ? [fallbackEdit] : [],\n     }\n   }\n \n@@ -564,31 +575,6 @@ function emptyHighlightResult(): EditorHighlightResult {\n   return { tokens: EditorTokenStore.empty() }\n }\n \n-export const createTextDiffEdit = (previousText: string, nextText: string) => {\n-  if (previousText === nextText) return null\n-\n-  let start = 0\n-  const maxPrefixLength = Math.min(previousText.length, nextText.length)\n-  while (start < maxPrefixLength && previousText[start] === nextText[start]) start += 1\n-\n-  let previousEnd = previousText.length\n-  let nextEnd = nextText.length\n-  while (\n-    previousEnd > start &&\n-    nextEnd > start &&\n-    previousText[previousEnd - 1] === nextText[nextEnd - 1]\n-  ) {\n-    previousEnd -= 1\n-    nextEnd -= 1\n-  }\n-\n-  return {\n-    from: start,\n-    to: previousEnd,\n-    text: nextText.slice(start, nextEnd),\n-  }\n-}\n-\n const incrementalEditsForChange = (\n   snapshot: PieceTableSnapshot,\n   change: DocumentSessionChange,\n",
+  "diagnostics": false,
+  "consumers": false,
+  "repetitions": 10,
+  "sizes": [65536, 4194304, 50331648],
+  "samples": [
+    {
+      "size": 65536,
+      "emptyHeap": 642432,
+      "openHeap": 896828,
+      "liveHeap": 1080784,
+      "disposedHeap": 1024868,
+      "retained": 0,
+      "open": {
+        "operation": "open",
+        "durationMs": 37.89999997615814,
+        "fullReads": 0,
+        "fullReadUnits": 0,
+        "wireUnits": 65536,
+        "heapAtRequest": 2868216
+      },
+      "operations": [
+        {
+          "operation": "skipped-edit",
+          "durationMs": 1.100000023841858,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 2817039
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.19999992847442627,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 2846163
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.10000002384185791,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 2878507
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.2999999523162842,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 3153691
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.10000002384185791,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3995883
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.19999992847442627,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 4028187
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.20000004768371582,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 3028799
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.20000004768371582,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3055947
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.09999990463256836,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3089759
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.10000002384185791,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 3125907
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.10000002384185791,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3141631
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3765643
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.10000002384185791,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 3185623
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.09999990463256836,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3200195
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.10000002384185791,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3216663
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 3237767
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.10000002384185791,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3252355
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3268747
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 3294839
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.09999990463256836,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3311183
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.10000002384185791,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3327575
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.10000002384185791,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 3348631
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3363219
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.09999990463256836,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3379599
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 3402983
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.10000002384185791,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3417631
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3434103
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.20000004768371582,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 3455251
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.10000002384185791,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3470883
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.09999990463256836,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3487267
+        }
+      ]
+    },
+    {
+      "size": 4194304,
+      "emptyHeap": 642432,
+      "openHeap": 5028880,
+      "liveHeap": 5210556,
+      "disposedHeap": 1026088,
+      "retained": 0,
+      "open": {
+        "operation": "open",
+        "durationMs": 52.699999928474426,
+        "fullReads": 0,
+        "fullReadUnits": 0,
+        "wireUnits": 4194304,
+        "heapAtRequest": 11100932
+      },
+      "operations": [
+        {
+          "operation": "skipped-edit",
+          "durationMs": 1.2999999523162842,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 6965695
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 1.4000000953674316,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 6992483
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 1.399999976158142,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 7027251
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 1.399999976158142,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 7479487
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 1.1999999284744263,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 7103823
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 1.600000023841858,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 7129539
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.8999999761581421,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 7163879
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.8999999761581421,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 7192739
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 1,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 7221523
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.7000000476837158,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 7256715
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.3999999761581421,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 7271155
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.6000000238418579,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 7291815
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.3999999761581421,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 7311907
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.6000000238418579,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 7325207
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 1.399999976158142,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 7340399
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.8999999761581421,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 7360215
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 1.100000023841858,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 7377655
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 1,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 7392759
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.7000000476837158,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 7415123
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.8999999761581421,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 7428423
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.8999999761581421,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 7443515
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 1,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 7463259
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.6000000238418579,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 7476523
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.5,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 7491627
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.3999999761581421,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 7511463
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.5,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 7526239
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.3999999761581421,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 7541399
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.3999999761581421,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 7562239
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 1,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 7755123
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.6000000238418579,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 7593811
+        }
+      ]
+    },
+    {
+      "size": 50331648,
+      "emptyHeap": 642432,
+      "openHeap": 51166372,
+      "liveHeap": 51346884,
+      "disposedHeap": 1025072,
+      "retained": 0,
+      "open": {
+        "operation": "open",
+        "durationMs": 216.30000007152557,
+        "fullReads": 0,
+        "fullReadUnits": 0,
+        "wireUnits": 50331648,
+        "heapAtRequest": 103390460
+      },
+      "operations": [
+        {
+          "operation": "skipped-edit",
+          "durationMs": 4.5,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 53299215
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 8.700000047683716,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 53329107
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 8.600000023841858,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 53361231
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 8.799999952316284,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 53813163
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 8.600000023841858,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 53436891
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 8.599999904632568,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 53462607
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 9.800000071525574,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 53500675
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 9.399999976158142,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 53525775
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 9.600000023841858,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 53554559
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 10.899999976158142,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 53589827
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 10.5,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 53604235
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 10.5,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 53624895
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 8.399999976158142,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 53645063
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 8.200000047683716,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 53658439
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 8.099999904632568,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 53673635
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 9.200000047683716,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 53697895
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 8.299999952316284,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 53711271
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 9.100000023841858,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 53726375
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 8.200000047683716,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 53748851
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 8.5,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 53763739
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 8,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 53778843
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 8.199999928474426,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 53798675
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 9.5,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 53815075
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 8.5,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 53830179
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 11.899999976158142,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 53850091
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 9.100000023841858,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 53863527
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 8.799999952316284,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 53878711
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 10.200000047683716,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3,
+          "heapAtRequest": 53899699
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 10.799999952316284,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 53913139
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 9.300000071525574,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 53928227
+        }
+      ]
+    }
+  ],
+  "memoryBoundary": "main-renderer CDP heap after forced GC; excludes worker heap",
+  "browser": "153.0.8010.12"
+}

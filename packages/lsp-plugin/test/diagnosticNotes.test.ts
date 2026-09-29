@@ -6,6 +6,19 @@ import { diagnosticNotes } from '../src/diagnosticNotes'
 const RANGE: lsp.Range = { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } }
 
 describe('diagnosticNotes', () => {
+  it('retains the diagnostic identity when combined notes request host actions', () => {
+    const first = { range: RANGE, message: 'first' }
+    const second = { range: RANGE, message: 'second' }
+    const run = vi.fn()
+    const notes = diagnosticNotes(
+      [first, second],
+      () => undefined,
+      (diagnostic) => [{ label: 'Inspect', run: () => run(diagnostic) }],
+    )
+    notes[1]?.actions?.[0]?.run()
+    expect(run).toHaveBeenCalledExactlyOnceWith(second)
+  })
+
   it('carries the source, code, documentation link and related locations', () => {
     const open = vi.fn()
     const [note] = diagnosticNotes(

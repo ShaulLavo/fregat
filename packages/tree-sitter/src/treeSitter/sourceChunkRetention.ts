@@ -19,14 +19,22 @@ export class TreeSitterSourceChunkRetention {
   // longer length means the tail chunk grew and must be re-sent.
   private readonly sentSourceChunkLengths = new Map<string, Map<string, number>>()
   private readonly sourceDocumentEpochs = new Map<string, number>()
+  // The worker keeps only the chunks of the last descriptor it received; see keepReferencedChunks.
+  // Pieces identify a descriptor without pinning its payload text.
+  private readonly latestDescriptors = new Map<string, TreeSitterSourceDescriptor['pieces']>()
 
   public createDescriptor(
     documentId: string,
     snapshot: PieceTableSnapshot,
   ): TreeSitterSourceDescriptor {
-    return createTreeSitterSourceDescriptor(snapshot, {
-      sentChunkLengths: this.sourceChunkLengthsForDocument(documentId),
-    })
+    const sent = this.sourceChunkLengthsForDocument(documentId)
+    const descriptor = createTreeSitterSourceDescriptor(snapshot, { sentChunkLengths: sent })
+    const referenced = new Set(descriptor.pieces.map((piece) => piece.chunkId))
+    for (const chunkId of sent.keys()) {
+      if (!referenced.has(chunkId)) sent.delete(chunkId)
+    }
+    this.latestDescriptors.set(documentId, descriptor.pieces)
+    return descriptor
   }
 
   public createRequest(
@@ -46,7 +54,7 @@ export class TreeSitterSourceChunkRetention {
 
     const sent = this.sourceChunkLengthsForDocument(request.documentId)
     for (const chunk of request.source.chunks) {
-      sent.set(chunk.chunkId, chunk.kind === 'string' ? chunk.text.length : chunk.length)
+      sent.set(chunk.chunkId, chunk.text.length)
     }
   }
 
@@ -54,11 +62,13 @@ export class TreeSitterSourceChunkRetention {
     if (!this.hasDocumentState(documentId)) return
 
     this.sentSourceChunkLengths.delete(documentId)
+    this.latestDescriptors.delete(documentId)
     this.sourceDocumentEpochs.set(documentId, this.currentSourceEpoch(documentId) + 1)
   }
 
   public clear(): void {
     this.sentSourceChunkLengths.clear()
+    this.latestDescriptors.clear()
     this.sourceDocumentEpochs.clear()
   }
 
@@ -79,8 +89,10 @@ export class TreeSitterSourceChunkRetention {
     return sent
   }
 
+  // An older response may name chunks a newer descriptor has since told the worker to drop.
   private canMarkRequestSent(request: TreeSitterSourceChunkRequest): boolean {
-    return request.epoch === this.currentSourceEpoch(request.documentId)
+    if (request.epoch !== this.currentSourceEpoch(request.documentId)) return false
+    return this.latestDescriptors.get(request.documentId) === request.source.pieces
   }
 
   private currentSourceEpoch(documentId: string): number {

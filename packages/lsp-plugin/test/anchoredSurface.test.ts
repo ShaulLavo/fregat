@@ -53,6 +53,8 @@ describe('the surfaces the plugin puts on screen', () => {
     const editor = await connectedEditor('call', 4)
 
     editor.type('(')
+    // The signature surface loads on the first '(' of a session, so the request follows its import.
+    await editor.awaitRequest('textDocument/signatureHelp')
     editor.answerSignatureHelp({ signatures: [{ label: 'call(a: number)' }] })
     await flushPromises()
 
@@ -109,6 +111,8 @@ describe('the surfaces the plugin puts on screen', () => {
     const editor = await connectedEditor('call', 4)
 
     editor.type('(')
+    // The signature surface loads on the first '(' of a session, so the request follows its import.
+    await editor.awaitRequest('textDocument/signatureHelp')
     editor.answerSignatureHelp({ signatures: [{ label: 'call(a: number)' }] })
     await flushPromises()
 

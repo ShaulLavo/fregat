@@ -1,14 +1,15 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Editor } from '../src/editor/Editor'
 import type {
-  EditorHighlightResult,
-  EditorHighlighterSession,
   EditorInitialPaintEvent,
+  EditorLogEvent,
   EditorPlugin,
   EditorInitialHighlightStatus,
   EditorViewContributionUpdateKind,
 } from '../src/plugins'
+import type { EditorHighlightResult, EditorHighlighterSession } from '../src/syntax/highlighter'
+import { createEditorLoggingPlugin } from '../src/logging'
 import type { EditorTheme } from '../src/theme'
 import {
   createEmptySyntaxResult,
@@ -582,8 +583,10 @@ describe('authoritative initial paint', () => {
     editor.openDocument({ documentId: 'error.ts', languageId: 'typescript', text: TEXT })
     await nextTask()
     initial.reject(new Error('highlight failed'))
-    await nextTask()
-    expect(editor.getState().initialHighlightStatus).toBe('error')
+    // The rejection settles only once the retry ladder runs out.
+    await vi.waitFor(() => expect(editor.getState().initialHighlightStatus).toBe('error'), {
+      timeout: 3_000,
+    })
 
     editor.addPlugin({
       activate: (context) =>
@@ -671,6 +674,274 @@ describe('authoritative initial paint', () => {
     container.remove()
   })
 })
+
+describe('highlight refresh retry', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('retries a failed refresh and paints when a later attempt succeeds', async () => {
+    let refreshes = 0
+    const view = mountRetryEditor(() => ({
+      refresh: async () => {
+        refreshes += 1
+        if (refreshes === 1) throw new Error('worker restarted')
+        return { tokens: EditorTokenStore.fromTokens([{ start: 0, end: 5, style: RED }]) }
+      },
+      applyChange: async () => ({ tokens: EditorTokenStore.empty() }),
+      dispose: () => undefined,
+    }))
+
+    await vi.advanceTimersByTimeAsync(0)
+    expect(refreshes).toBe(1)
+    expect(view.editor.getState().initialHighlightStatus).toBe('loading')
+
+    await vi.advanceTimersByTimeAsync(RETRY_WINDOW_MS)
+    expect(refreshes).toBe(2)
+    expect(view.editor.getState().initialHighlightStatus).toBe('painted')
+    expect(view.snapshots.at(-1)?.tokens).toEqual([[0, 5]])
+    expect(view.actions('editor.syntax.highlight_request_failed')).toHaveLength(1)
+    expect(view.actions('editor.syntax.highlight_retries_exhausted')).toHaveLength(0)
+    const recovered = view.actions('editor.syntax.highlight_recovered')
+    expect(recovered).toHaveLength(1)
+    expect(recovered[0]).toMatchObject({ level: 'info', syntax: { attempts: 2 } })
+    expect(view.paints.filter(isHighlightSettled).map((event) => event.status)).toEqual(['painted'])
+    view.dispose()
+  })
+
+  it('gives up after a bounded number of attempts with one terminal event', async () => {
+    let refreshes = 0
+    const view = mountRetryEditor(() => ({
+      refresh: async () => {
+        refreshes += 1
+        throw new Error(`grammar import failed ${refreshes}`)
+      },
+      applyChange: async () => ({ tokens: EditorTokenStore.empty() }),
+      dispose: () => undefined,
+    }))
+
+    await vi.advanceTimersByTimeAsync(RETRY_WINDOW_MS)
+    await vi.advanceTimersByTimeAsync(10 * RETRY_WINDOW_MS)
+
+    // The first request, one retry on the same session, one on a reloaded session.
+    expect(refreshes).toBe(3)
+    expect(view.sessionsCreated()).toBe(2)
+    expect(view.editor.getState().initialHighlightStatus).toBe('error')
+    expect(view.actions('editor.syntax.highlight_request_failed')).toHaveLength(3)
+    const terminal = view.actions('editor.syntax.highlight_retries_exhausted')
+    expect(terminal).toHaveLength(1)
+    expect(terminal[0]).toMatchObject({
+      level: 'warn',
+      error: { message: 'grammar import failed 3' },
+      syntax: { attempts: 3 },
+    })
+    expect(view.paints.filter(isHighlightSettled).map((event) => event.status)).toEqual(['error'])
+    view.dispose()
+  })
+
+  it('drops a retry whose document version was superseded', async () => {
+    const staleRetry = deferred<EditorHighlightResult>()
+    let refreshes = 0
+    const view = mountRetryEditor(() => ({
+      refresh: () => {
+        refreshes += 1
+        if (refreshes === 1) return Promise.reject(new Error('worker restarted'))
+        return staleRetry.promise
+      },
+      applyChange: async () => ({
+        tokens: EditorTokenStore.fromTokens([{ start: 0, end: 1, style: RED }]),
+      }),
+      dispose: () => undefined,
+    }))
+
+    await vi.advanceTimersByTimeAsync(RETRY_WINDOW_MS)
+    expect(refreshes).toBe(2)
+
+    view.editor.edit({ from: 0, to: 0, text: 'x' })
+    staleRetry.resolve({
+      tokens: EditorTokenStore.fromTokens([{ start: 6, end: 11, style: RED }]),
+    })
+    await vi.advanceTimersByTimeAsync(RETRY_WINDOW_MS)
+
+    expect(view.snapshots.some((snapshot) => hasToken(snapshot.tokens, [6, 11]))).toBe(false)
+    expect(view.snapshots.at(-1)?.tokens).toEqual([[0, 1]])
+    expect(view.editor.getState().initialHighlightStatus).toBe('painted')
+    expect(view.actions('editor.syntax.highlight_retries_exhausted')).toHaveLength(0)
+    view.dispose()
+  })
+
+  it('reloads the highlighter after an edit failure without spending refresh retries', async () => {
+    let edits = 0
+    const view = mountRetryEditor(() => ({
+      refresh: async () => ({ tokens: EditorTokenStore.empty() }),
+      applyChange: async () => {
+        edits += 1
+        throw new Error('edit rejected')
+      },
+      dispose: () => undefined,
+    }))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(view.editor.getState().initialHighlightStatus).toBe('painted')
+
+    view.editor.edit({ from: 0, to: 0, text: 'x' })
+    await vi.advanceTimersByTimeAsync(RETRY_WINDOW_MS)
+
+    expect(edits).toBe(1)
+    expect(view.sessionsCreated()).toBe(2)
+    expect(view.editor.getState().initialHighlightStatus).toBe('painted')
+    expect(view.actions('editor.syntax.highlight_request_failed')).toEqual([
+      expect.objectContaining({ syntax: expect.objectContaining({ failedRefreshes: 0 }) }),
+    ])
+    expect(view.actions('editor.syntax.highlight_retries_exhausted')).toHaveLength(0)
+    view.dispose()
+  })
+
+  it('starts a fresh ladder when an edit fails after the retries ran out', async () => {
+    let refreshes = 0
+    const view = mountRetryEditor(() => ({
+      refresh: async () => {
+        refreshes += 1
+        throw new Error('highlighter unavailable')
+      },
+      applyChange: () => Promise.reject(new Error('edit rejected')),
+      dispose: () => undefined,
+    }))
+    await vi.advanceTimersByTimeAsync(RETRY_WINDOW_MS)
+    expect(view.actions('editor.syntax.highlight_retries_exhausted')).toHaveLength(1)
+
+    view.editor.edit({ from: 0, to: 0, text: 'x' })
+    await vi.advanceTimersByTimeAsync(RETRY_WINDOW_MS)
+
+    // The edit reloads once; its refresh runs the full ladder, which reloads once more.
+    expect(refreshes).toBe(6)
+    expect(view.sessionsCreated()).toBe(4)
+    const terminal = view.actions('editor.syntax.highlight_retries_exhausted')
+    expect(terminal.map((event) => (event.syntax as { attempts: number }).attempts)).toEqual([3, 3])
+    expect(view.editor.getState().initialHighlightStatus).toBe('error')
+    view.dispose()
+  })
+
+  it('settles as an error when the provider declines the reloaded session', async () => {
+    let refreshes = 0
+    let offered = 0
+    const view = mountRetryEditor(() => {
+      offered += 1
+      if (offered > 1) return null
+      return {
+        refresh: async () => {
+          refreshes += 1
+          throw new Error('worker lost')
+        },
+        applyChange: async () => ({ tokens: EditorTokenStore.empty() }),
+        dispose: () => undefined,
+      }
+    }, [syntaxPlugin(syntaxSession(deferred<EditorSyntaxResult>()))])
+
+    await vi.advanceTimersByTimeAsync(10 * RETRY_WINDOW_MS)
+
+    expect(refreshes).toBe(2)
+    expect(view.sessionsCreated()).toBe(2)
+    expect(view.editor.getState().initialHighlightStatus).toBe('error')
+    const terminal = view.actions('editor.syntax.highlight_retries_exhausted')
+    expect(terminal).toHaveLength(1)
+    expect(terminal[0]).toMatchObject({
+      error: { message: 'worker lost' },
+      syntax: { attempts: 2 },
+    })
+    view.dispose()
+  })
+
+  it('starts a fresh ladder after a highlighter theme change and a new document', async () => {
+    const themeListeners = new Set<() => void>()
+    const view = mountRetryEditor(() => ({
+      refresh: () => Promise.reject(new Error('highlighter unavailable')),
+      applyChange: () => Promise.reject(new Error('highlighter unavailable')),
+      onDidChangeTheme: (listener) => {
+        themeListeners.add(listener)
+        return () => themeListeners.delete(listener)
+      },
+      dispose: () => undefined,
+    }))
+    await vi.advanceTimersByTimeAsync(RETRY_WINDOW_MS)
+    expect(view.actions('editor.syntax.highlight_retries_exhausted')).toHaveLength(1)
+
+    for (const listener of themeListeners) listener()
+    await vi.advanceTimersByTimeAsync(RETRY_WINDOW_MS)
+    view.editor.openDocument({ documentId: 'other.ts', languageId: 'typescript', text: TEXT })
+    await vi.advanceTimersByTimeAsync(RETRY_WINDOW_MS)
+
+    const terminal = view.actions('editor.syntax.highlight_retries_exhausted')
+    expect(terminal.map((event) => (event.syntax as { attempts: number }).attempts)).toEqual([
+      3, 3, 3,
+    ])
+    view.dispose()
+  })
+})
+
+// Longer than the whole retry ladder's backoff.
+const RETRY_WINDOW_MS = 2_000
+const RED = { color: '#ff0000' }
+
+function mountRetryEditor(
+  createSession: () => EditorHighlighterSession | null,
+  plugins: readonly EditorPlugin[] = [],
+): {
+  readonly editor: Editor
+  readonly paints: EditorInitialPaintEvent[]
+  readonly snapshots: Array<{ readonly tokens: readonly [number, number][] }>
+  actions(action: string): EditorLogEvent[]
+  sessionsCreated(): number
+  dispose(): void
+} {
+  const events: EditorLogEvent[] = []
+  const paints: EditorInitialPaintEvent[] = []
+  const snapshots: Array<{
+    readonly foregroundColor: string | null
+    readonly status: EditorInitialHighlightStatus
+    readonly tokens: readonly [number, number][]
+  }> = []
+  let sessions = 0
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const editor = new Editor(container, {
+    plugins: [
+      {
+        activate: (context) =>
+          context.registerHighlighter({
+            createSession: () => {
+              sessions += 1
+              return createSession()
+            },
+          }),
+      },
+      themeSnapshotPlugin(snapshots),
+      createEditorLoggingPlugin((event) => events.push(event)),
+      ...plugins,
+    ],
+    onInitialPaint: (event) => paints.push(event),
+  })
+  editor.openDocument({ documentId: 'retry.ts', languageId: 'typescript', text: TEXT })
+  return {
+    editor,
+    paints,
+    snapshots,
+    actions: (action) => events.filter((event) => event.action === action),
+    sessionsCreated: () => sessions,
+    dispose: () => {
+      editor.dispose()
+      container.remove()
+    },
+  }
+}
+
+function hasToken(tokens: readonly [number, number][], range: [number, number]): boolean {
+  return tokens.some(([start, end]) => start === range[0] && end === range[1])
+}
 
 function highlighterPlugin(
   session: EditorHighlighterSession,

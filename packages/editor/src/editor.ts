@@ -1,3 +1,4 @@
+export type { EditorPointHit, EditorMarkerHit } from './pointQueries'
 import './style.css'
 
 export { createBracketMatchPlugin, EDITOR_BRACKET_MATCH_PLUGIN_ID } from './bracketMatchPlugin'
@@ -34,11 +35,11 @@ export type {
   EditorPreparedDocument,
   EditorPreparedDocumentMatch,
   EditorPreparedDocumentPayload,
-  EditorPreparedHighlighterTransfer,
+  EditorPreparedHighlighterBorrow,
   EditorPreparedStageOutcome,
   EditorPreparedStageRequest,
   EditorPreparedStructuralConfiguration,
-  EditorPreparedStructuralTransfer,
+  EditorPreparedStructuralBorrow,
   EditorPreparedTagValue,
   EditorPreparedTabSizePolicy,
 } from './editor/preparedDocument'
@@ -58,11 +59,7 @@ export {
   parseMergeConflicts,
   resolveMergeConflict,
 } from './mergeConflicts'
-export type {
-  EditorSelectionRevealOptions,
-  EditorSelectionRevealTarget,
-  EditorSetSelectionOptions,
-} from './editor/selectionReveal'
+export type { EditorSetSelectionOptions } from './editor/selectionReveal'
 export type {
   EditorChangeHandler,
   EditorDocumentMode,
@@ -86,6 +83,7 @@ export type {
   HighlightRegistry,
 } from './editor/types'
 export type { EditorCommandContext, EditorCommandId } from './editor/commands'
+export type { EditorAnyCommandId } from './editor/commandCatalog'
 export {
   defaultEditorCommandPacks,
   defaultEditorKeyBindings,
@@ -139,16 +137,11 @@ export type {
   EditorEditContribution,
   EditorEditContributionContext,
   EditorEditContributionProvider,
-  EditorDisposable,
   EditorGutterContribution,
   EditorGutterRowContext,
   EditorGutterWidthContext,
-  EditorHighlightResult,
   EditorInitialHighlightStatus,
   EditorInitialPaintEvent,
-  EditorHighlighterProvider,
-  EditorHighlighterSession,
-  EditorHighlighterSessionOptions,
   EditorInjectedTextRow,
   EditorInjectedTextRowProvider,
   EditorInjectedTextRowProviderContext,
@@ -189,3 +182,22 @@ export type {
   EditorVisibleSnapshot,
   EditorVisibleSnapshotJSON,
 } from './plugins'
+export type { EditorDisposable } from './editor/disposables'
+export type {
+  EditorHighlightResult,
+  EditorHighlighterProvider,
+  EditorHighlighterSession,
+  EditorHighlighterSessionOptions,
+} from './syntax/highlighter'
+
+export type { JumpCause } from './editor/jumpHistory'
+
+export { createEditorDocumentAnalysis } from './editor/documentAnalysis'
+export type {
+  EditorDocumentAnalysis,
+  EditorAnalysisRead,
+  EditorAnalysisStructuralRequest,
+  EditorAnalysisHighlighterRequest,
+  EditorRetainedSyntaxSession,
+  EditorRetainedHighlighterSession,
+} from './editor/documentAnalysis'

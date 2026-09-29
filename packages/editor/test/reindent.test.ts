@@ -1,6 +1,7 @@
 import { detectPlatform } from '@tanstack/hotkeys'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
+import { createStringTextSnapshot } from '../src/documentTextSnapshot'
 import type { EditorCommandId } from '../src/editor/commands'
 import {
   documentSelectionEditForCommand,
@@ -353,10 +354,15 @@ function run(
 ): string {
   return applyEdits(
     text,
-    documentSelectionEditForCommand(command, text, [selection(0, text.length)], {
-      languageId,
-      tabSize: 2,
-    }).edits,
+    documentSelectionEditForCommand(
+      command,
+      createStringTextSnapshot(text),
+      [selection(0, text.length)],
+      {
+        languageId,
+        tabSize: 2,
+      },
+    ).edits,
   )
 }
 

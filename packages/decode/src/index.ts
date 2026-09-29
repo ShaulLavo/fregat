@@ -1,5 +1,6 @@
 import type {
   EditorPlugin,
+  EditorRowPresentation,
   EditorViewContribution,
   EditorViewContributionContext,
   EditorViewContributionUpdateKind,
@@ -17,9 +18,6 @@ import './style.css'
 
 export type { DecodeMode, DecodePluginOptions } from './options'
 
-// How long to wait for syntax tokens before revealing anyway (e.g. plaintext,
-// which never tokenizes). Keeps the reveal syntax-coloured without hanging.
-const TOKENS_WAIT_MS = 200
 const INPUT_EVENTS = ['keydown', 'pointerdown', 'wheel'] as const
 
 /**
@@ -41,8 +39,8 @@ class DecodeViewContribution implements EditorViewContribution {
   private animatedDocumentId: string | null = null
   private pendingDocumentId: string | null = null
   private reveal: RevealHandle | null = null
-  private tokensTimer: ReturnType<typeof setTimeout> | null = null
   private disposed = false
+  private presentations: readonly EditorRowPresentation[] = []
 
   public constructor(
     private readonly context: EditorViewContributionContext,
@@ -57,9 +55,13 @@ class DecodeViewContribution implements EditorViewContribution {
       this.handleDocumentOpen(snapshot)
       return
     }
-    // Later ticks (notably 'tokens') are how a reveal that is waiting for
-    // syntax colours actually starts.
-    if (this.pendingDocumentId !== null) this.maybeStart(snapshot, false)
+    // A later tick (notably 'tokens') carries the settled highlight a waiting reveal starts on.
+    if (this.pendingDocumentId !== null) this.maybeStart(snapshot)
+  }
+
+  public updateViewport(): void {
+    if (this.reveal === null) return
+    this.teardown()
   }
 
   public dispose(): void {
@@ -70,7 +72,7 @@ class DecodeViewContribution implements EditorViewContribution {
   private handleDocumentOpen(snapshot: EditorViewSnapshot): void {
     const documentId = snapshot.documentId
     if (!documentId || documentId === this.animatedDocumentId) return
-    if (snapshot.fullText.length === 0) return
+    if (snapshot.textSnapshot.length === 0) return
 
     // A fresh document supersedes any in-flight reveal.
     this.teardown()
@@ -78,36 +80,24 @@ class DecodeViewContribution implements EditorViewContribution {
     this.pendingDocumentId = documentId
 
     // Hide the real rows immediately (CSS clip) so there is no flash of the
-    // fully-painted file before the reveal — even while we wait for tokens.
+    // fully-painted file before the reveal, and let input during the wait show it at once.
     this.context.scrollElement.classList.add(ACTIVE_CLASS)
-    /**
-     * @justification The ceiling on how long the reveal waits for tokens before starting anyway. A scheduler would
-     * pace it against other editor work, which is the opposite of what it is for: it exists so a
-     * document whose tokens never arrive still reveals.
-     */
-    this.tokensTimer = setTimeout(
-      () => this.maybeStart(this.context.getSnapshot(), true),
-      TOKENS_WAIT_MS,
-    )
-
-    // Cached/already-tokenized documents can start right away.
-    this.maybeStart(snapshot, false)
+    this.addInputListeners()
+    this.maybeStart(snapshot)
   }
 
-  /** Start once the rows exist and (tokens are painted OR we have waited enough). */
-  private maybeStart(snapshot: EditorViewSnapshot, force: boolean): void {
+  /** Starts once the document's initial highlight has settled, so the reveal is coloured. */
+  private maybeStart(snapshot: EditorViewSnapshot): void {
     if (this.pendingDocumentId === null) return
     if (snapshot.documentId !== this.pendingDocumentId) return
-    if (!force && snapshot.tokens.length === 0) return
+    if (!highlightSettled(snapshot)) return
 
+    this.pendingDocumentId = null
     const rows = collectRevealRows(this.context, snapshot, this.options.maxRows)
     if (rows.length === 0) {
-      if (force) this.teardown() // gave up waiting and there is nothing to reveal
+      this.teardown()
       return
     }
-
-    this.clearTokensTimer()
-    this.pendingDocumentId = null
     this.beginReveal(snapshot, rows)
   }
 
@@ -115,15 +105,19 @@ class DecodeViewContribution implements EditorViewContribution {
     snapshot: EditorViewSnapshot,
     rows: ReturnType<typeof collectRevealRows>,
   ): void {
-    this.addInputListeners()
-    this.context.log?.({
+    this.context.log({
       level: 'info',
       action: 'decode.reveal',
       mode: this.options.mode,
       lineCount: rows.length,
       languageId: snapshot.languageId,
+      highlightStatus: snapshot.initialHighlightStatus,
       tokenized: snapshot.tokens.length > 0,
     })
+    this.presentations = rows.map((row) => row.presentation)
+    for (const presentation of this.presentations) {
+      presentation.signal.addEventListener('abort', this.cancelOnInput, { once: true })
+    }
     this.reveal = this.startEngine(snapshot, rows)
   }
 
@@ -150,18 +144,17 @@ class DecodeViewContribution implements EditorViewContribution {
    * hidden→shown between the two operations.
    */
   private teardown(): void {
-    this.clearTokensTimer()
     this.removeInputListeners()
     this.pendingDocumentId = null
     this.context.scrollElement.classList.remove(ACTIVE_CLASS)
     this.reveal?.cancel()
     this.reveal = null
-  }
-
-  private clearTokensTimer(): void {
-    if (this.tokensTimer === null) return
-    clearTimeout(this.tokensTimer)
-    this.tokensTimer = null
+    const presentations = this.presentations
+    this.presentations = []
+    for (const presentation of presentations) {
+      presentation.signal.removeEventListener('abort', this.cancelOnInput)
+      presentation.dispose()
+    }
   }
 
   private readonly cancelOnInput = (): void => this.teardown()
@@ -189,6 +182,11 @@ function scaleTimings(options: ResolvedDecodeOptions, speed: number): ResolvedDe
     maxDurationMs: options.maxDurationMs / speed,
     staggerMs: options.staggerMs / speed,
   }
+}
+
+function highlightSettled(snapshot: EditorViewSnapshot): boolean {
+  const status = snapshot.initialHighlightStatus
+  return status !== 'idle' && status !== 'loading'
 }
 
 function reducedMotion(context: EditorViewContributionContext): boolean {

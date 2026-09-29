@@ -102,7 +102,7 @@ describe('indexed long-line geometry', () => {
     const buffer = createEditorTextBuffer(original)
     const session = createEditorBufferSession(buffer)
     const views = [mountView(4), mountView(7)]
-    for (const view of views) view.setText(original, buffer.getTextSnapshot())
+    for (const view of views) view.setText(buffer.getTextSnapshot())
     for (const offset of [32, 524_288, original.length - 64]) {
       for (const view of views) checkCaret(view, original, offset)
       const inserted = 'Z\t😀e\u0301'
@@ -124,7 +124,7 @@ describe('indexed long-line geometry', () => {
     const buffer = createEditorTextBuffer(text)
     const session = createEditorBufferSession(buffer)
     const view = mountView(7)
-    view.setText(text, buffer.getTextSnapshot())
+    view.setText(buffer.getTextSnapshot())
     checkCaret(view, text, 5_400)
     expect(view.getState().mountedRows[0]!.element.dataset.editorVirtualWindowStart).toBeDefined()
     applyChange([view], session.applyEdits([{ from: 3_000, to: 3_000, text: '\n' }]))

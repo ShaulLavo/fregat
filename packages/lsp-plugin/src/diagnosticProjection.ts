@@ -1,5 +1,8 @@
-import type { DocumentSessionChange, TextEdit } from '@singapore-editor/core/document'
-import { projectDecorationRangeThroughEdits } from '@singapore-editor/core/extensions'
+import type { TextEdit } from '@singapore-editor/core/document'
+import {
+  type EditorContributionChange,
+  projectDecorationRangeThroughEdits,
+} from '@singapore-editor/core/extensions'
 import {
   lspPositionToOffsetInSnapshot,
   offsetToLspPositionInSnapshot,
@@ -10,7 +13,7 @@ import type * as lsp from 'vscode-languageserver-protocol'
 export type SnapshotDocumentSession = {
   readonly previousDocument: LspTextDocumentSnapshot
   readonly nextDocument: LspTextDocumentSnapshot
-  readonly change: DocumentSessionChange | null
+  readonly change: EditorContributionChange | null
 }
 
 /**
@@ -38,7 +41,7 @@ export function projectDiagnosticsInSnapshot(
   )
 }
 
-function editsForChange(change: DocumentSessionChange | null): readonly TextEdit[] {
+function editsForChange(change: EditorContributionChange | null): readonly TextEdit[] {
   if (!change) return []
   return change.edits
 }
@@ -91,7 +94,7 @@ function projectDiagnosticsThroughSnapshotChange(
   previousDocument: LspTextDocumentSnapshot,
   nextDocument: LspTextDocumentSnapshot,
   diagnostics: readonly lsp.Diagnostic[],
-  change: DocumentSessionChange | null,
+  change: EditorContributionChange | null,
 ): readonly lsp.Diagnostic[] {
   if (diagnostics.length === 0) return diagnostics
 

@@ -1,7 +1,6 @@
 import type { DocumentSession } from '../documentSession'
 import {
   createStringTextSnapshot,
-  defineLazyFullTextProperty,
   type DocumentTextSnapshot,
   type TextSnapshot,
 } from '../documentTextSnapshot'
@@ -31,7 +30,6 @@ export type EditorDocumentAttachment = {
   readonly languageId: EditorSyntaxLanguageId | null
   readonly session: DocumentSession
   readonly textSnapshot: DocumentTextSnapshot
-  readonly fullText: string
 }
 
 export class EditorDocumentController {
@@ -52,10 +50,6 @@ export class EditorDocumentController {
     this.highlightPrefix = options.highlightPrefix
     this.currentDocumentMode = normalizeEditorDocumentMode(options.defaultDocumentMode)
     this.currentEditability = normalizeEditorEditability(options.defaultEditability)
-  }
-
-  get text(): string {
-    return this.currentTextSnapshot.materializeFullText()
   }
 
   get textSnapshot(): TextSnapshot {
@@ -94,11 +88,6 @@ export class EditorDocumentController {
     return this.currentTextVersion
   }
 
-  setRenderedText(text: string): void {
-    this.currentTextSnapshot = createStringTextSnapshot(text)
-    this.currentTextVersion += 1
-  }
-
   setRenderedTextSnapshot(textSnapshot: TextSnapshot): void {
     if (this.currentTextSnapshot === textSnapshot) return
 
@@ -130,13 +119,13 @@ export class EditorDocumentController {
     this.currentSessionOptions = options
     this.setRenderedTextSnapshot(session.getTextSnapshot())
 
-    return this.createAttachment({
+    return {
       documentVersion: this.currentDocumentVersion,
       internalDocumentId: this.currentSessionDocumentId(),
       languageId: this.currentLanguageId,
       session,
       textSnapshot: session.getTextSnapshot(),
-    })
+    }
   }
 
   detachSession(): void {
@@ -170,13 +159,13 @@ export class EditorDocumentController {
     this.currentSessionOptions = {}
     this.setRenderedTextSnapshot(this.currentSession.getTextSnapshot())
 
-    return this.createAttachment({
+    return {
       documentVersion: this.currentDocumentVersion,
       internalDocumentId: this.currentSessionDocumentId(),
       languageId: this.currentLanguageId,
       session: this.currentSession,
       textSnapshot: this.currentSession.getTextSnapshot(),
-    })
+    }
   }
 
   currentSessionDocumentId(): string {
@@ -189,11 +178,5 @@ export class EditorDocumentController {
 
   private generatedOpenSessionId(documentVersion: number): string {
     return `${this.highlightPrefix}-open-${documentVersion}`
-  }
-
-  private createAttachment(
-    attachment: Omit<EditorDocumentAttachment, 'fullText'>,
-  ): EditorDocumentAttachment {
-    return defineLazyFullTextProperty(attachment)
   }
 }

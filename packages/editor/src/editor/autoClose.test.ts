@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   autoClosingPairForClose,
   autoClosingPairForOpen,
+  autoClosingPairsForLanguage,
   shouldAutoClose,
   shouldDeletePair,
   shouldSurroundSelection,
@@ -24,32 +25,49 @@ const at = (textBefore: string, textAfter = '', languageId: string | null = 'typ
 
 describe('autoClosingPairForOpen', () => {
   it('finds a pair for a known language', () => {
-    expect(autoClosingPairForOpen('typescript', '(')).toEqual({ close: ')', open: '(' })
+    expect(autoClosingPairForOpen(autoClosingPairsForLanguage('typescript'), '(')).toEqual({
+      close: ')',
+      open: '(',
+    })
   })
 
   it('treats quotes as pairs in code', () => {
-    expect(autoClosingPairForOpen('typescript', "'")?.quote).toBe(true)
+    expect(autoClosingPairForOpen(autoClosingPairsForLanguage('typescript'), "'")?.quote).toBe(true)
   })
 
   // Apostrophes are punctuation in prose, so markdown deliberately omits them.
   it('omits apostrophes in markdown', () => {
-    expect(autoClosingPairForOpen('markdown', "'")).toBeNull()
-    expect(autoClosingPairForOpen('markdown', '(')).not.toBeNull()
+    expect(autoClosingPairForOpen(autoClosingPairsForLanguage('markdown'), "'")).toBeNull()
+    expect(autoClosingPairForOpen(autoClosingPairsForLanguage('markdown'), '(')).not.toBeNull()
   })
 
-  it('has no pairs for an unknown or absent language', () => {
-    expect(autoClosingPairForOpen('cobol', '(')).toBeNull()
-    expect(autoClosingPairForOpen(null, '(')).toBeNull()
+  // An unfamiliar language closes what a familiar one closes; an apostrophe in prose is kept by
+  // shouldAutoClose's word-character rule rather than by leaving quotes out of the set.
+  it('closes every pair for an unknown or absent language', () => {
+    expect(autoClosingPairForOpen(autoClosingPairsForLanguage('cobol'), '(')?.close).toBe(')')
+    expect(autoClosingPairForOpen(autoClosingPairsForLanguage(null), '{')?.close).toBe('}')
+    expect(autoClosingPairForOpen(autoClosingPairsForLanguage('cobol'), '"')?.close).toBe('"')
+    expect(autoClosingPairForOpen(autoClosingPairsForLanguage(null), "'")?.close).toBe("'")
+    expect(autoClosingPairForOpen(autoClosingPairsForLanguage('cobol'), '`')?.close).toBe('`')
+  })
+
+  it('closes pairs in the catalog languages beyond the JavaScript family', () => {
+    expect(autoClosingPairForOpen(autoClosingPairsForLanguage('astro'), '(')?.close).toBe(')')
+    expect(autoClosingPairForOpen(autoClosingPairsForLanguage('go'), '`')?.close).toBe('`')
+    expect(autoClosingPairForOpen(autoClosingPairsForLanguage('rust'), "'")).toBeNull()
   })
 })
 
 describe('autoClosingPairForClose', () => {
   it('finds the pair a closer belongs to', () => {
-    expect(autoClosingPairForClose('typescript', ')')).toEqual({ close: ')', open: '(' })
+    expect(autoClosingPairForClose(autoClosingPairsForLanguage('typescript'), ')')).toEqual({
+      close: ')',
+      open: '(',
+    })
   })
 
   it('is null for a character that closes nothing', () => {
-    expect(autoClosingPairForClose('typescript', 'x')).toBeNull()
+    expect(autoClosingPairForClose(autoClosingPairsForLanguage('typescript'), 'x')).toBeNull()
   })
 })
 

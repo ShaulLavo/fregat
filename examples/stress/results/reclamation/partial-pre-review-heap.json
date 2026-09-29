@@ -1,0 +1,1956 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Diagnostic ownership attribution before the review fixes; not a replacement acceptance benchmark.",
+  "provenance": {
+    "sourceState": "HEAD plus pre-review working changes; the tested bundle hash identifies the artifact, not HEAD alone. Captured before subsequent review fixes.",
+    "head": "b31e22eb18c240d04ade431e44a80fa60e694aa4",
+    "bundleSha256": "ab9ed87f7e4fbcbd0b031cea12fee77aa133e578ddc295d2604c0109f8af59df",
+    "browser": "153.0.8010.12",
+    "stage": "After automatic maintenance and GC, before undo, typing, or disposal; two mounted views, 200 retained history transactions. Baseline is mounted initial editor before churn."
+  },
+  "interpretation": {
+    "categories": "Disjoint shallow self-size totals. Supporting arrays/numbers are separate from tree and piece object rows. Counts include current and historical states; these are not tombstone counts.",
+    "owners": "Dominator retained sizes use the snapshot graph with weak edges excluded, not DevTools ephemeron semantics. Nested rows overlap; owner rows are not additive with shallow categories.",
+    "inversePayloads": "Unique string reachability includes sliced/concatenated parents and can overlap other owners. Required payload units derive from observed nonempty inverse references and the fixture deletion size; UTF-16 units are not physical bytes.",
+    "native": "DOM and external allocation self sizes are separate from Runtime.getHeapUsage JS heap. Snapshot totals and Runtime measurements have different accounting and capture times.",
+    "measurement": "Single diagnostic samples include extra snapshot collection and can affect JIT/allocation timing. They do not replace the 30-case benchmark or alter its 10% median threshold.",
+    "baseline": "Reported browser heap growth already subtracts the mounted-editor baseline. Newly compiled code after baseline is still counted in growth."
+  },
+  "snapshots": [
+    {
+      "workload": "mixed",
+      "stage": "baseline",
+      "file": "partial-pre-review-mixed-baseline.heapsnapshot.gz",
+      "rawBytes": 9107663,
+      "compressedBytes": 1828491,
+      "rawSha256": "fd46dd6f1f2bf95e63948a001442d1003e573635a832b5b99af018e49282422f",
+      "compressedSha256": "2d1949a4fbc3f78aa5a7213f824965fff34499ff6946aa835b89d64b23e29817"
+    },
+    {
+      "workload": "mixed",
+      "stage": "maintained",
+      "file": "partial-pre-review-mixed-maintained.heapsnapshot.gz",
+      "rawBytes": 13652329,
+      "compressedBytes": 2575142,
+      "rawSha256": "6514670f508c0ee4dbdec577a84bf8a721c51efebea5f5e3032d8d44822ef6ed",
+      "compressedSha256": "0d4e2eced3ca99bdf68da0e0f41788bb3d784c8d486ac35ba552d521b78b6914"
+    },
+    {
+      "workload": "survivors",
+      "stage": "baseline",
+      "file": "partial-pre-review-survivors-baseline.heapsnapshot.gz",
+      "rawBytes": 9102506,
+      "compressedBytes": 1823604,
+      "rawSha256": "27373f797630652285e8e206398ee32b9745eab1b5955b634b47eb5a9c8a01ec",
+      "compressedSha256": "bca6ae7dbdb3418c2ca1685f91d233f2977693d527407ab612e1327edea15cff"
+    },
+    {
+      "workload": "survivors",
+      "stage": "maintained",
+      "file": "partial-pre-review-survivors-maintained.heapsnapshot.gz",
+      "rawBytes": 15015477,
+      "compressedBytes": 2804170,
+      "rawSha256": "678b82ccd0e49f4c60f30201906f729336d1da4dfdb2bb23f841d47a97820027",
+      "compressedSha256": "820d1ef05c8ad05bacba3024bddbaa0af9f2f19cce760cedb8f7f8e46a3697e7"
+    }
+  ],
+  "analysisCommand": "python3 examples/stress/reclamation-live-heap.py examples/stress/results/reclamation/partial-pre-review-mixed-maintained.heapsnapshot.gz --baseline examples/stress/results/reclamation/partial-pre-review-mixed-baseline.heapsnapshot.gz --top 50",
+  "workloads": {
+    "mixed": {
+      "captureFile": "partial-pre-review-mixed-capture.json",
+      "measuredAt": "2026-09-23T14:47:29.384Z",
+      "runtimeHeap": {
+        "baselineBytes": 2949060,
+        "beforeMaintenanceAbsoluteBytes": 7160880,
+        "afterMaintenanceAbsoluteBytes": 6925876,
+        "beforeMaintenanceGrowthBytes": 4211820,
+        "afterMaintenanceGrowthBytes": 3976816,
+        "reductionFraction": 0.055796306584801836
+      },
+      "liveUnits": 128014,
+      "deletedUnits": 384000,
+      "retainedHistoryTransactions": 200,
+      "collector": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 24,
+        "codeUnits": 294912,
+        "snapshots": 202,
+        "maxSliceMs": 0.7999999523162842
+      },
+      "categories": {
+        "synthetic": {
+          "count": 32,
+          "selfBytes": 0,
+          "baselineSelfBytes": 0,
+          "growthBytes": 0
+        },
+        "native": {
+          "count": 19237,
+          "selfBytes": 2948582,
+          "baselineSelfBytes": 2677043,
+          "growthBytes": 271539
+        },
+        "string": {
+          "count": 37349,
+          "selfBytes": 1702008,
+          "baselineSelfBytes": 557692,
+          "growthBytes": 1144316
+        },
+        "object shape": {
+          "count": 4852,
+          "selfBytes": 300392,
+          "baselineSelfBytes": 263708,
+          "growthBytes": 36684
+        },
+        "code": {
+          "count": 40044,
+          "selfBytes": 3088952,
+          "baselineSelfBytes": 1076744,
+          "growthBytes": 2012208
+        },
+        "array": {
+          "count": 2145,
+          "selfBytes": 375784,
+          "baselineSelfBytes": 224384,
+          "growthBytes": 151400
+        },
+        "number": {
+          "count": 24466,
+          "selfBytes": 114360,
+          "baselineSelfBytes": 540,
+          "growthBytes": 113820
+        },
+        "symbol": {
+          "count": 73,
+          "selfBytes": 288,
+          "baselineSelfBytes": 288,
+          "growthBytes": 0
+        },
+        "object": {
+          "count": 11409,
+          "selfBytes": 304568,
+          "baselineSelfBytes": 93148,
+          "growthBytes": 211420
+        },
+        "concatenated string": {
+          "count": 732,
+          "selfBytes": 14640,
+          "baselineSelfBytes": 14220,
+          "growthBytes": 420
+        },
+        "closure": {
+          "count": 7049,
+          "selfBytes": 207296,
+          "baselineSelfBytes": 206488,
+          "growthBytes": 808
+        },
+        "transaction": {
+          "count": 201,
+          "selfBytes": 8040,
+          "baselineSelfBytes": 0,
+          "growthBytes": 8040
+        },
+        "piece-tree node": {
+          "count": 3665,
+          "selfBytes": 219900,
+          "baselineSelfBytes": 60,
+          "growthBytes": 219840
+        },
+        "piece": {
+          "count": 1920,
+          "selfBytes": 76800,
+          "baselineSelfBytes": 40,
+          "growthBytes": 76760
+        },
+        "reverse-index header": {
+          "count": 117,
+          "selfBytes": 3276,
+          "baselineSelfBytes": 28,
+          "growthBytes": 3248
+        },
+        "sliced string": {
+          "count": 90,
+          "selfBytes": 1800,
+          "baselineSelfBytes": 0,
+          "growthBytes": 1800
+        },
+        "regexp": {
+          "count": 28,
+          "selfBytes": 672,
+          "baselineSelfBytes": 672,
+          "growthBytes": 0
+        }
+      },
+      "inverseEditStrings": {
+        "inverseEditArrays": 202,
+        "distinctTextReferences": 87,
+        "stringGraphNodes": 173,
+        "stringGraphBytes": 784064,
+        "distinctSliceParents": 86,
+        "sliceParentBytes": 782344,
+        "note": "Unique string nodes reachable from inverse edit text, including sliced/cons parents. Other owners can share these bytes; this is not exclusive retained size.",
+        "nonemptyPayloadCount": 86,
+        "requiredPayloadUnits": 88064
+      },
+      "inverseParentExamples": [
+        {
+          "node": 106352,
+          "id": 283867,
+          "type": "string",
+          "name": "00000384xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "selfBytes": 15372,
+          "retainedBytes": 15372,
+          "path": [
+            {
+              "node": 1,
+              "id": 3,
+              "type": "synthetic",
+              "name": "(GC roots)",
+              "selfBytes": 0,
+              "edge": "1"
+            },
+            {
+              "node": 11,
+              "id": 23,
+              "type": "synthetic",
+              "name": "(Global handles)",
+              "selfBytes": 0,
+              "edge": "10"
+            },
+            {
+              "node": 3690,
+              "id": 7381,
+              "type": "native",
+              "name": "system / NativeContext / http://127.0.0.1:43521",
+              "selfBytes": 1252,
+              "edge": "3 / gin::ContextHolder::context_"
+            },
+            {
+              "node": 54575,
+              "id": 51663,
+              "type": "object",
+              "name": "Window [JSGlobalObject] / http://127.0.0.1:43521",
+              "selfBytes": 24,
+              "edge": "global_object"
+            },
+            {
+              "node": 89480,
+              "id": 135547,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 76,
+              "edge": "reclamationLive"
+            },
+            {
+              "node": 89481,
+              "id": 135549,
+              "type": "object",
+              "name": "Bf",
+              "selfBytes": 148,
+              "edge": "buffer"
+            },
+            {
+              "node": 89974,
+              "id": 273431,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 56,
+              "edge": "history"
+            },
+            {
+              "node": 126205,
+              "id": 323571,
+              "type": "object",
+              "name": "Map",
+              "selfBytes": 16,
+              "edge": "nodes"
+            },
+            {
+              "node": 126292,
+              "id": 323745,
+              "type": "array",
+              "name": "",
+              "selfBytes": 3604,
+              "edge": "table"
+            },
+            {
+              "node": 116453,
+              "id": 304069,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 64,
+              "edge": "201"
+            },
+            {
+              "node": 116456,
+              "id": 304075,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 40,
+              "edge": "transaction"
+            },
+            {
+              "node": 120217,
+              "id": 311597,
+              "type": "object",
+              "name": "Array",
+              "selfBytes": 16,
+              "edge": "inverseEdits"
+            },
+            {
+              "node": 106358,
+              "id": 283879,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 24,
+              "edge": "0"
+            },
+            {
+              "node": 120218,
+              "id": 311599,
+              "type": "sliced string",
+              "name": "(sliced string)",
+              "selfBytes": 20,
+              "edge": "text"
+            },
+            {
+              "node": 106352,
+              "id": 283867,
+              "type": "string",
+              "name": "00000384xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "selfBytes": 15372,
+              "edge": "parent"
+            }
+          ]
+        },
+        {
+          "node": 136438,
+          "id": 337589,
+          "type": "string",
+          "name": "00000400xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "selfBytes": 15372,
+          "retainedBytes": 15372,
+          "path": [
+            {
+              "node": 1,
+              "id": 3,
+              "type": "synthetic",
+              "name": "(GC roots)",
+              "selfBytes": 0,
+              "edge": "1"
+            },
+            {
+              "node": 11,
+              "id": 23,
+              "type": "synthetic",
+              "name": "(Global handles)",
+              "selfBytes": 0,
+              "edge": "10"
+            },
+            {
+              "node": 3690,
+              "id": 7381,
+              "type": "native",
+              "name": "system / NativeContext / http://127.0.0.1:43521",
+              "selfBytes": 1252,
+              "edge": "3 / gin::ContextHolder::context_"
+            },
+            {
+              "node": 54575,
+              "id": 51663,
+              "type": "object",
+              "name": "Window [JSGlobalObject] / http://127.0.0.1:43521",
+              "selfBytes": 24,
+              "edge": "global_object"
+            },
+            {
+              "node": 89480,
+              "id": 135547,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 76,
+              "edge": "reclamationLive"
+            },
+            {
+              "node": 89481,
+              "id": 135549,
+              "type": "object",
+              "name": "Bf",
+              "selfBytes": 148,
+              "edge": "buffer"
+            },
+            {
+              "node": 89974,
+              "id": 273431,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 56,
+              "edge": "history"
+            },
+            {
+              "node": 126205,
+              "id": 323571,
+              "type": "object",
+              "name": "Map",
+              "selfBytes": 16,
+              "edge": "nodes"
+            },
+            {
+              "node": 126292,
+              "id": 323745,
+              "type": "array",
+              "name": "",
+              "selfBytes": 3604,
+              "edge": "table"
+            },
+            {
+              "node": 126310,
+              "id": 323781,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 64,
+              "edge": "285"
+            },
+            {
+              "node": 134825,
+              "id": 334363,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 40,
+              "edge": "transaction"
+            },
+            {
+              "node": 136434,
+              "id": 337581,
+              "type": "object",
+              "name": "Array",
+              "selfBytes": 16,
+              "edge": "inverseEdits"
+            },
+            {
+              "node": 136435,
+              "id": 337583,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 24,
+              "edge": "0"
+            },
+            {
+              "node": 136437,
+              "id": 337587,
+              "type": "sliced string",
+              "name": "(sliced string)",
+              "selfBytes": 20,
+              "edge": "text"
+            },
+            {
+              "node": 136438,
+              "id": 337589,
+              "type": "string",
+              "name": "00000400xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "selfBytes": 15372,
+              "edge": "parent"
+            }
+          ]
+        },
+        {
+          "node": 118712,
+          "id": 308587,
+          "type": "string",
+          "name": "00000416xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "selfBytes": 15372,
+          "retainedBytes": 15372,
+          "path": [
+            {
+              "node": 1,
+              "id": 3,
+              "type": "synthetic",
+              "name": "(GC roots)",
+              "selfBytes": 0,
+              "edge": "1"
+            },
+            {
+              "node": 11,
+              "id": 23,
+              "type": "synthetic",
+              "name": "(Global handles)",
+              "selfBytes": 0,
+              "edge": "10"
+            },
+            {
+              "node": 3690,
+              "id": 7381,
+              "type": "native",
+              "name": "system / NativeContext / http://127.0.0.1:43521",
+              "selfBytes": 1252,
+              "edge": "3 / gin::ContextHolder::context_"
+            },
+            {
+              "node": 54575,
+              "id": 51663,
+              "type": "object",
+              "name": "Window [JSGlobalObject] / http://127.0.0.1:43521",
+              "selfBytes": 24,
+              "edge": "global_object"
+            },
+            {
+              "node": 89480,
+              "id": 135547,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 76,
+              "edge": "reclamationLive"
+            },
+            {
+              "node": 89481,
+              "id": 135549,
+              "type": "object",
+              "name": "Bf",
+              "selfBytes": 148,
+              "edge": "buffer"
+            },
+            {
+              "node": 89974,
+              "id": 273431,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 56,
+              "edge": "history"
+            },
+            {
+              "node": 126205,
+              "id": 323571,
+              "type": "object",
+              "name": "Map",
+              "selfBytes": 16,
+              "edge": "nodes"
+            },
+            {
+              "node": 126292,
+              "id": 323745,
+              "type": "array",
+              "name": "",
+              "selfBytes": 3604,
+              "edge": "table"
+            },
+            {
+              "node": 119449,
+              "id": 310061,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 64,
+              "edge": "369"
+            },
+            {
+              "node": 119452,
+              "id": 310067,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 40,
+              "edge": "transaction"
+            },
+            {
+              "node": 118705,
+              "id": 308573,
+              "type": "object",
+              "name": "Array",
+              "selfBytes": 16,
+              "edge": "inverseEdits"
+            },
+            {
+              "node": 118706,
+              "id": 308575,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 24,
+              "edge": "0"
+            },
+            {
+              "node": 118711,
+              "id": 308585,
+              "type": "sliced string",
+              "name": "(sliced string)",
+              "selfBytes": 20,
+              "edge": "text"
+            },
+            {
+              "node": 118712,
+              "id": 308587,
+              "type": "string",
+              "name": "00000416xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "selfBytes": 15372,
+              "edge": "parent"
+            }
+          ]
+        }
+      ],
+      "ownerExamples": {
+        "history": [
+          {
+            "node": 89974,
+            "id": 273431,
+            "type": "object",
+            "name": "Object",
+            "selfBytes": 56,
+            "retainedBytes": 1163600,
+            "path": [
+              {
+                "node": 1,
+                "id": 3,
+                "type": "synthetic",
+                "name": "(GC roots)",
+                "selfBytes": 0,
+                "edge": "1"
+              },
+              {
+                "node": 11,
+                "id": 23,
+                "type": "synthetic",
+                "name": "(Global handles)",
+                "selfBytes": 0,
+                "edge": "10"
+              },
+              {
+                "node": 3690,
+                "id": 7381,
+                "type": "native",
+                "name": "system / NativeContext / http://127.0.0.1:43521",
+                "selfBytes": 1252,
+                "edge": "3 / gin::ContextHolder::context_"
+              },
+              {
+                "node": 54575,
+                "id": 51663,
+                "type": "object",
+                "name": "Window [JSGlobalObject] / http://127.0.0.1:43521",
+                "selfBytes": 24,
+                "edge": "global_object"
+              },
+              {
+                "node": 89480,
+                "id": 135547,
+                "type": "object",
+                "name": "Object",
+                "selfBytes": 76,
+                "edge": "reclamationLive"
+              },
+              {
+                "node": 89481,
+                "id": 135549,
+                "type": "object",
+                "name": "Bf",
+                "selfBytes": 148,
+                "edge": "buffer"
+              },
+              {
+                "node": 89974,
+                "id": 273431,
+                "type": "object",
+                "name": "Object",
+                "selfBytes": 56,
+                "edge": "history"
+              }
+            ]
+          }
+        ],
+        "editChain": [
+          {
+            "node": 89973,
+            "id": 136373,
+            "type": "object",
+            "name": "$u",
+            "selfBytes": 56,
+            "retainedBytes": 7996,
+            "path": [
+              {
+                "node": 1,
+                "id": 3,
+                "type": "synthetic",
+                "name": "(GC roots)",
+                "selfBytes": 0,
+                "edge": "1"
+              },
+              {
+                "node": 11,
+                "id": 23,
+                "type": "synthetic",
+                "name": "(Global handles)",
+                "selfBytes": 0,
+                "edge": "10"
+              },
+              {
+                "node": 3690,
+                "id": 7381,
+                "type": "native",
+                "name": "system / NativeContext / http://127.0.0.1:43521",
+                "selfBytes": 1252,
+                "edge": "3 / gin::ContextHolder::context_"
+              },
+              {
+                "node": 54575,
+                "id": 51663,
+                "type": "object",
+                "name": "Window [JSGlobalObject] / http://127.0.0.1:43521",
+                "selfBytes": 24,
+                "edge": "global_object"
+              },
+              {
+                "node": 89480,
+                "id": 135547,
+                "type": "object",
+                "name": "Object",
+                "selfBytes": 76,
+                "edge": "reclamationLive"
+              },
+              {
+                "node": 89481,
+                "id": 135549,
+                "type": "object",
+                "name": "Bf",
+                "selfBytes": 148,
+                "edge": "buffer"
+              },
+              {
+                "node": 89973,
+                "id": 136373,
+                "type": "object",
+                "name": "$u",
+                "selfBytes": 56,
+                "edge": "editChain"
+              }
+            ]
+          }
+        ],
+        "measurements": [
+          {
+            "node": 45777,
+            "id": 225439,
+            "type": "object",
+            "name": "e",
+            "selfBytes": 28,
+            "retainedBytes": 235320,
+            "path": [
+              {
+                "node": 1,
+                "id": 3,
+                "type": "synthetic",
+                "name": "(GC roots)",
+                "selfBytes": 0,
+                "edge": "1"
+              },
+              {
+                "node": 11,
+                "id": 23,
+                "type": "synthetic",
+                "name": "(Global handles)",
+                "selfBytes": 0,
+                "edge": "10"
+              },
+              {
+                "node": 3690,
+                "id": 7381,
+                "type": "native",
+                "name": "system / NativeContext / http://127.0.0.1:43521",
+                "selfBytes": 1252,
+                "edge": "3 / gin::ContextHolder::context_"
+              },
+              {
+                "node": 54575,
+                "id": 51663,
+                "type": "object",
+                "name": "Window [JSGlobalObject] / http://127.0.0.1:43521",
+                "selfBytes": 24,
+                "edge": "global_object"
+              },
+              {
+                "node": 89480,
+                "id": 135547,
+                "type": "object",
+                "name": "Object",
+                "selfBytes": 76,
+                "edge": "reclamationLive"
+              },
+              {
+                "node": 89482,
+                "id": 135551,
+                "type": "object",
+                "name": "Array",
+                "selfBytes": 16,
+                "edge": "editors"
+              },
+              {
+                "node": 89978,
+                "id": 136385,
+                "type": "object",
+                "name": "BJ",
+                "selfBytes": 456,
+                "edge": "0"
+              },
+              {
+                "node": 90141,
+                "id": 136719,
+                "type": "object",
+                "name": "zK",
+                "selfBytes": 124,
+                "edge": "view"
+              },
+              {
+                "node": 90010,
+                "id": 136427,
+                "type": "object",
+                "name": "Object",
+                "selfBytes": 292,
+                "edge": "view"
+              },
+              {
+                "node": 90027,
+                "id": 136473,
+                "type": "object",
+                "name": "Map",
+                "selfBytes": 16,
+                "edge": "rowElements"
+              },
+              {
+                "node": 90232,
+                "id": 136893,
+                "type": "array",
+                "name": "",
+                "selfBytes": 76,
+                "edge": "table"
+              },
+              {
+                "node": 90283,
+                "id": 137005,
+                "type": "object",
+                "name": "Object",
+                "selfBytes": 176,
+                "edge": "6"
+              },
+              {
+                "node": 45777,
+                "id": 225439,
+                "type": "object",
+                "name": "e",
+                "selfBytes": 28,
+                "edge": "measurements"
+              }
+            ]
+          }
+        ],
+        "chunks": [
+          {
+            "node": 81395,
+            "id": 260645,
+            "type": "object",
+            "name": "Array",
+            "selfBytes": 16,
+            "retainedBytes": 111924,
+            "path": [
+              {
+                "node": 1,
+                "id": 3,
+                "type": "synthetic",
+                "name": "(GC roots)",
+                "selfBytes": 0,
+                "edge": "1"
+              },
+              {
+                "node": 11,
+                "id": 23,
+                "type": "synthetic",
+                "name": "(Global handles)",
+                "selfBytes": 0,
+                "edge": "10"
+              },
+              {
+                "node": 3690,
+                "id": 7381,
+                "type": "native",
+                "name": "system / NativeContext / http://127.0.0.1:43521",
+                "selfBytes": 1252,
+                "edge": "3 / gin::ContextHolder::context_"
+              },
+              {
+                "node": 54575,
+                "id": 51663,
+                "type": "object",
+                "name": "Window [JSGlobalObject] / http://127.0.0.1:43521",
+                "selfBytes": 24,
+                "edge": "global_object"
+              },
+              {
+                "node": 89480,
+                "id": 135547,
+                "type": "object",
+                "name": "Object",
+                "selfBytes": 76,
+                "edge": "reclamationLive"
+              },
+              {
+                "node": 89481,
+                "id": 135549,
+                "type": "object",
+                "name": "Bf",
+                "selfBytes": 148,
+                "edge": "buffer"
+              },
+              {
+                "node": 89975,
+                "id": 136377,
+                "type": "object",
+                "name": "Tc",
+                "selfBytes": 40,
+                "edge": "cleanSnapshot"
+              },
+              {
+                "node": 90089,
+                "id": 273467,
+                "type": "object",
+                "name": "Object",
+                "selfBytes": 52,
+                "edge": "buffers"
+              },
+              {
+                "node": 111038,
+                "id": 293239,
+                "type": "object",
+                "name": "e",
+                "selfBytes": 36,
+                "edge": "chunks"
+              },
+              {
+                "node": 111035,
+                "id": 293233,
+                "type": "object",
+                "name": "Object",
+                "selfBytes": 36,
+                "edge": "log"
+              },
+              {
+                "node": 81395,
+                "id": 260645,
+                "type": "object",
+                "name": "Array",
+                "selfBytes": 16,
+                "edge": "chunks"
+              }
+            ]
+          }
+        ]
+      },
+      "largestGrowthGroups": [
+        {
+          "name": "code: system / InstructionStream",
+          "count": 1457,
+          "selfBytes": 1328768,
+          "countDelta": 1261,
+          "bytesDelta": 1206656
+        },
+        {
+          "name": "object: Object",
+          "count": 13587,
+          "selfBytes": 518780,
+          "countDelta": 12012,
+          "bytesDelta": 482596
+        },
+        {
+          "name": "code: system / TrustedByteArray",
+          "count": 3387,
+          "selfBytes": 329972,
+          "countDelta": 2840,
+          "bytesDelta": 301284
+        },
+        {
+          "name": "number: heap number",
+          "count": 9540,
+          "selfBytes": 114360,
+          "countDelta": 9485,
+          "bytesDelta": 113820
+        },
+        {
+          "name": "string: 00000464xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "count": 14,
+          "selfBytes": 112808,
+          "countDelta": 14,
+          "bytesDelta": 112808
+        },
+        {
+          "name": "string: 00000480xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "count": 14,
+          "selfBytes": 112808,
+          "countDelta": 14,
+          "bytesDelta": 112808
+        },
+        {
+          "name": "string: 00000448xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "count": 14,
+          "selfBytes": 112808,
+          "countDelta": 14,
+          "bytesDelta": 112808
+        },
+        {
+          "name": "string: 00000416xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "count": 14,
+          "selfBytes": 112808,
+          "countDelta": 14,
+          "bytesDelta": 112808
+        }
+      ],
+      "snapshotSelfBytes": 9367358,
+      "baselineSelfBytes": 5115055,
+      "snapshotNativeBytes": 2948582
+    },
+    "survivors": {
+      "captureFile": "partial-pre-review-survivors-capture.json",
+      "measuredAt": "2026-09-23T14:48:06.226Z",
+      "runtimeHeap": {
+        "baselineBytes": 2839972,
+        "beforeMaintenanceAbsoluteBytes": 7519732,
+        "afterMaintenanceAbsoluteBytes": 7298856,
+        "beforeMaintenanceGrowthBytes": 4679760,
+        "afterMaintenanceGrowthBytes": 4458884,
+        "reductionFraction": 0.04719814691351698
+      },
+      "liveUnits": 32014,
+      "deletedUnits": 480000,
+      "retainedHistoryTransactions": 200,
+      "collector": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 25,
+        "codeUnits": 384000,
+        "snapshots": 202,
+        "maxSliceMs": 0.7999999523162842
+      },
+      "categories": {
+        "synthetic": {
+          "count": 32,
+          "selfBytes": 0,
+          "baselineSelfBytes": 0,
+          "growthBytes": 0
+        },
+        "native": {
+          "count": 19308,
+          "selfBytes": 2953822,
+          "baselineSelfBytes": 2678343,
+          "growthBytes": 275479
+        },
+        "string": {
+          "count": 46783,
+          "selfBytes": 1586380,
+          "baselineSelfBytes": 557692,
+          "growthBytes": 1028688
+        },
+        "object shape": {
+          "count": 4860,
+          "selfBytes": 300740,
+          "baselineSelfBytes": 263764,
+          "growthBytes": 36976
+        },
+        "code": {
+          "count": 40509,
+          "selfBytes": 3201612,
+          "baselineSelfBytes": 1076744,
+          "growthBytes": 2124868
+        },
+        "array": {
+          "count": 2585,
+          "selfBytes": 396984,
+          "baselineSelfBytes": 224384,
+          "growthBytes": 172600
+        },
+        "number": {
+          "count": 33227,
+          "selfBytes": 216120,
+          "baselineSelfBytes": 540,
+          "growthBytes": 215580
+        },
+        "symbol": {
+          "count": 73,
+          "selfBytes": 288,
+          "baselineSelfBytes": 288,
+          "growthBytes": 0
+        },
+        "object": {
+          "count": 14029,
+          "selfBytes": 362532,
+          "baselineSelfBytes": 93148,
+          "growthBytes": 269384
+        },
+        "piece": {
+          "count": 2900,
+          "selfBytes": 116000,
+          "baselineSelfBytes": 40,
+          "growthBytes": 115960
+        },
+        "piece-tree node": {
+          "count": 4584,
+          "selfBytes": 275040,
+          "baselineSelfBytes": 60,
+          "growthBytes": 274980
+        },
+        "reverse-index header": {
+          "count": 203,
+          "selfBytes": 5684,
+          "baselineSelfBytes": 28,
+          "growthBytes": 5656
+        },
+        "closure": {
+          "count": 7049,
+          "selfBytes": 207296,
+          "baselineSelfBytes": 206488,
+          "growthBytes": 808
+        },
+        "transaction": {
+          "count": 201,
+          "selfBytes": 8040,
+          "baselineSelfBytes": 0,
+          "growthBytes": 8040
+        },
+        "sliced string": {
+          "count": 174,
+          "selfBytes": 3480,
+          "baselineSelfBytes": 0,
+          "growthBytes": 3480
+        },
+        "concatenated string": {
+          "count": 741,
+          "selfBytes": 14820,
+          "baselineSelfBytes": 14220,
+          "growthBytes": 600
+        },
+        "reverse-index split node": {
+          "count": 2791,
+          "selfBytes": 89312,
+          "baselineSelfBytes": 0,
+          "growthBytes": 89312
+        },
+        "regexp": {
+          "count": 28,
+          "selfBytes": 672,
+          "baselineSelfBytes": 672,
+          "growthBytes": 0
+        }
+      },
+      "inverseEditStrings": {
+        "inverseEditArrays": 202,
+        "distinctTextReferences": 101,
+        "stringGraphNodes": 201,
+        "stringGraphBytes": 849024,
+        "distinctSliceParents": 100,
+        "sliceParentBytes": 847024,
+        "note": "Unique string nodes reachable from inverse edit text, including sliced/cons parents. Other owners can share these bytes; this is not exclusive retained size.",
+        "nonemptyPayloadCount": 100,
+        "requiredPayloadUnits": 96000
+      },
+      "inverseParentExamples": [
+        {
+          "node": 39299,
+          "id": 229261,
+          "type": "string",
+          "name": "00000400xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "selfBytes": 15372,
+          "retainedBytes": 15372,
+          "path": [
+            {
+              "node": 1,
+              "id": 3,
+              "type": "synthetic",
+              "name": "(GC roots)",
+              "selfBytes": 0,
+              "edge": "1"
+            },
+            {
+              "node": 11,
+              "id": 23,
+              "type": "synthetic",
+              "name": "(Global handles)",
+              "selfBytes": 0,
+              "edge": "10"
+            },
+            {
+              "node": 3690,
+              "id": 7381,
+              "type": "native",
+              "name": "system / NativeContext / http://127.0.0.1:42493",
+              "selfBytes": 1252,
+              "edge": "3 / gin::ContextHolder::context_"
+            },
+            {
+              "node": 76906,
+              "id": 51669,
+              "type": "object",
+              "name": "Window [JSGlobalObject] / http://127.0.0.1:42493",
+              "selfBytes": 24,
+              "edge": "global_object"
+            },
+            {
+              "node": 63868,
+              "id": 135477,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 76,
+              "edge": "reclamationLive"
+            },
+            {
+              "node": 63869,
+              "id": 135479,
+              "type": "object",
+              "name": "Bf",
+              "selfBytes": 148,
+              "edge": "buffer"
+            },
+            {
+              "node": 39175,
+              "id": 229025,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 56,
+              "edge": "history"
+            },
+            {
+              "node": 38980,
+              "id": 228635,
+              "type": "object",
+              "name": "Map",
+              "selfBytes": 16,
+              "edge": "nodes"
+            },
+            {
+              "node": 38981,
+              "id": 228637,
+              "type": "array",
+              "name": "",
+              "selfBytes": 3604,
+              "edge": "table"
+            },
+            {
+              "node": 39011,
+              "id": 228697,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 64,
+              "edge": "222"
+            },
+            {
+              "node": 103676,
+              "id": 302385,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 40,
+              "edge": "transaction"
+            },
+            {
+              "node": 39295,
+              "id": 229253,
+              "type": "object",
+              "name": "Array",
+              "selfBytes": 16,
+              "edge": "inverseEdits"
+            },
+            {
+              "node": 39296,
+              "id": 229255,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 24,
+              "edge": "0"
+            },
+            {
+              "node": 39298,
+              "id": 229259,
+              "type": "sliced string",
+              "name": "(sliced string)",
+              "selfBytes": 20,
+              "edge": "text"
+            },
+            {
+              "node": 39299,
+              "id": 229261,
+              "type": "string",
+              "name": "00000400xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "selfBytes": 15372,
+              "edge": "parent"
+            }
+          ]
+        },
+        {
+          "node": 106024,
+          "id": 307081,
+          "type": "string",
+          "name": "00000416xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "selfBytes": 15372,
+          "retainedBytes": 15372,
+          "path": [
+            {
+              "node": 1,
+              "id": 3,
+              "type": "synthetic",
+              "name": "(GC roots)",
+              "selfBytes": 0,
+              "edge": "1"
+            },
+            {
+              "node": 11,
+              "id": 23,
+              "type": "synthetic",
+              "name": "(Global handles)",
+              "selfBytes": 0,
+              "edge": "10"
+            },
+            {
+              "node": 3690,
+              "id": 7381,
+              "type": "native",
+              "name": "system / NativeContext / http://127.0.0.1:42493",
+              "selfBytes": 1252,
+              "edge": "3 / gin::ContextHolder::context_"
+            },
+            {
+              "node": 76906,
+              "id": 51669,
+              "type": "object",
+              "name": "Window [JSGlobalObject] / http://127.0.0.1:42493",
+              "selfBytes": 24,
+              "edge": "global_object"
+            },
+            {
+              "node": 63868,
+              "id": 135477,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 76,
+              "edge": "reclamationLive"
+            },
+            {
+              "node": 63869,
+              "id": 135479,
+              "type": "object",
+              "name": "Bf",
+              "selfBytes": 148,
+              "edge": "buffer"
+            },
+            {
+              "node": 39175,
+              "id": 229025,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 56,
+              "edge": "history"
+            },
+            {
+              "node": 38980,
+              "id": 228635,
+              "type": "object",
+              "name": "Map",
+              "selfBytes": 16,
+              "edge": "nodes"
+            },
+            {
+              "node": 38981,
+              "id": 228637,
+              "type": "array",
+              "name": "",
+              "selfBytes": 3604,
+              "edge": "table"
+            },
+            {
+              "node": 39043,
+              "id": 228761,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 64,
+              "edge": "318"
+            },
+            {
+              "node": 54021,
+              "id": 258447,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 40,
+              "edge": "transaction"
+            },
+            {
+              "node": 54023,
+              "id": 258451,
+              "type": "object",
+              "name": "Array",
+              "selfBytes": 16,
+              "edge": "inverseEdits"
+            },
+            {
+              "node": 54026,
+              "id": 258457,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 24,
+              "edge": "0"
+            },
+            {
+              "node": 54027,
+              "id": 258459,
+              "type": "sliced string",
+              "name": "(sliced string)",
+              "selfBytes": 20,
+              "edge": "text"
+            },
+            {
+              "node": 106024,
+              "id": 307081,
+              "type": "string",
+              "name": "00000416xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "selfBytes": 15372,
+              "edge": "parent"
+            }
+          ]
+        },
+        {
+          "node": 53765,
+          "id": 257935,
+          "type": "string",
+          "name": "00000432xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "selfBytes": 15372,
+          "retainedBytes": 15372,
+          "path": [
+            {
+              "node": 1,
+              "id": 3,
+              "type": "synthetic",
+              "name": "(GC roots)",
+              "selfBytes": 0,
+              "edge": "1"
+            },
+            {
+              "node": 11,
+              "id": 23,
+              "type": "synthetic",
+              "name": "(Global handles)",
+              "selfBytes": 0,
+              "edge": "10"
+            },
+            {
+              "node": 3690,
+              "id": 7381,
+              "type": "native",
+              "name": "system / NativeContext / http://127.0.0.1:42493",
+              "selfBytes": 1252,
+              "edge": "3 / gin::ContextHolder::context_"
+            },
+            {
+              "node": 76906,
+              "id": 51669,
+              "type": "object",
+              "name": "Window [JSGlobalObject] / http://127.0.0.1:42493",
+              "selfBytes": 24,
+              "edge": "global_object"
+            },
+            {
+              "node": 63868,
+              "id": 135477,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 76,
+              "edge": "reclamationLive"
+            },
+            {
+              "node": 63869,
+              "id": 135479,
+              "type": "object",
+              "name": "Bf",
+              "selfBytes": 148,
+              "edge": "buffer"
+            },
+            {
+              "node": 39175,
+              "id": 229025,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 56,
+              "edge": "history"
+            },
+            {
+              "node": 38980,
+              "id": 228635,
+              "type": "object",
+              "name": "Map",
+              "selfBytes": 16,
+              "edge": "nodes"
+            },
+            {
+              "node": 38981,
+              "id": 228637,
+              "type": "array",
+              "name": "",
+              "selfBytes": 3604,
+              "edge": "table"
+            },
+            {
+              "node": 39075,
+              "id": 228825,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 64,
+              "edge": "414"
+            },
+            {
+              "node": 54083,
+              "id": 258571,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 40,
+              "edge": "transaction"
+            },
+            {
+              "node": 53761,
+              "id": 257927,
+              "type": "object",
+              "name": "Array",
+              "selfBytes": 16,
+              "edge": "inverseEdits"
+            },
+            {
+              "node": 53762,
+              "id": 257929,
+              "type": "object",
+              "name": "Object",
+              "selfBytes": 24,
+              "edge": "0"
+            },
+            {
+              "node": 53764,
+              "id": 257933,
+              "type": "sliced string",
+              "name": "(sliced string)",
+              "selfBytes": 20,
+              "edge": "text"
+            },
+            {
+              "node": 53765,
+              "id": 257935,
+              "type": "string",
+              "name": "00000432xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "selfBytes": 15372,
+              "edge": "parent"
+            }
+          ]
+        }
+      ],
+      "ownerExamples": {
+        "history": [
+          {
+            "node": 39175,
+            "id": 229025,
+            "type": "object",
+            "name": "Object",
+            "selfBytes": 56,
+            "retainedBytes": 1398144,
+            "path": [
+              {
+                "node": 1,
+                "id": 3,
+                "type": "synthetic",
+                "name": "(GC roots)",
+                "selfBytes": 0,
+                "edge": "1"
+              },
+              {
+                "node": 11,
+                "id": 23,
+                "type": "synthetic",
+                "name": "(Global handles)",
+                "selfBytes": 0,
+                "edge": "10"
+              },
+              {
+                "node": 3690,
+                "id": 7381,
+                "type": "native",
+                "name": "system / NativeContext / http://127.0.0.1:42493",
+                "selfBytes": 1252,
+                "edge": "3 / gin::ContextHolder::context_"
+              },
+              {
+                "node": 76906,
+                "id": 51669,
+                "type": "object",
+                "name": "Window [JSGlobalObject] / http://127.0.0.1:42493",
+                "selfBytes": 24,
+                "edge": "global_object"
+              },
+              {
+                "node": 63868,
+                "id": 135477,
+                "type": "object",
+                "name": "Object",
+                "selfBytes": 76,
+                "edge": "reclamationLive"
+              },
+              {
+                "node": 63869,
+                "id": 135479,
+                "type": "object",
+                "name": "Bf",
+                "selfBytes": 148,
+                "edge": "buffer"
+              },
+              {
+                "node": 39175,
+                "id": 229025,
+                "type": "object",
+                "name": "Object",
+                "selfBytes": 56,
+                "edge": "history"
+              }
+            ]
+          }
+        ],
+        "editChain": [
+          {
+            "node": 74962,
+            "id": 150101,
+            "type": "object",
+            "name": "$u",
+            "selfBytes": 56,
+            "retainedBytes": 7996,
+            "path": [
+              {
+                "node": 1,
+                "id": 3,
+                "type": "synthetic",
+                "name": "(GC roots)",
+                "selfBytes": 0,
+                "edge": "1"
+              },
+              {
+                "node": 11,
+                "id": 23,
+                "type": "synthetic",
+                "name": "(Global handles)",
+                "selfBytes": 0,
+                "edge": "10"
+              },
+              {
+                "node": 3690,
+                "id": 7381,
+                "type": "native",
+                "name": "system / NativeContext / http://127.0.0.1:42493",
+                "selfBytes": 1252,
+                "edge": "3 / gin::ContextHolder::context_"
+              },
+              {
+                "node": 76906,
+                "id": 51669,
+                "type": "object",
+                "name": "Window [JSGlobalObject] / http://127.0.0.1:42493",
+                "selfBytes": 24,
+                "edge": "global_object"
+              },
+              {
+                "node": 63868,
+                "id": 135477,
+                "type": "object",
+                "name": "Object",
+                "selfBytes": 76,
+                "edge": "reclamationLive"
+              },
+              {
+                "node": 63869,
+                "id": 135479,
+                "type": "object",
+                "name": "Bf",
+                "selfBytes": 148,
+                "edge": "buffer"
+              },
+              {
+                "node": 74962,
+                "id": 150101,
+                "type": "object",
+                "name": "$u",
+                "selfBytes": 56,
+                "edge": "editChain"
+              }
+            ]
+          }
+        ],
+        "measurements": [
+          {
+            "node": 37294,
+            "id": 225309,
+            "type": "object",
+            "name": "e",
+            "selfBytes": 28,
+            "retainedBytes": 237668,
+            "path": [
+              {
+                "node": 1,
+                "id": 3,
+                "type": "synthetic",
+                "name": "(GC roots)",
+                "selfBytes": 0,
+                "edge": "1"
+              },
+              {
+                "node": 11,
+                "id": 23,
+                "type": "synthetic",
+                "name": "(Global handles)",
+                "selfBytes": 0,
+                "edge": "10"
+              },
+              {
+                "node": 3690,
+                "id": 7381,
+                "type": "native",
+                "name": "system / NativeContext / http://127.0.0.1:42493",
+                "selfBytes": 1252,
+                "edge": "3 / gin::ContextHolder::context_"
+              },
+              {
+                "node": 76906,
+                "id": 51669,
+                "type": "object",
+                "name": "Window [JSGlobalObject] / http://127.0.0.1:42493",
+                "selfBytes": 24,
+                "edge": "global_object"
+              },
+              {
+                "node": 63868,
+                "id": 135477,
+                "type": "object",
+                "name": "Object",
+                "selfBytes": 76,
+                "edge": "reclamationLive"
+              },
+              {
+                "node": 63870,
+                "id": 135481,
+                "type": "object",
+                "name": "Array",
+                "selfBytes": 16,
+                "edge": "editors"
+              },
+              {
+                "node": 65426,
+                "id": 136985,
+                "type": "object",
+                "name": "BJ",
+                "selfBytes": 456,
+                "edge": "0"
+              },
+              {
+                "node": 65250,
+                "id": 136665,
+                "type": "object",
+                "name": "zK",
+                "selfBytes": 124,
+                "edge": "view"
+              },
+              {
+                "node": 65291,
+                "id": 136727,
+                "type": "object",
+                "name": "Object",
+                "selfBytes": 292,
+                "edge": "view"
+              },
+              {
+                "node": 65317,
+                "id": 136785,
+                "type": "object",
+                "name": "Map",
+                "selfBytes": 16,
+                "edge": "rowElements"
+              },
+              {
+                "node": 65415,
+                "id": 136957,
+                "type": "array",
+                "name": "",
+                "selfBytes": 76,
+                "edge": "table"
+              },
+              {
+                "node": 75343,
+                "id": 150703,
+                "type": "object",
+                "name": "Object",
+                "selfBytes": 176,
+                "edge": "6"
+              },
+              {
+                "node": 37294,
+                "id": 225309,
+                "type": "object",
+                "name": "e",
+                "selfBytes": 28,
+                "edge": "measurements"
+              }
+            ]
+          }
+        ],
+        "chunks": [
+          {
+            "node": 31127,
+            "id": 213761,
+            "type": "object",
+            "name": "Array",
+            "selfBytes": 16,
+            "retainedBytes": 60028,
+            "path": [
+              {
+                "node": 1,
+                "id": 3,
+                "type": "synthetic",
+                "name": "(GC roots)",
+                "selfBytes": 0,
+                "edge": "1"
+              },
+              {
+                "node": 11,
+                "id": 23,
+                "type": "synthetic",
+                "name": "(Global handles)",
+                "selfBytes": 0,
+                "edge": "10"
+              },
+              {
+                "node": 3690,
+                "id": 7381,
+                "type": "native",
+                "name": "system / NativeContext / http://127.0.0.1:42493",
+                "selfBytes": 1252,
+                "edge": "3 / gin::ContextHolder::context_"
+              },
+              {
+                "node": 76906,
+                "id": 51669,
+                "type": "object",
+                "name": "Window [JSGlobalObject] / http://127.0.0.1:42493",
+                "selfBytes": 24,
+                "edge": "global_object"
+              },
+              {
+                "node": 63868,
+                "id": 135477,
+                "type": "object",
+                "name": "Object",
+                "selfBytes": 76,
+                "edge": "reclamationLive"
+              },
+              {
+                "node": 63869,
+                "id": 135479,
+                "type": "object",
+                "name": "Bf",
+                "selfBytes": 148,
+                "edge": "buffer"
+              },
+              {
+                "node": 74963,
+                "id": 150105,
+                "type": "object",
+                "name": "Tc",
+                "selfBytes": 40,
+                "edge": "cleanSnapshot"
+              },
+              {
+                "node": 43559,
+                "id": 237655,
+                "type": "object",
+                "name": "Object",
+                "selfBytes": 52,
+                "edge": "buffers"
+              },
+              {
+                "node": 43560,
+                "id": 237657,
+                "type": "object",
+                "name": "e",
+                "selfBytes": 36,
+                "edge": "chunks"
+              },
+              {
+                "node": 41992,
+                "id": 234645,
+                "type": "object",
+                "name": "Object",
+                "selfBytes": 36,
+                "edge": "log"
+              },
+              {
+                "node": 31127,
+                "id": 213761,
+                "type": "object",
+                "name": "Array",
+                "selfBytes": 16,
+                "edge": "chunks"
+              }
+            ]
+          }
+        ]
+      },
+      "largestGrowthGroups": [
+        {
+          "name": "code: system / InstructionStream",
+          "count": 1508,
+          "selfBytes": 1403136,
+          "countDelta": 1312,
+          "bytesDelta": 1281024
+        },
+        {
+          "name": "object: Object",
+          "count": 19805,
+          "selfBytes": 739656,
+          "countDelta": 18230,
+          "bytesDelta": 703472
+        },
+        {
+          "name": "code: system / TrustedByteArray",
+          "count": 3497,
+          "selfBytes": 348792,
+          "countDelta": 2950,
+          "bytesDelta": 320104
+        },
+        {
+          "name": "number: heap number",
+          "count": 18020,
+          "selfBytes": 216120,
+          "countDelta": 17965,
+          "bytesDelta": 215580
+        },
+        {
+          "name": "string: 00000416xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "count": 16,
+          "selfBytes": 139456,
+          "countDelta": 16,
+          "bytesDelta": 139456
+        },
+        {
+          "name": "string: 00000432xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "count": 16,
+          "selfBytes": 139456,
+          "countDelta": 16,
+          "bytesDelta": 139456
+        },
+        {
+          "name": "string: 00000480xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "count": 16,
+          "selfBytes": 139456,
+          "countDelta": 16,
+          "bytesDelta": 139456
+        },
+        {
+          "name": "string: 00000464xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "count": 16,
+          "selfBytes": 139456,
+          "countDelta": 16,
+          "bytesDelta": 139456
+        }
+      ],
+      "snapshotSelfBytes": 9738822,
+      "baselineSelfBytes": 5116411,
+      "snapshotNativeBytes": 2953822
+    }
+  }
+}

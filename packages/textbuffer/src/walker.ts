@@ -1,5 +1,5 @@
 import type { PieceTreeNode, PieceTableTreeSnapshot } from './pieceTableTypes'
-import { bufferForPiece } from './buffers'
+import { bufferSpanAt } from './buffers'
 import { collectTextInRange } from './tree'
 import { getPieceVisibleLength, getSubtreeVisibleLength } from './node'
 
@@ -46,6 +46,7 @@ class PrototypePieceTableWalker implements PieceTableWalker {
   // reads chars with a single index instead of recomputing start + local.
   private readonly stack: PieceTreeNode[] = []
   private pieceText = ''
+  private spanStart = 0
   private textIndex = 0
   private textEnd = 0
   private offsetValue = 0
@@ -79,7 +80,7 @@ class PrototypePieceTableWalker implements PieceTableWalker {
     const code = this.pieceText.charCodeAt(this.textIndex)
     this.textIndex += 1
     this.offsetValue += 1
-    if (this.textIndex === this.textEnd) this.advancePiece()
+    if (this.textIndex === this.textEnd) this.advanceSpan()
     return code
   }
 
@@ -111,7 +112,7 @@ class PrototypePieceTableWalker implements PieceTableWalker {
       }
       remaining -= available
       this.offsetValue += available
-      this.advancePiece()
+      this.advanceSpan()
     }
   }
 
@@ -149,8 +150,7 @@ class PrototypePieceTableWalker implements PieceTableWalker {
       const nodeLength = getPieceVisibleLength(node.piece)
       if (remaining < nodeLength) {
         this.stack.push(node)
-        this.bindCurrentPiece(node)
-        this.textIndex += remaining
+        this.bindCurrentPiece(node, node.piece.start + remaining)
         return
       }
       remaining -= nodeLength
@@ -172,13 +172,25 @@ class PrototypePieceTableWalker implements PieceTableWalker {
   public nextChunk(): boolean {
     if (this.stack.length === 0) return false
     this.offsetValue += this.textEnd - this.textIndex
-    return this.advancePiece()
+    return this.advanceSpan()
   }
 
-  private bindCurrentPiece(node: PieceTreeNode): void {
-    this.pieceText = bufferForPiece(this.buffers, node.piece)
-    this.textIndex = node.piece.start
-    this.textEnd = node.piece.start + node.piece.length
+  private bindCurrentPiece(node: PieceTreeNode, at = node.piece.start): void {
+    const span = bufferSpanAt(this.buffers, node.piece.buffer, at)
+    this.pieceText = span.text
+    this.spanStart = span.start
+    this.textIndex = at - span.start
+    this.textEnd = Math.min(span.end, node.piece.start + node.piece.length) - span.start
+  }
+
+  private advanceSpan(): boolean {
+    const node = this.stack[this.stack.length - 1]
+    const at = this.spanStart + this.textEnd
+    if (node && at < node.piece.start + node.piece.length) {
+      this.bindCurrentPiece(node, at)
+      return true
+    }
+    return this.advancePiece()
   }
 
   private clearCurrentPiece(): void {

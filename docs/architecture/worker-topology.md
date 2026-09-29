@@ -13,7 +13,7 @@ owning disposal, and defining what happens after a worker failure.
 | `TreeSitterWorkerClient` | `@singapore-editor/tree-sitter` | Per worker document cache keeps at most 6 parsed snapshots and at most 8,000,000 retained source units, while preserving the newest 2 snapshots. Owner-side source chunk accounting is per live document and cleared on document disposal, source-cache errors, crash, or owner disposal. | A crash terminates the worker, rejects pending requests, clears owner caches, and leaves lifecycle `crashed`. The next request on the same owner creates a fresh worker generation; failed requests are not replayed automatically. |
 | `MinimapWorkerOwner` | `@singapore-editor/minimap` | No cross-document worker cache. The client owns one current minimap projection, one queued update, latest token source, style signatures, and a CSS color cache cleared on theme/style invalidation or disposal. | A crash terminates the worker and leaves lifecycle `crashed`. There is no automatic restart on the same owner; recreate the minimap contribution/client. Disposal waits for a worker `disposed` acknowledgement before terminating. |
 | `ShikiWorkerOwner` | `@singapore-editor/core/shiki` | Owner caches theme-request promises by sorted theme key. Worker caches one tokenizer per open document and highlighters by sorted language/theme key. These caches are lifecycle-scoped, not size-bounded. | A crash terminates the worker, rejects pending requests, clears owner theme cache, and leaves lifecycle `crashed`. The next request on the same owner creates a fresh worker generation; failed requests are not replayed automatically. |
-| `TypeScriptLspWorkerOwner` | `@singapore-editor/typescript-lsp` | No owner-side document cache. The owner tracks posted-message count, listener counts, and last error. The worker owns LSP document/project state for the lifetime of the worker. | A crash terminates the worker, clears listeners, and leaves lifecycle `crashed`. There is no automatic restart on the same owner; recreate the LSP transport/session/connection. |
+| `TypeScriptLspWorkerOwner` | `@singapore-editor/typescript-lsp` | No owner-side document cache. The owner tracks posted-message count, listener counts, and last error. The worker owns LSP document/project state for the lifetime of the worker. | A crash posts `$/serverExited` to the client, terminates the worker, clears listeners, and leaves lifecycle `crashed`. There is no automatic restart on the same owner; recreate the LSP transport/session/connection. |
 
 There is not yet a separate document worker owner. The main-thread document engine remains the
 document truth until that Phase 11 item is implemented.
@@ -176,22 +176,28 @@ Inspection:
 Caches:
 
 - The owner has no document cache and no language-service cache.
-- The worker owns the LSP server state for its lifetime: open documents, workspace files, diagnostic
-  timers, and TypeScript service promise.
+- The worker owns the LSP server state for its lifetime: open documents, workspace files, the
+  standard-library files the program's `lib` closure named, diagnostic timers, and the project host
+  (`src/worker/projectHost.ts`) that holds every file at a version. Workspace files change one at a
+  time through `editor/typescript/upsertFiles` and `deleteFiles`; only a tsconfig or package.json
+  change rebuilds the program.
 - LSP document/project state is cleared by LSP shutdown/exit handling or worker termination.
 
 Limits:
 
 - Owner-side memory is bounded to counters/listener sets and last error.
-- Worker-side TypeScript service memory is lifecycle-scoped and currently not size-bounded by the
-  owner.
+- Worker-side TypeScript service memory is lifecycle-scoped and not size-bounded by the owner. It
+  is the program's: 1.1 GB for Platform's `apps/web` (9,341 files), measured by
+  `bench/fileProvider.ts` in E054.
 
 Disposal and restart:
 
 - `terminate()`/`dispose()` detaches listeners, terminates the worker, clears owner listener sets, and
   leaves lifecycle `disposed`.
 - Native worker errors mark lifecycle `crashed`, record `lastError`, detach listeners, terminate the
-  worker, and notify owner error listeners.
+  worker, post `$/serverExited` (`LSP_SERVER_EXITED` in `@singapore-editor/lsp`) with the error to
+  the message listeners, and then notify owner error listeners. `LspConnection` reports the close
+  that follows as `LspServerExitedError`, once, and sets status `error`.
 - The owner does not recreate the worker after `crashed` or `disposed`; `postMessage` fails once the
   lifecycle is not `ready`.
 - Restart requires a new LSP transport/session/connection, which creates a new owner.

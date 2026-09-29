@@ -4,11 +4,13 @@ import type {
 } from '@singapore-editor/core/extensions'
 import type { InlineReplacementSpec } from '@singapore-editor/core/rendering'
 import { markdownInlineReplacements } from './replacements'
+import type { MarkdownLinkOptions } from './linkRender'
 import './style.css'
 
 export { markdownInlineReplacements } from './replacements'
+export { createMarkdownAuthoringPlugin } from './authoringPlugin'
 
-export type MarkdownPreviewPluginOptions = {
+export type MarkdownPreviewPluginOptions = MarkdownLinkOptions & {
   /** Language ids this applies to. Defaults to markdown only, so other files render as source. */
   readonly languageIds?: readonly string[]
 }
@@ -17,8 +19,8 @@ const DEFAULT_LANGUAGE_IDS = ['markdown']
 
 /**
  * Renders markdown as formatted text while the buffer keeps holding markdown source: fences hide,
- * headings drop their `#`, links collapse to their label, and the source under the caret comes back
- * so it stays editable as text. Include the plugin to turn it on, remove it to turn it off.
+ * headings drop their `#`, and the source under the caret comes back so it stays editable as text.
+ * Links keep their targets on rendered anchors; pipe tables preserve their source column widths.
  */
 export function createMarkdownPreviewPlugin(
   options: MarkdownPreviewPluginOptions = {},
@@ -27,31 +29,21 @@ export function createMarkdownPreviewPlugin(
 
   return {
     name: 'markdown-preview',
-    activate: (context) => {
-      // The contribution is optional on the context, so a host that predates it would otherwise
-      // install this plugin and render nothing at all. Say so instead of failing silently.
-      if (!context.registerInlineReplacementProvider) {
-        context.log?.({
-          action: 'markdown.preview.unsupported',
-          level: 'warn',
-          message:
-            'Editor does not support inline replacement providers; markdown preview is inactive.',
-        })
-        return undefined
-      }
-
-      return context.registerInlineReplacementProvider((replacementContext) =>
-        replacementsForContext(replacementContext, languageIds),
-      )
-    },
+    activate: (context) =>
+      context.registerInlineReplacementProvider(
+        (replacementContext) => replacementsForContext(replacementContext, languageIds, options),
+        { trigger: 'edit', requiresSyntax: true },
+      ),
   }
 }
 
 const replacementsForContext = (
   context: EditorInlineReplacementContext,
   languageIds: ReadonlySet<string>,
+  options: MarkdownLinkOptions,
 ): readonly InlineReplacementSpec[] => {
   if (context.languageId === null) return []
   if (!languageIds.has(context.languageId)) return []
-  return markdownInlineReplacements(context.text, context.captures)
+  if (context.records?.languageId !== context.languageId) return []
+  return markdownInlineReplacements(context.textSnapshot, context.records.data, options)
 }

@@ -7,10 +7,7 @@ export function createTypeScriptLspPlugin(
 ): TypeScriptLspPlugin {
   return createBaseTypeScriptLspPlugin({
     ...options,
-    workerFactory: () =>
-      createTypeScriptLspWorkerOwner({
-        workerFactory: options.workerFactory,
-        onError: options.onError,
-      }),
+    // The owner's own onError stays unset: the connection reports the crash, with its reason.
+    workerFactory: () => createTypeScriptLspWorkerOwner({ workerFactory: options.workerFactory }),
   })
 }

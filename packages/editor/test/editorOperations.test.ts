@@ -1,10 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createStringTextSnapshot } from '../src/documentTextSnapshot'
+import { readAll } from './factories/snapshotText'
 
 import { Editor } from '../src/editor'
 import { InputSelectionController } from '../src/editor/inputSelectionController'
 import { VirtualizedTextView } from '../src/virtualization'
 import { resetEditorInstanceCount } from '../src/public/testing'
-import { createDocumentSession, type DocumentSessionChange } from '../src/public/document'
+import {
+  createDocumentSession,
+  createEditorBufferSession,
+  createEditorTextBuffer,
+  type DocumentSessionChange,
+} from '../src/public/document'
 import type {
   EditorEditContributionContext,
   EditorPlugin,
@@ -262,15 +269,45 @@ describe('editor operations', () => {
     expect(revealOffset).not.toHaveBeenCalled()
   })
 
-  it('keeps the deprecated numeric public reveal target working', () => {
-    editor = new Editor(container, { defaultText: 'abc' })
-    const revealCaret = vi.spyOn(VirtualizedTextView.prototype, 'revealCaret')
-    const revealOffset = vi.spyOn(VirtualizedTextView.prototype, 'revealOffset')
+  it('adopts applyEdit tokens on the buffer session it edited', () => {
+    const capture: ViewContributionContextCapture = { context: null }
+    editor = new Editor(container, { plugins: [captureViewContributionPlugin(capture)] })
+    editor.attachSession(createEditorBufferSession(createEditorTextBuffer('abc')))
+    const context = requireViewContributionContext(capture.context)
 
-    editor.setSelection(0, 0, 2)
+    editor.applyEdit(
+      { from: 0, to: 1, text: 'X' },
+      [{ start: 0, end: 3, style: { color: 'red' } }],
+      createStringTextSnapshot('Xbc'),
+    )
 
-    expect(revealCaret).not.toHaveBeenCalled()
-    expect(revealOffset).toHaveBeenLastCalledWith(2, undefined)
+    expect(readAll(context.getSnapshot().textSnapshot)).toBe('Xbc')
+    expect(context.getSnapshot().tokens.length).toBe(1)
+  })
+
+  it('adopts applyEdit tokens for the edited document, not one a change listener opens', () => {
+    const capture: ViewContributionContextCapture = { context: null }
+    let reopened = false
+    editor = new Editor(container, {
+      plugins: [captureViewContributionPlugin(capture)],
+      onChange: (_state, change) => {
+        if (reopened || change?.kind !== 'edit') return
+        reopened = true
+        editor.openDocument({ documentId: 'other.ts', text: 'other' })
+      },
+    })
+    editor.attachSession(createEditorBufferSession(createEditorTextBuffer('abc')))
+    const context = requireViewContributionContext(capture.context)
+
+    editor.applyEdit(
+      { from: 0, to: 1, text: 'X' },
+      [{ start: 0, end: 3, style: { color: 'red' } }],
+      createStringTextSnapshot('Xbc'),
+    )
+
+    expect(reopened).toBe(true)
+    expect(readAll(context.getSnapshot().textSnapshot)).toBe('other')
+    expect(context.getSnapshot().tokens.length).toBe(0)
   })
 
   it('round-trips affinity through an explicit post-edit selection', () => {
@@ -327,11 +364,6 @@ describe('editor operations', () => {
       reveal: false,
       revealOffset: 2,
     })
-    expect(revealCaret).not.toHaveBeenCalled()
-    expect(revealOffset).toHaveBeenLastCalledWith(2, undefined)
-
-    revealOffset.mockClear()
-    context.setSelection(1, 1, 'test.legacyRevealTarget', 2)
     expect(revealCaret).not.toHaveBeenCalled()
     expect(revealOffset).toHaveBeenLastCalledWith(2, undefined)
   })

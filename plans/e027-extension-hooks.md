@@ -1,18 +1,21 @@
 # E027: Define and verify the extension hook contract
 
-- Status: Proposed
+- Status: Approved
 - Kind: Design
 - Owner: Editor
 - Priority: P2
 - Effort: M
 - Dependencies: None
 - Inspected baseline: Editor `9abb944f3a2b8d6516953fdec75e8df5e1a94811`.
+- Research: design pass done 2026-09-25 against Editor `e2fd299`; findings and a draft inventory below. Implementation steps 5–6 and the E028 hand-off remain.
+
+Decided 2026-09-25: owner — unparked. Rebase the plan on the [E050 host contracts](../docs/architecture/e050-host-obligations.md) first, then execute. Platform Plan 122 Phase 0 needs this design pass.
 
 ## Outcome
 
 Publish an accurate extension inventory that tells a plugin author which behavior they can
 change, which context they receive, and when their resources disappear. Propose only the
-missing hooks needed to exercise modal input in [E028](e028-modal-input-prototype.md).
+missing hooks needed to exercise modal input in [E028](../docs/architecture/modal-input-findings.md).
 
 A developer implementing a custom paste handler or view decoration should find its existing
 public hook. A developer intercepting input should find an explicit ownership contract,
@@ -118,3 +121,161 @@ Keep contribution contexts narrow and identify the precise additional operation 
 Optional methods already exist in plugin contexts. Record current behavior accurately, then
 remove unnecessary compatibility patterns only as part of a separately scheduled API change.
 The design is incomplete if host save callbacks are mislabeled as editor document events.
+
+## Research findings (2026-09-25)
+
+Read from Editor `origin/main` at `e2fd299` and Platform `origin/main` at `ed96e9f16`. No open PR
+changes this plan (Editor PRs #20, #34, #35 do not touch it). The draft inventory is
+[extension-hooks.md](../docs/architecture/extension-hooks.md): every category in Scope has rows, each
+with its symbol, scope, ordering, disposal, a production consumer, and a status.
+
+All eleven E050 rows are on main, not only rows 2, 5, 7, 8, 9 and 11: rows 1, 3, 4, 6 and 10 came
+back through PRs #30–#33 after the rollback. The hooks E050 added are rows in the inventory:
+`registerPressParticipant`, `registerNonCaretRows`, `registerKeymapContextKey`,
+`onDidChangeReservedOverlayWidth`, `setScrollPosition`, gutter `interactive`, `getRowPresentation`
+and `initialHighlightStatus`. E055 changes no hook. It does fix the reading rule the hooks follow:
+contexts hand out `TextReadSnapshot`, and `check:full-text` rejects a new whole-text read.
+
+Lifecycle claims were checked with four happy-dom probes against the worktree source
+(`/work/tmp/research/e027/probe.test.ts`, run through the wave-heavy wrapper, 4 of 4 as predicted).
+
+### Step 1: what exists
+
+`EditorPluginContext` has 13 registration methods and `log`
+([plugins.ts](../packages/editor/src/plugins.ts)). The view context has 33 members. Six contribution
+kinds exist: view, command, capability, edit, decoration, and the internal feature kind, whose
+combined context has DOM, edits, selections, decorations and commands on one object. Only
+`mergeConflictPlugin` reaches it, by casting its plugin context to `EditorInternalPluginContext`.
+
+Library-defined typed extension points already exist. Any package can call
+`createEditorLanguageFeatureToken` (many providers, ordered by selector, priority, then registration)
+or `createEditorCapabilityToken` (one owner). What is missing next to CodeMirror facets is a public
+change subscription per token (`EditorLanguageFeatureRegistry.subscribe` exists but is internal) and
+any combine or derive step.
+
+Notification fan-out: every view contribution is visited for every update kind except `viewport`,
+which has its own subscriber set ([viewContributions.ts](../packages/editor/src/editor/viewContributions.ts)).
+Decoration and feature contributions get every `handleEditorChange`. Plan 122 Phase 0 measures this;
+E027 only records who owns it.
+
+### Step 2: two views, two documents
+
+- The plugin host is per editor, so the same plugin object activates once per editor (probe 4).
+  Contributions, language features, decorations, commands and keymap context keys are all per editor.
+  Two views of one document share its text buffer (text and undo) through separate view sessions. No document scope exists;
+  Platform Plan 099 owns adding one.
+- Contributions survive a document swap and hear `document` or `clear` afterwards. There is no
+  will-change phase. Row handles abort before replacement. `textVersion` rises on every rendered change
+  and every swap in one editor ([documentController.ts](../packages/editor/src/editor/documentController.ts)),
+  so it rejects stale results across A-to-B-to-A.
+- **Ambiguity 1, factory state.** `createBracketMatchPlugin` (line 44) and `createMergeConflictPlugin`
+  (line 118) keep `controller` in the factory closure. With one object in two editors, the second
+  activation reassigns it: `jumpToBracket` and the merge-conflict lens rows then read the other
+  editor's controller. Found by reading the source, not reproduced: bracket pairs need a parse.
+  Platform builds its plugin array per editor, so today it does not hit this. The ambient hover plugin
+  is shared by design.
+- **Ambiguity 2, late registrations.** A registration made after `activate` returns, from a promise
+  or a timer, is host-owned. After `setPlugins([])` it still answers (probe 2). Platform's decode
+  loader disposes its own late registration, which is why it has no leak.
+- **Ambiguity 3, contribution registrations.** The editor collects what a contribution registers
+  only to undo a failed factory. After a successful create, a key reader whose `dispose` forgets it
+  reads true after the plugin is gone (probe 1). `onDidType` listeners are never collected.
+- **Ambiguity 4, split contexts.** A view contribution cannot apply edits or register commands. find
+  passes one controller through four providers, lsp-plugin through three, bracket match through two
+  with a comment that their creation order is not guaranteed.
+- Save, dirty state and open destinations are host-owned. The editor has no save event.
+
+### Step 3: input order
+
+The keydown order, the five text sources and the two proposed hooks are written out in the
+inventory's input section. Two facts decide the design. First, composition is already held at `el`
+capture before any keymap sees the key. Second, Platform disables the editor keymap
+(`HOSTED_EDITOR_KEYMAP`) and runs its own at `document` bubble. That makes a hook at the editor's
+own keydown the only point that comes before both keymaps.
+
+A registered command handler runs before the built-in, and a `false` does not fall through to it,
+except for `closeFind` (probe 3 for `selectAll`; `closeFind` from the router source). A command
+therefore cannot delegate to the default the way input must.
+
+### Step 4: the two designs against E028
+
+| E028 requirement                           | Key participant + text gate                                | Replace the input loop         | Today, no new hook                                                                                          |
+| ------------------------------------------ | ---------------------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| Normal mode inserts no letters             | Consume the keydown                                        | Owns all input                 | Only by a host layer binding every printable key; plugins cannot add bindings, Platform disables the keymap |
+| IME commit, dictation, drop in normal mode | Gate rejects                                               | Owns all input                 | Nothing                                                                                                     |
+| Insert mode and composition                | Delegate; the default path runs once                       | Reimplements both input routes | Default path                                                                                                |
+| Counts and operator-pending (`d3w`)        | Plugin state; cancel on `document`, `clear`, blur, dispose | Same                           | The chord trie matches exact chords with a 5 s timeout; counts are unbounded                                |
+| Escape while completion is open            | `context.suggestWidgetVisible` says delegate               | Reimplements widget ordering   | —                                                                                                           |
+| One undo entry per command                 | `applyEdits` in the same operation                         | Same                           | `applyEdits` exists, but not in the view context                                                            |
+| Two views, readonly                        | Per-view registration; edits rejected by `applyEdits`      | Per view                       | —                                                                                                           |
+| Block cursor                               | Needs a per-view cursor style                              | Same                           | The caret is editor-drawn, 2px wide in `style.css`                                                          |
+| Multi-cursor `dw`                          | Needs `applyEdits` to take a selection list                | Same                           | `applyEdits` takes one selection                                                                            |
+
+Word motions need no internal import: `nextWordOffset`, `previousWordOffset` and `wordRangeAtOffset`
+are root exports, and a plugin reads rows through `TextReadSnapshot.lineRange` and `readRange`.
+
+**Recommendation:** the key participant and the text gate, both experimental. Reject replacing the
+input loop (reasons in the inventory). The participant needs nothing from E026. Vim actions become
+palette-visible commands only once E026's namespaced IDs exist.
+
+### Decisions
+
+- **Recommendation, lifecycle ownership.** Give every contribution context its own disposable store,
+  released when the contribution goes (fixes ambiguity 3). Give every plugin its own context object in
+  place of the one shared context `pluginLifecycle.test.ts` pins, so a late registration belongs to
+  its plugin (fixes ambiguity 2; E025 reload needs this). Move bracket match and merge-conflict state
+  into `activate` (fixes ambiguity 1).
+- **Recommendation, one view context.** Make the combined feature context the public per-view
+  context: edits, selections, commands, decorations and DOM on one object. It already exists, and the
+  bridging in four first-party plugins is the evidence. Expose it as experimental for E028. Plan 122
+  Phase 1 picks the final `createPlugin` shape, so do not also rename the provider kinds here.
+- **Recommendation, extension points.** Keep tokens as the typed channel. Add a public per-token
+  provider-change subscription for Plan 122's annotation proof. Add no facet-style combine until Plan
+  122's comparison asks for one.
+- **Recommendation, frame work.** Add no frame hook. `update`, `requestViewUpdate` and row-presentation
+  signals cover every current consumer.
+- **Recommendation, E028 additions.** Add a per-view cursor style (line, block, underline) on the view
+  context, and a selection list on `applyEdits`.
+- **Recommendation, stability labels.** When published, the inventory gains a supported, experimental
+  or internal column. The participant, the gate and the combined context stay experimental until
+  E028 returns a verdict.
+- **E026 split.** E026 owns IDs, metadata, typed arguments, mutation classification and preset
+  bindings. E027 owns scope, ordering and disposal. Plugins still cannot contribute bindings: Platform
+  runs its own keymap and reads Editor bindings as data (`default-bindings.ts`), so a contributed
+  command's default bindings belong in its E026 declaration. `editorCommandMutates` feeds both the
+  editor keymap's `writable` check and Platform's `command-table.test.ts`, so deriving it from
+  declarations covers custom commands in both places.
+
+### Checks for step 6
+
+Checks 1 and 2 fail on today's code, as probes 1 and 2 show. Check 3 is predicted from the source:
+
+1. Removing a plugin releases every registration its contributions made through their contexts,
+   including `onDidType`.
+2. Removing a plugin releases a registration it made after `activate`.
+3. One bracket-match plugin object in two editors jumps within the invoking editor.
+
+The export check needs no new file. `public-api.test.ts` already imports
+`@singapore-editor/core/extensions` from the build. Add a symbol there when a proposed hook ships.
+
+### Owner questions
+
+1. **Full editor access.** Plan 122 settles that trusted plugins can reach the actual editor. This
+   plan's Risks say not to expose the whole instance. (a) The view context carries `editor`, typed as
+   the public `Editor` class and labelled unstable. Calling `setPlugins`, `dispose` or
+   `openDocument` from inside `update` is unsupported. (b) Keep contexts narrow; a host hands its
+   editor to its own plugins. Recommendation: (a). It exposes only what hosts can already call.
+2. **Who wins a key: a participant or an app shortcut.** (a) The participant is asked first, so Vim
+   can take Ctrl+R or Ctrl+W in that view and the app binding stops working there. (b) The host
+   keymap is asked first, the way terminals pre-claim through `claimKeybinding`
+   (`features/terminal/hooks/use-keybindings.ts`), and the participant sees only unbound keys.
+   Recommendation: (a), with Platform showing claimed chords in its shortcut UI later.
+
+### Proposed phases
+
+1. Editor, S: the lifecycle-ownership fixes and checks 1–3. Add stability labels to the inventory
+   and link it from `ARCHITECTURE.md`.
+2. Editor, S: expose the combined per-view context and the token change subscription as
+   experimental.
+3. Handed to E028 step 2: the key participant, the text gate, cursor style and the `applyEdits`
+   selection list, each proved in a real browser on both input routes.

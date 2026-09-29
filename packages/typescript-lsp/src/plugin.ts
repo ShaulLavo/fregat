@@ -1,6 +1,12 @@
+import { TypeScriptLspWorkspace } from './workspace'
 import type { EditorDisposable } from '@singapore-editor/core/extensions'
 import { createEditorCapabilityToken } from '@singapore-editor/core/extensions'
-import type { LspClient, LspWebSocketTransportOptions, LspWorkerLike } from '@singapore-editor/lsp'
+import type {
+  LspClient,
+  LspServerRequestHandler,
+  LspWebSocketTransportOptions,
+  LspWorkerLike,
+} from '@singapore-editor/lsp'
 import {
   createLanguageServerAdapterPlugin,
   createWebSocketLspTransportFactory,
@@ -11,11 +17,8 @@ import {
 import type { LanguageServerCompletionEditFeature } from '@singapore-editor/lsp-plugin/completion'
 
 import { isTypeScriptLspSourceFileName } from './paths'
-import type {
-  TypeScriptLspPlugin,
-  TypeScriptLspPluginOptions,
-  TypeScriptLspSourceFile,
-} from './types'
+import { LIBRARY_FILES_REQUEST } from './worker/customMethods'
+import type { TypeScriptLspPlugin, TypeScriptLspPluginOptions } from './types'
 
 const DEFAULT_DIAGNOSTIC_DELAY_MS = 150
 const DEFAULT_TIMEOUT_MS = 15000
@@ -26,9 +29,13 @@ const TYPESCRIPT_LSP_COMPLETION_EDIT_FEATURE =
   )
 
 export type TypeScriptLspResolvedOptions = {
+  readonly connectionProvider: TypeScriptLspPluginOptions['connectionProvider']
+  readonly documentSync: TypeScriptLspPluginOptions['documentSync']
   readonly rootUri: string | null
+  readonly canonicalPaths: TypeScriptLspPluginOptions['canonicalPaths']
   readonly compilerOptions: TypeScriptLspPluginOptions['compilerOptions']
   readonly diagnosticDelayMs: number
+  readonly libraryFiles: TypeScriptLspPluginOptions['libraryFiles']
   readonly timeoutMs: number
   readonly capabilities: TypeScriptLspPluginOptions['capabilities']
   readonly clientInfo: TypeScriptLspPluginOptions['clientInfo']
@@ -41,6 +48,8 @@ export type TypeScriptLspResolvedOptions = {
   readonly onDiagnostics: TypeScriptLspPluginOptions['onDiagnostics']
   readonly onOpenDefinition: TypeScriptLspPluginOptions['onOpenDefinition']
   readonly onOpenReferences: TypeScriptLspPluginOptions['onOpenReferences']
+  readonly onApplyWorkspaceEdit: TypeScriptLspPluginOptions['onApplyWorkspaceEdit']
+  readonly getDiagnosticActions: TypeScriptLspPluginOptions['getDiagnosticActions']
   readonly onRequestError: TypeScriptLspPluginOptions['onRequestError']
   readonly onError: TypeScriptLspPluginOptions['onError']
 }
@@ -49,20 +58,23 @@ export function createTypeScriptLspPlugin(
   options: TypeScriptLspPluginOptions = {},
 ): TypeScriptLspPlugin {
   const resolved = resolveOptions(options)
-  const workspaceFiles = new TypeScriptWorkspaceFiles()
+  const workspaceFiles = options.workspace ?? new TypeScriptLspWorkspace()
   const plugin = createLanguageServerAdapterPlugin({
     name: 'editor.typescript-lsp',
     rootUri: resolved.rootUri,
     initializationOptions: typeScriptInitializationOptions(resolved),
+    serverRequestHandlers: libraryRequestHandlers(resolved.libraryFiles),
     timeoutMs: resolved.timeoutMs,
     capabilities: resolved.capabilities,
     clientInfo: resolved.clientInfo,
     semanticTokens: resolved.semanticTokens,
     createTransport: typeScriptTransportFactory(resolved),
-    defaultHighlightPrefix: 'editor-typescript-lsp',
+    connectionProvider: resolved.connectionProvider,
     documentSync: {
-      shouldSyncLanguageId: isTypeScriptLspLanguage,
-      shouldSyncUri: isTypeScriptLspSourceFileName,
+      ...resolved.documentSync,
+      languageIdForDocument: resolved.documentSync?.languageIdForDocument ?? protocolLanguageId,
+      shouldSyncLanguageId: resolved.documentSync?.shouldSyncLanguageId ?? isTypeScriptLspLanguage,
+      shouldSyncUri: resolved.documentSync?.shouldSyncUri ?? isTypeScriptLspSourceFileName,
     },
     diagnostics: {
       minimapSourceId: 'editor.typescript-lsp.diagnostics',
@@ -89,6 +101,8 @@ export function createTypeScriptLspPlugin(
     onDiagnostics: resolved.onDiagnostics,
     onOpenDefinition: resolved.onOpenDefinition,
     onOpenReferences: resolved.onOpenReferences,
+    getDiagnosticActions: resolved.getDiagnosticActions,
+    onApplyWorkspaceEdit: resolved.onApplyWorkspaceEdit,
     onRequestError: (_serverId, method, error) => resolved.onRequestError?.(method, error),
     onError: resolved.onError,
   })
@@ -96,48 +110,9 @@ export function createTypeScriptLspPlugin(
   return {
     ...plugin,
     setWorkspaceFiles: (files) => workspaceFiles.setWorkspaceFiles(files),
-    clearWorkspaceFiles: () => workspaceFiles.clearWorkspaceFiles(),
-  }
-}
-
-class TypeScriptWorkspaceFiles {
-  private readonly clients = new Map<LspClient, (error: unknown) => void>()
-  private files: readonly TypeScriptLspSourceFile[] = []
-
-  public setWorkspaceFiles(files: readonly TypeScriptLspSourceFile[]): void {
-    this.files = files.map((file) => ({ path: file.path, text: file.text }))
-    this.syncClients()
-  }
-
-  public clearWorkspaceFiles(): void {
-    this.files = []
-    this.syncClients()
-  }
-
-  public registerClient(
-    client: LspClient,
-    onError: ((error: unknown) => void) | undefined,
-  ): EditorDisposable {
-    this.clients.set(client, onError ?? ignoreConnectionError)
-    return {
-      dispose: () => {
-        this.clients.delete(client)
-      },
-    }
-  }
-
-  public syncClient(client: LspClient): void {
-    const onError = this.clients.get(client)
-    if (!onError) return
-    if (!client.initialized) return
-
-    void client
-      .notify('editor/typescript/setWorkspaceFiles', { files: this.files })
-      .catch((error: unknown) => onError(error))
-  }
-
-  private syncClients(): void {
-    for (const client of this.clients.keys()) this.syncClient(client)
+    upsertWorkspaceFiles: (files) => workspaceFiles.upsertWorkspaceFiles(files),
+    deleteWorkspaceFiles: (paths) => workspaceFiles.deleteWorkspaceFiles(paths),
+    clearWorkspaceFiles: () => workspaceFiles.setWorkspaceFiles([]),
   }
 }
 
@@ -146,7 +121,7 @@ class TypeScriptWorkspaceFiles {
 // away as the price of holding it would be a trade nobody asked for.
 function registerTypeScriptConnection(
   context: LanguageServerConnectionContext,
-  workspaceFiles: TypeScriptWorkspaceFiles,
+  workspaceFiles: TypeScriptLspWorkspace,
   options: TypeScriptLspResolvedOptions,
 ): EditorDisposable {
   const registration = workspaceFiles.registerClient(context.client, options.onError)
@@ -180,16 +155,45 @@ function missingWorkerTransportFactory(): never {
 
 function typeScriptInitializationOptions(options: TypeScriptLspResolvedOptions): unknown {
   return {
+    canonicalPaths: options.canonicalPaths,
     compilerOptions: options.compilerOptions,
     diagnosticDelayMs: options.diagnosticDelayMs,
+    libraryFiles: librarySource(options.libraryFiles),
   }
+}
+
+function librarySource(libraryFiles: TypeScriptLspPluginOptions['libraryFiles']): string {
+  if (typeof libraryFiles === 'function') return 'host'
+  return libraryFiles ?? 'bundled'
+}
+
+/** A host loader answers the worker's request for library files by name. */
+function libraryRequestHandlers(
+  libraryFiles: TypeScriptLspPluginOptions['libraryFiles'],
+): Readonly<Record<string, LspServerRequestHandler<LspClient>>> {
+  if (typeof libraryFiles !== 'function') return {}
+  return {
+    [LIBRARY_FILES_REQUEST]: async (_client, params) => ({
+      files: await libraryFiles(libraryNames(params)),
+    }),
+  }
+}
+
+function libraryNames(params: unknown): readonly string[] {
+  if (typeof params !== 'object' || params === null || !('names' in params)) return []
+  const names = params.names
+  return Array.isArray(names) ? names.filter((name) => typeof name === 'string') : []
 }
 
 function resolveOptions(options: TypeScriptLspPluginOptions): TypeScriptLspResolvedOptions {
   return {
+    documentSync: options.documentSync,
+    connectionProvider: options.connectionProvider,
     rootUri: options.rootUri ?? 'file:///',
+    canonicalPaths: options.canonicalPaths,
     compilerOptions: options.compilerOptions,
     diagnosticDelayMs: options.diagnosticDelayMs ?? DEFAULT_DIAGNOSTIC_DELAY_MS,
+    libraryFiles: options.libraryFiles,
     timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     capabilities: options.capabilities,
     clientInfo: options.clientInfo,
@@ -202,6 +206,8 @@ function resolveOptions(options: TypeScriptLspPluginOptions): TypeScriptLspResol
     onDiagnostics: options.onDiagnostics,
     onOpenDefinition: options.onOpenDefinition,
     onOpenReferences: options.onOpenReferences,
+    getDiagnosticActions: options.getDiagnosticActions,
+    onApplyWorkspaceEdit: options.onApplyWorkspaceEdit,
     onRequestError: options.onRequestError,
     onError: options.onError,
   }
@@ -209,6 +215,8 @@ function resolveOptions(options: TypeScriptLspPluginOptions): TypeScriptLspResol
 
 function isTypeScriptLspLanguage(languageId: string): boolean {
   return (
+    languageId === 'tsx' ||
+    languageId === 'jsx' ||
     languageId === 'javascript' ||
     languageId === 'javascriptreact' ||
     languageId === 'typescript' ||
@@ -216,6 +224,8 @@ function isTypeScriptLspLanguage(languageId: string): boolean {
   )
 }
 
-function ignoreConnectionError(): void {
-  return undefined
+function protocolLanguageId(languageId: string): string {
+  if (languageId === 'tsx') return 'typescriptreact'
+  if (languageId === 'jsx') return 'javascriptreact'
+  return languageId
 }

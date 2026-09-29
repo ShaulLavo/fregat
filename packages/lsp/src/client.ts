@@ -18,7 +18,7 @@ import {
   responseResult,
   type LspRequestId,
 } from './protocol'
-import { createLspContentChanges, createLspContentChangesInSnapshot } from './positions'
+import { createLspContentChangesInSnapshot } from './positions'
 import { measureLspPerformance } from './performanceDiagnostics'
 import type {
   LspDocumentChange,
@@ -205,7 +205,7 @@ export class LspClient {
         uri: document.uri,
         languageId: document.languageId,
         version: document.version,
-        text: document.text,
+        text: documentPayloadText(document),
       },
     })
   }
@@ -228,7 +228,7 @@ export class LspClient {
 
     this.trySendNotification('textDocument/didSave', {
       textDocument: { uri: document.uri },
-      ...(this.syncSave.includeText ? { text: document.text } : {}),
+      ...(this.syncSave.includeText ? { text: documentPayloadText(document) } : {}),
     })
   }
 
@@ -295,7 +295,6 @@ export class LspClient {
       () => ({
         syncMode: this.syncMode,
         editCount: change.edits.length,
-        snapshot: Boolean(change.previousSnapshot),
         length: document.textSnapshot.length,
       }),
     )
@@ -305,14 +304,7 @@ export class LspClient {
     document: LspDocument,
     change: LspDocumentChange,
   ): readonly lsp.TextDocumentContentChangeEvent[] {
-    if (this.syncMode === 'incremental' && change.previousSnapshot) {
-      return createLspContentChangesInSnapshot(change.previousSnapshot, document, {
-        incremental: true,
-        edits: change.edits,
-      })
-    }
-
-    return createLspContentChanges(change.previousText ?? '', document.text, {
+    return createLspContentChangesInSnapshot(change.previousSnapshot, document, {
       incremental: this.syncMode === 'incremental',
       edits: change.edits,
     })
@@ -573,6 +565,11 @@ export class LspClient {
     if (this.transport) return this.transport
     throw new Error('LSP client is not connected')
   }
+}
+
+// didOpen and didSave with text carry the whole document by protocol definition.
+function documentPayloadText(document: LspDocument): string {
+  return document.textSnapshot.readRange(0, document.textSnapshot.length)
 }
 
 const messageText = (params: unknown): string | null => {

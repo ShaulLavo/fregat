@@ -53,42 +53,45 @@ function checkPlan(plan) {
   check(/^E\d{3}$/.test(plan.id), `Invalid plan ID: ${plan.id}`)
   check(!plans.has(plan.id), `Duplicate plan ID: ${plan.id}`)
   plans.set(plan.id, plan)
-  checkIndex(plan, plan.status === 'Completed' ? plan.reference : plan.file)
+  const referenced = plan.status === 'Completed' || plan.status === 'Moved'
+  checkIndex(plan, referenced ? plan.reference : plan.file)
   check(plan.topics.length > 0, `${plan.id}: no source topic`)
   for (const topic of plan.topics) {
     check(topics.has(topic), `${plan.id}: unknown source topic ${topic}`)
     coverage.add(topic)
   }
-  if (plan.status === 'Completed') {
-    checkCompletedReference(plan)
+  if (referenced) {
+    checkReference(plan)
     return
   }
   checkExecutablePlan(plan)
 }
 
-function checkCompletedReference(plan) {
-  check(
-    !Object.hasOwn(plan, 'file'),
-    `${plan.id}: completed entry must not have an executable file`,
-  )
+// A Completed entry points at its permanent reference; a Moved entry at the plan that owns it now.
+function checkReference(plan) {
+  const kind = plan.status.toLowerCase()
+  check(!Object.hasOwn(plan, 'file'), `${plan.id}: ${kind} entry must not have an executable file`)
   const reference = plan.reference
   const valid =
     typeof reference === 'string' && reference.startsWith('../') && reference.endsWith('.md')
-  check(valid, `${plan.id}: completed entry requires a relative Markdown reference outside plans`)
+  check(valid, `${plan.id}: ${kind} entry requires a relative Markdown reference outside plans`)
   if (!valid) return
 
   const path = resolve(directory, reference)
-  check(!path.startsWith(directory + sep), `${plan.id}: completed reference must be outside plans`)
+  check(!path.startsWith(directory + sep), `${plan.id}: ${kind} reference must be outside plans`)
   check(existsSync(path), `${plan.id}: missing reference ${reference}`)
   if (!existsSync(path)) return
   const isFile = statSync(path).isFile()
-  check(isFile, `${plan.id}: completed reference must be a file`)
+  check(isFile, `${plan.id}: ${kind} reference must be a file`)
   if (!isFile) return
   checkLinks(path, readFileSync(path, 'utf8'))
 }
 
 function checkExecutablePlan(plan) {
-  check(!Object.hasOwn(plan, 'reference'), `${plan.id}: only Completed entries may use a reference`)
+  check(
+    !Object.hasOwn(plan, 'reference'),
+    `${plan.id}: only Completed and Moved entries may use a reference`,
+  )
   check(typeof plan.file === 'string', `${plan.id}: executable entry requires a plan file`)
   if (typeof plan.file !== 'string') return
   check(!files.has(plan.file), `Duplicate plan file: ${plan.file}`)

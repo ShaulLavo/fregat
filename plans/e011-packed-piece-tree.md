@@ -1,29 +1,39 @@
 # E011: Evaluate a packed representation of persistent piece trees
 
-- Status: Proposed
+- Status: Approved
 - Kind: Research
 - Owner: Editor
 - Priority: P3
 - Effort: L
-- Dependencies: [E005](../docs/storage/piece-tree-inspection.md), [E009](e009-worker-transport-costs.md)
+- Dependencies: [E005](../docs/storage/piece-tree-inspection.md), [E009](../../platform/plans/099-document-contributions.md)
 - Inspected baseline: `9abb944f3a2b8d6516953fdec75e8df5e1a94811`, 2026-09-05.
+
+Decided 2026-09-25: owner — parked under Platform [Plan 112](../../platform/plans/112-large-file-ceiling.md)'s large-file work. Revive it only if 112 shows piece memory dominates. Its dependency E009 is folded into Platform Plan 099 unit 6.
 
 ## Outcome
 
 Determine whether an indexed typed-array tree can reduce retained metadata or enable worthwhile
 shared snapshots without slowing editing, walking, anchor resolution, or undo.
-The prototype preserves the same document behavior as the object treap on identical edit streams.
+The prototype preserves the same document behavior as the object AVL tree on identical edit streams.
 A favorable result includes measured tradeoffs and a bounded conversion plan.
 A negative result leaves the production representation alone.
 
 ## Current code
 
+Rechecked 2026-09-25 at Editor `c23cd30`, after E039, E040, E041, E045 and E006.
+
 - [Piece tree types](../packages/textbuffer/src/pieceTableTypes.ts) store object links,
-  floating-point order values, deterministic priorities, piece records, and cached aggregates.
-- [Tree operations](../packages/textbuffer/src/tree.ts) clone paths before changes.
-  [Order allocation](../packages/textbuffer/src/orders.ts) uses fractional numeric gaps.
-- [The reverse index](../packages/textbuffer/src/reverseIndex.ts) is another persistent tree.
-  Packing only the forward tree leaves substantial metadata and anchor work unchanged.
+  floating-point order values, an AVL height (E040 replaced the treap and its priorities),
+  piece records, and cached aggregates.
+- [Tree operations](../packages/textbuffer/src/tree.ts) apply an edit call in one descent
+  (E040, E045) and reuse nodes created inside the same edit (E041).
+  [Order allocation](../packages/textbuffer/src/orders.ts) uses fractional numeric gaps above a
+  small-integer floor; values below it name E006 stand-ins.
+- [The reverse index](../packages/textbuffer/src/reverseIndex.ts) is a persistent vector of
+  inserted buffers with thin entries (E039), not a second tree. Anchor work still reads it, so
+  packing only the forward tree leaves it unchanged.
+- E006 compaction bounds the tree: after 20,000 paragraph replacements it holds 4 pieces instead
+  of 20,002. Any memory case for packing is measured against that compacted tree.
 - [Buffers](../packages/textbuffer/src/buffers.ts) keep LF offset indexes beside text.
   [The walker](../packages/textbuffer/src/walker.ts) currently traverses object nodes.
 - [Public document exports](../packages/editor/src/public/document.ts) and

@@ -55,9 +55,11 @@ function handleRequest(request: MinimapWorkerRequest): void {
       if (layout) post({ type: 'layout', sequence: 0, layout })
       return
     }
-    case 'updateViewport':
-      renderer.updateViewport(request.viewport)
+    case 'updateViewport': {
+      const layout = renderer.updateViewport(request.viewport)
+      if (layout) post({ type: 'layout', sequence: 0, layout })
       return
+    }
     case 'render':
       postRender(request.sequence)
       return

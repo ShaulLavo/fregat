@@ -1,3 +1,4 @@
+import { TextPage } from '@singapore-editor/textbuffer/internal/textPages'
 import type { TransformBias } from './displayTransforms'
 import type { TextContent } from './textContent'
 import { containsRTL, estimatedCodePointWidth, isSimpleRowText } from './textCharacters'
@@ -25,7 +26,7 @@ type Summary = {
 type TextNode =
   | {
       readonly kind: 'leaf'
-      readonly text: string
+      readonly text: TextPage
       readonly start: number
       readonly summary: Summary
     }
@@ -63,7 +64,7 @@ class SourceRangeIndex {
     return this.state.kind === 'measured' && this.state.node.summary.utf16.suffix === null
   }
 
-  read(text: string, start: number, end: number, tabSize: number): TextNode {
+  read(text: TextPage, start: number, end: number, tabSize: number): TextNode {
     if (this.state.kind === 'measured') {
       return sliceNode(this.state.node, start - this.start, end - this.start, tabSize)
     }
@@ -94,7 +95,7 @@ class SourceRangeIndex {
     )
   }
 
-  private materialize(text: string, tabSize: number): TextNode {
+  private materialize(text: TextPage, tabSize: number): TextNode {
     if (this.state.kind === 'measured') return this.state.node
     if (this.state.kind === 'split') {
       const node = branch(
@@ -124,7 +125,15 @@ class SourceRangeIndex {
 export class TextSourceIndex {
   private readonly roots = new Map<number, SourceRangeIndex>()
 
-  constructor(readonly text: string) {}
+  readonly text: TextPage
+
+  constructor(text: string | TextPage) {
+    this.text = typeof text === 'string' ? new TextPage(text) : text
+  }
+
+  get length(): number {
+    return this.text.length
+  }
 
   get cachedTabSize(): number | undefined {
     return this.roots.keys().next().value
@@ -298,7 +307,7 @@ function joinSummary(left: Summary, right: Summary, tabSize: number): Summary {
   }
 }
 
-function scanSummary(text: string, start: number, end: number, tabSize: number): Summary {
+function scanSummary(text: TextPage, start: number, end: number, tabSize: number): Summary {
   if (start === end) return EMPTY
   const part = text.slice(start, end)
   const simple = isSimpleRowText(part)
@@ -335,15 +344,17 @@ function scanAdvance(text: string, tabSize: number, mode: ColumnMode): Advance {
       suffix = column - nextTab(prefix, tabSize)
       continue
     }
-    const point = mode === 'estimated' ? text.codePointAt(index)! : code
+    const next = index + 1 < text.length ? text.charCodeAt(index + 1) : -1
+    const pair = mode === 'estimated' && isPair(code, next)
+    const point = pair ? pairCodePoint(code, next) : code
     column += mode === 'estimated' ? estimatedCodePointWidth(point) : 1
-    if (point > 0xffff) index += 1
+    if (pair) index += 1
     if (suffix !== null) suffix = column - nextTab(prefix, tabSize)
   }
   return { prefix: suffix === null ? column : prefix, suffix }
 }
 
-function buildSource(text: string, start: number, end: number, tabSize: number): TextNode {
+function buildSource(text: TextPage, start: number, end: number, tabSize: number): TextNode {
   if (end - start <= BLOCK_LENGTH)
     return { kind: 'leaf', text, start, summary: scanSummary(text, start, end, tabSize) }
   const middle = sourceMiddle(start, end)
@@ -370,7 +381,7 @@ function joinNodes(
   end: number,
   tabSize: number,
 ): TextNode {
-  if (start === end) return { kind: 'leaf', text: '', start: 0, summary: EMPTY }
+  if (start === end) return { kind: 'leaf', text: new TextPage(''), start: 0, summary: EMPTY }
   if (end - start === 1) return nodes[start]!
   const middle = Math.floor((start + end) / 2)
   return branch(

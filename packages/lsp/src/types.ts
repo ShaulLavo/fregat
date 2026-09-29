@@ -15,9 +15,10 @@ export type LspTextEdit = {
   readonly text: string
 }
 
+// Read access only. The whole text is read once per payload the protocol defines as whole text
+// (didOpen, full sync, didSave with text), from the captured source, never kept.
 export type LspTextSnapshot = {
   readonly length: number
-  materializeFullText(): string
   readRange(start: number, end: number): string
   forEachTextChunk(visit: (text: string, start: number, end: number) => void): void
 }
@@ -60,7 +61,6 @@ export type LspDocumentOpenSnapshotOptions = LspTextDocumentSnapshot & {
 export type LspDocument = {
   readonly uri: lsp.DocumentUri
   readonly languageId: string
-  readonly text: string
   readonly version: number
   readonly textSnapshot: LspTextSnapshot
   readonly lineStarts: LspLineStarts
@@ -110,8 +110,7 @@ export type LspDocumentTransitionNotification = {
 
 export type LspDocumentChange = {
   readonly edits: readonly LspTextEdit[]
-  readonly previousSnapshot?: LspTextDocumentSnapshot
-  readonly previousText?: string
+  readonly previousSnapshot: LspTextDocumentSnapshot
 }
 
 export type LspWorkspaceSyncTarget = {

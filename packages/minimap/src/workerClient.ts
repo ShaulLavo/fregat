@@ -1,7 +1,9 @@
-import type { DocumentSessionChange, TextEdit } from '@singapore-editor/core/document'
+import { computeFrameLayout, computeRenderLayout, visibleDocumentLineRange } from './layout'
+import type { TextEdit } from '@singapore-editor/core/document'
 import type { EditorTokenStore } from '@singapore-editor/core/syntax'
 import { createError } from '@singapore-editor/core/logging/evlog'
 import type {
+  EditorContributionChange,
   EditorMinimapDecoration,
   EditorResolvedSelection,
   EditorViewportSnapshot,
@@ -221,8 +223,6 @@ export class MinimapWorkerClient {
   private pendingRender = false
   private activeRenderToken = 0
   private renderInFlight = false
-  private latestSliderHeight = 0
-  private latestSliderNeeded = false
   private latestBaseStyles: MinimapBaseStyles | null = null
   private latestBaseStylesSignature = ''
   private latestLayoutSignature = ''
@@ -261,7 +261,7 @@ export class MinimapWorkerClient {
   public update(
     snapshot: EditorViewSnapshot,
     kind: string,
-    change?: DocumentSessionChange | null,
+    change?: EditorContributionChange | null,
   ): void {
     if (this.disposed) return
     if (this.shouldSkipDocumentUpdate(snapshot, kind)) {
@@ -281,7 +281,7 @@ export class MinimapWorkerClient {
 
     const update = createPendingUpdate(snapshot, kind, change, previousSnapshot)
     this.latestViewport = snapshot.viewport
-    this.applyImmediateViewport(snapshot, snapshot.viewport.scrollTop)
+    this.applyImmediateViewport()
     this.queueUpdate(update)
   }
 
@@ -297,7 +297,7 @@ export class MinimapWorkerClient {
     if (this.disposed) return
 
     this.latestViewport = viewport
-    this.applyImmediateViewport(this.latestSnapshot, viewport.scrollTop)
+    this.applyImmediateViewport()
     const next = this.viewport(this.latestSnapshot)
     if (sameViewport(this.postedViewport, next)) return
 
@@ -306,10 +306,23 @@ export class MinimapWorkerClient {
     this.requestRender()
   }
 
-  public previewScrollTop(snapshot: EditorViewSnapshot, scrollTop: number): void {
-    if (this.disposed) return
-
-    this.applyImmediateViewport(snapshot, scrollTop)
+  public frameLayout() {
+    const viewport = this.viewport(this.latestSnapshot)
+    const metrics = this.metrics(this.latestSnapshot)
+    const renderLayout = computeRenderLayout({
+      minimap: this.options,
+      metrics,
+      viewport,
+      lineCount: this.latestSnapshot.lineCount,
+    })
+    return computeFrameLayout({
+      renderLayout,
+      metrics,
+      viewport,
+      lineCount: this.latestSnapshot.lineCount,
+      realLineCount: this.latestSnapshot.lineCount,
+      previous: null,
+    })
   }
 
   public setExternalDecorations(decorations: readonly EditorMinimapDecoration[]): void {
@@ -620,17 +633,12 @@ export class MinimapWorkerClient {
     this.renderInFlight = false
   }
 
-  private applyImmediateViewport(snapshot: EditorViewSnapshot, scrollTop: number): void {
-    const slider = immediateSlider(
-      this.viewport(snapshot),
-      scrollTop,
-      this.latestSliderHeight,
-      this.latestSliderNeeded,
-    )
-    setStyleValue(this.host.slider, 'display', slider.needed ? 'block' : 'none')
-    setStyleValue(this.host.slider, 'transform', `translate3d(0, ${slider.top}px, 0)`)
-    setStyleValue(this.host.slider, 'height', `${slider.height}px`)
-    setStyleValue(this.host.sliderHorizontal, 'height', `${slider.height}px`)
+  private applyImmediateViewport(): void {
+    const frame = this.frameLayout()
+    setStyleValue(this.host.slider, 'display', frame.sliderNeeded ? 'block' : 'none')
+    setStyleValue(this.host.slider, 'transform', `translate3d(0, ${frame.sliderTop}px, 0)`)
+    setStyleValue(this.host.slider, 'height', `${frame.sliderHeight}px`)
+    setStyleValue(this.host.sliderHorizontal, 'height', `${frame.sliderHeight}px`)
     setClassName(
       this.host.shadow,
       shadowVisible(this.latestViewport)
@@ -726,6 +734,7 @@ export class MinimapWorkerClient {
     const fallbackScrollWidth =
       snapshotViewport.scrollWidth > 0 ? 0 : this.host.colorScope.scrollWidth
 
+    const range = visibleDocumentLineRange(snapshot, snapshotViewport)
     return {
       scrollTop: snapshotViewport.scrollTop,
       scrollRow: snapshotViewport.scrollRow,
@@ -736,8 +745,8 @@ export class MinimapWorkerClient {
       clientWidth,
       minimapHeight: this.minimapHeight(snapshot),
       reservedWidth: Math.max(0, this.reservedLane()),
-      visibleStart: snapshotViewport.visibleRange.start,
-      visibleEnd: snapshotViewport.visibleRange.end,
+      visibleStart: range.start,
+      visibleEnd: range.end,
     }
   }
 
@@ -807,7 +816,7 @@ export class MinimapWorkerClient {
       if (this.renderInFlight) return
       if (this.pendingRender) this.requestRender()
 
-      this.applyRenderedResponse(response)
+      this.applyImmediateViewport()
       return
     }
   }
@@ -819,14 +828,6 @@ export class MinimapWorkerClient {
     setStyleValue(this.host.sliderHorizontal, 'width', `${canvasWidth}px`)
     setStyleValue(this.host.mainCanvas, 'height', `${canvasHeight}px`)
     setStyleValue(this.host.decorationsCanvas, 'height', `${canvasHeight}px`)
-  }
-
-  private applyRenderedResponse(
-    response: Extract<MinimapWorkerResponse, { type: 'rendered' }>,
-  ): void {
-    this.latestSliderHeight = response.sliderHeight
-    this.latestSliderNeeded = response.sliderNeeded
-    this.applyImmediateViewport(this.latestSnapshot, this.latestViewport.scrollTop)
   }
 
   private handleWorkerError = (error: Error): void => {
@@ -997,14 +998,6 @@ type MinimapLineStarts = {
   toArray(): readonly number[]
 }
 
-function lineStartsOf(text: EditorSecondaryViewTextProjection): MinimapLineStarts {
-  return text.lineStartsView ?? arrayLineStarts(text.lineStarts)
-}
-
-function snapshotLineStarts(snapshot: EditorViewSnapshot): MinimapLineStarts {
-  return snapshot.lineStartsView ?? arrayLineStarts(snapshot.lineStarts)
-}
-
 function arrayLineStarts(lineStarts: readonly number[]): MinimapLineStarts {
   return {
     length: lineStarts.length,
@@ -1020,25 +1013,7 @@ function documentSummaryPayload(
   maxColumn: number,
 ): MinimapDocumentSummaryPayload {
   const textLength = text.length
-  if (textLength !== null) return documentSummaryFromSnapshot(text, textLength, maxColumn)
-
-  return documentSummaryFromMaterializedText(text.materializeFullText(), text.lineStarts, maxColumn)
-}
-
-function documentSummaryFromSnapshot(
-  text: EditorSecondaryViewTextProjection,
-  textLength: number,
-  maxColumn: number,
-): MinimapDocumentSummaryPayload {
-  if (!text.snapshot) {
-    return documentSummaryFromMaterializedText(
-      text.materializeFullText(),
-      text.lineStarts,
-      maxColumn,
-    )
-  }
-
-  const lineStarts = lineStartsOf(text).toArray()
+  const lineStarts = text.lineStartsView.toArray()
   return {
     textLength,
     lineStarts,
@@ -1053,24 +1028,7 @@ function documentSummaryFromSnapshot(
   }
 }
 
-function documentSummaryFromMaterializedText(
-  text: string,
-  lineStarts: readonly number[],
-  maxColumn: number,
-): MinimapDocumentSummaryPayload {
-  return {
-    textLength: text.length,
-    lineStarts,
-    lines: lineStarts.map((startOffset, index) =>
-      lineSummaryFromMaterializedText(
-        text,
-        startOffset,
-        lineEndOffset(arrayLineStarts(lineStarts), index, text.length),
-        maxColumn,
-      ),
-    ),
-  }
-}
+type WorkerDocumentState = { readonly textLength: number; readonly lineCount: number }
 
 function documentSummaryPatchPayload(
   text: EditorSecondaryViewTextProjection,
@@ -1080,47 +1038,7 @@ function documentSummaryPatchPayload(
   workerDocument: WorkerDocumentState | null,
 ): MinimapDocumentSummaryPatch {
   const textLength = text.length
-  if (textLength !== null) {
-    return documentSummaryPatchFromSnapshot(
-      text,
-      textLength,
-      previous,
-      edits,
-      maxColumn,
-      workerDocument,
-    )
-  }
-
-  return documentSummaryPatchFromMaterializedText(
-    text.materializeFullText(),
-    text.lineStarts,
-    previous,
-    edits,
-    maxColumn,
-  )
-}
-
-type WorkerDocumentState = { readonly textLength: number; readonly lineCount: number }
-
-function documentSummaryPatchFromSnapshot(
-  text: EditorSecondaryViewTextProjection,
-  textLength: number,
-  previous: MinimapDocumentSummaryBaseline,
-  edits: readonly TextEdit[],
-  maxColumn: number,
-  workerDocument: WorkerDocumentState | null,
-): MinimapDocumentSummaryPatch {
-  if (!text.snapshot) {
-    return documentSummaryPatchFromMaterializedText(
-      text.materializeFullText(),
-      text.lineStarts,
-      previous,
-      edits,
-      maxColumn,
-    )
-  }
-
-  const lineStarts = lineStartsOf(text)
+  const lineStarts = text.lineStartsView
   const range = documentSummaryPatchRange(previous, lineStarts, textLength, edits, workerDocument)
   const lines = []
   for (let lineIndex = range.startLine; lineIndex < range.insertEndLine; lineIndex += 1) {
@@ -1142,36 +1060,6 @@ function documentSummaryPatchFromSnapshot(
   }
 }
 
-function documentSummaryPatchFromMaterializedText(
-  text: string,
-  lineStarts: readonly number[],
-  previous: MinimapDocumentSummaryBaseline,
-  edits: readonly TextEdit[],
-  maxColumn: number,
-): MinimapDocumentSummaryPatch {
-  const range = documentSummaryPatchRange(
-    previous,
-    arrayLineStarts(lineStarts),
-    text.length,
-    edits,
-    null,
-  )
-  return {
-    textLength: text.length,
-    startLine: range.startLine,
-    deleteCount: range.deleteCount,
-    lines: lineStarts.slice(range.startLine, range.insertEndLine).map((startOffset, index) => {
-      const lineIndex = range.startLine + index
-      return lineSummaryFromMaterializedText(
-        text,
-        startOffset,
-        lineEndOffset(arrayLineStarts(lineStarts), lineIndex, text.length),
-        maxColumn,
-      )
-    }),
-  }
-}
-
 function lineSummaryFromSnapshot(
   text: EditorSecondaryViewTextProjection,
   startOffset: number,
@@ -1181,20 +1069,7 @@ function lineSummaryFromSnapshot(
   const length = Math.max(0, endOffset - startOffset)
   const clippedEnd = startOffset + Math.min(length, maxColumn)
   return {
-    text: text.snapshot!.readRange(startOffset, clippedEnd),
-    length,
-  }
-}
-
-function lineSummaryFromMaterializedText(
-  text: string,
-  startOffset: number,
-  endOffset: number,
-  maxColumn: number,
-): MinimapDocumentSummaryPayload['lines'][number] {
-  const length = Math.max(0, endOffset - startOffset)
-  return {
-    text: text.slice(startOffset, startOffset + Math.min(length, maxColumn)),
+    text: text.snapshot.readRange(startOffset, clippedEnd),
     length,
   }
 }
@@ -1474,35 +1349,12 @@ function normalizeSummaryPatchRange(
 }
 
 function incrementalTextEdits(
-  change: DocumentSessionChange | null | undefined,
+  change: EditorContributionChange | null | undefined,
 ): readonly TextEdit[] | null {
   if (!change || change.edits.length === 0) return null
 
   const sorted = change.edits.toSorted(compareTextEdits)
   return sequentialTextEdits(sorted)
-}
-
-function immediateSlider(
-  viewport: MinimapViewport,
-  scrollTop: number,
-  sliderHeight: number,
-  sliderNeeded: boolean,
-): {
-  readonly needed: boolean
-  readonly top: number
-  readonly height: number
-} {
-  const scrollable = Math.max(0, viewport.scrollHeight - viewport.clientHeight)
-  const trackHeight = Math.max(1, viewport.minimapHeight)
-  const height = Math.max(0, sliderHeight)
-  const maxTop = Math.max(0, trackHeight - height)
-  const top = scrollable > 0 ? (clamp(scrollTop, 0, scrollable) / scrollable) * maxTop : 0
-
-  return { needed: sliderNeeded && maxTop > 0, top, height }
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value))
 }
 
 function sameViewport(previous: MinimapViewport | null, next: MinimapViewport): boolean {
@@ -1550,7 +1402,7 @@ function layoutSignature(snapshot: EditorViewSnapshot, minimapHeight: number): s
 function createPendingUpdate(
   snapshot: EditorViewSnapshot,
   kind: string,
-  change: DocumentSessionChange | null | undefined,
+  change: EditorContributionChange | null | undefined,
   previousSnapshot: EditorViewSnapshot,
 ): PendingMinimapUpdate {
   const base = basePendingUpdate(snapshot, kind)
@@ -1643,7 +1495,7 @@ function basePendingUpdate(snapshot: EditorViewSnapshot, kind: string): PendingM
 
 function contentPendingUpdate(
   base: PendingMinimapUpdate,
-  change: DocumentSessionChange | null | undefined,
+  change: EditorContributionChange | null | undefined,
   previousSnapshot: EditorViewSnapshot,
 ): PendingMinimapUpdate {
   const edits = incrementalTextEdits(change)
@@ -1667,15 +1519,9 @@ function previousDocumentSummary(update: PendingMinimapUpdate): MinimapDocumentS
 
 function snapshotSummaryBaseline(snapshot: EditorViewSnapshot): MinimapDocumentSummaryBaseline {
   return {
-    textLength: snapshotTextLength(snapshot),
-    lineStarts: snapshotLineStarts(snapshot),
+    textLength: snapshot.textSnapshot.length,
+    lineStarts: snapshot.lineStartsView,
   }
-}
-
-function snapshotTextLength(snapshot: EditorViewSnapshot): number {
-  const length = snapshot.textSnapshot?.length
-  if (typeof length === 'number') return length
-  return snapshot.fullText.length
 }
 
 function shouldSyncViewport(kind: string): boolean {
@@ -1707,12 +1553,12 @@ function compareTextEdits(left: TextEdit, right: TextEdit): number {
 }
 
 function tokenSourceAfterEdits(
-  change: DocumentSessionChange | null | undefined,
+  change: EditorContributionChange | null | undefined,
   previousSnapshot: EditorViewSnapshot,
   nextSnapshot: EditorViewSnapshot,
 ): EditorTokenStore | null {
   if (!change) return null
-  if (!editsPreserveLineStructure(change.edits, snapshotLineStarts(previousSnapshot))) return null
+  if (!editsPreserveLineStructure(change.edits, previousSnapshot.lineStartsView)) return null
   return nextSnapshot.tokens
 }
 

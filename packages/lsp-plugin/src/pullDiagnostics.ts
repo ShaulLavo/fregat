@@ -11,12 +11,15 @@ export type PullDiagnosticsControllerOptions = {
   getDocument(): PullDiagnosticsDocument | null
   publish(document: PullDiagnosticsDocument, diagnostics: readonly lsp.Diagnostic[]): void
   onRequestError(error: unknown): void
+  /** A request started or settled; called after any result it brought was published. */
+  onPendingChange?(pending: boolean): void
 }
 
 /** Keeps one active document's pull-diagnostic result current for one language-server lane. */
 export class PullDiagnosticsController {
   #abort: AbortController | null = null
   #disposed = false
+  #pending = false
   #resultId: string | null = null
   #uri: lsp.DocumentUri | null = null
 
@@ -49,6 +52,12 @@ export class PullDiagnosticsController {
         (report) => this.accept(document, abort, report),
         (error) => this.reject(abort, error),
       )
+      .finally(() => this.notifyPending())
+    this.notifyPending()
+  }
+
+  public get pending(): boolean {
+    return this.#pending
   }
 
   public refresh(): void {
@@ -58,6 +67,7 @@ export class PullDiagnosticsController {
   public cancel(): void {
     this.#abort?.abort()
     this.#abort = null
+    this.notifyPending()
   }
 
   public dispose(): void {
@@ -92,6 +102,13 @@ export class PullDiagnosticsController {
 
     this.#abort = null
     this.options.onRequestError(error)
+  }
+
+  private notifyPending(): void {
+    const pending = this.#abort !== null
+    if (pending === this.#pending) return
+    this.#pending = pending
+    this.options.onPendingChange?.(pending)
   }
 
   private reset(): void {

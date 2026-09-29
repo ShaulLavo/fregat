@@ -7,6 +7,7 @@ import {
   createLineGutterPlugin,
   type FoldGutterSvgIcon,
 } from '../src/index'
+import { createTestPluginContext } from '@singapore-editor/core/testing'
 
 const foldSvgIcon = {
   kind: 'svg',
@@ -401,7 +402,7 @@ function createFoldRow(
 function createContext(
   registerGutterContribution: EditorPluginContext['registerGutterContribution'],
 ): EditorPluginContext {
-  return {
+  return createTestPluginContext({
     registerHighlighter: vi.fn(() => ({ dispose: vi.fn() })),
     registerSyntaxProvider: vi.fn(() => ({ dispose: vi.fn() })),
     registerViewContribution: vi.fn(() => ({ dispose: vi.fn() })),
@@ -411,5 +412,5 @@ function createContext(
     registerDecorationContribution: vi.fn(() => ({ dispose: vi.fn() })),
     registerGutterContribution,
     registerInjectedTextRowProvider: vi.fn(() => ({ dispose: vi.fn() })),
-  }
+  })
 }

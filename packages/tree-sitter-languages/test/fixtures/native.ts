@@ -1,4 +1,7 @@
+import { SQL_FIXTURE } from './sql'
+
 export const NATIVE_FIXTURES = [
+  { id: 'sql', text: SQL_FIXTURE, captures: ['keyword', 'number', 'string', 'comment'] },
   {
     id: 'javascript',
     text: 'const greet = (name) => `Hi ${name}`; // 🪐\n',
@@ -30,11 +33,6 @@ export const NATIVE_FIXTURES = [
     captures: ['string', 'string.escape', 'number'],
   },
   { id: 'markdown', text: '# Title 🪐\n\n**bold** and `code`\n', captures: ['text.title'] },
-  {
-    id: 'markdown_inline',
-    text: '**bold** and `code` 🪐\n',
-    captures: ['text.strong', 'text.literal'],
-  },
   {
     id: 'astro',
     text: '---\nconst title = "🪐"\n---\n<!-- note --><Card title={title}>{title}</Card>\n',

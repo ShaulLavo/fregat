@@ -12,7 +12,8 @@ import { updateInlineMapForEdit } from '../inlineMap'
 import type { SelectionAffinity } from '../selections'
 import type { TextEdit } from '../tokens'
 import type { TextEditBatch } from '../textEditBatch'
-import type { DisplayProjectionTransition } from './displayProjectionTypes'
+import type { DisplayProjectionTransition, WrapAdvance } from './displayProjectionTypes'
+import { PROPORTIONAL_WRAP_MARGIN_PX } from './glyphAdvances'
 import { clamp } from '../style-utils'
 import {
   foldMapMatchesText,
@@ -76,7 +77,7 @@ function preparedLineStartsAreValid(
   return previous <= snapshotLength
 }
 
-export function setTextSnapshotLayoutState(
+function setTextSnapshotLayoutState(
   view: VirtualizedTextViewInternal,
   textSnapshot: TextSnapshot,
 ): { readonly lineCountChanged: boolean } {
@@ -156,13 +157,17 @@ export function setFoldStateLayout(
 export function refreshDisplayProjection(
   view: VirtualizedTextViewInternal,
   viewportColumns: number | null,
+  viewportWidth = view.virtualizer.getSnapshot().viewportWidth,
 ): void {
+  view.wrapAdvance = proportionalWrapAdvance(view, viewportWidth)
   view.model.projection.reconfigure({
     textSnapshot: view.model.textSnapshot,
     foldMap: view.model.foldMap,
     inlineMap: view.model.inlineMap,
     injectedTextRows: view.model.injectedTextRows,
     wrapColumn: view.wrapEnabled ? viewportColumns : null,
+    wrapBreak: view.wrapBreak,
+    wrapAdvance: view.wrapAdvance,
     tabSize: view.tabSize,
   })
   view.model.wrapColumn = view.wrapEnabled ? viewportColumns : null
@@ -174,12 +179,32 @@ export function refreshDisplayProjection(
 export function refreshDisplayProjectionForWrapWidth(
   view: VirtualizedTextViewInternal,
   viewportColumns: number,
+  viewportWidth: number,
 ): boolean {
   if (!view.wrapEnabled) return false
-  if (viewportColumns === view.model.wrapColumn) return false
+  const advance = proportionalWrapAdvance(view, viewportWidth)
+  if (viewportColumns === view.model.wrapColumn && advance === view.wrapAdvance) return false
 
-  refreshDisplayProjection(view, viewportColumns)
+  refreshDisplayProjection(view, viewportColumns, viewportWidth)
   return true
+}
+
+/**
+ * Wrap by measured advances once the face is not monospace, where columns place breaks a glyph or
+ * more from the edge. The same object comes back while width and face hold, so the projection can
+ * tell a real change by identity.
+ */
+function proportionalWrapAdvance(
+  view: VirtualizedTextViewInternal,
+  viewportWidth: number,
+): WrapAdvance | null {
+  const glyphs = view.glyphs
+  if (!view.wrapEnabled || !glyphs || viewportWidth <= 0) return null
+  const width = Math.max(1, viewportWidth - view.currentGutterWidth - PROPORTIONAL_WRAP_MARGIN_PX)
+  const current = view.wrapAdvance
+  if (current && current.width === width && current.glyphs === glyphs) return current
+
+  return { width, glyphs, advance: (codePoint) => glyphs.advance(codePoint) }
 }
 
 export function setWrapEnabledLayout(
@@ -305,8 +330,7 @@ export function sameLineEditPatch(
   view: VirtualizedTextViewInternal,
   edit: TextEdit,
 ): SameLineEditPatch | null {
-  if (view.model.foldMap) return null
-  if (view.wrapEnabled || hasModelRowProjections(view)) return null
+  if (!view.model.projection.supportsIncrementalRowPatch) return null
   if (edit.from < 0 || edit.to < edit.from || edit.to > view.model.textLength) return null
   if (edit.text.includes('\n')) return null
 
@@ -324,8 +348,7 @@ export function multiLineEditPatch(
   view: VirtualizedTextViewInternal,
   edit: TextEdit,
 ): MultiLineEditPatch | null {
-  if (view.model.foldMap) return null
-  if (view.wrapEnabled || hasModelRowProjections(view)) return null
+  if (!view.model.projection.supportsIncrementalRowPatch) return null
   const patch = sourceEditPatch(view, edit)
   if (!patch) return null
   if (patch.insertedLineBreaks === 0 && patch.startRow === patch.endRow) return null
@@ -372,7 +395,10 @@ export function visibleLineCount(view: VirtualizedTextViewInternal): number {
   return Math.max(1, view.model.visibleLineCount)
 }
 
-export function bufferRowForVirtualRow(view: VirtualizedTextViewInternal, row: number): number {
+export function bufferRowForVirtualRow(
+  view: VirtualizedTextViewInternal,
+  row: number,
+): number | null {
   return view.model.projection.bufferRowForRow(row)
 }
 
@@ -396,8 +422,4 @@ function fixedRowForOffset(view: VirtualizedTextViewInternal, offset: number): n
   if (offset < rowBottom) return row
 
   return Math.min(row + 1, visibleLineCount(view) - 1)
-}
-
-function hasModelRowProjections(view: VirtualizedTextViewInternal): boolean {
-  return view.model.inlineMap !== null || view.model.injectedTextRows.length > 0
 }

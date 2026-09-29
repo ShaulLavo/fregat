@@ -14,6 +14,15 @@ import type {
  * rename input, and it used to be written out once per surface.
  */
 
+/** One hook for a host to style every floating editor surface, whatever plugin owns it. */
+const EDITOR_POPUP_ATTRIBUTE = 'data-editor-popup'
+
+/** Whether an event target sits inside any floating editor surface. */
+export function isInsideEditorPopup(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false
+  return target.closest(`[${EDITOR_POPUP_ATTRIBUTE}]`) !== null
+}
+
 /** Which side of the anchor the surface takes. */
 export type AnchoredSurfacePlacement = 'top' | 'bottom'
 
@@ -93,7 +102,7 @@ export function createAnchoredSurface(options: AnchoredSurfaceOptions): Anchored
   else document.body.prepend(anchor)
 
   // One hook for a host to style every floating editor surface, whatever plugin owns it.
-  element.setAttribute('data-editor-popup', '')
+  element.setAttribute(EDITOR_POPUP_ATTRIBUTE, '')
   element.style.position = 'fixed'
   element.style.setProperty('position-anchor', anchorName)
   // The surface is placed entirely by its anchor, so any inset left over from an earlier life of

@@ -46,11 +46,12 @@ function insertBinding<Payload>(
         ? parseHotkey(stroke, platform)
         : rawHotkeyToParsedHotkey(stroke, platform)
     const modifiers = modifierMask(parsed.alt, parsed.ctrl, parsed.meta, parsed.shift)
-    const edges = node.next.get(parsed.key) ?? []
+    const strokeKey = parsed.key ?? PHYSICAL_KEY_NAMES.get(parsed.code) ?? parsed.code
+    const edges = node.next.get(strokeKey) ?? []
     let edge = edges[modifiers]
     if (!edge) edge = { keys: normalizeRegisterableHotkey(stroke, platform), node: emptyNode() }
     edges[modifiers] = edge
-    node.next.set(parsed.key, edges)
+    node.next.set(strokeKey, edges)
     node = edge.node
   }
   node.candidates.push(binding)

@@ -3,7 +3,7 @@ import type { Editor } from '@singapore-editor/core/editor'
 import { createVisibleEditor } from './support/visibleEditor'
 import type { EditorToken } from '@singapore-editor/core/syntax'
 import type { VirtualizedTextRowDecoration } from '@singapore-editor/core/rendering'
-import { createTextDiff } from '../src'
+import { createDiffEditorOptions, createTextDiff } from '../src'
 import { joinRenderLines } from '../src/lines'
 import { createStackedProjection } from '../src/projection'
 import type { DiffRenderRow } from '../src/types'
@@ -94,15 +94,9 @@ function mountDocumentModeDiff(): MountedDocumentModeDiff {
   })
   const rows = createStackedProjection(file).rows
   const mounted = createVisibleEditor(host, {
-    // §C6 #2 / #4, §C10, §C11 — the option bag a document-mode diff host must pass.
-    cursorLineHighlight: { gutterNumber: false, gutterBackground: false, rowBackground: false },
-    documentMode: 'static',
-    editability: 'readonly',
-    keymap: { defaultBindings: false, layers: [] },
-    tabSize: 4,
+    ...createDiffEditorOptions(),
   })
-  mounted.setText(joinRenderLines(rows), { languageId: null })
-  mounted.setTokens(rowTokens(rows))
+  mounted.setText(joinRenderLines(rows), { tokens: rowTokens(rows) })
   mounted.setRowDecorations(rowDecorations(rows))
 
   container = host

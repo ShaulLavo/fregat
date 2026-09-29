@@ -110,6 +110,8 @@ export type TreeSitterWorkerOwnerSnapshot = {
 
 export type TreeSitterBackend = {
   registerLanguages(languages: readonly TreeSitterLanguageDescriptor[]): Promise<void>
+  /** Starts the worker, then registers and compiles `languages` ahead of their first document. */
+  warmLanguages?(languages: readonly TreeSitterLanguageDescriptor[]): Promise<void>
   parse(
     payload: TreeSitterBackendParsePayload,
   ): Promise<TreeSitterParseResult | TreeSitterParseAckResult | undefined>
@@ -142,7 +144,11 @@ export class TreeSitterWorkerClient implements TreeSitterBackend {
   private readonly clientTasks = new Set<Promise<unknown>>()
   private readonly runtimeTasks = new Map<string, Set<Promise<unknown>>>()
   private readonly sourceChunkRetention = new TreeSitterSourceChunkRetention()
-  private readonly registeredLanguageSignatures = new Map<TreeSitterLanguageId, string>()
+  private readonly registeredLanguages = new Map<
+    TreeSitterLanguageId,
+    TreeSitterLanguageDescriptor
+  >()
+  private readonly warmedLanguages = new Set<TreeSitterLanguageId>()
 
   public inspect(): TreeSitterWorkerOwnerSnapshot {
     return {
@@ -150,7 +156,7 @@ export class TreeSitterWorkerClient implements TreeSitterBackend {
       pendingRequests: this.pendingRequests.size,
       workerGeneration: this.workerGeneration,
       cache: {
-        registeredLanguages: this.registeredLanguageSignatures.size,
+        registeredLanguages: this.registeredLanguages.size,
         sourceChunks: this.sourceChunkRetention.inspect(),
       },
       lastError: this.lastError?.message ?? null,
@@ -172,8 +178,30 @@ export class TreeSitterWorkerClient implements TreeSitterBackend {
 
     await this.postRequest({ type: 'registerLanguages', languages: nextLanguages })
     for (const language of nextLanguages) {
-      this.registeredLanguageSignatures.set(language.id, languageDescriptorSignature(language))
+      this.registeredLanguages.set(language.id, language)
+      // A changed registration drops the worker's compiled runtime for that id.
+      this.warmedLanguages.delete(language.id)
     }
+  }
+
+  public warmLanguages(languages: readonly TreeSitterLanguageDescriptor[]): Promise<void> {
+    return this.trackClientTask(this.finishWarmLanguages(languages))
+  }
+
+  private async finishWarmLanguages(
+    languages: readonly TreeSitterLanguageDescriptor[],
+  ): Promise<void> {
+    const handle = await this.ensureWorkerReady()
+    if (!handle) return
+
+    await this.finishRegisterLanguages(languages)
+    const languageIds = [...new Set(languages.map((language) => language.id))].filter(
+      (languageId) => !this.warmedLanguages.has(languageId),
+    )
+    if (languageIds.length === 0) return
+
+    for (const languageId of languageIds) this.warmedLanguages.add(languageId)
+    await this.postRequest({ type: 'warmLanguages', languageIds })
   }
 
   public parse(
@@ -505,24 +533,20 @@ export class TreeSitterWorkerClient implements TreeSitterBackend {
   }
 
   private shouldRegisterLanguageWithWorker(language: TreeSitterLanguageDescriptor): boolean {
-    return (
-      this.registeredLanguageSignatures.get(language.id) !== languageDescriptorSignature(language)
-    )
+    return !sameLanguageRegistration(this.registeredLanguages.get(language.id), language)
   }
 
   private unregisteredLanguages(
     languages: readonly TreeSitterLanguageDescriptor[],
   ): readonly TreeSitterLanguageDescriptor[] {
     const nextLanguages: TreeSitterLanguageDescriptor[] = []
-    const nextSignatures = new Map<TreeSitterLanguageId, string>()
+    const nextById = new Map<TreeSitterLanguageId, TreeSitterLanguageDescriptor>()
 
     for (const language of languages) {
       if (!this.shouldRegisterLanguageWithWorker(language)) continue
+      if (sameLanguageRegistration(nextById.get(language.id), language)) continue
 
-      const signature = languageDescriptorSignature(language)
-      if (nextSignatures.get(language.id) === signature) continue
-
-      nextSignatures.set(language.id, signature)
+      nextById.set(language.id, language)
       nextLanguages.push(language)
     }
 
@@ -578,23 +602,42 @@ export class TreeSitterWorkerClient implements TreeSitterBackend {
   private clearRetainedState(lifecycle: TreeSitterWorkerLifecycleState): void {
     this.lifecycle = lifecycle
     this.initPromise = null
-    this.registeredLanguageSignatures.clear()
+    this.registeredLanguages.clear()
+    this.warmedLanguages.clear()
     this.sourceChunkRetention.clear()
   }
 }
 
 export const createTreeSitterWorkerBackend = (): TreeSitterBackend => new TreeSitterWorkerClient()
 
+// `wasmUrl` can be the grammar as a multi-megabyte data URL: it is compared by value, never
+// serialised, and each descriptor's signature is computed once.
+const languageSignatures = new WeakMap<TreeSitterLanguageDescriptor, string>()
+
+function sameLanguageRegistration(
+  registered: TreeSitterLanguageDescriptor | undefined,
+  language: TreeSitterLanguageDescriptor,
+): boolean {
+  if (!registered) return false
+  if (registered === language) return true
+  if (registered.wasmUrl !== language.wasmUrl) return false
+  return languageDescriptorSignature(registered) === languageDescriptorSignature(language)
+}
+
 function languageDescriptorSignature(language: TreeSitterLanguageDescriptor): string {
-  return JSON.stringify({
+  const cached = languageSignatures.get(language)
+  if (cached !== undefined) return cached
+
+  const signature = JSON.stringify({
     aliases: sortedItems(language.aliases),
     extensions: sortedItems(language.extensions),
     foldQuerySource: language.foldQuerySource,
     highlightQuerySource: language.highlightQuerySource,
     id: language.id,
     injectionQuerySource: language.injectionQuerySource,
-    wasmUrl: language.wasmUrl,
   })
+  languageSignatures.set(language, signature)
+  return signature
 }
 
 function sortedItems(items: readonly string[]): readonly string[] {

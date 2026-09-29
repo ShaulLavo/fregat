@@ -28,4 +28,20 @@ describe('TypeScript diagnostic conversion', () => {
       message: "Type 'number' is not assignable to type 'string'.",
     })
   })
+
+  it('carries the deprecated and unnecessary flags as LSP tags', () => {
+    const text = "void 'x'.substr(1)\n"
+    const file = ts.createSourceFile('/src/index.ts', text, ts.ScriptTarget.ESNext)
+    const suggestion = {
+      file,
+      start: text.indexOf('substr'),
+      length: 6,
+      category: ts.DiagnosticCategory.Suggestion,
+      code: 6385,
+      messageText: 'deprecated',
+    }
+
+    expect(tsDiagnosticToLspDiagnostic({ ...suggestion, reportsDeprecated: {} }).tags).toEqual([2])
+    expect(tsDiagnosticToLspDiagnostic({ ...suggestion, reportsUnnecessary: {} }).tags).toEqual([1])
+  })
 })

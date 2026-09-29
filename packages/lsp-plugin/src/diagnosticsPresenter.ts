@@ -5,19 +5,33 @@ import {
   type EditorViewContributionContext,
 } from '@singapore-editor/core/extensions'
 import { lspPositionToOffsetInSnapshot, type LspTextDocumentSnapshot } from '@singapore-editor/lsp'
+import {
+  editorThemesEqual,
+  type EditorTheme,
+  type VirtualizedTextHighlightStyle,
+} from '@singapore-editor/core/rendering'
+import { readColorAlpha } from './colorAlpha'
 import type * as lsp from 'vscode-languageserver-protocol'
 
 import {
+  combineDiagnosticsFreshness,
   diagnosticHighlightGroups,
   summarizeDiagnostics,
+  type LanguageServerDiagnosticHighlightLayer,
   type LanguageServerDiagnosticSeverity,
 } from './diagnostics'
-import { DIAGNOSTIC_MARKER_COLORS, DIAGNOSTIC_STYLES } from './plugin.styles'
-import type { OffsetRange } from '@singapore-editor/plugin-ui'
+import {
+  DEPRECATED_DIAGNOSTIC_STYLE,
+  DIAGNOSTIC_MARKER_COLORS,
+  DIAGNOSTIC_STYLES,
+  UNNECESSARY_DIAGNOSTIC_OPACITY,
+} from './plugin.styles'
+import type { OffsetRange } from '@singapore-editor/plugin-ui/offset-range'
 import type {
   LanguageServerDiagnosticMarkerClaim,
   LanguageServerDiagnosticMarkerEvent,
   LanguageServerDiagnosticSummary,
+  LanguageServerDiagnosticsFreshness,
 } from './types'
 
 export { viewDocumentSnapshot } from './viewDocumentSnapshot'
@@ -27,12 +41,23 @@ const LSP_DIAGNOSTIC_WARNING = 2
 const LSP_DIAGNOSTIC_INFORMATION = 3
 const LSP_DIAGNOSTIC_HINT = 4
 
-const DIAGNOSTIC_SEVERITIES: readonly LanguageServerDiagnosticSeverity[] = [
+const DIAGNOSTIC_LAYERS: readonly LanguageServerDiagnosticHighlightLayer[] = [
   'error',
   'warning',
   'information',
   'hint',
+  'deprecated',
+  'unnecessary',
 ]
+
+const DIAGNOSTIC_LAYER_STYLES: Record<
+  LanguageServerDiagnosticHighlightLayer,
+  VirtualizedTextHighlightStyle
+> = {
+  ...DIAGNOSTIC_STYLES,
+  deprecated: DEPRECATED_DIAGNOSTIC_STYLE,
+  unnecessary: { overlay: { dim: 1 } },
+}
 
 const DIAGNOSTIC_MINIMAP_Z_INDEX: Record<LanguageServerDiagnosticSeverity, number> = {
   error: 40,
@@ -60,9 +85,10 @@ export type DiagnosticsPresenterOptions = {
 }
 
 export class DiagnosticsPresenter {
-  private readonly highlightNames: Record<LanguageServerDiagnosticSeverity, string>
+  private readonly highlightNames: Record<LanguageServerDiagnosticHighlightLayer, string>
   private markerClaim: Extract<LanguageServerDiagnosticMarkerClaim, { kind: 'claimed' }> | null =
     null
+  private unnecessaryDimCache: number | null = null
 
   public constructor(
     private readonly context: EditorViewContributionContext,
@@ -77,11 +103,13 @@ export class DiagnosticsPresenter {
     this.renderMinimapMarkers(diagnostics)
   }
 
+  public invalidateTheme(): void {
+    this.unnecessaryDimCache = null
+  }
+
   public clear(): void {
     this.releaseMarkerClaim()
     this.clearMinimapMarkers()
-    if (!this.context.clearRangeHighlight) return
-
     for (const name of Object.values(this.highlightNames)) this.context.clearRangeHighlight(name)
   }
 
@@ -147,16 +175,25 @@ export class DiagnosticsPresenter {
     document: LspTextDocumentSnapshot,
     diagnostics: readonly lsp.Diagnostic[],
   ): void {
-    if (!this.context.setRangeHighlight) return
-
     const groups = diagnosticHighlightGroups(document, diagnostics)
-    for (const severity of DIAGNOSTIC_SEVERITIES) {
+    for (const layer of DIAGNOSTIC_LAYERS) {
       this.context.setRangeHighlight(
-        this.highlightNames[severity],
-        groups[severity],
-        DIAGNOSTIC_STYLES[severity],
+        this.highlightNames[layer],
+        groups[layer],
+        layer === 'unnecessary' && groups.unnecessary.length > 0
+          ? { overlay: { dim: this.unnecessaryDim() } }
+          : DIAGNOSTIC_LAYER_STYLES[layer],
       )
     }
+  }
+
+  // Reading the alpha forces a style recalc, and it only moves with the theme.
+  private unnecessaryDim(): number {
+    this.unnecessaryDimCache ??= readColorAlpha(
+      this.context.scrollElement,
+      UNNECESSARY_DIAGNOSTIC_OPACITY,
+    )
+    return this.unnecessaryDimCache
   }
 
   private renderMinimapMarkers(diagnostics: readonly lsp.Diagnostic[]): void {
@@ -174,7 +211,7 @@ export class DiagnosticsPresenter {
   }
 
   private minimapFeature(): EditorMinimapFeature | null {
-    return this.context.getFeature?.(EDITOR_MINIMAP_FEATURE) ?? null
+    return this.context.getFeature(EDITOR_MINIMAP_FEATURE)
   }
 }
 
@@ -192,11 +229,22 @@ export type CompositeDiagnosticsLanePresenter = {
     uri: lsp.DocumentUri,
     version: number | null,
     diagnostics: readonly lsp.Diagnostic[],
+    freshness: LanguageServerDiagnosticsFreshness,
   ): void
 }
 
 export class CompositeDiagnosticsPresenter {
+  private theme: EditorTheme | null = null
+
+  public updateTheme(theme: EditorTheme | null): void {
+    if (editorThemesEqual(this.theme, theme)) return
+    this.theme = theme
+    this.presenter.invalidateTheme()
+    this.renderCombined()
+  }
+
   readonly #batches = new Map<string, DiagnosticBatch>()
+  readonly #freshness = new Map<string, LanguageServerDiagnosticsFreshness>()
   #diagnostics: readonly lsp.Diagnostic[] = []
 
   public constructor(
@@ -233,10 +281,11 @@ export class CompositeDiagnosticsPresenter {
         this.refreshDiagnostics()
         this.renderCombined()
       },
-      publishSummary: (uri, version, diagnostics) => {
+      publishSummary: (uri, version, diagnostics, freshness) => {
+        this.#freshness.set(laneId, freshness)
         const current = this.#batches.get(laneId)
         if (!current && diagnostics.length === 0) {
-          onDiagnostics?.(summarizeDiagnostics(uri, version, diagnostics))
+          onDiagnostics?.(summarizeDiagnostics(uri, version, diagnostics, freshness))
           this.publishCombinedSummary()
           return
         }
@@ -248,7 +297,7 @@ export class CompositeDiagnosticsPresenter {
           version,
         })
         this.refreshDiagnostics()
-        onDiagnostics?.(summarizeDiagnostics(uri, version, diagnostics))
+        onDiagnostics?.(summarizeDiagnostics(uri, version, diagnostics, freshness))
         this.publishCombinedSummary()
       },
     }
@@ -256,6 +305,7 @@ export class CompositeDiagnosticsPresenter {
 
   public clear(): void {
     this.#batches.clear()
+    this.#freshness.clear()
     this.refreshDiagnostics()
     this.presenter.clear()
   }
@@ -283,8 +333,16 @@ export class CompositeDiagnosticsPresenter {
 
   private publishCombinedSummary(): void {
     const current = this.currentBatch()
+    const freshness = combineDiagnosticsFreshness(
+      this.laneIds.flatMap((id) => this.#freshness.get(id) ?? []),
+    )
     this.onDiagnostics?.(
-      summarizeDiagnostics(current?.uri ?? null, current?.version ?? null, this.diagnostics),
+      summarizeDiagnostics(
+        current?.uri ?? null,
+        current?.version ?? null,
+        this.diagnostics,
+        freshness,
+      ),
     )
   }
 
@@ -320,12 +378,14 @@ export class CompositeDiagnosticsPresenter {
 function createHighlightNames(
   prefix: string,
   namespace: string,
-): Record<LanguageServerDiagnosticSeverity, string> {
+): Record<LanguageServerDiagnosticHighlightLayer, string> {
   return {
     error: `${prefix}-${namespace}-error`,
     warning: `${prefix}-${namespace}-warning`,
     information: `${prefix}-${namespace}-information`,
     hint: `${prefix}-${namespace}-hint`,
+    deprecated: `${prefix}-${namespace}-deprecated`,
+    unnecessary: `${prefix}-${namespace}-unnecessary`,
   }
 }
 

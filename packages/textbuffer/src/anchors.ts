@@ -6,7 +6,7 @@ import type {
   RealAnchor,
   ResolvedAnchor,
 } from './pieceTableTypes'
-import { getBufferText } from './buffers'
+import { bufferLength } from './buffers'
 import { splitsSurrogatePair } from './reads'
 import { anchoredUnit, coversAnchorOffset, lookupReverseIndex } from './reverseIndex'
 import {
@@ -20,7 +20,7 @@ import {
   newerVisibleLengthAfter,
   newerVisibleLengthBefore,
 } from './tree'
-import { ORIGINAL_BUFFER } from './node'
+import { isStandIn, ORIGINAL_BUFFER } from './node'
 
 export const Anchor = {
   MIN: { kind: 'min' },
@@ -90,9 +90,9 @@ const resolveMissingAnchor = (
   snapshot: PieceTableTreeSnapshot,
   anchor: RealAnchor,
 ): ResolvedAnchor => {
-  const originalText = getBufferText(snapshot.buffers, snapshot.buffers.original)
+  const originalLength = bufferLength(snapshot.buffers, snapshot.buffers.original)
   const isEmptyOriginalAnchor =
-    originalText.length === 0 && anchor.buffer === snapshot.buffers.original && anchor.offset === 0
+    originalLength === 0 && anchor.buffer === snapshot.buffers.original && anchor.offset === 0
 
   if (isEmptyOriginalAnchor) {
     return {
@@ -121,19 +121,46 @@ const locateAnchor = (
   return order === undefined ? null : findPieceByOrder(snapshot.root, order)
 }
 
-const holdsAnchor = (location: AnchorLocation | null, anchor: RealAnchor): boolean =>
-  location !== null &&
-  location.piece.buffer === anchor.buffer &&
-  coversAnchorOffset(location.piece, anchor.offset)
+// Only an entry of a compacted tombstone leads to a stand-in, and the stand-in
+// resolves every anchor that was in it.
+const holdsAnchor = (location: AnchorLocation | null, anchor: RealAnchor): boolean => {
+  if (location === null) return false
+  if (isStandIn(location.piece)) return true
+  return (
+    location.piece.buffer === anchor.buffer && coversAnchorOffset(location.piece, anchor.offset)
+  )
+}
 
-const findLinearAnchorIndex = (pieces: readonly Piece[], anchor: RealAnchor): number => {
-  const covers = (piece: Piece): boolean =>
-    piece.buffer === anchor.buffer && coversAnchorOffset(piece, anchor.offset)
+const covers = (piece: Piece, anchor: RealAnchor): boolean =>
+  !isStandIn(piece) && piece.buffer === anchor.buffer && coversAnchorOffset(piece, anchor.offset)
+
+// A compacted anchor's piece is gone; the index is the only record of its stand-in.
+const findStandInIndex = (
+  snapshot: PieceTableTreeSnapshot,
+  pieces: readonly Piece[],
+  anchor: RealAnchor,
+): number => {
+  if (anchor.buffer === ORIGINAL_BUFFER) return -1
+  const unit = anchoredUnit(anchor.offset, anchor.bias)
+  const order = lookupReverseIndex(snapshot.reverseIndex, anchor.buffer, unit)
+  return pieces.findIndex((piece) => isStandIn(piece) && piece.order === order)
+}
+
+const findLinearAnchorIndex = (
+  snapshot: PieceTableTreeSnapshot,
+  pieces: readonly Piece[],
+  anchor: RealAnchor,
+): number => {
+  // A neighbouring piece of the same buffer can still cover a compacted
+  // anchor's offset at its end, so the stand-in is asked first.
+  const standIn = findStandInIndex(snapshot, pieces, anchor)
+  if (standIn >= 0) return standIn
   const preferred =
     anchor.bias === 'left'
-      ? pieces.findLastIndex((piece) => covers(piece) && piece.start < anchor.offset)
-      : pieces.findIndex((piece) => covers(piece) && piece.start === anchor.offset)
-  return preferred >= 0 ? preferred : pieces.findIndex(covers)
+      ? pieces.findLastIndex((piece) => covers(piece, anchor) && piece.start < anchor.offset)
+      : pieces.findIndex((piece) => covers(piece, anchor) && piece.start === anchor.offset)
+  if (preferred >= 0) return preferred
+  return pieces.findIndex((piece) => covers(piece, anchor))
 }
 
 const visibleLength = (piece: Piece): number => (piece.visible ? piece.length : 0)
@@ -189,7 +216,7 @@ export const resolveAnchorLinear = (
   if (anchor.kind === 'max') return { offset: snapshot.length, liveness: 'live' }
 
   const pieces = flattenNodes(snapshot.root, []).map((node) => node.piece)
-  const at = findLinearAnchorIndex(pieces, anchor)
+  const at = findLinearAnchorIndex(snapshot, pieces, anchor)
   if (at < 0) return resolveMissingAnchor(snapshot, anchor)
 
   let visibleStart = 0

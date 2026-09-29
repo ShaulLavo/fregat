@@ -98,14 +98,24 @@ describe('range decoration paint order', () => {
         zIndex: 2,
       })
 
-      expect(highlightsMap.get('test-under')?.priority).toBe(1)
-      expect(highlightsMap.get('test-over')?.priority).toBe(2)
+      expect(highlightsMap.get('test-under')?.priority).toBe(-99)
+      expect(highlightsMap.get('test-over')?.priority).toBe(-98)
 
       view.setScrollMetrics(ROW_HEIGHT * 30, ROW_HEIGHT)
       view.setScrollMetrics(0, ROW_HEIGHT)
 
-      expect(highlightsMap.get('test-under')?.priority).toBe(1)
-      expect(highlightsMap.get('test-over')?.priority).toBe(2)
+      expect(highlightsMap.get('test-under')?.priority).toBe(-99)
+      expect(highlightsMap.get('test-over')?.priority).toBe(-98)
+    })
+
+    it('keeps a colorless wash below syntax without moving a color producer', () => {
+      view.setRangeHighlight('test-wash', [{ start: 0, end: 4 }], {
+        backgroundColor: 'blue',
+        zIndex: 2,
+      })
+      view.setRangeHighlight('test-color', [{ start: 0, end: 4 }], { color: 'red', zIndex: 2 })
+      expect(highlightsMap.get('test-wash')?.priority).toBe(-98)
+      expect(highlightsMap.get('test-color')?.priority).toBe(2)
     })
 
     it('restacks an existing group when its declared stacking changes', () => {
@@ -118,7 +128,7 @@ describe('range decoration paint order', () => {
       })
 
       expect(highlightsMap.get('test-under')).toBe(highlight)
-      expect(highlight?.priority).toBe(3)
+      expect(highlight?.priority).toBe(-97)
     })
   })
 
@@ -156,8 +166,8 @@ describe('range decoration paint order', () => {
       const occurrence = [...highlightsMap].find(([name]) => name.includes('occurrence'))
       const findMatch = [...highlightsMap].find(([name]) => name.includes('find-match'))
 
-      expect(occurrence?.[1].priority).toBe(1)
-      expect(findMatch?.[1].priority).toBe(2)
+      expect(occurrence?.[1].priority).toBe(-99)
+      expect(findMatch?.[1].priority).toBe(-98)
     })
 
     it('groups decorations in ascending zIndex regardless of input order', () => {
@@ -196,7 +206,7 @@ describe('range decoration paint order', () => {
       const entries = [...highlightsMap].filter(([name]) => name.includes('layered'))
 
       expect(entries).toHaveLength(2)
-      expect(entries.map(([, highlight]) => highlight.priority)).toEqual([1, 2])
+      expect(entries.map(([, highlight]) => highlight.priority)).toEqual([-99, -98])
     })
 
     it('repaints a decoration set that changed only its stacking', () => {

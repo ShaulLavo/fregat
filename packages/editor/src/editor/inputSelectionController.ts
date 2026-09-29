@@ -1,3 +1,4 @@
+import { scheduleFrame, type ScheduledFrame } from './scheduleFrame'
 import type {
   DocumentSession,
   DocumentSessionChange,
@@ -39,7 +40,7 @@ import type {
   EditorViewContributionUpdateKind,
 } from '../plugins'
 import { dataTransferTypes, pasteHandlerMatchesTypes } from './pasteHandlers'
-import { readRichTextFont, richTextForCopy } from './richText'
+import { readRichTextFont, richTextForCopy, type RichTextCopyFragment } from './richText'
 import type { EditorSyntaxInjection, EditorSyntaxLanguageId } from '../syntax/session'
 import {
   readClipboardMetadata,
@@ -51,12 +52,17 @@ import {
   isEditorDocumentSelectionEditCommand,
   type EditorDocumentSelectionEditCommandId,
 } from './reindent'
+import { widenOverAtomicRanges } from '../atomicRanges'
 import { childContainingNode, childNodeIndex, elementBoundaryToTextOffset } from './domBoundary'
 import {
+  atomicDeleteAction,
   editActionForCommand,
   listItemLineBreak,
+  trimTrailingWhitespaceAction,
   type EditorDocumentLine,
   type EditorEditActionCommandId,
+  type EditorEditActionOptions,
+  type EditorEditActionResult,
 } from './editActions'
 import { capitalize, indentTimingName, type SessionChangeOptions } from './editorUtils'
 import {
@@ -67,16 +73,20 @@ import {
   keyboardFallbackText,
   pagedHiddenInputContent,
   readHiddenInputState,
+  textUpdateEdit,
   type DeducedInputEdit,
+  type HiddenInputContent,
   type HiddenInputState,
 } from './input'
+import type {
+  EditorCharacterBoundsUpdateEvent,
+  EditorTextUpdateEvent,
+} from '../virtualization/editContext'
 import {
   NO_MOUSE_SELECTION_AUTO_SCROLL,
-  cancelFrame,
   mouseSelectionAutoScrollDelta,
   mouseSelectionEnds,
   mouseTextMove,
-  requestFrame,
   type MouseSelectionAnchor,
   type MouseSelectionAutoScrollDelta,
   type MouseSelectionDrag,
@@ -97,6 +107,7 @@ import {
   findNextExactOccurrenceFromRange,
   occurrenceQueryForSelection,
   occurrenceSelectTimingName,
+  wordRangeAt,
   type OccurrenceQuery,
   type OccurrenceSelectionChange,
 } from './occurrences'
@@ -123,6 +134,7 @@ import type { EditorSelectionSyncMode, EditorSessionOptions } from './types'
 import {
   autoClosingPairForClose,
   autoClosingPairForOpen,
+  autoClosingPairsForLanguage,
   shouldAutoClose,
   shouldDeletePair,
   shouldSurroundSelection,
@@ -145,6 +157,7 @@ import {
   type SnippetStopRange,
 } from './snippetSession'
 import { GhostTextSession, type EditorInlineSuggestCommandId } from './ghostText'
+import type { TextReadSnapshot } from '../documentTextSnapshot'
 import type { InlineReplacementSpec } from '../inlineMap'
 
 import { lineBreakIndent } from './indentation'
@@ -155,9 +168,14 @@ export type InputSelectionControllerOptions = {
   readonly announcer: EditorAnnouncer
   readonly selectionSyncMode: EditorSelectionSyncMode
   readonly rtlMoveVisually: boolean
+  readonly nonCaretOffset: (offset: number) => boolean
   readonly tabSize: number
   /** Whether Tab is the page's key for leaving the editor rather than the editor's for indenting. */
   readonly tabMovesFocus: boolean
+  /** Replaces the language's pairs; empty turns auto-close off. */
+  readonly autoClosingPairs?: readonly EditorAutoClosingPair[]
+  /** What typing an opener over a selection wraps it with; the auto-closing pairs when unset. */
+  readonly surroundingPairs?: readonly EditorAutoClosingPair[]
   readonly view: VirtualizedTextView
   getLanguageId(): EditorSyntaxLanguageId | null
   getSyntaxInjections(): readonly EditorSyntaxInjection[]
@@ -168,8 +186,15 @@ export type InputSelectionControllerOptions = {
   /** The two inputs a copy needs to render the range it took as styled markup. */
   getSyntaxTokens(): EditorTokenStore
   getEditorTheme(): EditorTheme | null
-  materializeFullText(): string
+  getTextSnapshot(): TextReadSnapshot
   canEditDocument(): boolean
+  /** False while a plugin's text gate refuses typed, composed, pasted or dropped text. */
+  acceptsText(): boolean
+  /** Offers a key to plugin key participants first; true when one took it. */
+  offerKey(event: KeyboardEvent): boolean
+  beginPointerJump?(): void
+  finishPointerJump?(): void
+  cancelPointerJump?(): void
   runInOperation<T>(run: () => T): T
   applySessionChange(
     change: DocumentSessionChange,
@@ -182,6 +207,15 @@ export type InputSelectionControllerOptions = {
     kind: EditorViewContributionUpdateKind,
     change?: DocumentSessionChange | null,
   ): void
+  /**
+   * The character the user typed, after the edit it caused has been applied. A contribution that
+   * acts on a keystroke has to read it here: the edit cannot stand in for it. Auto-closing turns a
+   * typed `(` into a two-character `()`, and typing over the closer it inserted changes no text at
+   * all, so the document change neither says what was pressed nor always happens.
+   */
+  onDidType(text: string): void
+  /** True when a contribution took the press for itself; the editor then leaves it alone. */
+  claimPress(event: MouseEvent): boolean
 }
 
 // A run of occurrence presses owns its search settings, so that widening one to whole words never
@@ -200,6 +234,7 @@ type OccurrenceQueryWithSources = OccurrenceQuery & {
 
 /** What a copy or a cut hands to the clipboard: the text, plus how it was assembled. */
 type ClipboardPayload = {
+  readonly fragments: readonly RichTextCopyFragment[]
   readonly metadata: ClipboardMetadata
   readonly text: string
 }
@@ -259,7 +294,7 @@ export class InputSelectionController {
   private mouseTextMoveDrag: MouseTextMoveDrag | null = null
   private mouseSelectionAnchor: MouseSelectionAnchor | null = null
   private columnSelection: ColumnSelectionRun | null = null
-  private mouseSelectionAutoScrollFrame = 0
+  private mouseSelectionAutoScrollFrame: ScheduledFrame | null = null
   private inputState: EditorInputState = createEditorInputState()
   private nativeInputHandlersInstalled = false
   // What the editor last wrote into the hidden input, which is the other half of every diff: an
@@ -267,6 +302,14 @@ export class InputSelectionController {
   // advances it — an event the editor decides not to act on leaves the element holding text it can
   // still be diffed against next time.
   private hiddenInputContent: HiddenInputState = EMPTY_HIDDEN_INPUT_STATE
+  /** What a textarea composition replaces in the written window, read when it starts. */
+  private compositionRange: { readonly start: number; readonly end: number } | null = null
+  /** The window range an EditContext composition replaces, and where its candidate now ends. */
+  private editContextComposition: {
+    readonly rangeStart: number
+    readonly rangeEnd: number
+    readonly spanEnd: number
+  } | null = null
 
   constructor(private readonly options: InputSelectionControllerOptions) {}
 
@@ -288,6 +331,7 @@ export class InputSelectionController {
     el.addEventListener('drop', this.handleDrop)
     el.addEventListener('paste', this.handlePaste)
     el.addEventListener('keydown', this.holdKeyForComposition, { capture: true })
+    el.addEventListener('keydown', this.offerKeyToParticipants, { capture: true })
     el.addEventListener('keydown', this.handleKeyDown)
     el.addEventListener('compositionstart', this.handleCompositionStart)
     el.addEventListener('compositionupdate', this.handleCompositionUpdate)
@@ -309,6 +353,7 @@ export class InputSelectionController {
     el.removeEventListener('drop', this.handleDrop)
     el.removeEventListener('paste', this.handlePaste)
     el.removeEventListener('keydown', this.holdKeyForComposition, { capture: true })
+    el.removeEventListener('keydown', this.offerKeyToParticipants, { capture: true })
     el.removeEventListener('keydown', this.handleKeyDown)
     el.removeEventListener('compositionstart', this.handleCompositionStart)
     el.removeEventListener('compositionupdate', this.handleCompositionUpdate)
@@ -349,7 +394,11 @@ export class InputSelectionController {
    * Wrapping takes every selection at once; auto-closing takes a single collapsed caret, and several
    * carets fall through to plain insertion.
    */
+  /** Set by {@link applyTypedText}, delivered by {@link applyChange} once the edit has landed. */
+  private pendingTypedText: string | null = null
+
   private applyTypedText(session: DocumentSession, text: string): DocumentSessionChange {
+    this.pendingTypedText = text
     // The keydown fallback turns Enter into '\n', so it arrives here rather than as a
     // beforeinput line break; both routes must indent identically.
     if (text === '\n') return this.applyLineBreak(session, text)
@@ -719,8 +768,8 @@ export class InputSelectionController {
 
     const caret = source.headOffset
 
-    const languageId = this.options.getLanguageId()
-    const closing = autoClosingPairForClose(languageId, text)
+    const pairs = this.autoClosingPairs()
+    const closing = autoClosingPairForClose(pairs, text)
     if (
       closing &&
       shouldTypeOverCloser({
@@ -732,7 +781,7 @@ export class InputSelectionController {
       return this.typeOverCloser(session, snapshot, caret)
     }
 
-    const opening = autoClosingPairForOpen(languageId, text)
+    const opening = autoClosingPairForOpen(pairs, text)
     if (!opening) return null
     if (!shouldAutoClose(opening, this.autoCloseContext(snapshot, caret))) return null
 
@@ -752,6 +801,12 @@ export class InputSelectionController {
     this.autoClose.track(change.snapshot, caret + opening.open.length, opening.close)
     this.markSessionSelectionForNextInput()
     return change
+  }
+
+  private autoClosingPairs(): readonly EditorAutoClosingPair[] {
+    return (
+      this.options.autoClosingPairs ?? autoClosingPairsForLanguage(this.options.getLanguageId())
+    )
   }
 
   /** The line the caret stands on, split at the caret, read without materializing the document. */
@@ -790,7 +845,7 @@ export class InputSelectionController {
 
     const charBefore = characterBefore(snapshot, caret)
     const pair =
-      charBefore === null ? null : autoClosingPairForOpen(this.options.getLanguageId(), charBefore)
+      charBefore === null ? null : autoClosingPairForOpen(this.autoClosingPairs(), charBefore)
     if (
       !shouldDeletePair({
         charAfter: characterAt(snapshot, caret),
@@ -820,7 +875,10 @@ export class InputSelectionController {
    */
   private surroundSelection(session: DocumentSession, text: string): DocumentSessionChange | null {
     const languageId = this.options.getLanguageId()
-    const opening = autoClosingPairForOpen(languageId, text)
+    const opening = autoClosingPairForOpen(
+      this.options.surroundingPairs ?? this.autoClosingPairs(),
+      text,
+    )
     if (!opening) return null
 
     const snapshot = session.getSnapshot()
@@ -922,7 +980,7 @@ export class InputSelectionController {
       return false
     }
 
-    return this.ghostText.show(snapshot, session.materializeFullText(), edit, caret)
+    return this.ghostText.show(snapshot, session.getTextSnapshot(), edit, caret)
   }
 
   /** The runs painting the suggestion that is showing, for the map the view renders from. */
@@ -1005,7 +1063,7 @@ export class InputSelectionController {
     // a copy that sits above it.
     const caret = this.primarySelectionHeadOffset(change) ?? acceptedCaret
     if (accepted.rest) {
-      this.ghostText.show(change.snapshot, session.materializeFullText(), accepted.rest, caret)
+      this.ghostText.show(change.snapshot, change.textSnapshot, accepted.rest, caret)
     }
     this.markSessionSelectionForNextInput()
     this.applyChange(
@@ -1042,17 +1100,35 @@ export class InputSelectionController {
     const start = context.event ? eventStartMs(context.event) : nowMs()
     const selectionChange = this.selectionChangeBeforeEdit()
     const change =
-      direction === 'backward'
+      this.atomicDelete(session, direction) ??
+      (direction === 'backward'
         ? (this.deleteAutoClosedPair(session) ??
           this.mirrorBackspaceDelete(session) ??
           session.backspace(this.options.tabSize))
-        : (this.mirrorSelectionDelete(session) ?? session.deleteSelection())
+        : (this.mirrorSelectionDelete(session) ?? session.deleteSelection()))
     this.applyChange(
       mergeChangeTimings(change, selectionChange),
       direction === 'backward' ? 'input.backspace' : 'input.delete',
       start,
     )
     return true
+  }
+
+  /** A delete that meets an atomic replacement takes all of it, or null to delete as usual. */
+  private atomicDelete(
+    session: DocumentSession,
+    direction: 'backward' | 'forward',
+  ): DocumentSessionChange | null {
+    const atomic = this.options.view.atomicRanges()
+    if (atomic.length === 0) return null
+
+    const snapshot = session.getSnapshot()
+    const selections = session
+      .getSelections()
+      .selections.map((selection) => resolveSelection(snapshot, selection))
+    const action = atomicDeleteAction(session.getTextSnapshot(), selections, direction, atomic)
+    if (!action) return null
+    return session.applyEdits(action.edits, { selections: action.selections })
   }
 
   applyIndentCommand(direction: 'indent' | 'outdent', context: EditorCommandContext): boolean {
@@ -1105,15 +1181,12 @@ export class InputSelectionController {
     const selections = session
       .getSelections()
       .selections.map((selection) => resolveSelection(snapshot, selection))
-    const text = session.materializeFullText()
-    const editOptions = {
+    const action = editActionForSession(command, session, selections, {
       injections: this.options.getSyntaxInjections(),
       languageId: this.options.getLanguageId(),
       tabSize: this.options.tabSize,
-    }
-    const action = isEditorDocumentSelectionEditCommand(command)
-      ? documentSelectionEditForCommand(command, text, selections, editOptions)
-      : editActionForCommand(command, text, selections, editOptions)
+      atomicRanges: this.options.view.atomicRanges(),
+    })
     const change = session.applyEdits(action.edits, {
       selections: action.selections,
     })
@@ -1231,11 +1304,11 @@ export class InputSelectionController {
     const session = this.session
     if (!session) return false
 
-    const text = session.materializeFullText()
-    const query = this.occurrenceQueryForCurrentSelection(text)
+    const snapshot = session.getTextSnapshot()
+    const query = this.occurrenceQueryForCurrentSelection(snapshot)
     if (!query) return false
 
-    const ranges = findAllExactOccurrences(text, query.query)
+    const ranges = findAllExactOccurrences(snapshot, query.query)
     if (ranges.length === 0) return false
 
     const selections = ranges.map((range) => occurrenceSelectionForRange(query, range))
@@ -1257,7 +1330,7 @@ export class InputSelectionController {
     const session = this.session
     if (!session) return false
 
-    const text = session.materializeFullText()
+    const snapshot = session.getTextSnapshot()
     const selectionSet = session.getSelections()
     const resolved = this.resolvedSelections()
     const preferredIndex = lastAddedSelectionIndex(selectionSet)
@@ -1265,7 +1338,7 @@ export class InputSelectionController {
     const source = resolved[sourceIndex]
     if (!source) return false
 
-    const query = occurrenceQueryForSelection(text, source)
+    const query = occurrenceQueryForSelection(snapshot, source)
     if (!query) return false
 
     const keptSelections = resolved.filter((_selection, index) => index !== sourceIndex)
@@ -1273,7 +1346,7 @@ export class InputSelectionController {
       start: selection.startOffset,
       end: selection.endOffset,
     }))
-    const next = findNextExactOccurrenceFromRange(text, query.query, selected, query.range)
+    const next = findNextExactOccurrenceFromRange(snapshot, query.query, selected, query.range)
     if (!next) return false
     if (next.start === query.range.start && next.end === query.range.end) return false
 
@@ -1359,6 +1432,8 @@ export class InputSelectionController {
         rtlMoveVisually: this.options.rtlMoveVisually,
         wordSeparators,
         view: this.options.view,
+        nonCaretOffset: this.options.nonCaretOffset,
+        atomicRanges: this.options.view.atomicRanges(),
       }),
     }))
     const primary = navigation[0]
@@ -1440,7 +1515,7 @@ export class InputSelectionController {
   applyFindEdits(
     edits: readonly TextEdit[],
     timingName: string,
-    selection?: EditorSelectionRange,
+    selection?: EditorSelectionRange | readonly EditorSelectionRange[],
   ): void {
     this.options.runInOperation(() => {
       const session = this.session
@@ -1449,7 +1524,10 @@ export class InputSelectionController {
       if (edits.length === 0) return
 
       const start = nowMs()
-      const change = session.applyEdits(edits, { selection })
+      const change = session.applyEdits(
+        edits,
+        isSelectionList(selection) ? { selections: selection } : { selection },
+      )
       this.syncSessionSelectionHighlight()
       this.markSessionSelectionForNextInput()
       this.applyChange(change, timingName, start, {
@@ -1476,7 +1554,7 @@ export class InputSelectionController {
     })
   }
 
-  syncDomSelection(): void {
+  syncDomSelection(options: { readonly notify?: boolean } = {}): void {
     const session = this.session
     if (!session) return
 
@@ -1490,19 +1568,19 @@ export class InputSelectionController {
 
     if (this.hasFocusedExternalElement()) {
       this.syncSessionSelectionHighlight()
-      this.options.notifyViewContributions('selection', null)
+      this.notifySelection(options.notify ?? true)
       return
     }
 
     if (this.isInputFocused()) {
       this.syncSessionSelectionHighlight()
-      this.options.notifyViewContributions('selection', null)
+      this.notifySelection(options.notify ?? true)
       return
     }
 
     if (this.options.selectionSyncMode === 'none') {
       this.syncSessionSelectionHighlight()
-      this.options.notifyViewContributions('selection', null)
+      this.notifySelection(options.notify ?? true)
       return
     }
 
@@ -1511,7 +1589,11 @@ export class InputSelectionController {
     domSelection?.removeAllRanges()
     if (range) domSelection?.addRange(range)
     this.syncSessionSelectionHighlight()
-    this.options.notifyViewContributions('selection', null)
+    this.notifySelection(options.notify ?? true)
+  }
+
+  private notifySelection(notify: boolean): void {
+    if (notify) this.options.notifyViewContributions('selection', null)
   }
 
   syncSessionSelectionHighlight(): void {
@@ -1555,9 +1637,7 @@ export class InputSelectionController {
     if (!selection) return
 
     const content = pagedHiddenInputContent(snapshot, resolveSelection(snapshot, selection))
-    const input = this.options.view.inputElement
-    if (input.value !== content.value) input.value = content.value
-    input.setSelectionRange(content.selectionStart, content.selectionEnd, content.direction)
+    this.writeInputWindow(content)
     this.hiddenInputContent = {
       selectionEnd: content.selectionEnd,
       selectionStart: content.selectionStart,
@@ -1597,6 +1677,11 @@ export class InputSelectionController {
       totalStart,
       selectionRevealOptions(change, revealOptions),
     )
+
+    // After the edit, so a listener that asks for the document sees the typed character in it.
+    const typed = this.pendingTypedText
+    this.pendingTypedText = null
+    if (typed !== null) this.options.onDidType(typed)
   }
 
   clearSelectionHighlight(): void {
@@ -1604,10 +1689,7 @@ export class InputSelectionController {
   }
 
   textOffsetFromPoint(clientX: number, clientY: number): number | null {
-    return (
-      this.options.view.textOffsetFromPoint(clientX, clientY) ??
-      this.options.view.textOffsetFromViewportPoint(clientX, clientY)
-    )
+    return this.options.view.textOffsetFromPoint(clientX, clientY)
   }
 
   rangeClientRect(start: number, end: number): DOMRect | null {
@@ -1628,10 +1710,6 @@ export class InputSelectionController {
     return this.options.getSession()
   }
 
-  private get text(): string {
-    return this.options.materializeFullText()
-  }
-
   private transitionInputState(transition: EditorInputStateTransition): void {
     this.inputState = transitionEditorInputState(this.inputState, transition)
   }
@@ -1648,22 +1726,148 @@ export class InputSelectionController {
     this.transitionInputState({ type: 'selection-owned-by-hidden-input' })
   }
 
+  /** The textarea holds the window as its value; an EditContext holds it as its text model. */
+  private writeInputWindow(content: HiddenInputContent): void {
+    const { editContext, inputElement: input } = this.options.view
+    if (editContext) {
+      if (editContext.text !== content.value) {
+        editContext.updateText(0, editContext.text.length, content.value)
+      }
+      // A backward selection is given end first, as EditContext takes one.
+      const backward = content.direction === 'backward'
+      editContext.updateSelection(
+        backward ? content.selectionEnd : content.selectionStart,
+        backward ? content.selectionStart : content.selectionEnd,
+      )
+      writeAccessibleWindow(input, content)
+      return
+    }
+    if (!(input instanceof HTMLTextAreaElement)) return
+
+    if (input.value !== content.value) input.value = content.value
+    input.setSelectionRange(content.selectionStart, content.selectionEnd, content.direction)
+  }
+
   private installNativeInputHandlers(): void {
     if (this.nativeInputHandlersInstalled) return
 
-    this.options.view.inputElement.addEventListener('input', this.handleHiddenInputChange, {
-      capture: true,
-    })
+    const editContext = this.options.view.editContext
+    if (editContext) {
+      this.options.view.inputElement.addEventListener('focus', this.handleEditContextFocus)
+      editContext.addEventListener('textupdate', this.handleTextUpdate)
+      editContext.addEventListener('compositionstart', this.handleCompositionStart as EventListener)
+      editContext.addEventListener('compositionend', this.handleEditContextCompositionEnd)
+      editContext.addEventListener('characterboundsupdate', this.handleCharacterBoundsUpdate)
+    } else {
+      this.options.view.inputElement.addEventListener('input', this.handleHiddenInputChange, {
+        capture: true,
+      })
+    }
     this.nativeInputHandlersInstalled = true
   }
 
   private uninstallNativeInputHandlers(): void {
     if (!this.nativeInputHandlersInstalled) return
 
-    this.options.view.inputElement.removeEventListener('input', this.handleHiddenInputChange, {
-      capture: true,
-    })
+    const editContext = this.options.view.editContext
+    if (editContext) {
+      this.options.view.inputElement.removeEventListener('focus', this.handleEditContextFocus)
+      editContext.removeEventListener('textupdate', this.handleTextUpdate)
+      editContext.removeEventListener(
+        'compositionstart',
+        this.handleCompositionStart as EventListener,
+      )
+      editContext.removeEventListener('compositionend', this.handleEditContextCompositionEnd)
+      editContext.removeEventListener('characterboundsupdate', this.handleCharacterBoundsUpdate)
+    } else {
+      this.options.view.inputElement.removeEventListener('input', this.handleHiddenInputChange, {
+        capture: true,
+      })
+    }
     this.nativeInputHandlersInstalled = false
+  }
+
+  /** The caret only goes into the document selection while the element has focus; this puts it there. */
+  private handleEditContextFocus = (): void => {
+    writeAccessibleWindow(this.options.view.inputElement, this.hiddenInputContent)
+  }
+
+  /**
+   * Every edit EditContext makes to the window, with the range it replaced: the edits the textarea
+   * route has to diff back out of its value arrive here already named. Typed characters the
+   * beforeinput handler takes never reach it, because preventing that event withholds the update.
+   */
+  private handleTextUpdate = this.traceInput('input.textupdate', (event: Event): void => {
+    const update = event as EditorTextUpdateEvent
+    this.transitionInputState({ type: 'native-input-observed' })
+    const session = this.session
+    if (!session) return
+    if (!this.canTypeText()) return
+    if (this.inputState.compositionActive) {
+      this.updateEditContextComposition(update)
+      return
+    }
+
+    const edit = textUpdateEdit(this.hiddenInputContent, {
+      text: update.text,
+      rangeStart: update.updateRangeStart,
+      rangeEnd: update.updateRangeEnd,
+    })
+    this.applyDeducedInput(session, edit, eventStartMs(event))
+  })
+
+  /**
+   * A candidate replaces the range the composition started over, and each later candidate replaces
+   * the one before it; tracking the span is what lets the commit name the original range.
+   */
+  private updateEditContextComposition(update: EditorTextUpdateEvent): void {
+    const current = this.editContextComposition ?? {
+      rangeStart: update.updateRangeStart,
+      rangeEnd: update.updateRangeEnd,
+      spanEnd: update.updateRangeEnd,
+    }
+    const spanEnd =
+      current.spanEnd + update.text.length - (update.updateRangeEnd - update.updateRangeStart)
+    this.editContextComposition = { ...current, spanEnd }
+    const candidate = this.options.view.editContext?.text.slice(current.rangeStart, spanEnd) ?? ''
+    this.transitionInputState({ text: candidate, type: 'composition-update' })
+    this.options.view.setCompositionPreedit(candidate)
+  }
+
+  private handleEditContextCompositionEnd = this.traceInput(
+    'input.compositionend',
+    (event: Event): void => {
+      const composition = this.editContextComposition
+      this.editContextComposition = null
+      const text = (event as CompositionEvent).data ?? ''
+      this.options.view.setCompositionPreedit('')
+      this.transitionInputState({ type: 'composition-end' })
+      const session = this.session
+      const replaces = composition && composition.rangeEnd > composition.rangeStart
+      if (!session || !composition || (text.length === 0 && !replaces)) {
+        this.refreshHiddenInputContent()
+        return
+      }
+
+      this.commitComposition(
+        text,
+        { start: composition.rangeStart, end: composition.rangeEnd },
+        eventStartMs(event),
+      )
+    },
+  )
+
+  /** The IME asks where the candidate is drawn, so its window opens beside it rather than guessing. */
+  private handleCharacterBoundsUpdate = (event: Event): void => {
+    const editContext = this.options.view.editContext
+    if (!editContext) return
+
+    const { rangeStart } = event as EditorCharacterBoundsUpdateEvent
+    const caret = this.options.view.inputElement.getBoundingClientRect()
+    editContext.updateControlBounds(this.options.el.getBoundingClientRect())
+    editContext.updateSelectionBounds(caret)
+    const drawn = this.options.view.compositionCharacterRects()
+    editContext.updateCharacterBounds(rangeStart, drawn.length > 0 ? drawn : [caret])
   }
 
   /**
@@ -1677,12 +1881,14 @@ export class InputSelectionController {
     this.transitionInputState({ type: 'native-input-observed' })
     const session = this.session
     if (!session) return
-    if (!this.options.canEditDocument()) return
+    if (!this.canTypeText()) return
     // A composition writes each intermediate candidate into the input on its way to the text it
     // finally commits. Diffing those would type every candidate the reader passed through.
     if (this.inputState.compositionActive) return
 
-    const current = readHiddenInputState(this.options.view.inputElement)
+    const input = this.options.view.inputElement
+    if (!(input instanceof HTMLTextAreaElement)) return
+    const current = readHiddenInputState(input)
     const deduced = deduceHiddenInputEdit(this.hiddenInputContent, current)
     // Nothing is written back for either of these, so the element keeps whatever the browser put
     // there and the editor keeps the older text to measure the next event against.
@@ -1696,6 +1902,14 @@ export class InputSelectionController {
     'input.compositionstart',
     (_event: CompositionEvent): void => {
       this.transitionInputState({ type: 'composition-start' })
+      this.editContextComposition = null
+      // A textarea selects what the composition is about to replace, which is how a correction
+      // reaching back over a word says so: the event itself carries only the new text.
+      const input = this.options.view.inputElement
+      this.compositionRange =
+        input instanceof HTMLTextAreaElement
+          ? { start: input.selectionStart, end: input.selectionEnd }
+          : null
     },
   )
 
@@ -1714,6 +1928,8 @@ export class InputSelectionController {
     (event: CompositionEvent): void => {
       const text = event.data || this.inputState.compositionText
       const shouldCommit = shouldCommitCompositionEnd(this.inputState, text)
+      const range = this.compositionRange
+      this.compositionRange = null
       // Taken down for every way a composition can end, including the ones below that return: text
       // already committed through beforeinput is the document's to draw, and text abandoned mid-word
       // was never the document's at all.
@@ -1729,13 +1945,17 @@ export class InputSelectionController {
         return
       }
 
-      this.applyCompositionText(text, eventStartMs(event))
+      this.commitComposition(text, range, eventStartMs(event))
     },
   )
 
   private handleMouseDown = (event: MouseEvent): void => {
     if (!this.session) return
     if (event.defaultPrevented) return
+    if (this.options.claimPress(event)) {
+      event.preventDefault()
+      return
+    }
 
     this.options.view.focusInput()
     if (event.detail >= 4) {
@@ -1745,6 +1965,7 @@ export class InputSelectionController {
 
     const position = this.textPositionFromMouseEvent(event)
     if (!position) return
+    this.options.beginPointerJump?.()
 
     // Alt on its own already means "another cursor here", so the rectangle takes the pair.
     if (event.altKey && event.shiftKey) {
@@ -2148,6 +2369,7 @@ export class InputSelectionController {
     const start = nowMs()
     if (granularity === 'column') {
       this.commitColumnSelection(session, head.offset, start)
+      this.options.finishPointerJump?.()
       return
     }
 
@@ -2161,6 +2383,7 @@ export class InputSelectionController {
     this.syncCustomSelectionHighlight(ends.anchorOffset, ends.headOffset, affinity)
     this.markSessionSelectionForNextInput()
     this.applyChange(change, 'input.selection', start, { syncDomSelection })
+    this.options.finishPointerJump?.()
   }
 
   /**
@@ -2227,12 +2450,15 @@ export class InputSelectionController {
       }
 
       event.preventDefault()
-      this.stopMouseTextMoveDrag()
+      this.stopMouseTextMoveDrag('finish')
       const start = eventStartMs(event)
       if (!drag.moved) {
         this.collapseSelectionToPosition(session, drag.press, start)
+        this.options.finishPointerJump?.()
         return
       }
+
+      this.options.cancelPointerJump?.()
 
       // The modifier is read here rather than at the press, because it can be taken up or let go at
       // any point while the text is in flight and what it says at the release is the user's answer.
@@ -2285,13 +2511,14 @@ export class InputSelectionController {
     this.applyChange(change, 'input.selection', start, { syncDomSelection: true })
   }
 
-  private stopMouseTextMoveDrag(): void {
+  private stopMouseTextMoveDrag(reason: 'cancel' | 'finish' = 'cancel'): void {
     const hadDrag = this.mouseTextMoveDrag !== null
     this.mouseTextMoveDrag = null
     this.options.el.ownerDocument.removeEventListener('mousemove', this.updateMouseTextMoveDrag)
     this.options.el.ownerDocument.removeEventListener('mouseup', this.finishMouseTextMoveDrag)
     if (!hadDrag) return
 
+    if (reason === 'cancel') this.options.cancelPointerJump?.()
     this.transitionInputState({ type: 'mouse-selection-finish' })
   }
 
@@ -2303,6 +2530,7 @@ export class InputSelectionController {
     this.options.el.ownerDocument.removeEventListener('mouseup', this.finishMouseSelectionDrag)
     if (!hadDrag) return
 
+    if (reason === 'cancel') this.options.cancelPointerJump?.()
     this.transitionInputState({
       type: reason === 'finish' ? 'mouse-selection-finish' : 'mouse-selection-cancel',
     })
@@ -2359,9 +2587,7 @@ export class InputSelectionController {
     clientY: number,
     fallback: VirtualizedTextHitPosition,
   ): VirtualizedTextHitPosition {
-    const position =
-      this.options.view.textPositionFromPoint(clientX, clientY) ??
-      this.options.view.textPositionFromViewportPoint(clientX, clientY)
+    const position = this.options.view.textPositionFromPoint(clientX, clientY)
     if (position) return position
     return fallback
   }
@@ -2405,20 +2631,20 @@ export class InputSelectionController {
   }
 
   private scheduleMouseSelectionAutoScroll(): void {
-    if (this.mouseSelectionAutoScrollFrame !== 0) return
+    if (this.mouseSelectionAutoScrollFrame !== null) return
 
-    this.mouseSelectionAutoScrollFrame = requestFrame(() => {
-      this.mouseSelectionAutoScrollFrame = 0
+    this.mouseSelectionAutoScrollFrame = scheduleFrame(() => {
+      this.mouseSelectionAutoScrollFrame = null
       if (!this.mouseSelectionDrag) return
       this.updateMouseSelectionAutoScroll()
     })
   }
 
   private stopMouseSelectionAutoScroll(): void {
-    if (this.mouseSelectionAutoScrollFrame === 0) return
+    if (this.mouseSelectionAutoScrollFrame === null) return
 
-    cancelFrame(this.mouseSelectionAutoScrollFrame)
-    this.mouseSelectionAutoScrollFrame = 0
+    this.mouseSelectionAutoScrollFrame.cancel()
+    this.mouseSelectionAutoScrollFrame = null
   }
 
   private selectFullDocument(event: MouseEvent, timingName: string): void {
@@ -2443,7 +2669,7 @@ export class InputSelectionController {
   private handleBeforeInput = this.traceInput('input.beforeinput', (event: InputEvent): void => {
     const session = this.session
     if (!session) return
-    if (!this.options.canEditDocument()) {
+    if (!this.canTypeText()) {
       event.preventDefault()
       return
     }
@@ -2471,7 +2697,7 @@ export class InputSelectionController {
   private handlePaste = this.traceInput('input.paste', (event: ClipboardEvent): void => {
     const session = this.session
     if (!session) return
-    if (!this.options.canEditDocument()) {
+    if (!this.canTypeText()) {
       event.preventDefault()
       return
     }
@@ -2495,7 +2721,7 @@ export class InputSelectionController {
     event.preventDefault()
     // After the selection sync above, so a handler reads the carets the paste is actually landing
     // on rather than the ones the last gesture left in the session.
-    const handled = this.handledPasteFragments(transfer, text, metadata !== null)
+    const handled = this.handledPasteFragments(transfer, text, metadata !== null, 'paste')
     const pasted = handled?.join('') ?? text
     const textChange = handled
       ? this.applyDistributedPaste(session, handled, this.resolvedSelections())
@@ -2541,6 +2767,8 @@ export class InputSelectionController {
     transfer: DataTransfer | null,
     text: string,
     internal: boolean,
+    source: EditorPasteContext['source'],
+    targets: readonly EditorPasteTarget[] = this.pasteTargets(),
   ): readonly string[] | null {
     if (!transfer) return null
 
@@ -2548,12 +2776,12 @@ export class InputSelectionController {
     if (handlers.length === 0) return null
 
     const types = dataTransferTypes(transfer)
-    const targets = this.pasteTargets()
     const context: EditorPasteContext = {
       dataTransfer: transfer,
       files: Array.from(transfer.files ?? []),
       internal,
       languageId: this.options.getLanguageId(),
+      source,
       targets,
       text,
       types,
@@ -2590,7 +2818,7 @@ export class InputSelectionController {
    */
   private handleDragOver = (event: DragEvent): void => {
     if (!this.session) return
-    if (!this.options.canEditDocument()) return
+    if (!this.canTypeText()) return
 
     event.preventDefault()
     // Text arriving from outside brings no cursor of its own, so the editor lends it one: without a
@@ -2619,11 +2847,12 @@ export class InputSelectionController {
     if (!session) return
 
     event.preventDefault()
-    if (!this.options.canEditDocument()) return
+    if (!this.canTypeText()) return
 
     // Normalized for the same reason as the pasted payload above.
+    const transfer = event.dataTransfer ?? null
     const text = normalizeLineEndings(dropPlainText(event))
-    if (text.length === 0) {
+    if (text.length === 0 && !this.hasPasteHandlerForTransfer(transfer)) {
       // The drag was claimed on its way across the text, whatever it turned out to be carrying, and
       // claiming it put a caret under the pointer to aim the drop with. Nothing else takes that
       // caret back down: the drop element is the one element a browser never fires dragleave at,
@@ -2640,13 +2869,24 @@ export class InputSelectionController {
     }
 
     const { offset } = position
+    // Handlers read a drop as they read a paste, so a dragged file row can land as a mention.
+    const handled = this.handledPasteFragments(transfer, text, false, 'drop', [
+      { start: offset, end: offset, text: '' },
+    ])
+    if (!handled && text.length === 0) {
+      this.syncSessionSelectionHighlight()
+      return
+    }
+
     this.transitionInputState({ text, type: 'drop-pending' })
     const start = eventStartMs(event)
     const selectionChange = session.setSelection(offset, offset, { affinity: position.affinity })
     this.markSessionSelectionForNextInput()
     // After the caret has been put where the text landed, which is the range this insertion runs
     // over: text dropped into a placeholder or a tag name is that name changing like any other.
-    const textChange = this.mirroredEdit(session, offset, offset, text) ?? session.applyText(text)
+    const textChange = handled
+      ? this.applyDistributedPaste(session, handled, this.resolvedSelections())
+      : (this.mirroredEdit(session, offset, offset, text) ?? session.applyText(text))
     const change = mergeChangeTimings(textChange, selectionChange)
     this.transitionInputState({ type: 'transaction-committed' })
     this.applyChange(change, 'input.drop', start, {
@@ -2661,45 +2901,14 @@ export class InputSelectionController {
     if (!event.clipboardData) return
 
     writeClipboardPayload(event.clipboardData, payload.text, payload.metadata)
-    this.writeRichTextPayload(event.clipboardData)
+    this.writeRichTextPayload(event.clipboardData, payload)
     event.preventDefault()
   }
 
-  /**
-   * The same text again as styled markup, so a paste into a document or a chat keeps the colours
-   * it was being read in.
-   *
-   * Never more than an addition: everything a paste depends on travels on text/plain, and a target
-   * with no use for markup reads that instead. One range only — markup is a single run of text
-   * with nowhere to say where one caret's share of it ended, which is exactly what the per-caret
-   * fragments beside it exist to carry.
-   */
-  private writeRichTextPayload(data: DataTransfer): void {
-    const session = this.session
-    if (!session) return
-
-    const resolved = this.resolvedSelections()
-    const selection = resolved.length === 1 ? resolved[0] : null
-    if (!selection) return
-
-    // A caret takes its line, the same range the plain payload was built from — minus the
-    // terminator, which under `white-space: pre` would paste as a blank line of its own.
-    const line = selection.collapsed ? this.readLineAt(selection.headOffset) : null
-    const range = line
-      ? { start: line.start, text: line.text }
-      : {
-          start: selection.startOffset,
-          text: readPieceTableTextRange(
-            session.getSnapshot(),
-            selection.startOffset,
-            selection.endOffset,
-          ),
-        }
-
+  private writeRichTextPayload(data: DataTransfer, payload: ClipboardPayload): void {
     const html = richTextForCopy({
       font: readRichTextFont(this.options.el),
-      startOffset: range.start,
-      text: range.text,
+      fragments: payload.fragments,
       theme: this.options.getEditorTheme(),
       tokens: this.options.getSyntaxTokens(),
     })
@@ -2733,7 +2942,7 @@ export class InputSelectionController {
   private deleteCaretLines(session: DocumentSession): DocumentSessionChange {
     const action = editActionForCommand(
       'editor.action.deleteLines',
-      session.materializeFullText(),
+      session.getTextSnapshot(),
       this.resolvedSelections(),
       { languageId: this.options.getLanguageId(), tabSize: this.options.tabSize },
     )
@@ -2860,6 +3069,21 @@ export class InputSelectionController {
     event.stopPropagation()
   }
 
+  // Ahead of both keymaps: the editor's own on this element and a host's on the document. A key
+  // that is part of a composition belongs to the IME, never to a participant.
+  private offerKeyToParticipants = (event: KeyboardEvent): void => {
+    if (event.isComposing || this.inputState.compositionActive) return
+    if (!this.options.offerKey(event)) return
+
+    event.preventDefault()
+    event.stopPropagation()
+  }
+
+  /** Text may enter the document: it is writable and no text gate refuses. */
+  private canTypeText(): boolean {
+    return this.options.canEditDocument() && this.options.acceptsText()
+  }
+
   /**
    * A key pressed somewhere that will never produce an input event of its own.
    *
@@ -2871,7 +3095,7 @@ export class InputSelectionController {
   private handleKeyDown = this.traceInput('input.keydownFallback', (event: KeyboardEvent): void => {
     const session = this.session
     if (!session) return
-    if (!this.options.canEditDocument()) return
+    if (!this.canTypeText()) return
     if (event.target === this.options.view.inputElement) return
 
     const typedText = keyboardFallbackText(event)
@@ -2887,7 +3111,7 @@ export class InputSelectionController {
   private applyKeyboardText(text: string, start: number): void {
     const session = this.session
     if (!session) return
-    if (!this.options.canEditDocument()) return
+    if (!this.canTypeText()) return
 
     const selectionChange = measureEditorPerformance('input.selectionChangeBeforeEdit', () =>
       this.selectionChangeBeforeEdit(),
@@ -2952,13 +3176,15 @@ export class InputSelectionController {
     // correction away entirely rather than apply it imperfectly. Each caret takes only what the one
     // in front of it left, so the text is replaced once and every caret still gets the insertion.
     let replacedThrough = 0
+    // A soft keyboard deletes by rewriting the text around the caret, and a chip goes whole there too.
+    const atomic = deduced.text.length === 0 ? this.options.view.atomicRanges() : []
     for (const selection of resolved) {
-      const from = clamp(
-        selection.startOffset - deduced.replacePrevCharCnt,
-        replacedThrough,
-        snapshot.length,
-      )
-      const to = clamp(selection.endOffset + deduced.replaceNextCharCnt, from, snapshot.length)
+      const reached = widenOverAtomicRanges(atomic, {
+        start: selection.startOffset - deduced.replacePrevCharCnt,
+        end: selection.endOffset + deduced.replaceNextCharCnt,
+      })
+      const from = clamp(reached.start, replacedThrough, snapshot.length)
+      const to = clamp(reached.end, from, snapshot.length)
       edits.push({ from, text: deduced.text, to })
       const caret = from + shift + deduced.text.length
       selections.push(selectionOffsetsWithAffinity(selection, caret, caret))
@@ -2969,10 +3195,46 @@ export class InputSelectionController {
     return session.applyEdits(edits, { selections })
   }
 
+  /**
+   * A composition commits over the range it started from. Only the written selection is plain
+   * composed text; a range behind the caret is a correction, rewritten around every caret, and
+   * neither is typed text, so neither closes a bracket.
+   */
+  private commitComposition(
+    text: string,
+    range: { readonly start: number; readonly end: number } | null,
+    start: number,
+  ): void {
+    const written = this.hiddenInputContent
+    const plain =
+      !range || (range.start === written.selectionStart && range.end === written.selectionEnd)
+    // Nothing to write, but the input may no longer hold what the document does: an abandoned
+    // composition over a selection took that selection out of the EditContext's text.
+    if (plain && text.length === 0) {
+      this.refreshHiddenInputContent()
+      return
+    }
+    if (plain) {
+      this.applyCompositionText(text, start)
+      return
+    }
+
+    const session = this.session
+    if (!session) return
+    if (!this.canTypeText()) return
+
+    this.transitionInputState({ text, type: 'composition-pending' })
+    const selectionChange = this.selectionChangeBeforeEdit()
+    const edit = textUpdateEdit(written, { text, rangeStart: range.start, rangeEnd: range.end })
+    const textChange = this.replaceAroundSelections(session, edit)
+    this.transitionInputState({ type: 'transaction-committed' })
+    this.applyChange(mergeChangeTimings(textChange, selectionChange), 'input.composition', start)
+  }
+
   private applyCompositionText(text: string, start: number): void {
     const session = this.session
     if (!session) return
-    if (!this.options.canEditDocument()) return
+    if (!this.canTypeText()) return
     if (text.length === 0) return
 
     this.transitionInputState({ text, type: 'composition-pending' })
@@ -3083,12 +3345,12 @@ export class InputSelectionController {
     source: ResolvedSelection,
     wholeWord: boolean,
   ): OccurrenceSelectionChange | null {
-    const text = session.materializeFullText()
+    const snapshot = session.getTextSnapshot()
     if (resolved.length === 1 && source.collapsed) {
-      return this.selectCurrentWordForOccurrence(text, source)
+      return this.selectCurrentWordForOccurrence(snapshot, source)
     }
 
-    const query = occurrenceQueryForSelection(text, source)
+    const query = occurrenceQueryForSelection(snapshot, source)
     if (!query) return null
 
     const selected = resolved.map((selection) => ({
@@ -3096,7 +3358,7 @@ export class InputSelectionController {
       end: selection.endOffset,
     }))
     const range = findNextExactOccurrenceFromRange(
-      text,
+      snapshot,
       query.query,
       selected,
       query.range,
@@ -3117,12 +3379,14 @@ export class InputSelectionController {
     }
   }
 
-  private occurrenceQueryForCurrentSelection(text: string): OccurrenceQueryWithSources | null {
+  private occurrenceQueryForCurrentSelection(
+    snapshot: TextReadSnapshot,
+  ): OccurrenceQueryWithSources | null {
     const resolved = this.resolvedSelections()
     const source = resolved.find((selection) => !selection.collapsed) ?? resolved[0]
     if (!source) return null
 
-    const query = occurrenceQueryForSelection(text, source)
+    const query = occurrenceQueryForSelection(snapshot, source)
     if (!query) return null
     const sourcesByRange = new Map(
       resolved.map(
@@ -3134,13 +3398,13 @@ export class InputSelectionController {
   }
 
   private selectCurrentWordForOccurrence(
-    text: string,
+    snapshot: TextReadSnapshot,
     selection: ResolvedSelection,
   ): OccurrenceSelectionChange | null {
     const session = this.session
     if (!session) return null
 
-    const range = wordRangeAtOffset(text, selection.headOffset)
+    const range = wordRangeAt(snapshot, selection.headOffset)
     if (range.start === range.end) return null
 
     return {
@@ -3159,19 +3423,33 @@ export class InputSelectionController {
     const resolved = this.resolvedSelections()
     const selected = resolved.filter((selection) => !selection.collapsed)
     if (selected.length > 0) {
-      const perSelection = selected.map((selection) =>
-        readPieceTableTextRange(snapshot, selection.startOffset, selection.endOffset),
-      )
-      return { metadata: { perSelection, pasteOnNewLine: false }, text: perSelection.join('\n') }
+      const fragments = selected.map((selection, index) => ({
+        startOffset: selection.startOffset,
+        text: readPieceTableTextRange(snapshot, selection.startOffset, selection.endOffset),
+        separator: index < selected.length - 1 ? '\n' : '',
+      }))
+      const perSelection = fragments.map((fragment) => fragment.text)
+      return {
+        fragments,
+        metadata: { perSelection, pasteOnNewLine: false },
+        text: perSelection.join('\n'),
+      }
     }
 
-    // A caret that selects nothing is pointing at its line, so that is what it takes. The
-    // terminator travels with it: it is what makes the payload a line rather than a run of
-    // characters, both to the next paste and to any other application it is handed to.
-    const perSelection = this.caretLines(resolved).map((line) => `${line.text}\n`)
-    if (perSelection.length === 0) return null
-
-    return { metadata: { perSelection, pasteOnNewLine: true }, text: perSelection.join('') }
+    const lines = this.caretLines(resolved)
+    if (lines.length === 0) return null
+    // HTML omits only the final line terminator; plain text and metadata keep it for line paste.
+    const fragments = lines.map((line, index) => ({
+      startOffset: line.start,
+      text: line.text,
+      separator: index < lines.length - 1 ? '\n' : '',
+    }))
+    const perSelection = fragments.map((fragment) => `${fragment.text}\n`)
+    return {
+      fragments,
+      metadata: { perSelection, pasteOnNewLine: true },
+      text: perSelection.join(''),
+    }
   }
 
   /** The lines the carets are on, in document order; two carets on one line answer for it once. */
@@ -3295,15 +3573,13 @@ export class InputSelectionController {
     const viewOffset = this.options.view.textOffsetFromDomBoundary(node, offset)
     if (viewOffset !== null) return viewOffset
 
-    if (node === this.options.el) return elementBoundaryToTextOffset(offset, this.text.length)
+    if (node === this.options.el)
+      return elementBoundaryToTextOffset(offset, this.options.getTextSnapshot().length)
     return this.externalBoundaryToTextOffset(node, offset)
   }
 
   private textPositionFromMouseEvent(event: MouseEvent): VirtualizedTextHitPosition | null {
-    return (
-      this.options.view.textPositionFromPoint(event.clientX, event.clientY) ??
-      this.options.view.textPositionFromViewportPoint(event.clientX, event.clientY)
-    )
+    return this.options.view.textPositionFromPoint(event.clientX, event.clientY)
   }
 
   private externalBoundaryToTextOffset(node: Node, offset: number): number | null {
@@ -3311,12 +3587,16 @@ export class InputSelectionController {
       const child = childContainingNode(node, this.options.el)
       const childIndex = child ? childNodeIndex(node, child) : -1
       if (childIndex === -1) return null
-      return elementBoundaryToTextOffset(offset <= childIndex ? 0 : 1, this.text.length)
+      return elementBoundaryToTextOffset(
+        offset <= childIndex ? 0 : 1,
+        this.options.getTextSnapshot().length,
+      )
     }
 
     const position = node.compareDocumentPosition(this.options.el)
     if ((position & Node.DOCUMENT_POSITION_FOLLOWING) !== 0) return 0
-    if ((position & Node.DOCUMENT_POSITION_PRECEDING) !== 0) return this.text.length
+    if ((position & Node.DOCUMENT_POSITION_PRECEDING) !== 0)
+      return this.options.getTextSnapshot().length
     return null
   }
 }
@@ -3483,6 +3763,22 @@ function pasteRevealBlock(text: string): SessionChangeOptions['revealBlock'] {
   return 'nearest'
 }
 
+function editActionForSession(
+  command: EditorEditActionCommandId | EditorDocumentSelectionEditCommandId,
+  session: DocumentSession,
+  selections: readonly ResolvedSelection[],
+  options: EditorEditActionOptions,
+): EditorEditActionResult {
+  const snapshot = session.getTextSnapshot()
+  if (isEditorDocumentSelectionEditCommand(command)) {
+    return documentSelectionEditForCommand(command, snapshot, selections, options)
+  }
+  if (command === 'editor.action.trimTrailingWhitespace')
+    return trimTrailingWhitespaceAction(snapshot)
+
+  return editActionForCommand(command, snapshot, selections, options)
+}
+
 function applyPasteText(session: DocumentSession, text: string): DocumentSessionChange {
   session.breakTypingRun()
   const change = session.applyText(text)
@@ -3510,9 +3806,39 @@ function dropPlainText(event: DragEvent): string {
   return transfer.getData('text')
 }
 
+/**
+ * An EditContext host has no value for a screen reader, so the window is written into it as text and
+ * the caret into the document selection: the two things a textarea shows a reader on its own.
+ * Taking the document selection is only right while the element holds focus.
+ */
+function writeAccessibleWindow(input: HTMLElement, content: HiddenInputState): void {
+  if (input.textContent !== content.value) input.textContent = content.value
+  if (input.ownerDocument.activeElement !== input) return
+
+  const selection = input.ownerDocument.getSelection()
+  const node = input.firstChild
+  if (!selection) return
+  if (!node) {
+    selection.collapse(input, 0)
+    return
+  }
+  const backward = 'direction' in content && content.direction === 'backward'
+  const anchor = backward ? content.selectionEnd : content.selectionStart
+  const focus = backward ? content.selectionStart : content.selectionEnd
+  selection.setBaseAndExtent(node, anchor, node, focus)
+}
+
 function beforeInputText(event: InputEvent): string | null {
+  // A textarea's Enter is insertLineBreak; an EditContext host's is insertParagraph.
   if (event.inputType === 'insertLineBreak') return '\n'
+  if (event.inputType === 'insertParagraph') return '\n'
   if (event.inputType === 'insertText') return event.data ?? ''
   if (event.inputType === 'insertFromComposition') return event.data ?? ''
   return null
+}
+
+function isSelectionList(
+  selection: EditorSelectionRange | readonly EditorSelectionRange[] | undefined,
+): selection is readonly EditorSelectionRange[] {
+  return Array.isArray(selection)
 }

@@ -1,5 +1,6 @@
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
 import { describe, expect, it, vi } from 'vitest'
+import { createTestViewSnapshotSource } from '@singapore-editor/core/testing'
 import type {
   EditorMinimapDecoration,
   EditorMinimapFeature,
@@ -9,6 +10,10 @@ import type {
 import { EDITOR_MINIMAP_FEATURE } from '@singapore-editor/core/extensions'
 import type { VirtualizedTextHighlightStyle } from '@singapore-editor/core/rendering'
 import { createEditorFindContributionProviders } from '../src'
+import {
+  createTestCapabilityContributionContext,
+  createTestViewContributionContext,
+} from '@singapore-editor/core/testing'
 
 const MINIMAP_MATCH_SOURCE = 'editor-find-test-find-match'
 const MINIMAP_CURRENT_SOURCE = 'editor-find-test-find-current'
@@ -115,12 +120,14 @@ function rows(decoration: EditorMinimapDecoration): readonly number[] {
 
 function openFind(providers: ReturnType<typeof createEditorFindContributionProviders>): void {
   const features: { openFind(): boolean }[] = []
-  providers.capability.createContribution({
-    registerFeature: (_token, feature) => {
-      features.push(feature as { openFind(): boolean })
-      return { dispose: vi.fn() }
-    },
-  })
+  providers.capability.createContribution(
+    createTestCapabilityContributionContext({
+      registerFeature: (_token, feature) => {
+        features.push(feature as { openFind(): boolean })
+        return { dispose: vi.fn() }
+      },
+    }),
+  )
   features[0]?.openFind()
 }
 
@@ -178,26 +185,15 @@ function viewContext(
   container.appendChild(scrollElement)
   const viewSnapshot = snapshot(text, selection)
 
-  return {
+  return createTestViewContributionContext({
     container,
     scrollElement,
     contentElement: scrollElement,
     highlightPrefix: 'editor-find-test',
-    hasDocument: () => true,
     getSnapshot: () => viewSnapshot,
-    requestViewUpdate: vi.fn(),
     getFeature: <T>(token: unknown) => (token === EDITOR_MINIMAP_FEATURE ? (minimap as T) : null),
-    revealLine: vi.fn(),
-    focusEditor: vi.fn(),
-    setSelection: vi.fn(),
-    setSelections: vi.fn(),
-    setScrollTop: vi.fn(),
-    reserveOverlayWidth: vi.fn(),
-    textOffsetFromPoint: vi.fn(() => null),
-    getRangeClientRect: vi.fn(() => null),
     setRangeHighlight: vi.fn(),
-    clearRangeHighlight: vi.fn(),
-  }
+  })
 }
 
 function snapshot(text: string, selection: readonly [number, number]): EditorViewSnapshot {
@@ -209,7 +205,7 @@ function snapshot(text: string, selection: readonly [number, number]): EditorVie
   return {
     documentId: 'find-minimap-test',
     languageId: null,
-    fullText: text,
+    ...createTestViewSnapshotSource(text),
     textVersion: 1,
     initialHighlightStatus: 'painted',
     syntaxStatus: 'ready',
@@ -237,7 +233,7 @@ function snapshot(text: string, selection: readonly [number, number]): EditorVie
     contentWidth: 88,
     totalHeight: lineStarts.length * 20,
     gutterWidth: 0,
-    gutterLayout: { fixedWidth: 0, lanes: [] },
+    gutterLayout: { leadingInset: 0, fixedWidth: 0, lanes: [] },
     tabSize: 2,
     foldMarkers: [],
     visibleRows: [],
@@ -250,9 +246,6 @@ function snapshot(text: string, selection: readonly [number, number]): EditorVie
       clientHeight: 200,
       clientWidth: 88,
       visibleRange: { start: 0, end: lineStarts.length },
-    },
-    toJSON() {
-      throw new Error('not used by this fixture')
     },
     toVisibleSnapshot() {
       return null

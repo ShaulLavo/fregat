@@ -1,3 +1,4 @@
+export type { EditorPointHit, EditorMarkerHit } from './pointQueries'
 export {
   createEditorConsoleLogger,
   createEditorConsoleLoggingPlugin,
@@ -37,11 +38,11 @@ export type {
   EditorPreparedDocument,
   EditorPreparedDocumentMatch,
   EditorPreparedDocumentPayload,
-  EditorPreparedHighlighterTransfer,
+  EditorPreparedHighlighterBorrow,
   EditorPreparedStageOutcome,
   EditorPreparedStageRequest,
   EditorPreparedStructuralConfiguration,
-  EditorPreparedStructuralTransfer,
+  EditorPreparedStructuralBorrow,
   EditorPreparedTagValue,
   EditorPreparedTabSizePolicy,
 } from './editor/preparedDocument'
@@ -77,7 +78,7 @@ export {
   deleteFromPieceTable,
   diffPieceTableSnapshots,
   documentTextRoundTripStatus,
-  forEachPieceTableTextChunk,
+  streamPieceTableTextChunks,
   getPieceTableLength,
   getDocumentMutationLeaseState,
   readPieceTableTextRange,
@@ -99,6 +100,12 @@ export {
   subscribeDocumentMutationLeaseState,
 } from './public/document'
 export { createHistoryViewer, layoutHistoryGraph } from './historyViewer'
+export { SERIALIZED_EDITOR_HISTORY_VERSION } from './historySerialization'
+export type {
+  SerializedEditorHistory,
+  SerializedEditorHistoryNode,
+  SerializedEditorHistorySelection,
+} from './historySerialization'
 export type {
   HistoryComparison,
   HistoryComparisonSide,
@@ -261,6 +268,7 @@ export type {
   SealDocumentTransactionResult,
   SelectionAffinity,
   TextEdit,
+  TextReadSnapshot,
   TextSnapshot,
 } from './public/document'
 export type {
@@ -278,8 +286,6 @@ export type {
   EditorRangeDecoration,
   EditorScrollMode,
   EditorScrollPosition,
-  EditorSelectionRevealOptions,
-  EditorSelectionRevealTarget,
   EditorSelectionSyncMode,
   EditorSetSelectionOptions,
   EditorSetTextOptions,
@@ -348,6 +354,7 @@ export type {
   EditorTokenStyleJSON,
   EditorViewContribution,
   EditorViewContributionContext,
+  EditorPressParticipant,
   EditorViewContributionProvider,
   EditorViewContributionUpdateKind,
   EditorViewportSnapshot,
@@ -368,7 +375,12 @@ export type {
   EditorVisibleSnapshot,
   EditorVisibleSnapshotJSON,
 } from './public/extensions'
-export type { BrowserTextMetrics } from './virtualization'
+export type {
+  BrowserTextMetrics,
+  EditorInputKind,
+  EditorInputRoute,
+  EditorWrapBreak,
+} from './virtualization'
 export type {
   EditorColorDefaults,
   EditorColorId,

@@ -35,6 +35,11 @@
       "import": "./dist/hoverPlugin.js",
       "default": "./dist/hoverPlugin.js"
     },
+    "./hover-registry": {
+      "types": "./dist/hoverRegistry.d.ts",
+      "import": "./dist/hoverRegistry.js",
+      "default": "./dist/hoverRegistry.js"
+    },
     "./hover-token": {
       "types": "./dist/hoverToken.d.ts",
       "import": "./dist/hoverToken.js",
@@ -81,12 +86,13 @@
   },
   "devDependencies": {
     "@singapore-editor/core": "workspace:*",
-    "@typescript/native-preview": "7.0.0-dev.20260613.1",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "@vitest/browser-playwright": "5.0.2",
     "happy-dom": "^20.14.5",
-    "oxfmt": "0.54.0",
-    "oxlint": "1.69.0",
+    "oxfmt": "0.70.0",
+    "oxlint": "1.85.0",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.2"
   },
   "peerDependencies": {
     "@singapore-editor/core": "workspace:*"

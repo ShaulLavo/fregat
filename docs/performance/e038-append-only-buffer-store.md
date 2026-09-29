@@ -158,7 +158,7 @@ the linear resolver shares the code, so no test sees it. It is unchanged by E038
   fill path now pays it for every insert. It is the cost behind the full-read lane above.
 - A fork copies the id map, one slot per buffer id in the lineage. A paged map would make that
   logarithmic; the branch lane is the place to see whether it ever matters.
-- [E006](../../plans/e006-tombstone-reclamation.md) needs to swap the log for a compacted one. The
+- [E006](../storage/e006-tombstone-compaction.md) needs to swap the log for a compacted one. The
   log is internal to `buffers.ts` and every read goes through a view, so a generation swap is a
   new log plus new views, not a second copy path.
 - The reverse index still copies a path per write and now keys one small range per insert, not

@@ -1,0 +1,136 @@
+{
+  "commit": "fad0eef5c96dbfed54f06b250dbdd05f50b71f56",
+  "at": "2026-09-28T18:23:01.313Z",
+  "memory": "CDP main-renderer heap after GC; peak is sampled JS heap and may miss brief allocations; excludes process RSS",
+  "viewport": {
+    "width": 1200,
+    "height": 720
+  },
+  "sizes": [
+    52428800,
+    209715200
+  ],
+  "modes": [
+    "resident",
+    "streamed"
+  ],
+  "samples": [
+    {
+      "mode": "resident",
+      "size": 52428800,
+      "opened": {
+        "bytes": 52428800,
+        "units": 39845888,
+        "buildMs": 445.7000000476837
+      },
+      "checks": null,
+      "emptyHeap": {
+        "usedSize": 758552,
+        "totalSize": 1310720,
+        "embedderHeapUsedSize": 316168,
+        "backingStorageSize": 118674
+      },
+      "liveHeap": {
+        "usedSize": 80532212,
+        "totalSize": 81530880,
+        "embedderHeapUsedSize": 325160,
+        "backingStorageSize": 8507325
+      },
+      "peakHeap": 206402456,
+      "disposedHeap": {
+        "usedSize": 827228,
+        "totalSize": 1835008,
+        "embedderHeapUsedSize": 325160,
+        "backingStorageSize": 118717
+      }
+    },
+    {
+      "mode": "streamed",
+      "size": 52428800,
+      "opened": {
+        "bytes": 52428800,
+        "units": 39845888,
+        "buildMs": 217.40000009536743
+      },
+      "checks": null,
+      "emptyHeap": {
+        "usedSize": 758552,
+        "totalSize": 1310720,
+        "embedderHeapUsedSize": 323344,
+        "backingStorageSize": 118674
+      },
+      "liveHeap": {
+        "usedSize": 81377576,
+        "totalSize": 106430464,
+        "embedderHeapUsedSize": 333048,
+        "backingStorageSize": 171114
+      },
+      "peakHeap": 86486308,
+      "disposedHeap": {
+        "usedSize": 1072888,
+        "totalSize": 3407872,
+        "embedderHeapUsedSize": 333048,
+        "backingStorageSize": 171114
+      }
+    },
+    {
+      "mode": "resident",
+      "size": 209715200,
+      "opened": {
+        "bytes": 209715200,
+        "units": 159383552,
+        "buildMs": 1776.2000000476837
+      },
+      "checks": null,
+      "emptyHeap": {
+        "usedSize": 758552,
+        "totalSize": 1310720,
+        "embedderHeapUsedSize": 323344,
+        "backingStorageSize": 118674
+      },
+      "liveHeap": {
+        "usedSize": 319607560,
+        "totalSize": 320606208,
+        "embedderHeapUsedSize": 324192,
+        "backingStorageSize": 33673149
+      },
+      "peakHeap": 822964708,
+      "disposedHeap": {
+        "usedSize": 827228,
+        "totalSize": 1835008,
+        "embedderHeapUsedSize": 324192,
+        "backingStorageSize": 118717
+      }
+    },
+    {
+      "mode": "streamed",
+      "size": 209715200,
+      "opened": {
+        "bytes": 209715200,
+        "units": 159383552,
+        "buildMs": 831.5999999046326
+      },
+      "checks": null,
+      "emptyHeap": {
+        "usedSize": 758552,
+        "totalSize": 1310720,
+        "embedderHeapUsedSize": 323344,
+        "backingStorageSize": 118674
+      },
+      "liveHeap": {
+        "usedSize": 321978292,
+        "totalSize": 421433344,
+        "embedderHeapUsedSize": 328912,
+        "backingStorageSize": 171114
+      },
+      "peakHeap": 334397444,
+      "disposedHeap": {
+        "usedSize": 321978292,
+        "totalSize": 421433344,
+        "embedderHeapUsedSize": 328912,
+        "backingStorageSize": 171114
+      }
+    }
+  ],
+  "browser": "153.0.8010.12"
+}

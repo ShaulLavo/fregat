@@ -173,9 +173,10 @@ const beginEdit = (snapshot: PieceTableTreeSnapshot): EditState => ({
   normalizeOrders: false,
 })
 
-// A relabelling changes every order, so it rebuilds the index from the tree.
 const finishEdit = (snapshot: PieceTableTreeSnapshot, state: EditState): PieceTableTreeSnapshot => {
-  if (state.normalizeOrders) return createNormalizedSnapshot(state.buffers, state.root)
+  if (state.normalizeOrders) {
+    return createNormalizedSnapshot(state.buffers, state.root, snapshot.reverseIndex, state.changes)
+  }
   const reverseIndex = applyReverseIndexChanges(snapshot.reverseIndex, state.changes)
   return createSnapshot(state.buffers, state.root, reverseIndex)
 }

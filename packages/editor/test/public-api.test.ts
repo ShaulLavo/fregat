@@ -40,12 +40,12 @@ import {
   type TextCharacterClass,
   type TextEdit,
   type TextOffsetRange,
+  createSelectionSet,
+  type SelectionSet,
 } from '@singapore-editor/core/document'
 import {
   Editor,
   type EditorInitialPaintEvent as EditorInitialPaintEventFromEditor,
-  type EditorSelectionRevealOptions,
-  type EditorSelectionRevealTarget,
   type EditorSetSelectionOptions,
   type EditorViewSnapshotJSON as EditorViewSnapshotJSONFromEditor,
   type EditorVisibleSnapshotJSON as EditorVisibleSnapshotJSONFromEditor,
@@ -53,6 +53,11 @@ import {
 import {
   createEditorCapabilityToken,
   createEditorLanguageFeatureToken,
+  createChannel,
+  createPlugin,
+  derive,
+  selectionInput,
+  type EditorViewScope,
   EDITOR_FIND_FEATURE,
   EDITOR_FIND_FEATURE_ID,
   type EditorAutoClosingPair,
@@ -97,23 +102,19 @@ import {
   projectDecorationRangeThroughEdits,
   reindentEditsForRanges,
 } from '@singapore-editor/core/extensions'
+import { serializeEditorViewSnapshot } from '@singapore-editor/core/extensions'
+import { createStringTextSnapshot } from '@singapore-editor/core/document'
 import { applyEditorTheme, type EditorTheme } from '@singapore-editor/core/rendering'
 import {
-  EditorSecondaryTextView,
+  createEditorSecondaryTextView,
   EditorSecondaryViewScheduler,
 } from '@singapore-editor/core/secondary-views'
 import {
   createEmptySyntaxResult,
   treeSitterCapturesToEditorTokens,
 } from '@singapore-editor/core/syntax'
-import { EditorPluginHost } from '@singapore-editor/core/testing'
+import { EditorPluginHost, VirtualizedTextView } from '@singapore-editor/core/testing'
 import { debugPieceTable } from '@singapore-editor/core/debug'
-import {
-  createSelectionSet,
-  type EditorSelectionContributionContext,
-  type SelectionSet,
-  VirtualizedTextView,
-} from '@singapore-editor/core/internal'
 import {
   createMergeConflictDocumentText,
   EDITOR_MERGE_CONFLICT_FEATURE,
@@ -145,7 +146,7 @@ describe('public API facade', () => {
     ]
     const contracts = null as unknown as SnapshotContracts
     const fullJSON = (snapshot: core.EditorViewSnapshot): core.EditorViewSnapshotJSON =>
-      snapshot.toJSON()
+      serializeEditorViewSnapshot(snapshot)
     const visibleJSON = (
       snapshot: core.EditorViewSnapshot,
     ): core.EditorVisibleSnapshotJSON | null => snapshot.toVisibleSnapshot()?.toJSON() ?? null
@@ -232,7 +233,7 @@ describe('public API facade', () => {
         remoteText: 'abc',
       }),
     ).toBe('abc')
-    expect(parseMergeConflicts('')).toEqual([])
+    expect(parseMergeConflicts(createStringTextSnapshot(''))).toEqual([])
     expect(EDITOR_MERGE_CONFLICT_FEATURE.id).toBe('editor.mergeConflicts')
     expect(materializePieceTableFullText(snapshot)).toBe('abc')
     expect(readPieceTableTextRange(snapshot, 1, 3)).toBe('bc')
@@ -330,7 +331,7 @@ describe('public API facade', () => {
 
     expect(
       structural({
-        text: 'fn main() {}',
+        textSnapshot: createStringTextSnapshot('fn main() {}'),
         languageId: 'rust',
         offset: 11,
         selection: { start: 11, end: 11 },
@@ -386,32 +387,21 @@ describe('public API facade', () => {
     }
     const contributionOptions: Parameters<EditorViewContributionContext['setSelection']>[3] =
       rootOptions
+    // @ts-expect-error A reveal offset goes in the options object, never positionally.
     const editorNumericArgs: Parameters<Editor['setSelection']> = [1, 2, 3]
     const viewNumericArgs: Parameters<EditorViewContributionContext['setSelection']> = [
       1,
       2,
       'test.numericViewSelection',
+      // @ts-expect-error A reveal offset goes in the options object, never positionally.
       3,
     ]
-    const selectionNumericArgs: Parameters<EditorSelectionContributionContext['setSelection']> = [
-      1,
-      2,
-      'test.numericSelection',
-      3,
-    ]
-    const legacyOptions: EditorSelectionRevealOptions = { reveal: false, revealOffset: 9 }
-    const legacyTarget: EditorSelectionRevealTarget = 12
-    const rootLegacyOptions: core.EditorSelectionRevealOptions = legacyOptions
-    const rootLegacyTarget: core.EditorSelectionRevealTarget = legacyTarget
 
     expect(categoryOptions.affinity).toBe('before')
     expect(editSelection.affinity).toBe('after')
     expect(contributionOptions?.revealOffset).toBe(12)
-    expect(editorNumericArgs[2]).toBe(3)
-    expect(viewNumericArgs[3]).toBe(3)
-    expect(selectionNumericArgs[3]).toBe(3)
-    expect(rootLegacyOptions.revealOffset).toBe(9)
-    expect(rootLegacyTarget).toBe(12)
+    expect(editorNumericArgs).toHaveLength(3)
+    expect(viewNumericArgs).toHaveLength(4)
   })
 
   it('exports the whitespace modes a host can select', () => {
@@ -557,6 +547,19 @@ describe('public API facade', () => {
     expect(copies).toEqual(['name', 'NAME'])
   })
 
+  it('exports the experimental plugin authoring model from the extensions entrypoint', () => {
+    const caret = derive([selectionInput], (selections) => selections[0]?.headOffset ?? null)
+    const setup = (scope: EditorViewScope) => void scope.watch(caret, () => undefined)
+    const plugin = createPlugin({ name: 'test.caret', view: setup })
+
+    expect(plugin.name).toBe('test.caret')
+    expect(plugin.activate).toBeTypeOf('function')
+    expect(caret.kinds).toEqual(selectionInput.kinds)
+    expect(createChannel<string>('test.channel', { kind: 'many' }).input.id).toBe(
+      'channel(test.channel)',
+    )
+  })
+
   it('exposes the pass and cursor-history methods hosts drive the editor through', () => {
     for (const method of ['runInOperation', 'cursorUndo', 'cursorRedo']) {
       expect(Editor.prototype[method as keyof Editor]).toBeTypeOf('function')
@@ -584,7 +587,6 @@ describe('public API facade', () => {
       [{ from: 0, to: 0, text: 'x' }],
     )
     const findFeature = {
-      isVisible: () => false,
       openFind: () => false,
       toggleFind: () => false,
       openFindReplace: () => false,
@@ -620,7 +622,7 @@ describe('public API facade', () => {
     expect(syntax.tokens).toEqual([])
     expect(debugPieceTable(createPieceTableSnapshot('abc')).length).toBeGreaterThan(0)
     expect(VirtualizedTextView).toBeTypeOf('function')
-    expect(EditorSecondaryTextView).toBeTypeOf('function')
+    expect(createEditorSecondaryTextView).toBeTypeOf('function')
     expect(EditorSecondaryViewScheduler).toBeTypeOf('function')
     expect({} as EditorPluginContext).toMatchObject({})
     host.dispose()

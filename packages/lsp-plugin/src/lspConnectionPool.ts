@@ -1,4 +1,8 @@
-import type { LspClient, LspNotificationHandler } from '@singapore-editor/lsp'
+import type {
+  LspClient,
+  LspNotificationHandler,
+  LspServerRequestHandler,
+} from '@singapore-editor/lsp'
 
 import {
   LspConnection,
@@ -25,12 +29,13 @@ export type LspConnectionPoolEvent = {
     | 'released'
     | 'closed'
     | 'retired'
+    | 'reconnecting'
     | 'error'
     | 'handler_ignored'
   readonly key: string
   readonly leaseCount: number
   readonly status: LanguageServerStatus
-  /** Time to `initialize` for `ready`; the connection's whole life for `closed`. */
+  /** Time to `initialize` for `ready`; the connection's life so far for `closed`, `retired` and `error`. */
   readonly durationMs?: number
   readonly reachedReady?: boolean
   readonly error?: unknown
@@ -44,11 +49,13 @@ export type LspConnectionPoolOptions = {
 }
 
 type NotificationHandlers = Readonly<Record<string, LspNotificationHandler<LspClient>>>
+type ServerRequestHandlers = Readonly<Record<string, LspServerRequestHandler<LspClient>>>
 
 /** Handlers are per borrower: the first one's are bound to a view the reader may have left. */
 type ConnectionLease = {
   readonly callbacks: LspConnectionCallbacks
   readonly notificationHandlers: NotificationHandlers
+  readonly serverRequestHandlers: ServerRequestHandlers
 }
 
 type PooledConnection = {
@@ -109,6 +116,7 @@ export class LspConnectionPool {
     const lease: ConnectionLease = {
       callbacks,
       notificationHandlers: options.notificationHandlers ?? {},
+      serverRequestHandlers: options.serverRequestHandlers ?? {},
     }
     this.#reportUndispatchable(entry, lease)
     entry.leases.add(lease)
@@ -148,7 +156,11 @@ export class LspConnectionPool {
     // connection reports `loading` from inside `connect()`, which is before any
     // `new LspConnection(...)` expression could have returned.
     entry.connection = new LspConnection(
-      { ...options, notificationHandlers: this.#dispatchers(entry, notificationMethods) },
+      {
+        ...options,
+        notificationHandlers: this.#dispatchers(entry, notificationMethods),
+        serverRequestHandlers: requestDispatchers(entry, options.serverRequestHandlers ?? {}),
+      },
       this.#fanOut(entry),
     )
     this.#entries.set(key, entry)
@@ -195,6 +207,15 @@ export class LspConnectionPool {
       onDiagnosticRefresh: () => {
         for (const lease of leasesOf(entry)) lease.callbacks.onDiagnosticRefresh?.()
       },
+      onReconnecting: (error) => {
+        entry.connected = false
+        this.#emit(entry, 'reconnecting', {
+          durationMs: Math.round(now() - entry.createdAt),
+          error,
+          reachedReady: entry.readyAt !== null,
+        })
+        for (const lease of leasesOf(entry)) lease.callbacks.onReconnecting?.(error)
+      },
       onUnavailable: () => {
         entry.connected = false
         this.#retire(entry)
@@ -208,7 +229,11 @@ export class LspConnectionPool {
         for (const lease of leasesOf(entry)) lease.callbacks.onStatusChange?.(status)
       },
       onError: (error) => {
-        this.#emit(entry, 'error', { error })
+        this.#emit(entry, 'error', {
+          durationMs: Math.round(now() - entry.createdAt),
+          error,
+          reachedReady: entry.readyAt !== null,
+        })
         for (const lease of leasesOf(entry)) lease.callbacks.onError?.(error)
       },
     }
@@ -347,4 +372,25 @@ function equalRecords(left: Record<string, unknown>, right: Record<string, unkno
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/**
+ * A request has one answer, so the first borrower that handles the method gives it; the methods
+ * are fixed by the first borrower, like the notification methods.
+ */
+function requestDispatchers(
+  entry: PooledConnection,
+  initial: ServerRequestHandlers,
+): ServerRequestHandlers {
+  const handlers: Record<string, LspServerRequestHandler<LspClient>> = {}
+  for (const method of Object.keys(initial)) {
+    handlers[method] = (client, params, message) => {
+      const handler = leasesOf(entry).find((lease) => lease.serverRequestHandlers[method])
+        ?.serverRequestHandlers[method]
+      // An answer the server can mistake for an empty one is worse than an error it can report.
+      if (!handler) throw new Error(`No editor on this connection answers ${method}`)
+      return handler(client, params, message)
+    }
+  }
+  return handlers
 }

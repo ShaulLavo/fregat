@@ -1,4 +1,4 @@
-import type { EditorDisposable } from '../plugins'
+import type { EditorDisposable } from './disposables'
 
 /**
  * Per-language editing rules, as data.
@@ -161,6 +161,13 @@ const CODE_PAIRS: readonly EditorAutoClosingPair[] = [
   ...QUOTED_PAIRS,
   { close: '`', open: '`', quote: true },
 ]
+
+/**
+ * What a language with no entry in the catalog closes: everything. Narrowing it to brackets bought
+ * nothing — `shouldAutoClose` already refuses a quote after a word character, which is the case the
+ * narrowing existed for, and it keeps an unfamiliar language behaving like a familiar one.
+ */
+export const DEFAULT_AUTO_CLOSING_PAIRS: readonly EditorAutoClosingPair[] = CODE_PAIRS
 
 /** Markdown and plain prose: brackets still help, but apostrophes are punctuation, not delimiters. */
 const PROSE_PAIRS: readonly EditorAutoClosingPair[] = [
@@ -361,22 +368,66 @@ const INDENTED: EditorLanguageConfiguration = {
   folding: HASH_MARKED_FOLDING,
 }
 
+/** C-family languages with no backtick literal, where a stray one should stay a single character. */
+const C_LIKE: EditorLanguageConfiguration = { ...CODE, autoClosingPairs: QUOTED_PAIRS }
+
+/** An apostrophe opens a lifetime far more often than a character literal, so it is left alone. */
+const RUST: EditorLanguageConfiguration = {
+  ...CODE,
+  autoClosingPairs: QUOTED_PAIRS.filter((pair) => pair.open !== "'"),
+}
+
+const LUA: EditorLanguageConfiguration = {
+  autoClosingPairs: QUOTED_PAIRS,
+  brackets: BRACKETS,
+  comments: { line: '--', block: { open: '--[[', close: ']]' } },
+}
+
+const SQL: EditorLanguageConfiguration = {
+  autoClosingPairs: CODE_PAIRS,
+  brackets: BRACKETS,
+  comments: { line: '--', block: { open: '/*', close: '*/' } },
+}
+
+/** Hash comments without Python's off-side folding: these blocks end at a token or a header. */
+const HASH_COMMENTED: EditorLanguageConfiguration = {
+  autoClosingPairs: QUOTED_PAIRS,
+  brackets: BRACKETS,
+  comments: { line: '#' },
+}
+
+const SHELL: EditorLanguageConfiguration = { ...HASH_COMMENTED, autoClosingPairs: CODE_PAIRS }
+
 /**
  * Seeded as the map's initial contents rather than by calling `register` at module load, so that a
  * bundler treating a top-level call as droppable cannot leave the editor with no languages at all.
  */
 const configurations = new Map<string, EditorLanguageConfiguration>([
+  ['astro', HTML],
+  ['c', C_LIKE],
+  ['cpp', C_LIKE],
+  ['csharp', C_LIKE],
   ['css', CSS],
+  ['go', CODE],
   ['html', HTML],
+  ['java', C_LIKE],
   ['javascript', CODE],
   ['javascriptreact', CODE_WITH_TAGS],
   ['json', JSON_LIKE],
   ['jsonc', JSON_LIKE],
   ['jsx', CODE_WITH_TAGS],
+  ['lua', LUA],
   ['markdown', MARKDOWN],
   ['md', MARKDOWN],
+  ['mdx', MARKDOWN],
+  ['php', CODE],
   ['python', INDENTED],
+  ['rust', RUST],
   ['scss', SCSS],
+  ['shellscript', SHELL],
+  ['sql', SQL],
+  ['svelte', HTML],
+  ['toml', HASH_COMMENTED],
   ['ts', CODE],
   ['tsx', CODE_WITH_TAGS],
   ['typescript', CODE],

@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import type { DocumentSessionChange } from '../src/documentSession'
 import type { Editor } from '../src/editor'
-import type { EditorHighlightResult, EditorPlugin } from '../src/plugins'
+import type { EditorPlugin } from '../src/plugins'
+import type { EditorHighlightResult } from '../src/syntax/highlighter'
 import { setHighlightRegistry } from '../src/public/testing'
 import {
   createEmptySyntaxResult,

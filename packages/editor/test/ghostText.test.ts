@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { createStringTextSnapshot as source } from '../src/documentTextSnapshot'
 import { computeGhostText, ghostTextDiff, ghostTextInlineSpecs } from '../src/editor/ghostText'
 
 /**
@@ -11,7 +12,7 @@ import { computeGhostText, ghostTextDiff, ghostTextInlineSpecs } from '../src/ed
 
 describe('deriving ghost text from a text edit', () => {
   it('offers only the characters the document does not already hold', () => {
-    const ghost = computeGhostText('console.', { from: 0, to: 8, text: 'console.log()' }, 8)
+    const ghost = computeGhostText(source('console.'), { from: 0, to: 8, text: 'console.log()' }, 8)
 
     expect(ghost?.parts).toEqual([{ offset: 8, text: 'log()' }])
     // Accepting writes the remainder, not the whole line again: replacing text with itself would
@@ -20,31 +21,33 @@ describe('deriving ghost text from a text edit', () => {
   })
 
   it('refuses a suggestion that would take characters away', () => {
-    expect(computeGhostText('foo bar', { from: 0, to: 7, text: 'foo baz' }, 7)).toBeNull()
+    expect(computeGhostText(source('foo bar'), { from: 0, to: 7, text: 'foo baz' }, 7)).toBeNull()
   })
 
   it('refuses to draw anything behind the caret', () => {
     const suggestion = { from: 0, to: 3, text: 'xfoo' }
 
-    expect(computeGhostText('foo', suggestion, 3)).toBeNull()
-    expect(computeGhostText('foo', suggestion, 0)?.parts).toEqual([{ offset: 0, text: 'x' }])
+    expect(computeGhostText(source('foo'), suggestion, 3)).toBeNull()
+    expect(computeGhostText(source('foo'), suggestion, 0)?.parts).toEqual([
+      { offset: 0, text: 'x' },
+    ])
   })
 
   it('refuses a replacement still covering rows once its common prefix is off', () => {
-    expect(computeGhostText('a\nb', { from: 0, to: 3, text: 'ax\nby' }, 0)).toBeNull()
+    expect(computeGhostText(source('a\nb'), { from: 0, to: 3, text: 'ax\nby' }, 0)).toBeNull()
     // The rows it covers reading exactly as the suggestion does is what makes the rest of it a
     // completion of one line rather than a rewrite of several.
-    expect(computeGhostText('a\nb', { from: 0, to: 3, text: 'a\nbc' }, 3)?.parts).toEqual([
+    expect(computeGhostText(source('a\nb'), { from: 0, to: 3, text: 'a\nbc' }, 3)?.parts).toEqual([
       { offset: 3, text: 'c' },
     ])
   })
 
   it('refuses a run that would not fit in the row it hangs off', () => {
-    expect(computeGhostText('ab', { from: 0, to: 2, text: 'a\nb' }, 1)).toBeNull()
+    expect(computeGhostText(source('ab'), { from: 0, to: 2, text: 'a\nb' }, 1)).toBeNull()
   })
 
   it('re-bases a suggestion that reaches back into the indentation in front of it', () => {
-    const ghost = computeGhostText('    foo', { from: 0, to: 7, text: '\tfoobar' }, 7)
+    const ghost = computeGhostText(source('    foo'), { from: 0, to: 7, text: '\tfoobar' }, 7)
 
     // Aligned against the whole line the tab would have to replace four spaces, which is a deletion
     // and the end of the ghost text; from past the indentation the same suggestion simply adds.
@@ -53,7 +56,11 @@ describe('deriving ghost text from a text edit', () => {
   })
 
   it('aligns brackets by depth rather than by the first one it meets', () => {
-    const ghost = computeGhostText('if ()', { from: 0, to: 5, text: '  if (f() = 1) { g(); }' }, 0)
+    const ghost = computeGhostText(
+      source('if ()'),
+      { from: 0, to: 5, text: '  if (f() = 1) { g(); }' },
+      0,
+    )
 
     expect(ghost?.parts).toEqual([
       { offset: 0, text: '  ' },
@@ -68,7 +75,7 @@ describe('deriving ghost text from a text edit', () => {
     expect(ghostTextDiff('(', ')(')).toEqual([
       { originalStart: 0, originalLength: 0, modifiedStart: 0, modifiedLength: 1 },
     ])
-    expect(computeGhostText('(', { from: 0, to: 1, text: ')(' }, 0)?.parts).toEqual([
+    expect(computeGhostText(source('('), { from: 0, to: 1, text: ')(' }, 0)?.parts).toEqual([
       { offset: 0, text: ')' },
     ])
   })
@@ -97,7 +104,7 @@ describe('deriving ghost text from a text edit', () => {
   // a classed run into its own element, which is the only reason text nobody typed can be told apart
   // from text they did.
   it('hangs every run off a point of its own, styled as text nobody has typed', () => {
-    const ghost = computeGhostText('con', { from: 0, to: 3, text: 'const answer' }, 3)
+    const ghost = computeGhostText(source('con'), { from: 0, to: 3, text: 'const answer' }, 3)
     const specs = ghostTextInlineSpecs(ghost!)
 
     expect(specs).toEqual([

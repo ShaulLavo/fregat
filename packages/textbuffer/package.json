@@ -48,10 +48,10 @@
     "bench:profile:check": "bun run build && bun run bench:prepare && node --expose-gc --test bench/profile.spec.mjs"
   },
   "devDependencies": {
-    "oxfmt": "0.54.0",
-    "oxlint": "1.69.0",
+    "oxfmt": "0.70.0",
+    "oxlint": "1.85.0",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.2"
   },
   "packageManager": "bun@1.3.14"
 }

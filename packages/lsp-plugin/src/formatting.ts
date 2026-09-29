@@ -1,7 +1,11 @@
 import type * as lsp from 'vscode-languageserver-protocol'
 
 import type { TextEdit } from '@singapore-editor/core'
-import { lspPositionToOffset } from '@singapore-editor/lsp'
+import {
+  lspPositionToOffsetInSnapshot,
+  type LspTextDocumentSnapshot,
+  type LspTextSnapshot,
+} from '@singapore-editor/lsp'
 
 import { minimalReplacementEdits, REDIFF_LENGTH_LIMIT } from './minimalEdits'
 
@@ -16,16 +20,16 @@ import { minimalReplacementEdits, REDIFF_LENGTH_LIMIT } from './minimalEdits'
  * change one line touches only that line.
  */
 export function prepareFormattingEdits(
-  text: string,
+  document: LspTextDocumentSnapshot,
   edits: readonly lsp.TextEdit[] | null,
 ): TextEdit[] {
   if (!edits || edits.length === 0) return []
 
   const converted = edits
     .map((edit) => ({
-      from: lspPositionToOffset(text, edit.range.start),
+      from: lspPositionToOffsetInSnapshot(document, edit.range.start),
       text: edit.newText,
-      to: lspPositionToOffset(text, edit.range.end),
+      to: lspPositionToOffsetInSnapshot(document, edit.range.end),
     }))
     .filter((edit) => edit.from <= edit.to)
     // Earliest first, and the longest of any that start together: when a formatter sends a
@@ -55,7 +59,11 @@ export function prepareFormattingEdits(
   }
 
   const minimal = applied.flatMap((edit) =>
-    minimalReplacementEdits(text.slice(edit.from, edit.to), edit.text, edit.from),
+    minimalReplacementEdits(
+      document.textSnapshot.readRange(edit.from, edit.to),
+      edit.text,
+      edit.from,
+    ),
   )
 
   // Descending, so applying them in order cannot shift the offsets of the ones still to come.
@@ -68,8 +76,8 @@ function joinFitsRediff(left: TextEdit, right: TextEdit): boolean {
 }
 
 /** Whether the edits would leave the document unchanged, so a no-op formatter records no change. */
-export function formattingChangesText(text: string, edits: readonly TextEdit[]): boolean {
-  return edits.some((edit) => text.slice(edit.from, edit.to) !== edit.text)
+export function formattingChangesText(text: LspTextSnapshot, edits: readonly TextEdit[]): boolean {
+  return edits.some((edit) => text.readRange(edit.from, edit.to) !== edit.text)
 }
 
 export function formattingOptions(tabSize: number): lsp.FormattingOptions {

@@ -64,6 +64,7 @@ type TestDocument = {
 
 afterEach(() => {
   vi.useRealTimers()
+  vi.unstubAllGlobals()
 })
 
 describe('LspClient', () => {
@@ -338,6 +339,8 @@ describe('LspClient', () => {
   })
 
   it('sends snapshot incremental changes without materializing the next full text', async () => {
+    const record = vi.fn()
+    vi.stubGlobal('__EDITOR_PERFORMANCE_DIAGNOSTICS__', record)
     const { client, transport } = await initializedClient({ textDocumentSync: 2 })
 
     const document = openTestDocument(client.workspace, {
@@ -355,6 +358,12 @@ describe('LspClient', () => {
 
     const didChange = transport.lastMessage()
     expect(didChangeTextDocument(didChange)).toEqual({ uri: 'file:///repo/a.ts', version: 1 })
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'lsp.contentChanges.path',
+        detail: expect.objectContaining({ path: 'snapshot-incremental' }),
+      }),
+    )
     expect(didChangeContentChanges(didChange)).toEqual([
       {
         range: {
@@ -367,6 +376,8 @@ describe('LspClient', () => {
   })
 
   it('materializes snapshot text when the server requests full sync', async () => {
+    const record = vi.fn()
+    vi.stubGlobal('__EDITOR_PERFORMANCE_DIAGNOSTICS__', record)
     const { client, transport } = await initializedClient({ textDocumentSync: 1 })
 
     const document = openTestDocument(client.workspace, {
@@ -379,6 +390,12 @@ describe('LspClient', () => {
     const didChange = transport.lastMessage()
     expect(didChangeTextDocument(didChange)).toEqual({ uri: 'file:///repo/a.ts', version: 1 })
     expect(didChangeContentChanges(didChange)).toEqual([{ text: 'abcX' }])
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'lsp.createContentChanges',
+        detail: expect.objectContaining({ syncMode: 'full' }),
+      }),
+    )
   })
 
   it('skips document sync notifications when the server does not opt in', async () => {
@@ -522,7 +539,8 @@ function updateTestDocument(
   workspace.updateDocumentSnapshot(document.uri, {
     edits,
     lineStarts:
-      lineStarts ?? arrayLspLineStarts(testLineStarts(textSnapshot.materializeFullText())),
+      lineStarts ??
+      arrayLspLineStarts(testLineStarts(textSnapshot.readRange(0, textSnapshot.length))),
     logicalRevisionCount: 1,
     sourceRevision: document.sourceRevision,
     sourceSegment: document.sourceSegment,
@@ -543,10 +561,13 @@ function testLineStarts(text: string): readonly number[] {
 function throwingFullTextSnapshot(text: string): LspTextSnapshot {
   return {
     length: text.length,
-    materializeFullText: () => {
-      throw new Error('unexpected full text materialization')
+    // Wider than any line-break probe, so only a whole-document read trips it.
+    readRange: (start, end) => {
+      if (start === 0 && end === text.length && text.length > 2) {
+        throw new Error('unexpected full text materialization')
+      }
+      return text.slice(start, end)
     },
-    readRange: (start, end) => text.slice(start, end),
     forEachTextChunk: (visit) => visit(text, 0, text.length),
   }
 }
@@ -554,7 +575,6 @@ function throwingFullTextSnapshot(text: string): LspTextSnapshot {
 function stringTextSnapshot(text: string): LspTextSnapshot {
   return {
     length: text.length,
-    materializeFullText: () => text,
     readRange: (start, end) => text.slice(start, end),
     forEachTextChunk: (visit) => visit(text, 0, text.length),
   }

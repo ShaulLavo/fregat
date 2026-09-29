@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   appendChunksToBuffers,
   BUFFER_CHUNK_SIZE,
-  bufferForPiece,
+  bufferSpanAt,
   countLineBreaks,
   createInitialBuffers,
   createOriginalPiece,
@@ -42,7 +42,7 @@ describe('piece table buffers', () => {
       visible: true,
     })
     const index = buffers.lineIndexes?.get(buffers.original)
-    expect(index).toMatchObject({ count: 1, scannedLength: 10, text: 'alpha\nbeta' })
+    expect(index).toMatchObject({ count: 1, scannedLength: 10 })
     expect(index?.offsets[0]).toBe(5)
   })
 
@@ -51,7 +51,7 @@ describe('piece table buffers', () => {
     const piece = createPiece(buffers, buffers.original, 6, 4, 20, false)
 
     expect(piece).toMatchObject({ start: 6, length: 4, lineBreaks: 0, visible: false })
-    expect(bufferForPiece(buffers, piece)).toBe('alpha\nbeta')
+    expect(bufferSpanAt(buffers, piece.buffer, piece.start).text).toBe('alpha\nbeta')
   })
 
   it('splits appended text into bounded chunks', () => {

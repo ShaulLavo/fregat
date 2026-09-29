@@ -1,6 +1,6 @@
 import type { EditorVisibleSnapshotJSON } from '../plugins'
 
-export const MAX_EDITOR_SNAPSHOT_BYTES = 262_144
+const MAX_EDITOR_SNAPSHOT_BYTES = 262_144
 const MAX_ABSOLUTE_PAINT_EXTENT = 16_000_000
 
 type Segment = {
@@ -20,18 +20,26 @@ export type SavedPaintRow = {
   readonly cursor: boolean
   readonly activeLanes: readonly string[]
   readonly segments: readonly Segment[]
+  readonly backgroundColor: string
+  readonly color: string
+  readonly gutterBackgroundColor: string
   readonly gutterCells: readonly { readonly id: string; readonly paint: string }[]
 }
 
 export type SavedPaint = {
-  readonly format: 1
+  readonly format: 5
   readonly appearance: string
   readonly scrollTop: number
   readonly scrollLeft: number
   readonly scrollHeight: number
   readonly scrollWidth: number
+  readonly reservedLeft: number
+  readonly reservedRight: number
   readonly viewportWidth: number
   readonly viewportHeight: number
+  // The scroller's outer box: unlike the viewport, a scrollbar arriving with content cannot move it.
+  readonly boxWidth: number
+  readonly boxHeight: number
   readonly gutterWidth: number
   readonly gutterLayout: EditorVisibleSnapshotJSON['gutterLayout']
   readonly rows: readonly SavedPaintRow[]
@@ -42,9 +50,17 @@ export function encodePaintSnapshot(
   snapshot: EditorVisibleSnapshotJSON,
   appearance: string,
   gutters: readonly SavedPaintRow['gutterCells'][],
+  reservations: { readonly left: number; readonly right: number },
+  backgrounds: readonly {
+    readonly backgroundColor: string
+    readonly color: string
+    readonly gutterBackgroundColor: string
+  }[] = [],
 ): string | null {
   const paint: SavedPaint = {
-    format: 1,
+    format: 5,
+    reservedLeft: reservations.left,
+    reservedRight: reservations.right,
     appearance,
     scrollTop: snapshot.viewport.scrollTop,
     scrollLeft: snapshot.viewport.scrollLeft,
@@ -52,10 +68,15 @@ export function encodePaintSnapshot(
     scrollWidth: snapshot.viewport.scrollWidth,
     viewportWidth: snapshot.viewport.clientWidth,
     viewportHeight: snapshot.viewport.clientHeight,
+    boxWidth: snapshot.viewport.borderBoxWidth ?? 0,
+    boxHeight: snapshot.viewport.borderBoxHeight ?? 0,
     gutterWidth: snapshot.gutterWidth,
     gutterLayout: snapshot.gutterLayout,
     rows: snapshot.rows.map((row, index) => ({
       gutterCells: gutters[index] ?? [],
+      backgroundColor: backgrounds[index]?.backgroundColor ?? '',
+      color: backgrounds[index]?.color ?? '',
+      gutterBackgroundColor: backgrounds[index]?.gutterBackgroundColor ?? '',
       top: row.top,
       height: row.height,
       left: row.leftSpacerWidth,
@@ -167,6 +188,9 @@ function isSegment(value: unknown): value is Segment {
 function isRow(value: unknown): value is SavedPaintRow {
   if (!record(value)) return false
   return (
+    color(value.backgroundColor) &&
+    color(value.color) &&
+    color(value.gutterBackgroundColor) &&
     number(value.top) &&
     number(value.height) &&
     value.height > 0 &&
@@ -205,20 +229,29 @@ function isLayer(value: unknown): value is SavedPaint['layers'][number] {
 }
 
 function isSavedPaint(value: unknown): value is SavedPaint {
-  if (!record(value) || value.format !== 1 || !string(value.appearance)) return false
+  if (!record(value) || value.format !== 5 || !string(value.appearance)) return false
   if (
     ![
       'scrollTop',
       'scrollLeft',
       'scrollHeight',
       'scrollWidth',
+      'reservedLeft',
+      'reservedRight',
       'viewportWidth',
       'viewportHeight',
+      'boxWidth',
+      'boxHeight',
       'gutterWidth',
     ].every((key) => number(value[key]))
   )
     return false
-  if (!record(value.gutterLayout) || !number(value.gutterLayout.fixedWidth)) return false
+  if (
+    !record(value.gutterLayout) ||
+    !number(value.gutterLayout.leadingInset) ||
+    !number(value.gutterLayout.fixedWidth)
+  )
+    return false
   if (!array(value.gutterLayout.lanes, 32, isLane)) return false
   if (!array(value.rows, 400, isRow) || !array(value.layers, 32, isLayer)) return false
   const segmentCount = value.rows.reduce((count, row) => count + row.segments.length, 0)
@@ -228,6 +261,7 @@ function isSavedPaint(value: unknown): value is SavedPaint {
 }
 
 function validPaintGeometry(paint: SavedPaint): boolean {
+  if (paint.reservedLeft + paint.reservedRight > MAX_ABSOLUTE_PAINT_EXTENT) return false
   if (paint.viewportWidth <= 0 || paint.viewportHeight <= 0) return false
   if (
     paint.scrollHeight > MAX_ABSOLUTE_PAINT_EXTENT ||
@@ -238,7 +272,7 @@ function validPaintGeometry(paint: SavedPaint): boolean {
   if (paint.scrollLeft > Math.max(0, paint.scrollWidth - paint.viewportWidth) + 1) return false
   const laneWidth = paint.gutterLayout.lanes.reduce(
     (sum, lane) => sum + lane.width,
-    paint.gutterLayout.fixedWidth,
+    paint.gutterLayout.leadingInset + paint.gutterLayout.fixedWidth,
   )
   if (Math.abs(laneWidth - paint.gutterWidth) > 0.001) return false
   if (!uniqueIds(paint.gutterLayout.lanes) || !uniqueIds(paint.layers)) return false

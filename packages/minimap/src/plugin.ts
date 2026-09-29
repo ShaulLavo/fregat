@@ -1,5 +1,5 @@
-import type { DocumentSessionChange } from '@singapore-editor/core/document'
 import type {
+  EditorContributionChange,
   EditorDisposable,
   EditorCapabilityContribution,
   EditorCapabilityContributionContext,
@@ -17,7 +17,7 @@ import {
   registerWheelScrollTarget,
 } from '@singapore-editor/core/extensions'
 import { mergeDenseDecorations } from './decorationMerge'
-import { computeRenderLayout } from './layout'
+import { computeRenderLayout, documentLineForSliderY, visibleDocumentLineRange } from './layout'
 import { resolveMinimapOptions } from './options'
 import type { EditorMinimapOptions, ResolvedMinimapOptions } from './types'
 import { minimapViewportGeometry, type MinimapScrollGeometry } from './viewportGeometry'
@@ -80,7 +80,7 @@ class MinimapContribution implements EditorViewContribution {
   private appliedReservedWidth = 0
   private layoutSignature = ''
   private scrollBox: MinimapScrollBox | null = null
-  private pendingSliderScrollTop: number | null = null
+  private pendingSliderLine: number | null = null
   private sliderScrollFrame = 0
   private disposed = false
 
@@ -113,7 +113,7 @@ class MinimapContribution implements EditorViewContribution {
   public update(
     snapshot: EditorViewSnapshot,
     kind: EditorViewContributionUpdateKind,
-    change?: DocumentSessionChange | null,
+    change?: EditorContributionChange | null,
   ): void {
     if (this.disposed) return
 
@@ -153,6 +153,7 @@ class MinimapContribution implements EditorViewContribution {
   private readonly reserveWidth = (_width: number): void => {
     if (this.context.getSnapshot().geometryCommitted === false) return
     this.scrollBox = null
+    this.layoutSignature = ''
     this.synchronizeLayoutReservation()
   }
 
@@ -249,6 +250,7 @@ class MinimapContribution implements EditorViewContribution {
   ): number {
     const snapshot = this.latestSnapshot
     const element = this.context.scrollElement
+    const range = visibleDocumentLineRange(snapshot, this.latestViewport)
     return computeRenderLayout({
       minimap: this.options,
       lineCount: snapshot.lineCount,
@@ -262,8 +264,8 @@ class MinimapContribution implements EditorViewContribution {
         clientHeight,
         minimapHeight,
         reservedWidth: 0,
-        visibleStart: this.latestViewport.visibleRange.start,
-        visibleEnd: this.latestViewport.visibleRange.end,
+        visibleStart: range.start,
+        visibleEnd: range.end,
       },
     }).width
   }
@@ -274,8 +276,11 @@ class MinimapContribution implements EditorViewContribution {
     if (event.target === this.host.slider || this.host.slider.contains(event.target as Node)) return
 
     event.preventDefault()
-    const row = this.rowFromPointer(event)
-    this.context.revealLine(row)
+    const frame = this.client.frameLayout()
+    const y = event.clientY - this.host.root.getBoundingClientRect().top
+    if (y >= frame.sliderTop && y <= frame.sliderTop + frame.sliderHeight) return
+    const line = documentLineForSliderY(frame, y - frame.sliderHeight / 2)
+    this.revealDocumentLine(line)
   }
 
   private readonly handleSliderPointerDown = (event: PointerEvent): void => {
@@ -285,23 +290,20 @@ class MinimapContribution implements EditorViewContribution {
     event.preventDefault()
     this.stopSliderDrag()
     const startY = event.clientY
-    const startScrollTop = this.latestViewport.scrollTop
-    const sliderHeight = Math.max(1, this.host.slider.getBoundingClientRect().height)
-    const scrollable = Math.max(
-      1,
-      this.latestViewport.scrollHeight - this.latestViewport.clientHeight,
-    )
-    const trackHeight = Math.max(1, this.host.root.clientHeight - sliderHeight)
-    const ratio = scrollable / trackHeight
+    const frame = this.client.frameLayout()
+    const startLine = documentLineForSliderY(frame, frame.sliderTop)
 
+    let moved = false
     const onMove = (move: PointerEvent): void => {
       if (this.context.getSnapshot().geometryCommitted === false) {
         this.stopSliderDrag()
         return
       }
-      const scrollTop = clamp(startScrollTop + (move.clientY - startY) * ratio, 0, scrollable)
-      this.client.previewScrollTop(this.latestSnapshot, scrollTop)
-      this.scheduleSliderScroll(scrollTop)
+      if (!moved && move.clientY === startY) return
+      if (frame.sliderLineHeight <= 0) return
+      moved = true
+      const line = startLine + (move.clientY - startY) / frame.sliderLineHeight
+      this.scheduleSliderScroll(line)
     }
     const onEnd = (): void => this.stopSliderDrag()
 
@@ -337,8 +339,8 @@ class MinimapContribution implements EditorViewContribution {
     this.host.slider.classList.remove('active')
   }
 
-  private scheduleSliderScroll(scrollTop: number): void {
-    this.pendingSliderScrollTop = scrollTop
+  private scheduleSliderScroll(line: number): void {
+    this.pendingSliderLine = line
     if (this.sliderScrollFrame !== 0) return
 
     this.sliderScrollFrame = requestFrame(() => {
@@ -348,12 +350,12 @@ class MinimapContribution implements EditorViewContribution {
   }
 
   private flushSliderScroll(): void {
-    const scrollTop = this.pendingSliderScrollTop
-    this.pendingSliderScrollTop = null
-    if (scrollTop === null) return
+    const line = this.pendingSliderLine
+    this.pendingSliderLine = null
+    if (line === null) return
     if (this.context.getSnapshot().geometryCommitted === false) return
 
-    setScrollTop(this.context.scrollElement, scrollTop)
+    this.revealDocumentLine(line)
   }
 
   private cancelSliderScroll(): void {
@@ -373,10 +375,8 @@ class MinimapContribution implements EditorViewContribution {
     }
   }
 
-  private rowFromPointer(event: PointerEvent): number {
-    const rect = this.host.root.getBoundingClientRect()
-    const ratio = Math.max(0, Math.min(1, (event.clientY - rect.top) / Math.max(1, rect.height)))
-    return Math.floor(ratio * Math.max(1, this.latestSnapshot.lineCount))
+  private revealDocumentLine(line: number): void {
+    this.context.revealLine(clamp(Math.floor(line), 0, this.latestSnapshot.lineCount - 1))
   }
 
   private logLane(
@@ -385,7 +385,7 @@ class MinimapContribution implements EditorViewContribution {
     geometry: ReturnType<typeof minimapViewportGeometry>,
   ): void {
     const viewport = this.latestViewport
-    this.context.log?.({
+    this.context.log({
       action: 'editor.minimap.lane_changed',
       level: 'info',
       minimap: {
@@ -519,12 +519,6 @@ function hostClassName(options: ResolvedMinimapOptions): string {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
-}
-
-function setScrollTop(element: HTMLElement, scrollTop: number): void {
-  if (element.scrollTop === scrollTop) return
-
-  element.scrollTop = scrollTop
 }
 
 function requestFrame(callback: () => void): number {

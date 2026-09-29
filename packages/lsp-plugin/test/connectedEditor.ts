@@ -9,19 +9,17 @@
 
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
 import {
-  createStringTextSnapshot,
   type DocumentSessionChange,
   type SelectionAffinity,
   type TextEdit,
-  type TextSnapshot,
+  type TextReadSnapshot,
 } from '@singapore-editor/core/document'
-import type { EditorCommandId } from '@singapore-editor/core/editor'
+import type { EditorAnyCommandId } from '@singapore-editor/core/editor'
 import type {
   EditorCommandHandler,
   EditorEditContributionContext,
   EditorLanguageFeatureSelector,
   EditorLanguageFeatureToken,
-  EditorPluginContext,
   EditorViewContribution,
   EditorViewContributionContext,
   EditorViewContributionProvider,
@@ -33,13 +31,24 @@ import { vi } from 'vitest'
 import type * as lsp from 'vscode-languageserver-protocol'
 
 import { createLanguageServerAdapterPlugin } from '../src/plugin'
+import { createTestKeymap } from '@singapore-editor/core/testing'
 import type {
   ApplyWorkspaceEditRequest,
   ApplyWorkspaceEditResult,
   LanguageServerPluginOptions,
   LanguageServerRenamePrompt,
 } from '../src/types'
-import { documentSyncSnapshotFields, viewSnapshotStructuralFields } from './documentSyncSnapshot'
+import {
+  documentSyncSnapshotFields,
+  viewSnapshotStructuralFields,
+  viewText,
+  viewTextFields,
+} from './documentSyncSnapshot'
+import {
+  createTestEditContributionContext,
+  createTestPluginContext,
+  createTestViewContributionContext,
+} from '@singapore-editor/core/testing'
 
 type JsonMessage = Record<string, unknown>
 
@@ -97,11 +106,13 @@ export type ConnectedEditor = {
   answerHover(hover: lsp.Hover | null): void
   answerDefinition(definition: readonly lsp.Location[]): void
   answerSignatureHelp(help: lsp.SignatureHelp | null): void
+  /** Waits for a request a lazily loaded controller only sends once its module has landed. */
+  awaitRequest(method: string): Promise<void>
   answerCodeAction(actions: readonly (lsp.Command | lsp.CodeAction)[] | null): void
   answerCodeActionResolve(action: lsp.CodeAction): void
   answerRename(edit: unknown): void
   publishDiagnostics(diagnostics: readonly lsp.Diagnostic[], version?: number): void
-  runCommand(commandId: EditorCommandId): boolean
+  runCommand(commandId: EditorAnyCommandId): boolean
   completionElement(): HTMLElement
   completionLabels(): readonly string[]
   focusedCompletionLabel(): string | null
@@ -112,7 +123,7 @@ export type ConnectedEditor = {
   initializeParams(): lsp.InitializeParams
   reportedErrors(): readonly unknown[]
   workspaceEditRequests(): readonly ApplyWorkspaceEditRequest[]
-  textSnapshot(): TextSnapshot
+  textSnapshot(): TextReadSnapshot
   /** The tab stops each accepted snippet handed the host, newest last. */
   startedSnippetSessions(): readonly (readonly SnippetStopRange[])[]
 }
@@ -138,6 +149,8 @@ export type ConnectedEditorOptions = {
   readonly onRequestRenameName?: (prompt: LanguageServerRenamePrompt) => Promise<string | null>
   readonly onDefinitionLinkHover?: LanguageServerPluginOptions['onDefinitionLinkHover']
   readonly onConnectionCreated?: LanguageServerPluginOptions['onConnectionCreated']
+  /** Commands another contribution would have registered, reachable through the same keymap. */
+  readonly commands?: ReadonlyMap<EditorAnyCommandId, EditorCommandHandler>
 }
 
 /**
@@ -157,7 +170,7 @@ export async function connectedEditor(
   let snapshot = editorSnapshot(text, caretOffset, 1, options.affinity ?? 'after')
   let anchorRect = new DOMRect(10, 20, 40, 18)
 
-  const commands = new Map<EditorCommandId, EditorCommandHandler>()
+  const commands = new Map<EditorAnyCommandId, EditorCommandHandler>(options.commands)
   const errors: unknown[] = []
   const workspaceEditRequests: ApplyWorkspaceEditRequest[] = []
   const snippetSessions: (readonly SnippetStopRange[])[] = []
@@ -171,12 +184,21 @@ export async function connectedEditor(
     snippetSessions,
     workspaceEditRequests,
   )
+  // The editor reports the keystroke separately from the edit it caused, because auto-closing and
+  // typing over a closer both make the edit a poor stand-in for it.
+  const typedTextListeners = new Set<(text: string) => void>()
+  const keymap = createTestKeymap(element, commands)
   const context = viewContributionContext({
     element,
+    registerKeymapContextKey: keymap.registerKeymapContextKey,
     getSnapshot: () => snapshot,
     getRangeClientRect: () => anchorRect,
     getFeature: (token) => features.get(token) ?? null,
     focusEditor,
+    onDidType: (listener) => {
+      typedTextListeners.add(listener)
+      return () => typedTextListeners.delete(listener)
+    },
   })
   // The hover is the host's, so the harness installs it the way an application would.
   const hover = activateHoverPlugin(commands).createContribution(context)
@@ -216,6 +238,14 @@ export async function connectedEditor(
   })
   await flushPromises()
 
+  const awaitRequest = async (method: string): Promise<void> => {
+    for (let turn = 0; turn < 100; turn++) {
+      if (transport.sent.map(jsonMessage).some((sent) => sent.method === method)) return
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    }
+    throw new Error(`no ${method} request after waiting`)
+  }
+
   const answer = (method: string, result: unknown): void => {
     const request = transport.sent.map(jsonMessage).findLast((sent) => sent.method === method)
     if (!request) throw new Error(`missing request ${method}`)
@@ -228,7 +258,7 @@ export async function connectedEditor(
   }
 
   const applyChange = (edit: TextEdit, caretOffset: number): void => {
-    const next = `${snapshot.fullText.slice(0, edit.from)}${edit.text}${snapshot.fullText.slice(edit.to)}`
+    const next = `${viewText(snapshot).slice(0, edit.from)}${edit.text}${viewText(snapshot).slice(edit.to)}`
     snapshot = editorSnapshot(
       next,
       caretOffset,
@@ -241,10 +271,14 @@ export async function connectedEditor(
   return {
     applyEdits,
     focusEditor,
-    dispose: () => contribution.dispose(),
+    dispose: () => {
+      contribution.dispose()
+      keymap.dispose()
+    },
     type: (character) => {
       const at = caretOffsetOf(snapshot)
       applyChange({ from: at, to: at, text: character }, at + character.length)
+      for (const listener of [...typedTextListeners]) listener(character)
     },
     backspace: () => {
       const at = caretOffsetOf(snapshot)
@@ -253,7 +287,7 @@ export async function connectedEditor(
     editElsewhere: (edit) => applyChange(edit, caretOffsetOf(snapshot)),
     moveCaret: (offset) => {
       snapshot = editorSnapshot(
-        snapshot.fullText,
+        viewText(snapshot),
         offset,
         snapshot.textVersion,
         caretAffinityOf(snapshot),
@@ -262,7 +296,7 @@ export async function connectedEditor(
     },
     selectRange: (start, end) => {
       snapshot = editorSnapshot(
-        snapshot.fullText,
+        viewText(snapshot),
         end,
         snapshot.textVersion,
         caretAffinityOf(snapshot),
@@ -302,6 +336,7 @@ export async function connectedEditor(
     answerHover: (hover) => answer('textDocument/hover', hover),
     answerDefinition: (definition) => answer('textDocument/definition', definition),
     answerSignatureHelp: (help) => answer('textDocument/signatureHelp', help),
+    awaitRequest,
     answerCodeAction: (actions) => answer('textDocument/codeAction', actions),
     answerCodeActionResolve: (action) => answer('codeAction/resolve', action),
     answerRename: (edit) => answer('textDocument/rename', edit),
@@ -356,7 +391,7 @@ export async function connectedEditor(
     },
     reportedErrors: () => errors,
     workspaceEditRequests: () => workspaceEditRequests,
-    textSnapshot: () => snapshot.textSnapshot!,
+    textSnapshot: () => snapshot.textSnapshot,
     startedSnippetSessions: () => snippetSessions,
   }
 }
@@ -373,7 +408,7 @@ export function singleLineRange(start: number, end: number): lsp.Range {
 function activateProvider(
   transport: LspManagedTransport,
   features: Map<unknown, unknown>,
-  commands: Map<EditorCommandId, EditorCommandHandler>,
+  commands: Map<EditorAnyCommandId, EditorCommandHandler>,
   applyEdits: EditorEditContributionContext['applyEdits'],
   errors: unknown[],
   options: ConnectedEditorOptions,
@@ -385,7 +420,6 @@ function activateProvider(
   createLanguageServerAdapterPlugin({
     name: 'editor.test-lsp',
     createTransport: () => transport,
-    defaultHighlightPrefix: 'editor-test',
     completion: {
       acceptTimingName: COMPLETION_ACCEPT_TIMING_NAME,
       widgetClassNamespace: 'test-lsp',
@@ -400,82 +434,72 @@ function activateProvider(
     onDefinitionLinkHover: options.onDefinitionLinkHover,
     onConnectionCreated: options.onConnectionCreated,
     onRequestError: (_serverId, _method, error) => errors.push(error),
-  }).activate({
-    registerHighlighter: () => disposable,
-    registerSyntaxProvider: () => disposable,
-    registerViewContribution: (value) => {
-      provider = value
-      return disposable
-    },
-    registerCommandContribution: (value) => {
-      value.createContribution({
-        registerCommand: (commandId, handler) => {
-          commands.set(commandId, handler)
-          return { dispose: () => commands.delete(commandId) }
-        },
-      })
-      return disposable
-    },
-    registerCapabilityContribution: () => disposable,
-    registerEditContribution: (value) => {
-      value.createContribution({
-        hasDocument: () => true,
-        materializeFullText: () => '',
-        getTextSnapshot: () => null,
-        getSelections: () => [],
-        focusEditor: vi.fn(),
-        applyEdits,
-        startSnippetSession: (ranges) => snippetSessions.push(ranges),
-        registerFeature: (id, feature) => {
-          features.set(id, feature)
-          return { dispose: () => features.delete(id) }
-        },
-      })
-      return disposable
-    },
-    registerDecorationContribution: () => disposable,
-    registerGutterContribution: () => disposable,
-    registerInjectedTextRowProvider: () => disposable,
-  } satisfies EditorPluginContext)
+  }).activate(
+    createTestPluginContext({
+      registerViewContribution: (value) => {
+        provider = value
+        return disposable
+      },
+      registerCommandContribution: (value) => {
+        value.createContribution({
+          registerCommand: (commandId, handler) => {
+            commands.set(commandId, handler)
+            return { dispose: () => commands.delete(commandId) }
+          },
+        })
+        return disposable
+      },
+      registerEditContribution: (value) => {
+        value.createContribution(
+          createTestEditContributionContext({
+            materializeFullText: () => '',
+            focusEditor: vi.fn(),
+            applyEdits,
+            startSnippetSession: (ranges) => snippetSessions.push(ranges),
+            registerFeature: (id, feature) => {
+              features.set(id, feature)
+              return { dispose: () => features.delete(id) }
+            },
+          }),
+        )
+        return disposable
+      },
+    }),
+  )
 
   if (!provider) throw new Error('missing provider')
   return provider
 }
 
 function activateHoverPlugin(
-  commands: Map<EditorCommandId, EditorCommandHandler>,
+  commands: Map<EditorAnyCommandId, EditorCommandHandler>,
 ): EditorViewContributionProvider {
   let provider: EditorViewContributionProvider | null = null
   const disposable = { dispose: () => undefined }
-  createHoverPlugin({ classNamespace: 'test' }).activate({
-    registerHighlighter: () => disposable,
-    registerSyntaxProvider: () => disposable,
-    registerViewContribution: (value) => {
-      provider = value
-      return disposable
-    },
-    registerCommandContribution: (value) => {
-      value.createContribution({
-        registerCommand: (commandId, handler) => {
-          commands.set(commandId, handler)
-          return { dispose: () => commands.delete(commandId) }
-        },
-      })
-      return disposable
-    },
-    registerCapabilityContribution: () => disposable,
-    registerEditContribution: () => disposable,
-    registerDecorationContribution: () => disposable,
-    registerGutterContribution: () => disposable,
-    registerInjectedTextRowProvider: () => disposable,
-  } satisfies EditorPluginContext)
+  createHoverPlugin({ classNamespace: 'test' }).activate(
+    createTestPluginContext({
+      registerViewContribution: (value) => {
+        provider = value
+        return disposable
+      },
+      registerCommandContribution: (value) => {
+        value.createContribution({
+          registerCommand: (commandId, handler) => {
+            commands.set(commandId, handler)
+            return { dispose: () => commands.delete(commandId) }
+          },
+        })
+        return disposable
+      },
+    }),
+  )
 
   if (!provider) throw new Error('missing hover provider')
   return provider
 }
 
 /** The core registry, reduced to what a single-document harness needs: order of registration. */
-export function providerRegistry(): Pick<
+function providerRegistry(): Pick<
   Required<EditorViewContributionContext>,
   'registerProvider' | 'getProviders'
 > {
@@ -507,28 +531,23 @@ function viewContributionContext(options: {
   getRangeClientRect(): DOMRect
   getFeature(token: unknown): unknown
   focusEditor(): void
+  onDidType(listener: (text: string) => void): () => void
+  registerKeymapContextKey: EditorViewContributionContext['registerKeymapContextKey']
 }): EditorViewContributionContext {
-  return {
+  return createTestViewContributionContext({
     ...providerRegistry(),
+    registerKeymapContextKey: options.registerKeymapContextKey,
+    onDidType: (listener) => ({ dispose: options.onDidType(listener) }),
     container: options.element,
     scrollElement: options.element,
     contentElement: options.element,
     highlightPrefix: 'editor-test',
-    hasDocument: () => true,
     getSnapshot: options.getSnapshot,
-    requestViewUpdate: vi.fn(),
     getFeature: options.getFeature as EditorViewContributionContext['getFeature'],
-    revealLine: vi.fn(),
     focusEditor: options.focusEditor,
-    setSelection: vi.fn(),
-    setSelections: vi.fn(),
-    setScrollTop: vi.fn(),
-    reserveOverlayWidth: vi.fn(),
     textOffsetFromPoint: vi.fn(() => 0),
     getRangeClientRect: () => options.getRangeClientRect(),
-    setRangeHighlight: vi.fn(),
-    clearRangeHighlight: vi.fn(),
-  }
+  })
 }
 
 function editorSnapshot(
@@ -543,10 +562,8 @@ function editorSnapshot(
     ...viewSnapshotStructuralFields(),
     documentId: 'src/index.ts',
     languageId: 'typescript',
-    fullText,
-    textSnapshot: createStringTextSnapshot(fullText),
+    ...viewTextFields(fullText),
     textVersion,
-    lineStarts: lineStartsOf(fullText),
     tokens: EditorTokenStore.empty(),
     brackets: [],
     selections: [

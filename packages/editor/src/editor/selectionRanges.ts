@@ -1,4 +1,5 @@
 import type { DocumentSession } from '../documentSession'
+import { textSnapshotRangeContent, type TextReadSnapshot } from '../documentTextSnapshot'
 import type { PieceTableSnapshot } from '@singapore-editor/textbuffer'
 import type {
   EditorSelectionRange,
@@ -7,9 +8,8 @@ import type {
 } from '../plugins'
 import { resolveSelection, type ResolvedSelection } from '../selections'
 import type { EditorSyntaxLanguageId, FoldRange } from '../syntax/session'
+import { forEachTextWindow, forEachTextWindowBackward } from '../textWindows'
 import {
-  clampTextOffsetRange,
-  lineRangeAtOffset,
   nextWordPartOffset,
   previousWordPartOffset,
   wordRangeAtOffset,
@@ -44,13 +44,16 @@ type SelectionRangeState = {
  * document closes the bucket so that the line steps interpolated below always have a rung above them
  * to fit under — including for a caret with no word around it, which then climbs line steps alone.
  */
-const wordSelectionRanges: EditorSelectionRangeProvider = ({ text, offset }) => {
-  const ranges: TextOffsetRange[] = [{ start: 0, end: text.length }]
-  const word = wordRangeAtOffset(text, offset)
-  if (word.start >= word.end) return ranges
+const wordSelectionRanges: EditorSelectionRangeProvider = ({ textSnapshot, offset }) => {
+  const ranges: TextOffsetRange[] = [{ start: 0, end: textSnapshot.length }]
+  const line = textSnapshot.lineRange(textSnapshot.lineAt(offset))
+  const lineText = textSnapshotRangeContent(textSnapshot, line.start, line.end)
+  const local = wordRangeAtOffset(lineText, offset - line.start)
+  if (local.start >= local.end) return ranges
 
+  const word = { start: line.start + local.start, end: line.start + local.end }
   ranges.push(word)
-  const part = wordPartRangeAtOffset(text, word, offset)
+  const part = wordPartRangeAtOffset(textSnapshot.readRange(word.start, word.end), word, offset)
   if (part) ranges.push(part)
 
   return ranges
@@ -65,10 +68,10 @@ function selectionRangeLadder(
   context: EditorSelectionRangeContext,
   providers: readonly EditorSelectionRangeProvider[],
 ): readonly TextOffsetRange[] {
-  const { text, selection } = context
+  const { textSnapshot, selection } = context
   const candidates = providers
     .flatMap((provider) => provider(context))
-    .map((range) => clampTextOffsetRange(text, range))
+    .map((range) => clampRange(textSnapshot, range))
     .filter((range) => containsRange(range, selection))
     .toSorted(innermostFirst)
 
@@ -78,7 +81,7 @@ function selectionRangeLadder(
     if (last && containsRange(range, last) && !rangesEqual(range, last)) chain.push(range)
   }
 
-  return chainWithLineSteps(text, chain)
+  return chainWithLineSteps(textSnapshot, chain)
 }
 
 export class SelectionRangeStore {
@@ -132,7 +135,7 @@ export class SelectionRangeStore {
 
     if (direction === 'shrink') return null
 
-    const text = session.materializeFullText()
+    const textSnapshot = session.getTextSnapshot()
     const languageId = this.options.getLanguageId()
     const folds = this.options.getSyntaxFolds()
     const providers = [wordSelectionRanges, ...this.options.getProviders()]
@@ -140,7 +143,7 @@ export class SelectionRangeStore {
     return resolved.map((selection) => ({
       ranges: selectionRangeLadder(
         {
-          text,
+          textSnapshot,
           languageId,
           offset: selection.headOffset,
           selection: { start: selection.startOffset, end: selection.endOffset },
@@ -161,14 +164,15 @@ export class SelectionRangeStore {
  * boundary — the part it would move into next.
  */
 function wordPartRangeAtOffset(
-  text: string,
+  wordText: string,
   word: TextOffsetRange,
   offset: number,
 ): TextOffsetRange | null {
-  const start = Math.max(word.start, previousWordPartOffset(text, Math.min(offset + 1, word.end)))
-  const end = Math.min(word.end, nextWordPartOffset(text, start))
+  const local = Math.min(offset + 1, word.end) - word.start
+  const start = previousWordPartOffset(wordText, local)
+  const end = Math.min(wordText.length, nextWordPartOffset(wordText, start))
 
-  return start < end ? { start, end } : null
+  return start < end ? { start: word.start + start, end: word.start + end } : null
 }
 
 /**
@@ -179,7 +183,7 @@ function wordPartRangeAtOffset(
  * — everything a grammar contributes inside one statement — never has a line step wedged into it.
  */
 function chainWithLineSteps(
-  text: string,
+  text: TextReadSnapshot,
   chain: readonly TextOffsetRange[],
 ): readonly TextOffsetRange[] {
   const first = chain[0]
@@ -214,29 +218,47 @@ function pushLineStep(
   stepped.push(step)
 }
 
-function lineContentRange(text: string, range: TextOffsetRange): TextOffsetRange {
+function lineContentRange(text: TextReadSnapshot, range: TextOffsetRange): TextOffsetRange {
   const first = lineRangeAtOffset(text, range.start)
   const last = lineRangeAtOffset(text, range.end)
 
   return { start: firstNonWhitespaceOffset(text, first), end: lastNonWhitespaceOffset(text, last) }
 }
 
-function wholeLineRange(text: string, range: TextOffsetRange): TextOffsetRange {
+function wholeLineRange(text: TextReadSnapshot, range: TextOffsetRange): TextOffsetRange {
   return {
     start: lineRangeAtOffset(text, range.start).start,
     end: lineRangeAtOffset(text, range.end).end,
   }
 }
 
-function firstNonWhitespaceOffset(text: string, line: TextOffsetRange): number {
-  let offset = line.start
-  while (offset < line.end && isWhitespace(text[offset])) offset += 1
+function lineRangeAtOffset(text: TextReadSnapshot, offset: number): TextOffsetRange {
+  return text.lineRange(text.lineAt(offset))
+}
+
+function firstNonWhitespaceOffset(text: TextReadSnapshot, line: TextOffsetRange): number {
+  let offset = line.end
+  forEachTextWindow(text, line.start, line.end, (window, start) => {
+    for (let index = 0; index < window.length; index += 1) {
+      if (isWhitespace(window[index])) continue
+      offset = start + index
+      return false
+    }
+    return true
+  })
   return offset
 }
 
-function lastNonWhitespaceOffset(text: string, line: TextOffsetRange): number {
-  let offset = line.end
-  while (offset > line.start && isWhitespace(text[offset - 1])) offset -= 1
+function lastNonWhitespaceOffset(text: TextReadSnapshot, line: TextOffsetRange): number {
+  let offset = line.start
+  forEachTextWindowBackward(text, line.start, line.end, (window, start) => {
+    for (let index = window.length - 1; index >= 0; index -= 1) {
+      if (isWhitespace(window[index])) continue
+      offset = start + index + 1
+      return false
+    }
+    return true
+  })
   return offset
 }
 
@@ -244,11 +266,19 @@ function isWhitespace(character: string | undefined): boolean {
   return character !== undefined && character.trim() === ''
 }
 
-function sameLines(text: string, left: TextOffsetRange, right: TextOffsetRange): boolean {
+function sameLines(text: TextReadSnapshot, left: TextOffsetRange, right: TextOffsetRange): boolean {
   return (
-    lineRangeAtOffset(text, left.start).start === lineRangeAtOffset(text, right.start).start &&
-    lineRangeAtOffset(text, left.end).start === lineRangeAtOffset(text, right.end).start
+    text.lineAt(left.start) === text.lineAt(right.start) &&
+    text.lineAt(left.end) === text.lineAt(right.end)
   )
+}
+
+function clampRange(text: TextReadSnapshot, range: TextOffsetRange): TextOffsetRange {
+  return { start: clampOffset(text, range.start), end: clampOffset(text, range.end) }
+}
+
+function clampOffset(text: TextReadSnapshot, offset: number): number {
+  return Math.max(0, Math.min(offset, text.length))
 }
 
 /** Innermost first — latest start, then shortest — so one pass over candidates only ever grows. */

@@ -4,14 +4,14 @@ import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '../../tree-sitter-languages/
 
 import {
   applyBatchToPieceTable,
+  createAnchorSelection,
   createPieceTableSnapshot,
+  createSelectionSet,
+  insertIntoPieceTable,
+  resolveSelection,
   type TextEdit,
 } from '@singapore-editor/core/document'
-import {
-  createAnchorSelection,
-  createSelectionSet,
-  resolveSelection,
-} from '@singapore-editor/core/internal'
+import { reclaimPieceTableText } from '@singapore-editor/core/testing'
 import {
   expandTreeSitterSelection,
   resolveTreeSitterLanguageContribution,
@@ -32,6 +32,26 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
 
   afterEach(async () => {
     await workerClient.dispose()
+  })
+
+  it('compiles warmed languages and skips a grammar that fails to load', async () => {
+    const typescript = await resolveTreeSitterLanguageContribution(
+      TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((contribution) => contribution.id === 'typescript')!,
+    )
+    const broken = { ...typescript, id: 'broken', wasmUrl: 'data:application/wasm;base64,AA==' }
+
+    await workerClient.warmLanguages([typescript, broken])
+    await workerClient.awaitIdleFence()
+    const parsed = await workerClient.parse({
+      documentId: 'warm.ts',
+      runtimeSessionId: 'runtime-warm.ts',
+      snapshotVersion: 1,
+      languageId: 'typescript',
+      snapshot: createPieceTableSnapshot('const warmed = true;\n'),
+    })
+
+    expect(parsed?.captures.length).toBeGreaterThan(0)
+    expect(workerClient.inspect().lifecycle).toBe('ready')
   })
 
   it('parses and edits through the real browser Worker', async () => {
@@ -105,6 +125,75 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
 
     expect(result?.documentId).toBe(documentId)
     expect(result?.captures.length).toBeGreaterThan(0)
+  })
+
+  it('parses copied original survivors through a warmed worker source cache', async () => {
+    const prefix = 'const 名前 = "🎉";\n'
+    const deleted = '// retired text\n'.repeat(4096)
+    const original = createPieceTableSnapshot(prefix + deleted + 'export const last = 42;\n')
+    const snapshot = applyBatchToPieceTable(original, [
+      { from: prefix.length, to: prefix.length + deleted.length, text: '' },
+    ])
+    const request = {
+      documentId: 'reclaimed.ts',
+      runtimeSessionId: 'runtime-reclaimed',
+      languageId: 'typescript',
+    }
+    const before = await workerClient.parse({ ...request, snapshotVersion: 1, snapshot })
+    const compact = reclaimPieceTableText(snapshot)
+    expect(compact.buffers).not.toBe(snapshot.buffers)
+    const after = await workerClient.parse({
+      ...request,
+      snapshotVersion: 2,
+      snapshot: compact,
+    })
+    expect(after?.captures.length).toBeGreaterThan(0)
+    expect(after?.captures).toEqual(before?.captures)
+    expect(after?.tokensPacked).toEqual(before?.tokensPacked)
+
+    const edits = [{ from: prefix.length, to: prefix.length, text: '// new line\n' }]
+    const nextSnapshot = applyBatchToPieceTable(compact, edits)
+    const payload = createTreeSitterEditPayload({
+      ...request,
+      previousSnapshotVersion: 2,
+      snapshotVersion: 3,
+      previousSnapshot: compact,
+      nextSnapshot,
+      edits,
+    })
+    const edited = payload ? await workerClient.edit(payload) : undefined
+    const full = await workerClient.parse({
+      ...request,
+      runtimeSessionId: 'runtime-reclaimed-full',
+      snapshotVersion: 3,
+      snapshot: nextSnapshot,
+    })
+    expect(edited?.captures.length).toBeGreaterThan(0)
+    expect(edited?.captures).toEqual(full?.captures)
+    expect(edited?.tokensPacked).toEqual(full?.tokensPacked)
+  })
+
+  it('parses equal-length divergent append tails without reusing the other branch text', async () => {
+    const base = insertIntoPieceTable(createPieceTableSnapshot(''), 0, 'const value = ')
+    const left = insertIntoPieceTable(base, base.length, '1;\n')
+    const right = insertIntoPieceTable(base, base.length, 'x;\n')
+    const request = {
+      documentId: 'fork.ts',
+      runtimeSessionId: 'runtime-fork',
+      languageId: 'typescript',
+    }
+    const first = await workerClient.parse({ ...request, snapshotVersion: 1, snapshot: left })
+    const second = await workerClient.parse({ ...request, snapshotVersion: 2, snapshot: right })
+    const full = await workerClient.parse({
+      ...request,
+      runtimeSessionId: 'runtime-fork-full',
+      snapshotVersion: 2,
+      snapshot: right,
+    })
+    expect(second?.captures.length).toBeGreaterThan(0)
+    expect(second?.captures).not.toEqual(first?.captures)
+    expect(second?.captures).toEqual(full?.captures)
+    expect(second?.tokensPacked).toEqual(full?.tokensPacked)
   })
 
   it('highlights PascalCase TSX component tag names and reports JSX folds', async () => {
@@ -647,8 +736,178 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
       )
 
       expect(languages).toEqual(
-        new Set(['css', 'html', 'javascript', 'markdown_inline'] satisfies TreeSitterLanguageId[]),
+        new Set(['css', 'html', 'javascript'] satisfies TreeSitterLanguageId[]),
       )
+    }
+  })
+
+  it('matches a full parse after edits that move structure outside the edited range', async () => {
+    const text = [
+      '# Title',
+      '',
+      'Some *text* here.',
+      '',
+      '```html',
+      '<main><script>const a = 1;</script><p>after</p></main>',
+      '```',
+      '',
+      'Closing paragraph with `code`.',
+      '',
+      '```css',
+      '.x { color: red; }',
+      '```',
+    ].join('\n')
+    const closeScript = text.indexOf('</script>')
+    const firstFenceEnd = text.indexOf('```\n\nClosing')
+    const scenarios = [
+      { name: 'open-fence', edit: { from: 0, to: 0, text: '```\n' } },
+      {
+        name: 'drop-script-close',
+        edit: { from: closeScript, to: closeScript + '</script>'.length, text: '' },
+      },
+      {
+        name: 'drop-fence-close',
+        edit: { from: firstFenceEnd, to: firstFenceEnd + 3, text: '' },
+      },
+      {
+        name: 'retag-fence',
+        edit: { from: text.indexOf('```css') + 3, to: text.indexOf('```css') + 6, text: 'js' },
+      },
+    ] satisfies readonly { readonly name: string; readonly edit: TextEdit }[]
+
+    for (const scenario of scenarios) {
+      await compareIncrementalInjectionsWithFullParse(workerClient, {
+        documentId: `markdown-structure-${scenario.name}.md`,
+        languageId: 'markdown',
+        text,
+        edit: scenario.edit,
+      })
+    }
+  })
+
+  it('matches a full parse after every step of a chain of structural markdown edits', async () => {
+    let text = [
+      '# Chain',
+      '',
+      'A paragraph with *emphasis* and `code`.',
+      '',
+      '```html',
+      '<div><script>let x = 1;</script><style>.a{}</style></div>',
+      '```',
+      '',
+      '- item one',
+      '- item two with [link](x)',
+      '',
+      '```js',
+      'const y = `${x}`;',
+      '```',
+    ].join('\n')
+    const inserts = ['`', '```', '\n', '*', '<', '>', '</script>', '<script>', ' ', '# ', '- ']
+    let seed = 7
+    const random = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648
+    const documentId = 'markdown-chain.md'
+    const runtimeSessionId = `runtime-${documentId}`
+    let snapshot = createPieceTableSnapshot(text)
+    await workerClient.parse({
+      documentId,
+      runtimeSessionId,
+      snapshotVersion: 1,
+      languageId: 'markdown',
+      snapshot,
+    })
+
+    for (let step = 0; step < 30; step += 1) {
+      const from = Math.floor(random() * text.length)
+      const remove = random() < 0.3 ? Math.min(text.length - from, 1 + Math.floor(random() * 4)) : 0
+      const insert =
+        remove > 0 && random() < 0.5 ? '' : inserts[Math.floor(random() * inserts.length)]!
+      const edit = { from, to: from + remove, text: insert }
+      const nextSnapshot = applyBatchToPieceTable(snapshot, [edit])
+      const payload = createTreeSitterEditPayload({
+        documentId,
+        runtimeSessionId,
+        previousSnapshotVersion: step + 1,
+        snapshotVersion: step + 2,
+        languageId: 'markdown',
+        previousSnapshot: snapshot,
+        nextSnapshot,
+        edits: [edit],
+      })
+      const incremental = payload ? await workerClient.edit(payload) : undefined
+      text = text.slice(0, from) + insert + text.slice(from + remove)
+      const full = await workerClient.parse({
+        documentId: `${documentId}:full-${step}`,
+        runtimeSessionId: `${runtimeSessionId}:full-${step}`,
+        snapshotVersion: 1,
+        languageId: 'markdown',
+        snapshot: nextSnapshot,
+      })
+
+      expect(incremental?.injections, `step ${step}`).toEqual(full?.injections)
+      expect(incremental?.captures, `step ${step}`).toEqual(full?.captures)
+      workerClient.disposeDocument(`${runtimeSessionId}:full-${step}`)
+      snapshot = nextSnapshot
+    }
+  })
+
+  it('resolves all 300 paragraphs after deletes and joins without inline injection layers', async () => {
+    // Headings split the document into sections, so an edit's changed range stays in its section.
+    let text = Array.from({ length: 300 }, (_, index) => {
+      const heading = index % 5 === 0 ? `## Part ${index}\n\n` : ''
+      return `${heading}Paragraph ${index} has *emphasis*.`
+    }).join('\n\n')
+    const documentId = 'markdown-over-cap.md'
+    const runtimeSessionId = `runtime-${documentId}`
+    let snapshot = createPieceTableSnapshot(text)
+    await workerClient.parse({
+      documentId,
+      runtimeSessionId,
+      snapshotVersion: 1,
+      languageId: 'markdown',
+      snapshot,
+    })
+    const deleteParagraph = (index: number): TextEdit => {
+      const from = text.indexOf(`Paragraph ${index} `)
+      return { from, to: text.indexOf('\n\n', from) + 2, text: '' }
+    }
+    const joinParagraph = (index: number): TextEdit => {
+      const from = text.indexOf('\n\n', text.indexOf(`Paragraph ${index} `))
+      return { from, to: from + 2, text: ' ' }
+    }
+    const edits = [() => deleteParagraph(10), () => joinParagraph(20), () => deleteParagraph(30)]
+
+    for (const [step, nextEdit] of edits.entries()) {
+      const edit = nextEdit()
+      const nextSnapshot = applyBatchToPieceTable(snapshot, [edit])
+      const payload = createTreeSitterEditPayload({
+        documentId,
+        runtimeSessionId,
+        previousSnapshotVersion: step + 1,
+        snapshotVersion: step + 2,
+        languageId: 'markdown',
+        previousSnapshot: snapshot,
+        nextSnapshot,
+        edits: [edit],
+      })
+      const incremental = payload ? await workerClient.edit(payload) : undefined
+      const full = await workerClient.parse({
+        documentId: `${documentId}:full-${step}`,
+        runtimeSessionId: `${runtimeSessionId}:full-${step}`,
+        snapshotVersion: 1,
+        languageId: 'markdown',
+        snapshot: nextSnapshot,
+      })
+
+      expect(incremental?.injections, `step ${step}`).toEqual(full?.injections)
+      expect(incremental?.captures, `step ${step}`).toEqual(full?.captures)
+      expect(incremental?.injections).toHaveLength(0)
+      expect(
+        incremental?.captures.filter((capture) => capture.captureName === 'text.emphasis').length,
+      ).toBeGreaterThan(290)
+      expect(incremental?.records?.data).toEqual(full?.records?.data)
+      workerClient.disposeDocument(`${runtimeSessionId}:full-${step}`)
+      text = text.slice(0, edit.from) + edit.text + text.slice(edit.to)
+      snapshot = nextSnapshot
     }
   })
 
@@ -706,7 +965,7 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
       result.incremental.injections.map((injection) => injection.languageId),
     )
 
-    expect(languages).toEqual(new Set(['html', 'javascript', 'markdown_inline']))
+    expect(languages).toEqual(new Set(['html', 'javascript']))
   })
 
   it('expands and shrinks structural selections through the cached syntax tree', async () => {

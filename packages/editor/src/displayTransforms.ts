@@ -68,7 +68,7 @@ export type DisplayInjectedTextRow = MeasuredText & {
   readonly metadata?: unknown
 }
 
-export type DisplayTextRow = DisplayDocumentTextRow | DisplayInjectedTextRow
+type DisplayTextRow = DisplayDocumentTextRow | DisplayInjectedTextRow
 
 export type DisplayRow = DisplayTextRow
 
@@ -132,10 +132,12 @@ export type InlineReplacement = {
   readonly className?: string
   readonly cursorStops?: InlineCursorStops
   readonly render?: InlineReplacementRender
+  /** Which mount a rendered node belongs to; the id when unset. */
+  readonly key?: string
   readonly metadata?: unknown
 }
 
-export type InlineRowSegmentKind = 'source' | 'replacement'
+type InlineRowSegmentKind = 'source' | 'replacement'
 
 export type InlineRowSegment = {
   readonly kind: InlineRowSegmentKind
@@ -148,6 +150,7 @@ export type InlineRowSegment = {
   readonly className?: string
   readonly cursorStops?: InlineCursorStops
   readonly render?: InlineReplacementRender
+  readonly key?: string
   readonly metadata?: unknown
 }
 
@@ -443,6 +446,7 @@ export const inlineReplacementSegment = (
   ...(replacement.className === undefined ? {} : { className: replacement.className }),
   ...(replacement.cursorStops === undefined ? {} : { cursorStops: replacement.cursorStops }),
   ...(replacement.render === undefined ? {} : { render: replacement.render }),
+  ...(replacement.key === undefined ? {} : { key: replacement.key }),
   ...(replacement.metadata === undefined ? {} : { metadata: replacement.metadata }),
 })
 
@@ -585,10 +589,12 @@ const inlineReplacementSourceColumn = (
   column: number,
   bias: TransformBias,
 ): number => {
+  const width = segment.displayEndColumn - segment.displayStartColumn
+  // Bias only chooses inside a run: its far edge is the source it ends at, or a step back from the
+  // column after a chip would land on the chip's start.
+  if (width > 0 && column >= segment.displayEndColumn) return segment.sourceEndColumn
   if (bias === 'before') return segment.sourceStartColumn
   if (bias === 'after') return segment.sourceEndColumn
-
-  const width = segment.displayEndColumn - segment.displayStartColumn
   if (width <= 0) return segment.sourceStartColumn
 
   const fromStart = column - segment.displayStartColumn

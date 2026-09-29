@@ -44,12 +44,11 @@ function annotateReplacementLines(lines: MutableDiffHunkLine[], start: number, e
   const additions = lineIndexesByType(lines, start, end, 'addition')
   const pairCount = Math.min(deletions.length, additions.length)
 
+  // An unpaired line gets no ranges: its row background already says it is all new or all gone,
+  // and a whole-line tint on top turns a multi-line addition into one opaque slab.
   for (let index = 0; index < pairCount; index += 1) {
     annotateLinePair(lines[deletions[index]!]!, lines[additions[index]!]!)
   }
-
-  markUnpairedLines(lines, deletions, pairCount, 'oldInlineRanges')
-  markUnpairedLines(lines, additions, pairCount, 'newInlineRanges')
 }
 
 function lineIndexesByType(
@@ -104,16 +103,4 @@ function appendPartRanges(
 ): void {
   if (part.removed) oldRanges.push({ start: oldOffset, end: oldOffset + part.value.length })
   if (part.added) newRanges.push({ start: newOffset, end: newOffset + part.value.length })
-}
-
-function markUnpairedLines(
-  lines: MutableDiffHunkLine[],
-  indexes: readonly number[],
-  start: number,
-  field: 'oldInlineRanges' | 'newInlineRanges',
-): void {
-  for (let index = start; index < indexes.length; index += 1) {
-    const line = lines[indexes[index]!]
-    line[field] = line.text.length > 0 ? [{ start: 0, end: line.text.length }] : []
-  }
 }

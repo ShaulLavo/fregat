@@ -1,12 +1,12 @@
 import { setTextBufferDiagnosticSink } from '@singapore-editor/textbuffer/diagnostics'
 
-export type EditorPerformanceOperation = {
+type EditorPerformanceOperation = {
   readonly id: number
   readonly input: string
   readonly startedAtMs: number
 }
 
-export type EditorPerformanceView = {
+type EditorPerformanceView = {
   readonly id: string
   readonly documentId: string | null
   readonly documentVersion: number

@@ -91,6 +91,7 @@ export type MinimapViewport = {
    * is a feedback loop, and integer rounding parks it in a one-pixel two-frame cycle.
    */
   readonly reservedWidth: number
+  /** Zero-based document-line bounds, end exclusive. */
   readonly visibleStart: number
   readonly visibleEnd: number
 }

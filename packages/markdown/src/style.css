@@ -10,6 +10,20 @@
   --editor-markdown-heading-scale: 1;
 }
 
+.editor-markdown-link {
+  color: var(--editor-link-color, currentColor);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.editor-inline-widget.editor-markdown-text {
+  white-space: pre;
+}
+
+.editor-markdown-padding {
+  visibility: hidden;
+}
+
 .editor-virtualized-row[class*='editor-inline-heading-marker-'] {
   font-weight: 700;
 }

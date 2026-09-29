@@ -1,5 +1,9 @@
 import { structuredPatch } from 'diff'
 
+import type { TextReadSnapshot } from './documentTextSnapshot'
+import type { TextEdit } from './tokens'
+import { recordEditorPerformanceDiagnostic } from './editor/performanceDiagnostics'
+
 export type TextOffsetRange = {
   readonly start: number
   readonly end: number
@@ -30,7 +34,6 @@ export type MergeConflictRegion = {
 }
 
 export type MergeConflictResolutionResult = {
-  readonly text: string
   readonly replacement: string
   readonly range: TextOffsetRange
   readonly selection: TextOffsetRange
@@ -47,6 +50,7 @@ type LineRange = {
   readonly line: number
   readonly start: number
   readonly end: number
+  /** The whole line; only lines that open with a marker are read. */
   readonly text: string
 }
 
@@ -84,33 +88,215 @@ const DEFAULT_THEIRS_LABEL = 'Incoming'
 const LOCAL_CONFLICT_LABEL_PREFIX = 'Local: '
 const REMOTE_CONFLICT_LABEL_PREFIX = 'Remote: '
 
-export function parseMergeConflicts(text: string): readonly MergeConflictRegion[] {
+const MARKER_LENGTH = 7
+const MARKERS = new Set(['<<<<<<<', '|||||||', '=======', '>>>>>>>'])
+const MARKER_CODES = new Set([0x3c, 0x7c, 0x3d, 0x3e])
+const NEWLINE = 0x0a
+const CARRY_LINE_LIMIT = 1_024
+const EMPTY_CONFLICTS: readonly MergeConflictRegion[] = Object.freeze([])
+
+// One scan per immutable source, shared by every caller that asks about it.
+const parsedSources = new WeakMap<TextReadSnapshot, readonly MergeConflictRegion[]>()
+
+export function parseMergeConflicts(source: TextReadSnapshot): readonly MergeConflictRegion[] {
+  const cached = parsedSources.get(source)
+  if (cached) return cached
+
+  const conflicts = scanMergeConflicts(source)
+  parsedSources.set(source, conflicts)
+  recordEditorPerformanceDiagnostic('mergeConflicts.scan', () => ({
+    scannedCodeUnits: source.length,
+    conflicts: conflicts.length,
+  }))
+  return conflicts
+}
+
+/**
+ * Carries the regions of `previous` to `next` without scanning, when `edits` (one batch in
+ * `previous` coordinates) touched no marker line on either side. Regions follow from the ordered
+ * marker lines alone, so an unchanged sequence parses the same; only offsets and rows move.
+ * Reads 7 units per touched line. Null means the caller must scan.
+ */
+export function carryMergeConflicts(
+  previous: TextReadSnapshot,
+  next: TextReadSnapshot,
+  edits: readonly TextEdit[],
+): readonly MergeConflictRegion[] | null {
+  const regions = parsedSources.get(previous)
+  if (!regions) return null
+
+  const sorted = edits.toSorted((left, right) => left.from - right.from)
+  let shift = 0
+  for (const edit of sorted) {
+    const from = edit.from + shift
+    if (touchesMarkerLine(previous, edit.from, edit.to)) return null
+    if (touchesMarkerLine(next, from, from + edit.text.length)) return null
+    shift += edit.text.length - (edit.to - edit.from)
+  }
+  const carried =
+    regions.length === 0
+      ? EMPTY_CONFLICTS
+      : regions.map((region) => shiftedRegion(region, sorted, next))
+  parsedSources.set(next, carried)
+  return carried
+}
+
+function touchesMarkerLine(source: TextReadSnapshot, start: number, end: number): boolean {
+  const first = source.lineAt(start)
+  const last = source.lineAt(end)
+  // Checking a large paste line by line costs more than the one chunk walk a scan takes.
+  if (last - first >= CARRY_LINE_LIMIT) return true
+  for (let row = first; row <= last; row += 1) {
+    const lineStart = source.lineStart(row)
+    if (source.lineRange(row).end - lineStart < MARKER_LENGTH) continue
+    if (MARKERS.has(source.readRange(lineStart, lineStart + MARKER_LENGTH))) return true
+  }
+  return false
+}
+
+// Every boundary is a marker line's start or end, and no edit touched a marker line, so an edit
+// either lies wholly before a boundary or is an insertion at the start of the line after one.
+function shiftedRegion(
+  region: MergeConflictRegion,
+  edits: readonly TextEdit[],
+  next: TextReadSnapshot,
+): MergeConflictRegion {
+  const at = (offset: number): number => shiftedOffset(offset, edits)
+  const range = (value: TextOffsetRange): TextOffsetRange =>
+    rangeFrom(at(value.start), at(value.end))
+  const startMarker = range(region.startMarker)
+  const separatorMarker = range(region.separatorMarker)
+  const endMarker = range(region.endMarker)
+  const baseMarker = region.baseMarker ? range(region.baseMarker) : undefined
+  return {
+    ...region,
+    range: range(region.range),
+    startMarker,
+    baseMarker,
+    separatorMarker,
+    endMarker,
+    startMarkerLine: next.lineAt(startMarker.start),
+    baseMarkerLine: baseMarker ? next.lineAt(baseMarker.start) : undefined,
+    separatorMarkerLine: next.lineAt(separatorMarker.start),
+    endMarkerLine: next.lineAt(endMarker.start),
+    ours: range(region.ours),
+    base: region.base ? range(region.base) : undefined,
+    theirs: range(region.theirs),
+  }
+}
+
+function shiftedOffset(offset: number, edits: readonly TextEdit[]): number {
+  let shifted = offset
+  for (const edit of edits) {
+    if (edit.from >= offset) break
+    shifted += edit.text.length - (edit.to - edit.from)
+  }
+  return shifted
+}
+
+function scanMergeConflicts(source: TextReadSnapshot): readonly MergeConflictRegion[] {
   const conflicts: MergeConflictRegion[] = []
   let pending: PendingConflict | null = null
-
-  for (const line of iterateLines(text)) {
+  const scanner = new MarkerLineScanner((line) => {
     const startLabel = conflictMarkerLabel(line.text, '<<<<<<<')
     if (startLabel !== null) {
       pending = {
         startMarker: line,
         oursLabel: startLabel || DEFAULT_OURS_LABEL,
       }
-      continue
+      return
     }
 
-    if (!pending) continue
-    if (readBaseMarker(pending, line)) continue
-    if (readSeparatorMarker(pending, line)) continue
+    if (!pending) return
+    if (readBaseMarker(pending, line)) return
+    if (readSeparatorMarker(pending, line)) return
 
     const endLabel = conflictMarkerLabel(line.text, '>>>>>>>')
-    if (endLabel === null) continue
+    if (endLabel === null) return
 
     const conflict = completePendingConflict(conflicts.length, pending, line, endLabel)
     if (conflict) conflicts.push(conflict)
     pending = null
+  })
+  // The source's own chunk strings, read by index: nothing is copied or joined.
+  source.forEachTextChunk((text, start) => scanner.feed(text, start))
+  scanner.finish(source.length)
+  return conflicts.length === 0 ? EMPTY_CONFLICTS : conflicts
+}
+
+/**
+ * Visits only the lines that open with a marker. Every other line costs one character test and a
+ * search for its break; a marker or line split across two chunks carries over in two numbers.
+ */
+class MarkerLineScanner {
+  private line = 0
+  private lineStart = 0
+  private headCode = 0
+  private headRun = 0
+  private rest = ''
+  private mode: 'head' | 'marker' | 'skip' = 'head'
+
+  constructor(private readonly visit: (line: LineRange) => void) {}
+
+  feed(text: string, offset: number): void {
+    let index = 0
+    while (index < text.length) {
+      if (this.mode === 'head') {
+        index = this.readHead(text, offset, index)
+        continue
+      }
+
+      const newline = text.indexOf('\n', index)
+      const contentEnd = newline === -1 ? text.length : newline
+      if (this.mode === 'marker') this.rest += text.slice(index, contentEnd)
+      if (newline === -1) return
+
+      this.endLine(offset + newline + 1)
+      index = newline + 1
+    }
   }
 
-  return conflicts
+  finish(length: number): void {
+    if (this.lineStart < length) this.endLine(length)
+  }
+
+  private readHead(text: string, offset: number, from: number): number {
+    for (let index = from; index < text.length; index += 1) {
+      const code = text.charCodeAt(index)
+      if (code === NEWLINE) {
+        this.endLine(offset + index + 1)
+        return index + 1
+      }
+      if (this.headRun === 0 && !MARKER_CODES.has(code)) return this.skip(index)
+      if (this.headRun > 0 && code !== this.headCode) return this.skip(index)
+
+      this.headCode = code
+      this.headRun += 1
+      if (this.headRun === MARKER_LENGTH) {
+        this.mode = 'marker'
+        return index + 1
+      }
+    }
+    return text.length
+  }
+
+  private skip(index: number): number {
+    this.mode = 'skip'
+    return index
+  }
+
+  private endLine(end: number): void {
+    if (this.mode === 'marker') {
+      const marker = String.fromCharCode(this.headCode).repeat(MARKER_LENGTH)
+      this.visit({ line: this.line, start: this.lineStart, end, text: marker + this.rest })
+    }
+    this.line += 1
+    this.lineStart = end
+    this.headCode = 0
+    this.headRun = 0
+    this.rest = ''
+    this.mode = 'head'
+  }
 }
 
 export function createMergeConflictDocumentText(
@@ -126,22 +312,19 @@ export function createMergeConflictDocumentText(
   return mergeConflictDocumentFromHunks(options, remotePath, hunks)
 }
 
+/** The replacement for one conflict, read from its chosen sides; never the resolved document. */
 export function resolveMergeConflict(
-  text: string,
+  source: TextReadSnapshot,
   conflict: MergeConflictRegion,
   resolution: MergeConflictResolution,
 ): MergeConflictResolutionResult | null {
   const ranges = resolutionRanges(conflict, resolution)
   if (!ranges) return null
 
-  const replacement = ranges.map((range) => text.slice(range.start, range.end)).join('')
-  const resolvedText = `${text.slice(0, conflict.range.start)}${replacement}${text.slice(
-    conflict.range.end,
-  )}`
+  const replacement = ranges.map((range) => source.readRange(range.start, range.end)).join('')
   const selectionOffset = conflict.range.start + replacement.length
 
   return {
-    text: resolvedText,
     replacement,
     range: conflict.range,
     selection: {
@@ -386,24 +569,6 @@ function rangeForSide(
 function conflictMarkerLabel(line: string, marker: string): string | null {
   if (!line.startsWith(marker)) return null
   return line.slice(marker.length).trim()
-}
-
-function* iterateLines(text: string): Generator<LineRange> {
-  let start = 0
-  let line = 0
-  while (start < text.length) {
-    const newline = text.indexOf('\n', start)
-    const contentEnd = newline === -1 ? text.length : newline
-    const end = newline === -1 ? text.length : newline + 1
-    yield {
-      line,
-      start,
-      end,
-      text: text.slice(start, contentEnd),
-    }
-    start = end
-    line += 1
-  }
 }
 
 function lineToRange(line: LineRange): TextOffsetRange {

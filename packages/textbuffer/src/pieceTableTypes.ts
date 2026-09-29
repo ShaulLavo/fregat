@@ -1,3 +1,4 @@
+import type { StandInTable } from './standIns'
 import type { DocumentLineEnding } from './lineEndings'
 
 declare const pieceBufferIdBrand: unique symbol
@@ -92,13 +93,10 @@ export type PieceBufferLineIndex = {
   offsets: Uint32Array
   count: number
   scannedLength: number
-  // The chunk string as scanned, `scannedLength` long. The inspector checks the
-  // offsets against it; the store itself trusts the log's append-only contract.
-  text: string
 }
 
-// Read view of a snapshot's chunk store: `size` counts chunk strings, `get`
-// resolves a buffer id to the chunk text it lives in.
+// `size` counts logical chunk slots. `get` and iteration expose dense chunks only;
+// sparse text is read through bufferSpanAt/forEachBufferSpan with logical offsets.
 export type PieceBufferChunks = {
   readonly size: number
   get(buffer: PieceBufferId): string | undefined
@@ -119,8 +117,6 @@ export type PieceTreeNode = {
   subtreeVisibleLength: number
   subtreePieces: number
   subtreeLineBreaks: number
-  subtreeMinOrder: number
-  subtreeMaxOrder: number
   // The oldest buffer in the subtree. A deleted anchor's gap ends at the
   // nearest piece no newer than its own, and this finds that piece.
   subtreeMinBuffer: number
@@ -160,9 +156,12 @@ export type PieceTableReverseIndex = {
   readonly shift: number
   readonly root: PieceTableReverseBranch | readonly PieceTableReverseSlot[] | null
   readonly tail: PieceTableReverseTail
+  // Where each compacted tombstone's stand-in is now. See standIns.ts.
+  readonly standIns: StandInTable
 }
 
 export type PieceTableTreeSnapshot = {
+  // Storage maintenance may republish this with equal text; never key a cache on its identity.
   readonly buffers: PieceTableBuffers
   readonly root: PieceTreeNode | null
   readonly reverseIndex: PieceTableReverseIndex

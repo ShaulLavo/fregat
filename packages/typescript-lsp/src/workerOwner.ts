@@ -1,4 +1,8 @@
-import type { LspWorkerLike } from '@singapore-editor/lsp'
+import {
+  LSP_SERVER_EXITED,
+  type LspServerExitedParams,
+  type LspWorkerLike,
+} from '@singapore-editor/lsp'
 
 export type TypeScriptLspWorkerLifecycleState = 'ready' | 'disposed' | 'crashed'
 
@@ -102,9 +106,21 @@ export class TypeScriptLspWorkerOwner implements LspWorkerLike {
     this.lastError = error
     this.detachWorker()
     this.terminateWorker()
+    this.announceExit(error)
     for (const listener of this.listeners.error) listener(event)
     this.options.onError?.(error)
     this.clearListeners()
+  }
+
+  /**
+   * Says why before the error closes the transport, as a server process's host does, so a crashed
+   * worker reaches the client as an exit with a reason rather than as a connection that went quiet.
+   */
+  private announceExit(error: Error): void {
+    const event = new MessageEvent('message', {
+      data: { jsonrpc: '2.0', method: LSP_SERVER_EXITED, params: crashedParams(error) },
+    })
+    for (const listener of this.listeners.message) listener(event)
   }
 
   private detachWorker(): void {
@@ -133,6 +149,21 @@ function defaultWorkerFactory(): Worker {
   return new Worker(new URL('./typescriptLsp.worker.ts', import.meta.url), {
     type: 'module',
   })
+}
+
+function crashedParams(error: Error): LspServerExitedParams {
+  return {
+    outcome: 'crashed',
+    serverId: 'typescript',
+    exitCode: null,
+    exitSignal: null,
+    error: {
+      code: 'LSP_SERVER_EXITED',
+      message: error.message,
+      why: 'The TypeScript language worker threw and stopped.',
+      fix: 'Reload the editor to start the TypeScript language worker again.',
+    },
+  }
 }
 
 export function workerEventError(event: Event): Error {

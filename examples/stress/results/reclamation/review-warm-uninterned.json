@@ -1,0 +1,35 @@
+{
+  "note": "Real textbuffer and measurement classes, with only the source-page constant replaced in isolated bundles. Each Node process warms a 1Mi-unit line and 20 edits, then times full-line measurement construction, classification and columnAt after each edit. Source indexes are reused; each edit creates a new snapshot wrapper. Private range counts are observed only by this probe.",
+  "rows": [
+    {
+      "pageUnits": 16384,
+      "sample": 1,
+      "node": "v26.7.0",
+      "initialRanges": 64,
+      "finalRanges": 66,
+      "edits": 100,
+      "medianMs": 0.015597999999997114,
+      "p95Ms": 0.024239000000001454
+    },
+    {
+      "pageUnits": 16384,
+      "sample": 2,
+      "node": "v26.7.0",
+      "initialRanges": 64,
+      "finalRanges": 66,
+      "edits": 100,
+      "medianMs": 0.014929999999999666,
+      "p95Ms": 0.02212600000000009
+    },
+    {
+      "pageUnits": 16384,
+      "sample": 3,
+      "node": "v26.7.0",
+      "initialRanges": 64,
+      "finalRanges": 66,
+      "edits": 100,
+      "medianMs": 0.01582599999999701,
+      "p95Ms": 0.023792000000000257
+    }
+  ]
+}

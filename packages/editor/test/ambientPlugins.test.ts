@@ -24,7 +24,7 @@ function demanding(): EditorPlugin {
     activate: (context) =>
       context.registerCapabilityContribution({
         createContribution: (capabilities) =>
-          capabilities.registerProvider?.(DEMAND, { language: '*' }, {}) ?? null,
+          capabilities.registerProvider(DEMAND, { language: '*' }, {}),
       }),
   }
 }

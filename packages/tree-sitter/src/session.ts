@@ -1,6 +1,5 @@
 import {
   applyBatchToPieceTable,
-  createDocumentTextSnapshot,
   diffPieceTableSnapshots,
   type DocumentSessionChange,
   type DocumentTextSnapshot,
@@ -20,7 +19,7 @@ import {
   treeSitterCapturesToEditorTokens,
   EditorTokenStore,
 } from '@singapore-editor/core/syntax'
-import { documentSessionChangeTextSnapshot } from '@singapore-editor/core/internal'
+import { documentSessionChangeTextSnapshot } from '@singapore-editor/core/document'
 import type {
   TreeSitterDegradedState,
   TreeSitterInputEdit,
@@ -29,9 +28,11 @@ import type {
   TreeSitterParseResult,
   TreeSitterRangeResult,
 } from './treeSitter/types'
-import type {
-  TreeSitterLanguageDescriptor,
-  TreeSitterLanguageResolver,
+import {
+  resolveTreeSitterLanguageClosure,
+  withInjectedLanguages,
+  type TreeSitterLanguageDescriptor,
+  type TreeSitterLanguageResolver,
 } from './treeSitter/registry'
 import {
   createTreeSitterWorkerBackend,
@@ -49,10 +50,11 @@ export type TreeSitterSyntaxSessionOptions = {
   readonly includeHighlights?: boolean
   readonly includeCaptures?: boolean
   readonly syntaxMode?: 'full' | 'range'
-  readonly fullText?: string
-  readonly textSnapshot?: DocumentTextSnapshot
+  readonly textSnapshot: DocumentTextSnapshot
   readonly snapshot: PieceTableSnapshot
   readonly backend?: TreeSitterBackend
+  /** Called once, after the session's first parse answers. */
+  readonly onFirstParse?: () => void
 }
 
 export class TreeSitterSyntaxSession implements EditorSyntaxSession {
@@ -76,6 +78,7 @@ export class TreeSitterSyntaxSession implements EditorSyntaxSession {
     Promise<readonly TreeSitterLanguageDescriptor[]>
   >()
   private disposed = false
+  private onFirstParse: (() => void) | undefined
 
   public constructor(options: TreeSitterSyntaxSessionOptions) {
     this.documentId = options.documentId
@@ -88,10 +91,10 @@ export class TreeSitterSyntaxSession implements EditorSyntaxSession {
     this.includeHighlights = options.includeHighlights ?? true
     this.includeCaptures = options.includeCaptures ?? true
     this.syntaxMode = options.syntaxMode ?? 'full'
-    this.textSnapshot =
-      options.textSnapshot ?? createDocumentTextSnapshot(options.snapshot, options.fullText)
+    this.textSnapshot = options.textSnapshot
     this.snapshot = options.snapshot
     this.backend = options.backend ?? createTreeSitterWorkerBackend()
+    this.onFirstParse = options.onFirstParse
     this.result = this.createEmptyResult({ snapshot: options.snapshot, snapshotVersion: 0 })
   }
 
@@ -99,14 +102,11 @@ export class TreeSitterSyntaxSession implements EditorSyntaxSession {
     return this.currentFoldingSupport
   }
 
-  public async refresh(
-    snapshot: PieceTableSnapshot,
-    fullText?: string,
-  ): Promise<EditorSyntaxResult> {
+  public async refresh(textSnapshot: DocumentTextSnapshot): Promise<EditorSyntaxResult> {
     if (this.disposed) return this.result
 
     const snapshotVersion = ++this.snapshotVersion
-    const textSnapshot = createDocumentTextSnapshot(snapshot, fullText)
+    const snapshot = textSnapshot.snapshot
 
     if (!(await this.ensureLanguageRegistered())) {
       return this.updateFromUnavailableLanguage(textSnapshot, snapshot)
@@ -143,7 +143,15 @@ export class TreeSitterSyntaxSession implements EditorSyntaxSession {
       )
     }
 
-    return this.updateFromTreeSitterResult(result, snapshotVersion, textSnapshot, snapshot)
+    const next = this.updateFromTreeSitterResult(result, snapshotVersion, textSnapshot, snapshot)
+    if (result && !this.disposed) this.notifyFirstParse()
+    return next
+  }
+
+  private notifyFirstParse(): void {
+    const onFirstParse = this.onFirstParse
+    this.onFirstParse = undefined
+    onFirstParse?.()
   }
 
   public async applyChange(change: DocumentSessionChange): Promise<EditorSyntaxResult> {
@@ -153,7 +161,7 @@ export class TreeSitterSyntaxSession implements EditorSyntaxSession {
     }
 
     if (this.parsedSnapshotVersion === 0) {
-      return this.refresh(change.snapshot)
+      return this.refresh(documentSessionChangeTextSnapshot(change))
     }
 
     if (!(await this.ensureLanguageRegistered())) {
@@ -191,7 +199,7 @@ export class TreeSitterSyntaxSession implements EditorSyntaxSession {
         : createTreeSitterEditPayload({ ...editPayloadOptions, resultMode: 'full' })
 
     if (!payload) {
-      return this.refresh(change.snapshot)
+      return this.refresh(documentSessionChangeTextSnapshot(change))
     }
 
     return this.applyIncrementalEdit(payload, documentSessionChangeTextSnapshot(change))
@@ -254,11 +262,11 @@ export class TreeSitterSyntaxSession implements EditorSyntaxSession {
       }
 
       if (!result) {
-        return this.reparseAfterIncrementalFailure(payload.snapshot)
+        return this.reparseAfterIncrementalFailure(nextTextSnapshot)
       }
 
       if (result.snapshotVersion !== payload.snapshotVersion) {
-        return this.reparseAfterIncrementalFailure(payload.snapshot)
+        return this.reparseAfterIncrementalFailure(nextTextSnapshot)
       }
 
       if (
@@ -266,7 +274,7 @@ export class TreeSitterSyntaxSession implements EditorSyntaxSession {
       ) {
         if (this.disposed || !this.isCurrentSnapshotVersion(payload.snapshotVersion))
           return this.result
-        return this.refresh(payload.snapshot)
+        return this.refresh(nextTextSnapshot)
       }
 
       return this.updateFromTreeSitterResult(
@@ -281,12 +289,12 @@ export class TreeSitterSyntaxSession implements EditorSyntaxSession {
         return this.result
       }
 
-      return this.reparseAfterIncrementalFailure(payload.snapshot)
+      return this.reparseAfterIncrementalFailure(nextTextSnapshot)
     }
   }
 
   private reparseAfterIncrementalFailure(
-    snapshot: PieceTableSnapshot,
+    textSnapshot: DocumentTextSnapshot,
   ): Promise<EditorSyntaxResult> {
     if (this.disposed) return Promise.resolve(this.result)
 
@@ -294,7 +302,7 @@ export class TreeSitterSyntaxSession implements EditorSyntaxSession {
     const disposedRuntimeSessionId = this.runtimeSessionId
     this.runtimeSessionId = createEditorRuntimeSessionId()
     this.backend.disposeDocument(disposedRuntimeSessionId)
-    return this.refresh(snapshot)
+    return this.refresh(textSnapshot)
   }
 
   private isCurrentSnapshotVersion(snapshotVersion: number): boolean {
@@ -318,7 +326,11 @@ export class TreeSitterSyntaxSession implements EditorSyntaxSession {
     }
     this.currentFoldingSupport = descriptor.foldQuerySource?.trim() ? 'supported' : 'unsupported'
 
-    const descriptors = await this.withInjectedLanguages(descriptor)
+    const descriptors = await withInjectedLanguages(
+      this.languageResolver,
+      descriptor,
+      () => this.disposed,
+    )
     if (this.disposed) return false
     await this.backend.registerLanguages(descriptors)
     return true
@@ -348,26 +360,8 @@ export class TreeSitterSyntaxSession implements EditorSyntaxSession {
   private async resolveLanguageDependencies(
     id: string,
   ): Promise<readonly TreeSitterLanguageDescriptor[]> {
-    const descriptor = await this.languageResolver?.resolveTreeSitterLanguage(id)
-    if (!descriptor || this.disposed) return []
-    return this.withInjectedLanguages(descriptor)
-  }
-
-  private async withInjectedLanguages(
-    descriptor: TreeSitterLanguageDescriptor,
-  ): Promise<readonly TreeSitterLanguageDescriptor[]> {
-    const descriptors = [descriptor]
-    const seen = new Set([descriptor.id])
-    for (let index = 0; index < descriptors.length; index += 1) {
-      const dependencies = descriptors[index]?.injectionDependencies ?? []
-      for (const id of dependencies) {
-        if (seen.has(id) || this.disposed) continue
-        seen.add(id)
-        const injected = await this.languageResolver?.resolveTreeSitterLanguage(id)
-        if (injected) descriptors.push(injected)
-      }
-    }
-    return descriptors
+    if (!this.languageResolver) return []
+    return resolveTreeSitterLanguageClosure(this.languageResolver, id, () => this.disposed)
   }
 
   private updateFromUnavailableLanguage(
@@ -612,6 +606,7 @@ const treeSitterParseResultToEditorSyntaxResultInner = (
   context: TreeSitterSyntaxResultContext,
 ): EditorSyntaxResult => ({
   captures: result.captures,
+  ...{ records: result.records },
   degraded: treeSitterDegradedStateToEditorSyntaxState(result.degraded),
   folds: result.folds,
   brackets: result.brackets,

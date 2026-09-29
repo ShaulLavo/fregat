@@ -1,4 +1,5 @@
 import { normalizeTabSize, visualColumnLength } from '../displayTransforms'
+import { createStringTextSnapshot, type TextReadSnapshot } from '../documentTextSnapshot'
 import type { ResolvedSelection } from '../selections'
 import type { TextOffsetRange } from '../textRanges'
 import type { TextEdit } from '../tokens'
@@ -11,6 +12,7 @@ import {
   type EditorIndentationRules,
   type EditorLanguageConfiguration,
 } from './languageConfiguration'
+import { TextCursor } from './textCursor'
 
 /**
  * Rewriting the indentation of whole rows from the language's indentation rules.
@@ -31,11 +33,6 @@ export type EditorDocumentSelectionEditCommandId =
   | 'editor.action.reindentlines'
   | 'editor.action.reindentselectedlines'
 
-type OffsetRange = {
-  readonly start: number
-  readonly end: number
-}
-
 type RowRange = {
   readonly startRow: number
   readonly endRow: number
@@ -49,14 +46,18 @@ type RowRange = {
  */
 type ReindentRange = Pick<ResolvedSelection, 'startOffset' | 'endOffset' | 'collapsed'>
 
-/** The document twice over: as written, and as the indentation rules are allowed to see it. */
-type ReindentSource = {
-  readonly text: string
-  /** Same length and same row starts as `text`, with every string and comment blanked out. */
-  readonly maskedText: string
+/** Strings and comments in document order, as parallel offsets; each ends where the next may start. */
+type LiteralRanges = {
   readonly starts: readonly number[]
-  /** Rows whose first character is inside a literal, where the indentation is content, not layout. */
-  readonly rowsInsideLiteral: ReadonlySet<number>
+  readonly ends: readonly number[]
+}
+
+/** The document read a row at a time, and the literals the indentation rules must not see. */
+type ReindentSource = {
+  readonly text: TextReadSnapshot
+  /** Every literal that starts before the end of the last row the command reads. */
+  readonly literals: LiteralRanges
+  readonly rows: RowReader
 }
 
 export function isEditorDocumentSelectionEditCommand(
@@ -69,7 +70,7 @@ export function isEditorDocumentSelectionEditCommand(
 
 export function documentSelectionEditForCommand(
   command: EditorDocumentSelectionEditCommandId,
-  text: string,
+  text: TextReadSnapshot,
   selections: readonly ReindentRange[],
   options: EditorEditActionOptions = {},
 ): EditorEditActionResult {
@@ -81,10 +82,21 @@ export function documentSelectionEditForCommand(
   // move rows for a reason the user has no way to inspect.
   if (!rules) return { edits: [], timingName }
 
-  const source = createReindentSource(text, configuration)
   const ranges = wholeDocument
-    ? [{ endRow: lastRow(source), startRow: 0 }]
-    : rowRangesForSelections(source, selections)
+    ? [{ endRow: text.lineCount - 1, startRow: 0 }]
+    : rowRangesForSelections(text, selections)
+  // Ranges come merged and in order, so the last one reaches furthest.
+  const lastRange = ranges.at(-1)
+  if (!lastRange) return { edits: [], timingName }
+
+  // Whether a row starts inside a literal depends on every row above it, so the scan starts at 0.
+  const limit = text.lineRange(lastRange.endRow).end
+  const cursor = new TextCursor(text)
+  const source: ReindentSource = {
+    text,
+    literals: scanLiterals(cursor, configuration, limit),
+    rows: new RowReader(text, cursor),
+  }
 
   return {
     edits: ranges.flatMap((range) => reindentEdits(source, rules, range, options)),
@@ -118,7 +130,7 @@ export function reindentEditsForRanges(
 ): readonly TextEdit[] {
   return documentSelectionEditForCommand(
     'editor.action.reindentselectedlines',
-    text,
+    createStringTextSnapshot(text),
     ranges.map((range) => ({
       collapsed: range.start === range.end,
       endOffset: range.end,
@@ -128,26 +140,8 @@ export function reindentEditsForRanges(
   ).edits
 }
 
-function createReindentSource(
-  text: string,
-  configuration: EditorLanguageConfiguration | null,
-): ReindentSource {
-  const starts = [0]
-
-  for (let index = 0; index < text.length; index += 1) {
-    if (text[index] !== '\n') continue
-    starts.push(index + 1)
-  }
-
-  return { ...maskLiterals(text, configuration), starts, text }
-}
-
 /**
- * Blanks every string and comment, delimiters included.
- *
- * Blanking rather than cutting keeps both copies of the document addressable by the same offsets.
- * The delimiters go too: a line comment's own marker is what a rule written to skip commented
- * delimiters is looking for, and once the comment is gone there is nothing left for it to skip.
+ * Every string and comment starting before `limit`, delimiters included.
  *
  * A quoted run may cross line breaks, because a template literal is written that way and the braces
  * inside one must not drive the indentation of the rows it spans — reindent would otherwise rewrite
@@ -155,90 +149,95 @@ function createReindentSource(
  * unbalanced delimiter is more often an apostrophe than the start of a literal, and one of those
  * must not swallow the rest of the file.
  */
-function maskLiterals(
-  text: string,
+function scanLiterals(
+  cursor: TextCursor,
   configuration: EditorLanguageConfiguration | null,
-): Pick<ReindentSource, 'maskedText' | 'rowsInsideLiteral'> {
-  const quotes = new Set(
-    (configuration?.autoClosingPairs ?? [])
-      .filter((pair) => pair.quote === true)
-      .map((pair) => pair.open),
-  )
-  const lineComment = configuration?.comments?.line
-  const blockComment = configuration?.comments?.block
-  const literals: OffsetRange[] = []
-  const rowsInsideLiteral = new Set<number>()
-  let row = 0
-  let index = 0
+  limit: number,
+): LiteralRanges {
+  const tokens: LiteralTokens = {
+    quotes: new Set(
+      (configuration?.autoClosingPairs ?? [])
+        .filter((pair) => pair.quote === true && pair.open.length === 1)
+        .map((pair) => pair.open.charCodeAt(0)),
+    ),
+    lineComment: configuration?.comments?.line,
+    blockComment: configuration?.comments?.block,
+  }
+  const starts: number[] = []
+  const ends: number[] = []
+  const opener = literalOpener(tokens)
+  if (!opener) return { starts, ends }
 
-  while (index < text.length) {
-    const start = index
-    if (text[index] === '\n') {
-      row += 1
-      index += 1
-      continue
+  // Only a unit that can open a literal stops the scan; every other one is stepped over.
+  for (let index = cursor.search(opener, 0, limit); index !== -1;) {
+    const end = literalEndAt(cursor, index, tokens)
+    if (end !== null) {
+      starts.push(index)
+      ends.push(end)
     }
-
-    if (blockComment && text.startsWith(blockComment.open, index)) {
-      index = offsetPast(text, index + blockComment.open.length, blockComment.close)
-    } else if (lineComment && text.startsWith(lineComment, index)) {
-      index = lineBreakFrom(text, index)
-    } else if (quotes.has(text[index] ?? '')) {
-      index = offsetPastQuoted(text, index, text[index] ?? '')
-    } else {
-      index += 1
-      continue
-    }
-
-    literals.push({ end: index, start })
-    for (let offset = start; offset < index; offset += 1) {
-      if (text[offset] !== '\n') continue
-      row += 1
-      rowsInsideLiteral.add(row)
-    }
+    index = cursor.search(opener, end ?? index + 1, limit)
   }
 
-  return { maskedText: blankRanges(text, literals), rowsInsideLiteral }
+  return { starts, ends }
+}
+
+/** Matches the first unit of every token that opens a literal. */
+function literalOpener(tokens: LiteralTokens): RegExp | null {
+  const units = new Set(tokens.quotes)
+  if (tokens.lineComment) units.add(tokens.lineComment.charCodeAt(0))
+  if (tokens.blockComment?.open) units.add(tokens.blockComment.open.charCodeAt(0))
+  if (units.size === 0) return null
+
+  const escaped = [...units].map((unit) => `\\u${unit.toString(16).padStart(4, '0')}`)
+  return new RegExp(`[${escaped.join('')}]`, 'g')
+}
+
+type LiteralTokens = {
+  readonly quotes: ReadonlySet<number>
+  readonly lineComment: string | undefined
+  readonly blockComment: { readonly open: string; readonly close: string } | undefined
+}
+
+/** Where the literal opening at `index` ends, or null when none opens there. */
+function literalEndAt(cursor: TextCursor, index: number, tokens: LiteralTokens): number | null {
+  const code = cursor.codeAt(index)
+  if (code === LINE_FEED) return null
+
+  const { blockComment, lineComment } = tokens
+  if (blockComment && cursor.startsWith(blockComment.open, index)) {
+    return offsetPast(cursor, index + blockComment.open.length, blockComment.close)
+  }
+  if (lineComment && cursor.startsWith(lineComment, index)) return lineBreakFrom(cursor, index)
+  if (tokens.quotes.has(code)) return offsetPastQuoted(cursor, index, code)
+  return null
 }
 
 /** Just past `token`, or the end of the text for a literal nothing closes. */
-function offsetPast(text: string, from: number, token: string): number {
-  const found = text.indexOf(token, from)
+function offsetPast(cursor: TextCursor, from: number, token: string): number {
+  const found = cursor.indexOf(token, from)
 
-  return found === -1 ? text.length : found + token.length
+  return found === -1 ? cursor.length : found + token.length
 }
 
-function lineBreakFrom(text: string, from: number): number {
-  const found = text.indexOf('\n', from)
+function lineBreakFrom(cursor: TextCursor, from: number): number {
+  const found = cursor.indexOf('\n', from)
 
-  return found === -1 ? text.length : found
+  return found === -1 ? cursor.length : found
 }
 
-function offsetPastQuoted(text: string, from: number, quote: string): number {
-  for (let index = from + quote.length; index < text.length; index += 1) {
-    const char = text[index]
+function offsetPastQuoted(cursor: TextCursor, from: number, quote: number): number {
+  for (let index = from + 1; index < cursor.length; index += 1) {
+    const code = cursor.codeAt(index)
     // An escaped delimiter is content, and so is whatever the escape was hiding.
-    if (char === '\\') index += 1
-    else if (char === quote) return index + 1
+    if (code === BACKSLASH) index += 1
+    else if (code === quote) return index + 1
   }
 
-  return lineBreakFrom(text, from)
+  return lineBreakFrom(cursor, from)
 }
 
-function blankRanges(text: string, ranges: readonly OffsetRange[]): string {
-  if (ranges.length === 0) return text
-
-  let masked = ''
-  let cursor = 0
-  for (const range of ranges) {
-    // Row starts have to survive, so the break is the one character a literal keeps.
-    masked +=
-      text.slice(cursor, range.start) + text.slice(range.start, range.end).replace(/[^\n]/g, ' ')
-    cursor = range.end
-  }
-
-  return masked + text.slice(cursor)
-}
+const LINE_FEED = 0x0a
+const BACKSLASH = 0x5c
 
 /**
  * The row ranges the selections ask to have made consistent.
@@ -249,11 +248,11 @@ function blankRanges(text: string, ranges: readonly OffsetRange[]): string {
  * above it and nothing selected below it, so it asks for nothing.
  */
 function rowRangesForSelections(
-  source: ReindentSource,
+  text: TextReadSnapshot,
   selections: readonly ReindentRange[],
 ): readonly RowRange[] {
   const ranges = selections
-    .map((selection) => rowRangeForSelection(source, selection))
+    .map((selection) => rowRangeForSelection(text, selection))
     .filter((range): range is RowRange => range !== null)
   const merged: RowRange[] = []
 
@@ -273,24 +272,24 @@ function rowRangesForSelections(
   return merged
 }
 
-function rowRangeForSelection(source: ReindentSource, selection: ReindentRange): RowRange | null {
-  const startRow = rowAtOffset(source, selection.startOffset)
-  const endRow = endRowForSelection(source, selection, startRow)
+function rowRangeForSelection(text: TextReadSnapshot, selection: ReindentRange): RowRange | null {
+  const startRow = text.lineAt(selection.startOffset)
+  const endRow = endRowForSelection(text, selection, startRow)
   if (startRow === 0) return endRow === 0 ? null : { endRow, startRow: 0 }
 
   return { endRow, startRow: startRow - 1 }
 }
 
 function endRowForSelection(
-  source: ReindentSource,
+  text: TextReadSnapshot,
   selection: ReindentRange,
   startRow: number,
 ): number {
   if (selection.collapsed) return startRow
 
-  const endRow = rowAtOffset(source, selection.endOffset)
+  const endRow = text.lineAt(selection.endOffset)
   // A selection stopping at a row start has not reached into that row.
-  if (endRow > startRow && selection.endOffset === rowStart(source, endRow)) return endRow - 1
+  if (endRow > startRow && selection.endOffset === text.lineStart(endRow)) return endRow - 1
 
   return endRow
 }
@@ -376,7 +375,7 @@ function referenceRow(
  * comment's continuation leader that the mask has already blanked out.
  */
 function skipsRules(source: ReindentSource, rules: EditorIndentationRules, row: number): boolean {
-  if (source.rowsInsideLiteral.has(row)) return true
+  if (startsInsideLiteral(source, row)) return true
 
   const text = rowText(source, row)
   if (text.trim().length === 0) return true
@@ -414,42 +413,102 @@ function indentationForColumn(column: number, unit: string, tabSize: number): st
   return '\t'.repeat(Math.floor(column / tabSize)) + ' '.repeat(column % tabSize)
 }
 
-function lastRow(source: ReindentSource): number {
-  return source.starts.length - 1
-}
-
 function rowStart(source: ReindentSource, row: number): number {
-  return source.starts[row] ?? source.text.length
-}
-
-function rowEnd(source: ReindentSource, row: number): number {
-  if (row < lastRow(source)) return rowStart(source, row + 1) - 1
-
-  return source.text.length
+  return source.rows.read(row).start
 }
 
 function rowText(source: ReindentSource, row: number): string {
-  return source.text.slice(rowStart(source, row), rowEnd(source, row))
+  return source.rows.read(row).text
 }
 
+type Row = {
+  readonly start: number
+  readonly text: string
+}
+
+/**
+ * Rows by index. The commands walk down a range and ask each row several questions, so the last row
+ * is kept and the next one is found from its end.
+ */
+class RowReader {
+  #index = -1
+  #row: Row = { start: 0, text: '' }
+
+  constructor(
+    private readonly text: TextReadSnapshot,
+    private readonly cursor: TextCursor,
+  ) {}
+
+  read(index: number): Row {
+    if (index === this.#index) return this.#row
+
+    const start = this.startOf(index)
+    const end = lineBreakFrom(this.cursor, start)
+    this.#index = index
+    this.#row = { start, text: this.cursor.slice(start, end) }
+    return this.#row
+  }
+
+  private startOf(index: number): number {
+    if (index > 0 && index === this.#index + 1) {
+      return this.#row.start + this.#row.text.length + 1
+    }
+    return this.text.lineStart(index)
+  }
+}
+
+/**
+ * The row with every literal blanked, delimiters included: a line comment's own marker is what a
+ * rule written to skip commented delimiters looks for, and blanking it leaves nothing to skip.
+ */
 function maskedRowText(source: ReindentSource, row: number): string {
-  return source.maskedText.slice(rowStart(source, row), rowEnd(source, row))
+  const text = rowText(source, row)
+  const start = rowStart(source, row)
+  const end = start + text.length
+  const { starts, ends } = source.literals
+  let masked = ''
+  let cursor = 0
+
+  for (
+    let index = firstLiteralEndingAfter(source.literals, start);
+    index < starts.length;
+    index++
+  ) {
+    const literalStart = Math.max(start, starts[index]!)
+    if (literalStart >= end) break
+
+    const literalEnd = Math.min(end, ends[index]!)
+    masked += text.slice(cursor, literalStart - start) + ' '.repeat(literalEnd - literalStart)
+    cursor = literalEnd - start
+  }
+
+  return masked + text.slice(cursor)
+}
+
+/** Whether the break before `row` sits inside a literal, which makes the row's indentation content. */
+function startsInsideLiteral(source: ReindentSource, row: number): boolean {
+  if (row === 0) return false
+
+  const start = rowStart(source, row)
+  const index = firstLiteralEndingAfter(source.literals, start - 1)
+  const literalStart = source.literals.starts[index]
+  return literalStart !== undefined && literalStart < start
+}
+
+/** The first literal whose end lies past `offset`. */
+function firstLiteralEndingAfter(literals: LiteralRanges, offset: number): number {
+  let low = 0
+  let high = literals.ends.length
+
+  while (low < high) {
+    const middle = (low + high) >>> 1
+    if (literals.ends[middle]! <= offset) low = middle + 1
+    else high = middle
+  }
+
+  return low
 }
 
 function indentationOfRow(source: ReindentSource, row: number): string {
   return leadingWhitespace(rowText(source, row))
-}
-
-function rowAtOffset(source: ReindentSource, offset: number): number {
-  const clamped = Math.min(Math.max(offset, 0), source.text.length)
-  let low = 0
-  let high = lastRow(source)
-
-  while (low < high) {
-    const middle = low + Math.ceil((high - low) / 2)
-    if (rowStart(source, middle) <= clamped) low = middle
-    else high = middle - 1
-  }
-
-  return low
 }

@@ -148,6 +148,41 @@ describe('shiki worker', () => {
     expect(loadLanguage).toHaveBeenCalledOnce()
   })
 
+  it('loads the languages a later preload adds, once each', async () => {
+    vi.useFakeTimers()
+    const api = languageApi()
+    ;(globalThis as { self?: unknown }).self = { postMessage: vi.fn() }
+    createHighlighterCore.mockResolvedValue(api)
+    await import('../../src/shiki/shiki.worker')
+
+    const onmessage = (globalThis as { self: { onmessage: (event: MessageEvent) => void } }).self
+      .onmessage
+    const preload = (id: number, languages: readonly string[]) =>
+      onmessage(
+        new MessageEvent('message', {
+          data: {
+            ...request('preload', {
+              languageRegistrations: languages.map(languageRegistration),
+              themeRegistrations: [themeRegistration('github-dark')],
+            }),
+            id,
+          },
+        }),
+      )
+
+    preload(1, ['typescript', 'json'])
+    await flushMicrotasks()
+    await vi.advanceTimersByTimeAsync(1_000)
+    preload(2, ['json', 'rust'])
+    await flushMicrotasks()
+    await vi.advanceTimersByTimeAsync(1_000)
+
+    const loaded = api.loadLanguage.mock.calls.map((registrations) =>
+      registrations.map((registration) => registration.name),
+    )
+    expect(loaded).toEqual([['typescript', 'json'], ['rust']])
+  })
+
   it('returns editor theme colors from the loaded Shiki theme', async () => {
     const postMessage = vi.fn()
     const getTheme = vi.fn(() => ({

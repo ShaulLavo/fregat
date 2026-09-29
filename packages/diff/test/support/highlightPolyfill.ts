@@ -64,7 +64,7 @@ export function highlightRegistry(): Map<string, TestHighlight> {
 }
 
 /** Every range currently registered anywhere in the document-global highlight registry. */
-export function registeredHighlightRanges(): readonly AbstractRange[] {
+function registeredHighlightRanges(): readonly AbstractRange[] {
   return [...highlightRegistry().values()].flatMap((highlight) => [...highlight.ranges])
 }
 

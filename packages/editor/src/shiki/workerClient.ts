@@ -1,7 +1,8 @@
 import { documentSessionChangeTextSnapshot, type DocumentSessionChange } from '../documentSession'
-import { createDocumentTextSnapshot, type DocumentTextSnapshot } from '../documentTextSnapshot'
+import type { DocumentTextSnapshot } from '../documentTextSnapshot'
 import {
   applyBatchToPieceTable,
+  diffPieceTableSnapshots,
   type PieceTableSnapshot,
   pieceTableSnapshotsHaveSameText,
 } from '@singapore-editor/textbuffer'
@@ -12,11 +13,12 @@ import type {
   EditorHighlightResult,
   EditorHighlighterSession,
   EditorHighlighterSessionOptions,
-} from '../plugins'
+} from '../syntax/highlighter'
 import { createEditorRuntimeSessionId } from '../syntax/session'
 import type { EditorTheme } from '../theme'
 import type {
   ShikiWorkerDocumentOptions,
+  ShikiWorkerEditRequest,
   ShikiWorkerLanguageRegistration,
   ShikiWorkerRequest,
   ShikiWorkerRequestPayload,
@@ -36,16 +38,12 @@ export type ShikiPreloadRegistrations = {
   readonly themeRegistrations: readonly ShikiWorkerThemeRegistration[]
 }
 
-export type ShikiPreloadRegistrationSource =
+type ShikiPreloadRegistrationSource =
   | ShikiPreloadRegistrations
   | Promise<ShikiPreloadRegistrations>
   | (() => Promise<ShikiPreloadRegistrations> | ShikiPreloadRegistrations)
 
-export type ShikiHighlighterSessionOptions = Omit<
-  EditorHighlighterSessionOptions,
-  'textSnapshot'
-> & {
-  readonly textSnapshot?: DocumentTextSnapshot
+export type ShikiHighlighterSessionOptions = EditorHighlighterSessionOptions & {
   readonly lang: string
   readonly theme: string
   readonly registrations: Promise<ShikiResolvedRegistrations> | ShikiResolvedRegistrations
@@ -356,12 +354,12 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
   public readonly onDidChangeTheme: ShikiHighlighterSessionOptions['onDidChangeTheme']
   private readonly preloadRegistrations: ShikiPreloadRegistrationSource | null
   private snapshot: PieceTableSnapshot
-  private textSnapshot: DocumentTextSnapshot
   // The whole document's tokens, kept packed so an edit answer only has to splice its lines in.
   private store: EditorTokenStore | null = null
   private currentTheme: EditorTheme | null | undefined
   private preloadScheduled = false
   private opened = false
+  private workerGeneration = 0
   private disposed = false
   private task: Promise<void> = Promise.resolve()
 
@@ -378,27 +376,22 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
     this.registrations = Promise.resolve(options.registrations)
     this.preloadRegistrations = options.preloadRegistrations ?? null
     this.snapshot = options.snapshot
-    this.textSnapshot =
-      options.textSnapshot ?? createDocumentTextSnapshot(options.snapshot, options.fullText)
   }
 
-  public async refresh(
-    snapshot: ShikiHighlighterSessionOptions['snapshot'],
-    fullText?: string,
-  ): Promise<EditorHighlightResult> {
+  public async refresh(textSnapshot: DocumentTextSnapshot): Promise<EditorHighlightResult> {
     if (this.disposed) return emptyHighlightResult()
 
     return this.enqueueRequest(async () => {
       if (this.disposed) return emptyHighlightResult()
 
       await this.synchronizeTheme()
+      const snapshot = textSnapshot.snapshot
       if (this.opened && pieceTableSnapshotsHaveSameText(this.snapshot, snapshot)) {
         return { tokens: this.currentTokens(), theme: this.currentTheme }
       }
 
-      const textSnapshot = createDocumentTextSnapshot(snapshot, fullText)
-      const documentText = textSnapshot.materializeFullText()
-      const documentOptions = await this.documentOptions(documentText)
+      const documentText = openPayloadText(textSnapshot)
+      const documentOptions = await this.documentOptions()
       if (this.disposed) return emptyHighlightResult()
 
       const result = await this.owner.request({
@@ -410,8 +403,8 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
 
       this.schedulePreload()
       this.snapshot = snapshot
-      this.textSnapshot = textSnapshot
       this.opened = true
+      this.workerGeneration = this.owner.inspect().workerGeneration
       this.disposed = false
       this.store = result?.tokensPacked ? EditorTokenStore.fromPacked(result.tokensPacked) : null
       this.currentTheme = result?.theme
@@ -436,8 +429,8 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
 
       this.schedulePreload()
       this.snapshot = change.snapshot
-      this.textSnapshot = nextTextSnapshot
       this.opened = true
+      this.workerGeneration = this.owner.inspect().workerGeneration
       this.disposed = false
       this.adoptEditResult(result)
       return { tokens: this.currentTokens(), theme: result?.theme }
@@ -473,6 +466,10 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
   }
 
   private async synchronizeTheme(): Promise<void> {
+    const worker = this.owner.inspect()
+    if (worker.lifecycle !== 'ready' || worker.workerGeneration !== this.workerGeneration) {
+      this.opened = false
+    }
     const next = this.options.resolveTheme?.(this.theme)
     if (!next || next.theme === this.theme) return
 
@@ -519,24 +516,32 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
     nextTextSnapshot: DocumentTextSnapshot,
   ): Promise<ShikiWorkerRequestPayload> {
     const edits = incrementalEditsForChange(this.snapshot, change)
-    if (edits && this.opened && !this.disposed) {
+    if (edits && this.opened && !this.disposed) return this.editRequest(edits)
+
+    if (!this.opened) {
       return {
-        type: 'edit',
+        type: 'open',
         ...(await this.documentOptions()),
-        edits,
+        text: openPayloadText(nextTextSnapshot),
       }
     }
 
-    const text = nextTextSnapshot.materializeFullText()
-    const fallbackEdit = createTextDiffEdit(this.textSnapshot.materializeFullText(), text)
+    const fallbackEdit = diffPieceTableSnapshots(this.snapshot, change.snapshot)
+    return this.editRequest(fallbackEdit ? [fallbackEdit] : [])
+  }
+
+  private editRequest(edits: readonly TextEdit[]): ShikiWorkerEditRequest {
     return {
       type: 'edit',
-      ...(await this.documentOptions(text)),
-      edits: fallbackEdit ? [fallbackEdit] : undefined,
+      documentId: this.documentId,
+      runtimeSessionId: this.runtimeSessionId,
+      lang: this.lang,
+      theme: this.theme,
+      edits,
     }
   }
 
-  private async documentOptions(text?: string): Promise<ShikiWorkerDocumentOptions> {
+  private async documentOptions(): Promise<ShikiWorkerDocumentOptions> {
     const registrations = await this.registrations
     return {
       documentId: this.documentId,
@@ -546,7 +551,6 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
       languageRegistrations: registrations.languageRegistrations,
       themeRegistration: registrations.themeRegistration,
       themeRegistrations: registrations.themeRegistrations,
-      text,
     }
   }
 
@@ -560,33 +564,13 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
   }
 }
 
-function emptyHighlightResult(): EditorHighlightResult {
-  return { tokens: EditorTokenStore.empty() }
+// The worker's open message is a whole-document protocol payload; edits after it are incremental.
+function openPayloadText(textSnapshot: DocumentTextSnapshot): string {
+  return textSnapshot.materializeFullText()
 }
 
-export const createTextDiffEdit = (previousText: string, nextText: string) => {
-  if (previousText === nextText) return null
-
-  let start = 0
-  const maxPrefixLength = Math.min(previousText.length, nextText.length)
-  while (start < maxPrefixLength && previousText[start] === nextText[start]) start += 1
-
-  let previousEnd = previousText.length
-  let nextEnd = nextText.length
-  while (
-    previousEnd > start &&
-    nextEnd > start &&
-    previousText[previousEnd - 1] === nextText[nextEnd - 1]
-  ) {
-    previousEnd -= 1
-    nextEnd -= 1
-  }
-
-  return {
-    from: start,
-    to: previousEnd,
-    text: nextText.slice(start, nextEnd),
-  }
+function emptyHighlightResult(): EditorHighlightResult {
+  return { tokens: EditorTokenStore.empty() }
 }
 
 const incrementalEditsForChange = (

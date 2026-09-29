@@ -1,6 +1,6 @@
 // Phosphor regular-weight glyphs as path data. Inline paths keep the icon font
 // (and its 4 MB of unused formats) out of every host's boot path.
-export const FIND_ICON_VIEW_BOX = '0 0 256 256'
+const FIND_ICON_VIEW_BOX = '0 0 256 256'
 
 export const FIND_ICONS = {
   caseSensitive: {

@@ -1,15 +1,18 @@
-import type { DocumentSessionChange, TextSnapshot } from '@singapore-editor/core/document'
-import { createStringTextSnapshot } from '@singapore-editor/core/document'
+import type { TextReadSnapshot } from '@singapore-editor/core/document'
 import type { EditorTheme, VirtualizedFoldMarker } from '@singapore-editor/core/rendering'
 import type { EditorToken, EditorTokenStore } from '@singapore-editor/core/syntax'
 import type {
+  EditorContributionChange,
   EditorPlugin,
   EditorViewContribution,
   EditorViewContributionContext,
   EditorViewContributionUpdateKind,
   EditorViewSnapshot,
 } from '@singapore-editor/core/extensions'
-import { EditorSecondaryTextView } from '@singapore-editor/core/secondary-views'
+import {
+  createEditorSecondaryTextView,
+  type EditorSecondaryTextView,
+} from '@singapore-editor/core/secondary-views'
 import './style.css'
 
 export type StickyScrollPluginOptions = {
@@ -92,6 +95,8 @@ function createStickyScrollContribution(
 }
 
 class StickyScrollContribution implements EditorViewContribution {
+  // Which scopes the viewport hides is the whole input; the caret changes none of it.
+  readonly inputs = ['content', 'tokens', 'viewport', 'layout'] as const
   private readonly context: EditorViewContributionContext
   private readonly options: ResolvedStickyScrollOptions
   private readonly root: HTMLDivElement
@@ -99,7 +104,7 @@ class StickyScrollContribution implements EditorViewContribution {
   private appliedText = ''
   private appliedTokens: EditorTokenStore | null = null
   private appliedTheme: EditorTheme | null = null
-  private appliedRowHeight = 0
+  private appliedMetrics: EditorViewSnapshot['metrics'] | null = null
   private contentKey = ''
   private layoutKey = ''
 
@@ -112,12 +117,9 @@ class StickyScrollContribution implements EditorViewContribution {
 
   public update(
     snapshot: EditorViewSnapshot,
-    kind: EditorViewContributionUpdateKind,
-    _change?: DocumentSessionChange | null,
+    _kind: EditorViewContributionUpdateKind,
+    _change?: EditorContributionChange | null,
   ): void {
-    // Which scopes the viewport hides is the whole input, and moving the caret changes none of it.
-    if (kind === 'selection') return
-
     this.renderSnapshot(snapshot)
   }
 
@@ -136,7 +138,7 @@ class StickyScrollContribution implements EditorViewContribution {
     }
 
     const lineView = this.ensureLineView(snapshot)
-    this.syncRowHeight(lineView, snapshot)
+    this.syncMetrics(lineView, snapshot)
     this.syncTheme(lineView, snapshot)
     this.syncContent(lineView, snapshot, header)
     this.syncLayout(lineView, snapshot, header)
@@ -148,16 +150,22 @@ class StickyScrollContribution implements EditorViewContribution {
 
     const created = createLineView(this.root, this.context, snapshot)
     this.lineView = created
-    this.appliedRowHeight = snapshot.metrics.rowHeight
+    this.appliedMetrics = snapshot.metrics
     return created
   }
 
-  private syncRowHeight(lineView: EditorSecondaryTextView, snapshot: EditorViewSnapshot): void {
-    const rowHeight = snapshot.metrics.rowHeight
-    if (rowHeight === this.appliedRowHeight) return
+  // Character width too: a font change moves every column the mirrored rows draw at.
+  private syncMetrics(lineView: EditorSecondaryTextView, snapshot: EditorViewSnapshot): void {
+    const metrics = snapshot.metrics
+    const applied = this.appliedMetrics
+    if (
+      applied?.rowHeight === metrics.rowHeight &&
+      applied.characterWidth === metrics.characterWidth
+    )
+      return
 
-    this.appliedRowHeight = rowHeight
-    lineView.setLineHeight(rowHeight)
+    this.appliedMetrics = metrics
+    lineView.setTextMetrics(metrics)
   }
 
   private syncTheme(lineView: EditorSecondaryTextView, snapshot: EditorViewSnapshot): void {
@@ -214,7 +222,7 @@ class StickyScrollContribution implements EditorViewContribution {
       '--editor-sticky-scroll-viewport-width',
       `${snapshot.viewport.clientWidth}px`,
     )
-    lineView.scrollElement.style.height = `${header.stackHeight}px`
+    lineView.setHeight(header.stackHeight)
   }
 }
 
@@ -251,7 +259,7 @@ function createLineView(
   context: EditorViewContributionContext,
   snapshot: EditorViewSnapshot,
 ): EditorSecondaryTextView {
-  const lineView = new EditorSecondaryTextView(root, {
+  return createEditorSecondaryTextView(root, {
     className: 'editor-sticky-scroll-lines',
     // Static: every line of the stack is on screen at once, so there is nothing to virtualize away.
     scrollMode: 'static',
@@ -260,13 +268,8 @@ function createLineView(
     tabSize: snapshot.tabSize,
     // Measuring the font again could land a fraction of a pixel away from the rows being mirrored.
     textMetrics: snapshot.metrics,
-    selectionHighlightName: `${context.highlightPrefix ?? 'editor'}-sticky-scroll-selection`,
+    selectionHighlightName: `${context.highlightPrefix}-sticky-scroll-selection`,
   })
-  lineView.setEditable(false)
-  // The stack repeats rows that are already in the focus and reading order.
-  lineView.scrollElement.tabIndex = -1
-  lineView.inputElement.tabIndex = -1
-  return lineView
 }
 
 function stickyScrollHeader(
@@ -427,7 +430,7 @@ function stickyScrollContent(
   snapshot: EditorViewSnapshot,
   rows: readonly number[],
 ): StickyScrollContent {
-  const textSnapshot = snapshot.textSnapshot ?? createStringTextSnapshot(snapshot.fullText)
+  const textSnapshot = snapshot.textSnapshot
   const lines: string[] = []
   const tokens: EditorToken[] = []
   let base = 0
@@ -461,7 +464,7 @@ function appendRowTokens(
 
 function rowTextRange(
   snapshot: EditorViewSnapshot,
-  textSnapshot: TextSnapshot,
+  textSnapshot: TextReadSnapshot,
   row: number,
 ): StickyScrollRowRange | null {
   const start = lineStartOffset(snapshot, row)
@@ -472,8 +475,5 @@ function rowTextRange(
 }
 
 function lineStartOffset(snapshot: EditorViewSnapshot, row: number): number | undefined {
-  const lineStarts = snapshot.lineStartsView
-  if (lineStarts) return lineStarts.at(row)
-
-  return snapshot.lineStarts[row]
+  return snapshot.lineStartsView.at(row)
 }

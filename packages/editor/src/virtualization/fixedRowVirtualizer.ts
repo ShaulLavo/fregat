@@ -1,3 +1,4 @@
+import { scheduleFrame, type ScheduledFrame } from '../editor/scheduleFrame'
 import { installNativeWheelScrollOwner } from './wheelScrollTarget'
 import {
   createRowHeightIndex,
@@ -44,6 +45,8 @@ export type FixedRowVirtualizerOptions = {
   readonly enabled?: boolean
   readonly maxScrollHeight?: number
   readonly scrollMode?: FixedRowScrollMode
+  /** Room below the last row to scroll it to the top. On by default. */
+  readonly scrollPastEnd?: boolean
 }
 
 type FixedRowScrollMode = 'virtualized' | 'static'
@@ -157,8 +160,8 @@ export class FixedRowVirtualizer {
   private attached: AttachedScrollElement | null = null
   private changeHandler: FixedRowVirtualizerChangeHandler | null = null
   private scrollHandler: (() => void) | null = null
-  private scrollAnimationFrame = 0
-  private resizeAnimationFrame = 0
+  private scrollAnimationFrame: ScheduledFrame | null = null
+  private resizeAnimationFrame: ScheduledFrame | null = null
   private trailingScrollEmitTimer: ReturnType<typeof setTimeout> | null = null
   private pendingResizeMetrics: PendingResizeMetrics | null = null
   private itemCache = new Map<number, FixedRowVirtualItem>()
@@ -587,27 +590,27 @@ export class FixedRowVirtualizer {
 
   private scheduleScrollSync(): void {
     if (this.pendingResizeMetrics) this.cancelScheduledResizeSync()
-    if (this.scrollAnimationFrame !== 0) return
+    if (this.scrollAnimationFrame !== null) return
 
-    this.scrollAnimationFrame = requestFrame(() => {
-      this.scrollAnimationFrame = 0
+    this.scrollAnimationFrame = scheduleFrame(() => {
+      this.scrollAnimationFrame = null
       this.syncScrollPositionFromElement()
     })
   }
 
   private cancelScheduledScrollSync(): void {
-    if (this.scrollAnimationFrame === 0) return
+    if (this.scrollAnimationFrame === null) return
 
-    cancelFrame(this.scrollAnimationFrame)
-    this.scrollAnimationFrame = 0
+    this.scrollAnimationFrame.cancel()
+    this.scrollAnimationFrame = null
   }
 
   private scheduleResizeSync(): void {
-    if (this.scrollAnimationFrame !== 0) return
-    if (this.resizeAnimationFrame !== 0) return
+    if (this.scrollAnimationFrame !== null) return
+    if (this.resizeAnimationFrame !== null) return
 
-    this.resizeAnimationFrame = requestFrame(() => {
-      this.resizeAnimationFrame = 0
+    this.resizeAnimationFrame = scheduleFrame(() => {
+      this.resizeAnimationFrame = null
       this.flushPendingResizeMetrics()
     })
   }
@@ -641,10 +644,10 @@ export class FixedRowVirtualizer {
   }
 
   private cancelScheduledResizeSync(): void {
-    if (this.resizeAnimationFrame === 0) return
+    if (this.resizeAnimationFrame === null) return
 
-    cancelFrame(this.resizeAnimationFrame)
-    this.resizeAnimationFrame = 0
+    this.resizeAnimationFrame.cancel()
+    this.resizeAnimationFrame = null
   }
 
   private emitChange(): void {
@@ -989,6 +992,7 @@ function normalizeOptions(
     enabled: options.enabled ?? true,
     maxScrollHeight: normalizeMaxScrollHeight(options.maxScrollHeight),
     scrollMode: normalizeScrollMode(options.scrollMode),
+    scrollPastEnd: options.scrollPastEnd ?? true,
   }
 }
 
@@ -1004,6 +1008,7 @@ function denormalizeOptions(
     enabled: options.enabled,
     maxScrollHeight: options.maxScrollHeight,
     scrollMode: options.scrollMode,
+    scrollPastEnd: options.scrollPastEnd,
   }
 }
 
@@ -1019,6 +1024,7 @@ function sameNormalizedOptions(
     left.enabled === right.enabled &&
     left.maxScrollHeight === right.maxScrollHeight &&
     left.scrollMode === right.scrollMode &&
+    left.scrollPastEnd === right.scrollPastEnd &&
     sameRowSizes(left.rowSizes, right.rowSizes)
   )
 }
@@ -1100,7 +1106,7 @@ function scrollPaddingEnd(
   options: NormalizedFixedRowVirtualizerOptions,
   viewportHeight: number,
 ): number {
-  if (options.count === 0) return 0
+  if (options.count === 0 || !options.scrollPastEnd) return 0
 
   return Math.max(0, viewportHeight - lastRowHeight(options))
 }
@@ -1357,24 +1363,6 @@ function resizeObserverBox(
 function createResizeObserver(callback: ResizeObserverCallback): ResizeObserver | null {
   if (typeof ResizeObserver === 'undefined') return null
   return new ResizeObserver(callback)
-}
-
-function requestFrame(callback: FrameRequestCallback): number {
-  if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(callback)
-  return setTimeout(() => callback(nowMs()), 0) as unknown as number
-}
-
-function cancelFrame(handle: number): void {
-  if (typeof cancelAnimationFrame === 'function') {
-    cancelAnimationFrame(handle)
-    return
-  }
-
-  clearTimeout(handle)
-}
-
-function nowMs(): DOMHighResTimeStamp {
-  return globalThis.performance?.now() ?? Date.now()
 }
 
 type LogicalScrollProperties = {

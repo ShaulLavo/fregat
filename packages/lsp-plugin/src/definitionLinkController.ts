@@ -1,13 +1,11 @@
 import type {
+  EditorDisposable,
   EditorViewContributionContext,
   EditorViewContributionUpdateKind,
   EditorViewSnapshot,
 } from '@singapore-editor/core/extensions'
-import {
-  anchoredSurfaceFollowsUpdate,
-  hoverTargetRange,
-  type OffsetRange,
-} from '@singapore-editor/plugin-ui'
+import { anchoredSurfaceFollowsUpdate } from '@singapore-editor/plugin-ui/anchored-surface'
+import { type OffsetRange, hoverTargetRange } from '@singapore-editor/plugin-ui/offset-range'
 
 import {
   navigateToTarget,
@@ -19,6 +17,7 @@ import {
   type DefinitionResult,
 } from './definitionNavigation'
 import { LINK_HIGHLIGHT_STYLE } from './plugin.styles'
+import { rangeAroundOffset } from './sourceText'
 import type { ActiveDocument, LanguageServerNavigationCommand } from './pluginTypes'
 import type { LanguageServerFeatureRouter } from './serverSet'
 import type {
@@ -31,7 +30,6 @@ import type {
 export type DefinitionLinkControllerOptions = {
   readonly context: EditorViewContributionContext
   readonly router: LanguageServerFeatureRouter
-  readonly defaultHighlightPrefix?: string
   readonly linkHighlightNameNamespace?: string
   readonly navigationTimingNamePrefix?: string
   getActiveDocument(): ActiveDocument | null
@@ -58,6 +56,7 @@ export class DefinitionLinkController {
   private lastPointerOffset: number | null = null
   private linkRange: OffsetRange | null = null
   private disposed = false
+  private pressParticipant: EditorDisposable | null = null
 
   public constructor(private readonly options: DefinitionLinkControllerOptions) {
     this.context = options.context
@@ -91,9 +90,7 @@ export class DefinitionLinkController {
   private installHandlers(): void {
     this.context.scrollElement.addEventListener('pointermove', this.handlePointerMove)
     this.context.scrollElement.addEventListener('pointerleave', this.handlePointerLeave)
-    this.context.scrollElement.addEventListener('mousedown', this.handleMouseDown, {
-      capture: true,
-    })
+    this.pressParticipant = this.context.registerPressParticipant(this.claimNavigationPress)
     this.context.container.ownerDocument.addEventListener('keydown', this.handleKeyDown)
     this.context.container.ownerDocument.addEventListener('keyup', this.handleKeyUp)
   }
@@ -101,9 +98,8 @@ export class DefinitionLinkController {
   private uninstallHandlers(): void {
     this.context.scrollElement.removeEventListener('pointermove', this.handlePointerMove)
     this.context.scrollElement.removeEventListener('pointerleave', this.handlePointerLeave)
-    this.context.scrollElement.removeEventListener('mousedown', this.handleMouseDown, {
-      capture: true,
-    })
+    this.pressParticipant?.dispose()
+    this.pressParticipant = null
     this.context.container.ownerDocument.removeEventListener('keydown', this.handleKeyDown)
     this.context.container.ownerDocument.removeEventListener('keyup', this.handleKeyUp)
   }
@@ -126,17 +122,16 @@ export class DefinitionLinkController {
     this.clearDefinitionLink()
   }
 
-  private readonly handleMouseDown = (event: MouseEvent): void => {
-    if (event.button !== 0) return
-    if (!isNavigationModifier(event)) return
+  private readonly claimNavigationPress = (event: MouseEvent): boolean => {
+    if (event.button !== 0) return false
+    if (!isNavigationModifier(event)) return false
 
     const offset = this.context.textOffsetFromPoint(event.clientX, event.clientY)
-    if (offset === null) return
+    if (offset === null) return false
 
-    event.preventDefault()
-    event.stopImmediatePropagation()
     this.context.focusEditor()
     this.requestNavigationAtOffset(offset, { kind: 'definition', openMode: 'default' })
+    return true
   }
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
@@ -165,7 +160,7 @@ export class DefinitionLinkController {
     this.definitionRequestId = requestId
     void requestNavigationTargets(this.router, {
       uri: active.uri,
-      text: active.fullText,
+      document: active,
       offset,
       kind: command.kind,
       includeDeclaration: command.includeDeclaration,
@@ -184,13 +179,13 @@ export class DefinitionLinkController {
 
     if (this.linkRange && offset >= this.linkRange.start && offset < this.linkRange.end) return
     this.clearDefinitionLink()
-    const range = hoverTargetRange(active.fullText, offset)
+    const range = rangeAroundOffset(active, offset, hoverTargetRange)
 
     const requestId = this.definitionHoverRequestId + 1
     this.definitionHoverRequestId = requestId
     void requestDefinition(this.router, {
       uri: active.uri,
-      text: active.fullText,
+      document: active,
       offset,
     })
       .then((result) => this.renderDefinitionLink(requestId, active, range, result))
@@ -206,16 +201,11 @@ export class DefinitionLinkController {
     if (requestId !== this.definitionHoverRequestId) return
     if (active !== this.options.getActiveDocument()) return
     const sourceRange = result.sourceRange ?? range
-    const target = preferredJumpableDefinitionTarget(
-      active.uri,
-      active.fullText,
-      sourceRange,
-      result,
-    )
+    const target = preferredJumpableDefinitionTarget(active.uri, active, sourceRange, result)
     if (!target) return this.clearDefinitionLink()
 
     this.linkRange = sourceRange
-    this.context.setRangeHighlight?.(this.linkHighlightName, [sourceRange], LINK_HIGHLIGHT_STYLE)
+    this.context.setRangeHighlight(this.linkHighlightName, [sourceRange], LINK_HIGHLIGHT_STYLE)
     this.context.scrollElement.style.cursor = 'pointer'
     this.options.onDefinitionLinkHover?.(target)
   }
@@ -251,7 +241,7 @@ export class DefinitionLinkController {
     })
     if (handled) return
 
-    const target = preferredReferenceTarget(active.uri, active.fullText, offset, result)
+    const target = preferredReferenceTarget(active.uri, active, offset, result)
     if (!target) return
     this.openNavigationTarget(active, target, {
       kind: 'references',
@@ -272,7 +262,7 @@ export class DefinitionLinkController {
     navigateToTarget(
       target,
       {
-        text: active.fullText,
+        document: active,
         setSelection: this.context.setSelection.bind(this.context),
         focusEditor: this.context.focusEditor.bind(this.context),
       },
@@ -298,7 +288,7 @@ export class DefinitionLinkController {
   private clearDefinitionLink(): void {
     this.definitionHoverRequestId += 1
     this.linkRange = null
-    this.context.clearRangeHighlight?.(this.linkHighlightName)
+    this.context.clearRangeHighlight(this.linkHighlightName)
     this.context.scrollElement.style.cursor = ''
   }
 }
@@ -345,7 +335,6 @@ function definitionLinkHighlightName(
   context: EditorViewContributionContext,
   options: DefinitionLinkControllerOptions,
 ): string {
-  const prefix = context.highlightPrefix ?? options.defaultHighlightPrefix ?? 'editor-lsp-plugin'
   const namespace = options.linkHighlightNameNamespace ?? 'lsp-plugin'
-  return `${prefix}-${namespace}-definition-link`
+  return `${context.highlightPrefix}-${namespace}-definition-link`
 }

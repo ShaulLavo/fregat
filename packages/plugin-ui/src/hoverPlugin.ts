@@ -5,6 +5,7 @@ import type {
 } from '@singapore-editor/core/extensions'
 
 import { createHoverController, type HoverController } from './hoverController'
+import { clearHoverController, setHoverController } from './hoverRegistry'
 
 export type HoverPluginOptions = {
   readonly name?: string
@@ -15,22 +16,6 @@ export type HoverPluginOptions = {
 type LiveHover = {
   readonly context: EditorViewContributionContext
   readonly controller: HoverController
-}
-
-const controllers = new WeakMap<HTMLElement, HoverController>()
-
-/**
- * The hover controller a view's scroll element belongs to, for a plugin that has to hide the hover
- * when its own surface opens. Null before the hover has activated on that view.
- */
-export function hoverControllerFor(scrollElement: HTMLElement): HoverController | null {
-  return controllers.get(scrollElement) ?? null
-}
-
-/** Whether an event target sits inside any floating editor surface. */
-export function isInsideEditorPopup(target: EventTarget | null): boolean {
-  if (!(target instanceof Element)) return false
-  return target.closest('[data-editor-popup]') !== null
 }
 
 /**
@@ -55,14 +40,12 @@ function activateHover(plugin: EditorPluginContext, options: HoverPluginOptions)
         const controller = createHoverController({ context, ...options })
         const entry: LiveHover = { context, controller }
         live.add(entry)
-        controllers.set(context.scrollElement, controller)
+        setHoverController(context.scrollElement, controller)
         return {
           update: (snapshot, kind) => controller.update(snapshot, kind),
           dispose: () => {
             live.delete(entry)
-            if (controllers.get(context.scrollElement) === controller) {
-              controllers.delete(context.scrollElement)
-            }
+            clearHoverController(context.scrollElement, controller)
             controller.dispose()
           },
         }

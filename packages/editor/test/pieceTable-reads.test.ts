@@ -2,25 +2,21 @@ import { describe, expect, it } from 'vitest'
 
 import {
   createPieceTableSnapshot,
-  forEachPieceTableTextChunk,
+  streamPieceTableTextChunks,
   getPieceTableLength,
   insertIntoPieceTable,
   materializePieceTableFullText,
   readPieceTableTextRange,
   streamPieceTablePieces,
 } from '@singapore-editor/textbuffer'
-import {
-  ensureValidRange,
-  getPieceTableOriginalText,
-} from '@singapore-editor/textbuffer/internal/reads'
+import { ensureValidRange } from '@singapore-editor/textbuffer/internal/reads'
 
 describe('piece table reads', () => {
-  it('reads snapshot length, original text, full text, and ranges', () => {
+  it('reads snapshot length, full text, and ranges', () => {
     const initial = createPieceTableSnapshot('abcdef')
     const edited = insertIntoPieceTable(initial, 3, 'XX')
 
     expect(getPieceTableLength(edited)).toBe(8)
-    expect(getPieceTableOriginalText(edited)).toBe('abcdef')
     expect(materializePieceTableFullText(edited)).toBe('abcXXdef')
     expect(materializePieceTableFullText(edited)).toBe('abcXXdef')
     expect(readPieceTableTextRange(edited, 2, 6)).toBe('cXXd')
@@ -33,7 +29,7 @@ describe('piece table reads', () => {
     const edited = insertIntoPieceTable(initial, 3, 'XX')
     const chunks: string[] = []
 
-    forEachPieceTableTextChunk(edited, (text, start, end) => {
+    streamPieceTableTextChunks(edited, (text, start, end) => {
       chunks.push(`${start}:${end}:${text}`)
     })
 

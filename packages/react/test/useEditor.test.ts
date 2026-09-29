@@ -18,9 +18,9 @@ import {
   EditorHost,
   useEditor,
   useEditorSelector,
-  type ReactEditorCommands,
   type ReactEditorController,
   type ReactEditorOptions,
+  type ReactEditorStoreSnapshot,
 } from '../src'
 
 class MockHighlight extends Set<Range> {}
@@ -38,6 +38,7 @@ type ActEnvironment = typeof globalThis & {
 
 type Diagnostic = {
   readonly name: string
+  readonly detail?: { readonly fullTextReads?: number }
 }
 
 type EditorCursor = {
@@ -74,7 +75,7 @@ describe('useEditor', () => {
     expect(mounted.controller.getEditor()).not.toBeNull()
     expect(mounted.controller.materializeFullText()).toBe('alpha')
     expect(mounted.controller.getState()?.length).toBe(5)
-    expect(mounted.controller.getSnapshot()?.fullText).toBe('alpha')
+    expect(viewText(mounted.controller)).toBe('alpha')
 
     mounted.dispose()
 
@@ -331,7 +332,7 @@ describe('useEditor', () => {
     expect(mounted.controller.materializeFullText()).toBe('alpha!')
     expect(mounted.controller.getState()?.length).toBe(6)
     expect(mounted.controller.getLastChange()?.kind).toBe('edit')
-    expect(mounted.controller.getSnapshot()?.fullText).toBe('alpha!')
+    expect(viewText(mounted.controller)).toBe('alpha!')
 
     mounted.dispose()
   })
@@ -352,6 +353,65 @@ describe('useEditor', () => {
     expect(textSnapshotReads(diagnostics)).toHaveLength(1)
 
     mounted.dispose()
+  })
+
+  it('never reads the whole text when store or view snapshots are spread or stringified', () => {
+    const diagnostics = collectDiagnostics()
+    const captured: { snapshot: ReactEditorStoreSnapshot | null } = { snapshot: null }
+    const host = document.createElement('div')
+    const root = createRoot(host)
+    document.body.append(host)
+    act(() => root.render(createElement(StoreProbeHarness, { captured })))
+    const store = captured.snapshot
+    if (!store) throw new Error('store probe did not render')
+    diagnostics.length = 0
+
+    const spread = { ...store, view: { ...store.snapshot } }
+    JSON.stringify(store.snapshot)
+    JSON.stringify(store.state)
+
+    expect(spread.textSnapshot?.length).toBe(5)
+    expect(fullTextReads(diagnostics)).toHaveLength(0)
+
+    act(() => root.unmount())
+    host.remove()
+  })
+
+  it('keeps useFullText current and stops reading once its subscriber unmounts', () => {
+    const diagnostics = collectDiagnostics()
+    let controller!: ReactEditorController
+    const texts: string[] = []
+    const host = document.createElement('div')
+    const root = createRoot(host)
+    document.body.append(host)
+    const render = (withProbe: boolean): void =>
+      act(() =>
+        root.render(
+          createElement(FullTextHarness, {
+            withProbe,
+            onController: (next: ReactEditorController) => {
+              controller = next
+            },
+            onText: (text: string) => texts.push(text),
+          }),
+        ),
+      )
+    render(true)
+    expect(texts.at(-1)).toBe('alpha')
+
+    diagnostics.length = 0
+    act(() => controller.commands.edit({ from: 5, to: 5, text: '!' }))
+    expect(texts.at(-1)).toBe('alpha!')
+    expect(fullTextReads(diagnostics)).toHaveLength(1)
+
+    render(false)
+    diagnostics.length = 0
+    act(() => controller.commands.edit({ from: 6, to: 6, text: '?' }))
+    expect(controller.materializeFullText()).toBe('alpha!?')
+    expect(fullTextReads(diagnostics)).toHaveLength(1)
+
+    act(() => root.unmount())
+    host.remove()
   })
 
   it('syncs full view snapshots on selection updates', () => {
@@ -375,21 +435,6 @@ describe('useEditor', () => {
       endOffset: 2,
     })
 
-    mounted.dispose()
-  })
-
-  it('forwards the deprecated numeric selection reveal target', () => {
-    const mounted = mountReactEditor({
-      document: { text: 'alpha', documentId: 'a.ts', revision: 1 },
-    })
-    const instance = mounted.controller.getEditor()
-    if (!instance) throw new Error('editor did not mount')
-    const setSelection = vi.spyOn(instance, 'setSelection')
-    const selectionArgs: Parameters<ReactEditorCommands['setSelection']> = [1, 1, 4]
-
-    act(() => mounted.controller.commands.setSelection(...selectionArgs))
-
-    expect(setSelection).toHaveBeenLastCalledWith(1, 1, 4)
     mounted.dispose()
   })
 
@@ -960,6 +1005,58 @@ function CursorProbe({
   return null
 }
 
+function StoreProbeHarness({
+  captured,
+}: {
+  readonly captured: { snapshot: ReactEditorStoreSnapshot | null }
+}): ReactElement {
+  const controller = useEditor({ document: { text: 'alpha', documentId: 'a.ts', revision: 1 } })
+  captured.snapshot = useEditorSelector(controller, (snapshot) => snapshot)
+  return createElement(EditorHost, { controller })
+}
+
+function FullTextHarness({
+  withProbe,
+  onController,
+  onText,
+}: {
+  readonly withProbe: boolean
+  readonly onController: (controller: ReactEditorController) => void
+  readonly onText: (text: string) => void
+}): ReactElement {
+  const controller = useEditor({ document: { text: 'alpha', documentId: 'a.ts', revision: 1 } })
+
+  useLayoutEffect(() => {
+    onController(controller)
+  }, [controller, onController])
+
+  return createElement(
+    'div',
+    null,
+    createElement(EditorHost, { controller }),
+    withProbe ? createElement(FullTextProbe, { controller, onText }) : null,
+  )
+}
+
+function FullTextProbe({
+  controller,
+  onText,
+}: {
+  readonly controller: ReactEditorController
+  readonly onText: (text: string) => void
+}): null {
+  const text = controller.useFullText()
+  useLayoutEffect(() => {
+    onText(text)
+  }, [text, onText])
+  return null
+}
+
+function viewText(controller: ReactEditorController): string | undefined {
+  const source = controller.getSnapshot()?.textSnapshot
+  return source?.readRange(0, source.length)
+}
+
 function TextProbe({
   controller,
   renders,
@@ -968,7 +1065,7 @@ function TextProbe({
   readonly renders: { text: number }
 }): null {
   renders.text += 1
-  const text = useEditorSelector(controller, (snapshot) => snapshot.fullText)
+  const text = controller.useFullText()
   void text
   return null
 }
@@ -1043,6 +1140,9 @@ async function flushInitialPaintCallbacks(): Promise<void> {
 function mountSnapshotEditor(options: ReactEditorOptions): MountedEditor {
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(320)
   vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(80)
+  // Paint admission compares the outer box, which happy-dom otherwise reports as 0 by 0.
+  vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(320)
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(80)
   const mounted = mountReactEditor(options)
   const editor = mounted.controller.getEditor()
   const view: unknown = editor && Reflect.get(editor, 'view')
@@ -1164,6 +1264,14 @@ function collectDiagnostics(): Diagnostic[] {
     diagnostics.push(diagnostic)
   }
   return diagnostics
+}
+
+/** Whole-text reads of any kind: materialization, a full-range readRange, or a chunk walk. */
+function fullTextReads(diagnostics: readonly Diagnostic[]): readonly Diagnostic[] {
+  return diagnostics.filter(
+    (diagnostic) =>
+      diagnostic.name === 'textSnapshot.read' && diagnostic.detail?.fullTextReads === 1,
+  )
 }
 
 function textSnapshotReads(diagnostics: readonly Diagnostic[]): readonly Diagnostic[] {

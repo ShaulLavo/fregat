@@ -1,3 +1,5 @@
+import type { TooltipAction } from '@singapore-editor/plugin-ui/tooltip'
+import type { LanguageServerDocument } from './document'
 import type { DocumentLogicalRevisionScope } from '@singapore-editor/core/document'
 import type {
   EditorDisposable,
@@ -8,13 +10,14 @@ import type {
 import type {
   LspClient,
   LspNotificationHandler,
+  LspServerRequestHandler,
   LspWebSocketTransportOptions,
 } from '@singapore-editor/lsp'
 import type * as lsp from 'vscode-languageserver-protocol'
 
 import type { LanguageServerConnectionContext } from './connectionContext'
 import type { LanguageServerDocumentSyncController } from './documentSyncController'
-import type { LspConnectionProvider } from './lspConnection'
+import type { LspConnectionProvider, LspReconnectOptions } from './lspConnection'
 import type { ParsedWorkspaceEdit } from './workspaceEdit'
 import type { WorkspaceTextDocumentProvenance } from './workspaceTextEdits'
 export type { LanguageServerConnectionContext } from './connectionContext'
@@ -55,11 +58,26 @@ export type LanguageServerDiagnosticCounts = {
   readonly total: number
 }
 
+/**
+ * How far a summary's diagnostics can be trusted, so an empty list is never mistaken for a clean
+ * file. `awaiting`: a first result is being asked for. `refreshing`: a result is shown and a newer
+ * one is being asked for. `current`: nothing is pending. `silent`: the server has said nothing and
+ * nothing is pending — a push-only server may never publish, so this never waits. `unavailable`:
+ * the connection is gone and what was shown was cleared.
+ */
+export type LanguageServerDiagnosticsFreshness =
+  | 'awaiting'
+  | 'refreshing'
+  | 'current'
+  | 'silent'
+  | 'unavailable'
+
 export type LanguageServerDiagnosticSummary = {
   readonly uri: lsp.DocumentUri | null
   readonly version: number | null
   readonly diagnostics: readonly lsp.Diagnostic[]
   readonly counts: LanguageServerDiagnosticCounts
+  readonly freshness: LanguageServerDiagnosticsFreshness
 }
 
 export type LanguageServerDiagnosticMarkerEvent = {
@@ -98,18 +116,30 @@ export type LanguageServerReferencesResult = {
   readonly targets: readonly LanguageServerDefinitionTarget[]
 }
 
+export type LanguageServerDocumentSnapshot = Pick<
+  EditorViewSnapshot,
+  | 'documentId'
+  | 'languageId'
+  | 'textSnapshot'
+  | 'textVersion'
+  | 'documentSyncPoint'
+  | 'changesSinceDocumentSyncPoint'
+  | 'lineStarts'
+  | 'lineStartsView'
+>
+
 export type LanguageServerDocumentSyncOptions = {
   /** Projects a live path transition before deferred view publication catches up. */
   readonly controller?: LanguageServerDocumentSyncController
   /** Resolves opaque editor identities to protocol URIs. Returning null disables synchronization. */
-  uriForDocument?(snapshot: EditorViewSnapshot): lsp.DocumentUri | null
+  uriForDocument?(snapshot: LanguageServerDocumentSnapshot): lsp.DocumentUri | null
   /**
    * The language id sent to the server when the editor and protocol use different names.
    * Returning undefined keeps the editor's id.
    */
   languageIdForDocument?(languageId: string, uri: lsp.DocumentUri): string | undefined
-  shouldSyncLanguageId?(languageId: string, snapshot: EditorViewSnapshot): boolean
-  shouldSyncUri?(uri: lsp.DocumentUri, snapshot: EditorViewSnapshot): boolean
+  shouldSyncLanguageId?(languageId: string, snapshot: LanguageServerDocumentSnapshot): boolean
+  shouldSyncUri?(uri: lsp.DocumentUri, snapshot: LanguageServerDocumentSnapshot): boolean
 }
 
 export type { WorkspaceTextDocumentProvenance } from './workspaceTextEdits'
@@ -157,6 +187,16 @@ export type LanguageServerRenamePrompt = {
   readonly signal: AbortSignal
 }
 
+export type LanguageServerDiagnosticActionContext = {
+  readonly documentUri: lsp.DocumentUri
+  readonly textVersion: number
+  readonly diagnostic: lsp.Diagnostic
+}
+
+export type LanguageServerDiagnosticActions = (
+  context: LanguageServerDiagnosticActionContext,
+) => readonly TooltipAction[]
+
 export type LanguageServerPluginOptions = LanguageServerLaneHostOptions & {
   readonly rootUri?: lsp.DocumentUri | null
   readonly initializationOptions?: unknown
@@ -174,6 +214,11 @@ export type LanguageServerPluginOptions = LanguageServerLaneHostOptions & {
    * after the plugin's and cannot displace it, because the diagnostics feature hangs off it.
    */
   readonly notificationHandlers?: Readonly<Record<string, LspNotificationHandler<LspClient>>>
+  /**
+   * Answers requests the server sends the client, such as a server asking the host for files.
+   * A method the plugin answers itself (`workspace/diagnostic/refresh`) stays the plugin's.
+   */
+  readonly serverRequestHandlers?: Readonly<Record<string, LspServerRequestHandler<LspClient>>>
   /** Which documents reach the server, and under what language id. */
   readonly documentSync?: LanguageServerDocumentSyncOptions
   readonly webSocketRoute: string | URL
@@ -201,6 +246,7 @@ export type LanguageServerPluginOptions = LanguageServerLaneHostOptions & {
   onConnected?(context: LanguageServerConnectionContext): void
   readonly onStatusChange?: (status: LanguageServerStatus) => void
   readonly onDiagnostics?: (summary: LanguageServerDiagnosticSummary) => void
+  readonly getDiagnosticActions?: LanguageServerDiagnosticActions
   readonly onDidNavigateDiagnostic?: (
     event: LanguageServerDiagnosticMarkerEvent,
   ) => LanguageServerDiagnosticMarkerClaim
@@ -225,9 +271,12 @@ export type LanguageServerLaneOptions = LanguageServerLaneHostOptions & {
   readonly capabilities?: lsp.ClientCapabilities
   readonly clientInfo?: lsp.InitializeParams['clientInfo']
   readonly notificationHandlers?: Readonly<Record<string, LspNotificationHandler<LspClient>>>
+  readonly serverRequestHandlers?: Readonly<Record<string, LspServerRequestHandler<LspClient>>>
   readonly webSocketRoute: string | URL
   readonly webSocketTransportOptions?: LspWebSocketTransportOptions
   readonly connectionProvider?: LspConnectionProvider
+  /** Reconnects after the server goes away on its own; off unless given. */
+  readonly reconnect?: LspReconnectOptions
   readonly readyNotifications?: readonly LanguageServerReadyNotification[]
   onConnectionCreated?(context: LanguageServerConnectionContext): EditorDisposable | void
   onConnected?(context: LanguageServerConnectionContext): void
@@ -240,19 +289,38 @@ export type LanguageServerLaneOptions = LanguageServerLaneHostOptions & {
 
 export type LanguageServerSetPluginOptions = Pick<
   LanguageServerPluginOptions,
-  | 'documentSync'
   | 'onDiagnostics'
   | 'onDidNavigateDiagnostic'
+  | 'getDiagnosticActions'
   | 'onInteractiveReady'
   | 'onRequestError'
   | 'onDefinitionLinkHover'
   | 'onOpenDefinition'
   | 'onOpenReferences'
   | 'onError'
-  | 'onApplyWorkspaceEdit'
 > & {
-  readonly lanes: readonly LanguageServerLaneOptions[]
   readonly semanticTokens?: LanguageServerSemanticTokensFactory
+} & (
+    | {
+        readonly lanes: readonly LanguageServerLaneOptions[]
+        readonly document?: never
+        readonly documentSync?: LanguageServerDocumentSyncOptions
+        readonly onApplyWorkspaceEdit?: OnApplyWorkspaceEdit
+      }
+    | {
+        readonly document: LanguageServerDocument
+        readonly lanes?: never
+        readonly documentSync?: never
+        readonly onApplyWorkspaceEdit?: never
+      }
+  )
+
+export type LanguageServerDocumentPluginOptions = Omit<
+  Extract<LanguageServerSetPluginOptions, { readonly document: LanguageServerDocument }>,
+  'lanes' | 'document'
+> & {
+  readonly document: LanguageServerDocument
+  readonly webSocketRoute?: never
 }
 
 export type LanguageServerPlugin = EditorPlugin

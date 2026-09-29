@@ -34,12 +34,16 @@ export {
   type LspContentChangeOptions,
 } from './positions'
 export {
+  LSP_SERVER_EXITED,
   LspRequestCancelledError,
   LspResponseError,
+  LspServerExitedError,
   METHOD_NOT_FOUND,
   REQUEST_CANCELLED,
+  type LspServerExitedParams,
 } from './protocol'
 export {
+  LspTransportClosedError,
   createWebSocketLspTransport,
   createWorkerLspTransport,
   type LspManagedTransport,

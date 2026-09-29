@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest'
 import { createKeymapRuntime } from '../src/keymap/runtime'
+import { defaultEditorKeyBindings } from '../src/keymap/presets'
 import type { KeymapBinding, KeymapRuntime, KeymapSequenceEvent } from '../src/keymap/types'
 
 let runtime: KeymapRuntime<string> | undefined
@@ -262,3 +263,41 @@ test('explicit event ownership survives ordered fallback when every command decl
   expect(event.defaultPrevented).toBe(true)
   expect(calls).toEqual(['first', 'second'])
 })
+
+test.each(['windows', 'linux'] as const)(
+  '%s keeps horizontal column selection on arrows beside jump and word-part bindings',
+  (platform) => {
+    const calls: string[] = []
+    runtime = createKeymapRuntime<string, null>({
+      root: document,
+      platform,
+      bindings: defaultEditorKeyBindings(platform).map((binding) => ({
+        ...binding,
+        payload: binding.command,
+      })),
+      captureContext: () => null,
+      isAvailable: () => true,
+      dispatch: ({ payload }) => {
+        calls.push(payload)
+        return true
+      },
+    })
+    for (const arrow of ['ArrowLeft', 'ArrowRight']) {
+      runtime.claimKeybinding(key('k', { ctrlKey: true }))
+      runtime.claimKeybinding(key(arrow, { altKey: true }))
+      runtime.claimKeybinding(key(arrow, { altKey: true }))
+      runtime.claimKeybinding(key(arrow, { ctrlKey: true, altKey: true, shiftKey: true }))
+      runtime.claimKeybinding(key(arrow, { altKey: true, shiftKey: true }))
+    }
+    expect(calls).toEqual([
+      'cursorColumnSelectLeft',
+      'jumpBack',
+      'cursorWordPartLeftSelect',
+      'editor.action.smartSelect.shrink',
+      'cursorColumnSelectRight',
+      'jumpForward',
+      'cursorWordPartRightSelect',
+      'editor.action.smartSelect.expand',
+    ])
+  },
+)

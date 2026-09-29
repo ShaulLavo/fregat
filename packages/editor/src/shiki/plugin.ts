@@ -1,8 +1,8 @@
+import type { EditorPlugin } from '../plugins'
 import type {
   EditorHighlighterProvider,
   EditorHighlighterSessionOptions,
-  EditorPlugin,
-} from '../plugins'
+} from '../syntax/highlighter'
 import type { EditorSyntaxLanguageId } from '../syntax/session'
 import {
   createShikiWorkerOwner,
@@ -28,7 +28,8 @@ export type ShikiHighlighterPluginOptions = {
   readonly resolveTheme: ShikiThemeRegistrationResolver
   readonly theme?: string | (() => string)
   readonly languages?: ShikiLanguageMap
-  readonly preloadLanguages?: readonly string[]
+  /** Grammars loaded in the background after the first highlight; a getter is read then. */
+  readonly preloadLanguages?: readonly string[] | (() => readonly string[])
   /** Additional themes to load in the background after a session opens. */
   readonly preloadThemes?: readonly string[] | (() => readonly string[])
   readonly onThemeChanged?: (listener: () => void) => (() => void) | void
@@ -93,7 +94,7 @@ const createSession = (
 ) => {
   if (!owner.canUseWorker()) return null
 
-  const lang = shikiLanguageForSession(sessionOptions, pluginOptions.languages)
+  const lang = shikiLanguageForDocument(sessionOptions, pluginOptions.languages)
   if (!lang) return null
 
   const theme = shikiThemeName(pluginOptions)
@@ -145,8 +146,12 @@ const shikiThemeName = (options: ShikiHighlighterPluginOptions): string => {
   return theme ?? DEFAULT_THEME
 }
 
-const shikiLanguageForSession = (
-  options: EditorHighlighterSessionOptions,
+/**
+ * The Shiki grammar a document uses: an explicit map entry, then its extension (`.tsx`, `.jsx`),
+ * then the default map. Hosts that choose grammars ahead of a document use the same answer.
+ */
+export const shikiLanguageForDocument = (
+  options: Pick<EditorHighlighterSessionOptions, 'documentId' | 'languageId'>,
   languages: ShikiLanguageMap | undefined,
 ): string | null => {
   if (!options.languageId) return null
@@ -161,12 +166,13 @@ const shikiLanguageForSession = (
 const preloadLanguages = (
   lang: string,
   options: ShikiHighlighterPluginOptions,
-): readonly string[] => [lang, ...Array.from(options.preloadLanguages ?? [])]
+): readonly string[] => {
+  const languages = options.preloadLanguages
+  const extra = typeof languages === 'function' ? languages() : languages
+  return [lang, ...Array.from(extra ?? [])]
+}
 
 type ShikiRegistrationCache = {
-  readonly loadedLanguages: (
-    languages: readonly string[],
-  ) => readonly ShikiWorkerLanguageRegistration[]
   readonly loadedThemes: (themes: readonly string[]) => readonly ShikiWorkerThemeRegistration[]
   readonly resolveLanguage: ShikiLanguageRegistrationResolver
   readonly resolveTheme: ShikiThemeRegistrationResolver
@@ -177,7 +183,6 @@ const createRegistrationCache = (
 ): ShikiRegistrationCache => {
   const languagePromises = new Map<string, Promise<readonly ShikiWorkerLanguageRegistration[]>>()
   const themePromises = new Map<string, Promise<ShikiWorkerThemeRegistration>>()
-  const loadedLanguages = new Map<string, readonly ShikiWorkerLanguageRegistration[]>()
   const loadedThemes = new Map<string, ShikiWorkerThemeRegistration>()
 
   const resolveLanguage = (language: string) => {
@@ -186,7 +191,6 @@ const createRegistrationCache = (
 
     const pending = options.resolveLanguage(language).then((registrations) => {
       assertLanguageRegistrations(language, registrations)
-      loadedLanguages.set(language, registrations)
       return registrations
     })
     languagePromises.set(language, pending)
@@ -211,10 +215,6 @@ const createRegistrationCache = (
   }
 
   return {
-    loadedLanguages: (languages) =>
-      uniqueLanguageRegistrations(
-        languages.flatMap((language) => loadedLanguages.get(language) ?? []),
-      ),
     loadedThemes: (themes) =>
       uniqueThemeRegistrations(themes.flatMap((theme) => loadedThemes.get(theme) ?? [])),
     resolveLanguage,
@@ -228,16 +228,14 @@ const resolveDocumentRegistrations = async (
   options: ShikiHighlighterPluginOptions,
   cache: ShikiRegistrationCache,
 ): Promise<ShikiResolvedRegistrations> => {
+  // The session's own grammar only: the preload set reaches the worker through `preload`, and
+  // carrying it here made every open wait on grammars it does not use.
   const languageRegistrations = language ? await cache.resolveLanguage(language) : []
   const themeRegistration = await cache.resolveTheme(theme)
-  const preloadLanguageNames = language ? preloadLanguages(language, options) : []
   const preloadThemeNames = [theme, ...(preloadThemes(options) ?? [])]
 
   return {
-    languageRegistrations: uniqueLanguageRegistrations([
-      ...languageRegistrations,
-      ...cache.loadedLanguages(preloadLanguageNames),
-    ]),
+    languageRegistrations: uniqueLanguageRegistrations(languageRegistrations),
     themeRegistration,
     themeRegistrations: uniqueThemeRegistrations([
       themeRegistration,

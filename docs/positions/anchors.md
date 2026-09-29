@@ -61,6 +61,7 @@ Resolution produces `ResolvedAnchor`: `{ offset, liveness }`.
 - **Live:** exact visible position. Liveness = `live`.
 - **Deleted:** gap where text used to be. Liveness = `deleted`.
 - **Bias at gap:** Left = left edge, Right = right edge. The gap of a deleted piece reaches, on each side, to the nearest piece whose buffer is no newer than its own: another part of the same insert, or text that was there when it was inserted. Text between arrived later, so bias decides which side of it the anchor takes. Until E039 the edges were the nearest pieces of the same buffer only, and an insert deleted whole, which has none, resolved to the document's start or end.
+- **Where text lands:** an insert goes after the last visible piece ending at its offset, and a replacement's text where its hidden text began. Neither goes between two tombstones, so the side a deleted anchor takes never depends on the tree's shape. Until E006 an insert landed after whichever piece the descent reached first, which could be a tombstone.
 - **Replacement (delete + insert):** delete-first, then insert. Left-biased stays before new text; right-biased stays after.
 - **Boundary clamping:** clamps to 0 / document.length at document edges.
 - **Deterministic** for a given (anchor, snapshot) pair.
@@ -78,6 +79,8 @@ Phase 2 deletes preserve anchor-resolvable identity by keeping deleted pieces in
 - Future collaboration can reuse the same visibility model; no separate deleted-span history index is introduced.
 
 This is required for deleted anchors to resolve deterministically. If deleted pieces were physically removed, the current direct-node reverse-index design would have no snapshot-local place to find the deleted buffer span.
+
+Since E006, maintenance compacts each run of adjacent invisible pieces. Tombstones whose deleted anchors resolve alike share one textless **stand-in**, and the reverse index leads their entries to it; every anchor resolves exactly as before. See [tombstone compaction](../storage/e006-tombstone-compaction.md).
 
 ### Boundary Creation (Locked)
 

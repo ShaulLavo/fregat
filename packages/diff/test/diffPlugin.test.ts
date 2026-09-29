@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { VirtualizedTextView } from '@singapore-editor/core/testing'
 import { Editor } from '@singapore-editor/core/editor'
 import { createVisibleEditor } from './support/visibleEditor'
 import {
@@ -9,7 +10,15 @@ import {
   type EditorToken,
   type EditorTokenInput,
 } from '@singapore-editor/core/syntax'
-import { createDiffPlugin, createTextDiff, diffSyntaxBackend, joinRenderLines } from '../src'
+import {
+  createDiffEditorOptions,
+  createDiffPlugin,
+  createDiffRegionStore,
+  createTextDiff,
+  diffRowAtEvent,
+  diffSyntaxBackend,
+  joinRenderLines,
+} from '../src'
 import { createDiffGutterContribution } from '../src/diffGutter'
 import { diffGutterDigits } from '../src/gutters'
 import { projectDiffSyntaxTokens } from '../src/diffSyntax'
@@ -51,11 +60,6 @@ describe('diff plugin — rows and expansion (§C3, §C5)', () => {
       (element) => Number(element.dataset.editorVirtualRow),
     )
     expect(indices).toEqual(plugin.getRows().map((_row, index) => index))
-    expect(plugin.getDocumentModeStatus()).toMatchObject({
-      lineCount: plugin.getRows().length,
-      rowCount: plugin.getRows().length,
-      violations: [],
-    })
   })
 
   it('toggles an expandable hunk row from a gutter click, and shows a pointer over it', () => {
@@ -78,6 +82,43 @@ describe('diff plugin — rows and expansion (§C3, §C5)', () => {
 
     view.dispatchEvent(pointerEvent('mouseleave', 0))
     expect(view.style.cursor).toBe('')
+  })
+
+  it('names the diff row and pane under a pointer event', () => {
+    const { plugin, host } = mountDiff({ file: singleHunkDiff(), side: 'new' })
+    const element = host.querySelector<HTMLElement>('[data-editor-virtual-row="1"]')
+    const press = pointerEvent('mousedown', rowY(element!))
+    element?.dispatchEvent(press)
+
+    expect(diffRowAtEvent(press)).toEqual({ side: 'new', rowIndex: 1, rows: plugin.getRows() })
+
+    // The gutter band: no row element under the pointer, so the row geometry answers.
+    const gutterPress = pointerEvent('mousedown', 0)
+    queryScrollElement(host).dispatchEvent(gutterPress)
+    expect(diffRowAtEvent(gutterPress)?.rowIndex).toBe(0)
+
+    const outside = pointerEvent('mousedown', 0)
+    document.body.dispatchEvent(outside)
+    expect(diffRowAtEvent(outside)).toBeNull()
+  })
+
+  it('names a buffer row after wrapped segments shift its display index', () => {
+    const { editor, plugin, host } = mountDiff({
+      file: createTextDiff({
+        oldFile: { path: 'a.txt', text: `${'long '.repeat(200)}\nbefore\n` },
+        newFile: { path: 'a.txt', text: `${'long '.repeat(200)}\nafter\n` },
+      }),
+    })
+    editor.setWordWrap(true)
+    const target = plugin.getRows().findIndex((row) => row.type === 'addition')
+    const view: unknown = Reflect.get(editor, 'view')
+    if (!(view instanceof VirtualizedTextView)) throw new Error('Expected text view')
+    view.scrollToRow(target)
+    const row = view.getState().mountedRows.find((row) => row.bufferRow === target)!
+    expect(row.index).toBeGreaterThan(target)
+    const event = pointerEvent('mousedown', rowY(row.element) - queryScrollElement(host).scrollTop)
+    queryScrollElement(host).dispatchEvent(event)
+    expect(diffRowAtEvent(event)?.rowIndex).toBe(target)
   })
 
   it('refuses a caret on a separator it cannot expand', () => {
@@ -108,8 +149,8 @@ describe('diff plugin — rows and expansion (§C3, §C5)', () => {
     // happy-dom gives every element a zero-sized rect, so the editor's word- and line-selection
     // paths resolve an offset at the end of the document no matter where the press was, with or
     // without this plugin. What IS decisive is that `InputSelectionController.handleMouseDown`
-    // calls `view.focusInput()` immediately after its `defaultPrevented` guard — so an editor that
-    // never took focus is an editor whose handler never ran.
+    // calls `view.focusInput()` as soon as no press participant claimed the press — so an editor
+    // that never took focus is one whose selection handling never ran.
     const { host } = mountDiff({ file: prefixSkippedDiff() })
     const view = queryScrollElement(host)
 
@@ -129,6 +170,20 @@ describe('diff plugin — rows and expansion (§C3, §C5)', () => {
 
       expect(host.contains(document.activeElement)).toBe(false)
     }
+  })
+
+  it('keeps arrow keys off a separator row', () => {
+    const { editor, plugin } = mountDiff({ file: prefixSkippedDiff() })
+    const rows = plugin.getRows()
+    expect(rows[0]?.type).toBe('hunk')
+    const firstContent = (rows[0]?.text.length ?? 0) + 1
+
+    editor.setSelection(firstContent)
+    editor.dispatchCommand('cursorLeft')
+    expect(editor.getState().cursor.row).toBe(1)
+
+    editor.dispatchCommand('cursorDocumentStart')
+    expect(editor.getState().cursor.row).toBe(1)
   })
 
   it('toggles the unmodified tail after the last hunk', () => {
@@ -200,6 +255,19 @@ describe('diff plugin — gutter (§3.3)', () => {
     expect(laneTone(deletion, 'indicator')).toBe('deleted')
   })
 
+  it('tints the whole gutter row, so the tint covers a leading inset', () => {
+    const { host } = mountDiff({ file: singleHunkDiff(), side: 'stacked' })
+    const addition = gutterCellForIndicator(host, '+')
+    const deletion = gutterCellForIndicator(host, '-')
+
+    expect(addition.parentElement?.classList).toContain('editor-diff-gutter-band-addition')
+    expect(deletion.parentElement?.classList).toContain('editor-diff-gutter-band-deletion')
+    // The cell stays clear, or its tint would stack on the row's.
+    for (const cell of gutterCells(host)) {
+      expect(cell.classList).not.toContain('editor-diff-gutter-tinted')
+    }
+  })
+
   it('shows only its own side’s number lane in split mode', () => {
     const { host } = mountDiff({ file: singleHunkDiff(), side: 'old' })
 
@@ -213,7 +281,7 @@ describe('diff plugin — gutter (§3.3)', () => {
     const { host } = mountDiff({ file: singleHunkDiff(), side: 'stacked' })
     const columns = queryScrollElement(host).style.getPropertyValue('--editor-diff-gutter-columns')
 
-    // Three lanes, all in px: two number lanes from `ceil(chars * charWidth + 6)` and a 12px
+    // Three lanes, all in px: two number lanes from `max(chars, 3) * charWidth + 8` and a 12px
     // indicator. A `1fr` anywhere here means the geometry was guessed.
     expect(columns.split(' ')).toHaveLength(3)
     expect(columns).not.toContain('fr')
@@ -221,7 +289,7 @@ describe('diff plugin — gutter (§3.3)', () => {
   })
 
   it('republishes columns when the lane split changes but the total does not', () => {
-    // The stacked total is `ceil(old*cw + 6) + ceil(new*cw + 6) + 12`, which is SYMMETRIC in the
+    // The stacked total is `max(old, 3)*cw + 8 + max(new, 3)*cw + 8 + 12`, which is SYMMETRIC in the
     // two lane character counts — so a file whose old/new digit widths are transposed has an
     // identical total and a different split. Memoizing the publish on the total therefore keeps
     // serving the previous columns, and since lanes are `overflow: hidden; text-align: right`, the
@@ -233,6 +301,7 @@ describe('diff plugin — gutter (§3.3)', () => {
     let digits = diffGutterDigits([numberedRow(1000, 10)])
     const contribution = createDiffGutterContribution({
       side: 'stacked',
+      tint: 'row',
       getDigits: () => digits,
       resolveRow: () => null,
       onLayout: (layout) => published.push(layout.lanes.map((lane) => lane.width).join(',')),
@@ -244,7 +313,7 @@ describe('diff plugin — gutter (§3.3)', () => {
     const second = width()
 
     expect(second).toBe(first)
-    expect(published).toEqual(['38,22,12', '22,38,12'])
+    expect(published).toEqual(['40,32,12', '32,40,12'])
   })
 
   it('never queries the DOM to update a cell (§3.3, trap 3)', () => {
@@ -332,14 +401,13 @@ describe('diff plugin — syntax (§C10, §C11)', () => {
     expect(sessionOptions).toContainEqual(
       expect.objectContaining({
         documentId: 'note.ts#diff-old',
-        fullText: 'keep\nold\nskip\n',
         includeCaptures: true,
         includeHighlights: true,
         languageId: 'typescript',
         syntaxMode: 'full',
       }),
     )
-    expect(sessionOptions[0]?.textSnapshot?.readRange(0, 4)).toBe('keep')
+    expect(sessionOptions[0]?.textSnapshot.materializeFullText()).toBe('keep\nold\nskip\n')
   })
 
   it('uses a host-owned highlighter provider instead of constructing a diff worker', async () => {
@@ -359,12 +427,11 @@ describe('diff plugin — syntax (§C10, §C11)', () => {
     await flushUntil(() => createSession.mock.calls.length >= 2)
 
     expect(createSession).toHaveBeenCalledWith(
-      expect.objectContaining({
-        documentId: 'note.ts#diff-old',
-        fullText: 'keep\nold\nskip\n',
-        languageId: 'typescript',
-      }),
+      expect.objectContaining({ documentId: 'note.ts#diff-old', languageId: 'typescript' }),
     )
+    const calls = createSession.mock.calls as unknown as [EditorSyntaxSessionOptions][]
+    const old = calls.find(([options]) => options.documentId === 'note.ts#diff-old')?.[0]
+    expect(old?.textSnapshot.materializeFullText()).toBe('keep\nold\nskip\n')
   })
 
   it('recolors existing diff sessions and releases theme subscriptions on close', async () => {
@@ -527,9 +594,8 @@ type MountOptions = {
 }
 
 /**
- * The host half of §C3, in miniature: construct the editor with the option bag §C6/§C10/§C11
- * require, push the plugin's rows in as text, and re-apply its tokens after every `setText`.
- * Platform's shared mount component does exactly this — see the platform plan §3.
+ * The host half of §C3, in miniature: construct the editor from `createDiffEditorOptions()` and
+ * push the plugin's rows in as text with their tokens.
  */
 function mountDiff(options: MountOptions = {}): {
   editor: Editor
@@ -547,18 +613,13 @@ function mountDiff(options: MountOptions = {}): {
     syntaxHighlight: options.syntaxHighlight ?? false,
   })
   const editor = createVisibleEditor(host, {
-    cursorLineHighlight: { gutterNumber: false, gutterBackground: false, rowBackground: false },
-    documentMode: 'static',
-    editability: 'readonly',
-    keymap: { defaultBindings: false, layers: [] },
+    ...createDiffEditorOptions(),
     plugins: [plugin],
-    tabSize: 4,
   })
   mounted.push({ editor, host })
 
   const push = (): void => {
-    editor.setText(joinRenderLines(plugin.getRows()), { languageId: null })
-    editor.setTokens(plugin.getTokens())
+    editor.setText(joinRenderLines(plugin.getRows()), { tokens: plugin.getTokens() })
   }
   plugin.onDidChangeRows(push)
   plugin.onDidChangeTokens(() => editor.setTokens(plugin.getTokens()))
@@ -665,11 +726,18 @@ function clickGutter(view: HTMLElement, y: number): void {
   view.dispatchEvent(pointerEvent('click', y))
 }
 
+function rowY(element: HTMLElement): number {
+  const top = Number.parseFloat(
+    element.style.transform.replace('translateY(', '') || element.style.top,
+  )
+  return top + 1
+}
+
 function clickRow(host: HTMLElement, row: number): void {
   const element = host.querySelector<HTMLElement>(`[data-editor-virtual-row="${row}"]`)
   if (!element) throw new Error(`Expected virtual row ${row}`)
-  element.dispatchEvent(pointerEvent('mousedown', 0))
-  element.dispatchEvent(pointerEvent('click', 0))
+  element.dispatchEvent(pointerEvent('mousedown', rowY(element)))
+  element.dispatchEvent(pointerEvent('click', rowY(element)))
 }
 
 /** `cancelable`, or `preventDefault()` is a no-op and `defaultPrevented` can never be true. */
@@ -686,7 +754,7 @@ function createRecordingSyntaxBackend(
     provider: {
       createSession(options) {
         sessionOptions.push(options)
-        parsedTexts.push(options.fullText)
+        parsedTexts.push(options.textSnapshot.materializeFullText())
         return {
           foldingSupport: 'supported',
           applyChange: async () => createEmptySyntaxResult(),
@@ -722,7 +790,7 @@ function createTokenSyntaxBackend(): DiffSyntaxBackend {
 
 function syntaxResultForOptions(options: EditorSyntaxSessionOptions) {
   const target = options.documentId.endsWith('#diff-old') ? 'old' : 'new'
-  const start = options.fullText.indexOf(target)
+  const start = options.textSnapshot.materializeFullText().indexOf(target)
   const tokens: EditorToken[] =
     start === -1 ? [] : [{ end: start + target.length, start, style: { color: 'rgb(1, 2, 3)' } }]
 
@@ -772,3 +840,52 @@ async function flushUntil(done: () => boolean): Promise<void> {
     await flushPromises()
   }
 }
+
+it('caches stacked rows until file or expansion changes', () => {
+  const plugin = createDiffPlugin({ mode: 'document', side: 'old' })
+  plugin.setFile(prefixSkippedDiff())
+  const collapsed = plugin.getStackedRows()
+  expect(plugin.getStackedRows()).toBe(collapsed)
+  expect(collapsed.map((row) => row.type)).toContain('addition')
+  expect(plugin.getRows().map((row) => row.type)).not.toContain('addition')
+  const key = collapsed.find((row) => row.expandable)?.expandKey
+  if (!key) throw new Error('Expected an expandable region')
+  plugin.toggleRegion(key)
+  const expanded = plugin.getStackedRows()
+  expect(expanded).not.toBe(collapsed)
+  expect(expanded.map((row) => row.text)).toContain('alpha')
+  expect(plugin.getStackedRows()).toBe(expanded)
+  plugin.toggleRegion(key)
+  expect(plugin.getStackedRows()).toEqual(collapsed)
+  expect(plugin.getStackedRows()).not.toBe(expanded)
+  plugin.setFile(singleHunkDiff())
+  expect(plugin.getStackedRows().map((row) => row.text)).toEqual(['one', 'two', 'TWO'])
+  plugin.setFile(null)
+  expect(plugin.getStackedRows()).toEqual([])
+  expect(plugin.getStackedRows()).toBe(plugin.getStackedRows())
+})
+
+it('keeps private stacked expansion separate and follows a shared region store', () => {
+  const regions = createDiffRegionStore()
+  const left = createDiffPlugin({ mode: 'document', side: 'old', regions })
+  const right = createDiffPlugin({ mode: 'document', side: 'new', regions })
+  const independent = createDiffPlugin({ mode: 'document', side: 'new' })
+  const stacked = createDiffPlugin({ mode: 'document', regions })
+  const file = prefixSkippedDiff()
+  for (const plugin of [left, right, independent, stacked]) plugin.setFile(file)
+  const collapsed = independent.getStackedRows()
+  const sharedCollapsed = right.getStackedRows()
+  const key = collapsed.find((row) => row.expandable)?.expandKey
+  if (!key) throw new Error('Expected an expandable region')
+  left.toggleRegion(key)
+  expect(left.getStackedRows().map((row) => row.text)).toContain('alpha')
+  expect(right.getStackedRows()).toEqual(left.getStackedRows())
+  expect(right.getStackedRows()).not.toBe(sharedCollapsed)
+  expect(independent.getStackedRows()).toEqual(collapsed)
+  expect(independent.getExpandedRegions().size).toBe(0)
+  expect(stacked.getStackedRows()).toBe(stacked.getRows())
+  independent.toggleRegion(key)
+  right.toggleRegion(key)
+  expect(left.getStackedRows()).toEqual(collapsed)
+  expect(independent.getStackedRows().map((row) => row.text)).toContain('alpha')
+})

@@ -1,3 +1,4 @@
+import type { EditorViewSnapshot, EditorViewportSnapshot } from '@singapore-editor/core/extensions'
 import { Constants } from './minimapCharSheet'
 import type {
   MinimapMetrics,
@@ -14,7 +15,9 @@ export type MinimapFrameLayout = {
   readonly scrollTop: number
   readonly scrollHeight: number
   readonly sliderNeeded: boolean
-  readonly computedSliderRatio: number
+  readonly sliderLineHeight: number
+  readonly documentLineHeight: number
+  readonly documentStart: number
   readonly sliderTop: number
   readonly sliderHeight: number
   readonly topPaddingLineCount: number
@@ -43,7 +46,14 @@ export function computeRenderLayout(options: {
     configuredScale,
     height,
     lineCount: options.lineCount,
-    minimap: options.minimap,
+    // A collapsed span can exceed the proportional raster's document coverage.
+    minimap:
+      (options.viewport.visibleEnd - options.viewport.visibleStart) *
+        baseCharHeight *
+        configuredScale >
+      baseCanvasInnerHeight
+        ? { ...options.minimap, size: 'fill' }
+        : options.minimap,
     pixelRatio,
     rowHeight: options.metrics.rowHeight,
   })
@@ -88,8 +98,85 @@ export function computeFrameLayout(options: {
   readonly realLineCount: number
   readonly previous: MinimapFrameLayout | null
 }): MinimapFrameLayout {
-  if (options.renderLayout.heightIsEditorHeight) return containedFrameLayout(options)
-  return proportionalFrameLayout(options)
+  const { renderLayout: layout, viewport, realLineCount } = options
+  const pixelRatio = layout.canvasInnerHeight / Math.max(1, layout.canvasOuterHeight)
+  const documentLineHeight = layout.isSampling
+    ? layout.height / Math.max(1, realLineCount)
+    : layout.lineHeight / pixelRatio
+  const start = Math.min(realLineCount, Math.max(0, viewport.visibleStart))
+  const end = Math.min(realLineCount, Math.max(start, viewport.visibleEnd))
+  const visibleCount = end - start
+  const linesFitting = layout.height / documentLineHeight
+  const travel = Math.max(0, realLineCount - linesFitting)
+  const progress = start / Math.max(1, realLineCount - visibleCount)
+  const documentStart = Math.min(start, travel * progress)
+  const rasterStart = layout.isSampling ? 0 : documentStart
+  const startLineNumber = Math.floor(rasterStart) + 1
+  const startLineFraction = rasterStart - Math.floor(rasterStart)
+  return {
+    scrollTop: viewport.scrollTop,
+    scrollHeight: viewport.scrollHeight,
+    sliderNeeded: visibleCount < realLineCount,
+    documentLineHeight,
+    sliderLineHeight:
+      travel > 0
+        ? Math.max(0, layout.height - visibleCount * documentLineHeight) /
+          Math.max(1, realLineCount - visibleCount)
+        : documentLineHeight,
+    documentStart,
+    sliderTop: (start - documentStart) * documentLineHeight,
+    sliderHeight: Math.min(layout.height, visibleCount * documentLineHeight),
+    topPaddingLineCount: 0,
+    startLineNumber,
+    startLineFraction,
+    endLineNumber: Math.min(
+      options.lineCount,
+      startLineNumber +
+        Math.ceil(layout.canvasInnerHeight / layout.lineHeight + startLineFraction) -
+        1,
+    ),
+  }
+}
+
+/** Zero-based document line at a CSS pixel in the rendered minimap. */
+export function documentLineAtY(frame: MinimapFrameLayout, y: number): number {
+  return frame.documentStart + y / frame.documentLineHeight
+}
+
+/** Inverse of slider placement, including a proportional raster's moving origin. */
+export function documentLineForSliderY(frame: MinimapFrameLayout, y: number): number {
+  if (frame.sliderLineHeight <= 0) return 0
+  return y / frame.sliderLineHeight
+}
+
+/** Mounted rows include overscan. Continuations still identify a visible document line. */
+export function visibleDocumentLineRange(
+  snapshot: Pick<EditorViewSnapshot, 'visibleRows' | 'lineCount'>,
+  viewport: EditorViewportSnapshot,
+): { readonly start: number; readonly end: number } {
+  let start = Infinity
+  let end = 0
+  const wrapped = new Set(
+    snapshot.visibleRows
+      .filter((row) => row.source === 'document' && !row.firstWrapSegment)
+      .map((row) => row.bufferRow),
+  )
+  for (const row of snapshot.visibleRows) {
+    if (row.source !== 'document') continue
+    if (row.top + row.height <= viewport.scrollTop) continue
+    if (row.top >= viewport.scrollTop + viewport.clientHeight) continue
+    const clippedStart = Math.max(0, (viewport.scrollTop - row.top) / row.height)
+    const clippedEnd = Math.min(
+      1,
+      (viewport.scrollTop + viewport.clientHeight - row.top) / row.height,
+    )
+    start = Math.min(start, row.bufferRow + (wrapped.has(row.bufferRow) ? 0 : clippedStart))
+    end = Math.max(end, row.bufferRow + (wrapped.has(row.bufferRow) ? 1 : clippedEnd))
+  }
+  if (start !== Infinity) return { start, end }
+  const nearest = snapshot.visibleRows.find((row) => row.source === 'document')
+  const anchor = Math.min(Math.max(0, snapshot.lineCount - 1), nearest?.bufferRow ?? 0)
+  return { start: anchor, end: anchor }
 }
 
 export function yForLineNumber(
@@ -98,13 +185,6 @@ export function yForLineNumber(
   minimapLineHeight: number,
 ): number {
   return (lineNumber - frame.startLineNumber + frame.topPaddingLineCount) * minimapLineHeight
-}
-
-// How many document lines the viewport actually shows. Both slider heights need this,
-// and both used to divide the viewport's pixels by the *minimap's* line height instead
-// of the editor's row height — so the slider grew to the size of the whole minimap.
-function visibleLineCount(viewport: MinimapViewport, metrics: MinimapMetrics): number {
-  return viewport.clientHeight / Math.max(1, metrics.rowHeight)
 }
 
 function computeFittedScale(options: {
@@ -191,138 +271,4 @@ function computeMinimapWidth(options: {
     minimapMaxWidth,
     Math.max(0, proportionalWidth) + MINIMAP_GUTTER_WIDTH + MINIMAP_RIGHT_GUTTER_WIDTH,
   )
-}
-
-function containedFrameLayout(options: {
-  readonly renderLayout: MinimapRenderLayout
-  readonly metrics: MinimapMetrics
-  readonly viewport: MinimapViewport
-  readonly lineCount: number
-  readonly realLineCount: number
-}): MinimapFrameLayout {
-  const sliderHeight = Math.max(
-    1,
-    Math.floor(
-      (visibleLineCount(options.viewport, options.metrics) / Math.max(1, options.realLineCount)) *
-        options.renderLayout.height,
-    ),
-  )
-  const maxSliderTop = Math.max(0, options.renderLayout.height - sliderHeight)
-  const ratio =
-    maxSliderTop / Math.max(1, options.viewport.scrollHeight - options.viewport.clientHeight)
-  const maxLinesFitting = Math.floor(
-    options.renderLayout.canvasInnerHeight / options.renderLayout.lineHeight,
-  )
-
-  return {
-    scrollTop: options.viewport.scrollTop,
-    scrollHeight: options.viewport.scrollHeight,
-    sliderNeeded: maxSliderTop > 0,
-    computedSliderRatio: ratio,
-    sliderTop: options.viewport.scrollTop * ratio,
-    sliderHeight,
-    topPaddingLineCount: 0,
-    startLineNumber: 1,
-    startLineFraction: 0,
-    endLineNumber: Math.min(options.lineCount, maxLinesFitting),
-  }
-}
-
-function proportionalFrameLayout(options: {
-  readonly renderLayout: MinimapRenderLayout
-  readonly metrics: MinimapMetrics
-  readonly viewport: MinimapViewport
-  readonly lineCount: number
-  readonly previous: MinimapFrameLayout | null
-}): MinimapFrameLayout {
-  const lineHeight = options.renderLayout.lineHeight
-  const pixelRatio =
-    options.renderLayout.canvasInnerHeight / Math.max(1, options.renderLayout.canvasOuterHeight)
-  const minimapLinesFitting = Math.floor(options.renderLayout.canvasInnerHeight / lineHeight)
-  const sliderHeight = Math.max(
-    1,
-    Math.floor((visibleLineCount(options.viewport, options.metrics) * lineHeight) / pixelRatio),
-  )
-  const maxSliderTop = Math.max(0, options.renderLayout.height - sliderHeight)
-  const ratio =
-    maxSliderTop / Math.max(1, options.viewport.scrollHeight - options.viewport.clientHeight)
-  const sliderTop = options.viewport.scrollTop * ratio
-
-  if (minimapLinesFitting >= options.lineCount) {
-    return frame(
-      options.viewport,
-      maxSliderTop > 0,
-      ratio,
-      sliderTop,
-      sliderHeight,
-      0,
-      1,
-      options.lineCount,
-      0,
-    )
-  }
-
-  const startLine = proportionalStartLine(options, sliderTop, pixelRatio)
-  const startLineNumber = Math.floor(startLine)
-  const startLineFraction = startLine - startLineNumber
-  const linesFitting = Math.ceil(
-    options.renderLayout.canvasInnerHeight / lineHeight + startLineFraction,
-  )
-  const endLineNumber = Math.min(options.lineCount, startLineNumber + linesFitting - 1)
-  return frame(
-    options.viewport,
-    true,
-    ratio,
-    sliderTop,
-    sliderHeight,
-    0,
-    startLineNumber,
-    endLineNumber,
-    startLineFraction,
-  )
-}
-
-function proportionalStartLine(
-  options: {
-    readonly renderLayout: MinimapRenderLayout
-    readonly viewport: MinimapViewport
-    readonly previous: MinimapFrameLayout | null
-  },
-  sliderTop: number,
-  pixelRatio: number,
-): number {
-  const visibleStart = Math.max(1, options.viewport.scrollRow + 1)
-  const raw = Math.max(1, visibleStart - (sliderTop * pixelRatio) / options.renderLayout.lineHeight)
-  const previous = options.previous
-  if (!previous || previous.scrollHeight !== options.viewport.scrollHeight) return raw
-  if (previous.scrollTop > options.viewport.scrollTop)
-    return Math.min(raw, previous.startLineNumber + previous.startLineFraction)
-  if (previous.scrollTop < options.viewport.scrollTop)
-    return Math.max(raw, previous.startLineNumber + previous.startLineFraction)
-  return raw
-}
-
-function frame(
-  viewport: MinimapViewport,
-  sliderNeeded: boolean,
-  ratio: number,
-  sliderTop: number,
-  sliderHeight: number,
-  topPaddingLineCount: number,
-  startLineNumber: number,
-  endLineNumber: number,
-  startLineFraction: number,
-): MinimapFrameLayout {
-  return {
-    scrollTop: viewport.scrollTop,
-    scrollHeight: viewport.scrollHeight,
-    sliderNeeded,
-    computedSliderRatio: ratio,
-    sliderTop,
-    sliderHeight,
-    topPaddingLineCount,
-    startLineNumber,
-    startLineFraction,
-    endLineNumber,
-  }
 }

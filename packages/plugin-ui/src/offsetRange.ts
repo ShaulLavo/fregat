@@ -1,3 +1,5 @@
+import type { TextReadSnapshot } from '@singapore-editor/core/document'
+
 /** Half-open `[start, end)` offset range into the editor text buffer. */
 export type OffsetRange = {
   readonly start: number
@@ -49,6 +51,27 @@ export function hoverTargetRange(text: string, offset: number): OffsetRange {
 
   const start = Math.max(0, Math.min(offset, Math.max(0, text.length - 1)))
   return { start, end: Math.min(text.length, start + 1) }
+}
+
+const HOVER_WINDOW_RADIUS = 256
+
+/**
+ * `hoverTargetRange` over a document source, reading a window of the offset's line rather than the
+ * document. The window widens only while an identifier runs into its edge.
+ */
+export function hoverTargetRangeInSource(source: TextReadSnapshot, offset: number): OffsetRange {
+  const line = source.lineRange(source.lineAt(Math.min(offset, Math.max(0, source.length - 1))))
+  // One past the break, so a caret on the line break targets it as the string search did.
+  const lineEnd = Math.min(source.length, line.end + 1)
+  for (let radius = HOVER_WINDOW_RADIUS; ; radius *= 2) {
+    const from = Math.max(line.start, offset - radius)
+    const to = Math.min(lineEnd, Math.max(from, offset + radius))
+    const local = hoverTargetRange(source.readRange(from, to), offset - from)
+    const range = { start: from + local.start, end: from + local.end }
+    const clippedLeft = range.start === from && from > line.start
+    const clippedRight = range.end === to && to < lineEnd
+    if (!clippedLeft && !clippedRight) return range
+  }
 }
 
 function identifierIndexAtOffset(text: string, offset: number): number | null {

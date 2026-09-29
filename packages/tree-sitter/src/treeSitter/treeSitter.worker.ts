@@ -15,6 +15,17 @@ import {
 } from '@singapore-editor/core/syntax'
 import type { PackedEditorTokens } from '@singapore-editor/core/syntax'
 import parserWasmUrl from 'web-tree-sitter/web-tree-sitter.wasm?url'
+import { MarkdownDocument } from 'tree-sitter-md'
+import {
+  initializeMarkdown,
+  editMarkdown,
+  markdownCaptures,
+  markdownRecords,
+  markdownDefinitions,
+  markdownFolds,
+  markdownRange,
+  markdownMdxSource,
+} from './markdown'
 import type { TreeSitterLanguageDescriptor } from './registry'
 import {
   clearTreeSitterSourceCache,
@@ -74,6 +85,8 @@ type ParsedLayer = {
 }
 
 type ParsedDocument = {
+  readonly markdown?: MarkdownDocument
+  markdownDefinitions?: Uint32Array
   readonly snapshotVersion: number
   readonly languageId: TreeSitterLanguageId
   readonly source: TreeSitterPieceTableInput
@@ -99,7 +112,14 @@ type CancellationContext = {
 
 type FlattenedDocument = Pick<
   TreeSitterParseResult,
-  'captures' | 'folds' | 'brackets' | 'errors' | 'injections' | 'tokens' | 'tokensPacked'
+  | 'captures'
+  | 'folds'
+  | 'brackets'
+  | 'errors'
+  | 'injections'
+  | 'tokens'
+  | 'tokensPacked'
+  | 'records'
 > & {
   readonly degraded: readonly TreeSitterDegradedState[]
 }
@@ -148,6 +168,11 @@ const languageDescriptorOrder: TreeSitterLanguageId[] = []
 const runtimePromises = new Map<TreeSitterLanguageId, Promise<Runtime>>()
 const documentCaches = new Map<string, DocumentCache>()
 const sourceCache: TreeSitterSourceCache = new Map()
+const injectedMarkdown = new WeakMap<
+  Tree,
+  { document: MarkdownDocument; offset: number; row: number }
+>()
+const markdownDocuments = new Map<string, { document: MarkdownDocument; snapshotVersion: number }>()
 const activeRuntimeTasks = new Map<string, Set<Promise<TreeSitterWorkerResult>>>()
 const activeWorkerTasks = new Set<Promise<TreeSitterWorkerResult>>()
 const disposedRuntimeSessions = new Set<string>()
@@ -196,6 +221,36 @@ const registerLanguage = (descriptor: TreeSitterLanguageDescriptor): void => {
   disposeRuntimeForLanguage(normalized.id)
   disposeCachedSnapshotsForLanguage(normalized.id)
 }
+
+/**
+ * Compiles grammars and queries ahead of their first document, one language per macrotask so a
+ * parse that arrives meanwhile waits for at most one compile.
+ */
+const warmLanguages = async (languageIds: readonly TreeSitterLanguageId[]): Promise<undefined> => {
+  for (const languageId of languageIds) {
+    if (runtimePromises.has(languageId) || !languageDescriptors.has(languageId)) continue
+    await yieldToMessages()
+    await warmLanguage(languageId).catch(() => undefined)
+  }
+  return undefined
+}
+
+// A failure stays in `runtimePromises`, so the language's first document reports it.
+const warmLanguage = async (languageId: TreeSitterLanguageId): Promise<void> => {
+  if (languageId === 'markdown' || languageId === 'mdx') {
+    await ensureParserRuntime()
+    await initializeMarkdown()
+    if (languageId === 'markdown') return
+  }
+  const runtime = await ensureRuntime(languageId)
+  ensureQuery(runtime, 'highlight')
+  ensureQuery(runtime, 'fold')
+  ensureQuery(runtime, 'injection')
+}
+
+// @justification Yields one macrotask between warm-up compiles so a parse or edit message queued
+// meanwhile runs before the next language; worker-task tracking keeps idle fences behind warm-up.
+const yieldToMessages = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
 
 const ensureRuntime = async (languageId: TreeSitterLanguageId): Promise<Runtime> => {
   const existing = runtimePromises.get(languageId)
@@ -258,15 +313,261 @@ const ensureInjectionQuery = (runtime: Runtime): Query | null => {
   return runtime.injectionQuery
 }
 
+// Resolved on receipt, in message order: the client's sent-chunk ledger assumes that order.
+const resolveRequestSource = (
+  request: TreeSitterParseRequest | TreeSitterEditRequest,
+): TreeSitterPieceTableInput =>
+  runWorkerPhase('resolve source', () =>
+    resolveTreeSitterSourceDescriptor(sourceCache, request.runtimeSessionId, request.source),
+  )
+
+const parseMarkdownDocument = async (
+  request: TreeSitterParseRequest | TreeSitterEditRequest,
+  source: TreeSitterPieceTableInput,
+  context: CancellationContext,
+): Promise<TreeSitterParseResult | TreeSitterParseAckResult | undefined> => {
+  assertNotCancelled(context)
+  await ensureParserRuntime()
+  await initializeMarkdown()
+  assertRuntimeSessionActive(request.runtimeSessionId)
+  assertNotCancelled(context)
+  const prior = markdownDocuments.get(request.runtimeSessionId)
+  const oldDocument =
+    request.type === 'edit'
+      ? cachedDocumentForVersion(
+          request.runtimeSessionId,
+          request.languageId,
+          request.previousSnapshotVersion,
+        )
+      : null
+  if (prior && prior.snapshotVersion > request.snapshotVersion) return undefined
+  const document = prior?.document ?? new MarkdownDocument({ frontmatter: true })
+  const start = nowMs()
+  if (prior?.snapshotVersion !== request.snapshotVersion) {
+    if (request.type === 'edit' && prior?.snapshotVersion === request.previousSnapshotVersion) {
+      editMarkdown(document, request.edits)
+    } else document.setText(readTreeSitterInputRange(source, 0, source.length))
+  }
+  markdownDocuments.set(request.runtimeSessionId, {
+    document,
+    snapshotVersion: request.snapshotVersion,
+  })
+  const parsed: ParsedDocument = {
+    markdown: document,
+    snapshotVersion: request.snapshotVersion,
+    languageId: request.languageId,
+    source,
+    layers: [],
+    degraded: [],
+    missingLanguages: [],
+    size: source.length,
+    lastUsed: nextUse++,
+  }
+  const prepared = await parseMarkdownFences(
+    parsed,
+    context,
+    oldDocument,
+    request.type === 'edit' ? request.inputEdits : [],
+  )
+  assertRuntimeSessionActive(request.runtimeSessionId)
+  assertNotCancelled(context)
+  replaceCachedDocument(request.runtimeSessionId, prepared)
+  const timings = [
+    { name: 'treeSitter.parse', durationMs: nowMs() - start },
+    ...phaseTimings(context),
+  ]
+  if (request.resultMode === 'parseOnly')
+    return parseAckResult(
+      request,
+      [{ startIndex: 0, endIndex: source.length }],
+      timings,
+      prepared.degraded,
+      prepared.missingLanguages,
+    )
+  const result = await flattenDocument(
+    prepared,
+    context,
+    request.includeHighlights,
+    request.includeCaptures ?? true,
+  )
+  return {
+    documentId: request.documentId,
+    snapshotVersion: request.snapshotVersion,
+    languageId: request.languageId,
+    ...result,
+    statistics: resultStatistics(prepared, result, context),
+    missingLanguages: prepared.missingLanguages,
+    timings,
+  }
+}
+
+const parseMarkdownFences = async (
+  document: ParsedDocument,
+  context: CancellationContext,
+  oldDocument: ParsedDocument | null,
+  inputEdits: readonly TreeSitterEditRequest['inputEdits'][number][],
+): Promise<ParsedDocument> => {
+  const markdown = document.markdown!
+  const fences = markdown.injections(0, document.size)
+  const layers: ParsedLayer[] = []
+  const missingLanguages = new Set<string>()
+  const degraded: TreeSitterDegradedState[] = []
+  const reusableLayers = prepareReusableLayers(oldDocument, inputEdits)
+  const reservedLayerIds = new Set(reusableLayers.map((layer) => layer.layer.id))
+  try {
+    for (let offset = 0; offset < fences.length; offset += 4) {
+      const name = readTreeSitterInputRange(
+        document.source,
+        fences[offset + 2]!,
+        fences[offset + 3]!,
+      )
+      if (!name.trim()) continue
+      const languageId = resolveRegisteredLanguageAlias(name)
+      if (!languageId) {
+        missingLanguages.add(name)
+        continue
+      }
+      if (languageId === 'markdown') continue
+      const plan: InjectionPlan = {
+        id: `fence:${offset}`,
+        key: `fence:${offset}`,
+        kind: 'injection',
+        parentId: 'markdown',
+        parentLanguageId: 'markdown',
+        languageId,
+        depth: 1,
+        ranges: [markdownRange(markdown, fences[offset]!, fences[offset + 1]!)],
+      }
+      const layer = await parseMarkdownFence(
+        plan,
+        document.source,
+        reusableLayers,
+        reservedLayerIds,
+        context,
+      )
+      layers.push(layer)
+      await appendInjectionLayers(layers, layer, {
+        documentId: '',
+        snapshotVersion: document.snapshotVersion,
+        languageId: 'markdown',
+        source: document.source,
+        rootLayer: layer,
+        context,
+        oldDocument,
+        inputEdits,
+        injectionRanges: null,
+        degraded,
+        reusableLayers,
+        missingLanguages,
+        reservedLayerIds,
+      })
+    }
+    return { ...document, layers, degraded, missingLanguages: [...missingLanguages] }
+  } catch (error) {
+    for (const layer of layers) disposeLayer(layer)
+    throw error
+  } finally {
+    disposeAvailableReusableLayers(reusableLayers)
+  }
+}
+
+const parseMarkdownFence = async (
+  plan: InjectionPlan,
+  source: TreeSitterPieceTableInput,
+  reusableLayers: ReusableLayer[],
+  reservedIds: Set<string>,
+  context: CancellationContext,
+): Promise<ParsedLayer> => {
+  const runtime = await ensureRuntime(plan.languageId)
+  const reusable = takeReusableLayer(reusableLayers, plan)
+  const identity = reusable?.layer ?? reserveInjectionPlanIdentity(plan, reservedIds)
+  try {
+    const tree = parseInjectedSource(
+      runtime.parser,
+      source,
+      plan.ranges,
+      reusable?.layer.tree ?? null,
+      context,
+    )
+    return { ...plan, id: identity.id, key: identity.key, tree }
+  } finally {
+    reusable?.layer.tree.delete()
+  }
+}
+
+const prepareMdxMarkdown = async (
+  request: TreeSitterParseRequest | TreeSitterEditRequest,
+  source: TreeSitterPieceTableInput,
+  root: ParsedLayer,
+): Promise<MarkdownDocument | undefined> => {
+  if (request.languageId !== 'mdx') return undefined
+  await initializeMarkdown()
+  const document =
+    markdownDocuments.get(request.runtimeSessionId)?.document ?? new MarkdownDocument()
+  document.setText(
+    markdownMdxSource(readTreeSitterInputRange(source, 0, source.length), root.tree.rootNode),
+  )
+  markdownDocuments.set(request.runtimeSessionId, {
+    document,
+    snapshotVersion: request.snapshotVersion,
+  })
+  return document
+}
+
+const appendMarkdownResult = (
+  document: ParsedDocument,
+  result: Writable<FlattenedDocument>,
+  range: TreeSitterSyntaxRange,
+): void => {
+  if (!document.markdown) return
+  const markdown = document.markdown
+  result.records = {
+    languageId: 'markdown',
+    data: markdownRecords(markdown, range, (links) => {
+      const hasReference = links.some(
+        (link) =>
+          readTreeSitterInputRange(document.source, link.endIndex - 1, link.endIndex) === ']',
+      )
+      if (!hasReference) return new Uint32Array()
+      return (document.markdownDefinitions ??= markdownDefinitions(markdown, document.size))
+    }),
+  }
+  appendItems(result.captures, markdownCaptures(document.markdown, range))
+  appendItems(result.folds, markdownFolds(document.markdown, range))
+}
+
+const markdownSelection = (
+  document: ParsedDocument,
+  range: TreeSitterSelectionRange,
+): TreeSitterSelectionRange => {
+  const fence = document.layers.find((layer) => layerContainsSelection(layer, range))
+  if (fence) return expandedRangeAt(fence.tree.rootNode, range)
+  const records = document.markdown!.decorations(range.startIndex, range.endIndex + 1)
+  let best = { startIndex: 0, endIndex: document.size }
+  for (let index = 0; index < records.length; index += 4) {
+    const startIndex = records[index]!,
+      endIndex = records[index + 1]!
+    if (startIndex > range.startIndex || endIndex < range.endIndex) continue
+    if (startIndex === range.startIndex && endIndex === range.endIndex) continue
+    if (endIndex - startIndex < best.endIndex - best.startIndex) best = { startIndex, endIndex }
+  }
+  return best
+}
+
 const parseDocument = async (
   request: TreeSitterParseRequest,
+  source: TreeSitterPieceTableInput,
 ): Promise<TreeSitterParseResult | TreeSitterParseAckResult | undefined> =>
   runCancellableRequest(request, async (context) => {
+    if (request.languageId === 'markdown') return parseMarkdownDocument(request, source, context)
+    if (
+      request.languageId === 'mdx' &&
+      (markdownDocuments.get(request.runtimeSessionId)?.snapshotVersion ?? 0) >
+        request.snapshotVersion
+    )
+      return undefined
     const runtime = await runAsyncWorkerPhase('load runtime', () =>
       ensureRuntime(request.languageId),
-    )
-    const source = runWorkerPhase('resolve source', () =>
-      resolveTreeSitterSourceDescriptor(sourceCache, request.runtimeSessionId, request.source),
     )
     const parseStart = nowMs()
     const parsedDocument =
@@ -309,6 +610,7 @@ const parseDocument = async (
       degraded: result.degraded,
       tokens: result.tokens,
       tokensPacked: result.tokensPacked,
+      records: result.records,
       timings: [
         ...phaseTimings(context),
         { name: 'treeSitter.parse', durationMs: parseMs },
@@ -356,6 +658,7 @@ const reloadInjections = async (
     languageId: request.languageId,
     source: cached.source,
     rootLayer: { ...root, tree: root.tree.copy() },
+    markdown: cached.markdown,
     context,
     oldDocument: cached,
     inputEdits: [],
@@ -389,6 +692,7 @@ const parseFullDocument = async (
     measurePhase(context, 'parseRoot', () => parseRootLayer(runtime, source, null, context)),
   )
   const degraded: TreeSitterDegradedState[] = []
+  const markdown = await prepareMdxMarkdown(request, source, rootLayer)
   const parsedDocument = await runAsyncWorkerPhase('parse injections', () =>
     parseParsedDocument({
       documentId: request.documentId,
@@ -396,6 +700,7 @@ const parseFullDocument = async (
       languageId: request.languageId,
       source,
       rootLayer,
+      markdown,
       context,
       oldDocument: null,
       inputEdits: [],
@@ -406,13 +711,58 @@ const parseFullDocument = async (
   assertNotCancelled(context)
   assertRuntimeSessionActive(request.runtimeSessionId)
   replaceCachedDocument(request.runtimeSessionId, parsedDocument)
+  scheduleIdleReparse(request.runtimeSessionId, parsedDocument, runtime)
   return parsedDocument
+}
+
+// The first edit of a freshly parsed tree can reparse the whole document: tree-sitter refuses to
+// reuse a node whose first token was lexed in another state, and markdown's external scanner makes
+// that every block (43 ms at 1 MB). One unchanged reparse while the worker is idle takes it off the
+// first keystroke.
+const scheduleIdleReparse = (
+  runtimeSessionId: string,
+  document: ParsedDocument,
+  runtime: Runtime,
+): void => {
+  // @justification Runs once after the parse answer is posted; it re-checks that the document is
+  // still cached and idle, so a late or stale callback does nothing.
+  setTimeout(() => reparseIdleDocument(runtimeSessionId, document, runtime), 0)
+}
+
+const reparseIdleDocument = (
+  runtimeSessionId: string,
+  document: ParsedDocument,
+  runtime: Runtime,
+): void => {
+  if (activeRuntimeTasks.has(runtimeSessionId)) return
+  const cache = documentCaches.get(runtimeSessionId)
+  const index = cache?.snapshots.indexOf(document) ?? -1
+  if (!cache || index === -1) return
+
+  const [root, ...injections] = document.layers
+  if (!root) return
+  const context = createCancellationContext(undefined, PARSE_BUDGET_MS)
+  try {
+    const tree = parseSource(runtime.parser, document.source, root.tree, context)
+    cache.snapshots[index] = { ...document, layers: [{ ...root, tree }, ...injections] }
+    root.tree.delete()
+  } catch (error) {
+    recordOptionalWorkerPhaseFailure('idle reparse', error, [], 'optional-phase-failed')
+  }
 }
 
 const editDocument = async (
   request: TreeSitterEditRequest,
+  source: TreeSitterPieceTableInput,
 ): Promise<TreeSitterParseResult | TreeSitterParseAckResult | undefined> =>
   runCancellableRequest(request, async (context) => {
+    if (request.languageId === 'markdown') return parseMarkdownDocument(request, source, context)
+    if (
+      request.languageId === 'mdx' &&
+      (markdownDocuments.get(request.runtimeSessionId)?.snapshotVersion ?? 0) >
+        request.snapshotVersion
+    )
+      return undefined
     const runtime = await runAsyncWorkerPhase('load runtime', () =>
       ensureRuntime(request.languageId),
     )
@@ -429,9 +779,6 @@ const editDocument = async (
       editReusableTree(oldRootLayer.tree, request.inputEdits),
     )
     const editMs = nowMs() - editStart
-    const source = runWorkerPhase('resolve source', () =>
-      resolveTreeSitterSourceDescriptor(sourceCache, request.runtimeSessionId, request.source),
-    )
     const parseStart = nowMs()
     const rootLayer = runWorkerPhase('parse root', () =>
       measurePhase(context, 'parseRoot', () =>
@@ -441,9 +788,14 @@ const editDocument = async (
     const changedRanges = runWorkerPhase('changed ranges', () =>
       treeChangedRanges(reusableTree, rootLayer.tree),
     )
-    // Delimiter edits can invalidate descendants outside the edited range.
-    const injectionRanges = [{ startIndex: 0, endIndex: source.length }]
+    // A delimiter edit that moves structure outside the edited range shows up in the root's
+    // changed ranges; an edit inside an injection's text may change no root structure at all.
+    const injectionRanges = enclosingRanges(
+      [...changedRanges, ...editedRanges(request.inputEdits, source.length)],
+      [reusableTree, rootLayer.tree],
+    )
     const degraded: TreeSitterDegradedState[] = []
+    const markdown = await prepareMdxMarkdown(request, source, rootLayer)
     const parsedDocument = await runAsyncWorkerPhase('parse injections', () =>
       parseParsedDocument({
         documentId: request.documentId,
@@ -451,6 +803,7 @@ const editDocument = async (
         languageId: request.languageId,
         source,
         rootLayer,
+        markdown,
         context,
         oldDocument: cached,
         inputEdits: request.inputEdits,
@@ -503,6 +856,7 @@ const editDocument = async (
       degraded: result.degraded,
       tokens: result.tokens,
       tokensPacked: result.tokensPacked,
+      records: result.records,
       timings: [
         ...phaseTimings(context),
         { name: 'treeSitter.edit', durationMs: editMs },
@@ -559,6 +913,7 @@ const queryDocumentRangeWithContext = async (
     degraded: result.degraded,
     tokens: result.tokens,
     tokensPacked: result.tokensPacked,
+    records: result.records,
     statistics: resultStatistics(cached, result, context, range),
     timings: [
       { name: 'treeSitter.queryRange', durationMs: nowMs() - queryStart },
@@ -743,6 +1098,7 @@ const editReusableTree = (
 }
 
 type ParseParsedDocumentOptions = {
+  readonly markdown?: MarkdownDocument
   readonly documentId: string
   readonly snapshotVersion: number
   readonly languageId: TreeSitterLanguageId
@@ -751,7 +1107,8 @@ type ParseParsedDocumentOptions = {
   readonly context: CancellationContext
   readonly oldDocument: ParsedDocument | null
   readonly inputEdits: readonly TreeSitterEditRequest['inputEdits'][number][]
-  readonly injectionRanges: readonly TreeSitterSyntaxRange[] | null
+  // Grows as reparsed layers report their own changed ranges, so their children are found too.
+  readonly injectionRanges: TreeSitterSyntaxRange[] | null
   readonly degraded: TreeSitterDegradedState[]
 }
 
@@ -765,13 +1122,15 @@ type InjectionGroup = Omit<PendingInjectionPlan, 'kind' | 'patternIndex' | 'rang
 
 type ReusableLayer = {
   readonly layer: ParsedLayer
-  state: 'available' | 'consumed' | 'carried'
+  state: 'available' | 'consumed'
 }
 
 type ParseInjectionContext = ParseParsedDocumentOptions & {
   readonly reusableLayers: ReusableLayer[]
   readonly missingLanguages: Set<string>
   readonly reservedLayerIds: Set<string>
+  /** Layers already present, when a pass may find them again. */
+  readonly knownLayers?: ReadonlySet<string>
 }
 
 const parseRootLayer = (
@@ -809,10 +1168,14 @@ const parseParsedDocument = async (
   try {
     const parsedLayers: ParsedLayer[] = []
     await appendInjectionLayers(parsedLayers, options.rootLayer, context)
-    if (options.injectionRanges) await appendCarriedLayers(parsedLayers, context)
-    const layers = orderParsedLayers(options.rootLayer, parsedLayers)
+    if (options.injectionRanges) {
+      await appendCarriedLayers(parsedLayers, context)
+      await refillCappedLayers(parsedLayers, context)
+    }
+    const layers = cappedLayers(orderParsedLayers(options.rootLayer, parsedLayers))
 
     return {
+      markdown: options.markdown,
       snapshotVersion: options.snapshotVersion,
       languageId: options.languageId,
       source: options.source,
@@ -888,6 +1251,7 @@ const appendInjectionLayers = async (
 
   for (const plan of plans) {
     if (layers.length >= MAX_INJECTION_LAYERS) break
+    if (options.knownLayers?.has(layerIdentity(plan))) continue
     if (isNonProgressingInjection(plan, parent, layers, options.rootLayer)) continue
     if (!languageDescriptors.has(plan.languageId)) {
       options.missingLanguages.add(plan.languageId)
@@ -907,6 +1271,29 @@ const appendInjectionLayers = async (
       )
     }
   }
+}
+
+// A capped document never parsed the layers past the cap. Once an edit leaves room, the next ones
+// are found after the last kept layer, as a full parse would find them.
+const refillCappedLayers = async (
+  layers: ParsedLayer[],
+  options: ParseInjectionContext,
+): Promise<void> => {
+  const oldLayers = options.oldDocument?.layers.length ?? 0
+  if (oldLayers <= MAX_INJECTION_LAYERS || layers.length >= MAX_INJECTION_LAYERS) return
+
+  let tailStart = 0
+  for (const layer of layers) tailStart = Math.max(tailStart, rangeSpan(layer.ranges).endIndex)
+  await appendInjectionLayers(layers, options.rootLayer, {
+    ...options,
+    injectionRanges: [{ startIndex: tailStart, endIndex: options.source.length }],
+    knownLayers: new Set(layers.map(layerIdentity)),
+  })
+}
+
+const layerIdentity = (layer: Pick<ParsedLayer, 'languageId' | 'parentId' | 'ranges'>): string => {
+  const span = rangeSpan(layer.ranges)
+  return `${layer.languageId}\u0000${layer.parentId}\u0000${span.startIndex}\u0000${span.endIndex}`
 }
 
 const isNonProgressingInjection = (
@@ -954,10 +1341,79 @@ const parseInjectionLayer = async (
         options.context,
       ),
     )
+    recordLayerChanges(options.injectionRanges, resolvedPlan.ranges, oldTree, tree)
     return { ...resolvedPlan, tree }
   } finally {
     oldTree?.delete()
   }
+}
+
+const recordLayerChanges = (
+  injectionRanges: TreeSitterSyntaxRange[] | null,
+  ranges: readonly TreeSitterRange[],
+  oldTree: Tree | null,
+  tree: Tree,
+): void => {
+  if (!injectionRanges) return
+  if (!oldTree) {
+    injectionRanges.push(rangeSpan(ranges))
+    return
+  }
+  appendItems(injectionRanges, enclosingRanges(treeChangedRanges(oldTree, tree), [oldTree, tree]))
+}
+
+// Changed ranges miss structure that moved without its first node changing: deleting a fence's
+// opening leaves the heading it becomes as the only change, and the fence's content turns into a
+// paragraph unreported. Each range grows to the smallest named node holding it in either tree.
+const enclosingRanges = (
+  ranges: readonly TreeSitterSyntaxRange[],
+  trees: readonly Tree[],
+): TreeSitterSyntaxRange[] =>
+  ranges.map((range) => {
+    let { startIndex, endIndex } = range
+    for (const tree of trees) {
+      const node = tree.rootNode.namedDescendantForIndex(range.startIndex, range.endIndex)
+      if (!node) continue
+      startIndex = Math.min(startIndex, node.startIndex)
+      endIndex = Math.max(endIndex, node.endIndex)
+    }
+    return { startIndex, endIndex }
+  })
+
+/** Each edit's inserted text in the final document, widened by one unit to catch adjacency. */
+const editedRanges = (
+  edits: readonly TreeSitterEditRequest['inputEdits'][number][],
+  length: number,
+): TreeSitterSyntaxRange[] => {
+  const ranges: TreeSitterSyntaxRange[] = []
+  for (const edit of edits) {
+    for (let index = 0; index < ranges.length; index += 1) {
+      ranges[index] = rangeAfterEdit(ranges[index]!, edit)
+    }
+    ranges.push({ startIndex: edit.startIndex, endIndex: edit.newEndIndex })
+  }
+  return ranges.map((range) => ({
+    startIndex: Math.max(0, range.startIndex - 1),
+    endIndex: Math.min(length, range.endIndex + 1),
+  }))
+}
+
+const rangeAfterEdit = (
+  range: TreeSitterSyntaxRange,
+  edit: TreeSitterEditRequest['inputEdits'][number],
+): TreeSitterSyntaxRange => ({
+  startIndex: indexAfterEdit(range.startIndex, edit, edit.startIndex),
+  endIndex: indexAfterEdit(range.endIndex, edit, edit.newEndIndex),
+})
+
+const indexAfterEdit = (
+  index: number,
+  edit: TreeSitterEditRequest['inputEdits'][number],
+  inside: number,
+): number => {
+  if (index <= edit.startIndex) return index
+  if (index >= edit.oldEndIndex) return index + edit.newEndIndex - edit.oldEndIndex
+  return inside
 }
 
 const takeReusableLayer = (
@@ -1092,7 +1548,10 @@ const appendCarriedLayers = async (
     if (!carried) continue
 
     layers.push(carried)
-    availableParentIds.add(carried.id)
+    // Its reparse may have grown children its old tree did not have.
+    const firstChild = layers.length
+    await appendInjectionLayers(layers, carried, options)
+    for (const layer of [carried, ...layers.slice(firstChild)]) availableParentIds.add(layer.id)
   }
 }
 
@@ -1104,10 +1563,9 @@ const carryReusableLayer = async (
   const layerChanged = reusable.layer.ranges.some((range) => {
     return rangeIntersectsChangedRanges(range, changedRanges)
   })
-  if (!layerChanged) {
-    reusable.state = 'carried'
-    return reusable.layer
-  }
+  // Reparsed, not kept: an edit before a layer still touches its first token's padding, and the
+  // kept tree then differs from what a fresh parse gives. An unchanged reparse is cheap.
+  if (!layerChanged) return reparseCarriedLayer(reusable, options)
 
   if (reusable.layer.kind !== 'combined-injection') return null
   const contentRanges = rangesWithoutBridgeNewlines(reusable.layer.ranges, options.source)
@@ -1116,6 +1574,22 @@ const carryReusableLayer = async (
   })
   if (untouchedRanges.length === 0) return null
   return reparsePartialCombinedLayer(reusable, untouchedRanges, options)
+}
+
+const reparseCarriedLayer = async (
+  reusable: ReusableLayer,
+  options: ParseInjectionContext,
+): Promise<ParsedLayer | null> => {
+  try {
+    return await parseInjectionLayer(
+      injectionPlanForLayer(reusable.layer, reusable.layer.ranges),
+      options,
+    )
+  } catch (error) {
+    if (error instanceof SyntaxRequestCancelled) throw error
+    recordOptionalWorkerPhaseFailure('parse injection', error, options.degraded, 'injection-failed')
+    return null
+  }
 }
 
 const reparsePartialCombinedLayer = async (
@@ -1172,6 +1646,16 @@ const orderParsedLayers = (
   return ordered
 }
 
+// Carried layers join the ones found near an edit, so the cap a full parse applies in discovery
+// order is applied here in the same order; the layers past it are the ones a full parse never makes.
+const cappedLayers = (layers: ParsedLayer[]): ParsedLayer[] => {
+  const limit = MAX_INJECTION_LAYERS + 1
+  if (layers.length <= limit) return layers
+
+  for (const layer of layers.slice(limit)) layer.tree.delete()
+  return layers.slice(0, limit)
+}
+
 const appendOrderedChildren = (
   ordered: ParsedLayer[],
   parentId: string,
@@ -1208,7 +1692,7 @@ const findInjections = (
   runtime: Runtime,
   source: TreeSitterPieceTableInput,
   context: CancellationContext,
-  changedRanges: readonly TreeSitterSyntaxRange[] | null,
+  changedRanges: TreeSitterSyntaxRange[] | null,
 ): InjectionPlan[] => {
   if (parent.depth >= MAX_INJECTION_DEPTH) return []
 
@@ -1224,13 +1708,28 @@ const findInjections = (
     addUniqueInjectionMatches(parent, matches, source, singles, groups, seen)
   }
 
+  const matchSpans: TreeSitterSyntaxRange[] = []
   for (const range of changedRanges ?? []) {
     const matches = query.matches(parent.tree.rootNode, queryOptions(context, range))
     assertNotCancelled(context)
     addUniqueInjectionMatches(parent, matches, source, singles, groups, seen)
+    for (const match of matches) matchSpans.push(injectionMatchSpan(match))
   }
+  // A match touched by the edit owns all of its content: an edit to a fence's language leaves the
+  // content untouched, and the layer carried over from before would outlive its injection.
+  if (changedRanges) appendItems(changedRanges, matchSpans)
 
   return singlesToPlans(singles).concat(groupsToPlans(groups, source)).sort(compareInjectionPlans)
+}
+
+const injectionMatchSpan = (match: ReturnType<Query['matches']>[number]): TreeSitterSyntaxRange => {
+  let startIndex = Number.POSITIVE_INFINITY
+  let endIndex = 0
+  for (const capture of match.captures) {
+    startIndex = Math.min(startIndex, capture.node.startIndex)
+    endIndex = Math.max(endIndex, capture.node.endIndex)
+  }
+  return { startIndex: Number.isFinite(startIndex) ? startIndex : 0, endIndex }
 }
 
 const addUniqueInjectionMatches = (
@@ -1578,13 +2077,35 @@ const parseInjectedSource = (
   oldTree: Tree | null,
   context: CancellationContext,
 ): Tree => {
-  const tree = parser.parse((index) => readTreeSitterPieceTableInput(source, index), oldTree, {
+  const tree = parser.parse((index) => readInjectedInput(source, ranges, index), oldTree, {
     includedRanges: [...ranges],
     progressCallback: () => isCancelled(context),
   })
   if (tree) return tree
   if (isCancelled(context)) throw new SyntaxRequestCancelled()
   throw new Error('Tree-sitter injection parse returned no tree')
+}
+
+// A read stops at the end of the range it starts in: past it the parser jumps to the next range,
+// and a batch read there would copy text the layer never sees into wasm memory.
+const readInjectedInput = (
+  source: TreeSitterPieceTableInput,
+  ranges: readonly TreeSitterRange[],
+  index: number,
+): string | undefined => {
+  const end = readEndForRanges(ranges, index)
+  if (end === null) return undefined
+
+  const text = readTreeSitterPieceTableInput(source, index)
+  if (text === undefined || index + text.length <= end) return text
+  return text.slice(0, end - index)
+}
+
+const readEndForRanges = (ranges: readonly TreeSitterRange[], index: number): number | null => {
+  for (const range of ranges) {
+    if (index < range.endIndex) return range.endIndex
+  }
+  return null
 }
 
 const packHighlights = (
@@ -1605,6 +2126,7 @@ const flattenDocument = async (
   includeCaptures: boolean,
 ): Promise<FlattenedDocument> => {
   const result = createEmptyFlattenedDocument()
+  appendMarkdownResult(document, result, { startIndex: 0, endIndex: document.size })
   appendItems(result.degraded, document.degraded)
   const queryContext = { ...context, budgetMs: QUERY_BUDGET_MS }
 
@@ -1614,6 +2136,7 @@ const flattenDocument = async (
 
   const captures = measurePhase(context, 'captureSorting', () => sortCaptures(result.captures))
   return {
+    records: result.records,
     captures: includeCaptures ? captures : [],
     folds: sortFolds(result.folds),
     brackets: sortBrackets(result.brackets),
@@ -1630,6 +2153,7 @@ const flattenDocumentRange = async (
   options: RangeFlattenOptions,
 ): Promise<FlattenedDocument> => {
   const result = createEmptyFlattenedDocument()
+  appendMarkdownResult(document, result, options.range)
   appendItems(result.degraded, document.degraded)
   if (options.range.endIndex <= options.range.startIndex) return result
 
@@ -1640,6 +2164,7 @@ const flattenDocumentRange = async (
 
   const captures = measurePhase(context, 'captureSorting', () => sortCaptures(result.captures))
   return {
+    records: result.records,
     captures: options.includeCaptures ? captures : [],
     folds: sortFolds(result.folds),
     brackets: sortBrackets(result.brackets),
@@ -1662,6 +2187,7 @@ const flattenLayer = async (
   withCaptures: boolean,
 ): Promise<void> => {
   const runtime = await ensureRuntime(layer.languageId)
+  await appendInjectedMarkdown(layer, result)
   const treeData = runOptionalWorkerPhase(
     'collect diagnostics',
     emptyTreeData(),
@@ -1694,6 +2220,7 @@ const flattenLayerRange = async (
   options: RangeFlattenOptions,
 ): Promise<void> => {
   const runtime = await ensureRuntime(layer.languageId)
+  await appendInjectedMarkdown(layer, result, options.range)
   const treeData = runOptionalWorkerPhase(
     'collect range diagnostics',
     emptyTreeData(),
@@ -2046,9 +2573,10 @@ const selectDocument = async (
     snapshotVersion: request.snapshotVersion,
     languageId: request.languageId,
     status: 'ok',
-    ranges: request.ranges.map((range) =>
-      selectionRangeForAction(layerForSelection(cached, range).tree, request.action, range),
-    ),
+    ranges: request.ranges.map((range) => {
+      if (cached.languageId === 'markdown') return markdownSelection(cached, range)
+      return selectionRangeForAction(layerForSelection(cached, range).tree, request.action, range)
+    }),
   }
 }
 
@@ -2157,6 +2685,10 @@ const staleSelectionResult = (request: TreeSitterSelectionRequest): TreeSitterSe
 
 const replaceCachedDocument = (documentId: string, snapshot: ParsedDocument): void => {
   const cache = ensureDocumentCache(documentId)
+  if (snapshot.markdown) {
+    for (const old of cache.snapshots) disposeCachedSnapshot(old)
+    cache.snapshots.length = 0
+  }
   const existingIndex = cache.snapshots.findIndex(
     (item) => item.snapshotVersion === snapshot.snapshotVersion,
   )
@@ -2192,6 +2724,8 @@ const cachedDocumentForVersion = (
     return item.languageId === languageId && item.snapshotVersion === snapshotVersion
   })
   if (!snapshot) return null
+  if (snapshot.markdown && markdownDocuments.get(documentId)?.snapshotVersion !== snapshotVersion)
+    return null
 
   snapshot.lastUsed = nextUse++
   return snapshot
@@ -2225,12 +2759,59 @@ const disposeOldestRetainedSnapshot = (snapshots: ParsedDocument[]): void => {
 const retainedSourceUnits = (snapshots: readonly ParsedDocument[]): number =>
   snapshots.reduce((sum, snapshot) => sum + snapshot.size, 0)
 
+// Injected MDX is a separate language subject. Its resolver sees only that fence's source.
+const appendInjectedMarkdown = async (
+  layer: ParsedLayer,
+  result: Writable<FlattenedDocument>,
+  requested?: TreeSitterSyntaxRange,
+): Promise<void> => {
+  if (layer.kind === 'root' || layer.languageId !== 'mdx') return
+  await initializeMarkdown()
+  let scope = injectedMarkdown.get(layer.tree)
+  if (!scope) {
+    const root = layer.tree.rootNode
+    const document = new MarkdownDocument()
+    document.setText(markdownMdxSource(root.text, root, root.startIndex))
+    scope = { document, offset: root.startIndex, row: root.startPosition.row }
+    injectedMarkdown.set(layer.tree, scope)
+  }
+  const { document, offset, row } = scope
+  const range = {
+    startIndex: Math.max(0, (requested?.startIndex ?? offset) - offset),
+    endIndex:
+      Math.min(layer.tree.rootNode.endIndex, requested?.endIndex ?? layer.tree.rootNode.endIndex) -
+      offset,
+  }
+  const captures = markdownCaptures(document, range).map((capture) => ({
+    ...capture,
+    startIndex: capture.startIndex + offset,
+    endIndex: capture.endIndex + offset,
+  }))
+  const folds = markdownFolds(document, range).map((fold) => ({
+    ...fold,
+    startIndex: fold.startIndex + offset,
+    endIndex: fold.endIndex + offset,
+    startLine: fold.startLine + row,
+    endLine: fold.endLine + row,
+  }))
+  appendItems(result.captures, captures)
+  appendItems(result.folds, folds)
+}
+
+const disposeLayer = (layer: ParsedLayer): void => {
+  injectedMarkdown.get(layer.tree)?.document.dispose()
+  injectedMarkdown.delete(layer.tree)
+  layer.tree.delete()
+}
+
 const disposeCachedSnapshot = (snapshot: ParsedDocument): void => {
-  for (const layer of snapshot.layers) layer.tree.delete()
+  for (const layer of snapshot.layers) disposeLayer(layer)
 }
 
 const disposeDocument = (runtimeSessionId: string): void => {
   markRuntimeSessionDisposed(runtimeSessionId)
+  markdownDocuments.get(runtimeSessionId)?.document.dispose()
+  markdownDocuments.delete(runtimeSessionId)
   const cache = documentCaches.get(runtimeSessionId)
   disposeTreeSitterSourceDocument(sourceCache, runtimeSessionId)
   if (!cache) return
@@ -2278,6 +2859,8 @@ const disposeAll = (): void => {
   }
 
   documentCaches.clear()
+  for (const state of markdownDocuments.values()) state.document.dispose()
+  markdownDocuments.clear()
   clearTreeSitterSourceCache(sourceCache)
   languageDescriptors.clear()
   languageDescriptorOrder.length = 0
@@ -2407,7 +2990,10 @@ const appendItems = <T>(target: T[], items: readonly T[]): void => {
   for (const item of items) target.push(item)
 }
 
-const handleRequest = async (request: TreeSitterWorkerRequest): Promise<TreeSitterWorkerResult> => {
+const handleRequest = async (
+  request: TreeSitterWorkerRequest,
+  source?: TreeSitterPieceTableInput,
+): Promise<TreeSitterWorkerResult> => {
   const { payload } = request
 
   if (payload.type === 'init') {
@@ -2420,8 +3006,10 @@ const handleRequest = async (request: TreeSitterWorkerRequest): Promise<TreeSitt
     return undefined
   }
 
-  if (payload.type === 'parse') return parseDocument(payload)
-  if (payload.type === 'edit') return editDocument(payload)
+  if (payload.type === 'warmLanguages') return warmLanguages(payload.languageIds)
+
+  if (payload.type === 'parse') return parseDocument(payload, source!)
+  if (payload.type === 'edit') return editDocument(payload, source!)
   if (payload.type === 'queryRange') return queryDocumentRange(payload)
   if (payload.type === 'selection') return selectDocument(payload)
 
@@ -2447,7 +3035,14 @@ const executeRequest = (request: TreeSitterWorkerRequest): Promise<TreeSitterWor
   }
 
   const runtimeSessionId = runtimeSessionIdForRequest(payload)
-  const task = handleRequest(request)
+  const source =
+    payload.type === 'parse' || payload.type === 'edit' ? resolveRequestSource(payload) : undefined
+  const markdown =
+    'languageId' in payload && (payload.languageId === 'markdown' || payload.languageId === 'mdx')
+  const task =
+    markdown && runtimeSessionId
+      ? awaitRuntimeTasks(runtimeSessionId).then(() => handleRequest(request, source))
+      : handleRequest(request, source)
   trackWorkerTask(task)
   if (runtimeSessionId) trackRuntimeTask(runtimeSessionId, task)
   return task
@@ -2537,8 +3132,11 @@ const postResponse = (response: TreeSitterWorkerResponse): void => {
 function responseTransfers(response: TreeSitterWorkerResponse): Transferable[] {
   if (!response.ok) return []
 
-  const result = response.result as { tokensPacked?: PackedEditorTokens } | undefined
-  if (!result?.tokensPacked) return []
-
-  return packedEditorTokenTransfers(result.tokensPacked)
+  const result = response.result
+  if (!result) return []
+  const transfers: Transferable[] = []
+  if ('tokensPacked' in result && result.tokensPacked)
+    transfers.push(...packedEditorTokenTransfers(result.tokensPacked))
+  if ('records' in result && result.records) transfers.push(result.records.data.buffer)
+  return transfers
 }

@@ -5,7 +5,11 @@ import type {
 } from '@singapore-editor/core/extensions'
 import type { EditorTheme } from '@singapore-editor/core/rendering'
 
+import { EDITOR_SNIPPET_TOKENS_FEATURE } from '@singapore-editor/core/extensions'
+
 import { anchoredSurfaceFollowsUpdate } from './anchoredSurface'
+import { createTooltipCodeTokenizer, type TooltipCodeBlock } from './codeTokens'
+import { tooltipCodeBlocks } from './markdownTooltip'
 import type {
   EditorHoverParticipant,
   HoverAnchor,
@@ -13,7 +17,7 @@ import type {
   HoverRequest,
 } from './hoverParticipant'
 import { EDITOR_HOVER_PARTICIPANT } from './hoverToken'
-import { hoverTargetRange, sameOffsetRange, unionOffsetRange } from './offsetRange'
+import { hoverTargetRangeInSource, sameOffsetRange, unionOffsetRange } from './offsetRange'
 import {
   createTooltipController,
   HOVER_ASYNC_DISPATCH_DELAY_MS,
@@ -79,6 +83,8 @@ export function createHoverController(options: HoverControllerOptions): HoverCon
   let nextOperationId = 0
   let theme: EditorTheme | null = context.getSnapshot().theme ?? null
   let disposed = false
+  const snippetTokens = context.getFeature(EDITOR_SNIPPET_TOKENS_FEATURE)
+  const codeTokenizer = snippetTokens ? createTooltipCodeTokenizer(snippetTokens) : null
 
   const tooltip: TooltipController = createTooltipController({
     document: ownerDocument,
@@ -86,6 +92,7 @@ export function createHoverController(options: HoverControllerOptions): HoverCon
     reentryElement: element,
     markdownCodeBackground: options.markdownCodeBackground,
     classNamespace: options.classNamespace,
+    codeTokenizer,
     onDidHide: () => cancelOperation(),
     onRequestEditorFocus: () => context.focusEditor(),
   })
@@ -103,15 +110,26 @@ export function createHoverController(options: HoverControllerOptions): HoverCon
     tooltip.hide()
   }
 
+  const warmCodeBlock = (block: TooltipCodeBlock): void => {
+    void codeTokenizer?.tokenize(block.text, block.languageId)
+  }
+
   const isCurrent = (candidate: HoverOperation): boolean => operation === candidate
 
   const render = (current: HoverOperation): void => {
-    if (!isCurrent(current) || !current.revealed) return
+    if (!isCurrent(current)) return
 
     const parts = orderedParts(current)
+    const blocks = parts.flatMap((part) => (part.markdown ? tooltipCodeBlocks(part.markdown) : []))
+    // An answer usually lands inside the dwell, so its tokens are asked for before the reveal.
+    if (!current.revealed) return blocks.forEach(warmCodeBlock)
+
     const pending = current.pendingAsync > 0
     if (parts.length === 0 && pending && !current.loading) return
     if (parts.length === 0 && !pending) return hide()
+
+    const tokens = codeTokenizer?.prepare(blocks)
+    if (tokens) return void tokens.then(() => render(current))
 
     const range = unionOffsetRange(parts.map((part) => part.range)) ?? current.anchor.range
     const rect = context.getRangeClientRect(range.start, range.end)
@@ -174,7 +192,7 @@ export function createHoverController(options: HoverControllerOptions): HoverCon
 
   const start = (anchor: HoverAnchor, focusOnShow: boolean): boolean => {
     const snapshot = context.getSnapshot()
-    const participants = context.getProviders?.(EDITOR_HOVER_PARTICIPANT, snapshot.languageId) ?? []
+    const participants = context.getProviders(EDITOR_HOVER_PARTICIPANT, snapshot.languageId)
     if (participants.length === 0) return false
 
     hide()
@@ -223,7 +241,7 @@ export function createHoverController(options: HoverControllerOptions): HoverCon
   const scheduleAt = (offset: number, point: HoverAnchor['point']): void => {
     tooltip.cancelHide()
     const snapshot = context.getSnapshot()
-    const range = hoverTargetRange(snapshot.fullText, offset)
+    const range = hoverTargetRangeInSource(snapshot.textSnapshot, offset)
     const current = operation
     if (
       current &&
@@ -275,12 +293,14 @@ export function createHoverController(options: HoverControllerOptions): HoverCon
 
   return {
     update: (snapshot, kind) => {
-      theme = snapshot.theme ?? null
+      const nextTheme = snapshot.theme ?? null
+      if (nextTheme !== theme) codeTokenizer?.clear()
+      theme = nextTheme
       if (shouldHideOnUpdate(kind)) hide()
     },
     showAtOffset: (offset, showOptions = {}) => {
       if (disposed || !context.hasDocument()) return false
-      const range = hoverTargetRange(context.getSnapshot().fullText, offset)
+      const range = hoverTargetRangeInSource(context.getSnapshot().textSnapshot, offset)
       return start({ offset, range, source: 'keyboard' }, showOptions.focus ?? false)
     },
     hide,

@@ -34,8 +34,14 @@ import {
 import type { TextEdit } from './tokens'
 import type { EditorViewFoldState } from './viewFolds'
 export type { HistoryNodeId } from './history'
+import {
+  restoreDocumentHistory,
+  serializeDocumentHistory,
+  type SerializedEditorHistory,
+} from './historySerialization'
 import { EditorEventSource } from './editor/emitter'
 import { createDocumentTextSnapshot, type DocumentTextSnapshot } from './documentTextSnapshot'
+import { TextStorageMaintenance, type TextStorageMaintenanceStats } from './textStorageMaintenance'
 import {
   applyBatchToPieceTable,
   createPieceTableSnapshot,
@@ -48,6 +54,7 @@ import {
   readPieceTableTextRange,
   snapBatchEditRanges,
 } from '@singapore-editor/textbuffer'
+import { bufferStorageIdentity, copyTextRange } from '@singapore-editor/textbuffer/internal/buffers'
 
 import {
   DocumentEditChain,
@@ -182,6 +189,7 @@ export type EditorHistoryGraph = {
 }
 
 export type EditorTextBuffer = {
+  getStorageMaintenanceStats(): Readonly<TextStorageMaintenanceStats>
   applyText(
     selections: SelectionSet<PieceTableAnchor>,
     text: string,
@@ -243,6 +251,13 @@ export type EditorTextBuffer = {
   preferHistoryBranch(id: HistoryNodeId): boolean
   /** Forgets every state but the current one. The text does not change; only where undo can go. */
   clearHistory(sourceView?: EditorViewSession | null): DocumentSessionChange
+  /** The history as plain data, or null when there is nothing but the current state. */
+  serializeHistory(): SerializedEditorHistory | null
+  /**
+   * Adopts a serialized history whose current state is this buffer's text. Only a buffer
+   * with no history of its own accepts one; the caller vouches that the text matches.
+   */
+  restoreHistory(data: SerializedEditorHistory): boolean
 }
 
 export type EditorViewSession = {
@@ -571,6 +586,11 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
   private readonly tooLargeForHeapOperation: boolean
   private readonly retainedHistoryStates: number | undefined
   private readonly now: () => number
+  private subscribers = 0
+  private readonly storageMaintenance = new TextStorageMaintenance(
+    () => this.storageSnapshots(),
+    () => this.history.current,
+  )
 
   public constructor(rawText: string, options: EditorTextBufferOptions = {}) {
     this.retainedHistoryStates = options.retainedHistoryStates
@@ -946,11 +966,31 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     }
     this.history = this.createHistory(this.history.current, this.history.selections)
     this.typingRun = null
+    this.storageMaintenance.request(0, true)
     // No text moved, so no revision either; a checkout change with no edits tells every
     // view that undo and redo just went away.
     const change = appendTiming(this.createChange('checkout', []), 'session.clearHistory', start)
     this.emitChange(change, sourceView?.viewId)
     return change
+  }
+
+  public serializeHistory(): SerializedEditorHistory | null {
+    if (this.history.nodes.size === 1) return null
+    return serializeDocumentHistory(this.history)
+  }
+
+  public restoreHistory(data: SerializedEditorHistory): boolean {
+    if (this.mutationLease || this.currentBarrier || this.history.nodes.size !== 1) return false
+    const restored = restoreDocumentHistory(data, this.history.current, {
+      retainedStates: this.retainedHistoryStates,
+    })
+    if (!restored) return false
+
+    this.history = restored
+    this.typingRun = null
+    // No text moved; an empty checkout tells every view that undo and redo arrived.
+    this.emitChange(this.createChange('checkout', []), null, 'external')
+    return true
   }
 
   public preferHistoryBranch(id: HistoryNodeId): boolean {
@@ -989,6 +1029,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     this.cleanSnapshot = this.history.current
     this.dirtyCacheSnapshot = this.history.current
     this.dirtyCacheValue = false
+    this.storageMaintenance.request(0, true)
   }
 
   public breakTypingRun(): void {
@@ -997,7 +1038,33 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
 
   public subscribe(listener: EditorTextBufferChangeListener): () => void {
     const subscription = this.changes.subscribe(listener)
-    return () => subscription.dispose()
+    this.subscribers++
+    this.storageMaintenance.resume()
+    let active = true
+    return () => {
+      if (!active) return
+      active = false
+      subscription.dispose()
+      if (--this.subscribers === 0) this.storageMaintenance.suspend()
+    }
+  }
+
+  public getStorageMaintenanceStats(): Readonly<TextStorageMaintenanceStats> {
+    return this.storageMaintenance.getStats()
+  }
+
+  private *storageSnapshots(): Generator<PieceTableSnapshot> {
+    yield this.cleanSnapshot
+    yield this.dirtyCacheSnapshot
+    yield this.textSnapshot.snapshot
+    yield* historyStorageSnapshots(this.history)
+    for (let barrier = this.currentBarrier; barrier; barrier = barrier.older) {
+      yield* historyStorageSnapshots(barrier.historyBefore)
+      for (const segment of barrier.segments) {
+        yield segment.snapshotBefore
+        yield segment.snapshotAfter
+      }
+    }
   }
 
   public acquireMutationLease(
@@ -1069,6 +1136,11 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     )
     const revisionBefore = this.revision
     const historyBefore = this.history
+    // Maintenance may have moved history to a reclaimed log while this was prepared on the old one.
+    const storageBefore = bufferStorageIdentity(prepared.snapshotBefore.buffers)
+    if (bufferStorageIdentity(prepared.snapshotAfter.buffers) !== storageBefore) {
+      this.storageMaintenance.request(0, true)
+    }
     const barrier = this.commitPreparedHistory(
       transaction,
       options.history,
@@ -1243,6 +1315,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
       this.history = this.createHistory(last.snapshotAfter, last.selectionAfter)
     }
     state.completed = true
+    this.storageMaintenance.request(0, true)
     const receipt = createReceipt(barrier)
     return { status: 'completed', receipt }
   }
@@ -1253,6 +1326,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     const alreadySealed = barrier.phase === 'sealed'
     barrier.phase = 'sealed'
     barrier.historyBefore = clearEditorHistoryRedo(barrier.historyBefore)
+    this.storageMaintenance.request(0, true)
     const sealedReceipt = createReceipt(barrier)
     return {
       receipt: sealedReceipt,
@@ -1269,6 +1343,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     barrier.released = true
     barrier.installed = false
     this.unlinkBarrier(barrier)
+    this.storageMaintenance.request(0, true)
     return { status: 'released' }
   }
 
@@ -1646,6 +1721,9 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
   ): void {
     if (change.kind === 'none') return
 
+    const deletedUnits = change.edits.reduce((sum, edit) => sum + edit.to - edit.from, 0)
+    this.storageMaintenance.request(deletedUnits)
+
     this.pendingChanges.push({ change, origin, sourceViewId: sourceViewId ?? null })
     if (this.publishingChanges) return
 
@@ -1656,6 +1734,15 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
       this.pendingChanges.length = 0
       this.publishingChanges = false
     }
+  }
+}
+
+function* historyStorageSnapshots(history: DocumentHistory): Generator<PieceTableSnapshot> {
+  for (const node of history.nodes.values()) {
+    yield node.snapshot
+    if (!node.transaction) continue
+    yield node.transaction.snapshotBefore
+    yield node.transaction.snapshotAfter
   }
 }
 
@@ -2739,10 +2826,12 @@ function invertTextEdits(
   for (const edit of sorted) {
     const from = edit.from + delta
     const to = from + edit.text.length
+    const text = readPieceTableTextRange(snapshot, edit.from, edit.to)
     inverse.push({
       from,
       to,
-      text: readPieceTableTextRange(snapshot, edit.from, edit.to),
+      // Small undo slices must not pin a whole source; large deletions stay off this copy path.
+      text: text.length <= 1024 ? copyTextRange(text, 0, text.length) : text,
     })
     delta += edit.text.length - (edit.to - edit.from)
   }

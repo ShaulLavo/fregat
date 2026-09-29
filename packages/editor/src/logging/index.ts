@@ -16,7 +16,7 @@ export function createEditorLoggingPlugin(
   return {
     name: options.name ?? 'editor.logging',
     activate(context) {
-      return context.registerLogger?.(logger)
+      return context.registerLogger(logger)
     },
   }
 }

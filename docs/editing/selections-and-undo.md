@@ -163,6 +163,18 @@ while preserving the anchor property that selections can still resolve across sn
 
 Anchors reference immutable buffers, not the treap. Resolvable against any snapshot. Same anchor may be live/deleted depending on snapshot. Undoing deletion restores liveness.
 
+### Serialized History
+
+`buffer.serializeHistory()` returns the graph as plain data and `buffer.restoreHistory(data)`
+rebuilds it over a freshly created buffer, so a host can keep undo across a close or a reload.
+No text is stored: each state carries the edits from its parent and their inverse, and the
+restoring buffer's own text stands in for the current state. Restore climbs to the root with
+the inverse edits, then fills the other branches forward. A recorded transaction is reused only
+when it spans exactly parent to state; a state replaced outside the graph is diffed instead.
+Selections are stored as offsets, because anchors do not outlive their buffer. Only a buffer
+with no history of its own accepts one, and the host vouches that the text matches (a content
+hash); the length check and the batch's range checks catch data that cannot fit.
+
 ### Future: Operation-Based Undo
 
 For collaboration: individual operations must be reversible without affecting concurrent ones. Deferred.

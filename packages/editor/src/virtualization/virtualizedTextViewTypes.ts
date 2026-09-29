@@ -1,3 +1,4 @@
+import type { HighlightOverlay } from './highlightOverlay'
 import type { TextContent } from '../textContent'
 import type {
   EditorGutterContribution,
@@ -12,6 +13,7 @@ import type { BrowserTextMetrics } from './browserMetrics'
 import type { RowInlineMapping } from './virtualizedTextViewInlineMapping'
 import type { FixedRowVisibleRange } from './fixedRowVirtualizer'
 import type { MeasuredText } from '../textMeasurements'
+import type { WrapBreak } from './displayProjectionTypes'
 
 type CaretPositionResult = {
   readonly offsetNode: Node
@@ -63,6 +65,10 @@ export type DocumentWithCaretHitTesting = Document & {
 }
 
 export type VirtualizedTextViewOptions = {
+  /** In pixels. Unset, the stylesheet decides. */
+  readonly fontSize?: number
+  /** A CSS `font-family` list. Unset, the stylesheet decides. */
+  readonly fontFamily?: string
   readonly lineHeight?: number
   readonly rowHeight?: number
   readonly rowGap?: number
@@ -71,6 +77,8 @@ export type VirtualizedTextViewOptions = {
   readonly rowPositioning?: VirtualizedTextViewRowPositioning
   readonly className?: string
   readonly gutterWidth?: number | ((context: EditorGutterWidthContext) => number)
+  /** Empty pixels at the gutter's leading edge, before the first lane. Defaults to 0. */
+  readonly gutterLeadingInset?: number
   readonly longLineChunkSize?: number
   readonly longLineChunkThreshold?: number
   readonly horizontalOverscanColumns?: number
@@ -80,13 +88,36 @@ export type VirtualizedTextViewOptions = {
   readonly onViewportChange?: () => void
   readonly onViewportScroll?: () => void
   readonly wrap?: boolean
+  /** Where a wrapped row may end. Defaults to `'character'`. */
+  readonly wrapBreak?: WrapBreak
   readonly injectedTextRows?: readonly InjectedTextRow[]
   readonly gutterContributions?: readonly EditorGutterContribution[]
   readonly cursorLineHighlight?: EditorCursorLineHighlightOptions
   readonly hiddenCharacters?: HiddenCharactersMode
   readonly tabSize?: number
   readonly textMetrics?: BrowserTextMetrics
+  /** Defaults to the textarea; EditContext is taken only where the engine has it. */
+  readonly inputRoute?: EditorInputRoute
+  /** The input's accessible name. Defaults to "Editor input". */
+  readonly inputLabel?: string
+  readonly inputKind?: EditorInputKind
+  readonly scrollPastEnd?: boolean
+  readonly onContentHeightChange?: (height: number) => void
 }
+
+/**
+ * `'prose'` asks soft keyboards to capitalize sentences and autocorrect; `'code'` (the default)
+ * turns both off.
+ */
+export type EditorInputKind = 'code' | 'prose'
+
+export type EditorWrapBreak = WrapBreak
+
+/**
+ * How typed text reaches the editor. EditContext hands over every edit with the range it replaced,
+ * where the textarea leaves some to be diffed back out of its value; only Chromium has it.
+ */
+export type EditorInputRoute = 'textarea' | 'edit-context'
 
 export type VirtualizedTextViewScrollMode = 'virtualized' | 'static'
 
@@ -106,17 +137,29 @@ export type VirtualizedTextHighlightRange = {
   readonly end: number
 }
 
-export type VirtualizedTextHighlightStyle = {
-  readonly backgroundColor?: string
-  readonly color?: string
-  readonly textDecoration?: string
-  // Stacking against other highlight groups, highest paints last. Without it
-  // the CSS highlight registry falls back to registration order, which shifts
-  // as groups scroll in and out of the mounted window.
-  readonly zIndex?: number
-}
+export type VirtualizedTextHighlightStyle =
+  | {
+      readonly overlay: HighlightOverlay
+      readonly backgroundColor?: never
+      readonly color?: never
+      readonly textDecoration?: never
+      readonly zIndex?: never
+      readonly dimmable?: never
+    }
+  | {
+      readonly overlay?: never
+      readonly backgroundColor?: string
+      readonly color?: string
+      readonly textDecoration?: string
+      /** Stacking within the color-producing or colorless highlight band. */
+      readonly zIndex?: number
+      /** Keep this producer's color at full opacity inside a fade mask. */
+      readonly dimmable?: boolean
+    }
 
 export type VirtualizedTextRowDecoration = {
+  /** Declares that these classes change only foreground/background paint. */
+  readonly snapshotStyle?: 'colors'
   readonly className?: string
   readonly gutterClassName?: string
 }
@@ -281,6 +324,7 @@ export type MountedVirtualizedTextRow = VirtualizedTextRow & {
   readonly rowDecorationClassName: string
   readonly rowDecorationGutterClassName: string
   readonly rowDecorationKey: string
+  readonly rowDecorationSnapshotStyle: boolean
   /** Classes derived from the row's inline replacement kinds (`editor-inline-<kind>`). */
   readonly inlineKindsClassName: string
   readonly cursorLineContentActive: boolean

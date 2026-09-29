@@ -202,7 +202,7 @@ describe('tab-focus mode', () => {
     const platform = detectPlatform()
     const hotkey = defaultEditorKeyBindings(platform).find((binding) => binding.command === command)
       ?.chord[0]
-    if (hotkey === undefined || typeof hotkey === 'string') {
+    if (hotkey === undefined || typeof hotkey === 'string' || hotkey.key === undefined) {
       throw new Error(`${command} has no default chord on ${platform}`)
     }
 

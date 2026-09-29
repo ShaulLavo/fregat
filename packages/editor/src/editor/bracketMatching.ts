@@ -52,11 +52,11 @@ export type BracketLevelOptions = {
   readonly maxLevel?: number
 }
 
-export function isOpeningBracket(char: string): boolean {
+function isOpeningBracket(char: string): boolean {
   return CLOSING_FOR_OPENING[char] !== undefined
 }
 
-export function isClosingBracket(char: string): boolean {
+function isClosingBracket(char: string): boolean {
   return OPENING_FOR_CLOSING[char] !== undefined
 }
 
@@ -65,7 +65,7 @@ export function isClosingBracket(char: string): boolean {
  * `index` covers `[index, index + 1)`. Assumes `brackets` is sorted by index, which is how the
  * syntax layer ships it.
  */
-export function bracketIndexAtOffset(brackets: readonly BracketInfo[], offset: number): number {
+function bracketIndexAtOffset(brackets: readonly BracketInfo[], offset: number): number {
   let low = 0
   let high = brackets.length - 1
 

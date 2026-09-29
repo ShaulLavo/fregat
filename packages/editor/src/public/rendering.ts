@@ -28,6 +28,7 @@ export type {
   InlineMap,
   InlineMapUpdate,
   InlineReplacementRange,
+  InlineReplacementReveal,
   InlineReplacementSpec,
 } from '../inlineMap'
 export type {
@@ -49,3 +50,4 @@ export type {
   VirtualizedTextHighlightStyle,
   VirtualizedTextRowDecoration,
 } from '../virtualization'
+export { scheduleFrame, type ScheduledFrame } from '../editor/scheduleFrame'

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  LspTransportClosedError,
   createWebSocketLspTransport,
   createWorkerLspTransport,
   type LspTransportHandler,
@@ -49,6 +50,13 @@ class FakeWebSocket implements LspWebSocketLike {
 
   public receive(message: string): void {
     this.emit('message', message)
+  }
+
+  /** What a browser dispatches when the server or the network ends the socket. */
+  public drop(code: number, reason = ''): void {
+    this.readyState = 3
+    const event = new CloseEvent('close', { code, reason, wasClean: false })
+    for (const listener of this.listenersFor('close')) listener(event)
   }
 
   public listenerCount(type: string): number {
@@ -205,6 +213,35 @@ describe('WebSocket LSP transport', () => {
     second.close()
 
     expect(unexpectedCloses).toBe(1)
+  })
+
+  it('reports the close code and traffic of a socket the transport did not close', async () => {
+    FakeWebSocket.instances.length = 0
+    const pending = createWebSocketLspTransport('ws://localhost:3000', {
+      WebSocketCtor: FakeWebSocket,
+    })
+    const socket = FakeWebSocket.instances[0]
+    if (!socket) throw new Error('missing socket')
+    socket.open()
+    const transport = await pending
+    const errors: unknown[] = []
+    transport.onDidClose((error) => errors.push(error))
+    transport.subscribe(() => undefined)
+    transport.send('{}')
+    socket.receive('{}')
+    socket.receive('{}')
+
+    socket.drop(1006)
+
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toBeInstanceOf(LspTransportClosedError)
+    expect(errors[0]).toMatchObject({
+      code: 1006,
+      message: 'LSP transport closed (1006)',
+      receivedCount: 2,
+      sentCount: 1,
+      wasClean: false,
+    })
   })
 })
 

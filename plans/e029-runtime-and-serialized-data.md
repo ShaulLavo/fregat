@@ -1,6 +1,6 @@
 # E029: Document runtime and serialized data boundaries
 
-- Status: Proposed
+- Status: Approved
 - Kind: Design
 - Owner: Editor
 - Priority: P2
@@ -71,8 +71,9 @@ Document three actual flows: host text into a normalized piece table and back to
 snapshot changes into Tree-sitter source synchronization, and Editor edits into LSP changes.
 Show where version and generation checks apply and which caches must exist at the receiver.
 
-Use [E018](e018-persisted-undo.md) as a proposed consumer of the vocabulary, not an already
-shipped encoding. Durable history needs an explicit format and reconstruction contract.
+[E018](../docs/editing/e018-persisted-undo.md) shipped on 2026-09-20: `serializeHistory` and
+`restoreHistory` store each node's edit script against its parent, and Platform restores it when the
+content hash matches. Document that format as an existing consumer of this vocabulary.
 Explain why serializing runtime tree pointers, sync segment objects, or parser handles does
 not preserve their meaning across restart.
 
@@ -96,7 +97,7 @@ not preserve their meaning across restart.
 This is documentation work. Check links, export paths, type definitions, and the actual
 encoder and decoder pairs. Do not run the repository's test suite to validate prose.
 
-Use [Tree-sitter source tests](../packages/tree-sitter/test/source-sharedChunks.test.ts) and
+Use [Tree-sitter source tests](../packages/tree-sitter/test/source-chunks.test.ts) and
 [LSP positions tests](../packages/lsp/test/positions.test.ts) as existing evidence for transfer
 and coordinate claims. Inspect their assertions before stating the behavior they establish.
 

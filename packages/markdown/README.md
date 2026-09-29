@@ -1,19 +1,22 @@
 # @singapore-editor/markdown
 
-Markdown live preview for the Singapore editor. Markdown text stays the document — this renders it as
+Markdown authoring and live preview for the Singapore editor. Markdown text stays the document — this renders it as
 formatted text without ever converting it into another model.
 
 ```ts
-import { createMarkdownPreviewPlugin } from '@singapore-editor/markdown'
+import {
+  createMarkdownAuthoringPlugin,
+  createMarkdownPreviewPlugin,
+} from '@singapore-editor/markdown'
 import '@singapore-editor/markdown/style.css'
 
 new Editor(container, {
-  plugins: [markdown(), createMarkdownPreviewPlugin()],
+  plugins: [markdown(), createMarkdownAuthoringPlugin(), createMarkdownPreviewPlugin()],
 })
 ```
 
 The plugin's presence is the switch. It needs a markdown language plugin alongside it (for example
-`markdown()` from `@singapore-editor/tree-sitter-languages`), because it reads that grammar's captures.
+`markdown()` from `@singapore-editor/tree-sitter-languages`), because it reads that grammar's current syntax records.
 
 ## What it does
 
@@ -27,7 +30,10 @@ The plugin's presence is the switch. It needs a markdown language plugin alongsi
 | `![alt](img.png)`       | `alt`           |
 | `- item`                | `• item`        |
 
-Ordered lists, block quotes, escapes, and fenced code blocks are deliberately left as written.
+Formatted links are anchors with their destination and a tooltip. `openLink` on
+`createMarkdownPreviewPlugin` lets a host open workspace paths through its own navigation.
+Pipe tables retain the width of hidden syntax as spacing, so formatted cells keep their columns.
+Moving the caret into a link reveals its source for editing.
 
 ## How it works
 
@@ -41,3 +47,23 @@ back, so it stays editable as plain text.
 
 `markdownInlineReplacements(text, captures)` is exported on its own if you want the derivation
 without the plugin.
+
+## Authoring
+
+`createMarkdownAuthoringPlugin()` works in plain source and live preview. It registers
+commands for bold, italic, strikethrough, inline code, links, level-two headings,
+bullet and numbered lists, tasks, quotes and fenced code. The default keymap binds
+Mod+B, Mod+I and Mod+Shift+K to bold, italic and links. Tab and Shift+Tab indent
+and outdent list items. Commands operate on one selection in a writable Markdown
+document and preserve the source buffer's undo history.
+
+Current parser records let a command remove the surrounding mark at the caret or
+select an existing link destination. Each command edits source directly; rich-text
+editing with permanently hidden syntax remains a separate interaction policy.
+
+Semantic commands wait for current parser records. A pending command is canceled if
+its document, source, selection or writability changes. Toggling a nonempty selection
+removes intersecting marks within that selection while preserving formatting outside
+it; an unmarked selection receives marks on each nonblank line. Italics use asterisks
+so partial-word selections remain valid Markdown. Numbered tasks support the same
+completion command as bulleted tasks.

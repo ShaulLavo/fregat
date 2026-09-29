@@ -1,0 +1,11 @@
+{
+  "seeds": 400,
+  "steps": 800,
+  "failures": [],
+  "compactions": 115068,
+  "interleaved": 7928,
+  "tombstones": 468621,
+  "unverified": 0,
+  "runtime": "Node v26.7.0",
+  "measuredAt": "2026-09-25T13:57:27.932Z"
+}

@@ -1,0 +1,102 @@
+{
+  "browser": "153.0.8010.12",
+  "bundleHash": "a507e9c84eb65b608023c4fc9e397712c0f47d328afe44b3d89e753db599d810",
+  "measuredAt": "2026-09-23T15:10:24.635Z",
+  "options": {
+    "workloads": "original,paste-tail",
+    "repetitions": "1",
+    "cycles": "500,1000",
+    "typing-samples": "0",
+    "observe-only": false
+  },
+  "workloadDefinitions": {
+    "aligned": "16,384 UTF-16 unit inserts, deleted whole",
+    "survivors": "1,024 unit inserts retaining 64 units each",
+    "mixed": "1,024 unit inserts; three of four deleted whole",
+    "paragraph": "replace the same 1,024 unit paragraph each cycle",
+    "original": "delete 4,194,304 units from original text; release session and external owners separately",
+    "paste-tail": "paste 4,194,368 units, retain the 64-unit writable tail, reset sync-chain payload, release history and external owners"
+  },
+  "failure": null,
+  "note": "Two mounted editors; automatic maintenance; actual GC heap. Heap peaks are 10ms CDP samples, not an exact maximum. Input probes measure trusted keydown to the second animation frame on identical text in the same browser before/after maintenance; observational paired timings, not the E002 calibrated regression gate. Original deletion checks history/clean and external-reader release separately; undo is excluded there because DocumentEditChain legitimately retains the restored insertion payload.",
+  "samples": [
+    {
+      "workload": "original",
+      "cycles": 1,
+      "originalUnits": 4194317,
+      "deletedUnits": 4194304,
+      "liveUnits": 13,
+      "revision": 1,
+      "dirty": false,
+      "heapBefore": -3404268,
+      "heapAfter": -7519448,
+      "heapBeforeAbsolute": 7513988,
+      "heapAfterAbsolute": 3398808,
+      "heapWhilePinned": 7652208,
+      "heapWithMeasurement": 3415952,
+      "sampledPeakHeap": 7937660,
+      "heapSamples": 58,
+      "stats": {
+        "completed": 2,
+        "cancelled": 0,
+        "chunks": 1,
+        "codeUnits": 4194304,
+        "snapshots": 1,
+        "maxSliceMs": 0.40000009536743164
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "oldReadersValid": true,
+      "history": {
+        "protected": true,
+        "undoRedoChecked": false
+      },
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 0
+    },
+    {
+      "workload": "paste-tail",
+      "cycles": 1,
+      "pastedUnits": 4194368,
+      "deletedUnits": 4194304,
+      "liveUnits": 77,
+      "revision": 2,
+      "dirty": false,
+      "heapBefore": 4923804,
+      "heapAfter": 749316,
+      "heapBeforeAbsolute": 7766460,
+      "heapAfterAbsolute": 3591972,
+      "heapWhilePinned": 7912164,
+      "heapWithMeasurement": 3599308,
+      "sampledPeakHeap": 8315132,
+      "heapSamples": 28,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 256,
+        "codeUnits": 4194304,
+        "snapshots": 1,
+        "maxSliceMs": 0.6000001430511475
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "oldReadersValid": true,
+      "syncPayloadReleased": true,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 0
+    }
+  ],
+  "heapSummary": [
+    {
+      "workload": "paste-tail/1",
+      "samples": 1,
+      "medianReduction": 0.8478176629289061
+    }
+  ]
+}

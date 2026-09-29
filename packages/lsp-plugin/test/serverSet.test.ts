@@ -461,7 +461,7 @@ function diagnostic(message: string): lsp.Diagnostic {
 
 function publish(presenter: CompositeDiagnosticsLanePresenter, item: lsp.Diagnostic): void {
   presenter.render(snapshotDocument('text'), [item])
-  presenter.publishSummary('file:///test.ts', 1, [item])
+  presenter.publishSummary('file:///test.ts', 1, [item], 'current')
 }
 
 function deferred<T>(): { promise: Promise<T>; resolve(value: T): void } {

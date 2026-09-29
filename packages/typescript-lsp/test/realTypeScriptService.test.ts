@@ -1,21 +1,19 @@
 /*
- * The one suite in this package that runs against a real TypeScript checker.
- *
- * `worker.test.ts` replaces `typescript` and `@typescript/vfs` with fakes at module scope, which is
- * right for asserting the worker's message plumbing and useless for asserting anything a checker
- * computes. So this lives in its own file, and mocks neither.
+ * Where the standard library comes from, with the network off.
  *
  * `fetch` is stubbed to throw for the whole file. That is the assertion, not a precaution: the
  * milestone this suite closes is "the tests can build a language service with the network off", and
  * a stub that throws is the only way to prove no code path quietly dialled out.
  */
 
+import { createWorkerLspTransport, LspClient } from '@singapore-editor/lsp'
 import ts from 'typescript'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as lsp from 'vscode-languageserver-protocol'
+import { createTypeScriptLanguageSession } from '../src/worker/session'
+import { InProcessTypeScriptWorker } from './inProcessWorker'
 import {
   createRealTypeScriptService,
-  REAL_SERVICE_COMPILER_OPTIONS,
   typeScriptLibraryFilesFromDisk,
 } from './realTypeScriptService'
 
@@ -89,59 +87,79 @@ describe('a real TypeScript language service, offline', () => {
     expect(offlineFetch).not.toHaveBeenCalled()
   })
 
-  it('keeps the harness compiler options identical to the worker defaults', async () => {
-    const { __typeScriptLspWorkerInternalsForTests } = await import('../src/typescriptLsp.worker')
+  it('builds the session service from a lib loader instead of fetching', async () => {
+    const worker = new InProcessTypeScriptWorker()
+    const client = await connectedClient(worker)
+    await client.notify('editor/typescript/setWorkspaceFiles', {
+      files: [{ path: 'src/fixture.ts', text: FIXTURE_SOURCE }],
+    })
 
-    expect(REAL_SERVICE_COMPILER_OPTIONS).toEqual(
-      __typeScriptLspWorkerInternalsForTests.defaultCompilerOptions(),
-    )
-  })
-
-  it('lets createService take a lib map instead of fetching one', async () => {
-    const { __typeScriptLspWorkerInternalsForTests } = await import('../src/typescriptLsp.worker')
-    setWorkspaceFiles([{ path: 'src/fixture.ts', text: FIXTURE_SOURCE }])
-
-    const state = await __typeScriptLspWorkerInternalsForTests.createService(
-      typeScriptLibraryFilesFromDisk(),
-    )
+    const tokens = await client.request<lsp.SemanticTokens>('textDocument/semanticTokens/full', {
+      textDocument: { uri: 'file:///src/fixture.ts' },
+    })
 
     expect(offlineFetch).not.toHaveBeenCalled()
-    expect(state.env.getSourceFile(FIXTURE_FILE_NAME)?.text).toBe(FIXTURE_SOURCE)
-    expect(
-      state.env.languageService.getEncodedSemanticClassifications(
-        FIXTURE_FILE_NAME,
-        ts.createTextSpan(0, FIXTURE_SOURCE.length),
-        ts.SemanticClassificationFormat.TwentyTwenty,
-      ).spans.length,
-    ).toBeGreaterThan(0)
+    expect(tokens.data.length).toBeGreaterThan(0)
+    worker.terminate()
   })
 
-  it('still fetches the lib files from the CDN when no lib map is given', async () => {
-    const { __typeScriptLspWorkerInternalsForTests } = await import('../src/typescriptLsp.worker')
-    setWorkspaceFiles([])
+  it('loads the bundled standard library with the network off', async () => {
+    const posted: unknown[] = []
+    const session = createTypeScriptLanguageSession({ post: (message) => posted.push(message) })
+    session.receive({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} })
+    session.receive({
+      jsonrpc: '2.0',
+      method: 'editor/typescript/setWorkspaceFiles',
+      params: { files: [{ path: 'src/fixture.ts', text: FIXTURE_SOURCE }] },
+    })
+    session.receive({
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'textDocument/diagnostic',
+      params: { textDocument: { uri: 'file:///src/fixture.ts' } },
+    })
 
-    await expect(__typeScriptLspWorkerInternalsForTests.createService()).rejects.toThrow(
-      OFFLINE_MESSAGE,
-    )
+    await vi.waitFor(() => expect(posted).toHaveLength(2), { timeout: 10_000 })
+    expect(posted[1]).toMatchObject({ id: 2, result: { kind: 'full', items: [] } })
+    expect(offlineFetch).not.toHaveBeenCalled()
+    session.dispose()
+  })
 
-    expect(offlineFetch).toHaveBeenCalled()
+  it('fetches the standard library from the CDN only when the host opts in', async () => {
+    const posted: unknown[] = []
+    const session = createTypeScriptLanguageSession({ post: (message) => posted.push(message) })
+    session.receive({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: { initializationOptions: { libraryFiles: 'cdn' } },
+    })
+    session.receive({
+      jsonrpc: '2.0',
+      method: 'editor/typescript/setWorkspaceFiles',
+      params: { files: [{ path: 'src/fixture.ts', text: FIXTURE_SOURCE }] },
+    })
+    session.receive({
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'textDocument/hover',
+      params: {
+        textDocument: { uri: 'file:///src/fixture.ts' },
+        position: { line: 0, character: 13 },
+      },
+    })
+
+    await vi.waitFor(() => expect(posted).toHaveLength(2))
+    expect(posted[1]).toMatchObject({ id: 2, error: { message: OFFLINE_MESSAGE } })
     expect(String(offlineFetch.mock.calls[0]?.[0])).toContain(
       `playgroundcdn.typescriptlang.org/cdn/${ts.version}/typescript/lib/lib.`,
     )
+    session.dispose()
   })
 })
 
-function setWorkspaceFiles(files: readonly { path: string; text: string }[]): void {
-  send({
-    jsonrpc: '2.0',
-    method: 'editor/typescript/setWorkspaceFiles',
-    params: { files },
-  })
-}
-
-function send(message: lsp.NotificationMessage): void {
-  const target = globalThis as unknown as {
-    onmessage?: (event: MessageEvent) => void
-  }
-  target.onmessage?.(new MessageEvent('message', { data: message }))
+async function connectedClient(worker: InProcessTypeScriptWorker): Promise<LspClient> {
+  const client = new LspClient({ rootUri: 'file:///' })
+  await client.connect(createWorkerLspTransport(worker))
+  return client
 }

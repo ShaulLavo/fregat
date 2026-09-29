@@ -40,19 +40,18 @@
   "dependencies": {
     "@singapore-editor/lsp": "workspace:*",
     "@singapore-editor/lsp-plugin": "workspace:*",
-    "@typescript/vfs": "^1.6.4",
     "typescript": "~6.0.3",
-    "vscode-languageserver-protocol": "^3.18.3"
+    "vscode-languageserver-protocol": "^3.18.4"
   },
   "devDependencies": {
     "@singapore-editor/core": "workspace:*",
     "@singapore-editor/plugin-ui": "workspace:*",
-    "@types/node": "^25.9.6",
-    "@typescript/native-preview": "7.0.0-dev.20260613.1",
+    "@types/node": "^26.6.3",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "happy-dom": "^20.14.5",
-    "oxfmt": "0.54.0",
-    "oxlint": "1.69.0",
-    "vitest": "^4.1.11"
+    "oxfmt": "0.70.0",
+    "oxlint": "1.85.0",
+    "vitest": "^5.0.2"
   },
   "peerDependencies": {
     "@singapore-editor/core": "workspace:*"

@@ -1,4 +1,8 @@
-import type { LspManagedTransport, LspTransportHandler } from '@singapore-editor/lsp'
+import {
+  LspServerExitedError,
+  type LspManagedTransport,
+  type LspTransportHandler,
+} from '@singapore-editor/lsp'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type {
@@ -8,7 +12,7 @@ import type {
   LspConnectionOptions,
   LspConnectionPoolEvent,
 } from '../src/index.ts'
-import { LspConnectionPool } from '../src/index.ts'
+import { LspConnection, LspConnectionPool } from '../src/index.ts'
 
 /** The socket the pool is supposed to stop rebuilding. */
 class FakeTransport implements LspManagedTransport {
@@ -390,4 +394,88 @@ describe('LspConnectionPool', () => {
       'custom/late',
     ])
   })
+
+  it('answers a server request through the first borrower that handles it', async () => {
+    const provider = pool.provider(KEY)
+    const first = provider.acquire(
+      connectionOptions({ serverRequestHandlers: { 'custom/files': () => ({ from: 'first' }) } }),
+      callbacks(),
+    )
+    provider.acquire(
+      connectionOptions({ serverRequestHandlers: { 'custom/files': () => ({ from: 'second' }) } }),
+      callbacks(),
+    )
+    const transport = FakeTransport.created[0] as FakeTransport
+    completeHandshake(transport)
+    await flush()
+
+    transport.receive({ jsonrpc: '2.0', id: 'server-1', method: 'custom/files' })
+    await flush()
+    first.release()
+    transport.receive({ jsonrpc: '2.0', id: 'server-2', method: 'custom/files' })
+    await flush()
+
+    expect(responses(transport)).toEqual([
+      { jsonrpc: '2.0', id: 'server-1', result: { from: 'first' } },
+      { jsonrpc: '2.0', id: 'server-2', result: { from: 'second' } },
+    ])
+  })
+
+  it('reports the close after a server says why it exited as that exit', async () => {
+    const lease = callbacks()
+    pool.provider(KEY).acquire(connectionOptions(), lease)
+    const transport = FakeTransport.created[0] as FakeTransport
+    completeHandshake(transport)
+    await flush()
+
+    transport.receive({
+      jsonrpc: '2.0',
+      method: '$/serverExited',
+      params: { outcome: 'exited', exitCode: 1, error: { message: 'The server stopped.' } },
+    })
+    transport.fail()
+
+    const error = lease.onError.mock.calls.at(-1)?.[0]
+    expect(error).toBeInstanceOf(LspServerExitedError)
+    expect(error).toMatchObject({ message: 'The server stopped.', params: { exitCode: 1 } })
+    expect(lease.onStatusChange).toHaveBeenCalledWith('error')
+  })
+
+  // Driven without the pool, which retires a failed connection before a second report could land.
+  it('reports a transport that closes before initialize is answered once', async () => {
+    const lease = callbacks()
+    const connection = new LspConnection(connectionOptions(), lease)
+    connection.connect()
+    const transport = FakeTransport.created[0] as FakeTransport
+
+    transport.receive({ jsonrpc: '2.0', method: '$/serverExited', params: { outcome: 'crashed' } })
+    transport.fail()
+    await flush()
+    await flush()
+
+    expect(lease.onError).toHaveBeenCalledTimes(1)
+    expect(lease.onError.mock.calls[0]?.[0]).toBeInstanceOf(LspServerExitedError)
+    connection.dispose()
+  })
+
+  it('does not blame a later close on an exit the server kept talking after', async () => {
+    const lease = callbacks()
+    pool.provider(KEY).acquire(connectionOptions(), lease)
+    const transport = FakeTransport.created[0] as FakeTransport
+    completeHandshake(transport)
+    await flush()
+
+    transport.receive({ jsonrpc: '2.0', method: '$/serverExited', params: { outcome: 'exited' } })
+    transport.receive({ jsonrpc: '2.0', method: 'custom/refresh', params: {} })
+    transport.fail()
+
+    expect(lease.onError).toHaveBeenCalledTimes(1)
+    expect(lease.onError.mock.calls[0]?.[0]).not.toBeInstanceOf(LspServerExitedError)
+  })
 })
+
+function responses(transport: FakeTransport): readonly unknown[] {
+  return transport.sent
+    .map((message) => JSON.parse(message) as Record<string, unknown>)
+    .filter((message) => typeof message.id === 'string' && !('method' in message))
+}

@@ -1,11 +1,11 @@
 import {
   wordRangeAtOffset,
-  type DocumentSessionChange,
   type TextEdit,
-  type TextSnapshot,
+  type TextReadSnapshot,
 } from '@singapore-editor/core/document'
 import type { EditorSetSelectionOptions } from '@singapore-editor/core/editor'
 import type {
+  EditorContributionChange,
   EditorDisposable,
   EditorResolvedSelection,
   EditorSelectionRange,
@@ -14,6 +14,7 @@ import type {
 import type { VirtualizedTextHighlightStyle } from '@singapore-editor/core/rendering'
 import { EditorSecondaryViewScheduler } from '@singapore-editor/core/secondary-views'
 import {
+  countMatches,
   escapeRegExpCharacters,
   FIND_MATCHES_LIMIT,
   FIND_REPLACE_ALL_LIMIT,
@@ -54,17 +55,30 @@ export const FIND_HIGHLIGHT_Z_INDEX = {
 } as const
 
 const FIND_MATCH_STYLE = {
+  dimmable: false,
   backgroundColor: 'rgba(234, 179, 8, 0.34)',
   zIndex: FIND_HIGHLIGHT_Z_INDEX.match,
 }
 const FIND_CURRENT_STYLE = {
+  dimmable: false,
   backgroundColor: 'rgba(245, 158, 11, 0.72)',
   color: '#111827',
   zIndex: FIND_HIGHLIGHT_Z_INDEX.current,
 }
 const FIND_SCOPE_STYLE = {
+  dimmable: false,
   backgroundColor: 'rgba(59, 130, 246, 0.22)',
   zIndex: FIND_HIGHLIGHT_Z_INDEX.scope,
+}
+
+// A match on screen stays where the reader is looking at it; one that is not lands
+// in the middle, with context on both sides rather than on the viewport's edge.
+function findReveal(match: FindRange, committed = true): EditorSetSelectionOptions {
+  return {
+    ...(committed ? { jumpCause: 'find' as const } : {}),
+    revealOffset: match.end,
+    revealBlock: 'center-if-outside',
+  }
 }
 
 // Seeding stops here rather than pushing a multi-megabyte selection through the
@@ -102,7 +116,7 @@ export type EditorFindHost = {
   // Ranges rather than a string, so nothing find does can cost a copy of the
   // document — the reason there is no full-text accessor here to reach for.
   textSource(): FindTextSource
-  hasTextSnapshot(snapshot: TextSnapshot): boolean
+  hasTextSnapshot(snapshot: TextReadSnapshot): boolean
   // Followed wherever they end up, however far off screen: a scope decides where
   // Replace All rewrites, and one that stopped being followed would rewrite text
   // the user never marked.
@@ -112,7 +126,7 @@ export type EditorFindHost = {
   trackPaintedRanges(ranges: readonly FindRange[]): FindTrackedRanges
   getSelections(): readonly EditorFindResolvedSelection[]
   focusEditor(): void
-  announce?(message: string): void
+  announce(message: string): void
   setSelection(
     anchor: number,
     head: number,
@@ -133,7 +147,7 @@ export type EditorFindHost = {
 }
 
 export type EditorFindEditHost = {
-  textSnapshot(): TextSnapshot | null
+  textSnapshot(): TextReadSnapshot | null
   getSelections(): readonly EditorFindResolvedSelection[]
   applyEdits(
     edits: readonly TextEdit[],
@@ -156,10 +170,11 @@ export type EditorFindState = FindQuery & {
 }
 
 export type EditorFindWidgetState = EditorFindState & {
+  // Every match in the searched text, however many of them are painted.
   readonly matchesCount: number
   readonly matchesPosition: number
-  // The count stopped at FIND_MATCHES_LIMIT, so it is a floor and not a total.
-  readonly matchesTruncated: boolean
+  // Painting stopped at FIND_MATCHES_LIMIT. The count and navigation did not.
+  readonly highlightsTruncated: boolean
 }
 
 export type EditorFindUiEvent =
@@ -200,7 +215,9 @@ export class EditorFindController {
   }
   private readonly scheduler = new EditorSecondaryViewScheduler()
   private matches: readonly FindMatch[] = []
-  private matchesTruncated = false
+  private highlightsTruncated = false
+  // Counted rather than listed, so it is exact past the paint cap.
+  private totalMatches = 0
   private scope: FindTrackedRanges | null = null
   // What the host follows the painted matches by, so a deferred re-search cannot
   // leave a highlight standing on text that moved out from under it.
@@ -282,7 +299,7 @@ export class EditorFindController {
     const match = this.nextMatchAt(startOffset, true)
     // Landing behind where the search started is the search having run out and begun again. Nothing
     // on screen says so to a reader who cannot see the caret jump back up the file.
-    if (match && match.start < startOffset) this.host?.announce?.('Wrapped to the first match')
+    if (match && match.start < startOffset) this.host?.announce('Wrapped to the first match')
 
     return this.selectMatch(match)
   }
@@ -294,7 +311,7 @@ export class EditorFindController {
     const match = this.searchFrom(findPreviousMatchFrom, startOffset, {
       escapeEmptyMatchAtOffset: true,
     })
-    if (match && match.start > startOffset) this.host?.announce?.('Wrapped to the last match')
+    if (match && match.start > startOffset) this.host?.announce('Wrapped to the last match')
 
     return this.selectMatch(match)
   }
@@ -457,7 +474,7 @@ export class EditorFindController {
 
   public handleViewUpdate(
     kind: EditorViewContributionUpdateKind,
-    change: DocumentSessionChange | null,
+    change: EditorContributionChange | null,
   ): void {
     if (!this.state.revealed) return
     if (!isFindDocumentUpdate(kind)) return
@@ -503,7 +520,8 @@ export class EditorFindController {
     this.scopeHighlightName = ''
     this.state = { ...this.state, revealed: false, inSelection: false }
     this.matches = []
-    this.matchesTruncated = false
+    this.highlightsTruncated = false
+    this.totalMatches = 0
     this.scope = null
     this.trackedMatches = null
     this.currentMatch = null
@@ -555,12 +573,15 @@ export class EditorFindController {
     // One past the cap, so a document holding exactly FIND_MATCHES_LIMIT
     // matches is reported as a complete count rather than an overflow.
     const found = this.findAll(false, FIND_MATCHES_LIMIT + 1)
-    this.matchesTruncated = found.length > FIND_MATCHES_LIMIT
-    this.adoptMatches(this.matchesTruncated ? found.slice(0, FIND_MATCHES_LIMIT) : found)
+    this.highlightsTruncated = found.length > FIND_MATCHES_LIMIT
+    this.totalMatches = this.highlightsTruncated ? this.countAll() : found.length
+    this.adoptMatches(this.highlightsTruncated ? found.slice(0, FIND_MATCHES_LIMIT) : found)
     this.currentMatch = matchAtSelection(this.matches, this.primarySelection())
     this.updateHighlights()
     this.updateWidget()
-    if (moveCursor) this.selectFirstMatchFromSelection()
+    // Nothing listed is nothing to land on, and asking anyway is two more passes
+    // over the document for every keystroke of a query that matches nothing.
+    if (moveCursor && found.length > 0) this.selectFirstMatchFromSelection()
   }
 
   private scheduleResearch(): void {
@@ -636,9 +657,7 @@ export class EditorFindController {
     const offset = this.primarySelection()?.endOffset ?? 0
     const match = this.searchFrom(findNextMatchFrom, offset, {})
     if (!match) return
-    this.host?.setSelection(match.start, match.end, 'input.findNavigate', {
-      revealOffset: match.end,
-    })
+    this.host?.setSelection(match.start, match.end, 'input.findNavigate', findReveal(match))
   }
 
   private canPaintCurrentDocument(): boolean {
@@ -667,6 +686,11 @@ export class EditorFindController {
     if (!search) return []
 
     return findMatches(search.source, this.state, search.scopes, captureMatches, limit)
+  }
+
+  private countAll(before?: number): number {
+    const search = this.searchTarget()
+    return search ? countMatches(search.source, this.state, search.scopes, before) : 0
   }
 
   private searchFrom(
@@ -704,19 +728,19 @@ export class EditorFindController {
     // Deliberately not escaping an empty match here: re-searching should land
     // on the match at the cursor, empty or not. Only an explicit Find
     // Next/Previous is asking to move off it.
-    this.selectMatch(this.nextMatchAt(offset, false))
+    this.selectMatch(this.nextMatchAt(offset, false), false)
   }
 
   private nextMatchAt(offset: number, escapeEmptyMatchAtOffset: boolean): FindMatch | null {
     return this.searchFrom(findNextMatchFrom, offset, { escapeEmptyMatchAtOffset })
   }
 
-  private selectMatch(match: FindMatch | null): boolean {
+  private selectMatch(match: FindMatch | null, committed = true): boolean {
     const host = this.host
     if (!match || !host) return false
 
     if (this.canPaintCurrentDocument()) this.currentMatch = match
-    host.setSelection(match.start, match.end, 'input.findNavigate', { revealOffset: match.end })
+    host.setSelection(match.start, match.end, 'input.findNavigate', findReveal(match, committed))
     if (!this.canPaintCurrentDocument()) return true
     this.updateHighlights()
     this.updateWidget()
@@ -759,18 +783,21 @@ export class EditorFindController {
   private widgetState(): EditorFindWidgetState {
     return {
       ...this.state,
-      matchesCount: this.matches.length,
+      // Between an edit and its re-search the painted matches are what is known.
+      matchesCount: this.highlightsTruncated ? this.totalMatches : this.matches.length,
       matchesPosition: this.currentMatchPosition(),
-      matchesTruncated: this.matchesTruncated,
+      highlightsTruncated: this.highlightsTruncated,
     }
   }
 
-  // Unnumbered when the current match is not among the painted ones, which is
-  // where navigation past the cap goes: the count is over what was painted, and
-  // that set has no place to name for a match beyond it.
+  // Past the paint cap the match is in no list to look it up in, so its place is
+  // the number of matches in front of it.
   private currentMatchPosition(): number {
     if (!this.currentMatch) return 0
-    return findMatchIndex(this.matches, this.currentMatch) + 1
+
+    const painted = findMatchIndex(this.matches, this.currentMatch)
+    if (painted >= 0 || !this.highlightsTruncated) return painted + 1
+    return this.countAll(this.currentMatch.start) + 1
   }
 
   private focusWidget(focus: 'find' | 'replace' | 'none'): void {

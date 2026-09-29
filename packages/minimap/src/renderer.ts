@@ -221,9 +221,12 @@ export class MinimapWorkerRenderer {
     return this.state.layout
   }
 
-  public updateViewport(viewport: MinimapViewport): void {
-    if (!this.state) return
-    this.state.viewport = viewport
+  public updateViewport(viewport: MinimapViewport): MinimapRenderLayout | null {
+    if (!this.state) return null
+    const previous = this.state.layout
+    const next = this.updateLayout(this.state.metrics, viewport)
+    if (!next || (previous && renderLayoutsEqual(previous, next))) return null
+    return next
   }
 
   public render(): RenderResult | null {
@@ -340,11 +343,14 @@ export class MinimapWorkerRenderer {
     const charRenderer = MinimapCharRendererFactory.create(layout.scale, state.styles.fontFamily)
     const useLighterFont = relativeLuminance(state.styles.background) >= 0.5
     const renderBackground = state.styles.background
-    let tokenCursor = this.tokenCursorForOffset(this.lineStartOffset(startLineNumber))
+    let tokenCursor = this.tokenCursorForOffset(
+      this.lineStartOffset(this.documentLineForRasterLine(layout, startLineNumber)),
+    )
 
     for (let line = startLineNumber; line <= endLineNumber; line += 1) {
-      const text = this.lineText(line)
-      const lineStart = this.lineStartOffset(line)
+      const documentLine = this.documentLineForRasterLine(layout, line)
+      const text = this.lineText(documentLine)
+      const lineStart = this.lineStartOffset(documentLine)
       const lineEnd = lineStart + text.length
       const lineTokens = tokensForLineFromCursor(
         state.document.tokens,
@@ -407,9 +413,14 @@ export class MinimapWorkerRenderer {
     context: OffscreenCanvasRenderingContext2D,
   ): void {
     context.clearRect(0, 0, layout.canvasInnerWidth, rasterHeight(layout))
-    this.renderSelectionHighlights(layout, frame, context)
-    this.renderMinimapDecorations(layout, frame, context)
-    this.renderSectionHeaders(layout, frame, context)
+    const lineCount = this.requireState().document.lineStarts.length
+    const decorationLayout = layout.isSampling
+      ? { ...layout, lineHeight: layout.canvasInnerHeight / Math.max(1, lineCount) }
+      : layout
+    const decorationFrame = layout.isSampling ? { ...frame, endLineNumber: lineCount } : frame
+    this.renderSelectionHighlights(decorationLayout, decorationFrame, context)
+    this.renderMinimapDecorations(decorationLayout, decorationFrame, context)
+    this.renderSectionHeaders(decorationLayout, decorationFrame, context)
   }
 
   private renderSelectionHighlights(
@@ -466,6 +477,12 @@ export class MinimapWorkerRenderer {
     const state = this.requireState()
     if (!layout.isSampling) return state.document.lineStarts.length
     return Math.max(1, Math.min(state.document.lineStarts.length, layout.canvasInnerHeight))
+  }
+
+  private documentLineForRasterLine(layout: MinimapRenderLayout, line: number): number {
+    if (!layout.isSampling) return line
+    const count = this.requireState().document.lineStarts.length
+    return Math.floor(((line - 1) * count) / this.minimapLineCount(layout)) + 1
   }
 
   private lineText(lineNumber: number): string {

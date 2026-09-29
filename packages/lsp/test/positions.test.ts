@@ -1,5 +1,5 @@
 import { arrayLspLineStarts } from '../src/workspace'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   createLspContentChanges,
@@ -15,6 +15,36 @@ import {
 } from '../src/index.ts'
 
 describe('LSP position helpers', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it.each([
+    { path: 'full-sync', options: { incremental: false } },
+    { path: 'missing-edits', options: { incremental: true } },
+    {
+      path: 'invalid-edits',
+      options: { incremental: true, edits: [{ from: 9, to: 9, text: 'd' }] },
+    },
+    {
+      path: 'length-mismatch',
+      options: { incremental: true, edits: [{ from: 3, to: 3, text: 'de' }] },
+    },
+  ])('reports $path and serializes the authoritative next snapshot', ({ path, options }) => {
+    const record = vi.fn()
+    vi.stubGlobal('__EDITOR_PERFORMANCE_DIAGNOSTICS__', record)
+    const next = materializingSnapshotDocument('abcd')
+    const read = vi.spyOn(next.textSnapshot, 'readRange')
+    expect(createLspContentChangesInSnapshot(snapshotDocument('abc'), next, options)).toEqual([
+      { text: 'abcd' },
+    ])
+    expect(read.mock.calls.filter(([start, end]) => start === 0 && end === 4)).toHaveLength(1)
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'lsp.contentChanges.path',
+        detail: expect.objectContaining({ path }),
+      }),
+    )
+  })
+
   it('converts offsets and positions in empty text', () => {
     expect(offsetToLspPosition('', 0)).toEqual({ line: 0, character: 0 })
     expect(lspPositionToOffset('', { line: 10, character: 5 })).toBe(0)
@@ -217,7 +247,6 @@ function materializingSnapshotDocument(text: string): LspTextDocumentSnapshot {
   return {
     textSnapshot: {
       length: text.length,
-      materializeFullText: () => text,
       readRange: (start, end) => text.slice(start, end),
       forEachTextChunk: (visit) => visit(text, 0, text.length),
     },
@@ -228,10 +257,13 @@ function materializingSnapshotDocument(text: string): LspTextDocumentSnapshot {
 function throwingFullTextSnapshot(text: string): LspTextSnapshot {
   return {
     length: text.length,
-    materializeFullText: () => {
-      throw new Error('unexpected full text materialization')
+    // Wider than any line-break probe, so only a whole-document read trips it.
+    readRange: (start, end) => {
+      if (start === 0 && end === text.length && text.length > 2) {
+        throw new Error('unexpected full text materialization')
+      }
+      return text.slice(start, end)
     },
-    readRange: (start, end) => text.slice(start, end),
     forEachTextChunk: (visit) => visit(text, 0, text.length),
   }
 }

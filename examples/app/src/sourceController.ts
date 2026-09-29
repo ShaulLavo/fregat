@@ -1,6 +1,11 @@
 import type { Editor } from '@singapore-editor/core/editor'
 import type { DiffPlugin, DiffTextFile } from '@singapore-editor/diff'
-import type { TypeScriptLspDefinitionTarget } from '@singapore-editor/typescript-lsp'
+import {
+  documentUriToFileName,
+  type TypeScriptLspDefinitionTarget,
+  type TypeScriptLspWorkspaceEditRequest,
+  type TypeScriptLspWorkspaceEditResult,
+} from '@singapore-editor/typescript-lsp'
 import type { Sidebar } from './components/sidebar.ts'
 import type { StatusBar } from './components/statusBar.ts'
 import type { TopBar } from './components/topBar.ts'
@@ -14,12 +19,14 @@ import {
 } from './githubSource.ts'
 import { loadCachedSourceSnapshot, saveSourceSnapshotToCache } from './sourceCache.ts'
 import { findSourceFile, firstSourceFile } from './tree.ts'
+import { applyTextEdits, offsetEdits, type OffsetEdit } from './workspaceEdits.ts'
 
 const SELECTED_FILE_KEY = 'editor-selected-file'
 const DEFAULT_SELECTED_FILE = 'README.md'
 
 type SourceWorkspace = {
   setWorkspaceFiles(files: readonly Pick<SourceFile, 'path' | 'text'>[]): void
+  upsertWorkspaceFiles(files: readonly Pick<SourceFile, 'path' | 'text'>[]): void
   clearWorkspaceFiles(): void
 }
 
@@ -91,6 +98,38 @@ export class SourceController {
     return true
   }
 
+  /**
+   * Lands a rename or a code action: the open file through the editor, so it can be undone, and
+   * every other file in the source list, which the language worker is then told about. Every
+   * operation is checked before any lands, so a plan the demo cannot apply changes nothing.
+   */
+  readonly applyWorkspaceEdit = async (
+    request: TypeScriptLspWorkspaceEditRequest,
+  ): Promise<TypeScriptLspWorkspaceEditResult> => {
+    const snapshot = this.currentSnapshot
+    if (!snapshot) return failedEdit('NO_SOURCE', 'No source is loaded to edit.')
+
+    const openEdits: OffsetEdit[] = []
+    const changed = new Map<string, SourceFile>()
+    for (const operation of request.plan.operations) {
+      if (operation.kind !== 'text-document') {
+        return failedEdit('UNSUPPORTED', `The demo cannot ${operation.kind} files.`)
+      }
+      const path = sourcePathForUri(operation.uri)
+      if (path === this.currentSelectedPath) {
+        openEdits.push(...offsetEdits(this.editor.getTextSnapshot(), operation.edits))
+        continue
+      }
+      const file = changed.get(path) ?? findSourceFile(snapshot.files, path)
+      if (!file) return failedEdit('MISSING_FILE', `${path} is not in the source list.`)
+      changed.set(path, { ...file, text: applyTextEdits(file.text, operation.edits) })
+    }
+
+    if (openEdits.length > 0) this.editor.edit(openEdits)
+    this.replaceFiles([...changed.values()])
+    return { status: 'applied' }
+  }
+
   async refreshSource(): Promise<void> {
     if (this.isRefreshingSource) return
 
@@ -155,7 +194,10 @@ export class SourceController {
     })
   }
 
-  private readonly displayFile = (file: SourceFile, reason: 'auto' | 'user'): void => {
+  private readonly displayFile = (listed: SourceFile, reason: 'auto' | 'user'): void => {
+    this.keepActiveFileEdits()
+    // The sidebar holds the file as it was listed; an edit since then lives in the snapshot.
+    const file = findSourceFile(this.currentSnapshot?.files ?? [], listed.path) ?? listed
     this.currentSelectedPath = file.path
     localStorage.setItem(SELECTED_FILE_KEY, file.path)
     this.editor.openDocument({
@@ -166,6 +208,27 @@ export class SourceController {
     if (this.activeView === 'diff') this.configureCurrentLiveDiff()
     if (reason === 'user') this.editor.focus()
     this.updateStatus()
+  }
+
+  /** The file being left keeps its edits, and the worker reads them once the file is closed. */
+  private keepActiveFileEdits(): void {
+    const file = this.currentFile()
+    if (!file || this.editor.getState().documentId !== file.path) return
+
+    const text = this.editor.materializeFullText()
+    if (text !== file.text) this.replaceFiles([{ ...file, text }])
+  }
+
+  private replaceFiles(files: readonly SourceFile[]): void {
+    const snapshot = this.currentSnapshot
+    if (!snapshot || files.length === 0) return
+
+    const byPath = new Map(files.map((file) => [file.path, file]))
+    this.currentSnapshot = {
+      ...snapshot,
+      files: snapshot.files.map((file) => byPath.get(file.path) ?? file),
+    }
+    this.sourceWorkspace?.upsertWorkspaceFiles(files)
   }
 
   private showEditMode(): void {
@@ -224,6 +287,14 @@ export class SourceController {
     this.editor.clearDocument()
     this.updateStatus()
   }
+}
+
+function failedEdit(code: string, message: string): TypeScriptLspWorkspaceEditResult {
+  return { status: 'failed', code, message }
+}
+
+function sourcePathForUri(uri: string): string {
+  return (documentUriToFileName(uri) ?? uri).replace(/^\//, '')
 }
 
 function diffBaseFile(file: SourceFile): DiffTextFile {

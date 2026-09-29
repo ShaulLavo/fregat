@@ -21,4 +21,4 @@ choosing a license, and publishing the initial version are separate operations.
 Tombstones remain required by the current [deleted-anchor contract](../positions/anchors.md).
 Persistent snapshots preserve old text; invisible pieces and reverse-index entries preserve the location
 and bias of deleted anchors in newer snapshots. Removing them is not extraction simplification.
-Any future reclamation must satisfy the independent [E006 ownership plan](../../plans/e006-tombstone-reclamation.md).
+Any future reclamation must satisfy the independent [E006 compaction](e006-tombstone-compaction.md).

@@ -17,31 +17,56 @@ on:
 permissions:
   contents: read
 
+# A second push to a PR branch makes the first run's answer worthless. On main every run finishes,
+# so main always has a verdict; pushes during a run collapse into one pending run of the newest
+# commit, because GitHub keeps one pending run per group.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  verify:
+  # A PR that changes only Markdown under plans or docs, or root Markdown, runs no job below; none
+  # of it is built, typechecked or tested. Other files there are data tests read (stress#test reads
+  # docs/performance), and package READMEs are code too: tests read them. Main runs
+  # everything: collapsed pending runs mean one run's diff is not everything since the last verdict.
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ github.event_name != 'pull_request' || steps.filter.outputs.code == 'true' }}
+    steps:
+      - name: Classify changed files
+        id: filter
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          predicate-quantifier: some-with-excludes
+          filters: |
+            code:
+              - '**'
+              - '!plans/**/*.md'
+              - '!docs/**/*.md'
+              - '!*.md'
+
+  # Three jobs side by side: checks, core's tests, and every other package's tests.
+  check:
+    name: Typecheck, lint, catalog
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup
+        uses: ./.github/actions/setup
 
-      # `bun run test` runs each package's `vitest run`, and vitest's bin is a Node script — so the
-      # tests execute on Node, not on Bun, and the runner's default Node is older than this repo
-      # assumes. `packages/find` uses RegExp modifier groups (`(?s:a.b)`), which V8 only gained
-      # recently, so without this the suite fails on a feature the code legitimately relies on.
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      - name: Check turbo inputs
+        run: bun scripts/check-turbo-inputs.mjs
 
       - name: Check native language catalog
         run: bun run --cwd packages/tree-sitter-languages languages:generate -- --check
@@ -52,20 +77,136 @@ jobs:
       - name: Lint
         run: bun run lint
 
+      # Every save carries the restored entries forward, so entries written over three days ago go;
+      # one still in use is rebuilt once.
+      - name: Prune turbo cache
+        if: ${{ always() }}
+        run: find .turbo/cache -type f -mtime +3 -delete 2>/dev/null || true
+
+  core:
+    name: Test (core)
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Playwright version
+        id: playwright
+        working-directory: packages/editor
+        run: echo "version=$(./node_modules/.bin/playwright --version | cut -d ' ' -f 2)" >> "$GITHUB_OUTPUT"
+
+      # Browsers are a download per Playwright release; the OS libraries still come from apt.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-${{ github.job }}
+
       # Browser projects check geometry and CSS behavior that happy-dom cannot reproduce.
       # Run the workspace's own Playwright, not `bunx playwright` — bare `bunx` fetches the latest
-      # from the registry, which downloads browsers into a revision directory the pinned 1.60.0
+      # from the registry, which downloads browsers into a revision directory the pinned version
       # does not look in, so the install "succeeds" and the launch still fails.
       #
-      # Both browsers, deliberately: vitest browser mode runs `headless: true`, which launches
-      # `chrome-headless-shell`, a separate download from `chromium`.
-      - name: Install Playwright Chromium
+      # Chromium and its headless shell, deliberately: vitest browser mode runs `headless: true`,
+      # which launches `chrome-headless-shell`, a separate download from `chromium`. Firefox and
+      # WebKit are for core's highlight-paint project only.
+      - name: Install Playwright browsers
         working-directory: packages/editor
-        run: ./node_modules/.bin/playwright install --with-deps chromium chromium-headless-shell
+        run: ./node_modules/.bin/playwright install --with-deps chromium chromium-headless-shell firefox webkit
+
+      - name: Test
+        run: bun run test -- --filter=@singapore-editor/core
+
+      - name: Prune turbo cache
+        if: ${{ always() }}
+        run: find .turbo/cache -type f -mtime +3 -delete 2>/dev/null || true
+
+  packages:
+    name: Test (packages)
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Playwright version
+        id: playwright
+        working-directory: packages/editor
+        run: echo "version=$(./node_modules/.bin/playwright --version | cut -d ' ' -f 2)" >> "$GITHUB_OUTPUT"
+
+      # Browsers are a download per Playwright release; the OS libraries still come from apt.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-${{ github.job }}
+
+      - name: Install Playwright browsers
+        working-directory: packages/editor
+        run: ./node_modules/.bin/playwright install --with-deps chromium chromium-headless-shell firefox webkit
+
+      # The worker test imports built packages; turbo replays the build from the cache.
+      - name: Build packages
+        run: bun run build -- --filter='./packages/*'
 
       - name: Test tree-sitter browser worker
         run: bun run --cwd packages/tree-sitter test:browser
 
-      # Serial package execution keeps browser processes within the runner's capacity.
-      - name: Test
-        run: bun run test -- --concurrency=1
+      # Each Vitest process sizes its worker pool for the whole runner. Serialize packages
+      # so cache misses cannot multiply those pools and starve CPU-heavy tests.
+      - name: Test (no browser)
+        run: >-
+          bun run test -- --concurrency=1
+          --filter=@singapore-editor/decode
+          --filter=@singapore-editor/diff
+          --filter=@singapore-editor/gutters
+          --filter=@singapore-editor/lsp
+          --filter=@singapore-editor/lsp-plugin
+          --filter=@singapore-editor/markdown
+          --filter=@singapore-editor/panes
+          --filter=@singapore-editor/textbuffer
+          --filter=@singapore-editor/tree-sitter-languages
+          --filter=@singapore-editor/typescript-lsp
+
+      - name: Test (browser)
+        if: ${{ !cancelled() }}
+        run: >-
+          bun run test -- --concurrency=1
+          --filter=!@singapore-editor/core
+          --filter=!@singapore-editor/decode
+          --filter=!@singapore-editor/diff
+          --filter=!@singapore-editor/gutters
+          --filter=!@singapore-editor/lsp
+          --filter=!@singapore-editor/lsp-plugin
+          --filter=!@singapore-editor/markdown
+          --filter=!@singapore-editor/panes
+          --filter=!@singapore-editor/textbuffer
+          --filter=!@singapore-editor/tree-sitter-languages
+          --filter=!@singapore-editor/typescript-lsp
+
+      - name: Prune turbo cache
+        if: ${{ always() }}
+        run: find .turbo/cache -type f -mtime +3 -delete 2>/dev/null || true
+
+  # The one status to read: red when any job failed or was cancelled; a job skipped because the
+  # change cannot affect it counts as passed.
+  verdict:
+    name: CI
+    needs: [changes, check, core, packages]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verdict
+        env:
+          FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: test "$FAILED" = false

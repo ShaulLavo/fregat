@@ -521,3 +521,20 @@ describe('theme application', () => {
     expect(element.style.getPropertyValue('--editor-background')).toBe('')
   })
 })
+
+it('applies and clears selection and popup colors through the public theme', () => {
+  const editor = mountEditor()
+  editor.setTheme({
+    selectionColor: '#123456',
+    inactiveSelectionColor: '#234567',
+    popupBackgroundColor: '#345678',
+  })
+  expect(editorRoot().style.getPropertyValue('--editor-selection-background')).toBe('#123456')
+  expect(editorRoot().style.getPropertyValue('--editor-selection-inactive-background')).toBe(
+    '#234567',
+  )
+  expect(editorRoot().style.getPropertyValue('--editor-popup-background')).toBe('#345678')
+  editor.setTheme({})
+  expect(editorRoot().style.getPropertyValue('--editor-selection-background')).toBe('')
+  expect(editorRoot().style.getPropertyValue('--editor-popup-background')).toBe('')
+})

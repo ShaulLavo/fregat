@@ -1,3 +1,10 @@
+export { synchronizeLanguageServerBuffer } from './bufferSync'
+export {
+  createLanguageServerDocument,
+  LanguageServerDocument,
+  type LanguageServerDocumentOptions,
+} from './document'
+export type { LanguageServerDocumentPluginOptions, LanguageServerDocumentSnapshot } from './types'
 export {
   createLanguageServerAdapterPlugin,
   createLanguageServerPlugin,
@@ -37,6 +44,7 @@ export {
   type LspConnectionLease,
   type LspConnectionOptions,
   type LspConnectionProvider,
+  type LspReconnectOptions,
   type LspConnectionTransportFactory,
 } from './lspConnection'
 export {
@@ -45,9 +53,11 @@ export {
   type LanguageServerDocumentUriTransition,
 } from './documentSyncController'
 export {
+  combineDiagnosticsFreshness,
   diagnosticHighlightGroups,
   summarizeDiagnostics,
   type LanguageServerDiagnosticHighlightGroups,
+  type LanguageServerDiagnosticHighlightLayer,
   type LanguageServerDiagnosticSeverity,
 } from './diagnostics'
 export { viewDocumentSnapshot } from './viewDocumentSnapshot'
@@ -75,10 +85,13 @@ export type {
   ApplyWorkspaceEditRequest,
   ApplyWorkspaceEditResult,
   LanguageServerDiagnosticCounts,
+  LanguageServerDiagnosticActionContext,
+  LanguageServerDiagnosticActions,
   LanguageServerDiagnosticMarkerClaim,
   LanguageServerDiagnosticMarkerEvent,
   LanguageServerDefinitionTarget,
   LanguageServerDiagnosticSummary,
+  LanguageServerDiagnosticsFreshness,
   LanguageServerDocumentSyncOptions,
   LanguageServerNavigationKind,
   LanguageServerNavigationOpenMode,

@@ -58,14 +58,13 @@ See [`pieceTableTypes.ts`](src/pieceTableTypes.ts).
 
 Each node holds one piece and summaries of its subtree:
 
-| Field                                | Meaning                                                        |
-| ------------------------------------ | -------------------------------------------------------------- |
-| `subtreeOriginalLength`              | Length of the original buffer's pieces, deleted ones included. |
-| `subtreeVisibleLength`               | Length of the visible text.                                    |
-| `subtreePieces`                      | Number of stored pieces.                                       |
-| `subtreeLineBreaks`                  | Number of visible line breaks.                                 |
-| `subtreeMinOrder`, `subtreeMaxOrder` | The subtree's order range.                                     |
-| `subtreeMinBuffer`                   | The oldest buffer id in the subtree.                           |
+| Field                   | Meaning                                                        |
+| ----------------------- | -------------------------------------------------------------- |
+| `subtreeOriginalLength` | Length of the original buffer's pieces, deleted ones included. |
+| `subtreeVisibleLength`  | Length of the visible text.                                    |
+| `subtreePieces`         | Number of stored pieces.                                       |
+| `subtreeLineBreaks`     | Number of visible line breaks.                                 |
+| `subtreeMinBuffer`      | The oldest buffer id in the subtree.                           |
 
 Offset lookups use visible lengths to choose a branch. Line lookups use line-break counts. Anchor resolution descends by order, by original length for an anchor in the original text, and by oldest buffer to find the edges of a deleted piece's gap.
 
@@ -77,7 +76,7 @@ See [`tree.ts`](src/tree.ts), [`join.ts`](src/join.ts), [`node.ts`](src/node.ts)
 
 ### Why an AVL tree?
 
-Deleted text stays in the tree as tombstones, so **the sequence tree only ever grows**. An edit therefore needs no split and no merge. An insert descends once, places its pieces beside or inside the landing piece, and rejoins each node on the way back up. A delete descends once, hides the range in place, and cuts only the two pieces its ends fall inside. Each rejoin is a `join` of two subtrees whose heights differ by at most two, which is a constant number of rotations. An edit path-copies one root-to-leaf path and nothing else.
+Deleted text stays in the tree as tombstones, so **an edit never removes a piece**; only [maintenance](#compaction) shrinks the tree. An edit therefore needs no split and no merge. An insert descends once, places its pieces beside or inside the landing piece, and rejoins each node on the way back up. A delete descends once, hides the range in place, and cuts only the two pieces its ends fall inside. Each rejoin is a `join` of two subtrees whose heights differ by at most two, which is a constant number of rotations. An edit path-copies one root-to-leaf path and nothing else.
 
 The tree was a treap until [E040](../../docs/performance/e040-balanced-tree.md). That measurement compared the treap, AVL and weight-balanced trees, each edited through split and join and through one descent. The balance rule barely mattered; a balanced tree driven through split and join was slower than the treap, and the one-descent edits were a quarter to a third faster under either rule. AVL was marginally ahead and its invariant is the simpler one to validate.
 
@@ -85,7 +84,7 @@ The tree was a treap until [E040](../../docs/performance/e040-balanced-tree.md).
 
 An anchor names a buffer and an offset in it. Resolving one means finding the piece that holds that offset, and then that piece's place in the document. Two facts make this cheap:
 
-- **A buffer's pieces keep their buffer order in the document.** Pieces are cut and hidden, never moved or dropped.
+- **A buffer's pieces keep their buffer order in the document.** Pieces are cut and hidden, never moved. Compaction drops tombstones, and their entries then lead to a stand-in.
 - **Whatever sits between two pieces of one buffer is newer than they are.** It was inserted into that buffer's text, so its buffer id is larger.
 
 **The original buffer needs no index.** Its pieces tile the original text in document order, so `subtreeOriginalLength` is a prefix sum over original offsets. One descent finds the piece holding an original offset and the visible length before it. This is the buffer that random edits cut, so those cuts write nothing.
@@ -94,7 +93,7 @@ An anchor names a buffer and an offset in it. Resolving one means finding the pi
 
 A slot holds **the order of the buffer's only piece**, or a small AVL tree of `start → order` once the buffer has been cut. It holds nothing else. Visibility and length live on the piece in the sequence tree, where the descent by order finds them, so hiding a piece and typing onto the end of one change no entry. Only a new key writes: inserted text, and the later parts of a cut in an inserted buffer.
 
-A relabel changes every order, so the index is rebuilt from one walk of the tree. `resolveAnchorLinear` is the reference: it uses no index and no summaries, only the pieces in order. The inspector checks the two facts above, one entry per inserted piece, and each entry's order.
+A relabel changes every order, so the index is rebuilt from one walk of the tree, and the entries that lead to stand-ins are carried over from the index before it. `resolveAnchorLinear` is the reference: it uses no summaries and only the pieces in order, asking the index only where a compacted anchor's stand-in is. The inspector checks the two facts above, one entry per inserted piece or stand-in, and each entry's order.
 
 [E039](../../docs/performance/e039-reverse-index-cost.md) records the measurements behind this. Until then the index was a second AVL tree keyed by `(buffer, start)` whose entries mirrored whole pieces. An insert copied 20 of its nodes against 10 in the sequence tree, and a keystroke rewrote its deepest entry. A per-buffer tree inside the vector, the design first planned, kept the original buffer's tree and was within 7% of that baseline on random edits. Deferring the writes to the first resolution was not built: an editor resolves its selections after every edit, so there would be nothing to batch.
 
@@ -134,7 +133,7 @@ This example shows shared and copied nodes. The resulting shape depends on the e
 
 **One call, one pass:** every edit of a call writes with one epoch, the reverse index is written once at the end, and only the final snapshot exists. A replacement hides its range and places its text on the same descent.
 
-**Insert:** descend to the offset. Extend the newest append piece if it ends there. Otherwise fill or open chunks, assign orders, place the pieces at the landing, cutting its piece in two if the offset is inside it, and append the new buffers to the reverse index.
+**Insert:** descend to the last visible piece ending at the offset, so text never lands between two tombstones. Extend the newest append piece if it ends there. Otherwise fill or open chunks, assign orders, place the pieces at the landing, cutting its piece in two if the offset is inside it, and append the new buffers to the reverse index.
 
 **Delete:** descend over the range, mark the pieces inside it invisible in place, and cut the pieces its two ends fall inside. Only a cut inside an inserted buffer touches the reverse index.
 
@@ -182,11 +181,19 @@ resolveAnchor(replaced, right) // { offset: 3, liveness: 'deleted' }
 resolveAnchor(original, right) // { offset: 1, liveness: 'live' }
 ```
 
-A deleted piece's gap reaches, on each side, to the nearest piece whose buffer is no newer than its own: another part of the same insert, or text that was already there when it was inserted. Everything between arrived later. A left-biased anchor resolves before that later text and a right-biased one after it, wherever the text landed among the tombstones. `Anchor.MIN` and `Anchor.MAX` always resolve to the document's ends.
+A deleted piece's gap reaches, on each side, to the nearest piece whose buffer is no newer than its own: another part of the same insert, or text that was already there when it was inserted. Everything between arrived later. A left-biased anchor resolves before that later text and a right-biased one after it. An insert lands after the last visible piece ending at its offset and a replacement where its hidden text began, so neither goes between two tombstones and the result never depends on the tree's shape. `Anchor.MIN` and `Anchor.MAX` always resolve to the document's ends.
 
 Use anchors within the document history that created them. Branches can reuse sequence-based buffer IDs. Cross-branch merging needs its own identity and merge rules.
 
 See [`anchors.ts`](src/anchors.ts) and [`pieceTable.test.ts`](src/pieceTable.test.ts).
+
+### Compaction
+
+A run of adjacent tombstones only answers where a deleted anchor's gap scan stops. Since no text ever lands inside the run, each scan can stop in only a few ways a later edit can tell apart: inside the run, at a visible piece, inside another run, or past a document end. `compactTombstones` replaces each run with one tombstone per way both scans end, and leads the dropped tombstones' reverse-index entries to them. These **stand-ins** hold no text, and their buffer field is a threshold rather than an id. Original tombstones merge but stay pieces, because original anchors are found by summing their lengths. Every arrangement is checked against the run before it is published, and a run that fails is kept.
+
+Every anchor resolves exactly as it did, in the compacted snapshot and in every snapshot edited from it. The snapshot object, its text and its visible pieces stay the same. A differential test holds an uncompacted control beside every compaction. The editor runs the pass on its current snapshot during quiet time; history keeps the trees it recorded until it moves past them. What still grows with edit count is a reverse-index slot and a chunk-map entry per insertion ever made, about 22 bytes together, and a table row per stand-in identity. See the [E006 report](../../docs/storage/e006-tombstone-compaction.md).
+
+See [`compaction.ts`](src/compaction.ts).
 
 ## Text and positions
 
@@ -255,7 +262,7 @@ See [`reads.ts`](src/reads.ts), [`walker.ts`](src/walker.ts), and [`diff.ts`](sr
 
 Tree work depends on the number of stored pieces, including tombstones, and the tree height. Keeping a snapshot reference is constant-time. Keeping versions retains their nodes and caches; the buffer log is shared, and a version keeps only the extent it can see.
 
-Deletion visits the affected pieces. Order-gap exhaustion relabels the tree and rebuilds the reverse index. A cold line index scans its source string. Tombstones and their text remain in the current snapshot even after older undo entries are dropped.
+Deletion visits the affected pieces. Order-gap exhaustion relabels the tree and rebuilds the reverse index. A cold line index scans its source string. Tombstones stay in a snapshot until maintenance compacts them; older snapshots keep theirs.
 
 The inspector checks buffer bounds, the store extent, order labels, balance, subtree totals, newline indexes, the order of each buffer's pieces, and agreement between the tree and the reverse index:
 

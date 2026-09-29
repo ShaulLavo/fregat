@@ -73,7 +73,7 @@ export type EditorSyntaxServiceRequest = {
   readonly requestedRanges: readonly EditorSyntaxRange[]
   readonly snapshot: PieceTableSnapshot
   readonly snapshotTag: EditorSyntaxSnapshotTag
-  readonly textSnapshot?: DocumentTextSnapshot
+  readonly textSnapshot: DocumentTextSnapshot
 }
 
 export type EditorSyntaxProjectionTag = {
@@ -110,7 +110,13 @@ export type EditorSyntaxDegradedState =
       readonly message: string
     }
 
+export type EditorSyntaxRecords = {
+  readonly languageId: EditorSyntaxLanguageId
+  readonly data: Uint32Array
+}
+
 export type EditorSyntaxResult = {
+  readonly records?: EditorSyntaxRecords
   readonly captures: readonly EditorSyntaxCapture[]
   readonly folds: readonly FoldRange[]
   readonly brackets: readonly BracketInfo[]
@@ -136,8 +142,7 @@ export type EditorSyntaxSessionOptions = {
   readonly includeHighlights?: boolean
   readonly includeCaptures?: boolean
   readonly syntaxMode?: 'full' | 'range'
-  readonly fullText: string
-  readonly textSnapshot?: DocumentTextSnapshot
+  readonly textSnapshot: DocumentTextSnapshot
   readonly snapshot: PieceTableSnapshot
 }
 
@@ -157,7 +162,7 @@ export type EditorSyntaxFoldingSupport = 'pending' | 'supported' | 'unsupported'
 
 export type EditorSyntaxSession = {
   readonly foldingSupport: EditorSyntaxFoldingSupport
-  refresh(snapshot: PieceTableSnapshot, fullText?: string): Promise<EditorSyntaxResult>
+  refresh(textSnapshot: DocumentTextSnapshot): Promise<EditorSyntaxResult>
   applyChange(change: DocumentSessionChange): Promise<EditorSyntaxResult>
   canQueryRange?(): boolean
   queryRange?(range: EditorSyntaxRange): Promise<EditorSyntaxResult>

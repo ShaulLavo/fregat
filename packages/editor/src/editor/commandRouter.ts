@@ -1,5 +1,7 @@
-import type { EditorCommandHandler, EditorDisposable } from '../plugins'
+import type { EditorCommandHandler } from '../plugins'
+import type { EditorDisposable } from './disposables'
 import type { EditorCommandContext, EditorCommandId } from './commands'
+import { isEditorCommandId, type EditorAnyCommandId } from './commandCatalog'
 import {
   isEditorDocumentSelectionEditCommand,
   type EditorDocumentSelectionEditCommandId,
@@ -11,6 +13,7 @@ import { isEditorInlineSuggestCommand, type EditorInlineSuggestCommandId } from 
 export type EditorCommandRouterHandlers = {
   history(command: 'undo' | 'redo', context: EditorCommandContext): boolean
   cursorHistory(command: 'undo' | 'redo', context: EditorCommandContext): boolean
+  jumpHistory(command: 'back' | 'forward', context: EditorCommandContext): boolean
   delete(direction: 'backward' | 'forward', context: EditorCommandContext): boolean
   indent(direction: 'indent' | 'outdent', context: EditorCommandContext): boolean
   editAction(
@@ -35,13 +38,15 @@ export type EditorCommandRouterHandlers = {
 }
 
 export class EditorCommandRouter {
-  private readonly commandHandlers = new Map<EditorCommandId, EditorCommandHandler>()
+  private readonly commandHandlers = new Map<EditorAnyCommandId, EditorCommandHandler>()
 
   constructor(private readonly handlers: EditorCommandRouterHandlers) {}
 
-  dispatch(command: EditorCommandId, context: EditorCommandContext = {}): boolean {
+  dispatch(command: EditorAnyCommandId, context: EditorCommandContext = {}): boolean {
     const registeredResult = this.runRegisteredCommand(command, context)
     if (registeredResult === true) return true
+    // A contributed command has only the handler its plugin registered.
+    if (!isEditorCommandId(command)) return registeredResult ?? false
     // Escape spells one intention — put back whatever the last thing was — and arrives here as the
     // find command because that is what claims the key. Collapsing a run of cursors is the other
     // thing it has to be able to undo, and asking whether anything answered for find first is the
@@ -51,6 +56,8 @@ export class EditorCommandRouter {
 
     if (command === 'undo') return this.handlers.history('undo', context)
     if (command === 'redo') return this.handlers.history('redo', context)
+    if (command === 'jumpBack') return this.handlers.jumpHistory('back', context)
+    if (command === 'jumpForward') return this.handlers.jumpHistory('forward', context)
     if (command === 'cursorUndo') return this.handlers.cursorHistory('undo', context)
     if (command === 'cursorRedo') return this.handlers.cursorHistory('redo', context)
     if (command === 'selectAll') return this.handlers.selectAll(context)
@@ -96,7 +103,7 @@ export class EditorCommandRouter {
   }
 
   registerCommandHandler(
-    command: EditorCommandId,
+    command: EditorAnyCommandId,
     handler: EditorCommandHandler,
   ): EditorDisposable {
     if (this.commandHandlers.has(command)) {
@@ -110,14 +117,17 @@ export class EditorCommandRouter {
     }
   }
 
-  private unregisterCommandHandler(command: EditorCommandId, handler: EditorCommandHandler): void {
+  private unregisterCommandHandler(
+    command: EditorAnyCommandId,
+    handler: EditorCommandHandler,
+  ): void {
     if (this.commandHandlers.get(command) !== handler) return
 
     this.commandHandlers.delete(command)
   }
 
   private runRegisteredCommand(
-    command: EditorCommandId,
+    command: EditorAnyCommandId,
     context: EditorCommandContext,
   ): boolean | null {
     return this.commandHandlers.get(command)?.(context) ?? null

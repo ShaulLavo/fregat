@@ -12,12 +12,10 @@
   justify-content: center;
   line-height: 1;
   padding: 0;
-  pointer-events: auto;
 }
 
 .editor-virtualized-fold-toggle[hidden] {
   display: inline-flex;
-  pointer-events: none;
   visibility: hidden;
 }
 

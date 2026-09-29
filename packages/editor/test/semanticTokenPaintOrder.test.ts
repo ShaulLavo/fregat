@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { snapshotText } from './factories/snapshotText'
 
 import type {
   EditorViewContributionContext,
@@ -20,6 +21,7 @@ import {
   treeSitterCapturesToEditorTokens,
 } from '../src/syntax'
 import { type VirtualizedTextHighlightRegistry, VirtualizedTextView } from '../src/virtualization'
+import { createTestViewContributionContext } from '../src/testContexts'
 
 /**
  * The semantic layer over a real mounted view, in the harness the house already uses for "which
@@ -90,25 +92,16 @@ function viewContext(
   view: VirtualizedTextView,
   container: HTMLElement,
 ): EditorViewContributionContext {
-  return {
+  return createTestViewContributionContext({
     container,
     scrollElement: container as HTMLDivElement,
     contentElement: view.contentElement,
     highlightPrefix: 'test-',
-    hasDocument: () => true,
     getSnapshot: () => snapshot(),
-    requestViewUpdate: () => undefined,
-    revealLine: vi.fn(),
-    focusEditor: vi.fn(),
-    setSelection: vi.fn(),
-    setSelections: vi.fn(),
-    setScrollTop: vi.fn(),
-    reserveOverlayWidth: vi.fn(),
     textOffsetFromPoint: vi.fn(() => 0),
-    getRangeClientRect: vi.fn(() => null),
     setRangeHighlight: (name, ranges, style) => view.setRangeHighlight(name, ranges, style),
     clearRangeHighlight: (name) => view.clearRangeHighlight(name),
-  }
+  })
 }
 
 function snapshot(): EditorViewSnapshot {
@@ -138,7 +131,7 @@ function snapshot(): EditorViewSnapshot {
     documentId: 'src/index.ts',
     documentSyncPoint: TEST_DOCUMENT_SYNC_POINT,
     languageId: 'typescript',
-    fullText: TEXT,
+    ...snapshotText(TEXT),
     textVersion: 1,
     initialHighlightStatus: 'painted',
     syntaxStatus: 'ready',
@@ -152,7 +145,7 @@ function snapshot(): EditorViewSnapshot {
     contentWidth: 0,
     totalHeight: 0,
     gutterWidth: 0,
-    gutterLayout: { fixedWidth: 0, lanes: [] },
+    gutterLayout: { leadingInset: 0, fixedWidth: 0, lanes: [] },
     tabSize: 4,
     foldMarkers: [],
     visibleRows: rows,
@@ -165,9 +158,6 @@ function snapshot(): EditorViewSnapshot {
       clientHeight: 0,
       clientWidth: 0,
       visibleRange: { start: 0, end: 3 } as EditorViewSnapshot['viewport']['visibleRange'],
-    },
-    toJSON() {
-      throw new Error('not used by this fixture')
     },
     toVisibleSnapshot() {
       return null

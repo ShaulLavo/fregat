@@ -21,6 +21,7 @@ type SharedTokenGroup = {
 // `styleKey` per document, so mounting an editor whose styles already exist costs nothing.
 const sharedByDocument = new WeakMap<Document, SharedTokenHighlights>()
 let nextSharedTokenId = 0
+export const SHARED_TOKEN_HIGHLIGHT_PREFIX = 'editor-shared-token-'
 
 export function getSharedTokenHighlights(
   doc: Document,
@@ -53,7 +54,7 @@ export class SharedTokenHighlights {
       return { name: existing.name, highlight: existing.highlight }
     }
 
-    const name = `editor-shared-token-${nextSharedTokenId++}`
+    const name = `${SHARED_TOKEN_HIGHLIGHT_PREFIX}${nextSharedTokenId++}`
     const highlight = new Highlight()
     const group: SharedTokenGroup = { name, highlight, rule: buildHighlightRule(name, style) }
     this.#groups.set(styleKey, group)

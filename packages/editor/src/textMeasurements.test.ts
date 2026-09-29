@@ -1,4 +1,13 @@
-import { getDocumentTextSourceIndex } from './documentTextSourceCache'
+import { TextPageOwner, TextPageRegistry } from '@singapore-editor/textbuffer/internal/textPages'
+import { appendDocumentTextMeasurements } from './documentTextSourceCache'
+import { bufferSpanAt } from '@singapore-editor/textbuffer/internal/buffers'
+import { reclaimSnapshotStorage } from '@singapore-editor/textbuffer/internal/reclamation'
+import {
+  createPieceTableSnapshot,
+  insertIntoPieceTable,
+  deleteFromPieceTable,
+  type PieceTableSnapshot,
+} from '@singapore-editor/textbuffer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { bufferColumnToVisualColumn, visualColumnToBufferColumn } from './displayTransforms'
 import { createDocumentTextSnapshot, measureTextSnapshotRange } from './documentTextSnapshot'
@@ -9,6 +18,7 @@ import {
   TextMeasurements,
   TextSourceIndex,
   type ColumnMode,
+  type MeasuredTextRange,
 } from './textMeasurements'
 import {
   estimatedColumnToBufferColumn,
@@ -28,10 +38,125 @@ const texts = [
 ]
 const modes: readonly ColumnMode[] = ['utf16', 'estimated']
 const biases = ['before', 'after', 'nearest'] as const
+const SOURCE_PAGE_LENGTH = 16 * 1024
 
 afterEach(() => vi.unstubAllGlobals())
 
+function originalSource(snapshot: PieceTableSnapshot): TextSourceIndex {
+  const span = bufferSpanAt(snapshot.buffers, snapshot.buffers.original, 0)
+  const ranges: MeasuredTextRange[] = []
+  appendDocumentTextMeasurements(
+    ranges,
+    span.owner,
+    span.text,
+    0,
+    Math.min(SOURCE_PAGE_LENGTH, span.text.length),
+  )
+  return ranges[0]!.source
+}
+
 describe('indexed text measurements', () => {
+  it('keeps a measured sparse source through reclamation of a distant span', () => {
+    const original = createPieceTableSnapshot('x'.repeat(200000))
+    const first = deleteFromPieceTable(original, 90000, 10)
+    Array.from(reclaimSnapshotStorage([first]))
+    const measured = originalSource(first)
+    measured.range(0, SOURCE_PAGE_LENGTH, 4)
+    const second = deleteFromPieceTable(first, 180000, 10)
+    Array.from(reclaimSnapshotStorage([second]))
+    expect(originalSource(second)).toBe(measured)
+  })
+
+  it('borrows bounded measurement ranges across physical page boundaries', () => {
+    const text = 'x'.repeat(SOURCE_PAGE_LENGTH - 1) + '\ud834\udd1e\t' + 'y'.repeat(100_000)
+    const owner = new TextPageOwner(new TextPageRegistry())
+    const ranges: MeasuredTextRange[] = []
+    appendDocumentTextMeasurements(
+      ranges,
+      owner,
+      text,
+      SOURCE_PAGE_LENGTH - 6,
+      SOURCE_PAGE_LENGTH + 14,
+    )
+    expect(ranges).toHaveLength(2)
+    expect(ranges.map((range) => range.source.text.length)).toEqual([6, 14])
+    expect(ranges.every((range) => range.source.text.storageLength === text.length)).toBe(true)
+    checkMeasurements(
+      text.slice(SOURCE_PAGE_LENGTH - 6, SOURCE_PAGE_LENGTH + 14),
+      new TextMeasurements(ranges),
+    )
+    expect(ranges.every((range) => range.source.text.storageLength === text.length)).toBe(true)
+    const overlapping: MeasuredTextRange[] = []
+    appendDocumentTextMeasurements(
+      overlapping,
+      owner,
+      text,
+      SOURCE_PAGE_LENGTH,
+      SOURCE_PAGE_LENGTH + 14,
+    )
+    expect(overlapping[0]!.source).toBe(ranges[1]!.source)
+  })
+
+  it('measures only visible fragments when survivors share one physical page', () => {
+    const text = 'x'.repeat(SOURCE_PAGE_LENGTH)
+    const owner = new TextPageOwner(new TextPageRegistry())
+    const ranges: MeasuredTextRange[] = []
+    for (let start = 0; start < text.length; start += 1024)
+      appendDocumentTextMeasurements(ranges, owner, text, start, start + 64)
+    expect(ranges.reduce((total, range) => total + range.source.text.length, 0)).toBe(1024)
+    expect(new TextMeasurements(ranges).columnAt(1024, 4, 'estimated')).toBe(1024)
+  })
+
+  it('reuses both sides of an insertion while bounding cached range variants', () => {
+    const text = 'x'.repeat(SOURCE_PAGE_LENGTH)
+    const owner = new TextPageOwner(new TextPageRegistry())
+    const first: MeasuredTextRange[] = []
+    appendDocumentTextMeasurements(first, owner, text, 0, 100)
+    appendDocumentTextMeasurements(first, owner, text, 100, text.length)
+    const repeated: MeasuredTextRange[] = []
+    appendDocumentTextMeasurements(repeated, owner, text, 0, 100)
+    appendDocumentTextMeasurements(repeated, owner, text, 100, text.length)
+    expect(repeated[0]!.source).toBe(first[0]!.source)
+    expect(repeated[1]!.source).toBe(first[1]!.source)
+    const replacement: MeasuredTextRange[] = []
+    appendDocumentTextMeasurements(replacement, owner, text, 200, 300)
+    appendDocumentTextMeasurements(replacement, owner, text, 0, 100)
+    expect(replacement[1]!.source).not.toBe(first[0]!.source)
+    expect(new TextMeasurements(first).columnAt(text.length, 4, 'estimated')).toBe(text.length)
+  })
+
+  it('releases a wrapper cache generation while preserving previously returned measurements', () => {
+    const original = createPieceTableSnapshot('a'.repeat(4096) + '\t😀tail')
+    const current = deleteFromPieceTable(original, 0, 4000)
+    const wrapper = createDocumentTextSnapshot(current)
+    const before = measureTextSnapshotRange(wrapper, 0, current.length)
+    const text = wrapper.materializeFullText()
+    const job = reclaimSnapshotStorage([current])
+    while (!job.next().done) {
+      // Publication preserves the wrapper, but retires its old cache generation.
+    }
+    const after = measureTextSnapshotRange(wrapper, 0, current.length)
+    expect(after).not.toBe(before)
+    checkMeasurements(text, before)
+    checkMeasurements(text, after)
+  })
+
+  it('keeps cached Unicode roots correct when borrowed pages move during reclamation', () => {
+    const original = createPieceTableSnapshot('x'.repeat(40_000) + '𝄞\tשלוםe\u0301end')
+    const wrapper = createDocumentTextSnapshot(original)
+    const before = measureTextSnapshotRange(wrapper, 39_998, original.length)
+    const sliced = before.slice(1, before.length - 1)
+    const text = wrapper.readRange(39_998, original.length)
+    checkMeasurements(text, before)
+    const current = deleteFromPieceTable(original, 0, 40_000)
+    const job = reclaimSnapshotStorage([current])
+    while (!job.next().done) {
+      // Existing roots read the relocated page rather than capturing its old string.
+    }
+    checkMeasurements(text, before)
+    checkMeasurements(text.slice(1, -1), sliced)
+  })
+
   it('matches scalar columns and inverse biases across tabs, controls, and Unicode', () => {
     for (const text of texts) checkMeasurements(text, measureString(text))
   })
@@ -66,22 +191,12 @@ describe('indexed text measurements', () => {
     const session = createEditorBufferSession(buffer)
     const first = measureTextSnapshotRange(buffer.getTextSnapshot(), 0, original.length)
     expect(first.columnAt(original.length, 4, 'utf16')).toBe(original.length)
-    const source = getDocumentTextSourceIndex(
-      buffer.getSnapshot().buffers,
-      buffer.getSnapshot().buffers.original,
-      original,
-    )
+    const source = originalSource(buffer.getSnapshot())
     session.applyEdits([{ from: 0, to: 0, text: '😀\t' }])
     const changed = measureTextSnapshotRange(buffer.getTextSnapshot(), 0, original.length + 3)
     expect(measureTextSnapshotRange(buffer.getTextSnapshot(), 0, original.length + 3)).toBe(changed)
     expect(changed.columnAt(original.length + 3, 4, 'estimated')).toBe(original.length + 4)
-    expect(
-      getDocumentTextSourceIndex(
-        buffer.getSnapshot().buffers,
-        buffer.getSnapshot().buffers.original,
-        original,
-      ),
-    ).toBe(source)
+    expect(originalSource(buffer.getSnapshot())).toBe(source)
     session.undo()
     session.applyEdits([{ from: 0, to: 0, text: 'ab\t' }])
     const branched = measureTextSnapshotRange(buffer.getTextSnapshot(), 0, original.length + 3)
@@ -93,7 +208,34 @@ describe('indexed text measurements', () => {
     expect(
       measureTextSnapshotRange(restoredWrapper, 0, original.length + 3).columnAt(3, 4, 'utf16'),
     ).toBe(4)
-    expect(indexedLengths.filter((length) => length >= original.length)).toEqual([original.length])
+    expect(indexedLengths.filter((length) => length === SOURCE_PAGE_LENGTH)).toHaveLength(
+      original.length / SOURCE_PAGE_LENGTH,
+    )
+  })
+
+  it('keeps original measurements through reclamation while old ranges remain readable', () => {
+    const original = createPieceTableSnapshot('original')
+    const inserted = insertIntoPieceTable(original, 0, 'x'.repeat(16384))
+    const deleted = deleteFromPieceTable(inserted, 0, 16384)
+    const current = insertIntoPieceTable(deleted, 0, '!')
+    const source = originalSource(current)
+    const oldRange = measureTextSnapshotRange(
+      createDocumentTextSnapshot(inserted),
+      0,
+      inserted.length,
+    )
+    const job = reclaimSnapshotStorage([current])
+    while (!job.next().done) {
+      /* Finish maintenance before asking for the retained index. */
+    }
+    expect(originalSource(current)).toBe(source)
+    expect(oldRange.columnAt(inserted.length, 4, 'utf16')).toBe(inserted.length)
+    const newRange = measureTextSnapshotRange(
+      createDocumentTextSnapshot(current),
+      0,
+      current.length,
+    )
+    expect(newRange.columnAt(current.length, 4, 'utf16')).toBe(9)
   })
 
   it('indexes only the requested old-text slices when paste makes one row measurable', () => {

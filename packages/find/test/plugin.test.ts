@@ -1,9 +1,11 @@
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
 import { describe, expect, it, vi } from 'vitest'
+import { createTestViewSnapshotSource } from '@singapore-editor/core/testing'
 import type {
   EditorCapabilityContributionProvider,
   EditorCommandContributionProvider,
   EditorEditContributionProvider,
+  EditorOverlaySide,
   EditorPluginContext,
   EditorViewContributionContext,
   EditorViewContributionProvider,
@@ -15,6 +17,11 @@ import {
   EDITOR_FIND_FEATURE,
   type EditorFindContributionProviders,
 } from '../src'
+import {
+  createTestCapabilityContributionContext,
+  createTestPluginContext,
+  createTestViewContributionContext,
+} from '@singapore-editor/core/testing'
 
 describe('createEditorFindPlugin', () => {
   it('registers public find contribution providers', () => {
@@ -35,12 +42,14 @@ describe('createEditorFindPlugin', () => {
     const providers = createEditorFindContributionProviders()
     const registrations: { readonly token: unknown; readonly feature: unknown }[] = []
 
-    const contribution = providers.capability.createContribution({
-      registerFeature: (token, feature) => {
-        registrations.push({ token, feature })
-        return { dispose: vi.fn() }
-      },
-    })
+    const contribution = providers.capability.createContribution(
+      createTestCapabilityContributionContext({
+        registerFeature: (token, feature) => {
+          registrations.push({ token, feature })
+          return { dispose: vi.fn() }
+        },
+      }),
+    )
 
     expect(registrations).toEqual([
       {
@@ -91,12 +100,14 @@ describe('createEditorFindPlugin', () => {
     const features: { openFind(): boolean }[] = []
     const viewContribution = providers.view.createContribution(context)
 
-    providers.capability.createContribution({
-      registerFeature: (_token, value) => {
-        features.push(value as { openFind(): boolean })
-        return { dispose: vi.fn() }
-      },
-    })
+    providers.capability.createContribution(
+      createTestCapabilityContributionContext({
+        registerFeature: (_token, value) => {
+          features.push(value as { openFind(): boolean })
+          return { dispose: vi.fn() }
+        },
+      }),
+    )
 
     const feature = features[0]
     expect(context.container.querySelector('.editor-find-widget')).toBeNull()
@@ -149,9 +160,8 @@ describe('createEditorFindPlugin', () => {
     contribution?.dispose()
   })
 
-  // A reservation staked mid-layout is never announced to the contributions
-  // that already ran in that pass, so no update call follows it here.
-  it('follows a reservation the host never announces', async () => {
+  // No update call follows the claim here: the host announces it only through the width event.
+  it('follows a reservation announced outside any update', () => {
     const providers = createEditorFindContributionProviders()
     const context = viewContext()
     const viewContribution = providers.view.createContribution(context)
@@ -160,60 +170,33 @@ describe('createEditorFindPlugin', () => {
 
     context.reserveOverlayWidth('right', 64)
 
-    await vi.waitFor(() => {
-      expect(findWidgetElement(context).style.marginRight).toBe('64px')
-    })
-
+    expect(findWidgetElement(context).style.marginRight).toBe('64px')
     viewContribution?.dispose()
   })
 
-  it('releases the scroll-surface watcher on dispose', () => {
-    const observers = trackMutationObservers()
-    try {
-      const providers = createEditorFindContributionProviders()
-      const viewContribution = providers.view.createContribution(viewContext())
-      openFindWidget(providers)
-      expect(observers.connected()).toBe(1)
+  it('releases its reservation listener on dispose', () => {
+    const providers = createEditorFindContributionProviders()
+    const context = viewContext()
+    const viewContribution = providers.view.createContribution(context)
+    openFindWidget(providers)
+    expect(context.widthListeners.size).toBe(1)
 
-      viewContribution?.dispose()
+    viewContribution?.dispose()
 
-      expect(observers.connected()).toBe(0)
-    } finally {
-      observers.restore()
-    }
+    expect(context.widthListeners.size).toBe(0)
   })
 })
 
-function trackMutationObservers(): { connected(): number; restore(): void } {
-  const original = globalThis.MutationObserver
-  let connected = 0
-  globalThis.MutationObserver = class extends original {
-    public observe(target: Node, options?: MutationObserverInit): void {
-      connected += 1
-      super.observe(target, options)
-    }
-
-    public disconnect(): void {
-      connected -= 1
-      super.disconnect()
-    }
-  }
-  return {
-    connected: () => connected,
-    restore: () => {
-      globalThis.MutationObserver = original
-    },
-  }
-}
-
 function openFindWidget(providers: EditorFindContributionProviders): void {
   const features: { openFind(): boolean }[] = []
-  providers.capability.createContribution({
-    registerFeature: (_token, value) => {
-      features.push(value as { openFind(): boolean })
-      return { dispose: vi.fn() }
-    },
-  })
+  providers.capability.createContribution(
+    createTestCapabilityContributionContext({
+      registerFeature: (_token, value) => {
+        features.push(value as { openFind(): boolean })
+        return { dispose: vi.fn() }
+      },
+    }),
+  )
   features[0]?.openFind()
 }
 
@@ -230,7 +213,7 @@ function findWidgetElement(context: EditorViewContributionContext): HTMLElement 
 }
 
 function pluginContext(): EditorPluginContext {
-  return {
+  return createTestPluginContext({
     registerHighlighter: vi.fn(() => ({ dispose: vi.fn() })),
     registerSyntaxProvider: vi.fn(() => ({ dispose: vi.fn() })),
     registerViewContribution: vi.fn<EditorPluginContext['registerViewContribution']>(
@@ -248,45 +231,43 @@ function pluginContext(): EditorPluginContext {
     registerDecorationContribution: vi.fn(() => ({ dispose: vi.fn() })),
     registerGutterContribution: vi.fn(() => ({ dispose: vi.fn() })),
     registerInjectedTextRowProvider: vi.fn(() => ({ dispose: vi.fn() })),
-  }
+  })
 }
 
-function viewContext(viewSnapshot = snapshot()): EditorViewContributionContext {
+function viewContext(viewSnapshot = snapshot()): EditorViewContributionContext & {
+  readonly widthListeners: Set<(side: EditorOverlaySide) => void>
+} {
   const container = document.createElement('div')
   const scrollElement = document.createElement('div')
   container.appendChild(scrollElement)
-  return {
+  const widthListeners = new Set<(side: EditorOverlaySide) => void>()
+  const context = createTestViewContributionContext({
     container,
     scrollElement,
     contentElement: scrollElement,
     highlightPrefix: 'editor-find-test',
-    hasDocument: () => true,
     getSnapshot: () => viewSnapshot,
-    requestViewUpdate: vi.fn(),
-    revealLine: vi.fn(),
-    focusEditor: vi.fn(),
-    setSelection: vi.fn(),
-    setSelections: vi.fn(),
-    setScrollTop: vi.fn(),
     reserveOverlayWidth: vi.fn<EditorViewContributionContext['reserveOverlayWidth']>(
       (side, width) => {
         scrollElement.style[overlayPadding(side)] = width > 0 ? `${Math.ceil(width)}px` : ''
+        for (const listener of [...widthListeners]) listener(side)
       },
     ),
     getReservedOverlayWidth: (side) =>
       Number.parseFloat(scrollElement.style[overlayPadding(side)]) || 0,
-    textOffsetFromPoint: vi.fn(() => null),
-    getRangeClientRect: vi.fn(() => null),
-    setRangeHighlight: vi.fn(),
-    clearRangeHighlight: vi.fn(),
-  }
+    onDidChangeReservedOverlayWidth: (listener) => {
+      widthListeners.add(listener)
+      return { dispose: () => widthListeners.delete(listener) }
+    },
+  })
+  return Object.assign(context, { widthListeners })
 }
 
 function snapshot(): EditorViewSnapshot {
   return {
     documentId: 'find-test',
     languageId: null,
-    fullText: 'foo bar foo',
+    ...createTestViewSnapshotSource('foo bar foo'),
     textVersion: 1,
     initialHighlightStatus: 'painted',
     syntaxStatus: 'ready',
@@ -308,7 +289,7 @@ function snapshot(): EditorViewSnapshot {
     contentWidth: 88,
     totalHeight: 20,
     gutterWidth: 0,
-    gutterLayout: { fixedWidth: 0, lanes: [] },
+    gutterLayout: { leadingInset: 0, fixedWidth: 0, lanes: [] },
     tabSize: 2,
     foldMarkers: [],
     visibleRows: [],
@@ -321,9 +302,6 @@ function snapshot(): EditorViewSnapshot {
       clientHeight: 20,
       clientWidth: 88,
       visibleRange: { start: 0, end: 1 },
-    },
-    toJSON() {
-      throw new Error('not used by this fixture')
     },
     toVisibleSnapshot() {
       return null

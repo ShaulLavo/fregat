@@ -1,20 +1,25 @@
-import { lspPositionToOffset, offsetToLspPosition } from '@singapore-editor/lsp'
-import { identifierRangeAtOffset, type OffsetRange } from '@singapore-editor/plugin-ui'
+import {
+  lspPositionToOffsetInSnapshot,
+  offsetToLspPositionInSnapshot,
+  type LspTextDocumentSnapshot,
+} from '@singapore-editor/lsp'
+import { type OffsetRange, identifierRangeAtOffset } from '@singapore-editor/plugin-ui/offset-range'
 import type { EditorSetSelectionOptions } from '@singapore-editor/core/editor'
 import type * as lsp from 'vscode-languageserver-protocol'
 
 import { documentUriToFileName } from './paths'
+import { rangeAroundOffset } from './sourceText'
 import type { LanguageServerFeatureRouter } from './serverSet'
 import type { LanguageServerDefinitionTarget, LanguageServerNavigationKind } from './types'
 
 /**
  * Inputs required to issue a `textDocument/definition` request against the
  * LSP client. The request is expressed in editor-native coordinates
- * (`offset` into `text`) and converted to an LSP `Position` internally.
+ * (`offset` into `document`) and converted to an LSP `Position` internally.
  */
 export type DefinitionRequest = {
   readonly uri: lsp.DocumentUri
-  readonly text: string
+  readonly document: LspTextDocumentSnapshot
   readonly offset: number
   readonly signal?: AbortSignal
 }
@@ -43,7 +48,7 @@ export type DefinitionResult = {
  * module decoupled from `@singapore-editor/core`'s full contribution surface.
  */
 export type NavigationEditor = {
-  readonly text: string
+  readonly document: LspTextDocumentSnapshot
   setSelection(
     anchor: number,
     head: number,
@@ -84,7 +89,7 @@ export async function requestNavigationTargets(
     REQUEST_METHODS[request.kind],
     {
       textDocument: { uri: request.uri },
-      position: offsetToLspPosition(request.text, request.offset),
+      position: offsetToLspPositionInSnapshot(request.document, request.offset),
     } satisfies lsp.TextDocumentPositionParams,
     request.signal ? { signal: request.signal } : undefined,
   )
@@ -100,7 +105,7 @@ async function requestReferences(
     'textDocument/references',
     {
       textDocument: { uri: request.uri },
-      position: offsetToLspPosition(request.text, request.offset),
+      position: offsetToLspPositionInSnapshot(request.document, request.offset),
       context: {
         includeDeclaration: request.includeDeclaration ?? true,
       },
@@ -113,7 +118,7 @@ async function requestReferences(
 /**
  * Navigate the editor to `target` by translating its LSP range into
  * offsets in the editor's current text and applying the selection. The
- * caller is responsible for ensuring `editor.text` is the text of the same
+ * caller is responsible for ensuring `editor.document` is the text of the same
  * document `target` refers to (i.e. a same-document jump); cross-document
  * jumps should be routed through `onOpenDefinition`, not this function.
  */
@@ -129,8 +134,8 @@ export function navigateToTarget(
   editor: NavigationEditor,
   timingName: string,
 ): void {
-  const start = lspPositionToOffset(editor.text, target.range.start)
-  const end = lspPositionToOffset(editor.text, target.range.end)
+  const start = lspPositionToOffsetInSnapshot(editor.document, target.range.start)
+  const end = lspPositionToOffsetInSnapshot(editor.document, target.range.end)
   editor.setSelection(start, end, timingName, { revealBlock: 'center', revealOffset: start })
   editor.focusEditor()
 }
@@ -149,15 +154,15 @@ export function preferredDefinitionTarget(
 
 export function preferredReferenceTarget(
   activeUri: lsp.DocumentUri,
-  activeText: string,
+  activeDocument: LspTextDocumentSnapshot,
   sourceOffset: number,
   result: DefinitionResult,
 ): LanguageServerDefinitionTarget | null {
   const sourceRange =
-    identifierRangeAtOffset(activeText, sourceOffset) ??
+    rangeAroundOffset(activeDocument, sourceOffset, identifierRangeAtOffset) ??
     ({ start: sourceOffset, end: sourceOffset } satisfies OffsetRange)
   const sameDocumentTargets = result.targets.flatMap((target) =>
-    targetWithOffset(activeUri, activeText, target),
+    targetWithOffset(activeUri, activeDocument, target),
   )
   const nextTarget = sameDocumentTargets.find((target) => target.start > sourceRange.end)
   if (nextTarget) return nextTarget.target
@@ -175,12 +180,12 @@ export function preferredReferenceTarget(
  */
 export function preferredJumpableDefinitionTarget(
   activeUri: lsp.DocumentUri,
-  activeText: string,
+  activeDocument: LspTextDocumentSnapshot,
   sourceRange: OffsetRange,
   result: DefinitionResult,
 ): LanguageServerDefinitionTarget | null {
   const targets = result.targets.filter(
-    (target) => !targetIsSourceRange(activeUri, activeText, sourceRange, target),
+    (target) => !targetIsSourceRange(activeUri, activeDocument, sourceRange, target),
   )
   return preferredTarget(activeUri, targets)
 }
@@ -199,7 +204,7 @@ function preferredTarget(
 
 function targetWithOffset(
   activeUri: lsp.DocumentUri,
-  activeText: string,
+  activeDocument: LspTextDocumentSnapshot,
   target: LanguageServerDefinitionTarget,
 ): readonly (OffsetRange & {
   readonly target: LanguageServerDefinitionTarget
@@ -208,8 +213,8 @@ function targetWithOffset(
 
   return [
     {
-      start: lspPositionToOffset(activeText, target.range.start),
-      end: lspPositionToOffset(activeText, target.range.end),
+      start: lspPositionToOffsetInSnapshot(activeDocument, target.range.start),
+      end: lspPositionToOffsetInSnapshot(activeDocument, target.range.end),
       target,
     },
   ]
@@ -217,14 +222,14 @@ function targetWithOffset(
 
 function targetIsSourceRange(
   activeUri: lsp.DocumentUri,
-  activeText: string,
+  activeDocument: LspTextDocumentSnapshot,
   sourceRange: OffsetRange,
   target: LanguageServerDefinitionTarget,
 ): boolean {
   if (target.uri !== activeUri) return false
 
-  const targetStart = lspPositionToOffset(activeText, target.range.start)
-  const targetEnd = lspPositionToOffset(activeText, target.range.end)
+  const targetStart = lspPositionToOffsetInSnapshot(activeDocument, target.range.start)
+  const targetEnd = lspPositionToOffsetInSnapshot(activeDocument, target.range.end)
   return rangesOverlap(sourceRange, { start: targetStart, end: targetEnd })
 }
 
@@ -248,8 +253,8 @@ function definitionSourceRange(
   const items = Array.isArray(result) ? result : [result]
   for (const item of items) {
     if (!('originSelectionRange' in item) || !item.originSelectionRange) continue
-    const start = lspPositionToOffset(request.text, item.originSelectionRange.start)
-    const end = lspPositionToOffset(request.text, item.originSelectionRange.end)
+    const start = lspPositionToOffsetInSnapshot(request.document, item.originSelectionRange.start)
+    const end = lspPositionToOffsetInSnapshot(request.document, item.originSelectionRange.end)
     if (request.offset >= start && request.offset < end) return { start, end }
   }
   return null

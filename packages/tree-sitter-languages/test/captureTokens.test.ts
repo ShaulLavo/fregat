@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { Language, Parser, Query } from 'web-tree-sitter'
+import { init, MarkdownDocument, CAPTURES } from 'tree-sitter-md'
 
 import type { EditorSyntaxCapture, EditorToken } from '@singapore-editor/core/syntax'
 import {
@@ -15,7 +16,6 @@ import {
  * several shipped rules match the same span, and a fixture can only ever contain the overlaps its
  * author already thought of — running the real queries is what catches the ones nobody enumerated.
  */
-const grammarsDir = `${process.cwd()}/src/grammars/`
 const queriesDir = `${process.cwd()}/src/queries/`
 const modulesDir = `${process.cwd()}/node_modules/`
 
@@ -60,13 +60,6 @@ const collect = (
   return captures.toSorted((a, b) => a.startIndex - b.startIndex || a.endIndex - b.endIndex)
 }
 
-type SyntaxNode = { type: string; startIndex: number; endIndex: number; children: SyntaxNode[] }
-
-const inlineNodes = (node: SyntaxNode): SyntaxNode[] => {
-  if (node.type === 'inline') return [node]
-  return node.children.flatMap((child) => inlineNodes(child))
-}
-
 beforeAll(async () => {
   await Parser.init()
 
@@ -92,41 +85,21 @@ beforeAll(async () => {
     return captures
   }
 
-  const blockLanguage = await Language.load(
-    await readFile(`${grammarsDir}tree-sitter-markdown.wasm`),
-  )
-  const inlineLanguage = await Language.load(
-    await readFile(`${grammarsDir}tree-sitter-markdown-inline.wasm`),
-  )
-  const blockQuery = new Query(
-    blockLanguage,
-    await readFile(`${queriesDir}markdown-highlights.scm`, 'utf8'),
-  )
-  const inlineQuery = new Query(
-    inlineLanguage,
-    await readFile(`${queriesDir}markdown-inline-highlights.scm`, 'utf8'),
-  )
-  const blockParser = new Parser()
-  blockParser.setLanguage(blockLanguage)
-  const inlineParser = new Parser()
-  inlineParser.setLanguage(inlineLanguage)
-
+  await init()
   parseMarkdown = (text) => {
-    const tree = blockParser.parse(text)!
-    const captures = collect(blockQuery, tree.rootNode, 'markdown')
-
-    // Mirrors the markdown -> markdown_inline injection: inline content parses separately and its
-    // captures shift back into document offsets.
-    for (const inlineNode of inlineNodes(tree.rootNode as unknown as SyntaxNode)) {
-      const inlineTree = inlineParser.parse(text.slice(inlineNode.startIndex, inlineNode.endIndex))!
-      captures.push(
-        ...collect(inlineQuery, inlineTree.rootNode, 'markdown_inline', inlineNode.startIndex),
-      )
-      inlineTree.delete()
+    const document = new MarkdownDocument()
+    document.setText(text)
+    const packed = document.highlights(0, text.length)
+    const captures: EditorSyntaxCapture[] = []
+    for (let index = 0; index < packed.length; index += 3) {
+      captures.push({
+        startIndex: packed[index]!,
+        endIndex: packed[index + 1]!,
+        captureName: CAPTURES[packed[index + 2]!]!,
+      })
     }
-
-    tree.delete()
-    return captures.toSorted((a, b) => a.startIndex - b.startIndex || a.endIndex - b.endIndex)
+    document.dispose()
+    return captures
   }
 })
 

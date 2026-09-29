@@ -1,3 +1,5 @@
+import type { TextReadSnapshot } from '../documentTextSnapshot'
+import { readLeadingWhitespace } from '../textWindows'
 import type { InlineReplacementSpec } from '../inlineMap'
 import { normalizeLineEndings, type PieceTableSnapshot } from '@singapore-editor/textbuffer'
 
@@ -21,7 +23,7 @@ export function isEditorInlineSuggestCommand(
 }
 
 /** One run of suggested text, hung off the offset it would be typed at. */
-export type GhostTextPart = {
+type GhostTextPart = {
   readonly offset: number
   readonly text: string
 }
@@ -74,14 +76,14 @@ const BRACKET_GROUP_STRIDE = 100
  * that is about to disappear cannot be drawn as text that is about to arrive.
  */
 export function computeGhostText(
-  text: string,
+  source: TextReadSnapshot,
   suggestion: TextEdit,
   caret: number,
 ): GhostText | null {
-  const edit = reducedSuggestion(text, suggestion)
+  const edit = reducedSuggestion(source, suggestion)
   if (!edit) return null
 
-  const changes = ghostTextDiff(text.slice(edit.from, edit.to), edit.text)
+  const changes = ghostTextDiff(source.readRange(edit.from, edit.to), edit.text)
   if (!changes) return null
 
   const parts: GhostTextPart[] = []
@@ -143,8 +145,13 @@ export class GhostTextSession {
   private painted: GhostText | null = null
 
   /** Offers a suggestion at the caret, and reports whether any of it can be shown. */
-  show(snapshot: PieceTableSnapshot, text: string, suggestion: TextEdit, caret: number): boolean {
-    const ghost = computeGhostText(text, suggestion, caret)
+  show(
+    snapshot: PieceTableSnapshot,
+    source: TextReadSnapshot,
+    suggestion: TextEdit,
+    caret: number,
+  ): boolean {
+    const ghost = computeGhostText(source, suggestion, caret)
     this.validForSnapshot = ghost ? snapshot : null
     this.validForCaret = ghost ? caret : null
     this.ghost = ghost
@@ -221,30 +228,31 @@ export class GhostTextSession {
  *
  * Null for a suggestion whose covered rows are not text the document already reads that way.
  */
-function reducedSuggestion(text: string, suggestion: TextEdit): TextEdit | null {
-  const from = clampOffset(text, Math.min(suggestion.from, suggestion.to))
-  const to = clampOffset(text, Math.max(suggestion.from, suggestion.to))
+function reducedSuggestion(source: TextReadSnapshot, suggestion: TextEdit): TextEdit | null {
+  const from = clampOffset(source, Math.min(suggestion.from, suggestion.to))
+  const to = clampOffset(source, Math.max(suggestion.from, suggestion.to))
   const proposed = normalizeLineEndings(suggestion.text)
-  const shared = commonPrefixLength(text.slice(from, to), proposed)
+  const replaced = source.readRange(from, to)
+  const shared = commonPrefixLength(replaced, proposed)
   const stripped = { from: from + shared, to, text: proposed.slice(shared) }
 
   // A replacement still covering rows after its common prefix is rewriting text the reader has
   // already written, which is a refactoring rather than a completion of what they are typing.
-  if (text.slice(stripped.from, stripped.to).includes('\n')) return null
+  if (replaced.includes('\n', shared)) return null
 
-  return rebasedOnIndentation(text, stripped)
+  return rebasedOnIndentation(source, stripped)
 }
 
 /**
  * Moves a suggestion that reaches back into the line's leading whitespace past the whitespace that is
  * already there, so indentation is never drawn a second time in front of itself.
  */
-function rebasedOnIndentation(text: string, edit: TextEdit): TextEdit {
-  const lineStart = text.lastIndexOf('\n', edit.from - 1) + 1
-  const indentEnd = indentEndOffset(text, lineStart)
+function rebasedOnIndentation(source: TextReadSnapshot, edit: TextEdit): TextEdit {
+  const line = source.lineRange(source.lineAt(edit.from))
+  const indentEnd = line.start + readLeadingWhitespace(source, line.start, line.end).length
   if (edit.from > indentEnd) return edit
 
-  const replacedIndentation = text.slice(edit.from, indentEnd)
+  const replacedIndentation = source.readRange(edit.from, indentEnd)
   const from = Math.min(edit.from + replacedIndentation.length, edit.to)
   const indented = edit.text.startsWith(replacedIndentation)
 
@@ -498,6 +506,6 @@ function isHighSurrogate(code: number): boolean {
   return code >= 0xd800 && code <= 0xdbff
 }
 
-function clampOffset(text: string, offset: number): number {
-  return Math.max(0, Math.min(offset, text.length))
+function clampOffset(source: TextReadSnapshot, offset: number): number {
+  return Math.max(0, Math.min(offset, source.length))
 }

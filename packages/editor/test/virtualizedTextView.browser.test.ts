@@ -342,6 +342,7 @@ describe.skipIf(typeof globalThis.Highlight === 'undefined')(
         const totalHeight = retained.view.getState().totalHeight
         expect(scrollTop).toBe(30_000)
         const offset = text.indexOf('line 1500')
+        retained.view.focusInput()
         retained.view.setSelection(offset + 4, offset + 4)
         assertNativeCaret(retained.view, offset + 4)
         const oldRanges = tokenRangesIn(retained.host)
@@ -488,6 +489,7 @@ describe.skipIf(typeof globalThis.Highlight === 'undefined')(
       view.scrollElement.scrollLeft = 8_000 * view.getState().metrics.characterWidth
       view.scrollElement.dispatchEvent(new Event('scroll'))
       await browserFrames(3)
+      view.focusInput()
       view.setSelection(8_004, 8_004)
       const savedScrollLeft = view.getState().scrollLeft
       const chunks = view.getState().mountedRows[0]!.chunks.map((chunk) => chunk.startOffset)
@@ -579,6 +581,7 @@ describe.skipIf(typeof globalThis.Highlight === 'undefined')(
       const state = view.getState()
       const firstRow = state.mountedRows.find((row) => row.index === state.visibleRange.start)!
       const offset = firstRow.startOffset
+      view.focusInput()
       view.setSelection(offset, offset)
       expect(state.scrollTop).toBeGreaterThan(16_000_000)
       expect(firstRow.bufferRow).toBeGreaterThanOrEqual(849_999)

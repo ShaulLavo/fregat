@@ -4,53 +4,39 @@ import type * as lsp from 'vscode-languageserver-protocol'
 import {
   formatSignatureHelp,
   nextSignatureIndex,
-  signatureHelpTriggerFromChange,
+  signatureHelpTriggerFromTypedText,
 } from '../src/signatureHelp'
 
-/**
- * Only `kind` and `edits` are read by the trigger, so the rest of DocumentSessionChange is elided
- * rather than fabricated — the same shape completion.test.ts uses.
- */
-function edit(text: string): Parameters<typeof signatureHelpTriggerFromChange>[0] {
-  return {
-    edits: [{ from: 0, text, to: 0 }],
-    kind: 'edit',
-  } as unknown as Parameters<typeof signatureHelpTriggerFromChange>[0]
-}
-
-describe('signatureHelpTriggerFromChange', () => {
+describe('signatureHelpTriggerFromTypedText', () => {
   it('opens on an argument list', () => {
-    expect(signatureHelpTriggerFromChange(edit('('))).toEqual({
+    expect(signatureHelpTriggerFromTypedText('(')).toEqual({
       kind: 'open',
       triggerCharacter: '(',
     })
   })
 
   it('re-requests on the next argument', () => {
-    expect(signatureHelpTriggerFromChange(edit(','))).toEqual({
+    expect(signatureHelpTriggerFromTypedText(',')).toEqual({
       kind: 'argument',
       triggerCharacter: ',',
     })
   })
 
+  // Auto-closing writes '()' for a typed '(' and types over its own closer without changing any
+  // text, so this reads the keystroke; both characters still count.
   it('dismisses when the call closes', () => {
-    expect(signatureHelpTriggerFromChange(edit(')'))).toEqual({ kind: 'close' })
+    expect(signatureHelpTriggerFromTypedText(')')).toEqual({ kind: 'close' })
   })
 
   // Typing an argument must not tear down the signature it belongs to.
   it('leaves ordinary typing alone', () => {
-    expect(signatureHelpTriggerFromChange(edit('x'))).toBeNull()
+    expect(signatureHelpTriggerFromTypedText('x')).toBeNull()
   })
 
-  it('ignores non-edit and multi-character changes', () => {
-    expect(signatureHelpTriggerFromChange(null)).toBeNull()
-    expect(
-      signatureHelpTriggerFromChange({
-        ...edit('('),
-        kind: 'undo',
-      } as unknown as Parameters<typeof signatureHelpTriggerFromChange>[0]),
-    ).toBeNull()
-    expect(signatureHelpTriggerFromChange(edit('()'))).toBeNull()
+  it('ignores text that is not one of the trigger characters', () => {
+    expect(signatureHelpTriggerFromTypedText('')).toBeNull()
+    expect(signatureHelpTriggerFromTypedText('()')).toBeNull()
+    expect(signatureHelpTriggerFromTypedText('\n')).toBeNull()
   })
 })
 

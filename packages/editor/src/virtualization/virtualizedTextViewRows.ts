@@ -1,3 +1,6 @@
+import { completeRowPresentation, invalidateRowPresentations } from '../rowPresentation'
+import { createError } from '../logging/errors'
+import { pointViewport } from './pointViewport'
 import type { SavedPaint, SavedPaintRow } from '../editor/paintSnapshot'
 import type { MeasuredText } from '../textMeasurements'
 import { sliceTextContent, type TextContent } from '../textContent'
@@ -30,11 +33,11 @@ import {
   createRowResizeObserver,
   elementMeasuredSize,
   hideFoldPlaceholder,
+  markRowRetired,
   rangesIntersectInclusive,
   restoreRowElements,
   retireRowElements,
   rowElementFromNode,
-  scrollElementPadding,
   setStyleValue,
   showFoldPlaceholder,
   snapshotRowsKey,
@@ -68,7 +71,7 @@ import type {
   VirtualizedCaretPosition,
   VirtualizedCaretPositions,
 } from './virtualizedTextViewTypes'
-import type { VirtualizedTextViewInternal } from './virtualizedTextViewInternals'
+import type { RevealBlock, VirtualizedTextViewInternal } from './virtualizedTextViewInternals'
 import {
   type RowInlineMapping,
   offsetForLocalIndex,
@@ -93,11 +96,15 @@ import {
   renderHiddenCharacters,
 } from './virtualizedTextViewHiddenCharacters'
 import { memoizedContainsRTL } from './virtualizedTextViewBidi'
+import type { GlyphAdvances } from './glyphAdvances'
+import { columnAtPixels, pixelsBeforeColumn } from './proportionalRows'
 
 const GUTTER_CELL_CLASS = 'editor-virtualized-gutter-cell'
 const CURSOR_LINE_ROW_CLASS = 'editor-virtualized-cursor-line-row'
 const CURSOR_LINE_GUTTER_CLASS = 'editor-virtualized-cursor-line-gutter'
+const CURSOR_LINE_GUTTER_BAND_CLASS = 'editor-virtualized-cursor-line-gutter-band'
 const gutterCursorLineStates = new WeakMap<HTMLElement, boolean>()
+const gutterCursorLineBandStates = new WeakMap<HTMLElement, boolean>()
 const MAX_ROW_TEXT_NODE_LENGTH = 50
 const MAX_SINGLE_NODE_ROW_LENGTH = 512
 /** Above this, the row shows a fixed endpoint-only placeholder instead of laying out unbounded text. */
@@ -139,6 +146,7 @@ type InlineWidgetHost = {
 }
 
 type InlineWidgetRun = {
+  /** The mount's key: the replacement's `key`, else its id. */
   readonly id: string
   readonly localStart: number
   readonly localEnd: number
@@ -279,6 +287,7 @@ function createRow(view: VirtualizedTextViewInternal): MountedVirtualizedTextRow
     rowDecorationClassName: '',
     rowDecorationGutterClassName: '',
     rowDecorationKey: '',
+    rowDecorationSnapshotStyle: false,
     inlineKindsClassName: '',
     cursorLineContentActive: false,
     textRenderMode: 'simple',
@@ -307,6 +316,7 @@ function createGutterCell(
   cell.classList.add(GUTTER_CELL_CLASS)
   if (contribution.className) cell.classList.add(contribution.className)
   cell.dataset.editorGutterContribution = contribution.id
+  if (contribution.interactive) cell.dataset.editorGutterInteractive = ''
   setCachedGutterCellWidth(view, cell, contribution.id)
   return cell
 }
@@ -477,13 +487,26 @@ function foldMarkersForPass(
   return source.readRows(bufferRows)
 }
 
+/** A mounted row the projection cannot place would paint as line 1, so it fails instead. */
+function mountedBufferRow(view: VirtualizedTextViewInternal, index: number): number {
+  const bufferRow = bufferRowForVirtualRow(view, index)
+  if (bufferRow !== null) return bufferRow
+  throw createError({
+    code: 'EDITOR_ROW_UNMAPPED',
+    message: 'The editor mounted a display row its projection does not have',
+    why: 'Rows are mounted from the virtualizer, which must agree with the display projection.',
+    fix: 'Report this editor bug with the document that triggered it.',
+    internal: { index, rowCount: view.model.projection.rowCount },
+  })
+}
+
 function rowUpdateState(
   view: VirtualizedTextViewInternal,
   index: number,
   updatePass: RowUpdatePass,
 ): RowUpdateState {
   const displayRow = view.model.projection.getRow(index)
-  const bufferRow = bufferRowForDisplayRow(view, index)
+  const bufferRow = mountedBufferRow(view, index)
   const primaryText = isDocumentTextDisplayRow(displayRow) && displayRow.sourceStartColumn === 0
 
   return {
@@ -536,12 +559,6 @@ function mountedRowUpdateState(
   }
 }
 
-function bufferRowForDisplayRow(view: VirtualizedTextViewInternal, index: number): number {
-  const displayRow = view.model.projection.getRow(index)
-  if (displayRow?.kind === 'text') return displayRow.bufferRow
-  return bufferRowForVirtualRow(view, index)
-}
-
 function inlineRowForDisplayRow(row: DisplayRow | undefined): InlineRow | undefined {
   return isDocumentTextDisplayRow(row) ? row.inlineRow : undefined
 }
@@ -591,27 +608,45 @@ function updateRow(
 
   const state = rowUpdateState(view, item.index, updatePass)
 
-  updateRowElement(view, row, item, state, snapshot)
-  updateMountedRowPaintFacts(row, state)
-  updateMutableRow(row, {
-    bufferRow: state.bufferRow,
-    endOffset: state.endOffset,
-    injectedTextRowId: state.injectedTextRowId,
-    kind: state.kind,
-    metadata: state.metadata,
-    foldCollapsed: state.foldMarker?.collapsed ?? false,
-    foldMarkerKey: state.foldMarker?.key ?? '',
-    height: item.size,
-    index: item.index,
-    source: state.source,
-    startOffset: state.startOffset,
-    text: state.text,
-    measurements: state.measurements,
-    inlineMapping: state.inlineMapping,
-    textRevision: view.textRevision,
-    top: item.start,
-    chunkKey: rowChunkKey(view, state, snapshot, state.inlineMapping),
-  })
+  const replacing = rowContentChanged(row, state)
+  if (replacing) invalidateRowPresentations(row.element)
+  try {
+    updateRowElement(view, row, item, state, snapshot)
+    updateMountedRowPaintFacts(row, state)
+    updateMutableRow(row, {
+      bufferRow: state.bufferRow,
+      endOffset: state.endOffset,
+      injectedTextRowId: state.injectedTextRowId,
+      kind: state.kind,
+      metadata: state.metadata,
+      foldCollapsed: state.foldMarker?.collapsed ?? false,
+      foldMarkerKey: state.foldMarker?.key ?? '',
+      height: item.size,
+      index: item.index,
+      source: state.source,
+      startOffset: state.startOffset,
+      text: state.text,
+      measurements: state.measurements,
+      inlineMapping: state.inlineMapping,
+      textRevision: view.textRevision,
+      top: item.start,
+      chunkKey: rowChunkKey(view, state, snapshot, state.inlineMapping),
+    })
+  } finally {
+    if (replacing) completeRowPresentation(row.element)
+  }
+}
+
+function rowContentChanged(row: MountedVirtualizedTextRow, state: RowUpdateState): boolean {
+  return (
+    row.index !== state.index ||
+    row.bufferRow !== state.bufferRow ||
+    row.source !== state.source ||
+    row.injectedTextRowId !== state.injectedTextRowId ||
+    row.kind !== state.kind ||
+    row.text !== state.text ||
+    row.inlineMapping?.line !== state.inlineMapping?.line
+  )
 }
 
 function updateRowElement(
@@ -679,35 +714,41 @@ function updateRowAfterSameLineEdit(
 ): boolean {
   const state = rowUpdateState(view, item.index, updatePass)
 
-  const editedRowPatchedInPlace = updateRowElementForSameLineEdit(
-    view,
-    row,
-    item,
-    state,
-    patch,
-    snapshot,
-  )
-  updateMountedRowPaintFacts(row, state)
-  updateMutableRow(row, {
-    bufferRow: state.bufferRow,
-    endOffset: state.endOffset,
-    injectedTextRowId: state.injectedTextRowId,
-    kind: state.kind,
-    metadata: state.metadata,
-    foldCollapsed: state.foldMarker?.collapsed ?? false,
-    foldMarkerKey: state.foldMarker?.key ?? '',
-    height: item.size,
-    index: item.index,
-    source: state.source,
-    startOffset: state.startOffset,
-    text: state.text,
-    measurements: state.measurements,
-    inlineMapping: state.inlineMapping,
-    textRevision: view.textRevision,
-    top: item.start,
-    chunkKey: rowChunkKey(view, state, snapshot, state.inlineMapping),
-  })
-  return editedRowPatchedInPlace
+  const replacing = rowContentChanged(row, state)
+  if (replacing) invalidateRowPresentations(row.element)
+  try {
+    const editedRowPatchedInPlace = updateRowElementForSameLineEdit(
+      view,
+      row,
+      item,
+      state,
+      patch,
+      snapshot,
+    )
+    updateMountedRowPaintFacts(row, state)
+    updateMutableRow(row, {
+      bufferRow: state.bufferRow,
+      endOffset: state.endOffset,
+      injectedTextRowId: state.injectedTextRowId,
+      kind: state.kind,
+      metadata: state.metadata,
+      foldCollapsed: state.foldMarker?.collapsed ?? false,
+      foldMarkerKey: state.foldMarker?.key ?? '',
+      height: item.size,
+      index: item.index,
+      source: state.source,
+      startOffset: state.startOffset,
+      text: state.text,
+      measurements: state.measurements,
+      inlineMapping: state.inlineMapping,
+      textRevision: view.textRevision,
+      top: item.start,
+      chunkKey: rowChunkKey(view, state, snapshot, state.inlineMapping),
+    })
+    return editedRowPatchedInPlace
+  } finally {
+    if (replacing) completeRowPresentation(row.element)
+  }
 }
 
 function updateRowElementForSameLineEdit(
@@ -863,7 +904,7 @@ function setRenderedDirectRowText(
   const simple = isSimpleRowText(content)
   const maxTextNodeLength = simple ? Number.POSITIVE_INFINITY : bidiTextNodeLength(view, content)
   const rendered = simple
-    ? createSplitTextChunkParts(row.element.ownerDocument, text, 0)
+    ? createSplitTextChunkParts(row.element.ownerDocument, text, 0, characterWidth(view))
     : createRenderedChunkParts(
         row.element.ownerDocument,
         text,
@@ -1067,7 +1108,7 @@ function inlineRowRuns(mapping: RowInlineMapping | null, text: TextContent): Inl
     // caret no side to stop on and the measured advance nothing to span.
     if (localStart < 0 || localEnd > text.length || localEnd <= localStart) continue
 
-    const id = segment.id
+    const id = segment.render ? (segment.key ?? segment.id) : segment.id
     const styling = className === undefined ? {} : { className }
     if (render) widgets.push({ id, localStart, localEnd, render, ...styling })
     else if (className !== undefined) classes.push({ id, localStart, localEnd, className })
@@ -1092,7 +1133,7 @@ function setInlineRunRowText(
     .map((run) => inlineWidgetPlacement(view, run))
   const classes = inlineClassesInWindow(runs.classes, window)
   const leftWidth =
-    estimatedDisplayCellForColumn(content, window.start, view.tabSize) * characterWidth(view) +
+    textPixelsBeforeColumn(view, content, window.start) +
     inlineWidgetAdvanceDelta(view, content, runs.widgets, window.start)
   setLeftSpacerWidth(row, Math.round(leftWidth))
   const chunk = row.chunks[0]
@@ -1175,11 +1216,31 @@ function inlineWidgetAdvanceDelta(
     if (widget.localEnd > localOffset) break
     const width = inlineWidgetsByView.get(view)?.hosts.get(widget.id)?.measuredWidth
     if (width === null || width === undefined) continue
-    const start = estimatedDisplayCellForColumn(content, widget.localStart, view.tabSize)
-    const end = estimatedDisplayCellForColumn(content, widget.localEnd, view.tabSize)
-    delta += width - (end - start) * characterWidth(view)
+    const start = textPixelsBeforeColumn(view, content, widget.localStart)
+    const end = textPixelsBeforeColumn(view, content, widget.localEnd)
+    delta += width - (end - start)
   }
   return delta
+}
+
+function pixelsBeforeWidgetAdvances(
+  view: VirtualizedTextViewInternal,
+  content: MeasuredText,
+  widgets: readonly InlineWidgetRun[],
+  pixels: number,
+  bias: 'before' | 'after',
+): number {
+  let delta = 0
+  for (const widget of widgets) {
+    const width = inlineWidgetsByView.get(view)?.hosts.get(widget.id)?.measuredWidth
+    if (width === null || width === undefined) continue
+    const start = textPixelsBeforeColumn(view, content, widget.localStart)
+    if (pixels < start + delta) break
+    const end = textPixelsBeforeColumn(view, content, widget.localEnd)
+    if (pixels <= start + delta + width) return bias === 'before' ? start : end
+    delta += width - (end - start)
+  }
+  return pixels - delta
 }
 
 function columnBeforeWidgetAdvances(
@@ -1535,7 +1596,9 @@ function retireInlineWidgets(view: VirtualizedTextViewInternal): void {
 
   widgets.inlineMap = view.model.inlineMap
   const live = new Set<string>()
-  for (const range of view.model.inlineMap?.ranges ?? []) live.add(range.id)
+  for (const replacements of view.model.inlineMap?.rowReplacements.values() ?? []) {
+    for (const replacement of replacements) live.add(replacement.key ?? replacement.id)
+  }
 
   for (const [id, host] of widgets.hosts) {
     if (live.has(id)) continue
@@ -1571,9 +1634,7 @@ function setChunkedRowText(
 ): void {
   const { text } = content
   const window = horizontalChunkWindow(view, content, snapshot)
-  const leftSpacerWidth = Math.round(
-    estimatedDisplayCellForColumn(content, window.start, view.tabSize) * characterWidth(view),
-  )
+  const leftSpacerWidth = Math.round(textPixelsBeforeColumn(view, content, window.start))
   setLeftSpacerWidth(row, leftSpacerWidth)
   if (reuseRowChunks(view, row, text, window, startOffset, mapping)) return
 
@@ -1743,11 +1804,7 @@ function createRowChunkParts(
   text: string,
   localStart: number,
 ): RenderedChunkParts {
-  if (isSimpleRowText(text)) {
-    return createSplitTextChunkParts(view.scrollElement.ownerDocument, text, localStart)
-  }
-
-  return createRenderedChunkParts(
+  return createSplitTextChunkParts(
     view.scrollElement.ownerDocument,
     text,
     localStart,
@@ -1755,22 +1812,16 @@ function createRowChunkParts(
   )
 }
 
-/**
- * Reading a character position out of a text node costs the browser a scan of that node, and the
- * scan does not stay linear in its length — so caret placement, hit testing and every highlight
- * range painted over a very long line get steadily more expensive the more text one node holds.
- * Spreading the text over several nodes bounds each of those scans and changes nothing about what
- * renders or what the parts describe: adjacent text nodes lay out as one, and the parts still cover
- * the same local span end to end.
- *
- * Callers must have established that the text is simple. A fixed stride can cut a grapheme cluster
- * in two, and each half then measures — and stops the caret — as a character of its own.
- */
+// Bound browser text-node scans without splitting grapheme clusters.
 function createSplitTextChunkParts(
   document: Document,
   text: string,
   localStart: number,
+  characterWidth: number,
 ): RenderedChunkParts {
+  if (!isSimpleRowText(text))
+    return createRenderedChunkParts(document, text, localStart, characterWidth)
+
   const nodeCount = Math.max(1, Math.ceil(text.length / MAX_ROW_TEXT_NODE_LENGTH))
   const nodes: Text[] = []
   const parts: VirtualizedTextChunkPart[] = []
@@ -1900,12 +1951,25 @@ function rowChunkKey(
   return `${window.start}:${window.end}`
 }
 
+/** How far along the row its text reaches by `column`: measured advances in a proportional face. */
+function textPixelsBeforeColumn(
+  view: VirtualizedTextViewInternal,
+  content: MeasuredText,
+  column: number,
+): number {
+  if (view.glyphs) return pixelsBeforeColumn(content.text, column, view.glyphs, view.tabSize)
+  return estimatedDisplayCellForColumn(content, column, view.tabSize) * characterWidth(view)
+}
+
 function horizontalChunkWindow(
   view: VirtualizedTextViewInternal,
   content: MeasuredText,
   snapshot = view.virtualizer.getSnapshot(),
   widgets: readonly InlineWidgetRun[] = [],
 ): HorizontalChunkWindow {
+  if (view.glyphs) {
+    return proportionalChunkWindow(view, content, snapshot, view.glyphs, widgets)
+  }
   const { text } = content
   const viewportColumns = horizontalViewportColumns(view, snapshot.viewportWidth)
   const leftColumn = Math.max(
@@ -1934,6 +1998,34 @@ function horizontalChunkWindow(
   return {
     start: start === 0 ? 0 : previousGraphemeBoundary(text, start + 1),
     end: graphemeChunkEnd(text, clampedEnd),
+  }
+}
+
+/**
+ * The window a scroll offset reaches along a row in a proportional face, found from measured
+ * advances: column arithmetic would mount text far from where the spacer puts the viewport.
+ */
+function proportionalChunkWindow(
+  view: VirtualizedTextViewInternal,
+  content: MeasuredText,
+  snapshot: FixedRowVirtualizerSnapshot,
+  glyphs: GlyphAdvances,
+  widgets: readonly InlineWidgetRun[],
+): HorizontalChunkWindow {
+  const { text } = content
+  const left = horizontalTextScrollLeft(view, snapshot.scrollLeft)
+  const overscan = view.horizontalOverscanColumns * characterWidth(view)
+  const right = left + Math.max(0, snapshot.viewportWidth - gutterWidth(view)) + overscan
+  const startPixels = pixelsBeforeWidgetAdvances(view, content, widgets, left - overscan, 'before')
+  const endPixels = pixelsBeforeWidgetAdvances(view, content, widgets, right, 'after')
+  const startColumn = columnAtPixels(text, startPixels, glyphs, view.tabSize, 'before')
+  const endColumn = columnAtPixels(text, endPixels, glyphs, view.tabSize, 'after')
+  const start = alignChunkStart(startColumn, view.longLineChunkSize)
+  const end = clamp(alignChunkEnd(endColumn, view.longLineChunkSize), start, text.length)
+  if (isSimpleRowText(content)) return { start, end }
+  return {
+    start: start === 0 ? 0 : previousGraphemeBoundary(text, start + 1),
+    end: graphemeChunkEnd(text, end),
   }
 }
 
@@ -2039,6 +2131,12 @@ function updateMountedGutterFacts(
     gutterCursorLineBackgroundLaneIds: readonly string[]
   }
   mutable.gutterNumberCursorLine = state.cursorLine && view.cursorLineHighlight.gutterNumber
+  setCursorLineGutterBand(
+    row.gutterElement,
+    state.cursorLine &&
+      view.currentGutterLeadingInset > 0 &&
+      view.cursorLineHighlight.gutterBackground === true,
+  )
   if (!state.cursorLine) {
     mutable.gutterCursorLineBackgroundLaneIds = []
     return
@@ -2187,6 +2285,12 @@ function updateCursorLineGutterCellClass(
   element.classList.toggle(CURSOR_LINE_GUTTER_CLASS, enabled)
 }
 
+function setCursorLineGutterBand(element: HTMLElement, enabled: boolean): void {
+  if ((gutterCursorLineBandStates.get(element) ?? false) === enabled) return
+  gutterCursorLineBandStates.set(element, enabled)
+  element.classList.toggle(CURSOR_LINE_GUTTER_BAND_CLASS, enabled)
+}
+
 function cursorLineGutterBackgroundEnabled(
   view: VirtualizedTextViewInternal,
   contributionId: string,
@@ -2247,6 +2351,8 @@ function applyRowDecoration(
   virtualRow: number,
 ): void {
   const decoration = rowDecorationForVirtualRow(view, virtualRow)
+  ;(row as { rowDecorationSnapshotStyle: boolean }).rowDecorationSnapshotStyle =
+    decoration?.snapshotStyle === 'colors'
   if (!decoration) {
     clearRowDecoration(row)
     return
@@ -2268,7 +2374,9 @@ function rowDecorationForVirtualRow(
   const displayRow = view.model.projection.getRow(virtualRow)
   if (isInjectedTextDisplayRow(displayRow)) return injectedRowDecoration(displayRow)
 
-  return view.rowDecorations.get(bufferRowForVirtualRow(view, virtualRow))
+  const bufferRow = bufferRowForVirtualRow(view, virtualRow)
+  if (bufferRow === null) return undefined
+  return view.rowDecorations.get(bufferRow)
 }
 
 function injectedRowDecoration(
@@ -2287,7 +2395,7 @@ function rowDecorationKeyForDecoration(
 ): string {
   if (!decoration) return ''
 
-  return `${decoration.className ?? ''}|${decoration.gutterClassName ?? ''}`
+  return `${decoration.className ?? ''}|${decoration.gutterClassName ?? ''}|${decoration.snapshotStyle ?? ''}`
 }
 
 function clearRowDecoration(row: MountedVirtualizedTextRow): void {
@@ -2348,8 +2456,8 @@ function setCoreBidiRefusal(row: MountedVirtualizedTextRow, active: boolean): vo
 function updateMountedRowPaintFacts(row: MountedVirtualizedTextRow, state: RowUpdateState): void {
   const unsupportedClass =
     row.inlineKindsClassName.length > 0 ||
-    row.rowDecorationClassName.length > 0 ||
-    row.rowDecorationGutterClassName.length > 0
+    (!row.rowDecorationSnapshotStyle &&
+      (row.rowDecorationClassName.length > 0 || row.rowDecorationGutterClassName.length > 0))
   const unsupportedWidget = row.textRenderMode === 'widget' && !row.coreBidiRefusal
   const mutable = row as {
     primaryText: boolean
@@ -2454,7 +2562,9 @@ function releaseRowsOutside(
   const reusableRows: MountedVirtualizedTextRow[] = []
   for (const [index, row] of view.rowElements) {
     if (index >= start && index < end) continue
+    invalidateRowPresentations(row.element)
     view.rowElements.delete(index)
+    markRowRetired(row)
     reusableRows.push(row)
   }
 
@@ -2494,19 +2604,36 @@ export function updateGutterWidthIfNeeded(view: VirtualizedTextViewInternal): vo
 
 function applyGutterWidth(view: VirtualizedTextViewInternal): void {
   const widths = gutterContributionWidthMap(view)
+  const laneWidth = fixedGutterWidth(view) + totalGutterContributionWidth(widths)
+  const leadingInset = laneWidth > 0 ? view.gutterLeadingInset : 0
+  const nextWidth = leadingInset + laneWidth
+  view.currentGutterLeadingInset = leadingInset
   if (view.provisional) {
     view.gutterContributionWidths = widths
-    view.currentGutterWidth = fixedGutterWidth(view) + totalGutterContributionWidth(widths)
+    view.currentGutterWidth = nextWidth
     return
   }
   updateGutterContributionWidths(view, widths)
 
-  const nextWidth = fixedGutterWidth(view) + totalGutterContributionWidth(widths)
+  setGutterLeadingInsetProperty(view, leadingInset)
   setStyleValue(view.scrollElement, '--editor-gutter-width', `${nextWidth}px`)
   if (nextWidth === view.currentGutterWidth) return
 
   view.currentGutterWidth = nextWidth
   applySpacerWidth(view)
+}
+
+/** Left unset at zero, so an editor without an inset carries no trace of the option. */
+export function setGutterLeadingInsetProperty(
+  view: VirtualizedTextViewInternal,
+  inset: number,
+): void {
+  if (inset > 0) {
+    setStyleValue(view.scrollElement, '--editor-gutter-inset', `${inset}px`)
+    return
+  }
+  if (view.scrollElement.style.getPropertyValue('--editor-gutter-inset') === '') return
+  view.scrollElement.style.removeProperty('--editor-gutter-inset')
 }
 
 function fixedGutterWidth(view: VirtualizedTextViewInternal): number {
@@ -2636,11 +2763,14 @@ function scanVisualColumns(
 }
 
 // Only document text contributes to the horizontal extent; injected rows are measured for real
-// once they mount.
+// once they mount. A proportional row counts in average-width columns of its measured advances.
 function estimatedDisplayRowColumns(view: VirtualizedTextViewInternal, rowIndex: number): number {
   const displayRow = view.model.projection.getRow(rowIndex)
   if (!isDocumentTextDisplayRow(displayRow)) return 0
-  return visualColumnLength(displayRow, view.tabSize)
+  const glyphs = view.glyphs
+  if (!glyphs) return visualColumnLength(displayRow, view.tabSize)
+  const { text } = displayRow
+  return pixelsBeforeColumn(text, text.length, glyphs, view.tabSize) / characterWidth(view)
 }
 
 function applyContentWidth(view: VirtualizedTextViewInternal, visualColumns: number): void {
@@ -2844,6 +2974,32 @@ export function scrollOffsetIntoView(
   syncVirtualizerMetricsFromScrollElement(view)
 }
 
+/** The block a reveal acts on, once a conditional one has looked at the viewport. */
+export function settledRevealBlock(
+  view: VirtualizedTextViewInternal,
+  offset: number,
+  block: RevealBlock,
+  affinity?: SelectionAffinity,
+): 'nearest' | 'center' | 'end' {
+  if (block !== 'center-if-outside') return block
+  // On screen already: 'nearest' still scrolls sideways to a column out of view.
+  return offsetRowIsInsideViewport(view, offset, affinity) ? 'nearest' : 'center'
+}
+
+/** Whether the row holding the offset is wholly on screen, top to bottom. */
+function offsetRowIsInsideViewport(
+  view: VirtualizedTextViewInternal,
+  offset: number,
+  affinity?: SelectionAffinity,
+): boolean {
+  const snapshot = view.virtualizer.getSnapshot()
+  const top = rowTop(view, rowForOptionalAffinity(view, offset, affinity))
+  return (
+    top >= snapshot.scrollTop &&
+    top + getRowHeight(view) <= snapshot.scrollTop + snapshot.viewportHeight
+  )
+}
+
 export function scrollOffsetToViewportBlock(
   view: VirtualizedTextViewInternal,
   offset: number,
@@ -2955,17 +3111,20 @@ export function viewportPointMetrics(
   readonly clientX: number
   readonly clientY: number
   readonly verticalDirection: number
+  readonly scale: number
 } {
-  const rect = view.scrollElement.getBoundingClientRect()
-  const padding = scrollElementPadding(view.scrollElement)
-  const left = rect.left + padding.left
-  const top = rect.top + padding.top
-  const right = Math.max(left, rect.right - padding.right)
-  const bottom = Math.max(top, rect.bottom - padding.bottom)
+  const { left, top, right, bottom, scale } = pointViewport(view.scrollElement)
 
   return {
-    x: viewportTextX(view, clientX, left, right, view.virtualizer.getSnapshot().scrollLeft),
-    y: clamp(clientY, top, Math.max(top, bottom - 1)) - top,
+    x: viewportTextX(
+      view,
+      clientX / scale,
+      left / scale,
+      right / scale,
+      view.scrollElement.scrollLeft,
+    ),
+    y: (clamp(clientY, top, Math.max(top, bottom - 1)) - top) / scale,
+    scale,
     clientX,
     clientY,
     verticalDirection: pointVerticalDirection(clientY, top, bottom),
@@ -3048,6 +3207,8 @@ export function paintProvisionalRows(
 ): (() => void) | null {
   const slots: MountedVirtualizedTextRow[] = []
   for (const row of view.rowElements.values()) {
+    invalidateRowPresentations(row.element)
+    markRowRetired(row)
     row.element.remove()
     row.gutterElement.remove()
     view.rowPool.push(row)
@@ -3064,6 +3225,7 @@ export function paintProvisionalRows(
     layer.rectangles.map((rectangle) => {
       const element = view.scrollElement.ownerDocument.createElement('div')
       element.dataset.editorSavedPaintLayer = layer.id
+      element.style.zIndex = '1'
       Object.assign(element.style, {
         position: 'absolute',
         pointerEvents: 'none',
@@ -3091,6 +3253,7 @@ function paintProvisionalRow(
 ): boolean {
   slot.element.className = 'editor-virtualized-row'
   slot.gutterElement.className = 'editor-virtualized-gutter-row'
+  gutterCursorLineBandStates.delete(slot.gutterElement)
   delete slot.element.dataset.editorVirtualWindowStart
   delete slot.element.dataset.editorVirtualWindowEnd
   slot.element.classList.toggle('editor-virtualized-cursor-line-row', row.cursor)
@@ -3098,6 +3261,8 @@ function paintProvisionalRow(
   slot.element.dataset.editorProvisionalRow = ''
   Object.assign(slot.element.style, {
     top: `${row.top}px`,
+    backgroundColor: row.backgroundColor,
+    color: row.color,
     transform: '',
     height: `${row.height}px`,
     lineHeight: `${row.height}px`,
@@ -3112,6 +3277,8 @@ function paintProvisionalRow(
   for (const segment of row.segments) {
     const span = view.scrollElement.ownerDocument.createElement('span')
     span.textContent = segment.text
+    span.style.position = 'relative'
+    span.style.zIndex = '2'
     if (segment.kind === 'control') span.className = 'editor-virtualized-control-character'
     if (segment.kind === 'refusal') span.className = 'editor-virtualized-bidi-ceiling'
     if (segment.width > 0) span.style.width = `${segment.width}px`
@@ -3158,6 +3325,13 @@ function paintProvisionalGutter(
     if (!renderer || !savedCell || !restoreSavedGutter(renderer, cell, savedCell.paint))
       return false
   }
+  setCursorLineGutterBand(
+    slot.gutterElement,
+    paint.gutterLayout.leadingInset > 0 &&
+      view.cursorLineHighlight.gutterBackground === true &&
+      row.activeLanes.length > 0,
+  )
+  slot.gutterElement.style.backgroundColor = row.gutterBackgroundColor
   view.gutterElement.appendChild(slot.gutterElement)
   return true
 }
@@ -3185,6 +3359,7 @@ function releaseProvisionalSlot(
   slot.gutterElement.removeAttribute('style')
   slot.element.className = 'editor-virtualized-row'
   slot.gutterElement.className = 'editor-virtualized-gutter-row'
+  gutterCursorLineBandStates.delete(slot.gutterElement)
   delete slot.element.dataset.editorVirtualWindowStart
   delete slot.element.dataset.editorVirtualWindowEnd
   slot.textNode.data = ''
@@ -3212,6 +3387,7 @@ function releaseProvisionalSlot(
     rowDecorationClassName: '',
     rowDecorationGutterClassName: '',
     rowDecorationKey: '',
+    rowDecorationSnapshotStyle: false,
     inlineKindsClassName: '',
   })
   view.rowPool.push(slot)

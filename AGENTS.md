@@ -6,6 +6,14 @@ Instructions for AI coding agents working with this codebase.
 
 Browser-based code editor targeting ultra-low latency typing (<1-2ms perceived). Balanced-tree piece table with persistent immutable snapshots, CSS Highlight API rendering, and optional Tree-sitter syntax plugins.
 
+## The Simple API Comes First
+
+Every feature works on an editor that was only given text: `new Editor(element)` and `setText(text)`, or a plugin built from plain options. Documents — an `openDocument` id, a shared `DocumentSession`, a `LanguageServerDocument` — add identity and sharing: persistence, one buffer or one protocol state behind several views. They are supported, and no feature may require one.
+
+- When a feature needs something a document usually supplies, such as a language server's URI, take it as a plain option on the simple path and let a document fill it in when there is one.
+- A new capability must not add required setup to the one-line use. If it cannot work without a document, the design is wrong, not the caller.
+- Test the simple path. A feature covered only through documents has not proven it works without one.
+
 ## Architecture
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the high-level system design: main thread vs worker split, core systems, data flow, and remaining open questions.
@@ -38,13 +46,13 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the high-level system design: main th
 
 ### Packages
 
-| Package | Purpose | Key files |
-|---|---|---|
-| `packages/editor` | Core editor: document sessions, CSS Highlight API renderer, and Shiki highlighter | `src/editor.ts`, `src/documentSession.ts`, `src/tokens.ts`, `src/shiki/*` |
-| `packages/textbuffer` | Persistent text storage, snapshots, anchors, and line mapping | `src/index.ts`, `src/pieceTableTypes.ts`, `src/tree.ts` |
-| `packages/tree-sitter` | Optional Tree-sitter runtime, worker client, language registry, and structural selection helpers | `src/session.ts`, `src/treeSitter/workerClient.ts`, `src/treeSitter/treeSitter.worker.ts` |
-| `packages/tree-sitter-languages` | First-party lazy Tree-sitter language plugins | `src/index.ts`, `src/queries/*` |
-| `examples/app` | Demo app with file browser | `src/app.ts`, `src/main.ts` |
+| Package                          | Purpose                                                                                          | Key files                                                                                 |
+| -------------------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `packages/editor`                | Core editor: document sessions, CSS Highlight API renderer, and Shiki highlighter                | `src/editor.ts`, `src/documentSession.ts`, `src/tokens.ts`, `src/shiki/*`                 |
+| `packages/textbuffer`            | Persistent text storage, snapshots, anchors, and line mapping                                    | `src/index.ts`, `src/pieceTableTypes.ts`, `src/tree.ts`                                   |
+| `packages/tree-sitter`           | Optional Tree-sitter runtime, worker client, language registry, and structural selection helpers | `src/session.ts`, `src/treeSitter/workerClient.ts`, `src/treeSitter/treeSitter.worker.ts` |
+| `packages/tree-sitter-languages` | First-party lazy Tree-sitter language plugins                                                    | `src/index.ts`, `src/queries/*`                                                           |
+| `examples/app`                   | Demo app with file browser                                                                       | `src/app.ts`, `src/main.ts`                                                               |
 
 ### What's Implemented
 
@@ -64,17 +72,17 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the high-level system design: main th
 
 ### Key Types (in code)
 
-| Type | Location |
-|---|---|
-| `Piece` | `packages/textbuffer/src/pieceTableTypes.ts` |
-| `PieceBufferId` | `packages/textbuffer/src/pieceTableTypes.ts` |
-| `PieceTreeNode` | `packages/textbuffer/src/pieceTableTypes.ts` |
-| `PieceTableSnapshot` | `packages/textbuffer/src/pieceTableTypes.ts` |
-| `EditorToken`, `EditorTokenStyle`, `TextEdit` | `packages/editor/src/tokens.ts` |
-| `EditorTokenStore` (the document's tokens; object tokens are input only) | `packages/editor/src/syntax/tokenStore.ts` |
-| `TreeSitterLanguageContribution`, `TreeSitterBackend` | `packages/tree-sitter/src/index.ts` |
-| `TokenPatch`, `IncrementalTokenizer` | `packages/editor/src/shiki/tokenizer.ts` |
-| `Editor` (class) | `packages/editor/src/editor.ts` |
+| Type                                                                     | Location                                     |
+| ------------------------------------------------------------------------ | -------------------------------------------- |
+| `Piece`                                                                  | `packages/textbuffer/src/pieceTableTypes.ts` |
+| `PieceBufferId`                                                          | `packages/textbuffer/src/pieceTableTypes.ts` |
+| `PieceTreeNode`                                                          | `packages/textbuffer/src/pieceTableTypes.ts` |
+| `PieceTableSnapshot`                                                     | `packages/textbuffer/src/pieceTableTypes.ts` |
+| `EditorToken`, `EditorTokenStyle`, `TextEdit`                            | `packages/editor/src/tokens.ts`              |
+| `EditorTokenStore` (the document's tokens; object tokens are input only) | `packages/editor/src/syntax/tokenStore.ts`   |
+| `TreeSitterLanguageContribution`, `TreeSitterBackend`                    | `packages/tree-sitter/src/index.ts`          |
+| `TokenPatch`, `IncrementalTokenizer`                                     | `packages/editor/src/shiki/tokenizer.ts`     |
+| `Editor` (class)                                                         | `packages/editor/src/editor.ts`              |
 
 ### Terminology
 
@@ -92,7 +100,7 @@ Run `bun run format` (oxfmt via Turborepo). It formats the **entire repo**, so w
 
 ### Dead-code checks
 
-`bun run knip` (config in `knip.jsonc`) finds unused files, exports, and dependencies across the workspace. Public API entry points are registered per-package from each package's `exports` map, so only genuinely-internal dead code is reported. A few real deps are referenced in ways knip can't see statically (CSS `@import`, wasm build tooling, the vitest playwright provider) and are listed under `ignoreDependencies` with the reason inline.
+`bun run knip` (config in `knip.ts`) finds unused files, exports, and dependencies across the workspace. Each package's entry points are computed from its `exports` map, so a new export needs no config and only genuinely-internal dead code is reported. A few real deps are referenced in ways knip can't see statically (wasm build tooling, the vitest playwright provider) and are listed under `ignoreDependencies` with the reason inline.
 
 <!-- opensrc:start -->
 
@@ -116,3 +124,5 @@ npx opensrc <owner>/<repo>      # GitHub repo (e.g., npx opensrc vercel/ai)
 ```
 
 <!-- opensrc:end -->
+
+- Firefox/WebKit Playwright runs on the Arch dev machine need `/work/projects/platform/scripts/playwright-webkit-arch.sh` after any `playwright install` that downloads a new WebKit.

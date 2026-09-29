@@ -1,0 +1,97 @@
+--- a/grammar.js
++++ b/grammar.js
+@@ -239,6 +239,7 @@
+   ],
+ 
+   conflicts: ($) => [
++    [$._block_not_section, $.paragraph],
+     // JavaScript
+     [$.primary_expression, $._property_name],
+     [$.primary_expression, $._property_name, $.arrow_function],
+@@ -568,7 +569,7 @@
+         1,
+         seq(
+           optional($._whitespace),
+-          field("heading_content", alias($._line, $.markdown_inline)),
++          field("heading_content", repeat1(choice(alias($._line, $.markdown_inline), $._jsx_element, $.jsx_expression))),
+         ),
+       ),
+ 
+@@ -768,7 +769,7 @@
+     // https://github.github.com/gfm/#paragraphs
+     paragraph: ($) =>
+       seq(
+-        alias(repeat1(choice($._line, $._soft_line_break)), $.markdown_inline),
++        repeat1(choice(alias(prec.right(repeat1(choice($._line, $._soft_line_break))), $.markdown_inline), $._jsx_element, $.jsx_expression)),
+         choice($._newline, $._eof),
+       ),
+ 
+--- a/src/scanner.c
++++ b/src/scanner.c
+@@ -106,46 +106,26 @@
+ }
+ 
+ // For explanation of the tokens see grammar.js
+-static const bool paragraph_interrupt_symbols[] = {
+-    false, // LINE_ENDING,
+-    false, // SOFT_LINE_ENDING,
+-    false, // BLOCK_CLOSE,
+-    false, // BLOCK_CONTINUATION,
+-    true,  // BLOCK_QUOTE_START,
+-    false, // INDENTED_CHUNK_START,
+-    true,  // ATX_H1_MARKER,
+-    true,  // ATX_H2_MARKER,
+-    true,  // ATX_H3_MARKER,
+-    true,  // ATX_H4_MARKER,
+-    true,  // ATX_H5_MARKER,
+-    true,  // ATX_H6_MARKER,
+-    true,  // SETEXT_H1_UNDERLINE,
+-    true,  // SETEXT_H2_UNDERLINE,
+-    true,  // THEMATIC_BREAK,
+-    true,  // LIST_MARKER_MINUS,
+-    true,  // LIST_MARKER_PLUS,
+-    true,  // LIST_MARKER_STAR,
+-    true,  // LIST_MARKER_PARENTHESIS,
+-    true,  // LIST_MARKER_DOT,
+-    false, // LIST_MARKER_MINUS_DONT_INTERRUPT,
+-    false, // LIST_MARKER_PLUS_DONT_INTERRUPT,
+-    false, // LIST_MARKER_STAR_DONT_INTERRUPT,
+-    false, // LIST_MARKER_PARENTHESIS_DONT_INTERRUPT,
+-    false, // LIST_MARKER_DOT_DONT_INTERRUPT,
+-    true,  // FENCED_CODE_BLOCK_START_BACKTICK,
+-    true,  // FENCED_CODE_BLOCK_START_TILDE,
+-    true,  // BLANK_LINE_START,
+-    false, // FENCED_CODE_BLOCK_END_BACKTICK,
+-    false, // FENCED_CODE_BLOCK_END_TILDE,
+-    false, // CLOSE_BLOCK,
+-    false, // NO_INDENTED_CHUNK,
+-    false, // ERROR,
+-    false, // TRIGGER_ERROR,
+-    false, // EOF,
+-    false, // MINUS_METADATA,
+-    false, // PLUS_METADATA,
+-    true,  // PIPE_TABLE_START,
+-    false, // PIPE_TABLE_LINE_ENDING,
++static const bool paragraph_interrupt_symbols[UNCLOSED_SPAN + 1] = {
++    [BLOCK_QUOTE_START] = true,
++    [ATX_H1_MARKER] = true,
++    [ATX_H2_MARKER] = true,
++    [ATX_H3_MARKER] = true,
++    [ATX_H4_MARKER] = true,
++    [ATX_H5_MARKER] = true,
++    [ATX_H6_MARKER] = true,
++    [SETEXT_H1_UNDERLINE] = true,
++    [SETEXT_H2_UNDERLINE] = true,
++    [THEMATIC_BREAK] = true,
++    [LIST_MARKER_MINUS] = true,
++    [LIST_MARKER_PLUS] = true,
++    [LIST_MARKER_STAR] = true,
++    [LIST_MARKER_PARENTHESIS] = true,
++    [LIST_MARKER_DOT] = true,
++    [FENCED_CODE_BLOCK_START_BACKTICK] = true,
++    [FENCED_CODE_BLOCK_START_TILDE] = true,
++    [BLANK_LINE_START] = true,
++    [PIPE_TABLE_START] = true,
+ };
+ 
+ // State bitflags used with `Scanner.state`

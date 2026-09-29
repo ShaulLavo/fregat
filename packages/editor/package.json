@@ -37,11 +37,6 @@
       "import": "./dist/public/extensions.js",
       "default": "./dist/public/extensions.js"
     },
-    "./internal": {
-      "types": "./dist/internal.d.ts",
-      "import": "./dist/internal.js",
-      "default": "./dist/internal.js"
-    },
     "./logging": {
       "types": "./dist/logging/index.d.ts",
       "import": "./dist/logging/index.js",
@@ -91,6 +86,9 @@
   "scripts": {
     "build": "bun ../../scripts/build-package.ts",
     "bench:inspection": "bun bench/pieceTable-inspection.ts",
+    "bench:reclamation": "bun bench/reclamation-run.ts",
+    "bench:reclamation-text": "bun bench/reclamation-compare.ts",
+    "bench:reclamation-positions": "bun bench/reclamation-positions.ts",
     "bench:anchors": "bun bench/pieceTable-anchors.ts",
     "bench:transforms": "bun bench/displayTransforms.ts",
     "bench:fold-map": "bun bench/foldMap.ts",
@@ -98,10 +96,11 @@
     "bench:virtualization": "bun bench/virtualization.ts",
     "bench:walker": "bun bench/pieceTable-walker.ts",
     "bench:tokens": "bun bench/tokenStore.ts",
+    "bench:edit-commands": "EDIT_COMMAND_LATENCY=1 vitest run --project dom test/editCommandLatency.test.ts",
     "bidi:check": "bun scripts/generateBidiClass.mjs --check",
     "bidi:generate": "bun scripts/generateBidiClass.mjs",
     "test": "bun run bidi:check && vitest run",
-    "typecheck": "tsgo --noEmit",
+    "typecheck": "tsgo --noEmit && tsgo --noEmit -p test/types/tsconfig.json",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check ."
@@ -109,7 +108,7 @@
   "dependencies": {
     "@shikijs/engine-oniguruma": "4.4.3",
     "@singapore-editor/textbuffer": "workspace:*",
-    "@tanstack/hotkeys": "0.8.0",
+    "@tanstack/hotkeys": "0.10.0",
     "diff": "^9.0.0",
     "evlog": "^2.29.0",
     "shiki": "^4.4.3"
@@ -118,12 +117,13 @@
     "@playwright/test": "^1.63.0",
     "@shikijs/langs": "4.4.3",
     "@shikijs/themes": "4.4.3",
-    "@typescript/native-preview": "7.0.0-dev.20260613.1",
-    "@vitest/browser-playwright": "^4.1.11",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "@vitest/browser-playwright": "^5.0.2",
     "happy-dom": "^20.14.5",
-    "oxfmt": "0.54.0",
-    "oxlint": "1.69.0",
+    "oxfmt": "0.70.0",
+    "oxlint": "1.85.0",
+    "tree-sitter-md": "0.1.1",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.2"
   }
 }

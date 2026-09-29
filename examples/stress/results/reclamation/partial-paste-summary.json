@@ -1,0 +1,68 @@
+{
+  "note": "Same Node v26.7.0, three fresh processes per scenario. Borrowed is the sparse candidate before dense-survivor detachment, not clean repository HEAD. Eager is a rejected synchronous-copy prototype. Peaks are sampled at operation boundaries.",
+  "rows": [
+    {
+      "scenario": "tail",
+      "borrowed": {
+        "insertMs": 3.976081999999998,
+        "reclaimMs": 1.7385870000000025,
+        "retainedHeapBytes": 17336136,
+        "stagePeakHeapBytes": 18652264
+      },
+      "eagerRejected": {
+        "insertMs": 295.219242,
+        "reclaimMs": 1.0676939999999604,
+        "retainedHeapBytes": 571952,
+        "stagePeakHeapBytes": 60470304
+      },
+      "final": {
+        "insertMs": 4.034086000000002,
+        "reclaimMs": 1.8625460000000018,
+        "retainedHeapBytes": 581800,
+        "stagePeakHeapBytes": 18979272
+      }
+    },
+    {
+      "scenario": "closed-full",
+      "borrowed": {
+        "insertMs": 3.9428979999999996,
+        "reclaimMs": 1.7615900000000053,
+        "retainedHeapBytes": 17332000,
+        "stagePeakHeapBytes": 18652424
+      },
+      "eagerRejected": {
+        "insertMs": 297.408395,
+        "reclaimMs": 1.0089649999999892,
+        "retainedHeapBytes": 569336,
+        "stagePeakHeapBytes": 63738680
+      },
+      "final": {
+        "insertMs": 4.081894000000002,
+        "reclaimMs": 2.7825890000000015,
+        "retainedHeapBytes": 592744,
+        "stagePeakHeapBytes": 19128288
+      }
+    },
+    {
+      "scenario": "closed-partial",
+      "borrowed": {
+        "insertMs": 3.893967,
+        "reclaimMs": 3.216307999999998,
+        "retainedHeapBytes": 574304,
+        "stagePeakHeapBytes": 18648264
+      },
+      "eagerRejected": {
+        "insertMs": 298.114209,
+        "reclaimMs": 1.4202350000000479,
+        "retainedHeapBytes": 581080,
+        "stagePeakHeapBytes": 61107456
+      },
+      "final": {
+        "insertMs": 3.975664000000002,
+        "reclaimMs": 3.5431930000000023,
+        "retainedHeapBytes": 591360,
+        "stagePeakHeapBytes": 18578832
+      }
+    }
+  ]
+}

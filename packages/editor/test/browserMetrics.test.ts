@@ -18,44 +18,6 @@ const mockRegistry = {
 
 class MockHighlight extends Set<Range> {}
 
-// Stands in for the FontFaceSet happy-dom does not implement: the editor reads document.fonts and
-// listens for the load that invalidates its first reading.
-class FakeFontFaceSet extends EventTarget {
-  status: 'loading' | 'loaded' = 'loading'
-  readonly ready: Promise<FakeFontFaceSet>
-  listenerCount = 0
-  private resolveReady!: (value: FakeFontFaceSet) => void
-
-  constructor() {
-    super()
-    this.ready = new Promise((resolve) => {
-      this.resolveReady = resolve
-    })
-  }
-
-  addEventListener(type: string, listener: EventListenerOrEventListenerObject | null): void {
-    this.listenerCount += 1
-    super.addEventListener(type, listener)
-  }
-
-  removeEventListener(type: string, listener: EventListenerOrEventListenerObject | null): void {
-    this.listenerCount -= 1
-    super.removeEventListener(type, listener)
-  }
-
-  finishLoading(): void {
-    this.status = 'loaded'
-    this.dispatchEvent(new Event('loadingdone'))
-  }
-
-  // Reaching 'loaded' without the announcement is the case the editor cannot see coming, and the
-  // one where a stale reading would otherwise outlive the session.
-  settleQuietly(): void {
-    this.status = 'loaded'
-    this.resolveReady(this)
-  }
-}
-
 const PROBE_CLASS = 'editor-virtualized-metric-probe'
 const ROW_HEIGHT = 24
 
@@ -63,7 +25,6 @@ let advanceOf: (character: string) => number
 let probeHeight = ROW_HEIGHT
 let onProbeRect: (() => void) | null = null
 let originalGetBoundingClientRect: () => DOMRect
-let fonts: FakeFontFaceSet
 let container: HTMLElement
 let editor: Editor | null = null
 let snapshots: EditorViewSnapshot[] = []
@@ -182,8 +143,6 @@ describe('browser text metrics', () => {
     advanceOf = () => 8
     probeHeight = ROW_HEIGHT
     stubProbeMeasurement()
-    fonts = new FakeFontFaceSet()
-    Object.defineProperty(document, 'fonts', { configurable: true, value: fonts })
     clearBrowserTextMetricsCache()
     container = document.createElement('div')
     document.body.appendChild(container)
@@ -194,63 +153,18 @@ describe('browser text metrics', () => {
     editor = null
     container.remove()
     HTMLElement.prototype.getBoundingClientRect = originalGetBoundingClientRect
-    Reflect.deleteProperty(document, 'fonts')
     clearBrowserTextMetricsCache()
     setHighlightRegistry(undefined)
   })
 
-  it('re-measures a mounted editor when a font finishes loading', () => {
-    mountEditor()
-    const before = snapshots.at(-1)
-
-    advanceOf = () => 12
-    fonts.finishLoading()
-    const after = snapshots.at(-1)
-
-    expect(before?.metrics.characterWidth).toBe(8)
-    expect(after?.metrics.characterWidth).toBe(12)
-    expect(after?.contentWidth).toBeGreaterThan(before?.contentWidth ?? 0)
-  })
-
-  it('re-measures a mounted editor when a pending font settles unannounced', async () => {
-    mountEditor()
-    const before = snapshots.at(-1)
-
-    advanceOf = () => 12
-    fonts.settleQuietly()
-    await fonts.ready
-
-    expect(before?.metrics.characterWidth).toBe(8)
-    expect(snapshots.at(-1)?.metrics.characterWidth).toBe(12)
-  })
-
-  it('releases the font subscription with the last editor on the window', () => {
-    mountEditor()
-    const mountedListeners = fonts.listenerCount
-
-    editor?.dispose()
-    advanceOf = () => 12
-    fonts.finishLoading()
-
-    expect(mountedListeners).toBe(1)
-    expect(fonts.listenerCount).toBe(0)
-    expect(snapshots.at(-1)?.metrics.characterWidth).toBe(8)
-  })
-
-  it('leaves the cache standing when a font settles after the last editor is gone', async () => {
-    mountEditor()
-    editor?.dispose()
-    measureBrowserTextMetrics(container)
-
-    fonts.settleQuietly()
-    await fonts.ready
-
-    // The cache is shared by every document, so a reading dropped here is paid for by editors that
-    // have nothing to do with the window this promise came from.
-    expect(countLayoutsDuring(() => measureBrowserTextMetrics(container))).toBe(0)
-  })
-
   it('stops at the editor an earlier listener tore down', () => {
+    const queries: MediaQueryList[] = []
+    const originalMatchMedia = window.matchMedia.bind(window)
+    const matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => {
+      const list = originalMatchMedia(query)
+      queries.push(list)
+      return list
+    })
     let disposeSecond: (() => void) | null = null
     editor = new Editor(container, {
       defaultText: 'mmmmmmmmmm',
@@ -263,7 +177,8 @@ describe('browser text metrics', () => {
     disposeSecond = () => second.dispose()
 
     probeHeight = 30
-    fonts.finishLoading()
+    queries[0]?.dispatchEvent(new Event('change'))
+    matchMedia.mockRestore()
     secondHost.remove()
 
     expect(measuredRowHeight(editorRootIn(container))).toBe('30px')

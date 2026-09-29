@@ -1,0 +1,95 @@
+{
+  "scope": "Review corrections to the uncommitted E006 sparse implementation; not completion of E006.",
+  "baselineCommit": "b31e22eb18c240d04ade431e44a80fa60e694aa4",
+  "focusedTests": {
+    "textbuffer": 145,
+    "core": 202,
+    "treeSitterSourceUnit": 18,
+    "treeSitterBrowser": 57,
+    "platformWorkspaceEditAndRetention": 73
+  },
+  "typechecksPassed": ["textbuffer", "core", "tree-sitter", "stress"],
+  "lintPassed": ["textbuffer", "core (two existing warnings)", "tree-sitter", "stress"],
+  "buildsPassed": ["textbuffer", "core", "clean baseline stress dependencies"],
+  "packageSmoke": "passed",
+  "rootFormatCheck": "passed",
+  "validatedInputSamplesPerRun": 108,
+  "inputComparison": "Fresh clean baseline and borrowed-page candidate, matched manifests/config/browser/hardware/runtime. Original baseline source hash matches rerun. Not calibrated acceptance.",
+  "coldProbe": "3 fresh Node processes per eager-copy reproduction/borrowed variant, 32 Mi UTF-16 units, real DisplayProjection acquisition plus first classification; not browser paint time.",
+  "heapAttribution": "Pre-review 500-cycle mixed/survivors captures with raw gzip snapshots, checksum manifest and portable analyzer; compiled code and inverse-string parents are measured retainers.",
+  "limits": [
+    "E006 heap target remains open; no threshold changed.",
+    "First classification still scans/indexes the full long line.",
+    "Borrowed readers detach during maintenance of their document family; disposing every view alone does not drain them.",
+    "Prior baseline failures remain documented in partial-validation.json; full workspace typecheck/full core suite were not repeated in this review."
+  ],
+  "changes": [
+    "Borrow bounded measurement pages; construction/classification do not copy.",
+    "Intern identical ranges and share latest immutable-prefix backing per physical owner; detach pages independently during maintenance.",
+    "Reuse already independent sparse spans; retain a bounded two-entry source index cache.",
+    "Family registry follows forks and finds readers from abandoned logs after atomic storage publication.",
+    "Remove bufferTextOwner/textOwner; restrict cached-tail reads to append chunks.",
+    "Calibrate retained heap across browser task boundaries, preserving immediate observations and rejected candidates."
+  ],
+  "mountedHeapSamples": 30,
+  "heapInstrument": "All stages preserve immediate GC plus two timer-task/GC readings; sentinel and maintenance suspension verified. Last settled reading enters release calculation.",
+  "heapTarget": {
+    "medianThreshold": 0.1,
+    "passed": false,
+    "observations": [
+      {
+        "workload": "aligned/500",
+        "samples": 3,
+        "medianReduction": 0.6784098439806567
+      },
+      {
+        "workload": "aligned/1000",
+        "samples": 3,
+        "medianReduction": 0.8188845639057336
+      },
+      {
+        "workload": "survivors/500",
+        "samples": 3,
+        "medianReduction": 0.044580183178387967
+      },
+      {
+        "workload": "survivors/1000",
+        "samples": 3,
+        "medianReduction": 0.10740265911077795
+      },
+      {
+        "workload": "mixed/500",
+        "samples": 3,
+        "medianReduction": 0.013600401418969343
+      },
+      {
+        "workload": "mixed/1000",
+        "samples": 3,
+        "medianReduction": 0.06339333804917247
+      },
+      {
+        "workload": "paragraph/500",
+        "samples": 3,
+        "medianReduction": 0.03477267028690567
+      },
+      {
+        "workload": "paragraph/1000",
+        "samples": 3,
+        "medianReduction": 0.13028486639573034
+      },
+      {
+        "workload": "paste-tail/1",
+        "samples": 3,
+        "medianReduction": 0.9106524276596947
+      }
+    ],
+    "maxSliceMs": 5.200000047683716
+  },
+  "runtimeSourceSha256": {
+    "textbuffer": "63941baaf4933c469fb6a0df2a983920eb4ce8c927feed271d05241f2e63400e",
+    "editor": "37bf934a75e2ea99f4b8d17183e763958a2fa5813f98de750f0763f0ebf11145"
+  },
+  "runtimeSourceHashNote": "Supplemental sorted-path/content digest includes new untracked source files, excludes *.test.ts; heap bundleHash identifies the built browser artifact. Existing input sourceHash does not independently identify untracked textbuffer module contents.",
+  "finalInputRunId": "c8f5e8f2-8770-4be5-a04e-ddaf95486ac4",
+  "heapBundleSha256": "3653dca6a577a0e16a4951eafbf2403516b381d8de253e31ee804558c9fc23ca"
+}

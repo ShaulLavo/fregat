@@ -18,7 +18,6 @@ export {
   readPieceTableLine,
   readPieceTableTextRange,
   materializePieceTableFullText,
-  forEachPieceTableTextChunk,
   pieceTableSnapshotsHaveSameText,
   streamPieceTablePieces,
   streamPieceTableTextChunks,

@@ -1,11 +1,11 @@
 import { projectDecorationRangeThroughEdits } from './editor/decorationStore'
 import type {
-  EditorDisposable,
   EditorTrackedRanges,
   EditorViewContributionContext,
   EditorViewContributionUpdateKind,
   EditorViewSnapshot,
 } from './plugins'
+import type { EditorDisposable } from './editor/disposables'
 import {
   createSemanticTokenStyles,
   type SemanticTokenDropReason,
@@ -122,7 +122,7 @@ export function createSemanticTokenLayer(
     scopeAliases: options.scopeAliases,
     zIndex: SEMANTIC_TOKEN_Z_INDEX,
   })
-  const prefix = context.highlightPrefix ?? ''
+  const prefix = context.highlightPrefix
   // Keyed by resolved style rather than by scope name, and the index is remembered for the layer's
   // life: the live group count is then the number of distinct semantic *colours* the viewport holds,
   // which is a property of the theme and not of the server. A fifty-type legend still collapses to a
@@ -147,7 +147,7 @@ export function createSemanticTokenLayer(
   }
 
   const clearPainted = (): void => {
-    for (const group of painted.values()) context.clearRangeHighlight?.(group.name)
+    for (const group of painted.values()) context.clearRangeHighlight(group.name)
     painted = new Map()
     paintedDocumentId = null
   }
@@ -274,8 +274,8 @@ export function createSemanticTokenLayer(
       if (sameRanges(group.ranges, ranges)) continue
 
       group.ranges = ranges
-      if (ranges.length === 0) context.clearRangeHighlight?.(group.name)
-      else context.setRangeHighlight?.(group.name, ranges, group.style)
+      if (ranges.length === 0) context.clearRangeHighlight(group.name)
+      else context.setRangeHighlight(group.name, ranges, group.style)
     }
   }
 
@@ -284,7 +284,7 @@ export function createSemanticTokenLayer(
     snapshot: EditorViewSnapshot,
     projectedThroughEdits: number,
   ): SemanticTokenPushResult {
-    const textLength = documentLength(snapshot)
+    const textLength = snapshot.textSnapshot.length
     const unresolved = new Set<string>()
     const groups = new Map<string, PaintedGroup>()
     let paintedSpans = 0
@@ -311,14 +311,14 @@ export function createSemanticTokenLayer(
     // A group that painted last time and holds nothing now has to be cleared explicitly: an empty
     // set of ranges is not the same message as "leave what is there".
     for (const [styleKey, group] of painted) {
-      if (!groups.has(styleKey)) context.clearRangeHighlight?.(group.name)
+      if (!groups.has(styleKey)) context.clearRangeHighlight(group.name)
     }
     for (const group of groups.values()) {
-      context.setRangeHighlight?.(group.name, group.ranges, group.style)
+      context.setRangeHighlight(group.name, group.ranges, group.style)
       // Anchors are a property of the buffer, so a batch edit, a multi-cursor run, a formatter
       // response and a Replace All all resolve correctly — which single-edit offset projection
       // cannot do.
-      group.tracked = context.trackRanges?.(group.ranges, SEMANTIC_TOKEN_STICKINESS) ?? null
+      group.tracked = context.trackRanges(group.ranges, SEMANTIC_TOKEN_STICKINESS)
     }
     painted = groups
     paintedDocumentId = snapshot.documentId
@@ -528,20 +528,6 @@ function innermostSpan(active: readonly SemanticTokenSpan[]): SemanticTokenSpan 
 function isInnerSpan(span: SemanticTokenSpan, incumbent: SemanticTokenSpan): boolean {
   if (span.start !== incumbent.start) return span.start > incumbent.start
   return span.end < incumbent.end
-}
-
-/**
- * How long the document is, without materialising it.
- *
- * `fullText` is a lazy getter that walks the piece table and joins the whole document into a
- * string, and its memo lives on the snapshot object — which `Editor.getSnapshot()` builds fresh on
- * every call, so nothing amortises it. Reading `.length` off it therefore cost one whole-document
- * serialisation per push: a megabyte-scale allocation and a full tree walk, to learn a number
- * `textSnapshot` holds directly. The fallback is for hosts and harnesses that supply a snapshot
- * without one.
- */
-function documentLength(snapshot: EditorViewSnapshot): number {
-  return snapshot.textSnapshot?.length ?? snapshot.fullText.length
 }
 
 function clampOffset(offset: number, textLength: number): number {

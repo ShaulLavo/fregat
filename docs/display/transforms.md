@@ -79,9 +79,9 @@ text through shared measurements. These costs are separate from row/string mater
 Horizontal extent still follows observed rows rather than a whole-document maximum-width scan.
 
 Live snapshots retain content handles. `toVisibleSnapshot()` captures mounted paint parts and stays
-bounded to mounted content. The explicit full-document `toJSON()` export still materializes full text
-and source line starts, including its row strings. E033 owns that public full-text boundary; E034
-owns fallback indentation-fold discovery.
+bounded to mounted content. A live snapshot has no `toJSON()` or `fullText`: whole-view JSON comes
+only from `serializeEditorViewSnapshot(snapshot)`, which reads the captured revision's full text and
+source line starts on purpose (E033). E034 owns fallback indentation-fold discovery.
 
 Measurements and commands are recorded in [the E031 performance report](../performance/e031-projection.md).
 
@@ -168,6 +168,16 @@ second validation layer instead of collapsing immediately to a monolithic mapper
 
 - Tab expansion uses configurable `tabSize` math shared with the renderer.
 - Wrapping uses indexed numeric summaries and materializes segments on demand with the existing tab-column math.
+- `wrapBreak: 'word'` (Editor option `wordWrapBreak`) ends a row at the last word boundary: after a
+  run of spaces, beside a CJK character, or at a replacement's edge, falling back to the filling
+  column for a word wider than the row. Spaces hang past the edge instead of starting a row, and a
+  replacement is never split. Every line that breaks, or is wider than a row, stores explicit row
+  ends (the `breaks` of a wrapped entry, shared with tabbed lines). Building the 500k-line
+  `bench:transforms` fixture costs 123 ms against 69 ms for character wrap; the character path is
+  unchanged.
+- A proportional face wraps by measured advances (E052): `wrapAdvance` carries the row width in pixels
+  and a per-face glyph table read from a canvas, and both break modes place ends where the running
+  advance would pass the width less a 1 px margin. Monospace faces never build the table.
 
 The removed block-row and block-surface APIs are not part of the transform architecture and are not
 compatibility targets.
@@ -207,7 +217,9 @@ contiguous segment list covering the whole line, so column conversion in either 
 Hidden spans are zero-width in display space, so several source columns share one display column.
 `display -> source -> display` is always the identity. `source -> display -> source` is not, at a
 hidden boundary. The inverse resolves by bias: `before`/`nearest` to the earliest source column,
-`after` to the latest. Horizontal motion passes the bias matching its direction.
+`after` to the latest. Horizontal motion passes the bias matching its direction. Bias chooses only
+inside a run: the display column at a visible replacement's end always resolves to its source end,
+so a step back from the column after a chip lands between the chip and the next character.
 
 ### Reveal
 
@@ -215,6 +227,36 @@ hidden boundary. The inverse resolves by bias: `before`/`nearest` to the earlies
 touched group, and returns a derived map. Reveal is construct-scoped, not marker-scoped: a caret
 anywhere inside `**bold**` unhides both fences. Because mapping and painting both read the revealed
 map, they cannot disagree about what is currently hidden.
+
+Each replacement picks its policy with `reveal`: `'touch'` (the default, edges included), `'inside'`
+(a caret strictly between the edges, or a selection overlapping the interior), or `'never'`.
+
+### Atomic replacements
+
+A replacement with `atomic: true` is one unit to editing as well as to painting, which is what a chat
+composer's mention chip needs. The view hands the atomic spans of the rendered (revealed) map to the
+input layer (`VirtualizedTextView.atomicRanges`):
+
+- Every caret move that lands strictly inside one carries on to the edge it was heading for: logical,
+  word, visual and vertical motion alike.
+- Backspace at its end and Delete at its start take all of it. A word delete, a selection delete and
+  a soft keyboard's range deletion widen over any atomic span they would cut into.
+
+A replacement that renders a node can carry a `key`. A mount whose key a later map still holds keeps
+its node, so a provider that derives ids from offsets does not remount a widget on every edit before
+it. A key repeated within one map falls back to the id.
+
+### Triggers
+
+`registerInlineReplacementProvider(provider, { trigger })` takes `'syntax'` (the default: rerun when
+captures land, and captures stay on while it is registered) or `'edit'` (rerun inside every
+operation that edits text or moves a selection, with no capture demand). The context carries the
+resolved selections, so an edit-triggered provider can leave the token being typed as text.
+
+Captures describe the text of the last parse, so a syntax-triggered provider never reruns on an edit:
+the map it made is carried to the current text by its anchors and merged with what the
+edit-triggered providers derive, until fresh captures land. A new document drops it and derives the
+edit-triggered part from the new text at once.
 
 ### InlineMap Invalidation Analysis
 
@@ -271,10 +313,11 @@ spans, by adjacency for links and images.
 
 ### Still open
 
-- Wrapping may split a multi-character replacement across rows; the wrap pass does not yet treat
-  replacements as unbreakable units.
-- Edits drop the map and wait for the next parse to supply a fresh one, matching how FoldMap behaves.
-  `updateInlineMapForEdit` can carry it across an edit once the host drives that.
+- Character wrap (the default) may split a multi-character replacement across rows, which then
+  paints as the text it stands for. Word wrap (`wordWrapBreak: 'word'`) keeps every replacement on
+  one row; both count a replacement by its placeholder text, not the width its rendered node measures.
+- Carrying a syntax-derived map re-resolves every range on each refresh; with many replacements and
+  an edit-triggered provider on one editor that is O(ranges) per keystroke until Phase 4's range set.
 
 ---
 

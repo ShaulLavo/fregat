@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "manifestHash": "a56b03c08983fa01255a4542cb9e5beba2199a0097fbd40b8b63a72c327f4e1f",
+  "manifestHash": "33678241f42e9f42b0be049581bae1f4be92448b0bf77ec476f30502f5659e80",
   "languages": [
     {
       "id": "javascript",
@@ -661,231 +661,31 @@
     },
     {
       "id": "markdown",
-      "parserABI": 14,
+      "parserABI": 15,
       "source": {
-        "package": "@tree-sitter-grammars/tree-sitter-markdown",
-        "version": "0.3.2",
-        "repository": "github:tree-sitter-grammars/tree-sitter-markdown",
+        "package": "tree-sitter-md",
+        "version": "0.1.1",
+        "repository": "https://github.com/ShaulLavo/tree-sitter-md",
+        "revision": "ff455a7dd3dc6177ddaf6879de462cecc34df73f",
         "license": "MIT",
-        "compiler": "upstream artifact; compiler not recorded",
-        "revision": "1c8dea73bc0c996d92dd9ebc30dd388716b1c5db",
-        "queryRevision": "1c8dea73bc0c996d92dd9ebc30dd388716b1c5db",
-        "integrity": "sha512-hQXCcDVvg2t4E8cn7zz6jjIBerzk9E9ZlHxJp5IrUOpY4s1YVpXJbMeWZks2/V7lmkPRnnkM8IrTbQ5ltwEOnA==",
-        "tarball": "https://registry.npmjs.org/@tree-sitter-grammars/tree-sitter-markdown/-/tree-sitter-markdown-0.3.2.tgz"
+        "compiler": "wasi-sdk 34"
       },
       "sourceFiles": [
         {
-          "file": "common/html_entities.json",
-          "sha256": "108b7cf9b6b81f27f4b7afab787c83cd633b4d276823c5ec494496426d1457eb"
-        },
-        {
           "file": "package.json",
-          "sha256": "4cc54bfbb566b637038fb4e8996d46e218052935a4d00f86b77a8cc939eabf30"
-        },
-        {
-          "file": "tree-sitter-markdown-inline/grammar.js",
-          "sha256": "1bfe06864486e2e47bdbed6d5d2eb4b1ce8ae66d660ff13d2ede03ce77e66d39"
-        },
-        {
-          "file": "tree-sitter-markdown-inline/src/grammar.json",
-          "sha256": "b1c8b9d6e571e43477b338936905548f52368ef6e8b1b1c4337b1d83c5b38a04"
-        },
-        {
-          "file": "tree-sitter-markdown-inline/src/node-types.json",
-          "sha256": "6e041bf025013a84d53a2aed577d20d00469ef6e9fe172f89de1c166a396c83b"
-        },
-        {
-          "file": "tree-sitter-markdown-inline/src/parser.c",
-          "sha256": "59f09d69bac99f5e8f1ebf8c9a161eedb674120829340540a3d9c4c6a18d4f32"
-        },
-        {
-          "file": "tree-sitter-markdown-inline/src/scanner.c",
-          "sha256": "96f2aa2310e6e9de52f08d6e7b0ac9cd1fe70f35e0449deb726dfe687524cc55"
-        },
-        {
-          "file": "tree-sitter-markdown-inline/src/tree_sitter/alloc.h",
-          "sha256": "253b44a7b4313a7afd0c505c2fc6e7ce4b8e78955ebf4be3ea000532ec060673"
-        },
-        {
-          "file": "tree-sitter-markdown-inline/src/tree_sitter/array.h",
-          "sha256": "4ff743903dc46f5db6aa54f31c6b4d160a8a9779e5b2ab1ee59ae7ebcd850ea1"
-        },
-        {
-          "file": "tree-sitter-markdown-inline/src/tree_sitter/parser.h",
-          "sha256": "a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a"
-        },
-        {
-          "file": "tree-sitter-markdown/grammar.js",
-          "sha256": "4f0b919d97851684bdb3afc736d3d028d39e99010622cffeffa48432fbeb70c0"
-        },
-        {
-          "file": "tree-sitter-markdown/src/grammar.json",
-          "sha256": "2fd650df7a288233d37f1be0ae3fceebe15194e2ebb4d697a2525222a47ed382"
-        },
-        {
-          "file": "tree-sitter-markdown/src/node-types.json",
-          "sha256": "419ca876ed13795d262ed9daca286469bf48da2cafe4db67b6246a5dc7ce55d6"
-        },
-        {
-          "file": "tree-sitter-markdown/src/parser.c",
-          "sha256": "649c08a1ca4ef3c1ddf3fe707079475f15c7084cd305a6dc7b9cfd8aa1fd177c"
-        },
-        {
-          "file": "tree-sitter-markdown/src/scanner.c",
-          "sha256": "c321731403c07179c7dfd0287c935e55eaab5589559172da51bb51df256f661b"
-        },
-        {
-          "file": "tree-sitter-markdown/src/tree_sitter/alloc.h",
-          "sha256": "253b44a7b4313a7afd0c505c2fc6e7ce4b8e78955ebf4be3ea000532ec060673"
-        },
-        {
-          "file": "tree-sitter-markdown/src/tree_sitter/array.h",
-          "sha256": "4ff743903dc46f5db6aa54f31c6b4d160a8a9779e5b2ab1ee59ae7ebcd850ea1"
-        },
-        {
-          "file": "tree-sitter-markdown/src/tree_sitter/parser.h",
-          "sha256": "a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a"
+          "sha256": "49818836ad67a68872724af7d684cce027e7519af23f38ac9cbdc99aa3a3adf2"
         }
       ],
       "files": [
         {
-          "file": "./grammars/tree-sitter-markdown.wasm",
-          "sha256": "1c416f01be25112976035eed39d9463a045585d264df95350413ac708928dec1"
-        },
-        {
-          "file": "./queries/markdown-highlights.scm",
-          "sha256": "b0a6445be85eec72e295cdbaf5e25cfe68debaa7be95085fd5a84766b4a46f9a"
-        },
-        {
-          "file": "./queries/markdown-folds.scm",
-          "sha256": "75198126df21dafb696ed6728906d431578909636e0cd30d79245fa702662677"
-        },
-        {
-          "file": "./queries/markdown-injections.scm",
-          "sha256": "ce9a3ab58651a7dca5ea684592e21ad73865763e91df7461942d40685de5ae78"
+          "file": "tree-sitter-md/tree-sitter-markdown.wasm",
+          "sha256": "4d71e4c53f38c368b3c80fad9a6ff5d000873b2e63d8666ac9dac8ff736b6367"
         }
       ],
       "queries": [
         {
           "kind": "highlights",
-          "sha256": "b0a6445be85eec72e295cdbaf5e25cfe68debaa7be95085fd5a84766b4a46f9a"
-        },
-        {
-          "kind": "folds",
-          "sha256": "75198126df21dafb696ed6728906d431578909636e0cd30d79245fa702662677"
-        },
-        {
-          "kind": "injections",
-          "sha256": "ce9a3ab58651a7dca5ea684592e21ad73865763e91df7461942d40685de5ae78"
-        }
-      ]
-    },
-    {
-      "id": "markdown_inline",
-      "parserABI": 14,
-      "source": {
-        "package": "@tree-sitter-grammars/tree-sitter-markdown",
-        "version": "0.3.2",
-        "repository": "github:tree-sitter-grammars/tree-sitter-markdown",
-        "license": "MIT",
-        "compiler": "upstream artifact; compiler not recorded",
-        "revision": "1c8dea73bc0c996d92dd9ebc30dd388716b1c5db",
-        "queryRevision": "1c8dea73bc0c996d92dd9ebc30dd388716b1c5db",
-        "integrity": "sha512-hQXCcDVvg2t4E8cn7zz6jjIBerzk9E9ZlHxJp5IrUOpY4s1YVpXJbMeWZks2/V7lmkPRnnkM8IrTbQ5ltwEOnA==",
-        "tarball": "https://registry.npmjs.org/@tree-sitter-grammars/tree-sitter-markdown/-/tree-sitter-markdown-0.3.2.tgz"
-      },
-      "sourceFiles": [
-        {
-          "file": "common/html_entities.json",
-          "sha256": "108b7cf9b6b81f27f4b7afab787c83cd633b4d276823c5ec494496426d1457eb"
-        },
-        {
-          "file": "package.json",
-          "sha256": "4cc54bfbb566b637038fb4e8996d46e218052935a4d00f86b77a8cc939eabf30"
-        },
-        {
-          "file": "tree-sitter-markdown-inline/grammar.js",
-          "sha256": "1bfe06864486e2e47bdbed6d5d2eb4b1ce8ae66d660ff13d2ede03ce77e66d39"
-        },
-        {
-          "file": "tree-sitter-markdown-inline/src/grammar.json",
-          "sha256": "b1c8b9d6e571e43477b338936905548f52368ef6e8b1b1c4337b1d83c5b38a04"
-        },
-        {
-          "file": "tree-sitter-markdown-inline/src/node-types.json",
-          "sha256": "6e041bf025013a84d53a2aed577d20d00469ef6e9fe172f89de1c166a396c83b"
-        },
-        {
-          "file": "tree-sitter-markdown-inline/src/parser.c",
-          "sha256": "59f09d69bac99f5e8f1ebf8c9a161eedb674120829340540a3d9c4c6a18d4f32"
-        },
-        {
-          "file": "tree-sitter-markdown-inline/src/scanner.c",
-          "sha256": "96f2aa2310e6e9de52f08d6e7b0ac9cd1fe70f35e0449deb726dfe687524cc55"
-        },
-        {
-          "file": "tree-sitter-markdown-inline/src/tree_sitter/alloc.h",
-          "sha256": "253b44a7b4313a7afd0c505c2fc6e7ce4b8e78955ebf4be3ea000532ec060673"
-        },
-        {
-          "file": "tree-sitter-markdown-inline/src/tree_sitter/array.h",
-          "sha256": "4ff743903dc46f5db6aa54f31c6b4d160a8a9779e5b2ab1ee59ae7ebcd850ea1"
-        },
-        {
-          "file": "tree-sitter-markdown-inline/src/tree_sitter/parser.h",
-          "sha256": "a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a"
-        },
-        {
-          "file": "tree-sitter-markdown/grammar.js",
-          "sha256": "4f0b919d97851684bdb3afc736d3d028d39e99010622cffeffa48432fbeb70c0"
-        },
-        {
-          "file": "tree-sitter-markdown/src/grammar.json",
-          "sha256": "2fd650df7a288233d37f1be0ae3fceebe15194e2ebb4d697a2525222a47ed382"
-        },
-        {
-          "file": "tree-sitter-markdown/src/node-types.json",
-          "sha256": "419ca876ed13795d262ed9daca286469bf48da2cafe4db67b6246a5dc7ce55d6"
-        },
-        {
-          "file": "tree-sitter-markdown/src/parser.c",
-          "sha256": "649c08a1ca4ef3c1ddf3fe707079475f15c7084cd305a6dc7b9cfd8aa1fd177c"
-        },
-        {
-          "file": "tree-sitter-markdown/src/scanner.c",
-          "sha256": "c321731403c07179c7dfd0287c935e55eaab5589559172da51bb51df256f661b"
-        },
-        {
-          "file": "tree-sitter-markdown/src/tree_sitter/alloc.h",
-          "sha256": "253b44a7b4313a7afd0c505c2fc6e7ce4b8e78955ebf4be3ea000532ec060673"
-        },
-        {
-          "file": "tree-sitter-markdown/src/tree_sitter/array.h",
-          "sha256": "4ff743903dc46f5db6aa54f31c6b4d160a8a9779e5b2ab1ee59ae7ebcd850ea1"
-        },
-        {
-          "file": "tree-sitter-markdown/src/tree_sitter/parser.h",
-          "sha256": "a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a"
-        }
-      ],
-      "files": [
-        {
-          "file": "./grammars/tree-sitter-markdown-inline.wasm",
-          "sha256": "43c294f941a7dd078fe7f94729ff2d65fcb170d0cc3b1b2a8e60c0f4329e44a2"
-        },
-        {
-          "file": "./queries/markdown-inline-highlights.scm",
-          "sha256": "8e020863c2cac1b3ecb52f185a717b5d76c26e474a4b28bf1ed6a5e66a2b9e0b"
-        },
-        {
-          "file": "./queries/markdown-inline-injections.scm",
-          "sha256": "db3c0fd4f5f4888674dc636adcd6efbc93aec6414a362913bd268d21402be8a9"
-        }
-      ],
-      "queries": [
-        {
-          "kind": "highlights",
-          "sha256": "8e020863c2cac1b3ecb52f185a717b5d76c26e474a4b28bf1ed6a5e66a2b9e0b"
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
         {
           "kind": "folds",
@@ -893,7 +693,7 @@
         },
         {
           "kind": "injections",
-          "sha256": "db3c0fd4f5f4888674dc636adcd6efbc93aec6414a362913bd268d21402be8a9"
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         }
       ]
     },
@@ -905,13 +705,13 @@
         "revision": "213f6e6973d9b456c6e50e86f19f66877e7ef0ee",
         "queryRevision": "213f6e6973d9b456c6e50e86f19f66877e7ef0ee",
         "license": "MIT",
-        "compiler": "wasi-sdk 29; tree-sitter 0.26.13"
+        "compiler": "wasi-sdk 34; tree-sitter 0.27.0"
       },
       "sourceFiles": [],
       "files": [
         {
           "file": "./grammars/tree-sitter-astro.wasm",
-          "sha256": "2458cbe28a987c39a18495b3ec51b5a8a8617e1595cb5afc9fc9ceccf6405c48"
+          "sha256": "602004854e05205f4a0f4890283c4693e0533f1a497e42053a38572610aa3163"
         },
         {
           "file": "./queries/astro-highlights.scm",
@@ -2075,6 +1875,82 @@
         {
           "kind": "injections",
           "sha256": "51a5bfb755d3a2745cebd4648c4c2ca7917a8905362f3f979b5c07af25e303b4"
+        }
+      ]
+    },
+    {
+      "id": "sql",
+      "parserABI": 15,
+      "source": {
+        "repository": "https://github.com/DerekStride/tree-sitter-sql",
+        "revision": "97614d051eebfd3bc5d97c0bdb5a1638719ca811",
+        "queryRevision": "97614d051eebfd3bc5d97c0bdb5a1638719ca811",
+        "license": "MIT",
+        "compiler": "wasi-sdk 34; tree-sitter 0.27.0"
+      },
+      "sourceFiles": [],
+      "files": [
+        {
+          "file": "./grammars/tree-sitter-sql.wasm",
+          "sha256": "13df5dd065a3870728b32f37089b3bf6f54ec0868c3840d718d60ffb084a6365"
+        },
+        {
+          "file": "./queries/sql-highlights.scm",
+          "sha256": "e0780d48190be2ece884abf551da50d8011a946e7e3fb39ee48fbe5a28f158ab"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "14dcaae604bd913d763be1d942085179f8406d1c99ae12df19137d784ebd76ec"
+        },
+        {
+          "kind": "folds",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "injections",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "id": "mdx",
+      "parserABI": 15,
+      "source": {
+        "repository": "https://github.com/srazzak/tree-sitter-mdx",
+        "revision": "3aa29e8de1bf0213948a04fe953039b6ab73777b",
+        "queryRevision": "3aa29e8de1bf0213948a04fe953039b6ab73777b",
+        "license": "MIT",
+        "compiler": "wasi-sdk 34; tree-sitter 0.27.0"
+      },
+      "sourceFiles": [],
+      "files": [
+        {
+          "file": "./grammars/tree-sitter-mdx.wasm",
+          "sha256": "71c92f82a0805e336b60b08a62d1cc48be287cb699cc943acad8640829624245"
+        },
+        {
+          "file": "./queries/mdx-highlights.scm",
+          "sha256": "9d4be8b024b6a299d52ed27f55b74fe27b8f8729d6246aac075d13d587cf990f"
+        },
+        {
+          "file": "./queries/mdx-injections.scm",
+          "sha256": "78cc79db0c2f07522328fef0f426e8bf7f0ff587467eeccbc21aa4827807e733"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "9d4be8b024b6a299d52ed27f55b74fe27b8f8729d6246aac075d13d587cf990f"
+        },
+        {
+          "kind": "folds",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "injections",
+          "sha256": "78cc79db0c2f07522328fef0f426e8bf7f0ff587467eeccbc21aa4827807e733"
         }
       ]
     }

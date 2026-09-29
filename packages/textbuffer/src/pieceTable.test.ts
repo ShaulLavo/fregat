@@ -10,7 +10,7 @@ import {
   createPieceTableWalker,
   deleteFromPieceTable,
   diffPieceTableSnapshots,
-  forEachPieceTableTextChunk,
+  streamPieceTableTextChunks,
   readPieceTableTextRange,
   insertIntoPieceTable,
   debugPieceTable,
@@ -281,7 +281,7 @@ describe('piece table', () => {
     const snapshot = insertIntoPieceTable(createPieceTableSnapshot('ac'), 1, 'b')
     const chunks: string[] = []
 
-    forEachPieceTableTextChunk(snapshot, (text, start, end) => {
+    streamPieceTableTextChunks(snapshot, (text, start, end) => {
       chunks.push(`${start}:${end}:${text}`)
     })
 

@@ -23,6 +23,7 @@ import {
   type TextSegment,
 } from '../graphemes'
 import type { SelectionAffinity } from '../selections'
+import { recordEditorPerformanceDiagnostic } from '../editor/performanceDiagnostics'
 import { clamp } from '../style-utils'
 import { RTL_BIDI_CHARACTER } from './bidiClassData'
 import { rowLocalIndexForOffset, rowOffsetForLocalIndex } from './virtualizedTextViewInlineMapping'
@@ -311,6 +312,14 @@ let inlineWidgetWidthRevision = 0
 let rowGeometrySweepCount = 0
 let rtlTextClassificationScanCount = 0
 
+/** Why a row's geometry is built the way it is; every value but `calculated` measures the DOM. */
+type RowGeometryPath =
+  | 'calculated'
+  | 'inline-mapping'
+  | 'non-simple-text'
+  | 'proportional-font'
+  | 'tab'
+
 export function createTextChunkParts(
   node: Text,
   localStart: number,
@@ -468,8 +477,9 @@ export function xToOffset(
   view: VirtualizedTextViewInternal,
   row: MountedVirtualizedTextRow,
   x: number,
+  scale?: number,
 ): number {
-  if (rowUsesCalculatedGeometry(row)) return calculatedXToOffset(view, row, x)
+  if (rowUsesCalculatedGeometry(view, row)) return calculatedXToOffset(view, row, x, scale)
 
   const geometry = ensureRowGeometry(view, row)
   return offsetForX(geometry, Math.max(0, x))
@@ -484,7 +494,7 @@ export function knownRowContentWidth(
   const cached = row.geometryCache as RowGeometryCache | null
   if (cached?.key === key && !cached.geometry.plan && Number.isFinite(cached.geometry.width))
     return cached.geometry.width
-  if (rowUsesCalculatedGeometry(row)) return calculatedRowWidth(view, row)
+  if (rowUsesCalculatedGeometry(view, row)) return calculatedRowWidth(view, row)
 
   const measured = measuredRowWidths.get(row.element)
   return measured?.key === key ? measured.width : null
@@ -1536,8 +1546,20 @@ function buildRowGeometry(
   view: VirtualizedTextViewInternal,
   row: MountedVirtualizedTextRow,
 ): RowGeometry {
-  if (rowUsesCalculatedGeometry(row)) return buildCalculatedRowGeometry(view, row)
+  const path = rowGeometryPath(view, row)
+  recordEditorPerformanceDiagnostic('view.rowGeometry', () => ({
+    path,
+    length: row.text.length,
+  }))
+  if (path === 'calculated') return buildCalculatedRowGeometry(view, row)
   return buildMeasuredRowGeometry(view, row)
+}
+
+function rowUsesCalculatedGeometry(
+  view: VirtualizedTextViewInternal,
+  row: MountedVirtualizedTextRow,
+): boolean {
+  return rowGeometryPath(view, row) === 'calculated'
 }
 
 /**
@@ -1545,11 +1567,17 @@ function buildRowGeometry(
  * editor's base font. Rows with inline replacements can be restyled per replacement kind — a
  * markdown heading row is bold and larger — so their advance widths only exist in the DOM.
  */
-function rowUsesCalculatedGeometry(row: MountedVirtualizedTextRow): boolean {
-  if (row.inlineMapping) return false
-  if (!isSimpleRowText(row)) return false
+function rowGeometryPath(
+  view: VirtualizedTextViewInternal,
+  row: MountedVirtualizedTextRow,
+): RowGeometryPath {
+  if (row.inlineMapping) return 'inline-mapping'
+  if (!isSimpleRowText(row)) return 'non-simple-text'
+  if (!view.monospace) return 'proportional-font'
   // CSS tab stops can disagree with the estimated cell grid after a horizontal spacer.
-  return !(row.measurements?.hasTabs ?? (typeof row.text === 'string' && row.text.includes('\t')))
+  const hasTabs =
+    row.measurements?.hasTabs ?? (typeof row.text === 'string' && row.text.includes('\t'))
+  return hasTabs ? 'tab' : 'calculated'
 }
 
 function buildCalculatedRowGeometry(
@@ -1582,12 +1610,15 @@ function calculatedXToOffset(
   view: VirtualizedTextViewInternal,
   row: MountedVirtualizedTextRow,
   x: number,
+  scale?: number,
 ): number {
   const anchor = calculatedRowAnchorForX(view, row, x)
   // Undoing the anchor's own offset costs a few bits, so a column's exact left edge can come back a
   // hair under the whole number it was built from and fall into the cell before it. The tolerance
   // is orders of magnitude below a pixel, so it can only reclaim that.
-  const cells = (x - anchor.x) / Math.max(1, calculatedCellWidth(view, row)) + COLUMN_EPSILON
+  const cells =
+    (x - anchor.x) / Math.max(1, cellWidthInRowSpace(view, scale ?? rowClientRectScale(row))) +
+    COLUMN_EPSILON
   // Each anchor speaks only for its own columns. Re-anchoring on a measured
   // advance leaves a gap wherever the measured position and the extrapolated
   // one disagree, and an x inside that gap extrapolates past the span into
@@ -1633,13 +1664,6 @@ function calculatedRowAnchorForX(
 // probed through the host, which may scale everything it contains.
 function cellWidthInRowSpace(view: VirtualizedTextViewInternal, scale: number): number {
   return view.metrics.characterWidth / scale
-}
-
-function calculatedCellWidth(
-  view: VirtualizedTextViewInternal,
-  row: MountedVirtualizedTextRow,
-): number {
-  return cellWidthInRowSpace(view, rowClientRectScale(row))
 }
 
 const clampChunkLocal = (chunk: VirtualizedTextChunk, local: number): number =>
@@ -2567,6 +2591,9 @@ function resolveRowGeometry(geometry: RowGeometry): RowGeometry {
   if (!plan) return geometry
 
   rowGeometrySweepCount += 1
+  recordEditorPerformanceDiagnostic('view.rowGeometry.sweep', () => ({
+    boundaries: geometry.offsets.length,
+  }))
 
   const { offsets, xs } = geometry
   let ascending = true

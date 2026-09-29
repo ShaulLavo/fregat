@@ -1,15 +1,14 @@
+import type { LanguageServerDocumentSnapshot } from './types'
 import {
   type DocumentLogicalRevisionScope,
-  type DocumentSessionChange,
   type DocumentSyncPoint,
   type DocumentSyncSegment,
   type TextEdit,
 } from '@singapore-editor/core/document'
 import type {
+  EditorContributionChange,
   EditorViewContributionUpdateKind,
-  EditorViewSnapshot,
 } from '@singapore-editor/core/extensions'
-import { defineLazyFullTextProperty } from '@singapore-editor/core/internal'
 import {
   recordLspPerformanceDiagnostic,
   type LspDocumentTransitionNotification,
@@ -27,6 +26,9 @@ import type { ActiveDocument, DocumentDescriptor } from './pluginTypes'
 import type { LanguageServerDocumentSyncOptions } from './types'
 import { viewDocumentSnapshot } from './viewDocumentSnapshot'
 
+/** `result` came from the server; `reset` is the client emptying the list itself. */
+export type DocumentSyncSummaryKind = 'result' | 'reset'
+
 export type DocumentSyncDiagnosticsPresenter = {
   clear(): void
   render(document: LspTextDocumentSnapshot, diagnostics: readonly lsp.Diagnostic[]): void
@@ -34,6 +36,7 @@ export type DocumentSyncDiagnosticsPresenter = {
     uri: lsp.DocumentUri,
     version: number | null,
     diagnostics: readonly lsp.Diagnostic[],
+    kind: DocumentSyncSummaryKind,
   ): void
 }
 
@@ -66,13 +69,19 @@ export class DocumentSync {
     return this.diagnosticItems
   }
 
-  public shouldSync(kind: EditorViewContributionUpdateKind, snapshot: EditorViewSnapshot): boolean {
+  public shouldSync(
+    kind: EditorViewContributionUpdateKind,
+    snapshot: LanguageServerDocumentSnapshot,
+  ): boolean {
     if (kind === 'document' || kind === 'content' || kind === 'clear') return true
     if (!this.document) return false
     return !sameSyncPoint(this.syncPoint, snapshot.documentSyncPoint)
   }
 
-  public sync(snapshot: EditorViewSnapshot, change: DocumentSessionChange | null): void {
+  public sync(
+    snapshot: LanguageServerDocumentSnapshot,
+    change: EditorContributionChange | null,
+  ): void {
     const projectedUri = this.projectedDocumentUri(snapshot)
     const descriptor = documentDescriptor(snapshot, this.options, projectedUri)
     if (!descriptor) {
@@ -89,7 +98,7 @@ export class DocumentSync {
   }
 
   public transitionDocumentUri(
-    snapshot: EditorViewSnapshot,
+    snapshot: LanguageServerDocumentSnapshot,
     transition: LanguageServerDocumentUriTransition,
   ): boolean {
     if (!this.matchesTransitionSource(snapshot, transition)) return false
@@ -122,11 +131,11 @@ export class DocumentSync {
 
     this.presenter.clear()
     if (attachment) this.workspace.closeDocument(attachment)
-    this.presenter.publishSummary(active.uri, active.lspVersion, [])
+    this.presenter.publishSummary(active.uri, active.lspVersion, [], 'reset')
   }
 
   private matchesTransitionSource(
-    snapshot: EditorViewSnapshot,
+    snapshot: LanguageServerDocumentSnapshot,
     transition: LanguageServerDocumentUriTransition,
   ): boolean {
     const active = this.document
@@ -140,7 +149,9 @@ export class DocumentSync {
     return point.segment !== transition.syncPoint.segment
   }
 
-  private projectedDocumentUri(snapshot: EditorViewSnapshot): lsp.DocumentUri | undefined {
+  private projectedDocumentUri(
+    snapshot: LanguageServerDocumentSnapshot,
+  ): lsp.DocumentUri | undefined {
     const projection = this.pendingUriProjection
     if (!projection) return undefined
     if (snapshot.documentSyncPoint.segment !== projection.segment) {
@@ -187,13 +198,13 @@ export class DocumentSync {
     this.presenter.clear()
     if (!active) return
 
-    this.presenter.publishSummary(active.uri, active.lspVersion, [])
+    this.presenter.publishSummary(active.uri, active.lspVersion, [], 'reset')
   }
 
   private openOrUpdateDocument(
     descriptor: DocumentDescriptor,
-    change: DocumentSessionChange | null,
-    snapshot: EditorViewSnapshot,
+    change: EditorContributionChange | null,
+    snapshot: LanguageServerDocumentSnapshot,
   ): void {
     const active = this.document
     if (!active) {
@@ -220,7 +231,7 @@ export class DocumentSync {
   ): void {
     this.diagnosticItems = diagnostics
     this.presenter.render(active, diagnostics)
-    this.presenter.publishSummary(active.uri, version, diagnostics)
+    this.presenter.publishSummary(active.uri, version, diagnostics, 'result')
   }
 
   private openDocument(descriptor: DocumentDescriptor, syncPoint: DocumentSyncPoint): void {
@@ -269,8 +280,8 @@ export class DocumentSync {
 
   private updateDocument(
     descriptor: DocumentDescriptor,
-    change: DocumentSessionChange | null,
-    snapshot: EditorViewSnapshot,
+    change: EditorContributionChange | null,
+    snapshot: LanguageServerDocumentSnapshot,
   ): void {
     const active = this.document
     const diagnostics = projectDiagnosticsInSnapshot(this.diagnosticItems, {
@@ -329,7 +340,7 @@ export class DocumentSync {
 
     this.diagnosticItems = []
     this.presenter.clear()
-    this.presenter.publishSummary(active.uri, active.lspVersion, [])
+    this.presenter.publishSummary(active.uri, active.lspVersion, [], 'reset')
     this.pendingUriProjection = {
       fromUri: active.uri,
       toUri: transition.document.uri,
@@ -367,10 +378,10 @@ type SyncChanges = {
 }
 
 function changesSinceLastSync(
-  snapshot: EditorViewSnapshot,
+  snapshot: LanguageServerDocumentSnapshot,
   point: DocumentSyncPoint | null,
   scope: DocumentLogicalRevisionScope,
-  change: DocumentSessionChange | null,
+  change: EditorContributionChange | null,
   previousTextSnapshot: LspTextSnapshot,
   nextTextSnapshot: LspTextSnapshot,
 ): SyncChanges {
@@ -397,9 +408,9 @@ function changesSinceLastSync(
 }
 
 function fallbackSyncChanges(
-  snapshot: EditorViewSnapshot,
+  snapshot: LanguageServerDocumentSnapshot,
   point: DocumentSyncPoint | null,
-  change: DocumentSessionChange | null,
+  change: EditorContributionChange | null,
   scope: DocumentLogicalRevisionScope,
   previousTextSnapshot: LspTextSnapshot,
   nextTextSnapshot: LspTextSnapshot,
@@ -423,7 +434,7 @@ function fallbackSyncChanges(
 }
 
 function fallbackLogicalRevisionCount(
-  change: DocumentSessionChange | null,
+  change: EditorContributionChange | null,
   scope: DocumentLogicalRevisionScope,
   textChanged: boolean,
   point: DocumentSyncPoint | null,
@@ -457,18 +468,15 @@ function isSharedUriTransition(
   return currentPoint.segment !== nextPoint.segment
 }
 
-// Spreading a descriptor would evaluate its enumerable lazy fullText getter
-// and materialize the whole document on every keystroke. Rebuild the active
-// document with a fresh lazy property over the same text snapshot instead.
 function activeDocument(descriptor: DocumentDescriptor, lspVersion: number): ActiveDocument {
-  return defineLazyFullTextProperty({
+  return {
     uri: descriptor.uri,
     languageId: descriptor.languageId,
     textSnapshot: descriptor.textSnapshot,
     lineStarts: descriptor.lineStarts,
     textVersion: descriptor.textVersion,
     lspVersion,
-  })
+  }
 }
 
 function activeDocumentForTransition(
@@ -476,18 +484,18 @@ function activeDocumentForTransition(
   transition: LspDocumentTransitionNotification,
 ): ActiveDocument {
   const document = transition.document
-  return defineLazyFullTextProperty({
+  return {
     uri: document.uri,
     languageId: document.languageId,
     textSnapshot: document.textSnapshot,
     lineStarts: document.lineStarts,
     textVersion: active.textVersion,
     lspVersion: document.version,
-  })
+  }
 }
 
 function documentUri(
-  snapshot: EditorViewSnapshot,
+  snapshot: LanguageServerDocumentSnapshot,
   options: LanguageServerDocumentSyncOptions,
 ): lsp.DocumentUri | null {
   if (!snapshot.documentId) return null
@@ -496,7 +504,7 @@ function documentUri(
 }
 
 function documentDescriptor(
-  snapshot: EditorViewSnapshot,
+  snapshot: LanguageServerDocumentSnapshot,
   options: LanguageServerDocumentSyncOptions,
   projectedUri?: lsp.DocumentUri,
   projectedTextSnapshot?: LspTextSnapshot,
@@ -510,18 +518,18 @@ function documentDescriptor(
   if (options.shouldSyncUri?.(uri, snapshot) === false) return null
 
   const document = viewDocumentSnapshot(snapshot)
-  return defineLazyFullTextProperty({
+  return {
     uri,
     // `shouldSyncLanguageId` above still filters on the view's id, not this one.
     languageId: options.languageIdForDocument?.(snapshot.languageId, uri) ?? snapshot.languageId,
     textSnapshot: projectedTextSnapshot ?? document.textSnapshot,
     lineStarts: document.lineStarts,
     textVersion: snapshot.textVersion,
-  })
+  }
 }
 
 export function activeDocumentForSnapshot(
-  snapshot: EditorViewSnapshot,
+  snapshot: LanguageServerDocumentSnapshot,
   options: LanguageServerDocumentSyncOptions,
 ): ActiveDocument | null {
   const descriptor = documentDescriptor(snapshot, options)

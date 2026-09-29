@@ -1,5 +1,6 @@
 import type { EditorFindWidgetState } from './findController'
 import { createFindIcon, FIND_ICONS, type FindIcon } from './findIcons'
+import { FIND_MATCHES_LIMIT } from './search'
 
 const EDITOR_THEME_VARIABLES = [
   '--editor-background',
@@ -88,13 +89,9 @@ export class EditorFindWidget {
       this.replaceInput.value = state.replaceString
     this.replaceRow.hidden = !state.replaceRevealed
     setToggleExpanded(this.replaceToggleButton, state.replaceRevealed, 'Replace')
-    this.count.textContent = resultCountText(
-      state.matchesPosition,
-      state.matchesCount,
-      state.matchesTruncated,
-    )
-    this.count.title = state.matchesTruncated
-      ? truncatedCountTitle(state.matchesCount)
+    this.count.textContent = resultCountText(state.matchesPosition, state.matchesCount)
+    this.count.title = state.highlightsTruncated
+      ? TRUNCATED_HIGHLIGHTS_TITLE
       : this.count.textContent
     setTogglePressed(this.caseButton, state.matchCase, 'Match Case')
     setTogglePressed(this.wordButton, state.wholeWord, 'Match Whole Word')
@@ -263,14 +260,11 @@ function toggleTooltip(label: string, active: boolean): string {
   return active ? `${label} (On)` : `${label} (Off)`
 }
 
-function resultCountText(position: number, count: number, truncated: boolean): string {
+function resultCountText(position: number, count: number): string {
   if (count === 0) return 'No results'
-  return `${position || '?'} of ${count}${truncated ? '+' : ''}`
+  return `${position || '?'} of ${count}`
 }
 
-// The '+' alone reads as an error; name the operations that ignore the cap
-// rather than claiming all of them do — navigation still walks the capped list
-// until the incremental searcher lands.
-function truncatedCountTitle(count: number): string {
-  return `Only the first ${count} results are counted and highlighted. Replace All and Select All Matches still cover the entire text.`
-}
+// The count is exact; what stops at the cap is the painting, and saying so is the
+// only sign a reader gets that an unpainted match further down is still a match.
+const TRUNCATED_HIGHLIGHTS_TITLE = `Only the first ${FIND_MATCHES_LIMIT} results are highlighted. Every result is counted, and Find Next, Replace All and Select All Matches cover the entire text.`

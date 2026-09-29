@@ -113,11 +113,12 @@ describe('createTypeScriptLspServerSession', () => {
     expect(worker.sent).toEqual([message])
   })
 
-  it('records worker errors and tears down worker ownership', () => {
+  it('tells the socket why the worker exited and tears down worker ownership', () => {
     const worker = new FakeWorker()
     const errors: unknown[] = []
+    const send = vi.fn()
     const session = createTypeScriptLspServerSession({
-      send: vi.fn(),
+      send,
       workerFactory: () => worker,
       onError: (error) => errors.push(error),
     })
@@ -125,6 +126,10 @@ describe('createTypeScriptLspServerSession', () => {
     worker.fail('worker crashed')
 
     expect(errorMessage(errors[0])).toBe('worker crashed')
+    expect(JSON.parse(send.mock.calls.at(-1)?.[0] as string)).toMatchObject({
+      method: '$/serverExited',
+      params: { outcome: 'crashed', error: { message: 'worker crashed' } },
+    })
     expect(worker.terminated).toBe(true)
     expect(worker.listenerCount('message')).toBe(0)
     expect(worker.listenerCount('error')).toBe(0)

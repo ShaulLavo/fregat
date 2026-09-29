@@ -36,6 +36,27 @@ const CAPPED_OPTIONS = { seedSearchStringFromSelection: 'never', cursorMoveOnTyp
 
 describe('find navigation past the paint cap', () => {
   findTest(
+    'reads the document once for a query that matches nothing',
+    { text: 'alpha\nbravo\ncharlie', options: { seedSearchStringFromSelection: 'never' } },
+    (harness) => {
+      harness.openFind()
+      harness.typeSearch('zul')
+      const before = harness.documentReads().length
+      harness.typeSearch('u')
+
+      // The listing already says there is nothing to land on. Asking navigation
+      // anyway is a scan ahead and a wrapped scan more, on every keystroke.
+      expect(harness.documentReads().length - before).toBe(1)
+      assertFindState(harness, {
+        matches: [],
+        current: null,
+        selection: [0, 0],
+        count: 'No results',
+      })
+    },
+  )
+
+  findTest(
     'reaches the next match rather than the top of the document',
     {
       text: CAPPED_TEXT,
@@ -52,9 +73,8 @@ describe('find navigation past the paint cap', () => {
         matches: FIND_MATCHES_LIMIT,
         current: cappedMatch(FIND_MATCHES_LIMIT),
         selection: cappedMatch(FIND_MATCHES_LIMIT),
-        // Unnumbered rather than wrong: the count is of what was painted, and
-        // this match is past the end of it.
-        count: `? of ${FIND_MATCHES_LIMIT}+`,
+        // Numbered and totalled past the cap: only the painting stops there.
+        count: `${FIND_MATCHES_LIMIT + 1} of ${FIND_MATCHES_LIMIT + 2}`,
       })
 
       harness.pressEnter()
@@ -62,7 +82,7 @@ describe('find navigation past the paint cap', () => {
         matches: FIND_MATCHES_LIMIT,
         current: cappedMatch(FIND_MATCHES_LIMIT + 1),
         selection: cappedMatch(FIND_MATCHES_LIMIT + 1),
-        count: `? of ${FIND_MATCHES_LIMIT}+`,
+        count: `${FIND_MATCHES_LIMIT + 2} of ${FIND_MATCHES_LIMIT + 2}`,
       })
 
       // Backwards from there is the match just crossed, not the last painted one:
@@ -72,7 +92,7 @@ describe('find navigation past the paint cap', () => {
         matches: FIND_MATCHES_LIMIT,
         current: cappedMatch(FIND_MATCHES_LIMIT),
         selection: cappedMatch(FIND_MATCHES_LIMIT),
-        count: `? of ${FIND_MATCHES_LIMIT}+`,
+        count: `${FIND_MATCHES_LIMIT + 1} of ${FIND_MATCHES_LIMIT + 2}`,
       })
 
       // Onto the last match in the document, and then off the end of it.
@@ -82,7 +102,7 @@ describe('find navigation past the paint cap', () => {
         matches: FIND_MATCHES_LIMIT,
         current: cappedMatch(0),
         selection: cappedMatch(0),
-        count: `1 of ${FIND_MATCHES_LIMIT}+`,
+        count: `1 of ${FIND_MATCHES_LIMIT + 2}`,
       })
     },
   )
@@ -103,7 +123,7 @@ describe('find navigation past the paint cap', () => {
         matches: FIND_MATCHES_LIMIT,
         current: cappedMatch(FIND_MATCHES_LIMIT + 1),
         selection: cappedMatch(FIND_MATCHES_LIMIT + 1),
-        count: `? of ${FIND_MATCHES_LIMIT}+`,
+        count: `${FIND_MATCHES_LIMIT + 2} of ${FIND_MATCHES_LIMIT + 2}`,
       })
 
       // Nothing ahead and nothing to wrap to, so the last match is where this
@@ -113,7 +133,7 @@ describe('find navigation past the paint cap', () => {
         matches: FIND_MATCHES_LIMIT,
         current: cappedMatch(FIND_MATCHES_LIMIT + 1),
         selection: cappedMatch(FIND_MATCHES_LIMIT + 1),
-        count: `? of ${FIND_MATCHES_LIMIT}+`,
+        count: `${FIND_MATCHES_LIMIT + 2} of ${FIND_MATCHES_LIMIT + 2}`,
       })
     },
   )
@@ -443,7 +463,7 @@ describe('find match search from an offset', () => {
     // Whole lines rather than a slice cut at the cursor, but only lines from the
     // cursor's own onward: the 300 in front of it are not what the press asked
     // about.
-    expect(reads).toEqual([[cursor, cursor + lines[300]!.length]])
+    expect(reads).toEqual([[cursor, text.length]])
   })
 
   it('answers only from the ranges it was given', () => {

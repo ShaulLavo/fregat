@@ -1,4 +1,6 @@
-import type { EditorDisposable } from '../plugins'
+export type EditorDisposable = {
+  dispose(): void
+}
 
 // Post-teardown rule shared by both owners below: a disposed owner never retains again, since no
 // later unwind is left to hand the work to. Anything handed over anyway is unwound on the spot,

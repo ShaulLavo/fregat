@@ -1,9 +1,7 @@
 import type * as lsp from 'vscode-languageserver-protocol'
 
-import type { DocumentSessionChange } from '@singapore-editor/core'
-
 /**
- * What a single edit means for the signature widget.
+ * What a typed character means for the signature widget.
  *
  * `open` and `argument` ask the server for help; `close` dismisses, because the call the widget was
  * describing has ended. Anything else leaves an open widget alone, so typing an argument does not
@@ -22,18 +20,15 @@ export type SignatureHelpDisplay = {
   readonly signatureCount: number
 }
 
-export function signatureHelpTriggerFromChange(
-  change: DocumentSessionChange | null,
-): SignatureHelpTrigger | null {
-  if (!change || change.kind !== 'edit') return null
-  if (change.edits.length !== 1) return null
-
-  const edit = change.edits[0]
-  if (!edit || edit.text.length !== 1) return null
-
-  if (edit.text === '(') return { kind: 'open', triggerCharacter: '(' }
-  if (edit.text === ',') return { kind: 'argument', triggerCharacter: ',' }
-  if (edit.text === ')') return { kind: 'close' }
+/**
+ * Read from the keystroke, never from the edit it caused. Auto-closing writes a typed `(` as the
+ * two-character `()`, and typing over the closer it inserted moves the caret without changing any
+ * text, so an edit-derived trigger misses both of the characters that matter.
+ */
+export function signatureHelpTriggerFromTypedText(text: string): SignatureHelpTrigger | null {
+  if (text === '(') return { kind: 'open', triggerCharacter: '(' }
+  if (text === ',') return { kind: 'argument', triggerCharacter: ',' }
+  if (text === ')') return { kind: 'close' }
 
   return null
 }

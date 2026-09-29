@@ -272,24 +272,13 @@ export class LspWorkspace {
 }
 
 function cloneDocument(document: MutableLspDocument): LspDocument {
-  return defineLazyDocumentText({
+  return {
     uri: document.uri,
     languageId: document.languageId,
     version: document.version,
     textSnapshot: document.textSnapshot,
     lineStarts: document.lineStarts,
-  })
-}
-
-function defineLazyDocumentText<TDocument extends Omit<LspDocument, 'text'>>(
-  document: TDocument,
-): TDocument & { readonly text: string } {
-  Object.defineProperty(document, 'text', {
-    configurable: true,
-    enumerable: true,
-    get: () => document.textSnapshot.materializeFullText(),
-  })
-  return document as TDocument & { readonly text: string }
+  }
 }
 
 function documentSnapshot(document: MutableLspDocument): LspTextDocumentSnapshot {

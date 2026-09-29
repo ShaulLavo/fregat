@@ -1,3 +1,5 @@
+import { documentRow } from './visibleRows'
+import { documentLineAtY, documentLineForSliderY, visibleDocumentLineRange } from '../src/layout'
 import { describe, expect, it } from 'vitest'
 import {
   computeFrameLayout,
@@ -11,6 +13,97 @@ import { resolveMinimapOptions } from '../src/options'
 import { RenderMinimap, type MinimapRenderLayout, type MinimapViewport } from '../src/types'
 
 describe('minimap layout', () => {
+  it.each(['proportional', 'fill', 'fit'] as const)(
+    'maps wrapped and folded bounds in %s mode',
+    (size) => {
+      const editorViewport = {
+        ...viewport({ scrollTop: 100, clientHeight: 100 }),
+        borderBoxHeight: 100,
+        borderBoxWidth: 800,
+        visibleRange: { start: 5, end: 10 },
+      }
+      const rows = [
+        documentRow(8, 80),
+        documentRow(10, 100, { firstWrapSegment: false }),
+        documentRow(10, 120, { firstWrapSegment: false }),
+        documentRow(11, 140, { source: 'injected' }),
+        documentRow(50, 160),
+        documentRow(51, 180),
+        documentRow(52, 200),
+      ]
+      const range = visibleDocumentLineRange({ visibleRows: rows, lineCount: 100 }, editorViewport)
+      expect(range).toEqual({ start: 10, end: 52 })
+      const current = viewport({
+        clientHeight: 200,
+        visibleStart: range.start,
+        visibleEnd: range.end,
+      })
+      const metrics = { rowHeight: 20, characterWidth: 8, devicePixelRatio: 2 }
+      const renderLayout = computeRenderLayout({
+        minimap: resolveMinimapOptions({ size }),
+        metrics,
+        viewport: current,
+        lineCount: 100,
+      })
+      const frame = computeFrameLayout({
+        renderLayout,
+        metrics,
+        viewport: current,
+        lineCount: 100,
+        realLineCount: 100,
+        previous: null,
+      })
+      expect(documentLineForSliderY(frame, frame.sliderTop)).toBeCloseTo(10)
+      expect(documentLineAtY(frame, frame.sliderTop)).toBeCloseTo(10)
+      expect(documentLineAtY(frame, frame.sliderTop + frame.sliderHeight)).toBeCloseTo(52)
+      expect(documentLineAtY(frame, frame.sliderTop + frame.sliderHeight / 2)).toBeCloseTo(31)
+    },
+  )
+
+  it('fits a collapsed document span larger than the proportional raster', () => {
+    const current = viewport({ clientHeight: 100, visibleStart: 10, visibleEnd: 990 })
+    const metrics = { rowHeight: 20, characterWidth: 8, devicePixelRatio: 1 }
+    const renderLayout = computeRenderLayout({
+      minimap: resolveMinimapOptions(),
+      metrics,
+      viewport: current,
+      lineCount: 1000,
+    })
+    const frame = computeFrameLayout({
+      renderLayout,
+      metrics,
+      viewport: current,
+      lineCount: 100,
+      realLineCount: 1000,
+      previous: null,
+    })
+    expect(renderLayout.isSampling).toBe(true)
+    expect(documentLineForSliderY(frame, frame.sliderTop)).toBeCloseTo(10)
+    expect(documentLineAtY(frame, frame.sliderTop)).toBeCloseTo(10)
+    expect(documentLineAtY(frame, frame.sliderTop + frame.sliderHeight)).toBeCloseTo(990)
+  })
+
+  it('retains a document line when only wrap continuations are on screen', () => {
+    const current = {
+      ...viewport({ clientHeight: 40 }),
+      borderBoxWidth: 800,
+      borderBoxHeight: 40,
+      visibleRange: { start: 20, end: 22 },
+    }
+    expect(
+      visibleDocumentLineRange(
+        {
+          lineCount: 100,
+          visibleRows: [
+            documentRow(7, 0, { firstWrapSegment: false }),
+            documentRow(7, 20, { firstWrapSegment: false }),
+          ],
+        },
+        current,
+      ),
+    ).toEqual({ start: 7, end: 8 })
+  })
+
   it('computes proportional render dimensions from editor metrics', () => {
     const layout = computeRenderLayout({
       minimap: resolveMinimapOptions({ maxColumn: 80, scale: 2 }),
@@ -34,6 +127,8 @@ describe('minimap layout', () => {
       minimapHeight: 580,
       scrollHeight: 6000,
       scrollTop: 5400,
+      visibleStart: 270,
+      visibleEnd: 300,
     })
     const renderLayout = computeRenderLayout({
       minimap: resolveMinimapOptions({ size: 'fill' }),
@@ -51,8 +146,8 @@ describe('minimap layout', () => {
     })
 
     expect(renderLayout.height).toBe(580)
-    expect(frame.sliderHeight).toBe(58)
-    expect(frame.sliderTop + frame.sliderHeight).toBeCloseTo(580)
+    expect(frame.sliderHeight).toBe(30)
+    expect(frame.sliderTop + frame.sliderHeight).toBeCloseTo(300)
   })
 
   // The lane the minimap reserves is padding, and padding leaves the content box, so
@@ -173,7 +268,7 @@ describe('minimap layout', () => {
       canvasInnerHeight: 100,
       canvasOuterWidth: 80,
       canvasOuterHeight: 100,
-      lineHeight: 10,
+      lineHeight: 2,
       charWidth: 1,
       scale: 1,
       isSampling: false,
@@ -184,7 +279,13 @@ describe('minimap layout', () => {
     const frame = computeFrameLayout({
       renderLayout,
       metrics: { rowHeight: 10, characterWidth: 8, devicePixelRatio: 1 },
-      viewport: viewport({ clientHeight: 100, scrollHeight: 500, scrollTop: 200 }),
+      viewport: viewport({
+        clientHeight: 100,
+        scrollHeight: 500,
+        scrollTop: 200,
+        visibleStart: 20,
+        visibleEnd: 30,
+      }),
       lineCount: 50,
       realLineCount: 50,
       previous: null,
@@ -194,8 +295,8 @@ describe('minimap layout', () => {
     expect(frame.sliderTop).toBe(40)
     expect(frame.sliderHeight).toBe(20)
     expect(frame.startLineNumber).toBe(1)
-    expect(frame.endLineNumber).toBe(10)
-    expect(yForLineNumber(frame, 3, renderLayout.lineHeight)).toBe(20)
+    expect(frame.endLineNumber).toBe(50)
+    expect(yForLineNumber(frame, 3, renderLayout.lineHeight)).toBe(4)
   })
 
   // The slider stands for the viewport inside the minimap. Sizing it from the minimap's
@@ -301,7 +402,8 @@ describe('minimap layout', () => {
         ...base,
         scrollTop,
         scrollRow: scrollTop / 20,
-        visibleStart: Math.floor(scrollTop / 20),
+        visibleStart: scrollTop / 20,
+        visibleEnd: (scrollTop + 85) / 20,
       }
       const next = computeFrameLayout({
         renderLayout,
@@ -330,7 +432,7 @@ describe('minimap layout', () => {
     }
   })
 
-  it('uses the fractional row slot when a gap advances the visible range', () => {
+  it('uses document bounds even when a gap advances the display range', () => {
     const metrics = { rowHeight: 20, characterWidth: 8, devicePixelRatio: 1 }
     const current = viewport({
       clientHeight: 85,
@@ -358,7 +460,7 @@ describe('minimap layout', () => {
       1 +
       frame.startLineFraction +
       frame.sliderTop / renderLayout.lineHeight
-    expect(rowUnderSlider).toBeCloseTo(137.25, 10)
+    expect(rowUnderSlider).toBeCloseTo(138, 10)
   })
 })
 

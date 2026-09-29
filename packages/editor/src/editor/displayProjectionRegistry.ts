@@ -1,5 +1,6 @@
 import type { InjectedTextRow } from '../displayTransforms'
-import type { EditorGutterContribution, EditorDisposable } from '../plugins'
+import type { EditorGutterContribution } from '../plugins'
+import type { EditorDisposable } from './disposables'
 import type { FoldRange } from '../syntax/session'
 import type { VirtualizedTextRowDecoration } from '../virtualization/virtualizedTextViewTypes'
 import { rejectCrossingFoldRanges, type FoldRangeRejection } from './folds'

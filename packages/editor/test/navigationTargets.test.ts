@@ -87,8 +87,15 @@ function createWrappedTestView(text: string, rowWidth: number) {
   }
 }
 
-function targets(text: string, view = createTestView(text), rtlMoveVisually = false) {
+function targets(
+  text: string,
+  view = createTestView(text),
+  rtlMoveVisually = false,
+  nonCaretRows: ReadonlySet<number> = new Set(),
+) {
   const snapshot = createPieceTableSnapshot(text)
+  const nonCaretOffset = (offset: number) =>
+    nonCaretRows.has(text.slice(0, offset).split('\n').length - 1)
 
   return (
     command: EditorCommandId,
@@ -103,6 +110,7 @@ function targets(text: string, view = createTestView(text), rtlMoveVisually = fa
       rtlMoveVisually,
       wordSeparators,
       view,
+      nonCaretOffset,
     })
 }
 
@@ -394,6 +402,46 @@ describe('word-part navigation', () => {
     const move = targets('x = y')
 
     expect(move('cursorWordPartLeft', selection(3))?.offset).toBe(2)
+  })
+})
+
+describe('rows a contribution keeps the caret off', () => {
+  // Row 1 is a separator whose label is buffer text.
+  const text = 'one\n--sep--\nthree\nfour'
+  const separator = new Set([1])
+
+  it('steps a vertical move over the row and keeps its column', () => {
+    const move = targets(text, undefined, false, separator)
+
+    expect(move('cursorDown', selection(1))?.offset).toBe(13)
+    expect(move('cursorUp', selection(13))?.offset).toBe(1)
+  })
+
+  it('enters the next row from its near edge on a horizontal move', () => {
+    const move = targets(text, undefined, false, separator)
+
+    expect(move('cursorRight', selection(3))?.offset).toBe(12)
+    expect(move('cursorLeft', selection(12))?.offset).toBe(3)
+  })
+
+  it('extends a selection past the row with the head beyond it', () => {
+    const move = targets(text, undefined, false, separator)
+
+    expect(move('selectDown', selection(1))).toMatchObject({ offset: 13, extend: true })
+  })
+
+  it('turns back when nothing lies beyond the row in the move direction', () => {
+    const leading = '--sep--\none'
+    const move = targets(leading, undefined, false, new Set([0]))
+
+    expect(move('cursorDocumentStart', selection(10))?.offset).toBe(8)
+    expect(move('cursorUp', selection(9))?.offset).toBe(9)
+  })
+
+  it('leaves every move alone when no row is marked', () => {
+    const move = targets(text)
+
+    expect(move('cursorDown', selection(1))?.offset).toBe(5)
   })
 })
 

@@ -184,7 +184,7 @@ function isExcusedByItsWord(
 
   let hasAscii = false
   let hasUnmistakable = false
-  for (let cursor = word.start; cursor < word.end; ) {
+  for (let cursor = word.start; cursor < word.end;) {
     const codePoint = text.codePointAt(cursor) ?? 0
     cursor += codePoint > 0xffff ? 2 : 1
     if (isPlainAsciiCodePoint(codePoint)) {

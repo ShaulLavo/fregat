@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { EditorTheme } from '@singapore-editor/core/rendering'
 import {
+  createTooltipCodeTokenizer,
   normalizeTooltipMarkdown,
   renderTooltipMarkdown as renderLanguageServerTooltipMarkdown,
   type TooltipMarkdownRenderOptions,
@@ -13,12 +14,32 @@ describe('tooltip Markdown rendering', () => {
 
     expect(code?.textContent).toBe('const value: string')
     expect(code?.getAttribute('data-language')).toBe('ts')
-    expect(code?.querySelector('.editor-typescript-lsp-hover-token-keyword')?.textContent).toBe(
-      'const',
-    )
-    expect(code?.querySelector('.editor-typescript-lsp-hover-token-punctuation')?.textContent).toBe(
-      ':',
-    )
+    expect(code?.querySelector('span')).toBeNull()
+  })
+
+  it('paints a fenced block with the tokens the editor hands back', async () => {
+    const tokenizer = createTooltipCodeTokenizer({
+      tokenize: async (_text, languageId) => [
+        { start: 0, end: 5, style: { color: `var(--editor-syntax-${languageId})` } },
+        { start: 6, end: 11, style: { color: 'rgb(1, 2, 3)', fontStyle: 'italic' } },
+      ],
+    })
+    const markdown = '```rust\nconst value: string\n```'
+    const first = renderTooltipMarkdown(document, markdown, undefined, { codeTokenizer: tokenizer })
+    await tokenizer.tokenize('const value: string', 'rust')
+    await Promise.resolve()
+
+    const spans = [...first.querySelectorAll<HTMLElement>('pre > code > span')]
+    expect(spans.map((span) => span.textContent)).toEqual(['const', 'value'])
+    expect(spans[0]?.style.color).toBe('var(--editor-syntax-rust)')
+    expect(spans[1]?.style.fontStyle).toBe('italic')
+    expect(first.querySelector('code')?.textContent).toBe('const value: string')
+
+    // A hover re-renders whole as participants report; a settled block must not pass through plain.
+    const second = renderTooltipMarkdown(document, markdown, undefined, {
+      codeTokenizer: tokenizer,
+    })
+    expect(second.querySelectorAll('pre > code > span')).toHaveLength(2)
   })
 
   it('keeps highlighted TypeScript code readable without forcing a tiny layout', () => {

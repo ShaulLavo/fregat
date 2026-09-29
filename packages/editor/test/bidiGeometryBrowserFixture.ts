@@ -21,7 +21,7 @@ export const BIDI_CORPUS = {
 
 export const BIDI_CORPUS_NAMES = Object.keys(BIDI_CORPUS) as readonly BidiCorpusName[]
 
-export const SUPPLEMENTARY_BIDI_LINES = {
+const SUPPLEMENTARY_BIDI_LINES = {
   controlRtl: 'אבג\u0085דהו',
   widgetRtl: 'אבג דהו',
 } as const
@@ -66,6 +66,8 @@ export function mountBidiGeometryFixture(): BidiGeometryFixture {
     container,
     BIDI_CORPUS_NAMES.map((name) => BIDI_CORPUS[name]).join('\n'),
   )
+  // The oracle reads carets synchronously, which only a focused editor draws.
+  view.focusInput()
   const rows = Object.fromEntries(
     BIDI_CORPUS_NAMES.map((name, index) => [name, mountedRow(view, index)]),
   ) as Record<BidiCorpusName, MountedVirtualizedTextRow>
@@ -162,7 +164,7 @@ export function subjectRangeSegments(
   ).map(({ left, width }) => ({ left, width }))
 }
 
-export function mergeOracleRects(rects: readonly OracleRect[]): readonly OracleRect[] {
+function mergeOracleRects(rects: readonly OracleRect[]): readonly OracleRect[] {
   const sorted = rects.toSorted((left, right) => left.left - right.left || left.width - right.width)
   const merged: OracleRect[] = []
   for (const rect of sorted) appendMergedRect(merged, rect)

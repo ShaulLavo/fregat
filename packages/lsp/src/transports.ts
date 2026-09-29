@@ -5,6 +5,31 @@ export type LspManagedTransport = LspTransport & {
   close(): void
 }
 
+/** A socket close the transport did not ask for: what the socket reported, and how busy it was. */
+export class LspTransportClosedError extends Error {
+  public readonly code: number | null
+  public readonly reason: string
+  public readonly wasClean: boolean | null
+  public readonly sentCount: number
+  public readonly receivedCount: number
+
+  public constructor(close: {
+    readonly code: number | null
+    readonly reason: string
+    readonly wasClean: boolean | null
+    readonly sentCount: number
+    readonly receivedCount: number
+  }) {
+    super(close.code === null ? 'LSP transport closed' : `LSP transport closed (${close.code})`)
+    this.name = 'LspTransportClosedError'
+    this.code = close.code
+    this.reason = close.reason
+    this.wasClean = close.wasClean
+    this.sentCount = close.sentCount
+    this.receivedCount = close.receivedCount
+  }
+}
+
 export type LspWebSocketLike = {
   readonly readyState?: number
   send(message: string): void
@@ -81,6 +106,8 @@ class WebSocketLspTransport implements LspManagedTransport {
   private readonly handlers = new Set<LspTransportHandler>()
   private readonly closeHandlers = new Set<(error?: unknown) => void>()
   private closed = false
+  private sentCount = 0
+  private receivedCount = 0
 
   public constructor(private readonly socket: LspWebSocketLike) {
     this.socket.addEventListener('message', this.handleMessage)
@@ -96,6 +123,7 @@ class WebSocketLspTransport implements LspManagedTransport {
     }
 
     this.socket.send(message)
+    this.sentCount += 1
   }
 
   public subscribe(handler: LspTransportHandler): void {
@@ -122,15 +150,21 @@ class WebSocketLspTransport implements LspManagedTransport {
   private readonly handleMessage = (event: Event): void => {
     const message = messageEventData(event)
     if (message === null) return
+    this.receivedCount += 1
     for (const handler of this.handlers) handler(message)
   }
 
-  private readonly handleClose = (): void => {
+  private readonly handleClose = (event: Event): void => {
     if (this.closed) return
 
     this.closed = true
     this.detachSocketListeners()
-    for (const handler of this.closeHandlers) handler()
+    const error = new LspTransportClosedError({
+      ...closeEventDetails(event),
+      receivedCount: this.receivedCount,
+      sentCount: this.sentCount,
+    })
+    for (const handler of this.closeHandlers) handler(error)
     this.closeHandlers.clear()
   }
 
@@ -265,3 +299,13 @@ const canCloseWebSocket = (socket: LspWebSocketLike): boolean =>
   socket.readyState === undefined ||
   socket.readyState === WEB_SOCKET_CONNECTING ||
   socket.readyState === WEB_SOCKET_OPEN
+
+/** Read structurally: a socket-like adapter may dispatch a plain `Event` without close fields. */
+const closeEventDetails = (event: Event) => {
+  const close = event as Partial<Pick<CloseEvent, 'code' | 'reason' | 'wasClean'>>
+  return {
+    code: typeof close.code === 'number' ? close.code : null,
+    reason: typeof close.reason === 'string' ? close.reason : '',
+    wasClean: typeof close.wasClean === 'boolean' ? close.wasClean : null,
+  }
+}

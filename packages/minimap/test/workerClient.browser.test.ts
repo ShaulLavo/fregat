@@ -1,3 +1,4 @@
+import { createTestViewSnapshotSource } from '@singapore-editor/core/testing'
 import { describe, expect, it } from 'vitest'
 import type { EditorViewSnapshot } from '@singapore-editor/core/extensions'
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
@@ -134,7 +135,7 @@ function snapshot(text: string): EditorViewSnapshot {
   return {
     documentId: 'test.ts',
     languageId: 'typescript',
-    fullText: text,
+    ...createTestViewSnapshotSource(text),
     textVersion: 1,
     initialHighlightStatus: 'painted',
     syntaxStatus: 'ready',
@@ -158,7 +159,7 @@ function snapshot(text: string): EditorViewSnapshot {
     contentWidth: 160,
     totalHeight: 40,
     gutterWidth: 0,
-    gutterLayout: { fixedWidth: 0, lanes: [] },
+    gutterLayout: { leadingInset: 0, fixedWidth: 0, lanes: [] },
     tabSize: 4,
     foldMarkers: [],
     visibleRows: [],
@@ -173,9 +174,6 @@ function snapshot(text: string): EditorViewSnapshot {
       borderBoxHeight: 200,
       borderBoxWidth: 400,
       visibleRange: { start: 0, end: 2 },
-    },
-    toJSON() {
-      throw new Error('not used by this fixture')
     },
     toVisibleSnapshot() {
       return null

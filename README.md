@@ -30,7 +30,7 @@ gutters, find, minimap, syntax and language servers are separate packages. nothi
 
 ## packages
 
-`core` (the `editor` folder), `gutters`, `find`, `markdown`, `minimap`, `scope-lines`, `diff`, `panes`, `tree-sitter`, `tree-sitter-languages`, `lsp`, `plugin-ui`, `lsp-plugin`, `typescript-lsp`, `decode`, `react`, `solid`. all under `@singapore-editor/`, one folder each in `packages/`
+`core` (the `editor` folder), `gutters`, `find`, `markdown`, `minimap`, `scope-lines`, `diff`, `panes`, `tree-sitter`, `tree-sitter-languages`, `lsp`, `plugin-ui`, `lsp-plugin`, `typescript-lsp`, `decode`, `spellcheck`, `react`, `solid`. all under `@singapore-editor/`, one folder each in `packages/`
 
 ## running the repo
 
@@ -58,3 +58,4 @@ bun run build
 - [progress](PROGRESS.md), what's implemented vs designed
 - [piece table](docs/storage/piece-table.md), [positions](docs/positions/types-and-conversions.md), [anchors](docs/positions/anchors.md), [selections and undo](docs/editing/selections-and-undo.md), [transforms](docs/display/transforms.md), [virtualization](docs/display/browser-virtualization.md), [tree-sitter](docs/syntax/tree-sitter.md)
 - [fregat's roadmap](https://github.com/ShaulLavo/fregat/blob/main/PLAN.md) sets execution order across both repos
+- [shared Markdown semantics for Editor and Fregat TUI](plans/bubli-markdown-consumer.md), the existing consumer work package aligned with Fregat's app-local terminal UI

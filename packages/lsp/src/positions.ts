@@ -298,7 +298,12 @@ const fullSnapshotContentChange = (
   reason: string,
 ): readonly lsp.TextDocumentContentChangeEvent[] => {
   recordContentChangePath(reason, document, document, [])
-  return [createFullContentChange(document.textSnapshot.materializeFullText())]
+  return [createFullContentChange(fullSyncPayloadText(document))]
+}
+
+// Full sync and incremental recovery send the whole document by protocol definition.
+function fullSyncPayloadText(document: LspTextDocumentSnapshot): string {
+  return document.textSnapshot.readRange(0, document.textSnapshot.length)
 }
 
 const applyTextEdits = (text: string, edits: readonly LspTextEdit[]): string | null => {

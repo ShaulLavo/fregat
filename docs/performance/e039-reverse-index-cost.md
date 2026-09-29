@@ -162,7 +162,7 @@ all, and that 5% also pays for the new summary. Replacements 2.29 against 2.16.
 - The deopt above.
 - A buffer cut many times, a large paste edited heavily, pays a path in its own small tree and
   a path in the vector per cut. Nothing in the fixtures does this enough to measure.
-- Tombstone reclamation, [E006](../../plans/e006-tombstone-reclamation.md), must keep the two
+- Tombstone reclamation, [E006](../storage/e006-tombstone-compaction.md), must keep the two
   facts resolution relies on: a buffer's pieces tile it in document order, and nothing older
   sits between two pieces of one buffer. The inspector now checks both.
 

@@ -24,6 +24,7 @@ import {
   measureBrowserTextMetrics,
 } from '../src/virtualization/browserMetrics'
 import { type VirtualizedTextHighlightRegistry, VirtualizedTextView } from '../src/virtualization'
+import type { VirtualizedTextViewInternal } from '../src/virtualization/virtualizedTextViewInternals'
 
 const highlightsMap = new Map<string, Highlight>()
 let registrySets = 0
@@ -127,7 +128,7 @@ describe('VirtualizedTextView', () => {
     view.setScrollMetrics(0, 40)
     view.setText('before')
 
-    expect(() => view.setText('alpha\nbeta', undefined, [0, 6, 3])).toThrow(
+    expect(() => view.setText('alpha\nbeta', [0, 6, 3])).toThrow(
       'Prepared line starts do not match the attached document',
     )
     expect(view.getState()).toMatchObject({
@@ -253,10 +254,10 @@ describe('VirtualizedTextView', () => {
     view.setText('before')
     view.setScrollMetrics(0, 40, 240)
 
-    expect(() => view.setText('alpha\nbeta', undefined, [0, Number.NaN, 5])).toThrow(
+    expect(() => view.setText('alpha\nbeta', [0, Number.NaN, 5])).toThrow(
       'Prepared line starts do not match the attached document',
     )
-    expect(() => view.setText('alpha\nbeta', undefined, [0, 1.5, 5])).toThrow(
+    expect(() => view.setText('alpha\nbeta', [0, 1.5, 5])).toThrow(
       'Prepared line starts do not match the attached document',
     )
     expect(view.getState()).toMatchObject({
@@ -266,10 +267,10 @@ describe('VirtualizedTextView', () => {
   })
 
   it('validates prepared line starts against snapshot length without rescanning text', () => {
-    expect(() => view.setText('alpha\nbeta', undefined, [0, 5])).not.toThrow()
+    expect(() => view.setText('alpha\nbeta', [0, 5])).not.toThrow()
 
     const shortSnapshot = throwingFullTextSnapshot('alpha')
-    expect(() => view.setText('alpha\nbeta', shortSnapshot, [0, 6])).toThrow(
+    expect(() => view.setText(shortSnapshot, [0, 6])).toThrow(
       'Prepared line starts do not match the attached document',
     )
     expect(view.getLineStarts()).toEqual([0, 6])
@@ -590,16 +591,37 @@ describe('VirtualizedTextView', () => {
     expect(highlightClears).toBe(clearCount)
   })
 
-  it('removes custom range highlights when ranges become empty', () => {
+  it('empties custom range highlights and keeps their rule when ranges become empty', () => {
+    view.setText('alpha\nbeta\ngamma')
+    view.setScrollMetrics(0, 20)
+    const style = { backgroundColor: 'rgba(234, 179, 8, 0.34)' }
+    const styleElement = (Reflect.get(view, 'view') as VirtualizedTextViewInternal).styleEl
+
+    view.setRangeHighlight('test-find', [{ start: 0, end: 5 }], style)
+    const highlight = highlightsMap.get('test-find')
+    const rules = styleElement.textContent
+    const ruleWrites = vi.spyOn(styleElement, 'textContent', 'set')
+    view.setRangeHighlight('test-find', [], style)
+
+    expect(highlightsMap.get('test-find')?.size).toBe(0)
+    expect(registryDeletes).toBe(0)
+
+    view.setRangeHighlight('test-find', [{ start: 6, end: 10 }], style)
+
+    expect(highlightsMap.get('test-find')).toBe(highlight)
+    expect(highlightsMap.get('test-find')?.size).toBe(1)
+    expect(styleElement.textContent).toBe(rules)
+    expect(ruleWrites).not.toHaveBeenCalled()
+  })
+
+  it('removes custom range highlights when they are cleared', () => {
     view.setText('alpha\nbeta\ngamma')
     view.setScrollMetrics(0, 20)
 
     view.setRangeHighlight('test-find', [{ start: 0, end: 5 }], {
       backgroundColor: 'rgba(234, 179, 8, 0.34)',
     })
-    view.setRangeHighlight('test-find', [], {
-      backgroundColor: 'rgba(234, 179, 8, 0.34)',
-    })
+    view.clearRangeHighlight('test-find')
 
     expect(highlightsMap.has('test-find')).toBe(false)
     expect(registryDeletes).toBe(1)
@@ -844,6 +866,7 @@ describe('VirtualizedTextView', () => {
     })
     view.setText('\tX')
     view.setScrollMetrics(0, 20)
+    view.focusInput()
 
     const charWidth = view.getState().metrics.characterWidth
     const marker = container.querySelector('[data-editor-hidden-character="tab"]') as HTMLElement
@@ -1818,6 +1841,7 @@ describe('VirtualizedTextView', () => {
   it('paints multiple selections and positions multiple carets', () => {
     view.setText('abc\ndef\nxyz')
     view.setScrollMetrics(0, 80)
+    view.focusInput()
     view.setSelections([
       { anchorOffset: 1, headOffset: 2 },
       { anchorOffset: 5, headOffset: 7 },
@@ -1836,6 +1860,7 @@ describe('VirtualizedTextView', () => {
   it('animates all carets through one shared blink layer', () => {
     view.setText('abc\ndef\nxyz')
     view.setScrollMetrics(0, 80)
+    view.focusInput()
     view.setSelections([
       { anchorOffset: 1, headOffset: 1 },
       { anchorOffset: 5, headOffset: 5 },
@@ -1874,6 +1899,7 @@ describe('VirtualizedTextView', () => {
     try {
       view.setText('abcd\ndef')
       view.setScrollMetrics(0, 40)
+      view.focusInput()
       view.setSelection(2, 2)
     } finally {
       restoreRangeGetClientRects(originalGetClientRects)
@@ -1887,6 +1913,7 @@ describe('VirtualizedTextView', () => {
   it('positions a caret at the end of a selection', () => {
     view.setText('abcd\ndef')
     view.setScrollMetrics(0, 40)
+    view.focusInput()
     view.setSelection(1, 6)
 
     const caret = container.querySelector('.editor-virtualized-caret') as HTMLElement
@@ -1897,6 +1924,7 @@ describe('VirtualizedTextView', () => {
   it('positions a caret at the head of a reversed selection', () => {
     view.setText('abcd\ndef')
     view.setScrollMetrics(0, 40)
+    view.focusInput()
     view.setSelection(6, 1)
 
     const caret = container.querySelector('.editor-virtualized-caret') as HTMLElement
@@ -2913,6 +2941,7 @@ describe('VirtualizedTextView', () => {
   it('renders control characters as visible cells with selection geometry', () => {
     view.setText('\u0000PNG\u0000\uFFFD')
     view.setScrollMetrics(0, 20)
+    view.focusInput()
     view.setSelection(0, 6)
 
     const range = selectionRanges(container)[0]!

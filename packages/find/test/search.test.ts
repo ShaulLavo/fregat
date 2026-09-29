@@ -3,7 +3,9 @@ import { createStringTextSnapshot } from '@singapore-editor/core/document'
 import { parseReplaceString } from '../src/replacePattern'
 import {
   FIND_MATCHES_LIMIT,
+  FIND_WINDOW_UNITS,
   findMatches,
+  findQueryPlan,
   findPreviousMatchFrom,
   findNextMatchFrom,
   type FindMatch,
@@ -247,22 +249,36 @@ describe('editor search', () => {
 })
 
 describe('editor search reads', () => {
-  it('reads one line at a time for a query that cannot cross a break', () => {
+  it('reads whole lines in bounded windows for a query that cannot cross a break', () => {
+    const line = 'alpha bravo charlie delta echo'
+    const lines = Array.from({ length: 10_000 }, () => line)
+    const text = lines.join('\n')
     const reads: FindRangeTuple[] = []
 
-    const matches = findMatches(recordingSource('alpha\nbravo\nalpha', reads), plainQuery('alpha'))
+    const matches = findMatches(recordingSource(text, reads), plainQuery('alpha'))
 
-    expect(ranges(matches)).toEqual([
+    expect(matches).toHaveLength(lines.length)
+    // Several reads, none of them the document, each one cut at line ends so no
+    // match is ever split across two of them.
+    expect(reads.length).toBeGreaterThan(1)
+    for (const [start, end] of reads) {
+      expect(end - start).toBeLessThanOrEqual(FIND_WINDOW_UNITS + line.length)
+      expect(start % (line.length + 1)).toBe(0)
+      expect((end + 1) % (line.length + 1)).toBe(0)
+    }
+  })
+
+  it('gives an anchored pattern one line at a time out of each window', () => {
+    const reads: FindRangeTuple[] = []
+    const text = 'alpha\nbravo alpha\nalpha'
+
+    // Under the multiline flag `$` would also stand before a carriage return.
+    expect(ranges(findMatches(recordingSource(text, reads), regexQuery('^alpha$')))).toEqual([
       [0, 5],
-      [12, 17],
+      [18, 23],
     ])
-    // Line content, and only ever one line of it: the document is never one
-    // read, and no read carries the break that would put `$` behind it.
-    expect(reads).toEqual([
-      [0, 5],
-      [6, 11],
-      [12, 17],
-    ])
+    expect(ranges(findMatches(source('alpha\r\nalpha'), regexQuery('alpha$')))).toEqual([[7, 12]])
+    expect(reads).toEqual([[0, text.length]])
   })
 
   it('reads only the lines a scope covers', () => {
@@ -280,11 +296,8 @@ describe('editor search reads', () => {
       [scopeStart + 8, scopeStart + 13],
       [scopeEnd - 5, scopeEnd],
     ])
-    // Two reads for two lines, and neither of them the 500 lines around them.
-    expect(reads).toEqual([
-      [scopeStart, scopeStart + lines[200]!.length],
-      [scopeStart + lines[200]!.length + 1, scopeEnd],
-    ])
+    // One read of the two lines, and none of the 500 around them.
+    expect(reads).toEqual([[scopeStart, scopeEnd]])
   })
 
   it('reads a line-bounded window for a query that can cross a break', () => {
@@ -608,7 +621,7 @@ describe('editor find controller', () => {
         matches: FIND_MATCHES_LIMIT,
         current: [0, 1],
         selection: [0, 1],
-        count: `1 of ${FIND_MATCHES_LIMIT}+`,
+        count: `1 of ${FIND_MATCHES_LIMIT + 2}`,
       })
 
       expect(harness.selectAllMatches()).toBe(true)
@@ -616,7 +629,7 @@ describe('editor find controller', () => {
         matches: FIND_MATCHES_LIMIT,
         current: [0, 1],
         selection: [0, 1],
-        count: `1 of ${FIND_MATCHES_LIMIT}+`,
+        count: `1 of ${FIND_MATCHES_LIMIT + 2}`,
         selectionCount: FIND_MATCHES_LIMIT + 2,
       })
     },
@@ -636,7 +649,7 @@ describe('editor find controller', () => {
         matches: FIND_MATCHES_LIMIT,
         current: [0, 1],
         selection: [0, 1],
-        count: `1 of ${FIND_MATCHES_LIMIT}+`,
+        count: `1 of ${FIND_MATCHES_LIMIT + 2}`,
       })
 
       harness.clickReplaceAll()
@@ -670,22 +683,23 @@ describe('editor find controller', () => {
 })
 
 describe('editor find widget', () => {
-  it('marks a truncated result count as a floor', () => {
+  it('shows an exact count and says when only the painting stopped', () => {
     const container = document.createElement('div')
     const widget = new EditorFindWidget(container, container, widgetOptions())
 
-    widget.update(widgetState({ matchesPosition: 2, matchesCount: 3, matchesTruncated: false }))
+    widget.update(widgetState({ matchesPosition: 2, matchesCount: 3 }))
     expect(countElement(container)?.textContent).toBe('2 of 3')
     expect(countElement(container)?.title).toBe('2 of 3')
 
     widget.update(
       widgetState({
-        matchesPosition: 1,
-        matchesCount: FIND_MATCHES_LIMIT,
-        matchesTruncated: true,
+        matchesPosition: 30_000,
+        matchesCount: 500_000,
+        highlightsTruncated: true,
       }),
     )
-    expect(countElement(container)?.textContent).toBe(`1 of ${FIND_MATCHES_LIMIT}+`)
+    expect(countElement(container)?.textContent).toBe('30000 of 500000')
+    expect(countElement(container)?.title).toContain(`first ${FIND_MATCHES_LIMIT} results`)
     expect(countElement(container)?.title).toContain('entire text')
 
     widget.dispose()
@@ -735,7 +749,7 @@ function widgetState(overrides: Partial<EditorFindWidgetState> = {}): EditorFind
     inSelection: false,
     matchesCount: 0,
     matchesPosition: 0,
-    matchesTruncated: false,
+    highlightsTruncated: false,
     ...overrides,
   }
 }
@@ -791,41 +805,21 @@ describe('searching text a line at a time', () => {
     }
   })
 
-  it('still reads a pattern whose groups only bundle one line at a time', () => {
-    const reads: number[] = []
-    const plain = source('alpha\nbravo')
-    const counted: FindTextSource = {
-      length: plain.length,
-      lineStartsView: plain.lineStartsView,
-      readRange: (start, end) => {
-        reads.push(end - start)
-        return plain.readRange(start, end)
-      },
-    }
-
+  it('still windows a pattern whose groups only bundle', () => {
     expect(found('alpha\nbravo', regex('(?<!x)(?:al)(?=pha)(?<middle>p)(ha)'))).toEqual([[0, 5]])
-
-    findMatches(counted, regex('(?<!x)(?:al)(?=pha)(?<middle>p)(ha)'))
-
-    expect(Math.max(...reads)).toBeLessThanOrEqual('alpha'.length)
+    expect(findQueryPlan(regex('(?<!x)(?:al)(?=pha)(?<middle>p)(ha)'))).toEqual({ kind: 'lines' })
   })
 
-  it('still reads a break-free pattern one line at a time', () => {
-    const reads: number[] = []
-    const plain = source('alpha\nbravo\ncharlie')
-    const counted: FindTextSource = {
-      length: plain.length,
-      lineStartsView: plain.lineStartsView,
-      readRange: (start, end) => {
-        reads.push(end - start)
-        return plain.readRange(start, end)
-      },
-    }
-
-    findMatches(counted, regex('[a-z]+'))
-
-    // Never the whole document in one read: the longest line, at most.
-    expect(Math.max(...reads)).toBeLessThanOrEqual('charlie'.length)
+  it('names how each query is read, and why one is read whole', () => {
+    expect(findQueryPlan(regex('[a-z]+'))).toEqual({ kind: 'lines' })
+    expect(findQueryPlan(regex('^[a-z]+'))).toEqual({ kind: 'anchored-lines' })
+    expect(findQueryPlan(regex('[$^]+\\$'))).toEqual({ kind: 'lines' })
+    expect(findQueryPlan(plainQuery('a\nb\nc'))).toEqual({ kind: 'literal-lines', lineBreaks: 2 })
+    expect(findQueryPlan(regex('a\\sb'))).toEqual({
+      kind: 'range',
+      reason: 'pattern-may-match-line-break',
+    })
+    expect(findQueryPlan(regex('('))).toBeNull()
   })
 
   it('walks back to the nearest match, not to the last one a paint budget allowed', () => {

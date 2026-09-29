@@ -28,7 +28,6 @@ export type ShikiWorkerDocumentOptions = {
   readonly languageRegistrations: readonly ShikiWorkerLanguageRegistration[]
   readonly themeRegistration: ShikiWorkerThemeRegistration
   readonly themeRegistrations: readonly ShikiWorkerThemeRegistration[]
-  readonly text?: string
 }
 
 export type ShikiWorkerOpenRequest = ShikiWorkerDocumentOptions & {
@@ -36,9 +35,15 @@ export type ShikiWorkerOpenRequest = ShikiWorkerDocumentOptions & {
   readonly text: string
 }
 
-export type ShikiWorkerEditRequest = ShikiWorkerDocumentOptions & {
+// The worker already holds an edited document's grammar and theme; an edit names them and nothing
+// more, so a keystroke clones no registrations.
+export type ShikiWorkerEditRequest = {
   readonly type: 'edit'
-  readonly edits?: readonly TextEdit[]
+  readonly documentId: string
+  readonly runtimeSessionId: string
+  readonly lang: string
+  readonly theme: string
+  readonly edits: readonly TextEdit[]
 }
 
 export type ShikiWorkerRecolorRequest = {

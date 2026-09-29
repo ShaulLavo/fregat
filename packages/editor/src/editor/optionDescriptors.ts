@@ -1,5 +1,6 @@
 import { normalizeEditorEditability } from './editorDocument'
 import {
+  normalizeGutterLeadingInset,
   normalizeRowGap,
   normalizeRowHeight,
   normalizeScrollMode,
@@ -29,7 +30,12 @@ export type EditorControlledSelection = EditorSetSelectionOptions & {
 }
 
 type EditorControlledOptions = {
+  readonly detectIndentation?: boolean
   readonly editability?: EditorEditability
+  readonly folding?: boolean
+  readonly fontFamily?: string
+  readonly fontSize?: number
+  readonly gutterLeadingInset?: number
   readonly hiddenCharacters?: HiddenCharactersMode
   readonly keymap?: EditorKeymapOptions
   readonly lineHeight?: number
@@ -40,6 +46,7 @@ type EditorControlledOptions = {
   readonly selection?: EditorControlledSelection | null
   readonly suspiciousCharacters?: EditorSuspiciousCharactersOptions
   readonly tabMovesFocus?: boolean
+  readonly tabSize?: number
   readonly theme?: EditorTheme | null
   readonly wordWrap?: boolean
 }
@@ -99,6 +106,28 @@ type AppliedOption = {
  */
 export const EDITOR_OPTION_DESCRIPTORS: readonly EditorOptionDescriptor[] = [
   defineOption({
+    name: 'detectIndentation',
+    defaultValue: true,
+    validate: (input) => (typeof input === 'boolean' ? input : undefined),
+    equals: Object.is,
+    applyTo: (editor, enabled) => {
+      if (enabled === undefined) return false
+      editor.setDetectIndentation(enabled)
+      return true
+    },
+  }),
+  defineOption({
+    name: 'folding',
+    defaultValue: true,
+    validate: (input) => (typeof input === 'boolean' ? input : undefined),
+    equals: Object.is,
+    applyTo: (editor, enabled) => {
+      if (enabled === undefined) return false
+      editor.setFolding(enabled)
+      return true
+    },
+  }),
+  defineOption({
     name: 'editability',
     defaultValue: 'editable',
     validate: (input) =>
@@ -108,6 +137,41 @@ export const EDITOR_OPTION_DESCRIPTORS: readonly EditorOptionDescriptor[] = [
       if (editability === undefined) return false
 
       editor.setEditability(editability)
+      return true
+    },
+  }),
+  // Undefined is a value here, not "not controlled": it hands the font back to the stylesheet, so
+  // a host that stops passing one does not leave the editor on the last size it was given.
+  defineOption({
+    name: 'fontFamily',
+    defaultValue: undefined,
+    validate: (input) => (typeof input === 'string' ? input : undefined),
+    equals: Object.is,
+    applyTo: (editor, fontFamily) => {
+      editor.setFontFamily(fontFamily)
+      return true
+    },
+  }),
+  defineOption({
+    name: 'fontSize',
+    defaultValue: undefined,
+    validate: (input) =>
+      typeof input === 'number' && Number.isFinite(input) && input > 0 ? input : undefined,
+    equals: Object.is,
+    applyTo: (editor, fontSize) => {
+      editor.setFontSize(fontSize)
+      return true
+    },
+  }),
+  // Undefined resets to no inset, so a host that stops passing one gets the flush gutter back.
+  defineOption({
+    name: 'gutterLeadingInset',
+    defaultValue: 0,
+    validate: (input) =>
+      input === undefined ? undefined : normalizeGutterLeadingInset(input as number),
+    equals: Object.is,
+    applyTo: (editor, inset) => {
+      editor.setGutterLeadingInset(inset ?? 0)
       return true
     },
   }),
@@ -235,6 +299,19 @@ export const EDITOR_OPTION_DESCRIPTORS: readonly EditorOptionDescriptor[] = [
       return true
     },
   }),
+  // Undefined resets to the default width rather than meaning "not controlled", for the same
+  // reason as the font options.
+  defineOption({
+    name: 'tabSize',
+    defaultValue: undefined,
+    validate: (input) =>
+      typeof input === 'number' && Number.isFinite(input) && input > 0 ? input : undefined,
+    equals: Object.is,
+    applyTo: (editor, tabSize) => {
+      editor.setTabSize(tabSize)
+      return true
+    },
+  }),
   defineOption({
     name: 'tabMovesFocus',
     defaultValue: false,
@@ -335,6 +412,7 @@ function selectionsEqual(
 
 function validateRevealBlock(input: unknown): EditorControlledSelection['revealBlock'] {
   if (input === 'nearest' || input === 'center' || input === 'end') return input
+  if (input === 'center-if-outside') return input
   return undefined
 }
 

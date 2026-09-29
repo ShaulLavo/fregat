@@ -1,5 +1,6 @@
-import type { DocumentSessionChange, TextEdit } from '@singapore-editor/core/document'
+import type { TextEdit } from '@singapore-editor/core/document'
 import {
+  type EditorContributionChange,
   editorLanguageConfiguration,
   reindentEditsForRanges,
   type EditorCapabilityToken,
@@ -69,7 +70,7 @@ export class FormatOnTypeController {
   public update(
     snapshot: EditorViewSnapshot,
     kind: EditorViewContributionUpdateKind,
-    change: DocumentSessionChange | null,
+    change: EditorContributionChange | null,
   ): void {
     if (kind === 'document' || kind === 'clear') {
       this.pending = null
@@ -103,7 +104,7 @@ export class FormatOnTypeController {
    */
   private carryPendingForward(
     snapshot: EditorViewSnapshot,
-    change: DocumentSessionChange | null,
+    change: EditorContributionChange | null,
   ): void {
     const pending = this.pending
     if (!pending || !change) return
@@ -142,7 +143,7 @@ export class FormatOnTypeController {
     // reader never touched; the version is the one reading that counts every edit either way.
     if (snapshot.textVersion !== pending.textVersion) return
 
-    const feature = this.options.context.getFeature?.(this.options.editFeature)
+    const feature = this.options.context.getFeature(this.options.editFeature)
     if (!feature) return
 
     const head =
@@ -160,7 +161,7 @@ export class FormatOnTypeController {
  */
 function formatOnTypeCaret(
   snapshot: EditorViewSnapshot,
-  change: DocumentSessionChange | null,
+  change: EditorContributionChange | null,
 ): number | null {
   if (!change || change.kind !== 'edit') return null
   if (change.edits.length !== 1) return null
@@ -282,9 +283,8 @@ function formatOnTypeWindow(
   caretOffset: number,
 ): FormatOnTypeWindow | null {
   const source = snapshot.textSnapshot
-  const length = source ? source.length : snapshot.fullText.length
-  const read = (start: number, end: number): string =>
-    source ? source.readRange(start, end) : snapshot.fullText.slice(start, end)
+  const length = source.length
+  const read = (start: number, end: number): string => source.readRange(start, end)
 
   const from = Math.max(0, caretOffset - FORMAT_ON_TYPE_WINDOW)
   const before = read(from, caretOffset)

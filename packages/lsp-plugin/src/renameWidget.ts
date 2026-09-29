@@ -1,13 +1,15 @@
-import { createAnchoredSurface } from '@singapore-editor/plugin-ui'
+import { createAnchoredSurface } from '@singapore-editor/plugin-ui/anchored-surface'
 
 export type RenameWidgetOptions = {
   readonly document: Document
   /** Element whose computed style carries the editor theme variables. */
   readonly themeSource: HTMLElement
   readonly classNamespace?: string
+  /** Called when the prompt closes while it holds focus, which hiding it would otherwise strand. */
+  readonly returnFocus?: () => void
 }
 
-export type RenameWidgetPrompt = {
+type RenameWidgetPrompt = {
   readonly anchor: DOMRect
   readonly currentName: string
   readonly signal: AbortSignal
@@ -29,6 +31,7 @@ type RenamePromptState = {
 
 const THEME_VARIABLES = [
   '--editor-background',
+  '--editor-popup-background',
   '--editor-foreground',
   '--editor-font-family',
   '--editor-font-size',
@@ -49,6 +52,7 @@ export function createRenameWidgetController(options: RenameWidgetOptions): Rena
   element.className = `${namespace}-rename`
   element.style.zIndex = '60'
   element.style.display = 'none'
+  element.style.background = 'var(--editor-popup-background, var(--editor-background, #1e1e1e))'
 
   const input = options.document.createElement('input')
   input.className = `${namespace}-rename-input`
@@ -79,8 +83,11 @@ export function createRenameWidgetController(options: RenameWidgetOptions): Rena
     promptState.settle = null
     promptState.removeAbortListener?.()
     promptState.removeAbortListener = null
+    // A close from a click elsewhere has already moved focus; Enter and Escape leave it here.
+    const heldFocus = element.contains(options.document.activeElement)
     element.style.display = 'none'
     surface.release()
+    if (heldFocus) options.returnFocus?.()
     resolve(value)
   }
 
@@ -150,6 +157,10 @@ function applyTheme(element: HTMLElement, source: HTMLElement): void {
   const style = getComputedStyle(source)
   for (const variable of THEME_VARIABLES) {
     const value = style.getPropertyValue(variable)
-    if (value) element.style.setProperty(variable, value)
+    if (value) {
+      element.style.setProperty(variable, value)
+      continue
+    }
+    element.style.removeProperty(variable)
   }
 }

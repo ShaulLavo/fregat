@@ -74,7 +74,7 @@ describe('unusual line terminators', () => {
       const session = createDocumentSession(`ab${LINE_SEPARATOR}cd`)
       const snapshot = createDocumentTextSnapshot(session.getSnapshot())
 
-      view.setText(snapshot.materializeFullText(), snapshot)
+      view.setText(snapshot)
 
       expect(view.getLineStarts()).toEqual([0, 3])
       expect(view.getLineCount()).toBe(2)
@@ -86,7 +86,7 @@ describe('unusual line terminators', () => {
       )
       const snapshot = createDocumentTextSnapshot(session.getSnapshot())
 
-      view.setText(snapshot.materializeFullText(), snapshot)
+      view.setText(snapshot)
 
       expect(view.getLineStarts()).toEqual([0, 4, 8])
       expect(view.getLineCount()).toBe(3)

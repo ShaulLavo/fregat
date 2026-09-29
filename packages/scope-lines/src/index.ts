@@ -1,6 +1,8 @@
-import type { TextSnapshot } from '@singapore-editor/core/document'
+import { scheduleFrame, type ScheduledFrame } from '@singapore-editor/core/rendering'
+import type { TextReadSnapshot } from '@singapore-editor/core/document'
 import type { VirtualizedFoldMarker } from '@singapore-editor/core/rendering'
 import type {
+  EditorContributionChange,
   EditorPlugin,
   EditorViewContribution,
   EditorViewContributionContext,
@@ -10,8 +12,6 @@ import type {
   EditorVisiblePaintRectangle,
   EditorVisibleRowSnapshot,
 } from '@singapore-editor/core/extensions'
-import { createStringTextSnapshot } from '@singapore-editor/core/document'
-import type { DocumentSessionChange } from '@singapore-editor/core/document'
 import './style.css'
 
 export { BRACKET_COLOR_Z_INDEX, createBracketColorsPlugin } from './bracketColors'
@@ -69,7 +69,7 @@ type ScopeGuideGeometry = ScopeGuidePlacement & {
 
 type ScopeLinesRenderContext = {
   readonly snapshot: EditorViewSnapshot
-  readonly textSnapshot: TextSnapshot
+  readonly textSnapshot: TextReadSnapshot
   readonly lineTextCache: Map<number, string>
   readonly indentColumnCache: Map<number, number>
 }
@@ -119,7 +119,7 @@ class ScopeLinesContribution implements EditorViewContribution {
   private readonly root: HTMLDivElement
   private readonly options: ResolvedScopeLinesOptions
   private pendingContentSnapshot: EditorViewSnapshot | null = null
-  private pendingContentFrame: number | null = null
+  private pendingContentFrame: ScheduledFrame | null = null
   private renderedSnapshot: EditorViewSnapshot | null = null
   private renderedSegments: readonly RenderedScopeLineSegment[] = []
   private signature = ''
@@ -135,7 +135,7 @@ class ScopeLinesContribution implements EditorViewContribution {
   public update(
     snapshot: EditorViewSnapshot,
     kind: EditorViewContributionUpdateKind,
-    _change?: DocumentSessionChange | null,
+    _change?: EditorContributionChange | null,
   ): void {
     if (snapshot.geometryCommitted === false) return
     if (kind === 'content') {
@@ -167,14 +167,10 @@ class ScopeLinesContribution implements EditorViewContribution {
     this.pendingContentSnapshot = snapshot
     if (this.pendingContentFrame !== null) return
 
-    const view = this.root.ownerDocument.defaultView
-    if (!view?.requestAnimationFrame) {
-      this.pendingContentSnapshot = null
-      this.renderSnapshot(snapshot)
-      return
-    }
-
-    this.pendingContentFrame = view.requestAnimationFrame(this.flushContentUpdate)
+    this.pendingContentFrame = scheduleFrame(
+      this.flushContentUpdate,
+      this.root.ownerDocument.defaultView ?? globalThis,
+    )
   }
 
   private flushContentUpdate = (): void => {
@@ -193,7 +189,7 @@ class ScopeLinesContribution implements EditorViewContribution {
     this.pendingContentSnapshot = null
     if (frame === null) return
 
-    this.root.ownerDocument.defaultView?.cancelAnimationFrame(frame)
+    frame.cancel()
   }
 
   private renderSnapshot(snapshot: EditorViewSnapshot): void {
@@ -253,7 +249,7 @@ function captureScopeLineRectangle(
 function createScopeLinesRenderContext(snapshot: EditorViewSnapshot): ScopeLinesRenderContext {
   return {
     snapshot,
-    textSnapshot: snapshot.textSnapshot ?? createStringTextSnapshot(snapshot.fullText),
+    textSnapshot: snapshot.textSnapshot,
     lineTextCache: new Map(),
     indentColumnCache: new Map(),
   }
@@ -496,12 +492,11 @@ function lineText(context: ScopeLinesRenderContext, row: number): string {
 function uncachedLineText(context: ScopeLinesRenderContext, row: number): string {
   const snapshot = context.snapshot
   const lineStarts = snapshot.lineStartsView
-  const start = lineStarts ? lineStarts.at(row) : snapshot.lineStarts[row]
+  const start = lineStarts.at(row)
   if (start === undefined) return ''
 
   const textSnapshot = context.textSnapshot
-  const nextStart =
-    (lineStarts ? lineStarts.at(row + 1) : snapshot.lineStarts[row + 1]) ?? textSnapshot.length + 1
+  const nextStart = lineStarts.at(row + 1) ?? textSnapshot.length + 1
   const end = Math.max(start, Math.min(textSnapshot.length, nextStart - 1))
   return textSnapshot.readRange(start, end)
 }

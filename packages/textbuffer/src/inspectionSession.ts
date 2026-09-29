@@ -1,3 +1,4 @@
+import { readBufferRange } from './buffers'
 import type { Piece, PieceTableSnapshot } from './pieceTableTypes'
 import { createInspectionLabels, walkInspectionTree } from './inspectionWalk'
 import { inspectionPieceFields, inspectionPieceKey } from './inspection'
@@ -45,8 +46,16 @@ export function inspectionLimit(
 
 function excerpt(snapshot: PieceTableSnapshot, piece: Piece, length: number): string | null {
   if (length === 0) return null
-  const text = snapshot.buffers.chunks.get(piece.buffer)
-  return text?.slice(piece.start, piece.start + Math.min(piece.length, length)) ?? null
+  try {
+    return readBufferRange(
+      snapshot.buffers,
+      piece.buffer,
+      piece.start,
+      piece.start + Math.min(piece.length, length),
+    )
+  } catch {
+    return null
+  }
 }
 
 function compareRecords(
@@ -117,8 +126,6 @@ export function createPieceTreeInspectionSession() {
               subtreeVisibleLength: node.subtreeVisibleLength,
               subtreePieces: node.subtreePieces,
               subtreeLineBreaks: node.subtreeLineBreaks,
-              subtreeMinOrder: node.subtreeMinOrder,
-              subtreeMaxOrder: node.subtreeMaxOrder,
               subtreeMinBuffer: node.subtreeMinBuffer,
             }),
             excerpt: excerpt(snapshot, node.piece, length),

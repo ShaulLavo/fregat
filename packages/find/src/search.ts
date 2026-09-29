@@ -3,7 +3,7 @@ import {
   compareTextOffsetRanges,
   isWholeWordRange,
   type TextOffsetRange,
-  type TextSnapshot,
+  type TextReadSnapshot,
 } from '@singapore-editor/core/document'
 
 // Bounds the match set the widget counts and paints, so a pathological query
@@ -15,6 +15,11 @@ export const FIND_MATCHES_LIMIT = 19_999
 // the user. Searching is linear, so the only real cost of lifting the cap here
 // is the edit batch itself.
 export const FIND_REPLACE_ALL_LIMIT = 1_073_741_824
+
+// How much text a windowed scan reads at once, rounded up to whole lines. Large
+// enough that the tree descent per read is noise, small enough that a fragmented
+// document is never joined into one string the size of the file.
+export const FIND_WINDOW_UNITS = 65_536
 
 // Escapes whose class cannot hold a line break, so a pattern built only from
 // these can be answered a line at a time. A carriage return is among them: it
@@ -44,7 +49,7 @@ export type FindTextSource = {
   readonly lineStartsView: FindLineStartsView
 }
 
-export function findTextSourceFromSnapshot(snapshot: TextSnapshot): FindTextSource {
+export function findTextSourceFromSnapshot(snapshot: TextReadSnapshot): FindTextSource {
   return {
     length: snapshot.length,
     readRange: (start, end) => snapshot.readRange(start, end),
@@ -89,8 +94,22 @@ type CompiledFindQuery = {
   // equivalent to the regex; see compileFindQuery.
   readonly simpleSearch: string | null
   readonly wholeWord: boolean
-  readonly lineCrossing: boolean
+  readonly plan: FindQueryPlan
 }
+
+/**
+ * How much text one match can depend on, which is what decides how it is read.
+ *
+ * `lines` and `anchored-lines` cannot match a break, so they are read in windows
+ * of whole lines. `literal-lines` is a literal holding breaks: it spans a known
+ * number of lines, so it is windowed too. `range` is every pattern nothing here
+ * can bound, read as one window because that is the only reading always correct.
+ */
+export type FindQueryPlan =
+  | { readonly kind: 'lines' }
+  | { readonly kind: 'anchored-lines' }
+  | { readonly kind: 'literal-lines'; readonly lineBreaks: number }
+  | { readonly kind: 'range'; readonly reason: 'pattern-may-match-line-break' }
 
 // One stretch of the document already read: the text of
 // `[start, start + text.length)`, to be searched from `from` onward.
@@ -108,25 +127,54 @@ export function findMatches(
   limit = FIND_MATCHES_LIMIT,
 ): readonly FindMatch[] {
   const compiled = compileFindQuery(query)
-  if (!compiled) return []
+  if (!compiled || limit <= 0) return []
 
   const matches: FindMatch[] = []
+  const collect: FindMatchVisitor = (start, end, captures) => {
+    matches.push({ start, end, matches: captures })
+    return matches.length < limit
+  }
   for (const range of searchRanges(source, ranges)) {
-    appendMatchesInRange(matches, source, compiled, range, captureMatches, limit)
+    scanRange(source, compiled, range, captureMatches, collect)
     if (matches.length >= limit) break
   }
 
   return matches
 }
 
-// Adapts a materialized line-start array for a source that has no view of its
-// own; searching only ever reaches line starts through the view.
-export function arrayFindLineStartsView(lineStarts: readonly number[]): FindLineStartsView {
-  return {
-    length: lineStarts.length,
-    at: (index) => lineStarts[index],
-    indexForOffset: (offset) => arrayLineIndexForOffset(lineStarts, offset),
+/**
+ * Every match counted, none kept: a total costs no record per match.
+ *
+ * With `before`, only the matches starting in front of that offset, which is the
+ * position of a match the listing stopped short of.
+ */
+export function countMatches(
+  source: FindTextSource,
+  query: FindQuery,
+  ranges: readonly FindRange[] | null = null,
+  before = Number.POSITIVE_INFINITY,
+): number {
+  const compiled = compileFindQuery(query)
+  if (!compiled) return 0
+
+  let count = 0
+  const tally: FindMatchVisitor = (start) => {
+    if (start >= before) return false
+
+    count += 1
+    return true
   }
+  for (const range of searchRanges(source, ranges)) {
+    if (range.start >= before) break
+    scanRange(source, compiled, range, false, tally)
+  }
+
+  return count
+}
+
+/** Null for a query that cannot be compiled, which is one that finds nothing. */
+export function findQueryPlan(query: FindQuery): FindQueryPlan | null {
+  return compileFindQuery(query)?.plan ?? null
 }
 
 /** The line holding `offset`, break excluded. */
@@ -150,14 +198,18 @@ export function findNextMatchFrom(
   ranges: readonly FindRange[] | null = null,
   options: FindMatchFromOptions = {},
 ): FindMatch | null {
+  const compiled = compileFindQuery(query)
+  if (!compiled) return null
+
   const searched = searchRanges(source, ranges)
-  const ahead = firstMatchAfter(source, query, searched, clampSourceOffset(source, offset), options)
+  const from = clampSourceOffset(source, offset)
+  const ahead = firstMatchAfter(source, compiled, searched, from, options)
   if (ahead) return ahead
   if (options.loop === false) return null
 
   // Wrapping is a second bounded scan rather than a listing, so a cursor past
   // the last match still costs only the text up to the first one.
-  return firstMatchAtOrAfter(source, query, searched, searched[0]?.start ?? 0, options)
+  return firstMatchAtOrAfter(source, compiled, searched, searched[0]?.start ?? 0, options)
 }
 
 export function findPreviousMatchFrom(
@@ -167,18 +219,16 @@ export function findPreviousMatchFrom(
   ranges: readonly FindRange[] | null = null,
   options: FindMatchFromOptions = {},
 ): FindMatch | null {
+  const compiled = compileFindQuery(query)
+  if (!compiled) return null
+
   const searched = searchRanges(source, ranges)
-  const behind = lastMatchBefore(
-    source,
-    query,
-    searched,
-    clampSourceOffset(source, offset),
-    options,
-  )
+  const from = clampSourceOffset(source, offset)
+  const behind = lastMatchBefore(source, compiled, searched, from, options)
   if (behind) return behind
   if (options.loop === false) return null
 
-  return lastMatchBefore(source, query, searched, source.length, {
+  return lastMatchBefore(source, compiled, searched, source.length, {
     ...options,
     escapeEmptyMatchAtOffset: false,
   })
@@ -190,26 +240,6 @@ export function findMatchIndex(matches: readonly FindMatch[], range: FindRange):
 
 export function escapeRegExpCharacters(value: string): string {
   return value.replace(/[\\{}*+?|^$.[\]()]/g, '\\$&')
-}
-
-function arrayLineIndexForOffset(lineStarts: readonly number[], offset: number): number {
-  const clamped = Math.max(0, offset)
-  let low = 0
-  let high = lineStarts.length - 1
-  while (low <= high) {
-    const middle = (low + high) >> 1
-    if (clamped < (lineStarts[middle] ?? 0)) {
-      high = middle - 1
-      continue
-    }
-    if (clamped >= (lineStarts[middle + 1] ?? Number.POSITIVE_INFINITY)) {
-      low = middle + 1
-      continue
-    }
-    return middle
-  }
-
-  return Math.max(0, lineStarts.length - 1)
 }
 
 // The break belongs to no line: a query that cannot match one would otherwise be
@@ -225,7 +255,7 @@ function escapesEmptyMatch(match: FindMatch, offset: number, escape: boolean): b
 
 function firstMatchAfter(
   source: FindTextSource,
-  query: FindQuery,
+  query: CompiledFindQuery,
   ranges: readonly FindRange[],
   offset: number,
   options: FindMatchFromOptions,
@@ -241,7 +271,7 @@ function firstMatchAfter(
 
 function firstMatchAtOrAfter(
   source: FindTextSource,
-  query: FindQuery,
+  query: CompiledFindQuery,
   ranges: readonly FindRange[],
   offset: number,
   options: FindMatchFromOptions,
@@ -249,78 +279,61 @@ function firstMatchAtOrAfter(
   for (const range of ranges) {
     if (range.end < offset) continue
 
-    const found = firstMatchInRange(source, query, range, offset, options)
+    const found = firstMatchInRange(source, query, range, offset, options.captureMatches ?? false)
     if (found) return found
   }
 
   return null
 }
 
-// Walked forward a line at a time from the cursor's line, the mirror of
-// lastMatchInRange. The range is never cut at the offset: a pattern resumed
-// there simply begins a fresh match at the cursor — 'pha' inside 'alpha' for
-// `\w+` — and a range no listing of the document holds is one the reader was
-// never shown and Replace must never rewrite. What the offset decides is which
-// matches are kept, not where the scan starts.
+// The range is never cut at the offset: a pattern resumed there simply begins a
+// fresh match at the cursor — 'pha' inside 'alpha' for `\w+` — and a range no
+// listing of the document holds is one the reader was never shown and Replace
+// must never rewrite. What the offset decides is which matches are kept, not
+// where the scan starts. Uncapped, because what stands at the cursor is being
+// asked for regardless of where the paint budget ran out.
 function firstMatchInRange(
   source: FindTextSource,
-  query: FindQuery,
+  query: CompiledFindQuery,
   range: FindRange,
   offset: number,
-  options: FindMatchFromOptions,
+  captureMatches: boolean,
 ): FindMatch | null {
-  if (isLineCrossingQuery(query)) return firstMatchInWindow(source, query, range, offset, options)
+  let found: FindMatch | null = null
+  const scanned = { start: forwardScanStart(source, query, range, offset), end: range.end }
+  scanRange(source, query, scanned, captureMatches, (start, end, captures) => {
+    if (start < offset) return true
 
-  const lineStartsView = source.lineStartsView
-  for (
-    let index = lineStartsView.indexForOffset(Math.max(range.start, offset));
-    index < lineStartsView.length;
-    index += 1
-  ) {
-    const lineStart = lineStartsView.at(index)
-    if (lineStart === undefined || lineStart > range.end) return null
+    found = { start, end, matches: captures }
+    return false
+  })
 
-    // Lines in front of the cursor are skipped rather than searched: a match
-    // that cannot hold a break cannot reach out of the line it starts on, so
-    // none of them could answer at or after the offset anyway.
-    const line = {
-      start: Math.max(range.start, lineStart),
-      end: Math.min(range.end, lineEndAt(source, index)),
-    }
-    const found =
-      line.end < line.start ? null : firstMatchInWindow(source, query, line, offset, options)
-    if (found) return found
-  }
-
-  return null
+  return found
 }
 
-// The first match in one window at or after the offset, listed the way the
-// document is listed so the two agree on where a match begins.
-function firstMatchInWindow(
+// Lines in front of the cursor are skipped rather than searched: a match that
+// cannot hold a break cannot reach out of the line it starts on, so none of them
+// could answer at or after the offset anyway.
+function forwardScanStart(
   source: FindTextSource,
-  query: FindQuery,
+  query: CompiledFindQuery,
   range: FindRange,
   offset: number,
-  options: FindMatchFromOptions,
-): FindMatch | null {
-  // Uncapped for the same reason the backward walk is: the cap bounds what gets
-  // painted, and what stands at the cursor is being asked for regardless of
-  // where the paint budget ran out.
-  const found = findMatches(
-    source,
-    query,
-    [range],
-    options.captureMatches ?? false,
-    FIND_REPLACE_ALL_LIMIT,
-  )
+): number {
+  if (!isLineLocalPlan(query.plan)) return range.start
 
-  return found.find((match) => match.start >= offset) ?? null
+  const lineStartsView = source.lineStartsView
+  const line = lineStartsView.indexForOffset(Math.max(range.start, offset))
+  return Math.max(range.start, lineStartsView.at(line) ?? 0)
+}
+
+function isLineLocalPlan(plan: FindQueryPlan): boolean {
+  return plan.kind === 'lines' || plan.kind === 'anchored-lines'
 }
 
 function lastMatchBefore(
   source: FindTextSource,
-  query: FindQuery,
+  query: CompiledFindQuery,
   ranges: readonly FindRange[],
   offset: number,
   options: FindMatchFromOptions,
@@ -328,37 +341,46 @@ function lastMatchBefore(
   for (const range of ranges.toReversed()) {
     if (range.start > offset) continue
 
-    const clipped = { start: range.start, end: Math.min(range.end, offset) }
-    const found = lastMatchInRange(source, query, clipped, offset, options)
+    const found = lastMatchInRange(source, query, range, offset, options)
     if (found) return found
   }
 
   return null
 }
 
-// Walked back a line at a time, because the match before the cursor is the one
+// Walked back a window at a time, because the match before the cursor is the one
 // being asked for and listing everything behind it to reach the last entry is
 // the whole document on a search that started near its end.
 function lastMatchInRange(
   source: FindTextSource,
-  query: FindQuery,
-  range: FindRange,
+  query: CompiledFindQuery,
+  searched: FindRange,
   offset: number,
   options: FindMatchFromOptions,
 ): FindMatch | null {
-  if (isLineCrossingQuery(query)) return lastMatchInWindow(source, query, range, offset, options)
+  // A pattern that can run past a break is shown the text behind the cursor too:
+  // cut at the cursor's line, `[^a]+$` would end there on a match no listing of
+  // the document holds. The scan still stops at the first match past the cursor.
+  if (!isLineLocalPlan(query.plan))
+    return lastMatchInWindow(source, query, searched, offset, options)
 
+  const range = { start: searched.start, end: Math.min(searched.end, offset) }
   const lineStartsView = source.lineStartsView
-  for (let index = lineStartsView.indexForOffset(range.end); index >= 0; index -= 1) {
-    const lineStart = lineStartsView.at(index) ?? 0
-    const line = {
-      start: Math.max(range.start, lineStart),
-      end: Math.min(range.end, lineEndAt(source, index)),
+  let last = lineStartsView.indexForOffset(range.end)
+  while (last >= 0) {
+    const reach = Math.max(range.start, (lineStartsView.at(last) ?? 0) - FIND_WINDOW_UNITS)
+    const first = lineStartsView.indexForOffset(reach)
+    const firstStart = lineStartsView.at(first) ?? 0
+    const window = {
+      start: Math.max(range.start, firstStart),
+      end: Math.min(range.end, lineEndAt(source, last)),
     }
     const found =
-      line.end < line.start ? null : lastMatchInWindow(source, query, line, offset, options)
+      window.end < window.start ? null : lastMatchInWindow(source, query, window, offset, options)
     if (found) return found
-    if (lineStart <= range.start) return null
+    if (firstStart <= range.start) return null
+
+    last = first - 1
   }
 
   return null
@@ -366,29 +388,29 @@ function lastMatchInRange(
 
 // The last match in one window, escaping the same way stepping an ordered list
 // does: what stands before a zero-width match parked on the cursor is the entry
-// the search is being asked for, and it may be in an earlier window.
+// the search is being asked for, and it may be in an earlier window. Uncapped,
+// and only the last two are kept: a listing that stopped at the paint cap would
+// answer every press behind the cursor with the 19,999th match.
 function lastMatchInWindow(
   source: FindTextSource,
-  query: FindQuery,
+  query: CompiledFindQuery,
   range: FindRange,
   offset: number,
   options: FindMatchFromOptions,
 ): FindMatch | null {
-  // Uncapped: the cap bounds what gets painted, and a listing that stopped at it
-  // would answer every press behind the cursor with the 19,999th match rather
-  // than the nearest one.
-  const found = findMatches(
-    source,
-    query,
-    [range],
-    options.captureMatches ?? false,
-    FIND_REPLACE_ALL_LIMIT,
-  )
-  const last = found.at(-1)
+  let last: FindMatch | null = null
+  let beforeLast: FindMatch | null = null
+  scanRange(source, query, range, options.captureMatches ?? false, (start, end, captures) => {
+    if (end > offset) return false
+
+    beforeLast = last
+    last = { start, end, matches: captures }
+    return true
+  })
   if (!last) return null
   if (!escapesEmptyMatch(last, offset, options.escapeEmptyMatchAtOffset ?? false)) return last
 
-  return found.at(-2) ?? null
+  return beforeLast
 }
 
 // A pattern compiled with the unicode flag may not be resumed inside a surrogate
@@ -406,23 +428,16 @@ function queryIsCaseSensitiveByContent(searchString: string): boolean {
   return searchString.toLowerCase() !== searchString.toUpperCase()
 }
 
-// True when no per-line haystack could answer the query, so the search has to
-// be handed text that still holds its breaks.
 /**
- * Whether a query has to be answered by a haystack that spans line breaks.
+ * Whether every part of a pattern is provably unable to match a line break.
  *
  * Asked the safe way round. Listing the constructs that CAN hold a break means
- * one nobody thought of routes a query to the per-line path, where it answers
+ * one nobody thought of routes a query to the windowed path, where it answers
  * "no results" for text that is plainly there — the one wrong answer a search
- * must never give. So a query stays on the per-line path only when every part of
- * it is provably break-free, and anything unrecognized takes the slower path
- * that is always correct.
+ * must never give. So a query is windowed only when every part of it is provably
+ * break-free, and anything unrecognized takes the slower path that is always
+ * correct.
  */
-function isLineCrossingQuery(query: FindQuery): boolean {
-  if (!query.isRegex) return query.searchString.includes('\n')
-  return !isLineSafePattern(query.searchString)
-}
-
 function isLineSafePattern(pattern: string): boolean {
   for (let index = 0; index < pattern.length; index += 1) {
     const char = pattern[index]
@@ -487,7 +502,8 @@ function compileFindQuery(query: FindQuery): CompiledFindQuery | null {
   if (query.searchString.length === 0) return null
 
   const source = query.isRegex ? query.searchString : escapeRegExpCharacters(query.searchString)
-  const lineCrossing = isLineCrossingQuery(query)
+  const plan = planFindQuery(query)
+  const lineCrossing = plan.kind === 'range' || plan.kind === 'literal-lines'
   // Flags describe the haystack, and only a line-crossing search is ever handed
   // one holding a break: a per-line slice bounds `^` and `$` by itself, so `m`
   // there would only claim breaks the slice does not contain.
@@ -508,8 +524,32 @@ function compileFindQuery(query: FindQuery): CompiledFindQuery | null {
     regex,
     simpleSearch: canUseSimpleSearch ? query.searchString : null,
     wholeWord: query.wholeWord,
-    lineCrossing,
+    plan,
   }
+}
+
+function planFindQuery(query: FindQuery): FindQueryPlan {
+  if (!query.isRegex) {
+    const lineBreaks = query.searchString.split('\n').length - 1
+    return lineBreaks === 0 ? { kind: 'lines' } : { kind: 'literal-lines', lineBreaks }
+  }
+
+  if (!isLineSafePattern(query.searchString))
+    return { kind: 'range', reason: 'pattern-may-match-line-break' }
+  return hasLineAnchor(query.searchString) ? { kind: 'anchored-lines' } : { kind: 'lines' }
+}
+
+// Asked of a pattern already known to be line-safe, so a class cannot be negated
+// and a `^` inside one is a member rather than an anchor.
+function hasLineAnchor(pattern: string): boolean {
+  for (let index = 0; index < pattern.length; index += 1) {
+    const char = pattern[index]
+    if (char === '\\') index += 1
+    else if (char === '[') index = characterClassEnd(pattern, index) ?? pattern.length
+    else if (char === '^' || char === '$') return true
+  }
+
+  return false
 }
 
 /**
@@ -574,46 +614,124 @@ function clampSourceOffset(source: FindTextSource, offset: number): number {
   return Math.min(Math.max(0, offset), source.length)
 }
 
-function appendMatchesInRange(
-  matches: FindMatch[],
+// Visited in document order; false stops the scan where it stands.
+type FindMatchVisitor = (start: number, end: number, captures: RegExpExecArray | null) => boolean
+
+/** False once the range is spent or the visitor stopped: nothing later in it is read. */
+function scanRange(
   source: FindTextSource,
   query: CompiledFindQuery,
   range: FindRange,
   captureMatches: boolean,
-  limit: number,
-): void {
-  if (query.lineCrossing) {
-    appendCrossingMatches(matches, source, query, range, captureMatches, limit)
-    return
-  }
+  visit: FindMatchVisitor,
+): boolean {
+  if (query.plan.kind === 'range')
+    return scanWholeRange(source, query, range, captureMatches, visit)
+  if (query.plan.kind === 'literal-lines')
+    return scanSpanningLiteral(source, query, range, query.plan.lineBreaks, visit)
 
-  appendLineMatches(matches, source, query, range, captureMatches, limit)
+  return scanLines(source, query, range, captureMatches, visit)
 }
 
 // Whole lines, even where the range was cut inside one: the anchors and the word
 // boundaries have to answer for the line the reader sees rather than for where
 // the range happens to end, so the range only decides which matches are kept.
-function appendLineMatches(
-  matches: FindMatch[],
+//
+// Read many lines to a window. A match that cannot hold a break cannot leave its
+// line, and a break is no word character, so a pattern with no `^` or `$` finds in
+// the window exactly what it finds line by line, without a tree descent per line.
+function scanLines(
   source: FindTextSource,
   query: CompiledFindQuery,
   range: FindRange,
   captureMatches: boolean,
-  limit: number,
-): void {
+  visit: FindMatchVisitor,
+): boolean {
   const lineStartsView = source.lineStartsView
-  for (
-    let index = lineStartsView.indexForOffset(range.start);
-    index < lineStartsView.length;
-    index += 1
-  ) {
+  let index = lineStartsView.indexForOffset(range.start)
+  while (index < lineStartsView.length) {
     const start = lineStartsView.at(index)
-    if (start === undefined || start > range.end) return
-    if (matches.length >= limit) return
+    if (start === undefined || start > range.end) return true
 
-    const window = readWindow(source, start, lineEndAt(source, index), range)
-    if (!appendWindowMatches(matches, window, query, range, captureMatches, limit)) return
+    const last = lastWindowLine(source, index, start, range.end)
+    const window = readWindow(source, start, lineEndAt(source, last), range)
+    if (!scanLineWindow(window, query, range, captureMatches, visit)) return false
+    index = last + 1
   }
+
+  return true
+}
+
+function lastWindowLine(
+  source: FindTextSource,
+  first: number,
+  start: number,
+  rangeEnd: number,
+): number {
+  const reach = Math.min(rangeEnd, start + FIND_WINDOW_UNITS)
+  return Math.max(first, source.lineStartsView.indexForOffset(reach))
+}
+
+function scanLineWindow(
+  window: FindWindow,
+  query: CompiledFindQuery,
+  range: FindRange,
+  captureMatches: boolean,
+  visit: FindMatchVisitor,
+): boolean {
+  if (query.plan.kind !== 'anchored-lines')
+    return scanWindow(window, query, range, captureMatches, visit)
+
+  // `^` and `$` answer for the ends of the haystack, so each line is its own.
+  let lineStart = 0
+  while (lineStart <= window.text.length) {
+    const found = window.text.indexOf('\n', lineStart)
+    const lineEnd = found === -1 ? window.text.length : found
+    const line = {
+      text: window.text.slice(lineStart, lineEnd),
+      start: window.start + lineStart,
+      from: Math.max(0, window.from - lineStart),
+    }
+    if (lineEnd >= window.from && !scanWindow(line, query, range, captureMatches, visit))
+      return false
+
+    lineStart = lineEnd + 1
+  }
+
+  return true
+}
+
+// A literal holding breaks spans exactly that many lines past the one it starts
+// on, so windows overlapping by that many lines show every match whole to at
+// least one of them. The cursor is carried across: restarting the greedy scan at
+// an overlap's first character would change which of two overlapping candidates
+// wins, and with it every match after them.
+function scanSpanningLiteral(
+  source: FindTextSource,
+  query: CompiledFindQuery,
+  range: FindRange,
+  lineBreaks: number,
+  visit: FindMatchVisitor,
+): boolean {
+  const lineStartsView = source.lineStartsView
+  const finalLine = lineStartsView.indexForOffset(range.end)
+  let first = lineStartsView.indexForOffset(range.start)
+  const cursor = { offset: range.start }
+  while (first <= finalLine) {
+    const start = lineStartsView.at(first) ?? 0
+    const last = Math.min(
+      finalLine,
+      Math.max(first + lineBreaks, lastWindowLine(source, first, start, range.end)),
+    )
+    const text = source.readRange(start, Math.max(start, lineEndAt(source, last)))
+    const window = { text, start, from: Math.max(0, cursor.offset - start) }
+    if (!scanWindow(window, query, range, false, visit, cursor)) return false
+    if (last === finalLine) return true
+
+    first = last + 1 - lineBreaks
+  }
+
+  return true
 }
 
 // Listing every match of a pattern that can span the range's ends has to look at
@@ -621,19 +739,18 @@ function appendLineMatches(
 // grown in steps would only re-run the pattern over text it already scanned. The
 // window still stops on line boundaries, or `^` and `$` would answer for its cut
 // ends instead of for real ones.
-function appendCrossingMatches(
-  matches: FindMatch[],
+function scanWholeRange(
   source: FindTextSource,
   query: CompiledFindQuery,
   range: FindRange,
   captureMatches: boolean,
-  limit: number,
-): void {
+  visit: FindMatchVisitor,
+): boolean {
   const lineStartsView = source.lineStartsView
   const start = lineStartsView.at(lineStartsView.indexForOffset(range.start)) ?? 0
   const end = lineEndAt(source, lineStartsView.indexForOffset(range.end))
   const window = readWindow(source, start, Math.max(start, end), range)
-  appendWindowMatches(matches, window, query, range, captureMatches, limit)
+  return scanWindow(window, query, range, captureMatches, visit)
 }
 
 function readWindow(
@@ -645,40 +762,44 @@ function readWindow(
   return { text: source.readRange(start, end), start, from: Math.max(0, range.start - start) }
 }
 
-/** False once the range is spent, so no later window can add to the result. */
-function appendWindowMatches(
-  matches: FindMatch[],
+// Where the next raw match may begin. It moves past every raw match, including
+// one the whole-word filter rejects, so the scan keeps one non-overlap phase.
+type FindCursor = { offset: number }
+
+/** False once the range is spent or the visitor stopped, so no later window can add anything. */
+function scanWindow(
   window: FindWindow,
   query: CompiledFindQuery,
   range: FindRange,
   captureMatches: boolean,
-  limit: number,
+  visit: FindMatchVisitor,
+  cursor?: FindCursor,
 ): boolean {
-  if (query.simpleSearch && !captureMatches) {
-    return appendSimpleMatches(matches, window, query, range, limit)
-  }
+  if (query.simpleSearch && !captureMatches)
+    return scanSimpleMatches(window, query.simpleSearch, query.wholeWord, range, visit, cursor)
 
-  return appendRegexMatches(matches, window, query, range, captureMatches, limit)
+  return scanRegexMatches(window, query, range, captureMatches, visit, cursor)
 }
 
-function appendSimpleMatches(
-  matches: FindMatch[],
+function scanSimpleMatches(
   window: FindWindow,
-  query: CompiledFindQuery,
+  searchString: string,
+  wholeWord: boolean,
   range: FindRange,
-  limit: number,
+  visit: FindMatchVisitor,
+  cursor?: FindCursor,
 ): boolean {
-  const searchString = query.simpleSearch
-  if (!searchString) return true
-
   // Searched as-is: no folded copy of the text is allocated, and every index
   // returned addresses the window it came from.
   let index = window.text.indexOf(searchString, window.from)
-  while (index !== -1 && matches.length < limit) {
+  while (index !== -1) {
     const start = window.start + index
-    if (start + searchString.length > range.end) return false
-    if (validWholeWordMatch(window.text, index, searchString.length, query.wholeWord))
-      matches.push({ start, end: start + searchString.length, matches: null })
+    const end = start + searchString.length
+    if (end > range.end) return false
+    if (cursor) cursor.offset = end
+    if (validWholeWordMatch(window.text, index, searchString.length, wholeWord)) {
+      if (!visit(start, end, null)) return false
+    }
 
     index = window.text.indexOf(searchString, index + searchString.length)
   }
@@ -686,29 +807,29 @@ function appendSimpleMatches(
   return true
 }
 
-function appendRegexMatches(
-  matches: FindMatch[],
+function scanRegexMatches(
   window: FindWindow,
   query: CompiledFindQuery,
   range: FindRange,
   captureMatches: boolean,
-  limit: number,
+  visit: FindMatchVisitor,
+  cursor?: FindCursor,
 ): boolean {
   query.regex.lastIndex = window.from
-  while (matches.length < limit) {
+  while (true) {
     const match = query.regex.exec(window.text)
     if (!match) return true
 
     const start = window.start + match.index
     const end = start + match[0].length
     if (start > range.end || end > range.end) return false
-    if (validWholeWordMatch(window.text, match.index, match[0].length, query.wholeWord))
-      matches.push({ start, end, matches: captureMatches ? match : null })
+    if (cursor) cursor.offset = end
+    if (validWholeWordMatch(window.text, match.index, match[0].length, query.wholeWord)) {
+      if (!visit(start, end, captureMatches ? match : null)) return false
+    }
 
     if (match[0].length === 0) advancePastEmptyMatch(query.regex, window.text)
   }
-
-  return true
 }
 
 function advancePastEmptyMatch(regex: RegExp, text: string): void {

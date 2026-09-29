@@ -37,12 +37,27 @@ const DOCUMENT = { text: 'alpha beta', documentId: 'a.ts', revision: 1 }
  * fails here rather than in a host that notices months later.
  */
 const OPTION_SAMPLES: Record<EditorControlledOptionName, OptionSample> = {
+  detectIndentation: {
+    initial: true,
+    next: false,
+    method: 'setDetectIndentation',
+    applied: [false],
+  },
+  folding: { initial: true, next: false, method: 'setFolding', applied: [false] },
   editability: {
     initial: 'editable',
     next: 'readonly',
     method: 'setEditability',
     applied: ['readonly'],
   },
+  fontFamily: {
+    initial: 'monospace',
+    next: 'JetBrains Mono, monospace',
+    method: 'setFontFamily',
+    applied: ['JetBrains Mono, monospace'],
+  },
+  fontSize: { initial: 13, next: 16, method: 'setFontSize', applied: [16] },
+  gutterLeadingInset: { initial: 4, next: 12, method: 'setGutterLeadingInset', applied: [12] },
   hiddenCharacters: {
     initial: 'hidden',
     next: 'show',
@@ -101,6 +116,7 @@ const OPTION_SAMPLES: Record<EditorControlledOptionName, OptionSample> = {
     method: 'setTabMovesFocus',
     applied: [true],
   },
+  tabSize: { initial: 2, next: 8, method: 'setTabSize', applied: [8] },
   theme: {
     initial: { backgroundColor: '#111111' },
     next: { backgroundColor: '#222222' },
@@ -191,6 +207,19 @@ describe('controlled options', () => {
     mounted.dispose()
   })
 
+  it('hands the flush gutter back when the host stops passing an inset', () => {
+    const mounted = mountReactEditor(optionsWith('gutterLeadingInset', 12))
+    const instance = mounted.controller.getEditor()
+    expect(instance).not.toBeNull()
+    const spy = vi.spyOn(instance as Editor, 'setGutterLeadingInset')
+
+    mounted.render({ document: DOCUMENT })
+
+    expect(spy.mock.calls).toEqual([[0]])
+
+    mounted.dispose()
+  })
+
   it('coerces input the editor cannot use to the descriptor default', () => {
     const rowGap = descriptorFor('rowGap')
     const scrollMode = descriptorFor('scrollMode')
@@ -198,6 +227,10 @@ describe('controlled options', () => {
 
     expect(rowGap.validate(Number.NaN)).toBe(rowGap.defaultValue)
     expect(rowGap.validate(-4)).toBe(rowGap.defaultValue)
+    const inset = descriptorFor('gutterLeadingInset')
+    expect(inset.validate(Number.NaN)).toBe(inset.defaultValue)
+    expect(inset.validate(-12)).toBe(inset.defaultValue)
+    expect(inset.validate(11.2)).toBe(12)
     expect(scrollMode.validate('sideways')).toBe(scrollMode.defaultValue)
     expect(selection.validate({ anchor: 'first' })).toBe(selection.defaultValue)
   })

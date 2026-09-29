@@ -1,0 +1,189 @@
+{
+  "note": "Canonical insert landing against the parent commit. Baseline (b) and candidate (c) alternate b1, c1, b2, c2 on one quiet machine; 15 samples each, --only the edit and anchor lanes. The ratio is Singapore over the pinned vscode-textbuffer measured in the same run.",
+  "baselineCommit": "30df13fe0ca3c1c00700a0d0ba1c8854b04c2f43",
+  "environment": {
+    "node": "v26.7.0",
+    "v8": "14.6.202.34-node.28",
+    "typescript": "6.0.3",
+    "platform": "linux",
+    "arch": "x64",
+    "release": "7.1.9-arch1-2",
+    "cpu": "Intel(R) Core(TM) i7-14700K",
+    "logicalCpus": 28,
+    "totalMemory": 33369657344,
+    "workerFlags": ["--expose-gc"]
+  },
+  "rows": [
+    {
+      "workload": "sequential-typing",
+      "b1": {
+        "singaporeMedianMs": 0.43261900000000253,
+        "ratioMedian": 0.6725173834844147
+      },
+      "c1": {
+        "singaporeMedianMs": 0.4251739999999984,
+        "ratioMedian": 0.692099458755541
+      },
+      "b2": {
+        "singaporeMedianMs": 0.41970799999999997,
+        "ratioMedian": 0.6684195690153567
+      },
+      "c2": {
+        "singaporeMedianMs": 0.4358490000000046,
+        "ratioMedian": 0.6802955003777341
+      }
+    },
+    {
+      "workload": "typing-with-lookups",
+      "b1": {
+        "singaporeMedianMs": 0.6631670000000014,
+        "ratioMedian": 0.6631789372208695
+      },
+      "c1": {
+        "singaporeMedianMs": 0.620166999999995,
+        "ratioMedian": 0.6253505305477081
+      },
+      "b2": {
+        "singaporeMedianMs": 0.6539080000000013,
+        "ratioMedian": 0.6772346710082084
+      },
+      "c2": {
+        "singaporeMedianMs": 0.633191999999994,
+        "ratioMedian": 0.6327256811729689
+      }
+    },
+    {
+      "workload": "random-insertions",
+      "b1": {
+        "singaporeMedianMs": 1.876097999999999,
+        "ratioMedian": 1.5860747208451578
+      },
+      "c1": {
+        "singaporeMedianMs": 1.8691769999999934,
+        "ratioMedian": 1.499086918757822
+      },
+      "b2": {
+        "singaporeMedianMs": 1.834857999999997,
+        "ratioMedian": 1.5475466745835078
+      },
+      "c2": {
+        "singaporeMedianMs": 1.8070450000000022,
+        "ratioMedian": 1.5167980996428436
+      }
+    },
+    {
+      "workload": "random-replacements",
+      "b1": {
+        "singaporeMedianMs": 2.6074299999999937,
+        "ratioMedian": 1.7947371319227357
+      },
+      "c1": {
+        "singaporeMedianMs": 2.331807000000012,
+        "ratioMedian": 1.6519349854522773
+      },
+      "b2": {
+        "singaporeMedianMs": 2.6725160000000017,
+        "ratioMedian": 1.871121952312403
+      },
+      "c2": {
+        "singaporeMedianMs": 2.300134,
+        "ratioMedian": 1.6215358433715794
+      }
+    },
+    {
+      "workload": "eight-cursor-batches",
+      "b1": {
+        "singaporeMedianMs": 2.3651509999999973,
+        "ratioMedian": 1.960660795836524
+      },
+      "c1": {
+        "singaporeMedianMs": 2.2629090000000076,
+        "ratioMedian": 1.962638975258297
+      },
+      "b2": {
+        "singaporeMedianMs": 2.354819000000006,
+        "ratioMedian": 1.956032810715409
+      },
+      "c2": {
+        "singaporeMedianMs": 2.253479999999996,
+        "ratioMedian": 1.9512271149809788
+      }
+    },
+    {
+      "workload": "mixed-edit-churn",
+      "b1": {
+        "singaporeMedianMs": 2.9273160000000047,
+        "ratioMedian": 2.2761627432303557
+      },
+      "c1": {
+        "singaporeMedianMs": 2.663769000000002,
+        "ratioMedian": 2.1477106434579776
+      },
+      "b2": {
+        "singaporeMedianMs": 2.9425799999999924,
+        "ratioMedian": 2.348424024861895
+      },
+      "c2": {
+        "singaporeMedianMs": 2.689489999999992,
+        "ratioMedian": 2.2092680350296745
+      }
+    },
+    {
+      "workload": "large-paste-delete",
+      "b1": {
+        "singaporeMedianMs": 4.7653509999999955,
+        "ratioMedian": 0.3712395965137052
+      },
+      "c1": {
+        "singaporeMedianMs": 4.672239999999988,
+        "ratioMedian": 0.3724747041919896
+      },
+      "b2": {
+        "singaporeMedianMs": 4.6884959999999865,
+        "ratioMedian": 0.3654713219939546
+      },
+      "c2": {
+        "singaporeMedianMs": 4.633377999999993,
+        "ratioMedian": 0.36728379525959526
+      }
+    },
+    {
+      "workload": "anchor-density",
+      "b1": {
+        "singaporeMedianMs": 10.581155999999993,
+        "ratioMedian": null
+      },
+      "c1": {
+        "singaporeMedianMs": 10.966278999999986,
+        "ratioMedian": null
+      },
+      "b2": {
+        "singaporeMedianMs": 10.525510999999995,
+        "ratioMedian": null
+      },
+      "c2": {
+        "singaporeMedianMs": 11.029954000000004,
+        "ratioMedian": null
+      }
+    },
+    {
+      "workload": "ascii-replacements",
+      "b1": {
+        "singaporeMedianMs": 2.341261000000003,
+        "ratioMedian": 1.6850829564331213
+      },
+      "c1": {
+        "singaporeMedianMs": 2.0798149999999964,
+        "ratioMedian": 1.5138103812957966
+      },
+      "b2": {
+        "singaporeMedianMs": 2.587733,
+        "ratioMedian": 1.7980257197013993
+      },
+      "c2": {
+        "singaporeMedianMs": 2.1147649999999913,
+        "ratioMedian": 1.5406440097621246
+      }
+    }
+  ]
+}

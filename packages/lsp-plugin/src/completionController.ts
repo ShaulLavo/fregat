@@ -1,11 +1,14 @@
-import type { DocumentSessionChange, SelectionAffinity } from '@singapore-editor/core/document'
+import type { SelectionAffinity } from '@singapore-editor/core/document'
 import type {
+  EditorContributionChange,
   EditorCapabilityToken,
+  EditorDisposable,
   EditorViewContributionContext,
   EditorViewContributionUpdateKind,
   EditorViewSnapshot,
 } from '@singapore-editor/core/extensions'
 import type * as lsp from 'vscode-languageserver-protocol'
+import type { CompletionKeyCommand } from './keyCommands'
 
 import {
   COMPLETION_REQUEST_DEBOUNCE_MS,
@@ -89,6 +92,13 @@ export type CompletionControllerOptions = {
   onRequestError(error: unknown): void
 }
 
+const COMPLETION_MOVES = {
+  next: 1,
+  previous: -1,
+  nextPage: 8,
+  previousPage: -8,
+} as const satisfies Partial<Record<CompletionKeyCommand, number>>
+
 export class CompletionController {
   private readonly context: EditorViewContributionContext
   private readonly completion: CompletionWidgetController
@@ -106,6 +116,7 @@ export class CompletionController {
   private caret: CompletionCaret | null = null
   private languageId: EditorViewSnapshot['languageId'] = null
   private disposed = false
+  private visibleKey: EditorDisposable | null = null
 
   public constructor(private readonly options: CompletionControllerOptions) {
     this.context = options.context
@@ -126,7 +137,7 @@ export class CompletionController {
   public update(
     snapshot: EditorViewSnapshot,
     kind: EditorViewContributionUpdateKind,
-    change: DocumentSessionChange | null,
+    change: EditorContributionChange | null,
   ): void {
     // A session's offsets are all read from these snapshots, and the distance between the request
     // and the acceptance is only a distance if both ends were measured on the same clock.
@@ -181,9 +192,10 @@ export class CompletionController {
   }
 
   private installHandlers(): void {
-    this.context.scrollElement.addEventListener('keydown', this.handleCompletionKeyDown, {
-      capture: true,
-    })
+    this.visibleKey = this.context.registerKeymapContextKey('suggestWidgetVisible', () =>
+      this.completion.isVisible(),
+    )
+    this.context.scrollElement.addEventListener('keydown', this.handleCommitCharacterKeyDown)
     this.context.container.ownerDocument.addEventListener(
       'pointerdown',
       this.handleDocumentPointerDown,
@@ -192,9 +204,9 @@ export class CompletionController {
   }
 
   private uninstallHandlers(): void {
-    this.context.scrollElement.removeEventListener('keydown', this.handleCompletionKeyDown, {
-      capture: true,
-    })
+    this.visibleKey?.dispose()
+    this.visibleKey = null
+    this.context.scrollElement.removeEventListener('keydown', this.handleCommitCharacterKeyDown)
     this.context.container.ownerDocument.removeEventListener(
       'pointerdown',
       this.handleDocumentPointerDown,
@@ -303,7 +315,7 @@ export class CompletionController {
     const sources = this.options.completionSources.forLanguage(this.languageId)
     const request: EditorCompletionRequest = {
       uri: active.uri,
-      text: active.fullText,
+      document: active,
       offset,
       trigger,
       signal: abort.signal,
@@ -373,7 +385,7 @@ export class CompletionController {
 
     // Judged once, here, rather than at every acceptance: what an item can be applied against is the
     // text the request went out with, and that text is the session's for as long as it lives.
-    const requestDocument = { text: active.fullText, offset }
+    const requestDocument = { document: active, offset }
     const items = result.items.filter((item) => completionItemApplies(requestDocument, item))
     const ranked = rankCompletionItems(items, caret.prefix)
     if (ranked.length === 0) return this.hide()
@@ -463,7 +475,7 @@ export class CompletionController {
   ): boolean {
     const application = completionApplication(
       {
-        text: acceptance.session.active.fullText,
+        document: acceptance.session.active,
         offset: acceptance.session.offset,
         caretOffset: acceptance.caretOffset,
         caretAffinity: acceptance.caretAffinity,
@@ -477,7 +489,7 @@ export class CompletionController {
 
   private completionEditFeature(): LanguageServerCompletionEditFeature | null {
     const token = this.options.completionEditFeature ?? LANGUAGE_SERVER_COMPLETION_EDIT_FEATURE
-    return this.context.getFeature?.(token) ?? null
+    return this.context.getFeature(token)
   }
 
   private cancelCompletionRequest(): void {
@@ -496,66 +508,44 @@ export class CompletionController {
     this.hide()
   }
 
-  private readonly handleCompletionKeyDown = (event: KeyboardEvent): void => {
-    if (isCompletionManualTrigger(event)) {
-      this.consumeCompletionKey(event)
+  /**
+   * The keymap's commands. False when there is no list for them to act on, and an acceptance that
+   * could not be applied is false too, so its Enter or Tab still reaches the next binding.
+   */
+  public runKeyCommand(command: CompletionKeyCommand): boolean {
+    if (command === 'trigger') {
       this.requestManualCompletion()
-      return
+      return true
     }
+    if (!this.completion.isVisible()) return false
+    if (command === 'accept') return this.acceptCompletion()
+    if (command === 'hide') {
+      this.hide()
+      return true
+    }
+
+    this.moveSelection(COMPLETION_MOVES[command])
+    return true
+  }
+
+  // Any typed character can commit, so this is a listener rather than a binding. Swallowed only once
+  // the item is in: a failed acceptance still owes the reader the character they typed.
+  private readonly handleCommitCharacterKeyDown = (event: KeyboardEvent): void => {
     if (!this.completion.isVisible()) return
 
-    if (event.key === 'ArrowDown') {
-      this.consumeCompletionKey(event)
-      this.moveSelection(1)
-      return
-    }
-    if (event.key === 'ArrowUp') {
-      this.consumeCompletionKey(event)
-      this.moveSelection(-1)
-      return
-    }
-    if (event.key === 'PageDown') {
-      this.consumeCompletionKey(event)
-      this.moveSelection(8)
-      return
-    }
-    if (event.key === 'PageUp') {
-      this.consumeCompletionKey(event)
-      this.moveSelection(-8)
-      return
-    }
-    if (event.key === 'Escape') {
-      this.consumeCompletionKey(event)
-      this.hide()
-      return
-    }
     const commitCharacter = completionCommitCharacter(
       event,
       this.completion.selectedItem(),
       this.options.completionAcceptOnCommitCharacter === true,
     )
-    if (commitCharacter !== null) {
-      // Swallowed only once the item is in: an acceptance that could not be applied still owes the
-      // reader the character they typed, and taking the key first would eat it on the way out.
-      if (this.acceptCompletion(commitCharacter)) this.consumeCompletionKey(event)
-      return
-    }
-    if (event.key !== 'Enter' && event.key !== 'Tab') return
-
-    // Swallowed only once the item is in, as a commit character is: an Enter taken for an acceptance
-    // that never happened is a newline the reader pressed for and did not get.
-    if (this.acceptCompletion()) this.consumeCompletionKey(event)
+    if (commitCharacter === null) return
+    if (this.acceptCompletion(commitCharacter)) event.preventDefault()
   }
 
   /** Moving the focus is the reader claiming the row, which a rebuilt list has to honour. */
   private moveSelection(delta: number): void {
     this.selectionChosen = true
     this.completion.moveSelection(delta)
-  }
-
-  private consumeCompletionKey(event: KeyboardEvent): void {
-    event.preventDefault()
-    event.stopImmediatePropagation()
   }
 }
 
@@ -589,10 +579,8 @@ function completionCaret(snapshot: EditorViewSnapshot): CompletionCaret | null {
   // A word ends where the caret is, so the window behind it is the whole of what a prefix can be
   // read from. No identifier reaches the end of it.
   const windowStart = Math.max(0, offset - COMPLETION_PREFIX_WINDOW)
-  const before = source
-    ? source.readRange(windowStart, offset)
-    : snapshot.fullText.slice(windowStart, offset)
-  const length = source ? source.length : snapshot.fullText.length
+  const before = source.readRange(windowStart, offset)
+  const length = source.length
   const prefix = completionPrefix(before, before.length)
   return {
     length,
@@ -617,10 +605,5 @@ function completionSessionSurvives(session: CompletionSession, caret: Completion
   if (caret.wordStart !== session.wordStart) return false
   if (caret.prefix.length === 0 && caret.offset < session.offset) return false
 
-  return caret.length - session.active.fullText.length === caret.offset - session.offset
-}
-
-function isCompletionManualTrigger(event: KeyboardEvent): boolean {
-  if (!event.ctrlKey && !event.metaKey) return false
-  return event.key === ' ' || event.code === 'Space'
+  return caret.length - session.active.textSnapshot.length === caret.offset - session.offset
 }

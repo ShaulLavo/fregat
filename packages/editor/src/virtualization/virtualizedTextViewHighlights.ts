@@ -1,3 +1,11 @@
+import {
+  type HighlightOverlay,
+  type HighlightOverlayRange,
+  buildHighlightOverlayMask,
+  splitHighlightOverlay,
+  overlayColorStyle,
+  validateHighlightOverlay,
+} from './highlightOverlay'
 import { EditorTokenStore, toEditorTokenStore, type EditorTokenInput } from '../syntax/tokenStore'
 import type { EditorTokenStyle } from '../tokens'
 import type { SelectionAffinity } from '../selections'
@@ -5,10 +13,11 @@ import {
   editorPerformanceDiagnosticsEnabled,
   recordEditorPerformanceDiagnostic,
 } from '../editor/performanceDiagnostics'
+import { scheduleFrame } from '../editor/scheduleFrame'
 import { tokenProjectionLiveRangeStatus } from '../editor/tokenProjection'
 import { clamp, normalizeTokenStyle, serializeTokenStyle } from '../style-utils'
 import { lowerBound, upperBound } from './rowHeightIndex'
-import { getSharedTokenHighlights } from './sharedTokenHighlights'
+import { getSharedTokenHighlights, SHARED_TOKEN_HIGHLIGHT_PREFIX } from './sharedTokenHighlights'
 import { rowLocalIndexForOffset } from './virtualizedTextViewInlineMapping'
 import { reregisterHighlights, scheduleHighlightRepaintNudge } from './geckoHighlightRepaint'
 import {
@@ -49,6 +58,8 @@ import type {
   VirtualizedTextSelection,
   VirtualizedTextViewInternal,
 } from './virtualizedTextViewInternals'
+
+type OverlayPaintGroup = VirtualizedTextHighlightGroup & { ranges: VirtualizedTextHighlightRange[] }
 
 type TokenRenderStyle = {
   readonly style: EditorTokenStyle
@@ -111,6 +122,13 @@ export function setTokens(view: VirtualizedTextViewInternal, tokens: EditorToken
 }
 
 export function adoptTokens(view: VirtualizedTextViewInternal, tokens: EditorTokenStore): void {
+  if (view.highlightOverlaySnapshot && view.highlightOverlaySnapshot !== view.model.textSnapshot) {
+    installTokens(view, tokens)
+    view.sameLineTokenEdit = null
+    view.tokenProjectionDirtyStartRow = null
+    refreshHighlightOverlayMask(view)
+    return
+  }
   const projectionStatus = tokenProjectionLiveRangeStatus(view.tokens, tokens)
   if (projectionStatus === true && !view.sameLineTokenEdit) {
     installTokens(view, tokens)
@@ -229,22 +247,46 @@ export function setRangeHighlight(
   ranges: readonly VirtualizedTextHighlightRange[],
   style: VirtualizedTextHighlightStyle,
 ): void {
+  validateRangeHighlightStyle(style)
   if (ranges.length === 0) {
-    clearRangeHighlight(view, name)
+    emptyRangeHighlight(view, name)
     return
   }
 
+  const previousOverlay = view.rangeHighlightGroups.get(name)?.style.overlay
   const nextRanges = sortedRangeHighlights(view, ranges)
   const group = getOrCreateRangeHighlightGroup(view, name, style)
   // Equal-priority highlights paint in registry order, which we cannot keep stable across mount
   // cycles, so the declared stacking is mirrored onto the Highlight itself.
-  group.highlight.priority = style.zIndex ?? 0
+  group.highlight.priority = (style.zIndex ?? 0) - (style.color ? 0 : 100)
   if (canSkipRangeHighlightUpdate(view, group, nextRanges, style)) return
 
   if (!sameHighlightStyle(group.style, style)) view.rangeHighlightRuleVersion += 1
   group.ranges = nextRanges
   group.style = style
   group.signature = staleRangeHighlightSignature()
+  if (style.overlay || previousOverlay) {
+    refreshHighlightOverlayMask(view)
+    return
+  }
+  prepareRangeHighlightTwins(view, group)
+  renderRangeHighlight(view, name)
+  rebuildStyleRules(view)
+}
+
+// An emptied group keeps its rule, so only a style change rewrites the view's <style>. Occurrence
+// highlights empty and refill every few keys; dropping the rule restyled every mounted row each time.
+function emptyRangeHighlight(view: VirtualizedTextViewInternal, name: string): void {
+  const group = view.rangeHighlightGroups.get(name)
+  if (!group || group.ranges.length === 0) return
+
+  group.ranges = []
+  group.signature = staleRangeHighlightSignature()
+  if (group.style.overlay) {
+    refreshHighlightOverlayMask(view)
+    return
+  }
+  prepareRangeHighlightTwins(view, group)
   renderRangeHighlight(view, name)
   rebuildStyleRules(view)
 }
@@ -253,7 +295,18 @@ export function renderRangeHighlight(view: VirtualizedTextViewInternal, name: st
   if (view.provisional) return
   const group = view.rangeHighlightGroups.get(name)
   if (!group || !view.highlightRegistry) return
+  if (group.style.overlay) {
+    for (const base of view.overlayBaseGroups.values()) renderPaintGroup(view, base)
+    return
+  }
+  renderPaintGroup(view, group)
+  for (const twin of group.twins?.values() ?? []) renderPaintGroup(view, twin)
+}
 
+function renderPaintGroup(
+  view: VirtualizedTextViewInternal,
+  group: VirtualizedTextHighlightGroup,
+): void {
   const signature = rangeHighlightSignature(view, group)
   if (signature === group.signature) return
 
@@ -273,15 +326,50 @@ export function clearRangeHighlight(view: VirtualizedTextViewInternal, name: str
   const group = view.rangeHighlightGroups.get(name)
   if (!group) return
 
-  group.highlight.clear()
-  unregisterRangeHighlight(view, group)
+  clearPaintGroup(view, group)
   view.rangeHighlightGroups.delete(name)
   view.rangeHighlightRuleVersion += 1
+  if (group.style.overlay) refreshHighlightOverlayMask(view)
   rebuildStyleRules(view)
   scheduleHighlightRepaintNudge(view.highlightRegistry)
 }
 
 function renderCaret(view: VirtualizedTextViewInternal): void {
+  if (view.selections.length > 0 && !viewHoldsFocus(view)) {
+    deferCaret(view)
+    return
+  }
+  cancelDeferredCaret(view)
+  renderCaretNow(view)
+}
+
+// Caret geometry reads row layout. An editor without focus positions its caret in the next frame,
+// after every write of the open or render that asked for it, so opening one forces no layout.
+function deferCaret(view: VirtualizedTextViewInternal): void {
+  if (view.deferredCaret) return
+  view.deferredCaret = scheduleFrame(() => {
+    view.deferredCaret = null
+    if (view.provisional) return
+    renderCaretNow(view)
+  })
+}
+
+export function cancelDeferredCaret(view: VirtualizedTextViewInternal): void {
+  view.deferredCaret?.cancel()
+  view.deferredCaret = null
+}
+
+export function flushDeferredCaret(view: VirtualizedTextViewInternal): void {
+  if (!view.deferredCaret) return
+  cancelDeferredCaret(view)
+  renderCaretNow(view)
+}
+
+function viewHoldsFocus(view: VirtualizedTextViewInternal): boolean {
+  return view.inputElement.matches(':focus')
+}
+
+function renderCaretNow(view: VirtualizedTextViewInternal): void {
   const selections = view.selections
   if (selections.length === 0) {
     hideCaretElement(view.caretElement)
@@ -346,6 +434,10 @@ export function clampStoredSelection(view: VirtualizedTextViewInternal): void {
 
 export function renderTokenHighlights(view: VirtualizedTextViewInternal): void {
   if (view.provisional) return
+  if (view.highlightOverlaySnapshot && view.highlightOverlaySnapshot !== view.model.textSnapshot) {
+    refreshHighlightOverlayMask(view)
+    return
+  }
   const pendingEdit = view.sameLineTokenEdit
   if (
     !view.highlightRegistry ||
@@ -565,14 +657,23 @@ function restoreRangeHighlightGroups(
   registry: HighlightRegistry,
 ): boolean {
   let restored = false
+  for (const base of view.overlayBaseGroups.values())
+    restored = restorePaintGroup(registry, base) || restored
   for (const group of view.rangeHighlightGroups.values()) {
-    if (!group.registered) continue
-
-    registry.set(group.name, group.highlight)
-    restored = true
+    restored = restorePaintGroup(registry, group) || restored
+    for (const twin of group.twins?.values() ?? [])
+      restored = restorePaintGroup(registry, twin) || restored
   }
-
   return restored
+}
+
+function restorePaintGroup(
+  registry: HighlightRegistry,
+  group: VirtualizedTextHighlightGroup,
+): boolean {
+  if (!group.registered) return false
+  registry.set(group.name, group.highlight)
+  return true
 }
 
 function restoreStyleRuleElements(view: VirtualizedTextViewInternal): void {
@@ -589,8 +690,26 @@ function syncTokenGroupsToPalette(view: VirtualizedTextViewInternal): void {
     const renderStyle = tokenRenderStyle(style)
     if (renderStyle) styles.set(renderStyle.styleKey, renderStyle.style)
   }
+  retainOverlayTokenStyles(view, styles)
   syncTokenGroupsToStyles(view, styles)
   view.tokenPaletteDirty = false
+}
+
+function retainOverlayTokenStyles(
+  view: VirtualizedTextViewInternal,
+  styles: Map<string, EditorTokenStyle>,
+): void {
+  if (view.highlightOverlayMask.length === 0) return
+  const overlays = new Map(
+    view.highlightOverlayMask.map((range) => [JSON.stringify(range.overlay), range.overlay]),
+  )
+  for (const style of [...styles.values()]) {
+    for (const overlay of overlays.values()) {
+      const twin = overlayColorStyle(style, overlay)
+      const key = serializeTokenStyle(twin)
+      if (view.tokenGroups.has(key)) styles.set(key, twin)
+    }
+  }
 }
 
 // Keyed by the palette's style object, which every store derived from one answer shares.
@@ -670,6 +789,10 @@ function appendTokenSegmentsForChunk(
     const end = clamp(tokenEnd, start, textLength)
     if (end <= start || end <= chunk.startOffset) return
 
+    if (view.highlightOverlayMask.length > 0) {
+      appendOverlayTokenSegments(view, segments, row, chunk, start, end, renderStyle, stats)
+      return
+    }
     const result = appendTokenSegmentForChunk(
       segments,
       row,
@@ -1041,6 +1164,10 @@ function sameHighlightStyle(
   if (left.backgroundColor !== right.backgroundColor) return false
   if (left.color !== right.color) return false
   if (left.zIndex !== right.zIndex) return false
+  if (left.dimmable !== right.dimmable) return false
+  if (left.overlay?.dim !== right.overlay?.dim) return false
+  if (left.overlay?.textDecoration !== right.overlay?.textDecoration) return false
+  if (Boolean(left.overlay) !== Boolean(right.overlay)) return false
 
   return left.textDecoration === right.textDecoration
 }
@@ -1103,9 +1230,10 @@ function addMountedRangeHighlightRanges(
   view: VirtualizedTextViewInternal,
   group: VirtualizedTextHighlightGroup,
 ): void {
-  const index = rangeHighlightIndex(group.ranges)
+  const ranges = group.paintRanges ?? group.ranges
+  const index = rangeHighlightIndex(ranges)
   for (const row of getMountedRows(view)) {
-    addMountedRangeHighlightRangesForRow(view, group, row, index)
+    addMountedRangeHighlightRangesForRow(view, group, row, index, ranges)
   }
 }
 
@@ -1114,11 +1242,12 @@ function addMountedRangeHighlightRangesForRow(
   group: VirtualizedTextHighlightGroup,
   row: MountedVirtualizedTextRow,
   index: RangeHighlightIndex,
+  ranges: readonly VirtualizedTextHighlightRange[],
 ): void {
-  const endIndex = firstStartingAtOrAfter(group.ranges, row.endOffset)
+  const endIndex = firstStartingAtOrAfter(ranges, row.endOffset)
   const startIndex = firstEndingAfter(index.maxEnds, row.startOffset, endIndex)
   for (let position = startIndex; position < endIndex; position += 1) {
-    addMountedRangeHighlightRange(view, group, row, group.ranges[position]!)
+    addMountedRangeHighlightRange(view, group, row, ranges[position]!)
   }
 }
 
@@ -1299,6 +1428,7 @@ function hideSecondaryCaretElements(view: VirtualizedTextViewInternal, startInde
 
 export function rebuildStyleRules(view: VirtualizedTextViewInternal): void {
   if (view.provisional) return
+  orderRangeHighlights(view)
   // Token highlight rules live in the shared per-document stylesheet
   // (sharedTokenHighlights), written once here per batch. The per-view style element only
   // carries range/decoration highlight rules, which are specific to this view's ranges.
@@ -1325,7 +1455,9 @@ export function rebuildStyleRules(view: VirtualizedTextViewInternal): void {
   for (const group of view.rangeHighlightGroups.values()) {
     const rule = rangeHighlightRule(view.highlightScope, group.name, group.style)
     if (rule) rules.push(rule)
+    for (const twin of group.twins?.values() ?? []) appendPaintRule(rules, view, twin)
   }
+  for (const base of view.overlayBaseGroups.values()) appendPaintRule(rules, view, base)
 
   const nextRules = rules.join('\n')
   if (view.styleEl.textContent === nextRules) {
@@ -1383,6 +1515,9 @@ function mixRangeHighlightChunkSignature(
     chunk.text.length,
   )
   let mixed = mixSignatureHash(hash, row.index)
+  // Text replacement collapses live DOM ranges even when their source offsets stay unchanged.
+  mixed = mixSignatureHash(mixed, row.textRevision)
+  mixed = mixSignatureHash(mixed, row.tokenHighlightSlotId)
   mixed = mixSignatureHash(mixed, chunk.localStart)
   mixed = mixSignatureHash(mixed, chunk.startOffset)
   mixed = mixSignatureHash(mixed, localStart)
@@ -1391,4 +1526,261 @@ function mixRangeHighlightChunkSignature(
 
 function mixSignatureHash(hash: number, value: number): number {
   return Math.imul(hash ^ (value | 0), SIGNATURE_HASH_PRIME) >>> 0
+}
+
+function validateRangeHighlightStyle(style: VirtualizedTextHighlightStyle): void {
+  if (!style.overlay) return
+  if (Object.keys(style).some((key) => key !== 'overlay'))
+    throw new TypeError('Highlight overlays cannot include ordinary paint fields')
+  validateHighlightOverlay(style.overlay)
+}
+
+function clearPaintGroup(
+  view: VirtualizedTextViewInternal,
+  group: VirtualizedTextHighlightGroup,
+): void {
+  for (const twin of group.twins?.values() ?? []) {
+    twin.highlight.clear()
+    unregisterRangeHighlight(view, twin)
+  }
+  group.twins?.clear()
+  group.highlight.clear()
+  unregisterRangeHighlight(view, group)
+}
+
+function refreshHighlightOverlayMask(view: VirtualizedTextViewInternal): void {
+  const ranges = [...view.rangeHighlightGroups.values()].flatMap((group) =>
+    group.style.overlay
+      ? group.ranges.map((range) => ({ ...range, overlay: group.style.overlay! }))
+      : [],
+  )
+  const snapshot = view.model.textSnapshot
+  view.highlightOverlaySnapshot = ranges.length ? snapshot : null
+  view.highlightOverlayMask = buildHighlightOverlayMask(ranges, snapshot.length, (offset) =>
+    snapshot.readRange(offset, offset + 1).charCodeAt(0),
+  )
+  syncOverlayBaseGroups(view)
+  for (const group of view.rangeHighlightGroups.values()) {
+    group.signature = staleRangeHighlightSignature()
+    if (group.style.overlay) {
+      clearPaintGroup(view, group)
+      continue
+    }
+    prepareRangeHighlightTwins(view, group)
+  }
+  view.rangeHighlightRuleVersion++
+  view.tokenPaletteDirty = true
+  for (const group of view.rangeHighlightGroups.values()) renderRangeHighlight(view, group.name)
+  renderTokenHighlights(view)
+  orderRangeHighlights(view)
+  rebuildStyleRules(view)
+}
+
+// One base group per distinct overlay, reused across edits, so the registry grows with the
+// overlay kinds in play and a keystroke re-fills Highlights instead of re-registering them.
+function syncOverlayBaseGroups(view: VirtualizedTextViewInternal): void {
+  const rangesByKey = new Map<string, HighlightOverlayRange[]>()
+  for (const range of view.highlightOverlayMask) {
+    const key = overlayKey(range.overlay)
+    const ranges = rangesByKey.get(key)
+    if (ranges) ranges.push(range)
+    else rangesByKey.set(key, [range])
+  }
+  for (const [key, base] of view.overlayBaseGroups) {
+    if (rangesByKey.has(key)) continue
+    clearPaintGroup(view, base)
+    view.overlayBaseGroups.delete(key)
+    view.rangeHighlightRuleVersion++
+  }
+  for (const [key, ranges] of rangesByKey) {
+    const existing = view.overlayBaseGroups.get(key)
+    if (existing) {
+      existing.ranges = ranges
+      existing.signature = staleRangeHighlightSignature()
+      continue
+    }
+    // WebKit omits text decorations from negative-priority highlights.
+    const style = { ...overlayColorStyle({}, ranges[0]!.overlay), zIndex: 0 }
+    view.overlayBaseGroups.set(
+      key,
+      createOverlayPaintGroup(nextOverlayBaseName(view), ranges, style),
+    )
+    view.rangeHighlightRuleVersion++
+  }
+}
+
+function overlayKey(overlay: HighlightOverlay): string {
+  return `${overlay.dim ?? 1}|${overlay.textDecoration ?? ''}`
+}
+
+function nextOverlayBaseName(view: VirtualizedTextViewInternal): string {
+  const names = new Set([...view.overlayBaseGroups.values()].map((group) => group.name))
+  for (let index = 0; ; index++) {
+    const name = `${view.highlightScope}-overlay-base-${index}`
+    if (!names.has(name)) return name
+  }
+}
+
+function createOverlayPaintGroup(
+  name: string,
+  ranges: readonly VirtualizedTextHighlightRange[],
+  style: VirtualizedTextHighlightStyle,
+): OverlayPaintGroup {
+  const highlight = new Highlight()
+  highlight.priority = style.zIndex ?? 0
+  return {
+    name,
+    ranges: [...ranges],
+    style,
+    highlight,
+    registered: false,
+    signature: staleRangeHighlightSignature(),
+  }
+}
+
+function prepareRangeHighlightTwins(
+  view: VirtualizedTextViewInternal,
+  group: VirtualizedTextHighlightGroup,
+): void {
+  const hadTwins = Boolean(group.twins?.size)
+  for (const twin of group.twins?.values() ?? []) clearPaintGroup(view, twin)
+  group.twins?.clear()
+  group.paintRanges = undefined
+  if (hadTwins) view.rangeHighlightRuleVersion++
+  if (!group.style.color || group.style.overlay || view.highlightOverlayMask.length === 0) return
+  const ordinary: VirtualizedTextHighlightRange[] = []
+  const twins = new Map<string, OverlayPaintGroup>()
+  for (const range of group.ranges) {
+    for (const part of splitHighlightOverlay(range.start, range.end, view.highlightOverlayMask)) {
+      appendRangeOverlayPart(group, part, ordinary, twins)
+    }
+  }
+  group.paintRanges = ordinary
+  group.twins = twins
+  view.rangeHighlightRuleVersion++
+}
+
+function appendRangeOverlayPart(
+  group: VirtualizedTextHighlightGroup,
+  part: ReturnType<typeof splitHighlightOverlay>[number],
+  ordinary: VirtualizedTextHighlightRange[],
+  twins: Map<string, OverlayPaintGroup>,
+): void {
+  if (!part.overlay) {
+    ordinary.push(part)
+    return
+  }
+  const style = overlayColorStyle(group.style, part.overlay, group.style.dimmable !== false)
+  if (style.color === group.style.color && style.textDecoration === group.style.textDecoration) {
+    ordinary.push(part)
+    return
+  }
+  const key = JSON.stringify(style)
+  const existing = twins.get(key)
+  if (existing) {
+    existing.ranges.push(part)
+    return
+  }
+  twins.set(key, createOverlayPaintGroup(`${group.name}-overlay-${twins.size}`, [part], style))
+}
+
+function appendOverlayTokenSegments(
+  view: VirtualizedTextViewInternal,
+  segments: TokenRowSegment[],
+  row: MountedVirtualizedTextRow,
+  chunk: VirtualizedTextChunk,
+  start: number,
+  end: number,
+  renderStyle: TokenRenderStyle,
+  stats: TokenSegmentBuildStats | null,
+): void {
+  for (const part of splitHighlightOverlay(
+    Math.max(start, chunk.startOffset),
+    Math.min(end, chunk.endOffset),
+    view.highlightOverlayMask,
+  )) {
+    const style = part.overlay
+      ? overlayColorStyle(renderStyle.style, part.overlay)
+      : renderStyle.style
+    const key = part.overlay ? serializeTokenStyle(style) : renderStyle.styleKey
+    recordTokenSegmentAppend(
+      stats,
+      appendTokenSegmentForChunk(segments, row, chunk, part, style, key),
+    )
+  }
+}
+
+function orderRangeHighlights(view: VirtualizedTextViewInternal): void {
+  if (view.highlightOverlayMask.length === 0 || !view.highlightRegistry) return
+  orderOverlayBases(view)
+  const groups = orderedPaintGroups(view)
+  if (rangeHighlightsInOrder(view.highlightRegistry, groups)) return
+  for (const group of groups) reregisterPaintGroup(view, group)
+}
+
+function orderOverlayBases(view: VirtualizedTextViewInternal): void {
+  const registry = view.highlightRegistry
+  if (!registry?.entries) return
+  const bases = new Set([...view.overlayBaseGroups.values()].map((group) => group.name))
+  const producers = new Set(orderedPaintGroups(view).map((group) => group.name))
+  const isProducer = (name: string) =>
+    name.startsWith(SHARED_TOKEN_HIGHLIGHT_PREFIX) || producers.has(name)
+  const entries = [...registry.entries()]
+  const lastBase = entries.findLastIndex(([name]) => bases.has(name))
+  if (lastBase < 0 || !entries.slice(0, lastBase).some(([name]) => isProducer(name))) return
+  // Equal-priority syntax and semantic colors must paint above the foreground base.
+  for (const [name, highlight] of entries) {
+    if (!isProducer(name)) continue
+    registry.delete(name)
+    registry.set(name, highlight)
+  }
+}
+
+function orderedPaintGroups(view: VirtualizedTextViewInternal): VirtualizedTextHighlightGroup[] {
+  const groups: VirtualizedTextHighlightGroup[] = []
+  for (const group of view.rangeHighlightGroups.values()) {
+    if (group.style.overlay) continue
+    if (group.registered) groups.push(group)
+    for (const twin of group.twins?.values() ?? []) if (twin.registered) groups.push(twin)
+  }
+  return groups
+}
+
+// Re-registering repaints every highlight, so it only runs when a token group or a range group
+// was registered out of order since the last check.
+function rangeHighlightsInOrder(
+  registry: HighlightRegistry,
+  groups: readonly VirtualizedTextHighlightGroup[],
+): boolean {
+  if (!registry.entries) return false
+  const positions = new Map(groups.map((group, index) => [group.name, index]))
+  let next = 0
+  for (const [name] of registry.entries()) {
+    const position = positions.get(name)
+    if (position === undefined) {
+      if (next > 0 && name.startsWith(SHARED_TOKEN_HIGHLIGHT_PREFIX)) return false
+      continue
+    }
+    if (position !== next) return false
+    next++
+  }
+  return next === groups.length
+}
+
+function reregisterPaintGroup(
+  view: VirtualizedTextViewInternal,
+  group: VirtualizedTextHighlightGroup,
+): void {
+  if (!group.registered) return
+  view.highlightRegistry?.delete(group.name)
+  view.highlightRegistry?.set(group.name, group.highlight)
+}
+
+function appendPaintRule(
+  rules: string[],
+  view: VirtualizedTextViewInternal,
+  group: VirtualizedTextHighlightGroup,
+): void {
+  const rule = rangeHighlightRule(view.highlightScope, group.name, group.style)
+  if (rule) rules.push(rule)
 }

@@ -33,7 +33,6 @@ export {
   debugPieceTable,
   detectDocumentLineEnding,
   diffPieceTableSnapshots,
-  forEachPieceTableTextChunk,
   getPieceTableLength,
   hasByteOrderMark,
   insertIntoPieceTable,

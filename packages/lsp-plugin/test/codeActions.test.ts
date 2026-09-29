@@ -17,6 +17,7 @@ import {
   type ConnectedEditor,
 } from './connectedEditor'
 import { syncedDocument } from './syncedDocument'
+import { snapshotDocument } from './snapshotDocument'
 
 const CODE_ACTION_ONLY_CAPABILITY: lsp.ServerCapabilities = { codeActionProvider: true }
 const RESOLVING_CAPABILITY: lsp.ServerCapabilities = {
@@ -84,16 +85,22 @@ describe('picking the auto fix out of an answer', () => {
 
 describe('automatic trigger range', () => {
   it('declines a caret enclosed in whitespace, and an empty line', () => {
-    expect(codeActionAutoTriggerRange('  const', 1, 1)).toBeNull()
-    expect(codeActionAutoTriggerRange('', 0, 0)).toBeNull()
-    expect(codeActionAutoTriggerRange('  const', 0, 0)).toBeNull()
-    expect(codeActionAutoTriggerRange('const  ', 7, 7)).toBeNull()
+    expect(codeActionAutoTriggerRange(snapshotDocument('  const'), 1, 1)).toBeNull()
+    expect(codeActionAutoTriggerRange(snapshotDocument(''), 0, 0)).toBeNull()
+    expect(codeActionAutoTriggerRange(snapshotDocument('  const'), 0, 0)).toBeNull()
+    expect(codeActionAutoTriggerRange(snapshotDocument('const  '), 7, 7)).toBeNull()
   })
 
   it('asks whenever one side of the caret is text, or the user drew a selection', () => {
-    expect(codeActionAutoTriggerRange('  const', 2, 2)).toEqual({ start: 2, end: 2 })
-    expect(codeActionAutoTriggerRange('  const', 7, 7)).toEqual({ start: 7, end: 7 })
-    expect(codeActionAutoTriggerRange('   ', 1, 3)).toEqual({ start: 1, end: 3 })
+    expect(codeActionAutoTriggerRange(snapshotDocument('  const'), 2, 2)).toEqual({
+      start: 2,
+      end: 2,
+    })
+    expect(codeActionAutoTriggerRange(snapshotDocument('  const'), 7, 7)).toEqual({
+      start: 7,
+      end: 7,
+    })
+    expect(codeActionAutoTriggerRange(snapshotDocument('   '), 1, 3)).toEqual({ start: 1, end: 3 })
   })
 })
 
@@ -356,7 +363,7 @@ describe('editor.action.autoFix', () => {
 
       expect(editor.workspaceEditRequests()).toHaveLength(0)
       expect(editor.applyEdits).not.toHaveBeenCalled()
-      expect(workspace?.getDocument(secondaryUri)?.textSnapshot.materializeFullText()).toBe(
+      expect(workspace?.getDocument(secondaryUri)?.textSnapshot.readRange(0, 15)).toBe(
         'const newer = 1',
       )
     },

@@ -4,7 +4,11 @@ import {
   type EditorViewContributionContext,
   type EditorViewSnapshot,
 } from '@singapore-editor/core/extensions'
-import { offsetToLspPosition, type LspClient } from '@singapore-editor/lsp'
+import {
+  offsetToLspPositionInSnapshot,
+  type LspClient,
+  type LspTextDocumentSnapshot,
+} from '@singapore-editor/lsp'
 import type * as lsp from 'vscode-languageserver-protocol'
 
 import { completionNeedsResolve, type LanguageServerCompletionTrigger } from './completion'
@@ -14,12 +18,12 @@ import { completionNeedsResolve, type LanguageServerCompletionTrigger } from './
  * second server has no reason to depend on this package, and restating the id is how they reach the
  * same list.
  */
-export const EDITOR_COMPLETION_SOURCE_ID = 'editor.completionSource'
+const EDITOR_COMPLETION_SOURCE_ID = 'editor.completionSource'
 
 /** What is being completed, in the text the caller has, not in a protocol position. */
 export type EditorCompletionRequest = {
   readonly uri: string
-  readonly text: string
+  readonly document: LspTextDocumentSnapshot
   readonly offset: number
   readonly trigger: LanguageServerCompletionTrigger
   readonly signal: AbortSignal
@@ -46,7 +50,7 @@ export type EditorCompletionSource = {
   resolveCompletionItem?(item: lsp.CompletionItem): PromiseLike<lsp.CompletionItem> | null
 }
 
-export const EDITOR_COMPLETION_SOURCE = createEditorLanguageFeatureToken<EditorCompletionSource>(
+const EDITOR_COMPLETION_SOURCE = createEditorLanguageFeatureToken<EditorCompletionSource>(
   EDITOR_COMPLETION_SOURCE_ID,
 )
 
@@ -74,7 +78,7 @@ export function createLanguageServerCompletionSource(
           'textDocument/completion',
           {
             textDocument: { uri: request.uri },
-            position: offsetToLspPosition(request.text, request.offset),
+            position: offsetToLspPositionInSnapshot(request.document, request.offset),
             context: request.trigger,
           } satisfies lsp.CompletionParams,
           { signal: request.signal },
@@ -127,7 +131,7 @@ export class LanguageServerCompletionSources
     // Every document, because which ones a server answers for is a question the plugin settles by
     // opening them, not one a language name can be matched against.
     this.registrations = sources.flatMap((source) => {
-      const registration = context.registerProvider?.(
+      const registration = context.registerProvider(
         EDITOR_COMPLETION_SOURCE,
         { language: '*' },
         source,
@@ -139,7 +143,7 @@ export class LanguageServerCompletionSources
   public forLanguage(
     languageId: EditorViewSnapshot['languageId'],
   ): readonly EditorCompletionSource[] {
-    const registered = this.context.getProviders?.(EDITOR_COMPLETION_SOURCE, languageId)
+    const registered = this.context.getProviders(EDITOR_COMPLETION_SOURCE, languageId)
     if (!registered) return this.sources
 
     const missing = this.sources.filter((source) => !registered.includes(source))

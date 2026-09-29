@@ -1,0 +1,786 @@
+{
+  "commit": "4c03e0d379bf6a0844bdf3537eed78d8c96027df",
+  "diff": "",
+  "diagnostics": false,
+  "consumers": false,
+  "repetitions": 10,
+  "sizes": [65536, 4194304, 50331648],
+  "samples": [
+    {
+      "size": 65536,
+      "emptyHeap": 641944,
+      "openHeap": 895988,
+      "liveHeap": 1087856,
+      "disposedHeap": 1031932,
+      "retained": 0,
+      "open": {
+        "operation": "open",
+        "durationMs": 37.300000071525574,
+        "fullReads": 0,
+        "fullReadUnits": 0,
+        "wireUnits": 65536,
+        "heapAtRequest": 2868067
+      },
+      "operations": [
+        {
+          "operation": "skipped-edit",
+          "durationMs": 1.2000000476837158,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 65541,
+          "heapAtRequest": 2935414
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.3999999761581421,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 65537,
+          "heapAtRequest": 3118818
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.3999999761581421,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3164114
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.3999999761581421,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 65542,
+          "heapAtRequest": 3587146
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.30000007152557373,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 65538,
+          "heapAtRequest": 3505434
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.19999992847442627,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3539542
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.30000007152557373,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 65543,
+          "heapAtRequest": 3735118
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.6000000238418579,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 65539,
+          "heapAtRequest": 3890074
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.19999992847442627,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3098210
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.30000007152557373,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 65544,
+          "heapAtRequest": 3328746
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.19999992847442627,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 65540,
+          "heapAtRequest": 3523598
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.20000004768371582,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3545978
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.2999999523162842,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 65545,
+          "heapAtRequest": 3699898
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.30000007152557373,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 65541,
+          "heapAtRequest": 3863198
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.09999990463256836,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3885986
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.40000009536743164,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 65546,
+          "heapAtRequest": 3209854
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.19999992847442627,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 65542,
+          "heapAtRequest": 3362346
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.20000004768371582,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3378610
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.10000002384185791,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 65547,
+          "heapAtRequest": 3560410
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.2999999523162842,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 65543,
+          "heapAtRequest": 3703990
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.10000002384185791,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3720254
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.19999992847442627,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 65548,
+          "heapAtRequest": 3891602
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.30000007152557373,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 65544,
+          "heapAtRequest": 3318762
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.10000002384185791,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3335026
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.19999992847442627,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 65549,
+          "heapAtRequest": 3485130
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.20000004768371582,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 65545,
+          "heapAtRequest": 3649450
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3665770
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.19999992847442627,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 65550,
+          "heapAtRequest": 3846350
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.30000007152557373,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 65546,
+          "heapAtRequest": 3989990
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 3147270
+        }
+      ]
+    },
+    {
+      "size": 4194304,
+      "emptyHeap": 641944,
+      "openHeap": 5028040,
+      "liveHeap": 5209748,
+      "disposedHeap": 1023384,
+      "retained": 0,
+      "open": {
+        "operation": "open",
+        "durationMs": 53.60000002384186,
+        "fullReads": 0,
+        "fullReadUnits": 0,
+        "wireUnits": 4194304,
+        "heapAtRequest": 11101119
+      },
+      "operations": [
+        {
+          "operation": "skipped-edit",
+          "durationMs": 11.100000023841858,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 4194309,
+          "heapAtRequest": 15389346
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 11.100000023841858,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 4194305,
+          "heapAtRequest": 19609846
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 1.899999976158142,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 19650026
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 10.5,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 4194310,
+          "heapAtRequest": 23916722
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 10.699999928474426,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 4194306,
+          "heapAtRequest": 28032014
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 1.8000000715255737,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 28062126
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 10.399999976158142,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 4194311,
+          "heapAtRequest": 32263706
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 10.799999952316284,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 4194307,
+          "heapAtRequest": 40674910
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.8999999761581421,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 40705758
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 9.5,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 4194312,
+          "heapAtRequest": 36540550
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 9.700000047683716,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 4194308,
+          "heapAtRequest": 36610678
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 1.7999999523162842,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 36628374
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 11,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 4194313,
+          "heapAtRequest": 45038638
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 9.700000047683716,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 4194309,
+          "heapAtRequest": 40814014
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 1.1999999284744263,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 40835322
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 9.700000047683716,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 4194314,
+          "heapAtRequest": 40829454
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 10.100000023841858,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 4194310,
+          "heapAtRequest": 49229282
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 1.899999976158142,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 49244258
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 9,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 4194315,
+          "heapAtRequest": 44995894
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 9.5,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 4194311,
+          "heapAtRequest": 44969918
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 1,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 44984894
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 10.5,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 4194316,
+          "heapAtRequest": 53391186
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 9.199999928474426,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 4194312,
+          "heapAtRequest": 49169418
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 1.8000000715255737,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 49184394
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 9,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 4194317,
+          "heapAtRequest": 49169146
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 10.5,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 4194313,
+          "heapAtRequest": 57570454
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 1.2999999523162842,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 57585510
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 10.700000047683716,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 4194318,
+          "heapAtRequest": 65992982
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 10.199999928474426,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 4194314,
+          "heapAtRequest": 74395998
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 1.7000000476837158,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 74410958
+        }
+      ]
+    },
+    {
+      "size": 50331648,
+      "emptyHeap": 641944,
+      "openHeap": 51165532,
+      "liveHeap": 51354660,
+      "disposedHeap": 1030952,
+      "retained": 0,
+      "open": {
+        "operation": "open",
+        "durationMs": 207.39999997615814,
+        "fullReads": 0,
+        "fullReadUnits": 0,
+        "wireUnits": 50331648,
+        "heapAtRequest": 103391143
+      },
+      "operations": [
+        {
+          "operation": "skipped-edit",
+          "durationMs": 109.39999997615814,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 50331653,
+          "heapAtRequest": 153940282
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 119.60000002384186,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 50331649,
+          "heapAtRequest": 254655134
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 8.600000023841858,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 254695218
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 112.89999997615814,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 50331654,
+          "heapAtRequest": 305064154
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 112.79999995231628,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 50331650,
+          "heapAtRequest": 355415010
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 8.100000023841858,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 355447586
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 113.5,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 50331655,
+          "heapAtRequest": 405751334
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 112.10000002384186,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 50331651,
+          "heapAtRequest": 456098082
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 8.399999976158142,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 456132794
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 112.69999992847443,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 50331656,
+          "heapAtRequest": 506470846
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 112.10000002384186,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 50331652,
+          "heapAtRequest": 556809770
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 8.5,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 556831218
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 112.60000002384186,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 50331657,
+          "heapAtRequest": 607154174
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 113.70000004768372,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 50331653,
+          "heapAtRequest": 657491622
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 9,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 657516382
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 112.79999995231628,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 50331658,
+          "heapAtRequest": 707840642
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 113.10000002384186,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 50331654,
+          "heapAtRequest": 758175898
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 8.899999976158142,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 758190874
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 112.29999995231628,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 50331659,
+          "heapAtRequest": 808550754
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 120.30000007152557,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 50331655,
+          "heapAtRequest": 204504438
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 8.399999976158142,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 204519414
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 119,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 50331660,
+          "heapAtRequest": 254819350
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 118.60000002384186,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 50331656,
+          "heapAtRequest": 305223142
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 8.899999976158142,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 305238118
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 119.39999997615814,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 50331661,
+          "heapAtRequest": 355507410
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 103.60000002384186,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 50331657,
+          "heapAtRequest": 405842730
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 8.399999976158142,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 405857786
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 104.19999992847443,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 50331662,
+          "heapAtRequest": 456249046
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 103,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 50331658,
+          "heapAtRequest": 506518950
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 8.400000095367432,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1,
+          "heapAtRequest": 103783854
+        }
+      ]
+    }
+  ],
+  "memoryBoundary": "main-renderer CDP heap after forced GC; excludes worker heap",
+  "browser": "153.0.8010.12"
+}
