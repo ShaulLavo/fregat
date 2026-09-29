@@ -47,7 +47,7 @@ test('reset credit confirmation and pending state work in Chromium', async () =>
     await page.getByRole('button', { name: 'Cancel' }).click()
     expect(requests).toEqual([])
     await page.getByRole('button', { name: 'Use reset credit…' }).click()
-    await page.getByRole('button', { name: 'Confirm' }).click()
+    await page.getByRole('button', { name: 'Use 1 credit' }).click()
     await waitFor(() => expect(requests).toHaveLength(1))
     expect(requests[0]).toEqual({
       accountKey: 'fixture-native-account',
