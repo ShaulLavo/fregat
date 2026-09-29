@@ -22,7 +22,7 @@ function chunk(
   }
 }
 
-test('folds a module to the directory, package or checkout that owns it', () => {
+test('folds a module to the directory, package or family that owns it', () => {
   const owners = Object.fromEntries(
     [
       '/work/projects/platform/apps/web/src/features/chat/components/input.tsx',
@@ -32,9 +32,9 @@ test('folds a module to the directory, package or checkout that owns it', () => 
       '/work/projects/platform/apps/web/src/main.tsx',
       '/work/projects/platform/apps/web/index.html',
       '/work/projects/platform/packages/ui/src/components/button.tsx?v=1',
-      '/work/projects/Editor/packages/core/dist/index.js',
-      // A linked checkout's vendored dependency is a dependency, not the checkout.
-      '/work/projects/ghostty-webgpu/node_modules/@tanstack/hotkeys/dist/index.js',
+      '/work/projects/platform/editor/packages/editor/dist/index.js',
+      // Dependencies inside a family belong to node_modules.
+      '/work/projects/platform/ghostty-webgpu/node_modules/@tanstack/hotkeys/dist/index.js',
       '/work/projects/platform/node_modules/react-dom/index.js',
       '\0rolldown/runtime.js',
       '/opt/elsewhere/module.js',
@@ -48,7 +48,7 @@ test('folds a module to the directory, package or checkout that owns it', () => 
     'apps/web/src',
     'apps/web',
     'packages/ui',
-    'Editor',
+    'editor',
     'node_modules',
     'node_modules',
     'virtual',
@@ -99,12 +99,9 @@ test('splits first-load bytes from lazy bytes per owner', () => {
   ])
 })
 
-test('attributes resolved linked code consistently from a worktree', () => {
-  const editorFile = '/work/projects/Editor/packages/core/dist/index.js'
-  const linked = [{ owner: 'Editor', root: '/work/projects/Editor' }]
-  expect(moduleOwner(editorFile, '/work/worktrees/platform/L4', linked)).toBe('Editor')
-  expect(moduleOwner(editorFile, '/work/projects/platform', linked)).toBe('Editor')
-  expect(
-    moduleOwner('/work/projects/Editor-next/src/index.ts', '/work/worktrees/platform/L4', linked),
-  ).toBe('external')
+test('attributes workspace families consistently from a worktree', () => {
+  const root = '/work/worktrees/platform/plan-207-monorepo'
+  expect(moduleOwner(`${root}/editor/packages/editor/dist/index.js`, root)).toBe('editor')
+  expect(moduleOwner(`${root}/ghostty-webgpu/dist/index.js`, root)).toBe('ghostty-webgpu')
+  expect(moduleOwner('/opt/editor-next/src/index.ts', root)).toBe('external')
 })

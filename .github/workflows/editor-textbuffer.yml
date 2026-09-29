@@ -3,15 +3,15 @@ name: Standalone textbuffer
 on:
   pull_request:
     paths:
-      - 'packages/textbuffer/**'
+      - 'editor/packages/textbuffer/**'
       - 'bun.lock'
-      - '.github/workflows/textbuffer.yml'
+      - '.github/workflows/editor-textbuffer.yml'
   push:
     branches: ['main']
     paths:
-      - 'packages/textbuffer/**'
+      - 'editor/packages/textbuffer/**'
       - 'bun.lock'
-      - '.github/workflows/textbuffer.yml'
+      - '.github/workflows/editor-textbuffer.yml'
 
 permissions:
   contents: read
@@ -33,13 +33,13 @@ jobs:
         with:
           bun-version: '1.4.2'
       - name: Install locked workspace dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
       - name: Verify package entry points and tests
-        run: bun run --cwd packages/textbuffer verify
+        run: bun run --cwd editor/packages/textbuffer verify
       - name: Verify without the editor or monorepo tooling
         run: |
           destination="$(mktemp -d)"
-          tar -C packages/textbuffer --exclude=node_modules --exclude=dist --exclude=coverage --exclude=.turbo -cf - . | tar -C "$destination" -xf -
+          tar -C editor/packages/textbuffer --exclude=node_modules --exclude=dist --exclude=coverage --exclude=.turbo -cf - . | tar -C "$destination" -xf -
           cd "$destination"
           bun install
           bun run verify

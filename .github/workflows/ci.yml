@@ -80,6 +80,8 @@ jobs:
               - 'apps/site/**'
               - 'apps/web/**'
               - 'packages/**'
+              - 'editor/**'
+              - 'ghostty-webgpu/**'
               - 'scripts/build-site.ts'
               - 'scripts/dev-sources.ts'
               - 'scripts/runtime-network.ts'

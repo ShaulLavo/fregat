@@ -47,7 +47,7 @@ Current ownership:
 | Structural provider alongside Shiki                 | Platform: `apps/web/src/features/editor/utils/plugins.ts`, `prepared-document.ts` |
 | Browser benchmark                                   | Platform: `scripts/agent/scenarios/editor-syntax-benchmark.ts`                    |
 
-Editor is the repository at `/work/projects/Editor`. Platform's `packages/editor-*` paths link into it. Make shared parser and query changes in Editor, then verify their integration in Platform.
+Editor source lives in `editor/` in this repository. Make shared parser and query changes there, then verify their integration in Platform.
 
 ### Measured baseline
 
@@ -68,7 +68,7 @@ Measurements used the Vite development server, Headless Chrome 153 with SwiftSha
 
 ## Build a catalog behind the existing provider
 
-Use a checked-in manifest and reproducible asset generation in `Editor/packages/tree-sitter-languages`. Generate the existing `TREE_SITTER_LANGUAGE_CONTRIBUTIONS` interface with lazy loaders. Keep file-detection metadata importable without importing grammar assets.
+Use a checked-in manifest and reproducible asset generation in `editor/packages/tree-sitter-languages`. Generate the existing `TREE_SITTER_LANGUAGE_CONTRIBUTIONS` interface with lazy loaders. Keep file-detection metadata importable without importing grammar assets.
 
 Each manifest entry records canonical identity, aliases, extensions, exact filenames, parser source revision, query sources, injection dependencies, and tested capabilities. Pin grammar and query sources independently. Retain source hashes, license notices, compiler versions, parser ABI, and emitted WASM hashes in the build lock artifact.
 
@@ -77,7 +77,7 @@ Use upstream grammar repositories and maintained query collections as build inpu
 A proposed maintenance interface, to implement in phase 1:
 
 ```sh
-# In Editor/packages/tree-sitter-languages:
+# In editor/packages/tree-sitter-languages:
 bun run languages:generate
 bun run languages:verify
 bun run languages:generate -- --check

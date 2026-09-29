@@ -49,7 +49,7 @@ export async function rowPixels(hostId: string): Promise<ImageData> {
   return context.getImageData(0, 0, canvas.width, canvas.height)
 }
 
-export function ink(
+function ink(
   { data }: ImageData,
   matches: (red: number, green: number, blue: number) => boolean,
 ): number {

@@ -4,9 +4,9 @@
     ".oxfmtrc.json",
     "examples/app/tsconfig.json",
     "global.d.ts",
-    "patches/**",
     "scripts/build-package.ts",
-    "tsconfig.json"
+    "tsconfig.json",
+    "scripts/workspace-root.ts"
   ],
   "tasks": {
     "dev": {
@@ -81,5 +81,6 @@
       "dependsOn": ["^build", "build"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/docs/performance/e034-*.json.gz"]
     }
-  }
+  },
+  "agentGuidance": false
 }

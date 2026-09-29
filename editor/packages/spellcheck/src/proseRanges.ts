@@ -3,7 +3,7 @@ import type { SpellTextRange } from './tokenizer'
 /** `prose` checks plain text and Markdown only; `proseAndCode` also checks comments and strings. */
 export type SpellcheckScope = 'prose' | 'proseAndCode'
 
-export type SpellcheckCapture = {
+type SpellcheckCapture = {
   readonly startIndex: number
   readonly endIndex: number
   readonly captureName: string

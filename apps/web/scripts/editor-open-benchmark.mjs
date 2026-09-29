@@ -27,7 +27,7 @@ const defaultAppUrl = 'http://localhost:5173/'
 const defaultServerUrl = process.env.VITE_SERVER_URL ?? 'http://localhost:3001'
 const defaultFilePath = 'apps/web/src/features/editor/components/editor.tsx'
 const platformRoot = resolve(import.meta.dirname, '../../..')
-const defaultEditorRoot = resolve(platformRoot, '../Editor')
+const defaultEditorRoot = resolve(platformRoot, 'editor')
 const defaultRootPath = platformRoot
 const defaultCalibrationFile = resolve(
   import.meta.dirname,

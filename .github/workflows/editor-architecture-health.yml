@@ -2,8 +2,24 @@ name: Architecture Health
 
 on:
   pull_request:
+    paths:
+      [
+        'editor/**',
+        'package.json',
+        'bun.lock',
+        'turbo.json',
+        '.github/workflows/editor-architecture-health.yml',
+      ]
   push:
     branches: ['main']
+    paths:
+      [
+        'editor/**',
+        'package.json',
+        'bun.lock',
+        'turbo.json',
+        '.github/workflows/editor-architecture-health.yml',
+      ]
   workflow_dispatch:
 
 permissions:
@@ -20,11 +36,11 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
 
       # check:full-text resolves each package's imports through its built exports.
       - name: Build packages
-        run: bun run build -- --filter='./packages/*'
+        run: bun run build:workspaces
 
       - name: Check architecture health baselines
-        run: bun run health
+        run: bun run --cwd editor health

@@ -1,0 +1,65 @@
+name: Workspace libraries
+
+on:
+  pull_request:
+    paths:
+      - editor/**
+      - ghostty-webgpu/**
+      - package.json
+      - bun.lock
+      - turbo.json
+      - .github/actions/setup/**
+      - .github/workflows/workspace-libraries.yml
+  push:
+    branches: [main]
+    paths:
+      - editor/**
+      - ghostty-webgpu/**
+      - package.json
+      - bun.lock
+      - turbo.json
+      - .github/actions/setup/**
+      - .github/workflows/workspace-libraries.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workspace-libraries-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  editor:
+    name: Editor tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Install browsers
+        run: editor/packages/editor/node_modules/.bin/playwright install --with-deps chromium chromium-headless-shell firefox webkit
+      - name: Check task inputs
+        run: bun editor/scripts/check-turbo-inputs.mjs
+      - name: Test Editor packages and examples
+        run: bun x turbo run test --filter='./editor/packages/*' --filter='./editor/examples/*' --concurrency=1
+      - name: Test tree-sitter browser worker
+        run: bun run --cwd editor/packages/tree-sitter test:browser
+
+  ghostty:
+    name: Ghostty tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Initialize xterm reference
+        run: git submodule update --init --depth=1 ghostty-webgpu/references/xterm.js
+      - name: Install Chromium
+        run: ghostty-webgpu/node_modules/.bin/playwright install --with-deps chromium
+      - name: Test terminal library
+        run: bun run --cwd ghostty-webgpu test
+      - name: Verify native resolver state
+        run: bun run --cwd ghostty-webgpu verify:config-resolver-state --state either
+      - name: Verify package entry points
+        run: bun run --cwd ghostty-webgpu test:package

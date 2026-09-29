@@ -29,7 +29,7 @@ type DiffSyntaxSourceSide = 'old' | 'new'
 
 let nextSyntaxControllerId = 0
 
-export type DiffSyntaxTokenSource = {
+type DiffSyntaxTokenSource = {
   readonly lineStarts: readonly number[]
   readonly side: DiffSyntaxSourceSide
   readonly tokens: EditorTokenInput

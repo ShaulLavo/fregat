@@ -1,7 +1,9 @@
+import { workspaceRoot } from '../../scripts/workspace-root'
 import { playwright } from '@vitest/browser-playwright'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
+  server: { fs: { allow: [workspaceRoot] } },
   test: {
     projects: [
       {
@@ -28,6 +30,7 @@ export default defineConfig({
         // and measured advances under a CSS transform. happy-dom reports every
         // rect empty, so these assertions are meaningless anywhere else.
         // Discovered mid-run, these make Vite reload and strand the browser test that was loading.
+        server: { fs: { allow: [workspaceRoot] } },
         optimizeDeps: {
           // tree-sitter-md is plain ESM over web-tree-sitter; served as-is, it is never discovered.
           exclude: ['web-tree-sitter', 'tree-sitter-md'],

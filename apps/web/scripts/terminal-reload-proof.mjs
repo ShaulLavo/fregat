@@ -16,6 +16,7 @@ const { values } = parseArgs({
     height: { type: 'string', default: '900' },
   },
 })
+const platformRoot = resolve(import.meta.dirname, '../../..')
 const targetUrl = new URL(values.url)
 const baseUrl = new URL(targetUrl)
 baseUrl.pathname = `${targetUrl.pathname.split('/~')[0].replace(/\/$/, '')}/`
@@ -288,8 +289,8 @@ try {
     url: targetUrl.href,
     api,
     viewport,
-    platform: await fingerprint('/work/projects/platform'),
-    ghostty: await fingerprint('/work/projects/ghostty-webgpu'),
+    platform: await fingerprint(platformRoot),
+    ghostty: await fingerprint(resolve(platformRoot, 'ghostty-webgpu')),
     recipeHash: createHash('sha256')
       .update(await readFile(new URL(import.meta.url)))
       .digest('hex'),

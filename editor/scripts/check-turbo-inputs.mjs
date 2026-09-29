@@ -30,7 +30,10 @@ const NOT_READS = new Set([
   'examples/stress/fallback-experiment.mjs reads .',
 ])
 
-const turbo = JSON.parse(readFileSync(path.join(repoRoot, 'turbo.json'), 'utf8'))
+const turboRoot = existsSync(path.join(repoRoot, '../editor/package.json'))
+  ? path.dirname(repoRoot)
+  : repoRoot
+const turbo = JSON.parse(readFileSync(path.join(turboRoot, 'turbo.json'), 'utf8'))
 const globalGlobs = (turbo.globalDependencies ?? []).map((pattern) => new Bun.Glob(pattern))
 const workspaces = readWorkspaces()
 const byName = new Map(workspaces.map((workspace) => [workspace.name, workspace]))
@@ -146,7 +149,7 @@ function isImportable(target) {
 
 /** A `$TURBO_ROOT$/…` entry in the task's `inputs` inside what it reads. */
 function isDeclaredInput(workspace, taskName, target) {
-  const relative = path.relative(repoRoot, target)
+  const relative = path.relative(turboRoot, target)
   return (task(workspace, taskName).inputs ?? []).some((input) => {
     if (!input.startsWith('$TURBO_ROOT$/')) return false
     const pattern = input.slice('$TURBO_ROOT$/'.length)
@@ -155,7 +158,7 @@ function isDeclaredInput(workspace, taskName, target) {
 }
 
 function isGlobalDependency(target) {
-  const relative = path.relative(repoRoot, target)
+  const relative = path.relative(turboRoot, target)
   return globalGlobs.some((glob) => glob.match(relative))
 }
 

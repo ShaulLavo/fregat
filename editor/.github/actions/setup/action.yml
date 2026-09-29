@@ -19,7 +19,7 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      run: bun install --frozen-lockfile
+      run: bun install
 
     # Turbo replays a task whose inputs are unchanged, so a PR re-runs only what its change can
     # reach. Each job saves its own cache, keyed by commit; a restore falls back to this job's

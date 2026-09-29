@@ -291,7 +291,7 @@ import { visualSearchScrollContent } from './visual-search-scroll-content'
 import { quickOpenNewFile } from './quick-open-new-file'
 import { projectSettings } from './project-settings'
 import { workspaceTwoRoots } from './workspace-two-roots'
-import { quickOpenLinkedFile } from './quick-open-linked-file'
+import { quickOpenEditorSource } from './quick-open-editor-source'
 import { paletteThemeNoFlicker, studioThemeNoFlicker } from './code-theme-no-flicker'
 import { quickOpenNoFlicker } from './quick-open-no-flicker'
 import { gitHistorySearchNoFlicker } from './git-history-search-no-flicker'
@@ -638,7 +638,7 @@ export const scenarios: readonly Scenario[] = [
   quickOpenNewFile,
   projectSettings,
   workspaceTwoRoots,
-  quickOpenLinkedFile,
+  quickOpenEditorSource,
   rootSwitchNoFlicker,
   quickOpenNoFlicker,
   paletteThemeNoFlicker,

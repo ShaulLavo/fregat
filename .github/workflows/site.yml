@@ -7,6 +7,8 @@ on:
       - apps/site/**
       - apps/web/**
       - packages/**
+      - editor/**
+      - ghostty-webgpu/**
       - scripts/build-site.ts
       - scripts/dev-sources.ts
       - scripts/runtime-network.ts
@@ -34,6 +36,16 @@ jobs:
       - name: Build landing page and interactive app
         working-directory: apps/site
         run: bun run site:build
+      - name: Build Editor example
+        env:
+          VITE_BASE_PATH: /${{ github.event.repository.name }}/editor/
+        run: bun x turbo run build --filter=@singapore-editor/example-app
+      - name: Build ghostty site
+        run: bun run --cwd ghostty-webgpu/site build -- --base /${{ github.event.repository.name }}/ghostty-webgpu/
+      - name: Assemble family sites
+        run: |
+          cp -R editor/examples/app/dist apps/site/dist/editor
+          cp -R ghostty-webgpu/site/dist apps/site/dist/ghostty-webgpu
       - uses: actions/upload-pages-artifact@v3
         with:
           path: apps/site/dist

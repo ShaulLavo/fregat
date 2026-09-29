@@ -18,7 +18,7 @@
 
 ## Cutover window and release conditions
 
-The rehearsal is complete; the live import has not happened. This plan requires a scoped
+The rehearsal is complete; draft PR #199 imports the source histories into an isolated branch. The coordinator captures final source heads under the owner's freeze and runs subtree pulls before merge. This plan requires a scoped
 write hold, not a repository-wide freeze. Land or park open Editor/ghostty PRs, obtain the
 owner's session freeze, record final source heads and dirty-state ownership, and refresh
 the split/fast-forward proof against those heads. Keep sibling writes paused from that
@@ -133,12 +133,12 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
       compare commit ids with singapore's main.
 - [ ] Owner freeze: land or park open work in the Editor and ghostty-webgpu (including open PRs
       such as singapore #62), then stop sessions from writing to those checkouts.
-- [ ] Subtree-add `editor/` and `ghostty-webgpu/` into Fregat main; update root workspaces.
-- [ ] Remove the `packages/editor-*` symlinks, the `link:ghostty-webgpu` override, and the
+- [x] Subtree-add `editor/` and `ghostty-webgpu/` into the integration branch; update root workspaces. PR #199 imports Editor `17a020ad4b98830aeebdb106af95de8f06694973` and ghostty `fd5c74283f83f780fcf60aab970d4c1fa6cc06cd`; both initial subtree splits reproduce the source heads exactly.
+- [x] Remove the `packages/editor-*` symlinks, the `link:ghostty-webgpu` override, and the
       `editor-ref`/`ghostty-ref` checkout steps and dist caches from
       `.github/actions/setup/action.yml`; Vite and TypeScript resolve the workspace packages
       directly.
-- [ ] Move the Editor's and ghostty-webgpu's repo-level CI (architecture health, textbuffer
+- [x] Move the Editor's and ghostty-webgpu's repo-level CI (architecture health, textbuffer
       benches, tree-sitter-x, config-resolver, pages/site) into Fregat's `.github/workflows` with
       path filters; keep each family's standalone workflows inside its folder.
 - [ ] One set of tooling: a single formatter version, one vitest patch, one lockfile; delete the
@@ -149,8 +149,18 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
 - [ ] Retire the old checkouts: `/work/projects/Editor` and `/work/projects/ghostty-webgpu`
       become read-only references (the owner decides when to delete them); update AGENTS.md
       (Editor symlink, `ghostty-webgpu` link, `editor-ref` rules), memory notes and scripts that
-      assume `../Editor`.
+      assume `../Editor`. PR #199 updates the repository rules and current scripts; checkout retirement and external memory edits remain with the coordinator.
 - [ ] Deploy with `bun run deploy --server --restart` and confirm the live check.
+
+## Source-integration validation
+
+PR #199 uses one root workspace install, including ghostty's demo and site. Editor-specific Turbo tasks run from the root; root typecheck builds library exports first. Imported-family Knip entries preserve Fregat's existing checks. Protocol-only ABI enums remain available for the native contract.
+
+Family formatter options match Fregat; generated-file exclusions remain with each family for standalone installs. Fregat applies the sole Vitest patch at the root. Standalone family CI runs plain `bun install` and uses upstream Vitest.
+
+Editor and ghostty sites join Fregat's existing Pages artifact at `editor/` and `ghostty-webgpu/`, sharing one deployment. Native config-resolver workflows remain manual dispatches. The integration regenerates ghostty's bootstrap input closure after removing its family lockfile and uses repository-relative Git object paths for a nested checkout.
+
+Pending in this lane: record final gates, suites, browser evidence and CI results. Mirror/publish workflows, source freeze, checkout retirement and deployment are owned by other lanes or the coordinator.
 
 ## Acceptance
 

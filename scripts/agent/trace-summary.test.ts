@@ -133,7 +133,7 @@ describe('sampled application frame attribution', () => {
                 1,
                 'writeNativeScrollTop',
                 0,
-                'http://localhost:5173/@fs/work/projects/Editor/packages/editor/dist/scroll.js',
+                'http://localhost:5173/@fs/work/projects/platform/editor/packages/editor/dist/scroll.js',
               ),
             ],
             samples: [1, 1],

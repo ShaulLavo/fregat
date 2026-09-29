@@ -15,7 +15,7 @@ import {
   type EditorSyntaxRange,
 } from '../syntax/session'
 
-export type EditorAnalysisConfigurationTag = readonly (string | number | boolean | null)[]
+type EditorAnalysisConfigurationTag = readonly (string | number | boolean | null)[]
 export type EditorAnalysisRead<T> =
   | { readonly kind: 'pending'; readonly revision: number }
   | {

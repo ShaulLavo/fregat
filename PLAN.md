@@ -10,7 +10,7 @@ The [September 29 inventory](plans/inventory-2026-09-29.md) reconciles the remai
 work across Fregat, Editor, Ghostty, the parser and native clients. It is a dated
 snapshot; this file remains the scheduler and each plan remains its scope authority.
 
-1. **Finish source consolidation in 207.** Reconcile open sibling work, capture final
+1. **Finish source consolidation in 207.** Draft PR #199 imports both histories, consolidates workspaces and tooling, and relocates CI. Final source pulls under the owner's freeze, mirrors and publishing remain with the coordinator. Reconcile open sibling work, capture final
    heads, obtain the scoped session hold, import the packages and verify the first
    mirrors. The rehearsal is complete. Publication bootstrap is a separate gate.
 2. **Close delivered residues and the existing wave-2 queue.** Verify before retiring

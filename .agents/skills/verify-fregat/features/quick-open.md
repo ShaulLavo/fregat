@@ -14,7 +14,7 @@ Cmd/Ctrl+P, or the command palette with no `>` prefix.
 
 `quick-open-new-file` searches a missing name, creates that file on disk, and searches again one and eight seconds later. The step labels carry the found count; both later steps must read `found-1`.
 
-`quick-open-linked-file` searches `tokenStore.ts`, which sits behind the `packages/editor-core` symlink by file name. The step must read `found-2` or more. It is read-only, so `--url` may point it at the mesh build.
+`quick-open-editor-source` searches for `tokenStore.ts` inside `editor/` and opens the result. The search must find at least one result and the editor must mount.
 
 ## Gotchas
 

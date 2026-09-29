@@ -72,12 +72,6 @@ type Report = {
 
 const webRoot = path.resolve(import.meta.dirname, '..')
 const repoRoot = path.resolve(webRoot, '..', '..')
-const linkedCheckouts = [
-  {
-    owner: 'Editor',
-    root: path.resolve(fs.realpathSync(path.join(repoRoot, 'packages/editor-core')), '..', '..'),
-  },
-]
 const NODE_MODULES_PACKAGE = /\/node_modules\/((?:@[^/]+\/)?[^/]+)\//gu
 
 if (import.meta.main) main()
@@ -154,7 +148,7 @@ function buildReport(dir: string): Report {
       chunkBytes: sum(stats.chunks.map((chunk) => chunk.size)),
       chunkGzip: sum(stats.chunks.map((chunk) => chunk.gzipSize)),
     },
-    owners: attributeOwners(stats.chunks, firstLoadNames, repoRoot, linkedCheckouts),
+    owners: attributeOwners(stats.chunks, firstLoadNames, repoRoot),
     packages,
     duplicatePackages: packages
       .filter((row) => row.versions.length > 1)

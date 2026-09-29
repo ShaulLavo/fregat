@@ -3,15 +3,15 @@ name: Textbuffer tree height
 on:
   pull_request:
     paths:
-      - 'packages/textbuffer/**'
+      - 'editor/packages/textbuffer/**'
       - 'bun.lock'
-      - '.github/workflows/textbuffer-height.yml'
+      - '.github/workflows/editor-textbuffer-height.yml'
   push:
     branches: ['main']
     paths:
-      - 'packages/textbuffer/**'
+      - 'editor/packages/textbuffer/**'
       - 'bun.lock'
-      - '.github/workflows/textbuffer-height.yml'
+      - '.github/workflows/editor-textbuffer-height.yml'
   workflow_dispatch:
 
 permissions:
@@ -38,22 +38,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: bun install
+      - run: bun install --frozen-lockfile
       - name: Check formatting and lint
         run: |
-          bun run --cwd packages/textbuffer format:check
-          bun run --cwd packages/textbuffer lint
+          bun run --cwd editor/packages/textbuffer format:check
+          bun run --cwd editor/packages/textbuffer lint
       - name: Build, prepare the pinned control and test the measurements
-        run: bun run --cwd packages/textbuffer bench:check
+        run: bun run --cwd editor/packages/textbuffer bench:check
       - name: Smoke both engines
-        run: bun run --cwd packages/textbuffer bench:height -- --profile smoke --trace-seeds 7 --out bench/results/height-smoke
+        run: bun run --cwd editor/packages/textbuffer bench:height -- --profile smoke --trace-seeds 7 --out bench/results/height-smoke
       # The standard sweep is a long replay whose output is an artifact, not a gate; pull requests get the smoke run only.
       - name: Sample both trees across edit seeds
         if: github.event_name != 'pull_request'
-        run: bun run --cwd packages/textbuffer bench:height -- --profile standard
+        run: bun run --cwd editor/packages/textbuffer bench:height -- --profile standard
       - name: Plot samples
         if: always()
-        working-directory: packages/textbuffer
+        working-directory: editor/packages/textbuffer
         run: |
           python -m pip install matplotlib==3.10.8
           for report in bench/results/height-*/height.json; do
@@ -65,5 +65,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: textbuffer-height-${{ github.run_id }}
-          path: packages/textbuffer/bench/results/height-*/
+          path: editor/packages/textbuffer/bench/results/height-*/
           if-no-files-found: warn
