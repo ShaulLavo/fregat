@@ -282,6 +282,37 @@ describe('Zed pending input', () => {
     expect(typed).toEqual(['J'])
   })
 
+  it('dispatch_key: a mismatch matches the leftover keys and the new key again', () => {
+    const calls: string[] = []
+    const dispatcher = createDispatcher({
+      platform: 'linux',
+      keymap: [
+        { keys: 'A B C', command: 'abc' },
+        { keys: 'B D', command: 'bd' },
+      ],
+    })
+    dispatcher
+      .createNode({
+        commands: { abc: () => void calls.push('abc'), bd: () => void calls.push('bd') },
+      })
+      .focus()
+    for (const key of ['a', 'b', 'd']) dispatcher.handleKey(press(key), null)
+    expect(calls).toEqual(['bd'])
+    expect(dispatcher.pending()).toBeNull()
+  })
+
+  it('dispatch_key: leftover keys and the new key may start a chord again', () => {
+    const { dispatcher, counts, typed } = terminal([
+      { keys: 'A B C', command: 'action' },
+      { keys: 'B D E', command: 'secondary' },
+    ])
+    for (const key of ['a', 'b', 'd']) dispatcher.handleKey(press(key), null)
+    expect(dispatcher.pending()?.keys).toBe('B D')
+    expect(typed).toEqual(['A'])
+    dispatcher.handleKey(press('e'), null)
+    expect(counts).toEqual({ action: 0, secondary: 1 })
+  })
+
   it('a printable prefix outside text input waits for the next key', () => {
     vi.useFakeTimers()
     const { dispatcher, counts } = terminal([

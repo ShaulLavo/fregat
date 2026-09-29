@@ -90,6 +90,18 @@ type DispatchResult<Payload> =
   | { readonly kind: 'declined' | 'unavailable' | 'handled' }
   | { readonly kind: 'cancelled'; readonly outcome: ChordOutcome }
 type Buffered<Source> = { readonly input: KeyInput; readonly source: Source }
+type Replayed<Payload, Source> = {
+  readonly claimed: KeymapBinding<Payload> | null
+  readonly rest: readonly Buffered<Source>[]
+}
+/** Buffered keys plus a new key that match again from the root after a mismatch. */
+type Sequence<Payload, Context, Source> = {
+  readonly node: KeymapNode<Payload>
+  readonly keys: string
+  readonly buffer: readonly Buffered<Source>[]
+  readonly context: Context
+  readonly selection: KeymapSelection<Payload>
+}
 type Pending<Payload, Source> = {
   readonly node: KeymapNode<Payload>
   readonly keys: string
@@ -177,17 +189,23 @@ export function createChordRuntime<Payload, Context, Source>(
     })
   }
   function arm(edge: KeymapEdge<Payload>, entry: Buffered<Source>, count: number, bound: boolean) {
-    const keys = pending ? `${pending.keys} ${edge.keys}` : edge.keys
-    const buffer = [...(pending?.buffer ?? []), entry]
-    const started = pending?.started ?? Date.now()
-    const focus = pending ? pending.focus : options.currentFocus?.()
-    // Zed times out a bound prefix or typed text; once running, the timeout restarts per stroke.
-    const timed = bound || pending?.timed === true || typesText(entry)
-    pending = { node: edge.node, keys, count, buffer, started, focus, timed }
+    setPending({
+      node: edge.node,
+      keys: pending ? `${pending.keys} ${edge.keys}` : edge.keys,
+      count,
+      buffer: [...(pending?.buffer ?? []), entry],
+      started: pending?.started ?? Date.now(),
+      focus: pending ? pending.focus : options.currentFocus?.(),
+      // Zed times out a bound prefix or typed text; once running, the timeout restarts per stroke.
+      timed: bound || pending?.timed === true || typesText(entry),
+    })
+  }
+  function setPending(next: Pending<Payload, Source>) {
+    pending = next
     clearTimeout(timer)
-    if (timed) timer = setTimeout(timeout, timeoutMs)
+    if (next.timed) timer = setTimeout(timeout, timeoutMs)
     syncCapture()
-    options.onPendingChange?.({ keys, candidateCount: count })
+    options.onPendingChange?.({ keys: next.keys, candidateCount: next.count })
   }
   function typesText({ input, source }: Buffered<Source>) {
     const { ctrl, meta } = input.modifiers
@@ -204,39 +222,43 @@ export function createChordRuntime<Payload, Context, Source>(
   function focusMoved() {
     return options.currentFocus !== undefined && options.currentFocus() !== pending!.focus
   }
-  /**
-   * Runs the longest buffered prefix that has an available binding, replays unbound keys to the
-   * host, and repeats on the rest, so no buffered key is dropped. Returns the first claiming binding.
-   */
+  /** Zed's `flush_dispatch`: replays prefixes until no buffered key is left. Returns the first claim. */
   function flush(buffer: readonly Buffered<Source>[]): KeymapBinding<Payload> | null {
     let claimed: KeymapBinding<Payload> | null = null
-    let start = 0
-    while (start < buffer.length) {
-      const first = buffer[start]!
-      const context = options.captureContext(first.source)
-      const end = longestBoundPrefix(buffer, start, context)
-      if (!end) {
-        options.replay?.(first.input, first.source)
-        start += 1
-        continue
-      }
-      const last = buffer[end.index]!
-      const result = execute(end.bindings, context, last.source)
-      if (result.kind === 'claimed') claimed ??= result.binding
-      if (result.kind === 'declined' || result.kind === 'unavailable')
-        options.replay?.(last.input, last.source)
-      start = end.index + 1
+    let rest = buffer
+    while (rest.length) {
+      const step = replayPrefix(rest)
+      claimed ??= step.claimed
+      rest = step.rest
     }
     return claimed
   }
+  /**
+   * Zed's `replay_prefix`: runs the longest buffered prefix that has an available binding, or
+   * hands the first key to the host's `replay`. Returns the keys after it.
+   */
+  function replayPrefix(buffer: readonly Buffered<Source>[]): Replayed<Payload, Source> {
+    const first = buffer[0]!
+    const context = options.captureContext(first.source)
+    const end = longestBoundPrefix(buffer, context)
+    if (!end) {
+      options.replay?.(first.input, first.source)
+      return { claimed: null, rest: buffer.slice(1) }
+    }
+    const last = buffer[end.index]!
+    const result = execute(end.bindings, context, last.source)
+    if (result.kind === 'declined' || result.kind === 'unavailable')
+      options.replay?.(last.input, last.source)
+    const claimed = result.kind === 'claimed' ? result.binding : null
+    return { claimed, rest: buffer.slice(end.index + 1) }
+  }
   function longestBoundPrefix(
     buffer: readonly Buffered<Source>[],
-    start: number,
     context: Context,
   ): { index: number; bindings: readonly KeymapBinding<Payload>[] } | null {
     let node = trie
     let found: { index: number; bindings: readonly KeymapBinding<Payload>[] } | null = null
-    for (let index = start; index < buffer.length; index += 1) {
+    for (let index = 0; index < buffer.length; index += 1) {
       const entry = buffer[index]!
       const edge = trieStep(node, entry.input)
       if (!edge) break
@@ -300,7 +322,7 @@ export function createChordRuntime<Payload, Context, Source>(
     const context = options.captureContext(source)
     return resolve(edge, input, source, context, select(edge.node, context, source), false)
   }
-  /** Returns undefined when the key does not continue the chord; the chord then replays. */
+  /** Returns undefined when the key matches from the root after the chord replayed. */
   function continueChord(input: KeyInput, source: Source): Ownership | null | undefined {
     const edge = trieStep(pending!.node, input)
     if (edge) {
@@ -310,8 +332,61 @@ export function createChordRuntime<Payload, Context, Source>(
         return resolve(edge, input, source, context, selection, true)
     }
     const ended = endPending()
-    report(ended, 'unmatched', flush(ended.buffer))
-    return undefined
+    const entry = { input, source }
+    let claimed: KeymapBinding<Payload> | null = null
+    let rest = ended.buffer
+    let sequence: Sequence<Payload, Context, Source> | null = null
+    // Zed's `dispatch_key`: replay a prefix, then match the leftover keys and this one again.
+    while (rest.length && !sequence) {
+      const step = replayPrefix(rest)
+      claimed ??= step.claimed
+      rest = step.rest
+      if (rest.length) sequence = lookupSequence([...rest, entry])
+    }
+    report(ended, 'unmatched', claimed)
+    return sequence ? resumeSequence(sequence) : undefined
+  }
+  function lookupSequence(
+    buffer: readonly Buffered<Source>[],
+  ): Sequence<Payload, Context, Source> | null {
+    let node = trie
+    const keys: string[] = []
+    for (const { input } of buffer) {
+      const edge = trieStep(node, input)
+      if (!edge) return null
+      node = edge.node
+      keys.push(edge.keys)
+    }
+    const { source } = buffer.at(-1)!
+    const context = options.captureContext(source)
+    const selection = select(node, context, source)
+    if (!selection.pending && !selection.bindings.length) return null
+    return { node, keys: keys.join(' '), buffer, context, selection }
+  }
+  function resumeSequence(sequence: Sequence<Payload, Context, Source>): Ownership | null {
+    const { buffer, selection } = sequence
+    const { source } = buffer.at(-1)!
+    if (selection.pending) {
+      effects.swallow(source)
+      setPending({
+        node: sequence.node,
+        keys: sequence.keys,
+        count: selection.pending,
+        buffer,
+        started: Date.now(),
+        focus: options.currentFocus?.(),
+        timed: selection.bindings.length > 0 || buffer.some(typesText),
+      })
+      return 'chord'
+    }
+    const result = execute(selection.bindings, sequence.context, source)
+    if (result.kind === 'claimed' || result.kind === 'handled' || result.kind === 'cancelled') {
+      effects.swallow(source)
+      return 'chord'
+    }
+    // Nothing took the new chord: its earlier keys go back to the host, the new key passes on.
+    for (const earlier of buffer.slice(0, -1)) options.replay?.(earlier.input, earlier.source)
+    return null
   }
   function resolve(
     edge: KeymapEdge<Payload>,
