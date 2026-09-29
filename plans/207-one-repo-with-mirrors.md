@@ -84,10 +84,9 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
   steps.
 - oxfmt/oxlint versions already match; `.oxfmtrc.json` configs differ. The vitest patch is
   identical in all three repos. Editor packages are on TypeScript 6.0 against Fregat's 7.0.
-- Open owner decision: mirror lockfiles. `editor/bun.lock` and `ghostty-webgpu/bun.lock` go stale
-  when Fregat changes a dependency, and the mirrors' standalone CI installs with
-  `--frozen-lockfile`. Recommended: keep both lockfiles tracked in Fregat and add a gate that
-  regenerates them (`bun install --lockfile-only` in each family folder) and fails when stale.
+- Lockfiles (owner, 2026-09-29): one root `bun.lock`, as Turbo expects. Delete
+  `editor/bun.lock` and `ghostty-webgpu/bun.lock`; the mirrors' standalone CI runs a plain
+  `bun install`, which also surfaces breakage from new dependency releases.
 
 ## Publishing
 
