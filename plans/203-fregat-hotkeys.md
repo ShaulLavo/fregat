@@ -8,8 +8,8 @@
   Platform (web, plus the TUI's matcher).
 - Decisions: [Keymap architecture](../docs/keymap/architecture.md). Research:
   `/work/reports/keymap-architecture/` (`03-tanstack-hotkeys.md` for this plan).
-- Authorized: create the GitHub fork and its clone, change nothing in consumers. Consumers adopt
-  the library in 204–206.
+- Authorized: add the library under `hotkeys/` in Fregat; change nothing in consumers. Consumers
+  adopt it in 204–206. Independent of 207's move; the mirror follows when 207 lands.
 
 ## Why
 
@@ -34,24 +34,18 @@ editor-grade chord handling. The core never touches the DOM.
 
 ## Repository and packaging
 
-Open owner decision (2026-09-29): its own repo (below) or `packages/hotkeys` in the Editor
-monorepo. Not the Fregat monorepo: the Editor and ghostty-webgpu would then depend on Fregat while
-Fregat pins them, a pin cycle.
-
-- Fork `TanStack/hotkeys` (MIT) to the owner's GitHub account as `hotkeys`; clone to
-  `/work/projects/hotkeys`. Keep upstream history and an `upstream` remote for reading; there is
-  no obligation to merge upstream.
-- Keep `packages/hotkeys` as `@fregat/hotkeys` (core). Keep `packages/react-hotkeys` as
-  `@fregat/react-hotkeys` only if 206 still needs hooks; otherwise delete it in 206. Delete the
-  Angular, Lit, Preact, Solid, Svelte and Vue adapters and every devtools package in the first
-  commit, with their docs, examples and CI jobs.
+- The code lives in Fregat under `hotkeys/` (layout and mirroring in
+  [207](207-one-repo-with-mirrors.md)): `hotkeys/packages/hotkeys` as `@fregat/hotkeys` (core) and
+  `hotkeys/packages/react-hotkeys` as `@fregat/react-hotkeys` only if 206 still needs hooks.
+  207 mirrors the folder to a public `hotkeys` repo and publishes both to npm.
+- Bring TanStack's `packages/hotkeys` (and `react-hotkeys`) in from `TanStack/hotkeys` (MIT) with
+  their licence and attribution. Keep a clone at `references/tanstack-hotkeys` to watch upstream;
+  we do not merge upstream. Leave the Angular, Lit, Preact, Solid, Svelte and Vue adapters and the
+  devtools packages behind.
 - Drop the `@tanstack/store` dependency if the new dispatcher no longer needs it.
-- Consumers link it the way Platform links ghostty-webgpu (`link:`). CI in Platform and the Editor
-  checks out a pinned ref (`hotkeys-ref`, next to `editor-ref` in
-  `.github/actions/setup/action.yml`); bump it in the same commit as a consumer that needs newer
-  library code.
-- Tooling: keep upstream's build if it runs under Bun; otherwise match the Editor's
-  `scripts/build-package.ts`. Tests on Vitest. Formatting with the repo's own formatter.
+- Consumers inside Fregat use the workspace package. The standalone Editor and ghostty-webgpu
+  mirrors depend on the published version.
+- Tests on Vitest; formatting and build with Fregat's tooling.
 
 ## What the core provides
 
@@ -92,8 +86,7 @@ source: 'default' | 'pack' | 'user' }`. Removal copies Zed: `command: null` supp
 
 ## Steps
 
-- [ ] Fork, clone, rename packages, delete unused adapters and devtools; CI green on the reduced
-      repo.
+- [ ] Import TanStack's core and React packages under `hotkeys/`, renamed; CI green.
 - [ ] Add `KeyInput` and the browser adapter; move the pure functions onto it.
 - [ ] Port the Editor's trie and runtime tests into the library before porting the code
       (`packages/editor/src/keymap/trie.test.ts`, the runtime contract tests behind Plan 057's

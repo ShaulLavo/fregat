@@ -8,8 +8,8 @@
 - Decisions: [Keymap architecture](../docs/keymap/architecture.md). Research:
   `/work/reports/keymap-architecture/` (`04-current-state.md` §3, `01-prior-art-vscode-zed-helix.md`
   on Zed's terminal context and VS Code's `commandsToSkipShell`).
-- Work happens in `/work/projects/ghostty-webgpu`; Platform consumes it as a `link:` and needs
-  `bun run build` there before use.
+- Work happens in Fregat's `ghostty-webgpu/` after [207](207-one-repo-with-mirrors.md) moves it
+  there; before that, in `/work/projects/ghostty-webgpu` (a `link:` that needs `bun run build`).
 
 ## Outcome
 

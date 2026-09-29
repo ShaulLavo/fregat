@@ -7,9 +7,9 @@
   [206](206-platform-one-keymap.md) consumes both.
 - Decisions: [Keymap architecture](../docs/keymap/architecture.md). Research:
   `/work/reports/keymap-architecture/` (`02-codemirror-and-hosts.md`, `04-current-state.md` §1).
-- Work happens in the Editor repo (`/work/projects/Editor`). Platform keeps building against the
-  pinned Editor until 206 adopts the new API; land Editor changes additively or on a branch that
-  206 merges with it.
+- Work happens in Fregat's `editor/` after [207](207-one-repo-with-mirrors.md) moves it there;
+  before that, in `/work/projects/Editor`. Land Editor changes additively so Platform keeps
+  building until 206 adopts the new API.
 
 ## Outcome
 

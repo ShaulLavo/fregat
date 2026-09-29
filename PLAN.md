@@ -74,6 +74,10 @@ and [205: ghostty-webgpu](plans/205-ghostty-on-fregat-hotkeys.md) then run in pa
 infrastructure only and takes its key events from whatever 202 has landed (bubli or OpenTUI).
 This workstream does not reorder the wave-2 queue above.
 
+[207: one repo with mirrors](plans/207-one-repo-with-mirrors.md) moves the Editor and
+ghostty-webgpu into Fregat and mirrors them (and `hotkeys/`) to their public repos. Run it before
+204 and 205 so their work lands in Fregat; 203 does not wait for it.
+
 ## Other work and boundaries
 
 The [plan index](plans/README.md) lists the remaining numbered plans without duplicating their

@@ -63,6 +63,7 @@ execution. `IDEA` is only for a plan the owner explicitly calls an idea or is un
 | [204](204-editor-on-fregat-hotkeys.md)       | The Editor on @fregat/hotkeys                                                 |
 | [205](205-ghostty-on-fregat-hotkeys.md)      | ghostty-webgpu on @fregat/hotkeys                                             |
 | [206](206-platform-one-keymap.md)            | Platform owns one keymap                                                      |
+| [207](207-one-repo-with-mirrors.md)          | One repo, with mirrors for the flagship packages                              |
 
 ## Supporting work
 
