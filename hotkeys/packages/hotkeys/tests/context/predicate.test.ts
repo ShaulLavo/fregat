@@ -85,6 +85,13 @@ describe('parseContextPredicate', () => {
 })
 
 describe('evaluatePredicate', () => {
+  it('an identifier matches the key of a key=value entry, as KeyContext::contains does', () => {
+    const stack = [parseKeyContext('Editor mode=full')]
+    expect(evaluatePredicate(parseContextPredicate('mode'), stack)).toBe(true)
+    expect(evaluatePredicate(parseContextPredicate('!mode'), stack)).toBe(false)
+    expect(evaluatePredicate(parseContextPredicate('full'), stack)).toBe(false)
+  })
+
   it('matches > against any ancestor of the innermost context', () => {
     expect(evaluate('parent > child', ['parent', 'child'])).toBe(true)
     expect(evaluate('parent > child', ['grandparent', 'parent', 'child'])).toBe(true)

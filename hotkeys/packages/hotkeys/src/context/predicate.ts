@@ -158,7 +158,8 @@ function evaluate(
   const context = contexts[end - 1]!
   switch (predicate.kind) {
     case 'identifier':
-      return context.identifiers.has(predicate.name)
+      // Zed's KeyContext::contains: an identifier also names the key of a key=value entry.
+      return context.identifiers.has(predicate.name) || context.values.has(predicate.name)
     case 'equal':
       return context.values.get(predicate.key) === predicate.value
     case 'not-equal': {
