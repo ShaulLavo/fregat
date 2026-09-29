@@ -65,6 +65,15 @@ Its status and acceptance checks live in 202; these are coordinated plans, not d
   [coordination index](https://github.com/ShaulLavo/bubli/blob/docs/bubli-plans-2026-09-28/docs/bubli/README.md)
   links the full series, reference specification, capability catalog and producer/consumer handoffs.
 
+## Keymap workstream
+
+[Keymap architecture](docs/keymap/architecture.md) records the owner's 2026-09-29 decisions.
+[203: @fregat/hotkeys](plans/203-fregat-hotkeys.md) comes first. [204: Editor](plans/204-editor-on-fregat-hotkeys.md)
+and [205: ghostty-webgpu](plans/205-ghostty-on-fregat-hotkeys.md) then run in parallel, and
+[206: Platform owns one keymap](plans/206-platform-one-keymap.md) adopts both. 206's TUI step is
+infrastructure only and takes its key events from whatever 202 has landed (bubli or OpenTUI).
+This workstream does not reorder the wave-2 queue above.
+
 ## Other work and boundaries
 
 The [plan index](plans/README.md) lists the remaining numbered plans without duplicating their

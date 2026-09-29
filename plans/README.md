@@ -59,6 +59,10 @@ execution. `IDEA` is only for a plan the owner explicitly calls an idea or is un
 | [200](200-document-backed-content-views.md)  | Shared documents behind content views                                         |
 | [201](201-cheap-overlay-marks.md)            | One-frame typing in large files, starting with cheap underlines               |
 | [202](202-bubli-tui.md)                      | Run the existing React TUI on bubli with a Charm-inspired experience          |
+| [203](203-fregat-hotkeys.md)                 | @fregat/hotkeys, our fork of TanStack Hotkeys                                 |
+| [204](204-editor-on-fregat-hotkeys.md)       | The Editor on @fregat/hotkeys                                                 |
+| [205](205-ghostty-on-fregat-hotkeys.md)      | ghostty-webgpu on @fregat/hotkeys                                             |
+| [206](206-platform-one-keymap.md)            | Platform owns one keymap                                                      |
 
 ## Supporting work
 
