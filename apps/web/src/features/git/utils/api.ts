@@ -27,7 +27,7 @@ function createGitCommitFailure(message: string) {
     code: 'GIT_COMMIT_REJECTED',
     message,
     status: 409,
-    why: 'git commit exited non-zero, which for a repository with hooks usually means a hook refused the commit.',
+    why: 'Git refused the commit. In a repository with hooks, this usually means a hook rejected it.',
     fix: 'Read the hook output shown with the commit, fix what it reported, and commit again.',
   })
 }

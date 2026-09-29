@@ -67,8 +67,8 @@ export function CloneRepositoryDialog({
         <DialogHeader>
           <DialogTitle>Clone repository</DialogTitle>
           <DialogDescription>
-            Clone into a new folder and open it as a project. A cancelled clone leaves nothing
-            behind.
+            Download the repository into a new folder and open it as a project. Cancel removes
+            anything already downloaded.
           </DialogDescription>
         </DialogHeader>
         <form

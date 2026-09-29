@@ -11,8 +11,8 @@ describe('git repository labels', () => {
   })
 
   it('formats sync change counts with outgoing commits', () => {
-    expect(syncChangesLabel(repositoryInfo({ ahead: 4 }))).toBe('Sync Changes 4↑')
-    expect(syncChangesLabel(repositoryInfo({ ahead: 4, behind: 2 }))).toBe('Sync Changes 2↓ 4↑')
+    expect(syncChangesLabel(repositoryInfo({ ahead: 4 }))).toBe('Pull and push 4↑')
+    expect(syncChangesLabel(repositoryInfo({ ahead: 4, behind: 2 }))).toBe('Pull and push 2↓ 4↑')
   })
 })
 

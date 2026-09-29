@@ -40,16 +40,16 @@ export const gitProcessErrors = defineErrorCatalog('git', {
   COMMAND_TIMED_OUT: {
     status: 504,
     message: ({ action, timeoutMs }: { action: string; timeoutMs: number }) =>
-      `git ${action} did not finish within ${formatTimeout(timeoutMs)} and was killed`,
-    why: 'The git subprocess exceeded its time budget: network commands wait on an unreachable or unauthenticated remote, local ones usually block on a stale index lock or a hook.',
-    fix: 'Check the remote (or clear the stale git lock) and retry. Raise timeoutMs for that call only when the command is legitimately slower than the budget.',
+      `git ${action} did not finish within ${formatTimeout(timeoutMs)} and was stopped`,
+    why: 'Commands that reach a remote usually wait on a connection or a sign-in. Local commands usually wait on a leftover Git lock file or a slow hook.',
+    fix: 'Check your connection and sign-in to the remote, or delete a leftover .git/index.lock, then try again.',
   },
   OUTPUT_LIMIT_EXCEEDED: {
     status: 413,
     message: ({ action, maxBytes, stream }: { action: string; maxBytes: number; stream: string }) =>
       `git ${action} wrote more than ${maxBytes} bytes to ${stream}`,
-    why: 'Buffering the whole output would grow the server heap without bound, so the read stops at the limit and discards the partial output.',
-    fix: 'Narrow the command (fewer paths, a smaller revision range) or raise maxOutputBytes for that call when the large output is expected.',
+    why: 'The output is too large to hold in memory, so the command was stopped.',
+    fix: 'Run it on fewer files or a shorter range of commits.',
   },
 })
 
