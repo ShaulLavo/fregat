@@ -42,7 +42,8 @@ editor-grade chord handling. The core never touches the DOM.
   their licence and attribution. Keep a clone at `references/tanstack-hotkeys` to watch upstream;
   we do not merge upstream. Leave the Angular, Lit, Preact, Solid, Svelte and Vue adapters and the
   devtools packages behind.
-- Drop the `@tanstack/store` dependency if the new dispatcher no longer needs it.
+- ~~Drop the `@tanstack/store` dependency if the new dispatcher no longer needs it.~~ Owner
+  decision: `@tanstack/store` stays.
 - Consumers inside Fregat use the workspace package. The standalone Editor and ghostty-webgpu
   mirrors depend on the published version.
 - Tests on Vitest; formatting and build with Fregat's tooling.
@@ -59,7 +60,7 @@ editor-grade chord handling. The core never touches the DOM.
    TUI's current parsing (`apps/tui/src/commands/state/keymap.ts`, `utils/bindings.ts`). The core
    imports no DOM types.
 3. **Bindings as data.** `Binding { keys: KeyChord, command: string, args?, context?: string,
-source: 'default' | 'pack' | 'user' }`. Removal copies Zed: `command: null` suppresses equal or
+source: 'default' | 'base' | 'pack' | 'user' }`. Removal copies Zed: `command: null` suppresses equal or
    weaker sources in that context; `unbind` removes one key→command pair.
 4. **Zed's context predicates**, parser and evaluator: identifiers, `key == value`, `!=`, `!`,
    `&&`, `||`, parentheses, and `>` for descendant. Evaluated against a context stack.
@@ -78,8 +79,10 @@ source: 'default' | 'pack' | 'user' }`. Removal copies Zed: `command: null` supp
    buffered keys on mismatch or timeout, so no key is silently eaten; a pending-label signal for
    UI; the `ChordOutcome` sequence event for telemetry; swallowing auto-repeat and key-up of a
    claimed key; `claimKeybinding(input)` for hosts that forward keys (terminals).
-8. **Composition helpers.** Build a table from ordered layers with sources and report which
-   binding hides which per context, as data. Nothing refuses a collision.
+8. **Composition helpers.** Build a table from ordered layers with sources. Nothing refuses a
+   collision. The "which binding hides which" report is not part of the library (owner
+   decision): if Settings wants it, Platform builds it in [206](206-platform-one-keymap.md) from
+   `bindingsForInput`.
 9. **TanStack's convenience API over the new dispatcher.** Keep the names where the meaning is the
    same so simple uses stay one call. Delete `HotkeyManager` and `SequenceManager` (global
    singletons, linear scan per press, O(n²) registration) once nothing uses them.
@@ -124,8 +127,9 @@ Branch `plan-203-hotkeys` (worktree `/work/worktrees/platform/plan-203-hotkeys`)
   `hotkeys/packages/{hotkeys,react-hotkeys}`, renamed `@fregat/*`, 0.0.0, `publishConfig.access`
   public. Workspace `hotkeys/packages/*`; CI package tests run `--filter '@fregat/*'`. Tests:
   594 core + 44 React pass. Build is `bun build` (ESM, externals) plus `tsc` declarations.
-  Decision: source exports point at `src/` for workspace consumers; `publishConfig.exports`
-  points at `dist/`. The React hooks' render-time ref writes moved into `useLayoutEffect` and
+  Decision (revised in review): `exports` point at `dist/` as the Editor packages do, because
+  `npm publish` does not apply `publishConfig.exports`; the React package reads the core's
+  source through tsconfig `paths` and a Vitest alias. The React hooks' render-time ref writes moved into `useLayoutEffect` and
   the recorders into lazy `useState`, so the repo's React Compiler lint passes.
 - Step 2 done. `src/key-input.ts` (`KeyInput`, `KeyModifiers`, `createKeyInput`) and
   `src/adapters/browser.ts` (`KeyboardEventLike`, structural, so no DOM lib types;
@@ -199,7 +203,25 @@ Branch `plan-203-hotkeys` (worktree `/work/worktrees/platform/plan-203-hotkeys`)
   `packages/hotkeys/README.md` shows a standalone dispatcher, nested focus contexts, a chord, a
   declining handler, the terminal adapter, one-call hotkeys and the numbers.
   `KeyStateTracker` gained `reset()` and clears on a hidden tab (core item 1). 578 tests.
-- All steps done. Left for later plans or review: `@tanstack/store` stays (registry views,
-  recorders, `KeyStateTracker`); composition helpers beyond `bindingsForInput` (item 8's layer-by-layer shadow report) are not
-  built; declaration output keeps extensionless imports, fine for bundler resolution (207 decides
-  the publish build).
+- All steps done. `@tanstack/store` stays (registry views, recorders, `KeyStateTracker`); the
+  shadow report moved to 206. Declaration output keeps extensionless imports, fine for bundler
+  resolution (207 decides the publish build).
+- Review fixes (PR #197 review at `abeb9cfd8`), each with a test seen red first:
+  - Registration filters (`ignoreInputs`, `target`, recording) apply before a prefix pends:
+    `createDispatcher({ isAvailable })` filters candidates and pending chords in
+    `resolveKeymapNode`. "egg" typed in an input with `G G` registered stays "egg"; an
+    element-scoped `Control+K Control+C` leaves `Control+K` alone elsewhere. The browser
+    dispatcher's default `replay` types a replayed printable prefix into its field.
+  - A timeout fires only in the focus the chord started in (Zed `start_pending_input_timeout`).
+  - Dispatchers take a host `currentFocus`; the browser one passes `document.activeElement`,
+    so a chord begun on one element does not complete on another.
+  - A mismatch replays the longest bound prefix, then matches the leftover keys plus the new
+    key again (Zed `dispatch_key`/`replay_prefix`): `a b d` with `a b c` and `b d` runs `bd`.
+  - Unregister and dispose remove the registry's command handlers.
+  - `exports` name `dist/`; `npm pack --dry-run` ships only files the manifest names. The React
+    build keeps the core external (it bundled a copy before). Open for 207: `npm pack` keeps
+    `workspace:*` in `@fregat/react-hotkeys`' dependencies; the publish step must rewrite it.
+  - Bench times per keyboard event with a sink against the Editor trie on the same table:
+    1.0–2.6× the Editor for an unbound key, about 2× for a bound one, all under 0.1 µs.
+  - An identifier predicate matches a `key=value` key (`mode` matches `mode=full`).
+  - `base` source between `default` and `pack` (Zed's BASE and VIM).
