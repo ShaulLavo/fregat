@@ -110,6 +110,11 @@ export function createHotkeyRegistry(
     platform: detectPlatform(),
     ...(options.timeoutMs !== undefined && { timeoutMs: options.timeoutMs }),
     beforeKey: syncKeymap,
+    // Filters apply before a prefix pends, so a chord no registration can take leaves the key alone.
+    isAvailable: (binding, event) => {
+      const entry = binding.command === null ? undefined : entries.get(binding.command)
+      return entry !== undefined && accepts(entry, event)
+    },
   })
   const root: FocusNode<KeyboardEvent> = dispatcher.createNode()
   dispatcher.focus(root)

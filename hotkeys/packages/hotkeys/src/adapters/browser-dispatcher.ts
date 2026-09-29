@@ -1,7 +1,7 @@
 import { createDispatcher } from '../dispatch/dispatcher'
 import { detectPlatform } from '../platform'
 import { isInputElement } from '../_event-target'
-import { attachKeyListeners, browserKeyEffects } from './browser-listeners'
+import { attachKeyListeners, browserKeyEffects, replayTextInput } from './browser-listeners'
 import type { Dispatcher, DispatcherOptions, FocusNode } from '../dispatch/dispatcher'
 
 export type BrowserDispatcherOptions = Omit<DispatcherOptions<KeyboardEvent>, 'effects'> & {
@@ -27,6 +27,7 @@ export function createBrowserDispatcher(options: BrowserDispatcherOptions = {}):
   const nodes = new Map<Element, FocusNode<KeyboardEvent>>()
   const dispatcher = createDispatcher<KeyboardEvent>({
     acceptsTextInput: (event) => isInputElement(event.target),
+    replay: replayTextInput,
     ...options,
     platform,
     effects: browserKeyEffects,

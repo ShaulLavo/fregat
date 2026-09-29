@@ -51,6 +51,11 @@ export type DispatcherOptions<Source> = {
   readonly effects?: KeyEffects<Source>
   readonly replay?: (input: KeyInput, source: Source) => void
   readonly acceptsTextInput?: (source: Source) => boolean
+  /**
+   * Filters bindings for this key before resolution, so an unavailable chord neither pends nor
+   * swallows its prefix.
+   */
+  readonly isAvailable?: (binding: CompiledBinding, source: Source) => boolean
   readonly timeoutMs?: number
   readonly onPendingChange?: (pending: PendingChordLabel | null) => void
   readonly onSequence?: (event: KeymapSequenceEvent<CompiledBinding>) => void
@@ -104,13 +109,19 @@ export function createDispatcher<Source = unknown>(
   let focusedNode: FocusNode<Source> | null = null
   let nextId = 1
   let keymap = compileKeymap(options.keymap ?? [], platform)
+  const { isAvailable } = options
 
   const runtime = createChordRuntime<CompiledBinding, Captured<Source>, Source>({
     bindings: keymap.bindings,
     platform,
     effects: options.effects ?? (NO_EFFECTS as KeyEffects<Source>),
     captureContext: capture,
-    select: (node, captured) => resolveKeymapNode(node, captured.stack),
+    select: (node, captured, source) =>
+      resolveKeymapNode(
+        node,
+        captured.stack,
+        isAvailable && ((binding) => isAvailable(binding, source)),
+      ),
     dispatch: (binding, captured, source) => runBinding(binding, captured, source),
     currentFocus: () => focusedNode,
     ...(options.replay && { replay: options.replay }),

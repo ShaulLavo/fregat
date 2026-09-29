@@ -1,4 +1,5 @@
 import { keyInputFromKeyboardEvent } from './browser'
+import { isInputElement } from '../_event-target'
 import type { KeyInput } from '../key-input'
 import type { ChordOutcome, KeymapPlatform } from '../chords/types'
 import type { KeyEffects } from '../chords/runtime'
@@ -26,6 +27,24 @@ export const browserKeyEffects: KeyEffects<KeyboardEvent> = {
     event.preventDefault()
     event.stopImmediatePropagation()
   },
+}
+
+/** Types a replayed printable key into the text field it was pressed in. */
+export function replayTextInput(input: KeyInput, event: KeyboardEvent): void {
+  const text = event.key
+  if (input.modifiers.ctrl || input.modifiers.meta || [...text].length !== 1) return
+  const field = event.target
+  if (!(field instanceof HTMLElement) || !isInputElement(field)) return
+  const document = field.ownerDocument
+  // execCommand keeps the field's undo history; happy-dom and old engines lack it.
+  if (typeof document.execCommand === 'function' && document.execCommand('insertText', false, text))
+    return
+  if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement)) return
+  const end = field.selectionEnd ?? field.value.length
+  field.setRangeText(text, field.selectionStart ?? end, end, 'end')
+  field.dispatchEvent(
+    new InputEvent('input', { bubbles: true, data: text, inputType: 'insertText' }),
+  )
 }
 
 /**

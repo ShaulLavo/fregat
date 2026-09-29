@@ -167,3 +167,39 @@ it('builds the keymap once for many registrations', () => {
   press(document, 'y')
   expect(setKeymap).toHaveBeenCalledOnce()
 })
+
+it('leaves typed text to a field when the only chord ignores inputs', () => {
+  vi.useFakeTimers()
+  const callback = vi.fn()
+  setup().register(['G', 'G'], callback)
+  const input = document.createElement('input')
+  document.body.append(input)
+  input.focus()
+  const typed = ['e', 'g', 'g'].map((key) => press(input, key))
+  vi.advanceTimersByTime(1500)
+  expect(typed.map((event) => event.defaultPrevented)).toEqual([false, false, false])
+  expect(callback).not.toHaveBeenCalled()
+  vi.useRealTimers()
+})
+
+it('does not claim an element-scoped chord prefix outside the element', () => {
+  const inside = document.createElement('div')
+  const outside = document.createElement('div')
+  outside.tabIndex = 0
+  document.body.append(inside, outside)
+  setup().register(['Control+K', 'Control+C'], vi.fn(), { target: inside })
+  expect(press(outside, 'k', { ctrlKey: true }).defaultPrevented).toBe(false)
+  expect(press(inside, 'k', { ctrlKey: true }).defaultPrevented).toBe(true)
+})
+
+it('types a chord prefix into the field when no continuation follows', () => {
+  vi.useFakeTimers()
+  setup().register(['G', 'G'], vi.fn(), { ignoreInputs: false })
+  const input = document.createElement('input')
+  document.body.append(input)
+  input.focus()
+  expect(press(input, 'g').defaultPrevented).toBe(true)
+  vi.advanceTimersByTime(1000)
+  expect(input.value).toBe('g')
+  vi.useRealTimers()
+})

@@ -51,8 +51,8 @@ export type ChordRuntimeOptions<Payload, Context, Source> = {
    */
   readonly replay?: (input: KeyInput, source: Source) => void
   /**
-   * True when the focused target takes typed text. A printable prefix then pends with a timeout
-   * so the character reaches the text when no chord follows.
+   * True when the focused target takes typed text. A printable prefix then pends with a timeout,
+   * and `replay` receives the character when no chord follows.
    */
   readonly acceptsTextInput?: (source: Source) => boolean
   /** Identifies the focus; a pending chord ends without replay when it changes. */

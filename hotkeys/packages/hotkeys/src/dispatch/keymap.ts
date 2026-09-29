@@ -106,16 +106,22 @@ type Ranked = { readonly depth: number; readonly binding: KeymapBinding<Compiled
 export function resolveKeymapNode(
   node: KeymapNode<CompiledBinding>,
   stack: readonly KeyContext[],
+  isAvailable: (binding: CompiledBinding) => boolean = always,
 ): KeymapSelection<CompiledBinding> {
   const ranked: Ranked[] = []
   for (const binding of node.candidates) {
+    if (!isAvailable(binding.payload)) continue
     const depth = predicateDepth(binding.payload.predicate, stack)
     if (depth !== null) ranked.push({ depth, binding })
   }
   ranked.sort(compareRanked)
   const bindings = actionable(ranked)
   const first = bindings[0]?.payload.index ?? -1
-  return { bindings, pending: pendingChords(node.descendants, stack, first) }
+  return { bindings, pending: pendingChords(node.descendants, stack, first, isAvailable) }
+}
+
+function always(): boolean {
+  return true
 }
 
 function compareRanked(a: Ranked, b: Ranked): number {
@@ -157,10 +163,11 @@ function pendingChords(
   descendants: readonly KeymapBinding<CompiledBinding>[],
   stack: readonly KeyContext[],
   firstIndex: number,
+  isAvailable: (binding: CompiledBinding) => boolean,
 ): number {
   const chords = new Set<string>()
   for (const { payload } of descendants) {
-    if (payload.index < firstIndex) continue
+    if (payload.index < firstIndex || !isAvailable(payload)) continue
     if (predicateDepth(payload.predicate, stack) === null) continue
     if (payload.command === null) chords.delete(payload.chord)
     else chords.add(payload.chord)
