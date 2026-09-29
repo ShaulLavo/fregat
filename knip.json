@@ -59,6 +59,7 @@
     "scripts": {
       "entry": [
         "agent/browser.ts",
+        "claude-gpt/run.ts",
         "large-file/bench.ts",
         "agent/injected/renders.ts",
         "agent/fixtures/fake-*.mjs",
