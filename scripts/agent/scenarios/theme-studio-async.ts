@@ -89,7 +89,7 @@ export const themeStudioAsync: Scenario = {
     await editAccent(page)
     const save = await holdPost(page, /\/themes\/palettes$/)
     try {
-      await studio.getByRole('button', { name: 'Apply', exact: true }).click()
+      await studio.getByRole('button', { name: 'Save and use', exact: true }).click()
       await save.arrived
       await studio.getByRole('button', { name: 'Close', exact: true }).click()
       await studio.getByRole('button', { name: 'Close', exact: true }).click()

@@ -248,10 +248,10 @@ function editorForAddress(address: Address): EditorReference {
   if (editor) return editor
   throw createError({
     code: 'address.INVALID_EDITOR_DESTINATION',
-    message: 'The destination is not an addressable editor',
+    message: 'This link does not point to a file that can be opened',
     status: 400,
-    why: 'The editor token is malformed',
-    fix: 'Select an addressable document',
+    why: 'The file part of the link is broken',
+    fix: 'Open the file from the file tree',
   })
 }
 

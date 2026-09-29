@@ -63,7 +63,7 @@ export function useMessageMenu({
     } catch (error) {
       // The inline changed-files card reports this in place; a dismissed menu
       // has nowhere to put it, so it surfaces as a toast instead.
-      toastError(errorMessage(error, 'Checkpoint diff unavailable.'))
+      toastError(errorMessage(error, 'Could not load the changes from this turn.'))
     }
   }
 

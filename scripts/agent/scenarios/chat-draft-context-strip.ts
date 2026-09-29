@@ -219,7 +219,7 @@ export const chatDraftContextStrip: Scenario = {
       const release = selectors.releaseWorktreeDialog(page)
       await release.waitFor()
       ok(
-        (await release.innerText()).includes('cleanup ownership'),
+        (await release.innerText()).includes('stops managing it'),
         'Release explains its ownership change',
       )
       await step('shared-worktree-release-confirmation')

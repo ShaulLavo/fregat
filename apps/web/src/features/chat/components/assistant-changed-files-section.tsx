@@ -59,7 +59,7 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
     try {
       await openCheckpointDiff(summary, path)
     } catch (error) {
-      setDiffError(errorMessage(error, 'Checkpoint diff unavailable.'))
+      setDiffError(errorMessage(error, 'Could not load the changes from this turn.'))
     }
   }
 
@@ -70,7 +70,7 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
     try {
       await openSessionCheckpointDiff(summary)
     } catch (error) {
-      setDiffError(errorMessage(error, 'Checkpoint diff unavailable.'))
+      setDiffError(errorMessage(error, 'Could not load the changes from this turn.'))
     }
   }
 

@@ -234,5 +234,5 @@ it('refuses undo while another session in the checkout has a turn admitted', asy
 
   await expect(
     hunks.revert({ sessionId, turnCount: 1, path: 'app.txt', hunkId: null }),
-  ).rejects.toThrow('isolated worktree')
+  ).rejects.toThrow('its own worktree')
 })

@@ -74,10 +74,10 @@ export class LoggingErrorBoundary extends Component<
                   <WarningCircleIcon className='size-(--icon-size)' weight='fill' />
                 </div>
                 <div className='min-w-0 space-y-1'>
-                  <DialogTitle>Application error</DialogTitle>
+                  <DialogTitle>Something went wrong</DialogTitle>
                   <DialogDescription>
-                    The interface hit a render failure. Details were written to the local evlog
-                    JSONL logs.
+                    The app hit an error while drawing this screen. The details are saved in the
+                    app’s logs.
                   </DialogDescription>
                 </div>
               </div>
@@ -90,9 +90,7 @@ export class LoggingErrorBoundary extends Component<
                 {errorMessage}
               </div>
             </div>
-            <p className='text-muted-foreground text-xs/relaxed'>
-              Reload the app after the underlying issue is fixed.
-            </p>
+            <p className='text-muted-foreground text-xs/relaxed'>Reload the app to try again.</p>
             <Accordion keepMounted>
               <AccordionItem value='stack-trace'>
                 <AccordionTrigger className='px-(--density-control-padding-x)'>

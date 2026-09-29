@@ -31,9 +31,9 @@ export function createEndpointClient({
       throw createClientError({
         code: 'INVALID_ENDPOINT_ROUTE',
         status: 500,
-        message: 'The server route is not callable.',
-        why: 'The captured client route does not resolve to an operation.',
-        fix: 'Call a typed HTTP or socket operation on the client.',
+        message: 'The app called a server action that does not exist.',
+        why: 'The request named a server route with no action behind it.',
+        fix: 'Reload the app and try again.',
       })
     return Reflect.apply(target, receiver, args)
   }

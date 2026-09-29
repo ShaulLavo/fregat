@@ -33,7 +33,7 @@ test.each([false, true])(
       })
       if (restoreFiles) {
         await expect(awaitRewind(transport, command, accepted.sequence)).rejects.toThrow(
-          'isolated worktree',
+          'its own worktree',
         )
         expect(
           (await fixture.engine.sessionDetailSnapshot(DOMAIN_SESSION)).session.messages,
@@ -63,7 +63,7 @@ test.each([false, true])(
           'https://unused.invalid',
           8,
         ),
-      ).rejects.toThrow('limit')
+      ).rejects.toThrow('more than 8 attachments')
     } finally {
       await fixture.server.cleanup()
     }

@@ -2,7 +2,7 @@ import { match } from 'node:assert'
 import type { Scenario } from './index'
 import { focusEditor, openFileFromTree, runPaletteCommand, selectors } from '../selectors'
 
-const BARRIER_TOAST = 'Undo stopped at a workspace edit'
+const BARRIER_TOAST = 'Undo stopped at a multi-file edit'
 const RENAMED = 'renamedValue'
 
 /**
@@ -34,7 +34,7 @@ export const editorUndoBarrier: Scenario = {
     await page.keyboard.press('Control+z')
     const toast = selectors.toast(page, BARRIER_TOAST)
     await toast.waitFor({ state: 'visible', timeout: 5000 })
-    match(await toast.innerText(), /Undo workspace edit/)
+    match(await toast.innerText(), /Undo multi-file edit/)
     // Sonner's enter animation: wait until the toast rests before the screenshot.
     await page.waitForTimeout(400)
     await step('barrier')
@@ -44,19 +44,19 @@ export const editorUndoBarrier: Scenario = {
     await selectors.historyStates(page).waitFor({ timeout: 10_000 })
     await selectors
       .historyStates(page)
-      .getByRole('option', { name: /Workspace edit/ })
+      .getByRole('option', { name: /Multi-file edit/ })
       .click()
-    await page.getByText('Earlier history is behind a workspace edit.').waitFor({ timeout: 10_000 })
+    await page.getByText('A multi-file edit blocks earlier versions.').waitFor({ timeout: 10_000 })
     await step('barrier-state')
     // The toast offers the same action; the pane's own button is the one under test.
     await selectors
       .historyPane(page)
-      .getByRole('button', { name: 'Undo workspace edit', exact: true })
+      .getByRole('button', { name: 'Undo multi-file edit', exact: true })
       .click()
     // The barrier leaves the graph once the group is undone; the path is reserved until then.
     await selectors
       .historyStates(page)
-      .getByRole('option', { name: /Workspace edit/ })
+      .getByRole('option', { name: /Multi-file edit/ })
       .waitFor({ state: 'detached', timeout: 10_000 })
     await page.waitForTimeout(500)
     await selectors

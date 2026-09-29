@@ -343,7 +343,7 @@ export function ChatDraftView({
               (!worktree ||
                 identity.baseWorktreeId !== worktree.id ||
                 identity.rootPath !== worktree.path)
-                ? 'The draft worktree is unavailable. Restore it before sending.'
+                ? 'The worktree this draft was started in is gone. Recreate it to send this draft.'
                 : null)
             }
             interactionMode={defaultInteractionMode}

@@ -61,7 +61,7 @@ export function ConnectionGate({
         action={
           <Button onClick={() => retry.mutate()} disabled={retry.isPending || query.isFetching}>
             {retry.isPending || query.isFetching ? <Spinner /> : null}{' '}
-            {drifted ? 'Trust replacement' : 'Retry connection'}
+            {drifted ? 'Trust the new server' : 'Retry connection'}
           </Button>
         }
         detail={

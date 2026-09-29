@@ -15,7 +15,7 @@ const machineErrors = defineErrorCatalog('machines', {
   SSH_SETTINGS: {
     status: 400,
     message: 'The SSH machine configuration is invalid.',
-    why: 'The backend launcher could not resolve a valid SSH entry from the primary settings.',
+    why: 'The saved SSH entry for this machine is missing or incomplete.',
     fix: 'Open Settings → Machines on the local machine and correct the entry.',
   },
   SSH_PROBE: {
@@ -27,13 +27,13 @@ const machineErrors = defineErrorCatalog('machines', {
   SSH_NOT_INSTALLED: {
     status: 412,
     message: 'Platform server is not installed for this SSH user.',
-    why: 'The probe found no platform-server on PATH or in ~/.local/bin.',
+    why: 'No platform-server was found on that machine’s PATH or in ~/.local/bin.',
     fix: 'Run bun run server:install from a prepared Platform checkout on that machine, then connect again.',
   },
   SSH_LAUNCH: {
     status: 502,
     message: 'The remote server could not start.',
-    why: 'The remote launcher could not reuse or start the configured server.',
+    why: 'Platform could not start a server on that machine or reuse one already running there.',
     fix: 'Inspect logs/ssh-launch.log in the server’s working directory on that machine and verify its dependencies are installed, then Retry.',
   },
   SSH_PROTOCOL: {
@@ -45,21 +45,21 @@ const machineErrors = defineErrorCatalog('machines', {
   },
   SSH_FORWARD: {
     status: 502,
-    message: 'The SSH port forward is unavailable.',
-    why: 'SSH exited or the retained local forwarding port is occupied.',
-    fix: 'Restore the SSH connection and free the reported local port, then reconnect the machine.',
+    message: 'The SSH tunnel to that machine is down.',
+    why: 'SSH exited, or another program is using the local port the tunnel needs.',
+    fix: 'Check that SSH can reach the machine and free the local port named above, then reconnect the machine.',
   },
   SSH_READINESS: {
     status: 504,
-    message: 'The forwarded server did not become ready.',
-    why: 'The forwarded /health endpoint did not answer with a valid descriptor.',
+    message: 'The server on that machine did not become ready.',
+    why: 'It did not answer the health check through the SSH tunnel.',
     fix: 'Inspect the remote server log and verify SERVER_ALLOWED_ORIGINS includes the browser origin.',
   },
   SSH_IDENTITY: {
     status: 409,
-    message: 'The SSH machine identity changed.',
-    why: 'The forwarded server identity differs from the previously confirmed environment.',
-    fix: 'Restore the machine’s original database before reconnecting.',
+    message: 'That machine is a different Platform installation than before.',
+    why: 'The server there has different app data than the one this app connected to last time.',
+    fix: 'If you replaced it on purpose, trust the new one to connect. Otherwise put the old installation’s data back, then reconnect.',
   },
   SSH_AUTH_CANCELLED: {
     status: 409,
@@ -70,7 +70,7 @@ const machineErrors = defineErrorCatalog('machines', {
   SSH_STOP: {
     status: 502,
     message: 'The remote server could not be stopped.',
-    why: 'SSH could not remove the launcher record and stop its managed server.',
+    why: 'SSH could not stop the server Platform started on that machine.',
     fix: 'Reconnect the SSH host and disconnect again, or inspect its .platform-ssh-launch record.',
   },
   SSH_UPDATE_NOT_A_RELEASE: {
@@ -119,7 +119,7 @@ const machineErrors = defineErrorCatalog('machines', {
   SSH_UPDATE_IN_USE: {
     status: 409,
     message: 'The previous server release is still in use.',
-    why: 'Another connection holds the running server, so activation was deferred.',
+    why: 'Another connection is still using the running server, so the new version waits to take over.',
     fix: 'Disconnect the other connections to that machine, then select Update server again.',
   },
   SSH_UPDATE_INSTALL: {

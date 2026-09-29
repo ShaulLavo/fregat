@@ -76,7 +76,7 @@ test('omits the checkpoint section when the message anchors neither action', () 
 
 test('a user message with a checkpoint after it offers the revert', () => {
   expect(itemLabels(menuContext({ canRevertCheckpoint: true }), 'checkpoint')).toEqual([
-    'Revert to Checkpoint Before This',
+    'Rewind to Before This Message',
   ])
 })
 

@@ -37,7 +37,7 @@ export const settingsSaveRejected: Scenario = {
       ok(text.includes('newer than the server'), `toast lost the catalog fix: ${text}`)
       await step('rejected')
 
-      await selectors.toastAction(page, 'Could not save settings', 'Discard').click()
+      await selectors.toastAction(page, 'Could not save settings', 'Undo change').click()
       await toast.waitFor({ state: 'hidden', timeout: 10_000 })
       await step('discarded')
     } finally {

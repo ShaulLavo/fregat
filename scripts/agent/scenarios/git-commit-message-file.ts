@@ -24,7 +24,7 @@ export const gitCommitMessageFile: Scenario = {
       // Discard: the tab closes and nothing is committed.
       await openMessageFile(page)
       await page.keyboard.type('never committed')
-      await selectors.editorTitleAction(page, 'Discard commit message').click()
+      await selectors.editorTitleAction(page, 'Cancel commit').click()
       await selectors.editorInput(page).first().waitFor({ state: 'detached', timeout: 10_000 })
       await Bun.sleep(1000)
       if ((await fixtureHeadSubject(fixture)) !== '')
@@ -35,7 +35,7 @@ export const gitCommitMessageFile: Scenario = {
       await openMessageFile(page)
       await page.keyboard.type(SUBJECT)
       await step('message-file-open')
-      await selectors.editorTitleAction(page, 'Accept commit message').click()
+      await selectors.editorTitleAction(page, 'Commit with this message').click()
       await waitForHeadSubject(fixture)
       await step('committed')
     } finally {

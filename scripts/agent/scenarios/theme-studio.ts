@@ -105,7 +105,7 @@ export const themeStudio: Scenario = {
 
     await dock.getByRole('listbox', { name: 'Code colors' }).or(dock).first().focus()
     await page.keyboard.press('Escape')
-    await dock.getByText('Repeat to discard edits').waitFor()
+    await dock.getByText('Repeat to drop your edits').waitFor()
     await page.keyboard.press('Escape')
     await dock.waitFor({ state: 'detached' })
     await page.waitForFunction(
@@ -127,7 +127,7 @@ export const themeStudio: Scenario = {
     await repainted(page, saved)
     await selectors.themeStudioTab(page, 'Colors').click()
     await setAccent(page, await cssToken(page, '--primary'))
-    await dock.getByRole('button', { name: 'Apply', exact: true }).click()
+    await dock.getByRole('button', { name: 'Save and use', exact: true }).click()
     await dock.waitFor({ state: 'detached' })
     let applied = selectedThemeId(await userSettings(page))
     for (let attempt = 0; attempt < 20 && applied === selectedThemeId(before); attempt += 1) {

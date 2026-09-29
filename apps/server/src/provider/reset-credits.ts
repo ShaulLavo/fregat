@@ -199,7 +199,7 @@ function resetError(code: string, message: string, status: number) {
     code: `provider.RESET_CREDIT_${code}`,
     message,
     status,
-    why: 'Reset credits change the provider account usage allowance.',
-    fix: 'Refresh usage and confirm the account before retrying.',
+    why: 'Using a reset credit changes how much the provider account can still use.',
+    fix: 'Refresh usage, check it is the right account, then try again.',
   })
 }

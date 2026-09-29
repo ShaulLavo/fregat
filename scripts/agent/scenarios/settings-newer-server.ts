@@ -44,7 +44,7 @@ async function answerAsNewerServer(page: Page) {
 export const settingsStreamGiveUp: Scenario = {
   name: 'settings-stream-give-up',
   description:
-    'The server starts sending settings this tab cannot read: the stream stops at once, a toast says settings stopped syncing, and Reload brings the page back.',
+    'The server starts sending settings this tab cannot read: the stream stops at once, a toast says settings changes stopped reaching this tab, and Reload page brings the page back.',
   async run(page, { step }) {
     const recorder = recordSettingsReads(page)
     await answerAsNewerServer(page)
@@ -54,14 +54,16 @@ export const settingsStreamGiveUp: Scenario = {
         window.dispatchEvent(new Event('pagehide'))
         window.dispatchEvent(new Event('pageshow'))
       })
-      const toast = selectors.toast(page, 'Settings stopped syncing')
+      const toast = selectors.toast(page, 'Settings changes stopped reaching this tab')
       await toast.waitFor({ timeout: 10_000 })
       await step('stopped-toast')
       await page.waitForTimeout(OBSERVE_MS)
       ok(recorder.reads.length === 1, `The stream read /settings ${recorder.reads.length} times`)
       await step('still-stopped')
       await page.unroute(SETTINGS_READ)
-      await selectors.toastAction(page, 'Settings stopped syncing', 'Reload').click()
+      await selectors
+        .toastAction(page, 'Settings changes stopped reaching this tab', 'Reload page')
+        .click()
       await waitForApp(page)
       await toast.waitFor({ state: 'detached' })
       await step('reloaded')
@@ -88,7 +90,7 @@ export const settingsNewerServer: Scenario = {
       await waitForApp(page)
       await page.waitForTimeout(OBSERVE_MS)
       ok(
-        (await selectors.toast(page, 'Settings stopped syncing').count()) === 0,
+        (await selectors.toast(page, 'Settings changes stopped reaching this tab').count()) === 0,
         'Healthy heartbeats keep settings syncing',
       )
       await step('observed')

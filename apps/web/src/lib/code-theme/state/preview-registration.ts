@@ -15,7 +15,7 @@ export async function loadPreviewRegistration(themeId: string): Promise<ThemeReg
       code: 'UNKNOWN_CODE_THEME',
       message: `Code theme unavailable: ${themeId}`,
       status: 400,
-      why: 'The requested theme is absent from the code-theme catalog.',
+      why: 'The app has no code theme with this name.',
       fix: 'Choose an available code theme.',
     })
   }

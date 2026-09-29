@@ -64,7 +64,7 @@ test('requires confirmation, calls the real route once and settles usage cache',
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(adapter.keys).toEqual([])
     fireEvent.click(screen.getByRole('button', { name: 'Use reset credit…' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Use 1 credit' }))
     await waitFor(() => expect(adapter.keys).toHaveLength(1))
     await waitFor(() =>
       expect(view.queryClient.getQueryData(providerUsageKeys.all)).toMatchObject({
@@ -88,8 +88,10 @@ test('a pending reset remains retryable after the last available credit disappea
     />,
   )
   try {
-    fireEvent.click(screen.getByRole('button', { name: 'Check reset attempt…' }))
-    expect(screen.getByText('This retries the same reset attempt.')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Check last reset…' }))
+    expect(
+      screen.getByText('Sends your last reset request again to see whether it went through.'),
+    ).toBeVisible()
   } finally {
     view.unmount()
     view.queryClient.clear()

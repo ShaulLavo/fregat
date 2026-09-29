@@ -4,14 +4,14 @@ const errors = defineErrorCatalog('orchestration', {
   LIVE_STREAM_OVERFLOW: {
     status: 409,
     message: 'Live updates exceeded the subscription buffer.',
-    why: 'The consumer has not acknowledged updates fast enough to keep retained delivery bounded.',
-    fix: 'Resume the subscription from the last applied sequence.',
+    why: 'Updates arrived faster than this page could take them in.',
+    fix: 'The app reconnects and catches up on its own. Reload if the view looks out of date.',
   },
   LIVE_STREAM_ACK_TIMEOUT: {
     status: 408,
-    message: 'Live updates went unacknowledged, so the server closed the connection.',
-    why: 'The client left a delivery unacknowledged past the server timeout.',
-    fix: 'Reconnect and resume the subscription from the last applied sequence.',
+    message: 'This page stopped taking live updates, so the server closed the connection.',
+    why: 'The page did not confirm it received updates in time.',
+    fix: 'The app reconnects and catches up on its own. Reload if the view looks out of date.',
   },
 })
 

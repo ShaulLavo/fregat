@@ -4,7 +4,7 @@ import type { PendingApprovalKind } from '@workspace/client-core/chat/pending-ap
 export function approvalTitle(requestKind: PendingApprovalKind | null) {
   if (requestKind === 'app-access') return 'App access'
   if (requestKind === 'command') return 'Run a command'
-  if (requestKind === 'file-change') return 'Apply a file change'
+  if (requestKind === 'file-change') return 'Change a file'
   if (requestKind === 'file-read') return 'Read a file'
 
   return 'Approval requested'
@@ -41,5 +41,5 @@ export function approvalReceiptTitle(payload: Record<string, unknown>) {
   if (payload.resolution === 'ended') return 'Ended unanswered'
   if (typeof payload.decision !== 'string') return 'Ended unanswered'
 
-  return RECEIPT_BY_DECISION[payload.decision] ?? 'Approval resolved'
+  return RECEIPT_BY_DECISION[payload.decision] ?? 'Answered'
 }

@@ -23,10 +23,10 @@ export function ModuleLoadError({
           action={
             <div className='flex gap-(--density-gap-tight)'>
               <Button size='sm' variant='outline' onClick={onRetry}>
-                Retry
+                Try again
               </Button>
               <Button size='sm' variant='outline' onClick={() => window.location.reload()}>
-                Reload
+                Reload app
               </Button>
             </div>
           }

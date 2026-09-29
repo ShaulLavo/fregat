@@ -32,7 +32,7 @@ it('reports a store that never accepts the lease instead of retrying forever', a
   const begun = leases.begin(worktreeId)
   const settled = expect(begun).rejects.toMatchObject({
     code: 'orchestration.TERMINAL_LEASE_UNPERSISTED',
-    message: 'terminal.lease.request was not persisted after 5 attempts',
+    message: 'terminal.lease.request could not be saved after 5 attempts',
   })
   await vi.runAllTimersAsync()
   await settled

@@ -86,11 +86,11 @@ async function applyCurrentView(
   if (intent.unavailable) return { status: 'unavailable', reason: intent.unavailable }
   const address = intent.address
   if (address.rejectedEnvironment !== null)
-    return { status: 'unavailable', reason: 'The addressed environment is unavailable.' }
+    return { status: 'unavailable', reason: 'The machine in this link is not connected.' }
   const environments = addressEnvironments(useEnvironmentsStore.getState().entries)
   const environmentId = address.environmentId ?? environments.primaryEnvironmentId
   if (!environmentId)
-    return { status: 'unavailable', reason: 'The machine identity is unconfirmed.' }
+    return { status: 'unavailable', reason: 'Still connecting to the machine in this link.' }
   application.activateEnvironment(confirmedEnvironmentOrigin(environmentId))
   const owner = application.getSnapshot()
   const activity = environmentActivitySignal(owner.origin)
@@ -107,7 +107,7 @@ async function applyCurrentView(
   confirmedEnvironmentId(owner.origin)
   if (addressedRoot === UNKNOWN_ROOT) return landOnStart(options, owner, trace)
   if (addressedRoot === null)
-    return { status: 'unavailable', reason: 'The link does not contain a valid workspace ID.' }
+    return { status: 'unavailable', reason: 'This link does not name a valid folder.' }
 
   if (needsChatSnapshot(intent, environmentId, addressedRoot)) {
     const snapshot = await fetchOrchestrationShellSnapshotHttp(client)
@@ -132,7 +132,7 @@ async function applyCurrentView(
   const opened = await openRoot(options, owner, environmentId, chat.rootPath, current, signal)
   if (!current() || opened === 'superseded') return superseded()
   if (opened === 'failed')
-    return { status: 'unavailable', reason: 'The workspace root failed to open.' }
+    return { status: 'unavailable', reason: 'The folder in this link could not be opened.' }
   confirmedEnvironmentId(owner.origin)
   const rootPath = owner.editor.workspaceStore.getState().rootFolder?.path ?? chat.rootPath
   options.reconcileResources?.(owner.editor.workspaceStore, rootPath)

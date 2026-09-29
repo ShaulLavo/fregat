@@ -354,9 +354,9 @@ export class TerminalService {
     throw createStructuredError({
       code: 'terminal.CLEANUP_UNCONFIRMED',
       status: 500,
-      message: 'Terminal cleanup could not be confirmed.',
-      why: 'The process, ownership lease or saved history could not be released.',
-      fix: 'Reconnect the terminal to retry cleanup, then close it again.',
+      message: 'The terminal did not close cleanly.',
+      why: 'Its shell or saved output could not be cleaned up.',
+      fix: 'Reconnect the terminal, then close it again.',
     })
   }
 
@@ -379,7 +379,7 @@ export class TerminalService {
           code: 'terminal.WORKTREE_UNAVAILABLE',
           status: 409,
           message: 'Terminal worktree is unavailable.',
-          why: 'The worktree path cannot be opened.',
+          why: 'The worktree folder cannot be opened.',
           fix: 'Restore the worktree before restarting this terminal.',
         })
       const previous = this.persistentSessions.get(key)
@@ -390,8 +390,8 @@ export class TerminalService {
           code: 'terminal.RESTART_UNCONFIRMED',
           status: 500,
           message: 'Terminal restart could not finish.',
-          why: 'The previous terminal process or its saved history could not be released.',
-          fix: 'Reconnect the terminal to retry cleanup, then restart again.',
+          why: 'The old shell or its saved output could not be cleaned up.',
+          fix: 'Reconnect the terminal, then restart it again.',
         })
       await this.startReplacement(key, worktreeId, terminalId, root, previous)
     })
@@ -1035,7 +1035,7 @@ export class TerminalSession {
       })
       .catch((error: unknown) => {
         this.finalizationFailed = true
-        this.errorMessage = `${terminalSpawnErrorMessage(error)} Reconnect this terminal to retry synchronization.`
+        this.errorMessage = `${terminalSpawnErrorMessage(error)} Reopen this terminal to copy the conversation again.`
         this.emit({ type: 'error', message: this.errorMessage })
         this.closeConnections()
         recordProcessWarning('terminal.session.end_failed', {
@@ -1082,7 +1082,7 @@ export class TerminalSession {
     })
     if (errorStringField(error, 'code') === terminalHostErrors.HOST_UNREACHABLE.code)
       return this.releaseUnknown(error)
-    this.emit({ type: 'error', message: 'Terminal cleanup could not be confirmed.' })
+    this.emit({ type: 'error', message: 'The terminal did not close cleanly.' })
     this.closeConnections()
   }
 

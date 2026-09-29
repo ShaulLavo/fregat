@@ -8,8 +8,8 @@ export function settingsInvariantError(message: string) {
     code: 'client.SETTINGS_INVARIANT',
     status: 500,
     message,
-    why: 'The settings owner could not establish confirmed state.',
-    fix: 'Reconnect and reload the confirmed settings document.',
+    why: 'The app could not load your saved settings from the server.',
+    fix: 'Reload the app to load your settings again.',
   })
 }
 

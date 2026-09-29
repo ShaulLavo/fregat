@@ -56,7 +56,7 @@ async function chooseTheme(page: Page) {
   await dock.waitFor()
   await dock.locator('[data-studio-themes]').focus()
   await page.keyboard.press('ArrowRight')
-  await dock.getByRole('button', { name: 'Apply', exact: true }).click()
+  await dock.getByRole('button', { name: 'Save and use', exact: true }).click()
   await dock.waitFor({ state: 'detached' })
   for (let attempt = 0; attempt < 50; attempt += 1) {
     const id = selectedThemeId(await userSettings(page))

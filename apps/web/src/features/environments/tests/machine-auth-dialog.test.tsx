@@ -53,7 +53,7 @@ test('SSH authentication masks and clears the secret while submitting only to th
   const field = screen.getByLabelText('Password:')
   expect(field).toHaveAttribute('type', 'password')
   await userEvent.type(field, 'private-test-response')
-  await userEvent.click(screen.getByRole('button', { name: 'Continue' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
   await waitFor(() =>
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Could not submit the SSH response. Try again.',
@@ -145,7 +145,7 @@ test('authentication remains cancelable while its response request is pending', 
   })
   renderWithProviders(<AuthDialog />, { connections })
   await userEvent.type(screen.getByLabelText('Password:'), 'private-test-response')
-  await userEvent.click(screen.getByRole('button', { name: 'Continue' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
   await waitFor(() => expect(responseStarted).toBe(true))
   expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled()
   await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))

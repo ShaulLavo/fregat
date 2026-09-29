@@ -1029,8 +1029,8 @@ function createOrchestrationRpcServerError(error: OrchestrationWsError) {
       code: error.code ?? 'client.RPC_FAILED',
       message: error.message,
       status: error.status ?? 502,
-      why: 'The server returned an error response for a client RPC call.',
-      fix: 'Inspect the structured RPC payload and retry once the server issue is resolved.',
+      why: 'The server answered with an error.',
+      fix: 'Try again. If it keeps failing, open the Logs panel to see what went wrong.',
     }),
     { [serverError]: true },
   )
@@ -1039,30 +1039,30 @@ function createOrchestrationRpcServerError(error: OrchestrationWsError) {
 function createOrchestrationRpcTimeoutError(method: string) {
   return createClientError({
     code: 'ORCHESTRATION_RPC_TIMEOUT',
-    message: `Orchestration RPC request timed out: ${method}`,
+    message: `The chat server did not answer in time (${method})`,
     status: 504,
-    why: 'The server did not answer the orchestration WebSocket request before the client timeout.',
-    fix: 'Inspect the chat pipeline logs and retry after the server is responsive.',
+    why: 'The server took too long to answer this chat request.',
+    fix: 'Try again. If it keeps happening, open the Logs panel to see what went wrong.',
   })
 }
 
 function createOrchestrationRpcConnectTimeoutError() {
   return createClientError({
     code: 'ORCHESTRATION_WS_CONNECT_TIMEOUT',
-    message: 'Timed out opening the orchestration WebSocket.',
+    message: 'Could not connect to the chat server in time.',
     status: 504,
-    why: 'The client could not establish the orchestration RPC socket in time.',
-    fix: 'Verify the server is running and accepting WebSocket upgrades.',
+    why: 'The connection that carries chats did not open in time.',
+    fix: 'Check that the server is running, then try again.',
   })
 }
 
 function createOrchestrationRpcSocketError() {
   return createClientError({
     code: 'ORCHESTRATION_WS_ERROR',
-    message: 'The orchestration WebSocket reported a transport error.',
+    message: 'The connection to the chat server failed.',
     status: 502,
-    why: 'The client socket failed before the server returned a usable response.',
-    fix: 'Inspect client and server logs for the WebSocket failure.',
+    why: 'The connection that carries chats broke before the server answered.',
+    fix: 'The app reconnects on its own. If it keeps failing, open the Logs panel to see what went wrong.',
   })
 }
 
@@ -1070,29 +1070,29 @@ function createOrchestrationRpcCloseError(event: OrchestrationSocketEvents['clos
   if (event.code === 1008) {
     return createClientError({
       code: 'ORCHESTRATION_WS_UNAUTHORIZED',
-      message: 'The orchestration WebSocket was rejected by the server.',
+      message: 'The chat server refused the connection.',
       status: 401,
-      why: 'The server closed the WebSocket because the connection is unauthorized.',
-      fix: 'Sign in again or fix the server auth configuration; retrying the socket will not help.',
+      why: "The server did not accept this browser's sign-in.",
+      fix: 'Sign in again. Retrying without signing in keeps failing.',
     })
   }
 
   return createClientError({
     code: 'ORCHESTRATION_WS_CLOSED',
-    message: 'The orchestration WebSocket closed before the request completed.',
+    message: 'The connection to the chat server closed before the request finished.',
     status: event.wasClean ? 499 : 502,
-    why: 'The shared orchestration RPC connection closed while work was still in flight.',
-    fix: 'Reconnect the chat view and inspect the server WebSocket logs if it repeats.',
+    why: 'The connection that carries chats closed while a request was still running.',
+    fix: 'The app reconnects on its own. Try the request again once it is back.',
   })
 }
 
 function createOrchestrationRpcHeartbeatTimeoutError() {
   return createClientError({
     code: 'ORCHESTRATION_WS_HEARTBEAT_TIMEOUT',
-    message: 'The orchestration WebSocket stopped answering heartbeats.',
+    message: 'The chat server stopped responding.',
     status: 504,
-    why: 'The socket stayed open but the server never answered a ping, so it is half-open.',
-    fix: 'Let the chat supervisors reconnect; inspect the server if heartbeats keep timing out.',
+    why: 'The connection stayed open, but the server stopped answering checks that it is still there.',
+    fix: 'The app reconnects on its own. If it keeps happening, check that the server is running.',
   })
 }
 
@@ -1115,10 +1115,10 @@ function settleParsedResult<TSchema extends v.GenericSchema>({
   reject(
     createClientError({
       code: 'ORCHESTRATION_RPC_INVALID_RESULT',
-      message: 'The orchestration server returned an invalid result.',
+      message: 'The chat server sent an answer the app could not read.',
       status: 502,
-      why: 'The response did not match the requested operation or subscription schema.',
-      fix: 'Check the server and client versions and inspect the orchestration logs.',
+      why: 'The server and this page may run different versions of Platform.',
+      fix: 'Reload the app. If it keeps happening, open the Logs panel to see what went wrong.',
       cause: parsed.issues,
     }),
   )

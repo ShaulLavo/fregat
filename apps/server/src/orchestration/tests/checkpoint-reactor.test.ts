@@ -303,7 +303,7 @@ describe('checkpoint reactor', () => {
           kind: 'checkpoint.revert.failed',
           payload: expect.objectContaining({
             detail: expect.stringMatching(
-              failure === 'unsupported' ? /cannot rewind/i : /runtime/i,
+              failure === 'unsupported' ? /cannot rewind its/i : /cannot rewind right now/i,
             ),
           }),
         }),

@@ -5,28 +5,28 @@ import { createClientError } from '../errors'
 export const transportErrors = defineErrorCatalog('client', {
   EDEN_STREAM_MISSING: {
     status: 502,
-    message: ({ label }: { label: string }) => `${label} response did not include a stream.`,
-    why: 'The RPC call succeeded without the SSE body required by the caller.',
-    fix: 'Verify the server route returns an event stream for this request.',
+    message: ({ label }: { label: string }) => `${label} got an empty answer from the server.`,
+    why: 'The server answered without the live results this view reads.',
+    fix: 'Reload the app and try again.',
   },
 })
 
 export function createOrchestrationRpcClosedError() {
   return createClientError({
     code: 'ORCHESTRATION_RPC_CLOSED',
-    message: 'The chat transport is closed.',
+    message: 'The chat connection is closed.',
     status: 499,
-    why: 'The owner released this environment connection.',
-    fix: 'Use the current chat transport to start another operation.',
+    why: 'The connection to this machine was closed while the request was running.',
+    fix: 'Try again.',
   })
 }
 
 export function createLiveStreamOverflowError() {
   return createClientError({
     code: 'orchestration.LIVE_STREAM_OVERFLOW',
-    message: 'Live updates exceeded the subscription buffer.',
+    message: 'Live updates came in faster than the app could show them.',
     status: 409,
-    why: 'Updates arrived faster than the subscription consumer could apply them.',
-    fix: 'Resume from the last applied sequence.',
+    why: 'Too many updates arrived at once, so some were dropped.',
+    fix: 'The app catches up on its own. Reload if the view looks out of date.',
   })
 }

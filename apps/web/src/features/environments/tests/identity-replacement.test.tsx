@@ -129,7 +129,7 @@ async function expectTrusted(
   expect(globalChromeStorage.keys(`env:${replacedId}|`)).toEqual([])
 }
 
-test('a replaced remote database shows the gate, and Trust replacement connects to it', async ({
+test('a replaced remote database shows the gate, and Trust the new server connects to it', async ({
   server,
   client,
 }) => {
@@ -144,9 +144,9 @@ test('a replaced remote database shows the gate, and Trust replacement connects 
     </QueryClientProvider>,
   )
   try {
-    const trust = await screen.findByRole('button', { name: 'Trust replacement' })
+    const trust = await screen.findByRole('button', { name: 'Trust the new server' })
     expect(screen.queryByText('Remote workbench')).toBeNull()
-    expect(screen.getByText(/Trust replacement connects to the new database/)).toBeVisible()
+    expect(screen.getByText(/trust the new one to connect/)).toBeVisible()
     await userEvent.click(trust)
     await screen.findByText('Remote workbench')
     await expectTrusted(h, replacedId)
@@ -155,7 +155,7 @@ test('a replaced remote database shows the gate, and Trust replacement connects 
   }
 })
 
-test('the rail notice for a replaced remote offers Trust replacement in place of Retry', async ({
+test('the rail notice for a replaced remote offers Trust the new server in place of Retry', async ({
   server,
   client,
 }) => {
@@ -164,11 +164,11 @@ test('the rail notice for a replaced remote offers Trust replacement in place of
   renderWithProviders(<MachineConnectionRows />, { connections: h.connections })
   expect(await screen.findByText('Remote fixture · Machine identity changed')).toBeVisible()
   expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull()
-  await userEvent.click(screen.getByRole('button', { name: 'Trust replacement' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Trust the new server' }))
   await expectTrusted(h, replacedId)
 })
 
-test('the settings row for a replaced remote offers Trust replacement in place of Retry now', async ({
+test('the settings row for a replaced remote offers Trust the new server in place of Retry now', async ({
   server,
   client,
 }) => {
@@ -183,11 +183,11 @@ test('the settings row for a replaced remote offers Trust replacement in place o
   )
   expect(await screen.findByText('Machine identity changed')).toBeVisible()
   expect(screen.queryByRole('button', { name: 'Retry now' })).toBeNull()
-  await userEvent.click(screen.getByRole('button', { name: 'Trust replacement' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Trust the new server' }))
   await expectTrusted(h, replacedId)
 })
 
-test('the connect picker offers Trust replacement for a replaced remote and closes once it is live', async ({
+test('the connect picker offers Trust the new server for a replaced remote and closes once it is live', async ({
   server,
   client,
 }) => {
@@ -197,7 +197,7 @@ test('the connect picker offers Trust replacement for a replaced remote and clos
     connections: h.connections,
   })
   expect(await screen.findByText('Machine identity changed')).toBeVisible()
-  await userEvent.click(screen.getByRole('button', { name: 'Trust replacement' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Trust the new server' }))
   await expectTrusted(h, replacedId)
   expect(onClose).toHaveBeenCalledOnce()
 })

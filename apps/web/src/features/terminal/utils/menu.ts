@@ -97,7 +97,7 @@ export function terminalMenu(context: TerminalMenuContext): Menu {
         destructive: true,
         icon: ArrowClockwiseIcon,
         id: 'reset',
-        label: 'Reset',
+        label: 'Redraw terminal',
         run: context.reset,
       }),
       actionItem({

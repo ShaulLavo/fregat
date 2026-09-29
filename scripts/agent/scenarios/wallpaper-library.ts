@@ -61,7 +61,10 @@ export const wallpaperLibrary: Scenario = {
         await selectors.wallpaperCard(page, UPLOAD_NAME).waitFor({ state: 'detached' })
         await step('upload-deleted')
       }
-      await selectors.themeStudio(page).getByRole('button', { name: 'Apply', exact: true }).click()
+      await selectors
+        .themeStudio(page)
+        .getByRole('button', { name: 'Save and use', exact: true })
+        .click()
       await selectors.themeStudio(page).waitFor({ state: 'detached' })
       await page.keyboard.press('Escape')
       await selectors.wallpaperStill(page).waitFor()

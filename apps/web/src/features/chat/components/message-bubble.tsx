@@ -204,7 +204,7 @@ export function MessageBubble({
               {restoring ? (
                 <span className='flex items-center gap-1.5' role='status'>
                   <StatusDot live tone='info' />
-                  <Shimmer>Restoring…</Shimmer>
+                  <Shimmer>Rewinding…</Shimmer>
                 </span>
               ) : null}
               <span className='touch:translate-x-0 size-5 shrink-0 -translate-x-2 transition-transform group-focus-within/message:translate-x-0 group-hover/message:translate-x-0'>
@@ -213,7 +213,7 @@ export function MessageBubble({
                     <TooltipTrigger
                       render={
                         <Button
-                          aria-label='Revert to checkpoint before this turn'
+                          aria-label='Rewind to before this message'
                           className='size-5'
                           data-scroll-anchor-ignore
                           disabled={checkpointRevertPending}
@@ -230,7 +230,7 @@ export function MessageBubble({
                         </Button>
                       }
                     />{' '}
-                    <TooltipContent>{'Revert to checkpoint before this turn'}</TooltipContent>
+                    <TooltipContent>{'Rewind to before this message'}</TooltipContent>
                   </Tooltip>
                 ) : null}
               </span>

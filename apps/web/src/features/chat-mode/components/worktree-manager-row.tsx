@@ -53,7 +53,7 @@ export function WorktreeManagerRow({
               return void actions.preview(choice.value)
             }}
           >
-            {choice.value === 'cleanup' ? 'Clean up' : choice.name}
+            {choice.value === 'cleanup' ? 'Remove' : choice.name}
           </Button>
         ))}
       </div>

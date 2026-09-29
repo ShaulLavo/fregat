@@ -35,7 +35,7 @@ test('logs render errors and shows a recovery dialog', async () => {
     </LoggingErrorBoundary>,
   )
 
-  expect(screen.getByRole('dialog', { name: 'Application error' })).toBeInTheDocument()
+  expect(screen.getByRole('dialog', { name: 'Something went wrong' })).toBeInTheDocument()
   expect(screen.getByText('render blew up')).toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Stack trace' }))
   expect(screen.getByText(/Error stack/)).toBeInTheDocument()

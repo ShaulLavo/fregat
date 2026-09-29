@@ -4,13 +4,13 @@ export const updateErrors = defineErrorCatalog('update', {
   NO_UPDATE_STAGED: {
     status: 409,
     message: 'No update is staged.',
-    why: 'Restart switches the server to a staged release, and no deploy has staged one.',
+    why: 'Restart switches the server to a waiting update, and no deploy has prepared one.',
     fix: 'Stage a release with bun run deploy --server, then restart.',
   },
   STAGED_RELEASE_CHANGED: {
     status: 409,
-    message: 'The staged release changed while the restart was waiting.',
-    why: 'A deploy staged a different release after the restart was requested.',
+    message: 'The waiting update changed while the restart was pending.',
+    why: 'A newer deploy replaced the update after you asked to restart.',
     fix: 'Review the new update, then restart again.',
   },
   LIVE_CHECK_FAILED: {

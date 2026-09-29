@@ -51,10 +51,10 @@ export async function commitWorkspaceEdits({
           code: 'WORKSPACE_EDIT_CLEANUP_FAILED',
           status: 502,
           message: finalized
-            ? 'The files were saved, but edit cleanup could not finish.'
-            : 'The edit did not finish and transaction cleanup could not be confirmed.',
-          why: 'Recovery failed before the server confirmed transaction release.',
-          fix: `Reconnect and inspect workspace edit ${operationId} before retrying.`,
+            ? 'The files were saved, but the server did not finish tidying up after the edit.'
+            : 'The edit did not finish, and the app cannot tell which files it changed.',
+          why: 'The connection to the server failed while the edit was being finished or undone.',
+          fix: 'Reconnect, check the files the edit touched, then try again.',
           cause: error,
           internal: { operationId, commitAcknowledged: committed, recoveryError },
         })
@@ -130,8 +130,8 @@ function assertState(result: WorkspaceEditResult, expected: WorkspaceEditState) 
     code: 'WORKSPACE_EDIT_NOT_SAVED',
     status: 409,
     message: `The file changes were not saved (${result.state}).`,
-    why: `Workspace edit ${result.operationId} reached ${result.state} instead of ${expected}.`,
-    fix: 'Keep the unsaved changes and inspect the workspace before retrying.',
+    why: 'The server stopped the edit before it finished.',
+    fix: 'Your unsaved changes are still open. Check the files, then save again.',
     internal: {
       operationId: result.operationId,
       expectedState: expected,
