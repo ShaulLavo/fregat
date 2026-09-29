@@ -14,17 +14,17 @@ mesh serve stop /ai
 
 `http://127.0.0.1:8318` is the local Claude dispatcher. `http://127.0.0.1:8317` and `https://omarchy.mesh.shaulavo.dev/ai` expose CLIProxyAPI, authenticated by its generated client key. The dispatcher stays local. CLIProxyAPI management, discovery, and the management panel are disabled.
 
-The install uses CLIProxyAPI v8.0.4, with the published archive SHA256 checked. Source is `gateway.ts`, `credentials.ts`, and `run.ts`; `run.ts` is bundled into the install's `gateway.js`.
+The install uses CLIProxyAPI v8.0.4, with the published archive SHA256 checked. Source is `gateway.ts` and `run.ts`; `run.ts` is bundled into the install's `gateway.js`.
 
-The runtime configuration lists existing Codex `auth.json` paths in `authSources`. Before GPT requests, current access tokens are copied to the proxy auth directory, with file permissions `0600`. Codex keeps ownership of refreshing those logins. The proxy never receives those refresh tokens. If an access token expires, use the corresponding Codex login to refresh it, then retry.
+Both accounts have independently authorized credentials in `/work/cli-proxy-api/auth`, with file permissions `0600`. CLIProxyAPI owns their refresh lifecycle. The gateway has no dependency on the official Codex login or its auth file. Logging out or switching accounts in Codex leaves this pool available.
 
-Both accounts are connected. The original account remains a Codex-owned access-token mirror; the second completed a separate proxy-owned device login. Its verification request returned `429 usage_limit_reached`, so its inference quota must reset before it can contribute capacity. The original account passed the native Sol agent check. For another independent proxy login, run:
+The second account's verification request returned `429 usage_limit_reached`, so its inference quota must reset before it can contribute capacity. The original account passed the native Sol agent check. For another independent proxy login, run:
 
 ```bash
 cli-proxy-login
 ```
 
-The command prints an OpenAI device sign-in URL and a short code. Open the URL from any browser, enter the code, and choose the other ChatGPT account. Device login works remotely without a localhost callback or SSH tunnel. These separately authorized credentials belong to CLIProxyAPI and it refreshes them itself. Each independent account joins the pool. Avoid authorizing the same account twice when its existing Codex login is already listed in `authSources`.
+The command prints an OpenAI device sign-in URL and a short code. Open the URL from any browser, enter the code, and choose the other ChatGPT account. Device login works remotely without a localhost callback or SSH tunnel. These separately authorized credentials belong to CLIProxyAPI and it refreshes them itself. Each independent account joins the pool. Account logins are kept by the proxy. The helper uses `-no-browser`, so it prints remote sign-in instructions without launching a browser on the host.
 
 Round-robin routing distributes new conversations. Session affinity retains an account within a conversation; GPT subagents can receive separate account bindings. An unavailable account can fail over to another account. Account limits and model access remain the provider's limits.
 

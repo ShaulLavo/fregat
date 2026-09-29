@@ -1,5 +1,4 @@
 import * as v from 'valibot'
-import { syncCredentials } from './credentials'
 import { createGateway } from './gateway'
 
 const portSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(65535))
@@ -9,8 +8,6 @@ const configSchema = v.object({
   proxyPort: portSchema,
   gatewayPort: portSchema,
   apiKey: v.pipe(v.string(), v.nonEmpty()),
-  authSources: v.array(v.string()),
-  authDir: v.string(),
 })
 try {
   await run()
@@ -28,14 +25,13 @@ function reportFailure(operation: string, error: unknown) {
       area: 'claude-gpt',
       operation,
       errorType: error instanceof Error ? error.name : typeof error,
-      fix: 'Check the runtime configuration, Codex login and mesh route.',
+      fix: 'Check the runtime configuration, proxy login and mesh route.',
     })}\n`,
   )
 }
 
 async function run() {
   const config = v.parse(configSchema, await Bun.file(Bun.argv[2] ?? '').json())
-  await syncCredentials(config.authSources, config.authDir)
   const server = Bun.serve({
     hostname: '127.0.0.1',
     port: config.gatewayPort,
@@ -44,7 +40,6 @@ async function run() {
       anthropicUrl: 'https://api.anthropic.com',
       proxyUrl: `http://127.0.0.1:${config.proxyPort}`,
       apiKey: config.apiKey,
-      syncCredentials: () => syncCredentials(config.authSources, config.authDir),
     }),
     error(error) {
       reportFailure('request', error)

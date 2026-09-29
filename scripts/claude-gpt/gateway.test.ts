@@ -22,9 +22,6 @@ test('preserves Claude OAuth, beta headers, request bytes and streaming tool eve
     anthropicUrl: upstream.url.toString(),
     proxyUrl: 'http://127.0.0.1:1',
     apiKey: 'proxy-key',
-    syncCredentials: async () => {
-      expect.unreachable('Claude requests must stay with Anthropic')
-    },
   })
   try {
     const response = await gateway(
@@ -50,7 +47,6 @@ test('GPT count_tokens reaches the translator with proxy auth and no Claude cred
   let observed:
     | { auth: string | null; apiKey: string | null; cookie: string | null; path: string }
     | undefined
-  let synced = false
   const upstream = Bun.serve({
     hostname: '127.0.0.1',
     port: 0,
@@ -68,9 +64,6 @@ test('GPT count_tokens reaches the translator with proxy auth and no Claude cred
     anthropicUrl: 'http://127.0.0.1:1',
     proxyUrl: upstream.url.toString(),
     apiKey: 'proxy-key',
-    syncCredentials: async () => {
-      synced = true
-    },
   })
   try {
     const response = await gateway(
@@ -84,7 +77,6 @@ test('GPT count_tokens reaches the translator with proxy auth and no Claude cred
         },
       }),
     )
-    expect(synced).toBe(true)
     expect(observed).toEqual({
       auth: 'Bearer proxy-key',
       apiKey: null,
@@ -102,9 +94,6 @@ test('rejects management paths, missing auth, malformed JSON and unsupported mod
     anthropicUrl: 'http://127.0.0.1:1',
     proxyUrl: 'http://127.0.0.1:1',
     apiKey: 'proxy-key',
-    syncCredentials: async () => {
-      expect.unreachable('Invalid requests must stop before credential reads')
-    },
   })
   expect((await gateway(new Request('http://localhost/v8/management'))).status).toBe(404)
   expect(
