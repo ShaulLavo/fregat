@@ -174,3 +174,67 @@ it('preserves unselected inline code when removing code from a partial selection
   expect(result).toEqual({ text: 'hello` world`', anchor: 0, head: 5 })
   expect(parsedSpans(result.text, Kind.CodeSpan)).toEqual(['` world`'])
 })
+
+describe('emphasis inside links', () => {
+  const commands = ['markdown.bold', 'markdown.italic', 'markdown.strikethrough'] as const
+
+  function pressTwice(
+    text: string,
+    anchor: number,
+    head: number,
+    command: MarkdownAuthoringCommand,
+  ) {
+    const once = apply(text, anchor, head, command)
+    return { once, twice: apply(once.text, once.anchor, once.head, command) }
+  }
+
+  it('toggles off in a link label at a caret', () => {
+    for (const command of commands) {
+      const { once, twice } = pressTwice('see [label](url) z', 7, 7, command)
+      expect(once.text).not.toBe('see [label](url) z')
+      expect(twice).toEqual({ text: 'see [latextbel](url) z', anchor: 7, head: 11 })
+    }
+  })
+
+  it('toggles off a selected word in a link label', () => {
+    for (const command of commands) {
+      const { twice } = pressTwice('see [a label](url) z', 7, 12, command)
+      expect(twice).toEqual({ text: 'see [a label](url) z', anchor: 7, head: 12 })
+    }
+  })
+
+  it('toggles off the whole selected link label', () => {
+    for (const command of commands) {
+      const { twice } = pressTwice('see [label](url) z', 5, 10, command)
+      expect(twice).toEqual({ text: 'see [label](url) z', anchor: 5, head: 10 })
+    }
+  })
+
+  it('formats the whole link from its destination and toggles back', () => {
+    const text = 'see [label](url) z'
+    for (const [anchor, head] of [
+      [13, 13],
+      [12, 15],
+      [2, 14],
+    ] as const) {
+      const { once, twice } = pressTwice(text, anchor, head, 'markdown.bold')
+      expect(once.text).toBe(anchor === 2 ? 'se**e [label](url)** z' : 'see **[label](url)** z')
+      expect(parsedSpans(once.text, Kind.Link)).toEqual(['[label](url)'])
+      expect(twice).toEqual({ text, anchor, head })
+    }
+  })
+
+  it('never stacks markers inside code, link destinations, autolinks or image sources', () => {
+    for (const command of commands) {
+      for (const [text, at] of [
+        ['a `code` b', 5],
+        ['a [l](url) b', 8],
+        ['a <http://x.y> b', 6],
+        ['a ![alt](src) b', 11],
+      ] as const) {
+        const { twice } = pressTwice(text, at, at, command)
+        expect(twice).toEqual({ text, anchor: at, head: at })
+      }
+    }
+  })
+})

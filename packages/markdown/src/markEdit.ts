@@ -4,6 +4,14 @@ import type { EditorSelectionRange } from '@singapore-editor/core/extensions'
 import type { MarkdownEdit } from './authoring'
 
 type Mark = { readonly start: number; readonly end: number; readonly width: number }
+type Range = { readonly low: number; readonly high: number }
+
+const OPAQUE_KINDS: ReadonlySet<number> = new Set([
+  Kind.CodeSpan,
+  Kind.HtmlInline,
+  Kind.Link,
+  Kind.Image,
+])
 
 export function markEdit(
   source: TextReadSnapshot,
@@ -12,10 +20,9 @@ export function markEdit(
   marker: string,
   records: Uint32Array,
 ): MarkdownEdit {
-  const low = Math.min(selection.anchor, selection.head)
-  const high = Math.max(selection.anchor, selection.head)
+  const { low, high } = formattableRange(source, records, selection)
   const marks = selectedMarks(source, records, kind, low, high)
-  if (marks.length) return removeMarks(source, selection, marks, marker)
+  if (marks.length) return removeMarks(source, selection, { low, high }, marks, marker)
   const edits: TextEdit[] = []
   const first = source.lineAt(low)
   const last = source.lineAt(high > low ? high - 1 : high)
@@ -37,6 +44,43 @@ export function markEdit(
     }
   }
   return { edits, selection: mappedSelection(selection, edits) }
+}
+
+// Delimiters inside code, raw HTML or a link destination never parse as emphasis, so each press
+// would stack more. An end inside one moves to its edge; only a bracketed label stays open.
+function formattableRange(
+  source: TextReadSnapshot,
+  records: Uint32Array,
+  selection: EditorSelectionRange,
+): Range {
+  let low = Math.min(selection.anchor, selection.head)
+  let high = Math.max(selection.anchor, selection.head)
+  const labels = new Map<number, number>()
+  for (let index = 0; index < records.length; index += 4) {
+    if (records[index + 2] === Kind.LinkText) labels.set(records[index]!, records[index + 1]!)
+  }
+  for (let index = 0; index < records.length; index += 4) {
+    const kind = records[index + 2]!
+    if (!OPAQUE_KINDS.has(kind)) continue
+    const start = records[index]!,
+      end = records[index + 1]!
+    const labelFrom = labelStart(source, kind, start)
+    const labelTo = labelFrom === null ? undefined : labels.get(labelFrom)
+    const opaque = (offset: number) =>
+      start < offset &&
+      offset < end &&
+      (labelTo === undefined || offset < labelFrom! || offset > labelTo)
+    const lowInside = opaque(low)
+    if (opaque(high)) high = end
+    if (lowInside) low = start
+  }
+  return { low, high }
+}
+
+function labelStart(source: TextReadSnapshot, kind: number, start: number): number | null {
+  if (kind === Kind.Link) return source.readRange(start, start + 1) === '[' ? start + 1 : null
+  if (kind === Kind.Image) return start + 2
+  return null
 }
 
 function selectedMarks(
@@ -63,11 +107,10 @@ function selectedMarks(
 function removeMarks(
   source: TextReadSnapshot,
   selection: EditorSelectionRange,
+  { low, high }: Range,
   marks: readonly Mark[],
   marker: string,
 ): MarkdownEdit {
-  const low = Math.min(selection.anchor, selection.head)
-  const high = Math.max(selection.anchor, selection.head)
   const edits: TextEdit[] = []
   for (const mark of marks) {
     const start = mark.start + mark.width
