@@ -1,6 +1,9 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
+    "hotkeys/packages/hotkeys": {
+      "entry": ["bench/lookup.ts"]
+    },
     "apps/desktop": {
       "entry": ["src/bun/index.ts", "src/preload/index.ts", "electrobun.config.ts"]
     },

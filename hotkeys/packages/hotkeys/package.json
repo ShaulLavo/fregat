@@ -1,0 +1,57 @@
+{
+  "name": "@fregat/hotkeys",
+  "version": "0.0.0",
+  "description": "Keyboard shortcuts for editors: key parsing, chord tries and context resolution. A fork of TanStack Hotkeys.",
+  "keywords": [
+    "chords",
+    "hotkeys",
+    "keybindings",
+    "keyboard",
+    "keymap",
+    "shortcuts"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ShaulLavo/fregat.git",
+    "directory": "hotkeys/packages/hotkeys"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target browser --format esm --packages external && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tanstack/store": "^0.11.1"
+  },
+  "devDependencies": {
+    "happy-dom": "^20.14.5",
+    "typescript": "^7.0.2",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

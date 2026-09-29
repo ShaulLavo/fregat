@@ -14,7 +14,8 @@
       "packages/ui",
       "packages/utils",
       "scripts",
-      "packages/push"
+      "packages/push",
+      "hotkeys/packages/*"
     ],
     "catalog": {
       "@opentui/core": "0.5.12",

@@ -42,7 +42,8 @@ editor-grade chord handling. The core never touches the DOM.
   their licence and attribution. Keep a clone at `references/tanstack-hotkeys` to watch upstream;
   we do not merge upstream. Leave the Angular, Lit, Preact, Solid, Svelte and Vue adapters and the
   devtools packages behind.
-- Drop the `@tanstack/store` dependency if the new dispatcher no longer needs it.
+- ~~Drop the `@tanstack/store` dependency if the new dispatcher no longer needs it.~~ Owner
+  decision: `@tanstack/store` stays.
 - Consumers inside Fregat use the workspace package. The standalone Editor and ghostty-webgpu
   mirrors depend on the published version.
 - Tests on Vitest; formatting and build with Fregat's tooling.
@@ -59,7 +60,7 @@ editor-grade chord handling. The core never touches the DOM.
    TUI's current parsing (`apps/tui/src/commands/state/keymap.ts`, `utils/bindings.ts`). The core
    imports no DOM types.
 3. **Bindings as data.** `Binding { keys: KeyChord, command: string, args?, context?: string,
-source: 'default' | 'pack' | 'user' }`. Removal copies Zed: `command: null` suppresses equal or
+source: 'default' | 'base' | 'pack' | 'user' }`. Removal copies Zed: `command: null` suppresses equal or
    weaker sources in that context; `unbind` removes one key→command pair.
 4. **Zed's context predicates**, parser and evaluator: identifiers, `key == value`, `!=`, `!`,
    `&&`, `||`, parentheses, and `>` for descendant. Evaluated against a context stack.
@@ -78,26 +79,28 @@ source: 'default' | 'pack' | 'user' }`. Removal copies Zed: `command: null` supp
    buffered keys on mismatch or timeout, so no key is silently eaten; a pending-label signal for
    UI; the `ChordOutcome` sequence event for telemetry; swallowing auto-repeat and key-up of a
    claimed key; `claimKeybinding(input)` for hosts that forward keys (terminals).
-8. **Composition helpers.** Build a table from ordered layers with sources and report which
-   binding hides which per context, as data. Nothing refuses a collision.
+8. **Composition helpers.** Build a table from ordered layers with sources. Nothing refuses a
+   collision. The "which binding hides which" report is not part of the library (owner
+   decision): if Settings wants it, Platform builds it in [206](206-platform-one-keymap.md) from
+   `bindingsForInput`.
 9. **TanStack's convenience API over the new dispatcher.** Keep the names where the meaning is the
    same so simple uses stay one call. Delete `HotkeyManager` and `SequenceManager` (global
    singletons, linear scan per press, O(n²) registration) once nothing uses them.
 
 ## Steps
 
-- [ ] Import TanStack's core and React packages under `hotkeys/`, renamed; CI green.
-- [ ] Add `KeyInput` and the browser adapter; move the pure functions onto it.
-- [ ] Port the Editor's trie and runtime tests into the library before porting the code
+- [x] Import TanStack's core and React packages under `hotkeys/`, renamed; CI green.
+- [x] Add `KeyInput` and the browser adapter; move the pure functions onto it.
+- [x] Port the Editor's trie and runtime tests into the library before porting the code
       (`packages/editor/src/keymap/trie.test.ts`, the runtime contract tests behind Plan 057's
       "20 runtime contract tests").
-- [ ] Port the trie and chord runtime; add focus-bound pending state and replay.
-- [ ] Add predicates, focus nodes and resolution; translate Zed's keymap tests as fixtures
+- [x] Port the trie and chord runtime; add focus-bound pending state and replay.
+- [x] Add predicates, focus nodes and resolution; translate Zed's keymap tests as fixtures
       (`test_depth_precedence`, `test_disable_weaker_sources_only`, `test_fail_to_disable`,
       `test_disable_deeper`, pending/replay cases in `key_dispatch.rs`).
-- [ ] Add the terminal-input adapter with tests from the TUI's key cases.
-- [ ] Rebuild the convenience API on the dispatcher; delete the old managers.
-- [ ] Benchmark and document.
+- [x] Add the terminal-input adapter with tests from the TUI's key cases.
+- [x] Rebuild the convenience API on the dispatcher; delete the old managers.
+- [x] Benchmark and document.
 
 ## Acceptance
 
@@ -115,3 +118,110 @@ source: 'default' | 'pack' | 'user' }`. Removal copies Zed: `command: null` supp
 
 Keymap contents and presets (204–206), consumer adoption, the TUI's keymap design (its own
 redesign plan), and any Settings UI.
+
+## Progress
+
+Branch `plan-203-hotkeys` (worktree `/work/worktrees/platform/plan-203-hotkeys`).
+
+- Step 1 done. Upstream `TanStack/hotkeys@536da97` (hotkeys 0.10.1, react-hotkeys 0.12.1) under
+  `hotkeys/packages/{hotkeys,react-hotkeys}`, renamed `@fregat/*`, 0.0.0, `publishConfig.access`
+  public. Workspace `hotkeys/packages/*`; CI package tests run `--filter '@fregat/*'`. Tests:
+  594 core + 44 React pass. Build is `bun build` (ESM, externals) plus `tsc` declarations.
+  Decision (revised in review): `exports` point at `dist/` as the Editor packages do, because
+  `npm publish` does not apply `publishConfig.exports`; the React package reads the core's
+  source through tsconfig `paths` and a Vitest alias. The React hooks' render-time ref writes moved into `useLayoutEffect` and
+  the recorders into lazy `useState`, so the repo's React Compiler lint passes.
+- Step 2 done. `src/key-input.ts` (`KeyInput`, `KeyModifiers`, `createKeyInput`) and
+  `src/adapters/browser.ts` (`KeyboardEventLike`, structural, so no DOM lib types;
+  `keyInputFromKeyboardEvent`, `parseKeyboardEvent`, `normalizeHotkeyFromEvent`). Matching and
+  parsing run on `KeyInput` (`matchesKeyInput`, `parseKeyInput`, `normalizeHotkeyFromKeyInput`);
+  the KeyboardEvent functions convert then call them. `NormalizedKeyboardEvent` is gone. 606 tests.
+- Step 3 done, step 4 half done. Editor `54e1e648`: `trie.test.ts` and every
+  `keymap-runtime.test.ts` case ported to `tests/chords/`, except the Alt+Arrow column-selection
+  case, which tests the Editor's preset contents (the library ships no keymap). The browser
+  suite's held-prefix and replacement cases are ported as synthetic-event tests. Written first,
+  seen red, then the code: `src/chords/{types,trie,runtime}.ts` (DOM-free
+  `createChordRuntime` over `KeyInput`; the host applies `KeyEffects`) and
+  `src/adapters/browser-keymap.ts` (`createKeymapRuntime`, the Editor's API: listeners,
+  per-event idempotence, capture while pending). Trie on `KeyInput`; AltGr strokes match the
+  produced glyph. 645 tests.
+- Step 4 done. Corrections against Zed (`key_dispatch.rs` `dispatch_key`/`flush_dispatch`/
+  `replay_prefix`, `window.rs` `dispatch_key_event`): a prefix with an available deeper binding
+  always pends, even when the prefix is itself bound; only then a timeout (1 s, Zed's
+  `PENDING_INPUT_TIMEOUT`; `timeoutMs` option) runs the prefix's bindings. An unbound prefix
+  waits for the next key. Mismatch or an unavailable continuation ends the chord, runs the
+  longest bound buffered prefix, hands the other buffered keys to the host's `replay` hook, and
+  then matches the new key from the root (it is no longer swallowed). A declined final binding
+  lets the key through. Pending records `currentFocus()` (browser: `document.activeElement`) and
+  ends without replay when it changes. Ported tests changed to match: five Editor cases
+  rewritten, four added. 650 tests.
+  Decision: no Zed-style timeout for printable prefixes in text fields (`text_input_requires_timeout`);
+  hosts forbid plain-letter chord starts today. Revisit if a keymap needs one.
+- Step 5, first half. `src/context/` ports Zed's `KeyContext` (`parseKeyContext`) and predicate
+  language (`parseContextPredicate`, `evaluatePredicate`, `predicateDepth`), identifiers without
+  Zed's vim-operator characters. `src/dispatch/keymap.ts`: `Binding`/`Unbinding` entries,
+  `compileKeymap` (trie of `CompiledBinding` payloads), `resolveKeymapNode` (Zed's
+  `bindings_for_input`: rank by depth, then source, then later-first; `command: null` suppresses
+  equal and weaker sources ranked after it; `unbind` removes one pair; pending chords defined
+  before the winning exact binding are shadowed), `bindingsForInput` for settings and tests. The
+  chord runtime takes a `select(node, context, source)` hook so the dispatcher plugs this in.
+  Zed's context and keymap tests translated in `tests/context/` and `tests/dispatch/keymap.test.ts`.
+- Step 5 done. `src/dispatch/dispatcher.ts`: `createDispatcher` (DOM-free focus tree:
+  `createNode({ parent, context, commands })`, `focus`, `contextStack`, `setKeymap`,
+  `handleKey`, `dispatchCommand`); commands run from the focused node up, a handler returning
+  `false` passes to the ancestor and then to the next candidate binding; unhandled keys return
+  false for default input. `src/adapters/browser-dispatcher.ts`: `createBrowserDispatcher` with
+  `attachElement(node, element)`; each keydown focuses the deepest attached element on the
+  event path. Listener code shared with `createKeymapRuntime` in
+  `adapters/browser-listeners.ts`. Runtime additions from Zed: a running timeout restarts on
+  each stroke and stays on; `acceptsTextInput(source)` gives printable prefixes a timeout
+  (browser default: the target is a text field) and their replay. Zed pending fixtures in
+  `tests/dispatch/dispatcher.test.ts`. 694 tests.
+- Step 6 done. `src/adapters/terminal.ts`: `TerminalKeyLike` (OpenTUI `KeyEvent` shape, no
+  OpenTUI dependency), `keyInputFromTerminalKey` (the TUI's name map and printed-symbol Shift
+  rule from `apps/tui/src/commands/utils/keyboard.ts`; legacy Alt as Alt, Super as Meta; Kitty
+  release and repeat), `terminalKeyEffects`. Tests from the TUI's key cases (Control+K,
+  ESC s, Kitty `?`, releases) plus a dispatcher-hosted chord and a replayed prefix. 702 tests.
+- Step 7 done. `src/hotkeys.ts`: `createHotkeyRegistry` / `getHotkeyRegistry(document)` with
+  TanStack's `register(keys, callback, options)` and handle (`callback`, `setOptions`,
+  `unregister`, `isActive`) on one browser dispatcher per document; arrays register chords.
+  The keymap rebuilds lazily before the next key (one trie build for any number of
+  registrations). Newest registration runs first; a callback returning `false` passes the key on.
+  `HotkeyManager`, `SequenceManager` and their three test files are deleted; their surviving
+  tests (recording, parsed identity, review regressions) run against the registry;
+  `findHotkeyConflicts` reads the registry. React hooks register with the registry;
+  `useHotkeyRegistrations` splits views by stroke count. Semantics that changed on purpose:
+  a single stroke that prefixes a registered chord waits (Zed) instead of both firing; element
+  targets must be in the document. Trie fix: physical bindings (`[KeyQ]`) now match their code
+  on any layout. Test setup stubs happy-dom's `getModifierState`, which reports AltGraph for
+  any Alt. 576 core + 44 React tests.
+- Step 8 done. `bench/lookup.ts` (`bun bench/lookup.ts`, knip entry): editor-shaped
+  255-binding table; `trieStep` plain `q` 0.005–0.010 µs against the Editor trie's 0.007–0.018 µs
+  on the same table (scratch comparison, same process; JIT noise about ±50%);
+  `dispatcher.handleKey` plain `q` 0.046 µs, bound `Control+E` with context resolution 0.11 µs;
+  `compileKeymap` 0.69 / 1.05 / 0.83 µs per binding at 255 / 2,550 / 25,500 bindings (linear).
+  `packages/hotkeys/README.md` shows a standalone dispatcher, nested focus contexts, a chord, a
+  declining handler, the terminal adapter, one-call hotkeys and the numbers.
+  `KeyStateTracker` gained `reset()` and clears on a hidden tab (core item 1). 578 tests.
+- All steps done. `@tanstack/store` stays (registry views, recorders, `KeyStateTracker`); the
+  shadow report moved to 206. Declaration output keeps extensionless imports, fine for bundler
+  resolution (207 decides the publish build).
+- Review fixes (PR #197 review at `abeb9cfd8`), each with a test seen red first:
+  - Registration filters (`ignoreInputs`, `target`, recording) apply before a prefix pends:
+    `createDispatcher({ isAvailable })` filters candidates and pending chords in
+    `resolveKeymapNode`. "egg" typed in an input with `G G` registered stays "egg"; an
+    element-scoped `Control+K Control+C` leaves `Control+K` alone elsewhere. The browser
+    dispatcher's default `replay` types a replayed printable prefix into its field.
+  - A timeout fires only in the focus the chord started in (Zed `start_pending_input_timeout`).
+  - Dispatchers take a host `currentFocus`; the browser one passes `document.activeElement`,
+    so a chord begun on one element does not complete on another.
+  - A mismatch replays the longest bound prefix, then matches the leftover keys plus the new
+    key again (Zed `dispatch_key`/`replay_prefix`): `a b d` with `a b c` and `b d` runs `bd`.
+  - Unregister and dispose remove the registry's command handlers.
+  - `exports` name `dist/`; `npm pack --dry-run` ships only files the manifest names. The React
+    build keeps the core external (it bundled a copy before). Open for 207: `npm pack` keeps
+    `workspace:*` in `@fregat/react-hotkeys`' dependencies; the publish step must rewrite it.
+  - Bench times per keyboard event with a sink against the Editor trie on the same table:
+    1.0–2.6× the Editor for an unbound key, about 2× for a bound one, all under 0.1 µs.
+  - An identifier predicate matches a `key=value` key (`mode` matches `mode=full`).
+  - `base` source between `default` and `pack` (Zed's BASE and VIM).
