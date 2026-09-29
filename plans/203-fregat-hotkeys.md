@@ -86,7 +86,7 @@ source: 'default' | 'pack' | 'user' }`. Removal copies Zed: `command: null` supp
 
 ## Steps
 
-- [ ] Import TanStack's core and React packages under `hotkeys/`, renamed; CI green.
+- [x] Import TanStack's core and React packages under `hotkeys/`, renamed; CI green.
 - [ ] Add `KeyInput` and the browser adapter; move the pure functions onto it.
 - [ ] Port the Editor's trie and runtime tests into the library before porting the code
       (`packages/editor/src/keymap/trie.test.ts`, the runtime contract tests behind Plan 057's
@@ -115,3 +115,16 @@ source: 'default' | 'pack' | 'user' }`. Removal copies Zed: `command: null` supp
 
 Keymap contents and presets (204–206), consumer adoption, the TUI's keymap design (its own
 redesign plan), and any Settings UI.
+
+## Progress
+
+Branch `plan-203-hotkeys` (worktree `/work/worktrees/platform/plan-203-hotkeys`).
+
+- Step 1 done. Upstream `TanStack/hotkeys@536da97` (hotkeys 0.10.1, react-hotkeys 0.12.1) under
+  `hotkeys/packages/{hotkeys,react-hotkeys}`, renamed `@fregat/*`, 0.0.0, `publishConfig.access`
+  public. Workspace `hotkeys/packages/*`; CI package tests run `--filter '@fregat/*'`. Tests:
+  594 core + 44 React pass. Build is `bun build` (ESM, externals) plus `tsc` declarations.
+  Decision: source exports point at `src/` for workspace consumers; `publishConfig.exports`
+  points at `dist/`. The React hooks' render-time ref writes moved into `useLayoutEffect` and
+  the recorders into lazy `useState`, so the repo's React Compiler lint passes.
+- Next: step 2 (`KeyInput` and the browser adapter).
