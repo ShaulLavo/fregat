@@ -84,6 +84,8 @@ type Registration = {
   readonly target: Target
   callback: HotkeyCallback
   options: HotkeyOptions
+  /** Removes the command handler, which holds the callback. */
+  release: () => void
   hasFired: boolean
   triggerCount: number
 }
@@ -210,11 +212,12 @@ export function createHotkeyRegistry(
         platform,
         ignoreInputs: registrationOptions.ignoreInputs ?? getDefaultIgnoreInputs(parsed[0]!),
       },
+      release: () => {},
       hasFired: false,
       triggerCount: 0,
     }
     entries.set(id, entry)
-    root.handle(id, ({ source }) => (source ? run(entry, source) : false))
+    entry.release = root.handle(id, ({ source }) => (source ? run(entry, source) : false))
     publish()
     return {
       id,
@@ -237,7 +240,10 @@ export function createHotkeyRegistry(
     }
   }
   function remove(id: string) {
-    if (!entries.delete(id)) return
+    const entry = entries.get(id)
+    if (!entry) return
+    entries.delete(id)
+    entry.release()
     publish()
   }
   function trigger(id: string): boolean {
@@ -267,6 +273,7 @@ export function createHotkeyRegistry(
       if (registries.get(doc) === registry) registries.delete(doc)
       doc.removeEventListener('keyup', onKeyUp, true)
       dispatcher.dispose()
+      for (const entry of entries.values()) entry.release()
       entries.clear()
       registrations.setState(() => new Map())
     },

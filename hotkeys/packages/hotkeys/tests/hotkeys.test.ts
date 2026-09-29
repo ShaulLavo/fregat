@@ -216,3 +216,23 @@ it('ends a chord when DOM focus moves before it completes', () => {
   press(second, 'c', { ctrlKey: true })
   expect(callback).not.toHaveBeenCalled()
 })
+
+it('removes the command handler on unregister and dispose', () => {
+  const hotkeys = setup()
+  const root = hotkeys.dispatcher.focused()!
+  const handle = root.handle
+  const removed: string[] = []
+  vi.spyOn(root, 'handle').mockImplementation((command, handler) => {
+    const remove = handle(command, handler)
+    return () => {
+      removed.push(command)
+      remove()
+    }
+  })
+  const first = hotkeys.register('Control+Q', vi.fn())
+  const second = hotkeys.register('Control+W', vi.fn())
+  first.unregister()
+  expect(removed).toEqual([first.id])
+  hotkeys.dispose()
+  expect(removed).toEqual([first.id, second.id])
+})
