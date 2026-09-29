@@ -73,6 +73,7 @@ export class KeyStateTracker {
   #keydownListener: ((event: KeyboardEvent) => void) | null = null
   #keyupListener: ((event: KeyboardEvent) => void) | null = null
   #blurListener: (() => void) | null = null
+  #visibilityListener: (() => void) | null = null
 
   private constructor() {
     this.#setupListeners()
@@ -142,17 +143,23 @@ export class KeyStateTracker {
       this.#syncState()
     }
 
-    // Clear all keys when window loses focus (keys might be released while not focused)
-    this.#blurListener = () => {
-      if (this.#heldEntries.size > 0) {
-        this.#heldEntries.clear()
-        this.#syncState()
-      }
+    // Keys released while the window is unfocused or hidden never report their keyup.
+    this.#blurListener = () => this.reset()
+    this.#visibilityListener = () => {
+      if (document.visibilityState === 'hidden') this.reset()
     }
 
     document.addEventListener('keydown', this.#keydownListener, true)
     document.addEventListener('keyup', this.#keyupListener, true)
     window.addEventListener('blur', this.#blurListener)
+    document.addEventListener('visibilitychange', this.#visibilityListener)
+  }
+
+  /** Forgets every held key, for hosts that know keyups were lost (paste, dictation tools). */
+  reset(): void {
+    if (this.#heldEntries.size === 0) return
+    this.#heldEntries.clear()
+    this.#syncState()
   }
 
   /**
@@ -189,6 +196,10 @@ export class KeyStateTracker {
       this.#keyupListener = null
     }
 
+    if (this.#visibilityListener) {
+      document.removeEventListener('visibilitychange', this.#visibilityListener)
+      this.#visibilityListener = null
+    }
     if (this.#blurListener) {
       window.removeEventListener('blur', this.#blurListener)
       this.#blurListener = null

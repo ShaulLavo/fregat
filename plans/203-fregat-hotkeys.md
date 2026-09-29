@@ -198,8 +198,8 @@ Branch `plan-203-hotkeys` (worktree `/work/worktrees/platform/plan-203-hotkeys`)
   `compileKeymap` 0.69 / 1.05 / 0.83 µs per binding at 255 / 2,550 / 25,500 bindings (linear).
   `packages/hotkeys/README.md` shows a standalone dispatcher, nested focus contexts, a chord, a
   declining handler, the terminal adapter, one-call hotkeys and the numbers.
+  `KeyStateTracker` gained `reset()` and clears on a hidden tab (core item 1). 578 tests.
 - All steps done. Left for later plans or review: `@tanstack/store` stays (registry views,
-  recorders, `KeyStateTracker`); `KeyStateTracker` external reset (core item 1) is not added yet;
-  composition helpers beyond `bindingsForInput` (item 8's layer-by-layer shadow report) are not
+  recorders, `KeyStateTracker`); composition helpers beyond `bindingsForInput` (item 8's layer-by-layer shadow report) are not
   built; declaration output keeps extensionless imports, fine for bundler resolution (207 decides
   the publish build).

@@ -279,3 +279,26 @@ describe('KeyStateTracker', () => {
     })
   })
 })
+
+describe('KeyStateTracker resets', () => {
+  afterEach(() => {
+    KeyStateTracker.resetInstance()
+    vi.restoreAllMocks()
+  })
+
+  it('forgets held keys on reset, for paste and dictation tools that drop keyups', () => {
+    const tracker = KeyStateTracker.getInstance()
+    dispatchKey('keydown', 'Meta', 'MetaLeft')
+    expect(tracker.getHeldKeys()).toEqual(['Meta'])
+    tracker.reset()
+    expect(tracker.getHeldKeys()).toEqual([])
+  })
+
+  it('forgets held keys when the tab is hidden', () => {
+    const tracker = KeyStateTracker.getInstance()
+    dispatchKey('keydown', 'Control', 'ControlLeft')
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    document.dispatchEvent(new Event('visibilitychange'))
+    expect(tracker.getHeldKeys()).toEqual([])
+  })
+})
