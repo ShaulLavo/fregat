@@ -56,10 +56,11 @@ export const SETTINGS_REGISTRY = {
     default: 'queue',
     scope: 'application',
     widget: 'enum',
+    optionTitles: { queue: 'Wait for the agent', steer: 'Send at once' },
     category: 'Chat',
     title: 'Follow-up behavior',
     description:
-      'Queue messages sent during a running turn, or send them at once as corrections. The alternate send key (Ctrl/Cmd+Enter, or Shift+Ctrl/Cmd+Enter where Ctrl/Cmd+Enter sends) takes the other behavior.',
+      'What happens to a message you send while the agent is still working: it waits until the turn ends, or reaches the agent at once to correct it. The other send key (Ctrl/Cmd+Enter, or Shift+Ctrl/Cmd+Enter where Ctrl/Cmd+Enter sends) does the other one.',
   }),
   'chat.sendShortcut': defineSetting({
     schema: v.picklist(['enter', 'mod-enter-multiline', 'mod-enter']),
@@ -67,10 +68,15 @@ export const SETTINGS_REGISTRY = {
     // Binds a key, so it never comes from a workspace file.
     scope: 'application',
     widget: 'enum',
+    optionTitles: {
+      enter: 'Enter',
+      'mod-enter-multiline': 'Enter until multiline',
+      'mod-enter': 'Ctrl/Cmd+Enter',
+    },
     category: 'Chat',
     title: 'Send shortcut',
     description:
-      'Which key sends a message. enter: Enter sends and Shift+Enter adds a line. mod-enter-multiline: like enter until the message has a second line, then Ctrl/Cmd+Enter sends. mod-enter: Ctrl/Cmd+Enter sends and Enter adds a line. Where Ctrl/Cmd+Enter sends, Shift+Ctrl/Cmd+Enter takes the other follow-up behavior.',
+      'Which key sends a message. Enter: Enter sends and Shift+Enter adds a line. Enter until multiline: Enter sends until the message has a second line, then Ctrl/Cmd+Enter sends. Ctrl/Cmd+Enter: Ctrl/Cmd+Enter sends and Enter adds a line. Where Ctrl/Cmd+Enter sends, Shift+Ctrl/Cmd+Enter sends with the other follow-up behavior.',
     keywords: ['send', 'enter', 'submit', 'newline', 'shortcut', 'keyboard'],
   }),
   'chat.planModeEnabled': defineSetting({
@@ -81,7 +87,7 @@ export const SETTINGS_REGISTRY = {
     category: 'Chat',
     title: 'Plan mode controls',
     description:
-      'Show the Plan mode picker and /plan and /default commands for providers that support them. Stored draft preferences are retained while hidden.',
+      'Show the Plan mode picker and the /plan and /default commands for providers that have them. Hiding them keeps the plan mode choice saved in each draft.',
   }),
   'agent.diagnosticsFeedback': defineSetting({
     schema: v.boolean(),
@@ -124,11 +130,17 @@ export const SETTINGS_REGISTRY = {
     default: 'paragraph',
     scope: 'application',
     widget: 'enum',
+    optionTitles: {
+      paragraph: 'By paragraph',
+      turn: 'When the turn ends',
+      token: 'Token by token',
+    },
     category: 'Chat',
     title: 'Response streaming',
     details:
       'Paragraph publishes text at blank lines, closed code fences and new list items: the first break at once, later ones at least 400 ms apart. The end of the turn, a question from the agent, or 24,000 buffered characters flushes the rest. Token mode still delivers reasoning by paragraph.',
-    description: 'Publish assistant responses by paragraph, complete turn, or individual token.',
+    description:
+      'How the agent’s reply appears while it writes: a paragraph at a time, all at once when the turn ends, or token by token.',
   }),
   'chat.projectResponseStreamingModes': defineSetting({
     schema: v.record(v.string(), v.picklist(['paragraph', 'turn', 'token'])),
@@ -147,10 +159,16 @@ export const SETTINGS_REGISTRY = {
     default: 'off',
     scope: 'application',
     widget: 'enum',
+    optionTitles: {
+      off: 'Off',
+      notifications: 'Notifications',
+      sound: 'Sound',
+      'notifications-and-sound': 'Notifications and sound',
+    },
     category: 'Chat',
     title: 'Session notifications',
     description:
-      'Notify when a session needs attention or completes. Native notifications require browser permission; sound starts after a pointer or keyboard gesture.',
+      'Notify you when a session needs you or finishes. System notifications need the browser’s permission; sound plays only after you have clicked or typed in the app.',
   }),
   'chat.inAppNotificationsEnabled': defineSetting({
     schema: v.boolean(),
@@ -160,7 +178,7 @@ export const SETTINGS_REGISTRY = {
     category: 'Chat',
     title: 'In-app session notifications',
     description:
-      'Show an Open session action when another session needs attention or completes while this window is focused.',
+      'While you are using this window, show a notice with an Open session button when another session needs you or finishes.',
   }),
   'chat.pushNotifications': defineSetting({
     schema: v.boolean(),
@@ -172,7 +190,7 @@ export const SETTINGS_REGISTRY = {
     details:
       'Only live changes push: replaying history, recovering after a restart and archived sessions never notify. A device the push service rejects with 404 or 410 is removed.',
     description:
-      'Push to every device registered below when a session needs attention or completes. Held back while a window of this server is visible and focused.',
+      'Send a push notification to every device listed below when a session needs you or finishes. None are sent while you are using a window of this app.',
   }),
   'chat.textGenerationModel': defineSetting({
     schema: modelSelectionSchema,
@@ -207,6 +225,7 @@ export const SETTINGS_REGISTRY = {
     default: 'updated_at',
     scope: 'application',
     widget: 'enum',
+    optionTitles: { updated_at: 'Latest activity', created_at: 'Creation time' },
     category: 'Chat',
     title: 'Session navigation order',
     description:
@@ -226,12 +245,17 @@ export const SETTINGS_REGISTRY = {
     default: 'repository',
     scope: 'application',
     widget: 'enum',
+    optionTitles: {
+      repository: 'Repository',
+      repository_path: 'Repository folder',
+      separate: 'Each machine apart',
+    },
     category: 'Chat',
     title: 'Project grouping',
     details:
       "Repository puts one repository's checkouts on this machine and on connected machines under one project row. Separate gives each machine's project its own row.",
     description:
-      'Group projects by repository, repository-relative path, or owning machine. Git projects currently register at the repository root, so both repository modes are equivalent.',
+      'Group projects by repository, by folder inside the repository, or by machine. Git projects are added at the repository root today, so the two repository options group the same way.',
   }),
   'chat.autoSettleAfterDays': defineSetting({
     schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(365)),
@@ -295,7 +319,7 @@ export const SETTINGS_REGISTRY = {
     category: 'Machines',
     title: 'Connected machines',
     description:
-      'SSH targets and direct origins available to this client. The local machine is always available.',
+      'Other machines this app can connect to, over SSH or by address. This machine is always available.',
     keywords: ['remote', 'ssh', 'environment', 'server', 'connect'],
   }),
   'environments.devicePairing': defineSetting({
@@ -333,7 +357,7 @@ export const SETTINGS_REGISTRY = {
     details:
       'Checked on each Git status read after the background fetch moves the upstream. After a failed pull the next try waits 60 seconds. The Git panel shows why a pull was skipped.',
     description:
-      'Fast-forward a project checkout on its default branch when its upstream moves. A checkout with changes, local commits or another branch checked out is left alone.',
+      'Pull new commits into a project’s default branch when the remote gets them. A checkout with uncommitted changes, unpushed commits or another branch checked out is left alone.',
     keywords: ['pull', 'fast-forward', 'fetch', 'default branch', 'main'],
   }),
   'git.projectAutoPull': defineSetting({
@@ -353,6 +377,7 @@ export const SETTINGS_REGISTRY = {
     // Machine scope: the value picks git flags and can reach the network.
     scope: 'machine',
     widget: 'enum',
+    optionTitles: { recursive: 'All, nested too', 'top-level': 'Top level only', none: 'None' },
     category: 'Git',
     title: 'Submodules in new worktrees',
     details:
@@ -403,6 +428,7 @@ export const SETTINGS_REGISTRY = {
     default: DEFAULT_COLOR_THEME,
     scope: 'window',
     widget: 'enum',
+    optionTitles: { dark: 'Dark', light: 'Light', system: 'System' },
     category: 'Appearance',
     title: 'Light / dark mode',
     description: 'Light or dark, or follow the operating system.',
@@ -496,7 +522,7 @@ export const SETTINGS_REGISTRY = {
     category: 'Appearance',
     title: 'Pane opacity',
     description:
-      'How opaque panels and sidebars are over the wallpaper. 100 turns the glass material off.',
+      'How opaque panels and sidebars are over the wallpaper. 100 hides the wallpaper behind them.',
     keywords: ['panes', 'surfaces', 'transparency', 'opacity', 'glass', 'material', 'blur'],
   }),
   'workbench.surface.contentOpacity': defineSetting({
@@ -525,7 +551,7 @@ export const SETTINGS_REGISTRY = {
     title: 'Backdrop blur',
     details:
       "Capped at 40 px. A repository's settings file can set this, and a large backdrop blur costs GPU time on every frame.",
-    description: 'Backdrop blur radius, in pixels, behind translucent surfaces.',
+    description: 'How much the wallpaper behind see-through panels is blurred, in pixels.',
     keywords: ['blur', 'surfaces', 'glass', 'transparency', 'material', 'vibrancy'],
   }),
   'workbench.surface.saturation': defineSetting({
@@ -535,7 +561,7 @@ export const SETTINGS_REGISTRY = {
     widget: 'number',
     category: 'Appearance',
     title: 'Backdrop saturation',
-    description: 'Backdrop saturation, as a percentage, behind translucent surfaces.',
+    description: 'How vivid the wallpaper behind see-through panels looks, as a percentage.',
     keywords: ['saturation', 'surfaces', 'glass', 'transparency', 'material', 'vibrancy'],
   }),
   'tui.theme.colors': defineSetting({
@@ -543,9 +569,11 @@ export const SETTINGS_REGISTRY = {
     default: 'theme',
     scope: 'application',
     widget: 'enum',
+    optionTitles: { theme: 'Theme colors', terminal: 'Terminal colors' },
     category: 'Appearance',
     title: 'Terminal app colors',
-    description: 'Use the selected theme bundle or the terminal host colors in the TUI.',
+    description:
+      'Colors for the terminal app: the selected theme’s, or the colors of the terminal it runs in.',
   }),
   'workbench.reduceMotion': defineSetting({
     schema: v.boolean(),
@@ -556,7 +584,7 @@ export const SETTINGS_REGISTRY = {
     title: 'Reduce terminal motion',
     details:
       "Applies to the terminal app: its spinners and loaders run at half speed. The web app follows the operating system's reduce-motion setting.",
-    description: 'Slow terminal loading indicators while keeping progress visible.',
+    description: 'Slow down spinners and loaders in the terminal app.',
     keywords: ['tui', 'terminal', 'animation', 'accessibility', 'motion'],
   }),
   'workbench.fontFamily': defineSetting({
@@ -632,11 +660,19 @@ export const SETTINGS_REGISTRY = {
     default: DEFAULT_WORKBENCH_FEEL,
     scope: 'window',
     widget: 'enum',
+    optionTitles: {
+      flat: 'Flat',
+      seam: 'Seam',
+      brisk: 'Brisk',
+      relaxed: 'Relaxed',
+      playful: 'Playful',
+    },
     category: 'Appearance',
     title: 'Feel',
     details:
       'Flat moves on fixed durations with flat controls. Seam, Brisk, Relaxed and Playful move on springs and give controls raised keys, sunken wells and squircle corners (squircles in Chromium only). Under reduced motion every feel uses fades.',
-    description: 'Motion and control depth: Flat, Seam, Brisk, Relaxed or Playful.',
+    description:
+      'How controls move and how raised they look: Flat, Seam, Brisk, Relaxed or Playful.',
     keywords: ['motion', 'spring', 'physical', 'animation', 'depth'],
   }),
   'workbench.density': defineSetting({
@@ -644,6 +680,7 @@ export const SETTINGS_REGISTRY = {
     default: DEFAULT_WORKBENCH_DENSITY,
     scope: 'window',
     widget: 'enum',
+    optionTitles: { compact: 'Compact', cozy: 'Cozy' },
     category: 'Appearance',
     title: 'Interface density',
     description: 'Use tighter compact spacing or roomier cozy spacing throughout the app.',
@@ -668,6 +705,7 @@ export const SETTINGS_REGISTRY = {
     default: 'always',
     scope: 'window',
     widget: 'enum',
+    optionTitles: { none: 'Never', onHover: 'On hover', always: 'Always' },
     category: 'Appearance',
     title: 'File tree indent guides',
     description:
@@ -724,7 +762,7 @@ export const SETTINGS_REGISTRY = {
     details:
       "A state is a run of typing. Each retained state keeps its text snapshot in memory, and each edit copies a map of them: 1,000 commits with pruning took 4.55 ms under Bun in the Editor's undo-graph measurement.",
     description:
-      'Earlier states kept per open file, across every undo branch. The least recently visited go first when the budget is exceeded.',
+      'How many undo steps each open file keeps, across every undo branch. Past this number, the steps you visited longest ago are dropped first.',
     keywords: ['undo', 'history', 'branches', 'retained', 'memory'],
   }),
   'editor.history.persist': defineSetting({
@@ -767,12 +805,13 @@ export const SETTINGS_REGISTRY = {
     default: 'preview',
     scope: 'window',
     widget: 'enum',
+    optionTitles: { source: 'Plain source', preview: 'Live preview' },
     category: 'Editor',
     title: 'Markdown editing style',
     details:
       'Live preview formats Markdown in place and reveals syntax near the caret. Plain source keeps Markdown syntax visible. The rendered side pane is a separate setting.',
     description:
-      'Edit Markdown as plain source or source-revealing live preview. Cycle markdown view changes one file.',
+      'Edit Markdown as plain source, or as a live preview that formats the text and shows the Markdown symbols near the cursor. The Cycle Markdown View command changes one file.',
     keywords: ['markdown', 'preview', 'split', 'render'],
   }),
   'editor.markdownRenderedPane': defineSetting({
@@ -794,6 +833,7 @@ export const SETTINGS_REGISTRY = {
     // turn it on for itself.
     scope: 'window',
     widget: 'enum',
+    optionTitles: { off: 'Off', prose: 'Prose', proseAndCode: 'Prose and code' },
     category: 'Editor',
     title: 'Spellcheck',
     description:
@@ -820,6 +860,7 @@ export const SETTINGS_REGISTRY = {
     default: 'stacked',
     scope: 'window',
     widget: 'enum',
+    optionTitles: { split: 'Side by side', stacked: 'Stacked' },
     category: 'Editor',
     description: 'Show diffs side by side or stacked.',
     keywords: ['diff', 'split', 'stacked', 'compare', 'git'],
@@ -829,6 +870,7 @@ export const SETTINGS_REGISTRY = {
     default: 'edit-context',
     scope: 'application',
     widget: 'enum',
+    optionTitles: { textarea: 'Hidden textarea', 'edit-context': 'EditContext' },
     category: 'Editor',
     // EditContext exists only in Chromium; other engines keep the textarea whatever this says.
     details:
@@ -878,9 +920,9 @@ export const SETTINGS_REGISTRY = {
     widget: 'number',
     category: 'Editor',
     details:
-      'Checked at a project switch and at a tab close, so opening two large projects can exceed it until the next switch or close. Counted in UTF-16 code units, which equals bytes for ASCII text. Parked documents over the budget are dropped and reload from disk when you switch back.',
+      'Checked at a project switch and at a tab close, so opening two large projects can exceed it until the next switch or close. Counted in UTF-16 code units, which equals bytes for ASCII text. Files of other projects past the limit leave memory and are read from disk again when you switch back.',
     description:
-      'Total text the editor keeps resident across the active and parked projects, in UTF-16 code units, re-checked at a project switch and a tab close. The active project is charged first and is never trimmed, so a large one leaves less room for parked projects.',
+      'How much text the editor keeps in memory across the current project and the other open projects, in UTF-16 code units. The current project counts first and is never trimmed, so a large one leaves less room for the others.',
     visibility: 'advanced',
     keywords: ['memory', 'retention', 'projects', 'budget', 'documents'],
   }),
@@ -976,6 +1018,13 @@ export const SETTINGS_REGISTRY = {
     default: 'off',
     scope: 'window',
     widget: 'enum',
+    optionTitles: {
+      off: 'Off',
+      diffusion: 'Diffusion',
+      autoregressive: 'Autoregressive',
+      parallel: 'Parallel',
+      token: 'Token',
+    },
     category: 'Editor',
     details:
       'Autoregressive types one character at a time, line after line. Parallel types every line at once, staggered. Token streams one token at a time, like a language model. Diffusion settles scrambled glyphs into the text.',
@@ -993,6 +1042,7 @@ export const SETTINGS_REGISTRY = {
     // find.
     scope: 'window',
     widget: 'enum',
+    optionTitles: { literal: 'Exact text', regex: 'Regular expression', fuzzy: 'Fuzzy' },
     category: 'Search',
     description: 'How a new search interprets the query.',
     keywords: ['search', 'regex', 'literal', 'fuzzy', 'match'],
@@ -1075,7 +1125,7 @@ export const SETTINGS_REGISTRY = {
     details:
       'The server rescans local Claude and Codex history every minute and brings imported chats up to date. A chat stops updating once it has a turn sent from Platform.',
     description:
-      'Imported chats receive one-way updates from local history until you send their first message in Platform. New chats are only imported when you click Import.',
+      'Imported chats keep getting new messages from the Claude or Codex history on this machine until you send a message in them from Platform. New chats are imported only when you click Import.',
     keywords: ['chat', 'import', 'sync', 'history', 'claude', 'codex', 'cli', 'app', 'local'],
   }),
   'chat.defaultRuntimeMode': defineSetting({
@@ -1086,10 +1136,15 @@ export const SETTINGS_REGISTRY = {
     // overrule a user who chose approval-required.
     scope: 'application',
     widget: 'enum',
+    optionTitles: {
+      'full-access': 'Full access',
+      'approval-required': 'Ask first',
+      'auto-accept-edits': 'Auto-accept edits',
+    },
     category: 'Chat',
     details:
       'Full access suits a machine with one owner who trusts agents with its checkouts: Codex starts with approval policy never and sandbox danger-full-access, and Claude pre-approves every tool. This is an application setting, so a workspace file in a cloned repository cannot change it.',
-    description: 'Permission posture a new session starts in.',
+    description: 'What the agent in a new session may do without asking you first.',
     keywords: ['chat', 'permission', 'approval', 'runtime', 'safety'],
   }),
   'chat.defaultInteractionMode': defineSetting({
@@ -1099,6 +1154,7 @@ export const SETTINGS_REGISTRY = {
     // before the user approves.
     scope: 'application',
     widget: 'enum',
+    optionTitles: { default: 'Default', plan: 'Plan' },
     category: 'Chat',
     // Plan mode is off in the composer while its switch is off, so this has nothing to pick.
     dependsOn: 'chat.planModeEnabled',
@@ -1110,6 +1166,13 @@ export const SETTINGS_REGISTRY = {
     default: '1h',
     scope: 'window',
     widget: 'enum',
+    optionTitles: {
+      '15m': '15 minutes',
+      '1h': '1 hour',
+      '6h': '6 hours',
+      '24h': '24 hours',
+      all: 'All',
+    },
     category: 'Logs',
     description: 'Time range the logs view opens on.',
     visibility: 'advanced',
@@ -1124,7 +1187,7 @@ export const SETTINGS_REGISTRY = {
     category: 'Logs',
     title: 'Log retention',
     description:
-      "Days of server log files this machine keeps, today included; older days are deleted once a day. 0 keeps every day, up to the writer's 60-file cap.",
+      'Days of server log files this machine keeps, today included; older days are deleted once a day. 0 keeps every day, up to 60 files.',
     visibility: 'advanced',
     keywords: ['logs', 'retention', 'delete', 'days', 'disk', 'cleanup'],
   }),
@@ -1209,11 +1272,12 @@ export const SETTINGS_REGISTRY = {
     // and a cloned repository must not be able to re-chrome the window.
     scope: 'machine',
     widget: 'enum',
+    optionTitles: { compositor: 'Window manager', window: 'Transparent window' },
     category: 'Window',
     details:
       'A per-pixel transparent window switches the embedded Chromium renderer to off-screen rendering. On macOS a 1440×960 window then copies 5.5 MB through the CPU on every paint, where the opaque window produced no paint events at all. On Linux the window manager already blends an opaque window over the desktop.',
     description:
-      'Where the see-through comes from: the window manager blending an opaque window, or a per-pixel transparent window (which costs a full-surface CPU copy per frame).',
+      'What makes the window see-through: the window manager, or the window itself. A transparent window copies the whole window through the CPU on every frame.',
     // The window is created once, from this value, before the page exists.
     requiresRestart: true,
     keywords: ['window', 'transparency', 'vibrancy', 'compositor', 'desktop', 'wallpaper', 'blur'],
@@ -1226,7 +1290,7 @@ export const SETTINGS_REGISTRY = {
     category: 'Prefetch',
     title: 'Prefetch on intent',
     description:
-      'Start loading what a press will open while the pointer heads for it or a key moves to it, so it paints at once. Folder listings follow this switch; each other surface has its own switch under it.',
+      'Start loading what a click will open while the pointer moves toward it or the keyboard selects it, so it shows at once. Folder listings follow this switch; files and diffs each have their own switch below.',
     keywords: ['prefetch', 'preload', 'hover', 'intent', 'speed', 'latency'],
   }),
   'prefetch.files': defineSetting({
@@ -1258,6 +1322,12 @@ export const SETTINGS_REGISTRY = {
     default: 'off',
     scope: 'window',
     widget: 'enum',
+    optionTitles: {
+      off: 'Off',
+      afterDelay: 'After a delay',
+      onFocusChange: 'When the editor loses focus',
+      onWindowChange: 'When the window loses focus',
+    },
     category: 'Files',
     description: 'Save edited files automatically, and when.',
     keywords: ['autosave', 'save', 'files', 'automatic'],
@@ -1268,7 +1338,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'window',
     widget: 'number',
     category: 'Files',
-    description: 'Milliseconds of quiet before an automatic save, when saving after a delay.',
+    description:
+      'Milliseconds after your last edit before an automatic save, when saving after a delay.',
     keywords: ['autosave', 'delay', 'debounce', 'files'],
   }),
   'files.picker.pinnedLocations': defineSetting({
@@ -1301,6 +1372,7 @@ export const SETTINGS_REGISTRY = {
     default: 'auto',
     scope: 'application',
     widget: 'enum',
+    optionTitles: { auto: 'Auto', columns: 'Columns', list: 'List', icons: 'Icons' },
     category: 'Files',
     title: 'File picker view',
     description:
@@ -1519,7 +1591,7 @@ export const SETTINGS_REGISTRY = {
     details:
       "Measured with rust-analyzer on hashbrown's map.rs (197 KB, 11,978 tokens) over twelve keystrokes: whole files cost 1.60 MB, 14.1 ms of JSON.parse and 9.0 MB of heap; deltas cost 1.9 KB, 0.1 ms and 2.0 MB, at the same latency. About 5 of 37 servers support delta.",
     description:
-      'Ask delta-capable language servers for only the tokens an edit changed. Saves bandwidth, parse time and garbage on every keystroke.',
+      'Ask language servers that support it for only the tokens an edit changed. Saves network, parsing time and memory on every keystroke.',
     visibility: 'advanced',
     keywords: ['lsp', 'semantic', 'tokens', 'delta', 'bandwidth', 'memory'],
   }),
@@ -1547,7 +1619,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'application',
     widget: 'providers',
     category: 'Providers',
-    description: 'Configured provider instances, in the order the picker shows them.',
+    description:
+      'Your agent providers, such as Codex and Claude, in the order the model picker shows them.',
     keywords: ['provider', 'agent', 'codex', 'claude', 'model'],
   }),
   'models.hidden': defineSetting({
@@ -1600,10 +1673,11 @@ export const SETTINGS_REGISTRY = {
     default: 'default',
     scope: 'application',
     widget: 'enum',
+    optionTitles: { default: 'Platform', vscode: 'VS Code' },
     category: 'Keyboard shortcuts',
     title: 'Keyboard mode',
     description:
-      'Shortcuts your overrides apply on top of. VS Code keeps VS Code bindings. Platform starts from them and adds its own keys for tabs, chats and sidebar panels.',
+      'The set of shortcuts your own changes build on. VS Code uses VS Code’s shortcuts. Platform starts from those and adds its own keys for tabs, chats and sidebar panels.',
     keywords: ['keybinding', 'shortcut', 'preset', 'vscode', 'keymap'],
   }),
   'keybindings.overrides': defineSetting({

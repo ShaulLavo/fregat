@@ -26,9 +26,8 @@ export function PushSection({ snapshot }: { readonly snapshot: SettingsProjectio
       <div className='space-y-1'>
         <h3 className='text-foreground text-sm font-medium'>Push notifications</h3>
         <p className='text-muted-foreground text-xs'>
-          Each browser that should receive notices from this server turns push on for itself. Push
-          session notifications then sends session notices to every device listed here, with every
-          tab closed.
+          Turn push on in each browser that should get notifications. With Push session
+          notifications on, every device listed here gets them, even with the app closed.
         </p>
       </div>
       <SettingRow id='chat.pushNotifications' snapshot={snapshot} />

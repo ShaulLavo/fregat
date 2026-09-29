@@ -48,37 +48,37 @@
     },
     "chat.defaultRuntimeMode": {
       "default": "full-access",
-      "description": "Permission posture a new session starts in.",
+      "description": "What the agent in a new session may do without asking you first.",
       "enum": ["approval-required", "auto-accept-edits", "full-access"],
-      "markdownDescription": "Permission posture a new session starts in.\n\nFull access suits a machine with one owner who trusts agents with its checkouts: Codex starts with approval policy never and sandbox danger-full-access, and Claude pre-approves every tool. This is an application setting, so a workspace file in a cloned repository cannot change it.",
+      "markdownDescription": "What the agent in a new session may do without asking you first.\n\nFull access suits a machine with one owner who trusts agents with its checkouts: Codex starts with approval policy never and sandbox danger-full-access, and Claude pre-approves every tool. This is an application setting, so a workspace file in a cloned repository cannot change it.",
       "type": "string"
     },
     "chat.followUpBehavior": {
       "default": "queue",
-      "description": "Queue messages sent during a running turn, or send them at once as corrections. The alternate send key (Ctrl/Cmd+Enter, or Shift+Ctrl/Cmd+Enter where Ctrl/Cmd+Enter sends) takes the other behavior.",
+      "description": "What happens to a message you send while the agent is still working: it waits until the turn ends, or reaches the agent at once to correct it. The other send key (Ctrl/Cmd+Enter, or Shift+Ctrl/Cmd+Enter where Ctrl/Cmd+Enter sends) does the other one.",
       "enum": ["queue", "steer"],
       "type": "string"
     },
     "chat.inAppNotificationsEnabled": {
       "default": false,
-      "description": "Show an Open session action when another session needs attention or completes while this window is focused.",
+      "description": "While you are using this window, show a notice with an Open session button when another session needs you or finishes.",
       "type": "boolean"
     },
     "chat.keepImportedSessionsUpdated": {
       "default": true,
-      "description": "Imported chats receive one-way updates from local history until you send their first message in Platform. New chats are only imported when you click Import.",
-      "markdownDescription": "Imported chats receive one-way updates from local history until you send their first message in Platform. New chats are only imported when you click Import.\n\nThe server rescans local Claude and Codex history every minute and brings imported chats up to date. A chat stops updating once it has a turn sent from Platform.",
+      "description": "Imported chats keep getting new messages from the Claude or Codex history on this machine until you send a message in them from Platform. New chats are imported only when you click Import.",
+      "markdownDescription": "Imported chats keep getting new messages from the Claude or Codex history on this machine until you send a message in them from Platform. New chats are imported only when you click Import.\n\nThe server rescans local Claude and Codex history every minute and brings imported chats up to date. A chat stops updating once it has a turn sent from Platform.",
       "type": "boolean"
     },
     "chat.notificationMode": {
       "default": "off",
-      "description": "Notify when a session needs attention or completes. Native notifications require browser permission; sound starts after a pointer or keyboard gesture.",
+      "description": "Notify you when a session needs you or finishes. System notifications need the browser’s permission; sound plays only after you have clicked or typed in the app.",
       "enum": ["notifications-and-sound", "notifications", "off", "sound"],
       "type": "string"
     },
     "chat.planModeEnabled": {
       "default": false,
-      "description": "Show the Plan mode picker and /plan and /default commands for providers that support them. Stored draft preferences are retained while hidden.",
+      "description": "Show the Plan mode picker and the /plan and /default commands for providers that have them. Hiding them keeps the plan mode choice saved in each draft.",
       "type": "boolean"
     },
     "chat.projectAutoSettle": {
@@ -105,9 +105,9 @@
     },
     "chat.projectGrouping": {
       "default": "repository",
-      "description": "Group projects by repository, repository-relative path, or owning machine. Git projects currently register at the repository root, so both repository modes are equivalent.",
+      "description": "Group projects by repository, by folder inside the repository, or by machine. Git projects are added at the repository root today, so the two repository options group the same way.",
       "enum": ["repository_path", "repository", "separate"],
-      "markdownDescription": "Group projects by repository, repository-relative path, or owning machine. Git projects currently register at the repository root, so both repository modes are equivalent.\n\nRepository puts one repository's checkouts on this machine and on connected machines under one project row. Separate gives each machine's project its own row.",
+      "markdownDescription": "Group projects by repository, by folder inside the repository, or by machine. Git projects are added at the repository root today, so the two repository options group the same way.\n\nRepository puts one repository's checkouts on this machine and on connected machines under one project row. Separate gives each machine's project its own row.",
       "type": "string"
     },
     "chat.projectGroupingOverrides": {
@@ -178,20 +178,20 @@
     },
     "chat.pushNotifications": {
       "default": false,
-      "description": "Push to every device registered below when a session needs attention or completes. Held back while a window of this server is visible and focused.",
-      "markdownDescription": "Push to every device registered below when a session needs attention or completes. Held back while a window of this server is visible and focused.\n\nOnly live changes push: replaying history, recovering after a restart and archived sessions never notify. A device the push service rejects with 404 or 410 is removed.",
+      "description": "Send a push notification to every device listed below when a session needs you or finishes. None are sent while you are using a window of this app.",
+      "markdownDescription": "Send a push notification to every device listed below when a session needs you or finishes. None are sent while you are using a window of this app.\n\nOnly live changes push: replaying history, recovering after a restart and archived sessions never notify. A device the push service rejects with 404 or 410 is removed.",
       "type": "boolean"
     },
     "chat.responseStreamingMode": {
       "default": "paragraph",
-      "description": "Publish assistant responses by paragraph, complete turn, or individual token.",
+      "description": "How the agent’s reply appears while it writes: a paragraph at a time, all at once when the turn ends, or token by token.",
       "enum": ["paragraph", "token", "turn"],
-      "markdownDescription": "Publish assistant responses by paragraph, complete turn, or individual token.\n\nParagraph publishes text at blank lines, closed code fences and new list items: the first break at once, later ones at least 400 ms apart. The end of the turn, a question from the agent, or 24,000 buffered characters flushes the rest. Token mode still delivers reasoning by paragraph.",
+      "markdownDescription": "How the agent’s reply appears while it writes: a paragraph at a time, all at once when the turn ends, or token by token.\n\nParagraph publishes text at blank lines, closed code fences and new list items: the first break at once, later ones at least 400 ms apart. The end of the turn, a question from the agent, or 24,000 buffered characters flushes the rest. Token mode still delivers reasoning by paragraph.",
       "type": "string"
     },
     "chat.sendShortcut": {
       "default": "enter",
-      "description": "Which key sends a message. enter: Enter sends and Shift+Enter adds a line. mod-enter-multiline: like enter until the message has a second line, then Ctrl/Cmd+Enter sends. mod-enter: Ctrl/Cmd+Enter sends and Enter adds a line. Where Ctrl/Cmd+Enter sends, Shift+Ctrl/Cmd+Enter takes the other follow-up behavior.",
+      "description": "Which key sends a message. Enter: Enter sends and Shift+Enter adds a line. Enter until multiline: Enter sends until the message has a second line, then Ctrl/Cmd+Enter sends. Ctrl/Cmd+Enter: Ctrl/Cmd+Enter sends and Enter adds a line. Where Ctrl/Cmd+Enter sends, Shift+Ctrl/Cmd+Enter sends with the other follow-up behavior.",
       "enum": ["enter", "mod-enter-multiline", "mod-enter"],
       "type": "string"
     },
@@ -341,8 +341,8 @@
     },
     "editor.history.retainedStates": {
       "default": 200,
-      "description": "Earlier states kept per open file, across every undo branch. The least recently visited go first when the budget is exceeded.",
-      "markdownDescription": "Earlier states kept per open file, across every undo branch. The least recently visited go first when the budget is exceeded.\n\nA state is a run of typing. Each retained state keeps its text snapshot in memory, and each edit copies a map of them: 1,000 commits with pruning took 4.55 ms under Bun in the Editor's undo-graph measurement.",
+      "description": "How many undo steps each open file keeps, across every undo branch. Past this number, the steps you visited longest ago are dropped first.",
+      "markdownDescription": "How many undo steps each open file keeps, across every undo branch. Past this number, the steps you visited longest ago are dropped first.\n\nA state is a run of typing. Each retained state keeps its text snapshot in memory, and each edit copies a map of them: 1,000 commits with pruning took 4.55 ms under Bun in the Editor's undo-graph measurement.",
       "maximum": 5000,
       "minimum": 10,
       "type": "integer"
@@ -382,9 +382,9 @@
     },
     "editor.markdownView": {
       "default": "preview",
-      "description": "Edit Markdown as plain source or source-revealing live preview. Cycle markdown view changes one file.",
+      "description": "Edit Markdown as plain source, or as a live preview that formats the text and shows the Markdown symbols near the cursor. The Cycle Markdown View command changes one file.",
       "enum": ["preview", "source"],
-      "markdownDescription": "Edit Markdown as plain source or source-revealing live preview. Cycle markdown view changes one file.\n\nLive preview formats Markdown in place and reveals syntax near the caret. Plain source keeps Markdown syntax visible. The rendered side pane is a separate setting.",
+      "markdownDescription": "Edit Markdown as plain source, or as a live preview that formats the text and shows the Markdown symbols near the cursor. The Cycle Markdown View command changes one file.\n\nLive preview formats Markdown in place and reveals syntax near the caret. Plain source keeps Markdown syntax visible. The rendered side pane is a separate setting.",
       "type": "string"
     },
     "editor.minimap.enabled": {
@@ -394,8 +394,8 @@
     },
     "editor.retainedTextBudget": {
       "default": 67108864,
-      "description": "Total text the editor keeps resident across the active and parked projects, in UTF-16 code units, re-checked at a project switch and a tab close. The active project is charged first and is never trimmed, so a large one leaves less room for parked projects.",
-      "markdownDescription": "Total text the editor keeps resident across the active and parked projects, in UTF-16 code units, re-checked at a project switch and a tab close. The active project is charged first and is never trimmed, so a large one leaves less room for parked projects.\n\nChecked at a project switch and at a tab close, so opening two large projects can exceed it until the next switch or close. Counted in UTF-16 code units, which equals bytes for ASCII text. Parked documents over the budget are dropped and reload from disk when you switch back.",
+      "description": "How much text the editor keeps in memory across the current project and the other open projects, in UTF-16 code units. The current project counts first and is never trimmed, so a large one leaves less room for the others.",
+      "markdownDescription": "How much text the editor keeps in memory across the current project and the other open projects, in UTF-16 code units. The current project counts first and is never trimmed, so a large one leaves less room for the others.\n\nChecked at a project switch and at a tab close, so opening two large projects can exceed it until the next switch or close. Counted in UTF-16 code units, which equals bytes for ASCII text. Files of other projects past the limit leave memory and are read from disk again when you switch back.",
       "maximum": 1073741824,
       "minimum": 0,
       "type": "integer"
@@ -489,7 +489,7 @@
         ]
       },
       "default": {},
-      "description": "SSH targets and direct origins available to this client. The local machine is always available.",
+      "description": "Other machines this app can connect to, over SSH or by address. This machine is always available.",
       "propertyNames": {
         "maxLength": 48,
         "minLength": 1,
@@ -506,7 +506,7 @@
     },
     "files.autoSaveDelay": {
       "default": 1000,
-      "description": "Milliseconds of quiet before an automatic save, when saving after a delay.",
+      "description": "Milliseconds after your last edit before an automatic save, when saving after a delay.",
       "maximum": 60000,
       "minimum": 100,
       "type": "integer"
@@ -590,8 +590,8 @@
     },
     "git.autoPull": {
       "default": false,
-      "description": "Fast-forward a project checkout on its default branch when its upstream moves. A checkout with changes, local commits or another branch checked out is left alone.",
-      "markdownDescription": "Fast-forward a project checkout on its default branch when its upstream moves. A checkout with changes, local commits or another branch checked out is left alone.\n\nChecked on each Git status read after the background fetch moves the upstream. After a failed pull the next try waits 60 seconds. The Git panel shows why a pull was skipped.",
+      "description": "Pull new commits into a project’s default branch when the remote gets them. A checkout with uncommitted changes, unpushed commits or another branch checked out is left alone.",
+      "markdownDescription": "Pull new commits into a project’s default branch when the remote gets them. A checkout with uncommitted changes, unpushed commits or another branch checked out is left alone.\n\nChecked on each Git status read after the background fetch moves the upstream. After a failed pull the next try waits 60 seconds. The Git panel shows why a pull was skipped.",
       "type": "boolean"
     },
     "git.maxDiffFileSizeMiB": {
@@ -679,7 +679,7 @@
     },
     "keybindings.preset": {
       "default": "default",
-      "description": "Shortcuts your overrides apply on top of. VS Code keeps VS Code bindings. Platform starts from them and adds its own keys for tabs, chats and sidebar panels.",
+      "description": "The set of shortcuts your own changes build on. VS Code uses VS Code’s shortcuts. Platform starts from those and adds its own keys for tabs, chats and sidebar panels.",
       "enum": ["default", "vscode"],
       "type": "string"
     },
@@ -691,7 +691,7 @@
     },
     "logs.retentionDays": {
       "default": 0,
-      "description": "Days of server log files this machine keeps, today included; older days are deleted once a day. 0 keeps every day, up to the writer's 60-file cap.",
+      "description": "Days of server log files this machine keeps, today included; older days are deleted once a day. 0 keeps every day, up to 60 files.",
       "maximum": 3650,
       "minimum": 0,
       "type": "integer"
@@ -738,8 +738,8 @@
     },
     "lsp.semanticTokens.delta": {
       "default": true,
-      "description": "Ask delta-capable language servers for only the tokens an edit changed. Saves bandwidth, parse time and garbage on every keystroke.",
-      "markdownDescription": "Ask delta-capable language servers for only the tokens an edit changed. Saves bandwidth, parse time and garbage on every keystroke.\n\nMeasured with rust-analyzer on hashbrown's map.rs (197 KB, 11,978 tokens) over twelve keystrokes: whole files cost 1.60 MB, 14.1 ms of JSON.parse and 9.0 MB of heap; deltas cost 1.9 KB, 0.1 ms and 2.0 MB, at the same latency. About 5 of 37 servers support delta.\n\nApplies while `lsp.semanticTokens.enabled` is on.",
+      "description": "Ask language servers that support it for only the tokens an edit changed. Saves network, parsing time and memory on every keystroke.",
+      "markdownDescription": "Ask language servers that support it for only the tokens an edit changed. Saves network, parsing time and memory on every keystroke.\n\nMeasured with rust-analyzer on hashbrown's map.rs (197 KB, 11,978 tokens) over twelve keystrokes: whole files cost 1.60 MB, 14.1 ms of JSON.parse and 9.0 MB of heap; deltas cost 1.9 KB, 0.1 ms and 2.0 MB, at the same latency. About 5 of 37 servers support delta.\n\nApplies while `lsp.semanticTokens.enabled` is on.",
       "type": "boolean"
     },
     "lsp.semanticTokens.enabled": {
@@ -1001,7 +1001,7 @@
     },
     "prefetch.enabled": {
       "default": true,
-      "description": "Start loading what a press will open while the pointer heads for it or a key moves to it, so it paints at once. Folder listings follow this switch; each other surface has its own switch under it.",
+      "description": "Start loading what a click will open while the pointer moves toward it or the keyboard selects it, so it shows at once. Folder listings follow this switch; files and diffs each have their own switch below.",
       "type": "boolean"
     },
     "prefetch.files": {
@@ -1012,7 +1012,7 @@
     },
     "providers.instances": {
       "default": [],
-      "description": "Configured provider instances, in the order the picker shows them.",
+      "description": "Your agent providers, such as Codex and Claude, in the order the model picker shows them.",
       "items": {
         "properties": {
           "binaryPath": {
@@ -1159,15 +1159,15 @@
     },
     "tui.theme.colors": {
       "default": "theme",
-      "description": "Use the selected theme bundle or the terminal host colors in the TUI.",
+      "description": "Colors for the terminal app: the selected theme’s, or the colors of the terminal it runs in.",
       "enum": ["terminal", "theme"],
       "type": "string"
     },
     "window.transparency": {
       "default": "compositor",
-      "description": "Where the see-through comes from: the window manager blending an opaque window, or a per-pixel transparent window (which costs a full-surface CPU copy per frame).",
+      "description": "What makes the window see-through: the window manager, or the window itself. A transparent window copies the whole window through the CPU on every frame.",
       "enum": ["compositor", "window"],
-      "markdownDescription": "Where the see-through comes from: the window manager blending an opaque window, or a per-pixel transparent window (which costs a full-surface CPU copy per frame).\n\nA per-pixel transparent window switches the embedded Chromium renderer to off-screen rendering. On macOS a 1440×960 window then copies 5.5 MB through the CPU on every paint, where the opaque window produced no paint events at all. On Linux the window manager already blends an opaque window over the desktop.",
+      "markdownDescription": "What makes the window see-through: the window manager, or the window itself. A transparent window copies the whole window through the CPU on every frame.\n\nA per-pixel transparent window switches the embedded Chromium renderer to off-screen rendering. On macOS a 1440×960 window then copies 5.5 MB through the CPU on every paint, where the opaque window produced no paint events at all. On Linux the window manager already blends an opaque window over the desktop.",
       "type": "string"
     },
     "workbench.colorTheme": {
@@ -1184,9 +1184,9 @@
     },
     "workbench.feel": {
       "default": "flat",
-      "description": "Motion and control depth: Flat, Seam, Brisk, Relaxed or Playful.",
+      "description": "How controls move and how raised they look: Flat, Seam, Brisk, Relaxed or Playful.",
       "enum": ["brisk", "flat", "playful", "relaxed", "seam"],
-      "markdownDescription": "Motion and control depth: Flat, Seam, Brisk, Relaxed or Playful.\n\nFlat moves on fixed durations with flat controls. Seam, Brisk, Relaxed and Playful move on springs and give controls raised keys, sunken wells and squircle corners (squircles in Chromium only). Under reduced motion every feel uses fades.",
+      "markdownDescription": "How controls move and how raised they look: Flat, Seam, Brisk, Relaxed or Playful.\n\nFlat moves on fixed durations with flat controls. Seam, Brisk, Relaxed and Playful move on springs and give controls raised keys, sunken wells and squircle corners (squircles in Chromium only). Under reduced motion every feel uses fades.",
       "type": "string"
     },
     "workbench.fontFamily": {
@@ -1205,8 +1205,8 @@
     },
     "workbench.reduceMotion": {
       "default": false,
-      "description": "Slow terminal loading indicators while keeping progress visible.",
-      "markdownDescription": "Slow terminal loading indicators while keeping progress visible.\n\nApplies to the terminal app: its spinners and loaders run at half speed. The web app follows the operating system's reduce-motion setting.",
+      "description": "Slow down spinners and loaders in the terminal app.",
+      "markdownDescription": "Slow down spinners and loaders in the terminal app.\n\nApplies to the terminal app: its spinners and loaders run at half speed. The web app follows the operating system's reduce-motion setting.",
       "type": "boolean"
     },
     "workbench.sounds.controls": {
@@ -1241,8 +1241,8 @@
     },
     "workbench.surface.blur": {
       "default": 9,
-      "description": "Backdrop blur radius, in pixels, behind translucent surfaces.",
-      "markdownDescription": "Backdrop blur radius, in pixels, behind translucent surfaces.\n\nCapped at 40 px. A repository's settings file can set this, and a large backdrop blur costs GPU time on every frame.",
+      "description": "How much the wallpaper behind see-through panels is blurred, in pixels.",
+      "markdownDescription": "How much the wallpaper behind see-through panels is blurred, in pixels.\n\nCapped at 40 px. A repository's settings file can set this, and a large backdrop blur costs GPU time on every frame.",
       "maximum": 40,
       "minimum": 0,
       "type": "integer"
@@ -1262,14 +1262,14 @@
     },
     "workbench.surface.opacity": {
       "default": 80,
-      "description": "How opaque panels and sidebars are over the wallpaper. 100 turns the glass material off.",
+      "description": "How opaque panels and sidebars are over the wallpaper. 100 hides the wallpaper behind them.",
       "maximum": 100,
       "minimum": 0,
       "type": "integer"
     },
     "workbench.surface.saturation": {
       "default": 160,
-      "description": "Backdrop saturation, as a percentage, behind translucent surfaces.",
+      "description": "How vivid the wallpaper behind see-through panels looks, as a percentage.",
       "maximum": 400,
       "minimum": 0,
       "type": "integer"

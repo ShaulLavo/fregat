@@ -33,7 +33,7 @@ export function notifySaveError({
 
   toast.error('Could not save settings', {
     action: { label: 'Retry', onClick: retry },
-    cancel: { label: 'Discard', onClick: discard },
+    cancel: { label: 'Undo change', onClick: discard },
     description: clientErrorDescription(clientError),
     id: settingsSaveToastId(mutationId),
   })

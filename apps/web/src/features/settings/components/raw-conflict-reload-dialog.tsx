@@ -21,9 +21,9 @@ export function RawConflictReloadDialog({
     <Dialog onOpenChange={(next) => next || onCancel()} open={open}>
       <DialogContent showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle>Discard local settings edits?</DialogTitle>
+          <DialogTitle>Drop your unsaved edits?</DialogTitle>
           <DialogDescription>
-            Reload replaces this dirty buffer with the latest confirmed settings.json.
+            settings.json goes back to the latest version and your unsaved edits are lost.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -31,7 +31,7 @@ export function RawConflictReloadDialog({
             Cancel
           </Button>
           <Button onClick={onConfirm} type='button' variant='destructive'>
-            Discard and reload
+            Drop my edits
           </Button>
         </DialogFooter>
       </DialogContent>
