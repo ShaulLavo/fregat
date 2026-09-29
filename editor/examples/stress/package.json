@@ -1,0 +1,53 @@
+{
+  "name": "@singapore-editor/stress",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "bench": "node run.mjs",
+    "bench:hidden": "node hidden.mjs",
+    "bench:reclamation": "node reclamation.mjs",
+    "bench:first-paint": "node first-paint.mjs",
+    "bench:dispatch": "node dispatch.mjs",
+    "fixtures": "node fixtures.mjs",
+    "first-paint:proof": "node test/verify-first-paint.mjs results/first-paint",
+    "compare": "node compare.mjs",
+    "profile:summary": "node profile-summary.mjs",
+    "profile:input": "node profile-input-layout.mjs",
+    "test": "vitest run",
+    "proof": "node test/verify-results.mjs results",
+    "typecheck": "tsgo --noEmit",
+    "lint": "oxlint .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "bench:input": "node run.mjs --suite input-latency",
+    "input:compare": "node input-compare.mjs",
+    "input:proof": "node test/verify-input-results.mjs results/input-latency",
+    "bench:reclamation-live": "node reclamation-live.mjs",
+    "bench:geometry": "node geometry.mjs",
+    "bench:blink": "node blink.mjs",
+    "bench:paged": "node paged.mjs"
+  },
+  "dependencies": {
+    "@singapore-editor/core": "workspace:*",
+    "@singapore-editor/decode": "workspace:*",
+    "@singapore-editor/find": "workspace:*",
+    "@singapore-editor/gutters": "workspace:*",
+    "@singapore-editor/lsp": "workspace:*",
+    "@singapore-editor/markdown": "workspace:*",
+    "@singapore-editor/minimap": "workspace:*",
+    "@singapore-editor/paged": "workspace:*",
+    "@singapore-editor/scope-lines": "workspace:*",
+    "@singapore-editor/tree-sitter": "workspace:*",
+    "@singapore-editor/tree-sitter-languages": "workspace:*",
+    "evlog": "^2.29.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "oxfmt": "0.70.0",
+    "oxlint": "1.85.0",
+    "vite": "8.3.1",
+    "vitest": "^5.0.2"
+  }
+}

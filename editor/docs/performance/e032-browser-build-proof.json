@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "benchmarkFiles": {
+    "packages/editor/bench/editBatchesBrowserRunner.mjs": "cf86a6007d230171166c2a1b858d1ff065f8a64c58ffeda2bd6982d0114cd09f",
+    "packages/editor/bench/editBatchesBrowser.mjs": "a14c80582fb6f5b09bbcfba4d2ec5f30a9559080983aa41e935d423f3fdc7e74",
+    "packages/editor/bench/editBatchesBuild.mjs": "57e09b76f5000889f37311b24af28ff4df423843aa34af85e729cafaf0fb873f",
+    "packages/editor/bench/editBatchesBuildProof.mjs": "b214c1bd9403eccb1e862fba037bbacba10e40b1e969c5bf0c9311fbe2376e9c",
+    "scripts/build-package.ts": "708156590fa23fd9720e9f751156ef2336ac83977c6e64baf3668d959813da17",
+    "examples/stress/core-package.mjs": "21833b27dfe83095b1261e4f2cc51b264eb72b9189711750b17f2e0123a31477",
+    "examples/stress/scenarios.mjs": "0f94307395f99d86678595cd50958cbeb21c0bc9835755e481d4b0dad1d4474c",
+    "packages/editor/bench/editBatchProjections.mjs": "70279ece023b256eae178b9b0b53becf6b9932594d0ceb79721bb729b781db71",
+    "examples/stress/src/fixtures.ts": "04030e51ccd9b0deb676b60012624ee2944a78b0fae5731d3cb72a5eefe0d185"
+  },
+  "benchmarkFingerprintMethod": "SHA-256 of sorted path + NUL + file SHA-256 + newline records",
+  "benchmarkSha256": "d59515c3ecb6c9c975f7031e61a8b10d4d8c7c393bde39a01e7d49b690553389",
+  "kind": "source-build-correspondence-proof",
+  "capturedAt": "2026-09-12T06:30:19.368Z",
+  "baseline": {
+    "directory": "/work/tmp/e032-baseline/packages/editor",
+    "sourceDirectory": "/work/tmp/e032-baseline/packages/editor/src",
+    "sourceSha256": "35a952657c1570d8b2f3aed146a86d096ccb84fba08cc74f7768c2c6c09a5fba",
+    "builtSha256": "c304a29154ada9871759f3e496ebb822d00e9dcc1184709db0188cc40363b8c1",
+    "provenance": {
+      "method": "rebuild-before-capture",
+      "packageJson": "62bd75dde920607d50e3893860d1e93b9f9e2b00c5211a712efe140c9504442c",
+      "buildScript": "708156590fa23fd9720e9f751156ef2336ac83977c6e64baf3668d959813da17",
+      "tsconfig": "e1a44743ca4fbba3558a9fb06ecac7071c42393ab13fac514ad088a551b6d1a2",
+      "lockfile": "bf497a38834fa48f010437458039ac0d95760c161b6638a65221bf91854a490d"
+    }
+  },
+  "candidate": {
+    "directory": "/work/tmp/e032-reviewed/packages/editor",
+    "sourceDirectory": "/work/tmp/e032-reviewed/packages/editor/src",
+    "sourceSha256": "84dc215d3831b5d96bd7ffdb20842f9d7c6b8d4ac8617eccd9c3ac866af2845d",
+    "builtSha256": "2a40bd71ad6935ab10c1f293191860d7301e5d94cecd39be9f938719133eec11",
+    "provenance": {
+      "method": "rebuild-before-capture",
+      "packageJson": "62bd75dde920607d50e3893860d1e93b9f9e2b00c5211a712efe140c9504442c",
+      "buildScript": "708156590fa23fd9720e9f751156ef2336ac83977c6e64baf3668d959813da17",
+      "tsconfig": "e1a44743ca4fbba3558a9fb06ecac7071c42393ab13fac514ad088a551b6d1a2",
+      "lockfile": "bf497a38834fa48f010437458039ac0d95760c161b6638a65221bf91854a490d"
+    }
+  },
+  "expectedBaseline": {
+    "directory": "/work/tmp/e032-build-proof-xgSC7i",
+    "sourceDirectory": "/work/tmp/e032-build-proof-xgSC7i/src",
+    "sourceSha256": "35a952657c1570d8b2f3aed146a86d096ccb84fba08cc74f7768c2c6c09a5fba",
+    "builtSha256": "095fbff629a2a7a742c59c5c628764b79d52ea852b50b2e0bc00cf620650eaa8",
+    "provenance": {
+      "method": "rebuild-before-capture",
+      "packageJson": "62bd75dde920607d50e3893860d1e93b9f9e2b00c5211a712efe140c9504442c",
+      "buildScript": "708156590fa23fd9720e9f751156ef2336ac83977c6e64baf3668d959813da17",
+      "tsconfig": "e1a44743ca4fbba3558a9fb06ecac7071c42393ab13fac514ad088a551b6d1a2",
+      "lockfile": "bf497a38834fa48f010437458039ac0d95760c161b6638a65221bf91854a490d"
+    }
+  },
+  "mixedPair": {
+    "sourceSha256": "35a952657c1570d8b2f3aed146a86d096ccb84fba08cc74f7768c2c6c09a5fba",
+    "builtSha256": "2a40bd71ad6935ab10c1f293191860d7301e5d94cecd39be9f938719133eec11"
+  },
+  "rebuilt": {
+    "directory": "/work/tmp/e032-build-proof-xgSC7i",
+    "sourceDirectory": "/work/tmp/e032-build-proof-xgSC7i/src",
+    "sourceSha256": "35a952657c1570d8b2f3aed146a86d096ccb84fba08cc74f7768c2c6c09a5fba",
+    "builtSha256": "095fbff629a2a7a742c59c5c628764b79d52ea852b50b2e0bc00cf620650eaa8",
+    "provenance": {
+      "method": "rebuild-before-capture",
+      "packageJson": "62bd75dde920607d50e3893860d1e93b9f9e2b00c5211a712efe140c9504442c",
+      "buildScript": "708156590fa23fd9720e9f751156ef2336ac83977c6e64baf3668d959813da17",
+      "tsconfig": "e1a44743ca4fbba3558a9fb06ecac7071c42393ab13fac514ad088a551b6d1a2",
+      "lockfile": "bf497a38834fa48f010437458039ac0d95760c161b6638a65221bf91854a490d"
+    }
+  },
+  "sourceUnchanged": true,
+  "outputMatchesBaseline": true,
+  "staleOutputRemoved": true
+}

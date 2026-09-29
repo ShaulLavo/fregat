@@ -1,0 +1,118 @@
+{
+  "name": "@singapore-editor/lsp-plugin",
+  "version": "0.1.1",
+  "files": [
+    "README.md",
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./completion": {
+      "types": "./dist/completion.d.ts",
+      "import": "./dist/completion.js",
+      "default": "./dist/completion.js"
+    },
+    "./completion-controller": {
+      "types": "./dist/completionController.d.ts",
+      "import": "./dist/completionController.js",
+      "default": "./dist/completionController.js"
+    },
+    "./definition-link-controller": {
+      "types": "./dist/definitionLinkController.d.ts",
+      "import": "./dist/definitionLinkController.js",
+      "default": "./dist/definitionLinkController.js"
+    },
+    "./definition-navigation": {
+      "types": "./dist/definitionNavigation.d.ts",
+      "import": "./dist/definitionNavigation.js",
+      "default": "./dist/definitionNavigation.js"
+    },
+    "./diagnostics": {
+      "types": "./dist/diagnostics.d.ts",
+      "import": "./dist/diagnostics.js",
+      "default": "./dist/diagnostics.js"
+    },
+    "./diagnostics-presenter": {
+      "types": "./dist/diagnosticsPresenter.d.ts",
+      "import": "./dist/diagnosticsPresenter.js",
+      "default": "./dist/diagnosticsPresenter.js"
+    },
+    "./document-sync": {
+      "types": "./dist/documentSync.d.ts",
+      "import": "./dist/documentSync.js",
+      "default": "./dist/documentSync.js"
+    },
+    "./document-sync-controller": {
+      "types": "./dist/documentSyncController.d.ts",
+      "import": "./dist/documentSyncController.js",
+      "default": "./dist/documentSyncController.js"
+    },
+    "./hover-participant": {
+      "types": "./dist/hoverParticipant.d.ts",
+      "import": "./dist/hoverParticipant.js",
+      "default": "./dist/hoverParticipant.js"
+    },
+    "./paths": {
+      "types": "./dist/paths.d.ts",
+      "import": "./dist/paths.js",
+      "default": "./dist/paths.js"
+    },
+    "./plugin-styles": {
+      "types": "./dist/plugin.styles.d.ts",
+      "import": "./dist/plugin.styles.js",
+      "default": "./dist/plugin.styles.js"
+    },
+    "./plugin-types": {
+      "types": "./dist/pluginTypes.d.ts",
+      "import": "./dist/pluginTypes.js",
+      "default": "./dist/pluginTypes.js"
+    },
+    "./websocket": {
+      "types": "./dist/websocket.d.ts",
+      "import": "./dist/websocket.js",
+      "default": "./dist/websocket.js"
+    },
+    "./workspace-edit": {
+      "types": "./dist/workspaceEdit.d.ts",
+      "import": "./dist/workspaceEdit.js",
+      "default": "./dist/workspaceEdit.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "bun ../../scripts/build-package.ts",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsgo --noEmit",
+    "lint": "oxlint .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check ."
+  },
+  "dependencies": {
+    "@singapore-editor/lsp": "workspace:*",
+    "@singapore-editor/plugin-ui": "workspace:*",
+    "vscode-languageserver-protocol": "^3.18.4"
+  },
+  "devDependencies": {
+    "@singapore-editor/core": "workspace:*",
+    "@singapore-editor/find": "workspace:*",
+    "@singapore-editor/scope-lines": "workspace:*",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "happy-dom": "^20.14.5",
+    "oxfmt": "0.70.0",
+    "oxlint": "1.85.0",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.2"
+  },
+  "peerDependencies": {
+    "@singapore-editor/core": "workspace:*"
+  }
+}

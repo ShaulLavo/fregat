@@ -1,0 +1,322 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "2026-09-07T18:21:31.545106+00:00",
+  "packageRuntime": {
+    "baseline": {
+      "jsMapFiles": 145,
+      "uniqueMappedCoreSources": 144,
+      "matchingCoreSources": 144,
+      "duplicateMappedEntries": 5,
+      "nonCoreEntriesExcluded": 50,
+      "coreSourceDirectories": ["/work/tmp/editor-layout/baseline/packages/editor/src"],
+      "mappedSourceDigest": "4c1ec68ce5ebcccdcf074441d0052651ceb03109eb6092a74787074075d301a8",
+      "mismatches": [],
+      "modifiedSources": {
+        "editor/inputSelectionController.ts": "ebc678e8add217acf6d1ee2d8e27c46aadff4faa894c14aed18be7c0cdb9409d",
+        "virtualization/virtualizedTextViewRows.ts": "d2cbbf7e95fb3878262dc050e2f79c4a644230c2ea199a8db48390f40c601963"
+      },
+      "coreDirectory": "/work/tmp/editor-layout/baseline/packages/editor",
+      "runtimeJsFiles": 155,
+      "runtimeJsBytes": 2398628,
+      "runtimeJsDigest": "3d600154972a5ce00e90278a1d6a3df8afd792aebb086bcbc4649dded6f953b3",
+      "latestRuntimeMtime": "2026-09-07T17:51:02.040887+00:00",
+      "exports": {
+        ".": {
+          "path": "/work/tmp/editor-layout/baseline/packages/editor/dist/index.js",
+          "sha256": "452b73e4d721158f65eb58c732b85363197a42410503821fb7d4c7ddd4ee833b",
+          "insideSelectedDist": true
+        },
+        "./debug": {
+          "path": "/work/tmp/editor-layout/baseline/packages/editor/dist/debug.js",
+          "sha256": "4183a71e18baedc4d3b815413e8324aeaca27f759949ced18607601486364d58",
+          "insideSelectedDist": true
+        },
+        "./document": {
+          "path": "/work/tmp/editor-layout/baseline/packages/editor/dist/public/document.js",
+          "sha256": "78afd86a3720b2d809549f95ad1f3efbd2b36fff8f74792b742e89d56cf871eb",
+          "insideSelectedDist": true
+        },
+        "./editor": {
+          "path": "/work/tmp/editor-layout/baseline/packages/editor/dist/editor.js",
+          "sha256": "5cbf6f5b6e88e3c7df5bf4c1ae3414a4f54264d9a6de06a40fae8a5ee2bd0c1c",
+          "insideSelectedDist": true
+        },
+        "./extensions": {
+          "path": "/work/tmp/editor-layout/baseline/packages/editor/dist/public/extensions.js",
+          "sha256": "655f37000e3516c52e8ff9706fc6ead32fcaaa8f6fc49a082c54eaafc456d5f9",
+          "insideSelectedDist": true
+        },
+        "./internal": {
+          "path": "/work/tmp/editor-layout/baseline/packages/editor/dist/internal.js",
+          "sha256": "028b4346c8d6385b31185be2e42b910d80154b01bd4e8dd8b13f3611cb271a38",
+          "insideSelectedDist": true
+        },
+        "./logging": {
+          "path": "/work/tmp/editor-layout/baseline/packages/editor/dist/logging/index.js",
+          "sha256": "e391a7279a1fc7a3c31e52ebf0fca21ed57b725465d6b5279e4d3e2af18e0199",
+          "insideSelectedDist": true
+        },
+        "./logging/evlog": {
+          "path": "/work/tmp/editor-layout/baseline/packages/editor/dist/logging/evlog.js",
+          "sha256": "57321eeb497c5d345d08af3d1ada6b728247859584ad30d11f8938c27dbafa31",
+          "insideSelectedDist": true
+        },
+        "./rendering": {
+          "path": "/work/tmp/editor-layout/baseline/packages/editor/dist/public/rendering.js",
+          "sha256": "97142c93f91b2bdd077b1c59a1d3849513bbecf1b1449e0916812b761df48a2c",
+          "insideSelectedDist": true
+        },
+        "./secondary-views": {
+          "path": "/work/tmp/editor-layout/baseline/packages/editor/dist/public/secondaryViews.js",
+          "sha256": "ac3566dceefaf6499f321dcf9fc525213a8597259ca4ba889543bf27c15f76c6",
+          "insideSelectedDist": true
+        },
+        "./shiki": {
+          "path": "/work/tmp/editor-layout/baseline/packages/editor/dist/shiki/index.js",
+          "sha256": "f6cc832dd3445b496792917938cc44b59cd24036a000a4b099446ff1fda22837",
+          "insideSelectedDist": true
+        },
+        "./syntax": {
+          "path": "/work/tmp/editor-layout/baseline/packages/editor/dist/public/syntax.js",
+          "sha256": "b2e565185b12456131cfb77234f35683a3acd7e27ab9c1021e9ad3a49a144553",
+          "insideSelectedDist": true
+        },
+        "./testing": {
+          "path": "/work/tmp/editor-layout/baseline/packages/editor/dist/public/testing.js",
+          "sha256": "56a1143f6a6151a0873ac10887fd1cc5e29bb598e4b8cedf6533d67423984d9c",
+          "insideSelectedDist": true
+        },
+        "./style.css": {
+          "path": "/work/tmp/editor-layout/baseline/packages/editor/dist/style.css",
+          "sha256": "29e08859032d950983219c79c39adbc2fb68ed071824ef02745206c6430a102b",
+          "insideSelectedDist": true
+        },
+        "./keymap": {
+          "path": "/work/tmp/editor-layout/baseline/packages/editor/dist/public/keymap.js",
+          "sha256": "1505bb58a16464280228aad10c0adc62f781717c1835d8bab07bf1ed61315e40",
+          "insideSelectedDist": true
+        }
+      }
+    },
+    "candidate": {
+      "jsMapFiles": 145,
+      "uniqueMappedCoreSources": 144,
+      "matchingCoreSources": 144,
+      "duplicateMappedEntries": 5,
+      "nonCoreEntriesExcluded": 50,
+      "coreSourceDirectories": ["/work/tmp/editor-layout/candidate/packages/editor/src"],
+      "mappedSourceDigest": "e229d46b3aae386dbb6303159220a2f03a4fb8b9341bef4518a15c51e334991a",
+      "mismatches": [],
+      "modifiedSources": {
+        "editor/inputSelectionController.ts": "77e858590decf3c95872fb7e31fcbaddb8e2d40f0a7db352cafccf0cedf876b5",
+        "virtualization/virtualizedTextViewRows.ts": "6833c5a8f6c62e9d432ffc0bc244788dc54044bd27b9d8c8cddeb701d3613130"
+      },
+      "coreDirectory": "/work/tmp/editor-layout/candidate/packages/editor",
+      "runtimeJsFiles": 155,
+      "runtimeJsBytes": 2398638,
+      "runtimeJsDigest": "6c71e1348f1ef5bf7517ef35524249509155f0ec765038dc1abf9d3fb55bd505",
+      "latestRuntimeMtime": "2026-09-07T18:11:27.490712+00:00",
+      "exports": {
+        ".": {
+          "path": "/work/tmp/editor-layout/candidate/packages/editor/dist/index.js",
+          "sha256": "452b73e4d721158f65eb58c732b85363197a42410503821fb7d4c7ddd4ee833b",
+          "insideSelectedDist": true
+        },
+        "./debug": {
+          "path": "/work/tmp/editor-layout/candidate/packages/editor/dist/debug.js",
+          "sha256": "4183a71e18baedc4d3b815413e8324aeaca27f759949ced18607601486364d58",
+          "insideSelectedDist": true
+        },
+        "./document": {
+          "path": "/work/tmp/editor-layout/candidate/packages/editor/dist/public/document.js",
+          "sha256": "78afd86a3720b2d809549f95ad1f3efbd2b36fff8f74792b742e89d56cf871eb",
+          "insideSelectedDist": true
+        },
+        "./editor": {
+          "path": "/work/tmp/editor-layout/candidate/packages/editor/dist/editor.js",
+          "sha256": "5cbf6f5b6e88e3c7df5bf4c1ae3414a4f54264d9a6de06a40fae8a5ee2bd0c1c",
+          "insideSelectedDist": true
+        },
+        "./extensions": {
+          "path": "/work/tmp/editor-layout/candidate/packages/editor/dist/public/extensions.js",
+          "sha256": "655f37000e3516c52e8ff9706fc6ead32fcaaa8f6fc49a082c54eaafc456d5f9",
+          "insideSelectedDist": true
+        },
+        "./internal": {
+          "path": "/work/tmp/editor-layout/candidate/packages/editor/dist/internal.js",
+          "sha256": "028b4346c8d6385b31185be2e42b910d80154b01bd4e8dd8b13f3611cb271a38",
+          "insideSelectedDist": true
+        },
+        "./logging": {
+          "path": "/work/tmp/editor-layout/candidate/packages/editor/dist/logging/index.js",
+          "sha256": "e391a7279a1fc7a3c31e52ebf0fca21ed57b725465d6b5279e4d3e2af18e0199",
+          "insideSelectedDist": true
+        },
+        "./logging/evlog": {
+          "path": "/work/tmp/editor-layout/candidate/packages/editor/dist/logging/evlog.js",
+          "sha256": "57321eeb497c5d345d08af3d1ada6b728247859584ad30d11f8938c27dbafa31",
+          "insideSelectedDist": true
+        },
+        "./rendering": {
+          "path": "/work/tmp/editor-layout/candidate/packages/editor/dist/public/rendering.js",
+          "sha256": "97142c93f91b2bdd077b1c59a1d3849513bbecf1b1449e0916812b761df48a2c",
+          "insideSelectedDist": true
+        },
+        "./secondary-views": {
+          "path": "/work/tmp/editor-layout/candidate/packages/editor/dist/public/secondaryViews.js",
+          "sha256": "ac3566dceefaf6499f321dcf9fc525213a8597259ca4ba889543bf27c15f76c6",
+          "insideSelectedDist": true
+        },
+        "./shiki": {
+          "path": "/work/tmp/editor-layout/candidate/packages/editor/dist/shiki/index.js",
+          "sha256": "f6cc832dd3445b496792917938cc44b59cd24036a000a4b099446ff1fda22837",
+          "insideSelectedDist": true
+        },
+        "./syntax": {
+          "path": "/work/tmp/editor-layout/candidate/packages/editor/dist/public/syntax.js",
+          "sha256": "b2e565185b12456131cfb77234f35683a3acd7e27ab9c1021e9ad3a49a144553",
+          "insideSelectedDist": true
+        },
+        "./testing": {
+          "path": "/work/tmp/editor-layout/candidate/packages/editor/dist/public/testing.js",
+          "sha256": "56a1143f6a6151a0873ac10887fd1cc5e29bb598e4b8cedf6533d67423984d9c",
+          "insideSelectedDist": true
+        },
+        "./style.css": {
+          "path": "/work/tmp/editor-layout/candidate/packages/editor/dist/style.css",
+          "sha256": "29e08859032d950983219c79c39adbc2fb68ed071824ef02745206c6430a102b",
+          "insideSelectedDist": true
+        },
+        "./keymap": {
+          "path": "/work/tmp/editor-layout/candidate/packages/editor/dist/public/keymap.js",
+          "sha256": "1505bb58a16464280228aad10c0adc62f781717c1835d8bab07bf1ed61315e40",
+          "insideSelectedDist": true
+        }
+      }
+    }
+  },
+  "servedTraceBuilds": {
+    "final-trace-before": {
+      "jsMapFiles": 25,
+      "uniqueMappedCoreSources": 117,
+      "matchingCoreSources": 117,
+      "duplicateMappedEntries": 0,
+      "nonCoreEntriesExcluded": 36,
+      "coreSourceDirectories": ["/work/tmp/editor-layout/baseline/packages/editor/src"],
+      "mappedSourceDigest": "69125b25fe66a608b3e9d16abf2bff0beae69d378d652a4fdf5a5f01730fc240",
+      "mismatches": [],
+      "modifiedSources": {
+        "editor/inputSelectionController.ts": "ebc678e8add217acf6d1ee2d8e27c46aadff4faa894c14aed18be7c0cdb9409d",
+        "virtualization/virtualizedTextViewRows.ts": "d2cbbf7e95fb3878262dc050e2f79c4a644230c2ea199a8db48390f40c601963"
+      },
+      "buildDirectory": "/work/tmp/editor-layout/final-trace-before/build",
+      "runtimeJsFiles": 25,
+      "runtimeJsDigest": "9d2cf276766b0a3157494813e29bed2fe193bbab819ff485fbdcfb489595481f"
+    },
+    "final-trace-after": {
+      "jsMapFiles": 25,
+      "uniqueMappedCoreSources": 117,
+      "matchingCoreSources": 117,
+      "duplicateMappedEntries": 0,
+      "nonCoreEntriesExcluded": 36,
+      "coreSourceDirectories": ["/work/tmp/editor-layout/candidate/packages/editor/src"],
+      "mappedSourceDigest": "386893afb84e535549ad24d045458ca5d7b5f611c7494590123509dd39a1d6ef",
+      "mismatches": [],
+      "modifiedSources": {
+        "editor/inputSelectionController.ts": "77e858590decf3c95872fb7e31fcbaddb8e2d40f0a7db352cafccf0cedf876b5",
+        "virtualization/virtualizedTextViewRows.ts": "6833c5a8f6c62e9d432ffc0bc244788dc54044bd27b9d8c8cddeb701d3613130"
+      },
+      "buildDirectory": "/work/tmp/editor-layout/final-trace-after/build",
+      "runtimeJsFiles": 25,
+      "runtimeJsDigest": "466a94a3a88fff6635b68ba14f75012324baf233113fb4a0f6639f3992113f71"
+    }
+  },
+  "artifacts": {
+    "timing-before": {
+      "resultSha256": "e42791aefc324eb72d455178e4cbe91d230001ed9f27849899506eb363a8ff52",
+      "id": "2da3e0cd-6784-42a3-9080-7e047009af31",
+      "createdAt": "2026-09-07T18:12:34.517Z",
+      "sourceHash": "3ae2a9bd9a823a5c30a71af092073a2244fae658ac2082f235fa95fe6cdbb1ba",
+      "coreDirectory": "/work/tmp/editor-layout/baseline/packages/editor",
+      "complete": true,
+      "samples": 12,
+      "servedRuntimeJsDigest": "ecb47df8c53844fdb3ab3bdeeaf06ecdeaea3966e03af07a255d9f00e8631012"
+    },
+    "timing-after": {
+      "resultSha256": "0d4dde45be0f5b93c6dfee8a71f524600d6a6e509d95a8973f9dbc9275eff45b",
+      "id": "98ed3274-7b3c-4af9-b33e-fda4e4ea87df",
+      "createdAt": "2026-09-07T18:13:18.129Z",
+      "sourceHash": "43abae3866df9a4949016f123be68384b0ee148af1992c86ea22cdaabc888f99",
+      "coreDirectory": "/work/tmp/editor-layout/candidate/packages/editor",
+      "complete": true,
+      "samples": 12,
+      "servedRuntimeJsDigest": "4008384933c1952f3d7209d32372ef25775af45115261342bd625e69c97b48e2"
+    },
+    "timing-after-repeat": {
+      "resultSha256": "7a0bb643bc129478f934b9c595ebf4e4a5928fa3386c3063da6430fce753f5c1",
+      "id": "3298ecb0-fdf3-4a26-81d4-46bb86181a96",
+      "createdAt": "2026-09-07T18:16:11.684Z",
+      "sourceHash": "43abae3866df9a4949016f123be68384b0ee148af1992c86ea22cdaabc888f99",
+      "coreDirectory": "/work/tmp/editor-layout/candidate/packages/editor",
+      "complete": true,
+      "samples": 12,
+      "servedRuntimeJsDigest": "4008384933c1952f3d7209d32372ef25775af45115261342bd625e69c97b48e2"
+    },
+    "timing-before-repeat": {
+      "resultSha256": "f1d52b5cfcf0f44e29d3c113ac4f38bf210a05e6ee2e716ce20325889f75a1a5",
+      "id": "65c7c3d9-04b8-48be-933b-7219018a72d6",
+      "createdAt": "2026-09-07T18:17:12.586Z",
+      "sourceHash": "3ae2a9bd9a823a5c30a71af092073a2244fae658ac2082f235fa95fe6cdbb1ba",
+      "coreDirectory": "/work/tmp/editor-layout/baseline/packages/editor",
+      "complete": true,
+      "samples": 12,
+      "servedRuntimeJsDigest": "ecb47df8c53844fdb3ab3bdeeaf06ecdeaea3966e03af07a255d9f00e8631012"
+    },
+    "final-trace-before": {
+      "resultSha256": "b8beea1f7d4912f02c1176b087240a3cd1896edb909894bfe179f0aedef4cd46",
+      "id": "1b58c6a0-8c0c-49b2-a78b-233308d143a0",
+      "createdAt": "2026-09-07T18:14:13.560Z",
+      "sourceHash": "3ae2a9bd9a823a5c30a71af092073a2244fae658ac2082f235fa95fe6cdbb1ba",
+      "coreDirectory": "/work/tmp/editor-layout/baseline/packages/editor",
+      "complete": true,
+      "samples": 1,
+      "servedRuntimeJsDigest": "9d2cf276766b0a3157494813e29bed2fe193bbab819ff485fbdcfb489595481f"
+    },
+    "final-trace-after": {
+      "resultSha256": "fcc4101cfc0334e3b493a1f6b6702e40f86c4ceac17c32e25b08117bb512f02a",
+      "id": "1cddb6a8-ec1e-4fe9-ad9e-bd6495cbdfae",
+      "createdAt": "2026-09-07T18:15:01.670Z",
+      "sourceHash": "43abae3866df9a4949016f123be68384b0ee148af1992c86ea22cdaabc888f99",
+      "coreDirectory": "/work/tmp/editor-layout/candidate/packages/editor",
+      "complete": true,
+      "samples": 1,
+      "servedRuntimeJsDigest": "466a94a3a88fff6635b68ba14f75012324baf233113fb4a0f6639f3992113f71"
+    }
+  },
+  "limitations": [
+    "Source-map sourcesContent is compared byte-for-byte with physical source; this does not prove arbitrary compiler correctness.",
+    "Timing builds are minified without source maps; served trace builds use the same selected package dist and have source maps.",
+    "Existing source hashing excludes package manifests, runtime dist and third-party dependencies; runtime digests are recorded separately here."
+  ],
+  "currentSelectedSourceHashes": {
+    "baseline": "3ae2a9bd9a823a5c30a71af092073a2244fae658ac2082f235fa95fe6cdbb1ba",
+    "candidate": "43abae3866df9a4949016f123be68384b0ee148af1992c86ea22cdaabc888f99"
+  },
+  "allChecksPassed": true,
+  "coreSourceChanges": [
+    "editor/inputSelectionController.ts",
+    "virtualization/virtualizedTextViewRows.ts"
+  ],
+  "timingRepeatRuntimeIdentical": {
+    "before": true,
+    "after": true
+  },
+  "packageRuntimePredatesArtifacts": {
+    "timing-before": true,
+    "timing-after": true,
+    "timing-after-repeat": true,
+    "timing-before-repeat": true,
+    "final-trace-before": true,
+    "final-trace-after": true
+  }
+}

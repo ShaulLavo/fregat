@@ -1,0 +1,304 @@
+{
+  "samples": [
+    {
+      "name": "cold-open-first-window",
+      "lines": 100000,
+      "durationMs": 4.886098000000004,
+      "source": {
+        "sourceIndexBytesRead": 4955688,
+        "sourceIndexBuilds": 1,
+        "sourceIndexRetainedBytes": 524288,
+        "sourceBytesRead": 2152,
+        "fullTextReads": 0,
+        "materializedStrings": 52
+      },
+      "projection": {
+        "sourceBytesRead": 2152,
+        "materializedRows": 52,
+        "materializedTextBytes": 2152,
+        "indexEntriesTouched": 0,
+        "summaryLinesMeasured": 0,
+        "cachedRows": 52,
+        "cachedTextBytes": 2152,
+        "indexNodes": 1,
+        "summaryBytes": 64
+      },
+      "mountedRows": 52
+    },
+    {
+      "name": "warm-distant-windows",
+      "lines": 100000,
+      "durationMs": 6.417370000000005,
+      "source": {
+        "sourceIndexBytesRead": 0,
+        "sourceIndexBuilds": 0,
+        "sourceIndexRetainedBytes": 0,
+        "sourceBytesRead": 7710,
+        "fullTextReads": 0,
+        "materializedStrings": 168
+      },
+      "projection": {
+        "sourceBytesRead": 9862,
+        "materializedRows": 220,
+        "materializedTextBytes": 9862,
+        "indexEntriesTouched": 0,
+        "summaryLinesMeasured": 0,
+        "cachedRows": 52,
+        "cachedTextBytes": 2152,
+        "indexNodes": 1,
+        "summaryBytes": 64
+      },
+      "mountedRows": 52
+    },
+    {
+      "name": "top-newline-edit",
+      "lines": 100000,
+      "durationMs": 1.3249629999999968,
+      "source": {
+        "sourceIndexBytesRead": 4,
+        "sourceIndexBuilds": 1,
+        "sourceIndexRetainedBytes": 256,
+        "sourceBytesRead": 2112,
+        "fullTextReads": 0,
+        "materializedStrings": 52
+      },
+      "projection": {
+        "sourceBytesRead": 11974,
+        "materializedRows": 272,
+        "materializedTextBytes": 11974,
+        "indexEntriesTouched": 1,
+        "summaryLinesMeasured": 0,
+        "cachedRows": 52,
+        "cachedTextBytes": 2112,
+        "indexNodes": 1,
+        "summaryBytes": 64
+      },
+      "mountedRows": 52
+    },
+    {
+      "name": "end-reveal",
+      "lines": 100000,
+      "durationMs": 1.231995999999981,
+      "source": {
+        "sourceIndexBytesRead": 0,
+        "sourceIndexBuilds": 0,
+        "sourceIndexRetainedBytes": 0,
+        "sourceBytesRead": 624,
+        "fullTextReads": 0,
+        "materializedStrings": 13
+      },
+      "projection": {
+        "sourceBytesRead": 12598,
+        "materializedRows": 285,
+        "materializedTextBytes": 12598,
+        "indexEntriesTouched": 1,
+        "summaryLinesMeasured": 0,
+        "cachedRows": 13,
+        "cachedTextBytes": 624,
+        "indexNodes": 1,
+        "summaryBytes": 64
+      },
+      "mountedRows": 13
+    },
+    {
+      "name": "wrap-enable",
+      "lines": 100000,
+      "durationMs": 9.765314999999987,
+      "source": {
+        "sourceIndexBytesRead": 0,
+        "sourceIndexBuilds": 0,
+        "sourceIndexRetainedBytes": 0,
+        "sourceBytesRead": 4956316,
+        "fullTextReads": 0,
+        "materializedStrings": 404
+      },
+      "projection": {
+        "sourceBytesRead": 4968914,
+        "materializedRows": 298,
+        "materializedTextBytes": 13222,
+        "indexEntriesTouched": 392,
+        "summaryLinesMeasured": 100001,
+        "cachedRows": 13,
+        "cachedTextBytes": 624,
+        "indexNodes": 781,
+        "summaryBytes": 460936
+      },
+      "mountedRows": 13
+    },
+    {
+      "name": "wrap-resize",
+      "lines": 100000,
+      "durationMs": 11.876496000000003,
+      "source": {
+        "sourceIndexBytesRead": 0,
+        "sourceIndexBuilds": 0,
+        "sourceIndexRetainedBytes": 0,
+        "sourceBytesRead": 4960942,
+        "fullTextReads": 0,
+        "materializedStrings": 546
+      },
+      "projection": {
+        "sourceBytesRead": 9929856,
+        "materializedRows": 350,
+        "materializedTextBytes": 16376,
+        "indexEntriesTouched": 783,
+        "summaryLinesMeasured": 200002,
+        "cachedRows": 52,
+        "cachedTextBytes": 3154,
+        "indexNodes": 781,
+        "summaryBytes": 460936
+      },
+      "mountedRows": 52
+    },
+    {
+      "name": "cold-open-first-window",
+      "lines": 500000,
+      "durationMs": 7.984665000000007,
+      "source": {
+        "sourceIndexBytesRead": 25668128,
+        "sourceIndexBuilds": 1,
+        "sourceIndexRetainedBytes": 2097152,
+        "sourceBytesRead": 2152,
+        "fullTextReads": 0,
+        "materializedStrings": 52
+      },
+      "projection": {
+        "sourceBytesRead": 2152,
+        "materializedRows": 52,
+        "materializedTextBytes": 2152,
+        "indexEntriesTouched": 0,
+        "summaryLinesMeasured": 0,
+        "cachedRows": 52,
+        "cachedTextBytes": 2152,
+        "indexNodes": 1,
+        "summaryBytes": 64
+      },
+      "mountedRows": 52
+    },
+    {
+      "name": "warm-distant-windows",
+      "lines": 500000,
+      "durationMs": 3.8632940000000247,
+      "source": {
+        "sourceIndexBytesRead": 0,
+        "sourceIndexBuilds": 0,
+        "sourceIndexRetainedBytes": 0,
+        "sourceBytesRead": 7920,
+        "fullTextReads": 0,
+        "materializedStrings": 168
+      },
+      "projection": {
+        "sourceBytesRead": 10072,
+        "materializedRows": 220,
+        "materializedTextBytes": 10072,
+        "indexEntriesTouched": 0,
+        "summaryLinesMeasured": 0,
+        "cachedRows": 52,
+        "cachedTextBytes": 2152,
+        "indexNodes": 1,
+        "summaryBytes": 64
+      },
+      "mountedRows": 52
+    },
+    {
+      "name": "top-newline-edit",
+      "lines": 500000,
+      "durationMs": 0.793545000000023,
+      "source": {
+        "sourceIndexBytesRead": 4,
+        "sourceIndexBuilds": 1,
+        "sourceIndexRetainedBytes": 256,
+        "sourceBytesRead": 2112,
+        "fullTextReads": 0,
+        "materializedStrings": 52
+      },
+      "projection": {
+        "sourceBytesRead": 12184,
+        "materializedRows": 272,
+        "materializedTextBytes": 12184,
+        "indexEntriesTouched": 1,
+        "summaryLinesMeasured": 0,
+        "cachedRows": 52,
+        "cachedTextBytes": 2112,
+        "indexNodes": 1,
+        "summaryBytes": 64
+      },
+      "mountedRows": 52
+    },
+    {
+      "name": "end-reveal",
+      "lines": 500000,
+      "durationMs": 0.504952000000003,
+      "source": {
+        "sourceIndexBytesRead": 0,
+        "sourceIndexBuilds": 0,
+        "sourceIndexRetainedBytes": 0,
+        "sourceBytesRead": 648,
+        "fullTextReads": 0,
+        "materializedStrings": 13
+      },
+      "projection": {
+        "sourceBytesRead": 12832,
+        "materializedRows": 285,
+        "materializedTextBytes": 12832,
+        "indexEntriesTouched": 1,
+        "summaryLinesMeasured": 0,
+        "cachedRows": 13,
+        "cachedTextBytes": 648,
+        "indexNodes": 1,
+        "summaryBytes": 64
+      },
+      "mountedRows": 13
+    },
+    {
+      "name": "wrap-enable",
+      "lines": 500000,
+      "durationMs": 38.210046999999975,
+      "source": {
+        "sourceIndexBytesRead": 0,
+        "sourceIndexBuilds": 0,
+        "sourceIndexRetainedBytes": 0,
+        "sourceBytesRead": 25668780,
+        "fullTextReads": 0,
+        "materializedStrings": 1967
+      },
+      "projection": {
+        "sourceBytesRead": 25681612,
+        "materializedRows": 298,
+        "materializedTextBytes": 13480,
+        "indexEntriesTouched": 1955,
+        "summaryLinesMeasured": 500001,
+        "cachedRows": 13,
+        "cachedTextBytes": 648,
+        "indexNodes": 3907,
+        "summaryBytes": 2304764
+      },
+      "mountedRows": 13
+    },
+    {
+      "name": "wrap-resize",
+      "lines": 500000,
+      "durationMs": 35.33332100000001,
+      "source": {
+        "sourceIndexBytesRead": 0,
+        "sourceIndexBuilds": 0,
+        "sourceIndexRetainedBytes": 0,
+        "sourceBytesRead": 25673382,
+        "fullTextReads": 0,
+        "materializedStrings": 2109
+      },
+      "projection": {
+        "sourceBytesRead": 51354994,
+        "materializedRows": 350,
+        "materializedTextBytes": 16634,
+        "indexEntriesTouched": 3909,
+        "summaryLinesMeasured": 1000002,
+        "cachedRows": 52,
+        "cachedTextBytes": 3154,
+        "indexNodes": 3907,
+        "summaryBytes": 2304764
+      },
+      "mountedRows": 52
+    }
+  ]
+}

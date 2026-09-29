@@ -1,0 +1,711 @@
+{
+  "runtime": "Bun 1.4.0",
+  "measuredAt": "2026-09-23T08:31:22.307Z",
+  "baseline": "6656eb7113040f7489a15f4c6e2293e511a55edd",
+  "reference": false,
+  "note": "One isolated process per sample. Raw piece-table edits and reads, not editor input/paint. Reclaim every 250 cycles. GC-sensitive heap deltas include timing arrays. Chunk extents count code units, not physical bytes.",
+  "runs": [
+    {
+      "mode": "control",
+      "seed": 60061,
+      "cycles": 1000,
+      "pinnedRoots": 10,
+      "heapWithPins": 3189791,
+      "heapAfterRelease": 2230508,
+      "extent": {
+        "liveCodeUnits": 4469,
+        "nodes": 1002,
+        "visible": 2,
+        "invisible": 1000,
+        "reverseEntries": 1000,
+        "lineIndexes": 1,
+        "chunks": 64,
+        "bufferIds": 1001,
+        "storedCodeUnits": 1028469,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 1000,
+        "p50Ms": 0.004012999999996936,
+        "p95Ms": 0.013186999999998505,
+        "maxMs": 0.4502470000000045
+      },
+      "rangeRead": {
+        "samples": 1000,
+        "p50Ms": 0.005375000000000796,
+        "p95Ms": 0.009888000000000119,
+        "maxMs": 0.1485759999999985
+      },
+      "maintenance": {
+        "samples": 4,
+        "p50Ms": 0.0018719999999987635,
+        "p95Ms": 0.012170000000001124,
+        "maxMs": 0.012170000000001124
+      }
+    },
+    {
+      "mode": "reclaim",
+      "seed": 60061,
+      "cycles": 1000,
+      "pinnedRoots": 10,
+      "heapWithPins": 3301831,
+      "heapAfterRelease": 759764,
+      "extent": {
+        "liveCodeUnits": 4469,
+        "nodes": 1002,
+        "visible": 2,
+        "invisible": 1000,
+        "reverseEntries": 1000,
+        "lineIndexes": 1,
+        "chunks": 2,
+        "bufferIds": 1001,
+        "storedCodeUnits": 12661,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 1000,
+        "p50Ms": 0.0043189999999988515,
+        "p95Ms": 0.014274999999994264,
+        "maxMs": 0.586471999999997
+      },
+      "rangeRead": {
+        "samples": 1000,
+        "p50Ms": 0.005653000000002351,
+        "p95Ms": 0.010203000000000628,
+        "maxMs": 0.025248999999998745
+      },
+      "maintenance": {
+        "samples": 4,
+        "p50Ms": 0.022638000000000602,
+        "p95Ms": 0.15575399999999817,
+        "maxMs": 0.15575399999999817
+      }
+    },
+    {
+      "mode": "control",
+      "seed": 60061,
+      "cycles": 5000,
+      "pinnedRoots": 50,
+      "heapWithPins": 36439022,
+      "heapAfterRelease": 11419969,
+      "extent": {
+        "liveCodeUnits": 4469,
+        "nodes": 5002,
+        "visible": 2,
+        "invisible": 5000,
+        "reverseEntries": 5000,
+        "lineIndexes": 1,
+        "chunks": 314,
+        "bufferIds": 5001,
+        "storedCodeUnits": 5124469,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 5000,
+        "p50Ms": 0.002920999999993512,
+        "p95Ms": 0.0114680000000007,
+        "maxMs": 1.1184880000000135
+      },
+      "rangeRead": {
+        "samples": 5000,
+        "p50Ms": 0.017444000000011783,
+        "p95Ms": 0.03349499999998784,
+        "maxMs": 0.047240999999985434
+      },
+      "maintenance": {
+        "samples": 20,
+        "p50Ms": 0.00026600000000343016,
+        "p95Ms": 0.012586999999999904,
+        "maxMs": 0.012586999999999904
+      }
+    },
+    {
+      "mode": "reclaim",
+      "seed": 60061,
+      "cycles": 5000,
+      "pinnedRoots": 50,
+      "heapWithPins": 37380119,
+      "heapAfterRelease": 1219769,
+      "extent": {
+        "liveCodeUnits": 4469,
+        "nodes": 5002,
+        "visible": 2,
+        "invisible": 5000,
+        "reverseEntries": 5000,
+        "lineIndexes": 1,
+        "chunks": 2,
+        "bufferIds": 5001,
+        "storedCodeUnits": 12661,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 5000,
+        "p50Ms": 0.003013000000002819,
+        "p95Ms": 0.011438999999995758,
+        "maxMs": 1.3619610000000364
+      },
+      "rangeRead": {
+        "samples": 5000,
+        "p50Ms": 0.0176309999999944,
+        "p95Ms": 0.0337989999999877,
+        "maxMs": 0.04578800000001593
+      },
+      "maintenance": {
+        "samples": 20,
+        "p50Ms": 0.02210200000000384,
+        "p95Ms": 0.14325799999999944,
+        "maxMs": 0.14325799999999944
+      }
+    },
+    {
+      "mode": "control",
+      "seed": 60061,
+      "cycles": 10000,
+      "pinnedRoots": 100,
+      "heapWithPins": 123835549,
+      "heapAfterRelease": 24864588,
+      "extent": {
+        "liveCodeUnits": 4469,
+        "nodes": 10002,
+        "visible": 2,
+        "invisible": 10000,
+        "reverseEntries": 10000,
+        "lineIndexes": 1,
+        "chunks": 626,
+        "bufferIds": 10001,
+        "storedCodeUnits": 10244469,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 10000,
+        "p50Ms": 0.003329000000007909,
+        "p95Ms": 0.011881999999999948,
+        "maxMs": 3.866310000000027
+      },
+      "rangeRead": {
+        "samples": 10000,
+        "p50Ms": 0.036620999999996684,
+        "p95Ms": 0.06823599999995622,
+        "maxMs": 2.0687059999999917
+      },
+      "maintenance": {
+        "samples": 40,
+        "p50Ms": 0.0000850000000127693,
+        "p95Ms": 0.0019419999999996662,
+        "maxMs": 0.011570999999999998
+      }
+    },
+    {
+      "mode": "reclaim",
+      "seed": 60061,
+      "cycles": 10000,
+      "pinnedRoots": 100,
+      "heapWithPins": 126953120,
+      "heapAfterRelease": 5065476,
+      "extent": {
+        "liveCodeUnits": 4469,
+        "nodes": 10002,
+        "visible": 2,
+        "invisible": 10000,
+        "reverseEntries": 10000,
+        "lineIndexes": 1,
+        "chunks": 2,
+        "bufferIds": 10001,
+        "storedCodeUnits": 20853,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 10000,
+        "p50Ms": 0.00342200000000048,
+        "p95Ms": 0.011965000000003556,
+        "maxMs": 1.7898180000000252
+      },
+      "rangeRead": {
+        "samples": 10000,
+        "p50Ms": 0.0347539999999924,
+        "p95Ms": 0.0704880000000685,
+        "maxMs": 0.15367199999997183
+      },
+      "maintenance": {
+        "samples": 40,
+        "p50Ms": 0.021920999999991864,
+        "p95Ms": 0.05247900000000527,
+        "maxMs": 0.14581599999999995
+      }
+    },
+    {
+      "mode": "control",
+      "seed": 60062,
+      "cycles": 1000,
+      "pinnedRoots": 10,
+      "heapWithPins": 3199826,
+      "heapAfterRelease": 2240692,
+      "extent": {
+        "liveCodeUnits": 4480,
+        "nodes": 1002,
+        "visible": 2,
+        "invisible": 1000,
+        "reverseEntries": 1000,
+        "lineIndexes": 1,
+        "chunks": 64,
+        "bufferIds": 1001,
+        "storedCodeUnits": 1028480,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 1000,
+        "p50Ms": 0.004082999999997838,
+        "p95Ms": 0.013424999999998022,
+        "maxMs": 0.5117639999999994
+      },
+      "rangeRead": {
+        "samples": 1000,
+        "p50Ms": 0.005736999999999881,
+        "p95Ms": 0.008514999999999162,
+        "maxMs": 0.02275600000000111
+      },
+      "maintenance": {
+        "samples": 4,
+        "p50Ms": 0.0020530000000000825,
+        "p95Ms": 0.011843999999999966,
+        "maxMs": 0.011843999999999966
+      }
+    },
+    {
+      "mode": "reclaim",
+      "seed": 60062,
+      "cycles": 1000,
+      "pinnedRoots": 10,
+      "heapWithPins": 3303871,
+      "heapAfterRelease": 760724,
+      "extent": {
+        "liveCodeUnits": 4480,
+        "nodes": 1002,
+        "visible": 2,
+        "invisible": 1000,
+        "reverseEntries": 1000,
+        "lineIndexes": 1,
+        "chunks": 2,
+        "bufferIds": 1001,
+        "storedCodeUnits": 12672,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 1000,
+        "p50Ms": 0.004678000000001958,
+        "p95Ms": 0.01311099999999854,
+        "maxMs": 0.6693059999999988
+      },
+      "rangeRead": {
+        "samples": 1000,
+        "p50Ms": 0.004642000000000479,
+        "p95Ms": 0.012443999999998567,
+        "maxMs": 0.02578399999999803
+      },
+      "maintenance": {
+        "samples": 4,
+        "p50Ms": 0.019197000000001907,
+        "p95Ms": 0.13688800000000256,
+        "maxMs": 0.13688800000000256
+      }
+    },
+    {
+      "mode": "control",
+      "seed": 60062,
+      "cycles": 5000,
+      "pinnedRoots": 50,
+      "heapWithPins": 36441333,
+      "heapAfterRelease": 11422305,
+      "extent": {
+        "liveCodeUnits": 4480,
+        "nodes": 5002,
+        "visible": 2,
+        "invisible": 5000,
+        "reverseEntries": 5000,
+        "lineIndexes": 1,
+        "chunks": 314,
+        "bufferIds": 5001,
+        "storedCodeUnits": 5124480,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 5000,
+        "p50Ms": 0.0029579999999924667,
+        "p95Ms": 0.01178200000001084,
+        "maxMs": 0.9719040000000234
+      },
+      "rangeRead": {
+        "samples": 5000,
+        "p50Ms": 0.017671000000007098,
+        "p95Ms": 0.033302999999989424,
+        "maxMs": 0.0863599999999849
+      },
+      "maintenance": {
+        "samples": 20,
+        "p50Ms": 0.0002309999999994261,
+        "p95Ms": 0.011288999999997884,
+        "maxMs": 0.011288999999997884
+      }
+    },
+    {
+      "mode": "reclaim",
+      "seed": 60062,
+      "cycles": 5000,
+      "pinnedRoots": 50,
+      "heapWithPins": 37381839,
+      "heapAfterRelease": 1221561,
+      "extent": {
+        "liveCodeUnits": 4480,
+        "nodes": 5002,
+        "visible": 2,
+        "invisible": 5000,
+        "reverseEntries": 5000,
+        "lineIndexes": 1,
+        "chunks": 2,
+        "bufferIds": 5001,
+        "storedCodeUnits": 12672,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 5000,
+        "p50Ms": 0.0031700000000114414,
+        "p95Ms": 0.012767000000000195,
+        "maxMs": 1.6033479999999827
+      },
+      "rangeRead": {
+        "samples": 5000,
+        "p50Ms": 0.017678000000003635,
+        "p95Ms": 0.04905899999999974,
+        "maxMs": 0.07607300000000805
+      },
+      "maintenance": {
+        "samples": 20,
+        "p50Ms": 0.022806999999986033,
+        "p95Ms": 0.13795299999999955,
+        "maxMs": 0.13795299999999955
+      }
+    },
+    {
+      "mode": "control",
+      "seed": 60062,
+      "cycles": 10000,
+      "pinnedRoots": 100,
+      "heapWithPins": 123827489,
+      "heapAfterRelease": 22859156,
+      "extent": {
+        "liveCodeUnits": 4480,
+        "nodes": 10002,
+        "visible": 2,
+        "invisible": 10000,
+        "reverseEntries": 10000,
+        "lineIndexes": 1,
+        "chunks": 626,
+        "bufferIds": 10001,
+        "storedCodeUnits": 10244480,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 10000,
+        "p50Ms": 0.0032289999999761676,
+        "p95Ms": 0.011178999999998496,
+        "maxMs": 1.9260739999999714
+      },
+      "rangeRead": {
+        "samples": 10000,
+        "p50Ms": 0.03526299999998628,
+        "p95Ms": 0.0665869999999984,
+        "maxMs": 0.12512900000001537
+      },
+      "maintenance": {
+        "samples": 40,
+        "p50Ms": 0.00008099999996602492,
+        "p95Ms": 0.002093000000002121,
+        "maxMs": 0.013085000000000235
+      }
+    },
+    {
+      "mode": "reclaim",
+      "seed": 60062,
+      "cycles": 10000,
+      "pinnedRoots": 100,
+      "heapWithPins": 126945700,
+      "heapAfterRelease": 2445924,
+      "extent": {
+        "liveCodeUnits": 4480,
+        "nodes": 10002,
+        "visible": 2,
+        "invisible": 10000,
+        "reverseEntries": 10000,
+        "lineIndexes": 1,
+        "chunks": 2,
+        "bufferIds": 10001,
+        "storedCodeUnits": 20864,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 10000,
+        "p50Ms": 0.003539000000046144,
+        "p95Ms": 0.012014000000021952,
+        "maxMs": 3.2761449999999854
+      },
+      "rangeRead": {
+        "samples": 10000,
+        "p50Ms": 0.03788800000000947,
+        "p95Ms": 0.0690710000000081,
+        "maxMs": 0.1035619999999966
+      },
+      "maintenance": {
+        "samples": 40,
+        "p50Ms": 0.02360900000002175,
+        "p95Ms": 0.05735700000002453,
+        "maxMs": 0.14159700000000086
+      }
+    },
+    {
+      "mode": "control",
+      "seed": 60063,
+      "cycles": 1000,
+      "pinnedRoots": 10,
+      "heapWithPins": 3196682,
+      "heapAfterRelease": 2237608,
+      "extent": {
+        "liveCodeUnits": 4472,
+        "nodes": 1002,
+        "visible": 2,
+        "invisible": 1000,
+        "reverseEntries": 1000,
+        "lineIndexes": 1,
+        "chunks": 64,
+        "bufferIds": 1001,
+        "storedCodeUnits": 1028472,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 1000,
+        "p50Ms": 0.004301000000001665,
+        "p95Ms": 0.013300999999998453,
+        "maxMs": 0.5332079999999983
+      },
+      "rangeRead": {
+        "samples": 1000,
+        "p50Ms": 0.005950000000005673,
+        "p95Ms": 0.010604000000000724,
+        "maxMs": 0.022929999999998785
+      },
+      "maintenance": {
+        "samples": 4,
+        "p50Ms": 0.0019759999999990896,
+        "p95Ms": 0.011392000000000735,
+        "maxMs": 0.011392000000000735
+      }
+    },
+    {
+      "mode": "reclaim",
+      "seed": 60063,
+      "cycles": 1000,
+      "pinnedRoots": 10,
+      "heapWithPins": 3299703,
+      "heapAfterRelease": 757400,
+      "extent": {
+        "liveCodeUnits": 4472,
+        "nodes": 1002,
+        "visible": 2,
+        "invisible": 1000,
+        "reverseEntries": 1000,
+        "lineIndexes": 1,
+        "chunks": 2,
+        "bufferIds": 1001,
+        "storedCodeUnits": 12664,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 1000,
+        "p50Ms": 0.004140999999997064,
+        "p95Ms": 0.012674999999997993,
+        "maxMs": 0.5632170000000016
+      },
+      "rangeRead": {
+        "samples": 1000,
+        "p50Ms": 0.004499999999996618,
+        "p95Ms": 0.011119000000000767,
+        "maxMs": 0.024877000000000038
+      },
+      "maintenance": {
+        "samples": 4,
+        "p50Ms": 0.021021999999998542,
+        "p95Ms": 0.14259699999999853,
+        "maxMs": 0.14259699999999853
+      }
+    },
+    {
+      "mode": "control",
+      "seed": 60063,
+      "cycles": 5000,
+      "pinnedRoots": 50,
+      "heapWithPins": 36435560,
+      "heapAfterRelease": 11415061,
+      "extent": {
+        "liveCodeUnits": 4472,
+        "nodes": 5002,
+        "visible": 2,
+        "invisible": 5000,
+        "reverseEntries": 5000,
+        "lineIndexes": 1,
+        "chunks": 314,
+        "bufferIds": 5001,
+        "storedCodeUnits": 5124472,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 5000,
+        "p50Ms": 0.0032429999999976644,
+        "p95Ms": 0.012494000000032202,
+        "maxMs": 6.720865000000018
+      },
+      "rangeRead": {
+        "samples": 5000,
+        "p50Ms": 0.017758999999998082,
+        "p95Ms": 0.0392879999999991,
+        "maxMs": 0.104298
+      },
+      "maintenance": {
+        "samples": 20,
+        "p50Ms": 0.0002469999999874517,
+        "p95Ms": 0.011845000000000994,
+        "maxMs": 0.011845000000000994
+      }
+    },
+    {
+      "mode": "reclaim",
+      "seed": 60063,
+      "cycles": 5000,
+      "pinnedRoots": 50,
+      "heapWithPins": 37381121,
+      "heapAfterRelease": 1222013,
+      "extent": {
+        "liveCodeUnits": 4472,
+        "nodes": 5002,
+        "visible": 2,
+        "invisible": 5000,
+        "reverseEntries": 5000,
+        "lineIndexes": 1,
+        "chunks": 2,
+        "bufferIds": 5001,
+        "storedCodeUnits": 12664,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 5000,
+        "p50Ms": 0.0030419999999971026,
+        "p95Ms": 0.011631999999991649,
+        "maxMs": 1.1815390000000008
+      },
+      "rangeRead": {
+        "samples": 5000,
+        "p50Ms": 0.01746400000000392,
+        "p95Ms": 0.033735000000007176,
+        "maxMs": 0.056062999999994645
+      },
+      "maintenance": {
+        "samples": 20,
+        "p50Ms": 0.01919499999999985,
+        "p95Ms": 0.13845600000000147,
+        "maxMs": 0.13845600000000147
+      }
+    },
+    {
+      "mode": "control",
+      "seed": 60063,
+      "cycles": 10000,
+      "pinnedRoots": 100,
+      "heapWithPins": 123839795,
+      "heapAfterRelease": 22869680,
+      "extent": {
+        "liveCodeUnits": 4472,
+        "nodes": 10002,
+        "visible": 2,
+        "invisible": 10000,
+        "reverseEntries": 10000,
+        "lineIndexes": 1,
+        "chunks": 626,
+        "bufferIds": 10001,
+        "storedCodeUnits": 10244472,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 10000,
+        "p50Ms": 0.0033429999999725624,
+        "p95Ms": 0.011680999999995834,
+        "maxMs": 1.9921679999999924
+      },
+      "rangeRead": {
+        "samples": 10000,
+        "p50Ms": 0.03448999999997682,
+        "p95Ms": 0.07000400000003992,
+        "maxMs": 0.20411400000000413
+      },
+      "maintenance": {
+        "samples": 40,
+        "p50Ms": 0.00008199999996350016,
+        "p95Ms": 0.001602999999999355,
+        "maxMs": 0.011390999999999707
+      }
+    },
+    {
+      "mode": "reclaim",
+      "seed": 60063,
+      "cycles": 10000,
+      "pinnedRoots": 100,
+      "heapWithPins": 126953758,
+      "heapAfterRelease": 2453928,
+      "extent": {
+        "liveCodeUnits": 4472,
+        "nodes": 10002,
+        "visible": 2,
+        "invisible": 10000,
+        "reverseEntries": 10000,
+        "lineIndexes": 1,
+        "chunks": 2,
+        "bufferIds": 10001,
+        "storedCodeUnits": 20856,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 10000,
+        "p50Ms": 0.00339400000001433,
+        "p95Ms": 0.011979000000025053,
+        "maxMs": 2.219930000000005
+      },
+      "rangeRead": {
+        "samples": 10000,
+        "p50Ms": 0.034559999999999036,
+        "p95Ms": 0.06898499999999785,
+        "maxMs": 0.12232799999992494
+      },
+      "maintenance": {
+        "samples": 40,
+        "p50Ms": 0.02361999999999398,
+        "p95Ms": 0.058958000000018274,
+        "maxMs": 0.14203799999999944
+      }
+    }
+  ]
+}

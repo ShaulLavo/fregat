@@ -1,0 +1,793 @@
+{
+  "before": "48fac5a0-72c9-43fe-9af6-026ccda6c5eb",
+  "after": "3fae6013-12bf-4d4c-82ca-e38cab51a6da",
+  "samplesPerRun": 108,
+  "comparable": true,
+  "correctnessAndCleanupPassed": true,
+  "metrics": [
+    {
+      "key": "ordinary/open/cold/attach",
+      "before": {
+        "count": 3,
+        "p50Ms": 11.899999976158142,
+        "p95Ms": 17.400000035762787
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 12.300000011920929,
+        "p95Ms": 15.700000047683716
+      },
+      "p95Speedup": 1.1082802536889087
+    },
+    {
+      "key": "ordinary/open/cold/visibleTextUpperBound",
+      "before": {
+        "count": 3,
+        "p50Ms": 91,
+        "p95Ms": 101
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 92.39999997615814,
+        "p95Ms": 100.60000002384186
+      },
+      "p95Speedup": 1.0039761429032141
+    },
+    {
+      "key": "ordinary/open/cold/highlightedPaintUpperBound",
+      "before": {
+        "count": 3,
+        "p50Ms": 191,
+        "p95Ms": 200.5
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 200.20000004768372,
+        "p95Ms": 207.89999997615814
+      },
+      "p95Speedup": 0.9644059645165619
+    },
+    {
+      "key": "ordinary/open/warm/attach",
+      "before": {
+        "count": 3,
+        "p50Ms": 2.300000011920929,
+        "p95Ms": 2.5
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 2.399999976158142,
+        "p95Ms": 2.699999988079071
+      },
+      "p95Speedup": 0.925925930014036
+    },
+    {
+      "key": "ordinary/open/warm/visibleTextUpperBound",
+      "before": {
+        "count": 3,
+        "p50Ms": 70.60000002384186,
+        "p95Ms": 71.10000002384186
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 71.5,
+        "p95Ms": 72.80000001192093
+      },
+      "p95Speedup": 0.9766483518159245
+    },
+    {
+      "key": "ordinary/open/warm/highlightedPaintUpperBound",
+      "before": {
+        "count": 3,
+        "p50Ms": 120.30000001192093,
+        "p95Ms": 121.39999997615814
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 120.79999995231628,
+        "p95Ms": 122.59999996423721
+      },
+      "p95Speedup": 0.9902120718725195
+    },
+    {
+      "key": "ordinary/jump/cold/commandToPaintUpperBound",
+      "before": {
+        "count": 3,
+        "p50Ms": 63.69999998807907,
+        "p95Ms": 63.90000003576279
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 63.30000001192093,
+        "p95Ms": 63.39999997615814
+      },
+      "p95Speedup": 1.0078864362743323
+    },
+    {
+      "key": "ordinary/jump/warm/commandToPaintUpperBound",
+      "before": {
+        "count": 3,
+        "p50Ms": 62.80000001192093,
+        "p95Ms": 63.299999952316284
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 63.60000002384186,
+        "p95Ms": 64.30000001192093
+      },
+      "p95Speedup": 0.9844478995424689
+    },
+    {
+      "key": "ordinary/typing/cold/keyToApplied",
+      "before": {
+        "count": 120,
+        "p50Ms": 0.6000000238418579,
+        "p95Ms": 1
+      },
+      "after": {
+        "count": 120,
+        "p50Ms": 0.699999988079071,
+        "p95Ms": 1.399999976158142
+      },
+      "p95Speedup": 0.7142857264499277
+    },
+    {
+      "key": "ordinary/typing/cold/keyToFrame",
+      "before": {
+        "count": 120,
+        "p50Ms": 9,
+        "p95Ms": 15.600000023841858
+      },
+      "after": {
+        "count": 120,
+        "p50Ms": 7.699999988079071,
+        "p95Ms": 15.799999952316284
+      },
+      "p95Speedup": 0.9873417766406318
+    },
+    {
+      "key": "ordinary/typing/cold/burstToPaintUpperBound",
+      "before": {
+        "count": 3,
+        "p50Ms": 111.40000003576279,
+        "p95Ms": 112.10000002384186
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 127.30000001192093,
+        "p95Ms": 127.90000003576279
+      },
+      "p95Speedup": 0.8764659889952853
+    },
+    {
+      "key": "ordinary/typing/warm/keyToApplied",
+      "before": {
+        "count": 120,
+        "p50Ms": 0.6000000238418579,
+        "p95Ms": 1.100000023841858
+      },
+      "after": {
+        "count": 120,
+        "p50Ms": 0.699999988079071,
+        "p95Ms": 1
+      },
+      "p95Speedup": 1.100000023841858
+    },
+    {
+      "key": "ordinary/typing/warm/keyToFrame",
+      "before": {
+        "count": 120,
+        "p50Ms": 7.800000011920929,
+        "p95Ms": 15.5
+      },
+      "after": {
+        "count": 120,
+        "p50Ms": 8,
+        "p95Ms": 15
+      },
+      "p95Speedup": 1.0333333333333334
+    },
+    {
+      "key": "ordinary/typing/warm/burstToPaintUpperBound",
+      "before": {
+        "count": 3,
+        "p50Ms": 113.69999998807907,
+        "p95Ms": 128.69999998807907
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 111.30000001192093,
+        "p95Ms": 113.39999997615814
+      },
+      "p95Speedup": 1.1349206350541243
+    },
+    {
+      "key": "ordinary/find-all/cold/queryToCount",
+      "before": {
+        "count": 3,
+        "p50Ms": 16.19999998807907,
+        "p95Ms": 16.5
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 16.5,
+        "p95Ms": 17.69999998807907
+      },
+      "p95Speedup": 0.9322033904583463
+    },
+    {
+      "key": "ordinary/find-all/warm/queryToCount",
+      "before": {
+        "count": 3,
+        "p50Ms": 11,
+        "p95Ms": 13.899999976158142
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 11.099999964237213,
+        "p95Ms": 12
+      },
+      "p95Speedup": 1.1583333313465118
+    },
+    {
+      "key": "ordinary/scroll/cold/wheelToPaintUpperBound",
+      "before": {
+        "count": 15,
+        "p50Ms": 98.5,
+        "p95Ms": 100.80000001192093
+      },
+      "after": {
+        "count": 15,
+        "p50Ms": 98.30000001192093,
+        "p95Ms": 101.10000002384186
+      },
+      "p95Speedup": 0.9970326408323424
+    },
+    {
+      "key": "ordinary/scroll/warm/wheelToPaintUpperBound",
+      "before": {
+        "count": 15,
+        "p50Ms": 98.5,
+        "p95Ms": 100.89999997615814
+      },
+      "after": {
+        "count": 15,
+        "p50Ms": 98.60000002384186,
+        "p95Ms": 101.19999998807907
+      },
+      "p95Speedup": 0.9970355730043847
+    },
+    {
+      "key": "ordinary/churn/cold/editDelete",
+      "before": {
+        "count": 3,
+        "p50Ms": 106,
+        "p95Ms": 111.80000001192093
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 110.40000003576279,
+        "p95Ms": 113
+      },
+      "p95Speedup": 0.9893805310789463
+    },
+    {
+      "key": "ordinary/churn/warm/editDelete",
+      "before": {
+        "count": 3,
+        "p50Ms": 101.69999998807907,
+        "p95Ms": 104.79999995231628
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 97.70000004768372,
+        "p95Ms": 99.19999998807907
+      },
+      "p95Speedup": 1.0564516125494976
+    },
+    {
+      "key": "long-line/open/cold/attach",
+      "before": {
+        "count": 3,
+        "p50Ms": 46.30000001192093,
+        "p95Ms": 48.80000001192093
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 22.600000023841858,
+        "p95Ms": 23.400000035762787
+      },
+      "p95Speedup": 2.0854700827922525
+    },
+    {
+      "key": "long-line/open/cold/visibleTextUpperBound",
+      "before": {
+        "count": 3,
+        "p50Ms": 124.10000002384186,
+        "p95Ms": 126.69999998807907
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 89.5,
+        "p95Ms": 90.39999997615814
+      },
+      "p95Speedup": 1.4015486728041437
+    },
+    {
+      "key": "long-line/open/warm/attach",
+      "before": {
+        "count": 3,
+        "p50Ms": 34.10000002384186,
+        "p95Ms": 36.60000002384186
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 11,
+        "p95Ms": 11.100000023841858
+      },
+      "p95Speedup": 3.297297292362898
+    },
+    {
+      "key": "long-line/open/warm/visibleTextUpperBound",
+      "before": {
+        "count": 3,
+        "p50Ms": 99.60000002384186,
+        "p95Ms": 100.30000001192093
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 66.40000003576279,
+        "p95Ms": 81
+      },
+      "p95Speedup": 1.2382716050854436
+    },
+    {
+      "key": "long-line/jump/cold/commandToPaintUpperBound",
+      "before": {
+        "count": 3,
+        "p50Ms": 130.39999997615814,
+        "p95Ms": 131.0999999642372
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 63.299999952316284,
+        "p95Ms": 64
+      },
+      "p95Speedup": 2.0484374994412065
+    },
+    {
+      "key": "long-line/jump/warm/commandToPaintUpperBound",
+      "before": {
+        "count": 3,
+        "p50Ms": 130.80000001192093,
+        "p95Ms": 130.80000001192093
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 63.80000001192093,
+        "p95Ms": 64.5
+      },
+      "p95Speedup": 2.027906976929007
+    },
+    {
+      "key": "long-line/typing/cold/keyToApplied",
+      "before": {
+        "count": 120,
+        "p50Ms": 26.30000001192093,
+        "p95Ms": 29
+      },
+      "after": {
+        "count": 120,
+        "p50Ms": 1.199999988079071,
+        "p95Ms": 2.5
+      },
+      "p95Speedup": 11.6
+    },
+    {
+      "key": "long-line/typing/cold/keyToFrame",
+      "before": {
+        "count": 120,
+        "p50Ms": 26.399999976158142,
+        "p95Ms": 29.100000023841858
+      },
+      "after": {
+        "count": 120,
+        "p50Ms": 9,
+        "p95Ms": 15.800000011920929
+      },
+      "p95Speedup": 1.8417721520181154
+    },
+    {
+      "key": "long-line/typing/cold/burstToPaintUpperBound",
+      "before": {
+        "count": 3,
+        "p50Ms": 1160.199999988079,
+        "p95Ms": 1177.3999999761581
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 144.69999998807907,
+        "p95Ms": 145.19999998807907
+      },
+      "p95Speedup": 8.10881542749878
+    },
+    {
+      "key": "long-line/typing/warm/keyToApplied",
+      "before": {
+        "count": 120,
+        "p50Ms": 28.19999998807907,
+        "p95Ms": 30.399999976158142
+      },
+      "after": {
+        "count": 120,
+        "p50Ms": 1.100000023841858,
+        "p95Ms": 2.5
+      },
+      "p95Speedup": 12.159999990463257
+    },
+    {
+      "key": "long-line/typing/warm/keyToFrame",
+      "before": {
+        "count": 120,
+        "p50Ms": 28.200000047683716,
+        "p95Ms": 30.599999964237213
+      },
+      "after": {
+        "count": 120,
+        "p50Ms": 8.100000023841858,
+        "p95Ms": 15.5
+      },
+      "p95Speedup": 1.9741935460798201
+    },
+    {
+      "key": "long-line/typing/warm/burstToPaintUpperBound",
+      "before": {
+        "count": 3,
+        "p50Ms": 1245.1000000238419,
+        "p95Ms": 1262.5999999642372
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 130.4000000357628,
+        "p95Ms": 131.19999998807907
+      },
+      "p95Speedup": 9.62347561035791
+    },
+    {
+      "key": "long-line/find-all/cold/queryToCount",
+      "before": {
+        "count": 3,
+        "p50Ms": 24.80000001192093,
+        "p95Ms": 29.200000047683716
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 14.400000035762787,
+        "p95Ms": 15.200000047683716
+      },
+      "p95Speedup": 1.9210526286895255
+    },
+    {
+      "key": "long-line/find-all/warm/queryToCount",
+      "before": {
+        "count": 3,
+        "p50Ms": 18.30000001192093,
+        "p95Ms": 29.400000035762787
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 11.100000023841858,
+        "p95Ms": 11.199999988079071
+      },
+      "p95Speedup": 2.6250000059870735
+    },
+    {
+      "key": "long-line/scroll/cold/wheelToPaintUpperBound",
+      "before": {
+        "count": 15,
+        "p50Ms": 98.60000002384186,
+        "p95Ms": 100.80000001192093
+      },
+      "after": {
+        "count": 15,
+        "p50Ms": 98.70000004768372,
+        "p95Ms": 101
+      },
+      "p95Speedup": 0.998019802098227
+    },
+    {
+      "key": "long-line/scroll/warm/wheelToPaintUpperBound",
+      "before": {
+        "count": 15,
+        "p50Ms": 98.60000002384186,
+        "p95Ms": 101.19999998807907
+      },
+      "after": {
+        "count": 15,
+        "p50Ms": 98.80000001192093,
+        "p95Ms": 101
+      },
+      "p95Speedup": 1.001980197901773
+    },
+    {
+      "key": "long-line/churn/cold/editDelete",
+      "before": {
+        "count": 3,
+        "p50Ms": 10674.399999976158,
+        "p95Ms": 10687.199999988079
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 763.8999999761581,
+        "p95Ms": 771.1000000238419
+      },
+      "p95Speedup": 13.8596809747862
+    },
+    {
+      "key": "long-line/churn/warm/editDelete",
+      "before": {
+        "count": 3,
+        "p50Ms": 10565.299999952316,
+        "p95Ms": 10576.899999976158
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 771.7000000476837,
+        "p95Ms": 774
+      },
+      "p95Speedup": 13.665245478005373
+    },
+    {
+      "key": "unicode/open/cold/attach",
+      "before": {
+        "count": 3,
+        "p50Ms": 20.899999976158142,
+        "p95Ms": 47.40000003576279
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 22.5,
+        "p95Ms": 23.399999976158142
+      },
+      "p95Speedup": 2.0256410292332405
+    },
+    {
+      "key": "unicode/open/cold/visibleTextUpperBound",
+      "before": {
+        "count": 3,
+        "p50Ms": 95.5,
+        "p95Ms": 117
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 93.30000001192093,
+        "p95Ms": 98.40000003576279
+      },
+      "p95Speedup": 1.1890243898117598
+    },
+    {
+      "key": "unicode/open/warm/attach",
+      "before": {
+        "count": 3,
+        "p50Ms": 7,
+        "p95Ms": 7.199999988079071
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 7.299999952316284,
+        "p95Ms": 8.300000011920929
+      },
+      "p95Speedup": 0.8674698768359065
+    },
+    {
+      "key": "unicode/open/warm/visibleTextUpperBound",
+      "before": {
+        "count": 3,
+        "p50Ms": 70.5,
+        "p95Ms": 71.09999996423721
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 68.5,
+        "p95Ms": 69.59999996423721
+      },
+      "p95Speedup": 1.021551724149005
+    },
+    {
+      "key": "unicode/jump/cold/commandToPaintUpperBound",
+      "before": {
+        "count": 3,
+        "p50Ms": 63.69999998807907,
+        "p95Ms": 64.5
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 64,
+        "p95Ms": 64.69999998807907
+      },
+      "p95Speedup": 0.996908810075488
+    },
+    {
+      "key": "unicode/jump/warm/commandToPaintUpperBound",
+      "before": {
+        "count": 3,
+        "p50Ms": 64.39999997615814,
+        "p95Ms": 65.19999998807907
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 64.79999995231628,
+        "p95Ms": 64.80000001192093
+      },
+      "p95Speedup": 1.0061728391371074
+    },
+    {
+      "key": "unicode/typing/cold/keyToApplied",
+      "before": {
+        "count": 120,
+        "p50Ms": 2.399999976158142,
+        "p95Ms": 3.699999988079071
+      },
+      "after": {
+        "count": 120,
+        "p50Ms": 2.300000011920929,
+        "p95Ms": 3.5
+      },
+      "p95Speedup": 1.0571428537368774
+    },
+    {
+      "key": "unicode/typing/cold/keyToFrame",
+      "before": {
+        "count": 120,
+        "p50Ms": 9,
+        "p95Ms": 16.600000023841858
+      },
+      "after": {
+        "count": 120,
+        "p50Ms": 8.899999976158142,
+        "p95Ms": 15.899999976158142
+      },
+      "p95Speedup": 1.0440251602976955
+    },
+    {
+      "key": "unicode/typing/cold/burstToPaintUpperBound",
+      "before": {
+        "count": 3,
+        "p50Ms": 194.10000002384186,
+        "p95Ms": 194.10000002384186
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 194.39999997615814,
+        "p95Ms": 194.69999998807907
+      },
+      "p95Speedup": 0.9969183360848796
+    },
+    {
+      "key": "unicode/typing/warm/keyToApplied",
+      "before": {
+        "count": 120,
+        "p50Ms": 1.9000000357627869,
+        "p95Ms": 2.700000047683716
+      },
+      "after": {
+        "count": 120,
+        "p50Ms": 1.800000011920929,
+        "p95Ms": 2.600000023841858
+      },
+      "p95Speedup": 1.0384615472787935
+    },
+    {
+      "key": "unicode/typing/warm/keyToFrame",
+      "before": {
+        "count": 120,
+        "p50Ms": 8.300000011920929,
+        "p95Ms": 15.800000011920929
+      },
+      "after": {
+        "count": 120,
+        "p50Ms": 8.699999988079071,
+        "p95Ms": 16.30000001192093
+      },
+      "p95Speedup": 0.969325153396667
+    },
+    {
+      "key": "unicode/typing/warm/burstToPaintUpperBound",
+      "before": {
+        "count": 3,
+        "p50Ms": 163.70000004768372,
+        "p95Ms": 179.69999998807907
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 179.30000001192093,
+        "p95Ms": 179.89999997615814
+      },
+      "p95Speedup": 0.998888271327929
+    },
+    {
+      "key": "unicode/find-all/cold/queryToCount",
+      "before": {
+        "count": 3,
+        "p50Ms": 29.899999976158142,
+        "p95Ms": 30.19999998807907
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 28.80000001192093,
+        "p95Ms": 31.600000023841858
+      },
+      "p95Speedup": 0.9556962014333386
+    },
+    {
+      "key": "unicode/find-all/warm/queryToCount",
+      "before": {
+        "count": 3,
+        "p50Ms": 22.19999998807907,
+        "p95Ms": 24
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 21.80000001192093,
+        "p95Ms": 24.100000023841858
+      },
+      "p95Speedup": 0.9958506214214552
+    },
+    {
+      "key": "unicode/scroll/cold/wheelToPaintUpperBound",
+      "before": {
+        "count": 15,
+        "p50Ms": 98.39999997615814,
+        "p95Ms": 101.20000004768372
+      },
+      "after": {
+        "count": 15,
+        "p50Ms": 98.19999998807907,
+        "p95Ms": 101.69999998807907
+      },
+      "p95Speedup": 0.9950835797398824
+    },
+    {
+      "key": "unicode/scroll/warm/wheelToPaintUpperBound",
+      "before": {
+        "count": 15,
+        "p50Ms": 98.19999998807907,
+        "p95Ms": 101.5
+      },
+      "after": {
+        "count": 15,
+        "p50Ms": 98.29999995231628,
+        "p95Ms": 101.19999998807907
+      },
+      "p95Speedup": 1.0029644269956153
+    },
+    {
+      "key": "unicode/churn/cold/editDelete",
+      "before": {
+        "count": 3,
+        "p50Ms": 1634.300000011921,
+        "p95Ms": 1747.300000011921
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 1179,
+        "p95Ms": 1230.6000000238419
+      },
+      "p95Speedup": 1.4198764829985928
+    },
+    {
+      "key": "unicode/churn/warm/editDelete",
+      "before": {
+        "count": 3,
+        "p50Ms": 1410,
+        "p95Ms": 1416.199999988079
+      },
+      "after": {
+        "count": 3,
+        "p50Ms": 1152.5,
+        "p95Ms": 1159.8999999761581
+      },
+      "p95Speedup": 1.2209673247841961
+    }
+  ]
+}

@@ -1,0 +1,188 @@
+// oxlint-disable-next-line typescript-eslint/triple-slash-reference
+/// <reference path="./vite-assets.d.ts" />
+import { createTreeSitterLanguagePlugin } from '@singapore-editor/tree-sitter'
+import type { EditorPlugin } from '@singapore-editor/core/extensions'
+import type {
+  TreeSitterLanguageAssets,
+  TreeSitterLanguageContribution,
+  TreeSitterLanguagePluginOptions,
+} from '@singapore-editor/tree-sitter'
+
+import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from './catalog.generated'
+
+export type JavaScriptTreeSitterLanguageOptions = TreeSitterLanguagePluginOptions & {
+  readonly jsx?: boolean
+}
+
+export type TypeScriptTreeSitterLanguageOptions = TreeSitterLanguagePluginOptions & {
+  readonly tsx?: boolean
+}
+
+export const JAVASCRIPT_TREE_SITTER_LANGUAGE = createJavaScriptContribution(false)
+
+export const TYPESCRIPT_TREE_SITTER_LANGUAGE = createTypeScriptContribution(false)
+
+export { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from './catalog.generated'
+export { TREE_SITTER_LANGUAGE_METADATA } from './metadata'
+
+export const TSX_TREE_SITTER_LANGUAGE = contribution('tsx')
+export const HTML_TREE_SITTER_LANGUAGE = contribution('html')
+export const CSS_TREE_SITTER_LANGUAGE = contribution('css')
+export const JSON_TREE_SITTER_LANGUAGE = contribution('json')
+export const MARKDOWN_TREE_SITTER_LANGUAGE = contribution('markdown')
+export const ASTRO_TREE_SITTER_LANGUAGE = contribution('astro')
+
+function contribution(id: string): TreeSitterLanguageContribution {
+  return TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((language) => language.id === id)!
+}
+
+export function javaScript(options: JavaScriptTreeSitterLanguageOptions = {}): EditorPlugin {
+  const { jsx = false, ...pluginOptions } = options
+  return createLanguagePlugin(
+    createJavaScriptContribution(jsx),
+    'tree-sitter-javascript',
+    pluginOptions,
+  )
+}
+
+export function typeScript(options: TypeScriptTreeSitterLanguageOptions = {}): EditorPlugin {
+  const { tsx = false, ...pluginOptions } = options
+  return createLanguagePlugin(
+    createTypeScriptContribution(tsx),
+    'tree-sitter-typescript',
+    pluginOptions,
+  )
+}
+
+export function html(options?: TreeSitterLanguagePluginOptions): EditorPlugin {
+  return createLanguagePlugin(HTML_TREE_SITTER_LANGUAGE, 'tree-sitter-html', options)
+}
+
+export function css(options?: TreeSitterLanguagePluginOptions): EditorPlugin {
+  return createLanguagePlugin(CSS_TREE_SITTER_LANGUAGE, 'tree-sitter-css', options)
+}
+
+export function json(options?: TreeSitterLanguagePluginOptions): EditorPlugin {
+  return createLanguagePlugin(JSON_TREE_SITTER_LANGUAGE, 'tree-sitter-json', options)
+}
+
+export function markdown(options: TreeSitterLanguagePluginOptions = {}): EditorPlugin {
+  return createTreeSitterLanguagePlugin([MARKDOWN_TREE_SITTER_LANGUAGE], {
+    ...options,
+    name: options.name ?? 'tree-sitter-markdown',
+  })
+}
+
+function createLanguagePlugin(
+  contribution: TreeSitterLanguageContribution,
+  name: string,
+  options: TreeSitterLanguagePluginOptions = {},
+): EditorPlugin {
+  return createTreeSitterLanguagePlugin([contribution], {
+    ...options,
+    name: options.name ?? name,
+  })
+}
+
+function createJavaScriptContribution(jsx: boolean): TreeSitterLanguageContribution {
+  return {
+    id: 'javascript',
+    extensions: jsx ? ['.cjs', '.js', '.jsx', '.mjs'] : ['.cjs', '.js', '.mjs'],
+    aliases: jsx ? ['javascript', 'js', 'jsx', 'node'] : ['javascript', 'js', 'node'],
+    injectionDependencies: ['regex', 'jsdoc'],
+    load: () => loadJavaScriptAssets(jsx),
+  }
+}
+
+function createTypeScriptContribution(tsx: boolean): TreeSitterLanguageContribution {
+  return {
+    id: tsx ? 'tsx' : 'typescript',
+    extensions: tsx ? ['.tsx'] : ['.cts', '.mts', '.ts'],
+    aliases: tsx ? ['tsx', 'typescriptreact'] : ['typescript', 'ts'],
+    injectionDependencies: ['regex', 'jsdoc'],
+    load: () => loadTypeScriptAssets(tsx),
+  }
+}
+
+async function loadJavaScriptAssets(jsx: boolean): Promise<TreeSitterLanguageAssets> {
+  const [wasmUrl, highlightQuerySource, foldQuerySource, injectionQuerySource] = await Promise.all([
+    loadDefault(import('tree-sitter-javascript/tree-sitter-javascript.wasm?url')),
+    loadDefault(import('./queries/javascript-highlights.scm?raw')),
+    loadDefault(import('./queries/javascript-folds.scm?raw')),
+    loadDefault(import('./queries/javascript-injections.scm?raw')),
+  ])
+  if (!jsx) return { wasmUrl, highlightQuerySource, foldQuerySource, injectionQuerySource }
+
+  const [jsxHighlightQuerySource, jsxFoldQuerySource] = await Promise.all([
+    loadDefault(import('tree-sitter-javascript/queries/highlights-jsx.scm?raw')),
+    loadDefault(import('./queries/jsx-folds.scm?raw')),
+  ])
+  return {
+    wasmUrl,
+    highlightQuerySource: [highlightQuerySource, jsxHighlightQuerySource].join('\n'),
+    foldQuerySource: [foldQuerySource, jsxFoldQuerySource].join('\n'),
+    injectionQuerySource,
+  }
+}
+
+async function loadTypeScriptAssets(tsx: boolean): Promise<TreeSitterLanguageAssets> {
+  const [
+    wasmUrl,
+    tsHighlightQuerySource,
+    jsHighlightQuerySource,
+    tsFoldQuerySource,
+    jsFoldQuerySource,
+    injectionQuerySource,
+  ] = await Promise.all([
+    loadDefault(
+      tsx
+        ? import('tree-sitter-typescript/tree-sitter-tsx.wasm?url')
+        : import('tree-sitter-typescript/tree-sitter-typescript.wasm?url'),
+    ),
+    loadDefault(import('./queries/typescript-highlights.scm?raw')),
+    loadDefault(import('./queries/javascript-highlights.scm?raw')),
+    loadDefault(import('./queries/typescript-folds.scm?raw')),
+    loadDefault(import('./queries/javascript-folds.scm?raw')),
+    loadDefault(import('./queries/javascript-injections.scm?raw')),
+  ])
+  const highlightQuerySource = await typeScriptHighlightQuerySource(tsx, [
+    tsHighlightQuerySource,
+    jsHighlightQuerySource,
+  ])
+  const foldQuerySource = await typeScriptFoldQuerySource(tsx, [
+    tsFoldQuerySource,
+    jsFoldQuerySource,
+  ])
+  return {
+    wasmUrl,
+    highlightQuerySource,
+    foldQuerySource,
+    injectionQuerySource,
+  }
+}
+
+async function typeScriptHighlightQuerySource(
+  tsx: boolean,
+  sources: readonly string[],
+): Promise<string> {
+  if (!tsx) return sources.join('\n')
+
+  const jsxHighlightQuerySource = await loadDefault(
+    import('tree-sitter-javascript/queries/highlights-jsx.scm?raw'),
+  )
+  return [...sources, jsxHighlightQuerySource].join('\n')
+}
+
+async function typeScriptFoldQuerySource(
+  tsx: boolean,
+  sources: readonly string[],
+): Promise<string> {
+  if (!tsx) return sources.join('\n')
+
+  const jsxFoldQuerySource = await loadDefault(import('./queries/jsx-folds.scm?raw'))
+  return [...sources, jsxFoldQuerySource].join('\n')
+}
+
+async function loadDefault(module: Promise<{ readonly default: string }>): Promise<string> {
+  return (await module).default
+}

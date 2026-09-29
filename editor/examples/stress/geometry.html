@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Row geometry workload</title>
+    <style>
+      /* Candidate 2: the whole view, metrics probe included, takes the font under test. */
+      #view-0 * {
+        font-family: var(--e036-font, monospace) !important;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="views"></main>
+    <script type="module" src="./src/geometry.ts"></script>
+  </body>
+</html>

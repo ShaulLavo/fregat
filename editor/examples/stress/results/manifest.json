@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "generatorVersion": 1,
+  "seed": 60061,
+  "fixtures": [
+    {
+      "id": "ordinary",
+      "bytes": 4469,
+      "utf16Length": 4469,
+      "normalizedLength": 4469,
+      "lines": 200,
+      "longestLine": 22,
+      "searchCount": 1,
+      "sha256": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197"
+    },
+    {
+      "id": "short-lines",
+      "bytes": 12834064,
+      "utf16Length": 12834064,
+      "normalizedLength": 12834064,
+      "lines": 500000,
+      "longestLine": 26,
+      "searchCount": 502,
+      "sha256": "2bacff110d8d3fe9b5d12e1ea6cc5cfb31d2a344d22119b49222674196352c6a"
+    },
+    {
+      "id": "long-line",
+      "bytes": 1048594,
+      "utf16Length": 1048594,
+      "normalizedLength": 1048594,
+      "lines": 1,
+      "longestLine": 1048594,
+      "searchCount": 1,
+      "sha256": "467fa816efc5aa5c082ed44ea4dc10bbbb41da16faf4d4822aa3d122edc628f7"
+    },
+    {
+      "id": "unicode",
+      "bytes": 137967,
+      "utf16Length": 103148,
+      "normalizedLength": 103148,
+      "lines": 2049,
+      "longestLine": 4099,
+      "searchCount": 2048,
+      "sha256": "a08a0ed8a79c3752faca174a45c5a60d5a6e1e6f17b5be7c0647fd02a51ee6bc"
+    },
+    {
+      "id": "mixed-endings",
+      "bytes": 71526,
+      "utf16Length": 71526,
+      "normalizedLength": 70526,
+      "lines": 3001,
+      "longestLine": 24,
+      "searchCount": 4,
+      "sha256": "0c220eb15fa687b9a1a4b262db08c813e4b4f067d2ddd9f2c54c3e40d1240765"
+    }
+  ]
+}

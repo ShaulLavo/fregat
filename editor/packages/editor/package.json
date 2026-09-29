@@ -1,0 +1,129 @@
+{
+  "name": "@singapore-editor/core",
+  "version": "0.1.2",
+  "files": [
+    "README.md",
+    "dist",
+    "scripts/unicode/LICENSE.txt",
+    "scripts/unicode/README.md"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "./dist/style.css"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./debug": {
+      "types": "./dist/debug.d.ts",
+      "import": "./dist/debug.js",
+      "default": "./dist/debug.js"
+    },
+    "./document": {
+      "types": "./dist/public/document.d.ts",
+      "import": "./dist/public/document.js",
+      "default": "./dist/public/document.js"
+    },
+    "./editor": {
+      "types": "./dist/editor.d.ts",
+      "import": "./dist/editor.js",
+      "default": "./dist/editor.js"
+    },
+    "./extensions": {
+      "types": "./dist/public/extensions.d.ts",
+      "import": "./dist/public/extensions.js",
+      "default": "./dist/public/extensions.js"
+    },
+    "./logging": {
+      "types": "./dist/logging/index.d.ts",
+      "import": "./dist/logging/index.js",
+      "default": "./dist/logging/index.js"
+    },
+    "./logging/evlog": {
+      "types": "./dist/logging/evlog.d.ts",
+      "import": "./dist/logging/evlog.js",
+      "default": "./dist/logging/evlog.js"
+    },
+    "./rendering": {
+      "types": "./dist/public/rendering.d.ts",
+      "import": "./dist/public/rendering.js",
+      "default": "./dist/public/rendering.js"
+    },
+    "./secondary-views": {
+      "types": "./dist/public/secondaryViews.d.ts",
+      "import": "./dist/public/secondaryViews.js",
+      "default": "./dist/public/secondaryViews.js"
+    },
+    "./shiki": {
+      "types": "./dist/shiki/index.d.ts",
+      "import": "./dist/shiki/index.js",
+      "default": "./dist/shiki/index.js"
+    },
+    "./syntax": {
+      "types": "./dist/public/syntax.d.ts",
+      "import": "./dist/public/syntax.js",
+      "default": "./dist/public/syntax.js"
+    },
+    "./testing": {
+      "types": "./dist/public/testing.d.ts",
+      "import": "./dist/public/testing.js",
+      "default": "./dist/public/testing.js"
+    },
+    "./style.css": "./dist/style.css",
+    "./keymap": {
+      "types": "./dist/public/keymap.d.ts",
+      "import": "./dist/public/keymap.js",
+      "default": "./dist/public/keymap.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "bun ../../scripts/build-package.ts",
+    "bench:inspection": "bun bench/pieceTable-inspection.ts",
+    "bench:reclamation": "bun bench/reclamation-run.ts",
+    "bench:reclamation-text": "bun bench/reclamation-compare.ts",
+    "bench:reclamation-positions": "bun bench/reclamation-positions.ts",
+    "bench:anchors": "bun bench/pieceTable-anchors.ts",
+    "bench:transforms": "bun bench/displayTransforms.ts",
+    "bench:fold-map": "bun bench/foldMap.ts",
+    "bench:piece-table": "bun bench/pieceTable-insertions.ts",
+    "bench:virtualization": "bun bench/virtualization.ts",
+    "bench:walker": "bun bench/pieceTable-walker.ts",
+    "bench:tokens": "bun bench/tokenStore.ts",
+    "bench:edit-commands": "EDIT_COMMAND_LATENCY=1 vitest run --project dom test/editCommandLatency.test.ts",
+    "bidi:check": "bun scripts/generateBidiClass.mjs --check",
+    "bidi:generate": "bun scripts/generateBidiClass.mjs",
+    "test": "bun run bidi:check && vitest run",
+    "typecheck": "tsgo --noEmit && tsgo --noEmit -p test/types/tsconfig.json",
+    "lint": "oxlint .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check ."
+  },
+  "dependencies": {
+    "@shikijs/engine-oniguruma": "4.4.3",
+    "@singapore-editor/textbuffer": "workspace:*",
+    "@tanstack/hotkeys": "0.10.0",
+    "diff": "^9.0.0",
+    "evlog": "^2.29.0",
+    "shiki": "^4.4.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@shikijs/langs": "4.4.3",
+    "@shikijs/themes": "4.4.3",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "@vitest/browser-playwright": "^5.0.2",
+    "happy-dom": "^20.14.5",
+    "oxfmt": "0.70.0",
+    "oxlint": "1.85.0",
+    "tree-sitter-md": "0.1.1",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.2"
+  }
+}

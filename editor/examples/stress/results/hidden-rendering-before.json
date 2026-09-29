@@ -1,0 +1,908 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-06T05:14:23.599Z",
+  "manifest": {
+    "schemaVersion": 1,
+    "generatorVersion": 1,
+    "seed": 60061,
+    "fixtures": [
+      {
+        "id": "ordinary",
+        "bytes": 4469,
+        "utf16Length": 4469,
+        "normalizedLength": 4469,
+        "lines": 200,
+        "longestLine": 22,
+        "searchCount": 1,
+        "sha256": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197"
+      },
+      {
+        "id": "short-lines",
+        "bytes": 12834064,
+        "utf16Length": 12834064,
+        "normalizedLength": 12834064,
+        "lines": 500000,
+        "longestLine": 26,
+        "searchCount": 502,
+        "sha256": "2bacff110d8d3fe9b5d12e1ea6cc5cfb31d2a344d22119b49222674196352c6a"
+      },
+      {
+        "id": "long-line",
+        "bytes": 1048594,
+        "utf16Length": 1048594,
+        "normalizedLength": 1048594,
+        "lines": 1,
+        "longestLine": 1048594,
+        "searchCount": 1,
+        "sha256": "467fa816efc5aa5c082ed44ea4dc10bbbb41da16faf4d4822aa3d122edc628f7"
+      }
+    ]
+  },
+  "config": {
+    "repetitions": 3,
+    "seed": 60061,
+    "churnCycles": 100,
+    "views": "two-visible-one-hidden",
+    "syntax": "tree-sitter-typescript-on-ordinary-only",
+    "viewport": { "width": 1000, "height": 1000 },
+    "delivery": "vite-production-playwright-route",
+    "revealMeasurement": "screenshot-completion-upper-bound",
+    "revealReadyMeasurement": "visible-updated-row-observation-with-animation-frame-polling",
+    "memory": "chromium-cdp-forced-gc-main-renderer",
+    "expectSuspended": false
+  },
+  "environment": {
+    "commit": "715516cfd631b34c1922b0eba7323e036645e1b8",
+    "coreDistHash": "cea8a922fd025ff57e6aedb2ed3ab4226ee9328f642f8e0c35b6de0d22c86e10",
+    "browser": "148.0.7778.96",
+    "runtime": "v26.7.0",
+    "hardware": {
+      "cpu": "Intel(R) Core(TM) i7-14700K",
+      "logicalCpus": 28,
+      "memoryBytes": 33368887296,
+      "arch": "x64",
+      "platform": "linux",
+      "release": "7.1.9-arch1-2"
+    },
+    "unsupportedMemory": ["worker heaps", "renderer process RSS", "user-agent-specific memory"]
+  },
+  "samples": [
+    {
+      "fixture": "ordinary",
+      "repetition": 0,
+      "state": "cold",
+      "firstMount": [
+        { "id": "view-0", "rows": 13, "ranges": 0, "height": 320, "text": "const needle0 = 2440;" },
+        { "id": "view-1", "rows": 13, "ranges": 0, "height": 320, "text": "const needle0 = 2440;" },
+        { "id": "view-2", "rows": 13, "ranges": 0, "height": 0, "text": "const needle0 = 2440;" }
+      ],
+      "measured": [
+        {
+          "id": "view-0",
+          "rows": 28,
+          "ranges": 140,
+          "height": 320,
+          "text": "const needle0 = 2440;"
+        },
+        {
+          "id": "view-1",
+          "rows": 28,
+          "ranges": 140,
+          "height": 320,
+          "text": "const needle0 = 2440;"
+        },
+        { "id": "view-2", "rows": 13, "ranges": 65, "height": 0, "text": "const needle0 = 2440;" }
+      ],
+      "hidden": [
+        {
+          "id": "view-0",
+          "rows": 28,
+          "ranges": 140,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-1",
+          "rows": 28,
+          "ranges": 140,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-2",
+          "rows": 13,
+          "ranges": 65,
+          "height": 0,
+          "text": "probeconst needle0 = 2440;"
+        }
+      ],
+      "revealed": [
+        {
+          "id": "view-0",
+          "rows": 28,
+          "ranges": 140,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-1",
+          "rows": 28,
+          "ranges": 140,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-2",
+          "rows": 28,
+          "ranges": 140,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        }
+      ],
+      "revealMs": 127.5,
+      "revealReadyMs": 0.9000000357627869,
+      "churnMs": 263.19999998807907,
+      "memory": {
+        "before": { "usedBytes": 1584132, "documents": 1, "nodes": 19, "jsEventListeners": 0 },
+        "hidden": { "usedBytes": 15376476, "documents": 1, "nodes": 728, "jsEventListeners": 113 },
+        "after": { "usedBytes": 8572316, "documents": 1, "nodes": 337, "jsEventListeners": 29 }
+      },
+      "cleanup": {
+        "trackedObjects": 4,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "repetition": 1,
+      "state": "warm",
+      "firstMount": [
+        { "id": "view-0", "rows": 13, "ranges": 0, "height": 320, "text": "const needle0 = 2440;" },
+        { "id": "view-1", "rows": 13, "ranges": 0, "height": 320, "text": "const needle0 = 2440;" },
+        { "id": "view-2", "rows": 13, "ranges": 0, "height": 0, "text": "const needle0 = 2440;" }
+      ],
+      "measured": [
+        {
+          "id": "view-0",
+          "rows": 28,
+          "ranges": 140,
+          "height": 320,
+          "text": "const needle0 = 2440;"
+        },
+        {
+          "id": "view-1",
+          "rows": 28,
+          "ranges": 140,
+          "height": 320,
+          "text": "const needle0 = 2440;"
+        },
+        { "id": "view-2", "rows": 13, "ranges": 65, "height": 0, "text": "const needle0 = 2440;" }
+      ],
+      "hidden": [
+        {
+          "id": "view-0",
+          "rows": 28,
+          "ranges": 140,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-1",
+          "rows": 28,
+          "ranges": 140,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-2",
+          "rows": 13,
+          "ranges": 65,
+          "height": 0,
+          "text": "probeconst needle0 = 2440;"
+        }
+      ],
+      "revealed": [
+        {
+          "id": "view-0",
+          "rows": 28,
+          "ranges": 140,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-1",
+          "rows": 28,
+          "ranges": 140,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-2",
+          "rows": 28,
+          "ranges": 140,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        }
+      ],
+      "revealMs": 90.80000001192093,
+      "revealReadyMs": 0.800000011920929,
+      "churnMs": 285.9000000357628,
+      "memory": {
+        "before": { "usedBytes": 8563020, "documents": 1, "nodes": 127, "jsEventListeners": 29 },
+        "hidden": { "usedBytes": 15442772, "documents": 1, "nodes": 728, "jsEventListeners": 113 },
+        "after": { "usedBytes": 8879508, "documents": 1, "nodes": 337, "jsEventListeners": 29 }
+      },
+      "cleanup": {
+        "trackedObjects": 4,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "repetition": 2,
+      "state": "warm",
+      "firstMount": [
+        { "id": "view-0", "rows": 13, "ranges": 0, "height": 320, "text": "const needle0 = 2440;" },
+        { "id": "view-1", "rows": 13, "ranges": 0, "height": 320, "text": "const needle0 = 2440;" },
+        { "id": "view-2", "rows": 13, "ranges": 0, "height": 0, "text": "const needle0 = 2440;" }
+      ],
+      "measured": [
+        {
+          "id": "view-0",
+          "rows": 28,
+          "ranges": 140,
+          "height": 320,
+          "text": "const needle0 = 2440;"
+        },
+        {
+          "id": "view-1",
+          "rows": 28,
+          "ranges": 140,
+          "height": 320,
+          "text": "const needle0 = 2440;"
+        },
+        { "id": "view-2", "rows": 13, "ranges": 65, "height": 0, "text": "const needle0 = 2440;" }
+      ],
+      "hidden": [
+        {
+          "id": "view-0",
+          "rows": 28,
+          "ranges": 140,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-1",
+          "rows": 28,
+          "ranges": 140,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-2",
+          "rows": 13,
+          "ranges": 65,
+          "height": 0,
+          "text": "probeconst needle0 = 2440;"
+        }
+      ],
+      "revealed": [
+        {
+          "id": "view-0",
+          "rows": 28,
+          "ranges": 140,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-1",
+          "rows": 28,
+          "ranges": 140,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-2",
+          "rows": 28,
+          "ranges": 140,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        }
+      ],
+      "revealMs": 97.59999996423721,
+      "revealReadyMs": 0.8999999761581421,
+      "churnMs": 272.2000000476837,
+      "memory": {
+        "before": { "usedBytes": 8884924, "documents": 1, "nodes": 337, "jsEventListeners": 29 },
+        "hidden": { "usedBytes": 15920436, "documents": 1, "nodes": 728, "jsEventListeners": 113 },
+        "after": { "usedBytes": 9406540, "documents": 1, "nodes": 337, "jsEventListeners": 29 }
+      },
+      "cleanup": {
+        "trackedObjects": 4,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "short-lines",
+      "repetition": 0,
+      "state": "cold",
+      "firstMount": [
+        { "id": "view-0", "rows": 13, "ranges": 0, "height": 320, "text": "const needle0 = 2440;" },
+        { "id": "view-1", "rows": 13, "ranges": 0, "height": 320, "text": "const needle0 = 2440;" },
+        { "id": "view-2", "rows": 13, "ranges": 0, "height": 0, "text": "const needle0 = 2440;" }
+      ],
+      "measured": [
+        { "id": "view-0", "rows": 28, "ranges": 0, "height": 320, "text": "const needle0 = 2440;" },
+        { "id": "view-1", "rows": 28, "ranges": 0, "height": 320, "text": "const needle0 = 2440;" },
+        { "id": "view-2", "rows": 13, "ranges": 0, "height": 0, "text": "const needle0 = 2440;" }
+      ],
+      "hidden": [
+        {
+          "id": "view-0",
+          "rows": 28,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-1",
+          "rows": 28,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-2",
+          "rows": 13,
+          "ranges": 0,
+          "height": 0,
+          "text": "probeconst needle0 = 2440;"
+        }
+      ],
+      "revealed": [
+        {
+          "id": "view-0",
+          "rows": 28,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-1",
+          "rows": 28,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-2",
+          "rows": 28,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        }
+      ],
+      "revealMs": 203.69999998807907,
+      "revealReadyMs": 8.399999976158142,
+      "churnMs": 96.80000001192093,
+      "memory": {
+        "before": { "usedBytes": 14464756, "documents": 1, "nodes": 19, "jsEventListeners": 0 },
+        "hidden": { "usedBytes": 170408720, "documents": 1, "nodes": 727, "jsEventListeners": 97 },
+        "after": { "usedBytes": 4480500, "documents": 1, "nodes": 337, "jsEventListeners": 26 }
+      },
+      "cleanup": {
+        "trackedObjects": 4,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "short-lines",
+      "repetition": 1,
+      "state": "warm",
+      "firstMount": [
+        { "id": "view-0", "rows": 13, "ranges": 0, "height": 320, "text": "const needle0 = 2440;" },
+        { "id": "view-1", "rows": 13, "ranges": 0, "height": 320, "text": "const needle0 = 2440;" },
+        { "id": "view-2", "rows": 13, "ranges": 0, "height": 0, "text": "const needle0 = 2440;" }
+      ],
+      "measured": [
+        { "id": "view-0", "rows": 28, "ranges": 0, "height": 320, "text": "const needle0 = 2440;" },
+        { "id": "view-1", "rows": 28, "ranges": 0, "height": 320, "text": "const needle0 = 2440;" },
+        { "id": "view-2", "rows": 13, "ranges": 0, "height": 0, "text": "const needle0 = 2440;" }
+      ],
+      "hidden": [
+        {
+          "id": "view-0",
+          "rows": 28,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-1",
+          "rows": 28,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-2",
+          "rows": 13,
+          "ranges": 0,
+          "height": 0,
+          "text": "probeconst needle0 = 2440;"
+        }
+      ],
+      "revealed": [
+        {
+          "id": "view-0",
+          "rows": 28,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-1",
+          "rows": 28,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-2",
+          "rows": 28,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        }
+      ],
+      "revealMs": 180.60000002384186,
+      "revealReadyMs": 1.2000000476837158,
+      "churnMs": 106.69999998807907,
+      "memory": {
+        "before": { "usedBytes": 17307144, "documents": 1, "nodes": 127, "jsEventListeners": 26 },
+        "hidden": { "usedBytes": 170752316, "documents": 1, "nodes": 727, "jsEventListeners": 110 },
+        "after": { "usedBytes": 4662172, "documents": 1, "nodes": 127, "jsEventListeners": 26 }
+      },
+      "cleanup": {
+        "trackedObjects": 4,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "short-lines",
+      "repetition": 2,
+      "state": "warm",
+      "firstMount": [
+        { "id": "view-0", "rows": 13, "ranges": 0, "height": 320, "text": "const needle0 = 2440;" },
+        { "id": "view-1", "rows": 13, "ranges": 0, "height": 320, "text": "const needle0 = 2440;" },
+        { "id": "view-2", "rows": 13, "ranges": 0, "height": 0, "text": "const needle0 = 2440;" }
+      ],
+      "measured": [
+        { "id": "view-0", "rows": 28, "ranges": 0, "height": 320, "text": "const needle0 = 2440;" },
+        { "id": "view-1", "rows": 28, "ranges": 0, "height": 320, "text": "const needle0 = 2440;" },
+        { "id": "view-2", "rows": 13, "ranges": 0, "height": 0, "text": "const needle0 = 2440;" }
+      ],
+      "hidden": [
+        {
+          "id": "view-0",
+          "rows": 28,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-1",
+          "rows": 28,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-2",
+          "rows": 13,
+          "ranges": 0,
+          "height": 0,
+          "text": "probeconst needle0 = 2440;"
+        }
+      ],
+      "revealed": [
+        {
+          "id": "view-0",
+          "rows": 28,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-1",
+          "rows": 28,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        },
+        {
+          "id": "view-2",
+          "rows": 28,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle0 = 2440;"
+        }
+      ],
+      "revealMs": 170.5,
+      "revealReadyMs": 1.199999988079071,
+      "churnMs": 90,
+      "memory": {
+        "before": { "usedBytes": 17497952, "documents": 1, "nodes": 127, "jsEventListeners": 26 },
+        "hidden": { "usedBytes": 171179708, "documents": 1, "nodes": 727, "jsEventListeners": 110 },
+        "after": { "usedBytes": 5140232, "documents": 1, "nodes": 337, "jsEventListeners": 26 }
+      },
+      "cleanup": {
+        "trackedObjects": 4,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "long-line",
+      "repetition": 0,
+      "state": "cold",
+      "firstMount": [
+        {
+          "id": "view-0",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "const needle = \"aaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-1",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "const needle = \"aaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-2",
+          "rows": 1,
+          "ranges": 0,
+          "height": 0,
+          "text": "const needle = \"aaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "measured": [
+        {
+          "id": "view-0",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "const needle = \"aaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-1",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "const needle = \"aaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-2",
+          "rows": 1,
+          "ranges": 0,
+          "height": 0,
+          "text": "const needle = \"aaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "hidden": [
+        {
+          "id": "view-0",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle = \"aaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-1",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle = \"aaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-2",
+          "rows": 1,
+          "ranges": 0,
+          "height": 0,
+          "text": "probeconst needle = \"aaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "revealed": [
+        {
+          "id": "view-0",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle = \"aaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-1",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle = \"aaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-2",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle = \"aaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "revealMs": 82.39999997615814,
+      "revealReadyMs": 7.600000023841858,
+      "churnMs": 736.1999999880791,
+      "memory": {
+        "before": { "usedBytes": 2562892, "documents": 1, "nodes": 19, "jsEventListeners": 0 },
+        "hidden": { "usedBytes": 13566700, "documents": 1, "nodes": 209, "jsEventListeners": 97 },
+        "after": { "usedBytes": 4401800, "documents": 1, "nodes": 188, "jsEventListeners": 26 }
+      },
+      "cleanup": {
+        "trackedObjects": 4,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "long-line",
+      "repetition": 1,
+      "state": "warm",
+      "firstMount": [
+        {
+          "id": "view-0",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "const needle = \"aaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-1",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "const needle = \"aaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-2",
+          "rows": 1,
+          "ranges": 0,
+          "height": 0,
+          "text": "const needle = \"aaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "measured": [
+        {
+          "id": "view-0",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "const needle = \"aaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-1",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "const needle = \"aaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-2",
+          "rows": 1,
+          "ranges": 0,
+          "height": 0,
+          "text": "const needle = \"aaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "hidden": [
+        {
+          "id": "view-0",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle = \"aaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-1",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle = \"aaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-2",
+          "rows": 1,
+          "ranges": 0,
+          "height": 0,
+          "text": "probeconst needle = \"aaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "revealed": [
+        {
+          "id": "view-0",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle = \"aaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-1",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle = \"aaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-2",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle = \"aaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "revealMs": 61.89999997615814,
+      "revealReadyMs": 1,
+      "churnMs": 755.1000000238419,
+      "memory": {
+        "before": { "usedBytes": 5449052, "documents": 1, "nodes": 78, "jsEventListeners": 26 },
+        "hidden": { "usedBytes": 13777136, "documents": 1, "nodes": 209, "jsEventListeners": 110 },
+        "after": { "usedBytes": 4504784, "documents": 1, "nodes": 188, "jsEventListeners": 26 }
+      },
+      "cleanup": {
+        "trackedObjects": 4,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "long-line",
+      "repetition": 2,
+      "state": "warm",
+      "firstMount": [
+        {
+          "id": "view-0",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "const needle = \"aaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-1",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "const needle = \"aaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-2",
+          "rows": 1,
+          "ranges": 0,
+          "height": 0,
+          "text": "const needle = \"aaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "measured": [
+        {
+          "id": "view-0",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "const needle = \"aaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-1",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "const needle = \"aaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-2",
+          "rows": 1,
+          "ranges": 0,
+          "height": 0,
+          "text": "const needle = \"aaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "hidden": [
+        {
+          "id": "view-0",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle = \"aaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-1",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle = \"aaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-2",
+          "rows": 1,
+          "ranges": 0,
+          "height": 0,
+          "text": "probeconst needle = \"aaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "revealed": [
+        {
+          "id": "view-0",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle = \"aaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-1",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle = \"aaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "id": "view-2",
+          "rows": 1,
+          "ranges": 0,
+          "height": 320,
+          "text": "probeconst needle = \"aaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "revealMs": 62.80000001192093,
+      "revealReadyMs": 0.9000000357627869,
+      "churnMs": 768.7000000476837,
+      "memory": {
+        "before": { "usedBytes": 5551948, "documents": 1, "nodes": 78, "jsEventListeners": 26 },
+        "hidden": { "usedBytes": 13863448, "documents": 1, "nodes": 209, "jsEventListeners": 110 },
+        "after": { "usedBytes": 4590132, "documents": 1, "nodes": 188, "jsEventListeners": 26 }
+      },
+      "cleanup": {
+        "trackedObjects": 4,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    }
+  ]
+}

@@ -1,0 +1,3740 @@
+{
+  "schemaVersion": 1,
+  "suite": "first-paint",
+  "id": "1f978ccf-200d-4669-b69d-1e690c04849c",
+  "createdAt": "2026-09-08T04:48:16.682Z",
+  "manifest": {
+    "schemaVersion": 1,
+    "generatorVersion": 1,
+    "seed": 60061,
+    "fixtures": [
+      {
+        "id": "ordinary",
+        "bytes": 4469,
+        "utf16Length": 4469,
+        "normalizedLength": 4469,
+        "lines": 200,
+        "longestLine": 22,
+        "searchCount": 1,
+        "sha256": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197"
+      },
+      {
+        "id": "short-lines",
+        "bytes": 12834064,
+        "utf16Length": 12834064,
+        "normalizedLength": 12834064,
+        "lines": 500000,
+        "longestLine": 26,
+        "searchCount": 502,
+        "sha256": "2bacff110d8d3fe9b5d12e1ea6cc5cfb31d2a344d22119b49222674196352c6a"
+      }
+    ]
+  },
+  "config": {
+    "repetitions": 1,
+    "warmups": 1,
+    "modes": ["direct", "prepared"],
+    "plugins": ["none", "tree-sitter"],
+    "states": ["cold", "warm"],
+    "diagnostics": true,
+    "viewport": { "width": 1000, "height": 1000 },
+    "delivery": "vite-production-playwright-route",
+    "textMeasurement": "screenshot-completion-upper-bound",
+    "callbackMeasurement": "public-onInitialPaint-observable-not-pixels",
+    "preparation": "exact-buffer-revision-and-provider-initial-4096-characters",
+    "cleanup": "worker-idle-fence-then-main-renderer-forced-gc",
+    "tabSize": 4,
+    "cold": "fresh-browser-context",
+    "warm": "fresh-document-after-one-unrecorded-open-in-same-context"
+  },
+  "environment": {
+    "commit": "116e68f745408bd951262ef740f4c25f0527e591",
+    "sourceHash": "784ecc3b68f048679572975273a388a835a8448a9fcfe4fcb0ab9ce68d8d1f31",
+    "coreDirectory": "/work/tmp/editor-e003-baseline",
+    "browser": "148.0.7778.96",
+    "runtime": "v26.7.0",
+    "hardware": {
+      "cpu": "Intel(R) Core(TM) i7-14700K",
+      "logicalCpus": 28,
+      "memoryBytes": 33370660864,
+      "arch": "x64",
+      "platform": "linux",
+      "release": "7.1.9-arch1-2"
+    }
+  },
+  "samples": [
+    {
+      "fixture": "ordinary",
+      "plugin": "none",
+      "mode": "direct",
+      "state": "cold",
+      "repetition": 0,
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "timing": {
+        "start": 546.2999999970198,
+        "constructorAt": 550.2000000029802,
+        "constructedAt": 559.4000000059605,
+        "attachedAt": 563.2999999970198,
+        "bufferMs": 3.800000011920929,
+        "preparationMs": 0
+      },
+      "latencyMs": {
+        "buffer": 3.800000011920929,
+        "preparation": 0,
+        "constructor": 9.200000002980232,
+        "attach": 3.8999999910593033,
+        "openSynchronous": 17,
+        "textCallback": 16.900000005960464,
+        "visibleTextUpperBound": 86.80000001192093
+      },
+      "observation": {
+        "now": 636.7000000029802,
+        "start": 546.2999999970198,
+        "paints": [
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 563.2000000029802
+          },
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "plain",
+            "at": 563.2000000029802
+          }
+        ],
+        "diagnostics": [
+          {
+            "name": "editor.document.attach",
+            "timestampMs": 559.6000000089407,
+            "detail": { "prepared": false, "structural": "absent", "highlighter": "absent" },
+            "at": 559.6000000089407
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 559.9000000059605,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 559.9000000059605
+          },
+          {
+            "name": "editor.line_starts.scan",
+            "timestampMs": 559.9000000059605,
+            "at": 559.9000000059605
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 561.5,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 561.5
+          },
+          {
+            "name": "editor.fallbackFoldRanges",
+            "timestampMs": 562.2000000029802,
+            "durationMs": 0.7000000029802322,
+            "at": 562.2000000029802
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 636.7000000029802,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 636.7000000029802
+          }
+        ],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "ordinary",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": null,
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "plain",
+          "cursor": { "row": 199, "column": 22 },
+          "length": 4469,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": null
+      },
+      "pixels": { "text": { "ink": 527, "chromatic": 0 }, "highlighted": null },
+      "assets": [],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "plugin": "none",
+      "mode": "direct",
+      "state": "warm",
+      "repetition": 0,
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "timing": {
+        "start": 674.5,
+        "constructorAt": 674.6000000089407,
+        "constructedAt": 675.5,
+        "attachedAt": 676.4000000059605,
+        "bufferMs": 0.10000000894069672,
+        "preparationMs": 0
+      },
+      "latencyMs": {
+        "buffer": 0.10000000894069672,
+        "preparation": 0,
+        "constructor": 0.8999999910593033,
+        "attach": 0.9000000059604645,
+        "openSynchronous": 1.9000000059604645,
+        "textCallback": 1.9000000059604645,
+        "visibleTextUpperBound": 134.90000000596046
+      },
+      "observation": {
+        "now": 813.6000000089407,
+        "start": 674.5,
+        "paints": [
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 676.4000000059605
+          },
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "plain",
+            "at": 676.4000000059605
+          }
+        ],
+        "diagnostics": [
+          {
+            "name": "editor.document.attach",
+            "timestampMs": 675.7000000029802,
+            "detail": { "prepared": false, "structural": "absent", "highlighter": "absent" },
+            "at": 675.7000000029802
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 675.7000000029802,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 675.7000000029802
+          },
+          {
+            "name": "editor.line_starts.scan",
+            "timestampMs": 675.7000000029802,
+            "at": 675.7000000029802
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 676.1000000089407,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 676.1000000089407
+          },
+          {
+            "name": "editor.fallbackFoldRanges",
+            "timestampMs": 676.2000000029802,
+            "durationMs": 0.09999999403953552,
+            "at": 676.2000000029802
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 813.7000000029802,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 813.7000000029802
+          }
+        ],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "ordinary",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": null,
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "plain",
+          "cursor": { "row": 199, "column": 22 },
+          "length": 4469,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": null
+      },
+      "pixels": { "text": { "ink": 527, "chromatic": 0 }, "highlighted": null },
+      "assets": [],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "plugin": "none",
+      "mode": "prepared",
+      "state": "cold",
+      "repetition": 0,
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "timing": {
+        "start": 545.4000000059605,
+        "constructorAt": 545.5,
+        "constructedAt": 551,
+        "attachedAt": 554.5999999940395,
+        "bufferMs": 3.9000000059604645,
+        "preparationMs": 4.200000002980232
+      },
+      "latencyMs": {
+        "buffer": 3.9000000059604645,
+        "preparation": 4.200000002980232,
+        "constructor": 5.5,
+        "attach": 3.5999999940395355,
+        "openSynchronous": 9.199999988079071,
+        "textCallback": 9.099999994039536,
+        "visibleTextUpperBound": 93.59999999403954
+      },
+      "observation": {
+        "now": 642.5,
+        "start": 545.4000000059605,
+        "paints": [
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 554.5
+          },
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "plain",
+            "at": 554.5
+          }
+        ],
+        "diagnostics": [
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 544.5,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 544.5
+          },
+          {
+            "name": "editor.document.attach",
+            "timestampMs": 551.2999999970198,
+            "detail": { "prepared": true, "structural": "absent", "highlighter": "absent" },
+            "at": 551.2999999970198
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 551.5999999940395,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 551.5999999940395
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 642.7000000029802,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 642.7000000029802
+          }
+        ],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "ordinary",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": null,
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "plain",
+          "cursor": { "row": 199, "column": 22 },
+          "length": 4469,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": null
+      },
+      "pixels": { "text": { "ink": 527, "chromatic": 0 }, "highlighted": null },
+      "assets": [],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "plugin": "none",
+      "mode": "prepared",
+      "state": "warm",
+      "repetition": 0,
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "timing": {
+        "start": 666.2999999970198,
+        "constructorAt": 666.2999999970198,
+        "constructedAt": 667.0999999940395,
+        "attachedAt": 667.8999999910593,
+        "bufferMs": 0.20000000298023224,
+        "preparationMs": 0.30000001192092896
+      },
+      "latencyMs": {
+        "buffer": 0.20000000298023224,
+        "preparation": 0.30000001192092896,
+        "constructor": 0.7999999970197678,
+        "attach": 0.7999999970197678,
+        "openSynchronous": 1.5999999940395355,
+        "textCallback": 1.5999999940395355,
+        "visibleTextUpperBound": 87
+      },
+      "observation": {
+        "now": 755.8999999910593,
+        "start": 666.2999999970198,
+        "paints": [
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 667.8999999910593
+          },
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "plain",
+            "at": 667.8999999910593
+          }
+        ],
+        "diagnostics": [
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 665.8999999910593,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 665.8999999910593
+          },
+          {
+            "name": "editor.document.attach",
+            "timestampMs": 667.1999999880791,
+            "detail": { "prepared": true, "structural": "absent", "highlighter": "absent" },
+            "at": 667.1999999880791
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 667.1999999880791,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 667.1999999880791
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 755.8999999910593,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 756
+          }
+        ],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "ordinary",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": null,
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "plain",
+          "cursor": { "row": 199, "column": 22 },
+          "length": 4469,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": null
+      },
+      "pixels": { "text": { "ink": 527, "chromatic": 0 }, "highlighted": null },
+      "assets": [],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "plugin": "tree-sitter",
+      "mode": "direct",
+      "state": "cold",
+      "repetition": 0,
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "timing": {
+        "start": 543.8999999910593,
+        "constructorAt": 544.7999999970198,
+        "constructedAt": 549.8999999910593,
+        "attachedAt": 556.7999999970198,
+        "bufferMs": 0.7999999970197678,
+        "preparationMs": 0
+      },
+      "latencyMs": {
+        "buffer": 0.7999999970197678,
+        "preparation": 0,
+        "constructor": 5.0999999940395355,
+        "attach": 6.9000000059604645,
+        "openSynchronous": 12.900000005960464,
+        "textCallback": 12.5,
+        "visibleTextUpperBound": 97.1000000089407,
+        "highlightCallback": 131.29999999701977,
+        "highlightedPaintUpperBound": 197.20000000298023
+      },
+      "observation": {
+        "now": 743,
+        "start": 543.8999999910593,
+        "paints": [
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 556.3999999910593
+          },
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "painted",
+            "at": 675.1999999880791
+          }
+        ],
+        "diagnostics": [
+          {
+            "name": "editor.document.attach",
+            "timestampMs": 550.0999999940395,
+            "detail": { "prepared": false, "structural": "absent", "highlighter": "absent" },
+            "at": 550.1999999880791
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 550.2999999970198,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 550.2999999970198
+          },
+          {
+            "name": "editor.syntax.session_created",
+            "timestampMs": 550.2999999970198,
+            "detail": { "family": "structural" },
+            "at": 550.2999999970198
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 550.5,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 550.5
+          },
+          {
+            "name": "editor.line_starts.scan",
+            "timestampMs": 550.5999999940395,
+            "at": 550.5999999940395
+          },
+          {
+            "name": "editor.syntax.structural.request",
+            "timestampMs": 556.7999999970198,
+            "durationMs": 0.20000000298023224,
+            "at": 556.7999999970198
+          },
+          {
+            "name": "startup.language.assets",
+            "at": 556.7999999970198,
+            "durationMs": 27.899999991059303
+          },
+          {
+            "name": "startup.worker.registerLanguages",
+            "at": 585,
+            "durationMs": 20.69999998807907
+          },
+          {
+            "name": "startup.worker.parse",
+            "at": 605.6999999880791,
+            "durationMs": 42.6000000089407
+          },
+          {
+            "name": "startup.worker.queryRange",
+            "at": 648.3999999910593,
+            "durationMs": 24.799999997019768
+          },
+          {
+            "name": "editor.syntax.structural.accepted",
+            "timestampMs": 673.5,
+            "detail": { "documentVersion": 1, "contentVersion": 1, "source": "visible" },
+            "at": 673.5
+          },
+          {
+            "name": "editor.input",
+            "timestampMs": 674.0999999940395,
+            "operation": { "id": 1, "input": "editor.operation", "startedAtMs": 673.7999999970198 },
+            "durationMs": 0.29999999701976776,
+            "at": 674.0999999940395
+          },
+          {
+            "name": "editor.tokenHighlights.segments",
+            "timestampMs": 674.5999999940395,
+            "durationMs": 0.4000000059604645,
+            "detail": {
+              "addedSegmentCount": 140,
+              "adjacentMergedSegmentCount": 0,
+              "chunkCount": 28,
+              "finalSegmentCount": 140,
+              "gapMergedSegmentCount": 0,
+              "mergedSegmentCount": 0,
+              "rawSegmentCount": 140,
+              "rowCount": 28,
+              "rowSlotCount": 28,
+              "tokenScanCount": 140
+            },
+            "at": 674.5999999940395
+          },
+          {
+            "name": "editor.tokenHighlights.ranges",
+            "timestampMs": 675.1999999880791,
+            "durationMs": 1,
+            "detail": {
+              "addedRangeCount": 140,
+              "deletedRangeCount": 0,
+              "liveRangeCount": 0,
+              "mountedRowCount": 28,
+              "rebuiltRowCount": 28,
+              "skippedRowCount": 0,
+              "staticRangeCount": 140,
+              "tokenRenderIndexDirty": true
+            },
+            "at": 675.1999999880791
+          },
+          {
+            "name": "editor.syntax.structural.apply",
+            "timestampMs": 675.3999999910593,
+            "durationMs": 2,
+            "at": 675.3999999910593
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 743.0999999940395,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 743.0999999940395
+          }
+        ],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "ordinary",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": "typescript",
+          "syntaxStatus": "ready",
+          "initialHighlightStatus": "painted",
+          "cursor": { "row": 199, "column": 22 },
+          "length": 4469,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 0,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 1, "sentChunks": 1, "sourceEpochs": 0 }
+          },
+          "lastError": null
+        }
+      },
+      "pixels": {
+        "text": { "ink": 527, "chromatic": 0 },
+        "highlighted": { "ink": 524, "chromatic": 180 }
+      },
+      "assets": [
+        {
+          "phase": "request",
+          "path": "/assets/tree-sitter-typescript-DJLS94Ei.js",
+          "wallTimeMs": 16
+        },
+        {
+          "phase": "request",
+          "path": "/assets/typescript-highlights-Copz-2oQ.js",
+          "wallTimeMs": 16
+        },
+        {
+          "phase": "request",
+          "path": "/assets/javascript-highlights-70ziJmbJ.js",
+          "wallTimeMs": 17
+        },
+        { "phase": "request", "path": "/assets/typescript-folds-v26TyEuW.js", "wallTimeMs": 17 },
+        { "phase": "request", "path": "/assets/javascript-folds-B7oa76u2.js", "wallTimeMs": 17 },
+        { "phase": "request", "path": "/assets/injections-Dqft2Yhg.js", "wallTimeMs": 17 },
+        {
+          "phase": "response",
+          "path": "/assets/javascript-folds-B7oa76u2.js",
+          "status": 200,
+          "wallTimeMs": 31
+        },
+        {
+          "phase": "response",
+          "path": "/assets/typescript-highlights-Copz-2oQ.js",
+          "status": 200,
+          "wallTimeMs": 31
+        },
+        {
+          "phase": "response",
+          "path": "/assets/typescript-folds-v26TyEuW.js",
+          "status": 200,
+          "wallTimeMs": 31
+        },
+        {
+          "phase": "response",
+          "path": "/assets/javascript-highlights-70ziJmbJ.js",
+          "status": 200,
+          "wallTimeMs": 31
+        },
+        {
+          "phase": "response",
+          "path": "/assets/injections-Dqft2Yhg.js",
+          "status": 200,
+          "wallTimeMs": 31
+        },
+        {
+          "phase": "response",
+          "path": "/assets/tree-sitter-typescript-DJLS94Ei.js",
+          "status": 200,
+          "wallTimeMs": 42
+        }
+      ],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 0,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 1, "sentChunks": 0, "sourceEpochs": 1 }
+          },
+          "lastError": null
+        }
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 0,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 1, "sentChunks": 0, "sourceEpochs": 1 }
+          },
+          "lastError": null
+        }
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "plugin": "tree-sitter",
+      "mode": "direct",
+      "state": "warm",
+      "repetition": 0,
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "timing": {
+        "start": 753.2000000029802,
+        "constructorAt": 753.3999999910593,
+        "constructedAt": 754.2999999970198,
+        "attachedAt": 755,
+        "bufferMs": 0.19999998807907104,
+        "preparationMs": 0
+      },
+      "latencyMs": {
+        "buffer": 0.19999998807907104,
+        "preparation": 0,
+        "constructor": 0.9000000059604645,
+        "attach": 0.7000000029802322,
+        "openSynchronous": 1.7999999970197678,
+        "textCallback": 1.7999999970197678,
+        "visibleTextUpperBound": 85.79999999701977,
+        "highlightCallback": 5,
+        "highlightedPaintUpperBound": 135.8999999910593
+      },
+      "observation": {
+        "now": 890.3999999910593,
+        "start": 753.2000000029802,
+        "paints": [
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 755
+          },
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "painted",
+            "at": 758.2000000029802
+          }
+        ],
+        "diagnostics": [
+          {
+            "name": "editor.document.attach",
+            "timestampMs": 754.2999999970198,
+            "detail": { "prepared": false, "structural": "absent", "highlighter": "absent" },
+            "at": 754.2999999970198
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 754.2999999970198,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 754.2999999970198
+          },
+          {
+            "name": "editor.syntax.session_created",
+            "timestampMs": 754.2999999970198,
+            "detail": { "family": "structural" },
+            "at": 754.2999999970198
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 754.3999999910593,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 754.3999999910593
+          },
+          {
+            "name": "editor.line_starts.scan",
+            "timestampMs": 754.3999999910593,
+            "at": 754.3999999910593
+          },
+          {
+            "name": "editor.syntax.structural.request",
+            "timestampMs": 755,
+            "durationMs": 0,
+            "at": 755
+          },
+          {
+            "name": "startup.worker.registerLanguages",
+            "at": 755.0999999940395,
+            "durationMs": 1.1000000089406967
+          },
+          {
+            "name": "startup.worker.parse",
+            "at": 756.2000000029802,
+            "durationMs": 1.7999999970197678
+          },
+          {
+            "name": "editor.syntax.structural.accepted",
+            "timestampMs": 758.0999999940395,
+            "detail": { "documentVersion": 1, "contentVersion": 1, "source": "full" },
+            "at": 758.0999999940395
+          },
+          {
+            "name": "editor.input",
+            "timestampMs": 758.2000000029802,
+            "operation": { "id": 2, "input": "editor.operation", "startedAtMs": 758.0999999940395 },
+            "durationMs": 0.10000000894069672,
+            "at": 758.2000000029802
+          },
+          {
+            "name": "editor.syntax.structural.apply",
+            "timestampMs": 758.2000000029802,
+            "durationMs": 0.10000000894069672,
+            "at": 758.2000000029802
+          },
+          {
+            "name": "editor.syntax.range.request",
+            "timestampMs": 771.2000000029802,
+            "durationMs": 0,
+            "at": 771.2000000029802
+          },
+          {
+            "name": "startup.worker.queryRange",
+            "at": 771.2000000029802,
+            "durationMs": 3.699999988079071
+          },
+          {
+            "name": "editor.syntax.structural.accepted",
+            "timestampMs": 774.8999999910593,
+            "detail": { "documentVersion": 1, "contentVersion": 1, "source": "visible" },
+            "at": 774.8999999910593
+          },
+          {
+            "name": "editor.input",
+            "timestampMs": 775.2000000029802,
+            "operation": { "id": 3, "input": "editor.operation", "startedAtMs": 775.0999999940395 },
+            "durationMs": 0.10000000894069672,
+            "at": 775.2000000029802
+          },
+          {
+            "name": "editor.tokenHighlights.segments",
+            "timestampMs": 775.2999999970198,
+            "durationMs": 0.09999999403953552,
+            "detail": {
+              "addedSegmentCount": 140,
+              "adjacentMergedSegmentCount": 0,
+              "chunkCount": 28,
+              "finalSegmentCount": 140,
+              "gapMergedSegmentCount": 0,
+              "mergedSegmentCount": 0,
+              "rawSegmentCount": 140,
+              "rowCount": 28,
+              "rowSlotCount": 28,
+              "tokenScanCount": 140
+            },
+            "at": 775.2999999970198
+          },
+          {
+            "name": "editor.tokenHighlights.ranges",
+            "timestampMs": 776,
+            "durationMs": 0.7999999970197678,
+            "detail": {
+              "addedRangeCount": 140,
+              "deletedRangeCount": 0,
+              "liveRangeCount": 0,
+              "mountedRowCount": 28,
+              "rebuiltRowCount": 28,
+              "skippedRowCount": 0,
+              "staticRangeCount": 140,
+              "tokenRenderIndexDirty": true
+            },
+            "at": 776
+          },
+          {
+            "name": "editor.syntax.range.apply",
+            "timestampMs": 776.0999999940395,
+            "durationMs": 1.2000000029802322,
+            "at": 776.0999999940395
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 890.5,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 890.5
+          }
+        ],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "ordinary",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": "typescript",
+          "syntaxStatus": "ready",
+          "initialHighlightStatus": "painted",
+          "cursor": { "row": 199, "column": 22 },
+          "length": 4469,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 0,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 2, "sentChunks": 1, "sourceEpochs": 1 }
+          },
+          "lastError": null
+        }
+      },
+      "pixels": {
+        "text": { "ink": 524, "chromatic": 180 },
+        "highlighted": { "ink": 524, "chromatic": 180 }
+      },
+      "assets": [],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 0,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 2, "sentChunks": 0, "sourceEpochs": 2 }
+          },
+          "lastError": null
+        }
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 0,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 2, "sentChunks": 0, "sourceEpochs": 2 }
+          },
+          "lastError": null
+        }
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "plugin": "tree-sitter",
+      "mode": "prepared",
+      "state": "cold",
+      "repetition": 0,
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "timing": {
+        "start": 670.5999999940395,
+        "constructorAt": 670.6999999880791,
+        "constructedAt": 676.0999999940395,
+        "attachedAt": 679.5999999940395,
+        "bufferMs": 3.9000000059604645,
+        "preparationMs": 130.90000000596046
+      },
+      "latencyMs": {
+        "buffer": 3.9000000059604645,
+        "preparation": 130.90000000596046,
+        "constructor": 5.4000000059604645,
+        "attach": 3.5,
+        "openSynchronous": 9,
+        "textCallback": 9,
+        "visibleTextUpperBound": 87.90000000596046,
+        "highlightCallback": 9,
+        "highlightedPaintUpperBound": 138
+      },
+      "observation": {
+        "now": 810,
+        "start": 670.5999999940395,
+        "paints": [
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 679.5999999940395
+          },
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "painted",
+            "at": 679.5999999940395
+          }
+        ],
+        "diagnostics": [
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 542.2999999970198,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 542.2999999970198
+          },
+          { "name": "startup.language.assets", "at": 543, "durationMs": 32.19999998807907 },
+          {
+            "name": "startup.worker.registerLanguages",
+            "at": 575.3999999910593,
+            "durationMs": 24.200000002980232
+          },
+          { "name": "startup.worker.parse", "at": 599.5999999940395, "durationMs": 45 },
+          {
+            "name": "startup.worker.queryRange",
+            "at": 644.5999999940395,
+            "durationMs": 24.599999994039536
+          },
+          {
+            "name": "editor.document.attach",
+            "timestampMs": 676.3999999910593,
+            "detail": { "prepared": true, "structural": "ready", "highlighter": "absent" },
+            "at": 676.3999999910593
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 676.6999999880791,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 676.6999999880791
+          },
+          {
+            "name": "editor.syntax.structural.accepted",
+            "timestampMs": 677.8999999910593,
+            "detail": { "documentVersion": 1, "contentVersion": 1, "source": "visible" },
+            "at": 677.8999999910593
+          },
+          {
+            "name": "editor.tokenHighlights.segments",
+            "timestampMs": 683.5,
+            "durationMs": 0.4000000059604645,
+            "detail": {
+              "addedSegmentCount": 140,
+              "adjacentMergedSegmentCount": 0,
+              "chunkCount": 28,
+              "finalSegmentCount": 140,
+              "gapMergedSegmentCount": 0,
+              "mergedSegmentCount": 0,
+              "rawSegmentCount": 140,
+              "rowCount": 28,
+              "rowSlotCount": 28,
+              "tokenScanCount": 140
+            },
+            "at": 683.5
+          },
+          {
+            "name": "editor.tokenHighlights.ranges",
+            "timestampMs": 684.0999999940395,
+            "durationMs": 1,
+            "detail": {
+              "addedRangeCount": 140,
+              "deletedRangeCount": 0,
+              "liveRangeCount": 0,
+              "mountedRowCount": 28,
+              "rebuiltRowCount": 28,
+              "skippedRowCount": 0,
+              "staticRangeCount": 140,
+              "tokenRenderIndexDirty": true
+            },
+            "at": 684.0999999940395
+          },
+          {
+            "name": "editor.tokenHighlights.segments",
+            "timestampMs": 684.5,
+            "durationMs": 0.10000000894069672,
+            "detail": {
+              "addedSegmentCount": 140,
+              "adjacentMergedSegmentCount": 0,
+              "chunkCount": 28,
+              "finalSegmentCount": 140,
+              "gapMergedSegmentCount": 0,
+              "mergedSegmentCount": 0,
+              "rawSegmentCount": 140,
+              "rowCount": 28,
+              "rowSlotCount": 28,
+              "tokenScanCount": 140
+            },
+            "at": 684.5
+          },
+          {
+            "name": "editor.tokenHighlights.ranges",
+            "timestampMs": 684.5999999940395,
+            "durationMs": 0.20000000298023224,
+            "detail": {
+              "addedRangeCount": 0,
+              "deletedRangeCount": 0,
+              "liveRangeCount": 0,
+              "mountedRowCount": 28,
+              "rebuiltRowCount": 0,
+              "skippedRowCount": 28,
+              "staticRangeCount": 0,
+              "tokenRenderIndexDirty": true
+            },
+            "at": 684.5999999940395
+          },
+          {
+            "name": "editor.syntax.range.request",
+            "timestampMs": 684.7999999970198,
+            "durationMs": 0.10000000894069672,
+            "at": 684.7999999970198
+          },
+          {
+            "name": "startup.worker.queryRange",
+            "at": 684.7999999970198,
+            "durationMs": 5.299999997019768
+          },
+          {
+            "name": "editor.syntax.structural.accepted",
+            "timestampMs": 690.2999999970198,
+            "detail": { "documentVersion": 1, "contentVersion": 1, "source": "visible" },
+            "at": 690.2999999970198
+          },
+          {
+            "name": "editor.input",
+            "timestampMs": 690.6999999880791,
+            "operation": { "id": 1, "input": "editor.operation", "startedAtMs": 690.3999999910593 },
+            "durationMs": 0.29999999701976776,
+            "at": 690.6999999880791
+          },
+          {
+            "name": "editor.tokenHighlights.segments",
+            "timestampMs": 690.7999999970198,
+            "durationMs": 0.10000000894069672,
+            "detail": {
+              "addedSegmentCount": 140,
+              "adjacentMergedSegmentCount": 0,
+              "chunkCount": 28,
+              "finalSegmentCount": 140,
+              "gapMergedSegmentCount": 0,
+              "mergedSegmentCount": 0,
+              "rawSegmentCount": 140,
+              "rowCount": 28,
+              "rowSlotCount": 28,
+              "tokenScanCount": 140
+            },
+            "at": 690.7999999970198
+          },
+          {
+            "name": "editor.tokenHighlights.ranges",
+            "timestampMs": 690.8999999910593,
+            "durationMs": 0.20000000298023224,
+            "detail": {
+              "addedRangeCount": 0,
+              "deletedRangeCount": 0,
+              "liveRangeCount": 0,
+              "mountedRowCount": 28,
+              "rebuiltRowCount": 0,
+              "skippedRowCount": 28,
+              "staticRangeCount": 0,
+              "tokenRenderIndexDirty": true
+            },
+            "at": 690.8999999910593
+          },
+          {
+            "name": "editor.syntax.range.apply",
+            "timestampMs": 691,
+            "durationMs": 0.7000000029802322,
+            "at": 691
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 810.0999999940395,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 810.0999999940395
+          }
+        ],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "ordinary",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": "typescript",
+          "syntaxStatus": "ready",
+          "initialHighlightStatus": "painted",
+          "cursor": { "row": 199, "column": 22 },
+          "length": 4469,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 0,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 1, "sentChunks": 1, "sourceEpochs": 0 }
+          },
+          "lastError": null
+        }
+      },
+      "pixels": {
+        "text": { "ink": 524, "chromatic": 180 },
+        "highlighted": { "ink": 524, "chromatic": 180 }
+      },
+      "assets": [
+        {
+          "phase": "request",
+          "path": "/assets/tree-sitter-typescript-DJLS94Ei.js",
+          "wallTimeMs": 7
+        },
+        {
+          "phase": "request",
+          "path": "/assets/typescript-highlights-Copz-2oQ.js",
+          "wallTimeMs": 7
+        },
+        {
+          "phase": "request",
+          "path": "/assets/javascript-highlights-70ziJmbJ.js",
+          "wallTimeMs": 7
+        },
+        { "phase": "request", "path": "/assets/typescript-folds-v26TyEuW.js", "wallTimeMs": 7 },
+        { "phase": "request", "path": "/assets/javascript-folds-B7oa76u2.js", "wallTimeMs": 7 },
+        { "phase": "request", "path": "/assets/injections-Dqft2Yhg.js", "wallTimeMs": 7 },
+        {
+          "phase": "response",
+          "path": "/assets/typescript-highlights-Copz-2oQ.js",
+          "status": 200,
+          "wallTimeMs": 10
+        },
+        {
+          "phase": "response",
+          "path": "/assets/javascript-highlights-70ziJmbJ.js",
+          "status": 200,
+          "wallTimeMs": 10
+        },
+        {
+          "phase": "response",
+          "path": "/assets/typescript-folds-v26TyEuW.js",
+          "status": 200,
+          "wallTimeMs": 10
+        },
+        {
+          "phase": "response",
+          "path": "/assets/javascript-folds-B7oa76u2.js",
+          "status": 200,
+          "wallTimeMs": 10
+        },
+        {
+          "phase": "response",
+          "path": "/assets/injections-Dqft2Yhg.js",
+          "status": 200,
+          "wallTimeMs": 10
+        },
+        {
+          "phase": "response",
+          "path": "/assets/tree-sitter-typescript-DJLS94Ei.js",
+          "status": 200,
+          "wallTimeMs": 37
+        }
+      ],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 0,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 1, "sentChunks": 0, "sourceEpochs": 1 }
+          },
+          "lastError": null
+        }
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 0,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 1, "sentChunks": 0, "sourceEpochs": 1 }
+          },
+          "lastError": null
+        }
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "plugin": "tree-sitter",
+      "mode": "prepared",
+      "state": "warm",
+      "repetition": 0,
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "timing": {
+        "start": 825.3999999910593,
+        "constructorAt": 825.5,
+        "constructedAt": 827,
+        "attachedAt": 828.8999999910593,
+        "bufferMs": 0.09999999403953552,
+        "preparationMs": 6.299999997019768
+      },
+      "latencyMs": {
+        "buffer": 0.09999999403953552,
+        "preparation": 6.299999997019768,
+        "constructor": 1.5,
+        "attach": 1.8999999910593033,
+        "openSynchronous": 3.5,
+        "textCallback": 3.4000000059604645,
+        "visibleTextUpperBound": 130.5,
+        "highlightCallback": 3.4000000059604645,
+        "highlightedPaintUpperBound": 180.20000000298023
+      },
+      "observation": {
+        "now": 1006.7999999970198,
+        "start": 825.3999999910593,
+        "paints": [
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 828.7999999970198
+          },
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "painted",
+            "at": 828.7999999970198
+          }
+        ],
+        "diagnostics": [
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 818.7000000029802,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 818.7000000029802
+          },
+          {
+            "name": "startup.worker.registerLanguages",
+            "at": 818.8999999910593,
+            "durationMs": 1.2000000029802322
+          },
+          {
+            "name": "startup.worker.parse",
+            "at": 820.0999999940395,
+            "durationMs": 1.2000000029802322
+          },
+          {
+            "name": "startup.worker.queryRange",
+            "at": 821.2999999970198,
+            "durationMs": 3.4000000059604645
+          },
+          {
+            "name": "editor.document.attach",
+            "timestampMs": 827.0999999940395,
+            "detail": { "prepared": true, "structural": "ready", "highlighter": "absent" },
+            "at": 827.0999999940395
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 827.2000000029802,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 827.2000000029802
+          },
+          {
+            "name": "editor.syntax.structural.accepted",
+            "timestampMs": 828.0999999940395,
+            "detail": { "documentVersion": 1, "contentVersion": 1, "source": "visible" },
+            "at": 828.0999999940395
+          },
+          {
+            "name": "editor.tokenHighlights.segments",
+            "timestampMs": 854.3999999910593,
+            "durationMs": 0.09999999403953552,
+            "detail": {
+              "addedSegmentCount": 140,
+              "adjacentMergedSegmentCount": 0,
+              "chunkCount": 28,
+              "finalSegmentCount": 140,
+              "gapMergedSegmentCount": 0,
+              "mergedSegmentCount": 0,
+              "rawSegmentCount": 140,
+              "rowCount": 28,
+              "rowSlotCount": 28,
+              "tokenScanCount": 140
+            },
+            "at": 854.3999999910593
+          },
+          {
+            "name": "editor.tokenHighlights.ranges",
+            "timestampMs": 854.5999999940395,
+            "durationMs": 0.29999999701976776,
+            "detail": {
+              "addedRangeCount": 140,
+              "deletedRangeCount": 0,
+              "liveRangeCount": 0,
+              "mountedRowCount": 28,
+              "rebuiltRowCount": 28,
+              "skippedRowCount": 0,
+              "staticRangeCount": 140,
+              "tokenRenderIndexDirty": true
+            },
+            "at": 854.5999999940395
+          },
+          {
+            "name": "editor.tokenHighlights.segments",
+            "timestampMs": 854.8999999910593,
+            "durationMs": 0.09999999403953552,
+            "detail": {
+              "addedSegmentCount": 140,
+              "adjacentMergedSegmentCount": 0,
+              "chunkCount": 28,
+              "finalSegmentCount": 140,
+              "gapMergedSegmentCount": 0,
+              "mergedSegmentCount": 0,
+              "rawSegmentCount": 140,
+              "rowCount": 28,
+              "rowSlotCount": 28,
+              "tokenScanCount": 140
+            },
+            "at": 854.8999999910593
+          },
+          {
+            "name": "editor.tokenHighlights.ranges",
+            "timestampMs": 854.8999999910593,
+            "durationMs": 0.09999999403953552,
+            "detail": {
+              "addedRangeCount": 0,
+              "deletedRangeCount": 0,
+              "liveRangeCount": 0,
+              "mountedRowCount": 28,
+              "rebuiltRowCount": 0,
+              "skippedRowCount": 28,
+              "staticRangeCount": 0,
+              "tokenRenderIndexDirty": true
+            },
+            "at": 854.8999999910593
+          },
+          {
+            "name": "editor.syntax.range.request",
+            "timestampMs": 854.8999999910593,
+            "durationMs": 0,
+            "at": 854.8999999910593
+          },
+          { "name": "startup.worker.queryRange", "at": 854.8999999910593, "durationMs": 1 },
+          {
+            "name": "editor.syntax.structural.accepted",
+            "timestampMs": 856,
+            "detail": { "documentVersion": 1, "contentVersion": 1, "source": "visible" },
+            "at": 856
+          },
+          {
+            "name": "editor.input",
+            "timestampMs": 856.2999999970198,
+            "operation": { "id": 2, "input": "editor.operation", "startedAtMs": 856.2000000029802 },
+            "durationMs": 0.09999999403953552,
+            "at": 856.2999999970198
+          },
+          {
+            "name": "editor.tokenHighlights.segments",
+            "timestampMs": 856.2999999970198,
+            "durationMs": 0,
+            "detail": {
+              "addedSegmentCount": 140,
+              "adjacentMergedSegmentCount": 0,
+              "chunkCount": 28,
+              "finalSegmentCount": 140,
+              "gapMergedSegmentCount": 0,
+              "mergedSegmentCount": 0,
+              "rawSegmentCount": 140,
+              "rowCount": 28,
+              "rowSlotCount": 28,
+              "tokenScanCount": 140
+            },
+            "at": 856.2999999970198
+          },
+          {
+            "name": "editor.tokenHighlights.ranges",
+            "timestampMs": 856.3999999910593,
+            "durationMs": 0.09999999403953552,
+            "detail": {
+              "addedRangeCount": 0,
+              "deletedRangeCount": 0,
+              "liveRangeCount": 0,
+              "mountedRowCount": 28,
+              "rebuiltRowCount": 0,
+              "skippedRowCount": 28,
+              "staticRangeCount": 0,
+              "tokenRenderIndexDirty": true
+            },
+            "at": 856.3999999910593
+          },
+          {
+            "name": "editor.syntax.range.apply",
+            "timestampMs": 856.3999999910593,
+            "durationMs": 0.3999999910593033,
+            "at": 856.3999999910593
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 1006.8999999910593,
+            "detail": { "length": 4469, "cached": true, "retained": true },
+            "at": 1006.8999999910593
+          }
+        ],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "ordinary",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": "typescript",
+          "syntaxStatus": "ready",
+          "initialHighlightStatus": "painted",
+          "cursor": { "row": 199, "column": 22 },
+          "length": 4469,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 0,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 2, "sentChunks": 1, "sourceEpochs": 1 }
+          },
+          "lastError": null
+        }
+      },
+      "pixels": {
+        "text": { "ink": 524, "chromatic": 180 },
+        "highlighted": { "ink": 524, "chromatic": 180 }
+      },
+      "assets": [],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 0,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 2, "sentChunks": 0, "sourceEpochs": 2 }
+          },
+          "lastError": null
+        }
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 0,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 2, "sentChunks": 0, "sourceEpochs": 2 }
+          },
+          "lastError": null
+        }
+      },
+      "correct": true
+    },
+    {
+      "fixture": "short-lines",
+      "plugin": "none",
+      "mode": "direct",
+      "state": "cold",
+      "repetition": 0,
+      "fixtureHash": "2bacff110d8d3fe9b5d12e1ea6cc5cfb31d2a344d22119b49222674196352c6a",
+      "timing": {
+        "start": 657.7000000029802,
+        "constructorAt": 687.2999999970198,
+        "constructedAt": 692.8999999910593,
+        "attachedAt": 818.8999999910593,
+        "bufferMs": 29.5,
+        "preparationMs": 0
+      },
+      "latencyMs": {
+        "buffer": 29.5,
+        "preparation": 0,
+        "constructor": 5.5999999940395355,
+        "attach": 126,
+        "openSynchronous": 161.19999998807907,
+        "textCallback": 161.09999999403954,
+        "visibleTextUpperBound": 230.3999999910593
+      },
+      "observation": {
+        "now": 891.8999999910593,
+        "start": 657.7000000029802,
+        "paints": [
+          {
+            "documentId": "short-lines",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 818.7999999970198
+          },
+          {
+            "documentId": "short-lines",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "plain",
+            "at": 818.7999999970198
+          }
+        ],
+        "diagnostics": [
+          {
+            "name": "editor.document.attach",
+            "timestampMs": 693.0999999940395,
+            "detail": { "prepared": false, "structural": "absent", "highlighter": "absent" },
+            "at": 693.0999999940395
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 693.3999999910593,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 693.3999999910593
+          },
+          {
+            "name": "editor.line_starts.scan",
+            "timestampMs": 693.3999999910593,
+            "at": 693.3999999910593
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 778.0999999940395,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 778.0999999940395
+          },
+          {
+            "name": "editor.fallbackFoldRanges",
+            "timestampMs": 812.8999999910593,
+            "durationMs": 34.79999999701977,
+            "at": 812.8999999910593
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 892.0999999940395,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 892.0999999940395
+          }
+        ],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "short-lines",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": null,
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "plain",
+          "cursor": { "row": 499999, "column": 25 },
+          "length": 12834064,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": null
+      },
+      "pixels": { "text": { "ink": 527, "chromatic": 0 }, "highlighted": null },
+      "assets": [],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "correct": true
+    },
+    {
+      "fixture": "short-lines",
+      "plugin": "none",
+      "mode": "direct",
+      "state": "warm",
+      "repetition": 0,
+      "fixtureHash": "2bacff110d8d3fe9b5d12e1ea6cc5cfb31d2a344d22119b49222674196352c6a",
+      "timing": {
+        "start": 1070.7000000029802,
+        "constructorAt": 1106.1000000089407,
+        "constructedAt": 1107,
+        "attachedAt": 1234.1000000089407,
+        "bufferMs": 35.400000005960464,
+        "preparationMs": 0
+      },
+      "latencyMs": {
+        "buffer": 35.400000005960464,
+        "preparation": 0,
+        "constructor": 0.8999999910593033,
+        "attach": 127.1000000089407,
+        "openSynchronous": 163.40000000596046,
+        "textCallback": 163.40000000596046,
+        "visibleTextUpperBound": 224.40000000596046
+      },
+      "observation": {
+        "now": 1298.2999999970198,
+        "start": 1070.7000000029802,
+        "paints": [
+          {
+            "documentId": "short-lines",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 1234.1000000089407
+          },
+          {
+            "documentId": "short-lines",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "plain",
+            "at": 1234.1000000089407
+          }
+        ],
+        "diagnostics": [
+          {
+            "name": "editor.document.attach",
+            "timestampMs": 1107.2000000029802,
+            "detail": { "prepared": false, "structural": "absent", "highlighter": "absent" },
+            "at": 1107.2000000029802
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 1107.2000000029802,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 1107.2000000029802
+          },
+          {
+            "name": "editor.line_starts.scan",
+            "timestampMs": 1107.2000000029802,
+            "at": 1107.2000000029802
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 1191.4000000059605,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 1191.4000000059605
+          },
+          {
+            "name": "editor.fallbackFoldRanges",
+            "timestampMs": 1228.4000000059605,
+            "durationMs": 37,
+            "at": 1228.4000000059605
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 1298.2999999970198,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 1298.2999999970198
+          }
+        ],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "short-lines",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": null,
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "plain",
+          "cursor": { "row": 499999, "column": 25 },
+          "length": 12834064,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": null
+      },
+      "pixels": { "text": { "ink": 527, "chromatic": 0 }, "highlighted": null },
+      "assets": [],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "correct": true
+    },
+    {
+      "fixture": "short-lines",
+      "plugin": "none",
+      "mode": "prepared",
+      "state": "cold",
+      "repetition": 0,
+      "fixtureHash": "2bacff110d8d3fe9b5d12e1ea6cc5cfb31d2a344d22119b49222674196352c6a",
+      "timing": {
+        "start": 725.6000000089407,
+        "constructorAt": 725.7000000029802,
+        "constructedAt": 730.7000000029802,
+        "attachedAt": 860.5,
+        "bufferMs": 28.900000005960464,
+        "preparationMs": 72.40000000596046
+      },
+      "latencyMs": {
+        "buffer": 28.900000005960464,
+        "preparation": 72.40000000596046,
+        "constructor": 5,
+        "attach": 129.79999999701977,
+        "openSynchronous": 134.8999999910593,
+        "textCallback": 134.79999999701977,
+        "visibleTextUpperBound": 204.8999999910593
+      },
+      "observation": {
+        "now": 932.6000000089407,
+        "start": 725.6000000089407,
+        "paints": [
+          {
+            "documentId": "short-lines",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 860.4000000059605
+          },
+          {
+            "documentId": "short-lines",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "plain",
+            "at": 860.4000000059605
+          }
+        ],
+        "diagnostics": [
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 681.2999999970198,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 681.2999999970198
+          },
+          {
+            "name": "editor.document.attach",
+            "timestampMs": 730.9000000059605,
+            "detail": { "prepared": true, "structural": "absent", "highlighter": "absent" },
+            "at": 730.9000000059605
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 731.2000000029802,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 731.2000000029802
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 932.7000000029802,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 932.7000000029802
+          }
+        ],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "short-lines",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": null,
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "plain",
+          "cursor": { "row": 499999, "column": 25 },
+          "length": 12834064,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": null
+      },
+      "pixels": { "text": { "ink": 527, "chromatic": 0 }, "highlighted": null },
+      "assets": [],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "correct": true
+    },
+    {
+      "fixture": "short-lines",
+      "plugin": "none",
+      "mode": "prepared",
+      "state": "warm",
+      "repetition": 0,
+      "fixtureHash": "2bacff110d8d3fe9b5d12e1ea6cc5cfb31d2a344d22119b49222674196352c6a",
+      "timing": {
+        "start": 1207.6000000089407,
+        "constructorAt": 1207.7000000029802,
+        "constructedAt": 1208.7000000029802,
+        "attachedAt": 1331.7999999970198,
+        "bufferMs": 35.79999999701977,
+        "preparationMs": 76.8999999910593
+      },
+      "latencyMs": {
+        "buffer": 35.79999999701977,
+        "preparation": 76.8999999910593,
+        "constructor": 1,
+        "attach": 123.09999999403954,
+        "openSynchronous": 124.19999998807907,
+        "textCallback": 124.09999999403954,
+        "visibleTextUpperBound": 192.3999999910593
+      },
+      "observation": {
+        "now": 1402.5,
+        "start": 1207.6000000089407,
+        "paints": [
+          {
+            "documentId": "short-lines",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 1331.7000000029802
+          },
+          {
+            "documentId": "short-lines",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "plain",
+            "at": 1331.7999999970198
+          }
+        ],
+        "diagnostics": [
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 1165.4000000059605,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 1165.4000000059605
+          },
+          {
+            "name": "editor.document.attach",
+            "timestampMs": 1208.7000000029802,
+            "detail": { "prepared": true, "structural": "absent", "highlighter": "absent" },
+            "at": 1208.7000000029802
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 1208.7000000029802,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 1208.7000000029802
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 1402.5,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 1402.5
+          }
+        ],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "short-lines",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": null,
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "plain",
+          "cursor": { "row": 499999, "column": 25 },
+          "length": 12834064,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": null
+      },
+      "pixels": { "text": { "ink": 527, "chromatic": 0 }, "highlighted": null },
+      "assets": [],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "correct": true
+    },
+    {
+      "fixture": "short-lines",
+      "plugin": "tree-sitter",
+      "mode": "direct",
+      "state": "cold",
+      "repetition": 0,
+      "fixtureHash": "2bacff110d8d3fe9b5d12e1ea6cc5cfb31d2a344d22119b49222674196352c6a",
+      "timing": {
+        "start": 657.7000000029802,
+        "constructorAt": 686.8000000119209,
+        "constructedAt": 692.2000000029802,
+        "attachedAt": 780.3000000119209,
+        "bufferMs": 28.900000005960464,
+        "preparationMs": 0
+      },
+      "latencyMs": {
+        "buffer": 28.900000005960464,
+        "preparation": 0,
+        "constructor": 5.399999991059303,
+        "attach": 88.1000000089407,
+        "openSynchronous": 122.6000000089407,
+        "textCallback": 122.1000000089407,
+        "visibleTextUpperBound": 208.29999999701977,
+        "highlightCallback": 2455.9000000059605,
+        "highlightedPaintUpperBound": 2508.5
+      },
+      "observation": {
+        "now": 3167.9000000059605,
+        "start": 657.7000000029802,
+        "paints": [
+          {
+            "documentId": "short-lines",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 779.8000000119209
+          },
+          {
+            "documentId": "short-lines",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "painted",
+            "at": 3113.6000000089407
+          }
+        ],
+        "diagnostics": [
+          {
+            "name": "editor.document.attach",
+            "timestampMs": 692.4000000059605,
+            "detail": { "prepared": false, "structural": "absent", "highlighter": "absent" },
+            "at": 692.4000000059605
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 692.6000000089407,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 692.6000000089407
+          },
+          {
+            "name": "editor.syntax.session_created",
+            "timestampMs": 692.6000000089407,
+            "detail": { "family": "structural" },
+            "at": 692.6000000089407
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 692.8000000119209,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 692.8000000119209
+          },
+          {
+            "name": "editor.line_starts.scan",
+            "timestampMs": 692.9000000059605,
+            "at": 692.9000000059605
+          },
+          {
+            "name": "editor.syntax.structural.request",
+            "timestampMs": 780.2000000029802,
+            "durationMs": 0.09999999403953552,
+            "at": 780.2000000029802
+          },
+          {
+            "name": "startup.language.assets",
+            "at": 780.1000000089407,
+            "durationMs": 22.799999997019768
+          },
+          { "name": "startup.worker.registerLanguages", "at": 803.1000000089407, "durationMs": 22 },
+          { "name": "startup.worker.parse", "at": 825.1000000089407, "durationMs": 2147.5 },
+          { "name": "startup.worker.queryRange", "at": 2972.9000000059605, "durationMs": 136.5 },
+          {
+            "name": "editor.syntax.structural.accepted",
+            "timestampMs": 3110.2000000029802,
+            "detail": { "documentVersion": 1, "contentVersion": 1, "source": "visible" },
+            "at": 3110.2000000029802
+          },
+          {
+            "name": "editor.input",
+            "timestampMs": 3111.4000000059605,
+            "operation": { "id": 1, "input": "editor.operation", "startedAtMs": 3111 },
+            "durationMs": 0.4000000059604645,
+            "at": 3111.4000000059605
+          },
+          {
+            "name": "editor.tokenHighlights.segments",
+            "timestampMs": 3112.300000011921,
+            "durationMs": 0.7000000029802322,
+            "detail": {
+              "addedSegmentCount": 140,
+              "adjacentMergedSegmentCount": 0,
+              "chunkCount": 28,
+              "finalSegmentCount": 140,
+              "gapMergedSegmentCount": 0,
+              "mergedSegmentCount": 0,
+              "rawSegmentCount": 140,
+              "rowCount": 28,
+              "rowSlotCount": 28,
+              "tokenScanCount": 140
+            },
+            "at": 3112.4000000059605
+          },
+          {
+            "name": "editor.tokenHighlights.ranges",
+            "timestampMs": 3113.5,
+            "durationMs": 1.8999999910593033,
+            "detail": {
+              "addedRangeCount": 140,
+              "deletedRangeCount": 0,
+              "liveRangeCount": 0,
+              "mountedRowCount": 28,
+              "rebuiltRowCount": 28,
+              "skippedRowCount": 0,
+              "staticRangeCount": 140,
+              "tokenRenderIndexDirty": true
+            },
+            "at": 3113.5
+          },
+          {
+            "name": "editor.syntax.structural.apply",
+            "timestampMs": 3113.800000011921,
+            "durationMs": 3.800000011920929,
+            "at": 3113.800000011921
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 3168,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 3168
+          }
+        ],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "short-lines",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": "typescript",
+          "syntaxStatus": "ready",
+          "initialHighlightStatus": "painted",
+          "cursor": { "row": 499999, "column": 25 },
+          "length": 12834064,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 0,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 1, "sentChunks": 784, "sourceEpochs": 0 }
+          },
+          "lastError": null
+        }
+      },
+      "pixels": {
+        "text": { "ink": 527, "chromatic": 0 },
+        "highlighted": { "ink": 524, "chromatic": 180 }
+      },
+      "assets": [
+        {
+          "phase": "request",
+          "path": "/assets/tree-sitter-typescript-DJLS94Ei.js",
+          "wallTimeMs": 244
+        },
+        {
+          "phase": "request",
+          "path": "/assets/typescript-highlights-Copz-2oQ.js",
+          "wallTimeMs": 244
+        },
+        {
+          "phase": "request",
+          "path": "/assets/javascript-highlights-70ziJmbJ.js",
+          "wallTimeMs": 244
+        },
+        { "phase": "request", "path": "/assets/typescript-folds-v26TyEuW.js", "wallTimeMs": 244 },
+        { "phase": "request", "path": "/assets/javascript-folds-B7oa76u2.js", "wallTimeMs": 244 },
+        { "phase": "request", "path": "/assets/injections-Dqft2Yhg.js", "wallTimeMs": 245 },
+        {
+          "phase": "response",
+          "path": "/assets/typescript-highlights-Copz-2oQ.js",
+          "status": 200,
+          "wallTimeMs": 259
+        },
+        {
+          "phase": "response",
+          "path": "/assets/typescript-folds-v26TyEuW.js",
+          "status": 200,
+          "wallTimeMs": 259
+        },
+        {
+          "phase": "response",
+          "path": "/assets/javascript-highlights-70ziJmbJ.js",
+          "status": 200,
+          "wallTimeMs": 259
+        },
+        {
+          "phase": "response",
+          "path": "/assets/javascript-folds-B7oa76u2.js",
+          "status": 200,
+          "wallTimeMs": 259
+        },
+        {
+          "phase": "response",
+          "path": "/assets/injections-Dqft2Yhg.js",
+          "status": 200,
+          "wallTimeMs": 259
+        },
+        {
+          "phase": "response",
+          "path": "/assets/tree-sitter-typescript-DJLS94Ei.js",
+          "status": 200,
+          "wallTimeMs": 265
+        }
+      ],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 1,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 1, "sentChunks": 0, "sourceEpochs": 1 }
+          },
+          "lastError": null
+        }
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 0,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 1, "sentChunks": 0, "sourceEpochs": 1 }
+          },
+          "lastError": null
+        }
+      },
+      "correct": true
+    },
+    {
+      "fixture": "short-lines",
+      "plugin": "tree-sitter",
+      "mode": "direct",
+      "state": "warm",
+      "repetition": 0,
+      "fixtureHash": "2bacff110d8d3fe9b5d12e1ea6cc5cfb31d2a344d22119b49222674196352c6a",
+      "timing": {
+        "start": 3434.5999999940395,
+        "constructorAt": 3470.7999999970198,
+        "constructedAt": 3471.7000000029802,
+        "attachedAt": 3554.5,
+        "bufferMs": 36.20000000298023,
+        "preparationMs": 0
+      },
+      "latencyMs": {
+        "buffer": 36.20000000298023,
+        "preparation": 0,
+        "constructor": 0.9000000059604645,
+        "attach": 82.79999999701977,
+        "openSynchronous": 119.90000000596046,
+        "textCallback": 119.79999999701977,
+        "visibleTextUpperBound": 198.90000000596046,
+        "highlightCallback": 1932.7999999970198,
+        "highlightedPaintUpperBound": 1998.4000000059605
+      },
+      "observation": {
+        "now": 5434.79999999702,
+        "start": 3434.5999999940395,
+        "paints": [
+          {
+            "documentId": "short-lines",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 3554.3999999910593
+          },
+          {
+            "documentId": "short-lines",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "painted",
+            "at": 5367.399999991059
+          }
+        ],
+        "diagnostics": [
+          {
+            "name": "editor.document.attach",
+            "timestampMs": 3471.8999999910593,
+            "detail": { "prepared": false, "structural": "absent", "highlighter": "absent" },
+            "at": 3471.8999999910593
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 3471.8999999910593,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 3471.8999999910593
+          },
+          {
+            "name": "editor.syntax.session_created",
+            "timestampMs": 3471.8999999910593,
+            "detail": { "family": "structural" },
+            "at": 3471.8999999910593
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 3471.8999999910593,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 3471.8999999910593
+          },
+          {
+            "name": "editor.line_starts.scan",
+            "timestampMs": 3471.8999999910593,
+            "at": 3471.8999999910593
+          },
+          {
+            "name": "editor.syntax.structural.request",
+            "timestampMs": 3554.5,
+            "durationMs": 0,
+            "at": 3554.5
+          },
+          {
+            "name": "startup.worker.registerLanguages",
+            "at": 3554.5999999940395,
+            "durationMs": 1.4000000059604645
+          },
+          { "name": "startup.worker.parse", "at": 3556, "durationMs": 1696.2000000029802 },
+          {
+            "name": "startup.worker.queryRange",
+            "at": 5252.29999999702,
+            "durationMs": 113.70000000298023
+          },
+          {
+            "name": "editor.syntax.structural.accepted",
+            "timestampMs": 5366.29999999702,
+            "detail": { "documentVersion": 1, "contentVersion": 1, "source": "visible" },
+            "at": 5366.29999999702
+          },
+          {
+            "name": "editor.input",
+            "timestampMs": 5366.899999991059,
+            "operation": { "id": 2, "input": "editor.operation", "startedAtMs": 5366.899999991059 },
+            "durationMs": 0,
+            "at": 5366.899999991059
+          },
+          {
+            "name": "editor.tokenHighlights.segments",
+            "timestampMs": 5367.0999999940395,
+            "durationMs": 0.09999999403953552,
+            "detail": {
+              "addedSegmentCount": 140,
+              "adjacentMergedSegmentCount": 0,
+              "chunkCount": 28,
+              "finalSegmentCount": 140,
+              "gapMergedSegmentCount": 0,
+              "mergedSegmentCount": 0,
+              "rawSegmentCount": 140,
+              "rowCount": 28,
+              "rowSlotCount": 28,
+              "tokenScanCount": 140
+            },
+            "at": 5367.0999999940395
+          },
+          {
+            "name": "editor.tokenHighlights.ranges",
+            "timestampMs": 5367.399999991059,
+            "durationMs": 0.3999999910593033,
+            "detail": {
+              "addedRangeCount": 140,
+              "deletedRangeCount": 0,
+              "liveRangeCount": 0,
+              "mountedRowCount": 28,
+              "rebuiltRowCount": 28,
+              "skippedRowCount": 0,
+              "staticRangeCount": 140,
+              "tokenRenderIndexDirty": true
+            },
+            "at": 5367.399999991059
+          },
+          {
+            "name": "editor.syntax.structural.apply",
+            "timestampMs": 5367.5,
+            "durationMs": 1.2000000029802322,
+            "at": 5367.5
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 5434.79999999702,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 5434.79999999702
+          }
+        ],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "short-lines",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": "typescript",
+          "syntaxStatus": "ready",
+          "initialHighlightStatus": "painted",
+          "cursor": { "row": 499999, "column": 25 },
+          "length": 12834064,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 0,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 2, "sentChunks": 784, "sourceEpochs": 1 }
+          },
+          "lastError": null
+        }
+      },
+      "pixels": {
+        "text": { "ink": 527, "chromatic": 0 },
+        "highlighted": { "ink": 524, "chromatic": 180 }
+      },
+      "assets": [],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 1,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 2, "sentChunks": 0, "sourceEpochs": 2 }
+          },
+          "lastError": null
+        }
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 0,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 2, "sentChunks": 0, "sourceEpochs": 2 }
+          },
+          "lastError": null
+        }
+      },
+      "correct": true
+    },
+    {
+      "fixture": "short-lines",
+      "plugin": "tree-sitter",
+      "mode": "prepared",
+      "state": "cold",
+      "repetition": 0,
+      "fixtureHash": "2bacff110d8d3fe9b5d12e1ea6cc5cfb31d2a344d22119b49222674196352c6a",
+      "timing": {
+        "start": 3248.2000000029802,
+        "constructorAt": 3248.2999999970198,
+        "constructedAt": 3253.5,
+        "attachedAt": 3382.2999999970198,
+        "bufferMs": 46.69999998807907,
+        "preparationMs": 2571.5
+      },
+      "latencyMs": {
+        "buffer": 46.69999998807907,
+        "preparation": 2571.5,
+        "constructor": 5.200000002980232,
+        "attach": 128.79999999701977,
+        "openSynchronous": 134.09999999403954,
+        "textCallback": 134,
+        "visibleTextUpperBound": 218.79999999701977,
+        "highlightCallback": 134,
+        "highlightedPaintUpperBound": 268.8999999910593
+      },
+      "observation": {
+        "now": 3518.7000000029802,
+        "start": 3248.2000000029802,
+        "paints": [
+          {
+            "documentId": "short-lines",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 3382.2000000029802
+          },
+          {
+            "documentId": "short-lines",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "painted",
+            "at": 3382.2000000029802
+          }
+        ],
+        "diagnostics": [
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 722.5,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 722.5999999940395
+          },
+          { "name": "startup.language.assets", "at": 777.5999999940395, "durationMs": 25 },
+          {
+            "name": "startup.worker.registerLanguages",
+            "at": 802.7999999970198,
+            "durationMs": 25.599999994039536
+          },
+          {
+            "name": "startup.worker.parse",
+            "at": 828.3999999910593,
+            "durationMs": 2289.4000000059605
+          },
+          {
+            "name": "startup.worker.queryRange",
+            "at": 3117.8999999910593,
+            "durationMs": 128.90000000596046
+          },
+          {
+            "name": "editor.document.attach",
+            "timestampMs": 3253.7000000029802,
+            "detail": { "prepared": true, "structural": "ready", "highlighter": "absent" },
+            "at": 3253.7000000029802
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 3254,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 3254
+          },
+          {
+            "name": "editor.syntax.structural.accepted",
+            "timestampMs": 3375.7999999970198,
+            "detail": { "documentVersion": 1, "contentVersion": 1, "source": "visible" },
+            "at": 3375.7999999970198
+          },
+          {
+            "name": "editor.tokenHighlights.segments",
+            "timestampMs": 3386.5,
+            "durationMs": 0.4000000059604645,
+            "detail": {
+              "addedSegmentCount": 140,
+              "adjacentMergedSegmentCount": 0,
+              "chunkCount": 28,
+              "finalSegmentCount": 140,
+              "gapMergedSegmentCount": 0,
+              "mergedSegmentCount": 0,
+              "rawSegmentCount": 140,
+              "rowCount": 28,
+              "rowSlotCount": 28,
+              "tokenScanCount": 140
+            },
+            "at": 3386.5
+          },
+          {
+            "name": "editor.tokenHighlights.ranges",
+            "timestampMs": 3387.2000000029802,
+            "durationMs": 1.1000000089406967,
+            "detail": {
+              "addedRangeCount": 140,
+              "deletedRangeCount": 0,
+              "liveRangeCount": 0,
+              "mountedRowCount": 28,
+              "rebuiltRowCount": 28,
+              "skippedRowCount": 0,
+              "staticRangeCount": 140,
+              "tokenRenderIndexDirty": true
+            },
+            "at": 3387.2000000029802
+          },
+          {
+            "name": "editor.tokenHighlights.segments",
+            "timestampMs": 3387.7000000029802,
+            "durationMs": 0.30000001192092896,
+            "detail": {
+              "addedSegmentCount": 140,
+              "adjacentMergedSegmentCount": 0,
+              "chunkCount": 28,
+              "finalSegmentCount": 140,
+              "gapMergedSegmentCount": 0,
+              "mergedSegmentCount": 0,
+              "rawSegmentCount": 140,
+              "rowCount": 28,
+              "rowSlotCount": 28,
+              "tokenScanCount": 140
+            },
+            "at": 3387.7000000029802
+          },
+          {
+            "name": "editor.tokenHighlights.ranges",
+            "timestampMs": 3387.7000000029802,
+            "durationMs": 0.30000001192092896,
+            "detail": {
+              "addedRangeCount": 0,
+              "deletedRangeCount": 0,
+              "liveRangeCount": 0,
+              "mountedRowCount": 28,
+              "rebuiltRowCount": 0,
+              "skippedRowCount": 28,
+              "staticRangeCount": 0,
+              "tokenRenderIndexDirty": true
+            },
+            "at": 3387.7000000029802
+          },
+          {
+            "name": "editor.syntax.range.request",
+            "timestampMs": 3388.0999999940395,
+            "durationMs": 0.09999999403953552,
+            "at": 3388.0999999940395
+          },
+          {
+            "name": "startup.worker.queryRange",
+            "at": 3388.0999999940395,
+            "durationMs": 115.6000000089407
+          },
+          {
+            "name": "editor.syntax.structural.accepted",
+            "timestampMs": 3504.0999999940395,
+            "detail": { "documentVersion": 1, "contentVersion": 1, "source": "visible" },
+            "at": 3504.0999999940395
+          },
+          {
+            "name": "editor.input",
+            "timestampMs": 3504.8999999910593,
+            "operation": { "id": 1, "input": "editor.operation", "startedAtMs": 3504.5 },
+            "durationMs": 0.3999999910593033,
+            "at": 3504.8999999910593
+          },
+          {
+            "name": "editor.tokenHighlights.segments",
+            "timestampMs": 3505,
+            "durationMs": 0.10000000894069672,
+            "detail": {
+              "addedSegmentCount": 140,
+              "adjacentMergedSegmentCount": 0,
+              "chunkCount": 28,
+              "finalSegmentCount": 140,
+              "gapMergedSegmentCount": 0,
+              "mergedSegmentCount": 0,
+              "rawSegmentCount": 140,
+              "rowCount": 28,
+              "rowSlotCount": 28,
+              "tokenScanCount": 140
+            },
+            "at": 3505
+          },
+          {
+            "name": "editor.tokenHighlights.ranges",
+            "timestampMs": 3505,
+            "durationMs": 0.10000000894069672,
+            "detail": {
+              "addedRangeCount": 0,
+              "deletedRangeCount": 0,
+              "liveRangeCount": 0,
+              "mountedRowCount": 28,
+              "rebuiltRowCount": 0,
+              "skippedRowCount": 28,
+              "staticRangeCount": 0,
+              "tokenRenderIndexDirty": true
+            },
+            "at": 3505
+          },
+          {
+            "name": "editor.syntax.range.apply",
+            "timestampMs": 3505.0999999940395,
+            "durationMs": 1,
+            "at": 3505.0999999940395
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 3518.8999999910593,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 3518.8999999910593
+          }
+        ],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "short-lines",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": "typescript",
+          "syntaxStatus": "ready",
+          "initialHighlightStatus": "painted",
+          "cursor": { "row": 499999, "column": 25 },
+          "length": 12834064,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 0,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 1, "sentChunks": 784, "sourceEpochs": 0 }
+          },
+          "lastError": null
+        }
+      },
+      "pixels": {
+        "text": { "ink": 524, "chromatic": 180 },
+        "highlighted": { "ink": 524, "chromatic": 180 }
+      },
+      "assets": [
+        {
+          "phase": "request",
+          "path": "/assets/tree-sitter-typescript-DJLS94Ei.js",
+          "wallTimeMs": 241
+        },
+        {
+          "phase": "request",
+          "path": "/assets/typescript-highlights-Copz-2oQ.js",
+          "wallTimeMs": 241
+        },
+        {
+          "phase": "request",
+          "path": "/assets/javascript-highlights-70ziJmbJ.js",
+          "wallTimeMs": 241
+        },
+        { "phase": "request", "path": "/assets/typescript-folds-v26TyEuW.js", "wallTimeMs": 241 },
+        { "phase": "request", "path": "/assets/javascript-folds-B7oa76u2.js", "wallTimeMs": 242 },
+        { "phase": "request", "path": "/assets/injections-Dqft2Yhg.js", "wallTimeMs": 242 },
+        {
+          "phase": "response",
+          "path": "/assets/typescript-highlights-Copz-2oQ.js",
+          "status": 200,
+          "wallTimeMs": 244
+        },
+        {
+          "phase": "response",
+          "path": "/assets/javascript-highlights-70ziJmbJ.js",
+          "status": 200,
+          "wallTimeMs": 244
+        },
+        {
+          "phase": "response",
+          "path": "/assets/typescript-folds-v26TyEuW.js",
+          "status": 200,
+          "wallTimeMs": 244
+        },
+        {
+          "phase": "response",
+          "path": "/assets/javascript-folds-B7oa76u2.js",
+          "status": 200,
+          "wallTimeMs": 244
+        },
+        {
+          "phase": "response",
+          "path": "/assets/injections-Dqft2Yhg.js",
+          "status": 200,
+          "wallTimeMs": 244
+        },
+        {
+          "phase": "response",
+          "path": "/assets/tree-sitter-typescript-DJLS94Ei.js",
+          "status": 200,
+          "wallTimeMs": 264
+        }
+      ],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 1,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 1, "sentChunks": 0, "sourceEpochs": 1 }
+          },
+          "lastError": null
+        }
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 0,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 1, "sentChunks": 0, "sourceEpochs": 1 }
+          },
+          "lastError": null
+        }
+      },
+      "correct": true
+    },
+    {
+      "fixture": "short-lines",
+      "plugin": "tree-sitter",
+      "mode": "prepared",
+      "state": "warm",
+      "repetition": 0,
+      "fixtureHash": "2bacff110d8d3fe9b5d12e1ea6cc5cfb31d2a344d22119b49222674196352c6a",
+      "timing": {
+        "start": 5388.20000000298,
+        "constructorAt": 5388.29999999702,
+        "constructedAt": 5389.70000000298,
+        "attachedAt": 5515.5999999940395,
+        "bufferMs": 35.5,
+        "preparationMs": 1874.7000000029802
+      },
+      "latencyMs": {
+        "buffer": 35.5,
+        "preparation": 1874.7000000029802,
+        "constructor": 1.4000000059604645,
+        "attach": 125.8999999910593,
+        "openSynchronous": 127.3999999910593,
+        "textCallback": 127.3999999910593,
+        "visibleTextUpperBound": 196.5,
+        "highlightCallback": 127.3999999910593,
+        "highlightedPaintUpperBound": 246.09999999403954
+      },
+      "observation": {
+        "now": 5635.70000000298,
+        "start": 5388.20000000298,
+        "paints": [
+          {
+            "documentId": "short-lines",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 5515.5999999940395
+          },
+          {
+            "documentId": "short-lines",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "painted",
+            "at": 5515.5999999940395
+          }
+        ],
+        "diagnostics": [
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 3548.0999999940395,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 3548.0999999940395
+          },
+          {
+            "name": "startup.worker.registerLanguages",
+            "at": 3592,
+            "durationMs": 1.3999999910593033
+          },
+          {
+            "name": "startup.worker.parse",
+            "at": 3593.3999999910593,
+            "durationMs": 1688.6000000089407
+          },
+          { "name": "startup.worker.queryRange", "at": 5282, "durationMs": 105.29999999701977 },
+          {
+            "name": "editor.document.attach",
+            "timestampMs": 5389.79999999702,
+            "detail": { "prepared": true, "structural": "ready", "highlighter": "absent" },
+            "at": 5389.79999999702
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 5389.899999991059,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 5389.899999991059
+          },
+          {
+            "name": "editor.syntax.structural.accepted",
+            "timestampMs": 5510.29999999702,
+            "detail": { "documentVersion": 1, "contentVersion": 1, "source": "visible" },
+            "at": 5510.29999999702
+          },
+          {
+            "name": "editor.tokenHighlights.segments",
+            "timestampMs": 5517.0999999940395,
+            "durationMs": 0.20000000298023224,
+            "detail": {
+              "addedSegmentCount": 140,
+              "adjacentMergedSegmentCount": 0,
+              "chunkCount": 28,
+              "finalSegmentCount": 140,
+              "gapMergedSegmentCount": 0,
+              "mergedSegmentCount": 0,
+              "rawSegmentCount": 140,
+              "rowCount": 28,
+              "rowSlotCount": 28,
+              "tokenScanCount": 140
+            },
+            "at": 5517.0999999940395
+          },
+          {
+            "name": "editor.tokenHighlights.ranges",
+            "timestampMs": 5517.399999991059,
+            "durationMs": 0.5,
+            "detail": {
+              "addedRangeCount": 140,
+              "deletedRangeCount": 0,
+              "liveRangeCount": 0,
+              "mountedRowCount": 28,
+              "rebuiltRowCount": 28,
+              "skippedRowCount": 0,
+              "staticRangeCount": 140,
+              "tokenRenderIndexDirty": true
+            },
+            "at": 5517.399999991059
+          },
+          {
+            "name": "editor.tokenHighlights.segments",
+            "timestampMs": 5517.5,
+            "durationMs": 0.10000000894069672,
+            "detail": {
+              "addedSegmentCount": 140,
+              "adjacentMergedSegmentCount": 0,
+              "chunkCount": 28,
+              "finalSegmentCount": 140,
+              "gapMergedSegmentCount": 0,
+              "mergedSegmentCount": 0,
+              "rawSegmentCount": 140,
+              "rowCount": 28,
+              "rowSlotCount": 28,
+              "tokenScanCount": 140
+            },
+            "at": 5517.5
+          },
+          {
+            "name": "editor.tokenHighlights.ranges",
+            "timestampMs": 5517.5999999940395,
+            "durationMs": 0.20000000298023224,
+            "detail": {
+              "addedRangeCount": 0,
+              "deletedRangeCount": 0,
+              "liveRangeCount": 0,
+              "mountedRowCount": 28,
+              "rebuiltRowCount": 0,
+              "skippedRowCount": 28,
+              "staticRangeCount": 0,
+              "tokenRenderIndexDirty": true
+            },
+            "at": 5517.5999999940395
+          },
+          {
+            "name": "editor.syntax.range.request",
+            "timestampMs": 5517.5999999940395,
+            "durationMs": 0,
+            "at": 5517.5999999940395
+          },
+          {
+            "name": "startup.worker.queryRange",
+            "at": 5517.5999999940395,
+            "durationMs": 112.70000000298023
+          },
+          {
+            "name": "editor.syntax.structural.accepted",
+            "timestampMs": 5630.399999991059,
+            "detail": { "documentVersion": 1, "contentVersion": 1, "source": "visible" },
+            "at": 5630.399999991059
+          },
+          {
+            "name": "editor.input",
+            "timestampMs": 5630.899999991059,
+            "operation": { "id": 2, "input": "editor.operation", "startedAtMs": 5630.79999999702 },
+            "durationMs": 0.09999999403953552,
+            "at": 5630.899999991059
+          },
+          {
+            "name": "editor.tokenHighlights.segments",
+            "timestampMs": 5631,
+            "durationMs": 0.10000000894069672,
+            "detail": {
+              "addedSegmentCount": 140,
+              "adjacentMergedSegmentCount": 0,
+              "chunkCount": 28,
+              "finalSegmentCount": 140,
+              "gapMergedSegmentCount": 0,
+              "mergedSegmentCount": 0,
+              "rawSegmentCount": 140,
+              "rowCount": 28,
+              "rowSlotCount": 28,
+              "tokenScanCount": 140
+            },
+            "at": 5631
+          },
+          {
+            "name": "editor.tokenHighlights.ranges",
+            "timestampMs": 5631,
+            "durationMs": 0.10000000894069672,
+            "detail": {
+              "addedRangeCount": 0,
+              "deletedRangeCount": 0,
+              "liveRangeCount": 0,
+              "mountedRowCount": 28,
+              "rebuiltRowCount": 0,
+              "skippedRowCount": 28,
+              "staticRangeCount": 0,
+              "tokenRenderIndexDirty": true
+            },
+            "at": 5631
+          },
+          {
+            "name": "editor.syntax.range.apply",
+            "timestampMs": 5631.0999999940395,
+            "durationMs": 0.7000000029802322,
+            "at": 5631.0999999940395
+          },
+          {
+            "name": "textSnapshot.materializeFullText",
+            "timestampMs": 5635.79999999702,
+            "detail": { "length": 12834064, "cached": true, "retained": true },
+            "at": 5635.79999999702
+          }
+        ],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "short-lines",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": "typescript",
+          "syntaxStatus": "ready",
+          "initialHighlightStatus": "painted",
+          "cursor": { "row": 499999, "column": 25 },
+          "length": 12834064,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 0,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 2, "sentChunks": 784, "sourceEpochs": 1 }
+          },
+          "lastError": null
+        }
+      },
+      "pixels": {
+        "text": { "ink": 524, "chromatic": 180 },
+        "highlighted": { "ink": 524, "chromatic": 180 }
+      },
+      "assets": [],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 1,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 2, "sentChunks": 0, "sourceEpochs": 2 }
+          },
+          "lastError": null
+        }
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": {
+          "lifecycle": "ready",
+          "pendingRequests": 0,
+          "workerGeneration": 1,
+          "cache": {
+            "registeredLanguages": 1,
+            "sourceChunks": { "documents": 2, "sentChunks": 0, "sourceEpochs": 2 }
+          },
+          "lastError": null
+        }
+      },
+      "correct": true
+    }
+  ]
+}

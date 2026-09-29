@@ -1,0 +1,8 @@
+{
+  // Resolves @singapore-editor/core through its exports map, so this checks the built declarations.
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "paths": {}
+  },
+  "include": ["./*.types.ts"]
+}

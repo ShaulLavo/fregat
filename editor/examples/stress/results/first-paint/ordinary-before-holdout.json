@@ -1,0 +1,1177 @@
+{
+  "schemaVersion": 1,
+  "suite": "first-paint",
+  "id": "1c3aefea-b071-4af3-b3f8-142881841513",
+  "createdAt": "2026-09-08T04:50:13.380Z",
+  "manifest": {
+    "schemaVersion": 1,
+    "generatorVersion": 1,
+    "seed": 60061,
+    "fixtures": [
+      {
+        "id": "ordinary",
+        "bytes": 4469,
+        "utf16Length": 4469,
+        "normalizedLength": 4469,
+        "lines": 200,
+        "longestLine": 22,
+        "searchCount": 1,
+        "sha256": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197"
+      }
+    ]
+  },
+  "config": {
+    "repetitions": 5,
+    "warmups": 1,
+    "modes": ["direct"],
+    "plugins": ["none"],
+    "states": ["cold", "warm"],
+    "diagnostics": false,
+    "viewport": { "width": 1000, "height": 1000 },
+    "delivery": "vite-production-playwright-route",
+    "textMeasurement": "screenshot-completion-upper-bound",
+    "callbackMeasurement": "public-onInitialPaint-observable-not-pixels",
+    "preparation": "exact-buffer-revision-and-provider-initial-4096-characters",
+    "cleanup": "worker-idle-fence-then-main-renderer-forced-gc",
+    "tabSize": 4,
+    "cold": "fresh-browser-context",
+    "warm": "fresh-document-after-one-unrecorded-open-in-same-context"
+  },
+  "environment": {
+    "commit": "116e68f745408bd951262ef740f4c25f0527e591",
+    "sourceHash": "784ecc3b68f048679572975273a388a835a8448a9fcfe4fcb0ab9ce68d8d1f31",
+    "coreDirectory": "/work/tmp/editor-e003-baseline",
+    "browser": "148.0.7778.96",
+    "runtime": "v26.7.0",
+    "hardware": {
+      "cpu": "Intel(R) Core(TM) i7-14700K",
+      "logicalCpus": 28,
+      "memoryBytes": 33370660864,
+      "arch": "x64",
+      "platform": "linux",
+      "release": "7.1.9-arch1-2"
+    }
+  },
+  "samples": [
+    {
+      "fixture": "ordinary",
+      "plugin": "none",
+      "mode": "direct",
+      "state": "cold",
+      "repetition": 0,
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "timing": {
+        "start": 552.9000000059605,
+        "constructorAt": 553.9000000059605,
+        "constructedAt": 565.2999999970198,
+        "attachedAt": 572.2999999970198,
+        "bufferMs": 0.8999999910593033,
+        "preparationMs": 0
+      },
+      "latencyMs": {
+        "buffer": 0.8999999910593033,
+        "preparation": 0,
+        "constructor": 11.399999991059303,
+        "attach": 7,
+        "openSynchronous": 19.399999991059303,
+        "textCallback": 19.399999991059303,
+        "visibleTextUpperBound": 96.5
+      },
+      "observation": {
+        "now": 652.6000000089407,
+        "start": 552.9000000059605,
+        "paints": [
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 572.2999999970198
+          },
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "plain",
+            "at": 572.2999999970198
+          }
+        ],
+        "diagnostics": [],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "ordinary",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": null,
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "plain",
+          "cursor": { "row": 199, "column": 22 },
+          "length": 4469,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": null
+      },
+      "pixels": { "text": { "ink": 527, "chromatic": 0 }, "highlighted": null },
+      "assets": [],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "plugin": "none",
+      "mode": "direct",
+      "state": "cold",
+      "repetition": 1,
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "timing": {
+        "start": 546.1000000089407,
+        "constructorAt": 546.9000000059605,
+        "constructedAt": 552.7999999970198,
+        "attachedAt": 559.6000000089407,
+        "bufferMs": 0.699999988079071,
+        "preparationMs": 0
+      },
+      "latencyMs": {
+        "buffer": 0.699999988079071,
+        "preparation": 0,
+        "constructor": 5.899999991059303,
+        "attach": 6.800000011920929,
+        "openSynchronous": 13.5,
+        "textCallback": 13.399999991059303,
+        "visibleTextUpperBound": 87.19999998807907
+      },
+      "observation": {
+        "now": 635.5,
+        "start": 546.1000000089407,
+        "paints": [
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 559.5
+          },
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "plain",
+            "at": 559.5
+          }
+        ],
+        "diagnostics": [],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "ordinary",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": null,
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "plain",
+          "cursor": { "row": 199, "column": 22 },
+          "length": 4469,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": null
+      },
+      "pixels": { "text": { "ink": 527, "chromatic": 0 }, "highlighted": null },
+      "assets": [],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "plugin": "none",
+      "mode": "direct",
+      "state": "cold",
+      "repetition": 2,
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "timing": {
+        "start": 541.9000000059605,
+        "constructorAt": 545.7000000029802,
+        "constructedAt": 550.7000000029802,
+        "attachedAt": 554.5,
+        "bufferMs": 3.7999999970197678,
+        "preparationMs": 0
+      },
+      "latencyMs": {
+        "buffer": 3.7999999970197678,
+        "preparation": 0,
+        "constructor": 5,
+        "attach": 3.7999999970197678,
+        "openSynchronous": 12.599999994039536,
+        "textCallback": 12.599999994039536,
+        "visibleTextUpperBound": 82.3999999910593
+      },
+      "observation": {
+        "now": 626.5999999940395,
+        "start": 541.9000000059605,
+        "paints": [
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 554.5
+          },
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "plain",
+            "at": 554.5
+          }
+        ],
+        "diagnostics": [],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "ordinary",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": null,
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "plain",
+          "cursor": { "row": 199, "column": 22 },
+          "length": 4469,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": null
+      },
+      "pixels": { "text": { "ink": 527, "chromatic": 0 }, "highlighted": null },
+      "assets": [],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "plugin": "none",
+      "mode": "direct",
+      "state": "cold",
+      "repetition": 3,
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "timing": {
+        "start": 544.5999999940395,
+        "constructorAt": 548.5,
+        "constructedAt": 553.7000000029802,
+        "attachedAt": 557.5999999940395,
+        "bufferMs": 3.800000011920929,
+        "preparationMs": 0
+      },
+      "latencyMs": {
+        "buffer": 3.800000011920929,
+        "preparation": 0,
+        "constructor": 5.200000002980232,
+        "attach": 3.8999999910593033,
+        "openSynchronous": 13,
+        "textCallback": 13,
+        "visibleTextUpperBound": 111.6000000089407
+      },
+      "observation": {
+        "now": 659.4000000059605,
+        "start": 544.5999999940395,
+        "paints": [
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 557.5999999940395
+          },
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "plain",
+            "at": 557.5999999940395
+          }
+        ],
+        "diagnostics": [],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "ordinary",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": null,
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "plain",
+          "cursor": { "row": 199, "column": 22 },
+          "length": 4469,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": null
+      },
+      "pixels": { "text": { "ink": 527, "chromatic": 0 }, "highlighted": null },
+      "assets": [],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "plugin": "none",
+      "mode": "direct",
+      "state": "cold",
+      "repetition": 4,
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "timing": {
+        "start": 551.7000000029802,
+        "constructorAt": 552.4000000059605,
+        "constructedAt": 557.7000000029802,
+        "attachedAt": 561.6000000089407,
+        "bufferMs": 0.7000000029802322,
+        "preparationMs": 0
+      },
+      "latencyMs": {
+        "buffer": 0.7000000029802322,
+        "preparation": 0,
+        "constructor": 5.299999997019768,
+        "attach": 3.9000000059604645,
+        "openSynchronous": 9.900000005960464,
+        "textCallback": 9.799999997019768,
+        "visibleTextUpperBound": 96
+      },
+      "observation": {
+        "now": 651.6000000089407,
+        "start": 551.7000000029802,
+        "paints": [
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 561.5
+          },
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "plain",
+            "at": 561.5
+          }
+        ],
+        "diagnostics": [],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "ordinary",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": null,
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "plain",
+          "cursor": { "row": 199, "column": 22 },
+          "length": 4469,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": null
+      },
+      "pixels": { "text": { "ink": 527, "chromatic": 0 }, "highlighted": null },
+      "assets": [],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "plugin": "none",
+      "mode": "direct",
+      "state": "warm",
+      "repetition": 0,
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "timing": {
+        "start": 671.2999999970198,
+        "constructorAt": 671.5,
+        "constructedAt": 672.4000000059605,
+        "attachedAt": 673.2000000029802,
+        "bufferMs": 0.20000000298023224,
+        "preparationMs": 0
+      },
+      "latencyMs": {
+        "buffer": 0.20000000298023224,
+        "preparation": 0,
+        "constructor": 0.9000000059604645,
+        "attach": 0.7999999970197678,
+        "openSynchronous": 1.9000000059604645,
+        "textCallback": 1.9000000059604645,
+        "visibleTextUpperBound": 131.1000000089407
+      },
+      "observation": {
+        "now": 804.9000000059605,
+        "start": 671.2999999970198,
+        "paints": [
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 673.2000000029802
+          },
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "plain",
+            "at": 673.2000000029802
+          }
+        ],
+        "diagnostics": [],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "ordinary",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": null,
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "plain",
+          "cursor": { "row": 199, "column": 22 },
+          "length": 4469,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": null
+      },
+      "pixels": { "text": { "ink": 527, "chromatic": 0 }, "highlighted": null },
+      "assets": [],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "plugin": "none",
+      "mode": "direct",
+      "state": "warm",
+      "repetition": 1,
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "timing": {
+        "start": 815,
+        "constructorAt": 815.0999999940395,
+        "constructedAt": 815.9000000059605,
+        "attachedAt": 816.7000000029802,
+        "bufferMs": 0.09999999403953552,
+        "preparationMs": 0
+      },
+      "latencyMs": {
+        "buffer": 0.09999999403953552,
+        "preparation": 0,
+        "constructor": 0.800000011920929,
+        "attach": 0.7999999970197678,
+        "openSynchronous": 1.7000000029802322,
+        "textCallback": 1.7000000029802322,
+        "visibleTextUpperBound": 87.79999999701977
+      },
+      "observation": {
+        "now": 905.7000000029802,
+        "start": 815,
+        "paints": [
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 816.7000000029802
+          },
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "plain",
+            "at": 816.7000000029802
+          }
+        ],
+        "diagnostics": [],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "ordinary",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": null,
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "plain",
+          "cursor": { "row": 199, "column": 22 },
+          "length": 4469,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": null
+      },
+      "pixels": { "text": { "ink": 527, "chromatic": 0 }, "highlighted": null },
+      "assets": [],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "plugin": "none",
+      "mode": "direct",
+      "state": "warm",
+      "repetition": 2,
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "timing": {
+        "start": 914.4000000059605,
+        "constructorAt": 914.5,
+        "constructedAt": 915.2999999970198,
+        "attachedAt": 915.9000000059605,
+        "bufferMs": 0.09999999403953552,
+        "preparationMs": 0
+      },
+      "latencyMs": {
+        "buffer": 0.09999999403953552,
+        "preparation": 0,
+        "constructor": 0.7999999970197678,
+        "attach": 0.6000000089406967,
+        "openSynchronous": 1.5,
+        "textCallback": 1.3999999910593033,
+        "visibleTextUpperBound": 87.5
+      },
+      "observation": {
+        "now": 1003.9000000059605,
+        "start": 914.4000000059605,
+        "paints": [
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 915.7999999970198
+          },
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "plain",
+            "at": 915.9000000059605
+          }
+        ],
+        "diagnostics": [],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "ordinary",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": null,
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "plain",
+          "cursor": { "row": 199, "column": 22 },
+          "length": 4469,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": null
+      },
+      "pixels": { "text": { "ink": 527, "chromatic": 0 }, "highlighted": null },
+      "assets": [],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "plugin": "none",
+      "mode": "direct",
+      "state": "warm",
+      "repetition": 3,
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "timing": {
+        "start": 1012.5999999940395,
+        "constructorAt": 1012.7000000029802,
+        "constructedAt": 1013.5999999940395,
+        "attachedAt": 1014.0999999940395,
+        "bufferMs": 0.10000000894069672,
+        "preparationMs": 0
+      },
+      "latencyMs": {
+        "buffer": 0.10000000894069672,
+        "preparation": 0,
+        "constructor": 0.8999999910593033,
+        "attach": 0.5,
+        "openSynchronous": 1.5,
+        "textCallback": 1.5,
+        "visibleTextUpperBound": 89.5
+      },
+      "observation": {
+        "now": 1104,
+        "start": 1012.5999999940395,
+        "paints": [
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 1014.0999999940395
+          },
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "plain",
+            "at": 1014.0999999940395
+          }
+        ],
+        "diagnostics": [],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "ordinary",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": null,
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "plain",
+          "cursor": { "row": 199, "column": 22 },
+          "length": 4469,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": null
+      },
+      "pixels": { "text": { "ink": 527, "chromatic": 0 }, "highlighted": null },
+      "assets": [],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "plugin": "none",
+      "mode": "direct",
+      "state": "warm",
+      "repetition": 4,
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "timing": {
+        "start": 1111.7999999970198,
+        "constructorAt": 1112,
+        "constructedAt": 1112.7999999970198,
+        "attachedAt": 1113.2000000029802,
+        "bufferMs": 0.20000000298023224,
+        "preparationMs": 0
+      },
+      "latencyMs": {
+        "buffer": 0.20000000298023224,
+        "preparation": 0,
+        "constructor": 0.7999999970197678,
+        "attach": 0.4000000059604645,
+        "openSynchronous": 1.4000000059604645,
+        "textCallback": 1.4000000059604645,
+        "visibleTextUpperBound": 89.79999999701977
+      },
+      "observation": {
+        "now": 1203.2999999970198,
+        "start": 1111.7999999970198,
+        "paints": [
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 1113.2000000029802
+          },
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "plain",
+            "at": 1113.2000000029802
+          }
+        ],
+        "diagnostics": [],
+        "droppedDiagnostics": 0,
+        "state": {
+          "documentId": "ordinary",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": null,
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "plain",
+          "cursor": { "row": 199, "column": 22 },
+          "length": 4469,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "revision": 0,
+        "correctText": true,
+        "rows": [
+          { "row": 0, "text": "const needle0 = 2440;" },
+          { "row": 1, "text": "const value1 = 9159;" },
+          { "row": 2, "text": "const value2 = 554;" },
+          { "row": 3, "text": "const value3 = 6417;" },
+          { "row": 4, "text": "const value4 = 5804;" },
+          { "row": 5, "text": "const value5 = 1035;" },
+          { "row": 6, "text": "const value6 = 158;" },
+          { "row": 7, "text": "const value7 = 7157;" },
+          { "row": 8, "text": "const value8 = 4880;" },
+          { "row": 9, "text": "const value9 = 3695;" },
+          { "row": 10, "text": "const value10 = 5426;" },
+          { "row": 11, "text": "const value11 = 6601;" },
+          { "row": 12, "text": "const value12 = 2900;" },
+          { "row": 13, "text": "const value13 = 5923;" },
+          { "row": 14, "text": "const value14 = 598;" },
+          { "row": 15, "text": "const value15 = 1805;" },
+          { "row": 16, "text": "const value16 = 5992;" },
+          { "row": 17, "text": "const value17 = 8807;" },
+          { "row": 18, "text": "const value18 = 2938;" },
+          { "row": 19, "text": "const value19 = 8049;" },
+          { "row": 20, "text": "const value20 = 5900;" },
+          { "row": 21, "text": "const value21 = 1339;" },
+          { "row": 22, "text": "const value22 = 5294;" },
+          { "row": 23, "text": "const value23 = 4357;" },
+          { "row": 24, "text": "const value24 = 9872;" },
+          { "row": 25, "text": "const value25 = 1023;" },
+          { "row": 26, "text": "const value26 = 4898;" },
+          { "row": 27, "text": "const value27 = 5833;" }
+        ],
+        "worker": null
+      },
+      "pixels": { "text": { "ink": 527, "chromatic": 0 }, "highlighted": null },
+      "assets": [],
+      "logs": [],
+      "beforeDisposalFence": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "cleanup": {
+        "retainedObjects": 0,
+        "retainedLabels": [],
+        "hosts": 0,
+        "active": false,
+        "worker": null
+      },
+      "correct": true
+    }
+  ]
+}

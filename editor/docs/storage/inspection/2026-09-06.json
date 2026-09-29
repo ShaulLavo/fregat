@@ -1,0 +1,50 @@
+{
+  "runtime": "1.4.0",
+  "fixture": {
+    "initialLines": 1000000,
+    "nodes": 23305,
+    "reverseEntries": 23305,
+    "visibleLength": 4045556,
+    "edits": 13334,
+    "seed": 123
+  },
+  "issues": [],
+  "costs": [
+    {
+      "operation": "10000 inserts and 3334 deletes, inspection disabled",
+      "ms": 146.098874,
+      "heapBeforeCollection": 21269472,
+      "retainedHeapBytes": 13042551
+    },
+    {
+      "operation": "validate",
+      "ms": 83.415008,
+      "heapBeforeCollection": 24899010,
+      "retainedHeapBytes": 215682
+    },
+    {
+      "operation": "inspect records, text hidden",
+      "ms": 25.28353500000003,
+      "heapBeforeCollection": 14828199,
+      "retainedHeapBytes": 17424884
+    },
+    {
+      "operation": "compare two roots, text hidden",
+      "ms": 90.366762,
+      "heapBeforeCollection": 27948975,
+      "retainedHeapBytes": 33274208
+    },
+    {
+      "operation": "format, 200 rows",
+      "ms": 25.800791000000004,
+      "heapBeforeCollection": 0,
+      "retainedHeapBytes": 181039
+    }
+  ],
+  "output": {
+    "records": 46610,
+    "changes": 46614,
+    "formattedCharacters": 57450
+  },
+  "memoryNote": "Heap deltas are GC-sensitive live-heap estimates, not total allocated bytes. Retained deltas may be negative when unrelated objects are collected."
+}

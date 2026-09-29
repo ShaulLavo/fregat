@@ -1,0 +1,69 @@
+name: Textbuffer benchmarks
+
+on:
+  pull_request:
+    paths:
+      - 'packages/textbuffer/**'
+      - 'bun.lock'
+      - '.github/workflows/textbuffer-bench.yml'
+  push:
+    branches: ['main']
+    paths:
+      - 'packages/textbuffer/**'
+      - 'bun.lock'
+      - '.github/workflows/textbuffer-bench.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: textbuffer-bench-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.2'
+      - run: bun install --frozen-lockfile
+      - name: Check formatting and lint
+        run: |
+          bun run --cwd packages/textbuffer format:check
+          bun run --cwd packages/textbuffer lint
+      - name: Verify the package and adapter contracts
+        run: |
+          bun run --cwd packages/textbuffer verify
+          bun run --cwd packages/textbuffer bench:check
+          bun run --cwd packages/textbuffer bench:profile:check
+      - name: Smoke the complete measurement pipeline
+        run: bun run --cwd packages/textbuffer bench -- --profile smoke
+      # Timing and profiling on shared runners are artifacts, not gates; pull requests stop at the smoke run.
+      - name: Compare buffers without performance pass/fail thresholds
+        if: github.event_name != 'pull_request'
+        run: bun run --cwd packages/textbuffer bench -- --profile standard
+      - name: Profile separately from clean timing runs
+        if: github.event_name != 'pull_request'
+        run: bun run --cwd packages/textbuffer bench:profile -- --profile standard --repeats 12
+      - name: Publish summary
+        if: always()
+        run: |
+          for report in packages/textbuffer/bench/results/*.md packages/textbuffer/bench/results/profile-*/report.md; do
+            if [ -f "$report" ]; then cat "$report" >> "$GITHUB_STEP_SUMMARY"; fi
+          done
+      - name: Retain raw samples and provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: textbuffer-benchmarks-${{ github.run_id }}
+          path: packages/textbuffer/bench/results/
+          if-no-files-found: warn

@@ -1,0 +1,60 @@
+{
+  "name": "@singapore-editor/gutters",
+  "version": "0.1.1",
+  "files": [
+    "README.md",
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "./src/lineGutter.css",
+    "./src/foldGutter.css",
+    "./src/style.css",
+    "./dist/lineGutter.css",
+    "./dist/foldGutter.css",
+    "./dist/style.css"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./line-gutter": {
+      "types": "./dist/lineGutter.d.ts",
+      "import": "./dist/lineGutter.js",
+      "default": "./dist/lineGutter.js"
+    },
+    "./fold-gutter": {
+      "types": "./dist/foldGutter.d.ts",
+      "import": "./dist/foldGutter.js",
+      "default": "./dist/foldGutter.js"
+    },
+    "./line-gutter.css": "./dist/lineGutter.css",
+    "./fold-gutter.css": "./dist/foldGutter.css",
+    "./style.css": "./dist/style.css"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "bun ../../scripts/build-package.ts",
+    "test": "vitest run",
+    "typecheck": "tsgo --noEmit",
+    "lint": "oxlint .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check ."
+  },
+  "dependencies": {
+    "@singapore-editor/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "happy-dom": "^20.14.5",
+    "oxfmt": "0.70.0",
+    "oxlint": "1.85.0",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.2"
+  }
+}

@@ -1,0 +1,145 @@
+/*
+ * No caret. A diff is a real `Editor`, so it brings one — and a caret is an insertion point, which
+ * a diff does not have: the document is a synthetic projection, `editability` is readonly and the
+ * host's keymap is empty, so a blinking bar claims an affordance that is not there.
+ *
+ * `display: none` on the layer rather than a transparent caret, so the blink animation stops
+ * running rather than animating something invisible. Selection is untouched — it paints from its
+ * own range highlight, so a reader can still select and copy.
+ *
+ * Scoped to the host's `.editor-diff-view` class. Base colors come from EditorTheme;
+ * `createDiffPlugin` registers the `diff.*` palette used below.
+ */
+.editor-diff-view .editor-virtualized-caret-layer {
+  display: none;
+}
+
+.editor-diff-row-addition {
+  background: var(--editor-diff-added-bg);
+}
+
+.editor-diff-row-deletion {
+  background: var(--editor-diff-deleted-bg);
+}
+
+.editor-diff-row-placeholder {
+  background: var(--editor-diff-placeholder-bg);
+}
+
+.editor-diff-row-hunk {
+  background: var(--editor-diff-hunk-bg);
+  color: var(--editor-diff-hunk-foreground);
+  user-select: none;
+}
+
+.editor-diff-row-expandable {
+  cursor: pointer;
+}
+
+.editor-diff-row-empty {
+  color: var(--editor-diff-muted);
+}
+
+/*
+ * The gutter cell. `grid-template-columns` comes from `diffGutterLayout`, published as a custom
+ * property on the scroll element every time the geometry is recomputed, so the DOM lanes sit
+ * exactly where the canvas used to paint them. Hardcoding `1fr 1fr 12px` here would drift, because
+ * the lane widths are `ceil(characters * characterWidth + 6)` and the indicator is a fixed 12px
+ * (gutters.ts:19-21, :142) — §3.3, trap 1.
+ *
+ * Deliberately no padding on this element. Its tracks are fixed px summing to exactly the cell's
+ * border-box width — which the core also writes inline on the same element — so padding here is
+ * inert, and having it *look* effective is how the indicator ended up flush against the code text
+ * with no gap. The 4px the canvas inset every lane by (`GUTTER_PADDING_RIGHT`) belongs on the
+ * lanes, indicator included.
+ */
+.editor-diff-gutter {
+  align-items: center;
+  box-sizing: border-box;
+  /* The diff's own hook first, then the editor colour theme, then the package default — rather
+     than forcing `--editor-gutter-foreground` above, which would outrank the theme's inline value
+     and leave the numbers a fixed grey. */
+  color: var(--editor-diff-gutter-foreground, var(--editor-gutter-foreground, #71717a));
+  display: grid;
+  font-variant-numeric: tabular-nums;
+  grid-template-columns: var(--editor-diff-gutter-columns, minmax(0, 1fr) minmax(0, 1fr) 12px);
+  height: 100%;
+  width: 100%;
+}
+
+.editor-diff-gutter-lane {
+  box-sizing: border-box;
+  min-width: 0;
+  overflow: hidden;
+  padding-right: 4px;
+  text-align: right;
+  white-space: pre;
+}
+
+/* The number lanes carry the plain gutter's left inset; the indicator lane is a fixed 12px track
+   that a left pad would squeeze. */
+.editor-diff-gutter-lane-old,
+.editor-diff-gutter-lane-new {
+  padding-left: 2px;
+}
+
+/*
+ * Per-lane tones, not per-row: in stacked mode a single addition row leaves the old lane at
+ * foreground and turns the new lane green, which a row-level class cannot express (§3.3, trap 2).
+ * `diffGutterLaneTone` decides; this only paints.
+ */
+.editor-diff-gutter-lane[data-diff-tone='added'] {
+  color: var(--editor-diff-added);
+}
+
+.editor-diff-gutter-lane[data-diff-tone='deleted'] {
+  color: var(--editor-diff-deleted);
+}
+
+.editor-diff-gutter-lane[data-diff-tone='hunk'] {
+  color: var(--editor-diff-hunk-foreground);
+}
+
+/*
+ * The gutter band's own tint, which the canvas used to fill. This *is* per pane — a split old pane
+ * shows no tint behind an addition, because that row is a placeholder there.
+ *
+ * In document mode the diff gutter is the pane's whole gutter, so the tint is the gutter row's own
+ * background (`editor-diff-gutter-band-*`, from the row decoration). The row spans the gutter's
+ * leading inset as well as the lanes, so a tinted row runs from the pane's edge to its text.
+ */
+.editor-diff-gutter-band-addition {
+  background: var(--editor-diff-added-bg);
+}
+
+.editor-diff-gutter-band-deletion {
+  background: var(--editor-diff-deleted-bg);
+}
+
+.editor-diff-gutter-band-hunk {
+  background: var(--editor-diff-hunk-bg);
+}
+
+.editor-diff-gutter-band-placeholder {
+  background: var(--editor-diff-placeholder-bg);
+}
+
+/*
+ * In overlay mode the diff lane shares the gutter with the host's own lanes, so only its cell is
+ * tinted. The tone comes from `diffGutterRowTone`.
+ */
+.editor-diff-gutter-tinted[data-diff-row-tone='added'] {
+  background: var(--editor-diff-added-bg);
+}
+
+.editor-diff-gutter-tinted[data-diff-row-tone='deleted'] {
+  background: var(--editor-diff-deleted-bg);
+}
+
+.editor-diff-gutter-tinted[data-diff-row-tone='hunk'] {
+  background: var(--editor-diff-hunk-bg);
+}
+
+.editor-diff-gutter-tinted[data-diff-row-type='placeholder'] {
+  background: var(--editor-diff-placeholder-bg);
+}

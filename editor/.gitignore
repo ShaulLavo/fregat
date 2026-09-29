@@ -1,0 +1,46 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Turborepo
+.turbo
+
+# Test artifacts
+.vitest/
+test-results/
+playwright-report/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Desloppify
+.desloppify/
+
+# opensrc - source code for packages
+opensrc/
+
+# Local reference checkouts
+references/
+
+# Screenshots vitest writes when a browser test fails. Both directories have been committed by
+# accident before and had to be deleted again in 915b33a.
+.vitest-attachments/
+__screenshots__/

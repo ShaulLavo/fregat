@@ -1,0 +1,153 @@
+.editor-scope-lines {
+  --editor-scope-line-color: rgba(161, 161, 170, 0.26);
+  --editor-scope-line-active-color: rgba(212, 212, 216, 0.52);
+  --editor-scope-line-color-0: color-mix(in srgb, var(--editor-syntax-type) 34%, transparent);
+  --editor-scope-line-color-1: color-mix(in srgb, var(--editor-syntax-keyword) 30%, transparent);
+  --editor-scope-line-color-2: color-mix(in srgb, var(--editor-syntax-string) 28%, transparent);
+  --editor-scope-line-color-3: color-mix(in srgb, var(--editor-syntax-number) 32%, transparent);
+  --editor-scope-line-color-4: color-mix(in srgb, var(--editor-syntax-function) 30%, transparent);
+  --editor-scope-line-color-5: color-mix(
+    in srgb,
+    var(--editor-syntax-variable-builtin) 30%,
+    transparent
+  );
+  --editor-scope-line-active-color-0: color-mix(
+    in srgb,
+    var(--editor-syntax-type) 58%,
+    transparent
+  );
+  --editor-scope-line-active-color-1: color-mix(
+    in srgb,
+    var(--editor-syntax-keyword) 54%,
+    transparent
+  );
+  --editor-scope-line-active-color-2: color-mix(
+    in srgb,
+    var(--editor-syntax-string) 50%,
+    transparent
+  );
+  --editor-scope-line-active-color-3: color-mix(
+    in srgb,
+    var(--editor-syntax-number) 56%,
+    transparent
+  );
+  --editor-scope-line-active-color-4: color-mix(
+    in srgb,
+    var(--editor-syntax-function) 54%,
+    transparent
+  );
+  --editor-scope-line-active-color-5: color-mix(
+    in srgb,
+    var(--editor-syntax-variable-builtin) 54%,
+    transparent
+  );
+  --editor-scope-line-width: 1px;
+
+  height: 0;
+  left: var(--editor-gutter-width, 0px);
+  min-width: max(100%, var(--editor-scope-lines-content-width, 0px));
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  /* Own compositor layer: WebKit re-resolves all CSS Highlight ranges when
+     children of an in-flow layer churn; see .editor-virtualized-row. */
+  will-change: transform;
+  z-index: 1;
+}
+
+.editor-scope-line {
+  background: var(--editor-scope-line-color);
+  position: absolute;
+  width: var(--editor-scope-line-width);
+}
+
+.editor-virtualized[data-editor-presentation='provisional'] .editor-scope-lines {
+  visibility: hidden;
+}
+
+.editor-scope-line[data-editor-scope-line-level='0'] {
+  background: var(--editor-scope-line-color-0);
+}
+
+.editor-scope-line[data-editor-scope-line-level='1'] {
+  background: var(--editor-scope-line-color-1);
+}
+
+.editor-scope-line[data-editor-scope-line-level='2'] {
+  background: var(--editor-scope-line-color-2);
+}
+
+.editor-scope-line[data-editor-scope-line-level='3'] {
+  background: var(--editor-scope-line-color-3);
+}
+
+.editor-scope-line[data-editor-scope-line-level='4'] {
+  background: var(--editor-scope-line-color-4);
+}
+
+.editor-scope-line[data-editor-scope-line-level='5'] {
+  background: var(--editor-scope-line-color-5);
+}
+
+.editor-scope-line-active {
+  background: var(--editor-scope-line-active-color);
+}
+
+.editor-scope-line-active[data-editor-scope-line-level='0'] {
+  background: var(--editor-scope-line-active-color-0);
+}
+
+.editor-scope-line-active[data-editor-scope-line-level='1'] {
+  background: var(--editor-scope-line-active-color-1);
+}
+
+.editor-scope-line-active[data-editor-scope-line-level='2'] {
+  background: var(--editor-scope-line-active-color-2);
+}
+
+.editor-scope-line-active[data-editor-scope-line-level='3'] {
+  background: var(--editor-scope-line-active-color-3);
+}
+
+.editor-scope-line-active[data-editor-scope-line-level='4'] {
+  background: var(--editor-scope-line-active-color-4);
+}
+
+.editor-scope-line-active[data-editor-scope-line-level='5'] {
+  background: var(--editor-scope-line-active-color-5);
+}
+
+/* The layer is a box over the scope the stack heads, in content coordinates, and is JS-positioned
+   on the rows of that scope. It exists to be the stack's containing block: a sticky box is held
+   inside the one it belongs to, so the stack is pinned to the top of the viewport while this box is
+   on screen and is slid up and out of it, pixel by pixel, as the box's end passes — which is the
+   push-out, computed by the browser on every frame instead of on every notification. */
+.editor-sticky-scroll {
+  /* Resolve the parent gutter here before the secondary text view shadows it. */
+  --editor-sticky-scroll-inset: var(--editor-gutter-width, 0px);
+
+  left: 0;
+  min-width: max(100%, var(--editor-sticky-scroll-content-width, 0px));
+  pointer-events: none;
+  position: absolute;
+  z-index: var(--editor-z-overlay-surface);
+}
+
+/* Compound so that it outranks the text view's own rules whichever order the two stylesheets happen
+   to load in, rather than only when this one loads second. */
+.editor-virtualized.editor-sticky-scroll-lines {
+  --editor-sticky-scroll-shadow: rgba(0, 0, 0, 0.42);
+
+  /* The stack stays clear of the gutter while its parent handles minimap clipping. */
+  box-shadow: 0 6px 6px -6px var(--editor-sticky-scroll-shadow);
+  left: var(--editor-sticky-scroll-inset, 0px);
+  /* Nothing about the stack is scrollable: its height is exactly the lines it holds, and a scrollbar
+     of its own would move it out of step with the rows it mirrors. */
+  overflow: hidden;
+  pointer-events: none;
+  position: sticky;
+  top: 0;
+  width: calc(
+    var(--editor-sticky-scroll-viewport-width, 0px) - var(--editor-sticky-scroll-inset, 0px)
+  );
+}

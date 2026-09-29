@@ -1,0 +1,448 @@
+{
+  "baseline": "6656eb7113040f7489a15f4c6e2293e511a55edd",
+  "runtime": "Bun 1.4.0",
+  "measuredAt": "2026-09-22T14:47:42.207Z",
+  "note": "One subprocess per sample, after warmup. Headless buffer/session operations, not keystroke-to-paint. Heap deltas are GC-sensitive. Extent counts deduplicate shared chunks; UTF-16 units are not physical heap bytes. Three view sessions, no mounted renderer.",
+  "runs": [
+    {
+      "cycles": 100,
+      "seed": 60061,
+      "payloadCodeUnits": 1024,
+      "retainedHistoryStates": 200,
+      "historyNodesBeforeClear": 201,
+      "historyNodesAfterClear": 1,
+      "pinnedRoots": 2,
+      "heapWithPins": 2116534,
+      "heapAfterRelease": 2102183,
+      "heapAfterHistoryClear": 613009,
+      "storageAfterReleaseAndHistoryClear": {
+        "liveCodeUnits": 4469,
+        "nodes": 103,
+        "visible": 2,
+        "invisible": 101,
+        "reverseEntries": 101,
+        "lineIndexes": 1,
+        "chunks": 8,
+        "bufferIds": 102,
+        "storedCodeUnits": 107893,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 100,
+        "p50Ms": 0.016366000000004988,
+        "p95Ms": 0.023410000000005482,
+        "maxMs": 0.04732699999999568
+      },
+      "read80Units": {
+        "samples": 100,
+        "p50Ms": 0.0019929999999988013,
+        "p95Ms": 0.003616000000000952,
+        "maxMs": 0.0075009999999977595
+      }
+    },
+    {
+      "cycles": 1000,
+      "seed": 60061,
+      "payloadCodeUnits": 1024,
+      "retainedHistoryStates": 200,
+      "historyNodesBeforeClear": 201,
+      "historyNodesAfterClear": 1,
+      "pinnedRoots": 11,
+      "heapWithPins": 5350128,
+      "heapAfterRelease": 4700099,
+      "heapAfterHistoryClear": 2409752,
+      "storageAfterReleaseAndHistoryClear": {
+        "liveCodeUnits": 4469,
+        "nodes": 1003,
+        "visible": 2,
+        "invisible": 1001,
+        "reverseEntries": 1001,
+        "lineIndexes": 1,
+        "chunks": 64,
+        "bufferIds": 1002,
+        "storedCodeUnits": 1029493,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 1000,
+        "p50Ms": 0.013172000000004402,
+        "p95Ms": 0.027063999999995758,
+        "maxMs": 0.8087509999999938
+      },
+      "read80Units": {
+        "samples": 1000,
+        "p50Ms": 0.004314000000000817,
+        "p95Ms": 0.007119000000002984,
+        "maxMs": 0.013054000000003896
+      }
+    },
+    {
+      "cycles": 5000,
+      "seed": 60061,
+      "payloadCodeUnits": 1024,
+      "retainedHistoryStates": 200,
+      "historyNodesBeforeClear": 201,
+      "historyNodesAfterClear": 1,
+      "pinnedRoots": 51,
+      "heapWithPins": 39421057,
+      "heapAfterRelease": 15609571,
+      "heapAfterHistoryClear": 11611050,
+      "storageAfterReleaseAndHistoryClear": {
+        "liveCodeUnits": 4469,
+        "nodes": 5003,
+        "visible": 2,
+        "invisible": 5001,
+        "reverseEntries": 5001,
+        "lineIndexes": 1,
+        "chunks": 314,
+        "bufferIds": 5002,
+        "storedCodeUnits": 5125493,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 5000,
+        "p50Ms": 0.010110999999994874,
+        "p95Ms": 0.02160699999998883,
+        "maxMs": 1.1837680000000148
+      },
+      "read80Units": {
+        "samples": 5000,
+        "p50Ms": 0.017706000000003996,
+        "p95Ms": 0.03406999999998561,
+        "maxMs": 0.05026399999999853
+      }
+    },
+    {
+      "cycles": 100,
+      "seed": 60062,
+      "payloadCodeUnits": 1024,
+      "retainedHistoryStates": 200,
+      "historyNodesBeforeClear": 201,
+      "historyNodesAfterClear": 1,
+      "pinnedRoots": 2,
+      "heapWithPins": 1856935,
+      "heapAfterRelease": 1866745,
+      "heapAfterHistoryClear": 82333,
+      "storageAfterReleaseAndHistoryClear": {
+        "liveCodeUnits": 4480,
+        "nodes": 103,
+        "visible": 2,
+        "invisible": 101,
+        "reverseEntries": 101,
+        "lineIndexes": 1,
+        "chunks": 8,
+        "bufferIds": 102,
+        "storedCodeUnits": 107904,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 100,
+        "p50Ms": 0.014690000000001646,
+        "p95Ms": 0.026172000000002527,
+        "maxMs": 0.03446200000000488
+      },
+      "read80Units": {
+        "samples": 100,
+        "p50Ms": 0.0007779999999968368,
+        "p95Ms": 0.0011699999999947863,
+        "maxMs": 0.0019300000000015416
+      }
+    },
+    {
+      "cycles": 1000,
+      "seed": 60062,
+      "payloadCodeUnits": 1024,
+      "retainedHistoryStates": 200,
+      "historyNodesBeforeClear": 201,
+      "historyNodesAfterClear": 1,
+      "pinnedRoots": 11,
+      "heapWithPins": 5392751,
+      "heapAfterRelease": 4715542,
+      "heapAfterHistoryClear": 2425195,
+      "storageAfterReleaseAndHistoryClear": {
+        "liveCodeUnits": 4480,
+        "nodes": 1003,
+        "visible": 2,
+        "invisible": 1001,
+        "reverseEntries": 1001,
+        "lineIndexes": 1,
+        "chunks": 64,
+        "bufferIds": 1002,
+        "storedCodeUnits": 1029504,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 1000,
+        "p50Ms": 0.013651000000002966,
+        "p95Ms": 0.025503999999997973,
+        "maxMs": 0.8483339999999941
+      },
+      "read80Units": {
+        "samples": 1000,
+        "p50Ms": 0.004094999999999516,
+        "p95Ms": 0.007061000000000206,
+        "maxMs": 0.009774999999997647
+      }
+    },
+    {
+      "cycles": 5000,
+      "seed": 60062,
+      "payloadCodeUnits": 1024,
+      "retainedHistoryStates": 200,
+      "historyNodesBeforeClear": 201,
+      "historyNodesAfterClear": 1,
+      "pinnedRoots": 51,
+      "heapWithPins": 39472100,
+      "heapAfterRelease": 15632852,
+      "heapAfterHistoryClear": 11637386,
+      "storageAfterReleaseAndHistoryClear": {
+        "liveCodeUnits": 4480,
+        "nodes": 5003,
+        "visible": 2,
+        "invisible": 5001,
+        "reverseEntries": 5001,
+        "lineIndexes": 1,
+        "chunks": 314,
+        "bufferIds": 5002,
+        "storedCodeUnits": 5125504,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 5000,
+        "p50Ms": 0.00984700000000771,
+        "p95Ms": 0.021383000000000152,
+        "maxMs": 1.1329729999999927
+      },
+      "read80Units": {
+        "samples": 5000,
+        "p50Ms": 0.01753999999999678,
+        "p95Ms": 0.03335099999998192,
+        "maxMs": 0.047293000000010466
+      }
+    },
+    {
+      "cycles": 100,
+      "seed": 60063,
+      "payloadCodeUnits": 1024,
+      "retainedHistoryStates": 200,
+      "historyNodesBeforeClear": 201,
+      "historyNodesAfterClear": 1,
+      "pinnedRoots": 2,
+      "heapWithPins": 1825771,
+      "heapAfterRelease": 1835461,
+      "heapAfterHistoryClear": 49977,
+      "storageAfterReleaseAndHistoryClear": {
+        "liveCodeUnits": 4472,
+        "nodes": 103,
+        "visible": 2,
+        "invisible": 101,
+        "reverseEntries": 101,
+        "lineIndexes": 1,
+        "chunks": 8,
+        "bufferIds": 102,
+        "storedCodeUnits": 107896,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 100,
+        "p50Ms": 0.014985000000002913,
+        "p95Ms": 0.025112000000000023,
+        "maxMs": 0.0486580000000032
+      },
+      "read80Units": {
+        "samples": 100,
+        "p50Ms": 0.0007420000000024629,
+        "p95Ms": 0.0010919999999998709,
+        "maxMs": 0.007595999999999492
+      }
+    },
+    {
+      "cycles": 1000,
+      "seed": 60063,
+      "payloadCodeUnits": 1024,
+      "retainedHistoryStates": 200,
+      "historyNodesBeforeClear": 201,
+      "historyNodesAfterClear": 1,
+      "pinnedRoots": 11,
+      "heapWithPins": 5205222,
+      "heapAfterRelease": 4715515,
+      "heapAfterHistoryClear": 2428096,
+      "storageAfterReleaseAndHistoryClear": {
+        "liveCodeUnits": 4472,
+        "nodes": 1003,
+        "visible": 2,
+        "invisible": 1001,
+        "reverseEntries": 1001,
+        "lineIndexes": 1,
+        "chunks": 64,
+        "bufferIds": 1002,
+        "storedCodeUnits": 1029496,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 1000,
+        "p50Ms": 0.013823000000002139,
+        "p95Ms": 0.04713200000000484,
+        "maxMs": 0.6589499999999973
+      },
+      "read80Units": {
+        "samples": 1000,
+        "p50Ms": 0.004050000000006548,
+        "p95Ms": 0.006979000000001179,
+        "maxMs": 0.0106049999999982
+      }
+    },
+    {
+      "cycles": 5000,
+      "seed": 60063,
+      "payloadCodeUnits": 1024,
+      "retainedHistoryStates": 200,
+      "historyNodesBeforeClear": 201,
+      "historyNodesAfterClear": 1,
+      "pinnedRoots": 51,
+      "heapWithPins": 39451586,
+      "heapAfterRelease": 15606449,
+      "heapAfterHistoryClear": 11611767,
+      "storageAfterReleaseAndHistoryClear": {
+        "liveCodeUnits": 4472,
+        "nodes": 5003,
+        "visible": 2,
+        "invisible": 5001,
+        "reverseEntries": 5001,
+        "lineIndexes": 1,
+        "chunks": 314,
+        "bufferIds": 5002,
+        "storedCodeUnits": 5125496,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 5000,
+        "p50Ms": 0.00992300000000057,
+        "p95Ms": 0.022336999999993168,
+        "maxMs": 1.2202570000000037
+      },
+      "read80Units": {
+        "samples": 5000,
+        "p50Ms": 0.017403999999999087,
+        "p95Ms": 0.033254999999996926,
+        "maxMs": 0.045580000000001064
+      }
+    },
+    {
+      "cycles": 5000,
+      "seed": 60061,
+      "payloadCodeUnits": 1024,
+      "retainedHistoryStates": 0,
+      "historyNodesBeforeClear": 1,
+      "historyNodesAfterClear": 1,
+      "pinnedRoots": 51,
+      "heapWithPins": 36368030,
+      "heapAfterRelease": 11623257,
+      "heapAfterHistoryClear": 11601712,
+      "storageAfterReleaseAndHistoryClear": {
+        "liveCodeUnits": 4469,
+        "nodes": 5003,
+        "visible": 2,
+        "invisible": 5001,
+        "reverseEntries": 5001,
+        "lineIndexes": 1,
+        "chunks": 314,
+        "bufferIds": 5002,
+        "storedCodeUnits": 5125493,
+        "lineIndexCapacityBytes": 1024,
+        "invariantIssues": []
+      },
+      "editPair": {
+        "samples": 5000,
+        "p50Ms": 0.006292000000001963,
+        "p95Ms": 0.019542999999998756,
+        "maxMs": 1.263936000000001
+      },
+      "read80Units": {
+        "samples": 5000,
+        "p50Ms": 0.020668000000000575,
+        "p95Ms": 0.033723999999978105,
+        "maxMs": 0.05250499999999647
+      }
+    }
+  ],
+  "anchorRemoval": {
+    "before": [
+      {
+        "offset": 7,
+        "liveness": "deleted"
+      },
+      {
+        "offset": 10,
+        "liveness": "deleted"
+      }
+    ],
+    "after": [
+      {
+        "offset": 0,
+        "liveness": "deleted"
+      },
+      {
+        "offset": 0,
+        "liveness": "deleted"
+      }
+    ],
+    "currentText": "prefix NEWsuffix",
+    "candidateText": "prefix NEWsuffix",
+    "retainedText": "prefix oldsuffix",
+    "beforeStorage": {
+      "liveCodeUnits": 16,
+      "nodes": 4,
+      "visible": 3,
+      "invisible": 1,
+      "reverseEntries": 2,
+      "lineIndexes": 1,
+      "chunks": 2,
+      "bufferIds": 3,
+      "storedCodeUnits": 19,
+      "lineIndexCapacityBytes": 0,
+      "invariantIssues": []
+    },
+    "afterStorage": {
+      "liveCodeUnits": 16,
+      "nodes": 3,
+      "visible": 3,
+      "invisible": 0,
+      "reverseEntries": 1,
+      "lineIndexes": 1,
+      "chunks": 2,
+      "bufferIds": 3,
+      "storedCodeUnits": 19,
+      "lineIndexCapacityBytes": 0,
+      "invariantIssues": []
+    }
+  },
+  "branchIdentity": {
+    "sharedLineage": true,
+    "leftAnchor": {
+      "kind": "anchor",
+      "buffer": 1,
+      "offset": 1,
+      "bias": "right"
+    },
+    "rightAnchor": {
+      "kind": "anchor",
+      "buffer": 1,
+      "offset": 1,
+      "bias": "right"
+    },
+    "leftText": "prefix AAAsuffix",
+    "rightText": "prefix BBBsuffix",
+    "leftIssues": [],
+    "rightIssues": []
+  }
+}

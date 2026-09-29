@@ -1,0 +1,358 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Focused layout optimization evidence; not budget acceptance",
+  "runOrder": ["timing-before", "timing-after", "timing-after-repeat", "timing-before-repeat"],
+  "timing": {
+    "before": {
+      "ordinary/multiple/typing": {
+        "dispatch": {
+          "count": 144,
+          "p50": 1.1000000014901161,
+          "p95": 1.5999999977648258,
+          "max": 2.099999997764826
+        },
+        "inputToApplied": {
+          "count": 144,
+          "p50": 1.1000000014901161,
+          "p95": 1.5999999977648258,
+          "max": 2.099999997764826
+        },
+        "inputToFrame": {
+          "count": 144,
+          "p50": 7.599999997764826,
+          "p95": 15.099999997764826,
+          "max": 16.199999999254942
+        }
+      },
+      "long-line/multiple/typing": {
+        "dispatch": {
+          "count": 144,
+          "p50": 2.100000001490116,
+          "p95": 5,
+          "max": 13.199999999254942
+        },
+        "inputToApplied": {
+          "count": 144,
+          "p50": 2.100000001490116,
+          "p95": 4.900000002235174,
+          "max": 13.100000001490116
+        },
+        "inputToFrame": {
+          "count": 144,
+          "p50": 8.899999998509884,
+          "p95": 16.199999999254942,
+          "max": 18.200000002980232
+        }
+      },
+      "long-line/multiple/paste": {
+        "dispatch": {
+          "count": 48,
+          "p50": 6,
+          "p95": 7.399999998509884,
+          "max": 8.900000002235174
+        },
+        "inputToApplied": {
+          "count": 48,
+          "p50": 6,
+          "p95": 7.399999998509884,
+          "max": 8.900000002235174
+        },
+        "inputToFrame": {
+          "count": 48,
+          "p50": 11.5,
+          "p95": 18.900000002235174,
+          "max": 20.799999997019768
+        }
+      },
+      "short-lines/multiple/paste": {
+        "dispatch": {
+          "count": 48,
+          "p50": 3.600000001490116,
+          "p95": 5.699999999254942,
+          "max": 5.799999997019768
+        },
+        "inputToApplied": {
+          "count": 48,
+          "p50": 3.600000001490116,
+          "p95": 5.699999999254942,
+          "max": 5.799999997019768
+        },
+        "inputToFrame": {
+          "count": 48,
+          "p50": 8.800000000745058,
+          "p95": 15.299999997019768,
+          "max": 18.600000001490116
+        }
+      }
+    },
+    "after": {
+      "ordinary/multiple/typing": {
+        "dispatch": {
+          "count": 144,
+          "p50": 1.199999999254942,
+          "p95": 1.800000000745058,
+          "max": 2.199999999254942
+        },
+        "inputToApplied": {
+          "count": 144,
+          "p50": 1.1000000014901161,
+          "p95": 1.7000000029802322,
+          "max": 2.199999999254942
+        },
+        "inputToFrame": {
+          "count": 144,
+          "p50": 7.399999998509884,
+          "p95": 15.399999998509884,
+          "max": 16.399999998509884
+        }
+      },
+      "long-line/multiple/typing": {
+        "dispatch": {
+          "count": 144,
+          "p50": 2,
+          "p95": 2.7000000029802322,
+          "max": 4.599999997764826
+        },
+        "inputToApplied": {
+          "count": 144,
+          "p50": 2,
+          "p95": 2.699999999254942,
+          "max": 4.599999997764826
+        },
+        "inputToFrame": {
+          "count": 144,
+          "p50": 8.400000002235174,
+          "p95": 15.800000000745058,
+          "max": 17.100000001490116
+        }
+      },
+      "long-line/multiple/paste": {
+        "dispatch": {
+          "count": 48,
+          "p50": 6.200000002980232,
+          "p95": 8.300000000745058,
+          "max": 9.199999999254942
+        },
+        "inputToApplied": {
+          "count": 48,
+          "p50": 6.199999999254942,
+          "p95": 8.300000000745058,
+          "max": 9.199999999254942
+        },
+        "inputToFrame": {
+          "count": 48,
+          "p50": 10.800000000745058,
+          "p95": 20.400000002235174,
+          "max": 21.300000000745058
+        }
+      },
+      "short-lines/multiple/paste": {
+        "dispatch": {
+          "count": 48,
+          "p50": 3.599999997764826,
+          "p95": 5.699999999254942,
+          "max": 5.699999999254942
+        },
+        "inputToApplied": {
+          "count": 48,
+          "p50": 3.599999997764826,
+          "p95": 5.699999999254942,
+          "max": 5.700000002980232
+        },
+        "inputToFrame": {
+          "count": 48,
+          "p50": 8.600000001490116,
+          "p95": 15.100000001490116,
+          "max": 19
+        }
+      }
+    }
+  },
+  "layoutTrace": {
+    "before": {
+      "name": "long-line-multiple-typing-0",
+      "window": {
+        "startMicros": 29487658580,
+        "endMicros": 29487754954
+      },
+      "metrics": {
+        "Timestamp": 0.096374000000651,
+        "AudioHandlers": 0,
+        "AudioWorkletProcessors": 0,
+        "Documents": 0,
+        "Frames": 0,
+        "JSEventListeners": 11,
+        "LayoutObjects": 24,
+        "MediaKeySessions": 0,
+        "MediaKeys": 0,
+        "Nodes": 12,
+        "Resources": 0,
+        "ContextLifecycleStateObservers": 0,
+        "V8PerContextDatas": 0,
+        "WorkerGlobalScopes": 0,
+        "UACSSResources": 0,
+        "RTCPeerConnections": 0,
+        "ResourceFetchers": 0,
+        "AdSubframes": 0,
+        "DetachedScriptStates": 0,
+        "ArrayBufferContents": 72,
+        "LayoutCount": 72,
+        "RecalcStyleCount": 84,
+        "LayoutDuration": 0.019028,
+        "RecalcStyleDuration": 0.0039510000000000005,
+        "DevToolsCommandDuration": 5.7999999999995555e-5,
+        "ScriptDuration": 0.061743,
+        "V8CompileDuration": 0,
+        "TaskDuration": 0.09107000000000001,
+        "TaskOtherDuration": 0.0062900000000000005,
+        "ThreadTime": 0.089973,
+        "ProcessTime": 0.13,
+        "JSHeapUsedSize": 40821864,
+        "JSHeapTotalSize": 44724224,
+        "FirstMeaningfulPaint": 0,
+        "DomContentLoaded": 0,
+        "NavigationStart": 0
+      },
+      "layouts": {
+        "count": 72,
+        "durationMs": 18.653,
+        "unattributedCount": 0,
+        "callsites": [
+          {
+            "callsite": "readRowClientRectScale packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2901:35",
+            "count": 48,
+            "durationMs": 16.548
+          },
+          {
+            "callsite": "refreshHiddenInputContent packages/editor/src/editor/inputSelectionController.ts:1541:46",
+            "count": 24,
+            "durationMs": 2.105
+          }
+        ]
+      },
+      "traceLayoutCountMatchesMetric": true
+    },
+    "after": {
+      "name": "long-line-multiple-typing-0",
+      "window": {
+        "startMicros": 29535741978,
+        "endMicros": 29535827139
+      },
+      "metrics": {
+        "Timestamp": 0.08516100000269944,
+        "AudioHandlers": 0,
+        "AudioWorkletProcessors": 0,
+        "Documents": 0,
+        "Frames": 0,
+        "JSEventListeners": 20,
+        "LayoutObjects": 22,
+        "MediaKeySessions": 0,
+        "MediaKeys": 0,
+        "Nodes": 11,
+        "Resources": 0,
+        "ContextLifecycleStateObservers": 0,
+        "V8PerContextDatas": 0,
+        "WorkerGlobalScopes": 0,
+        "UACSSResources": 0,
+        "RTCPeerConnections": 0,
+        "ResourceFetchers": 0,
+        "AdSubframes": 0,
+        "DetachedScriptStates": 0,
+        "ArrayBufferContents": 66,
+        "LayoutCount": 48,
+        "RecalcStyleCount": 80,
+        "LayoutDuration": 0.014294,
+        "RecalcStyleDuration": 0.0037600000000000003,
+        "DevToolsCommandDuration": 5.6000000000000494e-5,
+        "ScriptDuration": 0.055637,
+        "V8CompileDuration": 0,
+        "TaskDuration": 0.08073300000000001,
+        "TaskOtherDuration": 0.006986000000000001,
+        "ThreadTime": 0.07988200000000001,
+        "ProcessTime": 0.11000000000000004,
+        "JSHeapUsedSize": 37746308,
+        "JSHeapTotalSize": 40779776,
+        "FirstMeaningfulPaint": 0,
+        "DomContentLoaded": 0,
+        "NavigationStart": 0
+      },
+      "layouts": {
+        "count": 48,
+        "durationMs": 14.012999999999998,
+        "unattributedCount": 0,
+        "callsites": [
+          {
+            "callsite": "readRowClientRectScale packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2901:35",
+            "count": 24,
+            "durationMs": 6.494000000000001
+          },
+          {
+            "callsite": "refreshHiddenInputContent packages/editor/src/editor/inputSelectionController.ts:1542:46",
+            "count": 24,
+            "durationMs": 7.519000000000001
+          }
+        ]
+      },
+      "traceLayoutCountMatchesMetric": true
+    }
+  },
+  "isolatedExperiments": {
+    "before": {
+      "layouts": 72,
+      "callsites": {
+        "readRowClientRectScale": 48,
+        "refreshHiddenInputContent": 24
+      }
+    },
+    "transform": {
+      "layouts": 72,
+      "callsites": {
+        "readRowClientRectScale": 48,
+        "refreshHiddenInputContent": 24
+      }
+    },
+    "reorder": {
+      "layouts": 72,
+      "callsites": {
+        "readRowClientRectScale": 24,
+        "refreshHiddenInputContent": 24,
+        "(unattributed)": 24
+      }
+    },
+    "combined": {
+      "layouts": 48,
+      "callsites": {
+        "readRowClientRectScale": 24,
+        "refreshHiddenInputContent": 24
+      }
+    }
+  },
+  "sourceHashes": {
+    "before": "3ae2a9bd9a823a5c30a71af092073a2244fae658ac2082f235fa95fe6cdbb1ba",
+    "after": "43abae3866df9a4949016f123be68384b0ee148af1992c86ea22cdaabc888f99"
+  },
+  "nativeEvents": {
+    "timing-before": 192,
+    "timing-after": 192,
+    "timing-after-repeat": 192,
+    "timing-before-repeat": 192,
+    "final-trace-before": 24,
+    "final-trace-after": 24,
+    "input-lifecycle-check": 36
+  },
+  "allSamplesCorrect": true,
+  "thresholdsChanged": false,
+  "files": {
+    "final-trace-after.json.gz": "694db2587abeb20995c9c5db08a90f80d736ffe3ad0a25859e5bd77cb3bfc8b8",
+    "final-trace-after.trace.json.gz": "eac76c67312f578d0a002a2ad657c7742a286c76feeb4b093b4c552348158059",
+    "final-trace-before.json.gz": "b888f9f5b7fc9fbd4769083fbfe2ba6da7dea5fa6aae9679bd31dac2cdc1bdde",
+    "final-trace-before.trace.json.gz": "95bbfa9f80e68e402c868c1d36b9314064dbe5ca7a68640dbfdb955686df250d",
+    "input-lifecycle-check.json.gz": "cfffb0416d219e178b2798d62786e88afca754319f50bb0047c985102a38eec6",
+    "profile-after.metrics.json.gz": "04d6f558246624cb3113263a37860f7b58c6b3619a95a18f8db133f6c64f1a58",
+    "profile-before.metrics.json.gz": "972f8f911c4ba511c548e6aaa7ee775b2f41aa58ea45533f4634f89c745f11be",
+    "timing-after-repeat.json.gz": "534820b14d8a292ad8688511c35b4d3a6abee937f26004484febfc0f6509d1b1",
+    "timing-after.json.gz": "341e8105244d3da72e24cf0be201c09721580fecd71f46232c84ee4d5d78a85b",
+    "timing-before-repeat.json.gz": "9013dd1fa0c73ab348435e3ce8a89c204d30b99acc59338b3fc963a2cdbc891a",
+    "timing-before.json.gz": "ac8d0c4a5c7146bf959af167999be38c0b5a8d964ee610fe5d825605aec712ed"
+  }
+}

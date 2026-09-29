@@ -1,0 +1,2694 @@
+{
+  "directory": "/work/tmp/editor-long-line-fixed-profile-retry/",
+  "runId": "78886b71-0777-4bbc-a647-ec6066574d36",
+  "profiles": [
+    {
+      "file": "long-line-churn-cold-0.cpuprofile",
+      "durationMs": 847.887,
+      "samples": 807,
+      "sampledMs": 847.799,
+      "activeSampledMs": 840.367,
+      "self": [
+        {
+          "frame": "createRowChunk packages/editor/src/virtualization/virtualizedTextViewRows.ts:1457",
+          "sampledMs": 151.131,
+          "percentOfActive": 17.98392845030802
+        },
+        {
+          "frame": "readRowClientRectScale packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2893",
+          "sampledMs": 112.929,
+          "percentOfActive": 13.438057420150958
+        },
+        {
+          "frame": "(garbage collector)",
+          "sampledMs": 107.731,
+          "percentOfActive": 12.81951813909875
+        },
+        {
+          "frame": "getClientRects",
+          "sampledMs": 57.82,
+          "percentOfActive": 6.880327285578801
+        },
+        {
+          "frame": "getBoundingClientRect",
+          "sampledMs": 54.262,
+          "percentOfActive": 6.456940836563073
+        },
+        {
+          "frame": "(program)",
+          "sampledMs": 38.704,
+          "percentOfActive": 4.605606836060912
+        },
+        {
+          "frame": "rangeSummary packages/editor/src/textMeasurements.ts:300",
+          "sampledMs": 29.069,
+          "percentOfActive": 3.4590839478465956
+        },
+        {
+          "frame": "segmentGraphemes packages/editor/src/graphemes.ts:44",
+          "sampledMs": 27.077,
+          "percentOfActive": 3.2220446542998475
+        },
+        {
+          "frame": "setEnd",
+          "sampledMs": 14.71,
+          "percentOfActive": 1.750425706863787
+        },
+        {
+          "frame": "createPlanBuffer packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1884",
+          "sampledMs": 11.542,
+          "percentOfActive": 1.3734475532713684
+        },
+        {
+          "frame": "buildMeasuredRowGeometry packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1718",
+          "sampledMs": 9.512,
+          "percentOfActive": 1.13188642581158
+        },
+        {
+          "frame": "setStart",
+          "sampledMs": 9.488,
+          "percentOfActive": 1.129030530708607
+        },
+        {
+          "frame": "createBoundaryBuffer packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2589",
+          "sampledMs": 9.024,
+          "percentOfActive": 1.0738165587177984
+        },
+        {
+          "frame": "appendPlanBoundary packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1900",
+          "sampledMs": 7.381,
+          "percentOfActive": 0.8783067397934474
+        },
+        {
+          "frame": "selectNodeContents",
+          "sampledMs": 7.344,
+          "percentOfActive": 0.8739039015096975
+        },
+        {
+          "frame": "appendWhitespaceMarkersForChunk packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:267",
+          "sampledMs": 6.341,
+          "percentOfActive": 0.7545512853312898
+        },
+        {
+          "frame": "suspiciousCharacterRanges packages/editor/src/unicodeHighlight.ts:109",
+          "sampledMs": 5.323,
+          "percentOfActive": 0.633413734713524
+        },
+        {
+          "frame": "isSimpleRowText packages/editor/src/textCharacters.ts:19",
+          "sampledMs": 5.295,
+          "percentOfActive": 0.6300818570933889
+        },
+        {
+          "frame": "appendBoundary packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2594",
+          "sampledMs": 5.277,
+          "percentOfActive": 0.6279399357661594
+        },
+        {
+          "frame": "firstRangeRect$1 packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2945",
+          "sampledMs": 5.271,
+          "percentOfActive": 0.6272259619904161
+        },
+        {
+          "frame": "foldLines packages/editor/src/editor/foldRanges.ts:159",
+          "sampledMs": 5.146,
+          "percentOfActive": 0.6123515083290991
+        },
+        {
+          "frame": "root packages/editor/src/textMeasurements.ts:132",
+          "sampledMs": 4.221,
+          "percentOfActive": 0.5022805512353531
+        },
+        {
+          "frame": "measuredTextSegmentRect packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2771",
+          "sampledMs": 4.219,
+          "percentOfActive": 0.502042559976772
+        },
+        {
+          "frame": "renderHiddenCharacters packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:147",
+          "sampledMs": 4.217,
+          "percentOfActive": 0.501804568718191
+        },
+        {
+          "frame": "joinAdvance packages/editor/src/textMeasurements.ts:166",
+          "sampledMs": 4.217,
+          "percentOfActive": 0.501804568718191
+        },
+        {
+          "frame": "appendUnitPlan packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1864",
+          "sampledMs": 4.157,
+          "percentOfActive": 0.4946648309607588
+        },
+        {
+          "frame": "joinSummary packages/editor/src/textMeasurements.ts:176",
+          "sampledMs": 4.104,
+          "percentOfActive": 0.4883580626083604
+        },
+        {
+          "frame": "getPropertyValue",
+          "sampledMs": 3.925,
+          "percentOfActive": 0.4670578449653544
+        },
+        {
+          "frame": "appendIndexedTokenSegmentsForMountedRow packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:744",
+          "sampledMs": 3.178,
+          "percentOfActive": 0.3781681098853239
+        },
+        {
+          "frame": "setTimeout",
+          "sampledMs": 3.176,
+          "percentOfActive": 0.37793011862674286
+        },
+        {
+          "frame": "getMountedRows packages/editor/src/virtualization/virtualizedTextViewRows.ts:2425",
+          "sampledMs": 3.17,
+          "percentOfActive": 0.37721614485099964
+        },
+        {
+          "frame": "geometryFromBoundaries packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2606",
+          "sampledMs": 3.17,
+          "percentOfActive": 0.37721614485099964
+        },
+        {
+          "frame": "columnAt packages/editor/src/textMeasurements.ts:99",
+          "sampledMs": 3.159,
+          "percentOfActive": 0.3759071929288037
+        },
+        {
+          "frame": "setProperty",
+          "sampledMs": 3.155,
+          "percentOfActive": 0.37543121041164157
+        },
+        {
+          "frame": "resolveUnit packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2490",
+          "sampledMs": 2.562,
+          "percentOfActive": 0.30486680224235363
+        }
+      ],
+      "inclusive": [
+        {
+          "frame": "(root)",
+          "sampledMs": 840.367,
+          "percentOfActive": 100
+        },
+        {
+          "frame": "withOperation packages/editor/src/editor/Editor.ts:3014",
+          "sampledMs": 688.787,
+          "percentOfActive": 81.96264251214053
+        },
+        {
+          "frame": "runInOperation packages/editor/src/editor/Editor.ts:942",
+          "sampledMs": 688.787,
+          "percentOfActive": 81.96264251214053
+        },
+        {
+          "frame": "edit packages/editor/src/editor/Editor.ts:946",
+          "sampledMs": 680.232,
+          "percentOfActive": 80.94463490355999
+        },
+        {
+          "frame": "churn examples/stress/src/browser.ts:202",
+          "sampledMs": 676.013,
+          "percentOfActive": 80.44259234358321
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:943",
+          "sampledMs": 585.244,
+          "percentOfActive": 69.64147806851054
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:947",
+          "sampledMs": 577.732,
+          "percentOfActive": 68.74758290128004
+        },
+        {
+          "frame": "applySessionChange packages/editor/src/editor/Editor.ts:2989",
+          "sampledMs": 567.233,
+          "percentOfActive": 67.4982477893587
+        },
+        {
+          "frame": "applyEdits packages/editor/src/documentSession.ts:605",
+          "sampledMs": 506.997,
+          "percentOfActive": 60.330427063413964
+        },
+        {
+          "frame": "applyEdits packages/editor/src/documentSession.ts:1633",
+          "sampledMs": 506.997,
+          "percentOfActive": 60.330427063413964
+        },
+        {
+          "frame": "commitEdit packages/editor/src/documentSession.ts:1320",
+          "sampledMs": 499.583,
+          "percentOfActive": 59.448193467853926
+        },
+        {
+          "frame": "emitChange packages/editor/src/documentSession.ts:1458",
+          "sampledMs": 497.471,
+          "percentOfActive": 59.196874698792314
+        },
+        {
+          "frame": "handleBufferChange packages/editor/src/editor/Editor.ts:2611",
+          "sampledMs": 496.416,
+          "percentOfActive": 59.0713343098908
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:2603",
+          "sampledMs": 496.416,
+          "percentOfActive": 59.0713343098908
+        },
+        {
+          "frame": "fire packages/editor/src/editor/emitter.ts:33",
+          "sampledMs": 496.416,
+          "percentOfActive": 59.0713343098908
+        },
+        {
+          "frame": "flushOperation packages/editor/src/editor/Editor.ts:3041",
+          "sampledMs": 446.216,
+          "percentOfActive": 53.09775371950588
+        },
+        {
+          "frame": "syncDomSelection packages/editor/src/editor/inputSelectionController.ts:1460",
+          "sampledMs": 439.897,
+          "percentOfActive": 52.34582033801898
+        },
+        {
+          "frame": "syncSessionSelectionHighlight packages/editor/src/editor/inputSelectionController.ts:1498",
+          "sampledMs": 435.817,
+          "percentOfActive": 51.860318170513594
+        },
+        {
+          "frame": "setSelections packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:217",
+          "sampledMs": 430.507,
+          "percentOfActive": 51.22845137898085
+        },
+        {
+          "frame": "setSelections packages/editor/src/virtualization/virtualizedTextView.ts:1008",
+          "sampledMs": 430.507,
+          "percentOfActive": 51.22845137898085
+        },
+        {
+          "frame": "renderSelectionHighlight packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:244",
+          "sampledMs": 421.016,
+          "percentOfActive": 50.09906386138437
+        },
+        {
+          "frame": "renderCaret packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:319",
+          "sampledMs": 417.857,
+          "percentOfActive": 49.723156668455566
+        },
+        {
+          "frame": "caretPosition packages/editor/src/virtualization/virtualizedTextViewRows.ts:2742",
+          "sampledMs": 406.546,
+          "percentOfActive": 48.377197105550316
+        },
+        {
+          "frame": "offsetToX packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:456",
+          "sampledMs": 405.605,
+          "percentOfActive": 48.26522221838792
+        },
+        {
+          "frame": "boundaryPositionXsForAffinity packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1061",
+          "sampledMs": 405.605,
+          "percentOfActive": 48.26522221838792
+        },
+        {
+          "frame": "xForOffset packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2714",
+          "sampledMs": 245.587,
+          "percentOfActive": 29.223779610574905
+        },
+        {
+          "frame": "boundaryX packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1916",
+          "sampledMs": 245.487,
+          "percentOfActive": 29.21188004764585
+        },
+        {
+          "frame": "resolveUnit packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2490",
+          "sampledMs": 244.431,
+          "percentOfActive": 29.086220663115043
+        },
+        {
+          "frame": "resolvedUnitLogicalEdge packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1939",
+          "sampledMs": 244.431,
+          "percentOfActive": 29.086220663115043
+        },
+        {
+          "frame": "measureEditorPerformance packages/editor/src/editor/performanceDiagnostics.ts:23",
+          "sampledMs": 228.353,
+          "percentOfActive": 27.173008935381805
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:2995",
+          "sampledMs": 220.049,
+          "percentOfActive": 26.18486922975319
+        },
+        {
+          "frame": "renderSessionChange packages/editor/src/editor/Editor.ts:3188",
+          "sampledMs": 218.983,
+          "percentOfActive": 26.05801988892948
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:2998",
+          "sampledMs": 218.983,
+          "percentOfActive": 26.05801988892948
+        },
+        {
+          "frame": "renderEdit packages/editor/src/editor/Editor.ts:683",
+          "sampledMs": 204.466,
+          "percentOfActive": 24.330560338518765
+        },
+        {
+          "frame": "measuredUnitRect packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2516",
+          "sampledMs": 195.738,
+          "percentOfActive": 23.291966486070965
+        }
+      ]
+    },
+    {
+      "file": "long-line-churn-warm-0.cpuprofile",
+      "durationMs": 824.694,
+      "samples": 751,
+      "sampledMs": 824.133,
+      "activeSampledMs": 815.739,
+      "self": [
+        {
+          "frame": "createRowChunk packages/editor/src/virtualization/virtualizedTextViewRows.ts:1457",
+          "sampledMs": 140.429,
+          "percentOfActive": 17.21494252450845
+        },
+        {
+          "frame": "readRowClientRectScale packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2893",
+          "sampledMs": 120.252,
+          "percentOfActive": 14.741479811557372
+        },
+        {
+          "frame": "(garbage collector)",
+          "sampledMs": 116.73,
+          "percentOfActive": 14.309724066153512
+        },
+        {
+          "frame": "getClientRects",
+          "sampledMs": 59.823,
+          "percentOfActive": 7.333595672145135
+        },
+        {
+          "frame": "getBoundingClientRect",
+          "sampledMs": 44.148,
+          "percentOfActive": 5.412025169815346
+        },
+        {
+          "frame": "(program)",
+          "sampledMs": 38.218,
+          "percentOfActive": 4.6850769670200885
+        },
+        {
+          "frame": "rangeSummary packages/editor/src/textMeasurements.ts:300",
+          "sampledMs": 32.623,
+          "percentOfActive": 3.999195821212422
+        },
+        {
+          "frame": "segmentGraphemes packages/editor/src/graphemes.ts:44",
+          "sampledMs": 20.044,
+          "percentOfActive": 2.4571584783858564
+        },
+        {
+          "frame": "firstRangeRect$1 packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2945",
+          "sampledMs": 16.871,
+          "percentOfActive": 2.0681860251869777
+        },
+        {
+          "frame": "createPlanBuffer packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1884",
+          "sampledMs": 16.814,
+          "percentOfActive": 2.061198496087597
+        },
+        {
+          "frame": "buildMeasuredRowGeometry packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1718",
+          "sampledMs": 14.78,
+          "percentOfActive": 1.8118540366465254
+        },
+        {
+          "frame": "setEnd",
+          "sampledMs": 12.653,
+          "percentOfActive": 1.55110887183278
+        },
+        {
+          "frame": "resolveUnit packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2490",
+          "sampledMs": 10.531,
+          "percentOfActive": 1.2909766481681029
+        },
+        {
+          "frame": "createBoundaryBuffer packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2589",
+          "sampledMs": 9.503,
+          "percentOfActive": 1.1649559479196165
+        },
+        {
+          "frame": "appendPlanBoundary packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1900",
+          "sampledMs": 7.383,
+          "percentOfActive": 0.9050689007145668
+        },
+        {
+          "frame": "appendUnitPlan packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1864",
+          "sampledMs": 7.353,
+          "percentOfActive": 0.9013912538201557
+        },
+        {
+          "frame": "selectNodeContents",
+          "sampledMs": 6.326,
+          "percentOfActive": 0.7754931418014831
+        },
+        {
+          "frame": "replaceChildren",
+          "sampledMs": 5.274,
+          "percentOfActive": 0.6465303240374679
+        },
+        {
+          "frame": "setStart",
+          "sampledMs": 4.224,
+          "percentOfActive": 0.5178126827330801
+        },
+        {
+          "frame": "measuredTextSegmentRect packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2771",
+          "sampledMs": 4.224,
+          "percentOfActive": 0.5178126827330801
+        },
+        {
+          "frame": "foldLines packages/editor/src/editor/foldRanges.ts:159",
+          "sampledMs": 3.175,
+          "percentOfActive": 0.389217629658506
+        },
+        {
+          "frame": "createElement",
+          "sampledMs": 3.173,
+          "percentOfActive": 0.3889724531988786
+        },
+        {
+          "frame": "appendBoundary packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2594",
+          "sampledMs": 3.171,
+          "percentOfActive": 0.38872727673925117
+        },
+        {
+          "frame": "flushOperation packages/editor/src/editor/Editor.ts:3041",
+          "sampledMs": 3.171,
+          "percentOfActive": 0.38872727673925117
+        },
+        {
+          "frame": "createViewSnapshot packages/editor/src/editor/Editor.ts:2694",
+          "sampledMs": 3.167,
+          "percentOfActive": 0.38823692381999636
+        },
+        {
+          "frame": "item",
+          "sampledMs": 3.149,
+          "percentOfActive": 0.3860303356833497
+        },
+        {
+          "frame": "createTextNode",
+          "sampledMs": 3.147,
+          "percentOfActive": 0.3857851592237223
+        },
+        {
+          "frame": "appendWhitespaceMarkersForChunk packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:267",
+          "sampledMs": 3.145,
+          "percentOfActive": 0.3855399827640949
+        },
+        {
+          "frame": "rowsNeedingSameLineProjectionReconcile packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:528",
+          "sampledMs": 2.122,
+          "percentOfActive": 0.2601322236646771
+        },
+        {
+          "frame": "seek packages/editor/src/pieceTable/walker.ts:117",
+          "sampledMs": 2.115,
+          "percentOfActive": 0.25927410605598117
+        },
+        {
+          "frame": "root packages/editor/src/textMeasurements.ts:132",
+          "sampledMs": 2.114,
+          "percentOfActive": 0.25915151782616747
+        },
+        {
+          "frame": "estimatedLocalRangeWidth packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2963",
+          "sampledMs": 2.113,
+          "percentOfActive": 0.25902892959635376
+        },
+        {
+          "frame": "createSplitTextChunkParts packages/editor/src/virtualization/virtualizedTextViewRows.ts:1505",
+          "sampledMs": 2.113,
+          "percentOfActive": 0.25902892959635376
+        },
+        {
+          "frame": "setTimeout",
+          "sampledMs": 2.112,
+          "percentOfActive": 0.25890634136654006
+        },
+        {
+          "frame": "suspiciousCharacterRanges packages/editor/src/unicodeHighlight.ts:109",
+          "sampledMs": 2.112,
+          "percentOfActive": 0.25890634136654006
+        }
+      ],
+      "inclusive": [
+        {
+          "frame": "(root)",
+          "sampledMs": 815.739,
+          "percentOfActive": 100
+        },
+        {
+          "frame": "withOperation packages/editor/src/editor/Editor.ts:3014",
+          "sampledMs": 657.629,
+          "percentOfActive": 80.61757498415547
+        },
+        {
+          "frame": "runInOperation packages/editor/src/editor/Editor.ts:942",
+          "sampledMs": 657.629,
+          "percentOfActive": 80.61757498415547
+        },
+        {
+          "frame": "edit packages/editor/src/editor/Editor.ts:946",
+          "sampledMs": 652.365,
+          "percentOfActive": 79.97227054241614
+        },
+        {
+          "frame": "churn examples/stress/src/browser.ts:202",
+          "sampledMs": 648.151,
+          "percentOfActive": 79.4556837419812
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:943",
+          "sampledMs": 558.517,
+          "percentOfActive": 68.46761035085977
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:947",
+          "sampledMs": 554.304,
+          "percentOfActive": 67.95114613865465
+        },
+        {
+          "frame": "applySessionChange packages/editor/src/editor/Editor.ts:2989",
+          "sampledMs": 546.918,
+          "percentOfActive": 67.04570947325064
+        },
+        {
+          "frame": "applyEdits packages/editor/src/documentSession.ts:605",
+          "sampledMs": 483.514,
+          "percentOfActive": 59.27312535014263
+        },
+        {
+          "frame": "applyEdits packages/editor/src/documentSession.ts:1633",
+          "sampledMs": 483.514,
+          "percentOfActive": 59.27312535014263
+        },
+        {
+          "frame": "commitEdit packages/editor/src/documentSession.ts:1320",
+          "sampledMs": 479.295,
+          "percentOfActive": 58.75592560855862
+        },
+        {
+          "frame": "handleBufferChange packages/editor/src/editor/Editor.ts:2611",
+          "sampledMs": 476.128,
+          "percentOfActive": 58.367688684738624
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:2603",
+          "sampledMs": 476.128,
+          "percentOfActive": 58.367688684738624
+        },
+        {
+          "frame": "fire packages/editor/src/editor/emitter.ts:33",
+          "sampledMs": 476.128,
+          "percentOfActive": 58.367688684738624
+        },
+        {
+          "frame": "emitChange packages/editor/src/documentSession.ts:1458",
+          "sampledMs": 476.128,
+          "percentOfActive": 58.367688684738624
+        },
+        {
+          "frame": "flushOperation packages/editor/src/editor/Editor.ts:3041",
+          "sampledMs": 445.931,
+          "percentOfActive": 54.665891909054245
+        },
+        {
+          "frame": "syncDomSelection packages/editor/src/editor/inputSelectionController.ts:1460",
+          "sampledMs": 435.369,
+          "percentOfActive": 53.37111502576192
+        },
+        {
+          "frame": "syncSessionSelectionHighlight packages/editor/src/editor/inputSelectionController.ts:1498",
+          "sampledMs": 425.45,
+          "percentOfActive": 52.1551623742398
+        },
+        {
+          "frame": "setSelections packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:217",
+          "sampledMs": 423.341,
+          "percentOfActive": 51.896623797562704
+        },
+        {
+          "frame": "setSelections packages/editor/src/virtualization/virtualizedTextView.ts:1008",
+          "sampledMs": 423.341,
+          "percentOfActive": 51.896623797562704
+        },
+        {
+          "frame": "renderSelectionHighlight packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:244",
+          "sampledMs": 416.027,
+          "percentOfActive": 51.00001348470528
+        },
+        {
+          "frame": "renderCaret packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:319",
+          "sampledMs": 413.918,
+          "percentOfActive": 50.74147490802818
+        },
+        {
+          "frame": "caretPosition packages/editor/src/virtualization/virtualizedTextViewRows.ts:2742",
+          "sampledMs": 410.749,
+          "percentOfActive": 50.35299280774856
+        },
+        {
+          "frame": "offsetToX packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:456",
+          "sampledMs": 409.689,
+          "percentOfActive": 50.22304928414603
+        },
+        {
+          "frame": "boundaryPositionXsForAffinity packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1061",
+          "sampledMs": 409.689,
+          "percentOfActive": 50.22304928414603
+        },
+        {
+          "frame": "resolveUnit packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2490",
+          "sampledMs": 250.5,
+          "percentOfActive": 30.708351568332517
+        },
+        {
+          "frame": "resolvedUnitLogicalEdge packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1939",
+          "sampledMs": 250.5,
+          "percentOfActive": 30.708351568332517
+        },
+        {
+          "frame": "boundaryX packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1916",
+          "sampledMs": 250.5,
+          "percentOfActive": 30.708351568332517
+        },
+        {
+          "frame": "xForOffset packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2714",
+          "sampledMs": 250.5,
+          "percentOfActive": 30.708351568332517
+        },
+        {
+          "frame": "measureEditorPerformance packages/editor/src/editor/performanceDiagnostics.ts:23",
+          "sampledMs": 204.231,
+          "percentOfActive": 25.036316763082308
+        },
+        {
+          "frame": "measuredUnitRect packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2516",
+          "sampledMs": 202.065,
+          "percentOfActive": 24.77079065730583
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:2995",
+          "sampledMs": 196.964,
+          "percentOfActive": 24.145468097026132
+        },
+        {
+          "frame": "renderSessionChange packages/editor/src/editor/Editor.ts:3188",
+          "sampledMs": 195.793,
+          "percentOfActive": 24.001917279914288
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:2998",
+          "sampledMs": 195.793,
+          "percentOfActive": 24.001917279914288
+        },
+        {
+          "frame": "renderEdit packages/editor/src/editor/Editor.ts:683",
+          "sampledMs": 181.559,
+          "percentOfActive": 22.25699641674604
+        }
+      ]
+    },
+    {
+      "file": "long-line-typing-cold-0.cpuprofile",
+      "durationMs": 183.023,
+      "samples": 145,
+      "sampledMs": 182.867,
+      "activeSampledMs": 107.202,
+      "self": [
+        {
+          "frame": "(program)",
+          "sampledMs": 38.074,
+          "percentOfActive": 35.51612843043973
+        },
+        {
+          "frame": "readRowClientRectScale packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2893",
+          "sampledMs": 12.643,
+          "percentOfActive": 11.793623253297513
+        },
+        {
+          "frame": "(garbage collector)",
+          "sampledMs": 8.421,
+          "percentOfActive": 7.85526389433033
+        },
+        {
+          "frame": "createRowChunk packages/editor/src/virtualization/virtualizedTextViewRows.ts:1457",
+          "sampledMs": 7.38,
+          "percentOfActive": 6.884199921643253
+        },
+        {
+          "frame": "refreshHiddenInputContent packages/editor/src/editor/inputSelectionController.ts:1528",
+          "sampledMs": 6.323,
+          "percentOfActive": 5.898210854275106
+        },
+        {
+          "frame": "(anonymous)",
+          "sampledMs": 4.797,
+          "percentOfActive": 4.474729949068115
+        },
+        {
+          "frame": "getClientRects",
+          "sampledMs": 3.163,
+          "percentOfActive": 2.9505046547639036
+        },
+        {
+          "frame": "flushOperation packages/editor/src/editor/Editor.ts:3041",
+          "sampledMs": 2.11,
+          "percentOfActive": 1.9682468610660249
+        },
+        {
+          "frame": "scanSummary packages/editor/src/textMeasurements.ts:204",
+          "sampledMs": 2.107,
+          "percentOfActive": 1.9654484058133244
+        },
+        {
+          "frame": "abort",
+          "sampledMs": 2.107,
+          "percentOfActive": 1.9654484058133244
+        },
+        {
+          "frame": "appendCalculatedChunkBoundaries packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1657",
+          "sampledMs": 1.457,
+          "percentOfActive": 1.3591164343948807
+        },
+        {
+          "frame": "selectionFromResolved packages/editor/src/selections.ts:293",
+          "sampledMs": 1.105,
+          "percentOfActive": 1.0307643514113543
+        },
+        {
+          "frame": "setSelectionRange",
+          "sampledMs": 1.057,
+          "percentOfActive": 0.9859890673681461
+        },
+        {
+          "frame": "syncInlineSuggestion packages/editor/src/editor/inputSelectionController.ts:921",
+          "sampledMs": 1.057,
+          "percentOfActive": 0.9859890673681461
+        },
+        {
+          "frame": "editorPerformanceDiagnosticSink packages/editor/src/editor/performanceDiagnostics.ts:62",
+          "sampledMs": 1.056,
+          "percentOfActive": 0.9850562489505793
+        },
+        {
+          "frame": "RegExp: ^[a-z]$",
+          "sampledMs": 1.056,
+          "percentOfActive": 0.9850562489505793
+        },
+        {
+          "frame": "readPieceTableTextRange packages/editor/src/pieceTable/reads.ts:17",
+          "sampledMs": 1.056,
+          "percentOfActive": 0.9850562489505793
+        },
+        {
+          "frame": "match packages/editor/src/keymap/runtime.ts:132",
+          "sampledMs": 1.055,
+          "percentOfActive": 0.9841234305330124
+        },
+        {
+          "frame": "applyText packages/editor/src/documentSession.ts:533",
+          "sampledMs": 1.055,
+          "percentOfActive": 0.9841234305330124
+        },
+        {
+          "frame": "clampSelection packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:1400",
+          "sampledMs": 1.055,
+          "percentOfActive": 0.9841234305330124
+        },
+        {
+          "frame": "autoCloseChange packages/editor/src/editor/inputSelectionController.ts:695",
+          "sampledMs": 1.054,
+          "percentOfActive": 0.9831906121154456
+        },
+        {
+          "frame": "schedule packages/editor/src/editor/workScheduler.ts:145",
+          "sampledMs": 1.054,
+          "percentOfActive": 0.9831906121154456
+        },
+        {
+          "frame": "adoptTokens packages/editor/src/editor/Editor.ts:485",
+          "sampledMs": 1.054,
+          "percentOfActive": 0.9831906121154456
+        },
+        {
+          "frame": "collectTextInRange packages/editor/src/pieceTable/tree.ts:231",
+          "sampledMs": 1.054,
+          "percentOfActive": 0.9831906121154456
+        },
+        {
+          "frame": "estimatedDisplayCellForColumn packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1274",
+          "sampledMs": 1.053,
+          "percentOfActive": 0.9822577936978788
+        },
+        {
+          "frame": "transitionInputState packages/editor/src/editor/inputSelectionController.ts:1611",
+          "sampledMs": 1.053,
+          "percentOfActive": 0.9822577936978788
+        },
+        {
+          "frame": "boundaryPositionXsForAffinity packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1061",
+          "sampledMs": 1.052,
+          "percentOfActive": 0.9813249752803119
+        },
+        {
+          "frame": "createBoundaryBuffer packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2589",
+          "sampledMs": 1.044,
+          "percentOfActive": 0.9738624279397773
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:594",
+          "sampledMs": 0.65,
+          "percentOfActive": 0.6063319714184436
+        }
+      ],
+      "inclusive": [
+        {
+          "frame": "(root)",
+          "sampledMs": 107.202,
+          "percentOfActive": 100
+        },
+        {
+          "frame": "handleBeforeInput packages/editor/src/editor/inputSelectionController.ts:2407",
+          "sampledMs": 50.585,
+          "percentOfActive": 47.18661965261842
+        },
+        {
+          "frame": "withOperation packages/editor/src/editor/Editor.ts:3014",
+          "sampledMs": 48.523,
+          "percentOfActive": 45.2631480755956
+        },
+        {
+          "frame": "applySessionChange packages/editor/src/editor/Editor.ts:2989",
+          "sampledMs": 47.422,
+          "percentOfActive": 44.236114997854514
+        },
+        {
+          "frame": "applySessionChange packages/editor/src/editor/Editor.ts:527",
+          "sampledMs": 47.422,
+          "percentOfActive": 44.236114997854514
+        },
+        {
+          "frame": "applyChange packages/editor/src/editor/inputSelectionController.ts:1560",
+          "sampledMs": 47.422,
+          "percentOfActive": 44.236114997854514
+        },
+        {
+          "frame": "(program)",
+          "sampledMs": 38.074,
+          "percentOfActive": 35.51612843043973
+        },
+        {
+          "frame": "flushOperation packages/editor/src/editor/Editor.ts:3041",
+          "sampledMs": 32.661,
+          "percentOfActive": 30.466782336150445
+        },
+        {
+          "frame": "syncDomSelection packages/editor/src/editor/inputSelectionController.ts:1460",
+          "sampledMs": 29.497,
+          "percentOfActive": 27.515344862968973
+        },
+        {
+          "frame": "syncSessionSelectionHighlight packages/editor/src/editor/inputSelectionController.ts:1498",
+          "sampledMs": 28.847,
+          "percentOfActive": 26.909012891550532
+        },
+        {
+          "frame": "setSelections packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:217",
+          "sampledMs": 20.414,
+          "percentOfActive": 19.042555176209397
+        },
+        {
+          "frame": "setSelections packages/editor/src/virtualization/virtualizedTextView.ts:1008",
+          "sampledMs": 20.414,
+          "percentOfActive": 19.042555176209397
+        },
+        {
+          "frame": "boundaryPositionXsForAffinity packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1061",
+          "sampledMs": 19.359,
+          "percentOfActive": 18.058431745676387
+        },
+        {
+          "frame": "caretPosition packages/editor/src/virtualization/virtualizedTextViewRows.ts:2742",
+          "sampledMs": 19.359,
+          "percentOfActive": 18.058431745676387
+        },
+        {
+          "frame": "renderCaret packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:319",
+          "sampledMs": 19.359,
+          "percentOfActive": 18.058431745676387
+        },
+        {
+          "frame": "renderSelectionHighlight packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:244",
+          "sampledMs": 19.359,
+          "percentOfActive": 18.058431745676387
+        },
+        {
+          "frame": "measureEditorPerformance packages/editor/src/editor/performanceDiagnostics.ts:23",
+          "sampledMs": 18.976,
+          "percentOfActive": 17.70116229174829
+        },
+        {
+          "frame": "buildCalculatedRowGeometry packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1554",
+          "sampledMs": 18.307,
+          "percentOfActive": 17.077106770396075
+        },
+        {
+          "frame": "buildRowGeometry packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1534",
+          "sampledMs": 18.307,
+          "percentOfActive": 17.077106770396075
+        },
+        {
+          "frame": "ensureRowGeometry packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1486",
+          "sampledMs": 18.307,
+          "percentOfActive": 17.077106770396075
+        },
+        {
+          "frame": "offsetToX packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:456",
+          "sampledMs": 18.307,
+          "percentOfActive": 17.077106770396075
+        },
+        {
+          "frame": "renderSessionChange packages/editor/src/editor/Editor.ts:3188",
+          "sampledMs": 14.757,
+          "percentOfActive": 13.765601388033806
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:2998",
+          "sampledMs": 14.757,
+          "percentOfActive": 13.765601388033806
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:2995",
+          "sampledMs": 14.757,
+          "percentOfActive": 13.765601388033806
+        },
+        {
+          "frame": "renderEdit packages/editor/src/editor/Editor.ts:683",
+          "sampledMs": 12.65,
+          "percentOfActive": 11.800152982220482
+        },
+        {
+          "frame": "readRowClientRectScale packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2893",
+          "sampledMs": 12.643,
+          "percentOfActive": 11.793623253297513
+        },
+        {
+          "frame": "rowClientRectScale packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2884",
+          "sampledMs": 12.643,
+          "percentOfActive": 11.793623253297513
+        },
+        {
+          "frame": "applySameLineEdit packages/editor/src/virtualization/virtualizedTextView.ts:1132",
+          "sampledMs": 11.596,
+          "percentOfActive": 10.816962370105035
+        },
+        {
+          "frame": "applyEdit packages/editor/src/virtualization/virtualizedTextView.ts:570",
+          "sampledMs": 11.596,
+          "percentOfActive": 10.816962370105035
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:692",
+          "sampledMs": 11.596,
+          "percentOfActive": 10.816962370105035
+        },
+        {
+          "frame": "setChunkedRowText packages/editor/src/virtualization/virtualizedTextViewRows.ts:1414",
+          "sampledMs": 8.433,
+          "percentOfActive": 7.866457715341132
+        },
+        {
+          "frame": "updateRowTextChunks packages/editor/src/virtualization/virtualizedTextViewRows.ts:759",
+          "sampledMs": 8.433,
+          "percentOfActive": 7.866457715341132
+        },
+        {
+          "frame": "updateRowTextForSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:699",
+          "sampledMs": 8.433,
+          "percentOfActive": 7.866457715341132
+        },
+        {
+          "frame": "updateRowElementForSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:674",
+          "sampledMs": 8.433,
+          "percentOfActive": 7.866457715341132
+        },
+        {
+          "frame": "updateRowAfterSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:633",
+          "sampledMs": 8.433,
+          "percentOfActive": 7.866457715341132
+        }
+      ]
+    },
+    {
+      "file": "long-line-typing-warm-0.cpuprofile",
+      "durationMs": 179.027,
+      "samples": 139,
+      "sampledMs": 178.948,
+      "activeSampledMs": 101.074,
+      "self": [
+        {
+          "frame": "(program)",
+          "sampledMs": 42.595,
+          "percentOfActive": 42.14239072362823
+        },
+        {
+          "frame": "readRowClientRectScale packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2893",
+          "sampledMs": 20.053,
+          "percentOfActive": 19.83991926707165
+        },
+        {
+          "frame": "createRowChunk packages/editor/src/virtualization/virtualizedTextViewRows.ts:1457",
+          "sampledMs": 8.433,
+          "percentOfActive": 8.343391970239626
+        },
+        {
+          "frame": "(garbage collector)",
+          "sampledMs": 7.288,
+          "percentOfActive": 7.210558600629242
+        },
+        {
+          "frame": "refreshHiddenInputContent packages/editor/src/editor/inputSelectionController.ts:1528",
+          "sampledMs": 3.168,
+          "percentOfActive": 3.1343372182757188
+        },
+        {
+          "frame": "scanSummary packages/editor/src/textMeasurements.ts:204",
+          "sampledMs": 2.117,
+          "percentOfActive": 2.0945050161267984
+        },
+        {
+          "frame": "geometryFromBoundaries packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2606",
+          "sampledMs": 2.105,
+          "percentOfActive": 2.0826325266636325
+        },
+        {
+          "frame": "(anonymous)",
+          "sampledMs": 1.497,
+          "percentOfActive": 1.4810930605299089
+        },
+        {
+          "frame": "focusInput packages/editor/src/virtualization/virtualizedTextView.ts:615",
+          "sampledMs": 1.117,
+          "percentOfActive": 1.1051308941963314
+        },
+        {
+          "frame": "keyColumnX packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1698",
+          "sampledMs": 1.114,
+          "percentOfActive": 1.10216277183054
+        },
+        {
+          "frame": "handleKeyDown packages/editor/src/editor/inputSelectionController.ts:2835",
+          "sampledMs": 1.06,
+          "percentOfActive": 1.0487365692462949
+        },
+        {
+          "frame": "createRowChunks packages/editor/src/virtualization/virtualizedTextViewRows.ts:1437",
+          "sampledMs": 1.058,
+          "percentOfActive": 1.0467578210024338
+        },
+        {
+          "frame": "createBoundaryBuffer packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2589",
+          "sampledMs": 1.057,
+          "percentOfActive": 1.0457684468805033
+        },
+        {
+          "frame": "onKeyUp packages/editor/src/keymap/runtime.ts:216",
+          "sampledMs": 1.056,
+          "percentOfActive": 1.0447790727585728
+        },
+        {
+          "frame": "recordAppliedKey examples/stress/src/browser.ts:139",
+          "sampledMs": 1.054,
+          "percentOfActive": 1.042800324514712
+        },
+        {
+          "frame": "renderCaret packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:319",
+          "sampledMs": 1.054,
+          "percentOfActive": 1.042800324514712
+        },
+        {
+          "frame": "claimKeybinding packages/editor/src/keymap/runtime.ts:168",
+          "sampledMs": 1.054,
+          "percentOfActive": 1.042800324514712
+        },
+        {
+          "frame": "appendWhitespaceMarkersForChunk packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:267",
+          "sampledMs": 1.052,
+          "percentOfActive": 1.040821576270851
+        },
+        {
+          "frame": "logSessionChange packages/editor/src/editor/Editor.ts:3242",
+          "sampledMs": 1.051,
+          "percentOfActive": 1.0398322021489206
+        },
+        {
+          "frame": "normalizeWhiteSpace",
+          "sampledMs": 1.047,
+          "percentOfActive": 1.0358747056611988
+        },
+        {
+          "frame": "querySelector",
+          "sampledMs": 1.044,
+          "percentOfActive": 1.0329065832954074
+        }
+      ],
+      "inclusive": [
+        {
+          "frame": "(root)",
+          "sampledMs": 101.074,
+          "percentOfActive": 100
+        },
+        {
+          "frame": "withOperation packages/editor/src/editor/Editor.ts:3014",
+          "sampledMs": 43.316,
+          "percentOfActive": 42.8557294655401
+        },
+        {
+          "frame": "applySessionChange packages/editor/src/editor/Editor.ts:2989",
+          "sampledMs": 43.316,
+          "percentOfActive": 42.8557294655401
+        },
+        {
+          "frame": "applySessionChange packages/editor/src/editor/Editor.ts:527",
+          "sampledMs": 43.316,
+          "percentOfActive": 42.8557294655401
+        },
+        {
+          "frame": "applyChange packages/editor/src/editor/inputSelectionController.ts:1560",
+          "sampledMs": 43.316,
+          "percentOfActive": 42.8557294655401
+        },
+        {
+          "frame": "handleBeforeInput packages/editor/src/editor/inputSelectionController.ts:2407",
+          "sampledMs": 43.316,
+          "percentOfActive": 42.8557294655401
+        },
+        {
+          "frame": "(program)",
+          "sampledMs": 42.595,
+          "percentOfActive": 42.14239072362823
+        },
+        {
+          "frame": "flushOperation packages/editor/src/editor/Editor.ts:3041",
+          "sampledMs": 30.656,
+          "percentOfActive": 30.33025308190039
+        },
+        {
+          "frame": "syncSessionSelectionHighlight packages/editor/src/editor/inputSelectionController.ts:1498",
+          "sampledMs": 28.551,
+          "percentOfActive": 28.247620555236757
+        },
+        {
+          "frame": "syncDomSelection packages/editor/src/editor/inputSelectionController.ts:1460",
+          "sampledMs": 28.551,
+          "percentOfActive": 28.247620555236757
+        },
+        {
+          "frame": "renderCaret packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:319",
+          "sampledMs": 25.383,
+          "percentOfActive": 25.11328333696104
+        },
+        {
+          "frame": "renderSelectionHighlight packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:244",
+          "sampledMs": 25.383,
+          "percentOfActive": 25.11328333696104
+        },
+        {
+          "frame": "setSelections packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:217",
+          "sampledMs": 25.383,
+          "percentOfActive": 25.11328333696104
+        },
+        {
+          "frame": "setSelections packages/editor/src/virtualization/virtualizedTextView.ts:1008",
+          "sampledMs": 25.383,
+          "percentOfActive": 25.11328333696104
+        },
+        {
+          "frame": "buildCalculatedRowGeometry packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1554",
+          "sampledMs": 24.329,
+          "percentOfActive": 24.070483012446328
+        },
+        {
+          "frame": "buildRowGeometry packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1534",
+          "sampledMs": 24.329,
+          "percentOfActive": 24.070483012446328
+        },
+        {
+          "frame": "ensureRowGeometry packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1486",
+          "sampledMs": 24.329,
+          "percentOfActive": 24.070483012446328
+        },
+        {
+          "frame": "offsetToX packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:456",
+          "sampledMs": 24.329,
+          "percentOfActive": 24.070483012446328
+        },
+        {
+          "frame": "boundaryPositionXsForAffinity packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1061",
+          "sampledMs": 24.329,
+          "percentOfActive": 24.070483012446328
+        },
+        {
+          "frame": "caretPosition packages/editor/src/virtualization/virtualizedTextViewRows.ts:2742",
+          "sampledMs": 24.329,
+          "percentOfActive": 24.070483012446328
+        },
+        {
+          "frame": "readRowClientRectScale packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2893",
+          "sampledMs": 20.053,
+          "percentOfActive": 19.83991926707165
+        },
+        {
+          "frame": "rowClientRectScale packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2884",
+          "sampledMs": 20.053,
+          "percentOfActive": 19.83991926707165
+        },
+        {
+          "frame": "measureEditorPerformance packages/editor/src/editor/performanceDiagnostics.ts:23",
+          "sampledMs": 13.714,
+          "percentOfActive": 13.568276708154421
+        },
+        {
+          "frame": "applySameLineEdit packages/editor/src/virtualization/virtualizedTextView.ts:1132",
+          "sampledMs": 12.66,
+          "percentOfActive": 12.52547638363971
+        },
+        {
+          "frame": "applyEdit packages/editor/src/virtualization/virtualizedTextView.ts:570",
+          "sampledMs": 12.66,
+          "percentOfActive": 12.52547638363971
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:692",
+          "sampledMs": 12.66,
+          "percentOfActive": 12.52547638363971
+        },
+        {
+          "frame": "renderEdit packages/editor/src/editor/Editor.ts:683",
+          "sampledMs": 12.66,
+          "percentOfActive": 12.52547638363971
+        },
+        {
+          "frame": "renderSessionChange packages/editor/src/editor/Editor.ts:3188",
+          "sampledMs": 12.66,
+          "percentOfActive": 12.52547638363971
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:2998",
+          "sampledMs": 12.66,
+          "percentOfActive": 12.52547638363971
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:2995",
+          "sampledMs": 12.66,
+          "percentOfActive": 12.52547638363971
+        },
+        {
+          "frame": "createRowChunks packages/editor/src/virtualization/virtualizedTextViewRows.ts:1437",
+          "sampledMs": 9.491,
+          "percentOfActive": 9.39014979124206
+        },
+        {
+          "frame": "setChunkedRowText packages/editor/src/virtualization/virtualizedTextViewRows.ts:1414",
+          "sampledMs": 9.491,
+          "percentOfActive": 9.39014979124206
+        },
+        {
+          "frame": "updateRowTextChunks packages/editor/src/virtualization/virtualizedTextViewRows.ts:759",
+          "sampledMs": 9.491,
+          "percentOfActive": 9.39014979124206
+        },
+        {
+          "frame": "updateRowTextForSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:699",
+          "sampledMs": 9.491,
+          "percentOfActive": 9.39014979124206
+        },
+        {
+          "frame": "updateRowElementForSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:674",
+          "sampledMs": 9.491,
+          "percentOfActive": 9.39014979124206
+        }
+      ]
+    },
+    {
+      "file": "ordinary-churn-cold-0.cpuprofile",
+      "durationMs": 168.737,
+      "samples": 153,
+      "sampledMs": 168.595,
+      "activeSampledMs": 149.341,
+      "self": [
+        {
+          "frame": "(program)",
+          "sampledMs": 40.785,
+          "percentOfActive": 27.309981853610193
+        },
+        {
+          "frame": "updateRowFrame packages/editor/src/virtualization/virtualizedTextViewRows.ts:545",
+          "sampledMs": 12.659,
+          "percentOfActive": 8.476573747329937
+        },
+        {
+          "frame": "(garbage collector)",
+          "sampledMs": 4.222,
+          "percentOfActive": 2.827087002229796
+        },
+        {
+          "frame": "hiddenCharacterInputKey packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:206",
+          "sampledMs": 4.221,
+          "percentOfActive": 2.8264173937498747
+        },
+        {
+          "frame": "createViewSnapshot packages/editor/src/editor/Editor.ts:2694",
+          "sampledMs": 4.221,
+          "percentOfActive": 2.8264173937498747
+        },
+        {
+          "frame": "replaceChildren",
+          "sampledMs": 4.187,
+          "percentOfActive": 2.8036507054325335
+        },
+        {
+          "frame": "suspiciousCharacterRanges packages/editor/src/unicodeHighlight.ts:109",
+          "sampledMs": 3.195,
+          "percentOfActive": 2.1393990933501184
+        },
+        {
+          "frame": "updateMountedRowPaintFacts packages/editor/src/virtualization/virtualizedTextViewRows.ts:2069",
+          "sampledMs": 3.164,
+          "percentOfActive": 2.1186412304725426
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:594",
+          "sampledMs": 2.114,
+          "percentOfActive": 1.4155523265546635
+        },
+        {
+          "frame": "getPieceVisibleLineBreaks packages/editor/src/pieceTable/tree.ts:26",
+          "sampledMs": 2.113,
+          "percentOfActive": 1.4148827180747416
+        },
+        {
+          "frame": "deleteDatasetValue packages/editor/src/virtualization/virtualizedTextViewHelpers.ts:652",
+          "sampledMs": 2.112,
+          "percentOfActive": 1.4142131095948198
+        },
+        {
+          "frame": "appendWhitespaceMarkersForChunk packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:267",
+          "sampledMs": 2.112,
+          "percentOfActive": 1.4142131095948198
+        },
+        {
+          "frame": "planHiddenCharactersForRow packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:162",
+          "sampledMs": 2.111,
+          "percentOfActive": 1.413543501114898
+        },
+        {
+          "frame": "syncSimpleDirectRowChunk packages/editor/src/virtualization/virtualizedTextViewRows.ts:942",
+          "sampledMs": 2.111,
+          "percentOfActive": 1.413543501114898
+        },
+        {
+          "frame": "replaceData",
+          "sampledMs": 2.111,
+          "percentOfActive": 1.413543501114898
+        },
+        {
+          "frame": "mergeSnappedOverlaps packages/editor/src/pieceTable/edits.ts:93",
+          "sampledMs": 2.11,
+          "percentOfActive": 1.4128738926349764
+        },
+        {
+          "frame": "offsetToPoint packages/editor/src/pieceTable/positions.ts:140",
+          "sampledMs": 2.039,
+          "percentOfActive": 1.3653316905605293
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:943",
+          "sampledMs": 1.24,
+          "percentOfActive": 0.8303145151030192
+        },
+        {
+          "frame": "projectTokensThroughEdit packages/editor/src/editor/tokenProjection.ts:35",
+          "sampledMs": 1.136,
+          "percentOfActive": 0.7606752331911532
+        },
+        {
+          "frame": "bufferLineStartOffset packages/editor/src/virtualization/virtualizedTextViewLayout.ts:311",
+          "sampledMs": 1.095,
+          "percentOfActive": 0.7332212855143597
+        },
+        {
+          "frame": "onChange examples/stress/src/browser.ts:112",
+          "sampledMs": 1.065,
+          "percentOfActive": 0.713133031116706
+        },
+        {
+          "frame": "withDocumentSessionChangeTimings packages/editor/src/documentSession.ts:2511",
+          "sampledMs": 1.063,
+          "percentOfActive": 0.7117938141568625
+        },
+        {
+          "frame": "updateRowTextForSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:699",
+          "sampledMs": 1.058,
+          "percentOfActive": 0.7084457717572535
+        },
+        {
+          "frame": "captureCursorHistoryBefore packages/editor/src/editor/Editor.ts:3137",
+          "sampledMs": 1.057,
+          "percentOfActive": 0.7077761632773317
+        },
+        {
+          "frame": "computeFixedRowTotalSize packages/editor/src/virtualization/fixedRowVirtualizer.ts:86",
+          "sampledMs": 1.057,
+          "percentOfActive": 0.7077761632773317
+        },
+        {
+          "frame": "offsetAt packages/editor/src/virtualization/lineStartIndex.ts:32",
+          "sampledMs": 1.057,
+          "percentOfActive": 0.7077761632773317
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:2998",
+          "sampledMs": 1.056,
+          "percentOfActive": 0.7071065547974099
+        },
+        {
+          "frame": "getLineStartsView packages/editor/src/virtualization/virtualizedTextView.ts:801",
+          "sampledMs": 1.056,
+          "percentOfActive": 0.7071065547974099
+        },
+        {
+          "frame": "isLiveSelection packages/editor/src/selections.ts:141",
+          "sampledMs": 1.056,
+          "percentOfActive": 0.7071065547974099
+        },
+        {
+          "frame": "addTokenSegmentsForRow packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:963",
+          "sampledMs": 1.056,
+          "percentOfActive": 0.7071065547974099
+        },
+        {
+          "frame": "clearSelectionLayer packages/editor/src/virtualization/virtualizedTextViewSelectionLayer.ts:22",
+          "sampledMs": 1.056,
+          "percentOfActive": 0.7071065547974099
+        },
+        {
+          "frame": "update packages/editor/src/editor/viewContributions.ts:85",
+          "sampledMs": 1.056,
+          "percentOfActive": 0.7071065547974099
+        },
+        {
+          "frame": "rowDecorationForVirtualRow packages/editor/src/virtualization/virtualizedTextViewRows.ts:1989",
+          "sampledMs": 1.056,
+          "percentOfActive": 0.7071065547974099
+        },
+        {
+          "frame": "classifierMemo packages/editor/src/virtualization/virtualizedTextViewBidi.ts:110",
+          "sampledMs": 1.056,
+          "percentOfActive": 0.7071065547974099
+        },
+        {
+          "frame": "appendSuspiciousCharacterMarkers packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:315",
+          "sampledMs": 1.055,
+          "percentOfActive": 0.7064369463174882
+        }
+      ],
+      "inclusive": [
+        {
+          "frame": "(root)",
+          "sampledMs": 149.341,
+          "percentOfActive": 100
+        },
+        {
+          "frame": "withOperation packages/editor/src/editor/Editor.ts:3014",
+          "sampledMs": 103.281,
+          "percentOfActive": 69.15783341480237
+        },
+        {
+          "frame": "runInOperation packages/editor/src/editor/Editor.ts:942",
+          "sampledMs": 103.281,
+          "percentOfActive": 69.15783341480237
+        },
+        {
+          "frame": "edit packages/editor/src/editor/Editor.ts:946",
+          "sampledMs": 100.423,
+          "percentOfActive": 67.24409237918589
+        },
+        {
+          "frame": "churn examples/stress/src/browser.ts:202",
+          "sampledMs": 99.368,
+          "percentOfActive": 66.5376554328684
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:943",
+          "sampledMs": 95.254,
+          "percentOfActive": 63.78288614647016
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:947",
+          "sampledMs": 91.837,
+          "percentOfActive": 61.4948339705774
+        },
+        {
+          "frame": "applySessionChange packages/editor/src/editor/Editor.ts:2989",
+          "sampledMs": 84.527,
+          "percentOfActive": 56.59999598234912
+        },
+        {
+          "frame": "applyEdits packages/editor/src/documentSession.ts:605",
+          "sampledMs": 72.839,
+          "percentOfActive": 48.773612069023244
+        },
+        {
+          "frame": "applyEdits packages/editor/src/documentSession.ts:1633",
+          "sampledMs": 72.839,
+          "percentOfActive": 48.773612069023244
+        },
+        {
+          "frame": "commitEdit packages/editor/src/documentSession.ts:1320",
+          "sampledMs": 68.622,
+          "percentOfActive": 45.94987310919306
+        },
+        {
+          "frame": "measureEditorPerformance packages/editor/src/editor/performanceDiagnostics.ts:23",
+          "sampledMs": 66.691,
+          "percentOfActive": 44.65685913446408
+        },
+        {
+          "frame": "handleBufferChange packages/editor/src/editor/Editor.ts:2611",
+          "sampledMs": 65.46,
+          "percentOfActive": 43.83257109568036
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:2603",
+          "sampledMs": 65.46,
+          "percentOfActive": 43.83257109568036
+        },
+        {
+          "frame": "fire packages/editor/src/editor/emitter.ts:33",
+          "sampledMs": 65.46,
+          "percentOfActive": 43.83257109568036
+        },
+        {
+          "frame": "emitChange packages/editor/src/documentSession.ts:1458",
+          "sampledMs": 65.46,
+          "percentOfActive": 43.83257109568036
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:2995",
+          "sampledMs": 63.528,
+          "percentOfActive": 42.538887512471454
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:2998",
+          "sampledMs": 61.401,
+          "percentOfActive": 41.11463027567781
+        },
+        {
+          "frame": "renderSessionChange packages/editor/src/editor/Editor.ts:3188",
+          "sampledMs": 60.345,
+          "percentOfActive": 40.4075237208804
+        },
+        {
+          "frame": "renderEdit packages/editor/src/editor/Editor.ts:683",
+          "sampledMs": 55.984,
+          "percentOfActive": 37.48736113994148
+        },
+        {
+          "frame": "applyEdit packages/editor/src/virtualization/virtualizedTextView.ts:570",
+          "sampledMs": 46.295,
+          "percentOfActive": 30.999524577979255
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:692",
+          "sampledMs": 46.295,
+          "percentOfActive": 30.999524577979255
+        },
+        {
+          "frame": "applySameLineEdit packages/editor/src/virtualization/virtualizedTextView.ts:1132",
+          "sampledMs": 45.238,
+          "percentOfActive": 30.291748414701924
+        },
+        {
+          "frame": "(program)",
+          "sampledMs": 40.785,
+          "percentOfActive": 27.309981853610193
+        },
+        {
+          "frame": "updateMountedRowsAfterSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:614",
+          "sampledMs": 32.837,
+          "percentOfActive": 21.98793365519181
+        },
+        {
+          "frame": "updateRowAfterSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:633",
+          "sampledMs": 29.633,
+          "percentOfActive": 19.842508085522397
+        },
+        {
+          "frame": "flushOperation packages/editor/src/editor/Editor.ts:3041",
+          "sampledMs": 26.02,
+          "percentOfActive": 17.42321264756497
+        },
+        {
+          "frame": "updateRowElementForSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:674",
+          "sampledMs": 21.193,
+          "percentOfActive": 14.19101251498249
+        },
+        {
+          "frame": "renderHiddenCharacters packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:147",
+          "sampledMs": 19.464,
+          "percentOfActive": 13.033259453197715
+        },
+        {
+          "frame": "syncDomSelection packages/editor/src/editor/inputSelectionController.ts:1460",
+          "sampledMs": 18.995,
+          "percentOfActive": 12.719213076114396
+        },
+        {
+          "frame": "syncSessionSelectionHighlight packages/editor/src/editor/inputSelectionController.ts:1498",
+          "sampledMs": 16.824,
+          "percentOfActive": 11.26549306620419
+        },
+        {
+          "frame": "planHiddenCharactersForRow packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:162",
+          "sampledMs": 15.241,
+          "percentOfActive": 10.205502842487997
+        },
+        {
+          "frame": "updateRowFrame packages/editor/src/virtualization/virtualizedTextViewRows.ts:545",
+          "sampledMs": 12.659,
+          "percentOfActive": 8.476573747329937
+        },
+        {
+          "frame": "update packages/editor/src/editor/viewContributions.ts:85",
+          "sampledMs": 12.617,
+          "percentOfActive": 8.44845019117322
+        },
+        {
+          "frame": "notify packages/editor/src/editor/viewContributions.ts:50",
+          "sampledMs": 12.617,
+          "percentOfActive": 8.44845019117322
+        }
+      ]
+    },
+    {
+      "file": "ordinary-churn-warm-0.cpuprofile",
+      "durationMs": 143.688,
+      "samples": 110,
+      "sampledMs": 143.463,
+      "activeSampledMs": 128.71,
+      "self": [
+        {
+          "frame": "(program)",
+          "sampledMs": 38.359,
+          "percentOfActive": 29.802657136197652
+        },
+        {
+          "frame": "(garbage collector)",
+          "sampledMs": 5.279,
+          "percentOfActive": 4.101468417372388
+        },
+        {
+          "frame": "appendWhitespaceMarkersForChunk packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:267",
+          "sampledMs": 5.278,
+          "percentOfActive": 4.100691476963717
+        },
+        {
+          "frame": "replaceChildren",
+          "sampledMs": 4.223,
+          "percentOfActive": 3.281019345816176
+        },
+        {
+          "frame": "updateRowFrame packages/editor/src/virtualization/virtualizedTextViewRows.ts:545",
+          "sampledMs": 3.347,
+          "percentOfActive": 2.600419547820682
+        },
+        {
+          "frame": "appendWhitespaceMarker packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:278",
+          "sampledMs": 3.237,
+          "percentOfActive": 2.5149561028669103
+        },
+        {
+          "frame": "hiddenCharacterInputKey packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:206",
+          "sampledMs": 3.218,
+          "percentOfActive": 2.5001942351021675
+        },
+        {
+          "frame": "deleteDatasetValue packages/editor/src/virtualization/virtualizedTextViewHelpers.ts:652",
+          "sampledMs": 3.164,
+          "percentOfActive": 2.4582394530339524
+        },
+        {
+          "frame": "planHiddenCharactersForRow packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:162",
+          "sampledMs": 3.142,
+          "percentOfActive": 2.441146764043198
+        },
+        {
+          "frame": "updateRowElementForSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:674",
+          "sampledMs": 2.118,
+          "percentOfActive": 1.6455597855644473
+        },
+        {
+          "frame": "createViewSnapshot packages/editor/src/editor/Editor.ts:2694",
+          "sampledMs": 2.115,
+          "percentOfActive": 1.6432289643384352
+        },
+        {
+          "frame": "setTimeout",
+          "sampledMs": 2.114,
+          "percentOfActive": 1.6424520239297646
+        },
+        {
+          "frame": "offsetAt packages/editor/src/virtualization/lineStartIndex.ts:32",
+          "sampledMs": 2.111,
+          "percentOfActive": 1.6401212027037526
+        },
+        {
+          "frame": "getMountedRows packages/editor/src/virtualization/virtualizedTextViewRows.ts:2425",
+          "sampledMs": 2.111,
+          "percentOfActive": 1.6401212027037526
+        },
+        {
+          "frame": "syncRowChunkOffsets packages/editor/src/virtualization/virtualizedTextViewRows.ts:746",
+          "sampledMs": 2.11,
+          "percentOfActive": 1.639344262295082
+        },
+        {
+          "frame": "rememberHiddenCharacterInputs packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:226",
+          "sampledMs": 2.11,
+          "percentOfActive": 1.639344262295082
+        },
+        {
+          "frame": "appendWhitespaceMarkers packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:245",
+          "sampledMs": 1.412,
+          "percentOfActive": 1.0970398570429647
+        },
+        {
+          "frame": "updateGutterRowElement packages/editor/src/virtualization/virtualizedTextViewRows.ts:1731",
+          "sampledMs": 1.094,
+          "percentOfActive": 0.8499728070856966
+        },
+        {
+          "frame": "getState packages/editor/src/virtualization/virtualizedTextView.ts:844",
+          "sampledMs": 1.091,
+          "percentOfActive": 0.8476419858596845
+        },
+        {
+          "frame": "bufferColumnToVisualColumn packages/editor/src/displayTransforms.ts:193",
+          "sampledMs": 1.087,
+          "percentOfActive": 0.8445342242250019
+        },
+        {
+          "frame": "removeAllRanges",
+          "sampledMs": 1.064,
+          "percentOfActive": 0.8266645948255769
+        },
+        {
+          "frame": "suspiciousCharacterRanges packages/editor/src/unicodeHighlight.ts:109",
+          "sampledMs": 1.064,
+          "percentOfActive": 0.8266645948255769
+        },
+        {
+          "frame": "cursorLineBufferRow packages/editor/src/virtualization/virtualizedTextViewRows.ts:1814",
+          "sampledMs": 1.063,
+          "percentOfActive": 0.8258876544169063
+        },
+        {
+          "frame": "positionInputAtCaret packages/editor/src/virtualization/virtualizedTextViewRows.ts:2498",
+          "sampledMs": 1.063,
+          "percentOfActive": 0.8258876544169063
+        },
+        {
+          "frame": "rowUpdateState packages/editor/src/virtualization/virtualizedTextViewRows.ts:455",
+          "sampledMs": 1.059,
+          "percentOfActive": 0.8227798927822236
+        },
+        {
+          "frame": "get textSnapshot packages/editor/src/editor/Editor.ts:373",
+          "sampledMs": 1.058,
+          "percentOfActive": 0.8220029523735529
+        },
+        {
+          "frame": "projectSortedTokenRangesBulk packages/editor/src/editor/tokenProjection.ts:207",
+          "sampledMs": 1.058,
+          "percentOfActive": 0.8220029523735529
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:378",
+          "sampledMs": 1.057,
+          "percentOfActive": 0.8212260119648823
+        },
+        {
+          "frame": "usesDisplayRowTransforms packages/editor/src/virtualization/virtualizedTextViewLayout.ts:668",
+          "sampledMs": 1.057,
+          "percentOfActive": 0.8212260119648823
+        },
+        {
+          "frame": "resolveSelection packages/editor/src/selections.ts:218",
+          "sampledMs": 1.057,
+          "percentOfActive": 0.8212260119648823
+        },
+        {
+          "frame": "bufferRowForOffset packages/editor/src/virtualization/virtualizedTextViewLayout.ts:591",
+          "sampledMs": 1.057,
+          "percentOfActive": 0.8212260119648823
+        },
+        {
+          "frame": "bufferLineEndOffset packages/editor/src/virtualization/virtualizedTextViewLayout.ts:326",
+          "sampledMs": 1.056,
+          "percentOfActive": 0.8204490715562116
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/virtualization/virtualizedTextViewRows.ts:751",
+          "sampledMs": 1.056,
+          "percentOfActive": 0.8204490715562116
+        },
+        {
+          "frame": "cursorLineVirtualRow packages/editor/src/virtualization/virtualizedTextViewRows.ts:1820",
+          "sampledMs": 1.056,
+          "percentOfActive": 0.8204490715562116
+        },
+        {
+          "frame": "updateRowTextForSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:699",
+          "sampledMs": 1.056,
+          "percentOfActive": 0.8204490715562116
+        }
+      ],
+      "inclusive": [
+        {
+          "frame": "(root)",
+          "sampledMs": 128.71,
+          "percentOfActive": 100
+        },
+        {
+          "frame": "withOperation packages/editor/src/editor/Editor.ts:3014",
+          "sampledMs": 83.005,
+          "percentOfActive": 64.48993862170771
+        },
+        {
+          "frame": "runInOperation packages/editor/src/editor/Editor.ts:942",
+          "sampledMs": 83.005,
+          "percentOfActive": 64.48993862170771
+        },
+        {
+          "frame": "edit packages/editor/src/editor/Editor.ts:946",
+          "sampledMs": 81.949,
+          "percentOfActive": 63.6694895501515
+        },
+        {
+          "frame": "churn examples/stress/src/browser.ts:202",
+          "sampledMs": 79.597,
+          "percentOfActive": 61.84212570895812
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:943",
+          "sampledMs": 73.875,
+          "percentOfActive": 57.396472690544634
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:947",
+          "sampledMs": 73.336,
+          "percentOfActive": 56.97770181027115
+        },
+        {
+          "frame": "applySessionChange packages/editor/src/editor/Editor.ts:2989",
+          "sampledMs": 68.062,
+          "percentOfActive": 52.88011809494212
+        },
+        {
+          "frame": "applyEdits packages/editor/src/documentSession.ts:605",
+          "sampledMs": 57.144,
+          "percentOfActive": 44.39748271307591
+        },
+        {
+          "frame": "applyEdits packages/editor/src/documentSession.ts:1633",
+          "sampledMs": 57.144,
+          "percentOfActive": 44.39748271307591
+        },
+        {
+          "frame": "measureEditorPerformance packages/editor/src/editor/performanceDiagnostics.ts:23",
+          "sampledMs": 55.202,
+          "percentOfActive": 42.8886644394375
+        },
+        {
+          "frame": "commitEdit packages/editor/src/documentSession.ts:1320",
+          "sampledMs": 53.979,
+          "percentOfActive": 41.938466319633285
+        },
+        {
+          "frame": "handleBufferChange packages/editor/src/editor/Editor.ts:2611",
+          "sampledMs": 51.87,
+          "percentOfActive": 40.29989899774687
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:2603",
+          "sampledMs": 51.87,
+          "percentOfActive": 40.29989899774687
+        },
+        {
+          "frame": "fire packages/editor/src/editor/emitter.ts:33",
+          "sampledMs": 51.87,
+          "percentOfActive": 40.29989899774687
+        },
+        {
+          "frame": "emitChange packages/editor/src/documentSession.ts:1458",
+          "sampledMs": 51.87,
+          "percentOfActive": 40.29989899774687
+        },
+        {
+          "frame": "renderSessionChange packages/editor/src/editor/Editor.ts:3188",
+          "sampledMs": 50.946,
+          "percentOfActive": 39.582006060135186
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:2998",
+          "sampledMs": 50.946,
+          "percentOfActive": 39.582006060135186
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:2995",
+          "sampledMs": 50.946,
+          "percentOfActive": 39.582006060135186
+        },
+        {
+          "frame": "renderEdit packages/editor/src/editor/Editor.ts:683",
+          "sampledMs": 44.921,
+          "percentOfActive": 34.90094009789449
+        },
+        {
+          "frame": "applyEdit packages/editor/src/virtualization/virtualizedTextView.ts:570",
+          "sampledMs": 39.637,
+          "percentOfActive": 30.795586978478752
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:692",
+          "sampledMs": 39.637,
+          "percentOfActive": 30.795586978478752
+        },
+        {
+          "frame": "applySameLineEdit packages/editor/src/virtualization/virtualizedTextView.ts:1132",
+          "sampledMs": 38.581,
+          "percentOfActive": 29.97513790692254
+        },
+        {
+          "frame": "(program)",
+          "sampledMs": 38.359,
+          "percentOfActive": 29.802657136197652
+        },
+        {
+          "frame": "flushOperation packages/editor/src/editor/Editor.ts:3041",
+          "sampledMs": 23.933,
+          "percentOfActive": 18.594514800714784
+        },
+        {
+          "frame": "renderHiddenCharacters packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:147",
+          "sampledMs": 23.684,
+          "percentOfActive": 18.401056638955794
+        },
+        {
+          "frame": "updateRowAfterSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:633",
+          "sampledMs": 19.229,
+          "percentOfActive": 14.939787118328024
+        },
+        {
+          "frame": "updateMountedRowsAfterSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:614",
+          "sampledMs": 19.229,
+          "percentOfActive": 14.939787118328024
+        },
+        {
+          "frame": "syncDomSelection packages/editor/src/editor/inputSelectionController.ts:1460",
+          "sampledMs": 19.16,
+          "percentOfActive": 14.88617823012975
+        },
+        {
+          "frame": "syncSessionSelectionHighlight packages/editor/src/editor/inputSelectionController.ts:1498",
+          "sampledMs": 17.579,
+          "percentOfActive": 13.657835444021444
+        },
+        {
+          "frame": "planHiddenCharactersForRow packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:162",
+          "sampledMs": 17.351,
+          "percentOfActive": 13.480693030844535
+        },
+        {
+          "frame": "setSelections packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:217",
+          "sampledMs": 16.522,
+          "percentOfActive": 12.83660943205656
+        },
+        {
+          "frame": "setSelections packages/editor/src/virtualization/virtualizedTextView.ts:1008",
+          "sampledMs": 16.522,
+          "percentOfActive": 12.83660943205656
+        },
+        {
+          "frame": "updateRowElementForSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:674",
+          "sampledMs": 16.057,
+          "percentOfActive": 12.475332142024707
+        },
+        {
+          "frame": "hiddenCharacterMarkersForRow packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:230",
+          "sampledMs": 10.991,
+          "percentOfActive": 8.539352031699169
+        }
+      ]
+    },
+    {
+      "file": "ordinary-typing-cold-0.cpuprofile",
+      "durationMs": 148.747,
+      "samples": 112,
+      "sampledMs": 148.258,
+      "activeSampledMs": 80.887,
+      "self": [
+        {
+          "frame": "(program)",
+          "sampledMs": 39.285,
+          "percentOfActive": 48.567755016257244
+        },
+        {
+          "frame": "refreshHiddenInputContent packages/editor/src/editor/inputSelectionController.ts:1528",
+          "sampledMs": 8.392,
+          "percentOfActive": 10.3749675473191
+        },
+        {
+          "frame": "(garbage collector)",
+          "sampledMs": 4.294,
+          "percentOfActive": 5.308640449021475
+        },
+        {
+          "frame": "replaceData",
+          "sampledMs": 3.167,
+          "percentOfActive": 3.915338682359341
+        },
+        {
+          "frame": "flushOperation packages/editor/src/editor/Editor.ts:3041",
+          "sampledMs": 2.212,
+          "percentOfActive": 2.734679243883442
+        },
+        {
+          "frame": "(anonymous)",
+          "sampledMs": 2.092,
+          "percentOfActive": 2.5863241311953713
+        },
+        {
+          "frame": "setSelections packages/editor/src/documentSession.ts:1496",
+          "sampledMs": 1.23,
+          "percentOfActive": 1.520639905052728
+        },
+        {
+          "frame": "readRowClientRectScale packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2893",
+          "sampledMs": 1.093,
+          "percentOfActive": 1.3512678180671802
+        },
+        {
+          "frame": "adoptTokens packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:122",
+          "sampledMs": 1.085,
+          "percentOfActive": 1.3413774772213087
+        },
+        {
+          "frame": "isWhitespace$1 packages/editor/src/documentSession.ts:2395",
+          "sampledMs": 1.062,
+          "percentOfActive": 1.3129427472894284
+        },
+        {
+          "frame": "defineLazyFullTextProperty packages/editor/src/documentTextSnapshot.ts:71",
+          "sampledMs": 1.058,
+          "percentOfActive": 1.3079975768664927
+        },
+        {
+          "frame": "getPieceVisibleLineBreaks packages/editor/src/pieceTable/tree.ts:26",
+          "sampledMs": 1.057,
+          "percentOfActive": 1.3067612842607588
+        },
+        {
+          "frame": "projectSyntaxRangeCache packages/editor/src/editor/syntaxController.ts:1273",
+          "sampledMs": 1.056,
+          "percentOfActive": 1.305524991655025
+        },
+        {
+          "frame": "syncSimpleDirectRowChunk packages/editor/src/virtualization/virtualizedTextViewRows.ts:942",
+          "sampledMs": 1.056,
+          "percentOfActive": 1.305524991655025
+        },
+        {
+          "frame": "measuredRowRect packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2936",
+          "sampledMs": 1.056,
+          "percentOfActive": 1.305524991655025
+        },
+        {
+          "frame": "renderEdit packages/editor/src/editor/Editor.ts:683",
+          "sampledMs": 1.056,
+          "percentOfActive": 1.305524991655025
+        },
+        {
+          "frame": "needsRepaint packages/editor/src/editor/ghostText.ts:168",
+          "sampledMs": 1.056,
+          "percentOfActive": 1.305524991655025
+        },
+        {
+          "frame": "hasCollapsedSelection packages/editor/src/virtualization/virtualizedTextViewRows.ts:1827",
+          "sampledMs": 1.056,
+          "percentOfActive": 1.305524991655025
+        },
+        {
+          "frame": "updateNode packages/editor/src/pieceTable/tree.ts:95",
+          "sampledMs": 1.055,
+          "percentOfActive": 1.304288699049291
+        },
+        {
+          "frame": "updateMountedRowsAfterSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:614",
+          "sampledMs": 1.055,
+          "percentOfActive": 1.304288699049291
+        },
+        {
+          "frame": "replaceChildren",
+          "sampledMs": 1.055,
+          "percentOfActive": 1.304288699049291
+        },
+        {
+          "frame": "transitionEditorInputState packages/editor/src/editor/inputState.ts:72",
+          "sampledMs": 1.055,
+          "percentOfActive": 1.304288699049291
+        },
+        {
+          "frame": "updateRowFrame packages/editor/src/virtualization/virtualizedTextViewRows.ts:545",
+          "sampledMs": 1.055,
+          "percentOfActive": 1.304288699049291
+        },
+        {
+          "frame": "match packages/editor/src/keymap/runtime.ts:132",
+          "sampledMs": 1.054,
+          "percentOfActive": 1.3030524064435571
+        },
+        {
+          "frame": "getLanguageId packages/editor/src/editor/Editor.ts:518",
+          "sampledMs": 1.052,
+          "percentOfActive": 1.3005798212320892
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/inputSelectionController.ts:2426",
+          "sampledMs": 1.025,
+          "percentOfActive": 1.2671999208772733
+        },
+        {
+          "frame": "appendCalculatedChunkBoundaries packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1657",
+          "sampledMs": 0.101,
+          "percentOfActive": 0.12486555317912644
+        },
+        {
+          "frame": "innerSerialize",
+          "sampledMs": 0.017,
+          "percentOfActive": 0.021016974297476728
+        }
+      ],
+      "inclusive": [
+        {
+          "frame": "(root)",
+          "sampledMs": 80.887,
+          "percentOfActive": 100
+        },
+        {
+          "frame": "(program)",
+          "sampledMs": 39.285,
+          "percentOfActive": 48.567755016257244
+        },
+        {
+          "frame": "handleBeforeInput packages/editor/src/editor/inputSelectionController.ts:2407",
+          "sampledMs": 31.793,
+          "percentOfActive": 39.305450814098684
+        },
+        {
+          "frame": "withOperation packages/editor/src/editor/Editor.ts:3014",
+          "sampledMs": 27.84,
+          "percentOfActive": 34.418386143632475
+        },
+        {
+          "frame": "applySessionChange packages/editor/src/editor/Editor.ts:2989",
+          "sampledMs": 26.544,
+          "percentOfActive": 32.81615092660131
+        },
+        {
+          "frame": "applySessionChange packages/editor/src/editor/Editor.ts:527",
+          "sampledMs": 26.544,
+          "percentOfActive": 32.81615092660131
+        },
+        {
+          "frame": "applyChange packages/editor/src/editor/inputSelectionController.ts:1560",
+          "sampledMs": 26.544,
+          "percentOfActive": 32.81615092660131
+        },
+        {
+          "frame": "flushOperation packages/editor/src/editor/Editor.ts:3041",
+          "sampledMs": 16.025,
+          "percentOfActive": 19.811589006886148
+        },
+        {
+          "frame": "syncDomSelection packages/editor/src/editor/inputSelectionController.ts:1460",
+          "sampledMs": 13.813,
+          "percentOfActive": 17.076909763002707
+        },
+        {
+          "frame": "measureEditorPerformance packages/editor/src/editor/performanceDiagnostics.ts:23",
+          "sampledMs": 13.723,
+          "percentOfActive": 16.965643428486654
+        },
+        {
+          "frame": "syncSessionSelectionHighlight packages/editor/src/editor/inputSelectionController.ts:1498",
+          "sampledMs": 12.755,
+          "percentOfActive": 15.768912186136214
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:2995",
+          "sampledMs": 10.585,
+          "percentOfActive": 13.086157231693598
+        },
+        {
+          "frame": "renderEdit packages/editor/src/editor/Editor.ts:683",
+          "sampledMs": 9.529,
+          "percentOfActive": 11.780632240038573
+        },
+        {
+          "frame": "renderSessionChange packages/editor/src/editor/Editor.ts:3188",
+          "sampledMs": 9.529,
+          "percentOfActive": 11.780632240038573
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:2998",
+          "sampledMs": 9.529,
+          "percentOfActive": 11.780632240038573
+        },
+        {
+          "frame": "refreshHiddenInputContent packages/editor/src/editor/inputSelectionController.ts:1528",
+          "sampledMs": 9.449,
+          "percentOfActive": 11.681728831579859
+        },
+        {
+          "frame": "applySameLineEdit packages/editor/src/virtualization/virtualizedTextView.ts:1132",
+          "sampledMs": 7.388,
+          "percentOfActive": 9.133729771162239
+        },
+        {
+          "frame": "applyEdit packages/editor/src/virtualization/virtualizedTextView.ts:570",
+          "sampledMs": 7.388,
+          "percentOfActive": 9.133729771162239
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:692",
+          "sampledMs": 7.388,
+          "percentOfActive": 9.133729771162239
+        },
+        {
+          "frame": "updateMountedRowsAfterSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:614",
+          "sampledMs": 6.333,
+          "percentOfActive": 7.829441072112948
+        },
+        {
+          "frame": "updateRowElementForSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:674",
+          "sampledMs": 5.278,
+          "percentOfActive": 6.525152373063657
+        },
+        {
+          "frame": "updateRowAfterSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:633",
+          "sampledMs": 5.278,
+          "percentOfActive": 6.525152373063657
+        },
+        {
+          "frame": "(anonymous)",
+          "sampledMs": 4.461,
+          "percentOfActive": 5.51510131417904
+        },
+        {
+          "frame": "(garbage collector)",
+          "sampledMs": 4.294,
+          "percentOfActive": 5.308640449021475
+        },
+        {
+          "frame": "updateRowTextForSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:699",
+          "sampledMs": 4.223,
+          "percentOfActive": 5.220863674014366
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/inputSelectionController.ts:2426",
+          "sampledMs": 4.194,
+          "percentOfActive": 5.185011188448082
+        },
+        {
+          "frame": "evaluate",
+          "sampledMs": 3.408,
+          "percentOfActive": 4.2132852003412165
+        },
+        {
+          "frame": "setSelections packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:217",
+          "sampledMs": 3.306,
+          "percentOfActive": 4.087183354556356
+        },
+        {
+          "frame": "setSelections packages/editor/src/virtualization/virtualizedTextView.ts:1008",
+          "sampledMs": 3.306,
+          "percentOfActive": 4.087183354556356
+        },
+        {
+          "frame": "applyTypedText packages/editor/src/editor/inputSelectionController.ts:337",
+          "sampledMs": 3.169,
+          "percentOfActive": 3.9178112675708086
+        },
+        {
+          "frame": "replaceData",
+          "sampledMs": 3.167,
+          "percentOfActive": 3.915338682359341
+        },
+        {
+          "frame": "runInOperation packages/editor/src/editor/Editor.ts:942",
+          "sampledMs": 2.352,
+          "percentOfActive": 2.907760208686192
+        },
+        {
+          "frame": "setSelection packages/editor/src/editor/Editor.ts:1075",
+          "sampledMs": 2.352,
+          "percentOfActive": 2.907760208686192
+        },
+        {
+          "frame": "beginTyping examples/stress/src/browser.ts:169",
+          "sampledMs": 2.352,
+          "percentOfActive": 2.907760208686192
+        },
+        {
+          "frame": "buildCalculatedRowGeometry packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:1554",
+          "sampledMs": 2.25,
+          "percentOfActive": 2.7816583629013314
+        }
+      ]
+    },
+    {
+      "file": "ordinary-typing-warm-0.cpuprofile",
+      "durationMs": 148.686,
+      "samples": 112,
+      "sampledMs": 148.572,
+      "activeSampledMs": 67.506,
+      "self": [
+        {
+          "frame": "(program)",
+          "sampledMs": 38.186,
+          "percentOfActive": 56.566823689746094
+        },
+        {
+          "frame": "refreshHiddenInputContent packages/editor/src/editor/inputSelectionController.ts:1528",
+          "sampledMs": 4.228,
+          "percentOfActive": 6.263146979527746
+        },
+        {
+          "frame": "replaceData",
+          "sampledMs": 2.118,
+          "percentOfActive": 3.1374988889876456
+        },
+        {
+          "frame": "(garbage collector)",
+          "sampledMs": 2.112,
+          "percentOfActive": 3.1286107901519866
+        },
+        {
+          "frame": "transitionInputState packages/editor/src/editor/inputSelectionController.ts:1611",
+          "sampledMs": 2.11,
+          "percentOfActive": 3.1256480905401003
+        },
+        {
+          "frame": "lineStartOffset packages/editor/src/virtualization/virtualizedTextViewLayout.ts:301",
+          "sampledMs": 2.002,
+          "percentOfActive": 2.965662311498237
+        },
+        {
+          "frame": "updateRowFrame packages/editor/src/virtualization/virtualizedTextViewRows.ts:545",
+          "sampledMs": 1.236,
+          "percentOfActive": 1.8309483601457648
+        },
+        {
+          "frame": "focusInput packages/editor/src/virtualization/virtualizedTextView.ts:615",
+          "sampledMs": 1.228,
+          "percentOfActive": 1.8190975616982195
+        },
+        {
+          "frame": "getSelections packages/editor/src/documentSession.ts:1697",
+          "sampledMs": 1.065,
+          "percentOfActive": 1.5776375433294818
+        },
+        {
+          "frame": "previewNode",
+          "sampledMs": 1.058,
+          "percentOfActive": 1.5672680946878796
+        },
+        {
+          "frame": "sortedDeltas packages/editor/src/virtualization/lineStartIndex.ts:65",
+          "sampledMs": 1.057,
+          "percentOfActive": 1.5657867448819365
+        },
+        {
+          "frame": "reversePredecessor packages/editor/src/pieceTable/reverseIndex.ts:161",
+          "sampledMs": 1.056,
+          "percentOfActive": 1.5643053950759933
+        },
+        {
+          "frame": "updateRowAfterSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:633",
+          "sampledMs": 1.056,
+          "percentOfActive": 1.5643053950759933
+        },
+        {
+          "frame": "rowOffsetForLocalIndex packages/editor/src/virtualization/virtualizedTextViewInlineMapping.ts:53",
+          "sampledMs": 1.055,
+          "percentOfActive": 1.5628240452700501
+        },
+        {
+          "frame": "rememberHiddenCharacterInputs packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:226",
+          "sampledMs": 1.055,
+          "percentOfActive": 1.5628240452700501
+        },
+        {
+          "frame": "readRowClientRectScale packages/editor/src/virtualization/virtualizedTextViewGeometry.ts:2893",
+          "sampledMs": 1.054,
+          "percentOfActive": 1.561342695464107
+        },
+        {
+          "frame": "remove",
+          "sampledMs": 1.053,
+          "percentOfActive": 1.5598613456581638
+        },
+        {
+          "frame": "bufferRowForOffset packages/editor/src/virtualization/virtualizedTextViewLayout.ts:591",
+          "sampledMs": 1.052,
+          "percentOfActive": 1.5583799958522206
+        },
+        {
+          "frame": "appendWhitespaceMarker packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:278",
+          "sampledMs": 1.05,
+          "percentOfActive": 1.555417296240334
+        },
+        {
+          "frame": "resolveViewSelections packages/editor/src/editor/inputSelectionController.ts:1443",
+          "sampledMs": 1.045,
+          "percentOfActive": 1.5480105472106183
+        },
+        {
+          "frame": "createViewSnapshot packages/editor/src/editor/Editor.ts:2694",
+          "sampledMs": 1.002,
+          "percentOfActive": 1.4843125055550617
+        },
+        {
+          "frame": "(anonymous)",
+          "sampledMs": 0.628,
+          "percentOfActive": 0.9302876781323142
+        }
+      ],
+      "inclusive": [
+        {
+          "frame": "(root)",
+          "sampledMs": 67.506,
+          "percentOfActive": 100
+        },
+        {
+          "frame": "(program)",
+          "sampledMs": 38.186,
+          "percentOfActive": 56.566823689746094
+        },
+        {
+          "frame": "withOperation packages/editor/src/editor/Editor.ts:3014",
+          "sampledMs": 24.294,
+          "percentOfActive": 35.987912185583504
+        },
+        {
+          "frame": "applySessionChange packages/editor/src/editor/Editor.ts:2989",
+          "sampledMs": 24.294,
+          "percentOfActive": 35.987912185583504
+        },
+        {
+          "frame": "applySessionChange packages/editor/src/editor/Editor.ts:527",
+          "sampledMs": 24.294,
+          "percentOfActive": 35.987912185583504
+        },
+        {
+          "frame": "applyChange packages/editor/src/editor/inputSelectionController.ts:1560",
+          "sampledMs": 24.294,
+          "percentOfActive": 35.987912185583504
+        },
+        {
+          "frame": "handleBeforeInput packages/editor/src/editor/inputSelectionController.ts:2407",
+          "sampledMs": 24.294,
+          "percentOfActive": 35.987912185583504
+        },
+        {
+          "frame": "flushOperation packages/editor/src/editor/Editor.ts:3041",
+          "sampledMs": 13.673,
+          "percentOfActive": 20.254495896661037
+        },
+        {
+          "frame": "syncDomSelection packages/editor/src/editor/inputSelectionController.ts:1460",
+          "sampledMs": 12.671,
+          "percentOfActive": 18.770183391105977
+        },
+        {
+          "frame": "syncSessionSelectionHighlight packages/editor/src/editor/inputSelectionController.ts:1498",
+          "sampledMs": 11.606,
+          "percentOfActive": 17.192545847776493
+        },
+        {
+          "frame": "measureEditorPerformance packages/editor/src/editor/performanceDiagnostics.ts:23",
+          "sampledMs": 10.578,
+          "percentOfActive": 15.669718247266909
+        },
+        {
+          "frame": "applyEdit packages/editor/src/virtualization/virtualizedTextView.ts:570",
+          "sampledMs": 9.576,
+          "percentOfActive": 14.185405741711849
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:692",
+          "sampledMs": 9.576,
+          "percentOfActive": 14.185405741711849
+        },
+        {
+          "frame": "renderEdit packages/editor/src/editor/Editor.ts:683",
+          "sampledMs": 9.576,
+          "percentOfActive": 14.185405741711849
+        },
+        {
+          "frame": "renderSessionChange packages/editor/src/editor/Editor.ts:3188",
+          "sampledMs": 9.576,
+          "percentOfActive": 14.185405741711849
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:2998",
+          "sampledMs": 9.576,
+          "percentOfActive": 14.185405741711849
+        },
+        {
+          "frame": "(anonymous) packages/editor/src/editor/Editor.ts:2995",
+          "sampledMs": 9.576,
+          "percentOfActive": 14.185405741711849
+        },
+        {
+          "frame": "applySameLineEdit packages/editor/src/virtualization/virtualizedTextView.ts:1132",
+          "sampledMs": 8.522,
+          "percentOfActive": 12.624063046247741
+        },
+        {
+          "frame": "updateMountedRowsAfterSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:614",
+          "sampledMs": 7.467,
+          "percentOfActive": 11.061239000977691
+        },
+        {
+          "frame": "refreshHiddenInputContent packages/editor/src/editor/inputSelectionController.ts:1528",
+          "sampledMs": 6.338,
+          "percentOfActive": 9.388795070067847
+        },
+        {
+          "frame": "updateRowAfterSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:633",
+          "sampledMs": 5.358,
+          "percentOfActive": 7.937072260243534
+        },
+        {
+          "frame": "renderHiddenCharacters packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:147",
+          "sampledMs": 4.213,
+          "percentOfActive": 6.240926732438598
+        },
+        {
+          "frame": "setSelections packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:217",
+          "sampledMs": 4.212,
+          "percentOfActive": 6.239445382632655
+        },
+        {
+          "frame": "setSelections packages/editor/src/virtualization/virtualizedTextView.ts:1008",
+          "sampledMs": 4.212,
+          "percentOfActive": 6.239445382632655
+        },
+        {
+          "frame": "updateRowElementForSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:674",
+          "sampledMs": 3.354,
+          "percentOfActive": 4.96844724913341
+        },
+        {
+          "frame": "(anonymous)",
+          "sampledMs": 2.914,
+          "percentOfActive": 4.3166533345184135
+        },
+        {
+          "frame": "evaluate",
+          "sampledMs": 2.286,
+          "percentOfActive": 3.386365656386099
+        },
+        {
+          "frame": "replaceData",
+          "sampledMs": 2.118,
+          "percentOfActive": 3.1374988889876456
+        },
+        {
+          "frame": "updateRowTextForSameLineEdit packages/editor/src/virtualization/virtualizedTextViewRows.ts:699",
+          "sampledMs": 2.118,
+          "percentOfActive": 3.1374988889876456
+        },
+        {
+          "frame": "(garbage collector)",
+          "sampledMs": 2.112,
+          "percentOfActive": 3.1286107901519866
+        },
+        {
+          "frame": "transitionInputState packages/editor/src/editor/inputSelectionController.ts:1611",
+          "sampledMs": 2.11,
+          "percentOfActive": 3.1256480905401003
+        },
+        {
+          "frame": "bufferRowForOffset packages/editor/src/virtualization/virtualizedTextViewLayout.ts:591",
+          "sampledMs": 2.109,
+          "percentOfActive": 3.124166740734157
+        },
+        {
+          "frame": "createRowUpdatePass packages/editor/src/virtualization/virtualizedTextViewRows.ts:444",
+          "sampledMs": 2.109,
+          "percentOfActive": 3.124166740734157
+        },
+        {
+          "frame": "drawHiddenCharactersForRow packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:176",
+          "sampledMs": 2.108,
+          "percentOfActive": 3.122685390928214
+        },
+        {
+          "frame": "appendWhitespaceMarkersForChunk packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts:267",
+          "sampledMs": 2.105,
+          "percentOfActive": 3.1182413415103842
+        }
+      ]
+    }
+  ]
+}

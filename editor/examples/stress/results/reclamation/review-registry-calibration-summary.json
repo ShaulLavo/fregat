@@ -1,0 +1,116 @@
+{
+  "phase": "Before borrowed-page interning; current strong two-entry index cache; frozen production dist. Harness changed to measure the pre-maintenance heap after two explicit timer-task/GC rounds. Subsequent baseline/post-maintenance symmetric calibration is not exercised by these historical captures.",
+  "bundleHash": "7cbf9732dc7fe26a707b04967969ea3b1f797ae8084ebe0fff9a4ec7735c9bb4",
+  "browser": "153.0.8010.12",
+  "artifacts": [
+    "review-registry-calibration-counts.json",
+    "review-registry-calibration-snapshot.json"
+  ],
+  "findings": {
+    "registrationScaling": "250852 registry entries at end of500-cycle synchronous churn;1001821 at1000 cycles. Approximately4x registrations for2x cycles. Settled registries have503/1003 live pages.",
+    "heapCalibration": "The immediate GC reading includes large transient allocations that disappear while maintenance remains suspended. It cannot be counted as storage reclaimed by maintenance. Weak-only sentinel from churn is absent after both explicit task/GC rounds.",
+    "limits": "The retained-heap snapshot was taken after both task/GC rounds; there is no immediate-heap snapshot. Direct end-of-job registry counts prove excessive registration volume, but the precise distribution of the transient146 MB across pages, WeakRefs, finalizer records, and other allocations is not quantified.",
+    "retainedSnapshot": "1003 TextPage-shaped objects totaling24072 shallow bytes and2010 WeakRef objects totaling32184 shallow bytes. Runtime inspector confirms exactly1003 registry entries/live pages. Shape matching finds1004 owner/page-shaped records including one outside that exact registry; do not report them all as registry entries.",
+    "comparability": "These diagnostic captures leave historical baseline and after readings unchanged. The final harness applies the same two-task/GC barrier to every stage and preserves all immediate/first/second readings. No acceptance threshold was changed."
+  },
+  "snapshot": {
+    "file": "review-registry-before-interning-settled.heapsnapshot.gz",
+    "rawBytes": 19375877,
+    "compressedBytes": 4134657,
+    "rawSha256": "b411d6f0e0cd40b7c34764f5f4c31cc12134aeebaee5d7af6023f4e301473c59",
+    "compressedSha256": "31fd9fd046670674a858fad3068eba56407b3bf20f8320b743c7feeca082760b",
+    "stage": "Settled pre-maintenance survivors1000; scheduler suspended; sentinel already absent"
+  },
+  "rawSnapshotShapes": {
+    "borrowedPage": {
+      "count": 1003,
+      "shallowBytes": 24072,
+      "example": {
+        "node": 56283,
+        "id": 112567,
+        "type": "object",
+        "name": "$i",
+        "selfBytes": 24
+      }
+    },
+    "registryEntry": {
+      "count": 1004,
+      "shallowBytes": 20080,
+      "example": {
+        "node": 88606,
+        "id": 177213,
+        "type": "object",
+        "name": "Object",
+        "selfBytes": 20
+      }
+    },
+    "allWeakRefs": {
+      "count": 2010,
+      "shallowBytes": 32184
+    }
+  },
+  "observations": [
+    {
+      "cycles": 500,
+      "registryEntriesAtChurnEnd": 250852,
+      "heapCalibration": {
+        "immediateAbsolute": 43981656,
+        "firstTaskGcAbsolute": 7527192,
+        "secondTaskGcAbsolute": 7533264,
+        "stabilityDeltaBytes": 6072,
+        "immediateRegistry": {
+          "registryEntries": 503
+        },
+        "firstRegistry": {
+          "registryEntries": 503,
+          "sentinelAlive": false,
+          "livePages": 503,
+          "logicalUnits": 32014,
+          "backingUnits": 8146975
+        },
+        "secondRegistry": {
+          "registryEntries": 503,
+          "sentinelAlive": false,
+          "livePages": 503,
+          "logicalUnits": 32014,
+          "backingUnits": 8146975
+        }
+      },
+      "growthBefore": 4689756,
+      "growthAfter": 4487548,
+      "reductionFraction": 0.04311695533840143,
+      "correctnessPassed": true
+    },
+    {
+      "cycles": 1000,
+      "registryEntriesAtChurnEnd": 1001821,
+      "heapCalibration": {
+        "immediateAbsolute": 146487024,
+        "firstTaskGcAbsolute": 9079424,
+        "secondTaskGcAbsolute": 9003456,
+        "stabilityDeltaBytes": -75968,
+        "immediateRegistry": {
+          "registryEntries": 1003
+        },
+        "firstRegistry": {
+          "registryEntries": 1003,
+          "sentinelAlive": false,
+          "livePages": 1003,
+          "logicalUnits": 64014,
+          "backingUnits": 16326691
+        },
+        "secondRegistry": {
+          "registryEntries": 1003,
+          "sentinelAlive": false,
+          "livePages": 1003,
+          "logicalUnits": 64014,
+          "backingUnits": 16326691
+        }
+      },
+      "growthBefore": 6160012,
+      "growthAfter": 5502632,
+      "reductionFraction": 0.1067173245766404,
+      "correctnessPassed": true
+    }
+  ]
+}

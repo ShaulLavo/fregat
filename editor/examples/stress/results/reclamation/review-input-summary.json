@@ -1,0 +1,6661 @@
+{
+  "note": "Two independent clean b31e22e baseline runs, the prior eager-page run, two intermediate borrowed-page experiments, and the final interned/shared-backing run. Each has 108 validated samples with three repetitions per fixture/view/scenario. Workload, browser, machine and runtime match. No calibration or relaxed performance gate; raw distributions are preserved. Multiple means views, not multiple carets.",
+  "runs": {
+    "originalBaseline": {
+      "id": "23676c6c-1868-4d8f-87a7-bc5c57349366",
+      "createdAt": "2026-09-23T13:49:09.103Z",
+      "samples": 108,
+      "environment": {
+        "commit": "b31e22eb18c240d04ade431e44a80fa60e694aa4",
+        "dirty": false,
+        "sourceHash": "3bf811f8c63d310b56fe0d9cc4a0b3579969e19850f87825928a8a58f8f1e53e",
+        "coreDirectory": "/work/projects/Editor/packages/editor",
+        "browser": {
+          "engine": "chromium",
+          "version": "153.0.8010.12",
+          "headless": true
+        },
+        "hardware": {
+          "cpu": "Intel(R) Core(TM) i7-14700K",
+          "logicalCpus": 28,
+          "memoryBytes": 33369657344,
+          "architecture": "x64",
+          "platform": "linux",
+          "release": "7.1.9-arch1-2"
+        },
+        "runtime": "v26.7.0",
+        "unsupportedMemory": {
+          "processRss": "No portable renderer process RSS API; CDP reports heap and DOM counts.",
+          "userAgentSpecificMemory": "Cross-origin isolation is not required by this runner."
+        }
+      }
+    },
+    "eagerPages": {
+      "id": "acd82a87-1d94-48fb-a23d-7438b5c6385f",
+      "createdAt": "2026-09-23T14:32:23.211Z",
+      "samples": 108,
+      "environment": {
+        "commit": "b31e22eb18c240d04ade431e44a80fa60e694aa4",
+        "dirty": true,
+        "sourceHash": "15134de4d7954d2b73f423d9327a96042c0a1cb48a788a0c2d09bd4d973d0dfc",
+        "coreDirectory": "/work/projects/Editor/packages/editor",
+        "browser": {
+          "engine": "chromium",
+          "version": "153.0.8010.12",
+          "headless": true
+        },
+        "hardware": {
+          "cpu": "Intel(R) Core(TM) i7-14700K",
+          "logicalCpus": 28,
+          "memoryBytes": 33369657344,
+          "architecture": "x64",
+          "platform": "linux",
+          "release": "7.1.9-arch1-2"
+        },
+        "runtime": "v26.7.0",
+        "unsupportedMemory": {
+          "processRss": "No portable renderer process RSS API; CDP reports heap and DOM counts.",
+          "userAgentSpecificMemory": "Cross-origin isolation is not required by this runner."
+        }
+      }
+    },
+    "repeatedBaseline": {
+      "id": "6db6cf15-0a8c-43cb-a922-828ba610cd45",
+      "createdAt": "2026-09-23T15:01:29.498Z",
+      "samples": 108,
+      "environment": {
+        "commit": "b31e22eb18c240d04ade431e44a80fa60e694aa4",
+        "dirty": false,
+        "sourceHash": "3bf811f8c63d310b56fe0d9cc4a0b3579969e19850f87825928a8a58f8f1e53e",
+        "coreDirectory": "/work/worktrees/Editor/e006-review-baseline/packages/editor",
+        "browser": {
+          "engine": "chromium",
+          "version": "153.0.8010.12",
+          "headless": true
+        },
+        "hardware": {
+          "cpu": "Intel(R) Core(TM) i7-14700K",
+          "logicalCpus": 28,
+          "memoryBytes": 33369657344,
+          "architecture": "x64",
+          "platform": "linux",
+          "release": "7.1.9-arch1-2"
+        },
+        "runtime": "v26.7.0",
+        "unsupportedMemory": {
+          "processRss": "No portable renderer process RSS API; CDP reports heap and DOM counts.",
+          "userAgentSpecificMemory": "Cross-origin isolation is not required by this runner."
+        }
+      }
+    },
+    "weakIndexExperiment": {
+      "id": "0be60b25-8bb7-4c04-9798-c1c1e3d5ce15",
+      "createdAt": "2026-09-23T15:06:13.187Z",
+      "samples": 108,
+      "environment": {
+        "commit": "b31e22eb18c240d04ade431e44a80fa60e694aa4",
+        "dirty": true,
+        "sourceHash": "4264b978e62cb7f0bb9a02606bfa23623b7ee7197c97b1774f255d23a3b19626",
+        "coreDirectory": "/work/projects/Editor/packages/editor",
+        "browser": {
+          "engine": "chromium",
+          "version": "153.0.8010.12",
+          "headless": true
+        },
+        "hardware": {
+          "cpu": "Intel(R) Core(TM) i7-14700K",
+          "logicalCpus": 28,
+          "memoryBytes": 33369657344,
+          "architecture": "x64",
+          "platform": "linux",
+          "release": "7.1.9-arch1-2"
+        },
+        "runtime": "v26.7.0",
+        "unsupportedMemory": {
+          "processRss": "No portable renderer process RSS API; CDP reports heap and DOM counts.",
+          "userAgentSpecificMemory": "Cross-origin isolation is not required by this runner."
+        }
+      }
+    },
+    "internedPrefixes": {
+      "id": "d660d8d6-7e2a-4ac2-affc-2f8d7d66bf53",
+      "createdAt": "2026-09-23T15:26:21.361Z",
+      "samples": 108,
+      "environment": {
+        "commit": "b31e22eb18c240d04ade431e44a80fa60e694aa4",
+        "dirty": true,
+        "sourceHash": "5e3cceda1be702899b5cdfabfc0ed9c2445b7665a0d87e0bcb17401d6d556e17",
+        "coreDirectory": "/work/projects/Editor/packages/editor",
+        "browser": {
+          "engine": "chromium",
+          "version": "153.0.8010.12",
+          "headless": true
+        },
+        "hardware": {
+          "cpu": "Intel(R) Core(TM) i7-14700K",
+          "logicalCpus": 28,
+          "memoryBytes": 33369657344,
+          "architecture": "x64",
+          "platform": "linux",
+          "release": "7.1.9-arch1-2"
+        },
+        "runtime": "v26.7.0",
+        "unsupportedMemory": {
+          "processRss": "No portable renderer process RSS API; CDP reports heap and DOM counts.",
+          "userAgentSpecificMemory": "Cross-origin isolation is not required by this runner."
+        }
+      }
+    },
+    "borrowedPages": {
+      "id": "c8f5e8f2-8770-4be5-a04e-ddaf95486ac4",
+      "createdAt": "2026-09-23T15:32:58.676Z",
+      "samples": 108,
+      "environment": {
+        "commit": "b31e22eb18c240d04ade431e44a80fa60e694aa4",
+        "dirty": true,
+        "sourceHash": "89d4a8ebd18fcb727d9eeb1bc51ed3f92476f81fd72bbc8687e7b3388b70ec5f",
+        "coreDirectory": "/work/projects/Editor/packages/editor",
+        "browser": {
+          "engine": "chromium",
+          "version": "153.0.8010.12",
+          "headless": true
+        },
+        "hardware": {
+          "cpu": "Intel(R) Core(TM) i7-14700K",
+          "logicalCpus": 28,
+          "memoryBytes": 33369657344,
+          "architecture": "x64",
+          "platform": "linux",
+          "release": "7.1.9-arch1-2"
+        },
+        "runtime": "v26.7.0",
+        "unsupportedMemory": {
+          "processRss": "No portable renderer process RSS API; CDP reports heap and DOM counts.",
+          "userAgentSpecificMemory": "Cross-origin isolation is not required by this runner."
+        }
+      }
+    }
+  },
+  "rows": [
+    {
+      "key": "ordinary/single/typing/inputToApplied",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 0.8999998569488525,
+        "p99Ms": 1.5999999046325684,
+        "maxMs": 1.5999999046325684
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1.1000001430511475,
+        "p99Ms": 1.5,
+        "maxMs": 1.5
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1,
+        "p99Ms": 2.5,
+        "maxMs": 2.5
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1.5,
+        "p99Ms": 2.700000047683716,
+        "maxMs": 2.700000047683716
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1,
+        "p99Ms": 1.6000001430511475,
+        "maxMs": 1.6000001430511475
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1,
+        "p99Ms": 1.6999998092651367,
+        "maxMs": 1.6999998092651367
+      }
+    },
+    {
+      "key": "ordinary/single/typing/dispatch",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 0.8999998569488525,
+        "p99Ms": 1.5999999046325684,
+        "maxMs": 1.5999999046325684
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1.1000001430511475,
+        "p99Ms": 1.5,
+        "maxMs": 1.5
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1,
+        "p99Ms": 2.4000000953674316,
+        "maxMs": 2.4000000953674316
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1.5,
+        "p99Ms": 2.700000047683716,
+        "maxMs": 2.700000047683716
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1.1000001430511475,
+        "p99Ms": 1.6000001430511475,
+        "maxMs": 1.6000001430511475
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1,
+        "p99Ms": 1.6999998092651367,
+        "maxMs": 1.6999998092651367
+      }
+    },
+    {
+      "key": "ordinary/single/typing/inputToFrame",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 7,
+        "p95Ms": 15.600000143051147,
+        "p99Ms": 16.09999990463257,
+        "maxMs": 16.09999990463257
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 7.3999998569488525,
+        "p95Ms": 15.099999904632568,
+        "p99Ms": 16.09999990463257,
+        "maxMs": 16.09999990463257
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 7.799999952316284,
+        "p95Ms": 14.5,
+        "p99Ms": 15.5,
+        "maxMs": 15.5
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 7.299999952316284,
+        "p95Ms": 15.200000047683716,
+        "p99Ms": 16.100000143051147,
+        "maxMs": 16.100000143051147
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 7.400000095367432,
+        "p95Ms": 14.899999856948853,
+        "p99Ms": 15.899999856948853,
+        "maxMs": 15.899999856948853
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 6.5,
+        "p95Ms": 14.900000095367432,
+        "p99Ms": 15.799999952316284,
+        "maxMs": 15.799999952316284
+      }
+    },
+    {
+      "key": "ordinary/single/typing/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 115.59999990463257,
+        "p95Ms": 127.19999980926514,
+        "p99Ms": 127.19999980926514,
+        "maxMs": 127.19999980926514
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 116.70000004768372,
+        "p95Ms": 132.89999985694885,
+        "p99Ms": 132.89999985694885,
+        "maxMs": 132.89999985694885
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 116,
+        "p95Ms": 116.90000009536743,
+        "p99Ms": 116.90000009536743,
+        "maxMs": 116.90000009536743
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 116.59999990463257,
+        "p95Ms": 132.09999990463257,
+        "p99Ms": 132.09999990463257,
+        "maxMs": 132.09999990463257
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 131.90000009536743,
+        "p95Ms": 154.40000009536743,
+        "p99Ms": 154.40000009536743,
+        "maxMs": 154.40000009536743
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 130.20000004768372,
+        "p95Ms": 131.09999990463257,
+        "p99Ms": 131.09999990463257,
+        "maxMs": 131.09999990463257
+      }
+    },
+    {
+      "key": "ordinary/single/repeat/inputToApplied",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1.1999998092651367,
+        "p99Ms": 2.6000001430511475,
+        "maxMs": 2.6000001430511475
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 0.9000000953674316,
+        "p99Ms": 1.6000001430511475,
+        "maxMs": 1.6000001430511475
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1,
+        "p99Ms": 1.6000001430511475,
+        "maxMs": 1.6000001430511475
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 2.5999999046325684,
+        "maxMs": 2.5999999046325684
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 0.6000001430511475,
+        "p95Ms": 1,
+        "p99Ms": 1.7999999523162842,
+        "maxMs": 1.7999999523162842
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1,
+        "p99Ms": 1.6000001430511475,
+        "maxMs": 1.6000001430511475
+      }
+    },
+    {
+      "key": "ordinary/single/repeat/dispatch",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1.1999998092651367,
+        "p99Ms": 2.6000001430511475,
+        "maxMs": 2.6000001430511475
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 0.9000000953674316,
+        "p99Ms": 1.6000001430511475,
+        "maxMs": 1.6000001430511475
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1,
+        "p99Ms": 1.6000001430511475,
+        "maxMs": 1.6000001430511475
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 2.5999999046325684,
+        "maxMs": 2.5999999046325684
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 0.6000001430511475,
+        "p95Ms": 1,
+        "p99Ms": 1.7999999523162842,
+        "maxMs": 1.7999999523162842
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1,
+        "p99Ms": 1.6000001430511475,
+        "maxMs": 1.6000001430511475
+      }
+    },
+    {
+      "key": "ordinary/single/repeat/inputToFrame",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 7.299999952316284,
+        "p95Ms": 15.200000047683716,
+        "p99Ms": 16.600000143051147,
+        "maxMs": 16.600000143051147
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 8.100000143051147,
+        "p95Ms": 14.799999952316284,
+        "p99Ms": 15.899999856948853,
+        "maxMs": 15.899999856948853
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 6.900000095367432,
+        "p95Ms": 15,
+        "p99Ms": 16,
+        "maxMs": 16
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 7.5,
+        "p95Ms": 15,
+        "p99Ms": 15.900000095367432,
+        "maxMs": 15.900000095367432
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 7,
+        "p95Ms": 15.400000095367432,
+        "p99Ms": 16.200000047683716,
+        "maxMs": 16.200000047683716
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 7.3999998569488525,
+        "p95Ms": 14.799999952316284,
+        "p99Ms": 15.699999809265137,
+        "maxMs": 15.699999809265137
+      }
+    },
+    {
+      "key": "ordinary/single/repeat/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 116,
+        "p95Ms": 131.89999985694885,
+        "p99Ms": 131.89999985694885,
+        "maxMs": 131.89999985694885
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 115.90000009536743,
+        "p95Ms": 116.5,
+        "p99Ms": 116.5,
+        "maxMs": 116.5
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 115.5,
+        "p95Ms": 115.70000004768372,
+        "p99Ms": 115.70000004768372,
+        "maxMs": 115.70000004768372
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 115.89999985694885,
+        "p95Ms": 116.59999990463257,
+        "p99Ms": 116.59999990463257,
+        "maxMs": 116.59999990463257
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 132,
+        "p95Ms": 133.5,
+        "p99Ms": 133.5,
+        "maxMs": 133.5
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 116.10000014305115,
+        "p95Ms": 117.60000014305115,
+        "p99Ms": 117.60000014305115,
+        "maxMs": 117.60000014305115
+      }
+    },
+    {
+      "key": "ordinary/single/composition-update/inputToApplied",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.20000004768371582,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.20000004768371582,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      }
+    },
+    {
+      "key": "ordinary/single/composition-update/dispatch",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.19999980926513672,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      }
+    },
+    {
+      "key": "ordinary/single/composition-update/inputToFrame",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 7.799999952316284,
+        "p95Ms": 10.600000143051147,
+        "p99Ms": 11,
+        "maxMs": 11
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 7.599999904632568,
+        "p95Ms": 10.799999952316284,
+        "p99Ms": 11.400000095367432,
+        "maxMs": 11.400000095367432
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 5.299999952316284,
+        "p95Ms": 9.200000047683716,
+        "p99Ms": 10.400000095367432,
+        "maxMs": 10.400000095367432
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 5.900000095367432,
+        "p95Ms": 8.900000095367432,
+        "p99Ms": 9,
+        "maxMs": 9
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 6,
+        "p95Ms": 15.100000143051147,
+        "p99Ms": 16,
+        "maxMs": 16
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 6.900000095367432,
+        "p95Ms": 10.299999952316284,
+        "p99Ms": 10.699999809265137,
+        "maxMs": 10.699999809265137
+      }
+    },
+    {
+      "key": "ordinary/single/composition-update/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 99.20000004768372,
+        "p95Ms": 99.69999980926514,
+        "p99Ms": 99.69999980926514,
+        "maxMs": 99.69999980926514
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 98.60000014305115,
+        "p95Ms": 99.30000019073486,
+        "p99Ms": 99.30000019073486,
+        "maxMs": 99.30000019073486
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 98.5,
+        "p95Ms": 99.90000009536743,
+        "p99Ms": 99.90000009536743,
+        "maxMs": 99.90000009536743
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 99,
+        "p95Ms": 99.5,
+        "p99Ms": 99.5,
+        "maxMs": 99.5
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 99.5,
+        "p95Ms": 113.5,
+        "p99Ms": 113.5,
+        "maxMs": 113.5
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 98.89999985694885,
+        "p95Ms": 101.29999995231628,
+        "p99Ms": 101.29999995231628,
+        "maxMs": 101.29999995231628
+      }
+    },
+    {
+      "key": "ordinary/single/composition-commit/inputToApplied",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 1.3999998569488525,
+        "maxMs": 1.3999998569488525
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1.4000000953674316,
+        "p99Ms": 1.7999999523162842,
+        "maxMs": 1.7999999523162842
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1.3999998569488525,
+        "p99Ms": 1.4000000953674316,
+        "maxMs": 1.4000000953674316
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 1.2999999523162842,
+        "maxMs": 1.2999999523162842
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1.4000000953674316,
+        "p99Ms": 1.4000000953674316,
+        "maxMs": 1.4000000953674316
+      }
+    },
+    {
+      "key": "ordinary/single/composition-commit/dispatch",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 1.3999998569488525,
+        "maxMs": 1.3999998569488525
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 1.8999998569488525,
+        "maxMs": 1.8999998569488525
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1.3000001907348633,
+        "p99Ms": 1.7999999523162842,
+        "maxMs": 1.7999999523162842
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 1.4000000953674316,
+        "maxMs": 1.4000000953674316
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 1.2999999523162842,
+        "maxMs": 1.2999999523162842
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 1.4000000953674316,
+        "maxMs": 1.4000000953674316
+      }
+    },
+    {
+      "key": "ordinary/single/composition-commit/inputToFrame",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 8.5,
+        "p95Ms": 16,
+        "p99Ms": 16.09999990463257,
+        "maxMs": 16.09999990463257
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 6.8999998569488525,
+        "p95Ms": 15.399999856948853,
+        "p99Ms": 15.400000095367432,
+        "maxMs": 15.400000095367432
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 8.700000047683716,
+        "p95Ms": 15.5,
+        "p99Ms": 15.5,
+        "maxMs": 15.5
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 7.6000001430511475,
+        "p95Ms": 15.299999952316284,
+        "p99Ms": 16.100000143051147,
+        "maxMs": 16.100000143051147
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 8.200000047683716,
+        "p95Ms": 15.599999904632568,
+        "p99Ms": 15.900000095367432,
+        "maxMs": 15.900000095367432
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 8.5,
+        "p95Ms": 16,
+        "p99Ms": 16.299999952316284,
+        "maxMs": 16.299999952316284
+      }
+    },
+    {
+      "key": "ordinary/single/composition-commit/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 116.60000014305115,
+        "p95Ms": 116.79999995231628,
+        "p99Ms": 116.79999995231628,
+        "maxMs": 116.79999995231628
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 115.60000014305115,
+        "p95Ms": 115.70000004768372,
+        "p99Ms": 115.70000004768372,
+        "maxMs": 115.70000004768372
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 115.20000004768372,
+        "p95Ms": 115.59999990463257,
+        "p99Ms": 115.59999990463257,
+        "maxMs": 115.59999990463257
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 115.09999990463257,
+        "p95Ms": 115.19999980926514,
+        "p99Ms": 115.19999980926514,
+        "maxMs": 115.19999980926514
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 114.29999995231628,
+        "p95Ms": 115.40000009536743,
+        "p99Ms": 115.40000009536743,
+        "maxMs": 115.40000009536743
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 114.29999995231628,
+        "p95Ms": 114.30000019073486,
+        "p99Ms": 114.30000019073486,
+        "maxMs": 114.30000019073486
+      }
+    },
+    {
+      "key": "ordinary/single/paste/inputToApplied",
+      "originalBaseline": {
+        "count": 24,
+        "p50Ms": 4.5,
+        "p95Ms": 7.799999952316284,
+        "p99Ms": 11.5,
+        "maxMs": 11.5
+      },
+      "eagerPages": {
+        "count": 24,
+        "p50Ms": 4.300000190734863,
+        "p95Ms": 6.700000047683716,
+        "p99Ms": 6.799999952316284,
+        "maxMs": 6.799999952316284
+      },
+      "repeatedBaseline": {
+        "count": 24,
+        "p50Ms": 4.200000047683716,
+        "p95Ms": 6.3999998569488525,
+        "p99Ms": 6.5,
+        "maxMs": 6.5
+      },
+      "weakIndexExperiment": {
+        "count": 24,
+        "p50Ms": 4.099999904632568,
+        "p95Ms": 6.299999952316284,
+        "p99Ms": 6.599999904632568,
+        "maxMs": 6.599999904632568
+      },
+      "internedPrefixes": {
+        "count": 24,
+        "p50Ms": 4.299999952316284,
+        "p95Ms": 6.6000001430511475,
+        "p99Ms": 7.200000047683716,
+        "maxMs": 7.200000047683716
+      },
+      "borrowedPages": {
+        "count": 24,
+        "p50Ms": 4.200000047683716,
+        "p95Ms": 7.099999904632568,
+        "p99Ms": 7.5,
+        "maxMs": 7.5
+      }
+    },
+    {
+      "key": "ordinary/single/paste/dispatch",
+      "originalBaseline": {
+        "count": 24,
+        "p50Ms": 4.5,
+        "p95Ms": 7.799999952316284,
+        "p99Ms": 11.5,
+        "maxMs": 11.5
+      },
+      "eagerPages": {
+        "count": 24,
+        "p50Ms": 4.300000190734863,
+        "p95Ms": 6.700000047683716,
+        "p99Ms": 6.799999952316284,
+        "maxMs": 6.799999952316284
+      },
+      "repeatedBaseline": {
+        "count": 24,
+        "p50Ms": 4.200000047683716,
+        "p95Ms": 6.3999998569488525,
+        "p99Ms": 6.5,
+        "maxMs": 6.5
+      },
+      "weakIndexExperiment": {
+        "count": 24,
+        "p50Ms": 4.099999904632568,
+        "p95Ms": 6.299999952316284,
+        "p99Ms": 6.599999904632568,
+        "maxMs": 6.599999904632568
+      },
+      "internedPrefixes": {
+        "count": 24,
+        "p50Ms": 4.299999952316284,
+        "p95Ms": 6.6000001430511475,
+        "p99Ms": 7.200000047683716,
+        "maxMs": 7.200000047683716
+      },
+      "borrowedPages": {
+        "count": 24,
+        "p50Ms": 4.200000047683716,
+        "p95Ms": 7.099999904632568,
+        "p99Ms": 7.5,
+        "maxMs": 7.5
+      }
+    },
+    {
+      "key": "ordinary/single/paste/inputToFrame",
+      "originalBaseline": {
+        "count": 24,
+        "p50Ms": 9.699999809265137,
+        "p95Ms": 19,
+        "p99Ms": 20.09999990463257,
+        "maxMs": 20.09999990463257
+      },
+      "eagerPages": {
+        "count": 24,
+        "p50Ms": 9.200000047683716,
+        "p95Ms": 16.799999952316284,
+        "p99Ms": 17,
+        "maxMs": 17
+      },
+      "repeatedBaseline": {
+        "count": 24,
+        "p50Ms": 9.099999904632568,
+        "p95Ms": 16.5,
+        "p99Ms": 17.59999990463257,
+        "maxMs": 17.59999990463257
+      },
+      "weakIndexExperiment": {
+        "count": 24,
+        "p50Ms": 9,
+        "p95Ms": 15.899999856948853,
+        "p99Ms": 16.200000047683716,
+        "maxMs": 16.200000047683716
+      },
+      "internedPrefixes": {
+        "count": 24,
+        "p50Ms": 8.700000047683716,
+        "p95Ms": 16.100000143051147,
+        "p99Ms": 18.799999952316284,
+        "maxMs": 18.799999952316284
+      },
+      "borrowedPages": {
+        "count": 24,
+        "p50Ms": 8.700000047683716,
+        "p95Ms": 15.199999809265137,
+        "p99Ms": 16.59999990463257,
+        "maxMs": 16.59999990463257
+      }
+    },
+    {
+      "key": "ordinary/single/paste/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 148.20000004768372,
+        "p95Ms": 160.60000014305115,
+        "p99Ms": 160.60000014305115,
+        "maxMs": 160.60000014305115
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 146.29999995231628,
+        "p95Ms": 146.90000009536743,
+        "p99Ms": 146.90000009536743,
+        "maxMs": 146.90000009536743
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 145.70000004768372,
+        "p95Ms": 147.59999990463257,
+        "p99Ms": 147.59999990463257,
+        "maxMs": 147.59999990463257
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 147.90000009536743,
+        "p95Ms": 148,
+        "p99Ms": 148,
+        "maxMs": 148
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 146.79999995231628,
+        "p95Ms": 147.70000004768372,
+        "p99Ms": 147.70000004768372,
+        "maxMs": 147.70000004768372
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 147.09999990463257,
+        "p95Ms": 148.5,
+        "p99Ms": 148.5,
+        "maxMs": 148.5
+      }
+    },
+    {
+      "key": "ordinary/single/undo/inputToApplied",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1.0999999046325684,
+        "p99Ms": 1.5,
+        "maxMs": 1.5
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1,
+        "p99Ms": 1.5,
+        "maxMs": 1.5
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1.3999998569488525,
+        "p99Ms": 1.5,
+        "maxMs": 1.5
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 0.9000000953674316,
+        "p99Ms": 0.9000000953674316,
+        "maxMs": 0.9000000953674316
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 0.8999998569488525,
+        "p99Ms": 1,
+        "maxMs": 1
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 0.9000000953674316,
+        "p99Ms": 1.1000001430511475,
+        "maxMs": 1.1000001430511475
+      }
+    },
+    {
+      "key": "ordinary/single/undo/dispatch",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1,
+        "p99Ms": 1,
+        "maxMs": 1
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 0.8999998569488525,
+        "p99Ms": 1.3999998569488525,
+        "maxMs": 1.3999998569488525
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 1.3999998569488525,
+        "maxMs": 1.3999998569488525
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 0.9000000953674316,
+        "p99Ms": 1,
+        "maxMs": 1
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 0.8000001907348633,
+        "p99Ms": 0.9000000953674316,
+        "maxMs": 0.9000000953674316
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 0.9000000953674316,
+        "p99Ms": 0.9000000953674316,
+        "maxMs": 0.9000000953674316
+      }
+    },
+    {
+      "key": "ordinary/single/undo/inputToFrame",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 8.399999856948853,
+        "p95Ms": 15,
+        "p99Ms": 17,
+        "maxMs": 17
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 7.400000095367432,
+        "p95Ms": 15.899999856948853,
+        "p99Ms": 15.900000095367432,
+        "maxMs": 15.900000095367432
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 6.099999904632568,
+        "p95Ms": 15.799999952316284,
+        "p99Ms": 16.90000009536743,
+        "maxMs": 16.90000009536743
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 6.400000095367432,
+        "p95Ms": 15.299999952316284,
+        "p99Ms": 15.900000095367432,
+        "maxMs": 15.900000095367432
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 8.799999952316284,
+        "p95Ms": 15.200000047683716,
+        "p99Ms": 15.899999856948853,
+        "maxMs": 15.899999856948853
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 7.599999904632568,
+        "p95Ms": 15.400000095367432,
+        "p99Ms": 15.900000095367432,
+        "maxMs": 15.900000095367432
+      }
+    },
+    {
+      "key": "ordinary/single/undo/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 116.79999995231628,
+        "p95Ms": 132.60000014305115,
+        "p99Ms": 132.60000014305115,
+        "maxMs": 132.60000014305115
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 115.60000014305115,
+        "p95Ms": 116,
+        "p99Ms": 116,
+        "maxMs": 116
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 115.90000009536743,
+        "p95Ms": 116.20000004768372,
+        "p99Ms": 116.20000004768372,
+        "maxMs": 116.20000004768372
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 115.80000019073486,
+        "p95Ms": 116.70000004768372,
+        "p99Ms": 116.70000004768372,
+        "maxMs": 116.70000004768372
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 115.69999980926514,
+        "p95Ms": 115.90000009536743,
+        "p99Ms": 115.90000009536743,
+        "maxMs": 115.90000009536743
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 117.10000014305115,
+        "p95Ms": 117.20000004768372,
+        "p99Ms": 117.20000004768372,
+        "maxMs": 117.20000004768372
+      }
+    },
+    {
+      "key": "ordinary/multiple/typing/inputToApplied",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 1.2000000476837158,
+        "p99Ms": 1.8999998569488525,
+        "maxMs": 1.8999998569488525
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 2.0999999046325684,
+        "maxMs": 2.0999999046325684
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.1000001430511475,
+        "p99Ms": 2.0999999046325684,
+        "maxMs": 2.0999999046325684
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.3000001907348633,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.7999999523162842,
+        "p99Ms": 2.5,
+        "maxMs": 2.5
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.5,
+        "p99Ms": 2.200000047683716,
+        "maxMs": 2.200000047683716
+      }
+    },
+    {
+      "key": "ordinary/multiple/typing/dispatch",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 1.2000000476837158,
+        "p99Ms": 1.8999998569488525,
+        "maxMs": 1.8999998569488525
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.1000001430511475,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.3000001907348633,
+        "p99Ms": 1.8999998569488525,
+        "maxMs": 1.8999998569488525
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 2.5999999046325684,
+        "maxMs": 2.5999999046325684
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 1.5,
+        "p99Ms": 2.200000047683716,
+        "maxMs": 2.200000047683716
+      }
+    },
+    {
+      "key": "ordinary/multiple/typing/inputToFrame",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 7.5,
+        "p95Ms": 14.599999904632568,
+        "p99Ms": 15.5,
+        "maxMs": 15.5
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 7.800000190734863,
+        "p95Ms": 15.299999952316284,
+        "p99Ms": 15.899999856948853,
+        "maxMs": 15.899999856948853
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 7.900000095367432,
+        "p95Ms": 14.900000095367432,
+        "p99Ms": 16.299999952316284,
+        "maxMs": 16.299999952316284
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 7.900000095367432,
+        "p95Ms": 14.899999856948853,
+        "p99Ms": 15.700000047683716,
+        "maxMs": 15.700000047683716
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 7.8999998569488525,
+        "p95Ms": 15.099999904632568,
+        "p99Ms": 15.900000095367432,
+        "maxMs": 15.900000095367432
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 8.099999904632568,
+        "p95Ms": 14.5,
+        "p99Ms": 16.200000047683716,
+        "maxMs": 16.200000047683716
+      }
+    },
+    {
+      "key": "ordinary/multiple/typing/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 135.70000004768372,
+        "p95Ms": 135.79999995231628,
+        "p99Ms": 135.79999995231628,
+        "maxMs": 135.79999995231628
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 134,
+        "p95Ms": 136,
+        "p99Ms": 136,
+        "maxMs": 136
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 134,
+        "p95Ms": 134.5,
+        "p99Ms": 134.5,
+        "maxMs": 134.5
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 134,
+        "p95Ms": 135.60000014305115,
+        "p99Ms": 135.60000014305115,
+        "maxMs": 135.60000014305115
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 133.40000009536743,
+        "p95Ms": 134.90000009536743,
+        "p99Ms": 134.90000009536743,
+        "maxMs": 134.90000009536743
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 134,
+        "p95Ms": 135.79999995231628,
+        "p99Ms": 135.79999995231628,
+        "maxMs": 135.79999995231628
+      }
+    },
+    {
+      "key": "ordinary/multiple/repeat/inputToApplied",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 1.5999999046325684,
+        "p99Ms": 2.6999998092651367,
+        "maxMs": 2.6999998092651367
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.5,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.5999999046325684,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.7999999523162842,
+        "p99Ms": 3.1999998092651367,
+        "maxMs": 3.1999998092651367
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 1.9000000953674316,
+        "maxMs": 1.9000000953674316
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 1.3000001907348633,
+        "p99Ms": 2.200000047683716,
+        "maxMs": 2.200000047683716
+      }
+    },
+    {
+      "key": "ordinary/multiple/repeat/dispatch",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 1.5999999046325684,
+        "p99Ms": 2.6999998092651367,
+        "maxMs": 2.6999998092651367
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.5,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 0.9000000953674316,
+        "p95Ms": 1.5,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.8000001907348633,
+        "p99Ms": 3.1999998092651367,
+        "maxMs": 3.1999998092651367
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 1.9000000953674316,
+        "maxMs": 1.9000000953674316
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.4000000953674316,
+        "p99Ms": 2.200000047683716,
+        "maxMs": 2.200000047683716
+      }
+    },
+    {
+      "key": "ordinary/multiple/repeat/inputToFrame",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 8.299999952316284,
+        "p95Ms": 15.100000143051147,
+        "p99Ms": 15.700000047683716,
+        "maxMs": 15.700000047683716
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 7.800000190734863,
+        "p95Ms": 15.299999952316284,
+        "p99Ms": 15.899999856948853,
+        "maxMs": 15.899999856948853
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 7.3999998569488525,
+        "p95Ms": 15.099999904632568,
+        "p99Ms": 16.59999990463257,
+        "maxMs": 16.59999990463257
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 8.200000047683716,
+        "p95Ms": 15.099999904632568,
+        "p99Ms": 15.400000095367432,
+        "maxMs": 15.400000095367432
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 8.100000143051147,
+        "p95Ms": 15.5,
+        "p99Ms": 16.200000047683716,
+        "maxMs": 16.200000047683716
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 8,
+        "p95Ms": 15.600000143051147,
+        "p99Ms": 16.299999952316284,
+        "maxMs": 16.299999952316284
+      }
+    },
+    {
+      "key": "ordinary/multiple/repeat/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 134.20000004768372,
+        "p95Ms": 135.09999990463257,
+        "p99Ms": 135.09999990463257,
+        "maxMs": 135.09999990463257
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 133.5,
+        "p95Ms": 134,
+        "p99Ms": 134,
+        "maxMs": 134
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 134.29999995231628,
+        "p95Ms": 135.60000014305115,
+        "p99Ms": 135.60000014305115,
+        "maxMs": 135.60000014305115
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 135,
+        "p95Ms": 135,
+        "p99Ms": 135,
+        "maxMs": 135
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 133.60000014305115,
+        "p95Ms": 134,
+        "p99Ms": 134,
+        "maxMs": 134
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 133.59999990463257,
+        "p95Ms": 133.80000019073486,
+        "p99Ms": 133.80000019073486,
+        "maxMs": 133.80000019073486
+      }
+    },
+    {
+      "key": "ordinary/multiple/composition-update/inputToApplied",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.20000004768371582,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.19999980926513672,
+        "maxMs": 0.19999980926513672
+      }
+    },
+    {
+      "key": "ordinary/multiple/composition-update/dispatch",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      }
+    },
+    {
+      "key": "ordinary/multiple/composition-update/inputToFrame",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 6.900000095367432,
+        "p95Ms": 11,
+        "p99Ms": 15.899999856948853,
+        "maxMs": 15.899999856948853
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 6.799999952316284,
+        "p95Ms": 10.600000143051147,
+        "p99Ms": 10.799999952316284,
+        "maxMs": 10.799999952316284
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 7.5,
+        "p95Ms": 10.599999904632568,
+        "p99Ms": 10.799999952316284,
+        "maxMs": 10.799999952316284
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 7.6000001430511475,
+        "p95Ms": 10.700000047683716,
+        "p99Ms": 10.900000095367432,
+        "maxMs": 10.900000095367432
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 8.599999904632568,
+        "p95Ms": 11.100000143051147,
+        "p99Ms": 11.100000143051147,
+        "maxMs": 11.100000143051147
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 6.599999904632568,
+        "p95Ms": 10.099999904632568,
+        "p99Ms": 10.599999904632568,
+        "maxMs": 10.599999904632568
+      }
+    },
+    {
+      "key": "ordinary/multiple/composition-update/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 101.09999990463257,
+        "p95Ms": 112.89999985694885,
+        "p99Ms": 112.89999985694885,
+        "maxMs": 112.89999985694885
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 99,
+        "p95Ms": 99,
+        "p99Ms": 99,
+        "maxMs": 99
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 99,
+        "p95Ms": 99.29999995231628,
+        "p99Ms": 99.29999995231628,
+        "maxMs": 99.29999995231628
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 99.20000004768372,
+        "p95Ms": 99.39999985694885,
+        "p99Ms": 99.39999985694885,
+        "maxMs": 99.39999985694885
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 99.80000019073486,
+        "p95Ms": 99.90000009536743,
+        "p99Ms": 99.90000009536743,
+        "maxMs": 99.90000009536743
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 100.39999985694885,
+        "p95Ms": 100.69999980926514,
+        "p99Ms": 100.69999980926514,
+        "maxMs": 100.69999980926514
+      }
+    },
+    {
+      "key": "ordinary/multiple/composition-commit/inputToApplied",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7999999523162842,
+        "p99Ms": 2.0999999046325684,
+        "maxMs": 2.0999999046325684
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 1.7999999523162842,
+        "maxMs": 1.7999999523162842
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7999999523162842,
+        "p99Ms": 1.7999999523162842,
+        "maxMs": 1.7999999523162842
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 1.5999999046325684,
+        "p99Ms": 1.7999999523162842,
+        "maxMs": 1.7999999523162842
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 1.7999999523162842,
+        "maxMs": 1.7999999523162842
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.6000001430511475,
+        "p99Ms": 1.8000001907348633,
+        "maxMs": 1.8000001907348633
+      }
+    },
+    {
+      "key": "ordinary/multiple/composition-commit/dispatch",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7999999523162842,
+        "p99Ms": 2.0999999046325684,
+        "maxMs": 2.0999999046325684
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.6000001430511475,
+        "p99Ms": 1.7000000476837158,
+        "maxMs": 1.7000000476837158
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 1.7999999523162842,
+        "maxMs": 1.7999999523162842
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.5999999046325684,
+        "p99Ms": 1.7000000476837158,
+        "maxMs": 1.7000000476837158
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 1.7999999523162842,
+        "maxMs": 1.7999999523162842
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.6000001430511475,
+        "p99Ms": 1.8000001907348633,
+        "maxMs": 1.8000001907348633
+      }
+    },
+    {
+      "key": "ordinary/multiple/composition-commit/inputToFrame",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 6.700000047683716,
+        "p95Ms": 15.099999904632568,
+        "p99Ms": 15.799999952316284,
+        "maxMs": 15.799999952316284
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 7.1000001430511475,
+        "p95Ms": 15.200000047683716,
+        "p99Ms": 15.900000095367432,
+        "maxMs": 15.900000095367432
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 6.5,
+        "p95Ms": 14.700000047683716,
+        "p99Ms": 15.5,
+        "maxMs": 15.5
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 7.5,
+        "p95Ms": 14.600000143051147,
+        "p99Ms": 15.900000095367432,
+        "maxMs": 15.900000095367432
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 8.399999856948853,
+        "p95Ms": 15.200000047683716,
+        "p99Ms": 15.600000143051147,
+        "maxMs": 15.600000143051147
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 7.200000047683716,
+        "p95Ms": 14.099999904632568,
+        "p99Ms": 14.5,
+        "maxMs": 14.5
+      }
+    },
+    {
+      "key": "ordinary/multiple/composition-commit/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 114.5,
+        "p95Ms": 117.20000004768372,
+        "p99Ms": 117.20000004768372,
+        "maxMs": 117.20000004768372
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 116.70000004768372,
+        "p95Ms": 118.20000004768372,
+        "p99Ms": 118.20000004768372,
+        "maxMs": 118.20000004768372
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 115.90000009536743,
+        "p95Ms": 117.59999990463257,
+        "p99Ms": 117.59999990463257,
+        "maxMs": 117.59999990463257
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 115.89999985694885,
+        "p95Ms": 116.29999995231628,
+        "p99Ms": 116.29999995231628,
+        "maxMs": 116.29999995231628
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 154.5,
+        "p95Ms": 154.79999995231628,
+        "p99Ms": 154.79999995231628,
+        "maxMs": 154.79999995231628
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 116,
+        "p95Ms": 117,
+        "p99Ms": 117,
+        "maxMs": 117
+      }
+    },
+    {
+      "key": "ordinary/multiple/paste/inputToApplied",
+      "originalBaseline": {
+        "count": 24,
+        "p50Ms": 4.8999998569488525,
+        "p95Ms": 7.299999952316284,
+        "p99Ms": 7.5,
+        "maxMs": 7.5
+      },
+      "eagerPages": {
+        "count": 24,
+        "p50Ms": 5.299999952316284,
+        "p95Ms": 7.8999998569488525,
+        "p99Ms": 8.200000047683716,
+        "maxMs": 8.200000047683716
+      },
+      "repeatedBaseline": {
+        "count": 24,
+        "p50Ms": 5.099999904632568,
+        "p95Ms": 7.299999952316284,
+        "p99Ms": 8.799999952316284,
+        "maxMs": 8.799999952316284
+      },
+      "weakIndexExperiment": {
+        "count": 24,
+        "p50Ms": 5.299999952316284,
+        "p95Ms": 7.3999998569488525,
+        "p99Ms": 7.5,
+        "maxMs": 7.5
+      },
+      "internedPrefixes": {
+        "count": 24,
+        "p50Ms": 5.199999809265137,
+        "p95Ms": 7.200000047683716,
+        "p99Ms": 7.300000190734863,
+        "maxMs": 7.300000190734863
+      },
+      "borrowedPages": {
+        "count": 24,
+        "p50Ms": 5.699999809265137,
+        "p95Ms": 8.200000047683716,
+        "p99Ms": 8.900000095367432,
+        "maxMs": 8.900000095367432
+      }
+    },
+    {
+      "key": "ordinary/multiple/paste/dispatch",
+      "originalBaseline": {
+        "count": 24,
+        "p50Ms": 4.900000095367432,
+        "p95Ms": 7.299999952316284,
+        "p99Ms": 7.5,
+        "maxMs": 7.5
+      },
+      "eagerPages": {
+        "count": 24,
+        "p50Ms": 5.299999952316284,
+        "p95Ms": 7.8999998569488525,
+        "p99Ms": 8.200000047683716,
+        "maxMs": 8.200000047683716
+      },
+      "repeatedBaseline": {
+        "count": 24,
+        "p50Ms": 5.099999904632568,
+        "p95Ms": 7.299999952316284,
+        "p99Ms": 8.799999952316284,
+        "maxMs": 8.799999952316284
+      },
+      "weakIndexExperiment": {
+        "count": 24,
+        "p50Ms": 5.299999952316284,
+        "p95Ms": 7.3999998569488525,
+        "p99Ms": 7.5,
+        "maxMs": 7.5
+      },
+      "internedPrefixes": {
+        "count": 24,
+        "p50Ms": 5.199999809265137,
+        "p95Ms": 7.200000047683716,
+        "p99Ms": 7.300000190734863,
+        "maxMs": 7.300000190734863
+      },
+      "borrowedPages": {
+        "count": 24,
+        "p50Ms": 5.699999809265137,
+        "p95Ms": 8.200000047683716,
+        "p99Ms": 8.900000095367432,
+        "maxMs": 8.900000095367432
+      }
+    },
+    {
+      "key": "ordinary/multiple/paste/inputToFrame",
+      "originalBaseline": {
+        "count": 24,
+        "p50Ms": 11.799999952316284,
+        "p95Ms": 16,
+        "p99Ms": 19.5,
+        "maxMs": 19.5
+      },
+      "eagerPages": {
+        "count": 24,
+        "p50Ms": 9.400000095367432,
+        "p95Ms": 18,
+        "p99Ms": 19.799999952316284,
+        "maxMs": 19.799999952316284
+      },
+      "repeatedBaseline": {
+        "count": 24,
+        "p50Ms": 9.299999952316284,
+        "p95Ms": 19.40000009536743,
+        "p99Ms": 23.700000047683716,
+        "maxMs": 23.700000047683716
+      },
+      "weakIndexExperiment": {
+        "count": 24,
+        "p50Ms": 9.299999952316284,
+        "p95Ms": 18.699999809265137,
+        "p99Ms": 19.100000143051147,
+        "maxMs": 19.100000143051147
+      },
+      "internedPrefixes": {
+        "count": 24,
+        "p50Ms": 8.700000047683716,
+        "p95Ms": 15.900000095367432,
+        "p99Ms": 19,
+        "maxMs": 19
+      },
+      "borrowedPages": {
+        "count": 24,
+        "p50Ms": 11.900000095367432,
+        "p95Ms": 16.800000190734863,
+        "p99Ms": 18,
+        "maxMs": 18
+      }
+    },
+    {
+      "key": "ordinary/multiple/paste/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 147.70000004768372,
+        "p95Ms": 148,
+        "p99Ms": 148,
+        "maxMs": 148
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 147.29999995231628,
+        "p95Ms": 149.40000009536743,
+        "p99Ms": 149.40000009536743,
+        "maxMs": 149.40000009536743
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 147.40000009536743,
+        "p95Ms": 165.79999995231628,
+        "p99Ms": 165.79999995231628,
+        "maxMs": 165.79999995231628
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 146.89999985694885,
+        "p95Ms": 149.20000004768372,
+        "p99Ms": 149.20000004768372,
+        "maxMs": 149.20000004768372
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 148.70000004768372,
+        "p95Ms": 164.59999990463257,
+        "p99Ms": 164.59999990463257,
+        "maxMs": 164.59999990463257
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 148.90000009536743,
+        "p95Ms": 165.29999995231628,
+        "p99Ms": 165.29999995231628,
+        "maxMs": 165.29999995231628
+      }
+    },
+    {
+      "key": "ordinary/multiple/undo/inputToApplied",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0.9000000953674316,
+        "p95Ms": 2.299999952316284,
+        "p99Ms": 2.3000001907348633,
+        "maxMs": 2.3000001907348633
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.4000000953674316,
+        "p99Ms": 2.1999998092651367,
+        "maxMs": 2.1999998092651367
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.9000000953674316,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.7999999523162842,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.2000000476837158,
+        "p99Ms": 1.2999999523162842,
+        "maxMs": 1.2999999523162842
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 1.2999999523162842,
+        "maxMs": 1.2999999523162842
+      }
+    },
+    {
+      "key": "ordinary/multiple/undo/dispatch",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 2.200000047683716,
+        "p99Ms": 2.200000047683716,
+        "maxMs": 2.200000047683716
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.2000000476837158,
+        "p99Ms": 1.2999999523162842,
+        "maxMs": 1.2999999523162842
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0.7000000476837158,
+        "p95Ms": 1.2000000476837158,
+        "p99Ms": 1.2000000476837158,
+        "maxMs": 1.2000000476837158
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.6999998092651367,
+        "p99Ms": 1.9000000953674316,
+        "maxMs": 1.9000000953674316
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.1000001430511475,
+        "p99Ms": 1.2000000476837158,
+        "maxMs": 1.2000000476837158
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 1.2999999523162842,
+        "maxMs": 1.2999999523162842
+      }
+    },
+    {
+      "key": "ordinary/multiple/undo/inputToFrame",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 8.100000143051147,
+        "p95Ms": 14.399999856948853,
+        "p99Ms": 14.399999856948853,
+        "maxMs": 14.399999856948853
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 7.900000095367432,
+        "p95Ms": 15.200000047683716,
+        "p99Ms": 16.899999856948853,
+        "maxMs": 16.899999856948853
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 8.5,
+        "p95Ms": 16.90000009536743,
+        "p99Ms": 17,
+        "maxMs": 17
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 7.3999998569488525,
+        "p95Ms": 14.599999904632568,
+        "p99Ms": 15.5,
+        "maxMs": 15.5
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 7.800000190734863,
+        "p95Ms": 15,
+        "p99Ms": 15.700000047683716,
+        "maxMs": 15.700000047683716
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 8,
+        "p95Ms": 15,
+        "p99Ms": 15,
+        "maxMs": 15
+      }
+    },
+    {
+      "key": "ordinary/multiple/undo/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 117.09999990463257,
+        "p95Ms": 135,
+        "p99Ms": 135,
+        "maxMs": 135
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 116.10000014305115,
+        "p95Ms": 118,
+        "p99Ms": 118,
+        "maxMs": 118
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 116.20000004768372,
+        "p95Ms": 116.59999990463257,
+        "p99Ms": 116.59999990463257,
+        "maxMs": 116.59999990463257
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 117.60000014305115,
+        "p95Ms": 132.09999990463257,
+        "p99Ms": 132.09999990463257,
+        "maxMs": 132.09999990463257
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 116.39999985694885,
+        "p95Ms": 116.80000019073486,
+        "p99Ms": 116.80000019073486,
+        "maxMs": 116.80000019073486
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 116.79999995231628,
+        "p95Ms": 117.5,
+        "p99Ms": 117.5,
+        "maxMs": 117.5
+      }
+    },
+    {
+      "key": "short-lines/single/typing/inputToApplied",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 0.5,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 1.7999999523162842,
+        "maxMs": 1.7999999523162842
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 0.5,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 1.7999999523162842,
+        "maxMs": 1.7999999523162842
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 0.5,
+        "p95Ms": 0.8000001907348633,
+        "p99Ms": 1.5,
+        "maxMs": 1.5
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1.0999999046325684,
+        "p99Ms": 1.7999999523162842,
+        "maxMs": 1.7999999523162842
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 0.5,
+        "p95Ms": 0.8999998569488525,
+        "p99Ms": 1.4000000953674316,
+        "maxMs": 1.4000000953674316
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 0.5,
+        "p95Ms": 0.8000001907348633,
+        "p99Ms": 1.7999999523162842,
+        "maxMs": 1.7999999523162842
+      }
+    },
+    {
+      "key": "short-lines/single/typing/dispatch",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 0.5,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 1.7999999523162842,
+        "maxMs": 1.7999999523162842
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 0.5,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 1.7999999523162842,
+        "maxMs": 1.7999999523162842
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 0.5,
+        "p95Ms": 0.8000001907348633,
+        "p99Ms": 1.5,
+        "maxMs": 1.5
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1.0999999046325684,
+        "p99Ms": 1.7999999523162842,
+        "maxMs": 1.7999999523162842
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 0.5,
+        "p95Ms": 0.8999998569488525,
+        "p99Ms": 1.4000000953674316,
+        "maxMs": 1.4000000953674316
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 0.5,
+        "p95Ms": 0.8000001907348633,
+        "p99Ms": 1.7999999523162842,
+        "maxMs": 1.7999999523162842
+      }
+    },
+    {
+      "key": "short-lines/single/typing/inputToFrame",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 8.299999952316284,
+        "p95Ms": 15,
+        "p99Ms": 15.900000095367432,
+        "maxMs": 15.900000095367432
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 8.5,
+        "p95Ms": 15.199999809265137,
+        "p99Ms": 16,
+        "maxMs": 16
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 7.799999952316284,
+        "p95Ms": 15.299999952316284,
+        "p99Ms": 16.299999952316284,
+        "maxMs": 16.299999952316284
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 8.5,
+        "p95Ms": 15.200000047683716,
+        "p99Ms": 16.09999990463257,
+        "maxMs": 16.09999990463257
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 8.5,
+        "p95Ms": 15.200000047683716,
+        "p99Ms": 16,
+        "maxMs": 16
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 8.5,
+        "p95Ms": 15.5,
+        "p99Ms": 16.300000190734863,
+        "maxMs": 16.300000190734863
+      }
+    },
+    {
+      "key": "short-lines/single/typing/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 132.70000004768372,
+        "p95Ms": 133,
+        "p99Ms": 133,
+        "maxMs": 133
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 132,
+        "p95Ms": 133.39999985694885,
+        "p99Ms": 133.39999985694885,
+        "maxMs": 133.39999985694885
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 132.20000004768372,
+        "p95Ms": 133.40000009536743,
+        "p99Ms": 133.40000009536743,
+        "maxMs": 133.40000009536743
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 133,
+        "p95Ms": 134.40000009536743,
+        "p99Ms": 134.40000009536743,
+        "maxMs": 134.40000009536743
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 132.39999985694885,
+        "p95Ms": 132.90000009536743,
+        "p99Ms": 132.90000009536743,
+        "maxMs": 132.90000009536743
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 133,
+        "p95Ms": 133,
+        "p99Ms": 133,
+        "maxMs": 133
+      }
+    },
+    {
+      "key": "short-lines/single/repeat/inputToApplied",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 0.5,
+        "p95Ms": 1,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 0.5,
+        "p95Ms": 1.0999999046325684,
+        "p99Ms": 1.5,
+        "maxMs": 1.5
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 0.5,
+        "p95Ms": 1.0999999046325684,
+        "p99Ms": 1.9000000953674316,
+        "maxMs": 1.9000000953674316
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 0.5,
+        "p95Ms": 0.9000000953674316,
+        "p99Ms": 1.5,
+        "maxMs": 1.5
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1,
+        "p99Ms": 1.5,
+        "maxMs": 1.5
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 0.5,
+        "p95Ms": 0.9000000953674316,
+        "p99Ms": 1.5,
+        "maxMs": 1.5
+      }
+    },
+    {
+      "key": "short-lines/single/repeat/dispatch",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 0.5,
+        "p95Ms": 1,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 0.5,
+        "p95Ms": 1.0999999046325684,
+        "p99Ms": 1.5,
+        "maxMs": 1.5
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 0.5,
+        "p95Ms": 1.1999998092651367,
+        "p99Ms": 1.9000000953674316,
+        "maxMs": 1.9000000953674316
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 0.5,
+        "p95Ms": 0.9000000953674316,
+        "p99Ms": 1.5,
+        "maxMs": 1.5
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 1,
+        "p99Ms": 1.5,
+        "maxMs": 1.5
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 0.5,
+        "p95Ms": 0.9000000953674316,
+        "p99Ms": 1.5,
+        "maxMs": 1.5
+      }
+    },
+    {
+      "key": "short-lines/single/repeat/inputToFrame",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 7.1000001430511475,
+        "p95Ms": 15.299999952316284,
+        "p99Ms": 16.299999952316284,
+        "maxMs": 16.299999952316284
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 7.700000047683716,
+        "p95Ms": 15.299999952316284,
+        "p99Ms": 16.200000047683716,
+        "maxMs": 16.200000047683716
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 8,
+        "p95Ms": 15.100000143051147,
+        "p99Ms": 16.100000143051147,
+        "maxMs": 16.100000143051147
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 7.3999998569488525,
+        "p95Ms": 15.299999952316284,
+        "p99Ms": 16.299999952316284,
+        "maxMs": 16.299999952316284
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 7.700000047683716,
+        "p95Ms": 15.299999952316284,
+        "p99Ms": 16.200000047683716,
+        "maxMs": 16.200000047683716
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 8.099999904632568,
+        "p95Ms": 15.200000047683716,
+        "p99Ms": 16.300000190734863,
+        "maxMs": 16.300000190734863
+      }
+    },
+    {
+      "key": "short-lines/single/repeat/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 132.90000009536743,
+        "p95Ms": 133.20000004768372,
+        "p99Ms": 133.20000004768372,
+        "maxMs": 133.20000004768372
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 133.5,
+        "p95Ms": 134.90000009536743,
+        "p99Ms": 134.90000009536743,
+        "maxMs": 134.90000009536743
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 133.69999980926514,
+        "p95Ms": 133.70000004768372,
+        "p99Ms": 133.70000004768372,
+        "maxMs": 133.70000004768372
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 132.20000004768372,
+        "p95Ms": 133.20000004768372,
+        "p99Ms": 133.20000004768372,
+        "maxMs": 133.20000004768372
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 133.70000004768372,
+        "p95Ms": 133.89999985694885,
+        "p99Ms": 133.89999985694885,
+        "maxMs": 133.89999985694885
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 132.5,
+        "p95Ms": 132.59999990463257,
+        "p99Ms": 132.59999990463257,
+        "maxMs": 132.59999990463257
+      }
+    },
+    {
+      "key": "short-lines/single/composition-update/inputToApplied",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      }
+    },
+    {
+      "key": "short-lines/single/composition-update/dispatch",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      }
+    },
+    {
+      "key": "short-lines/single/composition-update/inputToFrame",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 8,
+        "p95Ms": 10.600000143051147,
+        "p99Ms": 10.899999856948853,
+        "maxMs": 10.899999856948853
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 7.3999998569488525,
+        "p95Ms": 11,
+        "p99Ms": 11.700000047683716,
+        "maxMs": 11.700000047683716
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 8.599999904632568,
+        "p95Ms": 11.299999952316284,
+        "p99Ms": 11.399999856948853,
+        "maxMs": 11.399999856948853
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 8.100000143051147,
+        "p95Ms": 11.400000095367432,
+        "p99Ms": 11.599999904632568,
+        "maxMs": 11.599999904632568
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 5.5,
+        "p95Ms": 9.900000095367432,
+        "p99Ms": 10.700000047683716,
+        "maxMs": 10.700000047683716
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 7.299999952316284,
+        "p95Ms": 10.400000095367432,
+        "p99Ms": 11,
+        "maxMs": 11
+      }
+    },
+    {
+      "key": "short-lines/single/composition-update/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 99.89999985694885,
+        "p95Ms": 101.20000004768372,
+        "p99Ms": 101.20000004768372,
+        "maxMs": 101.20000004768372
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 99.79999995231628,
+        "p95Ms": 99.79999995231628,
+        "p99Ms": 99.79999995231628,
+        "maxMs": 99.79999995231628
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 99.70000004768372,
+        "p95Ms": 99.90000009536743,
+        "p99Ms": 99.90000009536743,
+        "maxMs": 99.90000009536743
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 99.29999995231628,
+        "p95Ms": 99.5,
+        "p99Ms": 99.5,
+        "maxMs": 99.5
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 98.5,
+        "p95Ms": 98.70000004768372,
+        "p99Ms": 98.70000004768372,
+        "maxMs": 98.70000004768372
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 98.90000009536743,
+        "p95Ms": 99,
+        "p99Ms": 99,
+        "maxMs": 99
+      }
+    },
+    {
+      "key": "short-lines/single/composition-commit/inputToApplied",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1,
+        "p99Ms": 1,
+        "maxMs": 1
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1,
+        "p99Ms": 1,
+        "maxMs": 1
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1,
+        "p99Ms": 1,
+        "maxMs": 1
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1,
+        "p99Ms": 1.1000001430511475,
+        "maxMs": 1.1000001430511475
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1,
+        "p99Ms": 1,
+        "maxMs": 1
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1.5999999046325684,
+        "p99Ms": 1.7000000476837158,
+        "maxMs": 1.7000000476837158
+      }
+    },
+    {
+      "key": "short-lines/single/composition-commit/dispatch",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0.40000009536743164,
+        "p95Ms": 1,
+        "p99Ms": 1,
+        "maxMs": 1
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1,
+        "p99Ms": 1,
+        "maxMs": 1
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 0.9000000953674316,
+        "p99Ms": 1,
+        "maxMs": 1
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1.1000001430511475,
+        "p99Ms": 1.1000001430511475,
+        "maxMs": 1.1000001430511475
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1,
+        "p99Ms": 1,
+        "maxMs": 1
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1.5999999046325684,
+        "p99Ms": 1.6000001430511475,
+        "maxMs": 1.6000001430511475
+      }
+    },
+    {
+      "key": "short-lines/single/composition-commit/inputToFrame",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 8,
+        "p95Ms": 15.5,
+        "p99Ms": 16.200000047683716,
+        "maxMs": 16.200000047683716
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 8,
+        "p95Ms": 15.599999904632568,
+        "p99Ms": 16,
+        "maxMs": 16
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 7.299999952316284,
+        "p95Ms": 15.599999904632568,
+        "p99Ms": 15.700000047683716,
+        "maxMs": 15.700000047683716
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 9,
+        "p95Ms": 15.599999904632568,
+        "p99Ms": 15.700000047683716,
+        "maxMs": 15.700000047683716
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 8.899999856948853,
+        "p95Ms": 15.800000190734863,
+        "p99Ms": 16.09999990463257,
+        "maxMs": 16.09999990463257
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 7.5,
+        "p95Ms": 16.300000190734863,
+        "p99Ms": 16.40000009536743,
+        "maxMs": 16.40000009536743
+      }
+    },
+    {
+      "key": "short-lines/single/composition-commit/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 149.20000004768372,
+        "p95Ms": 150,
+        "p99Ms": 150,
+        "maxMs": 150
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 148.70000004768372,
+        "p95Ms": 149.09999990463257,
+        "p99Ms": 149.09999990463257,
+        "maxMs": 149.09999990463257
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 147.89999985694885,
+        "p95Ms": 148.29999995231628,
+        "p99Ms": 148.29999995231628,
+        "maxMs": 148.29999995231628
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 147.80000019073486,
+        "p95Ms": 150.30000019073486,
+        "p99Ms": 150.30000019073486,
+        "maxMs": 150.30000019073486
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 132,
+        "p95Ms": 147.60000014305115,
+        "p99Ms": 147.60000014305115,
+        "maxMs": 147.60000014305115
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 148.40000009536743,
+        "p95Ms": 149.19999980926514,
+        "p99Ms": 149.19999980926514,
+        "maxMs": 149.19999980926514
+      }
+    },
+    {
+      "key": "short-lines/single/paste/inputToApplied",
+      "originalBaseline": {
+        "count": 24,
+        "p50Ms": 4.099999904632568,
+        "p95Ms": 7.8999998569488525,
+        "p99Ms": 9.799999952316284,
+        "maxMs": 9.799999952316284
+      },
+      "eagerPages": {
+        "count": 24,
+        "p50Ms": 4.1000001430511475,
+        "p95Ms": 7.1000001430511475,
+        "p99Ms": 8.299999952316284,
+        "maxMs": 8.299999952316284
+      },
+      "repeatedBaseline": {
+        "count": 24,
+        "p50Ms": 4.099999904632568,
+        "p95Ms": 6,
+        "p99Ms": 6.799999952316284,
+        "maxMs": 6.799999952316284
+      },
+      "weakIndexExperiment": {
+        "count": 24,
+        "p50Ms": 4,
+        "p95Ms": 7,
+        "p99Ms": 7.400000095367432,
+        "maxMs": 7.400000095367432
+      },
+      "internedPrefixes": {
+        "count": 24,
+        "p50Ms": 4,
+        "p95Ms": 6.200000047683716,
+        "p99Ms": 7,
+        "maxMs": 7
+      },
+      "borrowedPages": {
+        "count": 24,
+        "p50Ms": 4.1000001430511475,
+        "p95Ms": 7.1000001430511475,
+        "p99Ms": 7.400000095367432,
+        "maxMs": 7.400000095367432
+      }
+    },
+    {
+      "key": "short-lines/single/paste/dispatch",
+      "originalBaseline": {
+        "count": 24,
+        "p50Ms": 4.1000001430511475,
+        "p95Ms": 7.8999998569488525,
+        "p99Ms": 9.799999952316284,
+        "maxMs": 9.799999952316284
+      },
+      "eagerPages": {
+        "count": 24,
+        "p50Ms": 4.1000001430511475,
+        "p95Ms": 7.1000001430511475,
+        "p99Ms": 8.299999952316284,
+        "maxMs": 8.299999952316284
+      },
+      "repeatedBaseline": {
+        "count": 24,
+        "p50Ms": 4.099999904632568,
+        "p95Ms": 6,
+        "p99Ms": 6.799999952316284,
+        "maxMs": 6.799999952316284
+      },
+      "weakIndexExperiment": {
+        "count": 24,
+        "p50Ms": 4,
+        "p95Ms": 7,
+        "p99Ms": 7.400000095367432,
+        "maxMs": 7.400000095367432
+      },
+      "internedPrefixes": {
+        "count": 24,
+        "p50Ms": 4,
+        "p95Ms": 6.200000047683716,
+        "p99Ms": 7,
+        "maxMs": 7
+      },
+      "borrowedPages": {
+        "count": 24,
+        "p50Ms": 4.1000001430511475,
+        "p95Ms": 7.1000001430511475,
+        "p99Ms": 7.400000095367432,
+        "maxMs": 7.400000095367432
+      }
+    },
+    {
+      "key": "short-lines/single/paste/inputToFrame",
+      "originalBaseline": {
+        "count": 24,
+        "p50Ms": 8.799999952316284,
+        "p95Ms": 17.299999952316284,
+        "p99Ms": 17.40000009536743,
+        "maxMs": 17.40000009536743
+      },
+      "eagerPages": {
+        "count": 24,
+        "p50Ms": 9.099999904632568,
+        "p95Ms": 16.59999990463257,
+        "p99Ms": 17.799999952316284,
+        "maxMs": 17.799999952316284
+      },
+      "repeatedBaseline": {
+        "count": 24,
+        "p50Ms": 8.5,
+        "p95Ms": 15.299999952316284,
+        "p99Ms": 16.299999952316284,
+        "maxMs": 16.299999952316284
+      },
+      "weakIndexExperiment": {
+        "count": 24,
+        "p50Ms": 8.799999952316284,
+        "p95Ms": 14.900000095367432,
+        "p99Ms": 15.400000095367432,
+        "maxMs": 15.400000095367432
+      },
+      "internedPrefixes": {
+        "count": 24,
+        "p50Ms": 9.099999904632568,
+        "p95Ms": 20.399999856948853,
+        "p99Ms": 21.40000009536743,
+        "maxMs": 21.40000009536743
+      },
+      "borrowedPages": {
+        "count": 24,
+        "p50Ms": 8.700000047683716,
+        "p95Ms": 18.600000143051147,
+        "p99Ms": 21.09999990463257,
+        "maxMs": 21.09999990463257
+      }
+    },
+    {
+      "key": "short-lines/single/paste/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 164.40000009536743,
+        "p95Ms": 179.70000004768372,
+        "p99Ms": 179.70000004768372,
+        "maxMs": 179.70000004768372
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 166.70000004768372,
+        "p95Ms": 181.70000004768372,
+        "p99Ms": 181.70000004768372,
+        "maxMs": 181.70000004768372
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 162.40000009536743,
+        "p95Ms": 163.20000004768372,
+        "p99Ms": 163.20000004768372,
+        "maxMs": 163.20000004768372
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 162.79999995231628,
+        "p95Ms": 163.70000004768372,
+        "p99Ms": 163.70000004768372,
+        "maxMs": 163.70000004768372
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 164.5,
+        "p95Ms": 165.5,
+        "p99Ms": 165.5,
+        "maxMs": 165.5
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 164.5,
+        "p95Ms": 181.59999990463257,
+        "p99Ms": 181.59999990463257,
+        "maxMs": 181.59999990463257
+      }
+    },
+    {
+      "key": "short-lines/single/undo/inputToApplied",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0.6000001430511475,
+        "p95Ms": 1.1000001430511475,
+        "p99Ms": 1.3000001907348633,
+        "maxMs": 1.3000001907348633
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 0.7999999523162842,
+        "p99Ms": 0.9000000953674316,
+        "maxMs": 0.9000000953674316
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1,
+        "p99Ms": 1.2999999523162842,
+        "maxMs": 1.2999999523162842
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1,
+        "p99Ms": 1.2999999523162842,
+        "maxMs": 1.2999999523162842
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 1,
+        "p99Ms": 1.2000000476837158,
+        "maxMs": 1.2000000476837158
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0.5999999046325684,
+        "p95Ms": 0.9000000953674316,
+        "p99Ms": 1,
+        "maxMs": 1
+      }
+    },
+    {
+      "key": "short-lines/single/undo/dispatch",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0.6000001430511475,
+        "p95Ms": 1.2000000476837158,
+        "p99Ms": 1.3000001907348633,
+        "maxMs": 1.3000001907348633
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 0.8999998569488525,
+        "p99Ms": 0.9000000953674316,
+        "maxMs": 0.9000000953674316
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 0.9000000953674316,
+        "p99Ms": 1.3999998569488525,
+        "maxMs": 1.3999998569488525
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 0.8999998569488525,
+        "p99Ms": 1.2000000476837158,
+        "maxMs": 1.2000000476837158
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 0.9000000953674316,
+        "p99Ms": 1.1000001430511475,
+        "maxMs": 1.1000001430511475
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0.5,
+        "p95Ms": 0.8999998569488525,
+        "p99Ms": 0.9000000953674316,
+        "maxMs": 0.9000000953674316
+      }
+    },
+    {
+      "key": "short-lines/single/undo/inputToFrame",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 8.199999809265137,
+        "p95Ms": 16,
+        "p99Ms": 16.300000190734863,
+        "maxMs": 16.300000190734863
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 6.299999952316284,
+        "p95Ms": 15.400000095367432,
+        "p99Ms": 16.199999809265137,
+        "maxMs": 16.199999809265137
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 6.599999904632568,
+        "p95Ms": 16,
+        "p99Ms": 16.200000047683716,
+        "maxMs": 16.200000047683716
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 7.700000047683716,
+        "p95Ms": 15.5,
+        "p99Ms": 16,
+        "maxMs": 16
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 6.799999952316284,
+        "p95Ms": 15.599999904632568,
+        "p99Ms": 15.700000047683716,
+        "maxMs": 15.700000047683716
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 6.599999904632568,
+        "p95Ms": 15.300000190734863,
+        "p99Ms": 15.900000095367432,
+        "maxMs": 15.900000095367432
+      }
+    },
+    {
+      "key": "short-lines/single/undo/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 132.40000009536743,
+        "p95Ms": 132.59999990463257,
+        "p99Ms": 132.59999990463257,
+        "maxMs": 132.59999990463257
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 115.60000014305115,
+        "p95Ms": 115.89999985694885,
+        "p99Ms": 115.89999985694885,
+        "maxMs": 115.89999985694885
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 115.79999995231628,
+        "p95Ms": 132.10000014305115,
+        "p99Ms": 132.10000014305115,
+        "maxMs": 132.10000014305115
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 114.09999990463257,
+        "p95Ms": 114.79999995231628,
+        "p99Ms": 114.79999995231628,
+        "maxMs": 114.79999995231628
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 115.29999995231628,
+        "p95Ms": 115.39999985694885,
+        "p99Ms": 115.39999985694885,
+        "maxMs": 115.39999985694885
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 116,
+        "p95Ms": 132.79999995231628,
+        "p99Ms": 132.79999995231628,
+        "maxMs": 132.79999995231628
+      }
+    },
+    {
+      "key": "short-lines/multiple/typing/inputToApplied",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7999999523162842,
+        "p99Ms": 2.9000000953674316,
+        "maxMs": 2.9000000953674316
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 2.200000047683716,
+        "maxMs": 2.200000047683716
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7999999523162842,
+        "p99Ms": 2.700000047683716,
+        "maxMs": 2.700000047683716
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 1.9000000953674316,
+        "maxMs": 1.9000000953674316
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 2.1000001430511475,
+        "maxMs": 2.1000001430511475
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 2.1000001430511475,
+        "p99Ms": 2.799999952316284,
+        "maxMs": 2.799999952316284
+      }
+    },
+    {
+      "key": "short-lines/multiple/typing/dispatch",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7999999523162842,
+        "p99Ms": 2.9000000953674316,
+        "maxMs": 2.9000000953674316
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 2.200000047683716,
+        "maxMs": 2.200000047683716
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7999999523162842,
+        "p99Ms": 2.799999952316284,
+        "maxMs": 2.799999952316284
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 1.9000000953674316,
+        "maxMs": 1.9000000953674316
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7999999523162842,
+        "p99Ms": 2.1000001430511475,
+        "maxMs": 2.1000001430511475
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 2.1000001430511475,
+        "p99Ms": 2.799999952316284,
+        "maxMs": 2.799999952316284
+      }
+    },
+    {
+      "key": "short-lines/multiple/typing/inputToFrame",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 7.900000095367432,
+        "p95Ms": 15.700000047683716,
+        "p99Ms": 16.299999952316284,
+        "maxMs": 16.299999952316284
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 7.5,
+        "p95Ms": 15.400000095367432,
+        "p99Ms": 16.59999990463257,
+        "maxMs": 16.59999990463257
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 7.400000095367432,
+        "p95Ms": 15.299999952316284,
+        "p99Ms": 15.700000047683716,
+        "maxMs": 15.700000047683716
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 7.099999904632568,
+        "p95Ms": 15.399999856948853,
+        "p99Ms": 15.900000095367432,
+        "maxMs": 15.900000095367432
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 7.3999998569488525,
+        "p95Ms": 15.5,
+        "p99Ms": 16.200000047683716,
+        "maxMs": 16.200000047683716
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 8.099999904632568,
+        "p95Ms": 15.099999904632568,
+        "p99Ms": 16.100000143051147,
+        "maxMs": 16.100000143051147
+      }
+    },
+    {
+      "key": "short-lines/multiple/typing/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 166.39999985694885,
+        "p95Ms": 167.40000009536743,
+        "p99Ms": 167.40000009536743,
+        "maxMs": 167.40000009536743
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 149.79999995231628,
+        "p95Ms": 164.90000009536743,
+        "p99Ms": 164.90000009536743,
+        "maxMs": 164.90000009536743
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 149.59999990463257,
+        "p95Ms": 166.29999995231628,
+        "p99Ms": 166.29999995231628,
+        "maxMs": 166.29999995231628
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 149.40000009536743,
+        "p95Ms": 167,
+        "p99Ms": 167,
+        "maxMs": 167
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 148.79999995231628,
+        "p95Ms": 149.79999995231628,
+        "p99Ms": 149.79999995231628,
+        "maxMs": 149.79999995231628
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 164.19999980926514,
+        "p95Ms": 171.79999995231628,
+        "p99Ms": 171.79999995231628,
+        "maxMs": 171.79999995231628
+      }
+    },
+    {
+      "key": "short-lines/multiple/repeat/inputToApplied",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 2.799999952316284,
+        "maxMs": 2.799999952316284
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 2.1000001430511475,
+        "maxMs": 2.1000001430511475
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 1.9000000953674316,
+        "maxMs": 1.9000000953674316
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.6999998092651367,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 1.9000000953674316,
+        "maxMs": 1.9000000953674316
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7999999523162842,
+        "p99Ms": 1.9000000953674316,
+        "maxMs": 1.9000000953674316
+      }
+    },
+    {
+      "key": "short-lines/multiple/repeat/dispatch",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 1.6000001430511475,
+        "p99Ms": 2.799999952316284,
+        "maxMs": 2.799999952316284
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 2.1000001430511475,
+        "maxMs": 2.1000001430511475
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.6999998092651367,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 1.9000000953674316,
+        "maxMs": 1.9000000953674316
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 1.9000000953674316,
+        "maxMs": 1.9000000953674316
+      }
+    },
+    {
+      "key": "short-lines/multiple/repeat/inputToFrame",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 7.6000001430511475,
+        "p95Ms": 16.200000047683716,
+        "p99Ms": 17.200000047683716,
+        "maxMs": 17.200000047683716
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 7.5,
+        "p95Ms": 15.800000190734863,
+        "p99Ms": 17.59999990463257,
+        "maxMs": 17.59999990463257
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 7.700000047683716,
+        "p95Ms": 15.5,
+        "p99Ms": 16.600000143051147,
+        "maxMs": 16.600000143051147
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 7.200000047683716,
+        "p95Ms": 16.09999990463257,
+        "p99Ms": 16.300000190734863,
+        "maxMs": 16.300000190734863
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 8.299999952316284,
+        "p95Ms": 15.900000095367432,
+        "p99Ms": 16.90000009536743,
+        "maxMs": 16.90000009536743
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 7.700000047683716,
+        "p95Ms": 15.899999856948853,
+        "p99Ms": 16.799999952316284,
+        "maxMs": 16.799999952316284
+      }
+    },
+    {
+      "key": "short-lines/multiple/repeat/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 165.20000004768372,
+        "p95Ms": 192.69999980926514,
+        "p99Ms": 192.69999980926514,
+        "maxMs": 192.69999980926514
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 149.89999985694885,
+        "p95Ms": 166.89999985694885,
+        "p99Ms": 166.89999985694885,
+        "maxMs": 166.89999985694885
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 148.79999995231628,
+        "p95Ms": 165.60000014305115,
+        "p99Ms": 165.60000014305115,
+        "maxMs": 165.60000014305115
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 149.60000014305115,
+        "p95Ms": 150.5,
+        "p99Ms": 150.5,
+        "maxMs": 150.5
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 148.30000019073486,
+        "p95Ms": 149.5,
+        "p99Ms": 149.5,
+        "maxMs": 149.5
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 164.79999995231628,
+        "p95Ms": 165.59999990463257,
+        "p99Ms": 165.59999990463257,
+        "maxMs": 165.59999990463257
+      }
+    },
+    {
+      "key": "short-lines/multiple/composition-update/inputToApplied",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.19999980926513672,
+        "maxMs": 0.19999980926513672
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      }
+    },
+    {
+      "key": "short-lines/multiple/composition-update/dispatch",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.19999980926513672,
+        "maxMs": 0.19999980926513672
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      }
+    },
+    {
+      "key": "short-lines/multiple/composition-update/inputToFrame",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 6.800000190734863,
+        "p95Ms": 10.300000190734863,
+        "p99Ms": 10.699999809265137,
+        "maxMs": 10.699999809265137
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 6.299999952316284,
+        "p95Ms": 9.299999952316284,
+        "p99Ms": 10.099999904632568,
+        "maxMs": 10.099999904632568
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 9,
+        "p95Ms": 11.400000095367432,
+        "p99Ms": 11.599999904632568,
+        "maxMs": 11.599999904632568
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 7.599999904632568,
+        "p95Ms": 10.400000095367432,
+        "p99Ms": 10.899999856948853,
+        "maxMs": 10.899999856948853
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 6.200000047683716,
+        "p95Ms": 10,
+        "p99Ms": 10.799999952316284,
+        "maxMs": 10.799999952316284
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 5.199999809265137,
+        "p95Ms": 8.5,
+        "p99Ms": 8.599999904632568,
+        "maxMs": 8.599999904632568
+      }
+    },
+    {
+      "key": "short-lines/multiple/composition-update/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 132.70000004768372,
+        "p95Ms": 133.29999995231628,
+        "p99Ms": 133.29999995231628,
+        "maxMs": 133.29999995231628
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 115.60000014305115,
+        "p95Ms": 134.40000009536743,
+        "p99Ms": 134.40000009536743,
+        "maxMs": 134.40000009536743
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 116.40000009536743,
+        "p95Ms": 116.80000019073486,
+        "p99Ms": 116.80000019073486,
+        "maxMs": 116.80000019073486
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 133.89999985694885,
+        "p95Ms": 134.30000019073486,
+        "p99Ms": 134.30000019073486,
+        "maxMs": 134.30000019073486
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 115.19999980926514,
+        "p95Ms": 132.40000009536743,
+        "p99Ms": 132.40000009536743,
+        "maxMs": 132.40000009536743
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 130.90000009536743,
+        "p95Ms": 132.59999990463257,
+        "p99Ms": 132.59999990463257,
+        "maxMs": 132.59999990463257
+      }
+    },
+    {
+      "key": "short-lines/multiple/composition-commit/inputToApplied",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0.7000000476837158,
+        "p95Ms": 1.3999998569488525,
+        "p99Ms": 1.5,
+        "maxMs": 1.5
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 1.3999998569488525,
+        "p99Ms": 1.7000000476837158,
+        "maxMs": 1.7000000476837158
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.4000000953674316,
+        "p99Ms": 1.4000000953674316,
+        "maxMs": 1.4000000953674316
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0.7000000476837158,
+        "p95Ms": 1.3999998569488525,
+        "p99Ms": 1.4000000953674316,
+        "maxMs": 1.4000000953674316
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0.7000000476837158,
+        "p95Ms": 1.4000000953674316,
+        "p99Ms": 1.4000000953674316,
+        "maxMs": 1.4000000953674316
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.4000000953674316,
+        "p99Ms": 1.8000001907348633,
+        "maxMs": 1.8000001907348633
+      }
+    },
+    {
+      "key": "short-lines/multiple/composition-commit/dispatch",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0.7000000476837158,
+        "p95Ms": 1.3999998569488525,
+        "p99Ms": 1.5,
+        "maxMs": 1.5
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 1.7000000476837158,
+        "maxMs": 1.7000000476837158
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0.7000000476837158,
+        "p95Ms": 1.4000000953674316,
+        "p99Ms": 1.4000000953674316,
+        "maxMs": 1.4000000953674316
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0.7000000476837158,
+        "p95Ms": 1.3999998569488525,
+        "p99Ms": 1.4000000953674316,
+        "maxMs": 1.4000000953674316
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0.7000000476837158,
+        "p95Ms": 1.4000000953674316,
+        "p99Ms": 1.5,
+        "maxMs": 1.5
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.4000000953674316,
+        "p99Ms": 1.7000000476837158,
+        "maxMs": 1.7000000476837158
+      }
+    },
+    {
+      "key": "short-lines/multiple/composition-commit/inputToFrame",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 8.799999952316284,
+        "p95Ms": 16.100000143051147,
+        "p99Ms": 16.299999952316284,
+        "maxMs": 16.299999952316284
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 7.699999809265137,
+        "p95Ms": 15.799999952316284,
+        "p99Ms": 15.800000190734863,
+        "maxMs": 15.800000190734863
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 7.200000047683716,
+        "p95Ms": 14.900000095367432,
+        "p99Ms": 15.099999904632568,
+        "maxMs": 15.099999904632568
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 8,
+        "p95Ms": 15.5,
+        "p99Ms": 15.900000095367432,
+        "maxMs": 15.900000095367432
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 7.6000001430511475,
+        "p95Ms": 15.5,
+        "p99Ms": 15.5,
+        "maxMs": 15.5
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 7.599999904632568,
+        "p95Ms": 15.200000047683716,
+        "p99Ms": 15.5,
+        "maxMs": 15.5
+      }
+    },
+    {
+      "key": "short-lines/multiple/composition-commit/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 150.30000019073486,
+        "p95Ms": 164.59999990463257,
+        "p99Ms": 164.59999990463257,
+        "maxMs": 164.59999990463257
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 146.5,
+        "p95Ms": 148.79999995231628,
+        "p99Ms": 148.79999995231628,
+        "maxMs": 148.79999995231628
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 150.30000019073486,
+        "p95Ms": 164.20000004768372,
+        "p99Ms": 164.20000004768372,
+        "maxMs": 164.20000004768372
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 149.70000004768372,
+        "p95Ms": 162.60000014305115,
+        "p99Ms": 162.60000014305115,
+        "maxMs": 162.60000014305115
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 148.5,
+        "p95Ms": 149.59999990463257,
+        "p99Ms": 149.59999990463257,
+        "maxMs": 149.59999990463257
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 150.40000009536743,
+        "p95Ms": 163.80000019073486,
+        "p99Ms": 163.80000019073486,
+        "maxMs": 163.80000019073486
+      }
+    },
+    {
+      "key": "short-lines/multiple/paste/inputToApplied",
+      "originalBaseline": {
+        "count": 24,
+        "p50Ms": 5.199999809265137,
+        "p95Ms": 6.599999904632568,
+        "p99Ms": 6.799999952316284,
+        "maxMs": 6.799999952316284
+      },
+      "eagerPages": {
+        "count": 24,
+        "p50Ms": 4.900000095367432,
+        "p95Ms": 6.799999952316284,
+        "p99Ms": 6.799999952316284,
+        "maxMs": 6.799999952316284
+      },
+      "repeatedBaseline": {
+        "count": 24,
+        "p50Ms": 4.599999904632568,
+        "p95Ms": 6.599999904632568,
+        "p99Ms": 7.400000095367432,
+        "maxMs": 7.400000095367432
+      },
+      "weakIndexExperiment": {
+        "count": 24,
+        "p50Ms": 4.799999952316284,
+        "p95Ms": 6.6000001430511475,
+        "p99Ms": 6.700000047683716,
+        "maxMs": 6.700000047683716
+      },
+      "internedPrefixes": {
+        "count": 24,
+        "p50Ms": 4.8999998569488525,
+        "p95Ms": 6.5,
+        "p99Ms": 7.099999904632568,
+        "maxMs": 7.099999904632568
+      },
+      "borrowedPages": {
+        "count": 24,
+        "p50Ms": 5.199999809265137,
+        "p95Ms": 6.8999998569488525,
+        "p99Ms": 7,
+        "maxMs": 7
+      }
+    },
+    {
+      "key": "short-lines/multiple/paste/dispatch",
+      "originalBaseline": {
+        "count": 24,
+        "p50Ms": 5.199999809265137,
+        "p95Ms": 6.599999904632568,
+        "p99Ms": 6.799999952316284,
+        "maxMs": 6.799999952316284
+      },
+      "eagerPages": {
+        "count": 24,
+        "p50Ms": 4.900000095367432,
+        "p95Ms": 6.799999952316284,
+        "p99Ms": 6.799999952316284,
+        "maxMs": 6.799999952316284
+      },
+      "repeatedBaseline": {
+        "count": 24,
+        "p50Ms": 4.599999904632568,
+        "p95Ms": 6.599999904632568,
+        "p99Ms": 7.400000095367432,
+        "maxMs": 7.400000095367432
+      },
+      "weakIndexExperiment": {
+        "count": 24,
+        "p50Ms": 4.799999952316284,
+        "p95Ms": 6.6000001430511475,
+        "p99Ms": 6.700000047683716,
+        "maxMs": 6.700000047683716
+      },
+      "internedPrefixes": {
+        "count": 24,
+        "p50Ms": 4.8999998569488525,
+        "p95Ms": 6.5,
+        "p99Ms": 7.099999904632568,
+        "maxMs": 7.099999904632568
+      },
+      "borrowedPages": {
+        "count": 24,
+        "p50Ms": 5.199999809265137,
+        "p95Ms": 6.8999998569488525,
+        "p99Ms": 7,
+        "maxMs": 7
+      }
+    },
+    {
+      "key": "short-lines/multiple/paste/inputToFrame",
+      "originalBaseline": {
+        "count": 24,
+        "p50Ms": 10.5,
+        "p95Ms": 18.200000047683716,
+        "p99Ms": 19.299999952316284,
+        "maxMs": 19.299999952316284
+      },
+      "eagerPages": {
+        "count": 24,
+        "p50Ms": 11.100000143051147,
+        "p95Ms": 17.399999856948853,
+        "p99Ms": 17.700000047683716,
+        "maxMs": 17.700000047683716
+      },
+      "repeatedBaseline": {
+        "count": 24,
+        "p50Ms": 10.600000143051147,
+        "p95Ms": 18,
+        "p99Ms": 19.40000009536743,
+        "maxMs": 19.40000009536743
+      },
+      "weakIndexExperiment": {
+        "count": 24,
+        "p50Ms": 10.699999809265137,
+        "p95Ms": 18.40000009536743,
+        "p99Ms": 18.40000009536743,
+        "maxMs": 18.40000009536743
+      },
+      "internedPrefixes": {
+        "count": 24,
+        "p50Ms": 11.099999904632568,
+        "p95Ms": 17.200000047683716,
+        "p99Ms": 17.59999990463257,
+        "maxMs": 17.59999990463257
+      },
+      "borrowedPages": {
+        "count": 24,
+        "p50Ms": 8.600000143051147,
+        "p95Ms": 18.899999856948853,
+        "p99Ms": 18.90000009536743,
+        "maxMs": 18.90000009536743
+      }
+    },
+    {
+      "key": "short-lines/multiple/paste/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 196.89999985694885,
+        "p95Ms": 199.59999990463257,
+        "p99Ms": 199.59999990463257,
+        "maxMs": 199.59999990463257
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 180.89999985694885,
+        "p95Ms": 182.19999980926514,
+        "p99Ms": 182.19999980926514,
+        "maxMs": 182.19999980926514
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 180.59999990463257,
+        "p95Ms": 182.39999985694885,
+        "p99Ms": 182.39999985694885,
+        "maxMs": 182.39999985694885
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 179.90000009536743,
+        "p95Ms": 180.79999995231628,
+        "p99Ms": 180.79999995231628,
+        "maxMs": 180.79999995231628
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 182,
+        "p95Ms": 182.29999995231628,
+        "p99Ms": 182.29999995231628,
+        "maxMs": 182.29999995231628
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 197.40000009536743,
+        "p95Ms": 197.70000004768372,
+        "p99Ms": 197.70000004768372,
+        "maxMs": 197.70000004768372
+      }
+    },
+    {
+      "key": "short-lines/multiple/undo/inputToApplied",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.3000001907348633,
+        "p99Ms": 1.8000001907348633,
+        "maxMs": 1.8000001907348633
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0.7000000476837158,
+        "p95Ms": 1.2000000476837158,
+        "p99Ms": 1.4000000953674316,
+        "maxMs": 1.4000000953674316
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 1.2999999523162842,
+        "maxMs": 1.2999999523162842
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0.7000000476837158,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 1.2999999523162842,
+        "maxMs": 1.2999999523162842
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.2000000476837158,
+        "p99Ms": 1.5,
+        "maxMs": 1.5
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 1.3999998569488525,
+        "maxMs": 1.3999998569488525
+      }
+    },
+    {
+      "key": "short-lines/multiple/undo/dispatch",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.3000001907348633,
+        "p99Ms": 1.7999999523162842,
+        "maxMs": 1.7999999523162842
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0.7000000476837158,
+        "p95Ms": 1.2000000476837158,
+        "p99Ms": 1.4000000953674316,
+        "maxMs": 1.4000000953674316
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0.7000000476837158,
+        "p95Ms": 1.2000000476837158,
+        "p99Ms": 1.2999999523162842,
+        "maxMs": 1.2999999523162842
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0.7000000476837158,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 1.2999999523162842,
+        "maxMs": 1.2999999523162842
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0.7000000476837158,
+        "p95Ms": 1.2000000476837158,
+        "p99Ms": 1.2999999523162842,
+        "maxMs": 1.2999999523162842
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0.7000000476837158,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 1.3999998569488525,
+        "maxMs": 1.3999998569488525
+      }
+    },
+    {
+      "key": "short-lines/multiple/undo/inputToFrame",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 8.400000095367432,
+        "p95Ms": 15.700000047683716,
+        "p99Ms": 16.200000047683716,
+        "maxMs": 16.200000047683716
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 7.5,
+        "p95Ms": 15.200000047683716,
+        "p99Ms": 16.200000047683716,
+        "maxMs": 16.200000047683716
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 8,
+        "p95Ms": 15.099999904632568,
+        "p99Ms": 16,
+        "maxMs": 16
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 8.5,
+        "p95Ms": 15.100000143051147,
+        "p99Ms": 16.799999952316284,
+        "maxMs": 16.799999952316284
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 8.399999856948853,
+        "p95Ms": 15.200000047683716,
+        "p99Ms": 15.5,
+        "maxMs": 15.5
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 8.5,
+        "p95Ms": 15.5,
+        "p99Ms": 15.5,
+        "maxMs": 15.5
+      }
+    },
+    {
+      "key": "short-lines/multiple/undo/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 131.10000014305115,
+        "p95Ms": 132,
+        "p99Ms": 132,
+        "maxMs": 132
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 132.79999995231628,
+        "p95Ms": 147.90000009536743,
+        "p99Ms": 147.90000009536743,
+        "maxMs": 147.90000009536743
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 131.20000004768372,
+        "p95Ms": 132,
+        "p99Ms": 132,
+        "maxMs": 132
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 131.79999995231628,
+        "p95Ms": 133.09999990463257,
+        "p99Ms": 133.09999990463257,
+        "maxMs": 133.09999990463257
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 131.20000004768372,
+        "p95Ms": 132.29999995231628,
+        "p99Ms": 132.29999995231628,
+        "maxMs": 132.29999995231628
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 116,
+        "p95Ms": 132.40000009536743,
+        "p99Ms": 132.40000009536743,
+        "maxMs": 132.40000009536743
+      }
+    },
+    {
+      "key": "long-line/single/typing/inputToApplied",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.9000000953674316,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.0999999046325684,
+        "p99Ms": 2.0999999046325684,
+        "maxMs": 2.0999999046325684
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.5,
+        "p99Ms": 2.0999999046325684,
+        "maxMs": 2.0999999046325684
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.4000000953674316,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 2,
+        "maxMs": 2
+      }
+    },
+    {
+      "key": "long-line/single/typing/dispatch",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.9000000953674316,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.0999999046325684,
+        "p99Ms": 2.0999999046325684,
+        "maxMs": 2.0999999046325684
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.5,
+        "p99Ms": 2.0999999046325684,
+        "maxMs": 2.0999999046325684
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.4000000953674316,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 2,
+        "maxMs": 2
+      }
+    },
+    {
+      "key": "long-line/single/typing/inputToFrame",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 7.599999904632568,
+        "p95Ms": 14.899999856948853,
+        "p99Ms": 16.200000047683716,
+        "maxMs": 16.200000047683716
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 7.799999952316284,
+        "p95Ms": 15.199999809265137,
+        "p99Ms": 16.5,
+        "maxMs": 16.5
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 7.400000095367432,
+        "p95Ms": 15.600000143051147,
+        "p99Ms": 16.5,
+        "maxMs": 16.5
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 7.5,
+        "p95Ms": 15.700000047683716,
+        "p99Ms": 16.899999856948853,
+        "maxMs": 16.899999856948853
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 7.5,
+        "p95Ms": 15.700000047683716,
+        "p99Ms": 16.09999990463257,
+        "maxMs": 16.09999990463257
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 7.699999809265137,
+        "p95Ms": 16.200000047683716,
+        "p99Ms": 17,
+        "maxMs": 17
+      }
+    },
+    {
+      "key": "long-line/single/typing/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 116.79999995231628,
+        "p95Ms": 133,
+        "p99Ms": 133,
+        "maxMs": 133
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 116.09999990463257,
+        "p95Ms": 116.29999995231628,
+        "p99Ms": 116.29999995231628,
+        "maxMs": 116.29999995231628
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 131.5,
+        "p95Ms": 133,
+        "p99Ms": 133,
+        "maxMs": 133
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 132.79999995231628,
+        "p95Ms": 133.30000019073486,
+        "p99Ms": 133.30000019073486,
+        "maxMs": 133.30000019073486
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 117.60000014305115,
+        "p95Ms": 130.5,
+        "p99Ms": 130.5,
+        "maxMs": 130.5
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 132.5,
+        "p95Ms": 133.09999990463257,
+        "p99Ms": 133.09999990463257,
+        "maxMs": 133.09999990463257
+      }
+    },
+    {
+      "key": "long-line/single/repeat/inputToApplied",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.4000000953674316,
+        "p99Ms": 2.1000001430511475,
+        "maxMs": 2.1000001430511475
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 1.5,
+        "p99Ms": 2.5999999046325684,
+        "maxMs": 2.5999999046325684
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 1.9000000953674316,
+        "p99Ms": 2.9000000953674316,
+        "maxMs": 2.9000000953674316
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.4000000953674316,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.8999998569488525,
+        "p99Ms": 3.0999999046325684,
+        "maxMs": 3.0999999046325684
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 2.0999999046325684,
+        "maxMs": 2.0999999046325684
+      }
+    },
+    {
+      "key": "long-line/single/repeat/dispatch",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.4000000953674316,
+        "p99Ms": 2.1000001430511475,
+        "maxMs": 2.1000001430511475
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 1.5,
+        "p99Ms": 2.5999999046325684,
+        "maxMs": 2.5999999046325684
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 1.9000000953674316,
+        "p99Ms": 3,
+        "maxMs": 3
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.4000000953674316,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 2,
+        "p99Ms": 3.1999998092651367,
+        "maxMs": 3.1999998092651367
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.2999999523162842,
+        "p99Ms": 2.0999999046325684,
+        "maxMs": 2.0999999046325684
+      }
+    },
+    {
+      "key": "long-line/single/repeat/inputToFrame",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 7.400000095367432,
+        "p95Ms": 15.400000095367432,
+        "p99Ms": 17.100000143051147,
+        "maxMs": 17.100000143051147
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 7.099999904632568,
+        "p95Ms": 15.700000047683716,
+        "p99Ms": 16.399999856948853,
+        "maxMs": 16.399999856948853
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 8.299999952316284,
+        "p95Ms": 16,
+        "p99Ms": 16.5,
+        "maxMs": 16.5
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 7.599999904632568,
+        "p95Ms": 15.800000190734863,
+        "p99Ms": 17.100000143051147,
+        "maxMs": 17.100000143051147
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 8,
+        "p95Ms": 15.799999952316284,
+        "p99Ms": 16.700000047683716,
+        "maxMs": 16.700000047683716
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 7.700000047683716,
+        "p95Ms": 15.800000190734863,
+        "p99Ms": 16.299999952316284,
+        "maxMs": 16.299999952316284
+      }
+    },
+    {
+      "key": "long-line/single/repeat/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 132.5,
+        "p95Ms": 132.70000004768372,
+        "p99Ms": 132.70000004768372,
+        "maxMs": 132.70000004768372
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 132.5,
+        "p95Ms": 133.10000014305115,
+        "p99Ms": 133.10000014305115,
+        "maxMs": 133.10000014305115
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 132.80000019073486,
+        "p95Ms": 133.09999990463257,
+        "p99Ms": 133.09999990463257,
+        "maxMs": 133.09999990463257
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 132.89999985694885,
+        "p95Ms": 133.09999990463257,
+        "p99Ms": 133.09999990463257,
+        "maxMs": 133.09999990463257
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 132.89999985694885,
+        "p95Ms": 133.59999990463257,
+        "p99Ms": 133.59999990463257,
+        "maxMs": 133.59999990463257
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 131.20000004768372,
+        "p95Ms": 131.29999995231628,
+        "p99Ms": 131.29999995231628,
+        "maxMs": 131.29999995231628
+      }
+    },
+    {
+      "key": "long-line/single/composition-update/inputToApplied",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.19999980926513672,
+        "maxMs": 0.19999980926513672
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      }
+    },
+    {
+      "key": "long-line/single/composition-update/dispatch",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.19999980926513672,
+        "maxMs": 0.19999980926513672
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      }
+    },
+    {
+      "key": "long-line/single/composition-update/inputToFrame",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 8.099999904632568,
+        "p95Ms": 11.699999809265137,
+        "p99Ms": 12.5,
+        "maxMs": 12.5
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 9.5,
+        "p95Ms": 12.899999856948853,
+        "p99Ms": 13.300000190734863,
+        "maxMs": 13.300000190734863
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 7.199999809265137,
+        "p95Ms": 10.900000095367432,
+        "p99Ms": 11.700000047683716,
+        "maxMs": 11.700000047683716
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 8.099999904632568,
+        "p95Ms": 11.899999856948853,
+        "p99Ms": 12.799999952316284,
+        "maxMs": 12.799999952316284
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 8.700000047683716,
+        "p95Ms": 11.900000095367432,
+        "p99Ms": 12.600000143051147,
+        "maxMs": 12.600000143051147
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 9.099999904632568,
+        "p95Ms": 12.600000143051147,
+        "p99Ms": 13.200000047683716,
+        "maxMs": 13.200000047683716
+      }
+    },
+    {
+      "key": "long-line/single/composition-update/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 99.79999995231628,
+        "p95Ms": 114.79999995231628,
+        "p99Ms": 114.79999995231628,
+        "maxMs": 114.79999995231628
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 99.70000004768372,
+        "p95Ms": 99.90000009536743,
+        "p99Ms": 99.90000009536743,
+        "maxMs": 99.90000009536743
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 97.89999985694885,
+        "p95Ms": 100,
+        "p99Ms": 100,
+        "maxMs": 100
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 99.20000004768372,
+        "p95Ms": 99.70000004768372,
+        "p99Ms": 99.70000004768372,
+        "maxMs": 99.70000004768372
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 99.79999995231628,
+        "p95Ms": 100.60000014305115,
+        "p99Ms": 100.60000014305115,
+        "maxMs": 100.60000014305115
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 100.10000014305115,
+        "p95Ms": 100.59999990463257,
+        "p99Ms": 100.59999990463257,
+        "maxMs": 100.59999990463257
+      }
+    },
+    {
+      "key": "long-line/single/composition-commit/inputToApplied",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 1,
+        "p95Ms": 2,
+        "p99Ms": 3.799999952316284,
+        "maxMs": 3.799999952316284
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 2,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0.9000000953674316,
+        "p95Ms": 2,
+        "p99Ms": 2.1000001430511475,
+        "maxMs": 2.1000001430511475
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 1,
+        "p95Ms": 2,
+        "p99Ms": 2.1000001430511475,
+        "maxMs": 2.1000001430511475
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 1,
+        "p95Ms": 2,
+        "p99Ms": 2.9000000953674316,
+        "maxMs": 2.9000000953674316
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 1,
+        "p95Ms": 2,
+        "p99Ms": 2.0999999046325684,
+        "maxMs": 2.0999999046325684
+      }
+    },
+    {
+      "key": "long-line/single/composition-commit/dispatch",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 1,
+        "p95Ms": 2,
+        "p99Ms": 3.799999952316284,
+        "maxMs": 3.799999952316284
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 2,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0.9000000953674316,
+        "p95Ms": 2,
+        "p99Ms": 2.1000001430511475,
+        "maxMs": 2.1000001430511475
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 1,
+        "p95Ms": 2,
+        "p99Ms": 2.1000001430511475,
+        "maxMs": 2.1000001430511475
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 1,
+        "p95Ms": 2,
+        "p99Ms": 2.700000047683716,
+        "maxMs": 2.700000047683716
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 1,
+        "p95Ms": 2,
+        "p99Ms": 2,
+        "maxMs": 2
+      }
+    },
+    {
+      "key": "long-line/single/composition-commit/inputToFrame",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 8.099999904632568,
+        "p95Ms": 16.09999990463257,
+        "p99Ms": 16.40000009536743,
+        "maxMs": 16.40000009536743
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 8.099999904632568,
+        "p95Ms": 15.700000047683716,
+        "p99Ms": 16.200000047683716,
+        "maxMs": 16.200000047683716
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 6.900000095367432,
+        "p95Ms": 15.299999952316284,
+        "p99Ms": 15.700000047683716,
+        "maxMs": 15.700000047683716
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 8,
+        "p95Ms": 15,
+        "p99Ms": 15.300000190734863,
+        "maxMs": 15.300000190734863
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 7.5,
+        "p95Ms": 14.699999809265137,
+        "p99Ms": 15.900000095367432,
+        "maxMs": 15.900000095367432
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 7.1000001430511475,
+        "p95Ms": 15.899999856948853,
+        "p99Ms": 16.200000047683716,
+        "maxMs": 16.200000047683716
+      }
+    },
+    {
+      "key": "long-line/single/composition-commit/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 115.20000004768372,
+        "p95Ms": 132.20000004768372,
+        "p99Ms": 132.20000004768372,
+        "maxMs": 132.20000004768372
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 114.10000014305115,
+        "p95Ms": 116,
+        "p99Ms": 116,
+        "maxMs": 116
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 115.39999985694885,
+        "p95Ms": 115.5,
+        "p99Ms": 115.5,
+        "maxMs": 115.5
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 115.29999995231628,
+        "p95Ms": 115.90000009536743,
+        "p99Ms": 115.90000009536743,
+        "maxMs": 115.90000009536743
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 115.5,
+        "p95Ms": 115.5,
+        "p99Ms": 115.5,
+        "maxMs": 115.5
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 115.5,
+        "p95Ms": 115.59999990463257,
+        "p99Ms": 115.59999990463257,
+        "maxMs": 115.59999990463257
+      }
+    },
+    {
+      "key": "long-line/single/paste/inputToApplied",
+      "originalBaseline": {
+        "count": 24,
+        "p50Ms": 4.5,
+        "p95Ms": 6,
+        "p99Ms": 6.699999809265137,
+        "maxMs": 6.699999809265137
+      },
+      "eagerPages": {
+        "count": 24,
+        "p50Ms": 4.299999952316284,
+        "p95Ms": 5.5,
+        "p99Ms": 5.6000001430511475,
+        "maxMs": 5.6000001430511475
+      },
+      "repeatedBaseline": {
+        "count": 24,
+        "p50Ms": 4.299999952316284,
+        "p95Ms": 7.1000001430511475,
+        "p99Ms": 7.800000190734863,
+        "maxMs": 7.800000190734863
+      },
+      "weakIndexExperiment": {
+        "count": 24,
+        "p50Ms": 4.299999952316284,
+        "p95Ms": 5.5,
+        "p99Ms": 5.5,
+        "maxMs": 5.5
+      },
+      "internedPrefixes": {
+        "count": 24,
+        "p50Ms": 4.299999952316284,
+        "p95Ms": 5.400000095367432,
+        "p99Ms": 5.5,
+        "maxMs": 5.5
+      },
+      "borrowedPages": {
+        "count": 24,
+        "p50Ms": 4.3999998569488525,
+        "p95Ms": 6,
+        "p99Ms": 6.200000047683716,
+        "maxMs": 6.200000047683716
+      }
+    },
+    {
+      "key": "long-line/single/paste/dispatch",
+      "originalBaseline": {
+        "count": 24,
+        "p50Ms": 4.5,
+        "p95Ms": 6,
+        "p99Ms": 6.699999809265137,
+        "maxMs": 6.699999809265137
+      },
+      "eagerPages": {
+        "count": 24,
+        "p50Ms": 4.299999952316284,
+        "p95Ms": 5.5,
+        "p99Ms": 5.5,
+        "maxMs": 5.5
+      },
+      "repeatedBaseline": {
+        "count": 24,
+        "p50Ms": 4.299999952316284,
+        "p95Ms": 7,
+        "p99Ms": 7.800000190734863,
+        "maxMs": 7.800000190734863
+      },
+      "weakIndexExperiment": {
+        "count": 24,
+        "p50Ms": 4.299999952316284,
+        "p95Ms": 5.5,
+        "p99Ms": 5.5,
+        "maxMs": 5.5
+      },
+      "internedPrefixes": {
+        "count": 24,
+        "p50Ms": 4.299999952316284,
+        "p95Ms": 5.5,
+        "p99Ms": 5.5,
+        "maxMs": 5.5
+      },
+      "borrowedPages": {
+        "count": 24,
+        "p50Ms": 4.299999952316284,
+        "p95Ms": 6,
+        "p99Ms": 6.200000047683716,
+        "maxMs": 6.200000047683716
+      }
+    },
+    {
+      "key": "long-line/single/paste/inputToFrame",
+      "originalBaseline": {
+        "count": 24,
+        "p50Ms": 9.899999856948853,
+        "p95Ms": 18,
+        "p99Ms": 20.399999856948853,
+        "maxMs": 20.399999856948853
+      },
+      "eagerPages": {
+        "count": 24,
+        "p50Ms": 9.799999952316284,
+        "p95Ms": 15,
+        "p99Ms": 15.300000190734863,
+        "maxMs": 15.300000190734863
+      },
+      "repeatedBaseline": {
+        "count": 24,
+        "p50Ms": 10.399999856948853,
+        "p95Ms": 15,
+        "p99Ms": 15.5,
+        "maxMs": 15.5
+      },
+      "weakIndexExperiment": {
+        "count": 24,
+        "p50Ms": 9.700000047683716,
+        "p95Ms": 15.200000047683716,
+        "p99Ms": 15.200000047683716,
+        "maxMs": 15.200000047683716
+      },
+      "internedPrefixes": {
+        "count": 24,
+        "p50Ms": 9.399999856948853,
+        "p95Ms": 14.800000190734863,
+        "p99Ms": 16,
+        "maxMs": 16
+      },
+      "borrowedPages": {
+        "count": 24,
+        "p50Ms": 9.400000095367432,
+        "p95Ms": 15.700000047683716,
+        "p99Ms": 20.90000009536743,
+        "maxMs": 20.90000009536743
+      }
+    },
+    {
+      "key": "long-line/single/paste/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 149.60000014305115,
+        "p95Ms": 158.5,
+        "p99Ms": 158.5,
+        "maxMs": 158.5
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 131.5,
+        "p95Ms": 132.40000009536743,
+        "p99Ms": 132.40000009536743,
+        "maxMs": 132.40000009536743
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 132.90000009536743,
+        "p95Ms": 148.09999990463257,
+        "p99Ms": 148.09999990463257,
+        "maxMs": 148.09999990463257
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 131.79999995231628,
+        "p95Ms": 132.89999985694885,
+        "p99Ms": 132.89999985694885,
+        "maxMs": 132.89999985694885
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 132.70000004768372,
+        "p95Ms": 133,
+        "p99Ms": 133,
+        "maxMs": 133
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 147.89999985694885,
+        "p95Ms": 150.20000004768372,
+        "p99Ms": 150.20000004768372,
+        "maxMs": 150.20000004768372
+      }
+    },
+    {
+      "key": "long-line/single/undo/inputToApplied",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 1.7999999523162842,
+        "p99Ms": 2.3999998569488525,
+        "maxMs": 2.3999998569488525
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 1.5,
+        "p99Ms": 1.5,
+        "maxMs": 1.5
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.3999998569488525,
+        "p99Ms": 1.7000000476837158,
+        "maxMs": 1.7000000476837158
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 2.5,
+        "maxMs": 2.5
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0.8000001907348633,
+        "p95Ms": 1.6999998092651367,
+        "p99Ms": 1.7000000476837158,
+        "maxMs": 1.7000000476837158
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.7999999523162842,
+        "p99Ms": 2.5,
+        "maxMs": 2.5
+      }
+    },
+    {
+      "key": "long-line/single/undo/dispatch",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7999999523162842,
+        "p99Ms": 2.299999952316284,
+        "maxMs": 2.299999952316284
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.6000001430511475,
+        "p99Ms": 1.6000001430511475,
+        "maxMs": 1.6000001430511475
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.3999998569488525,
+        "p99Ms": 1.5,
+        "maxMs": 1.5
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0.8999998569488525,
+        "p95Ms": 1.6000001430511475,
+        "p99Ms": 2.5999999046325684,
+        "maxMs": 2.5999999046325684
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.5999999046325684,
+        "p99Ms": 1.6000001430511475,
+        "maxMs": 1.6000001430511475
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0.7999999523162842,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 2.5999999046325684,
+        "maxMs": 2.5999999046325684
+      }
+    },
+    {
+      "key": "long-line/single/undo/inputToFrame",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 8.799999952316284,
+        "p95Ms": 15.200000047683716,
+        "p99Ms": 15.5,
+        "maxMs": 15.5
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 7.900000095367432,
+        "p95Ms": 15.800000190734863,
+        "p99Ms": 15.899999856948853,
+        "maxMs": 15.899999856948853
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 7.400000095367432,
+        "p95Ms": 15.299999952316284,
+        "p99Ms": 15.599999904632568,
+        "maxMs": 15.599999904632568
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 9.199999809265137,
+        "p95Ms": 15.799999952316284,
+        "p99Ms": 16.299999952316284,
+        "maxMs": 16.299999952316284
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 8.400000095367432,
+        "p95Ms": 16,
+        "p99Ms": 16.40000009536743,
+        "maxMs": 16.40000009536743
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 7.8999998569488525,
+        "p95Ms": 16,
+        "p99Ms": 16.299999952316284,
+        "maxMs": 16.299999952316284
+      }
+    },
+    {
+      "key": "long-line/single/undo/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 116.09999990463257,
+        "p95Ms": 116.09999990463257,
+        "p99Ms": 116.09999990463257,
+        "maxMs": 116.09999990463257
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 115.70000004768372,
+        "p95Ms": 116.10000014305115,
+        "p99Ms": 116.10000014305115,
+        "maxMs": 116.10000014305115
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 115,
+        "p95Ms": 115.90000009536743,
+        "p99Ms": 115.90000009536743,
+        "maxMs": 115.90000009536743
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 115.70000004768372,
+        "p95Ms": 116.89999985694885,
+        "p99Ms": 116.89999985694885,
+        "maxMs": 116.89999985694885
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 115.79999995231628,
+        "p95Ms": 118.09999990463257,
+        "p99Ms": 118.09999990463257,
+        "maxMs": 118.09999990463257
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 115.59999990463257,
+        "p95Ms": 115.59999990463257,
+        "p99Ms": 115.59999990463257,
+        "maxMs": 115.59999990463257
+      }
+    },
+    {
+      "key": "long-line/multiple/typing/inputToApplied",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 1.3000001907348633,
+        "p95Ms": 1.8000001907348633,
+        "p99Ms": 2.799999952316284,
+        "maxMs": 2.799999952316284
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 1.4000000953674316,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 3.4000000953674316,
+        "maxMs": 3.4000000953674316
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 1.3999998569488525,
+        "p95Ms": 1.8000001907348633,
+        "p99Ms": 2.9000000953674316,
+        "maxMs": 2.9000000953674316
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 1.5,
+        "p95Ms": 2,
+        "p99Ms": 3,
+        "maxMs": 3
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 1.5,
+        "p95Ms": 2.1999998092651367,
+        "p99Ms": 3.0999999046325684,
+        "maxMs": 3.0999999046325684
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 1.5,
+        "p95Ms": 3.299999952316284,
+        "p99Ms": 5.599999904632568,
+        "maxMs": 5.599999904632568
+      }
+    },
+    {
+      "key": "long-line/multiple/typing/dispatch",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 1.3000001907348633,
+        "p95Ms": 1.8000001907348633,
+        "p99Ms": 2.799999952316284,
+        "maxMs": 2.799999952316284
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 1.4000000953674316,
+        "p95Ms": 1.7000000476837158,
+        "p99Ms": 3.4000000953674316,
+        "maxMs": 3.4000000953674316
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 1.3999998569488525,
+        "p95Ms": 1.7999999523162842,
+        "p99Ms": 2.9000000953674316,
+        "maxMs": 2.9000000953674316
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 1.5,
+        "p95Ms": 2,
+        "p99Ms": 3,
+        "maxMs": 3
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 1.5,
+        "p95Ms": 2.1999998092651367,
+        "p99Ms": 3.0999999046325684,
+        "maxMs": 3.0999999046325684
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 1.5,
+        "p95Ms": 3.299999952316284,
+        "p99Ms": 5.599999904632568,
+        "maxMs": 5.599999904632568
+      }
+    },
+    {
+      "key": "long-line/multiple/typing/inputToFrame",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 8,
+        "p95Ms": 15.400000095367432,
+        "p99Ms": 16.199999809265137,
+        "maxMs": 16.199999809265137
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 8,
+        "p95Ms": 16.200000047683716,
+        "p99Ms": 16.600000143051147,
+        "maxMs": 16.600000143051147
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 7.8999998569488525,
+        "p95Ms": 15.700000047683716,
+        "p99Ms": 16.59999990463257,
+        "maxMs": 16.59999990463257
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 7.8999998569488525,
+        "p95Ms": 16,
+        "p99Ms": 16.40000009536743,
+        "maxMs": 16.40000009536743
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 8,
+        "p95Ms": 15.799999952316284,
+        "p99Ms": 17.699999809265137,
+        "maxMs": 17.699999809265137
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 8.200000047683716,
+        "p95Ms": 16.09999990463257,
+        "p99Ms": 16.59999990463257,
+        "maxMs": 16.59999990463257
+      }
+    },
+    {
+      "key": "long-line/multiple/typing/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 133.20000004768372,
+        "p95Ms": 148.79999995231628,
+        "p99Ms": 148.79999995231628,
+        "maxMs": 148.79999995231628
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 148.70000004768372,
+        "p95Ms": 149.10000014305115,
+        "p99Ms": 149.10000014305115,
+        "maxMs": 149.10000014305115
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 133.30000019073486,
+        "p95Ms": 134,
+        "p99Ms": 134,
+        "maxMs": 134
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 148.40000009536743,
+        "p95Ms": 148.89999985694885,
+        "p99Ms": 148.89999985694885,
+        "maxMs": 148.89999985694885
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 148.59999990463257,
+        "p95Ms": 149.20000004768372,
+        "p99Ms": 149.20000004768372,
+        "maxMs": 149.20000004768372
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 149.40000009536743,
+        "p95Ms": 166.5,
+        "p99Ms": 166.5,
+        "maxMs": 166.5
+      }
+    },
+    {
+      "key": "long-line/multiple/repeat/inputToApplied",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 1.5,
+        "p95Ms": 3.0999999046325684,
+        "p99Ms": 9.400000095367432,
+        "maxMs": 9.400000095367432
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 1.4000000953674316,
+        "p95Ms": 2.700000047683716,
+        "p99Ms": 4.699999809265137,
+        "maxMs": 4.699999809265137
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 1.5,
+        "p95Ms": 2.5,
+        "p99Ms": 3.0999999046325684,
+        "maxMs": 3.0999999046325684
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 1.5999999046325684,
+        "p95Ms": 2.0999999046325684,
+        "p99Ms": 3,
+        "maxMs": 3
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 1.5999999046325684,
+        "p95Ms": 2.700000047683716,
+        "p99Ms": 2.8999998569488525,
+        "maxMs": 2.8999998569488525
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 1.5,
+        "p95Ms": 3.200000047683716,
+        "p99Ms": 4.900000095367432,
+        "maxMs": 4.900000095367432
+      }
+    },
+    {
+      "key": "long-line/multiple/repeat/dispatch",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 1.5,
+        "p95Ms": 3.200000047683716,
+        "p99Ms": 9.400000095367432,
+        "maxMs": 9.400000095367432
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 1.4000000953674316,
+        "p95Ms": 2.700000047683716,
+        "p99Ms": 4.599999904632568,
+        "maxMs": 4.599999904632568
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 1.5,
+        "p95Ms": 2.5,
+        "p99Ms": 3.0999999046325684,
+        "maxMs": 3.0999999046325684
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 1.5999999046325684,
+        "p95Ms": 2.0999999046325684,
+        "p99Ms": 3,
+        "maxMs": 3
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 1.5999999046325684,
+        "p95Ms": 2.700000047683716,
+        "p99Ms": 3,
+        "maxMs": 3
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 1.5,
+        "p95Ms": 3.200000047683716,
+        "p99Ms": 4.900000095367432,
+        "maxMs": 4.900000095367432
+      }
+    },
+    {
+      "key": "long-line/multiple/repeat/inputToFrame",
+      "originalBaseline": {
+        "count": 72,
+        "p50Ms": 7.900000095367432,
+        "p95Ms": 17.5,
+        "p99Ms": 23.799999952316284,
+        "maxMs": 23.799999952316284
+      },
+      "eagerPages": {
+        "count": 72,
+        "p50Ms": 8.200000047683716,
+        "p95Ms": 15.599999904632568,
+        "p99Ms": 17,
+        "maxMs": 17
+      },
+      "repeatedBaseline": {
+        "count": 72,
+        "p50Ms": 8.299999952316284,
+        "p95Ms": 16.200000047683716,
+        "p99Ms": 17.300000190734863,
+        "maxMs": 17.300000190734863
+      },
+      "weakIndexExperiment": {
+        "count": 72,
+        "p50Ms": 8.100000143051147,
+        "p95Ms": 16.199999809265137,
+        "p99Ms": 16.90000009536743,
+        "maxMs": 16.90000009536743
+      },
+      "internedPrefixes": {
+        "count": 72,
+        "p50Ms": 7.799999952316284,
+        "p95Ms": 16.09999990463257,
+        "p99Ms": 17.200000047683716,
+        "maxMs": 17.200000047683716
+      },
+      "borrowedPages": {
+        "count": 72,
+        "p50Ms": 8.699999809265137,
+        "p95Ms": 15.799999952316284,
+        "p99Ms": 16.799999952316284,
+        "maxMs": 16.799999952316284
+      }
+    },
+    {
+      "key": "long-line/multiple/repeat/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 149.90000009536743,
+        "p95Ms": 166.80000019073486,
+        "p99Ms": 166.80000019073486,
+        "maxMs": 166.80000019073486
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 132.69999980926514,
+        "p95Ms": 150,
+        "p99Ms": 150,
+        "maxMs": 150
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 147.79999995231628,
+        "p95Ms": 149.60000014305115,
+        "p99Ms": 149.60000014305115,
+        "maxMs": 149.60000014305115
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 147.79999995231628,
+        "p95Ms": 150.20000004768372,
+        "p99Ms": 150.20000004768372,
+        "maxMs": 150.20000004768372
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 149,
+        "p95Ms": 149.89999985694885,
+        "p99Ms": 149.89999985694885,
+        "maxMs": 149.89999985694885
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 149.5,
+        "p95Ms": 150.29999995231628,
+        "p99Ms": 150.29999995231628,
+        "maxMs": 150.29999995231628
+      }
+    },
+    {
+      "key": "long-line/multiple/composition-update/inputToApplied",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.20000004768371582,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.20000004768371582,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0.09999990463256836,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      }
+    },
+    {
+      "key": "long-line/multiple/composition-update/dispatch",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.20000004768371582,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.20000004768371582,
+        "p99Ms": 0.20000004768371582,
+        "maxMs": 0.20000004768371582
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 0,
+        "p95Ms": 0.10000014305114746,
+        "p99Ms": 0.10000014305114746,
+        "maxMs": 0.10000014305114746
+      }
+    },
+    {
+      "key": "long-line/multiple/composition-update/inputToFrame",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 7,
+        "p95Ms": 10.900000095367432,
+        "p99Ms": 11.200000047683716,
+        "maxMs": 11.200000047683716
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 9,
+        "p95Ms": 12.400000095367432,
+        "p99Ms": 12.599999904632568,
+        "maxMs": 12.599999904632568
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 8.5,
+        "p95Ms": 11.599999904632568,
+        "p99Ms": 11.899999856948853,
+        "maxMs": 11.899999856948853
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 7.700000047683716,
+        "p95Ms": 12.399999856948853,
+        "p99Ms": 13,
+        "maxMs": 13
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 6.299999952316284,
+        "p95Ms": 10.599999904632568,
+        "p99Ms": 10.899999856948853,
+        "maxMs": 10.899999856948853
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 7.200000047683716,
+        "p95Ms": 12,
+        "p99Ms": 14.200000047683716,
+        "maxMs": 14.200000047683716
+      }
+    },
+    {
+      "key": "long-line/multiple/composition-update/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 99.20000004768372,
+        "p95Ms": 99.79999995231628,
+        "p99Ms": 99.79999995231628,
+        "maxMs": 99.79999995231628
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 100,
+        "p95Ms": 100,
+        "p99Ms": 100,
+        "maxMs": 100
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 99.20000004768372,
+        "p95Ms": 99.59999990463257,
+        "p99Ms": 99.59999990463257,
+        "maxMs": 99.59999990463257
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 101.79999995231628,
+        "p95Ms": 115.29999995231628,
+        "p99Ms": 115.29999995231628,
+        "maxMs": 115.29999995231628
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 114.70000004768372,
+        "p95Ms": 115.09999990463257,
+        "p99Ms": 115.09999990463257,
+        "maxMs": 115.09999990463257
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 116.09999990463257,
+        "p95Ms": 116.29999995231628,
+        "p99Ms": 116.29999995231628,
+        "maxMs": 116.29999995231628
+      }
+    },
+    {
+      "key": "long-line/multiple/composition-commit/inputToApplied",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 1.6999998092651367,
+        "p95Ms": 3.200000047683716,
+        "p99Ms": 3.5,
+        "maxMs": 3.5
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 1.6999998092651367,
+        "p95Ms": 4.8999998569488525,
+        "p99Ms": 5,
+        "maxMs": 5
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 1.7000000476837158,
+        "p95Ms": 4,
+        "p99Ms": 5.200000047683716,
+        "maxMs": 5.200000047683716
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 1.7999999523162842,
+        "p95Ms": 4.1000001430511475,
+        "p99Ms": 5.3999998569488525,
+        "maxMs": 5.3999998569488525
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 1.7000000476837158,
+        "p95Ms": 3.200000047683716,
+        "p99Ms": 3.200000047683716,
+        "maxMs": 3.200000047683716
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 2,
+        "p95Ms": 3.799999952316284,
+        "p99Ms": 4.299999952316284,
+        "maxMs": 4.299999952316284
+      }
+    },
+    {
+      "key": "long-line/multiple/composition-commit/dispatch",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 1.6000001430511475,
+        "p95Ms": 3.200000047683716,
+        "p99Ms": 3.5,
+        "maxMs": 3.5
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 1.6000001430511475,
+        "p95Ms": 5,
+        "p99Ms": 5,
+        "maxMs": 5
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 1.7000000476837158,
+        "p95Ms": 3.8000001907348633,
+        "p99Ms": 5.1000001430511475,
+        "maxMs": 5.1000001430511475
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 1.7000000476837158,
+        "p95Ms": 4.200000047683716,
+        "p99Ms": 5.299999952316284,
+        "maxMs": 5.299999952316284
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 1.7000000476837158,
+        "p95Ms": 3.200000047683716,
+        "p99Ms": 3.200000047683716,
+        "maxMs": 3.200000047683716
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 1.9000000953674316,
+        "p95Ms": 3.700000047683716,
+        "p99Ms": 4.299999952316284,
+        "maxMs": 4.299999952316284
+      }
+    },
+    {
+      "key": "long-line/multiple/composition-commit/inputToFrame",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 9.600000143051147,
+        "p95Ms": 15.799999952316284,
+        "p99Ms": 16.5,
+        "maxMs": 16.5
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 9.400000095367432,
+        "p95Ms": 17.09999990463257,
+        "p99Ms": 17.100000143051147,
+        "maxMs": 17.100000143051147
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 9.400000095367432,
+        "p95Ms": 16.40000009536743,
+        "p99Ms": 17,
+        "maxMs": 17
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 9.199999809265137,
+        "p95Ms": 15.299999952316284,
+        "p99Ms": 15.600000143051147,
+        "maxMs": 15.600000143051147
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 9.200000047683716,
+        "p95Ms": 15.700000047683716,
+        "p99Ms": 17.09999990463257,
+        "maxMs": 17.09999990463257
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 9.099999904632568,
+        "p95Ms": 16.09999990463257,
+        "p99Ms": 16.299999952316284,
+        "maxMs": 16.299999952316284
+      }
+    },
+    {
+      "key": "long-line/multiple/composition-commit/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 131.39999985694885,
+        "p95Ms": 131.89999985694885,
+        "p99Ms": 131.89999985694885,
+        "maxMs": 131.89999985694885
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 131.19999980926514,
+        "p95Ms": 132.5,
+        "p99Ms": 132.5,
+        "maxMs": 132.5
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 131.09999990463257,
+        "p95Ms": 148,
+        "p99Ms": 148,
+        "maxMs": 148
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 131.59999990463257,
+        "p95Ms": 132.40000009536743,
+        "p99Ms": 132.40000009536743,
+        "maxMs": 132.40000009536743
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 131.59999990463257,
+        "p95Ms": 132.5,
+        "p99Ms": 132.5,
+        "maxMs": 132.5
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 132,
+        "p95Ms": 147.10000014305115,
+        "p99Ms": 147.10000014305115,
+        "maxMs": 147.10000014305115
+      }
+    },
+    {
+      "key": "long-line/multiple/paste/inputToApplied",
+      "originalBaseline": {
+        "count": 24,
+        "p50Ms": 5.5,
+        "p95Ms": 8.700000047683716,
+        "p99Ms": 8.900000095367432,
+        "maxMs": 8.900000095367432
+      },
+      "eagerPages": {
+        "count": 24,
+        "p50Ms": 5,
+        "p95Ms": 6.200000047683716,
+        "p99Ms": 6.3999998569488525,
+        "maxMs": 6.3999998569488525
+      },
+      "repeatedBaseline": {
+        "count": 24,
+        "p50Ms": 4.900000095367432,
+        "p95Ms": 6.199999809265137,
+        "p99Ms": 6.5,
+        "maxMs": 6.5
+      },
+      "weakIndexExperiment": {
+        "count": 24,
+        "p50Ms": 5,
+        "p95Ms": 6.200000047683716,
+        "p99Ms": 6.200000047683716,
+        "maxMs": 6.200000047683716
+      },
+      "internedPrefixes": {
+        "count": 24,
+        "p50Ms": 4.900000095367432,
+        "p95Ms": 6.299999952316284,
+        "p99Ms": 6.299999952316284,
+        "maxMs": 6.299999952316284
+      },
+      "borrowedPages": {
+        "count": 24,
+        "p50Ms": 5.5,
+        "p95Ms": 7.300000190734863,
+        "p99Ms": 10.900000095367432,
+        "maxMs": 10.900000095367432
+      }
+    },
+    {
+      "key": "long-line/multiple/paste/dispatch",
+      "originalBaseline": {
+        "count": 24,
+        "p50Ms": 5.5,
+        "p95Ms": 8.700000047683716,
+        "p99Ms": 8.900000095367432,
+        "maxMs": 8.900000095367432
+      },
+      "eagerPages": {
+        "count": 24,
+        "p50Ms": 5,
+        "p95Ms": 6.300000190734863,
+        "p99Ms": 6.3999998569488525,
+        "maxMs": 6.3999998569488525
+      },
+      "repeatedBaseline": {
+        "count": 24,
+        "p50Ms": 4.8999998569488525,
+        "p95Ms": 6.299999952316284,
+        "p99Ms": 6.5,
+        "maxMs": 6.5
+      },
+      "weakIndexExperiment": {
+        "count": 24,
+        "p50Ms": 5,
+        "p95Ms": 6.200000047683716,
+        "p99Ms": 6.200000047683716,
+        "maxMs": 6.200000047683716
+      },
+      "internedPrefixes": {
+        "count": 24,
+        "p50Ms": 4.900000095367432,
+        "p95Ms": 6.200000047683716,
+        "p99Ms": 6.299999952316284,
+        "maxMs": 6.299999952316284
+      },
+      "borrowedPages": {
+        "count": 24,
+        "p50Ms": 5.5,
+        "p95Ms": 7.300000190734863,
+        "p99Ms": 10.900000095367432,
+        "maxMs": 10.900000095367432
+      }
+    },
+    {
+      "key": "long-line/multiple/paste/inputToFrame",
+      "originalBaseline": {
+        "count": 24,
+        "p50Ms": 11.400000095367432,
+        "p95Ms": 16.800000190734863,
+        "p99Ms": 17.5,
+        "maxMs": 17.5
+      },
+      "eagerPages": {
+        "count": 24,
+        "p50Ms": 10.400000095367432,
+        "p95Ms": 17.5,
+        "p99Ms": 17.600000143051147,
+        "maxMs": 17.600000143051147
+      },
+      "repeatedBaseline": {
+        "count": 24,
+        "p50Ms": 10.200000047683716,
+        "p95Ms": 17.5,
+        "p99Ms": 17.600000143051147,
+        "maxMs": 17.600000143051147
+      },
+      "weakIndexExperiment": {
+        "count": 24,
+        "p50Ms": 10.5,
+        "p95Ms": 17.59999990463257,
+        "p99Ms": 18,
+        "maxMs": 18
+      },
+      "internedPrefixes": {
+        "count": 24,
+        "p50Ms": 10.5,
+        "p95Ms": 17.59999990463257,
+        "p99Ms": 17.699999809265137,
+        "maxMs": 17.699999809265137
+      },
+      "borrowedPages": {
+        "count": 24,
+        "p50Ms": 10.900000095367432,
+        "p95Ms": 18.800000190734863,
+        "p99Ms": 19.09999990463257,
+        "maxMs": 19.09999990463257
+      }
+    },
+    {
+      "key": "long-line/multiple/paste/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 148.70000004768372,
+        "p95Ms": 165.40000009536743,
+        "p99Ms": 165.40000009536743,
+        "maxMs": 165.40000009536743
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 148.59999990463257,
+        "p95Ms": 148.89999985694885,
+        "p99Ms": 148.89999985694885,
+        "maxMs": 148.89999985694885
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 148.29999995231628,
+        "p95Ms": 148.29999995231628,
+        "p99Ms": 148.29999995231628,
+        "maxMs": 148.29999995231628
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 149.09999990463257,
+        "p95Ms": 150.39999985694885,
+        "p99Ms": 150.39999985694885,
+        "maxMs": 150.39999985694885
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 149.5,
+        "p95Ms": 149.5,
+        "p99Ms": 149.5,
+        "maxMs": 149.5
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 149,
+        "p95Ms": 149.29999995231628,
+        "p99Ms": 149.29999995231628,
+        "maxMs": 149.29999995231628
+      }
+    },
+    {
+      "key": "long-line/multiple/undo/inputToApplied",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 1.2999999523162842,
+        "p95Ms": 2,
+        "p99Ms": 2.0999999046325684,
+        "maxMs": 2.0999999046325684
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 1.3999998569488525,
+        "p95Ms": 2.0999999046325684,
+        "p99Ms": 2.0999999046325684,
+        "maxMs": 2.0999999046325684
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 1.2999999523162842,
+        "p95Ms": 2.299999952316284,
+        "p99Ms": 3.4000000953674316,
+        "maxMs": 3.4000000953674316
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 1.3999998569488525,
+        "p95Ms": 2.0999999046325684,
+        "p99Ms": 2.200000047683716,
+        "maxMs": 2.200000047683716
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 1.4000000953674316,
+        "p95Ms": 2.4000000953674316,
+        "p99Ms": 3.4000000953674316,
+        "maxMs": 3.4000000953674316
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 1.5,
+        "p95Ms": 2.5999999046325684,
+        "p99Ms": 3.6000001430511475,
+        "maxMs": 3.6000001430511475
+      }
+    },
+    {
+      "key": "long-line/multiple/undo/dispatch",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 1.2999999523162842,
+        "p95Ms": 1.8999998569488525,
+        "p99Ms": 2,
+        "maxMs": 2
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 1.3999998569488525,
+        "p95Ms": 2.0999999046325684,
+        "p99Ms": 2.1000001430511475,
+        "maxMs": 2.1000001430511475
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 1.2999999523162842,
+        "p95Ms": 2.200000047683716,
+        "p99Ms": 3.200000047683716,
+        "maxMs": 3.200000047683716
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 1.3000001907348633,
+        "p95Ms": 2,
+        "p99Ms": 2.0999999046325684,
+        "maxMs": 2.0999999046325684
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 1.3999998569488525,
+        "p95Ms": 2.299999952316284,
+        "p99Ms": 3.4000000953674316,
+        "maxMs": 3.4000000953674316
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 1.5,
+        "p95Ms": 2.5,
+        "p99Ms": 3.6000001430511475,
+        "maxMs": 3.6000001430511475
+      }
+    },
+    {
+      "key": "long-line/multiple/undo/inputToFrame",
+      "originalBaseline": {
+        "count": 36,
+        "p50Ms": 8.300000190734863,
+        "p95Ms": 15,
+        "p99Ms": 15.400000095367432,
+        "maxMs": 15.400000095367432
+      },
+      "eagerPages": {
+        "count": 36,
+        "p50Ms": 8.799999952316284,
+        "p95Ms": 15.5,
+        "p99Ms": 16.200000047683716,
+        "maxMs": 16.200000047683716
+      },
+      "repeatedBaseline": {
+        "count": 36,
+        "p50Ms": 8.900000095367432,
+        "p95Ms": 15.700000047683716,
+        "p99Ms": 15.799999952316284,
+        "maxMs": 15.799999952316284
+      },
+      "weakIndexExperiment": {
+        "count": 36,
+        "p50Ms": 7.599999904632568,
+        "p95Ms": 15.399999856948853,
+        "p99Ms": 16.299999952316284,
+        "maxMs": 16.299999952316284
+      },
+      "internedPrefixes": {
+        "count": 36,
+        "p50Ms": 7.5,
+        "p95Ms": 15.700000047683716,
+        "p99Ms": 16.799999952316284,
+        "maxMs": 16.799999952316284
+      },
+      "borrowedPages": {
+        "count": 36,
+        "p50Ms": 8.100000143051147,
+        "p95Ms": 16,
+        "p99Ms": 16.300000190734863,
+        "maxMs": 16.300000190734863
+      }
+    },
+    {
+      "key": "long-line/multiple/undo/burstToPaintUpperBound",
+      "originalBaseline": {
+        "count": 3,
+        "p50Ms": 115.89999985694885,
+        "p95Ms": 116.80000019073486,
+        "p99Ms": 116.80000019073486,
+        "maxMs": 116.80000019073486
+      },
+      "eagerPages": {
+        "count": 3,
+        "p50Ms": 116.40000009536743,
+        "p95Ms": 116.80000019073486,
+        "p99Ms": 116.80000019073486,
+        "maxMs": 116.80000019073486
+      },
+      "repeatedBaseline": {
+        "count": 3,
+        "p50Ms": 115.60000014305115,
+        "p95Ms": 131.40000009536743,
+        "p99Ms": 131.40000009536743,
+        "maxMs": 131.40000009536743
+      },
+      "weakIndexExperiment": {
+        "count": 3,
+        "p50Ms": 115,
+        "p95Ms": 116,
+        "p99Ms": 116,
+        "maxMs": 116
+      },
+      "internedPrefixes": {
+        "count": 3,
+        "p50Ms": 116.39999985694885,
+        "p95Ms": 131.90000009536743,
+        "p99Ms": 131.90000009536743,
+        "maxMs": 131.90000009536743
+      },
+      "borrowedPages": {
+        "count": 3,
+        "p50Ms": 131,
+        "p95Ms": 133.40000009536743,
+        "p99Ms": 133.40000009536743,
+        "maxMs": 133.40000009536743
+      }
+    }
+  ]
+}

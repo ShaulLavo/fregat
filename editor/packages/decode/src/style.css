@@ -1,0 +1,107 @@
+/* While a reveal is pending/running, hide the editor's real rows with a clip so
+   there is no flash of the fully-painted file. The reveal then animates each
+   row's clip-path open (via WAAPI), which sweeps the row's *real* glyphs — and
+   their CSS Custom Highlight colours — into view, so the text is syntax-coloured
+   from the first frame. This rule only covers rows the reveal hasn't taken over
+   yet; the gutter (a separate element) stays visible, so line numbers remain. */
+.editor-decode-active .editor-virtualized-row {
+  clip-path: inset(0 100% 0 0);
+}
+
+/* Hide the editor's own blinking caret during the reveal. */
+.editor-decode-active .editor-virtualized-caret-layer {
+  opacity: 0;
+}
+
+/* Diffusion overlay. The real rows stay clipped-hidden (the editor background is
+   transparent in the workbench, so there is nothing to cover with — we hide
+   geometry and reveal a colour-faithful overlay instead). Anchored at the
+   content origin so it scrolls with the rows (like the caret layer); glyph rows
+   are placed by their top and inherit the editor font / tab-size so columns line
+   up 1:1 with the real rows they hand off to. */
+.editor-decode-glyph-layer {
+  height: 0;
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  z-index: 4;
+}
+
+.editor-decode-glyph-row {
+  left: var(--editor-gutter-width, 0px);
+  position: absolute;
+  white-space: pre;
+}
+
+/* Each glyph carries its final syntax colour (inline) and its opacity is driven
+   inline per denoise step (faint when it first emerges, full once it locks). The
+   short transition smooths the brightness ramp between steps. */
+.editor-decode-glyph {
+  transition: opacity 120ms linear;
+}
+
+/* Our caret layer: one caret per revealing row, riding the reveal edge.
+   Zero-size anchor at content origin so carets (positioned by row top) scroll
+   with the editor content, like the rows themselves. */
+.editor-decode-caret-layer {
+  height: 0;
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  will-change: transform;
+  z-index: 4;
+}
+
+.editor-decode-caret {
+  left: var(--editor-gutter-width, 0px);
+  opacity: 0;
+  position: absolute;
+  width: 2px;
+  will-change: transform, opacity;
+}
+
+/* The visible bar — blinks on its own so the caret ticks while typing. The
+   outer caret's window opacity multiplies through, gating it to its turn. */
+.editor-decode-caret-bar {
+  animation: editor-decode-caret-blink 0.6s step-end infinite;
+  background: var(--editor-caret-color);
+  height: 100%;
+  width: 100%;
+}
+
+@keyframes editor-decode-caret-blink {
+  from,
+  to {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The plugin already no-ops under reduced motion; if the class is ever set,
+     never hide anything. */
+  .editor-decode-active .editor-virtualized-row {
+    clip-path: none;
+  }
+
+  .editor-decode-active .editor-virtualized-caret-layer {
+    opacity: 1;
+  }
+
+  .editor-decode-caret-layer {
+    display: none;
+  }
+
+  .editor-decode-caret-bar {
+    animation: none;
+  }
+
+  .editor-decode-glyph-layer {
+    display: none;
+  }
+}

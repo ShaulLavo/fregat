@@ -1,0 +1,63 @@
+{
+  "samples": [
+    {
+      "size": 1048576,
+      "measurement": {
+        "units": 1048560,
+        "lines": 92521,
+        "tokens": 370080,
+        "tokenizeMs": 1892.4000000953674,
+        "firstColor": "#F97583",
+        "changedColor": "#D73A49"
+      },
+      "before": {
+        "usedSize": 1048352,
+        "totalSize": 2097152,
+        "embedderHeapUsedSize": 429984,
+        "backingStorageSize": 157774
+      },
+      "retained": {
+        "usedSize": 150065096,
+        "totalSize": 151105536,
+        "embedderHeapUsedSize": 328416,
+        "backingStorageSize": 2072903
+      },
+      "disposed": {
+        "usedSize": 1892836,
+        "totalSize": 3842048,
+        "embedderHeapUsedSize": 328416,
+        "backingStorageSize": 2072903
+      }
+    },
+    {
+      "size": 5242880,
+      "measurement": {
+        "units": 5242868,
+        "lines": 462607,
+        "tokens": 1850424,
+        "tokenizeMs": 6091.099999904633,
+        "firstColor": "#F97583",
+        "changedColor": "#D73A49"
+      },
+      "before": {
+        "usedSize": 1052964,
+        "totalSize": 2097152,
+        "embedderHeapUsedSize": 310064,
+        "backingStorageSize": 157774
+      },
+      "retained": {
+        "usedSize": 741351828,
+        "totalSize": 742531072,
+        "embedderHeapUsedSize": 328416,
+        "backingStorageSize": 2072903
+      },
+      "disposed": {
+        "usedSize": 1892324,
+        "totalSize": 3842048,
+        "embedderHeapUsedSize": 328416,
+        "backingStorageSize": 2072903
+      }
+    }
+  ],
+  "browser": "153.0.8010.12"
+}

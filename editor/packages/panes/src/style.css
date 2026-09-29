@@ -1,0 +1,46 @@
+.editor-resizable-pane-group {
+  display: flex;
+  flex-wrap: nowrap;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  width: 100%;
+}
+
+.editor-resizable-pane-group[data-editor-pane-orientation='horizontal'] {
+  flex-direction: row;
+  touch-action: pan-y;
+}
+
+.editor-resizable-pane-group[data-editor-pane-orientation='vertical'] {
+  flex-direction: column;
+  touch-action: pan-x;
+}
+
+.editor-resizable-pane {
+  min-height: 0;
+  min-width: 0;
+}
+
+.editor-resizable-pane-handle {
+  background: transparent;
+  flex: 0 0 auto;
+  outline: none;
+  position: relative;
+  touch-action: none;
+}
+
+.editor-resizable-pane-handle[aria-orientation='vertical'] {
+  cursor: ew-resize;
+  width: 6px;
+}
+
+.editor-resizable-pane-handle[aria-orientation='horizontal'] {
+  cursor: ns-resize;
+  height: 6px;
+}
+
+.editor-resizable-pane-handle[aria-disabled='true'] {
+  cursor: default;
+}

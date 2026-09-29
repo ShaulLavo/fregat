@@ -1,0 +1,51 @@
+{
+  "name": "@singapore-editor/lsp",
+  "version": "0.1.1",
+  "files": [
+    "README.md",
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./positions": {
+      "types": "./dist/positions.d.ts",
+      "import": "./dist/positions.js",
+      "default": "./dist/positions.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js",
+      "default": "./dist/types.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "bun ../../scripts/build-package.ts",
+    "test": "vitest run",
+    "typecheck": "tsgo --noEmit",
+    "lint": "oxlint .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check ."
+  },
+  "dependencies": {
+    "vscode-languageserver-protocol": "^3.18.4"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "happy-dom": "^20.14.5",
+    "oxfmt": "0.70.0",
+    "oxlint": "1.85.0",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.2"
+  }
+}

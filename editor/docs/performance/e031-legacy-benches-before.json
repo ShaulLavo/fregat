@@ -1,0 +1,44 @@
+{
+  "baselineCommit": "ff1dfeda9e52b308f57915da7372f7ac6e5f04f9",
+  "diagnostics": false,
+  "transforms": [
+    {
+      "lines": 10000,
+      "plainBuildMs": 7.31,
+      "foldsAndWrapsBuildMs": 8.15,
+      "foldedWrappedRows": 11307
+    },
+    {
+      "lines": 50000,
+      "plainBuildMs": 16.41,
+      "foldsAndWrapsBuildMs": 33.87,
+      "foldedWrappedRows": 57087
+    },
+    {
+      "lines": 100000,
+      "plainBuildMs": 25.01,
+      "foldsAndWrapsBuildMs": 84.56,
+      "foldedWrappedRows": 114312
+    }
+  ],
+  "virtualization": [
+    {
+      "name": "large-document",
+      "durationMs": 49.401,
+      "mountedRows": 44,
+      "mountedCharacters": 440
+    },
+    {
+      "name": "large-fold-marker-scroll",
+      "durationMs": 4.253,
+      "mountedRows": 44,
+      "mountedCharacters": 440
+    },
+    {
+      "name": "long-line",
+      "durationMs": 1.749,
+      "mountedRows": 1,
+      "mountedCharacters": 2048
+    }
+  ]
+}

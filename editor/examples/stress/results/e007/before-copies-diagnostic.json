@@ -1,0 +1,377 @@
+{
+  "commit": "4c03e0d379bf6a0844bdf3537eed78d8c96027df",
+  "diff": "",
+  "diagnostics": true,
+  "repetitions": 5,
+  "sizes": [65536, 4194304, 50331648],
+  "samples": [
+    {
+      "size": 65536,
+      "emptyHeap": 641708,
+      "openHeap": 895924,
+      "liveHeap": 1061004,
+      "disposedHeap": 1006276,
+      "retained": 0,
+      "open": {
+        "operation": "open",
+        "durationMs": 38.09999990463257,
+        "fullReads": 1,
+        "fullReadUnits": 65536,
+        "wireUnits": 65536
+      },
+      "operations": [
+        {
+          "operation": "skipped-edit",
+          "durationMs": 1.8000000715255737,
+          "fullReads": 2,
+          "fullReadUnits": 131074,
+          "wireUnits": 65541
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.7999999523162842,
+          "fullReads": 2,
+          "fullReadUnits": 131074,
+          "wireUnits": 65537
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.5,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.6999999284744263,
+          "fullReads": 2,
+          "fullReadUnits": 131076,
+          "wireUnits": 65542
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.40000009536743164,
+          "fullReads": 2,
+          "fullReadUnits": 131076,
+          "wireUnits": 65538
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.20000004768371582,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.3999999761581421,
+          "fullReads": 2,
+          "fullReadUnits": 131078,
+          "wireUnits": 65543
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.3999999761581421,
+          "fullReads": 2,
+          "fullReadUnits": 131078,
+          "wireUnits": 65539
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.20000004768371582,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.3999999761581421,
+          "fullReads": 2,
+          "fullReadUnits": 131080,
+          "wireUnits": 65544
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.20000004768371582,
+          "fullReads": 2,
+          "fullReadUnits": 131080,
+          "wireUnits": 65540
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.10000002384185791,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.3999999761581421,
+          "fullReads": 2,
+          "fullReadUnits": 131082,
+          "wireUnits": 65545
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.2999999523162842,
+          "fullReads": 2,
+          "fullReadUnits": 131082,
+          "wireUnits": 65541
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.10000002384185791,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        }
+      ]
+    },
+    {
+      "size": 4194304,
+      "emptyHeap": 641708,
+      "openHeap": 5027976,
+      "liveHeap": 5189180,
+      "disposedHeap": 1003972,
+      "retained": 0,
+      "open": {
+        "operation": "open",
+        "durationMs": 52.89999997615814,
+        "fullReads": 1,
+        "fullReadUnits": 4194304,
+        "wireUnits": 4194304
+      },
+      "operations": [
+        {
+          "operation": "skipped-edit",
+          "durationMs": 11.299999952316284,
+          "fullReads": 2,
+          "fullReadUnits": 8388610,
+          "wireUnits": 4194309
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 11.200000047683716,
+          "fullReads": 2,
+          "fullReadUnits": 8388610,
+          "wireUnits": 4194305
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 2,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 10.300000071525574,
+          "fullReads": 2,
+          "fullReadUnits": 8388612,
+          "wireUnits": 4194310
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 10.699999928474426,
+          "fullReads": 2,
+          "fullReadUnits": 8388612,
+          "wireUnits": 4194306
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 1.7000000476837158,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 10.199999928474426,
+          "fullReads": 2,
+          "fullReadUnits": 8388614,
+          "wireUnits": 4194311
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 11.300000071525574,
+          "fullReads": 2,
+          "fullReadUnits": 8388614,
+          "wireUnits": 4194307
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.7999999523162842,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 9.5,
+          "fullReads": 2,
+          "fullReadUnits": 8388616,
+          "wireUnits": 4194312
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 9.899999976158142,
+          "fullReads": 2,
+          "fullReadUnits": 8388616,
+          "wireUnits": 4194308
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 1.7000000476837158,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 10.200000047683716,
+          "fullReads": 2,
+          "fullReadUnits": 8388618,
+          "wireUnits": 4194313
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 9.599999904632568,
+          "fullReads": 2,
+          "fullReadUnits": 8388618,
+          "wireUnits": 4194309
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 1.100000023841858,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        }
+      ]
+    },
+    {
+      "size": 50331648,
+      "emptyHeap": 641708,
+      "openHeap": 51165468,
+      "liveHeap": 51326488,
+      "disposedHeap": 1003936,
+      "retained": 0,
+      "open": {
+        "operation": "open",
+        "durationMs": 210,
+        "fullReads": 1,
+        "fullReadUnits": 50331648,
+        "wireUnits": 50331648
+      },
+      "operations": [
+        {
+          "operation": "skipped-edit",
+          "durationMs": 108.20000004768372,
+          "fullReads": 2,
+          "fullReadUnits": 100663298,
+          "wireUnits": 50331653
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 114.09999990463257,
+          "fullReads": 2,
+          "fullReadUnits": 100663298,
+          "wireUnits": 50331649
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 8.800000071525574,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 114,
+          "fullReads": 2,
+          "fullReadUnits": 100663300,
+          "wireUnits": 50331654
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 112.59999990463257,
+          "fullReads": 2,
+          "fullReadUnits": 100663300,
+          "wireUnits": 50331650
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 8.800000071525574,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 112.29999995231628,
+          "fullReads": 2,
+          "fullReadUnits": 100663302,
+          "wireUnits": 50331655
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 112.10000002384186,
+          "fullReads": 2,
+          "fullReadUnits": 100663302,
+          "wireUnits": 50331651
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 8.5,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 112.10000002384186,
+          "fullReads": 2,
+          "fullReadUnits": 100663304,
+          "wireUnits": 50331656
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 112.5,
+          "fullReads": 2,
+          "fullReadUnits": 100663304,
+          "wireUnits": 50331652
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 8.899999976158142,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 112.40000009536743,
+          "fullReads": 2,
+          "fullReadUnits": 100663306,
+          "wireUnits": 50331657
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 113.39999997615814,
+          "fullReads": 2,
+          "fullReadUnits": 100663306,
+          "wireUnits": 50331653
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 9.100000023841858,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        }
+      ]
+    }
+  ],
+  "memoryBoundary": "main-renderer CDP heap after forced GC; excludes worker heap",
+  "browser": "153.0.8010.12"
+}

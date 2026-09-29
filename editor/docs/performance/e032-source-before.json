@@ -1,0 +1,2483 @@
+{
+  "schemaVersion": 2,
+  "benchmarkFiles": {
+    "packages/editor/bench/editBatches.mjs": "c51b28fb4a174bb4c5bad9da557a4aaf18090107551182a309eff6c0731088db",
+    "packages/editor/bench/editBatchProjections.mjs": "70279ece023b256eae178b9b0b53becf6b9932594d0ceb79721bb729b781db71",
+    "examples/stress/src/fixtures.ts": "04030e51ccd9b0deb676b60012624ee2944a78b0fae5731d3cb72a5eefe0d185"
+  },
+  "benchmarkSha256": "47c97ccb9f10ae349692c60168b18cb74592b2bb84a79b9574abe8326cad5c96",
+  "requireIncremental": false,
+  "runs": [
+    {
+      "capturedAt": "2026-09-11T21:09:09.556Z",
+      "coreDirectory": "/work/tmp/e032-baseline/packages/editor",
+      "sourceSha256": "5645f00f182bde5df26706da351c7b2c69fdaae8f1c0fcac52b4c1dcf30085ab",
+      "runtime": "Bun 1.4.0",
+      "cpu": "Intel(R) Core(TM) i7-14700K",
+      "generatorVersion": 1,
+      "seed": 60061,
+      "repetitions": 30,
+      "warmups": 5,
+      "configuration": {
+        "environment": "happy-dom",
+        "viewport": {
+          "width": 800,
+          "height": 800
+        },
+        "rowHeight": 20,
+        "characterWidth": 8,
+        "wrap": false,
+        "syntax": false,
+        "plugins": [],
+        "timingsHaveDiagnostics": false
+      },
+      "measurement": "Synchronous Editor.edit through session commit, projection and mounted DOM reconciliation; excludes deferred consumers and browser layout/paint. Diagnostic run is separate. UTF-16 bytes count requested payloads including repeats.",
+      "retainedHeap": {
+        "supported": false,
+        "reason": "happy-dom host and runtime heap include fixture generation, source snapshots, cancelled deferred work, and GC scheduling; retained row/cache/index counters are reported instead."
+      },
+      "groups": [
+        {
+          "fixture": "ordinary",
+          "kind": "single-edit",
+          "decorated": false,
+          "utf16Length": 4469,
+          "fixtureSha256": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+          "p50Ms": 0.6584440000000029,
+          "p95Ms": 1.1086249999999893,
+          "samples": [
+            0.9301559999999967, 0.8883349999999979, 1.1086249999999893, 0.8997810000000044,
+            0.8317849999999964, 0.811222000000015, 0.8547259999999994, 0.7812429999999893,
+            0.9183160000000044, 0.809379000000007, 0.8251199999999983, 2.589686999999998,
+            0.8830189999999902, 0.6584440000000029, 0.593671999999998, 0.6045440000000042,
+            0.6068940000000111, 0.617637000000002, 0.5791710000000023, 0.614531999999997,
+            0.5970540000000142, 0.592172000000005, 0.5946169999999995, 0.567307999999997,
+            0.545517000000018, 0.5803439999999966, 0.5721149999999966, 0.5900099999999782,
+            0.7831919999999855, 0.716998000000018
+          ],
+          "diagnostic": {
+            "durationMs": 1.262773999999979,
+            "counters": {
+              "sourceBytesRead": 2122,
+              "sourceIndexBytesRead": 14,
+              "fullTextReads": 0,
+              "fullTextBytesRead": 0,
+              "materializedStrings": 52,
+              "materializeFullTextCalls": 0,
+              "projectionResetCalls": 0,
+              "rangeReadCalls": 53,
+              "maxRangeUtf16Length": 21,
+              "unchangedGapReads": 0,
+              "viewCalls": {
+                "applyEdit": 1
+              },
+              "ranges": [
+                {
+                  "start": 0,
+                  "end": 0,
+                  "length": 4469
+                },
+                {
+                  "start": 0,
+                  "end": 6,
+                  "length": 4476
+                },
+                {
+                  "start": 7,
+                  "end": 28,
+                  "length": 4476
+                },
+                {
+                  "start": 29,
+                  "end": 49,
+                  "length": 4476
+                },
+                {
+                  "start": 50,
+                  "end": 69,
+                  "length": 4476
+                },
+                {
+                  "start": 70,
+                  "end": 90,
+                  "length": 4476
+                },
+                {
+                  "start": 91,
+                  "end": 111,
+                  "length": 4476
+                },
+                {
+                  "start": 112,
+                  "end": 132,
+                  "length": 4476
+                },
+                {
+                  "start": 133,
+                  "end": 152,
+                  "length": 4476
+                },
+                {
+                  "start": 153,
+                  "end": 173,
+                  "length": 4476
+                },
+                {
+                  "start": 174,
+                  "end": 194,
+                  "length": 4476
+                },
+                {
+                  "start": 195,
+                  "end": 215,
+                  "length": 4476
+                }
+              ],
+              "committedEvents": 1,
+              "viewUpdatedEvents": 1
+            },
+            "projection": {
+              "instanceReplaced": false,
+              "work": {
+                "sourceBytesRead": 2122,
+                "materializedRows": 52,
+                "materializedTextBytes": 2122,
+                "indexEntriesTouched": 1,
+                "summaryLinesMeasured": 0
+              },
+              "retained": {
+                "sourceBytesRead": 153864,
+                "materializedRows": 3745,
+                "materializedTextBytes": 153864,
+                "indexEntriesTouched": 36,
+                "summaryLinesMeasured": 0,
+                "cachedRows": 52,
+                "cachedTextBytes": 2122,
+                "indexNodes": 1,
+                "summaryBytes": 64
+              }
+            },
+            "correctness": {
+              "mountedRows": 52,
+              "scrollTop": 0,
+              "projections": null
+            }
+          }
+        },
+        {
+          "fixture": "ordinary",
+          "kind": "sparse-batch",
+          "decorated": false,
+          "utf16Length": 4469,
+          "fixtureSha256": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+          "p50Ms": 0.5237039999999809,
+          "p95Ms": 0.7393940000000043,
+          "samples": [
+            0.5424680000000137, 0.7393940000000043, 0.5555519999999774, 0.5281699999999887,
+            0.5580550000000244, 0.5214010000000258, 0.5170109999999966, 0.5631020000000149,
+            0.5456259999999986, 0.5736760000000061, 0.5371729999999957, 0.5588449999999909,
+            0.6226549999999804, 0.6119099999999946, 2.182282000000015, 0.592647999999997,
+            0.6250510000000133, 0.5237039999999809, 0.4819270000000131, 0.5229900000000214,
+            0.4933560000000057, 0.4906389999999874, 0.4811989999999753, 0.46861999999998716,
+            0.47207299999999464, 0.4587630000000047, 0.459840000000014, 0.49431099999998196,
+            0.4902620000000013, 0.4985279999999932
+          ],
+          "diagnostic": {
+            "durationMs": 0.5875259999999969,
+            "counters": {
+              "sourceBytesRead": 2122,
+              "sourceIndexBytesRead": 14,
+              "fullTextReads": 0,
+              "fullTextBytesRead": 0,
+              "materializedStrings": 52,
+              "materializeFullTextCalls": 0,
+              "projectionResetCalls": 1,
+              "rangeReadCalls": 52,
+              "maxRangeUtf16Length": 21,
+              "unchangedGapReads": 0,
+              "viewCalls": {
+                "setText": 1
+              },
+              "ranges": [
+                {
+                  "start": 0,
+                  "end": 6,
+                  "length": 4483
+                },
+                {
+                  "start": 7,
+                  "end": 28,
+                  "length": 4483
+                },
+                {
+                  "start": 29,
+                  "end": 49,
+                  "length": 4483
+                },
+                {
+                  "start": 50,
+                  "end": 69,
+                  "length": 4483
+                },
+                {
+                  "start": 70,
+                  "end": 90,
+                  "length": 4483
+                },
+                {
+                  "start": 91,
+                  "end": 111,
+                  "length": 4483
+                },
+                {
+                  "start": 112,
+                  "end": 132,
+                  "length": 4483
+                },
+                {
+                  "start": 133,
+                  "end": 152,
+                  "length": 4483
+                },
+                {
+                  "start": 153,
+                  "end": 173,
+                  "length": 4483
+                },
+                {
+                  "start": 174,
+                  "end": 194,
+                  "length": 4483
+                },
+                {
+                  "start": 195,
+                  "end": 215,
+                  "length": 4483
+                },
+                {
+                  "start": 216,
+                  "end": 237,
+                  "length": 4483
+                }
+              ],
+              "committedEvents": 1,
+              "viewUpdatedEvents": 1
+            },
+            "projection": {
+              "instanceReplaced": false,
+              "work": {
+                "sourceBytesRead": 2122,
+                "materializedRows": 52,
+                "materializedTextBytes": 2122,
+                "indexEntriesTouched": 0,
+                "summaryLinesMeasured": 0
+              },
+              "retained": {
+                "sourceBytesRead": 153864,
+                "materializedRows": 3745,
+                "materializedTextBytes": 153864,
+                "indexEntriesTouched": 0,
+                "summaryLinesMeasured": 0,
+                "cachedRows": 52,
+                "cachedTextBytes": 2122,
+                "indexNodes": 1,
+                "summaryBytes": 64
+              }
+            },
+            "correctness": {
+              "mountedRows": 52,
+              "scrollTop": 0,
+              "projections": null
+            }
+          }
+        },
+        {
+          "fixture": "ordinary",
+          "kind": "single-edit",
+          "decorated": true,
+          "utf16Length": 4469,
+          "fixtureSha256": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+          "p50Ms": 1.3134039999999914,
+          "p95Ms": 1.5547789999999964,
+          "samples": [
+            1.3665239999999983, 1.3277050000000088, 1.3404299999999978, 1.3976220000000126,
+            1.4761100000000056, 1.5547789999999964, 1.333549000000005, 1.3144020000000296,
+            1.260093999999981, 1.313442000000009, 1.2772820000000138, 1.3071840000000066,
+            1.3910869999999704, 1.3980740000000083, 1.3839120000000094, 1.344840999999974,
+            1.306176999999991, 1.2502610000000232, 1.2777600000000007, 1.2765999999999735,
+            1.2219380000000228, 1.2502280000000496, 1.3134039999999914, 1.3864020000000323,
+            3.156778000000031, 1.257206999999994, 1.2318149999999832, 1.1756820000000516,
+            1.2567870000000312, 1.21875
+          ],
+          "diagnostic": {
+            "durationMs": 1.4581009999999992,
+            "counters": {
+              "sourceBytesRead": 2118,
+              "sourceIndexBytesRead": 14,
+              "fullTextReads": 0,
+              "fullTextBytesRead": 0,
+              "materializedStrings": 52,
+              "materializeFullTextCalls": 0,
+              "projectionResetCalls": 0,
+              "rangeReadCalls": 54,
+              "maxRangeUtf16Length": 21,
+              "unchangedGapReads": 0,
+              "viewCalls": {
+                "applyEdit": 1
+              },
+              "ranges": [
+                {
+                  "start": 0,
+                  "end": 0,
+                  "length": 4469
+                },
+                {
+                  "start": 0,
+                  "end": 0,
+                  "length": 4469
+                },
+                {
+                  "start": 0,
+                  "end": 6,
+                  "length": 4476
+                },
+                {
+                  "start": 7,
+                  "end": 28,
+                  "length": 4476
+                },
+                {
+                  "start": 29,
+                  "end": 49,
+                  "length": 4476
+                },
+                {
+                  "start": 50,
+                  "end": 69,
+                  "length": 4476
+                },
+                {
+                  "start": 70,
+                  "end": 90,
+                  "length": 4476
+                },
+                {
+                  "start": 91,
+                  "end": 111,
+                  "length": 4476
+                },
+                {
+                  "start": 112,
+                  "end": 132,
+                  "length": 4476
+                },
+                {
+                  "start": 133,
+                  "end": 152,
+                  "length": 4476
+                },
+                {
+                  "start": 153,
+                  "end": 173,
+                  "length": 4476
+                },
+                {
+                  "start": 174,
+                  "end": 194,
+                  "length": 4476
+                }
+              ],
+              "committedEvents": 1,
+              "viewUpdatedEvents": 1
+            },
+            "projection": {
+              "instanceReplaced": false,
+              "work": {
+                "sourceBytesRead": 2118,
+                "materializedRows": 52,
+                "materializedTextBytes": 2118,
+                "indexEntriesTouched": 3,
+                "summaryLinesMeasured": 0
+              },
+              "retained": {
+                "sourceBytesRead": 231048,
+                "materializedRows": 5617,
+                "materializedTextBytes": 231048,
+                "indexEntriesTouched": 180,
+                "summaryLinesMeasured": 0,
+                "cachedRows": 52,
+                "cachedTextBytes": 2118,
+                "indexNodes": 7,
+                "summaryBytes": 448
+              }
+            },
+            "correctness": {
+              "mountedRows": 52,
+              "scrollTop": 0,
+              "projections": {
+                "inputTokens": 199,
+                "retainedTokens": 199,
+                "tokensCorrect": true,
+                "collapsedFolds": 1,
+                "foldCorrect": true
+              }
+            }
+          }
+        },
+        {
+          "fixture": "ordinary",
+          "kind": "sparse-batch",
+          "decorated": true,
+          "utf16Length": 4469,
+          "fixtureSha256": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+          "p50Ms": 1.2671439999999734,
+          "p95Ms": 4.092505000000017,
+          "samples": [
+            1.2671439999999734, 1.2866960000000063, 1.2863049999999703, 1.273050000000012,
+            1.2786820000000034, 1.4040239999999926, 1.4073599999999828, 4.092505000000017,
+            1.3069879999999898, 1.3062380000000076, 1.2673950000000218, 1.2616600000000062,
+            1.288782000000026, 1.2891190000000279, 1.2669420000000287, 1.2922169999999937,
+            1.2749009999999998, 1.1792159999999967, 5.051922999999988, 1.173359000000005,
+            1.1717309999999657, 1.1401270000000068, 1.1899119999999925, 1.183651999999995,
+            1.1548740000000066, 1.1579060000000254, 1.165914999999984, 1.2108989999999835,
+            1.2126569999999788, 1.1575540000000046
+          ],
+          "diagnostic": {
+            "durationMs": 1.3291429999999878,
+            "counters": {
+              "sourceBytesRead": 4274,
+              "sourceIndexBytesRead": 14,
+              "fullTextReads": 0,
+              "fullTextBytesRead": 0,
+              "materializedStrings": 104,
+              "materializeFullTextCalls": 0,
+              "projectionResetCalls": 1,
+              "rangeReadCalls": 104,
+              "maxRangeUtf16Length": 21,
+              "unchangedGapReads": 0,
+              "viewCalls": {
+                "setText": 1
+              },
+              "ranges": [
+                {
+                  "start": 0,
+                  "end": 21,
+                  "length": 4469
+                },
+                {
+                  "start": 22,
+                  "end": 42,
+                  "length": 4469
+                },
+                {
+                  "start": 43,
+                  "end": 62,
+                  "length": 4469
+                },
+                {
+                  "start": 63,
+                  "end": 83,
+                  "length": 4469
+                },
+                {
+                  "start": 84,
+                  "end": 104,
+                  "length": 4469
+                },
+                {
+                  "start": 105,
+                  "end": 125,
+                  "length": 4469
+                },
+                {
+                  "start": 126,
+                  "end": 145,
+                  "length": 4469
+                },
+                {
+                  "start": 146,
+                  "end": 166,
+                  "length": 4469
+                },
+                {
+                  "start": 167,
+                  "end": 187,
+                  "length": 4469
+                },
+                {
+                  "start": 188,
+                  "end": 208,
+                  "length": 4469
+                },
+                {
+                  "start": 209,
+                  "end": 230,
+                  "length": 4469
+                },
+                {
+                  "start": 231,
+                  "end": 252,
+                  "length": 4469
+                }
+              ],
+              "committedEvents": 1,
+              "viewUpdatedEvents": 1
+            },
+            "projection": {
+              "instanceReplaced": false,
+              "work": {
+                "sourceBytesRead": 4274,
+                "materializedRows": 104,
+                "materializedTextBytes": 4274,
+                "indexEntriesTouched": 3,
+                "summaryLinesMeasured": 0
+              },
+              "retained": {
+                "sourceBytesRead": 308664,
+                "materializedRows": 7489,
+                "materializedTextBytes": 308664,
+                "indexEntriesTouched": 180,
+                "summaryLinesMeasured": 0,
+                "cachedRows": 52,
+                "cachedTextBytes": 2122,
+                "indexNodes": 1,
+                "summaryBytes": 64
+              }
+            },
+            "correctness": {
+              "mountedRows": 52,
+              "scrollTop": 0,
+              "projections": {
+                "inputTokens": 199,
+                "retainedTokens": 0,
+                "tokensCorrect": false,
+                "collapsedFolds": 0,
+                "foldCorrect": false
+              }
+            }
+          }
+        },
+        {
+          "fixture": "long-line",
+          "kind": "single-edit",
+          "decorated": false,
+          "utf16Length": 1048594,
+          "fixtureSha256": "467fa816efc5aa5c082ed44ea4dc10bbbb41da16faf4d4822aa3d122edc628f7",
+          "p50Ms": 0.5230730000000108,
+          "p95Ms": 0.597977999999955,
+          "samples": [
+            0.597977999999955, 0.5244120000000407, 0.5327750000000151, 0.558402000000001,
+            0.5230730000000108, 0.4952559999999835, 0.536752999999976, 0.565998000000036,
+            0.5239280000000122, 0.5251340000000937, 0.5490649999999277, 0.5675069999999778,
+            0.51447799999994, 0.532367000000022, 0.47166200000003755, 0.4814999999999827,
+            0.47307599999999184, 0.4786150000001044, 0.5992840000000115, 0.4894859999999426,
+            0.5280029999998987, 0.4427689999999984, 0.4504670000000033, 0.5257010000000264,
+            0.48721999999997934, 0.4879190000000335, 0.4950149999999667, 0.43920300000002044,
+            0.46049300000004223, 0.528020999999967
+          ],
+          "diagnostic": {
+            "durationMs": 0.5484270000000606,
+            "counters": {
+              "sourceBytesRead": 4108,
+              "sourceIndexBytesRead": 2097202,
+              "fullTextReads": 0,
+              "fullTextBytesRead": 0,
+              "materializedStrings": 2,
+              "materializeFullTextCalls": 0,
+              "projectionResetCalls": 0,
+              "rangeReadCalls": 3,
+              "maxRangeUtf16Length": 2048,
+              "unchangedGapReads": 0,
+              "viewCalls": {
+                "applyEdit": 1
+              },
+              "ranges": [
+                {
+                  "start": 0,
+                  "end": 0,
+                  "length": 1048594
+                },
+                {
+                  "start": 0,
+                  "end": 6,
+                  "length": 1048601
+                },
+                {
+                  "start": 7,
+                  "end": 2055,
+                  "length": 1048601
+                }
+              ],
+              "committedEvents": 1,
+              "viewUpdatedEvents": 1
+            },
+            "projection": {
+              "instanceReplaced": false,
+              "work": {
+                "sourceBytesRead": 32782,
+                "materializedRows": 2,
+                "materializedTextBytes": 12,
+                "indexEntriesTouched": 0,
+                "summaryLinesMeasured": 0
+              },
+              "retained": {
+                "sourceBytesRead": 2064960,
+                "materializedRows": 109,
+                "materializedTextBytes": 432,
+                "indexEntriesTouched": 0,
+                "summaryLinesMeasured": 0,
+                "cachedRows": 2,
+                "cachedTextBytes": 12,
+                "indexNodes": 1,
+                "summaryBytes": 64
+              }
+            },
+            "correctness": {
+              "mountedRows": 2,
+              "scrollTop": 0,
+              "projections": null
+            }
+          }
+        },
+        {
+          "fixture": "long-line",
+          "kind": "sparse-batch",
+          "decorated": false,
+          "utf16Length": 1048594,
+          "fixtureSha256": "467fa816efc5aa5c082ed44ea4dc10bbbb41da16faf4d4822aa3d122edc628f7",
+          "p50Ms": 0.45389000000000124,
+          "p95Ms": 0.6519909999999527,
+          "samples": [
+            0.48822500000005675, 0.4480469999999741, 0.46452899999997044, 0.41553399999997964,
+            0.5314730000000054, 0.454283999999916, 0.5034779999999728, 0.42908600000009756,
+            0.44485499999996136, 0.4821789999999737, 0.43924200000003566, 0.43371300000001156,
+            0.44778100000007726, 0.40562999999997373, 0.4746109999999817, 2.016044999999963,
+            0.5188369999999622, 0.4763580000000047, 0.45159800000010364, 0.4599860000000717,
+            0.4636920000000373, 0.4274709999999686, 0.4619280000000572, 0.45214999999996053,
+            0.47945500000002994, 0.45389000000000124, 0.6519909999999527, 0.44145400000002155,
+            0.42455200000006243, 0.39682600000003276
+          ],
+          "diagnostic": {
+            "durationMs": 0.4641780000000608,
+            "counters": {
+              "sourceBytesRead": 4120,
+              "sourceIndexBytesRead": 2097216,
+              "fullTextReads": 0,
+              "fullTextBytesRead": 0,
+              "materializedStrings": 3,
+              "materializeFullTextCalls": 0,
+              "projectionResetCalls": 1,
+              "rangeReadCalls": 3,
+              "maxRangeUtf16Length": 2048,
+              "unchangedGapReads": 0,
+              "viewCalls": {
+                "setText": 1
+              },
+              "ranges": [
+                {
+                  "start": 0,
+                  "end": 6,
+                  "length": 1048608
+                },
+                {
+                  "start": 1048602,
+                  "end": 1048608,
+                  "length": 1048608
+                },
+                {
+                  "start": 7,
+                  "end": 2055,
+                  "length": 1048608
+                }
+              ],
+              "committedEvents": 1,
+              "viewUpdatedEvents": 1
+            },
+            "projection": {
+              "instanceReplaced": false,
+              "work": {
+                "sourceBytesRead": 24602,
+                "materializedRows": 3,
+                "materializedTextBytes": 24,
+                "indexEntriesTouched": 0,
+                "summaryLinesMeasured": 0
+              },
+              "retained": {
+                "sourceBytesRead": 1770480,
+                "materializedRows": 145,
+                "materializedTextBytes": 864,
+                "indexEntriesTouched": 0,
+                "summaryLinesMeasured": 0,
+                "cachedRows": 3,
+                "cachedTextBytes": 24,
+                "indexNodes": 1,
+                "summaryBytes": 64
+              }
+            },
+            "correctness": {
+              "mountedRows": 3,
+              "scrollTop": 0,
+              "projections": null
+            }
+          }
+        },
+        {
+          "fixture": "short-lines",
+          "kind": "single-edit",
+          "decorated": false,
+          "utf16Length": 12834064,
+          "fixtureSha256": "2bacff110d8d3fe9b5d12e1ea6cc5cfb31d2a344d22119b49222674196352c6a",
+          "p50Ms": 0.638877999999977,
+          "p95Ms": 0.7060619999999744,
+          "samples": [
+            0.6472600000000739, 0.6051280000000361, 0.6172699999999622, 0.6700460000000703,
+            0.6243919999999434, 0.6218630000000758, 0.5910350000001472, 0.5844230000000152,
+            0.8152090000000953, 0.607499000000189, 0.6122470000000249, 0.6756130000001122,
+            0.6602049999999053, 0.6413849999999002, 0.644207999999935, 0.657952000000023,
+            0.5356030000000374, 0.644106999999849, 0.6590029999999842, 0.6573339999999916,
+            0.6125150000000303, 0.6765550000000076, 0.6198150000000169, 0.6036220000000867,
+            0.7060619999999744, 0.6365319999999883, 0.6481909999999971, 0.638877999999977,
+            0.697121000000152, 0.6330290000000787
+          ],
+          "diagnostic": {
+            "durationMs": 0.6891410000000633,
+            "counters": {
+              "sourceBytesRead": 2122,
+              "sourceIndexBytesRead": 14,
+              "fullTextReads": 0,
+              "fullTextBytesRead": 0,
+              "materializedStrings": 52,
+              "materializeFullTextCalls": 0,
+              "projectionResetCalls": 0,
+              "rangeReadCalls": 53,
+              "maxRangeUtf16Length": 21,
+              "unchangedGapReads": 0,
+              "viewCalls": {
+                "applyEdit": 1
+              },
+              "ranges": [
+                {
+                  "start": 0,
+                  "end": 0,
+                  "length": 12834064
+                },
+                {
+                  "start": 0,
+                  "end": 6,
+                  "length": 12834071
+                },
+                {
+                  "start": 7,
+                  "end": 28,
+                  "length": 12834071
+                },
+                {
+                  "start": 29,
+                  "end": 49,
+                  "length": 12834071
+                },
+                {
+                  "start": 50,
+                  "end": 69,
+                  "length": 12834071
+                },
+                {
+                  "start": 70,
+                  "end": 90,
+                  "length": 12834071
+                },
+                {
+                  "start": 91,
+                  "end": 111,
+                  "length": 12834071
+                },
+                {
+                  "start": 112,
+                  "end": 132,
+                  "length": 12834071
+                },
+                {
+                  "start": 133,
+                  "end": 152,
+                  "length": 12834071
+                },
+                {
+                  "start": 153,
+                  "end": 173,
+                  "length": 12834071
+                },
+                {
+                  "start": 174,
+                  "end": 194,
+                  "length": 12834071
+                },
+                {
+                  "start": 195,
+                  "end": 215,
+                  "length": 12834071
+                }
+              ],
+              "committedEvents": 1,
+              "viewUpdatedEvents": 1
+            },
+            "projection": {
+              "instanceReplaced": false,
+              "work": {
+                "sourceBytesRead": 2122,
+                "materializedRows": 52,
+                "materializedTextBytes": 2122,
+                "indexEntriesTouched": 1,
+                "summaryLinesMeasured": 0
+              },
+              "retained": {
+                "sourceBytesRead": 153864,
+                "materializedRows": 3745,
+                "materializedTextBytes": 153864,
+                "indexEntriesTouched": 36,
+                "summaryLinesMeasured": 0,
+                "cachedRows": 52,
+                "cachedTextBytes": 2122,
+                "indexNodes": 1,
+                "summaryBytes": 64
+              }
+            },
+            "correctness": {
+              "mountedRows": 52,
+              "scrollTop": 0,
+              "projections": null
+            }
+          }
+        },
+        {
+          "fixture": "short-lines",
+          "kind": "sparse-batch",
+          "decorated": false,
+          "utf16Length": 12834064,
+          "fixtureSha256": "2bacff110d8d3fe9b5d12e1ea6cc5cfb31d2a344d22119b49222674196352c6a",
+          "p50Ms": 0.5903769999999895,
+          "p95Ms": 0.7072259999999915,
+          "samples": [
+            0.5965550000000803, 0.5628400000000511, 0.7196489999998903, 0.6233230000000276,
+            0.5566039999998793, 0.6837279999999737, 0.6390470000001187, 0.5503049999999803,
+            0.5979889999998704, 0.6559400000001006, 0.5905779999998231, 0.6299599999997554,
+            0.6083899999998721, 0.5820619999999508, 0.555674000000181, 0.7072259999999915,
+            0.557021000000077, 0.5637679999999818, 0.5499479999998584, 0.5730929999999717,
+            0.5810489999998936, 0.5995200000002114, 0.6289890000002742, 0.5127959999999803,
+            0.5903769999999895, 0.627704999999878, 0.5500650000003589, 0.5726250000002437,
+            0.5401959999999235, 0.6763240000000224
+          ],
+          "diagnostic": {
+            "durationMs": 0.7210140000001957,
+            "counters": {
+              "sourceBytesRead": 2122,
+              "sourceIndexBytesRead": 14,
+              "fullTextReads": 0,
+              "fullTextBytesRead": 0,
+              "materializedStrings": 52,
+              "materializeFullTextCalls": 0,
+              "projectionResetCalls": 1,
+              "rangeReadCalls": 52,
+              "maxRangeUtf16Length": 21,
+              "unchangedGapReads": 0,
+              "viewCalls": {
+                "setText": 1
+              },
+              "ranges": [
+                {
+                  "start": 0,
+                  "end": 6,
+                  "length": 12834078
+                },
+                {
+                  "start": 7,
+                  "end": 28,
+                  "length": 12834078
+                },
+                {
+                  "start": 29,
+                  "end": 49,
+                  "length": 12834078
+                },
+                {
+                  "start": 50,
+                  "end": 69,
+                  "length": 12834078
+                },
+                {
+                  "start": 70,
+                  "end": 90,
+                  "length": 12834078
+                },
+                {
+                  "start": 91,
+                  "end": 111,
+                  "length": 12834078
+                },
+                {
+                  "start": 112,
+                  "end": 132,
+                  "length": 12834078
+                },
+                {
+                  "start": 133,
+                  "end": 152,
+                  "length": 12834078
+                },
+                {
+                  "start": 153,
+                  "end": 173,
+                  "length": 12834078
+                },
+                {
+                  "start": 174,
+                  "end": 194,
+                  "length": 12834078
+                },
+                {
+                  "start": 195,
+                  "end": 215,
+                  "length": 12834078
+                },
+                {
+                  "start": 216,
+                  "end": 237,
+                  "length": 12834078
+                }
+              ],
+              "committedEvents": 1,
+              "viewUpdatedEvents": 1
+            },
+            "projection": {
+              "instanceReplaced": false,
+              "work": {
+                "sourceBytesRead": 2122,
+                "materializedRows": 52,
+                "materializedTextBytes": 2122,
+                "indexEntriesTouched": 0,
+                "summaryLinesMeasured": 0
+              },
+              "retained": {
+                "sourceBytesRead": 153864,
+                "materializedRows": 3745,
+                "materializedTextBytes": 153864,
+                "indexEntriesTouched": 0,
+                "summaryLinesMeasured": 0,
+                "cachedRows": 52,
+                "cachedTextBytes": 2122,
+                "indexNodes": 1,
+                "summaryBytes": 64
+              }
+            },
+            "correctness": {
+              "mountedRows": 52,
+              "scrollTop": 0,
+              "projections": null
+            }
+          }
+        },
+        {
+          "fixture": "short-lines",
+          "kind": "single-edit",
+          "decorated": true,
+          "utf16Length": 12834064,
+          "fixtureSha256": "2bacff110d8d3fe9b5d12e1ea6cc5cfb31d2a344d22119b49222674196352c6a",
+          "p50Ms": 1.926372999999785,
+          "p95Ms": 2.1115930000000844,
+          "samples": [
+            2.094561999999769, 1.9218670000000202, 1.8442439999998896, 1.9753709999999955,
+            1.9074420000001737, 2.1081159999998818, 1.9309520000001612, 2.0263199999999415,
+            2.131285999999818, 2.07558999999992, 1.926372999999785, 2.1115930000000844,
+            1.8504720000000816, 1.9003819999998086, 1.9380799999998999, 1.9062380000000303,
+            1.8408369999997376, 2.0531599999999344, 1.9232969999998204, 1.9117590000000746,
+            2.081485000000157, 1.9090350000001308, 1.854558999999881, 2.1057129999999233,
+            1.8694770000001881, 1.9280359999997927, 1.8736049999997704, 1.945506000000023,
+            1.8866830000001755, 1.9680670000002465
+          ],
+          "diagnostic": {
+            "durationMs": 1.97653500000024,
+            "counters": {
+              "sourceBytesRead": 2118,
+              "sourceIndexBytesRead": 14,
+              "fullTextReads": 0,
+              "fullTextBytesRead": 0,
+              "materializedStrings": 52,
+              "materializeFullTextCalls": 0,
+              "projectionResetCalls": 0,
+              "rangeReadCalls": 54,
+              "maxRangeUtf16Length": 21,
+              "unchangedGapReads": 0,
+              "viewCalls": {
+                "applyEdit": 1
+              },
+              "ranges": [
+                {
+                  "start": 0,
+                  "end": 0,
+                  "length": 12834064
+                },
+                {
+                  "start": 0,
+                  "end": 0,
+                  "length": 12834064
+                },
+                {
+                  "start": 0,
+                  "end": 6,
+                  "length": 12834071
+                },
+                {
+                  "start": 7,
+                  "end": 28,
+                  "length": 12834071
+                },
+                {
+                  "start": 29,
+                  "end": 49,
+                  "length": 12834071
+                },
+                {
+                  "start": 50,
+                  "end": 69,
+                  "length": 12834071
+                },
+                {
+                  "start": 70,
+                  "end": 90,
+                  "length": 12834071
+                },
+                {
+                  "start": 91,
+                  "end": 111,
+                  "length": 12834071
+                },
+                {
+                  "start": 112,
+                  "end": 132,
+                  "length": 12834071
+                },
+                {
+                  "start": 133,
+                  "end": 152,
+                  "length": 12834071
+                },
+                {
+                  "start": 153,
+                  "end": 173,
+                  "length": 12834071
+                },
+                {
+                  "start": 174,
+                  "end": 194,
+                  "length": 12834071
+                }
+              ],
+              "committedEvents": 1,
+              "viewUpdatedEvents": 1
+            },
+            "projection": {
+              "instanceReplaced": false,
+              "work": {
+                "sourceBytesRead": 2118,
+                "materializedRows": 52,
+                "materializedTextBytes": 2118,
+                "indexEntriesTouched": 3,
+                "summaryLinesMeasured": 0
+              },
+              "retained": {
+                "sourceBytesRead": 231048,
+                "materializedRows": 5617,
+                "materializedTextBytes": 231048,
+                "indexEntriesTouched": 180,
+                "summaryLinesMeasured": 0,
+                "cachedRows": 52,
+                "cachedTextBytes": 2118,
+                "indexNodes": 7,
+                "summaryBytes": 448
+              }
+            },
+            "correctness": {
+              "mountedRows": 52,
+              "scrollTop": 0,
+              "projections": {
+                "inputTokens": 10000,
+                "retainedTokens": 10000,
+                "tokensCorrect": true,
+                "collapsedFolds": 1,
+                "foldCorrect": true
+              }
+            }
+          }
+        },
+        {
+          "fixture": "short-lines",
+          "kind": "sparse-batch",
+          "decorated": true,
+          "utf16Length": 12834064,
+          "fixtureSha256": "2bacff110d8d3fe9b5d12e1ea6cc5cfb31d2a344d22119b49222674196352c6a",
+          "p50Ms": 1.7845500000003085,
+          "p95Ms": 1.9458389999999781,
+          "samples": [
+            1.7945169999998143, 1.796252000000095, 1.7512539999997898, 1.7840290000003733,
+            1.7333659999999327, 1.8701059999998506, 1.7784769999998389, 1.811471999999867,
+            1.9561429999998836, 1.7666519999997945, 1.7695039999998698, 1.7900909999998476,
+            1.7693920000001526, 1.7757540000002336, 1.835283999999774, 1.7144969999999375,
+            1.7845500000003085, 1.79671800000051, 1.7112720000004629, 1.7088940000003277,
+            1.9458389999999781, 1.789534999999887, 1.7272389999998268, 1.918044000000009,
+            1.790990999999849, 1.8149060000005193, 1.8501280000000406, 1.7524979999998322,
+            1.7566100000003644, 1.8137540000006993
+          ],
+          "diagnostic": {
+            "durationMs": 1.8115859999998065,
+            "counters": {
+              "sourceBytesRead": 4274,
+              "sourceIndexBytesRead": 14,
+              "fullTextReads": 0,
+              "fullTextBytesRead": 0,
+              "materializedStrings": 104,
+              "materializeFullTextCalls": 0,
+              "projectionResetCalls": 1,
+              "rangeReadCalls": 104,
+              "maxRangeUtf16Length": 21,
+              "unchangedGapReads": 0,
+              "viewCalls": {
+                "setText": 1
+              },
+              "ranges": [
+                {
+                  "start": 0,
+                  "end": 21,
+                  "length": 12834064
+                },
+                {
+                  "start": 22,
+                  "end": 42,
+                  "length": 12834064
+                },
+                {
+                  "start": 43,
+                  "end": 62,
+                  "length": 12834064
+                },
+                {
+                  "start": 63,
+                  "end": 83,
+                  "length": 12834064
+                },
+                {
+                  "start": 84,
+                  "end": 104,
+                  "length": 12834064
+                },
+                {
+                  "start": 105,
+                  "end": 125,
+                  "length": 12834064
+                },
+                {
+                  "start": 126,
+                  "end": 145,
+                  "length": 12834064
+                },
+                {
+                  "start": 146,
+                  "end": 166,
+                  "length": 12834064
+                },
+                {
+                  "start": 167,
+                  "end": 187,
+                  "length": 12834064
+                },
+                {
+                  "start": 188,
+                  "end": 208,
+                  "length": 12834064
+                },
+                {
+                  "start": 209,
+                  "end": 230,
+                  "length": 12834064
+                },
+                {
+                  "start": 231,
+                  "end": 252,
+                  "length": 12834064
+                }
+              ],
+              "committedEvents": 1,
+              "viewUpdatedEvents": 1
+            },
+            "projection": {
+              "instanceReplaced": false,
+              "work": {
+                "sourceBytesRead": 4274,
+                "materializedRows": 104,
+                "materializedTextBytes": 4274,
+                "indexEntriesTouched": 3,
+                "summaryLinesMeasured": 0
+              },
+              "retained": {
+                "sourceBytesRead": 308664,
+                "materializedRows": 7489,
+                "materializedTextBytes": 308664,
+                "indexEntriesTouched": 180,
+                "summaryLinesMeasured": 0,
+                "cachedRows": 52,
+                "cachedTextBytes": 2122,
+                "indexNodes": 1,
+                "summaryBytes": 64
+              }
+            },
+            "correctness": {
+              "mountedRows": 52,
+              "scrollTop": 0,
+              "projections": {
+                "inputTokens": 10000,
+                "retainedTokens": 0,
+                "tokensCorrect": false,
+                "collapsedFolds": 0,
+                "foldCorrect": false
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "capturedAt": "2026-09-11T21:09:41.464Z",
+      "coreDirectory": "/work/tmp/e032-baseline/packages/editor",
+      "sourceSha256": "5645f00f182bde5df26706da351c7b2c69fdaae8f1c0fcac52b4c1dcf30085ab",
+      "runtime": "Bun 1.4.0",
+      "cpu": "Intel(R) Core(TM) i7-14700K",
+      "generatorVersion": 1,
+      "seed": 60061,
+      "repetitions": 30,
+      "warmups": 5,
+      "configuration": {
+        "environment": "happy-dom",
+        "viewport": {
+          "width": 800,
+          "height": 800
+        },
+        "rowHeight": 20,
+        "characterWidth": 8,
+        "wrap": false,
+        "syntax": false,
+        "plugins": [],
+        "timingsHaveDiagnostics": false
+      },
+      "measurement": "Synchronous Editor.edit through session commit, projection and mounted DOM reconciliation; excludes deferred consumers and browser layout/paint. Diagnostic run is separate. UTF-16 bytes count requested payloads including repeats.",
+      "retainedHeap": {
+        "supported": false,
+        "reason": "happy-dom host and runtime heap include fixture generation, source snapshots, cancelled deferred work, and GC scheduling; retained row/cache/index counters are reported instead."
+      },
+      "groups": [
+        {
+          "fixture": "ordinary",
+          "kind": "single-edit",
+          "decorated": false,
+          "utf16Length": 4469,
+          "fixtureSha256": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+          "p50Ms": 0.7263469999999757,
+          "p95Ms": 1.0173929999999984,
+          "samples": [
+            0.9495850000000132, 0.9115490000000079, 0.9379749999999945, 1.0173929999999984,
+            0.9193860000000029, 0.8637860000000046, 0.913139000000001, 0.9211300000000051,
+            0.9002979999999923, 0.8361299999999972, 0.9380740000000003, 1.145764999999983,
+            0.906784000000016, 0.7409600000000012, 0.633466999999996, 0.5965260000000114,
+            0.6386849999999811, 0.5824470000000019, 0.5636109999999803, 0.5700180000000046,
+            0.6009689999999921, 0.5698579999999822, 0.5718589999999892, 0.5572940000000131,
+            0.5630409999999983, 0.5596950000000049, 0.5678780000000074, 0.6726229999999873,
+            0.8287799999999947, 0.7263469999999757
+          ],
+          "diagnostic": {
+            "durationMs": 4.397941000000003,
+            "counters": {
+              "sourceBytesRead": 2122,
+              "sourceIndexBytesRead": 14,
+              "fullTextReads": 0,
+              "fullTextBytesRead": 0,
+              "materializedStrings": 52,
+              "materializeFullTextCalls": 0,
+              "projectionResetCalls": 0,
+              "rangeReadCalls": 53,
+              "maxRangeUtf16Length": 21,
+              "unchangedGapReads": 0,
+              "viewCalls": {
+                "applyEdit": 1
+              },
+              "ranges": [
+                {
+                  "start": 0,
+                  "end": 0,
+                  "length": 4469
+                },
+                {
+                  "start": 0,
+                  "end": 6,
+                  "length": 4476
+                },
+                {
+                  "start": 7,
+                  "end": 28,
+                  "length": 4476
+                },
+                {
+                  "start": 29,
+                  "end": 49,
+                  "length": 4476
+                },
+                {
+                  "start": 50,
+                  "end": 69,
+                  "length": 4476
+                },
+                {
+                  "start": 70,
+                  "end": 90,
+                  "length": 4476
+                },
+                {
+                  "start": 91,
+                  "end": 111,
+                  "length": 4476
+                },
+                {
+                  "start": 112,
+                  "end": 132,
+                  "length": 4476
+                },
+                {
+                  "start": 133,
+                  "end": 152,
+                  "length": 4476
+                },
+                {
+                  "start": 153,
+                  "end": 173,
+                  "length": 4476
+                },
+                {
+                  "start": 174,
+                  "end": 194,
+                  "length": 4476
+                },
+                {
+                  "start": 195,
+                  "end": 215,
+                  "length": 4476
+                }
+              ],
+              "committedEvents": 1,
+              "viewUpdatedEvents": 1
+            },
+            "projection": {
+              "instanceReplaced": false,
+              "work": {
+                "sourceBytesRead": 2122,
+                "materializedRows": 52,
+                "materializedTextBytes": 2122,
+                "indexEntriesTouched": 1,
+                "summaryLinesMeasured": 0
+              },
+              "retained": {
+                "sourceBytesRead": 153864,
+                "materializedRows": 3745,
+                "materializedTextBytes": 153864,
+                "indexEntriesTouched": 36,
+                "summaryLinesMeasured": 0,
+                "cachedRows": 52,
+                "cachedTextBytes": 2122,
+                "indexNodes": 1,
+                "summaryBytes": 64
+              }
+            },
+            "correctness": {
+              "mountedRows": 52,
+              "scrollTop": 0,
+              "projections": null
+            }
+          }
+        },
+        {
+          "fixture": "ordinary",
+          "kind": "sparse-batch",
+          "decorated": false,
+          "utf16Length": 4469,
+          "fixtureSha256": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+          "p50Ms": 0.5409280000000081,
+          "p95Ms": 0.9880139999999926,
+          "samples": [
+            0.9880139999999926, 0.9848579999999743, 0.6305289999999957, 0.54938199999998,
+            0.5409280000000081, 0.5683959999999786, 0.5303399999999954, 0.6132199999999841,
+            0.5875100000000089, 0.5992020000000196, 0.6035710000000165, 0.5742470000000139,
+            0.6422799999999995, 1.1085499999999797, 0.5892539999999826, 0.5032400000000052,
+            0.5117909999999881, 0.48107400000000666, 0.6224140000000205, 0.5299940000000163,
+            0.5463979999999822, 0.4997629999999731, 0.4727809999999977, 0.4669460000000072,
+            0.4729629999999929, 0.4842739999999992, 0.479834000000011, 0.5126209999999958,
+            0.4819139999999891, 0.4971869999999967
+          ],
+          "diagnostic": {
+            "durationMs": 0.5683680000000209,
+            "counters": {
+              "sourceBytesRead": 2122,
+              "sourceIndexBytesRead": 14,
+              "fullTextReads": 0,
+              "fullTextBytesRead": 0,
+              "materializedStrings": 52,
+              "materializeFullTextCalls": 0,
+              "projectionResetCalls": 1,
+              "rangeReadCalls": 52,
+              "maxRangeUtf16Length": 21,
+              "unchangedGapReads": 0,
+              "viewCalls": {
+                "setText": 1
+              },
+              "ranges": [
+                {
+                  "start": 0,
+                  "end": 6,
+                  "length": 4483
+                },
+                {
+                  "start": 7,
+                  "end": 28,
+                  "length": 4483
+                },
+                {
+                  "start": 29,
+                  "end": 49,
+                  "length": 4483
+                },
+                {
+                  "start": 50,
+                  "end": 69,
+                  "length": 4483
+                },
+                {
+                  "start": 70,
+                  "end": 90,
+                  "length": 4483
+                },
+                {
+                  "start": 91,
+                  "end": 111,
+                  "length": 4483
+                },
+                {
+                  "start": 112,
+                  "end": 132,
+                  "length": 4483
+                },
+                {
+                  "start": 133,
+                  "end": 152,
+                  "length": 4483
+                },
+                {
+                  "start": 153,
+                  "end": 173,
+                  "length": 4483
+                },
+                {
+                  "start": 174,
+                  "end": 194,
+                  "length": 4483
+                },
+                {
+                  "start": 195,
+                  "end": 215,
+                  "length": 4483
+                },
+                {
+                  "start": 216,
+                  "end": 237,
+                  "length": 4483
+                }
+              ],
+              "committedEvents": 1,
+              "viewUpdatedEvents": 1
+            },
+            "projection": {
+              "instanceReplaced": false,
+              "work": {
+                "sourceBytesRead": 2122,
+                "materializedRows": 52,
+                "materializedTextBytes": 2122,
+                "indexEntriesTouched": 0,
+                "summaryLinesMeasured": 0
+              },
+              "retained": {
+                "sourceBytesRead": 153864,
+                "materializedRows": 3745,
+                "materializedTextBytes": 153864,
+                "indexEntriesTouched": 0,
+                "summaryLinesMeasured": 0,
+                "cachedRows": 52,
+                "cachedTextBytes": 2122,
+                "indexNodes": 1,
+                "summaryBytes": 64
+              }
+            },
+            "correctness": {
+              "mountedRows": 52,
+              "scrollTop": 0,
+              "projections": null
+            }
+          }
+        },
+        {
+          "fixture": "ordinary",
+          "kind": "single-edit",
+          "decorated": true,
+          "utf16Length": 4469,
+          "fixtureSha256": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+          "p50Ms": 1.346830999999952,
+          "p95Ms": 3.2760220000000118,
+          "samples": [
+            1.4419809999999984, 1.3759739999999852, 1.346830999999952, 1.4951369999999997,
+            3.353736999999967, 1.376382000000035, 1.3845760000000382, 1.3408360000000243,
+            1.3095900000000142, 1.3363339999999653, 1.275291999999979, 1.3228689999999688,
+            1.4897809999999936, 1.4428389999999922, 1.4441560000000209, 1.3634500000000003,
+            1.323666000000003, 1.2680189999999811, 1.2763220000000501, 1.2490290000000073,
+            1.253979999999956, 1.3810300000000097, 1.3596059999999852, 3.2760220000000118,
+            1.252476999999999, 1.2309890000000223, 1.4619339999999852, 1.4062109999999848,
+            1.2957850000000235, 1.2415409999999838
+          ],
+          "diagnostic": {
+            "durationMs": 1.4744949999999903,
+            "counters": {
+              "sourceBytesRead": 2118,
+              "sourceIndexBytesRead": 14,
+              "fullTextReads": 0,
+              "fullTextBytesRead": 0,
+              "materializedStrings": 52,
+              "materializeFullTextCalls": 0,
+              "projectionResetCalls": 0,
+              "rangeReadCalls": 54,
+              "maxRangeUtf16Length": 21,
+              "unchangedGapReads": 0,
+              "viewCalls": {
+                "applyEdit": 1
+              },
+              "ranges": [
+                {
+                  "start": 0,
+                  "end": 0,
+                  "length": 4469
+                },
+                {
+                  "start": 0,
+                  "end": 0,
+                  "length": 4469
+                },
+                {
+                  "start": 0,
+                  "end": 6,
+                  "length": 4476
+                },
+                {
+                  "start": 7,
+                  "end": 28,
+                  "length": 4476
+                },
+                {
+                  "start": 29,
+                  "end": 49,
+                  "length": 4476
+                },
+                {
+                  "start": 50,
+                  "end": 69,
+                  "length": 4476
+                },
+                {
+                  "start": 70,
+                  "end": 90,
+                  "length": 4476
+                },
+                {
+                  "start": 91,
+                  "end": 111,
+                  "length": 4476
+                },
+                {
+                  "start": 112,
+                  "end": 132,
+                  "length": 4476
+                },
+                {
+                  "start": 133,
+                  "end": 152,
+                  "length": 4476
+                },
+                {
+                  "start": 153,
+                  "end": 173,
+                  "length": 4476
+                },
+                {
+                  "start": 174,
+                  "end": 194,
+                  "length": 4476
+                }
+              ],
+              "committedEvents": 1,
+              "viewUpdatedEvents": 1
+            },
+            "projection": {
+              "instanceReplaced": false,
+              "work": {
+                "sourceBytesRead": 2118,
+                "materializedRows": 52,
+                "materializedTextBytes": 2118,
+                "indexEntriesTouched": 3,
+                "summaryLinesMeasured": 0
+              },
+              "retained": {
+                "sourceBytesRead": 231048,
+                "materializedRows": 5617,
+                "materializedTextBytes": 231048,
+                "indexEntriesTouched": 180,
+                "summaryLinesMeasured": 0,
+                "cachedRows": 52,
+                "cachedTextBytes": 2118,
+                "indexNodes": 7,
+                "summaryBytes": 448
+              }
+            },
+            "correctness": {
+              "mountedRows": 52,
+              "scrollTop": 0,
+              "projections": {
+                "inputTokens": 199,
+                "retainedTokens": 199,
+                "tokensCorrect": true,
+                "collapsedFolds": 1,
+                "foldCorrect": true
+              }
+            }
+          }
+        },
+        {
+          "fixture": "ordinary",
+          "kind": "sparse-batch",
+          "decorated": true,
+          "utf16Length": 4469,
+          "fixtureSha256": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+          "p50Ms": 1.3026869999999917,
+          "p95Ms": 3.013507000000004,
+          "samples": [
+            1.370808000000011, 1.4497559999999794, 1.5626249999999686, 1.378830999999991,
+            1.3483100000000263, 1.2754869999999983, 3.013507000000004, 1.355450000000019,
+            1.3231820000000312, 1.2804709999999773, 1.3059059999999931, 1.2799669999999992,
+            1.2574880000000235, 1.3026869999999917, 1.2675510000000259, 1.2821720000000028,
+            1.227361999999971, 1.5387489999999957, 1.3110220000000368, 1.269215000000031,
+            1.2797760000000267, 1.2973460000000046, 1.3074359999999956, 1.327021000000002,
+            1.2781140000000164, 1.3515859999999975, 1.2554339999999797, 1.2920419999999808,
+            5.120201000000009, 1.2691239999999766
+          ],
+          "diagnostic": {
+            "durationMs": 1.3500250000000165,
+            "counters": {
+              "sourceBytesRead": 4274,
+              "sourceIndexBytesRead": 14,
+              "fullTextReads": 0,
+              "fullTextBytesRead": 0,
+              "materializedStrings": 104,
+              "materializeFullTextCalls": 0,
+              "projectionResetCalls": 1,
+              "rangeReadCalls": 104,
+              "maxRangeUtf16Length": 21,
+              "unchangedGapReads": 0,
+              "viewCalls": {
+                "setText": 1
+              },
+              "ranges": [
+                {
+                  "start": 0,
+                  "end": 21,
+                  "length": 4469
+                },
+                {
+                  "start": 22,
+                  "end": 42,
+                  "length": 4469
+                },
+                {
+                  "start": 43,
+                  "end": 62,
+                  "length": 4469
+                },
+                {
+                  "start": 63,
+                  "end": 83,
+                  "length": 4469
+                },
+                {
+                  "start": 84,
+                  "end": 104,
+                  "length": 4469
+                },
+                {
+                  "start": 105,
+                  "end": 125,
+                  "length": 4469
+                },
+                {
+                  "start": 126,
+                  "end": 145,
+                  "length": 4469
+                },
+                {
+                  "start": 146,
+                  "end": 166,
+                  "length": 4469
+                },
+                {
+                  "start": 167,
+                  "end": 187,
+                  "length": 4469
+                },
+                {
+                  "start": 188,
+                  "end": 208,
+                  "length": 4469
+                },
+                {
+                  "start": 209,
+                  "end": 230,
+                  "length": 4469
+                },
+                {
+                  "start": 231,
+                  "end": 252,
+                  "length": 4469
+                }
+              ],
+              "committedEvents": 1,
+              "viewUpdatedEvents": 1
+            },
+            "projection": {
+              "instanceReplaced": false,
+              "work": {
+                "sourceBytesRead": 4274,
+                "materializedRows": 104,
+                "materializedTextBytes": 4274,
+                "indexEntriesTouched": 3,
+                "summaryLinesMeasured": 0
+              },
+              "retained": {
+                "sourceBytesRead": 308664,
+                "materializedRows": 7489,
+                "materializedTextBytes": 308664,
+                "indexEntriesTouched": 180,
+                "summaryLinesMeasured": 0,
+                "cachedRows": 52,
+                "cachedTextBytes": 2122,
+                "indexNodes": 1,
+                "summaryBytes": 64
+              }
+            },
+            "correctness": {
+              "mountedRows": 52,
+              "scrollTop": 0,
+              "projections": {
+                "inputTokens": 199,
+                "retainedTokens": 0,
+                "tokensCorrect": false,
+                "collapsedFolds": 0,
+                "foldCorrect": false
+              }
+            }
+          }
+        },
+        {
+          "fixture": "long-line",
+          "kind": "single-edit",
+          "decorated": false,
+          "utf16Length": 1048594,
+          "fixtureSha256": "467fa816efc5aa5c082ed44ea4dc10bbbb41da16faf4d4822aa3d122edc628f7",
+          "p50Ms": 0.5342880000000605,
+          "p95Ms": 1.208742999999913,
+          "samples": [
+            0.6472290000000385, 0.5857540000000654, 0.6565799999999626, 1.208742999999913,
+            0.6088089999999511, 0.5511050000000068, 0.5356649999999945, 0.5262419999999111,
+            0.5378920000000562, 0.5968049999999039, 0.5087589999999409, 0.5408779999999069,
+            0.5724290000000565, 0.5993460000000823, 0.5707919999999831, 0.5108850000000302,
+            0.4856199999999262, 0.4479780000000346, 0.5241119999999455, 0.5247640000000047,
+            0.5618610000000217, 0.46961399999997866, 0.45480799999995725, 0.5175140000000056,
+            3.4378419999999323, 0.5342880000000605, 0.49988600000006045, 0.4705149999999776,
+            0.5146720000000187, 0.4733569999999645
+          ],
+          "diagnostic": {
+            "durationMs": 0.5320120000000088,
+            "counters": {
+              "sourceBytesRead": 4108,
+              "sourceIndexBytesRead": 2097202,
+              "fullTextReads": 0,
+              "fullTextBytesRead": 0,
+              "materializedStrings": 2,
+              "materializeFullTextCalls": 0,
+              "projectionResetCalls": 0,
+              "rangeReadCalls": 3,
+              "maxRangeUtf16Length": 2048,
+              "unchangedGapReads": 0,
+              "viewCalls": {
+                "applyEdit": 1
+              },
+              "ranges": [
+                {
+                  "start": 0,
+                  "end": 0,
+                  "length": 1048594
+                },
+                {
+                  "start": 0,
+                  "end": 6,
+                  "length": 1048601
+                },
+                {
+                  "start": 7,
+                  "end": 2055,
+                  "length": 1048601
+                }
+              ],
+              "committedEvents": 1,
+              "viewUpdatedEvents": 1
+            },
+            "projection": {
+              "instanceReplaced": false,
+              "work": {
+                "sourceBytesRead": 32782,
+                "materializedRows": 2,
+                "materializedTextBytes": 12,
+                "indexEntriesTouched": 0,
+                "summaryLinesMeasured": 0
+              },
+              "retained": {
+                "sourceBytesRead": 2064960,
+                "materializedRows": 109,
+                "materializedTextBytes": 432,
+                "indexEntriesTouched": 0,
+                "summaryLinesMeasured": 0,
+                "cachedRows": 2,
+                "cachedTextBytes": 12,
+                "indexNodes": 1,
+                "summaryBytes": 64
+              }
+            },
+            "correctness": {
+              "mountedRows": 2,
+              "scrollTop": 0,
+              "projections": null
+            }
+          }
+        },
+        {
+          "fixture": "long-line",
+          "kind": "sparse-batch",
+          "decorated": false,
+          "utf16Length": 1048594,
+          "fixtureSha256": "467fa816efc5aa5c082ed44ea4dc10bbbb41da16faf4d4822aa3d122edc628f7",
+          "p50Ms": 0.4822229999999763,
+          "p95Ms": 0.5674960000000056,
+          "samples": [
+            0.5324739999999792, 0.4832250000000613, 0.467687000000069, 0.4721540000000459,
+            0.5086880000000065, 0.5055639999999357, 0.4631840000000693, 0.46250099999997474,
+            0.45507100000008904, 0.5674960000000056, 0.47357499999998254, 0.46347800000000916,
+            0.5254509999999755, 0.5014060000000882, 0.5108810000000403, 0.4943430000000717,
+            0.49156700000003184, 0.514829000000077, 0.480495000000019, 0.4753200000000106,
+            0.4811489999999594, 0.4792569999999614, 0.49494000000004235, 0.5393139999999903,
+            0.5055830000000014, 0.574092999999948, 0.4822229999999763, 0.46927100000004884,
+            0.42520200000001296, 0.45261900000002697
+          ],
+          "diagnostic": {
+            "durationMs": 0.4514890000000378,
+            "counters": {
+              "sourceBytesRead": 4120,
+              "sourceIndexBytesRead": 2097216,
+              "fullTextReads": 0,
+              "fullTextBytesRead": 0,
+              "materializedStrings": 3,
+              "materializeFullTextCalls": 0,
+              "projectionResetCalls": 1,
+              "rangeReadCalls": 3,
+              "maxRangeUtf16Length": 2048,
+              "unchangedGapReads": 0,
+              "viewCalls": {
+                "setText": 1
+              },
+              "ranges": [
+                {
+                  "start": 0,
+                  "end": 6,
+                  "length": 1048608
+                },
+                {
+                  "start": 1048602,
+                  "end": 1048608,
+                  "length": 1048608
+                },
+                {
+                  "start": 7,
+                  "end": 2055,
+                  "length": 1048608
+                }
+              ],
+              "committedEvents": 1,
+              "viewUpdatedEvents": 1
+            },
+            "projection": {
+              "instanceReplaced": false,
+              "work": {
+                "sourceBytesRead": 24602,
+                "materializedRows": 3,
+                "materializedTextBytes": 24,
+                "indexEntriesTouched": 0,
+                "summaryLinesMeasured": 0
+              },
+              "retained": {
+                "sourceBytesRead": 1770480,
+                "materializedRows": 145,
+                "materializedTextBytes": 864,
+                "indexEntriesTouched": 0,
+                "summaryLinesMeasured": 0,
+                "cachedRows": 3,
+                "cachedTextBytes": 24,
+                "indexNodes": 1,
+                "summaryBytes": 64
+              }
+            },
+            "correctness": {
+              "mountedRows": 3,
+              "scrollTop": 0,
+              "projections": null
+            }
+          }
+        },
+        {
+          "fixture": "short-lines",
+          "kind": "single-edit",
+          "decorated": false,
+          "utf16Length": 12834064,
+          "fixtureSha256": "2bacff110d8d3fe9b5d12e1ea6cc5cfb31d2a344d22119b49222674196352c6a",
+          "p50Ms": 0.6742770000000746,
+          "p95Ms": 1.4636050000001433,
+          "samples": [
+            0.7175220000000309, 0.6678349999999682, 0.7195959999999104, 0.6846810000001824,
+            0.9351299999998446, 0.6622730000001411, 0.6656689999999799, 0.6622610000001714,
+            0.7776659999999538, 1.4636050000001433, 1.0560890000001564, 0.7191350000000511,
+            0.8476650000000063, 0.6933550000001105, 0.7055579999998827, 0.6745569999998224,
+            0.6528490000000602, 0.6742770000000746, 0.7239660000000185, 0.7195330000001832,
+            0.6128140000000712, 0.6432039999999688, 0.5773270000001958, 0.5925990000000638,
+            3.509158999999954, 0.6701779999998507, 0.5867120000000341, 0.6011379999999917,
+            0.6261879999999564, 0.5792930000000069
+          ],
+          "diagnostic": {
+            "durationMs": 0.6659260000001268,
+            "counters": {
+              "sourceBytesRead": 2122,
+              "sourceIndexBytesRead": 14,
+              "fullTextReads": 0,
+              "fullTextBytesRead": 0,
+              "materializedStrings": 52,
+              "materializeFullTextCalls": 0,
+              "projectionResetCalls": 0,
+              "rangeReadCalls": 53,
+              "maxRangeUtf16Length": 21,
+              "unchangedGapReads": 0,
+              "viewCalls": {
+                "applyEdit": 1
+              },
+              "ranges": [
+                {
+                  "start": 0,
+                  "end": 0,
+                  "length": 12834064
+                },
+                {
+                  "start": 0,
+                  "end": 6,
+                  "length": 12834071
+                },
+                {
+                  "start": 7,
+                  "end": 28,
+                  "length": 12834071
+                },
+                {
+                  "start": 29,
+                  "end": 49,
+                  "length": 12834071
+                },
+                {
+                  "start": 50,
+                  "end": 69,
+                  "length": 12834071
+                },
+                {
+                  "start": 70,
+                  "end": 90,
+                  "length": 12834071
+                },
+                {
+                  "start": 91,
+                  "end": 111,
+                  "length": 12834071
+                },
+                {
+                  "start": 112,
+                  "end": 132,
+                  "length": 12834071
+                },
+                {
+                  "start": 133,
+                  "end": 152,
+                  "length": 12834071
+                },
+                {
+                  "start": 153,
+                  "end": 173,
+                  "length": 12834071
+                },
+                {
+                  "start": 174,
+                  "end": 194,
+                  "length": 12834071
+                },
+                {
+                  "start": 195,
+                  "end": 215,
+                  "length": 12834071
+                }
+              ],
+              "committedEvents": 1,
+              "viewUpdatedEvents": 1
+            },
+            "projection": {
+              "instanceReplaced": false,
+              "work": {
+                "sourceBytesRead": 2122,
+                "materializedRows": 52,
+                "materializedTextBytes": 2122,
+                "indexEntriesTouched": 1,
+                "summaryLinesMeasured": 0
+              },
+              "retained": {
+                "sourceBytesRead": 153864,
+                "materializedRows": 3745,
+                "materializedTextBytes": 153864,
+                "indexEntriesTouched": 36,
+                "summaryLinesMeasured": 0,
+                "cachedRows": 52,
+                "cachedTextBytes": 2122,
+                "indexNodes": 1,
+                "summaryBytes": 64
+              }
+            },
+            "correctness": {
+              "mountedRows": 52,
+              "scrollTop": 0,
+              "projections": null
+            }
+          }
+        },
+        {
+          "fixture": "short-lines",
+          "kind": "sparse-batch",
+          "decorated": false,
+          "utf16Length": 12834064,
+          "fixtureSha256": "2bacff110d8d3fe9b5d12e1ea6cc5cfb31d2a344d22119b49222674196352c6a",
+          "p50Ms": 0.5999900000001617,
+          "p95Ms": 1.5807629999999335,
+          "samples": [
+            0.633726999999908, 1.7699390000000221, 0.6477639999998246, 0.6262369999999464,
+            0.5644469999997455, 0.5526769999996759, 0.5899549999999181, 0.609534999999596,
+            0.6256869999997434, 0.615907999999763, 0.5999900000001617, 1.5807629999999335,
+            0.6377640000000611, 0.5819729999998344, 0.6453300000002855, 0.6330219999999827,
+            0.542290000000321, 0.601596999999856, 0.518051000000014, 0.609414999999899,
+            0.5724850000001425, 0.5833299999999326, 0.5743909999996504, 0.5526800000002368,
+            0.5979539999998451, 0.5359050000001844, 0.5998490000001766, 0.5741519999996854,
+            0.602139999999963, 0.6549199999999473
+          ],
+          "diagnostic": {
+            "durationMs": 0.6873679999998785,
+            "counters": {
+              "sourceBytesRead": 2122,
+              "sourceIndexBytesRead": 14,
+              "fullTextReads": 0,
+              "fullTextBytesRead": 0,
+              "materializedStrings": 52,
+              "materializeFullTextCalls": 0,
+              "projectionResetCalls": 1,
+              "rangeReadCalls": 52,
+              "maxRangeUtf16Length": 21,
+              "unchangedGapReads": 0,
+              "viewCalls": {
+                "setText": 1
+              },
+              "ranges": [
+                {
+                  "start": 0,
+                  "end": 6,
+                  "length": 12834078
+                },
+                {
+                  "start": 7,
+                  "end": 28,
+                  "length": 12834078
+                },
+                {
+                  "start": 29,
+                  "end": 49,
+                  "length": 12834078
+                },
+                {
+                  "start": 50,
+                  "end": 69,
+                  "length": 12834078
+                },
+                {
+                  "start": 70,
+                  "end": 90,
+                  "length": 12834078
+                },
+                {
+                  "start": 91,
+                  "end": 111,
+                  "length": 12834078
+                },
+                {
+                  "start": 112,
+                  "end": 132,
+                  "length": 12834078
+                },
+                {
+                  "start": 133,
+                  "end": 152,
+                  "length": 12834078
+                },
+                {
+                  "start": 153,
+                  "end": 173,
+                  "length": 12834078
+                },
+                {
+                  "start": 174,
+                  "end": 194,
+                  "length": 12834078
+                },
+                {
+                  "start": 195,
+                  "end": 215,
+                  "length": 12834078
+                },
+                {
+                  "start": 216,
+                  "end": 237,
+                  "length": 12834078
+                }
+              ],
+              "committedEvents": 1,
+              "viewUpdatedEvents": 1
+            },
+            "projection": {
+              "instanceReplaced": false,
+              "work": {
+                "sourceBytesRead": 2122,
+                "materializedRows": 52,
+                "materializedTextBytes": 2122,
+                "indexEntriesTouched": 0,
+                "summaryLinesMeasured": 0
+              },
+              "retained": {
+                "sourceBytesRead": 153864,
+                "materializedRows": 3745,
+                "materializedTextBytes": 153864,
+                "indexEntriesTouched": 0,
+                "summaryLinesMeasured": 0,
+                "cachedRows": 52,
+                "cachedTextBytes": 2122,
+                "indexNodes": 1,
+                "summaryBytes": 64
+              }
+            },
+            "correctness": {
+              "mountedRows": 52,
+              "scrollTop": 0,
+              "projections": null
+            }
+          }
+        },
+        {
+          "fixture": "short-lines",
+          "kind": "single-edit",
+          "decorated": true,
+          "utf16Length": 12834064,
+          "fixtureSha256": "2bacff110d8d3fe9b5d12e1ea6cc5cfb31d2a344d22119b49222674196352c6a",
+          "p50Ms": 1.9671280000002298,
+          "p95Ms": 2.1699929999999767,
+          "samples": [
+            2.2122739999999794, 2.0236399999998866, 2.0013060000001133, 1.950184999999692,
+            2.1499369999996816, 1.9966370000001916, 1.9071839999996882, 2.037507999999889,
+            1.8933959999999388, 1.9671280000002298, 2.1699929999999767, 1.9779869999997572,
+            2.0331209999999373, 1.9250050000000556, 1.8665930000001936, 1.8304860000002918,
+            2.1685459999998784, 1.9459649999998874, 2.050036999999975, 2.0506209999998646,
+            1.9233809999996083, 1.8746930000002067, 2.1437989999999445, 1.9243030000002364,
+            1.9056960000002618, 1.9964680000002772, 1.9126099999998587, 1.948425000000043,
+            2.0154170000000704, 1.8373700000001918
+          ],
+          "diagnostic": {
+            "durationMs": 1.9579870000002302,
+            "counters": {
+              "sourceBytesRead": 2118,
+              "sourceIndexBytesRead": 14,
+              "fullTextReads": 0,
+              "fullTextBytesRead": 0,
+              "materializedStrings": 52,
+              "materializeFullTextCalls": 0,
+              "projectionResetCalls": 0,
+              "rangeReadCalls": 54,
+              "maxRangeUtf16Length": 21,
+              "unchangedGapReads": 0,
+              "viewCalls": {
+                "applyEdit": 1
+              },
+              "ranges": [
+                {
+                  "start": 0,
+                  "end": 0,
+                  "length": 12834064
+                },
+                {
+                  "start": 0,
+                  "end": 0,
+                  "length": 12834064
+                },
+                {
+                  "start": 0,
+                  "end": 6,
+                  "length": 12834071
+                },
+                {
+                  "start": 7,
+                  "end": 28,
+                  "length": 12834071
+                },
+                {
+                  "start": 29,
+                  "end": 49,
+                  "length": 12834071
+                },
+                {
+                  "start": 50,
+                  "end": 69,
+                  "length": 12834071
+                },
+                {
+                  "start": 70,
+                  "end": 90,
+                  "length": 12834071
+                },
+                {
+                  "start": 91,
+                  "end": 111,
+                  "length": 12834071
+                },
+                {
+                  "start": 112,
+                  "end": 132,
+                  "length": 12834071
+                },
+                {
+                  "start": 133,
+                  "end": 152,
+                  "length": 12834071
+                },
+                {
+                  "start": 153,
+                  "end": 173,
+                  "length": 12834071
+                },
+                {
+                  "start": 174,
+                  "end": 194,
+                  "length": 12834071
+                }
+              ],
+              "committedEvents": 1,
+              "viewUpdatedEvents": 1
+            },
+            "projection": {
+              "instanceReplaced": false,
+              "work": {
+                "sourceBytesRead": 2118,
+                "materializedRows": 52,
+                "materializedTextBytes": 2118,
+                "indexEntriesTouched": 3,
+                "summaryLinesMeasured": 0
+              },
+              "retained": {
+                "sourceBytesRead": 231048,
+                "materializedRows": 5617,
+                "materializedTextBytes": 231048,
+                "indexEntriesTouched": 180,
+                "summaryLinesMeasured": 0,
+                "cachedRows": 52,
+                "cachedTextBytes": 2118,
+                "indexNodes": 7,
+                "summaryBytes": 448
+              }
+            },
+            "correctness": {
+              "mountedRows": 52,
+              "scrollTop": 0,
+              "projections": {
+                "inputTokens": 10000,
+                "retainedTokens": 10000,
+                "tokensCorrect": true,
+                "collapsedFolds": 1,
+                "foldCorrect": true
+              }
+            }
+          }
+        },
+        {
+          "fixture": "short-lines",
+          "kind": "sparse-batch",
+          "decorated": true,
+          "utf16Length": 12834064,
+          "fixtureSha256": "2bacff110d8d3fe9b5d12e1ea6cc5cfb31d2a344d22119b49222674196352c6a",
+          "p50Ms": 1.7789099999999962,
+          "p95Ms": 1.9837990000005448,
+          "samples": [
+            1.8241159999997762, 1.7970869999999195, 1.9376519999996162, 1.7223690000000715,
+            1.816131000000496, 1.7227490000004764, 1.738644000000022, 1.9128570000002583,
+            1.74551799999972, 1.8248029999995197, 1.9039920000004713, 1.7553829999997106,
+            1.7739489999994476, 1.76792899999964, 1.7748759999994945, 1.8245280000001003,
+            1.819561999999678, 1.7484970000004978, 1.7808850000001257, 1.9837990000005448,
+            1.7060750000000553, 1.7698230000005424, 1.985486999999921, 1.727114000000256,
+            1.8164999999999054, 1.805076999999983, 1.764948000000004, 1.6959520000000339,
+            1.824814000000515, 1.7789099999999962
+          ],
+          "diagnostic": {
+            "durationMs": 1.821538999999575,
+            "counters": {
+              "sourceBytesRead": 4274,
+              "sourceIndexBytesRead": 14,
+              "fullTextReads": 0,
+              "fullTextBytesRead": 0,
+              "materializedStrings": 104,
+              "materializeFullTextCalls": 0,
+              "projectionResetCalls": 1,
+              "rangeReadCalls": 104,
+              "maxRangeUtf16Length": 21,
+              "unchangedGapReads": 0,
+              "viewCalls": {
+                "setText": 1
+              },
+              "ranges": [
+                {
+                  "start": 0,
+                  "end": 21,
+                  "length": 12834064
+                },
+                {
+                  "start": 22,
+                  "end": 42,
+                  "length": 12834064
+                },
+                {
+                  "start": 43,
+                  "end": 62,
+                  "length": 12834064
+                },
+                {
+                  "start": 63,
+                  "end": 83,
+                  "length": 12834064
+                },
+                {
+                  "start": 84,
+                  "end": 104,
+                  "length": 12834064
+                },
+                {
+                  "start": 105,
+                  "end": 125,
+                  "length": 12834064
+                },
+                {
+                  "start": 126,
+                  "end": 145,
+                  "length": 12834064
+                },
+                {
+                  "start": 146,
+                  "end": 166,
+                  "length": 12834064
+                },
+                {
+                  "start": 167,
+                  "end": 187,
+                  "length": 12834064
+                },
+                {
+                  "start": 188,
+                  "end": 208,
+                  "length": 12834064
+                },
+                {
+                  "start": 209,
+                  "end": 230,
+                  "length": 12834064
+                },
+                {
+                  "start": 231,
+                  "end": 252,
+                  "length": 12834064
+                }
+              ],
+              "committedEvents": 1,
+              "viewUpdatedEvents": 1
+            },
+            "projection": {
+              "instanceReplaced": false,
+              "work": {
+                "sourceBytesRead": 4274,
+                "materializedRows": 104,
+                "materializedTextBytes": 4274,
+                "indexEntriesTouched": 3,
+                "summaryLinesMeasured": 0
+              },
+              "retained": {
+                "sourceBytesRead": 308664,
+                "materializedRows": 7489,
+                "materializedTextBytes": 308664,
+                "indexEntriesTouched": 180,
+                "summaryLinesMeasured": 0,
+                "cachedRows": 52,
+                "cachedTextBytes": 2122,
+                "indexNodes": 1,
+                "summaryBytes": 64
+              }
+            },
+            "correctness": {
+              "mountedRows": 52,
+              "scrollTop": 0,
+              "projections": {
+                "inputTokens": 10000,
+                "retainedTokens": 0,
+                "tokensCorrect": false,
+                "collapsedFolds": 0,
+                "foldCorrect": false
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "baselineCommit": "64926519bfdd39f4afcfae225019a932d3e27785"
+}
