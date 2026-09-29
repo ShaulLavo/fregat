@@ -162,7 +162,7 @@ Family formatter options match Fregat; generated-file exclusions remain with eac
 
 Editor and ghostty sites join Fregat's existing Pages artifact at `editor/` and `ghostty-webgpu/`, sharing one deployment. Native config-resolver workflows remain manual dispatches. The integration regenerates ghostty's bootstrap input closure after removing its family lockfile and uses repository-relative Git object paths for a nested checkout.
 
-Local gates, typecheck, web build and Editor health pass. The updated quick-open scenario completed and its screenshots were read at `/work/tmp/fregat-evidence/20260929T201255Z-scenario-quick-open-editor-source/`. Suite closeout and green CI remain in progress. Mirror/publish workflows, source freeze, checkout retirement and deployment are owned by other lanes or the coordinator.
+Local gates, typecheck, web build and Editor health pass. The updated quick-open scenario completed and its screenshots were read at `/work/tmp/fregat-evidence/20260929T201255Z-scenario-quick-open-editor-source/`. All workspace suites completed; targeted reruns pass for the migrated browser boundaries and the local OpenSSH username environment. Root lint, the first-load byte gate, both family site builds, ghostty package smoke and the tree-sitter browser worker pass. GitHub CI remains in progress. Mirror/publish workflows, source freeze, checkout retirement and deployment are owned by other lanes or the coordinator.
 
 ## Acceptance
 
