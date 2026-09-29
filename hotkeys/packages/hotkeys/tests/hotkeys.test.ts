@@ -203,3 +203,16 @@ it('types a chord prefix into the field when no continuation follows', () => {
   expect(input.value).toBe('g')
   vi.useRealTimers()
 })
+
+it('ends a chord when DOM focus moves before it completes', () => {
+  const callback = vi.fn()
+  setup().register(['Control+K', 'Control+C'], callback)
+  const first = document.createElement('button')
+  const second = document.createElement('button')
+  document.body.append(first, second)
+  first.focus()
+  press(first, 'k', { ctrlKey: true })
+  second.focus()
+  press(second, 'c', { ctrlKey: true })
+  expect(callback).not.toHaveBeenCalled()
+})

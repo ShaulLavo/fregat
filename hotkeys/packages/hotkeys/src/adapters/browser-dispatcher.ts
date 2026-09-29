@@ -22,12 +22,14 @@ export type BrowserDispatcher = Dispatcher<KeyboardEvent> & {
 
 /** A dispatcher whose focus path follows DOM containment of attached elements. */
 export function createBrowserDispatcher(options: BrowserDispatcherOptions = {}): BrowserDispatcher {
-  const root = options.root ?? document
+  const root = options.root ?? globalThis.document
   const platform = options.platform ?? detectPlatform()
   const nodes = new Map<Element, FocusNode<KeyboardEvent>>()
+  const doc = 'defaultView' in root ? root : root.ownerDocument
   const dispatcher = createDispatcher<KeyboardEvent>({
     acceptsTextInput: (event) => isInputElement(event.target),
     replay: replayTextInput,
+    currentFocus: () => doc.activeElement,
     ...options,
     platform,
     effects: browserKeyEffects,

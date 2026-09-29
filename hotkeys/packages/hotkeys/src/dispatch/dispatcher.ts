@@ -56,6 +56,11 @@ export type DispatcherOptions<Source> = {
    * swallows its prefix.
    */
   readonly isAvailable?: (binding: CompiledBinding, source: Source) => boolean
+  /**
+   * Focus the host tracks beside the focused node (the DOM's active element). A pending chord
+   * ends when either changes.
+   */
+  readonly currentFocus?: () => unknown
   readonly timeoutMs?: number
   readonly onPendingChange?: (pending: PendingChordLabel | null) => void
   readonly onSequence?: (event: KeymapSequenceEvent<CompiledBinding>) => void
@@ -123,7 +128,7 @@ export function createDispatcher<Source = unknown>(
         isAvailable && ((binding) => isAvailable(binding, source)),
       ),
     dispatch: (binding, captured, source) => runBinding(binding, captured, source),
-    currentFocus: () => focusedNode,
+    currentFocus,
     ...(options.replay && { replay: options.replay }),
     ...(options.acceptsTextInput && { acceptsTextInput: options.acceptsTextInput }),
     ...(options.timeoutMs !== undefined && { timeoutMs: options.timeoutMs }),
@@ -132,6 +137,18 @@ export function createDispatcher<Source = unknown>(
     ...(options.onCaptureChange && { onCaptureChange: options.onCaptureChange }),
   })
   let currentInput: KeyInput | null = null
+  // One object per focus pair, so the runtime compares focus by identity.
+  let focusIdentity: { readonly node: FocusNode<Source> | null; readonly host: unknown } = {
+    node: null,
+    host: undefined,
+  }
+
+  function currentFocus() {
+    const host = options.currentFocus?.()
+    if (focusIdentity.node !== focusedNode || focusIdentity.host !== host)
+      focusIdentity = { node: focusedNode, host }
+    return focusIdentity
+  }
 
   function focusPath(): NodeState<Source>[] {
     const path: NodeState<Source>[] = []
