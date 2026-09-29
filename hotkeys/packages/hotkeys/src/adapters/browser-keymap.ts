@@ -1,6 +1,7 @@
 import { createChordRuntime } from '../chords/runtime'
 import { detectPlatform } from '../platform'
 import { keyInputFromKeyboardEvent } from './browser'
+import type { KeyInput } from '../key-input'
 import type {
   ChordOutcome,
   KeymapBinding,
@@ -29,6 +30,10 @@ export type KeymapRuntimeOptions<Payload, Context> = {
   ) => boolean
   readonly onPendingChange?: (pending: PendingChordLabel | null) => void
   readonly onSequence?: (event: KeymapSequenceEvent<Payload>) => void
+  /** Receives a buffered key no binding took after a chord mismatch or timeout. */
+  readonly replay?: (input: KeyInput, event: KeyboardEvent) => void
+  /** How long a prefix that is itself bound waits for its continuation. */
+  readonly timeoutMs?: number
 }
 export type KeymapRuntime<Payload> = {
   /** Offers a key event; idempotent per event, so a host may forward it before DOM dispatch. */
@@ -63,6 +68,7 @@ export function createKeymapRuntime<Payload, Context>(
     platform,
     effects: BROWSER_EFFECTS,
     onCaptureChange: syncCapture,
+    currentFocus: () => document.activeElement,
   })
 
   function syncCapture() {

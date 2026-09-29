@@ -91,7 +91,7 @@ source: 'default' | 'pack' | 'user' }`. Removal copies Zed: `command: null` supp
 - [x] Port the Editor's trie and runtime tests into the library before porting the code
       (`packages/editor/src/keymap/trie.test.ts`, the runtime contract tests behind Plan 057's
       "20 runtime contract tests").
-- [ ] Port the trie and chord runtime; add focus-bound pending state and replay.
+- [x] Port the trie and chord runtime; add focus-bound pending state and replay.
 - [ ] Add predicates, focus nodes and resolution; translate Zed's keymap tests as fixtures
       (`test_depth_precedence`, `test_disable_weaker_sources_only`, `test_fail_to_disable`,
       `test_disable_deeper`, pending/replay cases in `key_dispatch.rs`).
@@ -141,7 +141,18 @@ Branch `plan-203-hotkeys` (worktree `/work/worktrees/platform/plan-203-hotkeys`)
   `src/adapters/browser-keymap.ts` (`createKeymapRuntime`, the Editor's API: listeners,
   per-event idempotence, capture while pending). Trie on `KeyInput`; AltGr strokes match the
   produced glyph. 645 tests.
-- Next: rest of step 4, Zed corrections: pending state tied to the focus it started under; a
-  timeout only when the prefix is itself bound (then the timeout runs the prefix binding);
-  replay of buffered keys on mismatch or timeout. Expect to change the ported tests
-  "conditional candidates survive exact matches" and "real scheduled timer" accordingly.
+- Step 4 done. Corrections against Zed (`key_dispatch.rs` `dispatch_key`/`flush_dispatch`/
+  `replay_prefix`, `window.rs` `dispatch_key_event`): a prefix with an available deeper binding
+  always pends, even when the prefix is itself bound; only then a timeout (1 s, Zed's
+  `PENDING_INPUT_TIMEOUT`; `timeoutMs` option) runs the prefix's bindings. An unbound prefix
+  waits for the next key. Mismatch or an unavailable continuation ends the chord, runs the
+  longest bound buffered prefix, hands the other buffered keys to the host's `replay` hook, and
+  then matches the new key from the root (it is no longer swallowed). A declined final binding
+  lets the key through. Pending records `currentFocus()` (browser: `document.activeElement`) and
+  ends without replay when it changes. Ported tests changed to match: five Editor cases
+  rewritten, four added. 650 tests.
+  Decision: no Zed-style timeout for printable prefixes in text fields (`text_input_requires_timeout`);
+  hosts forbid plain-letter chord starts today. Revisit if a keymap needs one.
+- Next: step 5 (predicates, focus nodes, resolution, Zed keymap fixtures). The dispatcher can
+  sort each edge's candidates by context depth and source before `execute`; the trie keeps table
+  order.

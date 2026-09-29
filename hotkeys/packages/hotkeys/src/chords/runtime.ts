@@ -1,7 +1,7 @@
 import { isModifierKey } from '../parse'
 import { buildKeymapTrie, trieStep } from './trie'
 import type { KeyInput } from '../key-input'
-import type { KeymapNode } from './trie'
+import type { KeymapEdge, KeymapNode } from './trie'
 import type {
   ChordOutcome,
   KeymapBinding,
@@ -34,6 +34,14 @@ export type ChordRuntimeOptions<Payload, Context, Source> = {
   readonly onSequence?: (event: KeymapSequenceEvent<Payload>) => void
   /** Called whenever {@link ChordRuntime.wantsCapture} may have changed. */
   readonly onCaptureChange?: () => void
+  /**
+   * Receives a buffered key that no binding took when a chord mismatches or times out, so the
+   * host can give it to default input handling (a terminal re-encodes it for the shell).
+   */
+  readonly replay?: (input: KeyInput, source: Source) => void
+  /** Identifies the focus; a pending chord ends without replay when it changes. */
+  readonly currentFocus?: () => unknown
+  /** How long a prefix that is itself bound waits for its continuation. Other prefixes wait until the next key. */
   readonly timeoutMs?: number
 }
 export type ChordRuntime<Payload, Source> = {
@@ -60,14 +68,16 @@ type DispatchResult<Payload> =
   | { readonly kind: 'claimed'; readonly binding: KeymapBinding<Payload> }
   | { readonly kind: 'declined' | 'unavailable' | 'handled' }
   | { readonly kind: 'cancelled'; readonly outcome: ChordOutcome }
-type Pending<Payload> = {
+type Buffered<Source> = { readonly input: KeyInput; readonly source: Source }
+type Pending<Payload, Source> = {
   readonly node: KeymapNode<Payload>
   readonly keys: string
   readonly count: number
-  readonly strokes: number
+  readonly buffer: readonly Buffered<Source>[]
   readonly started: number
+  readonly focus: unknown
 }
-const DEFAULT_TIMEOUT_MS = 5_000
+const DEFAULT_TIMEOUT_MS = 1_000
 
 /** The chord state machine over {@link KeyInput}. Hosts adapt their events and apply {@link KeyEffects}. */
 export function createChordRuntime<Payload, Context, Source>(
@@ -79,7 +89,7 @@ export function createChordRuntime<Payload, Context, Source>(
   let enabled = options.enabled !== false
   let disposed = false
   let activeDispatch: { cancellation: ChordOutcome | null } | null = null
-  let pending: Pending<Payload> | null = null
+  let pending: Pending<Payload, Source> | null = null
   let timer: ReturnType<typeof setTimeout> | undefined
   const claimedKeys = new Map<string, Ownership>()
 
@@ -105,28 +115,87 @@ export function createChordRuntime<Payload, Context, Source>(
       activeDispatch.cancellation = outcome
       return
     }
-    const ended = pending
+    report(endPending(), outcome, binding)
+  }
+  function endPending(): Pending<Payload, Source> {
+    const ended = pending!
     pending = null
     clearTimeout(timer)
     syncCapture()
     options.onPendingChange?.(null)
+    return ended
+  }
+  function report(
+    ended: Pending<Payload, Source>,
+    outcome: ChordOutcome,
+    binding: KeymapBinding<Payload> | null,
+  ) {
     options.onSequence?.({
       outcome,
       keys: ended.keys,
       candidateCount: ended.count,
-      strokeCount: binding?.chord.length ?? ended.strokes,
+      strokeCount: binding?.chord.length ?? ended.buffer.length,
       elapsedMs: Date.now() - ended.started,
       binding,
     })
   }
-  function arm(node: KeymapNode<Payload>, keys: string, count: number) {
+  function arm(edge: KeymapEdge<Payload>, entry: Buffered<Source>, count: number, bound: boolean) {
+    const keys = pending ? `${pending.keys} ${edge.keys}` : edge.keys
+    const buffer = [...(pending?.buffer ?? []), entry]
     const started = pending?.started ?? Date.now()
-    const strokes = (pending?.strokes ?? 0) + 1
-    pending = { node, keys, count, started, strokes }
+    const focus = pending ? pending.focus : options.currentFocus?.()
+    pending = { node: edge.node, keys, count, buffer, started, focus }
     clearTimeout(timer)
-    timer = setTimeout(() => cancel('timeout'), timeoutMs)
+    // Zed waits only when the prefix is itself bound; otherwise the next key decides.
+    if (bound) timer = setTimeout(timeout, timeoutMs)
     syncCapture()
     options.onPendingChange?.({ keys, candidateCount: count })
+  }
+  function timeout() {
+    if (!pending) return
+    const ended = endPending()
+    report(ended, 'timeout', flush(ended.buffer))
+  }
+  /**
+   * Runs the longest buffered prefix that has an available binding, replays unbound keys to the
+   * host, and repeats on the rest, so no buffered key is dropped. Returns the first claiming binding.
+   */
+  function flush(buffer: readonly Buffered<Source>[]): KeymapBinding<Payload> | null {
+    let claimed: KeymapBinding<Payload> | null = null
+    let start = 0
+    while (start < buffer.length) {
+      const first = buffer[start]!
+      const context = options.captureContext(first.source)
+      const end = longestBoundPrefix(buffer, start, context)
+      if (!end) {
+        options.replay?.(first.input, first.source)
+        start += 1
+        continue
+      }
+      const last = buffer[end.index]!
+      const result = execute(end.node.candidates, context, last.source)
+      if (result.kind === 'claimed') claimed ??= result.binding
+      if (result.kind === 'declined' || result.kind === 'unavailable')
+        options.replay?.(last.input, last.source)
+      start = end.index + 1
+    }
+    return claimed
+  }
+  function longestBoundPrefix(
+    buffer: readonly Buffered<Source>[],
+    start: number,
+    context: Context,
+  ): { index: number; node: KeymapNode<Payload> } | null {
+    let node = trie
+    let found: { index: number; node: KeymapNode<Payload> } | null = null
+    for (let index = start; index < buffer.length; index += 1) {
+      const entry = buffer[index]!
+      const edge = trieStep(node, entry.input)
+      if (!edge) break
+      node = edge.node
+      if (availableCount(node.candidates, context, entry.source)) found = { index, node }
+    }
+    return found
   }
   function execute(
     candidates: readonly KeymapBinding<Payload>[],
@@ -186,37 +255,55 @@ export function createChordRuntime<Payload, Context, Source>(
     if (!enabled || input.composing) return null
     if (isModifierKey(input.key)) return pending ? ownChord(source) : null
     if (pending && input.repeat) return ownChord(source)
-    const fromChord = pending !== null
-    const edge = trieStep(pending?.node ?? trie, input)
-    if (!edge) return failContinuation(source, 'unmatched')
-    const context = options.captureContext(source)
-    if (fromChord) effects.swallow(source)
-    const result = execute(edge.node.candidates, context, source)
-    if (result.kind === 'claimed') {
-      cancel('completed', result.binding)
-      return fromChord ? 'chord' : 'binding'
+    if (pending && options.currentFocus && options.currentFocus() !== pending.focus)
+      cancel('superseded')
+    if (pending) {
+      const continued = continueChord(input, source)
+      if (continued !== undefined) return continued
     }
-    if (result.kind === 'handled')
-      return fromChord ? failContinuation(source, 'unavailable', true) : 'binding'
-    if (result.kind === 'cancelled') return failContinuation(source, result.outcome, fromChord)
-    if (result.kind === 'declined') return failContinuation(source, 'unavailable', fromChord)
-    const count = availableCount(edge.node.descendants, context, source)
-    if (!count) return failContinuation(source, 'unavailable')
-    if (input.repeat) return null
-    const keys = pending ? `${pending.keys} ${edge.keys}` : edge.keys
-    effects.swallow(source)
-    arm(edge.node, keys, count)
-    return 'chord'
+    const edge = trieStep(trie, input)
+    if (!edge) return null
+    return resolve(edge, input, source, options.captureContext(source), false)
   }
-  function failContinuation(
+  /** Returns undefined when the key does not continue the chord; the chord then replays. */
+  function continueChord(input: KeyInput, source: Source): Ownership | null | undefined {
+    const edge = trieStep(pending!.node, input)
+    if (edge) {
+      const context = options.captureContext(source)
+      const reachable =
+        availableCount(edge.node.candidates, context, source) ||
+        availableCount(edge.node.descendants, context, source)
+      if (reachable) return resolve(edge, input, source, context, true)
+    }
+    const ended = endPending()
+    report(ended, 'unmatched', flush(ended.buffer))
+    return undefined
+  }
+  function resolve(
+    edge: KeymapEdge<Payload>,
+    input: KeyInput,
     source: Source,
-    outcome: ChordOutcome,
-    fromChord = pending !== null,
+    context: Context,
+    fromChord: boolean,
   ): Ownership | null {
-    if (!fromChord) return null
-    effects.swallow(source)
-    cancel(outcome)
-    return 'chord'
+    const deeper = availableCount(edge.node.descendants, context, source)
+    if (deeper) {
+      if (input.repeat) return null
+      effects.swallow(source)
+      const bound = availableCount(edge.node.candidates, context, source) > 0
+      arm(edge, { input, source }, deeper, bound)
+      return 'chord'
+    }
+    const result = execute(edge.node.candidates, context, source)
+    const owned =
+      result.kind === 'claimed' || result.kind === 'handled' || result.kind === 'cancelled'
+    if (fromChord && owned) effects.swallow(source)
+    if (fromChord) {
+      if (result.kind === 'claimed') cancel('completed', result.binding)
+      else cancel(result.kind === 'cancelled' ? result.outcome : 'unavailable')
+    }
+    if (!owned) return null
+    return fromChord ? 'chord' : 'binding'
   }
   function handleKey(input: KeyInput, source: Source, inScope = true): boolean {
     if (disposed) return false

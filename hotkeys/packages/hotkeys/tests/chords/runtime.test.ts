@@ -74,28 +74,41 @@ test('unavailable prefixes and declined single shortcuts pass through', () => {
   expect(h.claim(tab)).toBe(false)
   expect(tab.defaultPrevented).toBe(false)
 })
-test('availability is fresh at continuation and an unavailable completion is consumed', () => {
+// Zed: an unavailable binding is no binding, so the continuation mismatches and runs fresh.
+test('availability is fresh at continuation and an unavailable completion runs fresh', () => {
   const h = setup()
   expect(h.claim(key('k', { ctrlKey: true }))).toBe(true)
   h.setAvailable(false)
   const continuation = key('c', { ctrlKey: true })
-  expect(h.claim(continuation)).toBe(true)
-  expect(continuation.defaultPrevented).toBe(true)
+  expect(h.claim(continuation)).toBe(false)
+  expect(continuation.defaultPrevented).toBe(false)
   expect(h.calls).toEqual([])
-  expect(h.events[0]?.outcome).toBe('unavailable')
-  expect(h.captures()).toBe(2)
+  expect(h.events[0]?.outcome).toBe('unmatched')
+  expect(h.captures()).toBe(3)
 })
-test('conditional candidates survive exact matches and share one captured context', () => {
+test('a bound prefix waits for its chord and runs its candidates in order on timeout', () => {
+  vi.useFakeTimers()
   const table: readonly KeymapBinding<string>[] = [
     { chord: ['Control+K'], payload: 'tab' },
     { chord: ['Control+K'], payload: 'single' },
     ...bindings,
   ]
   const h = setup(table)
-  h.claim(key('k', { ctrlKey: true }))
+  expect(h.claim(key('k', { ctrlKey: true }))).toBe(true)
+  expect(h.calls).toEqual([])
+  vi.advanceTimersByTime(1000)
   expect(h.calls).toEqual(['tab', 'single'])
-  expect(h.captures()).toBe(1)
-  expect(h.events).toEqual([])
+  expect(h.events.map((event) => [event.outcome, event.binding?.payload])).toEqual([
+    ['timeout', 'single'],
+  ])
+})
+test('a bound prefix followed by its continuation runs only the chord', () => {
+  vi.useFakeTimers()
+  const h = setup([{ chord: ['Control+K'], payload: 'single' }, ...bindings])
+  h.claim(key('k', { ctrlKey: true }))
+  h.claim(key('c', { ctrlKey: true }))
+  vi.advanceTimersByTime(5000)
+  expect(h.calls).toEqual(['comment'])
 })
 test('ineligible singles preserve deeper prefixes; deeper sequences execute', () => {
   const calls: string[] = []
@@ -114,13 +127,21 @@ test('ineligible singles preserve deeper prefixes; deeper sequences execute', ()
   runtime.claimKeybinding(key('e', { ctrlKey: true }))
   expect(calls).toEqual(['deep'])
 })
-test('real scheduled timer does not depend on another event and repeats do not extend it', () => {
+test('an unbound prefix waits for the next key without a timeout', () => {
   vi.useFakeTimers()
   const h = setup()
   h.claim(key('k', { ctrlKey: true }))
-  vi.advanceTimersByTime(4000)
+  vi.advanceTimersByTime(60_000)
+  h.claim(key('c', { ctrlKey: true }))
+  expect(h.calls).toEqual(['comment'])
+})
+test('a scheduled timeout does not depend on another event and repeats do not extend it', () => {
+  vi.useFakeTimers()
+  const h = setup([{ chord: ['Control+K'], payload: 'single' }, ...bindings])
+  h.claim(key('k', { ctrlKey: true }))
+  vi.advanceTimersByTime(900)
   h.claim(key('k', { ctrlKey: true, repeat: true }))
-  vi.advanceTimersByTime(1000)
+  vi.advanceTimersByTime(100)
   expect(h.events[0]?.outcome).toBe('timeout')
   const repeat = key('k', { repeat: true })
   expect(h.claim(repeat)).toBe(true)
@@ -188,16 +209,22 @@ test('element roots keep idle matching scoped and remember a declined event iden
   expect(calls).toBe(1)
 })
 
-test('declined eligible terminal candidates do not arm a longer sequence', () => {
-  const h = setup([{ chord: ['Control+K'], payload: 'tab' }, ...bindings])
-  const event = key('k', { ctrlKey: true })
-  expect(h.claim(event)).toBe(false)
-  expect(event.defaultPrevented).toBe(false)
-  expect(h.calls).toEqual(['tab'])
-  expect(h.claim(key('c', { ctrlKey: true }))).toBe(false)
-  expect(h.events).toEqual([])
+test('a declined prefix binding hands the prefix to replay on timeout', () => {
+  vi.useFakeTimers()
+  const replayed: string[] = []
+  runtime = createKeymapRuntime({
+    root: document,
+    platform: 'linux',
+    bindings: [{ chord: ['Control+K'], payload: 'tab' }, ...bindings],
+    captureContext: () => null,
+    isAvailable: () => true,
+    dispatch: ({ payload }) => payload !== 'tab',
+    replay: (input) => replayed.push(input.key),
+  })
+  expect(runtime.claimKeybinding(key('k', { ctrlKey: true }))).toBe(true)
+  vi.advanceTimersByTime(1000)
+  expect(replayed).toEqual(['K'])
 })
-
 test('synchronous target cancellation during a declined completion retains event ownership', () => {
   runtime = createKeymapRuntime({
     root: document,
@@ -265,7 +292,7 @@ test('explicit event ownership survives ordered fallback when every command decl
 })
 
 // From the Editor's browser chord suite, driven with synthetic events.
-test('held prefix, completion and mismatch stay owned until release', () => {
+test('held prefix and completion stay owned until release; a mismatch runs fresh', () => {
   const h = setup()
   expect(h.claim(key('k', { ctrlKey: true }))).toBe(true)
   expect(h.claim(key('k', { ctrlKey: true, repeat: true }))).toBe(true)
@@ -275,13 +302,12 @@ test('held prefix, completion and mismatch stay owned until release', () => {
   expect(h.claim(key('c', {}, 'keyup'))).toBe(true)
   expect(h.claim(key('k', {}, 'keyup'))).toBe(true)
   expect(h.claim(key('k', { ctrlKey: true }))).toBe(true)
-  const mismatch = key('x', { ctrlKey: true })
-  expect(h.claim(mismatch)).toBe(true)
-  expect(mismatch.defaultPrevented).toBe(true)
-  expect(h.claim(key('x', { ctrlKey: true, repeat: true }))).toBe(true)
+  const mismatch = key('x')
+  expect(h.claim(mismatch)).toBe(false)
+  expect(mismatch.defaultPrevented).toBe(false)
+  expect(h.claim(key('x', { repeat: true }))).toBe(false)
   expect(h.events.map((event) => event.outcome)).toEqual(['completed', 'unmatched'])
 })
-
 test('binding replacement cancels pending and disposal removes listeners', () => {
   const h = setup()
   h.claim(key('k', { ctrlKey: true }))
@@ -314,4 +340,57 @@ test('a pending chord publishes its label and clears it when it ends', () => {
   runtime.claimKeybinding(key('d', { ctrlKey: true }))
   runtime.claimKeybinding(key('e', { ctrlKey: true }))
   expect(labels).toEqual(['Mod+K/2', 'Mod+K Mod+D/1', null])
+})
+
+test('a mismatch replays the buffered keys in order before the new key runs', () => {
+  const order: string[] = []
+  runtime = createKeymapRuntime({
+    root: document,
+    platform: 'linux',
+    bindings: [...bindings, { chord: ['Control+X'], payload: 'cut' }],
+    captureContext: () => null,
+    isAvailable: () => true,
+    dispatch: ({ payload }) => {
+      order.push(payload)
+      return true
+    },
+    replay: (input) => order.push(`replay ${input.key}`),
+  })
+  runtime.claimKeybinding(key('k', { ctrlKey: true }))
+  runtime.claimKeybinding(key('d', { ctrlKey: true }))
+  expect(runtime.claimKeybinding(key('x', { ctrlKey: true }))).toBe(true)
+  expect(order).toEqual(['replay K', 'replay D', 'cut'])
+})
+
+test('a mismatch runs the longest bound prefix and replays the rest', () => {
+  const order: string[] = []
+  runtime = createKeymapRuntime({
+    root: document,
+    platform: 'linux',
+    bindings: [{ chord: ['Control+K', 'Control+D'], payload: 'kd' }, ...bindings],
+    captureContext: () => null,
+    isAvailable: () => true,
+    dispatch: ({ payload }) => {
+      order.push(payload)
+      return true
+    },
+    replay: (input) => order.push(`replay ${input.key}`),
+  })
+  runtime.claimKeybinding(key('k', { ctrlKey: true }))
+  runtime.claimKeybinding(key('d', { ctrlKey: true }))
+  runtime.claimKeybinding(key('z', { ctrlKey: true }))
+  expect(order).toEqual(['kd'])
+})
+
+test('a pending chord belongs to the focus it started under', () => {
+  const first = document.createElement('input')
+  const second = document.createElement('input')
+  document.body.append(first, second)
+  const h = setup()
+  first.focus()
+  h.claim(key('k', { ctrlKey: true }))
+  second.focus()
+  expect(h.claim(key('c', { ctrlKey: true }))).toBe(false)
+  expect(h.calls).toEqual([])
+  expect(h.events[0]?.outcome).toBe('superseded')
 })
