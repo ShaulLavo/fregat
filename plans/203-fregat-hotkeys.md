@@ -2,7 +2,9 @@
 
 ## Status and authorization
 
-- Status: APPROVED 2026-09-29, requested by the owner. First of the keymap plans: 203 builds the
+- Status: IMPLEMENTED 2026-09-29 in [PR 197](https://github.com/ShaulLavo/fregat/pull/197);
+  all eight steps and review fixes are recorded below. Approved by the owner; consumers
+  remain in 204–206, and mirror/publication work remains in 207. 203 supplies the
   library, [204](204-editor-on-fregat-hotkeys.md) moves the Editor onto it,
   [205](205-ghostty-on-fregat-hotkeys.md) ghostty-webgpu, [206](206-platform-one-keymap.md)
   Platform (web, plus the TUI's matcher).

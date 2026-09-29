@@ -4,6 +4,47 @@ Updated 2026-09-29. This file owns cross-project ordering. Each [plan](plans/REA
 owns its scope, decisions, status and acceptance checks. [AGENTS.md](AGENTS.md) owns execution
 rules; [docs](docs/README.md) holds architecture, research and delivery evidence.
 
+## Current execution order
+
+The [September 29 inventory](plans/inventory-2026-09-29.md) reconciles the remaining
+work across Fregat, Editor, Ghostty, the parser and native clients. It is a dated
+snapshot; this file remains the scheduler and each plan remains its scope authority.
+
+1. **Finish source consolidation in 207.** Reconcile open sibling work, capture final
+   heads, obtain the scoped session hold, import the packages and verify the first
+   mirrors. The rehearsal is complete. Publication bootstrap is a separate gate.
+2. **Close delivered residues and the existing wave-2 queue.** Verify before retiring
+   implemented plans. Keep **132 → 179 → 099 units 0–1 → 114 → 126 → 156 P0–P2** as
+   the default closeout order. Independent proofs and Platform-only slices can run
+   during consolidation; package-layout changes wait for their canonical locations.
+3. **Complete one keymap cutover: 204 + 205 → 206.** 203 has landed. Prepare the
+   producer APIs in parallel, migrate every consumer, then remove obsolete APIs in
+   the same verified release. Align E026 command metadata; Platform owns the shadow report.
+4. **Finish document guarantees and shared highlighting.** Prove landed 198 contracts
+   alongside 099 publication; implement 197 independently. Then migrate 200 consumers
+   against the exact contracts they need. 099 units 2–7 remain explicitly gated.
+5. **Take bounded product slices.** Prefer finishing an active lane before opening a
+   second architecture program. Markdown block/range authoring in 111/108 precedes
+   171's composer swap. 202's local controls can proceed independently; its semantic
+   Markdown cutover waits for parser producer/consumer gates. 201 owns measured typing
+   improvements, 178 owns remaining tree slices, and Ghostty 016 owns standalone readiness.
+6. **Run broad migrations and later programs by unit.** Establish 208's catalog and
+   package contract after 207, coordinate command/settings extraction with 206, then
+   migrate stable domains. 209 design work can proceed earlier but retains its design
+   and implementation gates. Native stays editor-first; 088 follows 087 interoperability.
+
+The default is one active structural cutover plus independent closeout/proof work.
+This order schedules Approved work; it does not expand any plan's authorization.
+
+## Scope of the package hold
+
+No active blanket code freeze was confirmed. 207 requires Editor and ghostty writes
+paused from final-head capture through the first verified mirror push, with the owner
+coordinating other sessions. Release the hold once Fregat is canonical and standalone
+mirror checks pass. Documentation, read-only baselines, independent Platform fixes,
+TUI local work and localization design can continue. Avoid starting sibling API/layout
+migrations during the cutover. Do not delete old checkouts or rewrite mirror history.
+
 ## Wave 2 closeout and dependency order
 
 The owner's remaining closeout queue is **132 → 179 → 099 → 114 → 126 → 156**. This is a
@@ -35,7 +76,8 @@ contracts a consumer needs:
 - [200](plans/200-document-backed-content-views.md) consumes the relevant 099 publication and
   198 acquisition/attachment guarantees. Comparison integration also needs 197's diff service.
   Its baseline research can run before those contracts land.
-- [182](plans/182-search-view-rendering.md) owns search rendering and multibuffer work;
+- [182](plans/182-search-view-rendering.md) owns the selected recycled-editor search rendering;
+  one-editor/multibuffer alternatives remain unscheduled.
   [171](plans/171-composer-on-our-editor.md) owns the composer migration. Neither moves into 200.
 - Markdown authoring and rendered blocks follow [108](plans/108-markdown-modes.md),
   [111](plans/111-editor-decorations.md) and [176](plans/176-markdown-parser.md). Reconcile landed
@@ -69,7 +111,7 @@ shared React/TypeScript logic. The wave-2 queue above is unchanged.
 ## Keymap workstream
 
 [Keymap architecture](docs/keymap/architecture.md) records the owner's 2026-09-29 decisions.
-[203: @fregat/hotkeys](plans/203-fregat-hotkeys.md) comes first. [204: Editor](plans/204-editor-on-fregat-hotkeys.md)
+[203: @fregat/hotkeys](plans/203-fregat-hotkeys.md) landed in PR 197. [204: Editor](plans/204-editor-on-fregat-hotkeys.md)
 and [205: ghostty-webgpu](plans/205-ghostty-on-fregat-hotkeys.md) then run in parallel, and
 [206: Platform owns one keymap](plans/206-platform-one-keymap.md) adopts both. 206's TUI step is
 infrastructure only and takes OpenTUI key events through the integration owned by 202.
@@ -78,6 +120,15 @@ This workstream does not reorder the wave-2 queue above.
 [207: one repo with mirrors](plans/207-one-repo-with-mirrors.md) moves the Editor and
 ghostty-webgpu into Fregat and mirrors them (and `hotkeys/`) to their public repos. Run it before
 204 and 205 so their work lands in Fregat; 203 does not wait for it.
+
+## Localization
+
+[208: all app text in JSON](plans/208-all-text-in-json.md) is Approved. Break execution
+into catalog/package ownership and typed generation, structured-error transport,
+bounded caller extraction/migration, then locale/plural/RTL acceptance. Prove standalone
+family catalog installation after 207 and coordinate command/settings metadata with 206.
+New UI work uses the catalog contract once available. Keep native adapter proofs separate
+from JavaScript generation. The approved full scope remains; this is its delivery order.
 
 ## Unified workspace design
 

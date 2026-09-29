@@ -7,6 +7,10 @@ exist; it does not duplicate status summaries that drift when a plan changes.
 A plan the owner asks for is approved work: write its status as `APPROVED` and write it for
 execution. `IDEA` is only for a plan the owner explicitly calls an idea or is unsure about.
 
+[September 29 inventory](inventory-2026-09-29.md) records remaining deliverables,
+readiness, cross-project conflicts and the PR reconciliation. It is a dated audit,
+not a second live status register.
+
 ## Current plan files
 
 | Plan                                         | Topic                                                                         |

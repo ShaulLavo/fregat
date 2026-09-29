@@ -16,6 +16,24 @@
   sessions work in them), npm trusted-publishing setup
   for the three families, and approval before any force-push to `singapore` or `ghostty-webgpu`.
 
+## Cutover window and release conditions
+
+The rehearsal is complete; the live import has not happened. This plan requires a scoped
+write hold, not a repository-wide freeze. Land or park open Editor/ghostty PRs, obtain the
+owner's session freeze, record final source heads and dirty-state ownership, and refresh
+the split/fast-forward proof against those heads. Keep sibling writes paused from that
+final-head capture through the first verified mirror push. Release the hold with Fregat
+as canonical source. Documentation, read-only baselines and independent Platform work
+can continue during the hold. Do not discard another session's changes or delete old checkouts.
+
+Source import and npm publication are separate delivery units. Before 204/205 add a
+cross-family hotkeys dependency, prove that the exact mirrored Editor/ghostty folder
+installs and builds without sibling workspaces. `workspace:*` rewriting during npm publish
+does not prove standalone mirror installation. Select and test a dependency arrangement
+that supports both root workspaces and exact mirrors; publish the required hotkeys version
+before mirroring a consumer commit that needs it. Record the first-publication and trusted
+publisher gates without blocking unrelated source-import work on every package release.
+
 ## Why
 
 Fregat is already a monorepo held together by hand: 13 tracked symlinks

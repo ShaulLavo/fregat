@@ -174,7 +174,11 @@ The follow-up plans this becomes; numbers are the coordinator's to assign.
 4. **Editor: one decoration range set** (M–L). Chunked mapped range set behind `registerDecorationSource`, replacing the anchored inline map and `EditorDecorationStore` mapping; source priorities; target: a keystroke at 20k replacements costs under 0.5 ms (7.2 ms today).
 5. **Editor: block widgets** (L). Height sums in the display projection, measure-and-correct with scroll anchoring, caret and hit testing across block rows. Unblocks Plan 108 Phase 2.
 
-Phases 1–3 are the composer path; 4 and 5 are the markdown path and can run after.
+Current order, reconciled 2026-09-29: phase 1 is delivered; wrap and spellcheck
+prerequisites are recorded in 171. Range/block primitives from phases 4–5 feed
+108/171's visual and source-revealing authoring acceptance. That acceptance precedes
+the composer host migration and Lexical deletion in 171. The historical numbered
+list above describes scope; it no longer schedules the composer before authoring.
 
 ### Phase 1 as landed (2026-09-26)
 

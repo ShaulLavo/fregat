@@ -2,6 +2,12 @@
 
 ## Status and authorization
 
+Current reconciliation, 2026-09-29: the owner selected recycled per-file editors
+(Q3). P1's pool and the 200-match cap correction are recorded delivered below.
+One-editor/multibuffer alternatives remain unscheduled. Reconcile acceptance and
+remaining measured costs against the selected implementation; do not schedule the
+historical one-editor recommendation as approved work.
+
 - Status: RESEARCH DONE 2026-09-26 — third pass: many editors, recycled and with two layout reads
   removed, fling the broad tier in 1,176 ms with no long task (today 1,767 ms and 15), and one editor
   does it in 151–155 ms. One editor keeps per-file sideways scroll through a per-block x offset:

@@ -2,7 +2,8 @@
 
 ## Status and authorization
 
-- Status: PHASES 1–4 DONE 2026-09-26 (wave 2, lane T); phase 5 next. Research done 2026-09-26 — no new glyphs upstream (our 93 are the whole pack, byte-identical);
+- Status: PHASES 1–5 RECORDED DONE 2026-09-26 (wave 2, lane T); reconcile release
+  evidence and preserve the contract before retiring this plan. Research done 2026-09-26 — no new glyphs upstream (our 93 are the whole pack, byte-identical);
   the gain is a generator, a hue-token file, two live colour bugs fixed, three two-hue icons, a
   stronger light palette and wider file coverage (5.6% → 2.1% generic). Provenance settled in round 2:
   the pack is Pierre's own drawing on its `@pierre/icons` library plus brand marks, not a recoloured

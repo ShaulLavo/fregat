@@ -9,7 +9,8 @@
   `/work/reports/keymap-architecture/` (`04-current-state.md` §3, `01-prior-art-vscode-zed-helix.md`
   on Zed's terminal context and VS Code's `commandsToSkipShell`).
 - Work happens in Fregat's `ghostty-webgpu/` after [207](207-one-repo-with-mirrors.md) moves it
-  there; before that, in `/work/projects/ghostty-webgpu` (a `link:` that needs `bun run build`).
+  there. Prepare with 204 and coordinate hosted-consumer adoption with 206; migrate callers
+  and delete replaced APIs in the same completed cutover.
 
 ## Outcome
 

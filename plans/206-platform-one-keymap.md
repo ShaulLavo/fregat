@@ -75,10 +75,19 @@ layer is Zed's, with an opt-in shell-keys pack.
   [202](202-tui-ui.md)'s integration. Its app-local controls use this dispatcher; the former
   standalone toolkit and renderer-fork workstream is superseded.
 - **Delete** `keymap-session.ts`, the trie/runtime imports from `@singapore-editor/core/keymap`,
-  `presetConflict`/`lostChords` machinery the library's report replaces,
+  `presetConflict`/`lostChords` machinery replaced by Platform's shadow report,
+  built from the library's `bindingsForInput`,
   `docs/keymap/matcher-baseline.json` and `verification.json`; retire `delivery.md` and
   `modes.md` into [architecture.md](../docs/keymap/architecture.md). Adjust
   [166](166-bare-function-keys.md) to contexts if it has not landed.
+
+## Coordinated cutover
+
+After 207 establishes the canonical source, prepare 204 and 205, migrate all current web/TUI
+imports and hosted options here, then delete obsolete runtimes and exports in that same
+verified release. Keep command IDs, titles, typed arguments and mutation policy in the catalog;
+binding packs and host presets own chords. Reconcile Editor E026's historical inline-binding
+requirements with this ownership before implementing its remaining catalog work.
 
 ## Steps
 
@@ -87,7 +96,8 @@ layer is Zed's, with an opt-in shell-keys pack.
       node commands; keep `bun run gates` green.
 - [ ] Register editors and terminals as nodes (204, 205); delete the hosted keymap and capture
       listener.
-- [ ] New overrides and preset settings; Settings keybinding UI on the library's report.
+- [ ] New overrides and preset settings; build the binding-shadow report in Platform from
+      `bindingsForInput` and show it in Settings. The library deliberately exposes no report API.
 - [ ] Raw handler audit and conversions; `use-question-digits` onto a context.
 - [ ] TUI matcher onto the library.
 - [ ] Scenarios in `scripts/agent/scenarios/` with selectors in `scripts/agent/selectors.ts`:
