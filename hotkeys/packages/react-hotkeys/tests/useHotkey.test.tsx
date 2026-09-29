@@ -1,18 +1,18 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
-import { HotkeyManager } from '@fregat/hotkeys'
+import { getHotkeyRegistry } from '@fregat/hotkeys'
 import { useHotkey } from '../src/useHotkey'
 import { useState, useRef } from 'react'
 
 describe('useHotkey', () => {
   // Reset the HotkeyManager singleton between tests
   beforeEach(() => {
-    HotkeyManager.resetInstance()
+    getHotkeyRegistry().dispose()
   })
 
   afterEach(() => {
-    HotkeyManager.resetInstance()
+    getHotkeyRegistry().dispose()
   })
 
   it('should register a hotkey handler', () => {
@@ -26,17 +26,12 @@ describe('useHotkey', () => {
     addEventListenerSpy.mockRestore()
   })
 
-  it('should remove handler on unmount', () => {
+  it('should unregister on unmount', () => {
     const callback = vi.fn()
-    const removeEventListenerSpy = vi.spyOn(document, 'removeEventListener')
-
     const { unmount } = renderHook(() => useHotkey('Mod+S', callback, { platform: 'mac' }))
-
+    expect(getHotkeyRegistry().registrations.state.size).toBe(1)
     unmount()
-
-    expect(removeEventListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function))
-
-    removeEventListenerSpy.mockRestore()
+    expect(getHotkeyRegistry().registrations.state.size).toBe(0)
   })
 
   it('should call callback when hotkey matches', () => {
@@ -73,13 +68,11 @@ describe('useHotkey', () => {
 
   it('should use keyup event when specified', () => {
     const callback = vi.fn()
-    const addEventListenerSpy = vi.spyOn(document, 'addEventListener')
-
     renderHook(() => useHotkey('Escape', callback, { eventType: 'keyup' }))
-
-    expect(addEventListenerSpy).toHaveBeenCalledWith('keyup', expect.any(Function))
-
-    addEventListenerSpy.mockRestore()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(callback).not.toHaveBeenCalled()
+    document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', bubbles: true }))
+    expect(callback).toHaveBeenCalledOnce()
   })
 
   describe('stale closure prevention', () => {
@@ -195,7 +188,7 @@ describe('useHotkey', () => {
 
     it('should preserve registration id when toggling enabled', () => {
       const callback = vi.fn()
-      const manager = HotkeyManager.getInstance()
+      const manager = getHotkeyRegistry()
 
       const { rerender } = renderHook(
         ({ enabled }: { enabled: boolean }) =>
@@ -204,11 +197,11 @@ describe('useHotkey', () => {
       )
 
       const idBefore = [...manager.registrations.state.keys()][0]
-      expect(manager.getRegistrationCount()).toBe(1)
+      expect(manager.registrations.state.size).toBe(1)
       expect(idBefore).toBeDefined()
 
       rerender({ enabled: false })
-      expect(manager.getRegistrationCount()).toBe(1)
+      expect(manager.registrations.state.size).toBe(1)
       expect([...manager.registrations.state.keys()][0]).toBe(idBefore)
       expect(manager.registrations.state.get(idBefore!)?.options.enabled).toBe(false)
 

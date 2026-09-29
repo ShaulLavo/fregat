@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { act, renderHook } from '@testing-library/react'
-import { HotkeyManager } from '@fregat/hotkeys'
+import { getHotkeyRegistry } from '@fregat/hotkeys'
 import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useHotkeys } from '../src/useHotkeys'
@@ -8,11 +8,11 @@ import type { UseHotkeyDefinition } from '../src/useHotkeys'
 
 describe('useHotkeys', () => {
   beforeEach(() => {
-    HotkeyManager.resetInstance()
+    getHotkeyRegistry().dispose()
   })
 
   afterEach(() => {
-    HotkeyManager.resetInstance()
+    getHotkeyRegistry().dispose()
   })
 
   it('should register multiple hotkey handlers', () => {
@@ -26,8 +26,8 @@ describe('useHotkeys', () => {
       ]),
     )
 
-    const manager = HotkeyManager.getInstance()
-    expect(manager.getRegistrationCount()).toBe(2)
+    const manager = getHotkeyRegistry()
+    expect(manager.registrations.state.size).toBe(2)
   })
 
   it('should call the correct callback for each hotkey', () => {
@@ -79,18 +79,18 @@ describe('useHotkeys', () => {
       ),
     )
 
-    const manager = HotkeyManager.getInstance()
-    expect(manager.getRegistrationCount()).toBe(2)
+    const manager = getHotkeyRegistry()
+    expect(manager.registrations.state.size).toBe(2)
 
     unmount()
-    expect(manager.getRegistrationCount()).toBe(0)
+    expect(manager.registrations.state.size).toBe(0)
   })
 
   it('should handle an empty array as a no-op', () => {
     renderHook(() => useHotkeys([]))
 
-    const manager = HotkeyManager.getInstance()
-    expect(manager.getRegistrationCount()).toBe(0)
+    const manager = getHotkeyRegistry()
+    expect(manager.registrations.state.size).toBe(0)
   })
 
   it('should handle dynamic array changes (add hotkey)', () => {
@@ -120,8 +120,8 @@ describe('useHotkeys', () => {
       },
     )
 
-    const manager = HotkeyManager.getInstance()
-    expect(manager.getRegistrationCount()).toBe(2)
+    const manager = getHotkeyRegistry()
+    expect(manager.registrations.state.size).toBe(2)
 
     rerender({
       defs: [
@@ -131,7 +131,7 @@ describe('useHotkeys', () => {
       ],
     })
 
-    expect(manager.getRegistrationCount()).toBe(3)
+    expect(manager.registrations.state.size).toBe(3)
 
     document.dispatchEvent(
       new KeyboardEvent('keydown', {
@@ -168,14 +168,14 @@ describe('useHotkeys', () => {
       },
     )
 
-    const manager = HotkeyManager.getInstance()
-    expect(manager.getRegistrationCount()).toBe(2)
+    const manager = getHotkeyRegistry()
+    expect(manager.registrations.state.size).toBe(2)
 
     rerender({
       defs: [{ hotkey: 'Mod+S', callback: saveCb }],
     })
 
-    expect(manager.getRegistrationCount()).toBe(1)
+    expect(manager.registrations.state.size).toBe(1)
 
     // Removed hotkey should no longer fire
     document.dispatchEvent(
@@ -224,8 +224,8 @@ describe('useHotkeys', () => {
     expect(enabledCb).toHaveBeenCalledTimes(1)
     expect(disabledCb).not.toHaveBeenCalled()
 
-    const manager = HotkeyManager.getInstance()
-    expect(manager.getRegistrationCount()).toBe(2)
+    const manager = getHotkeyRegistry()
+    expect(manager.registrations.state.size).toBe(2)
     const disabledReg = [...manager.registrations.state.values()].find((r) => r.hotkey === 'Mod+Z')
     expect(disabledReg?.options.enabled).toBe(false)
   })
@@ -234,6 +234,7 @@ describe('useHotkeys', () => {
     const callback = vi.fn()
     const targetA = document.createElement('div')
     const targetB = document.createElement('div')
+    document.body.append(targetA, targetB)
 
     const { rerender } = renderHook(
       ({ target }: { target: HTMLElement }) =>
@@ -253,7 +254,7 @@ describe('useHotkeys', () => {
     expect(callback).toHaveBeenCalledTimes(1)
 
     rerender({ target: targetB })
-    expect(HotkeyManager.getInstance().getRegistrationCount()).toBe(1)
+    expect(getHotkeyRegistry().registrations.state.size).toBe(1)
 
     targetA.dispatchEvent(
       new KeyboardEvent('keydown', {
@@ -379,7 +380,7 @@ describe('useHotkeys', () => {
 
     it('should preserve registration id when toggling enabled', () => {
       const callback = vi.fn()
-      const manager = HotkeyManager.getInstance()
+      const manager = getHotkeyRegistry()
 
       const { rerender } = renderHook(
         ({ enabled }: { enabled: boolean }) =>
@@ -390,10 +391,10 @@ describe('useHotkeys', () => {
       )
 
       const idBefore = [...manager.registrations.state.keys()][0]
-      expect(manager.getRegistrationCount()).toBe(1)
+      expect(manager.registrations.state.size).toBe(1)
 
       rerender({ enabled: false })
-      expect(manager.getRegistrationCount()).toBe(1)
+      expect(manager.registrations.state.size).toBe(1)
       expect([...manager.registrations.state.keys()][0]).toBe(idBefore)
 
       rerender({ enabled: true })

@@ -8,7 +8,9 @@ import { validateHotkey } from './validate'
 import { detectPlatform } from './platform'
 import { shouldIgnoreInputEvent } from './_event-target'
 import type { HotkeySequenceRecorderValidationContext, RecorderOptions } from './recorder-options'
-import type { HotkeySequence } from './sequence-manager'
+import type { Hotkey } from './hotkey.types'
+
+export type HotkeySequence = Array<Hotkey>
 
 /**
  * How the user can commit a recorded sequence from the keyboard.

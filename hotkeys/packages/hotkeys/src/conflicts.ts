@@ -2,15 +2,14 @@ import { detectPlatform } from './platform'
 import { parseRegisterableHotkey } from './parse'
 import { keysEqual } from './_keyboard-event'
 import { matchesKeyboardEvent } from './match'
-import { getHotkeyManager, toHotkeyRegistrationView } from './hotkey-manager'
-import { getSequenceManager } from './sequence-manager'
-import type { HotkeyRegistrationView } from './hotkey-manager'
-import type { SequenceRegistrationView } from './sequence-manager'
-import type { RegisterableHotkey } from './hotkey.types'
+import { getHotkeyRegistry } from './hotkeys'
+import type { HotkeyRegistrationView, HotkeyRegistry } from './hotkeys'
+import type { ParsedHotkey, RegisterableHotkey } from './hotkey.types'
 
-export type HotkeyConflict =
-  | { type: 'hotkey'; registration: HotkeyRegistrationView }
-  | { type: 'sequence'; registration: SequenceRegistrationView }
+export type HotkeyConflict = {
+  type: 'hotkey' | 'sequence'
+  registration: HotkeyRegistrationView
+}
 
 export interface HotkeyConflictOptions {
   /** Intended registration target. Defaults to document; disjoint targets are excluded. */
@@ -24,11 +23,13 @@ export interface HotkeyConflictOptions {
   /** IDs of registrations being edited. */
   excludeIds?: ReadonlyArray<string>
   /** Additional app-specific exclusions, such as all instances of one action. */
-  exclude?: (registration: HotkeyRegistrationView | SequenceRegistrationView) => boolean
+  exclude?: (registration: HotkeyRegistrationView) => boolean
   /** Platform used to resolve Mod in the candidate. Registrations retain their own platform. */
   platform?: 'mac' | 'windows' | 'linux'
   /** Source events allow detecting physical/logical overlap on the recorded layout. */
   events?: ReadonlyArray<KeyboardEvent>
+  /** Registry to search. Defaults to the document's. */
+  registry?: HotkeyRegistry
 }
 
 /** Whether two targets share a document and one contains the other (or is its window). */
@@ -66,10 +67,7 @@ export function findHotkeyConflicts(
   const target = options.target ?? (typeof document === 'undefined' ? undefined : document)
   const conflicts: Array<HotkeyConflict> = []
   // Apply scope policy before comparing equivalent bindings or observed event overlap.
-  const matches = (
-    registration: HotkeyRegistrationView | SequenceRegistrationView,
-    bindings: ReadonlyArray<RegisterableHotkey>,
-  ) => {
+  const matches = (registration: HotkeyRegistrationView, bindings: ReadonlyArray<ParsedHotkey>) => {
     if (
       (!options.includeDisabled && registration.options.enabled === false) ||
       (registration.options.eventType ?? 'keydown') !== (options.eventType ?? 'keydown') ||
@@ -80,7 +78,7 @@ export function findHotkeyConflicts(
       return false
     // Compare only the common prefix: a shorter sequence can collide with a longer one.
     return parsed.slice(0, Math.min(parsed.length, bindings.length)).every((a, index) => {
-      const b = parseRegisterableHotkey(bindings[index]!, registration.options.platform)
+      const b = bindings[index]!
       const same =
         a.ctrl === b.ctrl &&
         a.alt === b.alt &&
@@ -97,16 +95,13 @@ export function findHotkeyConflicts(
       )
     })
   }
-  for (const registration of getHotkeyManager().registrations.state.values()) {
-    if (matches(registration, [registration.hotkey]))
+  const registry = options.registry ?? getHotkeyRegistry()
+  for (const registration of registry.registrations.state.values()) {
+    if (matches(registration, registration.strokes))
       conflicts.push({
-        type: 'hotkey',
-        registration: toHotkeyRegistrationView(registration),
+        type: registration.strokes.length > 1 ? 'sequence' : 'hotkey',
+        registration,
       })
-  }
-  for (const registration of getSequenceManager().registrations.state.values()) {
-    if (matches(registration, registration.sequence))
-      conflicts.push({ type: 'sequence', registration })
   }
   return conflicts
 }

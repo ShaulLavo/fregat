@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { act, renderHook } from '@testing-library/react'
-import { SequenceManager } from '@fregat/hotkeys'
+import { getHotkeyRegistry } from '@fregat/hotkeys'
 import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useHotkeySequences } from '../src/useHotkeySequences'
@@ -11,13 +11,9 @@ function dispatchKey(key: string) {
 }
 
 describe('useHotkeySequences', () => {
-  beforeEach(() => {
-    SequenceManager.resetInstance()
-  })
+  beforeEach(() => {})
 
-  afterEach(() => {
-    SequenceManager.resetInstance()
-  })
+  afterEach(() => {})
 
   it('should register multiple sequence handlers', () => {
     const a = vi.fn()
@@ -30,7 +26,7 @@ describe('useHotkeySequences', () => {
       ]),
     )
 
-    expect(SequenceManager.getInstance().getRegistrationCount()).toBe(2)
+    expect(getHotkeyRegistry().registrations.state.size).toBe(2)
   })
 
   it('should call the correct callback for each sequence', () => {
@@ -63,14 +59,14 @@ describe('useHotkeySequences', () => {
       ]),
     )
 
-    expect(SequenceManager.getInstance().getRegistrationCount()).toBe(2)
+    expect(getHotkeyRegistry().registrations.state.size).toBe(2)
     unmount()
-    expect(SequenceManager.getInstance().getRegistrationCount()).toBe(0)
+    expect(getHotkeyRegistry().registrations.state.size).toBe(0)
   })
 
   it('should handle an empty array as a no-op', () => {
     renderHook(() => useHotkeySequences([]))
-    expect(SequenceManager.getInstance().getRegistrationCount()).toBe(0)
+    expect(getHotkeyRegistry().registrations.state.size).toBe(0)
   })
 
   it('should skip definitions with an empty sequence', () => {
@@ -80,7 +76,7 @@ describe('useHotkeySequences', () => {
         { sequence: ['G', 'G'], callback: vi.fn() },
       ]),
     )
-    expect(SequenceManager.getInstance().getRegistrationCount()).toBe(1)
+    expect(getHotkeyRegistry().registrations.state.size).toBe(1)
   })
 
   it('should register disabled sequences and keep them in the manager', () => {
@@ -105,11 +101,9 @@ describe('useHotkeySequences', () => {
     expect(enabledCb).toHaveBeenCalledTimes(1)
     expect(disabledCb).not.toHaveBeenCalled()
 
-    const manager = SequenceManager.getInstance()
-    expect(manager.getRegistrationCount()).toBe(2)
-    const disabledView = [...manager.registrations.state.values()].find(
-      (r) => r.sequence[0] === 'D' && r.sequence[1] === 'D',
-    )
+    const manager = getHotkeyRegistry()
+    expect(manager.registrations.state.size).toBe(2)
+    const disabledView = [...manager.registrations.state.values()].find((r) => r.hotkey === 'D D')
     expect(disabledView?.options.enabled).toBe(false)
   })
 
@@ -151,6 +145,7 @@ describe('useHotkeySequences', () => {
     const callback = vi.fn()
     const targetA = document.createElement('div')
     const targetB = document.createElement('div')
+    document.body.append(targetA, targetB)
 
     const { rerender } = renderHook(
       ({ target }: { target: HTMLElement }) =>
@@ -163,7 +158,7 @@ describe('useHotkeySequences', () => {
     expect(callback).toHaveBeenCalledTimes(1)
 
     rerender({ target: targetB })
-    expect(SequenceManager.getInstance().getRegistrationCount()).toBe(1)
+    expect(getHotkeyRegistry().registrations.state.size).toBe(1)
 
     targetA.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', bubbles: true }))
     targetA.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', bubbles: true }))
@@ -242,7 +237,7 @@ describe('useHotkeySequences', () => {
 
     it('should preserve registration id when toggling enabled', () => {
       const callback = vi.fn()
-      const manager = SequenceManager.getInstance()
+      const manager = getHotkeyRegistry()
 
       const { rerender } = renderHook(
         ({ enabled }: { enabled: boolean }) =>
@@ -251,10 +246,10 @@ describe('useHotkeySequences', () => {
       )
 
       const idBefore = [...manager.registrations.state.keys()][0]
-      expect(manager.getRegistrationCount()).toBe(1)
+      expect(manager.registrations.state.size).toBe(1)
 
       rerender({ enabled: false })
-      expect(manager.getRegistrationCount()).toBe(1)
+      expect(manager.registrations.state.size).toBe(1)
       expect([...manager.registrations.state.keys()][0]).toBe(idBefore)
 
       rerender({ enabled: true })

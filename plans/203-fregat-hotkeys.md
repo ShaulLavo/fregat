@@ -96,7 +96,7 @@ source: 'default' | 'pack' | 'user' }`. Removal copies Zed: `command: null` supp
       (`test_depth_precedence`, `test_disable_weaker_sources_only`, `test_fail_to_disable`,
       `test_disable_deeper`, pending/replay cases in `key_dispatch.rs`).
 - [x] Add the terminal-input adapter with tests from the TUI's key cases.
-- [ ] Rebuild the convenience API on the dispatcher; delete the old managers.
+- [x] Rebuild the convenience API on the dispatcher; delete the old managers.
 - [ ] Benchmark and document.
 
 ## Acceptance
@@ -178,5 +178,18 @@ Branch `plan-203-hotkeys` (worktree `/work/worktrees/platform/plan-203-hotkeys`)
   rule from `apps/tui/src/commands/utils/keyboard.ts`; legacy Alt as Alt, Super as Meta; Kitty
   release and repeat), `terminalKeyEffects`. Tests from the TUI's key cases (Control+K,
   ESC s, Kitty `?`, releases) plus a dispatcher-hosted chord and a replayed prefix. 702 tests.
-- Next: step 7, rebuild the convenience API (`HotkeyManager`/`SequenceManager`,
-  `useHotkey(s)`, `useHotkeySequence(s)`) on the dispatcher and delete the old managers.
+- Step 7 done. `src/hotkeys.ts`: `createHotkeyRegistry` / `getHotkeyRegistry(document)` with
+  TanStack's `register(keys, callback, options)` and handle (`callback`, `setOptions`,
+  `unregister`, `isActive`) on one browser dispatcher per document; arrays register chords.
+  The keymap rebuilds lazily before the next key (one trie build for any number of
+  registrations). Newest registration runs first; a callback returning `false` passes the key on.
+  `HotkeyManager`, `SequenceManager` and their three test files are deleted; their surviving
+  tests (recording, parsed identity, review regressions) run against the registry;
+  `findHotkeyConflicts` reads the registry. React hooks register with the registry;
+  `useHotkeyRegistrations` splits views by stroke count. Semantics that changed on purpose:
+  a single stroke that prefixes a registered chord waits (Zed) instead of both firing; element
+  targets must be in the document. Trie fix: physical bindings (`[KeyQ]`) now match their code
+  on any layout. Test setup stubs happy-dom's `getModifierState`, which reports AltGraph for
+  any Alt. 576 core + 44 React tests.
+- Next: step 8, benchmark (`bench/` in the package: 255-binding plain-key lookup against the
+  Editor trie's 0.04 µs, construction linearity) and the README examples.

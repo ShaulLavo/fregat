@@ -44,7 +44,7 @@ function insertBinding<Payload>(
         ? parseHotkey(stroke, platform)
         : rawHotkeyToParsedHotkey(stroke, platform)
     const modifiers = modifierMask(parsed.alt, parsed.ctrl, parsed.meta, parsed.shift)
-    const strokeKey = parsed.key ?? PHYSICAL_KEY_NAMES.get(parsed.code) ?? parsed.code
+    const strokeKey = parsed.code === undefined ? parsed.key : physicalSlot(parsed.code)
     const edges = node.next.get(strokeKey) ?? []
     let edge = edges[modifiers]
     if (!edge) edge = { keys: normalizeRegisterableHotkey(stroke, platform), node: emptyNode() }
@@ -55,7 +55,10 @@ function insertBinding<Payload>(
   node.candidates.push(binding)
 }
 
-/** One `Map.get` plus an index; falls back to the physical key on non-Latin layouts. */
+/**
+ * One `Map.get` plus an index for a printed key; then a physical binding on the code; then, on
+ * non-Latin layouts, the printed binding at that position.
+ */
 export function trieStep<Payload>(
   node: KeymapNode<Payload>,
   input: Pick<KeyInput, 'key' | 'code' | 'modifiers'>,
@@ -63,13 +66,19 @@ export function trieStep<Payload>(
   const { alt, ctrl, meta, shift, altGraph } = input.modifiers
   // AltGr synthesizes Control+Alt to type a glyph; the glyph is the stroke.
   const modifiers = modifierMask(alt && !altGraph, ctrl && !altGraph, meta, shift)
-  const edge = node.next.get(input.key)?.[modifiers]
+  const edge =
+    node.next.get(input.key)?.[modifiers] ??
+    (input.code ? node.next.get(physicalSlot(input.code))?.[modifiers] : undefined)
   if (edge) return edge
   // A Latin layout owns its printed letters; AZERTY Z must not activate physical W.
   if (LATIN_LETTER_PATTERN.test(input.key)) return null
   const physical = PHYSICAL_KEY_NAMES.get(input.code)
   if (!physical) return null
   return node.next.get(physical)?.[modifiers] ?? null
+}
+// Physical bindings (`[KeyQ]`) match the code on every layout, beside the printed-key slots.
+function physicalSlot(code: string): string {
+  return `[${code}]`
 }
 function modifierMask(alt: boolean, ctrl: boolean, meta: boolean, shift: boolean): number {
   return (alt ? 1 : 0) | (ctrl ? 2 : 0) | (meta ? 4 : 0) | (shift ? 8 : 0)

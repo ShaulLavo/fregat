@@ -24,6 +24,9 @@ export type Binding = {
   readonly args?: unknown
   readonly context?: string
   readonly source?: BindingSource
+  /** False keeps the browser default even when the command runs; true prevents it even when declined. */
+  readonly preventDefault?: boolean
+  readonly stopPropagation?: boolean
 }
 /** Removes one key→command pair where `context` matches, leaving other commands on the keys. */
 export type Unbinding = {
@@ -71,6 +74,10 @@ function compileEntry(
   const isUnbind = 'unbind' in entry
   return {
     chord,
+    ...(!isUnbind &&
+      entry.preventDefault !== undefined && { preventDefault: entry.preventDefault }),
+    ...(!isUnbind &&
+      entry.stopPropagation !== undefined && { stopPropagation: entry.stopPropagation }),
     payload: {
       entry,
       command: isUnbind ? null : entry.command,

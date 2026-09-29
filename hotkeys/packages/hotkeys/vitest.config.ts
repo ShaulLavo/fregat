@@ -7,5 +7,6 @@ export default defineConfig({
     watch: false,
     environment: 'happy-dom',
     globals: true,
+    setupFiles: ['./tests/setup.ts'],
   },
 })

@@ -1,8 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import {
-  HotkeyManager,
+  getHotkeyRegistry,
   HotkeyRecorder,
-  SequenceManager,
   createHotkeyHandler,
   formatHotkey,
   hasNonModifierKey,
@@ -30,8 +29,7 @@ void neither
 
 afterEach(() => {
   window.dispatchEvent(new Event('blur'))
-  HotkeyManager.resetInstance()
-  SequenceManager.resetInstance()
+  getHotkeyRegistry().dispose()
 })
 
 it('constructs exclusive identities from strings, raw bindings, and events', () => {
@@ -87,12 +85,12 @@ it('keeps physical identity in standalone handler context', () => {
 it('synthesizes code rather than inventing a character when triggering registrations', () => {
   const single = vi.fn(),
     sequence = vi.fn()
-  const manager = HotkeyManager.getInstance(),
-    sequences = SequenceManager.getInstance()
+  const manager = getHotkeyRegistry(),
+    sequences = getHotkeyRegistry()
   const handle = manager.register('Alt+[KeyS]', single)
   const seq = sequences.register(['[KeyG]', 'Alt+[KeyS]'], sequence)
-  manager.triggerRegistration(handle.id)
-  sequences.triggerSequence(seq.id)
+  manager.trigger(handle.id)
+  sequences.trigger(seq.id)
   for (const callback of [single, sequence]) {
     expect(callback.mock.calls[0]![0].code).toBe('KeyS')
     expect(callback.mock.calls[0]![0].key).toBe('')
@@ -103,7 +101,7 @@ it('recognizes physical action keys and preserves Escape input defaults', () => 
   expect(hasNonModifierKey('[KeyS]')).toBe(true)
   expect(hasNonModifierKey('[ShiftLeft]')).toBe(false)
   expect(hasNonModifierKey('[AltRight]')).toBe(false)
-  const manager = HotkeyManager.getInstance()
+  const manager = getHotkeyRegistry()
   const handle = manager.register('[Escape]', vi.fn())
   expect(manager.registrations.state.get(handle.id)?.options.ignoreInputs).toBe(false)
 })

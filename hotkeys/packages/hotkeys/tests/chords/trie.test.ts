@@ -86,3 +86,16 @@ test('stores each stroke under its normalized label and counts descendants per p
   expect(edge?.node.candidates).toEqual([])
   expect(edge?.node.descendants.map((binding) => binding.payload)).toEqual(['comment', 'uncomment'])
 })
+
+test('a physical binding matches its code on any layout, even under a Latin letter', () => {
+  const trie = buildKeymapTrie(
+    [
+      { chord: ['Shift+[KeyQ]'], payload: 'physical' },
+      { chord: ['[NumpadAdd]'], payload: 'numpad' },
+    ],
+    'linux',
+  )
+  expect(trieStep(trie, stroke('A', 'KeyQ', 8))?.node.candidates[0]?.payload).toBe('physical')
+  expect(trieStep(trie, stroke('q', 'KeyA', 8))).toBeNull()
+  expect(trieStep(trie, stroke('+', 'NumpadAdd', 0))?.node.candidates[0]?.payload).toBe('numpad')
+})

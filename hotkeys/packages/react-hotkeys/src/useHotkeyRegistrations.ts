@@ -1,60 +1,32 @@
 import { useSelector } from '@tanstack/react-store'
-import { getHotkeyManager, getSequenceManager, toHotkeyRegistrationView } from '@fregat/hotkeys'
-import type { HotkeyRegistrationView, SequenceRegistrationView } from '@fregat/hotkeys'
+import { getHotkeyRegistry } from '@fregat/hotkeys'
+import type { HotkeyRegistrationView } from '@fregat/hotkeys'
 
-/**
- * Return type for useHotkeyRegistrations.
- */
 export interface HotkeyRegistrationsResult {
-  /** All registered hotkeys (public view, no callbacks) */
+  /** Single-stroke registrations (public view, no callbacks) */
   hotkeys: Array<HotkeyRegistrationView>
-  /** All registered sequences */
-  sequences: Array<SequenceRegistrationView>
+  /** Multi-stroke registrations */
+  sequences: Array<HotkeyRegistrationView>
 }
 
 /**
- * React hook that reactively reads all hotkey and sequence registrations
- * from the singleton managers.
- *
- * This is a standalone hook that does NOT require the HotkeysProvider.
- * It subscribes to both HotkeyManager and SequenceManager stores and
- * re-renders when registrations change.
- *
- * @returns Object with `hotkeys` and `sequences` arrays
+ * Lists the document registry's registrations, for devtools, palettes and cheat sheets.
  *
  * @example
  * ```tsx
- * function ShortcutPalette() {
- *   const { hotkeys, sequences } = useHotkeyRegistrations()
- *
- *   return (
- *     <ul>
- *       {hotkeys.map((reg) => (
- *         <li key={reg.id}>
- *           {reg.options.meta?.name ?? reg.hotkey}
- *         </li>
- *       ))}
- *       {sequences.map((reg) => (
- *         <li key={reg.id}>
- *           {reg.options.meta?.name ?? reg.sequence.join(' ')}
- *         </li>
- *       ))}
- *     </ul>
- *   )
+ * function ShortcutList() {
+ *   const { hotkeys } = useHotkeyRegistrations()
+ *   return hotkeys.map((registration) => <li key={registration.id}>{registration.hotkey}</li>)
  * }
  * ```
  */
 export function useHotkeyRegistrations(): HotkeyRegistrationsResult {
-  const hotkeyManager = getHotkeyManager()
-  const sequenceManager = getSequenceManager()
-
-  const hotkeys = useSelector(hotkeyManager.registrations, (state) =>
-    Array.from(state.values()).map(toHotkeyRegistrationView),
+  const registry = getHotkeyRegistry()
+  const hotkeys = useSelector(registry.registrations, (state) =>
+    Array.from(state.values()).filter((view) => view.strokes.length === 1),
   )
-
-  const sequences = useSelector(sequenceManager.registrations, (state) =>
-    Array.from(state.values()),
+  const sequences = useSelector(registry.registrations, (state) =>
+    Array.from(state.values()).filter((view) => view.strokes.length > 1),
   )
-
   return { hotkeys, sequences }
 }

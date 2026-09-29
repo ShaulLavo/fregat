@@ -1,16 +1,16 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { formatHotkeySequence, getSequenceManager } from '@fregat/hotkeys'
+import { formatHotkeySequence, getHotkeyRegistry } from '@fregat/hotkeys'
 import { useDefaultHotkeysOptions } from './HotkeysProvider'
 import { isRef } from './utils'
 import type {
   HotkeyCallback,
   HotkeyCallbackContext,
   HotkeySequence,
-  SequenceOptions,
-  SequenceRegistrationHandle,
+  HotkeyOptions,
+  HotkeyRegistrationHandle,
 } from '@fregat/hotkeys'
 
-export interface UseHotkeySequenceOptions extends Omit<SequenceOptions, 'target'> {
+export interface UseHotkeySequenceOptions extends Omit<HotkeyOptions, 'target'> {
   /**
    * The DOM element to attach the event listener to.
    * Can be a React ref, direct DOM element, or null.
@@ -23,7 +23,7 @@ export interface UseHotkeySequenceOptions extends Omit<SequenceOptions, 'target'
  * React hook for registering a keyboard shortcut sequence (Vim-style).
  *
  * This hook allows you to register multi-key sequences like 'g g' or 'd d'
- * that trigger when the full sequence is pressed within a timeout.
+ * that trigger when the full sequence is pressed; prefixes wait for the next key.
  *
  * Each step may include modifiers. You can chain the same modifier across
  * steps (e.g. `Shift+R` then `Shift+T`). Modifier-only keydown events (Shift,
@@ -51,7 +51,7 @@ export interface UseHotkeySequenceOptions extends Omit<SequenceOptions, 'target'
  *   // 'd i w' to delete inner word
  *   useHotkeySequence(['D', 'I', 'W'], () => {
  *     deleteInnerWord()
- *   }, { timeout: 500 })
+ *   }, { requireReset: true })
  *
  *   // Same modifier on consecutive steps (bare Shift between chords is ignored)
  *   useHotkeySequence(['Shift+R', 'Shift+T'], () => {
@@ -72,10 +72,10 @@ export function useHotkeySequence(
     ...options,
   }
 
-  const manager = getSequenceManager()
+  const manager = getHotkeyRegistry()
 
   // Stable ref for registration handle
-  const registrationRef = useRef<SequenceRegistrationHandle | null>(null)
+  const registrationRef = useRef<HotkeyRegistrationHandle | null>(null)
 
   // Refs to capture current values for use in effect without adding dependencies
   const callbackRef = useRef(callback)

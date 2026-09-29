@@ -1,9 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import {
-  HotkeyManager,
+  getHotkeyRegistry,
   HotkeyRecorder,
   HotkeySequenceRecorder,
-  SequenceManager,
   areHotkeysEqual,
   findHotkeyConflicts,
   formatForDisplay,
@@ -40,8 +39,7 @@ function release(key: string, code: string, flags: KeyboardEventInit = {}) {
 afterEach(() => {
   instances.splice(0).forEach((r) => r.destroy())
   window.dispatchEvent(new Event('blur'))
-  HotkeyManager.resetInstance()
-  SequenceManager.resetInstance()
+  getHotkeyRegistry().dispose()
   document.body.replaceChildren()
 })
 
@@ -65,7 +63,7 @@ it.each([
   expect(binding).toBe(expected)
   release(key, code, flags)
   const callback = vi.fn()
-  HotkeyManager.getInstance().register(binding!, callback, {
+  getHotkeyRegistry().register(binding!, callback, {
     platform: 'mac',
   })
   press(key, code, flags)
@@ -125,7 +123,7 @@ it('rejects missing codes and AltGraph while ignoring IME', () => {
 it('suppresses recording keydowns, repeats and releases then allows normal use', () => {
   const down = vi.fn(),
     up = vi.fn(),
-    manager = HotkeyManager.getInstance()
+    manager = getHotkeyRegistry()
   manager.register('Alt+[KeyS]', down, { platform: 'mac' })
   manager.register('Alt+[KeyS]', up, {
     eventType: 'keyup',
@@ -169,9 +167,9 @@ it('keeps recording after rejection and clears with only onClear', () => {
   expect(r.store.state.isRecording).toBe(false)
 })
 it('resolves aliases, disabled state and exclusions', () => {
-  const manager = HotkeyManager.getInstance()
+  const manager = getHotkeyRegistry()
   const handle = manager.register('Control+S', vi.fn(), { platform: 'windows' })
-  expect(manager.isRegistered('Mod+S')).toBe(true)
+  expect(manager.registrations.state.get(handle.id)?.hotkey).toBe('Mod+S')
   expect(findHotkeyConflicts('Mod+S', { platform: 'windows' })).toHaveLength(1)
   expect(
     findHotkeyConflicts('Mod+S', {
@@ -189,7 +187,7 @@ it('resolves aliases, disabled state and exclusions', () => {
   ).toHaveLength(1)
 })
 it('detects physical/logical conflicts from source events and stays active', () => {
-  HotkeyManager.getInstance().register('Alt+S', vi.fn(), { platform: 'mac' })
+  getHotkeyRegistry().register('Alt+S', vi.fn(), { platform: 'mac' })
   const onReject = vi.fn(),
     onRecord = vi.fn()
   const r = recorder({
@@ -215,7 +213,7 @@ it('allows disjoint targets and finds overlapping targets', () => {
     child = document.createElement('div')
   a.append(child)
   document.body.append(a, b)
-  HotkeyManager.getInstance().register('Alt+[KeyS]', vi.fn(), { target: a })
+  getHotkeyRegistry().register('Alt+[KeyS]', vi.fn(), { target: a })
   expect(findHotkeyConflicts('Alt+[KeyS]', { target: b })).toEqual([])
   expect(findHotkeyConflicts('Alt+[KeyS]', { target: child })).toHaveLength(1)
   expect(findHotkeyConflicts('Alt+[KeyS]')).toHaveLength(1)
@@ -223,11 +221,11 @@ it('allows disjoint targets and finds overlapping targets', () => {
   expect(findHotkeyConflicts('Alt+[KeyS]', { eventType: 'keyup' })).toEqual([])
 })
 it('finds sequence prefix conflicts in both directions', () => {
-  SequenceManager.getInstance().register(['[KeyG]', '[KeyG]'], vi.fn())
+  getHotkeyRegistry().register(['[KeyG]', '[KeyG]'], vi.fn())
   expect(findHotkeyConflicts('[KeyG]')).toHaveLength(1)
   expect(findHotkeyConflicts(['[KeyG]', '[KeyG]', '[KeyD]'])).toHaveLength(1)
   expect(findHotkeyConflicts(['[KeyG]', '[KeyD]'])).toEqual([])
-  HotkeyManager.getInstance().register('[KeyX]', vi.fn())
+  getHotkeyRegistry().register('[KeyX]', vi.fn())
   expect(findHotkeyConflicts(['[KeyX]', '[KeyD]'])).toHaveLength(1)
 })
 it('retains rejected sequence steps, allows editing, and clears without onRecord', () => {
@@ -262,7 +260,7 @@ it('retains rejected sequence steps, allows editing, and clears without onRecord
   expect(onRecord).toHaveBeenCalledTimes(1)
 })
 it('skips unchanged options, including fresh equivalent metadata', () => {
-  const manager = HotkeyManager.getInstance()
+  const manager = getHotkeyRegistry()
   const handle = manager.register('Alt+S', vi.fn(), {
       meta: { name: 'Save', group: 'Editor' },
     }),
@@ -318,7 +316,7 @@ it('matches nonempty modifier subsets with exact and platform options', () => {
 
 it('releases pre-recording reset latches without firing keyup callbacks', () => {
   const callback = vi.fn()
-  HotkeyManager.getInstance().register('[KeyS]', callback, {
+  getHotkeyRegistry().register('[KeyS]', callback, {
     requireReset: true,
   })
   press('s', 'KeyS')
@@ -331,7 +329,7 @@ it('releases pre-recording reset latches without firing keyup callbacks', () => 
 })
 it('does not carry sequence progress across a recorded chord', () => {
   const callback = vi.fn()
-  SequenceManager.getInstance().register(['[KeyG]', '[KeyG]'], callback)
+  getHotkeyRegistry().register(['[KeyG]', '[KeyG]'], callback)
   press('g', 'KeyG')
   release('g', 'KeyG')
   const r = recorder({ onRecord: vi.fn() })
@@ -347,7 +345,7 @@ it('does not carry sequence progress across a recorded chord', () => {
 
 it('ends recording suppression when macOS swallows the main key release', () => {
   const callback = vi.fn()
-  HotkeyManager.getInstance().register('Mod+[KeyS]', callback, {
+  getHotkeyRegistry().register('Mod+[KeyS]', callback, {
     platform: 'mac',
   })
   const r = recorder({ onRecord: vi.fn(), platform: 'mac' })
@@ -364,7 +362,7 @@ it('rejects a sequence-prefix conflict at commit without executing registered se
   const callback = vi.fn(),
     onRecord = vi.fn(),
     onReject = vi.fn()
-  SequenceManager.getInstance().register(['[KeyG]', '[KeyG]'], callback)
+  getHotkeyRegistry().register(['[KeyG]', '[KeyG]'], callback)
   const r = new HotkeySequenceRecorder({
     onRecord,
     onReject,

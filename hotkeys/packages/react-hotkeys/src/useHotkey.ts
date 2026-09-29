@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { detectPlatform, getHotkeyManager, normalizeRegisterableHotkey } from '@fregat/hotkeys'
+import { detectPlatform, getHotkeyRegistry, normalizeRegisterableHotkey } from '@fregat/hotkeys'
 import { useDefaultHotkeysOptions } from './HotkeysProvider'
 import { isRef } from './utils'
 import type {
@@ -21,7 +21,7 @@ export interface UseHotkeyOptions extends Omit<HotkeyOptions, 'target'> {
 /**
  * React hook for registering a keyboard hotkey.
  *
- * Uses the singleton HotkeyManager for efficient event handling.
+ * Registers with the document's hotkey registry, one trie lookup per key.
  * The callback receives both the keyboard event and a context object
  * containing the hotkey string and parsed hotkey.
  *
@@ -87,7 +87,7 @@ export function useHotkey(
     ...options,
   }
 
-  const manager = getHotkeyManager()
+  const manager = getHotkeyRegistry()
 
   // Stable ref for registration handle
   const registrationRef = useRef<HotkeyRegistrationHandle | null>(null)

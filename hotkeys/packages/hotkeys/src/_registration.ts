@@ -2,7 +2,7 @@ import type { ConflictBehavior, ParsedHotkey } from './hotkey.types'
 
 /**
  * Default options for hotkey/sequence registration.
- * Omitted: platform, target (resolved at registration), requireReset (HotkeyManager only).
+ * Omitted: platform, target (resolved at registration), requireReset (single strokes only).
  */
 export const defaultHotkeyOptions = {
   preventDefault: true,

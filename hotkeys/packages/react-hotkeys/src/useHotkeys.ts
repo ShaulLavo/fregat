@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { detectPlatform, getHotkeyManager, normalizeRegisterableHotkey } from '@fregat/hotkeys'
+import { detectPlatform, getHotkeyRegistry, normalizeRegisterableHotkey } from '@fregat/hotkeys'
 import { useDefaultHotkeysOptions } from './HotkeysProvider'
 import { isRef } from './utils'
 import type { UseHotkeyOptions } from './useHotkey'
@@ -25,7 +25,7 @@ export interface UseHotkeyDefinition {
 /**
  * React hook for registering multiple keyboard hotkeys at once.
  *
- * Uses the singleton HotkeyManager for efficient event handling.
+ * Registers with the document's hotkey registry, one trie lookup per key.
  * Accepts a dynamic array of hotkey definitions, making it safe to use
  * with variable-length lists without violating the rules of hooks.
  *
@@ -36,7 +36,7 @@ export interface UseHotkeyDefinition {
  *
  * @param hotkeys - Array of hotkey definitions to register
  * @param commonOptions - Shared options applied to all hotkeys (overridden by per-definition options).
- *   Per-row `enabled: false` still registers that hotkey: `HotkeyManager` suppresses execution only (the row
+ *   Per-row `enabled: false` still registers that hotkey: the registry suppresses execution only (the row
  *   stays in the store and appears in TanStack Hotkeys devtools). Toggling `enabled` updates the existing handle
  *   via `setOptions` (no unregister/re-register churn).
  *
@@ -76,7 +76,7 @@ export function useHotkeys(
   }
 
   const defaultOptions = useDefaultHotkeysOptions().hotkey
-  const manager = getHotkeyManager()
+  const manager = getHotkeyRegistry()
   const platform = commonOptions.platform ?? defaultOptions?.platform ?? detectPlatform()
 
   const registrationsRef = useRef<Map<string, RegistrationRecord>>(new Map())

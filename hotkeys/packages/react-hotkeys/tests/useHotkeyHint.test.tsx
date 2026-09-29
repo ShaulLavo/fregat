@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, it, vi } from 'vitest'
 import { act, cleanup, renderHook } from '@testing-library/react'
-import { HotkeyManager, KeyStateTracker, SequenceManager } from '@fregat/hotkeys'
+import { KeyStateTracker, getHotkeyRegistry } from '@fregat/hotkeys'
 import { useHotkey, useHotkeyHint, useHotkeySequence } from '../src'
 
 function key(type: string, key: string, code: string, flags: KeyboardEventInit = {}) {
@@ -11,8 +11,7 @@ function key(type: string, key: string, code: string, flags: KeyboardEventInit =
 }
 afterEach(() => {
   cleanup()
-  HotkeyManager.resetInstance()
-  SequenceManager.resetInstance()
+  getHotkeyRegistry().dispose()
   KeyStateTracker.resetInstance()
 })
 it('selects hint visibility without rerendering on unrelated keys and clears on blur', () => {
@@ -50,14 +49,19 @@ it('preserves raw code bindings through hook normalization and sequence registra
     useHotkey({ code: 'KeyQ', shift: true }, single)
     useHotkeySequence(['Shift+[KeyQ]', '[NumpadEnter]'], sequence)
   })
+  // A bound prefix waits for its chord (Zed): the chord runs, the single stroke does not.
   key('keydown', 'A', 'KeyQ', { shiftKey: true })
   key('keyup', 'a', 'KeyQ')
   key('keydown', 'Enter', 'NumpadEnter')
-  expect(single).toHaveBeenCalledOnce()
+  expect(single).not.toHaveBeenCalled()
   expect(sequence).toHaveBeenCalledOnce()
+  // Any other key ends the wait and runs the prefix's own binding.
+  key('keydown', 'A', 'KeyQ', { shiftKey: true })
+  key('keydown', 'x', 'KeyX')
+  expect(single).toHaveBeenCalledOnce()
   unmount()
-  expect(HotkeyManager.getInstance().registrations.state.size).toBe(0)
-  expect(SequenceManager.getInstance().registrations.state.size).toBe(0)
+  expect(getHotkeyRegistry().registrations.state.size).toBe(0)
+  expect(getHotkeyRegistry().registrations.state.size).toBe(0)
 })
 it('moves an unchanged binding to a new target after commit', () => {
   const a = document.createElement('div'),

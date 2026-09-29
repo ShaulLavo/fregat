@@ -161,7 +161,7 @@ export type ParsedHotkey = ParsedModifiers &
  *
  * Like `ParsedHotkey` but without `modifiers` (derived from booleans)
  * and with optional modifier booleans (default to `false` when omitted).
- * Use with `HotkeyManager.register()` and `useHotkey()` when you prefer
+ * Use with `HotkeyRegistry.register()` and `useHotkey()` when you prefer
  * object form over a string.
  *
  * The `mod` modifier is platform-adaptive: Command on macOS, Control on Windows/Linux.
@@ -198,7 +198,7 @@ export type RawHotkey =
   | ({ code: string; key?: never } & RawModifiers)
 
 /**
- * A hotkey that can be passed to `HotkeyManager.register()` and `useHotkey()`.
+ * A hotkey that can be passed to `HotkeyRegistry.register()` and `useHotkey()`.
  * Either a type-safe string (`Hotkey`) or a raw object (`RawHotkey`).
  */
 export type RegisterableHotkey = Hotkey | RawHotkey
@@ -227,7 +227,10 @@ export interface HotkeyCallbackContext {
  * }
  * ```
  */
-export type HotkeyCallback = (event: KeyboardEvent, context: HotkeyCallbackContext) => void
+export type HotkeyCallback = (
+  event: KeyboardEvent,
+  context: HotkeyCallbackContext,
+) => void | boolean
 
 /**
  * Metadata for hotkey and sequence registrations.

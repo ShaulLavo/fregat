@@ -7,6 +7,8 @@ import type { Dispatcher, DispatcherOptions, FocusNode } from '../dispatch/dispa
 export type BrowserDispatcherOptions = Omit<DispatcherOptions<KeyboardEvent>, 'effects'> & {
   /** Where idle keys are heard; defaults to the global document. */
   readonly root?: HTMLElement | Document
+  /** Runs before each key event is offered, for hosts that update the keymap lazily. */
+  readonly beforeKey?: (event: KeyboardEvent) => void
 }
 export type BrowserDispatcher = Dispatcher<KeyboardEvent> & {
   /**
@@ -36,6 +38,7 @@ export function createBrowserDispatcher(options: BrowserDispatcherOptions = {}):
   const listeners = attachKeyListeners(root, platform, () => dispatcher, focusFromEvent)
 
   function focusFromEvent(event: KeyboardEvent) {
+    options.beforeKey?.(event)
     if (!nodes.size || event.type !== 'keydown') return
     for (const target of event.composedPath()) {
       const node = target instanceof Element ? nodes.get(target) : undefined

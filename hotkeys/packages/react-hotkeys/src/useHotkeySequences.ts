@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { formatHotkeySequence, getSequenceManager } from '@fregat/hotkeys'
+import { formatHotkeySequence, getHotkeyRegistry } from '@fregat/hotkeys'
 import { useDefaultHotkeysOptions } from './HotkeysProvider'
 import { isRef } from './utils'
 import type { UseHotkeySequenceOptions } from './useHotkeySequence'
-import type { HotkeyCallback, HotkeySequence, SequenceRegistrationHandle } from '@fregat/hotkeys'
+import type { HotkeyCallback, HotkeySequence, HotkeyRegistrationHandle } from '@fregat/hotkeys'
 
 /**
  * A single sequence definition for use with `useHotkeySequences`.
@@ -20,7 +20,7 @@ export interface UseHotkeySequenceDefinition {
 /**
  * React hook for registering multiple keyboard shortcut sequences at once (Vim-style).
  *
- * Uses the singleton SequenceManager. Accepts a dynamic array of definitions so you can
+ * Registers with the document's hotkey registry. Accepts a dynamic array of definitions so you can
  * register variable-length lists without violating the rules of hooks.
  *
  * Options are merged in this order:
@@ -32,7 +32,7 @@ export interface UseHotkeySequenceDefinition {
  *
  * @param definitions - Array of sequence definitions to register
  * @param commonOptions - Shared options applied to all sequences (overridden by per-definition options).
- *   Per-row `enabled: false` still registers that sequence: `SequenceManager` suppresses execution only (the row
+ *   Per-row `enabled: false` still registers that sequence: the registry suppresses execution only (the row
  *   stays in the store and appears in TanStack Hotkeys devtools). Toggling `enabled` updates the existing handle
  *   via `setOptions` (no unregister/re-register churn).
  *
@@ -42,7 +42,7 @@ export interface UseHotkeySequenceDefinition {
  *   useHotkeySequences([
  *     { sequence: ['G', 'G'], callback: () => scrollToTop() },
  *     { sequence: ['D', 'D'], callback: () => deleteLine() },
- *     { sequence: ['C', 'I', 'W'], callback: () => changeInnerWord(), options: { timeout: 500 } },
+ *     { sequence: ['C', 'I', 'W'], callback: () => changeInnerWord(), options: { requireReset: true } },
  *   ])
  * }
  * ```
@@ -66,12 +66,12 @@ export function useHotkeySequences(
   commonOptions: UseHotkeySequenceOptions = {},
 ): void {
   type RegistrationRecord = {
-    handle: SequenceRegistrationHandle
+    handle: HotkeyRegistrationHandle
     target: Document | HTMLElement | Window
   }
 
   const defaultOptions = useDefaultHotkeysOptions().hotkeySequence
-  const manager = getSequenceManager()
+  const manager = getHotkeyRegistry()
 
   const registrationsRef = useRef<Map<string, RegistrationRecord>>(new Map())
   const definitionsRef = useRef(definitions)

@@ -1,9 +1,8 @@
 import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import {
-  HotkeyManager,
+  getHotkeyRegistry,
   HotkeyRecorder,
   HotkeySequenceRecorder,
-  SequenceManager,
   formatForDisplay,
   formatHotkey,
   matchesKeyboardEvent,
@@ -17,8 +16,7 @@ const recorders: Array<HotkeyRecorder | HotkeySequenceRecorder> = []
 afterEach(() => {
   recorders.splice(0).forEach((recorder) => recorder.destroy())
   window.dispatchEvent(new Event('blur'))
-  HotkeyManager.resetInstance()
-  SequenceManager.resetInstance()
+  getHotkeyRegistry().dispose()
   document.body.replaceChildren()
 })
 
@@ -39,7 +37,7 @@ it('releases requireReset after a callback focuses an input', () => {
   const input = document.createElement('input')
   document.body.append(input)
   const callback = vi.fn(() => input.focus())
-  HotkeyManager.getInstance().register('[KeyS]', callback, {
+  getHotkeyRegistry().register('[KeyS]', callback, {
     requireReset: true,
   })
   dispatch(document, 'keydown', 's', 'KeyS')
@@ -51,7 +49,7 @@ it('releases requireReset after a callback focuses an input', () => {
 
 it('releases requireReset while a registration is disabled', () => {
   const callback = vi.fn()
-  const handle = HotkeyManager.getInstance().register('[KeyS]', callback, {
+  const handle = getHotkeyRegistry().register('[KeyS]', callback, {
     requireReset: true,
   })
   dispatch(document, 'keydown', 's', 'KeyS')
@@ -139,7 +137,7 @@ it('rejects physical tokens in raw and parsed logical fields without changing Un
     expect(() => parseRegisterableHotkey(raw)).toThrow('code field')
     expect(() => normalizeRegisterableHotkey(raw)).toThrow('code field')
     expect(() => formatForDisplay(raw)).toThrow('code field')
-    const manager = HotkeyManager.getInstance()
+    const manager = getHotkeyRegistry()
     expect(() => manager.register(raw, vi.fn())).toThrow('code field')
     expect(manager.registrations.state.size).toBe(0)
     const parsed: ParsedHotkey = {
