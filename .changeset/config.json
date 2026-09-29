@@ -3,7 +3,28 @@
   "changelog": "@changesets/cli/changelog",
   "commit": false,
   "fixed": [
-    ["@singapore-editor/*"],
+    [
+      "@singapore-editor/core",
+      "@singapore-editor/decode",
+      "@singapore-editor/diff",
+      "@singapore-editor/find",
+      "@singapore-editor/gutters",
+      "@singapore-editor/lsp",
+      "@singapore-editor/lsp-plugin",
+      "@singapore-editor/markdown",
+      "@singapore-editor/minimap",
+      "@singapore-editor/paged",
+      "@singapore-editor/panes",
+      "@singapore-editor/plugin-ui",
+      "@singapore-editor/react",
+      "@singapore-editor/scope-lines",
+      "@singapore-editor/solid",
+      "@singapore-editor/spellcheck",
+      "@singapore-editor/textbuffer",
+      "@singapore-editor/tree-sitter",
+      "@singapore-editor/tree-sitter-languages",
+      "@singapore-editor/typescript-lsp"
+    ],
     ["@fregat/hotkeys", "@fregat/react-hotkeys"],
     ["ghostty-webgpu"]
   ],
@@ -12,6 +33,9 @@
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
   "ignore": [],
-  "privatePackages": { "version": false, "tag": false },
+  "privatePackages": {
+    "version": false,
+    "tag": false
+  },
   "format": "oxfmt"
 }
