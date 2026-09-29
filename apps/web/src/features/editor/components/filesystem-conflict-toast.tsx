@@ -84,11 +84,11 @@ function conflictTitle(conflict: FilesystemConflict) {
 
 function conflictDescription(conflict: FilesystemConflict) {
   if (conflict.eventType === 'deleted') {
-    return 'Your unsaved changes are the only copy. Keep them to save the file again.'
+    return 'Something else deleted this file while you had unsaved changes. Keep them to save the file again.'
   }
   if (conflict.eventType === 'renamed') {
-    return `It is now ${displayPath(conflict.remotePath)}, and you have unsaved changes. Keep them to save over it.`
+    return `Something else renamed this file to ${displayPath(conflict.remotePath)} while you had unsaved changes. Keep them to save over it.`
   }
 
-  return 'You have unsaved changes. Keep them to save over the disk version.'
+  return 'Something else changed this file while you had unsaved changes. Keep yours to save over it, or use the disk version and drop yours.'
 }
