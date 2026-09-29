@@ -141,7 +141,7 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
 - [x] Move the Editor's and ghostty-webgpu's repo-level CI (architecture health, textbuffer
       benches, tree-sitter-x, config-resolver, pages/site) into Fregat's `.github/workflows` with
       path filters; keep each family's standalone workflows inside its folder.
-- [ ] One set of tooling: a single formatter version, one vitest patch, one lockfile; delete the
+- [x] One set of tooling: a single formatter version, one vitest patch, one lockfile; delete the
       duplicates. Keep `bun run gates` and the Editor's health checks green.
 - [ ] Mirror workflow; first push to `singapore` and `ghostty-webgpu`; update both READMEs.
 - [ ] Changesets with the fixed groups; a dry-run publish, then the first real publish after the
@@ -160,7 +160,7 @@ Family formatter options match Fregat; generated-file exclusions remain with eac
 
 Editor and ghostty sites join Fregat's existing Pages artifact at `editor/` and `ghostty-webgpu/`, sharing one deployment. Native config-resolver workflows remain manual dispatches. The integration regenerates ghostty's bootstrap input closure after removing its family lockfile and uses repository-relative Git object paths for a nested checkout.
 
-Pending in this lane: record final gates, suites, browser evidence and CI results. Mirror/publish workflows, source freeze, checkout retirement and deployment are owned by other lanes or the coordinator.
+Local gates, typecheck, web build and Editor health pass. The updated quick-open scenario completed and its screenshots were read at `/work/tmp/fregat-evidence/20260929T201255Z-scenario-quick-open-editor-source/`. Suite closeout and green CI remain in progress. Mirror/publish workflows, source freeze, checkout retirement and deployment are owned by other lanes or the coordinator.
 
 ## Acceptance
 

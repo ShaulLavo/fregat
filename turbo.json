@@ -130,6 +130,6 @@
     "editor/tsconfig.json",
     "editor/global.d.ts",
     "editor/examples/app/tsconfig.json",
-    "editor/scripts/workspace-root.ts"
+    "editor/scripts/workspace-root*"
   ]
 }

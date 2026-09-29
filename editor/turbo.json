@@ -6,7 +6,7 @@
     "global.d.ts",
     "scripts/build-package.ts",
     "tsconfig.json",
-    "scripts/workspace-root.ts"
+    "scripts/workspace-root*"
   ],
   "tasks": {
     "dev": {

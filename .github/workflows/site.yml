@@ -41,7 +41,7 @@ jobs:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/editor/
         run: bun x turbo run build --filter=@singapore-editor/example-app
       - name: Build ghostty site
-        run: bun run --cwd ghostty-webgpu/site build -- --base /${{ github.event.repository.name }}/ghostty-webgpu/
+        run: bun run --cwd ghostty-webgpu/site build --base /${{ github.event.repository.name }}/ghostty-webgpu/
       - name: Assemble family sites
         run: |
           cp -R editor/examples/app/dist apps/site/dist/editor
