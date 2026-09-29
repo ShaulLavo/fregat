@@ -18,13 +18,13 @@ The install uses CLIProxyAPI v8.0.4, with the published archive SHA256 checked. 
 
 The runtime configuration lists existing Codex `auth.json` paths in `authSources`. Before GPT requests, current access tokens are copied to the proxy auth directory, with file permissions `0600`. Codex keeps ownership of refreshing those logins. The proxy never receives those refresh tokens. If an access token expires, use the corresponding Codex login to refresh it, then retry.
 
-For an independent proxy login or a second account, run:
+Both accounts are connected. The original account remains a Codex-owned access-token mirror; the second completed a separate proxy-owned device login. For another independent proxy login, run:
 
 ```bash
 cli-proxy-login
 ```
 
-Choose the other ChatGPT account in the browser. These separately authorized credentials belong to CLIProxyAPI and it refreshes them itself. Each independent account joins the pool. Avoid authorizing the same account twice when its existing Codex login is already listed in `authSources`.
+The command prints an OpenAI device sign-in URL and a short code. Open the URL from any browser, enter the code, and choose the other ChatGPT account. Device login works remotely without a localhost callback or SSH tunnel. These separately authorized credentials belong to CLIProxyAPI and it refreshes them itself. Each independent account joins the pool. Avoid authorizing the same account twice when its existing Codex login is already listed in `authSources`.
 
 Round-robin routing distributes new conversations. Session affinity retains an account within a conversation; GPT subagents can receive separate account bindings. An unavailable account can fail over to another account. Account limits and model access remain the provider's limits.
 

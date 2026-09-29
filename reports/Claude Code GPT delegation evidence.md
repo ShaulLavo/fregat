@@ -11,3 +11,5 @@ This proves actual Sol model delegation and a tool operation within Claude Code'
 Claude Code emitted an `unrecognized_model` warning for `gpt-6.1-sol`; execution nevertheless succeeded. Its displayed provider/cost metadata described GPT as `firstParty` with unknown cost basis. That display is not evidence of an Anthropic invoice or accurate cross-provider billing attribution.
 
 The raw session-scoped transcript was captured at `.scratch/claude-gpt/native-check.jsonl`. This summary preserves the relevant evidence without publishing full conversation or environment contents.
+
+The second account completed OpenAI device authentication. The proxy auth directory contains two different account IDs, with the original account mirrored without a refresh token and the second credential independently managed by CLIProxyAPI. Both credential files have permissions `0600`. The service was restarted to load both accounts; no quota-exhaustion or forced-failover test was run.
