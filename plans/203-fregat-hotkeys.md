@@ -95,7 +95,7 @@ source: 'default' | 'pack' | 'user' }`. Removal copies Zed: `command: null` supp
 - [x] Add predicates, focus nodes and resolution; translate Zed's keymap tests as fixtures
       (`test_depth_precedence`, `test_disable_weaker_sources_only`, `test_fail_to_disable`,
       `test_disable_deeper`, pending/replay cases in `key_dispatch.rs`).
-- [ ] Add the terminal-input adapter with tests from the TUI's key cases.
+- [x] Add the terminal-input adapter with tests from the TUI's key cases.
 - [ ] Rebuild the convenience API on the dispatcher; delete the old managers.
 - [ ] Benchmark and document.
 
@@ -173,5 +173,10 @@ Branch `plan-203-hotkeys` (worktree `/work/worktrees/platform/plan-203-hotkeys`)
   each stroke and stays on; `acceptsTextInput(source)` gives printable prefixes a timeout
   (browser default: the target is a text field) and their replay. Zed pending fixtures in
   `tests/dispatch/dispatcher.test.ts`. 694 tests.
-- Next: step 6, the terminal-input adapter, shaped by `apps/tui/src/commands/state/keymap.ts`
-  and `utils/bindings.ts`.
+- Step 6 done. `src/adapters/terminal.ts`: `TerminalKeyLike` (OpenTUI `KeyEvent` shape, no
+  OpenTUI dependency), `keyInputFromTerminalKey` (the TUI's name map and printed-symbol Shift
+  rule from `apps/tui/src/commands/utils/keyboard.ts`; legacy Alt as Alt, Super as Meta; Kitty
+  release and repeat), `terminalKeyEffects`. Tests from the TUI's key cases (Control+K,
+  ESC s, Kitty `?`, releases) plus a dispatcher-hosted chord and a replayed prefix. 702 tests.
+- Next: step 7, rebuild the convenience API (`HotkeyManager`/`SequenceManager`,
+  `useHotkey(s)`, `useHotkeySequence(s)`) on the dispatcher and delete the old managers.

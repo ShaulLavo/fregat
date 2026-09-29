@@ -156,7 +156,7 @@ export function createDispatcher<Source = unknown>(
       const state = path[index]!
       const handlers = state.handlers.get(command)
       if (!handlers || state.removed) continue
-      for (const handler of [...handlers]) {
+      for (const handler of handlers) {
         if (handler({ command, args, node: state.node, input, source }) !== false) return true
       }
     }
