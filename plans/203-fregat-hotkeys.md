@@ -92,7 +92,7 @@ source: 'default' | 'pack' | 'user' }`. Removal copies Zed: `command: null` supp
       (`packages/editor/src/keymap/trie.test.ts`, the runtime contract tests behind Plan 057's
       "20 runtime contract tests").
 - [x] Port the trie and chord runtime; add focus-bound pending state and replay.
-- [ ] Add predicates, focus nodes and resolution; translate Zed's keymap tests as fixtures
+- [x] Add predicates, focus nodes and resolution; translate Zed's keymap tests as fixtures
       (`test_depth_precedence`, `test_disable_weaker_sources_only`, `test_fail_to_disable`,
       `test_disable_deeper`, pending/replay cases in `key_dispatch.rs`).
 - [ ] Add the terminal-input adapter with tests from the TUI's key cases.
@@ -162,7 +162,16 @@ Branch `plan-203-hotkeys` (worktree `/work/worktrees/platform/plan-203-hotkeys`)
   before the winning exact binding are shadowed), `bindingsForInput` for settings and tests. The
   chord runtime takes a `select(node, context, source)` hook so the dispatcher plugs this in.
   Zed's context and keymap tests translated in `tests/context/` and `tests/dispatch/keymap.test.ts`.
-- Next: focus nodes and the dispatcher (`src/dispatch/dispatcher.ts`): node tree, focus path →
-  context stack, commands dispatched deepest node first with `false` passing on, browser attach
-  sharing the listener code of `adapters/browser-keymap.ts`; then pending/replay cases from
-  `key_dispatch.rs` as fixtures.
+- Step 5 done. `src/dispatch/dispatcher.ts`: `createDispatcher` (DOM-free focus tree:
+  `createNode({ parent, context, commands })`, `focus`, `contextStack`, `setKeymap`,
+  `handleKey`, `dispatchCommand`); commands run from the focused node up, a handler returning
+  `false` passes to the ancestor and then to the next candidate binding; unhandled keys return
+  false for default input. `src/adapters/browser-dispatcher.ts`: `createBrowserDispatcher` with
+  `attachElement(node, element)`; each keydown focuses the deepest attached element on the
+  event path. Listener code shared with `createKeymapRuntime` in
+  `adapters/browser-listeners.ts`. Runtime additions from Zed: a running timeout restarts on
+  each stroke and stays on; `acceptsTextInput(source)` gives printable prefixes a timeout
+  (browser default: the target is a text field) and their replay. Zed pending fixtures in
+  `tests/dispatch/dispatcher.test.ts`. 694 tests.
+- Next: step 6, the terminal-input adapter, shaped by `apps/tui/src/commands/state/keymap.ts`
+  and `utils/bindings.ts`.

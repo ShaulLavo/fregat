@@ -1,4 +1,5 @@
 import { isModifierKey } from '../parse'
+import { isPrintableKey } from '../_keyboard-event'
 import { buildKeymapTrie, trieStep } from './trie'
 import type { KeyInput } from '../key-input'
 import type { KeymapEdge, KeymapNode } from './trie'
@@ -49,6 +50,11 @@ export type ChordRuntimeOptions<Payload, Context, Source> = {
    * host can give it to default input handling (a terminal re-encodes it for the shell).
    */
   readonly replay?: (input: KeyInput, source: Source) => void
+  /**
+   * True when the focused target takes typed text. A printable prefix then pends with a timeout
+   * so the character reaches the text when no chord follows.
+   */
+  readonly acceptsTextInput?: (source: Source) => boolean
   /** Identifies the focus; a pending chord ends without replay when it changes. */
   readonly currentFocus?: () => unknown
   /** How long a prefix that is itself bound waits for its continuation. Other prefixes wait until the next key. */
@@ -91,6 +97,7 @@ type Pending<Payload, Source> = {
   readonly buffer: readonly Buffered<Source>[]
   readonly started: number
   readonly focus: unknown
+  readonly timed: boolean
 }
 const DEFAULT_TIMEOUT_MS = 1_000
 
@@ -174,12 +181,18 @@ export function createChordRuntime<Payload, Context, Source>(
     const buffer = [...(pending?.buffer ?? []), entry]
     const started = pending?.started ?? Date.now()
     const focus = pending ? pending.focus : options.currentFocus?.()
-    pending = { node: edge.node, keys, count, buffer, started, focus }
+    // Zed times out a bound prefix or typed text; once running, the timeout restarts per stroke.
+    const timed = bound || pending?.timed === true || typesText(entry)
+    pending = { node: edge.node, keys, count, buffer, started, focus, timed }
     clearTimeout(timer)
-    // Zed waits only when the prefix is itself bound; otherwise the next key decides.
-    if (bound) timer = setTimeout(timeout, timeoutMs)
+    if (timed) timer = setTimeout(timeout, timeoutMs)
     syncCapture()
     options.onPendingChange?.({ keys, candidateCount: count })
+  }
+  function typesText({ input, source }: Buffered<Source>) {
+    const { ctrl, meta } = input.modifiers
+    if (ctrl || meta || !(isPrintableKey(input.key) || input.key === 'Space')) return false
+    return options.acceptsTextInput?.(source) === true
   }
   function timeout() {
     if (!pending) return

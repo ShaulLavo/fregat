@@ -1,6 +1,6 @@
 import { createChordRuntime } from '../chords/runtime'
 import { detectPlatform } from '../platform'
-import { keyInputFromKeyboardEvent } from './browser'
+import { attachKeyListeners, browserKeyEffects } from './browser-listeners'
 import type { KeyInput } from '../key-input'
 import type {
   ChordOutcome,
@@ -44,103 +44,29 @@ export type KeymapRuntime<Payload> = {
   readonly dispose: () => void
 }
 
-const BROWSER_EFFECTS = {
-  preventDefault: (event: KeyboardEvent) => event.preventDefault(),
-  stopPropagation: (event: KeyboardEvent) => event.stopPropagation(),
-  swallow: (event: KeyboardEvent) => {
-    event.preventDefault()
-    event.stopImmediatePropagation()
-  },
-}
-
 /** Attaches a chord runtime to a DOM root and cancels pending chords on blur, hidden tab, pointer and focus loss. */
 export function createKeymapRuntime<Payload, Context>(
   options: KeymapRuntimeOptions<Payload, Context>,
 ): KeymapRuntime<Payload> {
   const { root } = options
   const document = 'defaultView' in root ? root : root.ownerDocument
-  const window = document.defaultView
   const platform = options.platform ?? detectPlatform()
-  const processed = new WeakMap<KeyboardEvent, boolean>()
-  let disposed = false
   const runtime = createChordRuntime<Payload, Context, KeyboardEvent>({
     ...options,
     platform,
-    effects: BROWSER_EFFECTS,
-    onCaptureChange: syncCapture,
+    effects: browserKeyEffects,
+    onCaptureChange: () => listeners.syncCapture(),
     currentFocus: () => document.activeElement,
   })
-
-  function syncCapture() {
-    if (!disposed && runtime.wantsCapture()) document.addEventListener('keydown', onCapture, true)
-    else document.removeEventListener('keydown', onCapture, true)
-  }
-  function claimKeybinding(event: KeyboardEvent): boolean {
-    if (disposed) return false
-    const prior = processed.get(event)
-    if (prior !== undefined) return prior
-    const input = keyInputFromKeyboardEvent(event, platform)
-    const owned = runtime.handleKey(input, event, input.type === 'keyup' || inRoot(event))
-    processed.set(event, owned)
-    return owned
-  }
-  function inRoot(event: Event) {
-    if (root === document && event.target === null) return true
-    return event.composedPath().includes(root)
-  }
-  function onCapture(event: KeyboardEvent) {
-    if (runtime.capturesKey(keyInputFromKeyboardEvent(event, platform))) claimKeybinding(event)
-  }
-  function onKeyDown(event: Event) {
-    if (event.defaultPrevented || !('code' in event)) return
-    if (!(event instanceof KeyboardEvent)) return
-    claimKeybinding(event)
-  }
-  function onKeyUp(event: KeyboardEvent) {
-    claimKeybinding(event)
-  }
-  function onBlur() {
-    runtime.releaseAll()
-    runtime.cancel('blur')
-  }
-  function onVisibilityChange() {
-    if (document.visibilityState !== 'hidden') return
-    runtime.releaseAll()
-    runtime.cancel('hidden')
-  }
-  function onPointerDown() {
-    runtime.cancel('pointer')
-  }
-  function onFocusOut(event: Event) {
-    if (root === document) return
-    if (!(event instanceof FocusEvent)) return
-    const target = event.relatedTarget
-    if (target instanceof Node && root.contains(target)) return
-    runtime.cancel('superseded')
-  }
-  function dispose() {
-    if (disposed) return
-    runtime.dispose()
-    disposed = true
-    syncCapture()
-    root.removeEventListener('keydown', onKeyDown)
-    root.removeEventListener('focusout', onFocusOut)
-    document.removeEventListener('keyup', onKeyUp, true)
-    document.removeEventListener('visibilitychange', onVisibilityChange)
-    document.removeEventListener('pointerdown', onPointerDown, true)
-    window?.removeEventListener('blur', onBlur)
-  }
-  root.addEventListener('keydown', onKeyDown)
-  root.addEventListener('focusout', onFocusOut)
-  document.addEventListener('keyup', onKeyUp, true)
-  document.addEventListener('visibilitychange', onVisibilityChange)
-  document.addEventListener('pointerdown', onPointerDown, true)
-  window?.addEventListener('blur', onBlur)
+  const listeners = attachKeyListeners(root, platform, () => runtime)
   return {
-    claimKeybinding,
+    claimKeybinding: listeners.claim,
     updateBindings: runtime.updateBindings,
     setEnabled: runtime.setEnabled,
     cancel: runtime.cancel,
-    dispose,
+    dispose: () => {
+      runtime.dispose()
+      listeners.dispose()
+    },
   }
 }
