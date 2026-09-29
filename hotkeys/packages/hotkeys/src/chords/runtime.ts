@@ -196,8 +196,13 @@ export function createChordRuntime<Payload, Context, Source>(
   }
   function timeout() {
     if (!pending) return
+    // Zed flushes only while focus is where the chord started; elsewhere the prefix is dropped.
+    if (focusMoved()) return report(endPending(), 'superseded', null)
     const ended = endPending()
     report(ended, 'timeout', flush(ended.buffer))
+  }
+  function focusMoved() {
+    return options.currentFocus !== undefined && options.currentFocus() !== pending!.focus
   }
   /**
    * Runs the longest buffered prefix that has an available binding, replays unbound keys to the
@@ -285,8 +290,7 @@ export function createChordRuntime<Payload, Context, Source>(
     if (!enabled || input.composing) return null
     if (isModifierKey(input.key)) return pending ? ownChord(source) : null
     if (pending && input.repeat) return ownChord(source)
-    if (pending && options.currentFocus && options.currentFocus() !== pending.focus)
-      cancel('superseded')
+    if (pending && focusMoved()) cancel('superseded')
     if (pending) {
       const continued = continueChord(input, source)
       if (continued !== undefined) return continued

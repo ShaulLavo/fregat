@@ -138,6 +138,33 @@ describe('focus nodes and resolution', () => {
     expect(calls).toEqual([])
     expect(dispatcher.pending()).toBeNull()
   })
+
+  it('drops a timed-out prefix when focus moved while it waited', () => {
+    vi.useFakeTimers()
+    const calls: string[] = []
+    const dispatcher = createDispatcher({
+      platform: 'linux',
+      keymap: [
+        { keys: 'Control+K', command: 'k' },
+        { keys: 'Control+K Control+C', command: 'kc' },
+      ],
+    })
+    const root = dispatcher.createNode()
+    const editor = dispatcher.createNode({
+      parent: root,
+      commands: { k: () => void calls.push('editor') },
+    })
+    const terminal = dispatcher.createNode({
+      parent: root,
+      commands: { k: () => void calls.push('terminal') },
+    })
+    editor.focus()
+    expect(dispatcher.handleKey(press('ctrl-k'), null)).toBe(true)
+    terminal.focus()
+    vi.advanceTimersByTime(1000)
+    expect(calls).toEqual([])
+    expect(dispatcher.pending()).toBeNull()
+  })
 })
 
 // Pending cases from Zed's crates/gpui/src/key_dispatch.rs tests (zed-industries/zed@933d8d9).
