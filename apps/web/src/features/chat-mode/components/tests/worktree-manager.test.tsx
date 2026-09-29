@@ -13,7 +13,7 @@ test('the worktree manager stays reachable when the project has no sessions', as
   expect(await screen.findByRole('dialog', { name: 'Worktrees' })).toBeInTheDocument()
   expect(screen.getByText('Workspace')).toBeInTheDocument()
   expect(screen.getByText('The main checkout is protected from removal.')).toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: 'Clean up' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
   await userEvent.keyboard('{Escape}')
   await waitFor(() =>
     expect(screen.queryByRole('dialog', { name: 'Worktrees' })).not.toBeInTheDocument(),

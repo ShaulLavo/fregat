@@ -56,7 +56,7 @@ describe('collectWorkspaceSearch', () => {
   it('review: rejects a done object missing completion fields', async () => {
     const client = clientStreaming([match('src/a.ts'), { event: 'done', data: {} }])
     await expect(collectWorkspaceSearch(QUERY, undefined, client)).rejects.toThrow(
-      /invalid completion event/u,
+      /search finished with an answer the app could not read/u,
     )
   })
 
@@ -64,7 +64,7 @@ describe('collectWorkspaceSearch', () => {
     const client = clientStreaming([match('src/a.ts'), match('src/b.ts')])
 
     await expect(collectWorkspaceSearch(QUERY, undefined, client)).rejects.toThrow(
-      /ended after 2 matches without completing/u,
+      /stopped early after 2 matches/u,
     )
   })
 
@@ -100,7 +100,7 @@ describe('collectWorkspaceSearch', () => {
     const client = clientStreaming([match('src/a.ts'), { event: 'done', data: 'nonsense' }])
 
     await expect(collectWorkspaceSearch(QUERY, undefined, client)).rejects.toThrow(
-      /invalid completion event/u,
+      /search finished with an answer the app could not read/u,
     )
   })
 
@@ -117,7 +117,7 @@ describe('collectWorkspaceSearch', () => {
     const client = clientStreaming([match('src/a.ts'), { event: 'done', data }])
 
     await expect(collectWorkspaceSearch(QUERY, undefined, client)).rejects.toThrow(
-      /invalid completion event/u,
+      /search finished with an answer the app could not read/u,
     )
   })
 })
@@ -130,7 +130,7 @@ describe('streamWorkspaceSearch', () => {
     await expect(async () => {
       for await (const event of streamWorkspaceSearch(QUERY, undefined, client))
         seen.push(event.type)
-    }).rejects.toThrow(/without completing/u)
+    }).rejects.toThrow(/stopped early/u)
 
     expect(seen).toEqual(['match', 'match'])
   })
@@ -153,7 +153,7 @@ describe('search error codes', () => {
 
     await expect(collectWorkspaceSearch(QUERY, undefined, client)).rejects.toMatchObject({
       code: 'client.EDEN_STREAM_MISSING',
-      message: 'Search response did not include a stream.',
+      message: 'Search got an empty answer from the server.',
     })
   })
 

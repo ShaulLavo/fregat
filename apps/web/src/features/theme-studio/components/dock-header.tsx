@@ -44,23 +44,23 @@ export function DockHeader({
       <PaneBar className='gap-(--density-control-gap)'>
         <span className='flex min-w-0 shrink items-center gap-1.5 text-xs font-medium' title={name}>
           <span className='truncate'>{name}</span>
-          {dirty ? <StatusDot aria-label='Not applied' tone='warning' /> : null}
+          {dirty ? <StatusDot aria-label='Unsaved edits' tone='warning' /> : null}
         </span>
         <ModeSwitch mode={mode} onChange={onMode} />
         {phone ? null : <DockTabs tab={tab} onTab={onTab} />}
         <span className='min-w-0 flex-1' />
         {confirmingDiscard && !phone ? (
           <span className='text-muted-foreground shrink-0 text-xs' role='status'>
-            Repeat to discard edits
+            Repeat to drop your edits
           </span>
         ) : null}
         {phone && !dirty ? null : (
           <Button disabled={!dirty} size='sm' variant='ghost' onClick={onRevert}>
-            Revert
+            Undo edits
           </Button>
         )}
         <Button disabled={!dirty} size='sm' onClick={onApply}>
-          Apply
+          Save and use
         </Button>
         <IconTooltip label={collapsed ? 'Show the studio' : 'Hide the studio'}>
           <Button
@@ -81,7 +81,7 @@ export function DockHeader({
       </PaneBar>
       {phone && confirmingDiscard ? (
         <p className='text-muted-foreground px-(--bar-padding-x) text-xs' role='status'>
-          Repeat to discard edits
+          Repeat to drop your edits
         </p>
       ) : null}
       {phone && !collapsed ? (

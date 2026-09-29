@@ -37,9 +37,9 @@ export function MalformedBanner({ layers }: { layers: readonly SettingsLayerSnap
               Your {target} settings.json has a syntax error
             </p>
             <p className='text-muted-foreground mt-1 text-xs'>
-              {file.parseErrors[0]?.message ?? 'The document could not be parsed'} — the last
-              settings that loaded are still in effect, and changes here cannot be saved until the
-              file parses.
+              {file.parseErrors[0]?.message ?? 'The file could not be read'}. The app keeps using
+              your settings from before the error, and changes here cannot be saved until it is
+              fixed.
             </p>
           </div>
           {/* Both, in order: the broken file may not be the scope on screen. */}

@@ -302,7 +302,7 @@ describe('MessageBubble browser rendering', () => {
 
     await page.getByRole('article').hover()
     await vi.waitFor(() => expect(revertButton()).toBeVisible())
-    await page.getByRole('button', { name: 'Revert to checkpoint before this turn' }).click()
+    await page.getByRole('button', { name: 'Rewind to before this message' }).click()
     await vi.waitFor(() => {
       expect(revertToCheckpoint).toHaveBeenCalledWith(2, expect.any(String))
     })
@@ -501,9 +501,7 @@ function changedFileButtonOrNull(path: string) {
 }
 
 function revertButton() {
-  const button = document.querySelector(
-    'button[aria-label="Revert to checkpoint before this turn"]',
-  )
+  const button = document.querySelector('button[aria-label="Rewind to before this message"]')
   if (!(button instanceof HTMLButtonElement)) {
     throw new Error('Revert button not found')
   }

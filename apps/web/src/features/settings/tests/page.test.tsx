@@ -74,7 +74,7 @@ test(
     await userEvent.click(
       await screen.findByRole('button', { name: 'Actions for chat.planModeEnabled' }),
     )
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Reset setting' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Reset to default' }))
 
     // Reset removes the key rather than writing the default into the file, which
     // is what keeps the default coming from the running build.

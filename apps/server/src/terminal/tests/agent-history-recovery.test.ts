@@ -131,7 +131,7 @@ test('an unconfirmed CLI exit survives restart as visible unknown ownership', as
     await retry.open()
     expect(retry.messages).toContainEqual({
       type: 'error',
-      message: 'The previous terminal process may still own this session',
+      message: 'An earlier terminal may still be running this session',
     })
     expect(fixture.pty.spawns).toHaveLength(1)
     expect(fixture.database.select().from(agentTerminalHandoffs).all()).toMatchObject([

@@ -6,8 +6,8 @@ const errors = defineErrorCatalog('orchestration', {
   SESSION_REWIND_PENDING: {
     status: 409,
     message: 'This session is being rewound. Wait for its result before changing it.',
-    why: 'The native conversation and workspace are being restored; accepting this operation could lose a new prompt or change the rewind target.',
-    fix: 'Retry the operation after rewind completes or reports a failure.',
+    why: 'The conversation and files are going back to an earlier turn, and a change now could lose a new message or rewind to the wrong point.',
+    fix: 'Try again once the rewind finishes or fails.',
   },
 })
 

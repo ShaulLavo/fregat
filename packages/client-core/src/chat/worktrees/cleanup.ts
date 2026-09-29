@@ -3,43 +3,43 @@ import type { OrchestrationWorktreeShell, WorktreeCleanupEligibility } from '@wo
 export function cleanupEligibilityLabel(eligibility: WorktreeCleanupEligibility): string {
   switch (eligibility.reason) {
     case 'eligible':
-      return 'Ready to check for cleanup. Running processes and changes are checked before removal.'
+      return 'Can be removed. Platform checks for changes and running processes first.'
     case 'referenced':
-      return `${eligibility.nonDeletedSessionCount} sessions still use this checkout. Delete them before cleanup.`
+      return `${eligibility.nonDeletedSessionCount} sessions still use this worktree. Delete them before removing it.`
     case 'provider-stop-pending':
       return 'Waiting for the agent to stop.'
     case 'provider-stop-failed':
-      return 'The agent could not stop. Retry stopping it before cleanup.'
+      return 'The agent could not stop. Stop it again before removing the worktree.'
     case 'active-runtime':
-      return 'An agent is still running in this checkout.'
+      return 'An agent is still running in this worktree.'
     case 'active-terminal':
-      return 'A terminal is still running. Dispose of it and wait for it to exit.'
+      return 'A terminal is still running. Close it and wait for it to exit.'
     case 'terminal-ownership-unknown':
-      return 'Terminal ownership could not be verified after restart. Release this checkout for manual cleanup.'
+      return 'After the restart, Platform cannot tell whether a terminal still runs here. Stop managing this worktree and remove it yourself.'
     case 'external-driver-unverified':
-      return 'An external agent may still be running. Release this checkout for manual cleanup.'
+      return 'An agent outside Platform may still be running here. Stop managing this worktree and remove it yourself.'
     case 'protected':
       return 'The main checkout is protected from removal.'
     case 'external':
-      return 'This checkout is managed outside Platform.'
+      return 'This worktree is managed outside Platform.'
     case 'unclaimed':
-      return 'Adopt this checkout before Platform can clean it up.'
+      return 'Let Platform manage this worktree before it can remove it.'
     case 'missing':
-      return 'This checkout is absent. Confirm its absence to resolve the record.'
+      return 'This worktree folder is gone. Forget it to clear it from the list.'
     case 'not-ready':
-      return 'This checkout is not ready for cleanup.'
+      return 'This worktree is not ready to be removed.'
   }
 }
 
 export function cleanupStatusLabel(worktree: OrchestrationWorktreeShell): string {
   if (worktree.lifecycle.state === 'removed')
-    return 'Checkout removed. Its branch and commits were retained.'
+    return 'Worktree removed. Its branch and commits were kept.'
   if (worktree.lifecycle.state !== 'cleanup-blocked')
     return cleanupEligibilityLabel(worktree.cleanupEligibility)
   if (worktree.lifecycle.reason === 'active-runtime')
-    return 'The last cleanup attempt found a running agent. Retry checks again before removing files.'
+    return 'The last removal found a running agent. Check again before removing files.'
   if (worktree.lifecycle.reason === 'active-terminal')
-    return 'The last cleanup attempt found a running terminal. Retry checks again before removing files.'
+    return 'The last removal found a running terminal. Check again before removing files.'
   return cleanupEligibilityLabel(worktree.cleanupEligibility)
 }
 

@@ -12,8 +12,8 @@ export function ImportSection() {
       <div className='space-y-1'>
         <h3 className='text-foreground text-sm font-medium'>Import existing chats</h3>
         <p className='text-muted-foreground text-xs'>
-          Import conversation text for registered projects on the selected machine. Importing again
-          also fills history in chats already listed here. Tool activity and attachments are not
+          Import conversation text for projects added on the selected machine. Importing again also
+          fills history in chats already listed here. Tool activity and attachments are not
           imported.
         </p>
         <p className='text-muted-foreground text-xs'>

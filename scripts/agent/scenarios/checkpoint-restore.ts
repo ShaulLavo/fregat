@@ -14,9 +14,9 @@ const watchRestore = `(() => {
   const sample = () => {
     const target = document.querySelector('[data-restore-role="target"]')
     if (target) seen.target = true
-    if (target?.querySelector('[role="status"]')?.textContent?.includes('Restoring')) seen.restoring = true
+    if (target?.querySelector('[role="status"]')?.textContent?.includes('Rewinding')) seen.restoring = true
     seen.receding = Math.max(seen.receding, document.querySelectorAll('[data-restore-role="receding"]').length)
-    const others = document.querySelectorAll('[data-restore-role="other"] [aria-label="Revert to checkpoint before this turn"]')
+    const others = document.querySelectorAll('[data-restore-role="other"] [aria-label="Rewind to before this message"]')
     seen.otherActions = Math.max(seen.otherActions, others.length)
   }
   new MutationObserver(sample).observe(document.body, { subtree: true, childList: true, attributes: true })
@@ -31,7 +31,7 @@ async function sendTurn(page: Page, text: string, index: number) {
 export const checkpointRestore = isolatedNativeScenario({
   name: 'checkpoint-restore',
   description:
-    'Rewind a native fixture conversation to its first turn: the dialog closes on the held confirm, and while the rewind runs that turn shows a live dot and "Restoring…", later turns recede and no other turn offers a revert.',
+    'Rewind a native fixture conversation to its first turn: the dialog closes on the held confirm, and while the rewind runs that turn shows a live dot and "Rewinding…", later turns recede and no other turn offers a revert.',
   fixture: new URL('../fixtures/native-checkpoint.mjs', import.meta.url),
   prepareWorktree: async () => {
     const fixture = await createGitFixture('checkpoint-restore')

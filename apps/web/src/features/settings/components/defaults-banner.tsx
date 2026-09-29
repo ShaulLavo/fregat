@@ -15,8 +15,8 @@ export function DefaultsBanner() {
         <div className='min-w-0'>
           <p className='text-foreground text-sm font-medium'>Defaults are read-only</p>
           <p className='text-muted-foreground text-xs'>
-            This document is generated from this build. Copy a key into your user settings to change
-            it.
+            This file lists the built-in value of every setting. To change one, copy it into your
+            user settings.
           </p>
         </div>
       </div>

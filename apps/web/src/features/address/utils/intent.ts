@@ -100,17 +100,17 @@ function unavailableReason(
   editor: EditorReference | null,
   mainChat: ChatReference | null,
 ) {
-  if (address.rejectedEnvironment !== null) return 'This environment is unavailable.'
+  if (address.rejectedEnvironment !== null) return 'The machine in this link is not available.'
   if (address.workspace && parseWorkspaceToken(address.workspace).kind === 'invalid')
-    return 'This workspace address is invalid.'
+    return 'This link to a folder is broken.'
   if (address.mode === 'chat' && address.document && !mainChat)
-    return 'This chat address is invalid.'
+    return 'This link to a chat is broken.'
   if (address.mode === 'workbench' && address.document && !editor)
-    return 'This editor address is invalid.'
+    return 'This link to a file is broken.'
   if (editor?.kind === 'snapshot' && editor.source === 'branch')
-    return 'Branch diffs are not rendered yet.'
+    return 'Links to branch diffs cannot be opened yet.'
   if (editor && editor.kind !== 'settings' && address.workspace === '-')
-    return 'This document requires a workspace.'
+    return 'Open a folder to view this file.'
   return null
 }
 

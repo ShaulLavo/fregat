@@ -48,7 +48,8 @@ export function WorktreeManager() {
         <DialogHeader>
           <DialogTitle>Worktrees</DialogTitle>
           <DialogDescription>
-            Manage checkouts independently of sessions. Cleanup keeps branches and commits.
+            Each worktree is a separate copy of the project that sessions work in. Cleaning one up
+            keeps its branch and commits.
           </DialogDescription>
         </DialogHeader>
         <DropdownMenu>
@@ -75,7 +76,7 @@ export function WorktreeManager() {
         {projection?.bootstrapComplete && worktrees.length === 0 ? (
           <EmptyState
             title='No worktrees'
-            description='This project has no registered checkouts.'
+            description='Sessions started in a new worktree show up here.'
           />
         ) : null}
         {ref && project ? (

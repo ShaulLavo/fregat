@@ -32,16 +32,17 @@ export function CheckpointRevertDialog({
     <Dialog open={turnCount !== null} onOpenChange={(open) => open || disabled || onCancel()}>
       <DialogContent role='alertdialog' showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle className='tabular-nums'>
-            Revert this session to checkpoint {turnCount}?
-          </DialogTitle>
+          <DialogTitle>Rewind to before this message?</DialogTitle>
           <DialogDescription>
-            Newer messages will be removed and the original prompt restored to the composer. Keep
-            your current files, or restore files in an isolated worktree. This cannot be undone.
+            This message and everything after it leave the chat, and the message goes back into the
+            message box so you can edit it. This cannot be undone.
+            {canRestoreFiles
+              ? ' You can also put the files in this worktree back to how they were before it.'
+              : ' Your files stay as they are now.'}
           </DialogDescription>
         </DialogHeader>
         {error ? (
-          <InlineError message={error} onHandOff={onCancel} title='Checkpoint revert' />
+          <InlineError message={error} onHandOff={onCancel} title='Could not rewind' />
         ) : null}
         <DialogFooter>
           <Button type='button' variant='outline' disabled={disabled} onClick={onCancel}>
@@ -49,12 +50,12 @@ export function CheckpointRevertDialog({
           </Button>
           {canRestoreFiles ? (
             <HoldButton disabled={disabled} onConfirm={() => onConfirm(true)}>
-              Rewind and restore files
+              Rewind chat and files
             </HoldButton>
           ) : null}
           <HoldButton disabled={disabled} onConfirm={() => onConfirm(false)} variant='default'>
             {pending ? <Spinner aria-hidden /> : null}
-            Rewind conversation only
+            Rewind chat only
           </HoldButton>
         </DialogFooter>
       </DialogContent>

@@ -113,7 +113,7 @@ export function folderNameError(inputName: string) {
   if (!name) return 'Enter a folder name.'
   if (name === '.' || name === '..') return 'Choose a folder name other than “.” or “..”.'
   if (name.includes('/') || name.includes('\\')) {
-    return 'Folder names cannot contain path separators.'
+    return 'Folder names cannot contain / or \\.'
   }
   if (name.includes('\0')) return 'Folder names cannot contain null characters.'
   if (utf8Encoder.encode(name).byteLength > MAX_FOLDER_NAME_BYTES) {
@@ -200,9 +200,9 @@ function pathBelowCurrent(path: string, currentPath: string) {
 function invalidFolderNameError(message: string) {
   return createClientError({
     code: 'CLIENT_INVALID_FOLDER_NAME',
-    fix: 'Enter one folder name without path separators or traversal segments.',
+    fix: 'Enter just the folder name, such as "assets".',
     message,
     status: 400,
-    why: 'The folder name cannot be safely appended to the current picker path.',
+    why: 'A name with / or .. would create the folder somewhere else.',
   })
 }

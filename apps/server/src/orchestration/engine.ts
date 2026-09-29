@@ -1369,13 +1369,13 @@ export class OrchestrationEngine {
         tone: 'error',
         kind: unknownOwnership ? 'terminal.ownership.unknown' : 'terminal.history.failed',
         summary: unknownOwnership
-          ? 'Previous terminal process ownership is unconfirmed'
-          : 'Terminal history could not be synchronized',
+          ? 'An earlier terminal may still be running this session'
+          : 'The terminal conversation could not be copied into this chat',
         payload: {
           message,
           fix:
             errorStringField(error, 'fix') ??
-            'Reconnect the session terminal to retry synchronization.',
+            'Reopen the session’s terminal to copy the conversation again.',
         },
       },
     })

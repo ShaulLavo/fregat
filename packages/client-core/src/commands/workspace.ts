@@ -25,7 +25,7 @@ function sessionHistoryKeys(
 export const workspaceCommandMetadata = {
   'workspace.fixDiagnostic': defineMetadata({
     id: 'workspace.fixDiagnostic',
-    title: 'Fix diagnostic with AI',
+    title: 'Fix problem with AI',
     category: 'Problems',
     execution: 'sync',
     target: 'diagnostic',
@@ -35,7 +35,7 @@ export const workspaceCommandMetadata = {
   }),
   'workspace.toggleCheckpointChange': defineMetadata({
     id: 'workspace.toggleCheckpointChange',
-    title: 'Undo or reapply turn change',
+    title: 'Undo or redo an agent file change',
     category: 'Chat',
     execution: 'sync',
     target: 'checkpoint-change',
@@ -45,27 +45,27 @@ export const workspaceCommandMetadata = {
   }),
   'workspace.undoWorkspaceEdit': defineMetadata({
     category: 'Workspace',
-    description: 'Undo the latest atomic multi-file workspace edit.',
+    description: 'Undo the last edit that changed several files at once, such as a rename.',
     id: 'workspace.undoWorkspaceEdit',
     execution: 'async',
     target: 'workspace',
     undoCategory: 'workspace-operation',
     when: ['workspaceOpen', 'workspaceEditUndoable'],
-    title: 'Undo workspace edit',
+    title: 'Undo multi-file edit',
   }),
   'workspace.redoWorkspaceEdit': defineMetadata({
     category: 'Workspace',
-    description: 'Redo the latest atomic multi-file workspace edit.',
+    description: 'Redo the last undone edit that changed several files at once.',
     id: 'workspace.redoWorkspaceEdit',
     execution: 'async',
     target: 'workspace',
     undoCategory: 'workspace-operation',
     when: ['workspaceOpen', 'workspaceEditRedoable'],
-    title: 'Redo workspace edit',
+    title: 'Redo multi-file edit',
   }),
   'workspace.undoSessionAction': defineMetadata({
     category: 'Workspace',
-    description: 'Undo the latest session lifecycle action.',
+    description: 'Undo the last archive, snooze, pin or unpin of a session.',
     id: 'workspace.undoSessionAction',
     execution: 'async',
     keys: sessionHistoryKeys('Mod+Z', 'U'),
@@ -76,7 +76,7 @@ export const workspaceCommandMetadata = {
   }),
   'workspace.redoSessionAction': defineMetadata({
     category: 'Workspace',
-    description: 'Redo the session lifecycle action undone last.',
+    description: 'Redo the last session change you undid.',
     id: 'workspace.redoSessionAction',
     execution: 'async',
     keys: sessionHistoryKeys('Mod+Shift+Z', 'Shift+U'),
@@ -398,7 +398,7 @@ export const workspaceCommandMetadata = {
   }),
   'workspace.saveAllFiles': defineMetadata({
     category: 'Workspace',
-    description: 'Save all dirty editors.',
+    description: 'Save every file with unsaved changes.',
     id: 'workspace.saveAllFiles',
     execution: 'async',
     target: 'workspace',
@@ -463,7 +463,7 @@ export const workspaceCommandMetadata = {
   }),
   'workspace.revertFile': defineMetadata({
     category: 'Workspace',
-    description: 'Reload the active editor from disk.',
+    description: 'Drop unsaved changes in the active file and load it from disk.',
     id: 'workspace.revertFile',
     execution: 'async',
     target: 'workspace',
@@ -857,7 +857,7 @@ export const workspaceCommandMetadata = {
     target: 'workspace',
     undoCategory: 'workspace-operation',
     when: ['fileBackedTab', 'workspaceMutable'],
-    title: 'Accept commit message',
+    title: 'Commit with this message',
     vscodeCommandIds: ['git.commitMessageAccept'],
   }),
   'workspace.discardCommitMessage': defineMetadata({
@@ -868,7 +868,7 @@ export const workspaceCommandMetadata = {
     target: 'workspace',
     undoCategory: 'view-only',
     when: ['fileBackedTab'],
-    title: 'Discard commit message',
+    title: 'Cancel commit',
     vscodeCommandIds: ['git.commitMessageDiscard'],
   }),
   'workspace.toggleDiffViewMode': defineMetadata({

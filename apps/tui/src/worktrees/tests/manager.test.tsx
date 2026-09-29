@@ -62,18 +62,18 @@ test('compact worktree dialogs keep selected actions visible and their full safe
     await act(async () => frame.mockInput.pressEscape())
     expect(frame.renderer.currentFocusedRenderable?.id).toBe('worktree-actions')
     await act(async () => {
-      await chooseWorktreeOption(frame, 'Discard changes…')
+      await chooseWorktreeOption(frame, 'Delete changes and remove…')
       await expect
         .poll(() => frame.renderer.currentFocusedRenderable?.id)
         .toBe('worktree-cleanup-confirmation')
     })
     await frame.renderOnce()
-    expect(frame.captureCharFrame()).toContain('Permanently discard 2 changed files')
+    expect(frame.captureCharFrame()).toContain('Delete 2 changed files')
     expect(frame.captureCharFrame()).toContain('▶ Cancel')
     expect(frame.captureCharFrame()).toContain('Esc cancel')
     const preview = await readWorktreeDescription(frame)
     expect(preview.text).toBe(
-      `Permanently discard 2 changed files, including tracked, untracked, and ignored files in this checkout. Keep its branch and commits. Further edits require a new confirmation.Checkout: ${worktree.branch}`.replaceAll(
+      `Delete 2 changed files in this worktree, including untracked and ignored files, then remove it. This cannot be undone. Its branch and commits stay. If the files change again, you are asked again.Checkout: ${worktree.branch}`.replaceAll(
         /\s/g,
         '',
       ),
@@ -84,7 +84,7 @@ test('compact worktree dialogs keep selected actions visible and their full safe
     }
     await act(async () => frame.mockInput.pressArrow('down'))
     await frame.renderOnce()
-    expect(frame.captureCharFrame()).toContain('▶ Discard changes and remove')
+    expect(frame.captureCharFrame()).toContain('▶ Delete changes and remove')
     await act(async () => frame.mockInput.pressEscape())
     await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('worktree-actions')
     expect(await readFile(`${worktree.canonicalPath}/sample.txt`, 'utf8')).toBe(
@@ -135,7 +135,7 @@ test('worktree manager survives the last session and confirms safe and dirty cle
     await chooseWorktreeOption(frame, 'Cancel')
     expect(chat.getSnapshot().projection.worktreeById[worktree.id]?.lifecycle.state).toBe('ready')
     await chooseWorktreeOption(frame, 'Clean up…')
-    await chooseWorktreeOption(frame, 'Clean up')
+    await chooseWorktreeOption(frame, 'Remove worktree')
     await expect
       .poll(() => chat.getSnapshot().projection.worktreeById[worktree.id]?.lifecycle)
       .toMatchObject({ state: 'cleanup-blocked', reason: 'dirty' })
@@ -143,24 +143,23 @@ test('worktree manager survives the last session and confirms safe and dirty cle
       'Keep my tracked changes\n',
     )
     await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('worktree-actions')
-    await chooseWorktreeOption(frame, 'Discard changes…')
+    await chooseWorktreeOption(frame, 'Delete changes and remove…')
     await expect
       .poll(() => frame.renderer.currentFocusedRenderable?.id)
       .toBe('worktree-cleanup-confirmation')
     await frame.renderOnce()
-    expect(frame.captureCharFrame()).toContain('tracked, untracked, and')
-    expect(frame.captureCharFrame()).toContain('ignored files')
+    expect(frame.captureCharFrame()).toContain('untracked and ignored')
     await writeFile(`${worktree.canonicalPath}/ignored.txt`, 'Edited after preview\n')
-    await chooseWorktreeOption(frame, 'Discard changes and remove')
+    await chooseWorktreeOption(frame, 'Delete changes and remove')
     await expect
       .poll(() => chat.getSnapshot().projection.worktreeById[worktree.id]?.lifecycle)
       .toMatchObject({ state: 'cleanup-blocked', reason: 'needs-reconfirmation' })
     await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('worktree-actions')
-    await chooseWorktreeOption(frame, 'Discard changes…')
+    await chooseWorktreeOption(frame, 'Delete changes and remove…')
     await expect
       .poll(() => frame.renderer.currentFocusedRenderable?.id)
       .toBe('worktree-cleanup-confirmation')
-    await chooseWorktreeOption(frame, 'Discard changes and remove')
+    await chooseWorktreeOption(frame, 'Delete changes and remove')
     await expect
       .poll(() => chat.getSnapshot().projection.worktreeById[worktree.id]?.lifecycle.state)
       .toBe('removed')
@@ -169,7 +168,7 @@ test('worktree manager survives the last session and confirms safe and dirty cle
       (await runGit(repository, ['show-ref', '--verify', `refs/heads/${worktree.branch}`])).stdout,
     ).toContain(worktree.baseCommit)
     await frame.renderOnce()
-    expect(frame.captureCharFrame()).toContain('Checkout removed')
+    expect(frame.captureCharFrame()).toContain('Worktree removed')
     await act(async () => frame.mockInput.pressEscape())
     await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('worktree-manager')
     await frame.renderOnce()

@@ -2,10 +2,10 @@ import type { CloneProgress } from '@/features/git/utils/api'
 
 const STAGE_LABELS: Record<CloneProgress['stage'], string> = {
   connecting: 'Connecting',
-  counting: 'Counting objects',
-  receiving: 'Receiving objects',
-  resolving: 'Resolving deltas',
-  checkout: 'Checking out files',
+  counting: 'Preparing',
+  receiving: 'Downloading',
+  resolving: 'Unpacking',
+  checkout: 'Writing files',
 }
 
 export function cloneProgressLabel(progress: CloneProgress | null) {

@@ -51,7 +51,8 @@ fregat/
 ## Mirrors
 
 - A Fregat workflow on every push to main splits each family folder with its history
-  (`splitsh-lite`, cached) and pushes it to the mirror's main. Mirrors are read-only: their
+  (`git subtree split` on a full-depth checkout; splitsh-lite drops the subtree-add merge
+  history and would force a rewrite of the mirrors) and pushes it to the mirror's main. Mirrors are read-only: their
   README says development happens in Fregat; outside PRs are ported into Fregat by hand and
   closed with a link.
 - The Editor and ghostty-webgpu are brought in with `git subtree add` (not squashed), so their
@@ -59,6 +60,33 @@ fregat/
   singapore's existing commit ids so the first mirror push fast-forwards. If it cannot, stop and
   ask the owner before force-pushing a mirror.
 - Mirror repos keep their URLs, stars, issues and releases.
+
+## Rehearsal findings (2026-09-29)
+
+Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan207-rehearsal-LV9V1Y`).
+
+- `git subtree split --prefix=editor` reproduces singapore main exactly (`54e1e648`, 736
+  commits); ghostty-webgpu likewise (`fd5c7428`, 73). Old heads stay ancestors after new Fregat
+  commits, so mirror pushes fast-forward, provided nothing pushes to the mirrors between the
+  freeze and the subtree add.
+- Bun ignores the nested `editor/package.json`; the old `bun.lock` must be regenerated.
+  Root Turbo ignores `editor/turbo.json`: move its per-task overrides into the root
+  `turbo.json`, and set `"agentGuidance": false` in `editor/turbo.json`.
+- Typecheck (38 packages, editor built first) and the `apps/web` build pass; the root needs
+  `vite` as a devDependency.
+- Knip goes red (~87 files, ~340 exports in `editor/` and `ghostty-webgpu/`): add those
+  workspaces to `knip.json`.
+- Root `typecheck`/`test`/`lint` now cover all Editor packages, examples and ghostty's browser
+  tests; typecheck needs the Editor packages built first.
+- Layout-dependent scripts to update: `bundle-report.ts`, `bundle-owners.test.ts`,
+  `editor-open-benchmark.mjs`, `terminal-reload-proof.mjs`, the `quick-open-linked-file`
+  scenario; delete `check-linked-sources.ts`. The setup action loses six sibling clone/build/link
+  steps.
+- oxfmt/oxlint versions already match; `.oxfmtrc.json` configs differ. The vitest patch is
+  identical in all three repos. Editor packages are on TypeScript 6.0 against Fregat's 7.0.
+- Lockfiles (owner, 2026-09-29): one root `bun.lock`, as Turbo expects. Delete
+  `editor/bun.lock` and `ghostty-webgpu/bun.lock`; the mirrors' standalone CI runs a plain
+  `bun install`, which also surfaces breakage from new dependency releases.
 
 ## Publishing
 
@@ -81,7 +109,7 @@ fregat/
 
 ## Steps
 
-- [ ] Scratch rehearsal in `/work/tmp/plan207-*`: subtree-add both repos into a Fregat clone,
+- [x] Scratch rehearsal in `/work/tmp/plan207-*`: subtree-add both repos into a Fregat clone,
       update workspaces, run install, build, typecheck and the test suites; split `editor/` and
       compare commit ids with singapore's main.
 - [ ] Owner freeze: land or park open work in the Editor and ghostty-webgpu (including open PRs

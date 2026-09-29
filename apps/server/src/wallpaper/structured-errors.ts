@@ -17,8 +17,8 @@ export function createWallpaperSourceUnavailableError({
     code: WALLPAPER_SOURCE_UNAVAILABLE_CODE,
     message: 'Wallpaper source became unavailable while it was being read',
     status: 404,
-    why: 'The wallpaper provider rotated its media while the server was reading it.',
-    fix: 'Request the wallpaper again after the provider finishes rotating its media.',
+    why: 'The wallpaper changed to another image while the server was reading it.',
+    fix: 'Pick the wallpaper again.',
     ...(cause ? { cause } : {}),
     internal: { attempts, sourcePath },
   })

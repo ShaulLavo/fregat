@@ -32,7 +32,7 @@ export const themeStudioSettings: Scenario = {
       await accent.fill('#d33682')
       await accent.press('Enter')
       await studio.getByRole('button', { name: 'Close', exact: true }).click()
-      await studio.getByText('Repeat to discard edits', { exact: true }).waitFor()
+      await studio.getByText('Repeat to drop your edits', { exact: true }).waitFor()
       await step(`studio-discard-confirmation-${width}`)
       await studio.getByRole('button', { name: 'Close', exact: true }).click()
       await studio.waitFor({ state: 'detached' })

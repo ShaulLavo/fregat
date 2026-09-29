@@ -48,7 +48,7 @@ export const editorUndoBranch: Scenario = {
     await states.focus()
     await page.keyboard.press('ArrowLeft')
     await page.keyboard.press('Enter')
-    await page.getByText('This is the current state.').waitFor({ timeout: 10_000 })
+    await page.getByText('This is the current version.').waitFor({ timeout: 10_000 })
     await step('restored')
 
     // The file's own tab shows the restored text: B, not CC.

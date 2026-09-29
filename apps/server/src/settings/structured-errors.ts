@@ -12,26 +12,26 @@ export const settingsErrors = defineErrorCatalog('settings', {
   WRITE_INVALID: {
     status: 400,
     message: ({ key, reason }: { key: string; reason: string }) => `Cannot set ${key}: ${reason}`,
-    why: 'The value did not match the setting’s schema, so storing it would have persisted a document the server cannot read back.',
-    fix: 'Send a value matching the setting’s declared type. Retrying the same value cannot succeed.',
+    why: 'The value does not fit this setting, and saving it would leave a settings file the server cannot read.',
+    fix: 'Enter a value of the kind this setting expects.',
   },
   UNKNOWN_KEY: {
     status: 400,
     message: ({ key }: { key: string }) => `Unknown setting: ${key}`,
-    why: 'The write named a setting this build does not register. Reads keep unknown keys so another build’s settings survive, but a write has to name something real.',
-    fix: 'Check the key against the settings registry. A web build newer than the server offers settings the server cannot store — compare GET /platform/release. A renamed setting keeps its old value in the file until it is removed explicitly.',
+    why: 'This server does not know that setting. The page may be newer than the server, or the setting was renamed.',
+    fix: 'Reload the page. If the setting is still unknown, update the server. A renamed setting keeps its old value in the file until you remove it.',
   },
   SCOPE_NOT_ALLOWED: {
     status: 400,
     message: ({ key, scope, target }: { key: string; scope: string; target: string }) =>
       `${key} is ${scope}-scoped and cannot be written to ${target} settings`,
-    why: 'Workspace settings ship inside a cloned repository, so settings that reach process spawn, exec, env, or the keymap are readable only from the user’s own file.',
-    fix: 'Write this setting to user settings instead.',
+    why: 'Workspace settings travel with a cloned repository, so settings that run programs or change shortcuts are read only from your own settings file.',
+    fix: 'Save this setting in your user settings.',
   },
   FILE_MALFORMED: {
     status: 409,
     message: ({ detail }: { detail: string }) => `Settings file has syntax errors (${detail})`,
-    why: 'Editing a document the parser could not fully read would compute the edit against a broken tree and corrupt the parts it did understand.',
+    why: 'Changing a file the app cannot fully read could damage the parts it did read.',
     fix: 'Fix the JSON syntax in the named file, or delete the file to start from defaults.',
   },
   SECRETS_UNREADABLE: {
@@ -44,15 +44,15 @@ export const settingsErrors = defineErrorCatalog('settings', {
   RAW_REVISION_STALE: {
     status: 409,
     message: ({ target }: { target: string }) =>
-      `The ${target} settings document changed while this edit was open`,
-    why: 'Raw JSON replaces a whole document, so saving bytes based on an older revision could discard another edit.',
-    fix: 'Reload, compare, or explicitly overwrite against the newly confirmed revision.',
+      `The ${target} settings file changed while you were editing it`,
+    why: 'Saving replaces the whole file, so saving over the newer version would erase the other change.',
+    fix: 'Choose Use the latest version to drop your edits, Keep my changes to save over it, or Compare to see both.',
   },
   WRITE_CONTENDED: {
     status: 503,
-    message: () => 'Settings kept changing before the update could be committed',
-    why: 'Another process repeatedly replaced the settings document while this update was being staged.',
-    fix: 'Stop the competing writer, then retry the same settings action.',
+    message: () => 'Settings kept changing while this change was being saved',
+    why: 'Another program kept rewriting the settings file during the save.',
+    fix: 'Close the other program that edits settings, then try again.',
   },
   SERVER_SECRET_CONTENDED: {
     status: 503,
@@ -63,8 +63,8 @@ export const settingsErrors = defineErrorCatalog('settings', {
   ID_COLLISION: {
     status: 409,
     message: () => 'A settings write id was reused for different content',
-    why: 'Write ids make uncertain retries idempotent. Reusing one for another request would make acknowledgement ambiguous.',
-    fix: 'Retry the original request unchanged, or create a new id for a different request.',
+    why: 'The app reused a save ID for a different change, so the server cannot tell which change it means.',
+    fix: 'Reload the app and try again.',
   },
   TRANSACTION_RECOVERY_INVALID: {
     status: 500,
@@ -80,14 +80,14 @@ export const settingsErrors = defineErrorCatalog('settings', {
   },
   TRANSACTION_RECOVERY_REQUIRED: {
     status: 503,
-    message: () => 'Settings are unavailable until an interrupted transaction is recovered',
-    why: 'A durable settings-and-secrets journal remains after an uncertain write, so another live mutation could make safe recovery impossible.',
-    fix: 'Restart Platform to recover the journal before reading or changing settings again.',
+    message: () => 'Settings are unavailable until an interrupted save is finished',
+    why: 'A settings save was cut off partway, and changing settings now could make it impossible to finish safely.',
+    fix: 'Restart Platform so it can finish the interrupted save.',
   },
   POLICY_CONTROLLED: {
     status: 403,
     message: ({ key }: { key: string }) => `${key} is managed by policy and cannot be changed`,
-    why: 'A policy layer owns this setting. Accepting the write and then resolving back to the policy value would look like a silent failure.',
+    why: 'A policy sets this value, so a change here would not take effect.',
     fix: 'Change the policy configuration, or remove the key from it.',
   },
   FILE_PATH_UNSET: {

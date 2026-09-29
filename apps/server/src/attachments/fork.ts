@@ -39,7 +39,7 @@ async function copyBlob(attachmentsDir: string, source: ChatAttachment, copy: Ch
         code: 'attachments.FORK_SOURCE_MISSING',
         status: 409,
         message: `Attachment ${source.name} could not be copied into the fork.`,
-        why: 'Its file is missing or unreadable in the attachment store.',
+        why: 'Its saved file is missing or cannot be read.',
         fix: 'Fork from a turn before this attachment, or send it again in a new session.',
         internal: { attachmentId: source.id },
       })

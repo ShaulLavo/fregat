@@ -135,6 +135,6 @@ export function wholeFileHunkAction(
   if (values.every((state) => state === 'reverted')) return { reapply: true, reason: null }
   return {
     reapply: false,
-    reason: 'Use the individual changes while this file has mixed or edited changes',
+    reason: 'Some changes in this file are undone or edited. Toggle them one at a time.',
   }
 }

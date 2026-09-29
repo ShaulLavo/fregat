@@ -36,7 +36,7 @@ export function DiscardDialog({ rootPath }: { rootPath: string }) {
     ? discardPrompt(request, basename(toTreePath(paths[0] ?? '', rootPath)))
     : null
   let icon = <ArrowBendUpLeftIcon data-icon='inline-start' />
-  if (prompt?.confirm === 'Delete') icon = <TrashIcon data-icon='inline-start' />
+  if (prompt?.confirm === 'Delete file') icon = <TrashIcon data-icon='inline-start' />
   if (pending) icon = <Spinner />
 
   return (

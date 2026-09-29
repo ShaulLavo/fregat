@@ -13,6 +13,7 @@ const OPERATION_LABELS: Readonly<Record<string, string>> = {
   'init-submodules': 'Initialize submodules',
   publish: 'Publish repository',
   'stage-many': 'Stage',
+  sync: 'Pull and push',
   'unstage-many': 'Unstage',
 }
 

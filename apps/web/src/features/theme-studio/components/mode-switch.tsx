@@ -16,7 +16,7 @@ export function ModeSwitch({
   onChange: (mode: ColorMode) => void
 }) {
   const next: ColorMode = mode === 'dark' ? 'light' : 'dark'
-  const label = next === 'dark' ? 'Preview the dark half' : 'Preview the light half'
+  const label = next === 'dark' ? 'Preview dark mode' : 'Preview light mode'
 
   return (
     <IconTooltip label={label} shortcut='\'>

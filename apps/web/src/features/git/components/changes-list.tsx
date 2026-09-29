@@ -146,7 +146,7 @@ export function ChangesList({
           <EmptyState
             align='start'
             className='px-(--density-row-padding-x) py-4'
-            title='Working tree clean'
+            title='No changes'
           />
         </div>
       </ChangesContext>

@@ -29,12 +29,12 @@ export function ResetCreditAction({ account }: { account: ProviderAccountUsage }
           variant='secondary'
         >
           {mutation.isPending ? <Spinner /> : null}
-          {account.resetPending ? 'Check reset attempt…' : 'Use reset credit…'}
+          {account.resetPending ? 'Check last reset…' : 'Use reset credit…'}
         </Button>
       ) : null}
       {mutation.error ? (
         <p role='alert' className='text-destructive text-xs'>
-          {errorMessage(mutation.error, 'The reset could not be confirmed.')}
+          {errorMessage(mutation.error, 'Could not tell whether the reset worked.')}
         </p>
       ) : null}
       {mutation.data ? (
@@ -51,12 +51,12 @@ export function ResetCreditAction({ account }: { account: ProviderAccountUsage }
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {account.resetPending ? 'Check the previous reset?' : 'Use one reset credit?'}
+              {account.resetPending ? 'Check your last reset?' : 'Use one reset credit?'}
             </DialogTitle>
             <DialogDescription>
               {account.resetPending
-                ? 'This retries the same reset attempt.'
-                : 'This spends one credit from this Codex account to reset eligible usage limits. Instances sharing this account share the reset.'}
+                ? 'Sends your last reset request again to see whether it went through.'
+                : 'Spends one credit from this Codex account to reset its usage limits. Everything signed in to this account gets the reset.'}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -69,7 +69,7 @@ export function ResetCreditAction({ account }: { account: ProviderAccountUsage }
                 setConfirmation(null)
               }}
             >
-              Confirm
+              {account.resetPending ? 'Check again' : 'Use 1 credit'}
             </Button>
           </DialogFooter>
         </DialogContent>

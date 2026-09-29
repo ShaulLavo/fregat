@@ -129,6 +129,8 @@ import { claudeSessionTools, codexSessionTools } from './session-tools'
 import { claudeSessionFork, codexSessionFork } from './session-fork'
 import { searchFileActions } from './search-file-actions'
 import { settingsStaleDiagnostics } from './settings-stale-diagnostics'
+import { settingsEnumLabels } from './settings-enum-labels'
+import { settingsRawConflict } from './settings-raw-conflict'
 import { fontPicker } from './font-picker'
 import { fontPickerHover } from './font-picker-hover'
 import { settingsSaveRejected } from './settings-save-rejected'
@@ -506,6 +508,8 @@ export const scenarios: readonly Scenario[] = [
   filePickerNavigation,
   gitHistoryScroll,
   settingsStaleDiagnostics,
+  settingsEnumLabels,
+  settingsRawConflict,
   settingsResponsive,
   settingsSaveRejected,
   searchResults,

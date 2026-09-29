@@ -27,8 +27,8 @@ test('force removal requires the separate discard confirmation', async () => {
     />,
   )
   expect(confirmed).toBe(false)
-  expect(screen.getByText(/tracked, untracked, and ignored/)).toBeInTheDocument()
+  expect(screen.getByText(/untracked and ignored files/)).toBeInTheDocument()
   expect(screen.getByText(/3 changed files/)).toHaveClass('tabular-nums')
-  holdToConfirm(screen.getByRole('button', { name: 'Discard changes and remove' }))
+  holdToConfirm(screen.getByRole('button', { name: 'Delete changes and remove' }))
   expect(confirmed).toBe(true)
 })

@@ -2,6 +2,7 @@ import { commandIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { vi } from 'vitest'
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
 import { createRailHarness, renderRailHarness } from '../../../../../test/factories/rail-harness'
 import { expect, test } from '../../../../../test/fixtures'
@@ -84,13 +85,17 @@ test('timer wake appears at its deadline and acknowledgment retains server snooz
 }) => {
   const h = await createRailHarness(client, server)
   const sessionId = h.sessionIds[0]!
+  // The server refuses a deadline already past on arrival; a loaded run can take 200ms to get there.
+  vi.useFakeTimers({ toFake: ['Date'] })
   const deadline = new Date(Date.now() + 200).toISOString()
-  await h.dispatch({
-    type: 'session.snooze',
-    sessionId,
-    snoozedUntil: deadline,
-    commandId: v.parse(commandIdSchema, 'snooze-wake-ui'),
-  })
+  await h
+    .dispatch({
+      type: 'session.snooze',
+      sessionId,
+      snoozedUntil: deadline,
+      commandId: v.parse(commandIdSchema, 'snooze-wake-ui'),
+    })
+    .finally(() => vi.useRealTimers())
   await h.refresh()
   renderRailHarness(h)
   await screen.findByText('Woke')

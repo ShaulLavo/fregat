@@ -11,7 +11,7 @@ export function useWallpaperUpload(onUploaded: (asset: WallpaperAsset) => void) 
 
   async function uploadOne(file: File) {
     if (!ACCEPTED_WALLPAPER_TYPES.includes(file.type)) {
-      toast.error(`${file.name} was not added`, { description: 'Use a JPEG, PNG or WebP still.' })
+      toast.error(`${file.name} was not added`, { description: 'Use a JPEG, PNG or WebP image.' })
       return null
     }
     try {

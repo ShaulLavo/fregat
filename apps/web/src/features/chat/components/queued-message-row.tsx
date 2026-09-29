@@ -15,7 +15,7 @@ export function QueuedMessageRow({
   onRestore: (id: string) => void
 }) {
   const uncertain = message.held && message.submission !== null
-  const heldLabel = uncertain ? 'Delivery unconfirmed' : 'Held'
+  const heldLabel = uncertain ? 'May have been sent' : 'Paused'
   const label =
     message.content.prompt ||
     message.content.attachments.map((item) => item.name).join(', ') ||
@@ -44,19 +44,19 @@ export function QueuedMessageRow({
         <TooltipTrigger
           render={
             <Button
-              aria-label='Restore queued message'
+              aria-label='Move queued message back to the message box'
               size='xs'
               variant='ghost'
               disabled={uncertain}
               focusableWhenDisabled
               onClick={() => onRestore(message.id)}
             >
-              Restore
+              Edit
             </Button>
           }
         />
         <TooltipContent>
-          Retry delivery to confirm whether this message was sent before restoring it.
+          This message may already have been sent. Retry delivery to find out before you edit it.
         </TooltipContent>
       </Tooltip>
     </ListRow>

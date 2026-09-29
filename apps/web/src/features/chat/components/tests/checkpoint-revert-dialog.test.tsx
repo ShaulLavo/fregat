@@ -19,11 +19,9 @@ test('checkpoint zero opens an in-app confirmation with Cancel focused', async (
     />,
   )
 
-  expect(screen.getByRole('alertdialog')).toHaveAccessibleName(
-    'Revert this session to checkpoint 0?',
-  )
+  expect(screen.getByRole('alertdialog')).toHaveAccessibleName('Rewind to before this message?')
   expect(screen.getByRole('alertdialog')).toHaveAccessibleDescription(
-    'Newer messages will be removed and the original prompt restored to the composer. Keep your current files, or restore files in an isolated worktree. This cannot be undone.',
+    'This message and everything after it leave the chat, and the message goes back into the message box so you can edit it. This cannot be undone. Your files stay as they are now.',
   )
   await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus())
   await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
@@ -55,7 +53,7 @@ test('Revert waits while the session is busy and requires an explicit click', as
     <CheckpointRevertDialog turnCount={2} disabled onCancel={onCancel} onConfirm={onConfirm} />,
   )
 
-  const revert = screen.getByRole('button', { name: 'Rewind conversation only' })
+  const revert = screen.getByRole('button', { name: 'Rewind chat only' })
   expect(revert).toBeDisabled()
   await userEvent.click(revert)
   expect(onConfirm).not.toHaveBeenCalled()
@@ -67,7 +65,7 @@ test('Revert waits while the session is busy and requires an explicit click', as
       onConfirm={onConfirm}
     />,
   )
-  holdToConfirm(screen.getByRole('button', { name: 'Rewind conversation only' }))
+  holdToConfirm(screen.getByRole('button', { name: 'Rewind chat only' }))
   expect(onConfirm).toHaveBeenCalledWith(false)
   expect(onCancel).not.toHaveBeenCalled()
 })

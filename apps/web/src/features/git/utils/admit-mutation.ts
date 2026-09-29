@@ -54,8 +54,8 @@ function changedStatus() {
   return createClientError({
     code: 'git-status-changed',
     status: 409,
-    message: 'The repository needs another review before this action.',
-    why: 'The displayed changes are not the current confirmed repository state.',
-    fix: 'Review the refreshed changes, then try the action again.',
+    message: 'The changes shown are out of date, so nothing was discarded.',
+    why: 'These files changed after the list was drawn.',
+    fix: 'Check the updated list, then discard again.',
   })
 }

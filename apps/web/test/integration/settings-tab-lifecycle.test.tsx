@@ -102,7 +102,8 @@ for (const choice of ['Save', 'Discard', 'Cancel'] as const) {
     seedBothScopes(lifecycle)
     fireEvent.click(screen.getByRole('button', { name: 'Close all settings' }))
     expect(await screen.findByRole('dialog', { name: 'Unsaved changes' })).toBeDefined()
-    fireEvent.click(screen.getByRole('button', { name: choice, exact: true }))
+    const button = choice === 'Discard' ? 'Close without saving' : choice
+    fireEvent.click(screen.getByRole('button', { name: button, exact: true }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 
     if (choice === 'Cancel') {

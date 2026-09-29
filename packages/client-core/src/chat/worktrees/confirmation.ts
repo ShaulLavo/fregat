@@ -4,32 +4,32 @@ export type CleanupConfirmation = WorktreeConfirmation | { readonly kind: 'safe'
 
 export function cleanupConfirmationText(
   confirmation: CleanupConfirmation,
-  label = 'this checkout',
+  label = 'this worktree',
 ) {
   switch (confirmation.kind) {
     case 'safe':
       return {
-        title: 'Clean up worktree',
-        description: `Remove ${label} only if it has no changes or running processes. Keep its branch and commits.`,
-        action: 'Clean up',
+        title: 'Remove worktree',
+        description: `Remove ${label} if it has no changes and nothing runs in it. Its branch and commits stay.`,
+        action: 'Remove worktree',
       }
     case 'force':
       return {
-        title: 'Discard changes and remove',
-        description: `Permanently discard ${confirmation.preview.changedFileCount} changed files, including tracked, untracked, and ignored files in ${label}. Keep its branch and commits. Further edits require a new confirmation.`,
-        action: 'Discard changes and remove',
+        title: 'Delete changes and remove worktree',
+        description: `Delete ${confirmation.preview.changedFileCount} changed files in ${label}, including untracked and ignored files, then remove it. This cannot be undone. Its branch and commits stay. If the files change again, you are asked again.`,
+        action: 'Delete changes and remove',
       }
     case 'missing':
       return {
-        title: 'Confirm checkout is absent',
-        description: `Mark ${label} as absent. No files will be deleted. Its branch and commits may still exist.`,
-        action: 'Confirm checkout is absent',
+        title: 'Forget missing worktree',
+        description: `${label} is no longer on disk. Platform stops tracking it and deletes no files. Its branch and commits may still exist.`,
+        action: 'Forget missing worktree',
       }
     case 'release':
       return {
-        title: 'Release worktree',
-        description: `Keep ${label} and its branch on disk. Platform gives up cleanup ownership. Any later cleanup must be done manually.`,
-        action: 'Release worktree',
+        title: 'Stop managing worktree',
+        description: `${label} and its branch stay on disk. Platform stops managing it and never removes it, so remove it yourself when you are done.`,
+        action: 'Stop managing worktree',
       }
   }
 }

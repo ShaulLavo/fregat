@@ -86,10 +86,10 @@ export function loadVscodeThemeRegistration(
   if (!loader) {
     throw createClientError({
       code: 'UNKNOWN_SYNTAX_THEME',
-      message: `Unknown VSCode theme: ${shikiName}`,
+      message: `Unknown code theme: ${shikiName}`,
       status: 400,
-      why: 'No shared syntax theme loader is registered for this name.',
-      fix: 'Choose an available syntax theme.',
+      why: 'The app has no code theme with this name.',
+      fix: 'Choose another code theme.',
     })
   }
 

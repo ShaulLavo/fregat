@@ -29,7 +29,7 @@ export function RenderErrorState({
       description={<span className='font-mono wrap-anywhere'>{renderErrorMessage(error)}</span>}
       errorMessage={renderErrorMessage(error)}
       icon={<WarningCircleIcon weight='fill' />}
-      title={`${label} hit a render error`}
+      title={`${label} could not be shown`}
       tone='error'
     />
   )

@@ -10,10 +10,10 @@ import { chatProject, chatWorktree, TEST_ENVIRONMENT_ID } from '../../../../../t
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
 
-test('unknown terminal and external-driver ownership explain release for manual cleanup', () => {
+test('unknown terminal and external-driver ownership explain stopping management and removing it yourself', () => {
   for (const reason of ['terminal-ownership-unknown', 'external-driver-unverified'] as const) {
     const eligibility = { reason, nonDeletedSessionCount: 0, canResolveMissing: false }
-    expect(cleanupEligibilityLabel(eligibility)).toContain('manual cleanup')
+    expect(cleanupEligibilityLabel(eligibility)).toContain('remove it yourself')
     expect(
       canReleaseWorktree(chatWorktree({ ownership: 'platform', cleanupEligibility: eligibility })),
     ).toBe(true)
@@ -55,11 +55,13 @@ test('a live cleanup blocker stays visible even when the projection allows a saf
         worktree={worktree}
       />,
     )
-    expect(screen.getByText(/last cleanup attempt found a running/)).toHaveTextContent(
-      'Retry checks again before removing files.',
+    expect(screen.getByText(/last removal found a running/)).toHaveTextContent(
+      'Check again before removing files.',
     )
     expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled()
-    expect(screen.queryByRole('button', { name: 'Discard changes…' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Delete changes and remove…' }),
+    ).not.toBeInTheDocument()
     expect(screen.queryByText(/No sessions or running processes/)).not.toBeInTheDocument()
     view.unmount()
   }
@@ -88,10 +90,10 @@ test('released failed or blocked checkouts offer no Platform retry or retain act
         worktree={worktree}
       />,
     )
-    expect(screen.getByText('This checkout is managed outside Platform.')).toBeInTheDocument()
+    expect(screen.getByText('This worktree is managed outside Platform.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Retain checkout' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Release…' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Keep worktree' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Stop managing…' })).not.toBeInTheDocument()
     view.unmount()
   }
 })

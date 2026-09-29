@@ -3,7 +3,7 @@ import { selectors, waitForApp } from '../selectors'
 
 export const settingsModuleFailure: Scenario = {
   name: 'settings-module-failure',
-  description: 'Fail a module import, keep settings reachable and recover with Reload.',
+  description: 'Fail a module import, keep settings reachable and recover with Reload app.',
   async run(page, { step }) {
     const route = '**/src/features/settings/components/page.tsx*'
     await page.route(route, (request) => request.abort('failed'))
@@ -14,10 +14,10 @@ export const settingsModuleFailure: Scenario = {
       await page.getByText('Unable to load settings', { exact: true }).waitFor()
       await step('module-failure-contained')
       await page.unroute(route)
-      await page.getByRole('button', { name: 'Retry', exact: true }).click()
+      await page.getByRole('button', { name: 'Try again', exact: true }).click()
       await page.getByText('Unable to load settings', { exact: true }).waitFor()
       await step('failed-module-url-retained')
-      await page.getByRole('button', { name: 'Reload', exact: true }).click()
+      await page.getByRole('button', { name: 'Reload app', exact: true }).click()
       await selectors.settingsSearch(page).waitFor()
       await step('module-recovered-after-reload')
     } finally {

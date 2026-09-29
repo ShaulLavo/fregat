@@ -7,7 +7,7 @@ const NOTES: Record<Exclude<WorktreeRemovalChoice, 'offer'>, string> = {
   automatic:
     'Its worktree is removed once the session stops, unless it has changes or ignored files.',
   shared: 'Another session uses this worktree, so it stays.',
-  kept: 'The checkout and its changes stay on disk. Use Manage worktrees for separate cleanup.',
+  kept: 'Its worktree and changes stay on disk. Remove it later from Manage worktrees.',
 }
 
 /** The delete dialog's word on the session's worktree, with the switch to remove it too. */

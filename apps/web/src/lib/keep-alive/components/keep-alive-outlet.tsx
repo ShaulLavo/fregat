@@ -20,7 +20,7 @@ export function KeepAliveOutlet({ store }: { readonly store: KeepAliveStore }) {
       <div hidden ref={parkingRef} />
       {entries.map((entry) =>
         createPortal(
-          <RenderErrorBoundary label='Kept content' resetKeys={[entry.id]}>
+          <RenderErrorBoundary label='This view' resetKeys={[entry.id]}>
             {entry.render(entry.attached)}
           </RenderErrorBoundary>,
           entry.element,

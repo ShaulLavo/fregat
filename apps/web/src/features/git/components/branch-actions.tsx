@@ -158,7 +158,7 @@ export function BranchActions({
  * upstream does not exist yet, which is a different job from sending commits.
  */
 function pushLabel(state: GitBranchRemoteState) {
-  if (!state.hasUpstream) return 'Publish'
+  if (!state.hasUpstream) return 'Push branch'
   if (state.ahead > 0) return `Push ${state.ahead}`
 
   return null

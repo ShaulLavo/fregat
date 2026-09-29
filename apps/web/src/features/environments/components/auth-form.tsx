@@ -78,7 +78,7 @@ export function AuthForm({ prompt }: { readonly prompt: MachineAuthPrompt }) {
             </Button>
             <Button type='submit' disabled={pending || (!confirmation && secret.length === 0)}>
               {pending ? <Spinner /> : null}
-              {confirmation ? 'Trust and connect' : 'Continue'}
+              {confirmation ? 'Trust and connect' : 'Sign in'}
             </Button>
           </DialogFooter>
         </form>

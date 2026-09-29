@@ -129,7 +129,7 @@ export function PickerDialog({
                 disabled={working.size > 0}
                 onClick={() => void trust(machine.name)}
               >
-                Trust replacement
+                Trust the new server
               </Button>
             ) : null}
             {connecting ? (

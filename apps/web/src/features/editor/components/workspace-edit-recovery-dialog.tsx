@@ -57,23 +57,23 @@ export function WorkspaceEditRecoveryDialog() {
         >
           <DialogHeader>
             <DialogTitle>
-              {conflict ? 'Recovery conflict' : 'Workspace recovery required'}
+              {conflict ? 'Some files may be wrong' : 'Some files could not be put back'}
             </DialogTitle>
             <DialogDescription>
               {conflict
-                ? 'Rollback data was discarded without proving that every path was restored.'
-                : 'An atomic workspace edit could not restore every path. Recovery data is being kept until you choose an explicit outcome.'}
+                ? 'The saved copies were deleted before every file was put back, so these files may still hold part of the failed edit.'
+                : 'A multi-file edit failed partway, and undoing it did not put every file back. Copies of the originals are kept until you choose what to do.'}
             </DialogDescription>
           </DialogHeader>
 
           {conflict ? (
             <Alert variant='warning'>
               <WarningOctagonIcon />
-              <AlertTitle>Workspace state is unknown</AlertTitle>
+              <AlertTitle>File contents are unknown</AlertTitle>
               <AlertDescription>
                 <p>
-                  Save and resource operations are disabled for affected live buffers. Close and
-                  reopen them from disk before editing again.
+                  Saving is off for these files while they are open. Close and reopen them to load
+                  what is on disk, then edit again.
                 </p>
                 <ul className='text-2xs grid gap-1 font-mono'>
                   {recovery.unrecoveredPaths.map((path) => (
@@ -86,8 +86,8 @@ export function WorkspaceEditRecoveryDialog() {
             <Alert variant='destructive'>
               <WarningOctagonIcon />
               <AlertTitle className='tabular-nums'>
-                {recovery?.unrecoveredPaths.length ?? 0} unrecovered{' '}
-                {recovery?.unrecoveredPaths.length === 1 ? 'path' : 'paths'}
+                {recovery?.unrecoveredPaths.length ?? 0}{' '}
+                {recovery?.unrecoveredPaths.length === 1 ? 'file' : 'files'} not put back
               </AlertTitle>
               <AlertDescription>
                 <ul className='text-2xs grid gap-1 font-mono'>
@@ -102,9 +102,7 @@ export function WorkspaceEditRecoveryDialog() {
           {busy ? (
             <div className='text-muted-foreground flex items-center gap-2 text-xs' role='status'>
               <Spinner size='sm' aria-hidden='true' />
-              {state.phase === 'recovering'
-                ? 'Retrying exact recovery…'
-                : 'Releasing recovery data…'}
+              {state.phase === 'recovering' ? 'Putting files back…' : 'Deleting the saved copies…'}
             </div>
           ) : null}
 
@@ -113,10 +111,10 @@ export function WorkspaceEditRecoveryDialog() {
               <>
                 <Button disabled type='button'>
                   <FloppyDiskIcon data-icon='inline-start' />
-                  Save affected buffers
+                  Save these files
                 </Button>
                 <Button onClick={dismissConflict} type='button' variant='outline'>
-                  Continue with conflicted buffers
+                  Close
                 </Button>
               </>
             ) : (
@@ -128,11 +126,11 @@ export function WorkspaceEditRecoveryDialog() {
                   variant='destructive'
                 >
                   <TrashIcon data-icon='inline-start' />
-                  Discard recovery data
+                  Delete saved copies
                 </Button>
                 <Button disabled={busy} onClick={() => void service.retryRecovery()} type='button'>
                   <ArrowCounterClockwiseIcon data-icon='inline-start' />
-                  Retry recovery
+                  Try again
                 </Button>
               </>
             )}
@@ -146,10 +144,10 @@ export function WorkspaceEditRecoveryDialog() {
           showCloseButton={false}
         >
           <DialogHeader>
-            <DialogTitle>Discard rollback data?</DialogTitle>
+            <DialogTitle>Delete the saved copies?</DialogTitle>
             <DialogDescription>
-              Files may remain changed. This only deletes the rollback data and cannot prove that
-              the workspace was restored.
+              These files may still hold part of the failed edit. Once the copies are gone, they
+              cannot be put back.
             </DialogDescription>
           </DialogHeader>
           <ul className='bg-muted text-2xs grid max-h-40 gap-1 overflow-auto overscroll-contain rounded-lg p-3 font-mono'>
@@ -159,11 +157,11 @@ export function WorkspaceEditRecoveryDialog() {
           </ul>
           <DialogFooter>
             <Button onClick={() => setConfirmDiscard(false)} type='button' variant='outline'>
-              Keep recovery data
+              Keep saved copies
             </Button>
             <Button onClick={() => void discard()} type='button' variant='destructive'>
               <TrashIcon data-icon='inline-start' />
-              Discard exact paths
+              Delete copies
             </Button>
           </DialogFooter>
         </DialogContent>

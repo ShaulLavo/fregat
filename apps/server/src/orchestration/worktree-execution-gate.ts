@@ -4,9 +4,9 @@ import { defineErrorCatalog } from 'evlog'
 export const worktreeExecutionErrors = defineErrorCatalog('worktree', {
   EXECUTION_BUSY: {
     status: 409,
-    message: 'The checkout is being cleaned up.',
-    why: 'Cleanup holds exclusive ownership of the checkout.',
-    fix: 'Wait for cleanup to finish and select a ready worktree.',
+    message: 'This worktree is being removed.',
+    why: 'Nothing else can use a worktree while it is being removed.',
+    fix: 'Wait for the removal to finish, then pick another worktree.',
   },
 })
 

@@ -39,7 +39,7 @@ export function worktreeActions(
       value: 'cleanup',
       command: 'worktree.cleanup',
       name: 'Clean up…',
-      description: 'Check running processes and changes before removing the checkout',
+      description: 'Remove the worktree folder if nothing runs in it and it has no changes',
     })
   if (canRetryWorktree(worktree) && (!current || worktree.lifecycle.state === 'creation-failed'))
     actions.push({
@@ -48,44 +48,44 @@ export function worktreeActions(
       command:
         worktree.lifecycle.state === 'creation-failed' ? 'worktree.retry' : 'worktree.cleanup',
       name: 'Retry',
-      description: 'Retry the failed worktree operation',
+      description: 'Try the failed worktree step again',
     })
   if (canRetainWorktree(worktree))
     actions.push({
       kind: 'run',
       value: 'retain',
       command: 'worktree.retain',
-      name: 'Retain checkout',
-      description: 'Keep files and restore this checkout to ready',
+      name: 'Keep worktree',
+      description: 'Stop removing it and keep using its files',
     })
   if (!current && canForceCleanupWorktree(worktree))
     actions.push({
       kind: 'confirm',
       value: 'force',
-      name: 'Discard changes…',
-      description: 'Preview tracked, untracked, and ignored changes before removal',
+      name: 'Delete changes and remove…',
+      description: 'See which changed files would be deleted, then remove the worktree',
     })
   if (worktree.ownership === 'unclaimed')
     actions.push({
       kind: 'run',
       value: 'adopt',
       command: 'worktree.adopt',
-      name: 'Adopt checkout',
-      description: 'Give Platform ownership of this checkout',
+      name: 'Manage in Platform',
+      description: 'Let Platform manage this worktree and remove it later',
     })
   if (canReleaseWorktree(worktree))
     actions.push({
       kind: 'confirm',
       value: 'release',
-      name: 'Release…',
-      description: 'Keep files and transfer cleanup responsibility outside Platform',
+      name: 'Stop managing…',
+      description: 'Keep the worktree on disk and stop Platform from managing it',
     })
   if (!current && worktree.cleanupEligibility.canResolveMissing)
     actions.push({
       kind: 'confirm',
       value: 'missing',
-      name: 'Resolve missing checkout…',
-      description: 'Confirm that no checkout files remain',
+      name: 'Forget missing worktree…',
+      description: 'The folder is gone. Stop tracking it',
     })
   return actions
 }

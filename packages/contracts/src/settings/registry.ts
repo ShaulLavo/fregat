@@ -136,6 +136,8 @@ export type SettingDescriptor<TSchema extends v.GenericSchema = v.GenericSchema>
    * findable from the page.
    */
   readonly title?: string
+  /** What the page shows for each value of an enum key, keyed by the stored value. */
+  readonly optionTitles?: Readonly<Record<string, string>>
   /**
    * Another key's row edits this one too, so this key gets no row of its own.
    *
@@ -235,6 +237,11 @@ export function registryProblems(registry: SettingsRegistryShape): RegistryProbl
 
     if (descriptor.details !== undefined && descriptor.details.trim() === '') {
       problems.push({ id, reason: 'details must be omitted when there is nothing to say' })
+    }
+
+    for (const value of Object.keys(descriptor.optionTitles ?? {})) {
+      if (v.safeParse(descriptor.schema, value).success) continue
+      problems.push({ id, reason: `optionTitles names ${value}, which the schema rejects` })
     }
 
     if (descriptor.merge === 'record' && !isRecord(descriptor.default)) {

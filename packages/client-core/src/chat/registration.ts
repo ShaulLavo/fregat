@@ -27,8 +27,8 @@ export function projectRegistrationResult(receipt: OrchestrationDispatchResult) 
   throw createClientError({
     code: 'CHAT_PROJECT_IDENTITY_MISSING',
     status: 502,
-    message: 'Project registration did not return its checkout identity.',
-    why: 'The project command receipt omitted its registered checkout.',
-    fix: 'Refresh the project list and inspect the server command receipt.',
+    message: 'The project was added, but the server did not say which folder it uses.',
+    why: "The server's answer to adding the project was missing its folder.",
+    fix: 'Refresh the project list, then try again.',
   })
 }

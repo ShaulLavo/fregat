@@ -160,7 +160,9 @@ test('a machine refused before its first handshake keeps its editor suspended un
         version: '',
       })
     refuse()
-    expect(() => application.activateEnvironment(originB)).toThrow('different environment identity')
+    expect(() => application.activateEnvironment(originB)).toThrow(
+      'is a different installation than before',
+    )
 
     // Activated before its handshake, then refused by it: ConnectionGate withholds the workbench.
     useEnvironmentsStore.setState((state) => ({

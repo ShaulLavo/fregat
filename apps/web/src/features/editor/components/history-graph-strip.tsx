@@ -63,7 +63,7 @@ export function HistoryGraphStrip({
   return (
     <svg
       aria-activedescendant={focusedDom}
-      aria-label='History states'
+      aria-label='Versions'
       className='focus-ring-inset block shrink-0 outline-none'
       height={height}
       role='listbox'

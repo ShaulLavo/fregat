@@ -701,7 +701,7 @@ describe('ProviderService', () => {
         sessionId: input.sessionId,
         runtimeEpoch: input.runtimeEpoch,
       }),
-    ).rejects.toThrow('The session belongs to another provider instance')
+    ).rejects.toThrow('This session belongs to another provider')
 
     expect(other.startedSessions).toHaveLength(0)
     fixture.close()
@@ -786,10 +786,10 @@ describe('ProviderService', () => {
     })
     adapter.unresponsive = true
     await expect(service.stopRuntime({ sessionId: input.sessionId })).rejects.toThrow(
-      'The provider operation timed out',
+      'The agent took too long to answer',
     )
     await expect(service.hasRuntime({ sessionId: input.sessionId })).rejects.toThrow(
-      'The provider operation timed out',
+      'The agent took too long to answer',
     )
     fixture.close()
   })

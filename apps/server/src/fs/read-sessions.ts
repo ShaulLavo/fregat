@@ -216,8 +216,8 @@ export class FileReadSessions {
       return
     throw new FsError('READ_RANGE_INVALID', undefined, undefined, {
       internal: { start, end, byteLength: session.byteLength, maxRangeBytes },
-      why: 'The requested byte range exceeds the file or page size limit.',
-      fix: 'Reload the file view to request a new page.',
+      why: 'The part of the file asked for is past its end or larger than one page.',
+      fix: 'Close and reopen the file.',
     })
   }
 
@@ -239,7 +239,7 @@ function revision(stats: BigIntStats) {
 function expired(id: string) {
   return new FsError('READ_SESSION_EXPIRED', undefined, undefined, {
     internal: { sessionId: id },
-    why: 'The file read session has closed or expired.',
-    fix: 'Reopen the file to start a new read session.',
+    why: 'The server stopped reading this file because it was left idle or closed.',
+    fix: 'Close and reopen the file.',
   })
 }

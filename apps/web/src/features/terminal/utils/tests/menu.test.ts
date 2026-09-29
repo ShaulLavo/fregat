@@ -49,7 +49,7 @@ test('a blocked Paste is unavailable, and says which key still works', () => {
 })
 
 test('the screen section separates clear, viewer reset and process restart', () => {
-  expect(labels(menuContext(), 'screen')).toEqual(['Clear', 'Reset', 'Restart shell'])
+  expect(labels(menuContext(), 'screen')).toEqual(['Clear', 'Redraw terminal', 'Restart shell'])
 })
 
 test('Reset is destructive and Clear is not', () => {

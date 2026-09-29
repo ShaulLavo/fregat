@@ -17,7 +17,7 @@ export async function prepareRewindAttachments(
   const attachments = message.attachments ?? []
   if (existingCount + attachments.length > MAX_CHAT_ATTACHMENTS)
     throw createClientInvariantError(
-      `Rewind would exceed the limit of ${MAX_CHAT_ATTACHMENTS} attachments. Remove draft attachments first.`,
+      `Rewinding would put more than ${MAX_CHAT_ATTACHMENTS} attachments in the message box. Remove some first.`,
     )
   return Promise.all(
     attachments.map(async (attachment): Promise<ChatInputAttachment> => {
@@ -69,7 +69,7 @@ export async function awaitRewind(
     }
   }
   throw createClientInvariantError(
-    'Rewind result was not received. Refresh the session before retrying.',
+    'The rewind did not report back. Reload the app to see where the chat stands before you try again.',
   )
 }
 

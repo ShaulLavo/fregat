@@ -39,7 +39,7 @@ export function watchRootValidation({
     if (store.getState().rootFolder?.path !== path) return
 
     log.warn({ action: 'workspace.root_invalid', area: 'workspace', path, reason })
-    navigation.invalidateWorkspace(store, path, 'This workspace directory is unavailable.')
+    navigation.invalidateWorkspace(store, path, 'This folder is missing or cannot be opened.')
   }
   const confirmWhenStillCurrent = (entry: WorkspaceRootEntry) => {
     if (signal.aborted) return

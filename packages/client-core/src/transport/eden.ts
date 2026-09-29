@@ -16,8 +16,8 @@ function transportError(message: string, cause?: unknown) {
     status: 502,
     message,
     cause,
-    why: 'A server response could not be consumed.',
-    fix: 'Inspect server logs and retry the request.',
+    why: "The app could not read the server's answer.",
+    fix: 'Try again. If it keeps failing, open the Logs panel to see what went wrong.',
   })
 }
 

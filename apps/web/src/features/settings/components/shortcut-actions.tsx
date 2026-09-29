@@ -59,7 +59,7 @@ export function ShortcutActions({ customized, report }: { customized: boolean; r
           <DropdownMenuItem
             onClick={() => void copyTextToClipboard(report, 'shortcut resolution report')}
           >
-            Copy resolution report
+            Copy shortcut report
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
