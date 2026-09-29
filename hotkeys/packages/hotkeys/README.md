@@ -36,7 +36,7 @@ hotkeys.attachElement(app, document.body)
 Each node publishes a context. The path from the outermost node to the focused one forms the
 context stack, and a binding's `context` is a predicate over it: identifiers, `key == value`,
 `!=`, `!`, `&&`, `||`, parentheses and `>` for descendant. Candidates rank by the deepest
-context their predicate matches, then by source (`user` over `pack` over `default`), then later
+context their predicate matches, then by source (`user` over `pack` over `base` over `default`), then later
 entries first. The focused layer wins, so `Mod+B` below makes text bold in a Markdown editor and
 toggles the sidebar everywhere else.
 

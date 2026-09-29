@@ -9,8 +9,11 @@ import type { KeyChord, KeymapBinding, KeymapPlatform } from '../chords/types'
 import type { KeymapSelection } from '../chords/runtime'
 import type { KeymapNode } from '../chords/trie'
 
-/** Where a binding comes from; later sources win ties: a user binding beats a pack beats a default. */
-export type BindingSource = 'default' | 'pack' | 'user'
+/**
+ * Where a binding comes from, weakest first, as Zed's sources: the default keymap, a base layout
+ * (another editor's keys), a pack (vim), the user. A stronger source wins ties.
+ */
+export type BindingSource = 'default' | 'base' | 'pack' | 'user'
 /** A chord as strokes, or one string with strokes separated by spaces (`'Mod+K Mod+C'`). */
 export type BindingKeys = KeyChord | string
 
@@ -54,7 +57,12 @@ export type CompiledKeymap = {
   readonly root: KeymapNode<CompiledBinding>
 }
 
-const SOURCE_RANK: Readonly<Record<BindingSource, number>> = { default: 0, pack: 1, user: 2 }
+const SOURCE_RANK: Readonly<Record<BindingSource, number>> = {
+  default: 0,
+  base: 1,
+  pack: 2,
+  user: 3,
+}
 
 /** Parses the table once: chords, predicates and ranks; linear in the number of strokes. */
 export function compileKeymap(

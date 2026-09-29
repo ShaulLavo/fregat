@@ -1,6 +1,6 @@
 // Translated from Zed's crates/gpui/src/keymap.rs tests (zed-industries/zed@933d8d9).
 // Zed's NoAction is `command: null`, Unbind is `unbind`, and its meta indexes map to sources:
-// USER → 'user', VIM and BASE → 'pack', DEFAULT → 'default'.
+// USER → 'user', VIM → 'pack', BASE → 'base', DEFAULT → 'default'.
 import { describe, expect, it } from 'vitest'
 import { bindingsForInput, compileKeymap, createKeyInput, parseKeyContext } from '../../src'
 import type { KeymapEntry } from '../../src'
@@ -157,8 +157,20 @@ describe('Zed keymap resolution', () => {
       lookup(
         [
           { keys: 'Control+X', command: 'alpha', context: 'editor', source: 'default' },
-          { keys: 'Control+X', command: null, context: 'editor', source: 'pack' },
+          { keys: 'Control+X', command: null, context: 'editor', source: 'base' },
           { keys: 'Control+X', command: 'gamma', context: 'editor', source: 'pack' },
+        ],
+        'ctrl-x',
+        editor,
+      ).commands,
+    ).toEqual(['gamma'])
+    // Source strength decides, not table order: a pack binding listed first still survives.
+    expect(
+      lookup(
+        [
+          { keys: 'Control+X', command: 'gamma', context: 'editor', source: 'pack' },
+          { keys: 'Control+X', command: 'alpha', context: 'editor', source: 'default' },
+          { keys: 'Control+X', command: null, context: 'editor', source: 'base' },
         ],
         'ctrl-x',
         editor,
