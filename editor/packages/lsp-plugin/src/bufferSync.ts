@@ -33,7 +33,16 @@ export function synchronizeLanguageServerBuffer(
     getSnapshot,
   })
   sync.sync(getSnapshot(), null)
-  const unsubscribe = options.buffer.subscribe(({ change }) => sync.sync(getSnapshot(), change))
+  const unsubscribe = options.buffer.subscribe((event) =>
+    sync.sync(
+      bufferDocumentSnapshot({
+        ...options,
+        uri: sync.activeDocument?.uri ?? options.uri,
+        publication: event,
+      }),
+      event.change,
+    ),
+  )
   return {
     dispose() {
       unsubscribe()

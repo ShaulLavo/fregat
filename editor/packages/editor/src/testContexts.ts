@@ -64,6 +64,7 @@ export function createTestEditContributionContext(
     log: () => undefined,
     materializeFullText: () => missing('materializeFullText'),
     getTextSnapshot: () => null,
+    getCurrentDocumentSnapshot: () => null,
     getDocumentSyncPoint: () => missing('getDocumentSyncPoint'),
     changesSinceDocumentSyncPoint: () => null,
     getSelections: () => [],

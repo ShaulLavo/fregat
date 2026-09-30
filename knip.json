@@ -62,6 +62,7 @@
         "claude-gpt/run.ts",
         "large-file/bench.ts",
         "agent/injected/renders.ts",
+        "agent/injected/style-marks.ts",
         "agent/fixtures/fake-*.ts",
         "agent/logs.ts",
         "deploy/mesh.ts",

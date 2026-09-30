@@ -1442,7 +1442,7 @@ export class WorkspaceDocumentService {
     const document = this.liveDocumentsByKey.get(documentKey)
     if (!document || document.buffer !== buffer) return
 
-    const localRevision = buffer.getRevision()
+    const localRevision = event.revisionAfter
     if (localRevision <= document.localRevision) return
 
     if (event.change.kind === 'synchronize') {
@@ -1451,16 +1451,20 @@ export class WorkspaceDocumentService {
       return
     }
 
-    this.acceptTextRevision(document, localRevision)
+    this.acceptTextRevision(document, localRevision, event.change.isDirty)
     this.onStateChange()
   }
 
-  private acceptTextRevision(document: LiveEditorDocument, localRevision: number): void {
+  private acceptTextRevision(
+    document: LiveEditorDocument,
+    localRevision: number,
+    isDirty = document.buffer.isDirty(),
+  ): void {
     this.dirtyContentRevision += 1
     const contentRevision = editedContentRevision(this.dirtyContentRevision)
     this.liveDocumentsByKey.set(document.key, { ...document, contentRevision, localRevision })
     this.setContentRevision(document.key, contentRevision)
-    if (document.buffer.isDirty()) {
+    if (isDirty) {
       this.addDirtyKey(document.key)
       return
     }

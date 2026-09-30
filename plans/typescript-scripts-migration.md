@@ -17,7 +17,7 @@ in the format their runtime requires.
 - [x] Audit shared skills: personal helpers already use TypeScript; preserve the two Codex-managed JS helpers.
 - [x] Run strict typechecks, targeted script tests, repository gates and actual CLI entry points.
 - [x] Audit stale references and review the decision trail.
-- [ ] Commit changed paths, push the branch and deploy the verified build to the mesh.
+- [x] Commit changed paths, push the branch and deploy the verified build to the mesh.
 
 ## Completion checks
 
@@ -40,9 +40,14 @@ and the maintained browser runner; neither historical proof is claimed as passin
 - All 155 removed JavaScript files have TypeScript successors. The remaining JavaScript is the
   browser service worker and the upstream xterm reference payload.
 - Full workspace typechecking, lint, formatting, generated-file checks and repository gates pass.
-- Repository script suite: 305 tests passed. Stress suite: 245 tests passed. Cache and ownership
+- Repository script suite: 308 tests passed after integrating current main. Stress suite: 245 tests passed. Cache and ownership
   checks: 79 tests passed. Copied CLI fixture tests and seven real Node CLI probes pass.
 - The six native input smoke scenarios and the 200-cycle reclamation browser probe pass; these
   checks make no performance claim.
 - Independent review: `typescript-scripts-review.md`. Historical captures and old decision rows
   retain their original bytes.
+
+The migration was committed as `c47bd174` and deployed with a passing live check. Current main
+(`3293142d2`) was then merged to retain newer Mermaid and document-publication changes. The combined
+tree passes full typechecking, repository gates and all 308 script tests; the only merge conflict was
+the script entry list in `knip.json`, resolved by retaining both entries.

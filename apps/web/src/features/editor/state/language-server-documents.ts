@@ -56,8 +56,8 @@ export class LanguageServerDocuments {
       return current
     this.delete(key)
     // Subscribe before the LSP document so a growth crossing closes it before didChange.
-    const unsubscribe = buffer.subscribe(() => {
-      if (!this.accepts(buffer)) this.delete(key)
+    const unsubscribe = buffer.subscribe(({ change }) => {
+      if (change.textSnapshot.length > this.maxLength) this.delete(key)
     })
     try {
       const entry = { ...create(), buffer, configuration, unsubscribe }

@@ -145,3 +145,7 @@
 - `packages/ui` and `packages/tree` tests run through the React Compiler.
 - `import.meta.path`/`dir` are undefined under Vitest; use `import.meta.dirname`. Cold process-spawning tests may need a higher `testTimeout`.
 - The nightly `flake-watch.yml` reports flakes; fix them at the cause.
+
+## Content isolation
+
+Sanitized Markdown renders in light DOM with prefixed ids, names and fragment links. Library output that brings its own stylesheets or document ids renders in a shadow root; Mermaid passes source text unchanged and namespaces parsed custom-class identities for light-DOM measurement before displaying its SVG inside the root. Content that can run script renders in a sandboxed iframe with an opaque origin, using `srcdoc` or a blob with `sandbox="allow-scripts"` and no `allow-same-origin`. Images and SVG files render through `<img>`. PDF viewers disable scripting and evaluation. The editor stays in light DOM.
