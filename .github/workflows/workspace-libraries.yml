@@ -85,3 +85,11 @@ jobs:
         if: ${{ matrix.family == 'editor' }}
         working-directory: ${{ runner.temp }}/mirror
         run: bun run --cwd packages/tree-sitter test:runtime
+      - name: Check hoisted standalone tree-sitter runtime
+        if: ${{ matrix.family == 'editor' }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/mirror-hoisted"
+          git archive HEAD:editor | tar -x -C "$RUNNER_TEMP/mirror-hoisted"
+          cd "$RUNNER_TEMP/mirror-hoisted"
+          bun install --linker=hoisted
+          bun run --cwd packages/tree-sitter test:runtime
