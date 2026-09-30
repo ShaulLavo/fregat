@@ -19,7 +19,6 @@ import {
 } from '@singapore-editor/tree-sitter'
 import {
   TREE_SITTER_LANGUAGE_CONTRIBUTIONS,
-  TYPESCRIPT_TREE_SITTER_LANGUAGE,
   typeScript,
 } from '@singapore-editor/tree-sitter-languages'
 import typescript from '@shikijs/langs/typescript'
@@ -33,9 +32,8 @@ export function createInputConsumers(id: string, fixture: string) {
   const shiki = configuration.shiki ? createShikiWorkerOwner() : null
   if (tree) {
     const provider = createTreeSitterSyntaxProvider({ backend: tree })
-    provider.registerLanguage(TYPESCRIPT_TREE_SITTER_LANGUAGE)
     for (const contribution of TREE_SITTER_LANGUAGE_CONTRIBUTIONS)
-      if (contribution.id !== 'typescript') provider.registerLanguage(contribution)
+      provider.registerLanguage(contribution, { replace: true })
     plugins.push(createTreeSitterSyntaxPlugin(provider))
   }
   if (id === 'native' && configuration.treeSitter) plugins.push(typeScript())
@@ -63,19 +61,60 @@ export function createInputConsumers(id: string, fixture: string) {
     configuration,
     plugins,
     async settle(editors: readonly Editor[]) {
+      // Syntax sessions start lazily; a fence taken before they start resolves with nothing done.
+      await until(() =>
+        editors.every((editor) => editor.getState().initialHighlightStatus !== 'loading'),
+      )
       await tree?.awaitIdleFence()
       await shiki?.awaitIdleFence()
+      if (configuration.minimap) await minimapRendersAccepted()
       return {
         configuration,
         tree: tree?.inspect() ?? null,
         shiki: shiki?.inspect() ?? null,
-        views: editors.map((editor) => ({
-          initialHighlightStatus: editor.getState().initialHighlightStatus,
-        })),
+        plugins: plugins.map((plugin) => plugin.name ?? 'unnamed'),
+        views: editors.map((editor, index) => {
+          const host = document.getElementById(`view-${index}`)
+          return {
+            initialHighlightStatus: editor.getState().initialHighlightStatus,
+            gutterElements:
+              host?.querySelectorAll(
+                '.editor-virtualized-gutter-label, .editor-virtualized-fold-gutter-cell',
+              ).length ?? 0,
+            minimapElements: host?.querySelectorAll('[class*="minimap"]').length ?? 0,
+          }
+        }),
       }
     },
     async dispose() {
       await Promise.all([tree?.dispose(), shiki?.dispose()])
     },
   }
+}
+
+type WorkerProof = {
+  readonly terminated: boolean
+  readonly minimap: boolean
+  readonly latestRender: number
+  readonly acceptedRender: number
+}
+
+async function until(settled: () => boolean, timeoutMs = 30_000) {
+  const deadline = performance.now() + timeoutMs
+  while (!settled() && performance.now() < deadline)
+    await new Promise((resolve) => setTimeout(resolve, 16))
+}
+
+// Minimap renders arrive after the syntax fences; readiness waits for the latest requested frame.
+async function minimapRendersAccepted() {
+  await until(() =>
+    (
+      (globalThis as { __inputWorkerProof?: readonly WorkerProof[] }).__inputWorkerProof ?? []
+    ).every(
+      (worker) =>
+        worker.terminated ||
+        !worker.minimap ||
+        (worker.latestRender > 0 && worker.acceptedRender === worker.latestRender),
+    ),
+  )
 }

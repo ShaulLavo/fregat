@@ -108,7 +108,9 @@ export async function runSample(
   if (consumerId === 'native' && fixture.id === 'ordinary')
     await page.waitForFunction(() => __stress.observe().state.initialHighlightStatus === 'painted')
   const opened =
-    consumerId === 'native' ? null : await settleConsumers(page, consumerId, fixture.id, views)
+    consumerId === 'native'
+      ? null
+      : await settleConsumers(page, consumerId, fixture.id, views, scenario)
   const target = await page.evaluate(
     ({ scenario, slowdownMs, count }) => {
       const target = __stress.inputLatency.prepare(scenario, slowdownMs)
@@ -141,7 +143,7 @@ export async function runSample(
     const rendered = await page.evaluate(() => __stress.inputLatency.verifyRendered())
     await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 450)))
     const settled = opened
-      ? await settleConsumers(page, consumerId, fixture.id, views, opened)
+      ? await settleConsumers(page, consumerId, fixture.id, views, scenario, opened)
       : null
     const diagnostic = await page.evaluate(() => {
       const { diagnostics, droppedDiagnostics } = __stress.observe()
@@ -218,6 +220,7 @@ export async function runSample(
     cleanup.active ||
     cleanup.hosts ||
     cleanup.pendingFrames ||
+    cleanup.liveWorkers ||
     (repetition >= 0 && cleanup.afterListeners > cleanup.beforeListeners)
   )
     fail(`Input cleanup failed: ${JSON.stringify(cleanup)}`)
@@ -276,11 +279,11 @@ async function observePaint(page, scenario, before, observation) {
   return { method: 'screenshot-completion-upper-bound', startedAt, completedAt, imageChanged }
 }
 
-async function settleConsumers(page, consumerId, fixture, views, opened = null) {
+async function settleConsumers(page, consumerId, fixture, views, scenario, opened = null) {
   const readiness = await page.evaluate(async () => ({
     ...(await __stress.settleConsumers()),
     workers: globalThis.__inputWorkerProof.map((worker) => ({ ...worker })),
   }))
-  assertConsumerReadiness(readiness, consumerId, fixture, views, opened)
+  assertConsumerReadiness(readiness, consumerId, fixture, views, scenario, opened)
   return readiness
 }

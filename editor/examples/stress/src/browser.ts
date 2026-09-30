@@ -37,6 +37,7 @@ type Active = {
 declare global {
   var __stress: typeof bridge
   var __EDITOR_PERFORMANCE_DIAGNOSTICS__: ((event: Diagnostic) => void) | null
+  var __inputWorkerProof: readonly { readonly terminated: boolean }[] | undefined
 }
 
 let active: Active | null = null
@@ -328,6 +329,7 @@ function retention() {
     hosts: hosts.childElementCount,
     pendingFrames: frames.size + inputLatency.pendingFrames(),
     active: active !== null,
+    liveWorkers: globalThis.__inputWorkerProof?.filter((worker) => !worker.terminated).length ?? 0,
   }
 }
 

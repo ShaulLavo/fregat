@@ -154,6 +154,7 @@ function validateCleanup(sample, key) {
     cleanup.active !== false ||
     cleanup.hosts !== 0 ||
     cleanup.pendingFrames !== 0 ||
+    (cleanup.liveWorkers !== undefined && cleanup.liveWorkers !== 0) ||
     cleanup.contextClosed !== true ||
     cleanup.trackedObjects !== trackedObjects
   )

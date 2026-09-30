@@ -16,5 +16,6 @@ export function assertConsumerReadiness(
   id: string,
   fixture: string,
   views: string,
+  scenario: string,
   opened: unknown,
 ): void
