@@ -6,12 +6,14 @@ import { resourceQueryClient } from '@/lib/resources/state/query-client'
 
 afterEach(() => setMermaidLoader(null))
 
+const mermaidAPI = { getDiagramFromText: async () => ({ parser: { parse() {} } }) }
+
 test('concurrent fences share acquisition and a failed library can be requested again', async () => {
   let attempts = 0
   setMermaidLoader(async () => {
     attempts += 1
     if (attempts === 1) throw new Error('fixture import failure')
-    return { initialize() {}, render: async () => ({ svg: '<svg />' }) }
+    return { mermaidAPI, initialize() {}, render: async () => ({ svg: '<svg />' }) }
   })
   const failed = await Promise.allSettled([
     resourceQueryClient.query(mermaidQueryOptions),
@@ -34,20 +36,29 @@ test('renderer configuration remains owned by its diagram until rendering settle
     return { svg: `${text}:${theme}` }
   })
   setMermaidLoader(async () => ({
+    mermaidAPI,
     initialize: (config) => {
-      theme = config.theme
+      theme = (config.themeVariables as { darkMode: boolean }).darkMode
     },
     render,
   }))
   const renderer = await resourceQueryClient.query(mermaidQueryOptions)
-  const first = renderer.render('first', 'dark')
+  const first = renderer.render('first', {
+    colorMode: 'dark',
+    fontFamily: 'sans-serif',
+    variables: {},
+  })
   await vi.waitFor(() => expect(render).toHaveBeenCalledTimes(1))
-  const second = renderer.render('second', 'light')
+  const second = renderer.render('second', {
+    colorMode: 'light',
+    fontFamily: 'sans-serif',
+    variables: {},
+  })
   await Promise.resolve()
   expect(render).toHaveBeenCalledTimes(1)
   gate.resolve()
-  expect(await first).toBe('first:dark')
-  expect(await second).toBe('second:default')
+  expect(await first).toBe('first:true')
+  expect(await second).toBe('second:false')
 })
 
 test('remounting a diagram does not retry a failed library import', async () => {

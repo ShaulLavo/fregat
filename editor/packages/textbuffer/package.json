@@ -41,7 +41,7 @@
     "bench:height": "node bench/height.mjs",
     "bench:test": "vitest run --config bench/vitest.config.mjs",
     "bench:check": "bun run build && bun run bench:prepare && bun run bench:test",
-    "lint": "oxlint .",
+    "lint": "oxlint . --ignore-pattern 'bench/vscode-textbuffer/**'",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "bench:profile": "node bench/profile.mjs",
