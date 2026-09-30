@@ -16,16 +16,17 @@ bun run bench -- --profile standard --seed 7 --samples 15 --output bench/results
 bun run bench -- --only random-replacements,ranges-after-churn --samples 3
 ```
 
-`bench:check` builds the package, fetches/builds the pinned control and runs Vitest adapter/oracle tests.
+`bench:check` builds the package, builds the pinned control and runs Vitest adapter/oracle tests.
 `bench` also rebuilds both implementations, even when invoked directly as `node bench/run.mjs`.
 Timing runs use native Node child processes, not Bun's JavaScript engine. Node 24 is used in CI.
-The first preparation needs access to raw.githubusercontent.com; subsequent runs reuse source only
-after verifying each pinned Git blob hash. Compiled output is rebuilt, never trusted from cache.
+The pinned control's source is vendored in `bench/vscode-textbuffer/`, so preparation needs no network;
+each file's Git blob hash is verified before every build. Compiled output is rebuilt, never trusted from cache.
 No upstream npm dependencies or lifecycle scripts are installed or executed.
 
 The package remains independently usable outside the monorepo. Benchmark code uses its package exports,
 not editor-local aliases, shims or a copied Singapore implementation. There are no new runtime dependencies.
-The downloaded Microsoft source and its unchanged MIT license stay in the ignored `bench/.cache` directory.
+The vendored Microsoft source keeps its unchanged MIT license beside it; lint and formatting skip it so its
+bytes stay identical. Builds go to the ignored `bench/.cache` directory.
 See [upstream.json](upstream.json) for the exact repository commit and all source blob identities.
 The source revision is deliberately pinned; this is not a moving claim about VS Code's latest internals.
 
