@@ -1,6 +1,6 @@
 import { act } from '@testing-library/react'
 import { createClientError } from '@workspace/client-core/errors'
-import type { SessionId } from '@workspace/contracts'
+import type { ScopedSessionRef, SessionId } from '@workspace/contracts'
 import { useSessionActions } from '@/features/chat-mode/hooks/use-session-actions'
 import { useSessionMultiSelectStore } from '@/features/chat-mode/state/session-multi-select-store'
 import { sessionUndoHistory } from '@/features/chat-mode/state/session-undo-history'
@@ -10,16 +10,16 @@ import { createObservedInProcessClient } from '../../../../../test/client'
 import { renderHookWithProviders } from '../../../../../test/render'
 import { expect, test } from '../../../../../test/fixtures'
 
-test('partial bulk snooze clears selection before outcomes and Undo includes successful rows only', async ({
+test('partial bulk snooze clears selection before every command and Undo includes successful rows only', async ({
   server,
 }) => {
   let failedId: SessionId | undefined
-  let selectionDuringRequest: readonly unknown[] | undefined
+  const selectionsDuringRequests: (readonly ScopedSessionRef[])[] = []
   const client = createObservedInProcessClient(server, async (request) => {
     if (!request.url.endsWith('/orchestration/commands')) return
     const body = await request.clone().json()
     if (body.type !== 'session.snooze') return
-    selectionDuringRequest = useSessionMultiSelectStore.getState().refs
+    selectionsDuringRequests.push(useSessionMultiSelectStore.getState().refs)
     if (body.sessionId !== failedId) return
     throw createClientError({
       code: 'TEST_NETWORK_FAILURE',
@@ -48,7 +48,7 @@ test('partial bulk snooze clears selection before outcomes and Undo includes suc
     expect(result.succeeded).toEqual([refs[0], refs[2]])
     expect(result.failed).toBe(1)
   })
-  expect(selectionDuringRequest).toEqual([])
+  expect(selectionsDuringRequests).toEqual([[], [], []])
   expect(useSessionMultiSelectStore.getState().refs).toEqual([])
   expect(
     sessionUndoHistory

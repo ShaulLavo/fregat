@@ -86,7 +86,15 @@ Acceptance oracle `7445aa733ada33e45289e5aa5055f79142556513` stays frozen.
 ## Validation and remaining scope
 
 - Focused provider service/reaper/Codex/Claude and pagination checks: 217 passed.
-- Real-server DOM bulk snooze and session-removal checks: 7 passed.
+- Real-server DOM component lifecycle, bulk snooze and session-removal checks: 11 passed.
+- Exact upstream session vocabulary inventory: 10 passed. Only new experimental RPC and
+  utility/test occurrences were added.
+- Review strengthened the transport proof to record all three request-time selections. Moving
+  selection clearing after the first awaited command fails at the first snapshot; actual code
+  passes. Red/green logs are retained at `/work/tmp/foundations-126/repair-late-clear-red.log`,
+  `repair-lifecycle-before.log`, `repair-lifecycle-green.log`, `repair-vocabulary-before.log`
+  and `repair-vocabulary-green.log`. The stale component expectation for retained archived
+  selections was migrated to the approved clear-before-command behavior.
 - Native RPC fixture covers thread scoping, pagination, empty/completed lists, malformed and
   unsupported methods, parent-complete pending child requests, and pending foreground RPCs.
 - A native fixture process stays ready and alive through an injected 35-minute reaper sweep,
