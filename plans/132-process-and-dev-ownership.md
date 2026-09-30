@@ -1,7 +1,32 @@
 # Processes, leases and dev plumbing each get an owner
 
-Status: wave 2 closeout, reconciled 2026-09-28. Phase 1 and the schema collapse are delivered;
-phases 2 and 3 retain the items below. Source review only; remaining runtime checks are explicit.
+Status: Approved, active wave 2 closeout, updated 2026-09-30. Phase 1 and the schema collapse
+are delivered; phases 2 and 3 retain the items below.
+
+## Active closeout after the package move, 2026-09-30
+
+Plan numbers record creation order. This plan's process ownership and development plumbing
+predate 207; the source migration now supplies canonical package locations for its remaining work.
+
+- [x] Update the general roadmap for 207's delivered source migration and deferred publication.
+- [x] Prove loaded source still reloads and generated/unserved package files do not reload.
+- [x] Restrict the reload hook to modules served in the browser environment.
+- [x] Pass whole-tree gates and the full repository typecheck.
+- [x] Restart the mesh-managed dev route and verify the application loads.
+
+Baseline `typecheck:dev` fails in the notification badge test: its 2D canvas spy conflicts with
+the WebGPU `getContext` overload loaded by Ghostty's source types. Keep this failure in the
+configuration follow-up; it predates this HMR change. Resource disposal and memory measurements
+remain separate closeout units below. The 13 focused Vite/source-resolution tests and normal
+web typecheck pass. The real Vite watcher regression failed before the fix for both generated
+and unloaded files; both pass after the fix, and loaded source still sends one full reload.
+After restarting `:5173` on `omarchy`, `agent:browser look --doctor` passed with no browser
+or log problems. Screenshot read back in `/work/tmp/fregat-evidence/20260930T084038Z-look-1440x1000/`.
+
+Turbo owns task scheduling and build dependencies. Vite serves these packages directly from
+source. The current Editor controller is retained in React state and the Ghostty runtime has
+a static query with infinite retention. Ordinary unmount disposal exists; safe replacement
+across hot updates still needs proof before removing the reload fallback.
 
 ## Delivered schema collapse
 
@@ -21,11 +46,9 @@ state-loss review and authorization.
 
 - Item 10: reconcile the generated tsconfig from `dev-sources.ts` with every typecheck path.
   Editor sources must be checked under the intended settings without competing configurations.
-- Item 12: add lifecycle disposal in `@singapore-editor/react` and ghostty-webgpu's `Terminal`,
-  verify mounted instances release old resources, then remove the forced full reload from
-  `devSourcePlugin`. Until disposal works, preserve the reload.
-- Restrict the current `hotUpdate` reload to relevant served modules. It still watches package
-  roots and does not check `modules`, so generated `dist/` writes need a focused non-reload proof.
+- Item 12: prove hot updates replace the retained Editor controller and cached Ghostty runtime,
+  releasing their resources, then remove the forced full reload from `devSourcePlugin`.
+  Preserve the fallback until that proof passes; ordinary unmount disposal is already present.
 - Re-measure Vite memory against today's Vite/rolldown versions. The 2026-09-25 proposal for
   `RAYON_NUM_THREADS=4 MIMALLOC_PURGE_DELAY=0` is not in `apps/web`'s `dev:vite`. Treat the old
   2.50 GB → 1.31 GB result as a historical experiment, not current proof. Use the existing

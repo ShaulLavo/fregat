@@ -34,7 +34,7 @@ commit hooks are opt-in. `bun run hooks:install` gets you oxfmt and oxlint over 
 
 Editor packages live in `editor/packages/`, and the terminal library lives in `ghostty-webgpu/`. Bun installs their workspace links from the root `bun.lock`. Run `bun install --frozen-lockfile` at the root, then `bun run build:workspaces` to prepare the exports used by production builds and typechecking.
 
-`dev` and `dev:web` serve both libraries from their TypeScript source. Startup prints each package's resolved directory. Editing Fregat's UI hot reloads; editing Editor or ghostty reloads the page so mounted instances pick up the new code. `bun run --cwd apps/web typecheck:dev` checks the same source map Vite uses.
+`dev` and `dev:web` serve both libraries from their TypeScript source. Startup prints each package's resolved directory. Editing Fregat's UI hot reloads; editing loaded Editor or Ghostty modules reloads the page so mounted instances pick up the new code. Generated `dist` files and unloaded source files leave the page running. Turbo coordinates workspace tasks; Vite owns browser updates. The Editor controller retained in React state and Ghostty's cached runtime still require the source reload fallback. `bun run --cwd apps/web typecheck:dev` checks the same source map Vite uses.
 
 Ghostty's `ghostty-vt.wasm` and `bridge.wasm` are compiled artifacts. Run `bun run build:wasm` or `bun run build:bridge` in `ghostty-webgpu/` after changing their native inputs. Production builds read `dist`; run `bun run build:workspaces` after source changes. Restart dev after changing a package's export map.
 

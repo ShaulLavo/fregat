@@ -1,6 +1,6 @@
 # Execution roadmap
 
-Updated 2026-09-29. This file owns cross-project ordering. Each [plan](plans/README.md)
+Updated 2026-09-30. This file owns cross-project ordering. Each [plan](plans/README.md)
 owns its scope, decisions, status and acceptance checks. [AGENTS.md](AGENTS.md) owns execution
 rules; [docs](docs/README.md) holds architecture, research and delivery evidence.
 
@@ -10,25 +10,24 @@ The [September 29 inventory](plans/inventory-2026-09-29.md) reconciles the remai
 work across Fregat, Editor, Ghostty, the parser and native clients. It is a dated
 snapshot; this file remains the scheduler and each plan remains its scope authority.
 
-1. **Finish source consolidation in 207.** Draft PR #199 imports both histories, consolidates workspaces and tooling, and relocates CI. Final source pulls under the owner's freeze, mirrors and publishing remain with the coordinator. Reconcile open sibling work, capture final
-   heads, obtain the scoped session hold, import the packages and verify the first
-   mirrors. The rehearsal is complete. Publication bootstrap is a separate gate.
-2. **Close delivered residues and the existing wave-2 queue.** Verify before retiring
+1. **Close delivered residues and the existing wave-2 queue, starting with 132.** Verify before retiring
    implemented plans. Keep **132 → 179 → 099 units 0–1 → 114 → 126 → 156 P0–P2** as
    the default closeout order. Independent proofs and Platform-only slices can run
-   during consolidation; package-layout changes wait for their canonical locations.
-3. **Complete one keymap cutover: 204 + 205 → 206.** 203 has landed. Prepare the
+   alongside the active lane. 207's source migration and tooling alignment landed in
+   PRs #199 and #201; all three mirrors passed ancestry and exact-tree checks. Editor
+   and Ghostty work now lands in their canonical folders here. npm publication remains deferred.
+2. **Complete one keymap cutover: 204 + 205 → 206.** 203 has landed. Prepare the
    producer APIs in parallel, migrate every consumer, then remove obsolete APIs in
    the same verified release. Align E026 command metadata; Platform owns the shadow report.
-4. **Finish document guarantees and shared highlighting.** Prove landed 198 contracts
+3. **Finish document guarantees and shared highlighting.** Prove landed 198 contracts
    alongside 099 publication; implement 197 independently. Then migrate 200 consumers
    against the exact contracts they need. 099 units 2–7 remain explicitly gated.
-5. **Take bounded product slices.** Prefer finishing an active lane before opening a
+4. **Take bounded product slices.** Prefer finishing an active lane before opening a
    second architecture program. Markdown block/range authoring in 111/108 precedes
    171's composer swap. 202's local controls can proceed independently; its semantic
    Markdown cutover waits for parser producer/consumer gates. 201 owns measured typing
    improvements, 178 owns remaining tree slices, and Ghostty 016 owns standalone readiness.
-6. **Run broad migrations and later programs by unit.** Establish 208's catalog and
+5. **Run broad migrations and later programs by unit.** Establish 208's catalog and
    package contract after 207, coordinate command/settings extraction with 206, then
    migrate stable domains. 209 design work can proceed earlier but retains its design
    and implementation gates. Native stays editor-first; 088 follows 087 interoperability.
@@ -36,14 +35,14 @@ snapshot; this file remains the scheduler and each plan remains its scope author
 The default is one active structural cutover plus independent closeout/proof work.
 This order schedules Approved work; it does not expand any plan's authorization.
 
-## Scope of the package hold
+## Package cutover delivered
 
-No active blanket code freeze was confirmed. 207 requires Editor and ghostty writes
-paused from final-head capture through the first verified mirror push, with the owner
-coordinating other sessions. Release the hold once Fregat is canonical and standalone
-mirror checks pass. Documentation, read-only baselines, independent Platform fixes,
-TUI local work and localization design can continue. Avoid starting sibling API/layout
-migrations during the cutover. Do not delete old checkouts or rewrite mirror history.
+[207](plans/207-one-repo-with-mirrors.md) delivered source migration on 2026-09-30.
+The scoped cutover hold has ended. Develop Editor in `editor/packages/`, Ghostty in
+`ghostty-webgpu/`, and hotkeys in `hotkeys/`; their standalone repositories are mirrors.
+npm authentication, initial publication and trusted-publisher setup remain deferred.
+Before 204/205 mirror a consumer of hotkeys, prove standalone installation and satisfy
+207's required hotkeys publication gate. Old checkouts remain untouched references.
 
 ## Wave 2 closeout and dependency order
 
@@ -103,7 +102,7 @@ shared React/TypeScript logic. The wave-2 queue above is unchanged.
   Plans 176/189 retain parser ownership and required extensions; 171/179/197/198/200 keep their
   existing scope. Only exact consumed contracts are prerequisites, not unrelated whole plans.
 - Plans 203/206 own keymap infrastructure. Plan 202's controls integrate with that dispatcher;
-  they do not introduce a second one. Respect 207's canonical Editor source when it moves.
+  they do not introduce a second one. Editor source is canonical in `editor/packages/` after 207.
 - The [coordination and research index](docs/tui-research/ui-plan-links.md) links the retained
   catalog, source evidence, companion plans and implementation handoffs. These are plans, not
   delivered package changes; the existing fork overrides remain until the verified cutover.
@@ -117,9 +116,9 @@ and [205: ghostty-webgpu](plans/205-ghostty-on-fregat-hotkeys.md) then run in pa
 infrastructure only and takes OpenTUI key events through the integration owned by 202.
 This workstream does not reorder the wave-2 queue above.
 
-[207: one repo with mirrors](plans/207-one-repo-with-mirrors.md) moves the Editor and
-ghostty-webgpu into Fregat and mirrors them (and `hotkeys/`) to their public repos. Run it before
-204 and 205 so their work lands in Fregat; 203 does not wait for it.
+[207: one repo with mirrors](plans/207-one-repo-with-mirrors.md) delivered the Editor and
+ghostty-webgpu source move and verified all three public mirrors, including `hotkeys/`.
+204 and 205 now land in Fregat; their standalone hotkeys dependency retains 207's publication gate.
 
 ## Localization
 
@@ -137,7 +136,7 @@ for design review. Resolve its D1–D6 gates before the affected implementation 
 production implementation retains its separate owner authorization. Use the existing
 tab/group and session owners. Schedule command changes against 206, preserve 200
 content ownership, and apply 208 catalogs to new copy. It follows the package cutover
-for implementation; its design work can proceed during the scoped freeze.
+for implementation; its design work can proceed alongside closeout work.
 
 ## Zed parity workstream
 
