@@ -1,0 +1,95 @@
+{
+  "note": "Real textbuffer and measurement classes, with only the source-page constant replaced in isolated bundles. Each Node process warms a 1Mi-unit line and 20 edits, then times full-line measurement construction, classification and columnAt after each edit. Source indexes are reused; each edit creates a new snapshot wrapper. Private range counts are observed only by this probe.",
+  "rows": [
+    {
+      "pageUnits": 256,
+      "sample": 1,
+      "node": "v26.7.0",
+      "initialRanges": 4096,
+      "finalRanges": 4098,
+      "edits": 100,
+      "medianMs": 0.42828200000001004,
+      "p95Ms": 0.7688600000000037
+    },
+    {
+      "pageUnits": 256,
+      "sample": 2,
+      "node": "v26.7.0",
+      "initialRanges": 4096,
+      "finalRanges": 4098,
+      "edits": 100,
+      "medianMs": 0.4034649999999971,
+      "p95Ms": 0.6955939999999998
+    },
+    {
+      "pageUnits": 256,
+      "sample": 3,
+      "node": "v26.7.0",
+      "initialRanges": 4096,
+      "finalRanges": 4098,
+      "edits": 100,
+      "medianMs": 0.4132239999999996,
+      "p95Ms": 0.7874790000000047
+    },
+    {
+      "pageUnits": 4096,
+      "sample": 1,
+      "node": "v26.7.0",
+      "initialRanges": 256,
+      "finalRanges": 258,
+      "edits": 100,
+      "medianMs": 0.048709000000002334,
+      "p95Ms": 0.07597700000000174
+    },
+    {
+      "pageUnits": 4096,
+      "sample": 2,
+      "node": "v26.7.0",
+      "initialRanges": 256,
+      "finalRanges": 258,
+      "edits": 100,
+      "medianMs": 0.05199700000000007,
+      "p95Ms": 0.07608600000000365
+    },
+    {
+      "pageUnits": 4096,
+      "sample": 3,
+      "node": "v26.7.0",
+      "initialRanges": 256,
+      "finalRanges": 258,
+      "edits": 100,
+      "medianMs": 0.053461999999996124,
+      "p95Ms": 0.07297300000000462
+    },
+    {
+      "pageUnits": 16384,
+      "sample": 1,
+      "node": "v26.7.0",
+      "initialRanges": 64,
+      "finalRanges": 66,
+      "edits": 100,
+      "medianMs": 0.010716000000002168,
+      "p95Ms": 0.022776999999997827
+    },
+    {
+      "pageUnits": 16384,
+      "sample": 2,
+      "node": "v26.7.0",
+      "initialRanges": 64,
+      "finalRanges": 66,
+      "edits": 100,
+      "medianMs": 0.012985000000000468,
+      "p95Ms": 0.023116999999999166
+    },
+    {
+      "pageUnits": 16384,
+      "sample": 3,
+      "node": "v26.7.0",
+      "initialRanges": 64,
+      "finalRanges": 66,
+      "edits": 100,
+      "medianMs": 0.014122999999997887,
+      "p95Ms": 0.023993000000004372
+    }
+  ]
+}

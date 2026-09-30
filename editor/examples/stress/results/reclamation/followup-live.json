@@ -1,0 +1,4976 @@
+{
+  "browser": "153.0.8010.12",
+  "bundleHash": "af8ddcb95159618396edfc5cc801f05987bf62fd310b4529ecb5652b64e59601",
+  "measuredAt": "2026-09-23T16:03:07.975Z",
+  "options": {
+    "workloads": "aligned,survivors,mixed,paragraph,original,paste-tail",
+    "cycles": "500,1000",
+    "repetitions": "3",
+    "typing-samples": "0",
+    "observe-only": false
+  },
+  "workloadDefinitions": {
+    "aligned": "16,384 UTF-16 unit inserts, deleted whole",
+    "survivors": "1,024 unit inserts retaining 64 units each",
+    "mixed": "1,024 unit inserts; three of four deleted whole",
+    "paragraph": "replace the same 1,024 unit paragraph each cycle",
+    "original": "delete 4,194,304 units from original text; release session and external owners separately",
+    "paste-tail": "paste 4,194,368 units, retain the 64-unit writable tail, reset sync-chain payload, release history and external owners"
+  },
+  "failure": null,
+  "note": "Two mounted editors; automatic maintenance; actual GC heap. Every baseline, before, after, and external-owner heap reading uses the second explicit timer-task and GC with maintenance suspended; the immediate CDP-GC reading is preserved separately because weak targets/finalizer bookkeeping may remain until a task boundary. A WeakRef-only sentinel created in each churn job must be absent after both task/GC rounds; original and paste fixtures have no churn sentinel. Registry backingUnits sum page backing lengths with duplicates and are not physical retained bytes. Maintenance completion counts must remain unchanged across each capture; the automatic scheduler resumes at the next maintenance wait. Heap peaks are 10ms CDP samples, not an exact maximum. Input probes measure trusted keydown to the second animation frame on identical text in the same browser before/after maintenance; observational paired timings, not the E002 calibrated regression gate. Original deletion checks history/clean and external-reader release separately; undo is excluded there because DocumentEditChain legitimately retains the restored insertion payload.",
+  "samples": [
+    {
+      "workload": "aligned",
+      "cycles": 500,
+      "churnMs": 885.8999998569489,
+      "registryEntriesAtChurnEnd": 502,
+      "deletedUnits": 8192000,
+      "retainedCodeUnitsBefore": 8192014,
+      "retainedCodeUnitsAfter": 1638414,
+      "revision": 1001,
+      "dirty": true,
+      "liveUnits": 14,
+      "heapBefore": 18008428,
+      "heapAfter": 5878092,
+      "heapBeforeAbsolute": 20890204,
+      "heapBeforeImmediateAbsolute": 20881076,
+      "heapCalibration": {
+        "immediateAbsolute": 20881076,
+        "strings": {
+          "categories": {
+            "string": 8764332,
+            "concatenated string": 15620,
+            "sliced string": 0
+          },
+          "bytes": 8779952
+        },
+        "firstTaskGcAbsolute": 20881124,
+        "secondTaskGcAbsolute": 20890204,
+        "stabilityDeltaBytes": 9080,
+        "immediateRegistry": {
+          "registryEntries": 502,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 502,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 502,
+          "logicalUnits": 8192013,
+          "backingUnits": 8192026
+        },
+        "secondRegistry": {
+          "registryEntries": 502,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 502,
+          "logicalUnits": 8192013,
+          "backingUnits": 8192026
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2662060,
+        "strings": {
+          "categories": {
+            "string": 560164,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 574464
+        },
+        "firstTaskGcAbsolute": 2867944,
+        "secondTaskGcAbsolute": 2881776,
+        "stabilityDeltaBytes": 13832,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 8759152,
+        "strings": {
+          "categories": {
+            "string": 2206168,
+            "concatenated string": 15040,
+            "sliced string": 0
+          },
+          "bytes": 2221208
+        },
+        "firstTaskGcAbsolute": 8759756,
+        "secondTaskGcAbsolute": 8759868,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 102,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 102,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 102,
+          "logicalUnits": 1638413,
+          "backingUnits": 1638426
+        },
+        "secondRegistry": {
+          "registryEntries": 102,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 102,
+          "logicalUnits": 1638413,
+          "backingUnits": 1638426
+        }
+      },
+      "heapAfterAbsolute": 8759868,
+      "sampledPeakHeap": 30209824,
+      "heapSamples": 33,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 400,
+        "codeUnits": 6553600,
+        "snapshots": 202,
+        "maxSliceMs": 2
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 0
+    },
+    {
+      "workload": "aligned",
+      "cycles": 500,
+      "churnMs": 871.3999998569489,
+      "registryEntriesAtChurnEnd": 502,
+      "deletedUnits": 8192000,
+      "retainedCodeUnitsBefore": 8192014,
+      "retainedCodeUnitsAfter": 1638414,
+      "revision": 1001,
+      "dirty": true,
+      "liveUnits": 14,
+      "heapBefore": 18009404,
+      "heapAfter": 5879088,
+      "heapBeforeAbsolute": 20884212,
+      "heapBeforeImmediateAbsolute": 20875084,
+      "heapCalibration": {
+        "immediateAbsolute": 20875084,
+        "strings": {
+          "categories": {
+            "string": 8763092,
+            "concatenated string": 15600,
+            "sliced string": 0
+          },
+          "bytes": 8778692
+        },
+        "firstTaskGcAbsolute": 20875132,
+        "secondTaskGcAbsolute": 20884212,
+        "stabilityDeltaBytes": 9080,
+        "immediateRegistry": {
+          "registryEntries": 502,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 502,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 502,
+          "logicalUnits": 8192013,
+          "backingUnits": 8192026
+        },
+        "secondRegistry": {
+          "registryEntries": 502,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 502,
+          "logicalUnits": 8192013,
+          "backingUnits": 8192026
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2655092,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2860976,
+        "secondTaskGcAbsolute": 2874808,
+        "stabilityDeltaBytes": 13832,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 8753180,
+        "strings": {
+          "categories": {
+            "string": 2204928,
+            "concatenated string": 15040,
+            "sliced string": 0
+          },
+          "bytes": 2219968
+        },
+        "firstTaskGcAbsolute": 8753784,
+        "secondTaskGcAbsolute": 8753896,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 102,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 102,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 102,
+          "logicalUnits": 1638413,
+          "backingUnits": 1638426
+        },
+        "secondRegistry": {
+          "registryEntries": 102,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 102,
+          "logicalUnits": 1638413,
+          "backingUnits": 1638426
+        }
+      },
+      "heapAfterAbsolute": 8753896,
+      "sampledPeakHeap": 29194020,
+      "heapSamples": 33,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 400,
+        "codeUnits": 6553600,
+        "snapshots": 202,
+        "maxSliceMs": 2.1000001430511475
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 1
+    },
+    {
+      "workload": "aligned",
+      "cycles": 500,
+      "churnMs": 883.2000000476837,
+      "registryEntriesAtChurnEnd": 502,
+      "deletedUnits": 8192000,
+      "retainedCodeUnitsBefore": 8192014,
+      "retainedCodeUnitsAfter": 1638414,
+      "revision": 1001,
+      "dirty": true,
+      "liveUnits": 14,
+      "heapBefore": 18009512,
+      "heapAfter": 5874484,
+      "heapBeforeAbsolute": 20884320,
+      "heapBeforeImmediateAbsolute": 20875192,
+      "heapCalibration": {
+        "immediateAbsolute": 20875192,
+        "strings": {
+          "categories": {
+            "string": 8763124,
+            "concatenated string": 15620,
+            "sliced string": 0
+          },
+          "bytes": 8778744
+        },
+        "firstTaskGcAbsolute": 20875240,
+        "secondTaskGcAbsolute": 20884320,
+        "stabilityDeltaBytes": 9080,
+        "immediateRegistry": {
+          "registryEntries": 502,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 502,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 502,
+          "logicalUnits": 8192013,
+          "backingUnits": 8192026
+        },
+        "secondRegistry": {
+          "registryEntries": 502,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 502,
+          "logicalUnits": 8192013,
+          "backingUnits": 8192026
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2655092,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2970076,
+        "secondTaskGcAbsolute": 2874808,
+        "stabilityDeltaBytes": -95268,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 8748576,
+        "strings": {
+          "categories": {
+            "string": 2204960,
+            "concatenated string": 15040,
+            "sliced string": 0
+          },
+          "bytes": 2220000
+        },
+        "firstTaskGcAbsolute": 8749180,
+        "secondTaskGcAbsolute": 8749292,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 102,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 102,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 102,
+          "logicalUnits": 1638413,
+          "backingUnits": 1638426
+        },
+        "secondRegistry": {
+          "registryEntries": 102,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 102,
+          "logicalUnits": 1638413,
+          "backingUnits": 1638426
+        }
+      },
+      "heapAfterAbsolute": 8749292,
+      "sampledPeakHeap": 31234472,
+      "heapSamples": 32,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 400,
+        "codeUnits": 6553600,
+        "snapshots": 202,
+        "maxSliceMs": 2.299999952316284
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 2
+    },
+    {
+      "workload": "aligned",
+      "cycles": 1000,
+      "churnMs": 1712.7000000476837,
+      "registryEntriesAtChurnEnd": 1002,
+      "deletedUnits": 16384000,
+      "retainedCodeUnitsBefore": 16384014,
+      "retainedCodeUnitsAfter": 1638414,
+      "revision": 2001,
+      "dirty": true,
+      "liveUnits": 14,
+      "heapBefore": 33685900,
+      "heapAfter": 6178280,
+      "heapBeforeAbsolute": 36560700,
+      "heapBeforeImmediateAbsolute": 36559348,
+      "heapCalibration": {
+        "immediateAbsolute": 36559348,
+        "strings": {
+          "categories": {
+            "string": 16961092,
+            "concatenated string": 17360,
+            "sliced string": 0
+          },
+          "bytes": 16978452
+        },
+        "firstTaskGcAbsolute": 36559396,
+        "secondTaskGcAbsolute": 36560700,
+        "stabilityDeltaBytes": 1304,
+        "immediateRegistry": {
+          "registryEntries": 1002,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 1002,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 1002,
+          "logicalUnits": 16384013,
+          "backingUnits": 16384026
+        },
+        "secondRegistry": {
+          "registryEntries": 1002,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 1002,
+          "logicalUnits": 16384013,
+          "backingUnits": 16384026
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2853636,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2860344,
+        "secondTaskGcAbsolute": 2874800,
+        "stabilityDeltaBytes": 14456,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 9052364,
+        "strings": {
+          "categories": {
+            "string": 2204928,
+            "concatenated string": 15380,
+            "sliced string": 0
+          },
+          "bytes": 2220308
+        },
+        "firstTaskGcAbsolute": 9052968,
+        "secondTaskGcAbsolute": 9053080,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 102,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 102,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 102,
+          "logicalUnits": 1638413,
+          "backingUnits": 1638426
+        },
+        "secondRegistry": {
+          "registryEntries": 102,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 102,
+          "logicalUnits": 1638413,
+          "backingUnits": 1638426
+        }
+      },
+      "heapAfterAbsolute": 9053080,
+      "sampledPeakHeap": 43577784,
+      "heapSamples": 33,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 900,
+        "codeUnits": 14745600,
+        "snapshots": 202,
+        "maxSliceMs": 2.200000047683716
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 0
+    },
+    {
+      "workload": "aligned",
+      "cycles": 1000,
+      "churnMs": 1688.0999999046326,
+      "registryEntriesAtChurnEnd": 1002,
+      "deletedUnits": 16384000,
+      "retainedCodeUnitsBefore": 16384014,
+      "retainedCodeUnitsAfter": 1638414,
+      "revision": 2001,
+      "dirty": true,
+      "liveUnits": 14,
+      "heapBefore": 33677548,
+      "heapAfter": 6169972,
+      "heapBeforeAbsolute": 36552348,
+      "heapBeforeImmediateAbsolute": 36550996,
+      "heapCalibration": {
+        "immediateAbsolute": 36550996,
+        "strings": {
+          "categories": {
+            "string": 16961092,
+            "concatenated string": 17380,
+            "sliced string": 0
+          },
+          "bytes": 16978472
+        },
+        "firstTaskGcAbsolute": 36551044,
+        "secondTaskGcAbsolute": 36552348,
+        "stabilityDeltaBytes": 1304,
+        "immediateRegistry": {
+          "registryEntries": 1002,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 1002,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 1002,
+          "logicalUnits": 16384013,
+          "backingUnits": 16384026
+        },
+        "secondRegistry": {
+          "registryEntries": 1002,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 1002,
+          "logicalUnits": 16384013,
+          "backingUnits": 16384026
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2853636,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2860344,
+        "secondTaskGcAbsolute": 2874800,
+        "stabilityDeltaBytes": 14456,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 9044056,
+        "strings": {
+          "categories": {
+            "string": 2204928,
+            "concatenated string": 15320,
+            "sliced string": 0
+          },
+          "bytes": 2220248
+        },
+        "firstTaskGcAbsolute": 9044660,
+        "secondTaskGcAbsolute": 9044772,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 102,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 102,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 102,
+          "logicalUnits": 1638413,
+          "backingUnits": 1638426
+        },
+        "secondRegistry": {
+          "registryEntries": 102,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 102,
+          "logicalUnits": 1638413,
+          "backingUnits": 1638426
+        }
+      },
+      "heapAfterAbsolute": 9044772,
+      "sampledPeakHeap": 50359764,
+      "heapSamples": 33,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 900,
+        "codeUnits": 14745600,
+        "snapshots": 202,
+        "maxSliceMs": 2.200000047683716
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 1
+    },
+    {
+      "workload": "aligned",
+      "cycles": 1000,
+      "churnMs": 1730.2999999523163,
+      "registryEntriesAtChurnEnd": 1002,
+      "deletedUnits": 16384000,
+      "retainedCodeUnitsBefore": 16384014,
+      "retainedCodeUnitsAfter": 1638414,
+      "revision": 2001,
+      "dirty": true,
+      "liveUnits": 14,
+      "heapBefore": 33679152,
+      "heapAfter": 6175596,
+      "heapBeforeAbsolute": 36553960,
+      "heapBeforeImmediateAbsolute": 36552608,
+      "heapCalibration": {
+        "immediateAbsolute": 36552608,
+        "strings": {
+          "categories": {
+            "string": 16961124,
+            "concatenated string": 17360,
+            "sliced string": 0
+          },
+          "bytes": 16978484
+        },
+        "firstTaskGcAbsolute": 36552656,
+        "secondTaskGcAbsolute": 36553960,
+        "stabilityDeltaBytes": 1304,
+        "immediateRegistry": {
+          "registryEntries": 1002,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 1002,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 1002,
+          "logicalUnits": 16384013,
+          "backingUnits": 16384026
+        },
+        "secondRegistry": {
+          "registryEntries": 1002,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 1002,
+          "logicalUnits": 16384013,
+          "backingUnits": 16384026
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2962744,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2860352,
+        "secondTaskGcAbsolute": 2874808,
+        "stabilityDeltaBytes": 14456,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 9049688,
+        "strings": {
+          "categories": {
+            "string": 2204960,
+            "concatenated string": 15280,
+            "sliced string": 0
+          },
+          "bytes": 2220240
+        },
+        "firstTaskGcAbsolute": 9050292,
+        "secondTaskGcAbsolute": 9050404,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 102,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 102,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 102,
+          "logicalUnits": 1638413,
+          "backingUnits": 1638426
+        },
+        "secondRegistry": {
+          "registryEntries": 102,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 102,
+          "logicalUnits": 1638413,
+          "backingUnits": 1638426
+        }
+      },
+      "heapAfterAbsolute": 9050404,
+      "sampledPeakHeap": 44378664,
+      "heapSamples": 32,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 900,
+        "codeUnits": 14745600,
+        "snapshots": 202,
+        "maxSliceMs": 2.3999998569488525
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 2
+    },
+    {
+      "workload": "survivors",
+      "cycles": 500,
+      "churnMs": 1430,
+      "registryEntriesAtChurnEnd": 1003,
+      "deletedUnits": 480000,
+      "retainedCodeUnitsBefore": 512014,
+      "retainedCodeUnitsAfter": 128014,
+      "revision": 1001,
+      "dirty": true,
+      "liveUnits": 32014,
+      "heapBefore": 4135552,
+      "heapAfter": 3928272,
+      "heapBeforeAbsolute": 7010968,
+      "heapBeforeImmediateAbsolute": 7010304,
+      "heapCalibration": {
+        "immediateAbsolute": 7010304,
+        "strings": {
+          "categories": {
+            "string": 1283740,
+            "concatenated string": 14700,
+            "sliced string": 1480
+          },
+          "bytes": 1299920
+        },
+        "firstTaskGcAbsolute": 7010352,
+        "secondTaskGcAbsolute": 7010968,
+        "stabilityDeltaBytes": 616,
+        "immediateRegistry": {
+          "registryEntries": 503,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 503,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 503,
+          "logicalUnits": 32014,
+          "backingUnits": 8146975
+        },
+        "secondRegistry": {
+          "registryEntries": 503,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 503,
+          "logicalUnits": 32014,
+          "backingUnits": 8146975
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2854252,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2860960,
+        "secondTaskGcAbsolute": 2875416,
+        "stabilityDeltaBytes": 14456,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 6802972,
+        "strings": {
+          "categories": {
+            "string": 934856,
+            "concatenated string": 14680,
+            "sliced string": 1480
+          },
+          "bytes": 951016
+        },
+        "firstTaskGcAbsolute": 6803576,
+        "secondTaskGcAbsolute": 6803688,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 103,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 103,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 103,
+          "logicalUnits": 6414,
+          "backingUnits": 1593375
+        },
+        "secondRegistry": {
+          "registryEntries": 103,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 103,
+          "logicalUnits": 6414,
+          "backingUnits": 1593375
+        }
+      },
+      "heapAfterAbsolute": 6803688,
+      "sampledPeakHeap": 8375100,
+      "heapSamples": 30,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 25,
+        "codeUnits": 384000,
+        "snapshots": 202,
+        "maxSliceMs": 0.7000000476837158
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 0
+    },
+    {
+      "workload": "survivors",
+      "cycles": 500,
+      "churnMs": 1417.2999999523163,
+      "registryEntriesAtChurnEnd": 1003,
+      "deletedUnits": 480000,
+      "retainedCodeUnitsBefore": 512014,
+      "retainedCodeUnitsAfter": 128014,
+      "revision": 1001,
+      "dirty": true,
+      "liveUnits": 32014,
+      "heapBefore": 4144428,
+      "heapAfter": 3937820,
+      "heapBeforeAbsolute": 7019844,
+      "heapBeforeImmediateAbsolute": 7019180,
+      "heapCalibration": {
+        "immediateAbsolute": 7019180,
+        "strings": {
+          "categories": {
+            "string": 1283740,
+            "concatenated string": 14700,
+            "sliced string": 1480
+          },
+          "bytes": 1299920
+        },
+        "firstTaskGcAbsolute": 7019228,
+        "secondTaskGcAbsolute": 7019844,
+        "stabilityDeltaBytes": 616,
+        "immediateRegistry": {
+          "registryEntries": 503,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 503,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 503,
+          "logicalUnits": 32014,
+          "backingUnits": 8146975
+        },
+        "secondRegistry": {
+          "registryEntries": 503,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 503,
+          "logicalUnits": 32014,
+          "backingUnits": 8146975
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2854252,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2860960,
+        "secondTaskGcAbsolute": 2875416,
+        "stabilityDeltaBytes": 14456,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 6812520,
+        "strings": {
+          "categories": {
+            "string": 934856,
+            "concatenated string": 14680,
+            "sliced string": 1480
+          },
+          "bytes": 951016
+        },
+        "firstTaskGcAbsolute": 6813124,
+        "secondTaskGcAbsolute": 6813236,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 103,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 103,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 103,
+          "logicalUnits": 6414,
+          "backingUnits": 1593375
+        },
+        "secondRegistry": {
+          "registryEntries": 103,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 103,
+          "logicalUnits": 6414,
+          "backingUnits": 1593375
+        }
+      },
+      "heapAfterAbsolute": 6813236,
+      "sampledPeakHeap": 8388468,
+      "heapSamples": 29,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 25,
+        "codeUnits": 384000,
+        "snapshots": 202,
+        "maxSliceMs": 0.7000000476837158
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 1
+    },
+    {
+      "workload": "survivors",
+      "cycles": 500,
+      "churnMs": 1412.4000000953674,
+      "registryEntriesAtChurnEnd": 1003,
+      "deletedUnits": 480000,
+      "retainedCodeUnitsBefore": 512014,
+      "retainedCodeUnitsAfter": 128014,
+      "revision": 1001,
+      "dirty": true,
+      "liveUnits": 32014,
+      "heapBefore": 4142136,
+      "heapAfter": 3935300,
+      "heapBeforeAbsolute": 7016936,
+      "heapBeforeImmediateAbsolute": 7016272,
+      "heapCalibration": {
+        "immediateAbsolute": 7016272,
+        "strings": {
+          "categories": {
+            "string": 1283740,
+            "concatenated string": 14700,
+            "sliced string": 1480
+          },
+          "bytes": 1299920
+        },
+        "firstTaskGcAbsolute": 7016320,
+        "secondTaskGcAbsolute": 7016936,
+        "stabilityDeltaBytes": 616,
+        "immediateRegistry": {
+          "registryEntries": 503,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 503,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 503,
+          "logicalUnits": 32014,
+          "backingUnits": 8146975
+        },
+        "secondRegistry": {
+          "registryEntries": 503,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 503,
+          "logicalUnits": 32014,
+          "backingUnits": 8146975
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2853636,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2860344,
+        "secondTaskGcAbsolute": 2874800,
+        "stabilityDeltaBytes": 14456,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 6809384,
+        "strings": {
+          "categories": {
+            "string": 934856,
+            "concatenated string": 14680,
+            "sliced string": 1480
+          },
+          "bytes": 951016
+        },
+        "firstTaskGcAbsolute": 6809988,
+        "secondTaskGcAbsolute": 6810100,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 103,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 103,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 103,
+          "logicalUnits": 6414,
+          "backingUnits": 1593375
+        },
+        "secondRegistry": {
+          "registryEntries": 103,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 103,
+          "logicalUnits": 6414,
+          "backingUnits": 1593375
+        }
+      },
+      "heapAfterAbsolute": 6810100,
+      "sampledPeakHeap": 8381208,
+      "heapSamples": 30,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 25,
+        "codeUnits": 384000,
+        "snapshots": 202,
+        "maxSliceMs": 0.7000000476837158
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 2
+    },
+    {
+      "workload": "survivors",
+      "cycles": 1000,
+      "churnMs": 3866.600000143051,
+      "registryEntriesAtChurnEnd": 2003,
+      "deletedUnits": 960000,
+      "retainedCodeUnitsBefore": 1024014,
+      "retainedCodeUnitsAfter": 163854,
+      "revision": 2001,
+      "dirty": true,
+      "liveUnits": 64014,
+      "heapBefore": 5695324,
+      "heapAfter": 5005060,
+      "heapBeforeAbsolute": 8570132,
+      "heapBeforeImmediateAbsolute": 8784248,
+      "heapCalibration": {
+        "immediateAbsolute": 8784248,
+        "strings": {
+          "categories": {
+            "string": 1796248,
+            "concatenated string": 15000,
+            "sliced string": 1480
+          },
+          "bytes": 1812728
+        },
+        "firstTaskGcAbsolute": 8568668,
+        "secondTaskGcAbsolute": 8570132,
+        "stabilityDeltaBytes": 1464,
+        "immediateRegistry": {
+          "registryEntries": 1003,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 1003,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 1003,
+          "logicalUnits": 64014,
+          "backingUnits": 16326691
+        },
+        "secondRegistry": {
+          "registryEntries": 1003,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 1003,
+          "logicalUnits": 64014,
+          "backingUnits": 16326691
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2962744,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2860352,
+        "secondTaskGcAbsolute": 2874808,
+        "stabilityDeltaBytes": 14456,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 7879152,
+        "strings": {
+          "categories": {
+            "string": 1014344,
+            "concatenated string": 14840,
+            "sliced string": 1480
+          },
+          "bytes": 1030664
+        },
+        "firstTaskGcAbsolute": 7879756,
+        "secondTaskGcAbsolute": 7879868,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 107,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 107,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 107,
+          "logicalUnits": 6670,
+          "backingUnits": 1646627
+        },
+        "secondRegistry": {
+          "registryEntries": 107,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 107,
+          "logicalUnits": 6670,
+          "backingUnits": 1646627
+        }
+      },
+      "heapAfterAbsolute": 7879868,
+      "sampledPeakHeap": 9510536,
+      "heapSamples": 30,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 56,
+        "codeUnits": 860160,
+        "snapshots": 202,
+        "maxSliceMs": 1.6000001430511475
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 0
+    },
+    {
+      "workload": "survivors",
+      "cycles": 1000,
+      "churnMs": 3822.800000190735,
+      "registryEntriesAtChurnEnd": 2003,
+      "deletedUnits": 960000,
+      "retainedCodeUnitsBefore": 1024014,
+      "retainedCodeUnitsAfter": 163854,
+      "revision": 2001,
+      "dirty": true,
+      "liveUnits": 64014,
+      "heapBefore": 5685796,
+      "heapAfter": 4992616,
+      "heapBeforeAbsolute": 8560596,
+      "heapBeforeImmediateAbsolute": 8768000,
+      "heapCalibration": {
+        "immediateAbsolute": 8768000,
+        "strings": {
+          "categories": {
+            "string": 1796248,
+            "concatenated string": 14800,
+            "sliced string": 1480
+          },
+          "bytes": 1812528
+        },
+        "firstTaskGcAbsolute": 8552480,
+        "secondTaskGcAbsolute": 8560596,
+        "stabilityDeltaBytes": 8116,
+        "immediateRegistry": {
+          "registryEntries": 1003,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 1003,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 1003,
+          "logicalUnits": 64014,
+          "backingUnits": 16326691
+        },
+        "secondRegistry": {
+          "registryEntries": 1003,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 1003,
+          "logicalUnits": 64014,
+          "backingUnits": 16326691
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2853636,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2860344,
+        "secondTaskGcAbsolute": 2874800,
+        "stabilityDeltaBytes": 14456,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 7866700,
+        "strings": {
+          "categories": {
+            "string": 1014344,
+            "concatenated string": 14680,
+            "sliced string": 1480
+          },
+          "bytes": 1030504
+        },
+        "firstTaskGcAbsolute": 7867304,
+        "secondTaskGcAbsolute": 7867416,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 107,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 107,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 107,
+          "logicalUnits": 6670,
+          "backingUnits": 1646627
+        },
+        "secondRegistry": {
+          "registryEntries": 107,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 107,
+          "logicalUnits": 6670,
+          "backingUnits": 1646627
+        }
+      },
+      "heapAfterAbsolute": 7867416,
+      "sampledPeakHeap": 10856940,
+      "heapSamples": 30,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 56,
+        "codeUnits": 860160,
+        "snapshots": 202,
+        "maxSliceMs": 1.4000000953674316
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 1
+    },
+    {
+      "workload": "survivors",
+      "cycles": 1000,
+      "churnMs": 3426.5999999046326,
+      "registryEntriesAtChurnEnd": 2003,
+      "deletedUnits": 960000,
+      "retainedCodeUnitsBefore": 1024014,
+      "retainedCodeUnitsAfter": 163854,
+      "revision": 2001,
+      "dirty": true,
+      "liveUnits": 64014,
+      "heapBefore": 5691472,
+      "heapAfter": 5001360,
+      "heapBeforeAbsolute": 8566888,
+      "heapBeforeImmediateAbsolute": 8781416,
+      "heapCalibration": {
+        "immediateAbsolute": 8781416,
+        "strings": {
+          "categories": {
+            "string": 1796248,
+            "concatenated string": 15120,
+            "sliced string": 1480
+          },
+          "bytes": 1812848
+        },
+        "firstTaskGcAbsolute": 8565592,
+        "secondTaskGcAbsolute": 8566888,
+        "stabilityDeltaBytes": 1296,
+        "immediateRegistry": {
+          "registryEntries": 1003,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 1003,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 1003,
+          "logicalUnits": 64014,
+          "backingUnits": 16326691
+        },
+        "secondRegistry": {
+          "registryEntries": 1003,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 1003,
+          "logicalUnits": 64014,
+          "backingUnits": 16326691
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2854252,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2860960,
+        "secondTaskGcAbsolute": 2875416,
+        "stabilityDeltaBytes": 14456,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 7876060,
+        "strings": {
+          "categories": {
+            "string": 1014344,
+            "concatenated string": 14960,
+            "sliced string": 1480
+          },
+          "bytes": 1030784
+        },
+        "firstTaskGcAbsolute": 7876664,
+        "secondTaskGcAbsolute": 7876776,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 107,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 107,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 107,
+          "logicalUnits": 6670,
+          "backingUnits": 1646627
+        },
+        "secondRegistry": {
+          "registryEntries": 107,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 107,
+          "logicalUnits": 6670,
+          "backingUnits": 1646627
+        }
+      },
+      "heapAfterAbsolute": 7876776,
+      "sampledPeakHeap": 9352980,
+      "heapSamples": 30,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 56,
+        "codeUnits": 860160,
+        "snapshots": 202,
+        "maxSliceMs": 1.2999999523162842
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 2
+    },
+    {
+      "workload": "mixed",
+      "cycles": 500,
+      "churnMs": 1167.2000000476837,
+      "registryEntriesAtChurnEnd": 503,
+      "deletedUnits": 384000,
+      "retainedCodeUnitsBefore": 512014,
+      "retainedCodeUnitsAfter": 217102,
+      "revision": 876,
+      "dirty": true,
+      "liveUnits": 128014,
+      "heapBefore": 3648592,
+      "heapAfter": 3575864,
+      "heapBeforeAbsolute": 6523392,
+      "heapBeforeImmediateAbsolute": 6566876,
+      "heapCalibration": {
+        "immediateAbsolute": 6566876,
+        "strings": {
+          "categories": {
+            "string": 1289040,
+            "concatenated string": 16360,
+            "sliced string": 80
+          },
+          "bytes": 1305480
+        },
+        "firstTaskGcAbsolute": 6514764,
+        "secondTaskGcAbsolute": 6523392,
+        "stabilityDeltaBytes": 8628,
+        "immediateRegistry": {
+          "registryEntries": 128,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 128,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 128,
+          "logicalUnits": 128014,
+          "backingUnits": 2039836
+        },
+        "secondRegistry": {
+          "registryEntries": 128,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 128,
+          "logicalUnits": 128014,
+          "backingUnits": 2039836
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2853636,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2860344,
+        "secondTaskGcAbsolute": 2874800,
+        "stabilityDeltaBytes": 14456,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 6444136,
+        "strings": {
+          "categories": {
+            "string": 1094528,
+            "concatenated string": 16300,
+            "sliced string": 80
+          },
+          "bytes": 1110908
+        },
+        "firstTaskGcAbsolute": 6450552,
+        "secondTaskGcAbsolute": 6450664,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 32,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 32,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 32,
+          "logicalUnits": 29710,
+          "backingUnits": 466972
+        },
+        "secondRegistry": {
+          "registryEntries": 32,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 32,
+          "logicalUnits": 29710,
+          "backingUnits": 466972
+        }
+      },
+      "heapAfterAbsolute": 6450664,
+      "sampledPeakHeap": 7904688,
+      "heapSamples": 30,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 24,
+        "codeUnits": 294912,
+        "snapshots": 202,
+        "maxSliceMs": 0.40000009536743164
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 0
+    },
+    {
+      "workload": "mixed",
+      "cycles": 500,
+      "churnMs": 1164.5,
+      "registryEntriesAtChurnEnd": 503,
+      "deletedUnits": 384000,
+      "retainedCodeUnitsBefore": 512014,
+      "retainedCodeUnitsAfter": 217102,
+      "revision": 876,
+      "dirty": true,
+      "liveUnits": 128014,
+      "heapBefore": 3646084,
+      "heapAfter": 3573392,
+      "heapBeforeAbsolute": 6520884,
+      "heapBeforeImmediateAbsolute": 6564272,
+      "heapCalibration": {
+        "immediateAbsolute": 6564272,
+        "strings": {
+          "categories": {
+            "string": 1289040,
+            "concatenated string": 16380,
+            "sliced string": 80
+          },
+          "bytes": 1305500
+        },
+        "firstTaskGcAbsolute": 6512256,
+        "secondTaskGcAbsolute": 6520884,
+        "stabilityDeltaBytes": 8628,
+        "immediateRegistry": {
+          "registryEntries": 128,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 128,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 128,
+          "logicalUnits": 128014,
+          "backingUnits": 2039836
+        },
+        "secondRegistry": {
+          "registryEntries": 128,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 128,
+          "logicalUnits": 128014,
+          "backingUnits": 2039836
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2853636,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2860344,
+        "secondTaskGcAbsolute": 2874800,
+        "stabilityDeltaBytes": 14456,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 6441664,
+        "strings": {
+          "categories": {
+            "string": 1094528,
+            "concatenated string": 16320,
+            "sliced string": 80
+          },
+          "bytes": 1110928
+        },
+        "firstTaskGcAbsolute": 6448080,
+        "secondTaskGcAbsolute": 6448192,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 32,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 32,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 32,
+          "logicalUnits": 29710,
+          "backingUnits": 466972
+        },
+        "secondRegistry": {
+          "registryEntries": 32,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 32,
+          "logicalUnits": 29710,
+          "backingUnits": 466972
+        }
+      },
+      "heapAfterAbsolute": 6448192,
+      "sampledPeakHeap": 7901596,
+      "heapSamples": 29,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 24,
+        "codeUnits": 294912,
+        "snapshots": 202,
+        "maxSliceMs": 0.40000009536743164
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 1
+    },
+    {
+      "workload": "mixed",
+      "cycles": 500,
+      "churnMs": 1146.7000000476837,
+      "registryEntriesAtChurnEnd": 503,
+      "deletedUnits": 384000,
+      "retainedCodeUnitsBefore": 512014,
+      "retainedCodeUnitsAfter": 217102,
+      "revision": 876,
+      "dirty": true,
+      "liveUnits": 128014,
+      "heapBefore": 3645748,
+      "heapAfter": 3573056,
+      "heapBeforeAbsolute": 6520548,
+      "heapBeforeImmediateAbsolute": 6563920,
+      "heapCalibration": {
+        "immediateAbsolute": 6563920,
+        "strings": {
+          "categories": {
+            "string": 1289024,
+            "concatenated string": 16380,
+            "sliced string": 80
+          },
+          "bytes": 1305484
+        },
+        "firstTaskGcAbsolute": 6511920,
+        "secondTaskGcAbsolute": 6520548,
+        "stabilityDeltaBytes": 8628,
+        "immediateRegistry": {
+          "registryEntries": 128,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 128,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 128,
+          "logicalUnits": 128014,
+          "backingUnits": 2039836
+        },
+        "secondRegistry": {
+          "registryEntries": 128,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 128,
+          "logicalUnits": 128014,
+          "backingUnits": 2039836
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2853636,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2860344,
+        "secondTaskGcAbsolute": 2874800,
+        "stabilityDeltaBytes": 14456,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 6441328,
+        "strings": {
+          "categories": {
+            "string": 1094512,
+            "concatenated string": 16320,
+            "sliced string": 80
+          },
+          "bytes": 1110912
+        },
+        "firstTaskGcAbsolute": 6447744,
+        "secondTaskGcAbsolute": 6447856,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 32,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 32,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 32,
+          "logicalUnits": 29710,
+          "backingUnits": 466972
+        },
+        "secondRegistry": {
+          "registryEntries": 32,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 32,
+          "logicalUnits": 29710,
+          "backingUnits": 466972
+        }
+      },
+      "heapAfterAbsolute": 6447856,
+      "sampledPeakHeap": 7901200,
+      "heapSamples": 29,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 24,
+        "codeUnits": 294912,
+        "snapshots": 202,
+        "maxSliceMs": 0.40000009536743164
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 2
+    },
+    {
+      "workload": "mixed",
+      "cycles": 1000,
+      "churnMs": 3419.5,
+      "registryEntriesAtChurnEnd": 1003,
+      "deletedUnits": 768000,
+      "retainedCodeUnitsBefore": 1024014,
+      "retainedCodeUnitsAfter": 348174,
+      "revision": 1751,
+      "dirty": true,
+      "liveUnits": 256014,
+      "heapBefore": 4454844,
+      "heapAfter": 4130052,
+      "heapBeforeAbsolute": 7441388,
+      "heapBeforeImmediateAbsolute": 7581480,
+      "heapCalibration": {
+        "immediateAbsolute": 7581480,
+        "strings": {
+          "categories": {
+            "string": 1801412,
+            "concatenated string": 14980,
+            "sliced string": 80
+          },
+          "bytes": 1816472
+        },
+        "firstTaskGcAbsolute": 7440772,
+        "secondTaskGcAbsolute": 7441388,
+        "stabilityDeltaBytes": 616,
+        "immediateRegistry": {
+          "registryEntries": 253,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 253,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 253,
+          "logicalUnits": 256014,
+          "backingUnits": 4087837
+        },
+        "secondRegistry": {
+          "registryEntries": 253,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 253,
+          "logicalUnits": 256014,
+          "backingUnits": 4087837
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2655092,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2661800,
+        "secondTaskGcAbsolute": 2986544,
+        "stabilityDeltaBytes": 324744,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 7110068,
+        "strings": {
+          "categories": {
+            "string": 1355536,
+            "concatenated string": 14860,
+            "sliced string": 80
+          },
+          "bytes": 1370476
+        },
+        "firstTaskGcAbsolute": 7116484,
+        "secondTaskGcAbsolute": 7116596,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 33,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 33,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 33,
+          "logicalUnits": 30734,
+          "backingUnits": 483357
+        },
+        "secondRegistry": {
+          "registryEntries": 33,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 33,
+          "logicalUnits": 30734,
+          "backingUnits": 483357
+        }
+      },
+      "heapAfterAbsolute": 7116596,
+      "sampledPeakHeap": 8778192,
+      "heapSamples": 31,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 55,
+        "codeUnits": 675840,
+        "snapshots": 202,
+        "maxSliceMs": 0.7999999523162842
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 0
+    },
+    {
+      "workload": "mixed",
+      "cycles": 1000,
+      "churnMs": 4084.600000143051,
+      "registryEntriesAtChurnEnd": 1003,
+      "deletedUnits": 768000,
+      "retainedCodeUnitsBefore": 1024014,
+      "retainedCodeUnitsAfter": 348174,
+      "revision": 1751,
+      "dirty": true,
+      "liveUnits": 256014,
+      "heapBefore": 4568752,
+      "heapAfter": 4244944,
+      "heapBeforeAbsolute": 7443552,
+      "heapBeforeImmediateAbsolute": 7583704,
+      "heapCalibration": {
+        "immediateAbsolute": 7583704,
+        "strings": {
+          "categories": {
+            "string": 1801428,
+            "concatenated string": 14980,
+            "sliced string": 80
+          },
+          "bytes": 1816488
+        },
+        "firstTaskGcAbsolute": 7442936,
+        "secondTaskGcAbsolute": 7443552,
+        "stabilityDeltaBytes": 616,
+        "immediateRegistry": {
+          "registryEntries": 253,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 253,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 253,
+          "logicalUnits": 256014,
+          "backingUnits": 4087837
+        },
+        "secondRegistry": {
+          "registryEntries": 253,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 253,
+          "logicalUnits": 256014,
+          "backingUnits": 4087837
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2853636,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2860344,
+        "secondTaskGcAbsolute": 2874800,
+        "stabilityDeltaBytes": 14456,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 7113216,
+        "strings": {
+          "categories": {
+            "string": 1355536,
+            "concatenated string": 14880,
+            "sliced string": 80
+          },
+          "bytes": 1370496
+        },
+        "firstTaskGcAbsolute": 7119632,
+        "secondTaskGcAbsolute": 7119744,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 33,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 33,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 33,
+          "logicalUnits": 30734,
+          "backingUnits": 483357
+        },
+        "secondRegistry": {
+          "registryEntries": 33,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 33,
+          "logicalUnits": 30734,
+          "backingUnits": 483357
+        }
+      },
+      "heapAfterAbsolute": 7119744,
+      "sampledPeakHeap": 8812800,
+      "heapSamples": 30,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 55,
+        "codeUnits": 675840,
+        "snapshots": 202,
+        "maxSliceMs": 0.7999999523162842
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 1
+    },
+    {
+      "workload": "mixed",
+      "cycles": 1000,
+      "churnMs": 3660.2999999523163,
+      "registryEntriesAtChurnEnd": 1003,
+      "deletedUnits": 768000,
+      "retainedCodeUnitsBefore": 1024014,
+      "retainedCodeUnitsAfter": 348174,
+      "revision": 1751,
+      "dirty": true,
+      "liveUnits": 256014,
+      "heapBefore": 4453112,
+      "heapAfter": 4128480,
+      "heapBeforeAbsolute": 7439656,
+      "heapBeforeImmediateAbsolute": 7579744,
+      "heapCalibration": {
+        "immediateAbsolute": 7579744,
+        "strings": {
+          "categories": {
+            "string": 1801428,
+            "concatenated string": 14980,
+            "sliced string": 80
+          },
+          "bytes": 1816488
+        },
+        "firstTaskGcAbsolute": 7439040,
+        "secondTaskGcAbsolute": 7439656,
+        "stabilityDeltaBytes": 616,
+        "immediateRegistry": {
+          "registryEntries": 253,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 253,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 253,
+          "logicalUnits": 256014,
+          "backingUnits": 4087837
+        },
+        "secondRegistry": {
+          "registryEntries": 253,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 253,
+          "logicalUnits": 256014,
+          "backingUnits": 4087837
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2655092,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2661800,
+        "secondTaskGcAbsolute": 2986544,
+        "stabilityDeltaBytes": 324744,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 7108496,
+        "strings": {
+          "categories": {
+            "string": 1355536,
+            "concatenated string": 14880,
+            "sliced string": 80
+          },
+          "bytes": 1370496
+        },
+        "firstTaskGcAbsolute": 7114912,
+        "secondTaskGcAbsolute": 7115024,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 33,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 33,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 33,
+          "logicalUnits": 30734,
+          "backingUnits": 483357
+        },
+        "secondRegistry": {
+          "registryEntries": 33,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 33,
+          "logicalUnits": 30734,
+          "backingUnits": 483357
+        }
+      },
+      "heapAfterAbsolute": 7115024,
+      "sampledPeakHeap": 8383276,
+      "heapSamples": 29,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 55,
+        "codeUnits": 675840,
+        "snapshots": 202,
+        "maxSliceMs": 0.6000001430511475
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 2
+    },
+    {
+      "workload": "paragraph",
+      "cycles": 500,
+      "churnMs": 224.29999995231628,
+      "registryEntriesAtChurnEnd": 502,
+      "deletedUnits": 510976,
+      "retainedCodeUnitsBefore": 512013,
+      "retainedCodeUnitsAfter": 217101,
+      "revision": 500,
+      "dirty": true,
+      "liveUnits": 1037,
+      "heapBefore": 3536660,
+      "heapAfter": 3345272,
+      "heapBeforeAbsolute": 6411460,
+      "heapBeforeImmediateAbsolute": 6482604,
+      "heapCalibration": {
+        "immediateAbsolute": 6482604,
+        "strings": {
+          "categories": {
+            "string": 1494576,
+            "concatenated string": 14920,
+            "sliced string": 0
+          },
+          "bytes": 1509496
+        },
+        "firstTaskGcAbsolute": 6410836,
+        "secondTaskGcAbsolute": 6411460,
+        "stabilityDeltaBytes": 624,
+        "immediateRegistry": {
+          "registryEntries": 66,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 66,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 66,
+          "logicalUnits": 65549,
+          "backingUnits": 1024026
+        },
+        "secondRegistry": {
+          "registryEntries": 66,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 66,
+          "logicalUnits": 65549,
+          "backingUnits": 1024026
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2853636,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2860344,
+        "secondTaskGcAbsolute": 2874800,
+        "stabilityDeltaBytes": 14456,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 6213544,
+        "strings": {
+          "categories": {
+            "string": 1199664,
+            "concatenated string": 14960,
+            "sliced string": 0
+          },
+          "bytes": 1214624
+        },
+        "firstTaskGcAbsolute": 6219960,
+        "secondTaskGcAbsolute": 6220072,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 30,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 30,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 30,
+          "logicalUnits": 28685,
+          "backingUnits": 434202
+        },
+        "secondRegistry": {
+          "registryEntries": 30,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 30,
+          "logicalUnits": 28685,
+          "backingUnits": 434202
+        }
+      },
+      "heapAfterAbsolute": 6220072,
+      "sampledPeakHeap": 7366240,
+      "heapSamples": 30,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 18,
+        "codeUnits": 294912,
+        "snapshots": 202,
+        "maxSliceMs": 0.40000009536743164
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 0
+    },
+    {
+      "workload": "paragraph",
+      "cycles": 500,
+      "churnMs": 214.09999990463257,
+      "registryEntriesAtChurnEnd": 502,
+      "deletedUnits": 510976,
+      "retainedCodeUnitsBefore": 512013,
+      "retainedCodeUnitsAfter": 217101,
+      "revision": 500,
+      "dirty": true,
+      "liveUnits": 1037,
+      "heapBefore": 3731536,
+      "heapAfter": 3540148,
+      "heapBeforeAbsolute": 6407816,
+      "heapBeforeImmediateAbsolute": 6478960,
+      "heapCalibration": {
+        "immediateAbsolute": 6478960,
+        "strings": {
+          "categories": {
+            "string": 1494576,
+            "concatenated string": 14900,
+            "sliced string": 0
+          },
+          "bytes": 1509476
+        },
+        "firstTaskGcAbsolute": 6407192,
+        "secondTaskGcAbsolute": 6407816,
+        "stabilityDeltaBytes": 624,
+        "immediateRegistry": {
+          "registryEntries": 66,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 66,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 66,
+          "logicalUnits": 65549,
+          "backingUnits": 1024026
+        },
+        "secondRegistry": {
+          "registryEntries": 66,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 66,
+          "logicalUnits": 65549,
+          "backingUnits": 1024026
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2655092,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2661800,
+        "secondTaskGcAbsolute": 2676280,
+        "stabilityDeltaBytes": 14480,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 6209900,
+        "strings": {
+          "categories": {
+            "string": 1199664,
+            "concatenated string": 14940,
+            "sliced string": 0
+          },
+          "bytes": 1214604
+        },
+        "firstTaskGcAbsolute": 6216316,
+        "secondTaskGcAbsolute": 6216428,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 30,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 30,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 30,
+          "logicalUnits": 28685,
+          "backingUnits": 434202
+        },
+        "secondRegistry": {
+          "registryEntries": 30,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 30,
+          "logicalUnits": 28685,
+          "backingUnits": 434202
+        }
+      },
+      "heapAfterAbsolute": 6216428,
+      "sampledPeakHeap": 7356184,
+      "heapSamples": 30,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 18,
+        "codeUnits": 294912,
+        "snapshots": 202,
+        "maxSliceMs": 0.39999985694885254
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 1
+    },
+    {
+      "workload": "paragraph",
+      "cycles": 500,
+      "churnMs": 213,
+      "registryEntriesAtChurnEnd": 502,
+      "deletedUnits": 510976,
+      "retainedCodeUnitsBefore": 512013,
+      "retainedCodeUnitsAfter": 217101,
+      "revision": 500,
+      "dirty": true,
+      "liveUnits": 1037,
+      "heapBefore": 3421848,
+      "heapAfter": 3231128,
+      "heapBeforeAbsolute": 6408984,
+      "heapBeforeImmediateAbsolute": 6480128,
+      "heapCalibration": {
+        "immediateAbsolute": 6480128,
+        "strings": {
+          "categories": {
+            "string": 1494576,
+            "concatenated string": 14900,
+            "sliced string": 0
+          },
+          "bytes": 1509476
+        },
+        "firstTaskGcAbsolute": 6408360,
+        "secondTaskGcAbsolute": 6408984,
+        "stabilityDeltaBytes": 624,
+        "immediateRegistry": {
+          "registryEntries": 66,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 66,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 66,
+          "logicalUnits": 65549,
+          "backingUnits": 1024026
+        },
+        "secondRegistry": {
+          "registryEntries": 66,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 66,
+          "logicalUnits": 65549,
+          "backingUnits": 1024026
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2655708,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2662416,
+        "secondTaskGcAbsolute": 2987136,
+        "stabilityDeltaBytes": 324720,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 6211736,
+        "strings": {
+          "categories": {
+            "string": 1199664,
+            "concatenated string": 14940,
+            "sliced string": 0
+          },
+          "bytes": 1214604
+        },
+        "firstTaskGcAbsolute": 6218152,
+        "secondTaskGcAbsolute": 6218264,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 30,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 30,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 30,
+          "logicalUnits": 28685,
+          "backingUnits": 434202
+        },
+        "secondRegistry": {
+          "registryEntries": 30,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 30,
+          "logicalUnits": 28685,
+          "backingUnits": 434202
+        }
+      },
+      "heapAfterAbsolute": 6218264,
+      "sampledPeakHeap": 7366496,
+      "heapSamples": 30,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 18,
+        "codeUnits": 294912,
+        "snapshots": 202,
+        "maxSliceMs": 0.40000009536743164
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 2
+    },
+    {
+      "workload": "paragraph",
+      "cycles": 1000,
+      "churnMs": 380.2999999523163,
+      "registryEntriesAtChurnEnd": 1002,
+      "deletedUnits": 1022976,
+      "retainedCodeUnitsBefore": 1024013,
+      "retainedCodeUnitsAfter": 221197,
+      "revision": 1000,
+      "dirty": true,
+      "liveUnits": 1037,
+      "heapBefore": 4769376,
+      "heapAfter": 3962980,
+      "heapBeforeAbsolute": 7644240,
+      "heapBeforeImmediateAbsolute": 7780632,
+      "heapCalibration": {
+        "immediateAbsolute": 7780632,
+        "strings": {
+          "categories": {
+            "string": 2005972,
+            "concatenated string": 16240,
+            "sliced string": 0
+          },
+          "bytes": 2022212
+        },
+        "firstTaskGcAbsolute": 7637292,
+        "secondTaskGcAbsolute": 7644240,
+        "stabilityDeltaBytes": 6948,
+        "immediateRegistry": {
+          "registryEntries": 128,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 128,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 128,
+          "logicalUnits": 129037,
+          "backingUnits": 2048026
+        },
+        "secondRegistry": {
+          "registryEntries": 128,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 128,
+          "logicalUnits": 129037,
+          "backingUnits": 2048026
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2853700,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2860408,
+        "secondTaskGcAbsolute": 2874864,
+        "stabilityDeltaBytes": 14456,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 6831316,
+        "strings": {
+          "categories": {
+            "string": 1202784,
+            "concatenated string": 16220,
+            "sliced string": 0
+          },
+          "bytes": 1219004
+        },
+        "firstTaskGcAbsolute": 6837732,
+        "secondTaskGcAbsolute": 6837844,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 30,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 30,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 30,
+          "logicalUnits": 28685,
+          "backingUnits": 442394
+        },
+        "secondRegistry": {
+          "registryEntries": 30,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 30,
+          "logicalUnits": 28685,
+          "backingUnits": 442394
+        }
+      },
+      "heapAfterAbsolute": 6837844,
+      "sampledPeakHeap": 8978756,
+      "heapSamples": 31,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 49,
+        "codeUnits": 802816,
+        "snapshots": 202,
+        "maxSliceMs": 0.40000009536743164
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 0
+    },
+    {
+      "workload": "paragraph",
+      "cycles": 1000,
+      "churnMs": 375.59999990463257,
+      "registryEntriesAtChurnEnd": 1002,
+      "deletedUnits": 1022976,
+      "retainedCodeUnitsBefore": 1024013,
+      "retainedCodeUnitsAfter": 221197,
+      "revision": 1000,
+      "dirty": true,
+      "liveUnits": 1037,
+      "heapBefore": 4765404,
+      "heapAfter": 3953792,
+      "heapBeforeAbsolute": 7640212,
+      "heapBeforeImmediateAbsolute": 7776724,
+      "heapCalibration": {
+        "immediateAbsolute": 7776724,
+        "strings": {
+          "categories": {
+            "string": 2006036,
+            "concatenated string": 16240,
+            "sliced string": 0
+          },
+          "bytes": 2022276
+        },
+        "firstTaskGcAbsolute": 7633264,
+        "secondTaskGcAbsolute": 7640212,
+        "stabilityDeltaBytes": 6948,
+        "immediateRegistry": {
+          "registryEntries": 128,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 128,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 128,
+          "logicalUnits": 129037,
+          "backingUnits": 2048026
+        },
+        "secondRegistry": {
+          "registryEntries": 128,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 128,
+          "logicalUnits": 129037,
+          "backingUnits": 2048026
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2655092,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2970076,
+        "secondTaskGcAbsolute": 2874808,
+        "stabilityDeltaBytes": -95268,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 6822072,
+        "strings": {
+          "categories": {
+            "string": 1202848,
+            "concatenated string": 16220,
+            "sliced string": 0
+          },
+          "bytes": 1219068
+        },
+        "firstTaskGcAbsolute": 6828488,
+        "secondTaskGcAbsolute": 6828600,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 30,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 30,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 30,
+          "logicalUnits": 28685,
+          "backingUnits": 442394
+        },
+        "secondRegistry": {
+          "registryEntries": 30,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 30,
+          "logicalUnits": 28685,
+          "backingUnits": 442394
+        }
+      },
+      "heapAfterAbsolute": 6828600,
+      "sampledPeakHeap": 9002032,
+      "heapSamples": 30,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 49,
+        "codeUnits": 802816,
+        "snapshots": 202,
+        "maxSliceMs": 0.2999999523162842
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 1
+    },
+    {
+      "workload": "paragraph",
+      "cycles": 1000,
+      "churnMs": 382.5,
+      "registryEntriesAtChurnEnd": 1002,
+      "deletedUnits": 1022976,
+      "retainedCodeUnitsBefore": 1024013,
+      "retainedCodeUnitsAfter": 221197,
+      "revision": 1000,
+      "dirty": true,
+      "liveUnits": 1037,
+      "heapBefore": 4771316,
+      "heapAfter": 3963144,
+      "heapBeforeAbsolute": 7646124,
+      "heapBeforeImmediateAbsolute": 7782516,
+      "heapCalibration": {
+        "immediateAbsolute": 7782516,
+        "strings": {
+          "categories": {
+            "string": 2005972,
+            "concatenated string": 16200,
+            "sliced string": 0
+          },
+          "bytes": 2022172
+        },
+        "firstTaskGcAbsolute": 7639176,
+        "secondTaskGcAbsolute": 7646124,
+        "stabilityDeltaBytes": 6948,
+        "immediateRegistry": {
+          "registryEntries": 128,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 128,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 128,
+          "logicalUnits": 129037,
+          "backingUnits": 2048026
+        },
+        "secondRegistry": {
+          "registryEntries": 128,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 128,
+          "logicalUnits": 129037,
+          "backingUnits": 2048026
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2655092,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2860976,
+        "secondTaskGcAbsolute": 2874808,
+        "stabilityDeltaBytes": 13832,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 6831424,
+        "strings": {
+          "categories": {
+            "string": 1202784,
+            "concatenated string": 16200,
+            "sliced string": 0
+          },
+          "bytes": 1218984
+        },
+        "firstTaskGcAbsolute": 6837840,
+        "secondTaskGcAbsolute": 6837952,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 30,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 30,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 30,
+          "logicalUnits": 28685,
+          "backingUnits": 442394
+        },
+        "secondRegistry": {
+          "registryEntries": 30,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 30,
+          "logicalUnits": 28685,
+          "backingUnits": 442394
+        }
+      },
+      "heapAfterAbsolute": 6837952,
+      "sampledPeakHeap": 8962844,
+      "heapSamples": 29,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 49,
+        "codeUnits": 802816,
+        "snapshots": 202,
+        "maxSliceMs": 0.39999985694885254
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 2
+    },
+    {
+      "workload": "original",
+      "cycles": 1,
+      "originalUnits": 4194317,
+      "deletedUnits": 4194304,
+      "retainedCodeUnitsBefore": 4194317,
+      "retainedCodeUnitsAfter": 13,
+      "liveUnits": 13,
+      "revision": 1,
+      "dirty": false,
+      "heapBefore": 261192,
+      "heapAfter": -7445976,
+      "heapBeforeAbsolute": 11225768,
+      "heapAfterAbsolute": 3518600,
+      "heapCalibration": {
+        "immediateAbsolute": 11225360,
+        "strings": {
+          "categories": {
+            "string": 4766568,
+            "concatenated string": 14200,
+            "sliced string": 20
+          },
+          "bytes": 4780788
+        },
+        "firstTaskGcAbsolute": 11225684,
+        "secondTaskGcAbsolute": 11225768,
+        "stabilityDeltaBytes": 84,
+        "immediateRegistry": {
+          "registryEntries": 258,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 258,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 258,
+          "logicalUnits": 4194445,
+          "backingUnits": 1082133786
+        },
+        "secondRegistry": {
+          "registryEntries": 258,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 258,
+          "logicalUnits": 4194445,
+          "backingUnits": 1082133786
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 10938548,
+        "strings": {
+          "categories": {
+            "string": 4764024,
+            "concatenated string": 13820,
+            "sliced string": 80
+          },
+          "bytes": 4777924
+        },
+        "firstTaskGcAbsolute": 10945216,
+        "secondTaskGcAbsolute": 10964576,
+        "stabilityDeltaBytes": 19360,
+        "immediateRegistry": {
+          "registryEntries": 257,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 257,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 257,
+          "logicalUnits": 4194317,
+          "backingUnits": 1077939469
+        },
+        "secondRegistry": {
+          "registryEntries": 257,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 257,
+          "logicalUnits": 4194317,
+          "backingUnits": 1077939469
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 3518600,
+        "strings": {
+          "categories": {
+            "string": 565352,
+            "concatenated string": 14180,
+            "sliced string": 0
+          },
+          "bytes": 579532
+        },
+        "firstTaskGcAbsolute": 3518600,
+        "secondTaskGcAbsolute": 3518600,
+        "stabilityDeltaBytes": 0,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapPinnedCalibration": {
+        "immediateAbsolute": 15526316,
+        "strings": {
+          "categories": {
+            "string": 8957228,
+            "concatenated string": 14200,
+            "sliced string": 0
+          },
+          "bytes": 8971428
+        },
+        "firstTaskGcAbsolute": 15526360,
+        "secondTaskGcAbsolute": 15526360,
+        "stabilityDeltaBytes": 0,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapMeasurementCalibration": {
+        "immediateAbsolute": 3534800,
+        "strings": {
+          "categories": {
+            "string": 565492,
+            "concatenated string": 14180,
+            "sliced string": 0
+          },
+          "bytes": 579672
+        },
+        "firstTaskGcAbsolute": 3534800,
+        "secondTaskGcAbsolute": 3534800,
+        "stabilityDeltaBytes": 0,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapWhilePinned": 15526360,
+      "heapWithMeasurement": 3534800,
+      "sampledPeakHeap": 19218080,
+      "heapSamples": 59,
+      "stats": {
+        "completed": 2,
+        "cancelled": 0,
+        "chunks": 1,
+        "codeUnits": 4194304,
+        "snapshots": 1,
+        "maxSliceMs": 2.200000047683716
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "oldReadersValid": true,
+      "history": {
+        "protected": true,
+        "undoRedoChecked": false
+      },
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 0
+    },
+    {
+      "workload": "original",
+      "cycles": 1,
+      "originalUnits": 4194317,
+      "deletedUnits": 4194304,
+      "retainedCodeUnitsBefore": 4194317,
+      "retainedCodeUnitsAfter": 13,
+      "liveUnits": 13,
+      "revision": 1,
+      "dirty": false,
+      "heapBefore": 260748,
+      "heapAfter": -7446820,
+      "heapBeforeAbsolute": 11227124,
+      "heapAfterAbsolute": 3519556,
+      "heapCalibration": {
+        "immediateAbsolute": 11226716,
+        "strings": {
+          "categories": {
+            "string": 4767112,
+            "concatenated string": 14200,
+            "sliced string": 20
+          },
+          "bytes": 4781332
+        },
+        "firstTaskGcAbsolute": 11227040,
+        "secondTaskGcAbsolute": 11227124,
+        "stabilityDeltaBytes": 84,
+        "immediateRegistry": {
+          "registryEntries": 258,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 258,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 258,
+          "logicalUnits": 4194445,
+          "backingUnits": 1082133786
+        },
+        "secondRegistry": {
+          "registryEntries": 258,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 258,
+          "logicalUnits": 4194445,
+          "backingUnits": 1082133786
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 10939028,
+        "strings": {
+          "categories": {
+            "string": 4764568,
+            "concatenated string": 13820,
+            "sliced string": 80
+          },
+          "bytes": 4778468
+        },
+        "firstTaskGcAbsolute": 10945696,
+        "secondTaskGcAbsolute": 10966376,
+        "stabilityDeltaBytes": 20680,
+        "immediateRegistry": {
+          "registryEntries": 257,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 257,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 257,
+          "logicalUnits": 4194317,
+          "backingUnits": 1077939469
+        },
+        "secondRegistry": {
+          "registryEntries": 257,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 257,
+          "logicalUnits": 4194317,
+          "backingUnits": 1077939469
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 3519556,
+        "strings": {
+          "categories": {
+            "string": 565352,
+            "concatenated string": 14180,
+            "sliced string": 0
+          },
+          "bytes": 579532
+        },
+        "firstTaskGcAbsolute": 3519556,
+        "secondTaskGcAbsolute": 3519556,
+        "stabilityDeltaBytes": 0,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapPinnedCalibration": {
+        "immediateAbsolute": 15528064,
+        "strings": {
+          "categories": {
+            "string": 8957228,
+            "concatenated string": 14200,
+            "sliced string": 0
+          },
+          "bytes": 8971428
+        },
+        "firstTaskGcAbsolute": 15528108,
+        "secondTaskGcAbsolute": 15528108,
+        "stabilityDeltaBytes": 0,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapMeasurementCalibration": {
+        "immediateAbsolute": 3536436,
+        "strings": {
+          "categories": {
+            "string": 565492,
+            "concatenated string": 14180,
+            "sliced string": 0
+          },
+          "bytes": 579672
+        },
+        "firstTaskGcAbsolute": 3536436,
+        "secondTaskGcAbsolute": 3536436,
+        "stabilityDeltaBytes": 0,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapWhilePinned": 15528108,
+      "heapWithMeasurement": 3536436,
+      "sampledPeakHeap": 17206180,
+      "heapSamples": 60,
+      "stats": {
+        "completed": 2,
+        "cancelled": 0,
+        "chunks": 1,
+        "codeUnits": 4194304,
+        "snapshots": 1,
+        "maxSliceMs": 2.299999952316284
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "oldReadersValid": true,
+      "history": {
+        "protected": true,
+        "undoRedoChecked": false
+      },
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 1
+    },
+    {
+      "workload": "original",
+      "cycles": 1,
+      "originalUnits": 4194317,
+      "deletedUnits": 4194304,
+      "retainedCodeUnitsBefore": 4194317,
+      "retainedCodeUnitsAfter": 13,
+      "liveUnits": 13,
+      "revision": 1,
+      "dirty": false,
+      "heapBefore": 261192,
+      "heapAfter": -7446984,
+      "heapBeforeAbsolute": 11226916,
+      "heapAfterAbsolute": 3518740,
+      "heapCalibration": {
+        "immediateAbsolute": 11226508,
+        "strings": {
+          "categories": {
+            "string": 4767112,
+            "concatenated string": 14200,
+            "sliced string": 20
+          },
+          "bytes": 4781332
+        },
+        "firstTaskGcAbsolute": 11226832,
+        "secondTaskGcAbsolute": 11226916,
+        "stabilityDeltaBytes": 84,
+        "immediateRegistry": {
+          "registryEntries": 258,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 258,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 258,
+          "logicalUnits": 4194445,
+          "backingUnits": 1082133786
+        },
+        "secondRegistry": {
+          "registryEntries": 258,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 258,
+          "logicalUnits": 4194445,
+          "backingUnits": 1082133786
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 10938376,
+        "strings": {
+          "categories": {
+            "string": 4764568,
+            "concatenated string": 13820,
+            "sliced string": 80
+          },
+          "bytes": 4778468
+        },
+        "firstTaskGcAbsolute": 10945044,
+        "secondTaskGcAbsolute": 10965724,
+        "stabilityDeltaBytes": 20680,
+        "immediateRegistry": {
+          "registryEntries": 257,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 257,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 257,
+          "logicalUnits": 4194317,
+          "backingUnits": 1077939469
+        },
+        "secondRegistry": {
+          "registryEntries": 257,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 257,
+          "logicalUnits": 4194317,
+          "backingUnits": 1077939469
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 3518740,
+        "strings": {
+          "categories": {
+            "string": 565352,
+            "concatenated string": 14180,
+            "sliced string": 0
+          },
+          "bytes": 579532
+        },
+        "firstTaskGcAbsolute": 3518740,
+        "secondTaskGcAbsolute": 3518740,
+        "stabilityDeltaBytes": 0,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapPinnedCalibration": {
+        "immediateAbsolute": 15526568,
+        "strings": {
+          "categories": {
+            "string": 8957228,
+            "concatenated string": 14200,
+            "sliced string": 0
+          },
+          "bytes": 8971428
+        },
+        "firstTaskGcAbsolute": 15526612,
+        "secondTaskGcAbsolute": 15526612,
+        "stabilityDeltaBytes": 0,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapMeasurementCalibration": {
+        "immediateAbsolute": 3534940,
+        "strings": {
+          "categories": {
+            "string": 565492,
+            "concatenated string": 14180,
+            "sliced string": 0
+          },
+          "bytes": 579672
+        },
+        "firstTaskGcAbsolute": 3534940,
+        "secondTaskGcAbsolute": 3534940,
+        "stabilityDeltaBytes": 0,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 2,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapWhilePinned": 15526612,
+      "heapWithMeasurement": 3534940,
+      "sampledPeakHeap": 17477016,
+      "heapSamples": 60,
+      "stats": {
+        "completed": 2,
+        "cancelled": 0,
+        "chunks": 1,
+        "codeUnits": 4194304,
+        "snapshots": 1,
+        "maxSliceMs": 2.0999999046325684
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "oldReadersValid": true,
+      "history": {
+        "protected": true,
+        "undoRedoChecked": false
+      },
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 2
+    },
+    {
+      "workload": "paste-tail",
+      "cycles": 1,
+      "pastedUnits": 4194368,
+      "deletedUnits": 4194304,
+      "retainedCodeUnitsBefore": 4194381,
+      "retainedCodeUnitsAfter": 77,
+      "liveUnits": 77,
+      "revision": 2,
+      "dirty": false,
+      "heapBefore": 8550224,
+      "heapAfter": 797400,
+      "heapBeforeAbsolute": 11425640,
+      "heapAfterAbsolute": 3672816,
+      "heapWhilePinned": 15778164,
+      "heapWithMeasurement": 3677316,
+      "heapCalibration": {
+        "immediateAbsolute": 11417128,
+        "strings": {
+          "categories": {
+            "string": 4759748,
+            "concatenated string": 14620,
+            "sliced string": 5140
+          },
+          "bytes": 4779508
+        },
+        "firstTaskGcAbsolute": 11417192,
+        "secondTaskGcAbsolute": 11425640,
+        "stabilityDeltaBytes": 8448,
+        "immediateRegistry": {
+          "registryEntries": 260,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 260,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 260,
+          "logicalUnits": 4194502,
+          "backingUnits": 4210778
+        },
+        "secondRegistry": {
+          "registryEntries": 260,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 260,
+          "logicalUnits": 4194502,
+          "backingUnits": 4210778
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2854252,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2860960,
+        "secondTaskGcAbsolute": 2875416,
+        "stabilityDeltaBytes": 14456,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 3672816,
+        "strings": {
+          "categories": {
+            "string": 565804,
+            "concatenated string": 14680,
+            "sliced string": 0
+          },
+          "bytes": 580484
+        },
+        "firstTaskGcAbsolute": 3672816,
+        "secondTaskGcAbsolute": 3672816,
+        "stabilityDeltaBytes": 0,
+        "immediateRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 2,
+          "logicalUnits": 13,
+          "backingUnits": 26
+        },
+        "secondRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 2,
+          "logicalUnits": 13,
+          "backingUnits": 26
+        }
+      },
+      "heapPinnedCalibration": {
+        "immediateAbsolute": 15777720,
+        "strings": {
+          "categories": {
+            "string": 8957772,
+            "concatenated string": 14680,
+            "sliced string": 5140
+          },
+          "bytes": 8977592
+        },
+        "firstTaskGcAbsolute": 15778072,
+        "secondTaskGcAbsolute": 15778164,
+        "stabilityDeltaBytes": 92,
+        "immediateRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 2,
+          "logicalUnits": 13,
+          "backingUnits": 26
+        },
+        "secondRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 2,
+          "logicalUnits": 13,
+          "backingUnits": 26
+        }
+      },
+      "heapMeasurementCalibration": {
+        "immediateAbsolute": 3677316,
+        "strings": {
+          "categories": {
+            "string": 565940,
+            "concatenated string": 14680,
+            "sliced string": 0
+          },
+          "bytes": 580620
+        },
+        "firstTaskGcAbsolute": 3677316,
+        "secondTaskGcAbsolute": 3677316,
+        "stabilityDeltaBytes": 0,
+        "immediateRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 2,
+          "logicalUnits": 13,
+          "backingUnits": 26
+        },
+        "secondRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 2,
+          "logicalUnits": 13,
+          "backingUnits": 26
+        }
+      },
+      "sampledPeakHeap": 15795536,
+      "heapSamples": 31,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 256,
+        "codeUnits": 4194304,
+        "snapshots": 1,
+        "maxSliceMs": 2.299999952316284
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "oldReadersValid": true,
+      "syncPayloadReleased": true,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 0
+    },
+    {
+      "workload": "paste-tail",
+      "cycles": 1,
+      "pastedUnits": 4194368,
+      "deletedUnits": 4194304,
+      "retainedCodeUnitsBefore": 4194381,
+      "retainedCodeUnitsAfter": 77,
+      "liveUnits": 77,
+      "revision": 2,
+      "dirty": false,
+      "heapBefore": 8550696,
+      "heapAfter": 784732,
+      "heapBeforeAbsolute": 11425496,
+      "heapAfterAbsolute": 3659532,
+      "heapWhilePinned": 15764880,
+      "heapWithMeasurement": 3664032,
+      "heapCalibration": {
+        "immediateAbsolute": 11416984,
+        "strings": {
+          "categories": {
+            "string": 4759748,
+            "concatenated string": 14620,
+            "sliced string": 5140
+          },
+          "bytes": 4779508
+        },
+        "firstTaskGcAbsolute": 11417048,
+        "secondTaskGcAbsolute": 11425496,
+        "stabilityDeltaBytes": 8448,
+        "immediateRegistry": {
+          "registryEntries": 260,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 260,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 260,
+          "logicalUnits": 4194502,
+          "backingUnits": 4210778
+        },
+        "secondRegistry": {
+          "registryEntries": 260,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 260,
+          "logicalUnits": 4194502,
+          "backingUnits": 4210778
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2853636,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2860344,
+        "secondTaskGcAbsolute": 2874800,
+        "stabilityDeltaBytes": 14456,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 3659532,
+        "strings": {
+          "categories": {
+            "string": 565804,
+            "concatenated string": 14680,
+            "sliced string": 0
+          },
+          "bytes": 580484
+        },
+        "firstTaskGcAbsolute": 3659532,
+        "secondTaskGcAbsolute": 3659532,
+        "stabilityDeltaBytes": 0,
+        "immediateRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 2,
+          "logicalUnits": 13,
+          "backingUnits": 26
+        },
+        "secondRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 2,
+          "logicalUnits": 13,
+          "backingUnits": 26
+        }
+      },
+      "heapPinnedCalibration": {
+        "immediateAbsolute": 15764436,
+        "strings": {
+          "categories": {
+            "string": 8957772,
+            "concatenated string": 14680,
+            "sliced string": 5140
+          },
+          "bytes": 8977592
+        },
+        "firstTaskGcAbsolute": 15764788,
+        "secondTaskGcAbsolute": 15764880,
+        "stabilityDeltaBytes": 92,
+        "immediateRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 2,
+          "logicalUnits": 13,
+          "backingUnits": 26
+        },
+        "secondRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 2,
+          "logicalUnits": 13,
+          "backingUnits": 26
+        }
+      },
+      "heapMeasurementCalibration": {
+        "immediateAbsolute": 3664032,
+        "strings": {
+          "categories": {
+            "string": 565940,
+            "concatenated string": 14680,
+            "sliced string": 0
+          },
+          "bytes": 580620
+        },
+        "firstTaskGcAbsolute": 3664032,
+        "secondTaskGcAbsolute": 3664032,
+        "stabilityDeltaBytes": 0,
+        "immediateRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 2,
+          "logicalUnits": 13,
+          "backingUnits": 26
+        },
+        "secondRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 2,
+          "logicalUnits": 13,
+          "backingUnits": 26
+        }
+      },
+      "sampledPeakHeap": 16062240,
+      "heapSamples": 31,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 256,
+        "codeUnits": 4194304,
+        "snapshots": 1,
+        "maxSliceMs": 2.200000047683716
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "oldReadersValid": true,
+      "syncPayloadReleased": true,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 1
+    },
+    {
+      "workload": "paste-tail",
+      "cycles": 1,
+      "pastedUnits": 4194368,
+      "deletedUnits": 4194304,
+      "retainedCodeUnitsBefore": 4194381,
+      "retainedCodeUnitsAfter": 77,
+      "liveUnits": 77,
+      "revision": 2,
+      "dirty": false,
+      "heapBefore": 8749020,
+      "heapAfter": 993804,
+      "heapBeforeAbsolute": 11425916,
+      "heapAfterAbsolute": 3670700,
+      "heapWhilePinned": 15776012,
+      "heapWithMeasurement": 3675164,
+      "heapCalibration": {
+        "immediateAbsolute": 11417404,
+        "strings": {
+          "categories": {
+            "string": 4759748,
+            "concatenated string": 14620,
+            "sliced string": 5140
+          },
+          "bytes": 4779508
+        },
+        "firstTaskGcAbsolute": 11417468,
+        "secondTaskGcAbsolute": 11425916,
+        "stabilityDeltaBytes": 8448,
+        "immediateRegistry": {
+          "registryEntries": 260,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 260,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 260,
+          "logicalUnits": 4194502,
+          "backingUnits": 4210778
+        },
+        "secondRegistry": {
+          "registryEntries": 260,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 260,
+          "logicalUnits": 4194502,
+          "backingUnits": 4210778
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2655708,
+        "strings": {
+          "categories": {
+            "string": 555832,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 570132
+        },
+        "firstTaskGcAbsolute": 2662416,
+        "secondTaskGcAbsolute": 2676896,
+        "stabilityDeltaBytes": 14480,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 3670700,
+        "strings": {
+          "categories": {
+            "string": 565804,
+            "concatenated string": 14680,
+            "sliced string": 0
+          },
+          "bytes": 580484
+        },
+        "firstTaskGcAbsolute": 3670700,
+        "secondTaskGcAbsolute": 3670700,
+        "stabilityDeltaBytes": 0,
+        "immediateRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 2,
+          "logicalUnits": 13,
+          "backingUnits": 26
+        },
+        "secondRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 2,
+          "logicalUnits": 13,
+          "backingUnits": 26
+        }
+      },
+      "heapPinnedCalibration": {
+        "immediateAbsolute": 15775568,
+        "strings": {
+          "categories": {
+            "string": 8957772,
+            "concatenated string": 14680,
+            "sliced string": 5140
+          },
+          "bytes": 8977592
+        },
+        "firstTaskGcAbsolute": 15775920,
+        "secondTaskGcAbsolute": 15776012,
+        "stabilityDeltaBytes": 92,
+        "immediateRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 2,
+          "logicalUnits": 13,
+          "backingUnits": 26
+        },
+        "secondRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 2,
+          "logicalUnits": 13,
+          "backingUnits": 26
+        }
+      },
+      "heapMeasurementCalibration": {
+        "immediateAbsolute": 3675164,
+        "strings": {
+          "categories": {
+            "string": 565940,
+            "concatenated string": 14680,
+            "sliced string": 0
+          },
+          "bytes": 580620
+        },
+        "firstTaskGcAbsolute": 3675164,
+        "secondTaskGcAbsolute": 3675164,
+        "stabilityDeltaBytes": 0,
+        "immediateRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 2,
+          "logicalUnits": 13,
+          "backingUnits": 26
+        },
+        "secondRegistry": {
+          "registryEntries": 2,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 2,
+          "logicalUnits": 13,
+          "backingUnits": 26
+        }
+      },
+      "sampledPeakHeap": 15781872,
+      "heapSamples": 31,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 256,
+        "codeUnits": 4194304,
+        "snapshots": 1,
+        "maxSliceMs": 2.200000047683716
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "oldReadersValid": true,
+      "syncPayloadReleased": true,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 2
+    }
+  ],
+  "heapSummary": [
+    {
+      "workload": "aligned/500",
+      "samples": 3,
+      "medianReduction": 0.6735921647353117
+    },
+    {
+      "workload": "aligned/1000",
+      "samples": 3,
+      "medianReduction": 0.8166344568295544
+    },
+    {
+      "workload": "survivors/500",
+      "samples": 3,
+      "medianReduction": 0.04993462310266972
+    },
+    {
+      "workload": "survivors/1000",
+      "samples": 3,
+      "medianReduction": 0.12125369324491098
+    },
+    {
+      "workload": "mixed/500",
+      "samples": 3,
+      "medianReduction": 0.0199370063882236
+    },
+    {
+      "workload": "mixed/1000",
+      "samples": 3,
+      "medianReduction": 0.0729000303607904
+    },
+    {
+      "workload": "paragraph/500",
+      "samples": 3,
+      "medianReduction": 0.05411546487363783
+    },
+    {
+      "workload": "paragraph/1000",
+      "samples": 3,
+      "medianReduction": 0.16938136145247973
+    },
+    {
+      "workload": "paste-tail/1",
+      "samples": 3,
+      "medianReduction": 0.9067392854269081
+    }
+  ],
+  "stringHeapSummary": [
+    {
+      "workload": "aligned/500",
+      "samples": 3,
+      "medianReduction": 0.7993118751742736
+    },
+    {
+      "workload": "aligned/1000",
+      "samples": 3,
+      "medianReduction": 0.8996055888566173
+    },
+    {
+      "workload": "survivors/500",
+      "samples": 3,
+      "medianReduction": 0.48014488126561927
+    },
+    {
+      "workload": "survivors/1000",
+      "samples": 3,
+      "medianReduction": 0.6309654433500717
+    },
+    {
+      "workload": "mixed/500",
+      "samples": 3,
+      "medianReduction": 0.2657259760621009
+    },
+    {
+      "workload": "mixed/1000",
+      "samples": 3,
+      "medianReduction": 0.3587359398728476
+    },
+    {
+      "workload": "paragraph/500",
+      "samples": 3,
+      "medianReduction": 0.314960158937002
+    },
+    {
+      "workload": "paragraph/1000",
+      "samples": 3,
+      "medianReduction": 0.5543356734089924
+    },
+    {
+      "workload": "paste-tail/1",
+      "samples": 3,
+      "medianReduction": 0.9982816055718963
+    }
+  ],
+  "acceptance": "Retained code units must decrease; median baseline-subtracted string-category bytes must decrease by >10%. Total heap is observational. String bytes sum self_size for string, concatenated string and sliced string nodes, including backing strings, across the whole isolate; they are not exclusive document retained size. Original/paste external-owner checks use string bytes too."
+}

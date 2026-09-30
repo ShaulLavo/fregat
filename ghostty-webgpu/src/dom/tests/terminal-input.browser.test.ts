@@ -1,0 +1,1747 @@
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { GhosttyRuntime } from '../../core/runtime.js'
+import type { SelectionCoordinates } from '../../core/selection.js'
+import type { RendererTheme } from '../../render/instances/types.js'
+import type {
+  RendererFrameSnapshot,
+  RendererGridSize,
+  WebGpuTerminalRendererOptions,
+} from '../../render/renderer.js'
+import { TerminalSession } from '../../term/session.js'
+import type { TerminalFittedFont, TerminalKeyInput } from '../../term/types.js'
+import { createTerminalElements } from '../elements.js'
+import { createDomInputController } from '../input.js'
+import { createGhosttyWebGpuTerminalFromSession, Terminal } from '../terminal.js'
+import type {
+  GhosttyWebGpuRenderer,
+  GhosttyWebGpuRendererFactory,
+  GhosttyWebGpuTerminalOptions,
+} from '../types.js'
+
+const decoder = new TextDecoder()
+
+class RecordingRenderer implements GhosttyWebGpuRenderer {
+  atlasClearCount = 0
+  cursorBlink: boolean[] = []
+  disposeCount = 0
+  documentVisible: boolean[] = []
+  focused: boolean[] = []
+  fonts: TerminalFittedFont[] = []
+  readonly hasPendingFrame = false
+  readonly hasPendingTimer = false
+  notifications: string[] = []
+  onResize?: () => void
+  resizes: RendererGridSize[] = []
+  themes: Partial<RendererTheme>[] = []
+
+  clearTextureAtlas(): void {
+    this.atlasClearCount += 1
+  }
+
+  dispose(): void {
+    this.disposeCount += 1
+  }
+
+  notifyScroll(): void {
+    this.notifications.push('scroll')
+  }
+
+  notifySelectionChange(): void {
+    this.notifications.push('selection')
+  }
+
+  notifyWrite(): void {
+    this.notifications.push('write')
+  }
+
+  refreshRows(startRow: number, endRow: number): void {
+    this.notifications.push(`refresh:${startRow}:${endRow}`)
+  }
+
+  resize(grid: RendererGridSize): void {
+    this.onResize?.()
+    this.resizes.push({ ...grid })
+    this.notifications.push('resize')
+  }
+
+  schedule(): void {
+    this.notifications.push('schedule')
+  }
+
+  setCursorBlinkEnabled(enabled: boolean): void {
+    this.cursorBlink.push(enabled)
+  }
+
+  setDocumentVisible(visible: boolean): void {
+    this.documentVisible.push(visible)
+  }
+
+  setFocused(focused: boolean): void {
+    this.focused.push(focused)
+  }
+
+  setFont(font: TerminalFittedFont): void {
+    this.fonts.push(font)
+  }
+
+  setTheme(theme: Partial<RendererTheme>): void {
+    this.themes.push(theme)
+  }
+}
+
+interface RendererRecording {
+  options?: WebGpuTerminalRendererOptions
+  renderer?: RecordingRenderer
+}
+
+function recordingRendererFactory(recording: RendererRecording): GhosttyWebGpuRendererFactory {
+  return async (options) => {
+    const renderer = new RecordingRenderer()
+    recording.options = options
+    recording.renderer = renderer
+    return renderer
+  }
+}
+
+function deferred<T>(): { promise: Promise<T>; resolve(value: T): void } {
+  let resolveValue: (value: T) => void = () => {}
+  const promise = new Promise<T>((resolve) => {
+    resolveValue = resolve
+  })
+  return { promise, resolve: resolveValue }
+}
+
+function createHost(width = 360, height = 180): HTMLDivElement {
+  const host = document.createElement('div')
+  host.style.height = `${height}px`
+  host.style.width = `${width}px`
+  document.body.append(host)
+  return host
+}
+
+function keyboardEvent(
+  type: 'keydown' | 'keyup',
+  init: KeyboardEventInit,
+  states?: Readonly<Record<string, boolean>>,
+): KeyboardEvent {
+  const event = new KeyboardEvent(type, { bubbles: true, cancelable: true, ...init })
+  if (!states) return event
+  const fallback = event.getModifierState.bind(event)
+  Object.defineProperty(event, 'getModifierState', {
+    value: (key: string) => (key in states ? states[key] : fallback(key)),
+  })
+  return event
+}
+
+function dispatchKey(
+  target: HTMLTextAreaElement,
+  type: 'keydown' | 'keyup',
+  init: KeyboardEventInit,
+  states?: Readonly<Record<string, boolean>>,
+): KeyboardEvent {
+  const event = keyboardEvent(type, init, states)
+  target.dispatchEvent(event)
+  return event
+}
+
+function dispatchInput(
+  target: HTMLTextAreaElement,
+  value: string,
+  init: InputEventInit,
+): InputEvent {
+  target.value = value
+  const event = new InputEvent('input', { bubbles: true, ...init })
+  target.dispatchEvent(event)
+  return event
+}
+
+function dispatchComposition(target: HTMLTextAreaElement, type: string, data = ''): void {
+  target.dispatchEvent(new CompositionEvent(type, { bubbles: true, data }))
+}
+
+function primaryModifier(view: Window = window): Pick<KeyboardEventInit, 'ctrlKey' | 'metaKey'> {
+  const apple = /^(Mac|iPhone|iPad|iPod)/iu.test(view.navigator.platform)
+  return apple ? { metaKey: true } : { ctrlKey: true }
+}
+
+async function animationFrames(count = 2): Promise<void> {
+  for (let index = 0; index < count; index += 1) {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  }
+}
+
+async function settleRenderer(terminal: Terminal): Promise<void> {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    await animationFrames(1)
+    if (!terminal.hasPendingFrame && !terminal.hasPendingTimer) return
+  }
+  throw new Error('Renderer did not settle')
+}
+
+function decodedOutput(output: readonly Uint8Array[]): string[] {
+  return output.map((bytes) => decoder.decode(bytes))
+}
+
+function cursorFrame(x: number, y: number): RendererFrameSnapshot {
+  return Object.freeze({
+    cursor: Object.freeze({
+      blinking: false,
+      passwordInput: false,
+      style: 'block' as const,
+      viewport: Object.freeze({ wideTail: false, x, y }),
+      visible: true,
+    }),
+    rows: Object.freeze([]),
+  })
+}
+
+describe('Terminal DOM host', () => {
+  let runtime: GhosttyRuntime
+  const hosts: HTMLElement[] = []
+  const terminals: Terminal[] = []
+
+  beforeAll(async () => {
+    runtime = await GhosttyRuntime.create()
+  })
+
+  afterEach(() => {
+    for (const terminal of terminals.splice(0)) terminal.dispose()
+    for (const host of hosts.splice(0)) host.remove()
+  })
+
+  afterAll(() => {
+    runtime.dispose()
+  })
+
+  function trackedHost(width = 360, height = 180): HTMLDivElement {
+    const host = createHost(width, height)
+    hosts.push(host)
+    return host
+  }
+
+  async function trackedTerminal(options: GhosttyWebGpuTerminalOptions = {}): Promise<Terminal> {
+    const terminal = await Terminal.create({
+      ...options,
+      runtime: { kind: 'borrowed', runtime },
+    })
+    terminals.push(terminal)
+    return terminal
+  }
+
+  it('projects constructor cursor text before the first renderer opens', async () => {
+    const seed = await TerminalSession.create<Event>({ runtime: { kind: 'borrowed', runtime } })
+    const cursorText = { b: 30, g: 20, r: 10 }
+    const theme = { ...seed.appearance.theme, cursorText }
+    seed.dispose()
+    const recording: RendererRecording = {}
+    const terminal = await trackedTerminal({
+      appearance: {
+        cursor: { blink: true, style: 'block' },
+        font: { boldWeight: 800 },
+        theme,
+      },
+      rendererFactory: recordingRendererFactory(recording),
+    })
+
+    expect(terminal.appearance.rendererTheme.cursorText).toEqual(cursorText)
+    await terminal.open(trackedHost())
+
+    expect(recording.options?.cursorBlink).toBe(true)
+    expect(recording.options?.font.settings.boldWeight).toBe(800)
+    expect(recording.options?.theme?.cursorText).toEqual(cursorText)
+  })
+
+  it('commits one public appearance mutation without recreating owned layers', async () => {
+    const session = await TerminalSession.create<Event>({ runtime: { kind: 'borrowed', runtime } })
+    const runtimeIdentity = session.runtime
+    const renderStateIdentity = session.renderState
+    const recording: RendererRecording = {}
+    let rendererCreations = 0
+    const terminal = createGhosttyWebGpuTerminalFromSession(session, {
+      autoFit: false,
+      rendererFactory: async (options, signal) => {
+        rendererCreations += 1
+        return recordingRendererFactory(recording)(options, signal)
+      },
+    })
+    terminals.push(terminal)
+    await terminal.open(trackedHost())
+    const revision = session.revision
+    const appearances: unknown[] = []
+    terminal.on('appearance', (appearance) => appearances.push(appearance))
+    const cursorText = { b: 60, g: 50, r: 40 }
+    const theme = {
+      ...terminal.appearance.theme,
+      cursorText,
+      foreground: { b: 90, g: 80, r: 70 },
+    }
+
+    expect(
+      terminal.setAppearance({
+        colorScheme: 'light',
+        cursor: { blink: true, style: 'bar' },
+        font: { boldWeight: 800 },
+        theme,
+      }),
+    ).toEqual({ revision: revision + 1 })
+
+    expect(appearances).toHaveLength(1)
+    expect(session.revision).toBe(revision + 1)
+    expect(session.runtime).toBe(runtimeIdentity)
+    expect(session.renderState).toBe(renderStateIdentity)
+    expect(rendererCreations).toBe(1)
+    expect(recording.renderer?.cursorBlink.at(-1)).toBe(true)
+    expect(recording.renderer?.fonts.at(-1)?.settings.boldWeight).toBe(800)
+    expect(recording.renderer?.themes.at(-1)?.cursorText).toEqual(cursorText)
+  })
+
+  it('opens a real WebGPU renderer, preserves the host, and leaves idle cleanup empty', async () => {
+    const host = trackedHost()
+    host.dataset.owner = 'caller'
+    host.style.border = '1px solid transparent'
+    const existing = document.createElement('span')
+    existing.textContent = 'keep'
+    host.append(existing)
+    const terminal = await trackedTerminal({ appearance: { cursor: { blink: false } } })
+
+    await terminal.open(host)
+    await settleRenderer(terminal)
+
+    expect(terminal.lifecycle).toBe('open')
+    expect(terminal.canvas?.width).toBeGreaterThan(0)
+    expect(terminal.canvas?.height).toBeGreaterThan(0)
+    expect(terminal.hasPendingFrame).toBe(false)
+    expect(terminal.hasPendingTimer).toBe(false)
+    expect(host.dataset.owner).toBe('caller')
+    expect(host.style.border).toContain('1px')
+
+    terminal.dispose()
+    expect(terminal.lifecycle).toBe('disposed')
+    expect(Array.from(host.children)).toEqual([existing])
+    expect(() => runtime.ensureActive()).not.toThrow()
+    await expect(terminal.open(host)).rejects.toThrow('cannot open')
+  })
+
+  it('unwinds renderer failures and disposes a renderer that resolves after cancellation', async () => {
+    const failedHost = trackedHost()
+    const failed = await trackedTerminal({
+      rendererFactory: async () => {
+        throw new Error('renderer failed')
+      },
+    })
+
+    await expect(failed.open(failedHost)).rejects.toThrow('renderer failed')
+    expect(failed.lifecycle).toBe('disposed')
+    expect(failedHost.querySelector('.ghostty-webgpu')).toBeNull()
+
+    const pendingHost = trackedHost()
+    const pendingRenderer = new RecordingRenderer()
+    const creation = deferred<GhosttyWebGpuRenderer>()
+    const pending = await trackedTerminal({ rendererFactory: () => creation.promise })
+    const opening = pending.open(pendingHost)
+    await Promise.resolve()
+    pending.dispose()
+    creation.resolve(pendingRenderer)
+
+    await expect(opening).rejects.toMatchObject({ name: 'AbortError' })
+    expect(pendingRenderer.disposeCount).toBe(1)
+    expect(pendingHost.querySelector('.ghostty-webgpu')).toBeNull()
+    expect(() => runtime.ensureActive()).not.toThrow()
+  })
+
+  it('reconciles appearance and grid changes made while renderer creation is pending', async () => {
+    const host = trackedHost(320, 140)
+    const elements = createTerminalElements(host)
+    const session = await TerminalSession.create<Event>({
+      appearance: { grid: { columns: 17, rows: 6 } },
+      runtime: { kind: 'borrowed', runtime },
+    })
+    const creation = deferred<GhosttyWebGpuRenderer>()
+    let initialOptions: WebGpuTerminalRendererOptions | undefined
+    const terminal = createGhosttyWebGpuTerminalFromSession(session, {
+      autoFit: false,
+      elements,
+      rendererFactory: (options) => {
+        initialOptions = options
+        return creation.promise
+      },
+    })
+    terminals.push(terminal)
+
+    const opening = terminal.open(host)
+    await Promise.resolve()
+    const theme = session.appearance.theme
+    session.setFont({ family: 'serif', lineHeight: 1.2, size: 19 })
+    session.setCursor({ blink: true })
+    session.setTheme({ ...theme, background: { b: 3, g: 2, r: 1 } })
+    session.resize({ columns: 23, rows: 7 })
+
+    const renderer = new RecordingRenderer()
+    creation.resolve(renderer)
+    await opening
+
+    expect(initialOptions?.font.settings.size).not.toBe(19)
+    expect(renderer.fonts.at(-1)?.settings).toMatchObject({
+      family: 'serif',
+      lineHeight: 1.2,
+      size: 19,
+    })
+    expect(renderer.cursorBlink.at(-1)).toBe(true)
+    expect(renderer.themes.at(-1)?.background).toEqual({ b: 3, g: 2, r: 1 })
+    expect(renderer.resizes.at(-1)).toEqual({ columns: 23, rows: 7 })
+    expect(session.grid).toMatchObject({ columns: 23, rows: 7 })
+  })
+
+  it('adopts a synchronous DOM shell and keeps fixed-grid geometry current without auto-fit', async () => {
+    const host = trackedHost(320, 140)
+    const elements = createTerminalElements(host)
+    elements.textarea.focus({ preventScroll: true })
+    const session = await TerminalSession.create<Event>({
+      appearance: { grid: { columns: 17, rows: 6 } },
+      runtime: { kind: 'borrowed', runtime },
+    })
+    const recording: RendererRecording = {}
+    const inputOrder: string[] = []
+    let wheelAllowed = false
+    let wheelCalls = 0
+    let wheelFailure: Error | undefined
+    const terminal = createGhosttyWebGpuTerminalFromSession(session, {
+      autoFit: false,
+      elements,
+      inputHooks: {
+        beforeUserInput: () => inputOrder.push('before'),
+        customKeyEvent: () => true,
+        onKey: (_event, data) => inputOrder.push(`key:${decoder.decode(data)}`),
+      },
+      pointerHooks: {
+        customWheelEvent: () => {
+          wheelCalls += 1
+          if (wheelFailure) throw wheelFailure
+          return wheelAllowed
+        },
+      },
+      rendererFactory: recordingRendererFactory(recording),
+    })
+    terminals.push(terminal)
+
+    expect(terminal.element).toBe(elements.root)
+    expect(terminal.canvas).toBe(elements.canvas)
+    expect(terminal.textarea).toBe(elements.textarea)
+    await terminal.open(host)
+    expect(terminal.element).toBe(elements.root)
+    expect(host.querySelectorAll('.ghostty-webgpu')).toHaveLength(1)
+    expect(recording.renderer!.focused).toEqual([true])
+    expect(session.grid).toMatchObject({ columns: 17, rows: 6 })
+    expect(session.grid.cellWidth).toBe(recording.options?.font.cssCellWidth)
+    expect(session.grid.cellHeight).toBe(recording.options?.font.cssCellHeight)
+
+    terminal.onData((data) => inputOrder.push(`data:${decoder.decode(data)}`))
+    dispatchKey(elements.textarea, 'keydown', { code: 'KeyA', key: 'a' })
+    expect(inputOrder).toEqual(['before', 'key:a', 'data:a'])
+
+    const resizeCount = recording.renderer!.resizes.length
+    host.style.width = '640px'
+    await animationFrames(2)
+    expect(session.grid).toMatchObject({ columns: 17, rows: 6 })
+    expect(recording.renderer!.resizes).toHaveLength(resizeCount)
+
+    terminal.setFont({ family: 'serif', lineHeight: 1.2, size: 19 })
+    expect(session.grid).toMatchObject({ columns: 17, rows: 6 })
+    expect(recording.renderer!.fonts.at(-1)?.settings).toMatchObject({
+      family: 'serif',
+      lineHeight: 1.2,
+      size: 19,
+    })
+    expect(session.grid.cellWidth).toBe(recording.renderer!.fonts.at(-1)?.cssCellWidth)
+
+    terminal.refresh(1, 3)
+    terminal.clearTextureAtlas()
+    expect(recording.renderer!.notifications).toContain('refresh:1:3')
+    expect(recording.renderer!.atlasClearCount).toBe(1)
+
+    const refusedWheel = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      deltaY: session.grid.cellHeight,
+    })
+    elements.canvas.dispatchEvent(refusedWheel)
+    expect(refusedWheel.defaultPrevented).toBe(false)
+    expect(wheelCalls).toBe(1)
+
+    wheelAllowed = true
+    elements.canvas.dispatchEvent(refusedWheel)
+    expect(refusedWheel.defaultPrevented).toBe(true)
+    expect(wheelCalls).toBe(2)
+    wheelAllowed = false
+
+    session.write('one\r\ntwo\r\nthree\r\nfour\r\nfive\r\nsix\r\nseven\r\neight')
+    const scrollbar = elements.root.querySelector<HTMLElement>('[role="scrollbar"]')
+    const initialOffset = session.scrollbar.offset
+    expect(scrollbar).not.toBeNull()
+    expect(initialOffset).toBeGreaterThan(0)
+    const refusedScrollbarWheel = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      deltaY: -session.grid.cellHeight,
+    })
+    scrollbar!.dispatchEvent(refusedScrollbarWheel)
+    expect(refusedScrollbarWheel.defaultPrevented).toBe(false)
+    expect(session.scrollbar.offset).toBe(initialOffset)
+    expect(wheelCalls).toBe(3)
+
+    wheelAllowed = true
+    const acceptedWheel = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      deltaY: session.grid.cellHeight,
+    })
+    elements.canvas.dispatchEvent(acceptedWheel)
+    expect(acceptedWheel.defaultPrevented).toBe(true)
+    expect(wheelCalls).toBe(4)
+
+    const wheelErrors: unknown[] = []
+    const terminalErrors: unknown[] = []
+    const handleWheelError = (event: ErrorEvent): void => {
+      wheelErrors.push(event.error)
+      event.preventDefault()
+    }
+    terminal.on('error', (event) => terminalErrors.push(event))
+    wheelFailure = new Error('custom wheel failed')
+    const thrownWheel = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      deltaY: session.grid.cellHeight,
+    })
+    window.addEventListener('error', handleWheelError)
+    elements.canvas.dispatchEvent(thrownWheel)
+    window.removeEventListener('error', handleWheelError)
+    expect(wheelErrors).toEqual([wheelFailure])
+    expect(terminalErrors).toEqual([])
+    expect(thrownWheel.defaultPrevented).toBe(false)
+    expect(wheelCalls).toBe(5)
+
+    wheelFailure = undefined
+    elements.canvas.dispatchEvent(thrownWheel)
+    expect(thrownWheel.defaultPrevented).toBe(true)
+    expect(wheelCalls).toBe(6)
+
+    terminal.dispose()
+    expect(elements.root.isConnected).toBe(false)
+    expect(() => session.grid).toThrow('disposed')
+  })
+
+  it('routes printable and Kitty press, repeat, and release keys through real wasm', async () => {
+    const recording: RendererRecording = {}
+    const terminal = await trackedTerminal({ rendererFactory: recordingRendererFactory(recording) })
+    const manualPress: TerminalKeyInput = Object.freeze({
+      action: 'press',
+      code: 'KeyA',
+      composing: false,
+      text: 'a',
+    })
+    expect(() => terminal.key(manualPress)).toThrow('not open')
+    await terminal.open(trackedHost())
+    const textarea = terminal.textarea!
+    const output: Uint8Array[] = []
+    terminal.onData((bytes) => output.push(bytes))
+
+    const plain = dispatchKey(textarea, 'keydown', { code: 'KeyA', key: 'a' })
+    expect(plain.defaultPrevented).toBe(true)
+    expect(decodedOutput(output)).toEqual(['a'])
+
+    output.length = 0
+    terminal.write('\u001b[>11u')
+    const press = dispatchKey(textarea, 'keydown', { code: 'KeyA', key: 'a' })
+    const repeat = dispatchKey(textarea, 'keydown', { code: 'KeyA', key: 'a', repeat: true })
+    const release = dispatchKey(textarea, 'keyup', { code: 'KeyA', key: 'a' })
+
+    expect([press.defaultPrevented, repeat.defaultPrevented, release.defaultPrevented]).toEqual([
+      true,
+      true,
+      true,
+    ])
+    expect(decodedOutput(output)).toEqual(['\u001b[97u', '\u001b[97;1:2u', '\u001b[97;1:3u'])
+    expect(recording.renderer?.notifications).toContain('write')
+
+    const expected = output.map((bytes) => bytes.slice())
+    output.length = 0
+    const manualInputs: readonly TerminalKeyInput[] = Object.freeze([
+      manualPress,
+      Object.freeze({ ...manualPress, action: 'repeat' }),
+      Object.freeze({ ...manualPress, action: 'release' }),
+    ])
+    const returned = manualInputs.map((input) => terminal.key(input))
+    expect(returned).toEqual(expected)
+    expect(output).toEqual(expected)
+
+    terminal.dispose()
+    expect(() => terminal.key(manualPress)).toThrow('disposed')
+  })
+
+  it('tracks modifier sides, locks, AltGraph consumption, and unknown-code fallback', () => {
+    const textarea = document.createElement('textarea')
+    document.body.append(textarea)
+    hosts.push(textarea)
+    const keys: TerminalKeyInput[] = []
+    const abort = new AbortController()
+    const session = {
+      getSelection: () => undefined,
+      key: (input: TerminalKeyInput) => {
+        keys.push(input)
+        return new Uint8Array()
+      },
+      paste: () => new Uint8Array(),
+      selectionCoordinates: () => undefined,
+      sendInput: () => new Uint8Array(),
+      setFocused: () => new Uint8Array(),
+    }
+    const controller = createDomInputController({
+      onError: (cause) => {
+        throw cause
+      },
+      platform: 'linux',
+      session,
+      signal: abort.signal,
+      textarea,
+    })
+
+    dispatchKey(textarea, 'keydown', { code: 'ControlRight', ctrlKey: true, key: 'Control' })
+    dispatchKey(textarea, 'keydown', { code: 'KeyC', ctrlKey: true, key: 'c' })
+    expect(keys.at(-1)?.modifiers?.control).toBe('right')
+
+    dispatchKey(textarea, 'keydown', { code: 'ControlLeft', ctrlKey: true, key: 'Control' })
+    dispatchKey(textarea, 'keydown', { code: 'KeyC', ctrlKey: true, key: 'c' })
+    expect(keys.at(-1)?.modifiers?.control).toBe('unknown')
+
+    controller.resetTransientState()
+    dispatchKey(textarea, 'keydown', { code: 'ControlLeft', ctrlKey: true, key: 'Control' })
+    dispatchKey(textarea, 'keydown', { altKey: true, code: 'AltRight', ctrlKey: true, key: 'Alt' })
+    dispatchKey(
+      textarea,
+      'keydown',
+      { altKey: true, code: 'KeyQ', ctrlKey: true, key: '@' },
+      { Alt: true, AltGraph: true, Control: true },
+    )
+    expect(keys.at(-1)?.consumedModifiers).toMatchObject({ alt: 'right', control: 'left' })
+
+    dispatchKey(textarea, 'keydown', { code: 'KeyA', key: 'A' }, { CapsLock: true })
+    expect(keys.at(-1)).toMatchObject({
+      code: 'KeyA',
+      consumedModifiers: { capsLock: true },
+      modifiers: { capsLock: true },
+    })
+    dispatchKey(textarea, 'keydown', { code: 'Numpad1', key: '1' }, { NumLock: true })
+    expect(keys.at(-1)?.consumedModifiers).toMatchObject({ numLock: true })
+
+    for (const code of ['IntlYen', 'F24', 'NumpadMemorySubtract', 'AudioVolumeUp']) {
+      dispatchKey(textarea, 'keydown', { code, key: code })
+    }
+    expect(keys.slice(-4).map((key) => key.code)).toEqual([
+      'IntlYen',
+      'F24',
+      'NumpadMemorySubtract',
+      'AudioVolumeUp',
+    ])
+
+    const beforeUnknown = keys.length
+    const unknown = dispatchKey(textarea, 'keydown', { code: 'FutureVendorKey', key: 'x' })
+    expect(keys).toHaveLength(beforeUnknown)
+    expect(unknown.defaultPrevented).toBe(false)
+    controller.dispose()
+  })
+
+  it('drops hidden macOS host chords without breaking terminal-owned Command lifecycles', () => {
+    const host = document.createElement('div')
+    const textarea = document.createElement('textarea')
+    host.append(textarea)
+    document.body.append(host)
+    hosts.push(host)
+    const bubbled: string[] = []
+    host.addEventListener('keydown', (event) => bubbled.push(event.code))
+    const keys: TerminalKeyInput[] = []
+    const controller = createDomInputController({
+      onError: (cause) => {
+        throw cause
+      },
+      platform: 'mac',
+      session: {
+        getSelection: () => undefined,
+        key: (input) => {
+          keys.push(input)
+          return new Uint8Array()
+        },
+        paste: () => new Uint8Array(),
+        selectionCoordinates: () => undefined,
+        sendInput: () => new Uint8Array(),
+      },
+      signal: new AbortController().signal,
+      textarea,
+    })
+
+    dispatchKey(textarea, 'keydown', { code: 'MetaLeft', key: 'Meta', metaKey: true })
+    expect(keys).toEqual([])
+    dispatchKey(textarea, 'keyup', { code: 'MetaLeft', key: 'Meta' })
+    expect(keys).toEqual([])
+
+    for (const [code, key] of [
+      ['Tab', 'Tab'],
+      ['Space', ' '],
+    ] as const) {
+      bubbled.length = 0
+      dispatchKey(textarea, 'keydown', { code: 'MetaLeft', key: 'Meta', metaKey: true })
+      const press = dispatchKey(textarea, 'keydown', { code, key, metaKey: true })
+      const repeat = dispatchKey(textarea, 'keydown', { code, key, metaKey: true, repeat: true })
+      const release = dispatchKey(textarea, 'keyup', { code, key, metaKey: true })
+      dispatchKey(textarea, 'keyup', { code: 'MetaLeft', key: 'Meta' })
+
+      expect(keys).toEqual([])
+      expect([press.defaultPrevented, repeat.defaultPrevented, release.defaultPrevented]).toEqual([
+        false,
+        false,
+        false,
+      ])
+      expect(bubbled).toEqual(['MetaLeft', code, code])
+    }
+
+    dispatchKey(textarea, 'keydown', { code: 'MetaLeft', key: 'Meta', metaKey: true })
+    controller.resetTransientState()
+    dispatchKey(textarea, 'keyup', { code: 'MetaLeft', key: 'Meta' })
+    expect(keys).toEqual([])
+
+    dispatchKey(textarea, 'keydown', { code: 'MetaLeft', key: 'Meta', metaKey: true })
+    dispatchKey(textarea, 'keydown', { code: 'KeyA', key: 'a', metaKey: true })
+    dispatchKey(textarea, 'keyup', { code: 'KeyA', key: 'a', metaKey: true })
+    dispatchKey(textarea, 'keyup', { code: 'MetaLeft', key: 'Meta' })
+
+    expect(keys.map((input) => [input.code, input.action])).toEqual([
+      ['MetaLeft', 'press'],
+      ['KeyA', 'press'],
+      ['KeyA', 'release'],
+      ['MetaLeft', 'release'],
+    ])
+    controller.dispose()
+  })
+
+  it('runs dynamic input hooks and rethrows handler failures without stale key state', () => {
+    const textarea = document.createElement('textarea')
+    document.body.append(textarea)
+    hosts.push(textarea)
+    const calls: string[] = []
+    const errors: Array<{ cause: unknown; operation: string }> = []
+    const keys: TerminalKeyInput[] = []
+    let disabled = false
+    let customDecision = false
+    let customFailure: Error | undefined
+    const controller = createDomInputController({
+      hooks: {
+        beforeUserInput: () => calls.push('before'),
+        customKeyEvent: (event) => {
+          calls.push(`custom:${event.type}:${event.code}`)
+          if (customFailure) throw customFailure
+          return customDecision
+        },
+        inputDisabled: () => disabled,
+        onKey: (event, data) => calls.push(`onKey:${event.code}:${decoder.decode(data)}`),
+      },
+      onError: (cause, operation) => errors.push({ cause, operation }),
+      platform: 'linux',
+      session: {
+        getSelection: () => undefined,
+        key: (input, options) => {
+          keys.push(input)
+          calls.push(`key:${input.code}:${input.action}`)
+          const bytes =
+            input.action === 'press' ? new TextEncoder().encode(input.text) : new Uint8Array()
+          if (bytes.length > 0) options?.onEncoded?.(bytes)
+          return bytes
+        },
+        paste: () => new Uint8Array(),
+        selectionCoordinates: () => undefined,
+        sendInput: () => new Uint8Array(),
+      },
+      signal: new AbortController().signal,
+      textarea,
+    })
+
+    const refusedPress = dispatchKey(textarea, 'keydown', { code: 'KeyA', key: 'a' })
+    const refusedRepeat = dispatchKey(textarea, 'keydown', {
+      code: 'KeyA',
+      key: 'a',
+      repeat: true,
+    })
+    const refusedRelease = dispatchKey(textarea, 'keyup', { code: 'KeyA', key: 'a' })
+    expect(keys).toEqual([])
+    expect(calls).toEqual(['custom:keydown:KeyA', 'custom:keydown:KeyA', 'custom:keyup:KeyA'])
+    expect([
+      refusedPress.defaultPrevented,
+      refusedRepeat.defaultPrevented,
+      refusedRelease.defaultPrevented,
+    ]).toEqual([false, false, false])
+
+    customDecision = true
+    calls.length = 0
+    const accepted = dispatchKey(textarea, 'keydown', { code: 'KeyB', key: 'b' })
+    expect(accepted.defaultPrevented).toBe(true)
+    expect(calls).toEqual(['custom:keydown:KeyB', 'before', 'key:KeyB:press', 'onKey:KeyB:b'])
+
+    disabled = true
+    calls.length = 0
+    dispatchKey(textarea, 'keydown', { code: 'KeyC', key: 'c' })
+    dispatchKey(textarea, 'keydown', { code: 'KeyC', key: 'c', repeat: true })
+    dispatchKey(textarea, 'keyup', { code: 'KeyC', key: 'c' })
+    expect(calls).toEqual(['custom:keydown:KeyC', 'custom:keydown:KeyC', 'custom:keyup:KeyC'])
+    expect(keys.map((key) => key.code)).toEqual(['KeyB'])
+
+    disabled = false
+    customFailure = new Error('custom key failed')
+    calls.length = 0
+    const windowErrors: unknown[] = []
+    const handleWindowError = (event: ErrorEvent): void => {
+      windowErrors.push(event.error)
+      event.preventDefault()
+    }
+    window.addEventListener('error', handleWindowError)
+    dispatchKey(textarea, 'keydown', { code: 'KeyD', key: 'd' })
+    window.removeEventListener('error', handleWindowError)
+    expect(windowErrors).toEqual([customFailure])
+    expect(errors).toEqual([])
+    expect(keys.map((key) => key.code)).toEqual(['KeyB'])
+
+    customFailure = undefined
+    dispatchKey(textarea, 'keydown', { code: 'KeyD', key: 'd', repeat: true })
+    calls.length = 0
+    dispatchKey(textarea, 'keydown', { code: 'KeyE', key: 'e' })
+    expect(keys.map((key) => [key.code, key.action])).toEqual([
+      ['KeyB', 'press'],
+      ['KeyD', 'repeat'],
+      ['KeyE', 'press'],
+    ])
+    controller.dispose()
+  })
+
+  it('commits CJK, emoji, dead-key, replacement, and identical IME input exactly once', async () => {
+    const terminal = await trackedTerminal({ rendererFactory: recordingRendererFactory({}) })
+    await terminal.open(trackedHost())
+    const textarea = terminal.textarea!
+    const output: Uint8Array[] = []
+    terminal.onData((bytes) => output.push(bytes))
+
+    dispatchComposition(textarea, 'compositionstart')
+    dispatchInput(textarea, 'に', {
+      data: 'に',
+      inputType: 'insertCompositionText',
+      isComposing: true,
+    })
+    dispatchInput(textarea, '日本', {
+      data: '日本',
+      inputType: 'insertCompositionText',
+      isComposing: true,
+    })
+    // Chromium emits no later non-composing input when this value is final.
+    dispatchComposition(textarea, 'compositionend', '日本')
+    expect(decodedOutput(output)).toEqual(['日本'])
+
+    dispatchComposition(textarea, 'compositionstart')
+    dispatchInput(textarea, 'nihao', {
+      data: 'nihao',
+      inputType: 'insertCompositionText',
+      isComposing: true,
+    })
+    dispatchComposition(textarea, 'compositionend', '你好')
+    dispatchInput(textarea, '你好', { data: '你好', inputType: 'insertText', isComposing: false })
+
+    dispatchComposition(textarea, 'compositionstart')
+    dispatchInput(textarea, '😀', { data: '😀', inputType: 'insertText', isComposing: false })
+    dispatchComposition(textarea, 'compositionend', '😀')
+
+    const dead = dispatchKey(textarea, 'keydown', { code: 'Quote', key: 'Dead' })
+    dispatchComposition(textarea, 'compositionstart')
+    dispatchComposition(textarea, 'compositionend', 'é')
+    dispatchInput(textarea, 'é', { data: 'é', inputType: 'insertText', isComposing: false })
+
+    dispatchComposition(textarea, 'compositionstart')
+    dispatchInput(textarea, 'cancel', {
+      data: 'cancel',
+      inputType: 'insertCompositionText',
+      isComposing: true,
+    })
+    dispatchInput(textarea, '', {
+      data: null,
+      inputType: 'deleteCompositionText',
+      isComposing: true,
+    })
+    dispatchComposition(textarea, 'compositionend')
+    expect(decodedOutput(output)).toEqual(['日本', '你好', '😀', 'é'])
+
+    dispatchInput(textarea, 'replacement', {
+      data: null,
+      inputType: 'insertReplacementText',
+      isComposing: false,
+    })
+    dispatchInput(textarea, 'same', { data: 'same', inputType: 'insertText' })
+    dispatchInput(textarea, 'same', { data: 'same', inputType: 'insertText' })
+
+    expect(dead.defaultPrevented).toBe(false)
+    expect(decodedOutput(output)).toEqual([
+      '日本',
+      '你好',
+      '😀',
+      'é',
+      'replacement',
+      'same',
+      'same',
+    ])
+    expect(textarea.value).toBe('')
+  })
+
+  it('shows renderer-aligned IME preedit and clears it without scheduling terminal work', async () => {
+    const recording: RendererRecording = {}
+    const terminal = await trackedTerminal({ rendererFactory: recordingRendererFactory(recording) })
+    await terminal.open(trackedHost())
+    const root = terminal.element!
+    const textarea = terminal.textarea!
+    const preedit = root.querySelector<HTMLElement>('.ghostty-webgpu-composition')!
+    const output: Uint8Array[] = []
+    terminal.onData((bytes) => output.push(bytes))
+    terminal.focus()
+
+    const grid = terminal.appearance.grid
+    const font = recording.renderer!.fonts.at(-1) ?? recording.options!.font
+    recording.options!.onFrame?.(cursorFrame(3, 2))
+    expect(preedit.style.left).toBe(`${grid.cellWidth * 3}px`)
+    expect(preedit.style.top).toBe(`${grid.cellHeight * 2}px`)
+    expect(preedit.style.left).toBe(textarea.style.left)
+    expect(preedit.style.top).toBe(textarea.style.top)
+    expect(preedit.getAttribute('aria-hidden')).toBe('true')
+    expect(preedit.hidden).toBe(true)
+
+    const notifications = recording.renderer!.notifications.length
+    dispatchComposition(textarea, 'compositionstart')
+    dispatchInput(textarea, 'ni', {
+      data: 'ni',
+      inputType: 'insertCompositionText',
+      isComposing: true,
+    })
+    expect(preedit.hidden).toBe(false)
+    expect(preedit.classList.contains('active')).toBe(true)
+    expect(preedit.textContent).toBe('ni')
+    expect(textarea.value).toBe('ni')
+    expect(output).toEqual([])
+
+    dispatchInput(textarea, 'ni hao', {
+      data: 'ni hao',
+      inputType: 'insertCompositionText',
+      isComposing: true,
+    })
+    dispatchInput(textarea, '你好', {
+      data: '你好',
+      inputType: 'insertCompositionText',
+      isComposing: true,
+    })
+    expect(preedit.textContent).toBe('你好')
+    expect(preedit.getBoundingClientRect().width).toBeGreaterThan(font.cssCellWidth)
+    expect(recording.renderer!.notifications).toHaveLength(notifications)
+    expect(terminal.hasPendingTimer).toBe(false)
+
+    const theme = terminal.appearance.theme
+    terminal.setTheme({
+      ...theme,
+      background: { b: 6, g: 5, r: 4 },
+      foreground: { b: 9, g: 8, r: 7 },
+    })
+    expect(getComputedStyle(preedit).backgroundColor).toBe('rgb(4, 5, 6)')
+    expect(getComputedStyle(preedit).color).toBe('rgb(7, 8, 9)')
+
+    terminal.setFont({ family: 'serif', letterSpacing: 1, lineHeight: 1.2, size: 19 })
+    await animationFrames(3)
+    expect(preedit.style.fontFamily).toBe('serif')
+    expect(preedit.style.fontSize).toBe('19px')
+    expect(preedit.style.letterSpacing).toBe('1px')
+    expect(preedit.style.lineHeight).toBe(`${recording.renderer!.fonts.at(-1)!.cssCellHeight}px`)
+
+    dispatchComposition(textarea, 'compositionend', '你好')
+    expect(decodedOutput(output)).toEqual(['你好'])
+    expect(preedit.hidden).toBe(true)
+    expect(preedit.textContent).toBe('')
+
+    dispatchComposition(textarea, 'compositionstart')
+    dispatchInput(textarea, 'cancel', {
+      data: 'cancel',
+      inputType: 'insertCompositionText',
+      isComposing: true,
+    })
+    terminal.reset()
+    expect(preedit.hidden).toBe(true)
+    expect(preedit.textContent).toBe('')
+
+    dispatchComposition(textarea, 'compositionstart')
+    dispatchInput(textarea, 'blur', {
+      data: 'blur',
+      inputType: 'insertCompositionText',
+      isComposing: true,
+    })
+    terminal.blur()
+    expect(preedit.hidden).toBe(true)
+    expect(preedit.textContent).toBe('')
+
+    terminal.focus()
+    dispatchComposition(textarea, 'compositionstart')
+    dispatchInput(textarea, 'dispose', {
+      data: 'dispose',
+      inputType: 'insertCompositionText',
+      isComposing: true,
+    })
+    terminal.dispose()
+    expect(preedit.hidden).toBe(true)
+    expect(preedit.textContent).toBe('')
+    expect(root.isConnected).toBe(false)
+  })
+
+  it('suppresses a post-composition Kitty release without suppressing later keys', async () => {
+    const terminal = await trackedTerminal({ rendererFactory: recordingRendererFactory({}) })
+    await terminal.open(trackedHost())
+    const textarea = terminal.textarea!
+    const output: Uint8Array[] = []
+    terminal.onData((bytes) => output.push(bytes))
+    terminal.write('\u001b[>11u')
+
+    dispatchComposition(textarea, 'compositionstart')
+    dispatchKey(textarea, 'keydown', {
+      code: 'KeyA',
+      isComposing: true,
+      key: 'a',
+    })
+    dispatchComposition(textarea, 'compositionend', '你')
+    dispatchInput(textarea, '你', { data: '你', inputType: 'insertText', isComposing: false })
+    dispatchKey(textarea, 'keydown', { code: 'KeyA', key: 'a', repeat: true })
+    dispatchKey(textarea, 'keyup', { code: 'KeyA', key: 'a' })
+
+    expect(decodedOutput(output)).toEqual(['你'])
+
+    dispatchKey(textarea, 'keydown', { code: 'KeyB', key: 'b' })
+    dispatchKey(textarea, 'keyup', { code: 'KeyB', key: 'b' })
+    expect(decodedOutput(output)).toEqual(['你', '\u001b[98u', '\u001b[98;1:3u'])
+  })
+
+  it('routes paste fallbacks and focus reports without duplicate shortcut keys', async () => {
+    const terminal = await trackedTerminal({ rendererFactory: recordingRendererFactory({}) })
+    await terminal.open(trackedHost())
+    const textarea = terminal.textarea!
+    const output: Uint8Array[] = []
+    terminal.onData((bytes) => output.push(bytes))
+
+    terminal.write('\u001b[?1004h')
+    terminal.focus()
+    terminal.blur()
+    expect(decodedOutput(output)).toEqual(['\u001b[I', '\u001b[O'])
+
+    output.length = 0
+    const pasteKey = dispatchKey(textarea, 'keydown', {
+      code: 'KeyV',
+      key: 'v',
+      ...primaryModifier(),
+    })
+    const pasteRepeat = dispatchKey(textarea, 'keydown', {
+      code: 'KeyV',
+      key: 'v',
+      repeat: true,
+      ...primaryModifier(),
+    })
+    const pasteRelease = dispatchKey(textarea, 'keyup', {
+      code: 'KeyV',
+      key: 'v',
+      ...primaryModifier(),
+    })
+    expect(pasteKey.defaultPrevented).toBe(false)
+    expect(pasteRepeat.defaultPrevented).toBe(true)
+    expect(pasteRelease.defaultPrevented).toBe(false)
+    expect(output).toHaveLength(0)
+
+    const clipboard = new DataTransfer()
+    clipboard.setData('text/plain', 'first\nsecond')
+    const paste = new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: clipboard,
+    })
+    textarea.dispatchEvent(paste)
+    const unavailablePaste = new ClipboardEvent('paste', { bubbles: true, cancelable: true })
+    textarea.dispatchEvent(unavailablePaste)
+    dispatchInput(textarea, 'fallback\nvalue', {
+      data: null,
+      inputType: 'insertFromPaste',
+    })
+
+    expect(paste.defaultPrevented).toBe(true)
+    expect(unavailablePaste.defaultPrevented).toBe(false)
+    expect(decodedOutput(output)).toEqual(['first\rsecond', 'fallback\rvalue'])
+  })
+
+  it('keeps focus and visibility lifecycle active when keyboard transport is manual', async () => {
+    const recording: RendererRecording = {}
+    const terminal = await trackedTerminal({
+      keyboard: false,
+      rendererFactory: recordingRendererFactory(recording),
+    })
+    await terminal.open(trackedHost())
+    const textarea = terminal.textarea!
+    const output: Uint8Array[] = []
+    terminal.onData((bytes) => output.push(bytes))
+
+    terminal.write('\u001b[?1004h')
+    terminal.focus()
+    terminal.blur()
+    expect(decodedOutput(output)).toEqual(['\u001b[I', '\u001b[O'])
+    expect(recording.renderer?.focused).toEqual([true, false])
+
+    output.length = 0
+    terminal.focus()
+    window.dispatchEvent(new Event('blur'))
+    textarea.dispatchEvent(new FocusEvent('blur'))
+    window.dispatchEvent(new Event('focus'))
+    textarea.dispatchEvent(new FocusEvent('focus'))
+    expect(decodedOutput(output)).toEqual(['\u001b[I', '\u001b[O', '\u001b[I'])
+    expect(recording.renderer?.focused.slice(-3)).toEqual([true, false, true])
+
+    output.length = 0
+    const key = dispatchKey(textarea, 'keydown', { code: 'KeyA', key: 'a' })
+    dispatchKey(textarea, 'keyup', { code: 'KeyA', key: 'a' })
+    dispatchComposition(textarea, 'compositionstart')
+    dispatchComposition(textarea, 'compositionend', '日本')
+    dispatchInput(textarea, '日本', { data: '日本', inputType: 'insertText' })
+    const clipboard = new DataTransfer()
+    clipboard.setData('text/plain', 'paste')
+    const paste = new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: clipboard,
+    })
+    textarea.dispatchEvent(paste)
+
+    expect(key.defaultPrevented).toBe(false)
+    expect(paste.defaultPrevented).toBe(false)
+    expect(output).toEqual([])
+
+    const visibilityCount = recording.renderer!.documentVisible.length
+    textarea.ownerDocument.dispatchEvent(new Event('visibilitychange'))
+    expect(recording.renderer!.documentVisible).toHaveLength(visibilityCount + 1)
+
+    const manual = terminal.key({ action: 'press', code: 'KeyA', composing: false, text: 'a' })
+    expect(decoder.decode(manual)).toBe('a')
+    expect(decodedOutput(output)).toEqual(['a'])
+
+    const visibleAfterManual = recording.renderer!.documentVisible.length
+    const focusedAfterManual = recording.renderer!.focused.length
+    terminal.dispose()
+    terminal.dispose()
+    dispatchKey(textarea, 'keydown', { code: 'KeyB', key: 'b' })
+    textarea.ownerDocument.dispatchEvent(new Event('visibilitychange'))
+    window.dispatchEvent(new Event('blur'))
+    expect(decodedOutput(output)).toEqual(['a'])
+    expect(recording.renderer!.documentVisible).toHaveLength(visibleAfterManual)
+    expect(recording.renderer!.focused).toHaveLength(focusedAfterManual)
+  })
+
+  it('reserves copy once, suppresses repeat/release, and removes listeners on direct disposal', () => {
+    const textarea = document.createElement('textarea')
+    document.body.append(textarea)
+    hosts.push(textarea)
+    const keys: TerminalKeyInput[] = []
+    const copies: string[] = []
+    const selection: SelectionCoordinates = {
+      end: { x: 3, y: 0 },
+      rectangle: false,
+      start: { x: 0, y: 0 },
+    }
+    const controller = createDomInputController({
+      copySelection: (text) => {
+        copies.push(text)
+      },
+      onError: (cause) => {
+        throw cause
+      },
+      platform: 'mac',
+      session: {
+        getSelection: () => 'copy me',
+        key: (input) => {
+          keys.push(input)
+          return new Uint8Array()
+        },
+        paste: () => new Uint8Array(),
+        selectionCoordinates: () => selection,
+        sendInput: () => new Uint8Array(),
+      },
+      signal: new AbortController().signal,
+      textarea,
+    })
+
+    dispatchKey(textarea, 'keydown', { altKey: true, code: 'AltLeft', key: 'Alt' })
+    dispatchKey(textarea, 'keydown', { altKey: true, code: 'KeyE', key: 'é' })
+    expect(keys.at(-1)?.consumedModifiers).toMatchObject({ alt: 'left' })
+    keys.length = 0
+
+    const press = dispatchKey(textarea, 'keydown', { code: 'KeyC', key: 'c', metaKey: true })
+    const repeat = dispatchKey(textarea, 'keydown', {
+      code: 'KeyC',
+      key: 'c',
+      metaKey: true,
+      repeat: true,
+    })
+    const release = dispatchKey(textarea, 'keyup', { code: 'KeyC', key: 'c', metaKey: true })
+
+    expect(copies).toEqual(['copy me'])
+    expect(keys).toHaveLength(0)
+    expect([press.defaultPrevented, repeat.defaultPrevented, release.defaultPrevented]).toEqual([
+      true,
+      true,
+      false,
+    ])
+
+    dispatchKey(textarea, 'keydown', { code: 'MetaLeft', key: 'Meta', metaKey: true })
+    keys.length = 0
+    dispatchKey(textarea, 'keydown', { code: 'KeyC', key: 'c', metaKey: true })
+    dispatchKey(textarea, 'keyup', { code: 'MetaLeft', key: 'Meta' })
+    keys.length = 0
+    const freshPress = dispatchKey(textarea, 'keydown', { code: 'KeyC', key: 'c' })
+    const freshRelease = dispatchKey(textarea, 'keyup', { code: 'KeyC', key: 'c' })
+
+    expect(copies).toEqual(['copy me', 'copy me'])
+    expect(keys.map((input) => [input.code, input.action])).toEqual([
+      ['KeyC', 'press'],
+      ['KeyC', 'release'],
+    ])
+    expect([freshPress.defaultPrevented, freshRelease.defaultPrevented]).toEqual([false, false])
+
+    controller.dispose()
+    dispatchKey(textarea, 'keydown', { code: 'KeyA', key: 'a' })
+    expect(keys).toHaveLength(2)
+  })
+
+  it('switches macOS Option between text consumption and native meta encoding dynamically', () => {
+    const textarea = document.createElement('textarea')
+    document.body.append(textarea)
+    hosts.push(textarea)
+    const keys: TerminalKeyInput[] = []
+    let optionIsMeta = false
+    const controller = createDomInputController({
+      hooks: { macOptionIsMeta: () => optionIsMeta },
+      onError: (cause) => {
+        throw cause
+      },
+      platform: 'mac',
+      session: {
+        getSelection: () => undefined,
+        key: (input) => {
+          keys.push(input)
+          return new Uint8Array()
+        },
+        paste: () => new Uint8Array(),
+        selectionCoordinates: () => undefined,
+        sendInput: () => new Uint8Array(),
+      },
+      signal: new AbortController().signal,
+      textarea,
+    })
+
+    dispatchKey(textarea, 'keydown', { altKey: true, code: 'AltLeft', key: 'Alt' })
+    dispatchKey(textarea, 'keydown', { altKey: true, code: 'KeyE', key: 'é' })
+    expect(keys.at(-1)?.consumedModifiers).toMatchObject({ alt: 'left' })
+
+    optionIsMeta = true
+    dispatchKey(textarea, 'keydown', {
+      altKey: true,
+      code: 'KeyE',
+      isComposing: true,
+      key: 'e',
+    })
+    expect(keys.at(-1)).toMatchObject({ composing: false, text: 'e' })
+    expect(keys.at(-1)?.consumedModifiers?.alt).toBeUndefined()
+
+    controller.dispose()
+  })
+
+  it('leaves printable key defaults available to screen readers while retaining control ownership', () => {
+    const textarea = document.createElement('textarea')
+    document.body.append(textarea)
+    hosts.push(textarea)
+    let screenReaderMode = false
+    const controller = createDomInputController({
+      hooks: { screenReaderMode: () => screenReaderMode },
+      onError: (cause) => {
+        throw cause
+      },
+      platform: 'linux',
+      session: {
+        getSelection: () => undefined,
+        key: () => new TextEncoder().encode('x'),
+        paste: () => new Uint8Array(),
+        selectionCoordinates: () => undefined,
+        sendInput: () => new Uint8Array(),
+      },
+      signal: new AbortController().signal,
+      textarea,
+    })
+
+    const ordinary = dispatchKey(textarea, 'keydown', { code: 'KeyX', key: 'x' })
+    screenReaderMode = true
+    const accessible = dispatchKey(textarea, 'keydown', { code: 'KeyX', key: 'x' })
+    const controlled = dispatchKey(textarea, 'keydown', {
+      code: 'KeyX',
+      ctrlKey: true,
+      key: 'x',
+    })
+
+    expect(ordinary.defaultPrevented).toBe(true)
+    expect(accessible.defaultPrevented).toBe(false)
+    expect(controlled.defaultPrevented).toBe(true)
+    controller.dispose()
+  })
+
+  it('replaces defaults, preserves declaration order, and keeps shortcut state instance-local', () => {
+    const host = document.createElement('div')
+    const textarea = document.createElement('textarea')
+    host.append(textarea)
+    document.body.append(host)
+    hosts.push(host)
+    const keys: TerminalKeyInput[] = []
+    const calls: string[] = []
+    const copies: string[] = []
+    const sent: string[] = []
+    const pasted: string[] = []
+    const bubbled: string[] = []
+    host.addEventListener('keydown', (event) => bubbled.push(event.code))
+    const selection: SelectionCoordinates = {
+      end: { x: 3, y: 0 },
+      rectangle: false,
+      start: { x: 0, y: 0 },
+    }
+    const controller = createDomInputController({
+      copySelection: (text) => {
+        copies.push(text)
+      },
+      onError: (cause) => {
+        throw cause
+      },
+      platform: 'mac',
+      session: {
+        getSelection: () => 'selected',
+        key: (input) => {
+          keys.push(input)
+          return new Uint8Array()
+        },
+        paste: (data) => {
+          pasted.push(String(data))
+          return new Uint8Array()
+        },
+        selectionCoordinates: () => selection,
+        sendInput: (data) => {
+          sent.push(String(data))
+          return new Uint8Array()
+        },
+      },
+      shortcuts: [
+        {
+          hotkey: 'Mod+C',
+          id: 'replacement-copy',
+          onTrigger: () => {
+            calls.push('copy-passthrough')
+            return 'passthrough'
+          },
+        },
+        {
+          hotkey: 'Mod+K',
+          id: 'first',
+          onTrigger: () => {
+            calls.push('first-passthrough')
+            return 'passthrough'
+          },
+        },
+        {
+          hotkey: { key: 'K', mod: true },
+          id: 'second',
+          onTrigger: (context) => {
+            calls.push('second-claim')
+            expect(context.event.code).toBe('KeyK')
+            expect(context.hasSelection()).toBe(true)
+            expect(context.getSelection()).toBe('selected')
+            context.sendInput('command')
+            context.paste('clipboard')
+            return 'claim'
+          },
+          preventDefault: false,
+          stopPropagation: false,
+        },
+      ],
+      signal: new AbortController().signal,
+      textarea,
+    })
+
+    dispatchKey(textarea, 'keydown', { code: 'KeyC', key: 'c', metaKey: true })
+    const press = dispatchKey(textarea, 'keydown', { code: 'KeyK', key: 'k', metaKey: true })
+    const repeat = dispatchKey(textarea, 'keydown', {
+      code: 'KeyK',
+      key: 'k',
+      metaKey: true,
+      repeat: true,
+    })
+    const release = dispatchKey(textarea, 'keyup', { code: 'KeyK', key: 'k', metaKey: true })
+
+    expect(calls).toEqual(['copy-passthrough', 'first-passthrough', 'second-claim'])
+    expect(copies).toEqual([])
+    expect(keys.map((input) => input.code)).toEqual(['KeyC'])
+    expect(sent).toEqual(['command'])
+    expect(pasted).toEqual(['clipboard'])
+    expect(bubbled.filter((code) => code === 'KeyK')).toEqual(['KeyK', 'KeyK'])
+    expect([press.defaultPrevented, repeat.defaultPrevented, release.defaultPrevented]).toEqual([
+      false,
+      false,
+      false,
+    ])
+
+    controller.dispose()
+    controller.dispose()
+    dispatchKey(textarea, 'keydown', { code: 'KeyA', key: 'a' })
+    expect(keys.map((input) => input.code)).toEqual(['KeyC'])
+
+    const secondTextarea = document.createElement('textarea')
+    host.append(secondTextarea)
+    const secondKeys: string[] = []
+    const secondPastes: string[] = []
+    const secondCopies: string[] = []
+    const second = createDomInputController({
+      copySelection: (text) => {
+        secondCopies.push(text)
+      },
+      onError: (cause) => {
+        throw cause
+      },
+      platform: 'mac',
+      session: {
+        getSelection: () => 'selected',
+        key: (input) => {
+          secondKeys.push(input.code)
+          return new Uint8Array()
+        },
+        paste: (data) => {
+          secondPastes.push(String(data))
+          return new Uint8Array()
+        },
+        selectionCoordinates: () => selection,
+        sendInput: () => new Uint8Array(),
+      },
+      shortcuts: false,
+      signal: new AbortController().signal,
+      textarea: secondTextarea,
+    })
+    dispatchKey(secondTextarea, 'keydown', { code: 'KeyC', key: 'c', metaKey: true })
+    const pasteKey = dispatchKey(secondTextarea, 'keydown', {
+      code: 'KeyV',
+      key: 'v',
+      metaKey: true,
+    })
+    const clipboard = new DataTransfer()
+    clipboard.setData('text/plain', 'browser paste')
+    secondTextarea.dispatchEvent(
+      new ClipboardEvent('paste', { cancelable: true, clipboardData: clipboard }),
+    )
+
+    expect(secondCopies).toEqual([])
+    expect(secondKeys).toEqual(['KeyC'])
+    expect(pasteKey.defaultPrevented).toBe(false)
+    expect(secondPastes).toEqual(['browser paste'])
+    second.dispose()
+  })
+
+  it('keeps AltGraph, composing, and dead keys on the native Ghostty path', () => {
+    const textarea = document.createElement('textarea')
+    document.body.append(textarea)
+    hosts.push(textarea)
+    const callbacks: string[] = []
+    const keys: TerminalKeyInput[] = []
+    const controller = createDomInputController({
+      onError: (cause) => {
+        throw cause
+      },
+      platform: 'linux',
+      session: {
+        getSelection: () => undefined,
+        key: (input) => {
+          keys.push(input)
+          return new Uint8Array()
+        },
+        paste: () => new Uint8Array(),
+        selectionCoordinates: () => undefined,
+        sendInput: () => new Uint8Array(),
+      },
+      shortcuts: [
+        {
+          hotkey: 'Control+Alt+Q',
+          id: 'alt-graph',
+          onTrigger: () => {
+            callbacks.push('alt-graph')
+            return 'claim'
+          },
+        },
+        {
+          hotkey: 'Alt+E',
+          id: 'dead',
+          onTrigger: () => {
+            callbacks.push('dead')
+            return 'claim'
+          },
+        },
+        {
+          hotkey: 'Mod+K',
+          id: 'composing',
+          onTrigger: () => {
+            callbacks.push('composing')
+            return 'claim'
+          },
+        },
+      ],
+      signal: new AbortController().signal,
+      textarea,
+    })
+
+    dispatchKey(
+      textarea,
+      'keydown',
+      { altKey: true, code: 'KeyQ', ctrlKey: true, key: '@' },
+      { Alt: true, AltGraph: true, Control: true },
+    )
+    dispatchKey(
+      textarea,
+      'keydown',
+      { altKey: true, code: 'KeyV', ctrlKey: true, key: 'v' },
+      { Alt: true, AltGraph: true, Control: true },
+    )
+    dispatchComposition(textarea, 'compositionstart')
+    dispatchKey(textarea, 'keydown', { code: 'KeyK', ctrlKey: true, key: 'k' })
+    dispatchComposition(textarea, 'compositionend')
+    dispatchKey(textarea, 'keydown', { altKey: true, code: 'KeyE', key: 'Dead' })
+
+    expect(callbacks).toEqual([])
+    expect(keys.map((input) => [input.code, input.composing])).toEqual([
+      ['KeyQ', false],
+      ['KeyV', false],
+      ['KeyK', true],
+      ['KeyE', true],
+    ])
+    expect(keys[0]?.consumedModifiers).toMatchObject({ alt: 'unknown', control: 'unknown' })
+    controller.dispose()
+  })
+
+  it('claims callback failures and rejects duplicate non-empty shortcut ids', async () => {
+    const failure = new Error('host command failed')
+    let calls = 0
+    const terminal = await trackedTerminal({
+      keyboard: {
+        shortcuts: [
+          {
+            hotkey: 'Mod+E',
+            id: 'explode',
+            onTrigger: () => {
+              calls += 1
+              throw failure
+            },
+          },
+        ],
+      },
+      rendererFactory: recordingRendererFactory({}),
+    })
+    await terminal.open(trackedHost())
+    const errors: Array<{ cause: unknown; operation: string }> = []
+    const output: Uint8Array[] = []
+    terminal.on('error', (event) => errors.push(event))
+    terminal.onData((bytes) => output.push(bytes))
+    terminal.write('\u001b[>11u')
+    const modifiers = primaryModifier()
+    const press = dispatchKey(terminal.textarea!, 'keydown', {
+      code: 'KeyE',
+      key: 'e',
+      ...modifiers,
+    })
+    const repeat = dispatchKey(terminal.textarea!, 'keydown', {
+      code: 'KeyE',
+      key: 'e',
+      repeat: true,
+      ...modifiers,
+    })
+    const release = dispatchKey(terminal.textarea!, 'keyup', {
+      code: 'KeyE',
+      key: 'e',
+      ...modifiers,
+    })
+
+    expect(calls).toBe(1)
+    expect(errors).toEqual([{ cause: failure, operation: 'input.hotkey.explode' }])
+    expect(output).toEqual([])
+    expect([press.defaultPrevented, repeat.defaultPrevented, release.defaultPrevented]).toEqual([
+      true,
+      true,
+      false,
+    ])
+
+    const duplicateHost = trackedHost()
+    const duplicate = await trackedTerminal({
+      keyboard: {
+        shortcuts: [
+          { hotkey: 'Mod+A', id: 'same', onTrigger: () => 'claim' },
+          { hotkey: 'Mod+B', id: 'same', onTrigger: () => 'claim' },
+        ],
+      },
+      rendererFactory: recordingRendererFactory({}),
+    })
+    await expect(duplicate.open(duplicateHost)).rejects.toThrow(
+      'Duplicate terminal hotkey binding id: same',
+    )
+    expect(duplicate.lifecycle).toBe('disposed')
+    expect(duplicateHost.querySelector('.ghostty-webgpu')).toBeNull()
+  })
+
+  it('coalesces fit and DPR changes and emits resize only after renderer resize', async () => {
+    const recording: RendererRecording = {}
+    let pixelRatio = 1
+    let notifyPixelRatio = (): void => {}
+    const terminal = await trackedTerminal({
+      fitEnvironment: {
+        getPixelRatio: () => pixelRatio,
+        subscribePixelRatio: (notify) => {
+          notifyPixelRatio = notify
+          return () => {
+            notifyPixelRatio = (): void => {}
+          }
+        },
+      },
+      padding: { bottom: 3.1, left: 4.2, right: 5.3, top: 6.4 },
+      rendererFactory: recordingRendererFactory(recording),
+      scrollbar: { width: 0.1 },
+    })
+    const host = trackedHost(320, 140)
+    const order: string[] = []
+    const sizes: { cols: number; rows: number }[] = []
+    terminal.onResize((size) => {
+      order.push('event')
+      sizes.push(size)
+    })
+
+    await terminal.open(host)
+    const renderer = recording.renderer!
+    renderer.onResize = () => order.push('renderer')
+    await animationFrames(3)
+    expect(sizes).toHaveLength(1)
+    expect(renderer.resizes).toHaveLength(1)
+    expect(renderer.resizes[0]).toMatchObject({
+      columns: sizes[0]!.cols,
+      rows: sizes[0]!.rows,
+    })
+    expect(renderer.notifications.indexOf('resize')).toBeLessThan(
+      renderer.notifications.indexOf('schedule'),
+    )
+    const scrollbar = host.querySelector<HTMLElement>('[role="scrollbar"]')
+    expect(scrollbar?.style.width).toBe('1px')
+    const root = host.querySelector<HTMLElement>('.ghostty-webgpu')
+    const initialGrid = renderer.resizes[0]!
+    const fitted = renderer.fonts.at(-1) ?? recording.options!.font
+    const reservedColumns = Math.max(
+      2,
+      Math.floor((root!.clientWidth - 4 - 5 - 1) / fitted.cssCellWidth),
+    )
+    expect(initialGrid.columns).toBe(reservedColumns)
+
+    const previousResizeCount = sizes.length
+    host.style.width = '330px'
+    host.style.width = '340px'
+    host.style.width = '350px'
+    await animationFrames(3)
+    expect(sizes).toHaveLength(previousResizeCount + 1)
+    expect(renderer.resizes).toHaveLength(previousResizeCount + 1)
+
+    const unchangedCount = sizes.length
+    window.dispatchEvent(new Event('resize'))
+    await animationFrames(2)
+    expect(sizes).toHaveLength(unchangedCount)
+
+    pixelRatio = 2
+    notifyPixelRatio()
+    await animationFrames(3)
+    expect(terminal.appearance.grid.pixelRatio).toBe(2)
+    expect(scrollbar?.style.width).toBe('0.5px')
+    expect(sizes).toHaveLength(unchangedCount + 1)
+    expect(order).toEqual(Array.from({ length: sizes.length }, () => ['renderer', 'event']).flat())
+
+    const disposedResizeCount = sizes.length
+    terminal.dispose()
+    pixelRatio = 3
+    notifyPixelRatio()
+    await animationFrames(2)
+    expect(sizes).toHaveLength(disposedResizeCount)
+  })
+
+  it('fits inside the resize observer callback instead of one frame later', async () => {
+    const recording: RendererRecording = {}
+    const terminal = await trackedTerminal({ rendererFactory: recordingRendererFactory(recording) })
+    const host = trackedHost(320, 140)
+    await terminal.open(host)
+    await animationFrames(3)
+    const renderer = recording.renderer!
+    const resized = renderer.resizes.length
+
+    // Set during the frame-callback phase, so this frame's observer sees it.
+    host.style.width = '400px'
+    // A fit deferred to its own frame would still be pending at the next callback.
+    await animationFrames(1)
+    expect(renderer.resizes).toHaveLength(resized + 1)
+    expect(terminal.hasPendingFrame).toBe(false)
+  })
+
+  it('keeps zero-sized hosts idle until a real resize source and updates appearance atomically', async () => {
+    const recording: RendererRecording = {}
+    const terminal = await trackedTerminal({ rendererFactory: recordingRendererFactory(recording) })
+    const host = trackedHost(0, 0)
+    const sizes: { cols: number; rows: number }[] = []
+    terminal.onResize((size) => sizes.push(size))
+    await terminal.open(host)
+    await animationFrames(3)
+
+    expect(sizes).toHaveLength(0)
+    expect(recording.renderer?.resizes).toHaveLength(0)
+
+    host.style.height = '120px'
+    host.style.width = '300px'
+    await animationFrames(3)
+    expect(sizes).toHaveLength(1)
+    expect(sizes[0]!.cols).toBeGreaterThanOrEqual(2)
+    expect(sizes[0]!.rows).toBeGreaterThanOrEqual(1)
+
+    const appearanceOrder: string[] = []
+    terminal.on('appearance', () => appearanceOrder.push('event'))
+    terminal.setFont({ family: 'serif', lineHeight: 1.1, size: 18 })
+    terminal.setCursor({ blink: true, style: 'bar' })
+    const current = terminal.appearance.theme
+    terminal.setTheme({ ...current, background: { b: 3, g: 2, r: 1 } })
+
+    expect(recording.renderer?.fonts.at(-1)?.settings.family).not.toBe('serif')
+    expect(recording.renderer?.cursorBlink.at(-1)).toBe(true)
+    expect(recording.renderer?.themes.at(-1)?.background).toEqual({ b: 3, g: 2, r: 1 })
+    expect(appearanceOrder).toHaveLength(3)
+    await animationFrames(3)
+    expect(recording.renderer?.fonts.at(-1)?.settings).toMatchObject({
+      family: 'serif',
+      lineHeight: 1.1,
+      size: 18,
+    })
+    expect(sizes).toHaveLength(2)
+  })
+
+  it('survives listener-triggered disposal after native write effects return', async () => {
+    const terminal = await trackedTerminal({ rendererFactory: recordingRendererFactory({}) })
+    const host = trackedHost()
+    await terminal.open(host)
+    terminal.on('title', () => terminal.dispose())
+
+    expect(() => terminal.write('\u001b]0;dispose now\u0007')).not.toThrow()
+    expect(terminal.lifecycle).toBe('disposed')
+    expect(host.querySelector('.ghostty-webgpu')).toBeNull()
+  })
+})

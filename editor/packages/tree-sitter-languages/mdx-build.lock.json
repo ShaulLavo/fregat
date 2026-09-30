@@ -1,0 +1,21 @@
+{
+  "repository": "https://github.com/srazzak/tree-sitter-mdx",
+  "revision": "3aa29e8de1bf0213948a04fe953039b6ab73777b",
+  "archiveSha256": "699d141299773dcd45abfec00e7c2eba46e67c60e540b763e2c2a0f7d7f5104e",
+  "parserSha256": "7c19584d42d7a6a3169c621607e284d3434b78028eb1779d6141f7f95bd4b7a8",
+  "patchSha256": "c774472938d26885c53635b2808c844a9d805e55ec05c47fb0af13084717e42c",
+  "scannerSha256": "60c3ad4c1a8319739a4ba99f6bd2df1c3f957a730600e2d15ba9b1b62b4a6d0d",
+  "parserABI": 15,
+  "compiler": "wasi-sdk 34; tree-sitter 0.27.0",
+  "cliVersion": "tree-sitter 0.27.0",
+  "wasmSha256": "71c92f82a0805e336b60b08a62d1cc48be287cb699cc943acad8640829624245",
+  "querySources": [
+    {
+      "file": "queries/highlights.scm",
+      "revision": "3aa29e8de1bf0213948a04fe953039b6ab73777b",
+      "sha256": "96d788d73882032324c45c35e0471b62fa94919dd3b8a1013df30dddb4d2a6c0"
+    }
+  ],
+  "adaptedQuerySha256": "9d4be8b024b6a299d52ed27f55b74fe27b8f8729d6246aac075d13d587cf990f",
+  "licenseSha256": "a132395c442ccb99722012c7e09eb853cc44b894bc68667adbeb8c11c6d8959a"
+}

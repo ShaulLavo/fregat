@@ -4,7 +4,7 @@ import Foundation
 /// figure nobody can re-run is a memory, not a baseline, and "meets or beats"
 /// against a memory is unfalsifiable.
 enum Provenance: Int, CaseIterable {
-  /// Checked into `../Editor` with the command that reproduces it.
+  /// Checked into `editor/` with the command that reproduces it.
   case checkedIn = 1
   /// A live gate threshold in this repo's Playwright harness.
   case liveGate = 2
@@ -17,7 +17,7 @@ enum Provenance: Int, CaseIterable {
     switch self {
     case .checkedIn:
       return
-        "[1] checked in — ../Editor/docs/architecture/phase-0/performance-baseline.md (2026-05-24, Bun 1.3.10) plus the bench/*.ts it names. Re-runnable by command."
+        "[1] checked in — editor/docs/architecture/phase-0/performance-baseline.md (2026-05-24, Bun 1.3.10) plus the bench/*.ts it names. Re-runnable by command."
     case .liveGate:
       return
         "[2] live gate — threshold constants in apps/web/scripts/editor-{typing,scroll}-benchmark.mjs. The threshold is real; the harness cannot run today (seeding drift, see doc §5)."

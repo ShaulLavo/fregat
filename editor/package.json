@@ -1,0 +1,35 @@
+{
+  "name": "editor-workspace",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "typecheck": "turbo typecheck",
+    "lint": "turbo lint",
+    "format": "turbo format",
+    "format:check": "turbo format:check",
+    "health": "bun run check:full-text && bun scripts/command-reference.ts --check && bun scripts/architecture-health.mjs",
+    "commands:reference": "bun scripts/command-reference.ts",
+    "tree-sitter-x:update": "bun scripts/update-tree-sitter-x.ts",
+    "check:full-text": "bun scripts/check-full-text-boundary.mjs --self-test && bun scripts/check-full-text-boundary.mjs",
+    "health:write": "bun scripts/architecture-health.mjs --write",
+    "publish:packages": "bun scripts/publish-packages.ts",
+    "publish:packages:dry-run": "bun scripts/publish-packages.ts --dry-run",
+    "test": "turbo test",
+    "stress:build": "turbo build --filter=@singapore-editor/core --filter=@singapore-editor/decode --filter=@singapore-editor/find --filter=@singapore-editor/lsp --filter=@singapore-editor/markdown --filter=@singapore-editor/minimap --filter=@singapore-editor/scope-lines --filter=@singapore-editor/tree-sitter-languages --filter=@singapore-editor/paged",
+    "bench:stress": "bun run stress:build && bun run --cwd examples/stress bench",
+    "bench:input": "bun run stress:build && bun run --cwd examples/stress bench:input"
+  },
+  "devDependencies": {
+    "knip": "^6.38.0",
+    "turbo": "^2.11.4",
+    "typescript": "~6.0.3",
+    "typescript-api": "npm:typescript@~6.0.3",
+    "vite": "8.3.1"
+  },
+  "packageManager": "bun@1.4.2"
+}

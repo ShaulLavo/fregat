@@ -1,0 +1,35 @@
+.editor-virtualized-fold-toggle {
+  align-items: center;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: #a1a1aa;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  height: 14px;
+  justify-self: center;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+}
+
+.editor-virtualized-fold-toggle[hidden] {
+  display: inline-flex;
+  visibility: hidden;
+}
+
+.editor-virtualized-fold-icon {
+  align-items: center;
+  color: inherit;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 9px;
+  justify-content: center;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.editor-virtualized-fold-toggle:hover {
+  color: #e4e4e7;
+}

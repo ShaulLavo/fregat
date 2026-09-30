@@ -1,0 +1,557 @@
+{
+  "title": "Singapore platform-neutral core and React Strict DOM research",
+  "research_date": "2026-09-20",
+  "repositories": {
+    "ShaulLavo/singapore": "45e22a495902c577243334586bc391f04201a827",
+    "ShaulLavo/fregat": "43d3ac1762d4eb01f4521554967e666336858e33",
+    "react/react-strict-dom": "abd34bbf22bb468ffdc0baaf606f172c3a583487"
+  },
+  "method": "Pinned GitHub connector reads, repository search, and primary-source technical documentation.",
+  "limitations": [
+    "Targeted source audit, not an automated exhaustive full-tree dependency census.",
+    "No local repository builds, typechecks, test suites, benchmarks or physical-device tests were executed.",
+    "Local uncommitted changes were not accessible in the GitHub baseline.",
+    "Documentation and source evidence are not runtime certification.",
+    "Source archive retrieval did not succeed; the code was inspected through the GitHub connector."
+  ],
+  "sources": [
+    {
+      "id": "SG01",
+      "kind": "design-document",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "ARCHITECTURE.md",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/ARCHITECTURE.md",
+      "reviewed": "Whole document",
+      "evidence": "Browser-owned layout and CSS Highlights are explicit design commitments; worker authority is a target, not proof of current ownership."
+    },
+    {
+      "id": "SG02",
+      "kind": "package-documentation",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "packages/textbuffer/README.md",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/packages/textbuffer/README.md",
+      "reviewed": "Lines 1–160 requested",
+      "evidence": "Persistent AVL piece storage, immutable snapshots, source-coordinate anchors, UTF-16 positions."
+    },
+    {
+      "id": "SG03",
+      "kind": "source",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "packages/editor/src/documentSession.ts",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/packages/editor/src/documentSession.ts",
+      "reviewed": "Lines 1–130 and 130–440 requested",
+      "evidence": "Document/buffer/view separation, history graph, logical revisions, prepared transactions, receipts and mutation leases."
+    },
+    {
+      "id": "SG04",
+      "kind": "source",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "packages/editor/src/public/document.ts",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/packages/editor/src/public/document.ts",
+      "reviewed": "Whole file",
+      "evidence": "Existing public document subpath exposes buffer/view factories and full transaction machinery."
+    },
+    {
+      "id": "SG05",
+      "kind": "source",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "packages/editor/src/editor/Editor.ts",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/packages/editor/src/editor/Editor.ts",
+      "reviewed": "Lines 1–280 and 300–540 requested",
+      "evidence": "The concrete Editor mixes document, plugin and syntax orchestration with DOM view construction and observation."
+    },
+    {
+      "id": "SG06",
+      "kind": "source",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "packages/editor/src/editor.ts",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/packages/editor/src/editor.ts",
+      "reviewed": "Lines 1–240 requested",
+      "evidence": "The editor barrel imports CSS and exports browser-facing implementation and types."
+    },
+    {
+      "id": "SG07",
+      "kind": "source",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "packages/editor/src/editor/inputSelectionController.ts",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/packages/editor/src/editor/inputSelectionController.ts",
+      "reviewed": "Lines 1–220 and 240–520 requested",
+      "evidence": "DOM event wiring and hidden input coexist with shared autoclose, snippets, linked edits and history policy."
+    },
+    {
+      "id": "SG08",
+      "kind": "source",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "packages/editor/src/editor/inputState.ts",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/packages/editor/src/editor/inputState.ts",
+      "reviewed": "Lines 1–320 requested; returned state machine",
+      "evidence": "Existing composition and selection-ownership transitions include a commit-once guard; browser-specific ownership policy must be distinguished from shared editing semantics."
+    },
+    {
+      "id": "SG09",
+      "kind": "source",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "packages/editor/src/virtualization/virtualizedTextViewGeometry.ts",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/packages/editor/src/virtualization/virtualizedTextViewGeometry.ts",
+      "reviewed": "Lines 1–190 requested",
+      "evidence": "Lazy row geometry uses Text, HTMLElement and scratch DOM Range objects."
+    },
+    {
+      "id": "SG10",
+      "kind": "source",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "packages/editor/src/virtualization/fixedRowVirtualizer.ts",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/packages/editor/src/virtualization/fixedRowVirtualizer.ts",
+      "reviewed": "Lines 1–240 requested",
+      "evidence": "Numeric viewport calculations share a file with ResizeObserver, wheel ownership and browser scroll attachment."
+    },
+    {
+      "id": "SG11",
+      "kind": "source",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "packages/editor/src/plugins.ts",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/packages/editor/src/plugins.ts",
+      "reviewed": "Lines 340–730 and 1050–1400 requested",
+      "evidence": "Snapshot serialization costs, DOM-bearing view contexts, registry caches, ambient-plugin demand and lifecycle ownership."
+    },
+    {
+      "id": "SG12",
+      "kind": "source",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "packages/editor/src/editor/viewContributions.ts",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/packages/editor/src/editor/viewContributions.ts",
+      "reviewed": "Whole file",
+      "evidence": "Special viewport delivery is demand-checked; general delivery iterates view contributions; paint restoration and failure handling have explicit contracts."
+    },
+    {
+      "id": "SG13",
+      "kind": "source",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "packages/editor/src/editor/preparedDocument.ts",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/packages/editor/src/editor/preparedDocument.ts",
+      "reviewed": "Lines 1–260 requested",
+      "evidence": "Prepared stages transfer live sessions once, match provider/configuration/snapshot identity and dispose unclaimed ownership."
+    },
+    {
+      "id": "SG14",
+      "kind": "source",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "packages/editor/src/editor/paintSnapshot.ts",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/packages/editor/src/editor/paintSnapshot.ts",
+      "reviewed": "Lines 1–240 requested",
+      "evidence": "Bounded visual-paint codec with a 262,144-byte limit, format and appearance validation, geometry and payload bounds."
+    },
+    {
+      "id": "SG15",
+      "kind": "source",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "packages/react/src/index.ts",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/packages/react/src/index.ts",
+      "reviewed": "Lines 1–300 and 310–580 requested",
+      "evidence": "DOM-typed mount/getEditor, stable controllers, full/none store modes, deferred disposal and generation-guarded initial paint."
+    },
+    {
+      "id": "SG16",
+      "kind": "implementation-documentation",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "docs/architecture/worker-topology.md",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/docs/architecture/worker-topology.md",
+      "reviewed": "Lines 1–230 requested",
+      "evidence": "Current document authority is main-thread; individual worker owners have distinct lifecycle, cache and restart behavior."
+    },
+    {
+      "id": "SG17",
+      "kind": "source",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "packages/editor/src/editor/workScheduler.ts",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/packages/editor/src/editor/workScheduler.ts",
+      "reviewed": "Lines 1–220 requested",
+      "evidence": "Task classes, replacement, maximum delay, cancellation and injected clock already exist."
+    },
+    {
+      "id": "SG18",
+      "kind": "source",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "packages/tree-sitter/src/treeSitter/workerClient.ts",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/packages/tree-sitter/src/treeSitter/workerClient.ts",
+      "reviewed": "Lines 1–260 requested",
+      "evidence": "Existing TreeSitterBackend abstraction is defined beside browser Worker construction; requests carry runtime-session and snapshot identities."
+    },
+    {
+      "id": "SG19",
+      "kind": "source",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "packages/editor/package.json",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/packages/editor/package.json",
+      "reviewed": "Whole manifest",
+      "evidence": "The package named core exposes document, editor, extensions, rendering, syntax, shiki, keymap, testing/internal and CSS surfaces."
+    },
+    {
+      "id": "SG20",
+      "kind": "source",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "scripts/build-package.ts",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/scripts/build-package.ts",
+      "reviewed": "Lines 1–320 requested",
+      "evidence": "Build entries are inferred from exports and .ts sources; browser workers are rewritten, CSS copied, and declarations emitted from repository configuration."
+    },
+    {
+      "id": "SG21",
+      "kind": "source",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "package.json",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/package.json",
+      "reviewed": "Whole manifest",
+      "evidence": "Existing build, health, typecheck, test, stress and input benchmark commands; repository-pinned toolchain."
+    },
+    {
+      "id": "SG22",
+      "kind": "source",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "scripts/architecture-health.mjs",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/scripts/architecture-health.mjs",
+      "reviewed": "Lines 1–230 requested",
+      "evidence": "Existing package/source-cycle, public-export and production-timer inventories should be extended rather than duplicated."
+    },
+    {
+      "id": "SG23",
+      "kind": "measurement-documentation",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "docs/performance/input-latency.md",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/docs/performance/input-latency.md",
+      "reviewed": "Lines 1–260 requested; returned document",
+      "evidence": "Existing calibrated local benchmark, negative controls, complete dispatch measurement, source/peer ordering, native-IME caveats, frozen-core reference handling and layout-order constraints."
+    },
+    {
+      "id": "SG24",
+      "kind": "test-source",
+      "repository": "ShaulLavo/singapore",
+      "commit": "45e22a495902c577243334586bc391f04201a827",
+      "path": "packages/editor/test/imeComposition.browser.test.ts",
+      "url": "https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/packages/editor/test/imeComposition.browser.test.ts",
+      "reviewed": "Lines 1–250 requested; returned tests",
+      "evidence": "Browser geometry tests cover preedit positioning, layering, hidden-input focus, scaled hosts and logical/native scroll mismatch."
+    },
+    {
+      "id": "FG01",
+      "kind": "source",
+      "repository": "ShaulLavo/fregat",
+      "commit": "43d3ac1762d4eb01f4521554967e666336858e33",
+      "path": "package.json",
+      "url": "https://github.com/ShaulLavo/fregat/blob/43d3ac1762d4eb01f4521554967e666336858e33/package.json",
+      "reviewed": "Whole manifest",
+      "evidence": "Seventeen linked Singapore package overrides and linked-source checks; source checkout is ahead of npm packages."
+    },
+    {
+      "id": "FG02",
+      "kind": "source",
+      "repository": "ShaulLavo/fregat",
+      "commit": "43d3ac1762d4eb01f4521554967e666336858e33",
+      "path": "apps/web/src/features/editor/components/editor.tsx",
+      "url": "https://github.com/ShaulLavo/fregat/blob/43d3ac1762d4eb01f4521554967e666336858e33/apps/web/src/features/editor/components/editor.tsx",
+      "reviewed": "Whole file",
+      "evidence": "Main editor integrates shared buffers/views, prepared documents, provisional paint, capture, hosted keymaps and focus/lifecycle services."
+    },
+    {
+      "id": "FG03",
+      "kind": "source",
+      "repository": "ShaulLavo/fregat",
+      "commit": "43d3ac1762d4eb01f4521554967e666336858e33",
+      "path": "apps/web/src/features/editor/utils/plugins.ts",
+      "url": "https://github.com/ShaulLavo/fregat/blob/43d3ac1762d4eb01f4521554967e666336858e33/apps/web/src/features/editor/utils/plugins.ts",
+      "reviewed": "Whole file",
+      "evidence": "Language/configuration-dependent plugin construction; structural Tree-sitter remains useful with Shiki coloring; Markdown is first-paint-critical; Decode is lazy."
+    },
+    {
+      "id": "FG04",
+      "kind": "source",
+      "repository": "ShaulLavo/fregat",
+      "commit": "43d3ac1762d4eb01f4521554967e666336858e33",
+      "path": "apps/web/src/features/editor/state/workspace-document-service.ts",
+      "url": "https://github.com/ShaulLavo/fregat/blob/43d3ac1762d4eb01f4521554967e666336858e33/apps/web/src/features/editor/state/workspace-document-service.ts",
+      "reviewed": "Lines 1–260 requested",
+      "evidence": "Application ownership of live documents, per-tab views, save/conflict state, identity stamps and mutation reservations."
+    },
+    {
+      "id": "FG05",
+      "kind": "source",
+      "repository": "ShaulLavo/fregat",
+      "commit": "43d3ac1762d4eb01f4521554967e666336858e33",
+      "path": "apps/web/src/features/editor/state/workspace-edit-service.ts",
+      "url": "https://github.com/ShaulLavo/fregat/blob/43d3ac1762d4eb01f4521554967e666336858e33/apps/web/src/features/editor/state/workspace-edit-service.ts",
+      "reviewed": "Lines 930–1210 requested",
+      "evidence": "Local publication precedes server finalization; failures reverse local changes and may retain recovery locks."
+    },
+    {
+      "id": "FG06",
+      "kind": "source",
+      "repository": "ShaulLavo/fregat",
+      "commit": "43d3ac1762d4eb01f4521554967e666336858e33",
+      "path": "apps/web/src/features/editor/components/diff-pane.tsx",
+      "url": "https://github.com/ShaulLavo/fregat/blob/43d3ac1762d4eb01f4521554967e666336858e33/apps/web/src/features/editor/components/diff-pane.tsx",
+      "reviewed": "Whole file",
+      "evidence": "Readonly projected rows use setText rather than openDocument, exact row identity, diff-only plugins and storeSync none."
+    },
+    {
+      "id": "FG07",
+      "kind": "source",
+      "repository": "ShaulLavo/fregat",
+      "commit": "43d3ac1762d4eb01f4521554967e666336858e33",
+      "path": "apps/web/src/features/search/components/result-file-editor.tsx",
+      "url": "https://github.com/ShaulLavo/fregat/blob/43d3ac1762d4eb01f4521554967e666336858e33/apps/web/src/features/search/components/result-file-editor.tsx",
+      "reviewed": "Lines 1–290 requested; returned component",
+      "evidence": "Bounded readonly search excerpts, source-line mapping, separate selection/store policies and app-owned interaction."
+    },
+    {
+      "id": "FG08",
+      "kind": "source",
+      "repository": "ShaulLavo/fregat",
+      "commit": "43d3ac1762d4eb01f4521554967e666336858e33",
+      "path": "apps/tui/src/viewer/state/syntax.ts",
+      "url": "https://github.com/ShaulLavo/fregat/blob/43d3ac1762d4eb01f4521554967e666336858e33/apps/tui/src/viewer/state/syntax.ts",
+      "reviewed": "Whole file",
+      "evidence": "Terminal viewer consumes createIncrementalTokenizer with a supplied Shiki highlighter, not a DOM editor."
+    },
+    {
+      "id": "FG09",
+      "kind": "source",
+      "repository": "ShaulLavo/fregat",
+      "commit": "43d3ac1762d4eb01f4521554967e666336858e33",
+      "path": "packages/client-core/src/git/diff-files.ts",
+      "url": "https://github.com/ShaulLavo/fregat/blob/43d3ac1762d4eb01f4521554967e666336858e33/packages/client-core/src/git/diff-files.ts",
+      "reviewed": "Whole file",
+      "evidence": "Shared diff conversion distinguishes full contents and patch parsing; partial diff data is a real consumer contract."
+    },
+    {
+      "id": "FG10",
+      "kind": "source",
+      "repository": "ShaulLavo/fregat",
+      "commit": "43d3ac1762d4eb01f4521554967e666336858e33",
+      "path": "apps/web/src/keymap/editor-keymap.ts",
+      "url": "https://github.com/ShaulLavo/fregat/blob/43d3ac1762d4eb01f4521554967e666336858e33/apps/web/src/keymap/editor-keymap.ts",
+      "reviewed": "Whole file",
+      "evidence": "HOSTED_EDITOR_KEYMAP disables Singapore standalone keymap and maps platform editor command IDs."
+    },
+    {
+      "id": "FG11",
+      "kind": "source",
+      "repository": "ShaulLavo/fregat",
+      "commit": "43d3ac1762d4eb01f4521554967e666336858e33",
+      "path": ".github/actions/setup/action.yml",
+      "url": "https://github.com/ShaulLavo/fregat/blob/43d3ac1762d4eb01f4521554967e666336858e33/.github/actions/setup/action.yml",
+      "reviewed": "Whole file",
+      "evidence": "CI builds sibling Editor, links packages, defaults editor-ref to main and supports an explicit candidate ref."
+    },
+    {
+      "id": "FG12",
+      "kind": "proposed-plan",
+      "repository": "ShaulLavo/fregat",
+      "commit": "43d3ac1762d4eb01f4521554967e666336858e33",
+      "path": "plans/122-composable-plugins.md",
+      "url": "https://github.com/ShaulLavo/fregat/blob/43d3ac1762d4eb01f4521554967e666336858e33/plans/122-composable-plugins.md",
+      "reviewed": "Returned opening/design excerpt; not claimed as a full-file audit",
+      "evidence": "Proposed full-power, composable, isomorphic plugin direction with selective dispatch; no second publication/runtime architecture."
+    },
+    {
+      "id": "FG13",
+      "kind": "proposed-plan",
+      "repository": "ShaulLavo/fregat",
+      "commit": "43d3ac1762d4eb01f4521554967e666336858e33",
+      "path": "plans/099-document-contributions.md",
+      "url": "https://github.com/ShaulLavo/fregat/blob/43d3ac1762d4eb01f4521554967e666336858e33/plans/099-document-contributions.md",
+      "reviewed": "Lines 1–200 requested",
+      "evidence": "Proposed canonical publication and demand-driven document contributions; preserve independent workers, strings/chunks and application ownership."
+    },
+    {
+      "id": "FG14",
+      "kind": "roadmap-document",
+      "repository": "ShaulLavo/fregat",
+      "commit": "43d3ac1762d4eb01f4521554967e666336858e33",
+      "path": "PLAN.md",
+      "url": "https://github.com/ShaulLavo/fregat/blob/43d3ac1762d4eb01f4521554967e666336858e33/PLAN.md",
+      "reviewed": "Lines 1–170 requested",
+      "evidence": "Cross-project sequencing, delivered document/focus/paint/WorkspaceEdit foundations and explicitly proposed contribution work."
+    },
+    {
+      "id": "RSD01",
+      "kind": "source",
+      "repository": "react/react-strict-dom",
+      "commit": "abd34bbf22bb468ffdc0baaf606f172c3a583487",
+      "path": "packages/react-strict-dom/package.json",
+      "url": "https://github.com/react/react-strict-dom/blob/abd34bbf22bb468ffdc0baaf606f172c3a583487/packages/react-strict-dom/package.json",
+      "reviewed": "Whole file",
+      "evidence": "Pinned checkout declares 0.0.55, conditional native/web exports, React 19 peer and RN >=0.82; this is not a claim about npm latest."
+    },
+    {
+      "id": "RSD02",
+      "kind": "source",
+      "repository": "react/react-strict-dom",
+      "commit": "abd34bbf22bb468ffdc0baaf606f172c3a583487",
+      "path": "packages/react-strict-dom/src/native/modules/useStrictDOMElement.js",
+      "url": "https://github.com/react/react-strict-dom/blob/abd34bbf22bb468ffdc0baaf606f172c3a583487/packages/react-strict-dom/src/native/modules/useStrictDOMElement.js",
+      "reviewed": "Whole file",
+      "evidence": "Strict-ref wrapper binds native methods, scales geometry, and falls back to cached selection plus optional native setSelection."
+    },
+    {
+      "id": "RSD03",
+      "kind": "source",
+      "repository": "react/react-strict-dom",
+      "commit": "abd34bbf22bb468ffdc0baaf606f172c3a583487",
+      "path": "packages/react-strict-dom/src/native/modules/createStrictDOMTextInputComponent.js",
+      "url": "https://github.com/react/react-strict-dom/blob/abd34bbf22bb468ffdc0baaf606f172c3a583487/packages/react-strict-dom/src/native/modules/createStrictDOMTextInputComponent.js",
+      "reviewed": "Whole file",
+      "evidence": "Native input adapter passes minimal input/change objects, filters keypresses, and forwards native selection events."
+    },
+    {
+      "id": "D01",
+      "kind": "official-documentation",
+      "title": "React Strict DOM learning guide",
+      "url": "https://react.github.io/react-strict-dom/learn/",
+      "reviewed": "Relevant sections retrieved on 2026-09-20",
+      "evidence": "Scope and platform-subset design."
+    },
+    {
+      "id": "D02",
+      "kind": "official-documentation",
+      "title": "React Strict DOM HTML API",
+      "url": "https://react.github.io/react-strict-dom/api/html/",
+      "reviewed": "Relevant sections retrieved on 2026-09-20",
+      "evidence": "Published native layout and API compatibility; compare with implementation rather than trusting every status cell."
+    },
+    {
+      "id": "D03",
+      "kind": "official-documentation",
+      "title": "React Strict DOM CSS API",
+      "url": "https://react.github.io/react-strict-dom/api/css/",
+      "reviewed": "Relevant sections retrieved on 2026-09-20",
+      "evidence": "Supported style/theme facilities and restricted CSS model."
+    },
+    {
+      "id": "D04",
+      "kind": "official-documentation",
+      "title": "React Strict DOM common Web API",
+      "url": "https://react.github.io/react-strict-dom/api/other/common-min-api/",
+      "reviewed": "Relevant sections retrieved on 2026-09-20",
+      "evidence": "Minimum API surface and adding native APIs with Turbo Modules."
+    },
+    {
+      "id": "D05",
+      "kind": "official-documentation",
+      "title": "React Strict DOM document API",
+      "url": "https://react.github.io/react-strict-dom/api/other/document/",
+      "reviewed": "Relevant sections retrieved on 2026-09-20",
+      "evidence": "React owns element creation/updates and documented document reads are limited."
+    },
+    {
+      "id": "D06",
+      "kind": "official-documentation",
+      "title": "React Strict DOM compat API",
+      "url": "https://react.github.io/react-strict-dom/api/other/compat/",
+      "reviewed": "Relevant sections retrieved on 2026-09-20",
+      "evidence": "Explicitly experimental interoperability with custom native components."
+    },
+    {
+      "id": "D07",
+      "kind": "official-documentation",
+      "title": "React Strict DOM Vite setup",
+      "url": "https://react.github.io/react-strict-dom/learn/setup-vite/",
+      "reviewed": "Relevant sections retrieved on 2026-09-20",
+      "evidence": "Vite-version-sensitive Babel transform, packaged UI inclusion and web CSS extraction."
+    },
+    {
+      "id": "D08",
+      "kind": "official-documentation",
+      "title": "React Strict DOM Expo setup",
+      "url": "https://react.github.io/react-strict-dom/learn/setup/",
+      "reviewed": "Relevant sections retrieved on 2026-09-20",
+      "evidence": "Native setup, strict layout conformance and platform file resolution."
+    },
+    {
+      "id": "D09",
+      "kind": "official-documentation",
+      "title": "React Native TextInput",
+      "url": "https://reactnative.dev/docs/textinput",
+      "reviewed": "Relevant sections retrieved on 2026-09-20",
+      "evidence": "Native change event counters, selection and keyboard event distinctions."
+    },
+    {
+      "id": "D10",
+      "kind": "official-documentation",
+      "title": "React Native Text",
+      "url": "https://reactnative.dev/docs/text",
+      "reviewed": "Relevant sections retrieved on 2026-09-20",
+      "evidence": "onTextLayout exposes line measurement, which is not itself a complete glyph hit-testing contract."
+    },
+    {
+      "id": "D11",
+      "kind": "official-documentation",
+      "title": "Apple UITextInput",
+      "url": "https://developer.apple.com/documentation/uikit/uitextinput",
+      "reviewed": "Relevant sections retrieved on 2026-09-20",
+      "evidence": "OS input, marked text, selection, caret rectangles and hit-testing interfaces."
+    },
+    {
+      "id": "D12",
+      "kind": "official-documentation",
+      "title": "Android Layout",
+      "url": "https://developer.android.com/reference/android/text/Layout",
+      "reviewed": "Relevant sections retrieved on 2026-09-20",
+      "evidence": "Native text offset/horizontal mapping, secondary positions and selection paths."
+    },
+    {
+      "id": "D13",
+      "kind": "official-documentation",
+      "title": "Android InputConnection",
+      "url": "https://developer.android.com/reference/android/view/inputmethod/InputConnection",
+      "reviewed": "Relevant sections retrieved on 2026-09-20",
+      "evidence": "Composition, replacement, selection and input-method synchronization responsibilities."
+    },
+    {
+      "id": "D14",
+      "kind": "official-documentation",
+      "title": "CodeMirror system guide",
+      "url": "https://codemirror.net/docs/guide/",
+      "reviewed": "Relevant sections retrieved on 2026-09-20",
+      "evidence": "Functional state/imperative view separation as an architectural comparison; not a native-editor implementation."
+    },
+    {
+      "id": "D15",
+      "kind": "official-documentation",
+      "title": "Monaco ICodeEditor API",
+      "url": "https://microsoft.github.io/monaco-editor/typedoc/interfaces/editor_editor_api.editor.ICodeEditor.html",
+      "reviewed": "Relevant sections retrieved on 2026-09-20",
+      "evidence": "Distinct model, cursor, layout, composition and scroll events; not evidence of zero-cost dispatch."
+    },
+    {
+      "id": "D16",
+      "kind": "official-documentation",
+      "title": "Expo DOM components",
+      "url": "https://docs.expo.dev/guides/dom-components/",
+      "reviewed": "Relevant sections retrieved on 2026-09-20",
+      "evidence": "WebView-based reuse is a distinct fallback product, not a native Strict DOM renderer."
+    }
+  ]
+}

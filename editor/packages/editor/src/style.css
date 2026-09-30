@@ -1,0 +1,577 @@
+/* Stacking scale. Layers name a tier here instead of picking an integer that
+   beats whatever they happened to land next to, and the tiers are spaced so a
+   surface that has to sit between two of them can take an intermediate value
+   without renumbering the rest. Declared on the document root because plugin
+   overlays mount into the host container, outside the editor's own subtree.
+
+   Plugin stylesheets still hardcode theirs — 1 for indent guides and the split
+   handle, 4 for per-glyph and diff overlays, 5 for the minimap, 20 for the find
+   widget — so the two in-scroll tiers stay unspaced to fit between 1 and 4, and
+   the overlay tiers start above every one of them. Both can be spread out once
+   those stylesheets read from here too. */
+:root {
+  --editor-z-gutter: 2;
+  --editor-z-inline-surface: 3;
+  --editor-z-overlay-surface: 100;
+  --editor-z-overlay-widget: 200;
+  --editor-z-overlay-popup: 300;
+}
+
+.editor {
+  --editor-background: #1e1e1e;
+  --editor-foreground: #d4d4d4;
+  --editor-gutter-background: var(--editor-background);
+  --editor-gutter-foreground: #71717a;
+  --editor-gutter-active-foreground: var(--editor-foreground);
+  --editor-cursor-line-gutter-background: rgba(255, 255, 255, 0.06);
+  --editor-cursor-line-row-background: rgba(255, 255, 255, 0.06);
+  --editor-caret-color: var(--editor-foreground);
+  --editor-hidden-character-foreground: #71717a;
+  --editor-suspicious-character-color: #f87171;
+  --editor-minimap-background: var(--editor-background);
+  --editor-minimap-background-opacity: 0.5;
+  --editor-syntax-attribute: #99f6e4;
+  --editor-syntax-bracket: #d4d4d8;
+  --editor-syntax-comment: #71717a;
+  --editor-syntax-constant: #f0abfc;
+  --editor-syntax-function: #fecdd3;
+  --editor-syntax-keyword: #6ee7b7;
+  --editor-syntax-keyword-declaration: #a78bfa;
+  --editor-syntax-keyword-import: #f9a8d4;
+  --editor-syntax-namespace: #a5f3fc;
+  --editor-syntax-number: #c4b5fd;
+  --editor-syntax-property: #e9d5ff;
+  --editor-syntax-string: #fde68a;
+  --editor-syntax-type: #7dd3fc;
+  --editor-syntax-type-definition: #38bdf8;
+  --editor-syntax-type-parameter: #5eead4;
+  --editor-syntax-variable: #e4e4e7;
+  --editor-syntax-variable-builtin: #fdba74;
+
+  flex: 1;
+  overflow: auto;
+  /* Written by the editor from its `fontSize` and `fontFamily` options. */
+  font-size: var(--editor-font-size, 13px);
+  font-family: var(--editor-font-family, monospace);
+  white-space: pre;
+  tab-size: var(--editor-tab-size, 4);
+  color: var(--editor-foreground);
+  background: var(--editor-background);
+  margin: 0;
+}
+
+.editor::selection {
+  color: inherit;
+  background: transparent;
+}
+
+.editor-virtualized {
+  --editor-background: #1e1e1e;
+  --editor-foreground: #d4d4d4;
+  --editor-gutter-background: var(--editor-background);
+  --editor-gutter-foreground: #71717a;
+  --editor-gutter-active-foreground: var(--editor-foreground);
+  --editor-cursor-line-gutter-background: rgba(255, 255, 255, 0.06);
+  --editor-cursor-line-row-background: rgba(255, 255, 255, 0.06);
+  --editor-caret-color: var(--editor-foreground);
+  --editor-hidden-character-foreground: #71717a;
+  --editor-suspicious-character-color: #f87171;
+  --editor-minimap-background: var(--editor-background);
+  --editor-minimap-background-opacity: 0.5;
+  --editor-syntax-attribute: #99f6e4;
+  --editor-syntax-bracket: #d4d4d8;
+  --editor-syntax-comment: #71717a;
+  --editor-syntax-constant: #f0abfc;
+  --editor-syntax-function: #fecdd3;
+  --editor-syntax-keyword: #6ee7b7;
+  --editor-syntax-keyword-declaration: #a78bfa;
+  --editor-syntax-keyword-import: #f9a8d4;
+  --editor-syntax-namespace: #a5f3fc;
+  --editor-syntax-number: #c4b5fd;
+  --editor-syntax-property: #e9d5ff;
+  --editor-syntax-string: #fde68a;
+  --editor-syntax-type: #7dd3fc;
+  --editor-syntax-type-definition: #38bdf8;
+  --editor-syntax-type-parameter: #5eead4;
+  --editor-syntax-variable: #e4e4e7;
+  --editor-syntax-variable-builtin: #fdba74;
+  --editor-gutter-width: 0px;
+  /* Written by the editor from `gutterLeadingInset`; part of `--editor-gutter-width`. */
+  --editor-gutter-inset: 0px;
+  --editor-row-height: 24px;
+
+  flex: 1;
+  position: relative;
+  overflow: auto;
+  /* Written by the editor from its `fontSize` and `fontFamily` options. */
+  font-size: var(--editor-font-size, 13px);
+  font-family: var(--editor-font-family, monospace);
+  line-height: var(--editor-row-height);
+  white-space: pre;
+  tab-size: var(--editor-tab-size, 4);
+  color: var(--editor-foreground);
+  background: var(--editor-background);
+  contain: layout paint style;
+  /* The native scroll extent remains independent of the painted viewport. */
+  will-change: transform;
+}
+
+.editor-virtualized[data-editor-scroll-mode='static'] {
+  overflow-x: auto;
+  overflow-y: clip;
+}
+
+.editor-virtualized-viewport {
+  clip-path: inset(0);
+  left: 0;
+  position: sticky;
+  top: 0;
+}
+
+.editor-virtualized-clip {
+  inset: 0;
+  position: absolute;
+}
+
+.editor-virtualized-text-clip {
+  clip-path: inset(0 0 0 var(--editor-gutter-width));
+}
+
+.editor-virtualized-gutter-clip {
+  clip-path: inset(0 max(0px, calc(100% - var(--editor-gutter-width))) 0 0);
+  pointer-events: none;
+  z-index: var(--editor-z-gutter);
+}
+
+.editor-virtualized-content {
+  /* Move a complete row paint inside the sticky viewport; native scrolling cannot outrun it. */
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+
+.editor-virtualized-spacer {
+  /* Width and height are always set inline from JS (applySpacerWidth /
+     applyTotalHeight). No `min-width: max-content`: intrinsic sizing would make
+     the spacer's size depend on every mounted row's text, which disqualifies
+     rows as relayout boundaries and forces document-rooted layout on every
+     recycle frame. */
+  contain: layout paint style;
+  position: relative;
+}
+
+.editor-virtualized-gutter {
+  background: var(--editor-gutter-background);
+  height: 100%;
+  left: 0;
+  pointer-events: none;
+  position: sticky;
+  width: var(--editor-gutter-width);
+  z-index: var(--editor-z-gutter);
+}
+
+.editor-virtualized-gutter-row {
+  align-items: center;
+  box-sizing: border-box;
+  /* `size` requires externally imposed dimensions: height comes from
+     --editor-row-height, width from left/right against the fixed-width gutter.
+     layout+size containment makes each gutter row a relayout boundary, so
+     counter-set/content writes on recycle re-lay-out only that row. */
+  contain: layout paint style size;
+  display: flex;
+  height: var(--editor-row-height);
+  justify-content: flex-start;
+  line-height: var(--editor-row-height);
+  left: 0;
+  /* Lanes start after the leading inset; the row's own background still covers it. */
+  padding-left: var(--editor-gutter-inset);
+  position: absolute;
+  right: 0;
+  /* Same WebKit highlight-invalidation workaround as .editor-virtualized-row. */
+  will-change: transform;
+  top: 0;
+  user-select: none;
+}
+
+/* `display: flex` above beats the UA [hidden] rule, and a retired row keeps its old position. */
+.editor-virtualized-gutter-row[hidden] {
+  display: none;
+}
+
+.editor-virtualized-gutter-cell {
+  align-items: center;
+  box-sizing: border-box;
+  /* No `style` containment here, unlike the other virtualized elements: gutter
+     contributions set `counter-set` inline on this element (line numbers), and
+     WebKit resolves counter() in the element's own ::before to 0 when the same
+     element has style containment. Safari then renders every line number as
+     "0". Chromium/Firefox scope the counter to the subtree as css-contain
+     specifies. See docs/display/browser-quirks.md. */
+  contain: layout paint;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: var(--editor-row-height);
+  line-height: inherit;
+}
+
+/* The gutter passes presses through to the text; an interactive contribution's cell takes them. */
+.editor-virtualized-gutter-cell[data-editor-gutter-interactive] {
+  pointer-events: auto;
+}
+
+.editor-virtualized-gutter-cell.editor-virtualized-cursor-line-gutter {
+  background: var(--editor-cursor-line-gutter-background);
+}
+
+/* With every lane highlighted, the band reaches the gutter's edge through the leading inset. */
+.editor-virtualized-cursor-line-gutter-band::before {
+  background: var(--editor-cursor-line-gutter-background);
+  bottom: 0;
+  content: '';
+  left: 0;
+  position: absolute;
+  top: 0;
+  width: var(--editor-gutter-inset);
+}
+
+.editor-virtualized-gutter-cell.editor-virtualized-cursor-line-gutter[hidden] {
+  visibility: visible;
+}
+
+.editor-virtualized-cursor-line-row {
+  background: var(--editor-cursor-line-row-background);
+}
+
+.editor-virtualized-row {
+  box-sizing: border-box;
+  /* layout+size containment makes each row a Blink relayout boundary, so a
+     recycled row's text swap re-lays-out ~7 boxes instead of a document-rooted
+     pass over every mounted row (measured 105-118ms/frame at ~7fps). `size` is
+     safe because both dimensions are externally imposed: height from
+     --editor-row-height, width from left/right against the JS-sized spacer.
+     No `min-width: max-content` for the same reason: it made row size depend on
+     line text, forcing a full intrinsic re-measure of every mounted row per
+     recycle frame. Tradeoff: horizontal scroll extent now trusts the JS column
+     estimate (visualColumnLength), which undercounts double-width glyphs. */
+  contain: layout paint style size;
+  height: var(--editor-row-height);
+  left: var(--editor-gutter-width);
+  line-height: var(--editor-row-height);
+  position: absolute;
+  right: 0;
+  top: 0;
+  white-space: pre;
+  /* Own compositor layer per row: WebKit re-resolves every registered CSS
+     Highlight range when a painted row's transform changes, stalling scroll
+     remounts 100-300ms. Compositor-only moves skip that invalidation. */
+  will-change: transform;
+}
+
+.editor-virtualized-row-chunk {
+  white-space: pre;
+}
+
+.editor-virtualized-control-character {
+  color: var(--editor-hidden-character-foreground);
+  display: inline-block;
+  font: inherit;
+  line-height: inherit;
+  overflow: hidden;
+  text-align: center;
+  vertical-align: top;
+  white-space: pre;
+}
+
+/* Dimmed rather than recoloured, so a suggestion reads as not-yet-written against whatever the theme
+   is painting the line in, instead of taking a colour that means something else in it. */
+.editor-ghost-text {
+  opacity: 0.5;
+}
+
+/* Laid out as one box in the text flow, and aligned to the row's top edge so a node taller than the
+   line does not push the baseline the rest of the row sits on. */
+.editor-inline-widget {
+  display: inline-block;
+  line-height: inherit;
+  max-height: var(--editor-row-height);
+  overflow: hidden;
+  user-select: none;
+  vertical-align: top;
+  white-space: normal;
+}
+
+.editor-virtualized-row-spacer {
+  display: inline-block;
+  height: 1px;
+  pointer-events: none;
+}
+
+.editor-virtualized-bidi-ceiling {
+  color: var(--editor-hidden-character-foreground);
+  user-select: none;
+}
+
+.editor-virtualized-selection-layer {
+  height: var(--editor-row-height);
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  user-select: none;
+}
+
+.editor-virtualized-selection-range {
+  background-color: var(--editor-selection-background, rgba(56, 189, 248, 0.35));
+  height: calc(var(--editor-row-height) - 1px);
+  position: absolute;
+  top: 0.5px;
+}
+
+.editor-virtualized-hidden-character-layer {
+  height: var(--editor-row-height);
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  user-select: none;
+}
+
+.editor-virtualized-hidden-character-marker {
+  color: var(--editor-hidden-character-foreground);
+  display: inline-block;
+  font: inherit;
+  height: var(--editor-row-height);
+  line-height: var(--editor-row-height);
+  pointer-events: none;
+  position: absolute;
+  text-align: center;
+  top: 0;
+  user-select: none;
+  white-space: pre;
+}
+
+/* A confusable character is legible and has to stay legible — the reader has to be able to compare
+   it with what it imitates — so it is underlined rather than covered. */
+.editor-virtualized-hidden-character-marker[data-editor-hidden-character='ambiguous'] {
+  border-bottom: 2px solid var(--editor-suspicious-character-color);
+}
+
+/* An invisible one has no glyph and often no width at all, so the marker is the only thing there is
+   to see; the minimum width is what keeps a zero-width character from drawing a zero-width mark. */
+.editor-virtualized-hidden-character-marker[data-editor-hidden-character='invisible'] {
+  background-color: var(--editor-suspicious-character-color);
+  min-width: 2px;
+  opacity: 0.6;
+}
+
+.editor-virtualized-fold-placeholder {
+  color: #a1a1aa;
+  padding-left: 6px;
+  user-select: none;
+}
+
+/* Invisible, but not sizeless and not parked: the OS anchors an IME candidate window, an accent
+   picker and an emoji picker on this element's box, so it is kept a row tall and moved to the caret
+   (positionInputAtCaret). The width stays at one pixel so the browser's own scroll-the-caret-into-
+   view keeps whatever is being composed pinned to that box, and so nothing of the page of document
+   text this element carries for screen readers can ever be read off the screen. */
+.editor-virtualized-input {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  caret-color: transparent;
+  color: transparent;
+  height: var(--editor-row-height);
+  left: 0;
+  opacity: 0;
+  outline: none;
+  overflow: hidden;
+  padding: 0;
+  pointer-events: none;
+  position: absolute;
+  resize: none;
+  top: 0;
+  -webkit-text-fill-color: transparent;
+  /* An EditContext host shows the window as text; its breaks are the document's lines. */
+  white-space: pre;
+  width: 1px;
+}
+
+/* Text an IME is still assembling. It belongs to no line yet, so it draws over the row it is going
+   to land in and has to cover what is behind it; the underline is what says it is not committed. */
+.editor-virtualized-composition {
+  background: var(--editor-background);
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  text-decoration: underline;
+  top: 0;
+  user-select: none;
+  z-index: var(--editor-z-inline-surface);
+}
+
+.editor-virtualized-caret-layer {
+  animation: editor-virtualized-caret-blink 1s steps(1, end) infinite;
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+}
+
+.editor-virtualized-caret {
+  background: var(--editor-caret-color);
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  width: 2px;
+}
+
+@keyframes editor-virtualized-caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.editor-virtualized-metric-probe {
+  font: inherit;
+  left: -10000px;
+  line-height: inherit;
+  position: absolute;
+  tab-size: inherit;
+  visibility: hidden;
+  white-space: pre;
+}
+
+.editor-virtualized::selection {
+  color: inherit;
+  background: transparent;
+}
+
+/* Inline merge conflicts, after VS Code's merge-conflict extension: the marker lines are the
+   "headers", tinted at full strength, and the block between them at 40% of that. Hosts bind the
+   tokens; the fallbacks are VS Code's own values, which are the same in light and dark. */
+.editor-virtualized-row.editor-merge-conflict-current-header {
+  background-color: var(--editor-merge-current-header-background, rgb(64 200 174 / 0.5));
+}
+
+.editor-virtualized-row.editor-merge-conflict-current-content {
+  background-color: var(--editor-merge-current-content-background, rgb(64 200 174 / 0.2));
+}
+
+.editor-virtualized-row.editor-merge-conflict-common-header {
+  background-color: var(--editor-merge-common-header-background, rgb(96 96 96 / 0.4));
+}
+
+.editor-virtualized-row.editor-merge-conflict-common-content {
+  background-color: var(--editor-merge-common-content-background, rgb(96 96 96 / 0.16));
+}
+
+.editor-virtualized-row.editor-merge-conflict-incoming-content {
+  background-color: var(--editor-merge-incoming-content-background, rgb(64 166 255 / 0.2));
+}
+
+.editor-virtualized-row.editor-merge-conflict-incoming-header {
+  background-color: var(--editor-merge-incoming-header-background, rgb(64 166 255 / 0.5));
+}
+
+.editor-virtualized-row.editor-merge-conflict-current-header,
+.editor-virtualized-row.editor-merge-conflict-common-header,
+.editor-virtualized-row.editor-merge-conflict-splitter,
+.editor-virtualized-row.editor-merge-conflict-incoming-header {
+  outline: 1px solid var(--editor-merge-border, transparent);
+  outline-offset: -1px;
+}
+
+/* The "(Current Change)" / "(Incoming Change)" trailer VS Code appends after a marker line. Drawn
+   by CSS so it is neither text nor selectable, and disappears with the marker. */
+.editor-virtualized-row.editor-merge-conflict-current-header::after,
+.editor-virtualized-row.editor-merge-conflict-incoming-header::after {
+  color: var(--editor-merge-description-foreground, rgb(153 153 153));
+  pointer-events: none;
+  user-select: none;
+}
+
+.editor-virtualized-row.editor-merge-conflict-current-header::after {
+  content: ' (Current Change)';
+}
+
+.editor-virtualized-row.editor-merge-conflict-incoming-header::after {
+  content: ' (Incoming Change)';
+}
+
+/* The CodeLens line: an empty row injected above `<<<<<<<`, with the actions laid over it. */
+.editor-merge-conflict-lens-layer {
+  height: 0;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+  z-index: var(--editor-z-overlay-surface);
+}
+
+.editor-merge-conflict-lens {
+  align-items: center;
+  color: var(--editor-merge-lens-foreground, rgb(153 153 153));
+  display: flex;
+  font-size: 90%;
+  height: var(--editor-row-height);
+  left: var(--editor-gutter-width);
+  line-height: var(--editor-row-height);
+  position: absolute;
+  top: 0;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.editor-merge-conflict-lens-action {
+  appearance: none;
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  margin: 0;
+  padding: 0;
+}
+
+.editor-merge-conflict-lens-action:hover {
+  color: var(--editor-merge-lens-active-foreground, var(--editor-foreground));
+}
+
+.editor-merge-conflict-lens-action:focus-visible {
+  outline: 1px solid var(--editor-merge-lens-active-foreground, var(--editor-foreground));
+  outline-offset: 1px;
+}
+
+.editor-merge-conflict-lens-separator {
+  padding: 0 0.5em;
+}
+
+.editor:not(:focus-within) .editor-virtualized-selection-range {
+  background-color: var(
+    --editor-selection-inactive-background,
+    var(--editor-selection-background, rgba(56, 189, 248, 0.35))
+  );
+}
+
+/* A modal editor's caret: the block covers one cell, the underline sits under it. */
+.editor-virtualized[data-editor-cursor-style='block'] .editor-virtualized-caret {
+  opacity: 0.6;
+  width: 1ch;
+}
+
+.editor-virtualized[data-editor-cursor-style='underline'] .editor-virtualized-caret {
+  height: 2px !important;
+  margin-top: calc(var(--editor-row-height) - 2px);
+  width: 1ch;
+}

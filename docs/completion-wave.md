@@ -52,8 +52,7 @@ ln -s /work/projects/platform/references references
 bun install
 ```
 
-`/work/worktrees/platform/Editor -> /work/projects/Editor` already exists. The
-`packages/editor-*` symlinks resolve through it. Never delete it.
+Editor and ghostty source live inside each Platform worktree at `editor/` and `ghostty-webgpu/`. The root Bun install resolves their workspace packages.
 
 After the first commit, open a draft PR and keep pushing to it:
 
@@ -93,21 +92,7 @@ and its PR body says which other lanes' migrations it must absorb.
 Stay out of `apps/server/src/fonts/`, `lib/fonts`, `boot-appearance.ts` and `apply-appearance.ts`
 until it is on `main`. The settings registry is fine to add keys to; regenerate on rebase.
 
-**Editor** (lane L7 only). This is the only lane that edits the Editor repo:
-
-```bash
-git -C /work/projects/Editor worktree add /work/worktrees/Editor/L7 -b lane/L7 origin/main
-cd /work/worktrees/Editor/L7 && bun install && bun run build
-```
-
-- Test inside the Editor worktree: `test`, `bench:check`, `health`, `check:full-text`, and
-  `format:check` with `packages/*/node_modules/.bin/oxfmt`.
-- Never `bun link` from a worktree. It repoints every session's links. For the Platform half,
-  point only L7's Platform worktree `node_modules/@singapore-editor/*` links at the Editor
-  worktree (`bun install` restores them).
-- L7 opens two PRs, one per repo. The Platform PR body says the Editor PR merges first,
-  followed by `bun run build` in `/work/projects/Editor`, because Platform CI builds Editor
-  `main`.
+**Editor** work stays inside the lane's Platform worktree. Follow `editor/AGENTS.md`, run `bun run build:workspaces`, and verify Editor's `test`, `bench:check`, `health`, `check:full-text` and `format:check` tasks. Source and consumer changes ship in one Fregat PR. The standalone repositories are mirrors.
 
 **Finish.** When the queue is empty: final rebase, gates, push, `gh pr ready`, then
 `git worktree remove /work/worktrees/platform/<lane>` (the branch stays for the PR).

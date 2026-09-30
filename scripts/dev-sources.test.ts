@@ -69,12 +69,12 @@ sourceTest('refuses a partial editor source checkout even when built exports exi
   expect(() => readDevSources(web)).toThrow('Missing source for @singapore-editor/core/document')
 })
 
-sourceTest('identifies a missing linked checkout and a missing generated asset', ({ web }) => {
+sourceTest('identifies a missing workspace package and a missing generated asset', ({ web }) => {
   const wasm = path.join(web, 'node_modules/ghostty-webgpu/bridge.wasm')
   fs.unlinkSync(wasm)
   expect(() => readDevSources(web)).toThrow(wasm)
   fs.rmSync(path.join(web, 'node_modules/ghostty-webgpu'), { recursive: true })
-  expect(() => readDevSources(web)).toThrow('Run bun link')
+  expect(() => readDevSources(web)).toThrow('Run bun install at the repository root.')
 })
 
 function writeFile(root: string, relative: string, content = '') {

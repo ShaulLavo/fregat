@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { YAML } from 'bun'
@@ -16,18 +16,65 @@ function git(cwd, ...args) {
   return result.stdout.trim()
 }
 
-function mirror(cwd) {
+function mirror(cwd, family = 'hotkeys') {
   return spawnSync('bash', ['-c', script], {
     cwd,
     encoding: 'utf8',
     env: {
       ...process.env,
       MIRROR_TOKEN: 'fixture-token',
-      FAMILY_FOLDER: 'hotkeys',
+      FAMILY_FOLDER: family,
       MIRROR_REPOSITORY: 'fixture/mirror',
     },
   })
 }
+
+test.each(['editor', 'ghostty-webgpu'])(
+  'mirrors the tracked %s family tree after a legacy link',
+  async (family) => {
+    await withWorkspace(async ({ root }) => {
+      const origin = join(root, 'origin.git')
+      const destination = join(root, 'mirror.git')
+      const source = join(root, 'source')
+      git(root, 'init', '--bare', '--initial-branch=main', origin)
+      git(root, 'init', '--bare', '--initial-branch=main', destination)
+      git(root, 'clone', origin, source)
+      git(source, 'config', 'user.name', 'Fixture')
+      git(source, 'config', 'user.email', 'fixture@example.com')
+      git(source, 'config', `url.${destination}.insteadOf`, 'https://github.com/fixture/mirror.git')
+      await mkdir(join(source, 'outside'))
+      await symlink('outside', join(source, family))
+      git(source, 'add', family)
+      git(source, 'commit', '-m', 'legacy link')
+      git(source, 'push', 'origin', 'main')
+      const skipped = mirror(source, family)
+      expect(skipped.status, `${skipped.stdout}\n${skipped.stderr}`).toBe(0)
+      expect(skipped.stdout).toContain(`${family} has not landed yet.`)
+      await rm(join(source, family))
+      git(source, 'add', family)
+      git(source, 'commit', '-m', 'remove legacy link')
+      const imported = join(root, 'family-input')
+      git(root, 'init', '--initial-branch=main', imported)
+      await writeFile(join(imported, 'index.js'), 'family')
+      git(imported, 'add', 'index.js')
+      git(
+        imported,
+        '-c',
+        'user.name=Fixture',
+        '-c',
+        'user.email=fixture@example.com',
+        'commit',
+        '-m',
+        'family tree',
+      )
+      git(source, 'subtree', 'add', `--prefix=${family}`, imported, 'main')
+      git(source, 'push', 'origin', 'main')
+      const current = mirror(source, family)
+      expect(current.status, `${current.stdout}\n${current.stderr}`).toBe(0)
+      expect(git(destination, 'show', 'main:index.js')).toBe('family')
+    })
+  },
+)
 
 async function commitFamily(root, content) {
   await writeFile(join(root, 'hotkeys/index.js'), content)

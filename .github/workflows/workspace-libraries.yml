@@ -1,0 +1,77 @@
+name: Workspace libraries
+
+on:
+  pull_request:
+    paths:
+      - editor/**
+      - ghostty-webgpu/**
+      - package.json
+      - bun.lock
+      - turbo.json
+      - .github/actions/setup/**
+      - .github/workflows/workspace-libraries.yml
+  push:
+    branches: [main]
+    paths:
+      - editor/**
+      - ghostty-webgpu/**
+      - package.json
+      - bun.lock
+      - turbo.json
+      - .github/actions/setup/**
+      - .github/workflows/workspace-libraries.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workspace-libraries-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  editor:
+    name: Editor tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Install browsers
+        run: editor/packages/editor/node_modules/.bin/playwright install --with-deps chromium chromium-headless-shell firefox webkit
+      - name: Check generated language catalog
+        run: bun run --cwd editor/packages/tree-sitter-languages languages:generate -- --check
+      - name: Check task inputs
+        run: bun editor/scripts/check-turbo-inputs.mjs
+      - name: Test Editor packages and examples
+        run: bun x turbo run test --filter='./editor/packages/*' --filter='./editor/examples/*' --concurrency=1
+      - name: Test tree-sitter browser worker
+        run: bun run --cwd editor/packages/tree-sitter test:browser
+
+  ghostty:
+    name: Ghostty tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Initialize xterm reference
+        run: git submodule update --init --depth=1 ghostty-webgpu/references/xterm.js
+      - name: Install Chromium
+        run: ghostty-webgpu/node_modules/.bin/playwright install --with-deps chromium
+      - name: Verify terminal library and browser package
+        run: bun run --cwd ghostty-webgpu verify
+      - name: Classify native resolver state
+        id: native-state
+        working-directory: ghostty-webgpu
+        run: |
+          set -euo pipefail
+          state="$(bun scripts/verify-config-resolver-artifacts.ts --state either)"
+          if [[ "$state" != 'bootstrap' && "$state" != 'assembled' ]]; then
+            echo 'native resolver state classifier returned an invalid state' >&2
+            exit 1
+          fi
+          echo "state=$state" >> "$GITHUB_OUTPUT"
+      - name: Verify assembled host package
+        if: ${{ steps.native-state.outputs.state == 'assembled' }}
+        run: bun run --cwd ghostty-webgpu test:package:host

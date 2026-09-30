@@ -1,0 +1,69 @@
+name: Textbuffer tree height
+
+on:
+  pull_request:
+    paths:
+      - 'packages/textbuffer/**'
+      - 'bun.lock'
+      - '.github/workflows/textbuffer-height.yml'
+  push:
+    branches: ['main']
+    paths:
+      - 'packages/textbuffer/**'
+      - 'bun.lock'
+      - '.github/workflows/textbuffer-height.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: textbuffer-height-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  height:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.2'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: bun install
+      - name: Check formatting and lint
+        run: |
+          bun run --cwd packages/textbuffer format:check
+          bun run --cwd packages/textbuffer lint
+      - name: Build, prepare the pinned control and test the measurements
+        run: bun run --cwd packages/textbuffer bench:check
+      - name: Smoke both engines
+        run: bun run --cwd packages/textbuffer bench:height -- --profile smoke --trace-seeds 7 --out bench/results/height-smoke
+      # The standard sweep is a long replay whose output is an artifact, not a gate; pull requests get the smoke run only.
+      - name: Sample both trees across edit seeds
+        if: github.event_name != 'pull_request'
+        run: bun run --cwd packages/textbuffer bench:height -- --profile standard
+      - name: Plot samples
+        if: always()
+        working-directory: packages/textbuffer
+        run: |
+          python -m pip install matplotlib==3.10.8
+          for report in bench/results/height-*/height.json; do
+            python bench/plot-height.py "$report" --allow-partial
+            cat "$(dirname "$report")/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          done
+      - name: Retain plots and raw measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: textbuffer-height-${{ github.run_id }}
+          path: packages/textbuffer/bench/results/height-*/
+          if-no-files-found: warn

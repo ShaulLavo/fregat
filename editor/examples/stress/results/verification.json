@@ -1,0 +1,102 @@
+{
+  "contractsPassed": true,
+  "calibrationStable": false,
+  "controls": [
+    "cee8a268-9a7d-4261-a82c-23613621b671",
+    "298ac0ec-3080-4472-a4d7-542c4a44b579",
+    "2af7e6eb-ff51-4c1a-a144-f97b0dbc470d",
+    "dd99e03e-0768-4c72-b74e-bdb0a62c2f5b"
+  ],
+  "rerun": "a062bdd4-47e0-44af-bdee-aef239d93a2f",
+  "samplesPerRun": 180,
+  "latencyComparisons": 92,
+  "resourceComparisons": 250,
+  "liveCancellation": {
+    "passed": true,
+    "cleanup": {
+      "trackedObjects": 4,
+      "retainedObjects": 0,
+      "hosts": 0,
+      "pendingFrames": 0,
+      "active": false
+    }
+  },
+  "injectedSlowdown": {
+    "kind": "synthetic addition to recorded raw attach samples",
+    "addedMs": 10000,
+    "detected": ["ordinary/open/cold/attach", "ordinary/open/warm/attach"]
+  },
+  "injectedRetentionDetected": true,
+  "missingSamplesRejected": true,
+  "fixtureHashesRejected": true,
+  "differentOptionsRejected": true,
+  "missingPostChurnMemoryRejected": true,
+  "partialMemoryCoverageRejected": true,
+  "missingRetainedObjectsRejected": true,
+  "initialControlCheck": {
+    "candidate": "dd99e03e-0768-4c72-b74e-bdb0a62c2f5b",
+    "passed": false,
+    "failedLatencyLimits": 9,
+    "failedResourceLimits": 3
+  },
+  "unchangedComparison": {
+    "failedLatencyLimits": [
+      {
+        "key": "long-line/typing/cold/keyToApplied",
+        "p50Ms": 27,
+        "p95Ms": 31.899999976158142,
+        "baselineP50Ms": 26,
+        "limit": {
+          "p50Ms": 27.999999940395355,
+          "p95Ms": 28.799999833106995,
+          "controlP50Ms": [26, 25.80000001192093, 26.099999964237213, 26],
+          "controlP95Ms": [
+            27.899999976158142, 27.600000023841858, 27.80000001192093, 27.69999998807907
+          ]
+        },
+        "passed": false
+      },
+      {
+        "key": "long-line/typing/cold/keyToFrame",
+        "p50Ms": 27.19999998807907,
+        "p95Ms": 32,
+        "baselineP50Ms": 26.099999964237213,
+        "limit": {
+          "p50Ms": 28.099999964237213,
+          "p95Ms": 28.799999833106995,
+          "controlP50Ms": [
+            26.099999964237213, 25.900000035762787, 26.19999998807907, 26.099999964237213
+          ],
+          "controlP95Ms": [
+            27.899999976158142, 27.80000001192093, 27.899999976158142, 27.899999976158142
+          ]
+        },
+        "passed": false
+      },
+      {
+        "key": "long-line/typing/cold/burstToPaintUpperBound",
+        "p50Ms": 1241.300000011921,
+        "p95Ms": 1274,
+        "baselineP50Ms": 1155.5,
+        "limit": {
+          "p50Ms": 1202.6999999284744,
+          "p95Ms": 1204.6999999284744,
+          "controlP50Ms": [1155.5, 1143.8999999761581, 1158.5999999642372, 1144],
+          "controlP95Ms": [1158.6000000238419, 1160.5, 1160.5999999642372, 1159.6000000238419]
+        },
+        "passed": false
+      }
+    ],
+    "failedResourceLimits": [
+      {
+        "key": "ordinary/churn/cold/heapBytes",
+        "max": 4483740,
+        "limit": {
+          "max": 4483576,
+          "controlMaxima": [4482964, 4482772, 4482788, 4482760]
+        },
+        "passed": false
+      }
+    ]
+  }
+}

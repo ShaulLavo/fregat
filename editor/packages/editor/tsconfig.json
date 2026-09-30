@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "allowArbitraryExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    "paths": {
+      "@singapore-editor/core": ["./src/index.ts"],
+      "@singapore-editor/core/debug": ["./src/debug.ts"],
+      "@singapore-editor/core/document": ["./src/public/document.ts"],
+      "@singapore-editor/core/editor": ["./src/editor.ts"],
+      "@singapore-editor/core/extensions": ["./src/public/extensions.ts"],
+      "@singapore-editor/core/internal": ["./src/internal.ts"],
+      "@singapore-editor/core/logging": ["./src/logging/index.ts"],
+      "@singapore-editor/core/logging/evlog": ["./src/logging/evlog.ts"],
+      "@singapore-editor/core/rendering": ["./src/public/rendering.ts"],
+      "@singapore-editor/core/secondary-views": ["./src/public/secondaryViews.ts"],
+      "@singapore-editor/core/shiki": ["./src/shiki/index.ts"],
+      "@singapore-editor/core/syntax": ["./src/public/syntax.ts"],
+      "@singapore-editor/core/testing": ["./src/public/testing.ts"]
+    }
+  },
+  "include": ["src", "test", "../../global.d.ts"],
+  "exclude": ["dist"]
+}

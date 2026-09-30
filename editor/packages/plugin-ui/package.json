@@ -1,0 +1,100 @@
+{
+  "name": "@singapore-editor/plugin-ui",
+  "version": "0.1.0",
+  "files": [
+    "README.md",
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "./dist/hoverToken.js"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./anchored-surface": {
+      "types": "./dist/anchoredSurface.d.ts",
+      "import": "./dist/anchoredSurface.js",
+      "default": "./dist/anchoredSurface.js"
+    },
+    "./hover-controller": {
+      "types": "./dist/hoverController.d.ts",
+      "import": "./dist/hoverController.js",
+      "default": "./dist/hoverController.js"
+    },
+    "./hover-participant": {
+      "types": "./dist/hoverParticipant.d.ts",
+      "import": "./dist/hoverParticipant.js",
+      "default": "./dist/hoverParticipant.js"
+    },
+    "./hover-plugin": {
+      "types": "./dist/hoverPlugin.d.ts",
+      "import": "./dist/hoverPlugin.js",
+      "default": "./dist/hoverPlugin.js"
+    },
+    "./hover-registry": {
+      "types": "./dist/hoverRegistry.d.ts",
+      "import": "./dist/hoverRegistry.js",
+      "default": "./dist/hoverRegistry.js"
+    },
+    "./hover-token": {
+      "types": "./dist/hoverToken.d.ts",
+      "import": "./dist/hoverToken.js",
+      "default": "./dist/hoverToken.js"
+    },
+    "./markdown-tooltip": {
+      "types": "./dist/markdownTooltip.d.ts",
+      "import": "./dist/markdownTooltip.js",
+      "default": "./dist/markdownTooltip.js"
+    },
+    "./offset-range": {
+      "types": "./dist/offsetRange.d.ts",
+      "import": "./dist/offsetRange.js",
+      "default": "./dist/offsetRange.js"
+    },
+    "./styles": {
+      "types": "./dist/styles.d.ts",
+      "import": "./dist/styles.js",
+      "default": "./dist/styles.js"
+    },
+    "./tooltip": {
+      "types": "./dist/tooltip.d.ts",
+      "import": "./dist/tooltip.js",
+      "default": "./dist/tooltip.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "bun ../../scripts/build-package.ts",
+    "test": "vitest run",
+    "typecheck": "tsgo --noEmit",
+    "lint": "oxlint .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check ."
+  },
+  "dependencies": {
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "remark-stringify": "^11.0.0",
+    "unified": "^11.0.5"
+  },
+  "devDependencies": {
+    "@singapore-editor/core": "workspace:*",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "@vitest/browser-playwright": "5.0.2",
+    "happy-dom": "^20.14.5",
+    "oxfmt": "0.70.0",
+    "oxlint": "1.85.0",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.2"
+  },
+  "peerDependencies": {
+    "@singapore-editor/core": "workspace:*"
+  }
+}

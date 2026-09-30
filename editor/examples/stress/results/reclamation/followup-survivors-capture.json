@@ -1,0 +1,189 @@
+{
+  "browser": "153.0.8010.12",
+  "bundleHash": "af8ddcb95159618396edfc5cc801f05987bf62fd310b4529ecb5652b64e59601",
+  "measuredAt": "2026-09-23T16:03:40.582Z",
+  "options": {
+    "workloads": "survivors",
+    "cycles": "500",
+    "repetitions": "1",
+    "heap-snapshot": "/work/tmp/e006-followup/survivors.heapsnapshot",
+    "heap-snapshot-baseline": "/work/tmp/e006-followup/survivors-baseline.heapsnapshot",
+    "typing-samples": "0",
+    "observe-only": false
+  },
+  "workloadDefinitions": {
+    "aligned": "16,384 UTF-16 unit inserts, deleted whole",
+    "survivors": "1,024 unit inserts retaining 64 units each",
+    "mixed": "1,024 unit inserts; three of four deleted whole",
+    "paragraph": "replace the same 1,024 unit paragraph each cycle",
+    "original": "delete 4,194,304 units from original text; release session and external owners separately",
+    "paste-tail": "paste 4,194,368 units, retain the 64-unit writable tail, reset sync-chain payload, release history and external owners"
+  },
+  "failure": null,
+  "note": "Two mounted editors; automatic maintenance; actual GC heap. Every baseline, before, after, and external-owner heap reading uses the second explicit timer-task and GC with maintenance suspended; the immediate CDP-GC reading is preserved separately because weak targets/finalizer bookkeeping may remain until a task boundary. A WeakRef-only sentinel created in each churn job must be absent after both task/GC rounds; original and paste fixtures have no churn sentinel. Registry backingUnits sum page backing lengths with duplicates and are not physical retained bytes. Maintenance completion counts must remain unchanged across each capture; the automatic scheduler resumes at the next maintenance wait. Heap peaks are 10ms CDP samples, not an exact maximum. Input probes measure trusted keydown to the second animation frame on identical text in the same browser before/after maintenance; observational paired timings, not the E002 calibrated regression gate. Original deletion checks history/clean and external-reader release separately; undo is excluded there because DocumentEditChain legitimately retains the restored insertion payload.",
+  "samples": [
+    {
+      "workload": "survivors",
+      "cycles": 500,
+      "churnMs": 1535.7000000476837,
+      "registryEntriesAtChurnEnd": 1003,
+      "deletedUnits": 480000,
+      "retainedCodeUnitsBefore": 512014,
+      "retainedCodeUnitsAfter": 128014,
+      "revision": 1001,
+      "dirty": true,
+      "liveUnits": 32014,
+      "heapBefore": 4137276,
+      "heapAfter": 3930460,
+      "heapBeforeAbsolute": 7012140,
+      "heapBeforeImmediateAbsolute": 7086300,
+      "heapCalibration": {
+        "immediateAbsolute": 7086300,
+        "strings": {
+          "categories": {
+            "string": 1283756,
+            "concatenated string": 15180,
+            "sliced string": 1480
+          },
+          "bytes": 1300416
+        },
+        "firstTaskGcAbsolute": 7011524,
+        "secondTaskGcAbsolute": 7012140,
+        "stabilityDeltaBytes": 616,
+        "immediateRegistry": {
+          "registryEntries": 503,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 503,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 503,
+          "logicalUnits": 32014,
+          "backingUnits": 8146975
+        },
+        "secondRegistry": {
+          "registryEntries": 503,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 503,
+          "logicalUnits": 32014,
+          "backingUnits": 8146975
+        }
+      },
+      "heapBaselineCalibration": {
+        "immediateAbsolute": 2853700,
+        "strings": {
+          "categories": {
+            "string": 558956,
+            "concatenated string": 14300,
+            "sliced string": 0
+          },
+          "bytes": 573256
+        },
+        "firstTaskGcAbsolute": 2860408,
+        "secondTaskGcAbsolute": 2874864,
+        "stabilityDeltaBytes": 14456,
+        "immediateRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0
+        },
+        "firstRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        },
+        "secondRegistry": {
+          "registryEntries": 0,
+          "maintenanceCompleted": 0,
+          "sentinelCreated": false,
+          "sentinelAlive": false,
+          "livePages": 0,
+          "logicalUnits": 0,
+          "backingUnits": 0
+        }
+      },
+      "heapAfterCalibration": {
+        "immediateAbsolute": 6804608,
+        "strings": {
+          "categories": {
+            "string": 934872,
+            "concatenated string": 15220,
+            "sliced string": 1480
+          },
+          "bytes": 951572
+        },
+        "firstTaskGcAbsolute": 6805212,
+        "secondTaskGcAbsolute": 6805324,
+        "stabilityDeltaBytes": 112,
+        "immediateRegistry": {
+          "registryEntries": 103,
+          "maintenanceCompleted": 1
+        },
+        "firstRegistry": {
+          "registryEntries": 103,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 103,
+          "logicalUnits": 6414,
+          "backingUnits": 1593375
+        },
+        "secondRegistry": {
+          "registryEntries": 103,
+          "maintenanceCompleted": 1,
+          "sentinelCreated": true,
+          "sentinelAlive": false,
+          "livePages": 103,
+          "logicalUnits": 6414,
+          "backingUnits": 1593375
+        }
+      },
+      "heapAfterAbsolute": 6805324,
+      "sampledPeakHeap": 8389136,
+      "heapSamples": 30,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 25,
+        "codeUnits": 384000,
+        "snapshots": 202,
+        "maxSliceMs": 0.7999999523162842
+      },
+      "snapshotIdentity": true,
+      "wrapperIdentity": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "inputBefore": null,
+      "inputAfter": null,
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": [],
+      "repetition": 0
+    }
+  ],
+  "heapSummary": [
+    {
+      "workload": "survivors/500",
+      "samples": 1,
+      "medianReduction": 0.04998844650441503
+    }
+  ],
+  "stringHeapSummary": [
+    {
+      "workload": "survivors/500",
+      "samples": 1,
+      "medianReduction": 0.47973485890312995
+    }
+  ],
+  "acceptance": "Retained code units must decrease; median baseline-subtracted string-category bytes must decrease by >10%. Total heap is observational. String bytes sum self_size for string, concatenated string and sliced string nodes, including backing strings, across the whole isolate; they are not exclusive document retained size. Original/paste external-owner checks use string bytes too."
+}

@@ -30,19 +30,15 @@ typecheck, lint, format:check, test. lint is oxlint, formatting is oxfmt. narrow
 
 commit hooks are opt-in. `bun run hooks:install` gets you oxfmt and oxlint over staged files, then a repo typecheck
 
-## the linked checkouts
+## workspace libraries
 
-singapore and ghostty-webgpu are not vendored, and not published under the names used here. you need both as siblings, at `../Editor` and `../ghostty-webgpu`, registered once with `bun link` inside each package. the root `overrides` map then points every `@singapore-editor/*` and `ghostty-webgpu` at those checkouts through bun's `link:` protocol. ci does the same thing, cloning both repos as siblings and linking each package
+Editor packages live in `editor/packages/`, and the terminal library lives in `ghostty-webgpu/`. Bun installs their workspace links from the root `bun.lock`. Run `bun install --frozen-lockfile` at the root, then `bun run build:workspaces` to prepare the exports used by production builds and typechecking.
 
-they are deliberately not bun workspaces. turbo skips any workspace package whose realpath falls outside the repo root, so a `"../Editor/packages/*"` glob breaks `bun run dev` outright. `overrides` plus `link:` gets live source without workspace membership
+`dev` and `dev:web` serve both libraries from their TypeScript source. Startup prints each package's resolved directory. Editing Fregat's UI hot reloads; editing Editor or ghostty reloads the page so mounted instances pick up the new code. `bun run --cwd apps/web typecheck:dev` checks the same source map Vite uses.
 
-`dev` and `dev:web` serve both libraries from their linked typescript. no second demo server, no build watcher. startup prints every source package with the directory it resolved to, and a missing source file stops startup rather than quietly falling back to `dist`
+Ghostty's `ghostty-vt.wasm` and `bridge.wasm` are compiled artifacts. Run `bun run build:wasm` or `bun run build:bridge` in `ghostty-webgpu/` after changing their native inputs. Production builds read `dist`; run `bun run build:workspaces` after source changes. Restart dev after changing a package's export map.
 
-editing fregat's own ui hot-reloads. editing singapore or ghostty reloads the page, so mounted instances pick up the new code. `bun run --cwd apps/web typecheck:dev` runs the source typecheck once against the same module map vite uses
-
-two things still need a build step. ghostty's `ghostty-vt.wasm` and `bridge.wasm` are compiled artifacts, so run `bun run build:wasm` or `bun run build:bridge` in that checkout after changing their native inputs. and production builds read `dist`, which source development never updates
-
-restart dev after changing a package's export map or relinking a checkout
+The family folders are mirrored to their standalone repositories. Make library changes here and follow `editor/AGENTS.md` and `ghostty-webgpu/AGENTS.md` for their package rules.
 
 ## the shared dev server
 

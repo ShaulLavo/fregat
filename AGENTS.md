@@ -2,7 +2,7 @@
 
 ## Running A Task
 
-- Keep going when a step does not need the owner; put status notes in the same message as the next action. Stop only when blocked, or before something destructive: deleting data the owner keeps (`~/.platform`, `/work/platform-dev/home`, anything not yours in `/work`), force-pushing, taking another session's changes out of the tree, or changing anything outside this checkout except `../Editor` and `/work/projects/ghostty-webgpu`.
+- Keep going when a step does not need the owner; put status notes in the same message as the next action. Stop only when blocked, or before something destructive: deleting data the owner keeps (`~/.platform`, `/work/platform-dev/home`, anything not yours in `/work`), force-pushing, taking another session's changes out of the tree, or changing anything outside this checkout.
 - Done means: the narrowest check that could fail passes, a UI change has `look` evidence you read back, your files are committed by path and pushed, and the mesh runs it. Name anything you skipped.
 - Long runs keep their checklist in a file (the plan file, or the scratchpad) and tick items as they land.
 - End a run with what you need from the owner first, then what changed, then what you found. Mark what you could not confirm and where you looked.
@@ -130,7 +130,7 @@
 
 - Every finished change ships: `bun run deploy` (web only, reuses the server bundle) or, for server code, verify on the dev server first and then `bun run deploy --server --restart`. `--server` alone stages the build as `/work/platform-production/pending` and the app shows "Update available" until someone clicks Restart; `--restart` sends that button's request itself, waits for busy sessions (`developer.deployRestartWaitMinutes`), promotes, and awaits the live check. `bun run deploy --restart` alone restarts into what is already staged. Inside a Platform chat your own turn counts as busy: add `--interrupt`, which ends it with the restart. `--rollback` drops a staged release and moves `current` back; if the app does not return after Restart, run it from a terminal outside Platform. It serves `https://omarchy.mesh.shaulavo.dev/platform` from `platform-prod.service` on port 3301, private to the owner's Tailscale. The route was set up once by hand: `mesh serve omarchy 3301 --at /platform --isolate`.
 - `GET /platform/release` reports the served release, commit and dirty count, plus `pending`, `phase` and `liveCheck` for a staged update.
-- `ghostty-webgpu` is a `link:`; run `bun run build` there first. CI builds the Editor at `editor-ref` in `.github/actions/setup/action.yml`; bump it in the same commit when Platform needs newer Editor code.
+- Editor packages live in `editor/packages/`; the terminal library lives in `ghostty-webgpu/`. Both are root Bun workspaces mirrored to their standalone repositories. Change their source here, follow each folder's `AGENTS.md`, and run `bun run build:workspaces` before checking consumers. CI builds those workspaces from this checkout.
 - A release's `server/node_modules` symlinks to the checkout's, so rollback does not undo a `bun install`.
 
 ## Testing

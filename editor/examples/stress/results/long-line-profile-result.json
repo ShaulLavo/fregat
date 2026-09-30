@@ -1,0 +1,3280 @@
+{
+  "schemaVersion": 1,
+  "id": "190486ec-7682-4943-872f-65877ef4d17e",
+  "createdAt": "2026-09-05T17:14:56.375Z",
+  "manifest": {
+    "schemaVersion": 1,
+    "generatorVersion": 1,
+    "seed": 60061,
+    "fixtures": [
+      {
+        "id": "ordinary",
+        "bytes": 4469,
+        "utf16Length": 4469,
+        "normalizedLength": 4469,
+        "lines": 200,
+        "longestLine": 22,
+        "searchCount": 1,
+        "sha256": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197"
+      },
+      {
+        "id": "long-line",
+        "bytes": 1048594,
+        "utf16Length": 1048594,
+        "normalizedLength": 1048594,
+        "lines": 1,
+        "longestLine": 1048594,
+        "searchCount": 1,
+        "sha256": "467fa816efc5aa5c082ed44ea4dc10bbbb41da16faf4d4822aa3d122edc628f7"
+      }
+    ]
+  },
+  "config": {
+    "runnerVersion": 1,
+    "repetitions": 1,
+    "warmups": 1,
+    "scenarios": ["open", "jump", "typing", "find-all", "scroll", "churn"],
+    "diagnostics": false,
+    "typedText": "abcdefghijklmnopqrstuvwxyz0123456789abcd",
+    "churnCycles": 100,
+    "viewport": {
+      "width": 1000,
+      "height": 1000
+    },
+    "syntax": "tree-sitter-typescript-on-ordinary-open-only",
+    "views": "two-visible-one-hidden-on-churn",
+    "delivery": "vite-production-playwright-route",
+    "paintMeasurement": "screenshot-completion-upper-bound",
+    "memory": "chromium-cdp-forced-gc",
+    "profiling": {
+      "intervalMicros": 1000,
+      "minify": false,
+      "scenarios": ["typing", "churn"]
+    }
+  },
+  "environment": {
+    "commit": "9abb944f3a2b8d6516953fdec75e8df5e1a94811",
+    "dirty": true,
+    "sourceHash": "44e669f6f7fc72b5d32355f81c2e73ad36fc44440537545cd0af418a3f874ed9",
+    "browser": {
+      "engine": "chromium",
+      "version": "148.0.7778.96",
+      "headless": true
+    },
+    "hardware": {
+      "cpu": "Intel(R) Core(TM) i7-14700K",
+      "logicalCpus": 28,
+      "memoryBytes": 33368887296,
+      "architecture": "x64",
+      "platform": "linux",
+      "release": "7.1.9-arch1-2"
+    },
+    "runtime": "v26.7.0",
+    "unsupportedMemory": {
+      "processRss": "No portable renderer process RSS API; CDP reports heap and DOM counts.",
+      "userAgentSpecificMemory": "Cross-origin isolation is not required by this runner."
+    }
+  },
+  "samples": [
+    {
+      "fixture": "ordinary",
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "scenario": "open",
+      "state": "cold",
+      "repetition": 0,
+      "latencyMs": {
+        "attach": [16.600000023841858],
+        "visibleTextUpperBound": [107.5],
+        "highlightedPaintUpperBound": [189.5]
+      },
+      "observation": {
+        "geometry": [
+          {
+            "className": "editor-virtualized editor",
+            "rect": {
+              "x": 8,
+              "y": 8,
+              "width": 900,
+              "height": 320,
+              "top": 8,
+              "right": 908,
+              "bottom": 328,
+              "left": 8
+            },
+            "clientHeight": 320,
+            "scrollHeight": 4300,
+            "scrollTop": 0,
+            "windowY": 0
+          },
+          {
+            "className": "editor-virtualized-input",
+            "rect": {
+              "x": 8,
+              "y": 8,
+              "width": 1,
+              "height": 20,
+              "top": 8,
+              "right": 9,
+              "bottom": 28,
+              "left": 8
+            },
+            "clientHeight": 20,
+            "scrollHeight": 360,
+            "scrollTop": 0,
+            "windowY": 0
+          }
+        ],
+        "now": 744.3999999761581,
+        "start": 553.0999999642372,
+        "paints": [
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 569.3000000119209
+          },
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "painted",
+            "at": 682.3999999761581
+          }
+        ],
+        "diagnostics": [],
+        "state": {
+          "documentId": "ordinary",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": "typescript",
+          "syntaxStatus": "ready",
+          "initialHighlightStatus": "painted",
+          "cursor": {
+            "row": 199,
+            "column": 22
+          },
+          "length": 4469,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "scroll": {
+          "top": 0,
+          "left": 0
+        },
+        "rows": [
+          {
+            "row": 0,
+            "text": "const needle0 = 2440;",
+            "height": 20
+          },
+          {
+            "row": 1,
+            "text": "const value1 = 9159;",
+            "height": 20
+          },
+          {
+            "row": 2,
+            "text": "const value2 = 554;",
+            "height": 20
+          },
+          {
+            "row": 3,
+            "text": "const value3 = 6417;",
+            "height": 20
+          },
+          {
+            "row": 4,
+            "text": "const value4 = 5804;",
+            "height": 20
+          },
+          {
+            "row": 5,
+            "text": "const value5 = 1035;",
+            "height": 20
+          },
+          {
+            "row": 6,
+            "text": "const value6 = 158;",
+            "height": 20
+          },
+          {
+            "row": 7,
+            "text": "const value7 = 7157;",
+            "height": 20
+          },
+          {
+            "row": 8,
+            "text": "const value8 = 4880;",
+            "height": 20
+          },
+          {
+            "row": 9,
+            "text": "const value9 = 3695;",
+            "height": 20
+          },
+          {
+            "row": 10,
+            "text": "const value10 = 5426;",
+            "height": 20
+          },
+          {
+            "row": 11,
+            "text": "const value11 = 6601;",
+            "height": 20
+          },
+          {
+            "row": 12,
+            "text": "const value12 = 2900;",
+            "height": 20
+          },
+          {
+            "row": 13,
+            "text": "const value13 = 5923;",
+            "height": 20
+          },
+          {
+            "row": 14,
+            "text": "const value14 = 598;",
+            "height": 20
+          },
+          {
+            "row": 15,
+            "text": "const value15 = 1805;",
+            "height": 20
+          },
+          {
+            "row": 16,
+            "text": "const value16 = 5992;",
+            "height": 20
+          },
+          {
+            "row": 17,
+            "text": "const value17 = 8807;",
+            "height": 20
+          },
+          {
+            "row": 18,
+            "text": "const value18 = 2938;",
+            "height": 20
+          },
+          {
+            "row": 19,
+            "text": "const value19 = 8049;",
+            "height": 20
+          },
+          {
+            "row": 20,
+            "text": "const value20 = 5900;",
+            "height": 20
+          },
+          {
+            "row": 21,
+            "text": "const value21 = 1339;",
+            "height": 20
+          },
+          {
+            "row": 22,
+            "text": "const value22 = 5294;",
+            "height": 20
+          },
+          {
+            "row": 23,
+            "text": "const value23 = 4357;",
+            "height": 20
+          },
+          {
+            "row": 24,
+            "text": "const value24 = 9872;",
+            "height": 20
+          },
+          {
+            "row": 25,
+            "text": "const value25 = 1023;",
+            "height": 20
+          },
+          {
+            "row": 26,
+            "text": "const value26 = 4898;",
+            "height": 20
+          },
+          {
+            "row": 27,
+            "text": "const value27 = 5833;",
+            "height": 20
+          }
+        ],
+        "text": {
+          "length": 4469,
+          "views": 1,
+          "cursor": {
+            "row": 199,
+            "column": 22
+          }
+        },
+        "textPixels": {
+          "ink": 527,
+          "chromatic": 0
+        },
+        "highlightPixels": {
+          "ink": 524,
+          "chromatic": 180
+        }
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 1973152,
+          "totalBytes": 2936832,
+          "documents": 1,
+          "nodes": 19,
+          "jsEventListeners": 13
+        },
+        "after": {
+          "usedBytes": 7705240,
+          "totalBytes": 8744960,
+          "documents": 1,
+          "nodes": 127,
+          "jsEventListeners": 29
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 2,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "scenario": "open",
+      "state": "warm",
+      "repetition": 0,
+      "latencyMs": {
+        "attach": [2.599999964237213],
+        "visibleTextUpperBound": [69.39999997615814],
+        "highlightedPaintUpperBound": [119.5]
+      },
+      "observation": {
+        "geometry": [
+          {
+            "className": "editor-virtualized editor",
+            "rect": {
+              "x": 8,
+              "y": 8,
+              "width": 900,
+              "height": 320,
+              "top": 8,
+              "right": 908,
+              "bottom": 328,
+              "left": 8
+            },
+            "clientHeight": 320,
+            "scrollHeight": 4300,
+            "scrollTop": 0,
+            "windowY": 0
+          },
+          {
+            "className": "editor-virtualized-input",
+            "rect": {
+              "x": 8,
+              "y": 8,
+              "width": 1,
+              "height": 20,
+              "top": 8,
+              "right": 9,
+              "bottom": 28,
+              "left": 8
+            },
+            "clientHeight": 20,
+            "scrollHeight": 360,
+            "scrollTop": 0,
+            "windowY": 0
+          }
+        ],
+        "now": 873.9000000357628,
+        "start": 752.9000000357628,
+        "paints": [
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 755.3000000119209
+          },
+          {
+            "documentId": "ordinary",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "painted",
+            "at": 763.5
+          }
+        ],
+        "diagnostics": [],
+        "state": {
+          "documentId": "ordinary",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": "typescript",
+          "syntaxStatus": "ready",
+          "initialHighlightStatus": "painted",
+          "cursor": {
+            "row": 199,
+            "column": 22
+          },
+          "length": 4469,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "scroll": {
+          "top": 0,
+          "left": 0
+        },
+        "rows": [
+          {
+            "row": 0,
+            "text": "const needle0 = 2440;",
+            "height": 20
+          },
+          {
+            "row": 1,
+            "text": "const value1 = 9159;",
+            "height": 20
+          },
+          {
+            "row": 2,
+            "text": "const value2 = 554;",
+            "height": 20
+          },
+          {
+            "row": 3,
+            "text": "const value3 = 6417;",
+            "height": 20
+          },
+          {
+            "row": 4,
+            "text": "const value4 = 5804;",
+            "height": 20
+          },
+          {
+            "row": 5,
+            "text": "const value5 = 1035;",
+            "height": 20
+          },
+          {
+            "row": 6,
+            "text": "const value6 = 158;",
+            "height": 20
+          },
+          {
+            "row": 7,
+            "text": "const value7 = 7157;",
+            "height": 20
+          },
+          {
+            "row": 8,
+            "text": "const value8 = 4880;",
+            "height": 20
+          },
+          {
+            "row": 9,
+            "text": "const value9 = 3695;",
+            "height": 20
+          },
+          {
+            "row": 10,
+            "text": "const value10 = 5426;",
+            "height": 20
+          },
+          {
+            "row": 11,
+            "text": "const value11 = 6601;",
+            "height": 20
+          },
+          {
+            "row": 12,
+            "text": "const value12 = 2900;",
+            "height": 20
+          },
+          {
+            "row": 13,
+            "text": "const value13 = 5923;",
+            "height": 20
+          },
+          {
+            "row": 14,
+            "text": "const value14 = 598;",
+            "height": 20
+          },
+          {
+            "row": 15,
+            "text": "const value15 = 1805;",
+            "height": 20
+          },
+          {
+            "row": 16,
+            "text": "const value16 = 5992;",
+            "height": 20
+          },
+          {
+            "row": 17,
+            "text": "const value17 = 8807;",
+            "height": 20
+          },
+          {
+            "row": 18,
+            "text": "const value18 = 2938;",
+            "height": 20
+          },
+          {
+            "row": 19,
+            "text": "const value19 = 8049;",
+            "height": 20
+          },
+          {
+            "row": 20,
+            "text": "const value20 = 5900;",
+            "height": 20
+          },
+          {
+            "row": 21,
+            "text": "const value21 = 1339;",
+            "height": 20
+          },
+          {
+            "row": 22,
+            "text": "const value22 = 5294;",
+            "height": 20
+          },
+          {
+            "row": 23,
+            "text": "const value23 = 4357;",
+            "height": 20
+          },
+          {
+            "row": 24,
+            "text": "const value24 = 9872;",
+            "height": 20
+          },
+          {
+            "row": 25,
+            "text": "const value25 = 1023;",
+            "height": 20
+          },
+          {
+            "row": 26,
+            "text": "const value26 = 4898;",
+            "height": 20
+          },
+          {
+            "row": 27,
+            "text": "const value27 = 5833;",
+            "height": 20
+          }
+        ],
+        "text": {
+          "length": 4469,
+          "views": 1,
+          "cursor": {
+            "row": 199,
+            "column": 22
+          }
+        },
+        "textPixels": {
+          "ink": 524,
+          "chromatic": 180
+        },
+        "highlightPixels": {
+          "ink": 524,
+          "chromatic": 180
+        }
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 7703156,
+          "totalBytes": 8482816,
+          "documents": 1,
+          "nodes": 127,
+          "jsEventListeners": 29
+        },
+        "after": {
+          "usedBytes": 7892652,
+          "totalBytes": 8482816,
+          "documents": 1,
+          "nodes": 127,
+          "jsEventListeners": 29
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 2,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "scenario": "jump",
+      "state": "cold",
+      "repetition": 0,
+      "latencyMs": {
+        "commandToPaintUpperBound": [62.89999997615814]
+      },
+      "observation": {
+        "target": {
+          "at": 642.6999999880791,
+          "row": 179,
+          "column": 0,
+          "offset": 3989,
+          "text": "const value179 = 449;"
+        },
+        "cursor": {
+          "row": 179,
+          "column": 0
+        },
+        "pixels": {
+          "ink": 11801,
+          "chromatic": 0
+        }
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 1973152,
+          "totalBytes": 2936832,
+          "documents": 1,
+          "nodes": 19,
+          "jsEventListeners": 13
+        },
+        "after": {
+          "usedBytes": 3677760,
+          "totalBytes": 4558848,
+          "documents": 1,
+          "nodes": 162,
+          "jsEventListeners": 26
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 2,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "scenario": "jump",
+      "state": "warm",
+      "repetition": 0,
+      "latencyMs": {
+        "commandToPaintUpperBound": [62.89999997615814]
+      },
+      "observation": {
+        "target": {
+          "at": 798.8999999761581,
+          "row": 179,
+          "column": 0,
+          "offset": 3989,
+          "text": "const value179 = 449;"
+        },
+        "cursor": {
+          "row": 179,
+          "column": 0
+        },
+        "pixels": {
+          "ink": 11801,
+          "chromatic": 0
+        }
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 3679708,
+          "totalBytes": 4296704,
+          "documents": 1,
+          "nodes": 162,
+          "jsEventListeners": 26
+        },
+        "after": {
+          "usedBytes": 3836676,
+          "totalBytes": 4034560,
+          "documents": 1,
+          "nodes": 162,
+          "jsEventListeners": 26
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 2,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "scenario": "typing",
+      "state": "cold",
+      "repetition": 0,
+      "latencyMs": {
+        "keyToApplied": [
+          4.400000035762787, 2, 1.0999999642372131, 0.800000011920929, 0.8999999761581421,
+          0.800000011920929, 0.8999999761581421, 1.300000011920929, 1.699999988079071,
+          1.699999988079071, 1.5, 1.100000023841858, 1.2000000476837158, 1, 1.100000023841858,
+          0.7000000476837158, 0.7000000476837158, 1.300000011920929, 1.2999999523162842, 1,
+          1.0999999642372131, 1.100000023841858, 1.100000023841858, 1.100000023841858, 1.5, 1,
+          0.699999988079071, 0.5, 0.6000000238418579, 0.5, 0.5, 0.5999999642372131, 0.5,
+          0.6000000238418579, 0.699999988079071, 0.6000000238418579, 0.9000000357627869,
+          0.699999988079071, 0.5, 0.3999999761581421
+        ],
+        "keyToFrame": [
+          7, 2.099999964237213, 15.300000011920929, 13.800000011920929, 12.5, 11.300000011920929,
+          10, 8.700000047683716, 7, 4.800000011920929, 2.900000035762787, 1.2000000476837158,
+          16.30000001192093, 14.699999988079071, 13.199999988079071, 11.800000011920929,
+          10.800000011920929, 9.699999988079071, 8.099999964237213, 6.399999976158142,
+          5.099999964237213, 3.800000011920929, 2.5, 1.199999988079071, 15.600000023841858,
+          13.800000011920929, 12.699999988079071, 11.800000011920929, 11.100000023841858,
+          10.199999988079071, 9.5, 8.699999988079071, 7.800000011920929, 7.100000023841858,
+          6.300000011920929, 5.400000035762787, 4.600000023841858, 3.5, 2.600000023841858,
+          1.800000011920929
+        ],
+        "burstToPaintUpperBound": [126.60000002384186]
+      },
+      "throughput": {
+        "operations": 40,
+        "durationMs": 55,
+        "operationsPerSecond": 727.2727272727273
+      },
+      "observation": {
+        "length": 4509,
+        "views": 1,
+        "cursor": {
+          "row": 8,
+          "column": 40
+        },
+        "keys": [
+          {
+            "key": "a",
+            "at": 671.5999999642372,
+            "trusted": true,
+            "appliedAt": 676,
+            "frameAt": 678.5999999642372
+          },
+          {
+            "key": "b",
+            "at": 676.5,
+            "trusted": true,
+            "appliedAt": 678.5,
+            "frameAt": 678.5999999642372
+          },
+          {
+            "key": "c",
+            "at": 679.5,
+            "trusted": true,
+            "appliedAt": 680.5999999642372,
+            "frameAt": 694.8000000119209
+          },
+          {
+            "key": "d",
+            "at": 681,
+            "trusted": true,
+            "appliedAt": 681.8000000119209,
+            "frameAt": 694.8000000119209
+          },
+          {
+            "key": "e",
+            "at": 682.3000000119209,
+            "trusted": true,
+            "appliedAt": 683.1999999880791,
+            "frameAt": 694.8000000119209
+          },
+          {
+            "key": "f",
+            "at": 683.5,
+            "trusted": true,
+            "appliedAt": 684.3000000119209,
+            "frameAt": 694.8000000119209
+          },
+          {
+            "key": "g",
+            "at": 684.8000000119209,
+            "trusted": true,
+            "appliedAt": 685.6999999880791,
+            "frameAt": 694.8000000119209
+          },
+          {
+            "key": "h",
+            "at": 686.0999999642372,
+            "trusted": true,
+            "appliedAt": 687.3999999761581,
+            "frameAt": 694.8000000119209
+          },
+          {
+            "key": "i",
+            "at": 687.8000000119209,
+            "trusted": true,
+            "appliedAt": 689.5,
+            "frameAt": 694.8000000119209
+          },
+          {
+            "key": "j",
+            "at": 690,
+            "trusted": true,
+            "appliedAt": 691.6999999880791,
+            "frameAt": 694.8000000119209
+          },
+          {
+            "key": "k",
+            "at": 691.8999999761581,
+            "trusted": true,
+            "appliedAt": 693.3999999761581,
+            "frameAt": 694.8000000119209
+          },
+          {
+            "key": "l",
+            "at": 693.5999999642372,
+            "trusted": true,
+            "appliedAt": 694.6999999880791,
+            "frameAt": 694.8000000119209
+          },
+          {
+            "key": "m",
+            "at": 695.5999999642372,
+            "trusted": true,
+            "appliedAt": 696.8000000119209,
+            "frameAt": 711.8999999761581
+          },
+          {
+            "key": "n",
+            "at": 697.1999999880791,
+            "trusted": true,
+            "appliedAt": 698.1999999880791,
+            "frameAt": 711.8999999761581
+          },
+          {
+            "key": "o",
+            "at": 698.6999999880791,
+            "trusted": true,
+            "appliedAt": 699.8000000119209,
+            "frameAt": 711.8999999761581
+          },
+          {
+            "key": "p",
+            "at": 700.0999999642372,
+            "trusted": true,
+            "appliedAt": 700.8000000119209,
+            "frameAt": 711.8999999761581
+          },
+          {
+            "key": "q",
+            "at": 701.0999999642372,
+            "trusted": true,
+            "appliedAt": 701.8000000119209,
+            "frameAt": 711.8999999761581
+          },
+          {
+            "key": "r",
+            "at": 702.1999999880791,
+            "trusted": true,
+            "appliedAt": 703.5,
+            "frameAt": 711.8999999761581
+          },
+          {
+            "key": "s",
+            "at": 703.8000000119209,
+            "trusted": true,
+            "appliedAt": 705.0999999642372,
+            "frameAt": 711.8999999761581
+          },
+          {
+            "key": "t",
+            "at": 705.5,
+            "trusted": true,
+            "appliedAt": 706.5,
+            "frameAt": 711.8999999761581
+          },
+          {
+            "key": "u",
+            "at": 706.8000000119209,
+            "trusted": true,
+            "appliedAt": 707.8999999761581,
+            "frameAt": 711.8999999761581
+          },
+          {
+            "key": "v",
+            "at": 708.0999999642372,
+            "trusted": true,
+            "appliedAt": 709.1999999880791,
+            "frameAt": 711.8999999761581
+          },
+          {
+            "key": "w",
+            "at": 709.3999999761581,
+            "trusted": true,
+            "appliedAt": 710.5,
+            "frameAt": 711.8999999761581
+          },
+          {
+            "key": "x",
+            "at": 710.6999999880791,
+            "trusted": true,
+            "appliedAt": 711.8000000119209,
+            "frameAt": 711.8999999761581
+          },
+          {
+            "key": "y",
+            "at": 712.3999999761581,
+            "trusted": true,
+            "appliedAt": 713.8999999761581,
+            "frameAt": 728
+          },
+          {
+            "key": "z",
+            "at": 714.1999999880791,
+            "trusted": true,
+            "appliedAt": 715.1999999880791,
+            "frameAt": 728
+          },
+          {
+            "key": "0",
+            "at": 715.3000000119209,
+            "trusted": true,
+            "appliedAt": 716,
+            "frameAt": 728
+          },
+          {
+            "key": "1",
+            "at": 716.1999999880791,
+            "trusted": true,
+            "appliedAt": 716.6999999880791,
+            "frameAt": 728
+          },
+          {
+            "key": "2",
+            "at": 716.8999999761581,
+            "trusted": true,
+            "appliedAt": 717.5,
+            "frameAt": 728
+          },
+          {
+            "key": "3",
+            "at": 717.8000000119209,
+            "trusted": true,
+            "appliedAt": 718.3000000119209,
+            "frameAt": 728
+          },
+          {
+            "key": "4",
+            "at": 718.5,
+            "trusted": true,
+            "appliedAt": 719,
+            "frameAt": 728
+          },
+          {
+            "key": "5",
+            "at": 719.3000000119209,
+            "trusted": true,
+            "appliedAt": 719.8999999761581,
+            "frameAt": 728
+          },
+          {
+            "key": "6",
+            "at": 720.1999999880791,
+            "trusted": true,
+            "appliedAt": 720.6999999880791,
+            "frameAt": 728
+          },
+          {
+            "key": "7",
+            "at": 720.8999999761581,
+            "trusted": true,
+            "appliedAt": 721.5,
+            "frameAt": 728
+          },
+          {
+            "key": "8",
+            "at": 721.6999999880791,
+            "trusted": true,
+            "appliedAt": 722.3999999761581,
+            "frameAt": 728
+          },
+          {
+            "key": "9",
+            "at": 722.5999999642372,
+            "trusted": true,
+            "appliedAt": 723.1999999880791,
+            "frameAt": 728
+          },
+          {
+            "key": "a",
+            "at": 723.3999999761581,
+            "trusted": true,
+            "appliedAt": 724.3000000119209,
+            "frameAt": 728
+          },
+          {
+            "key": "b",
+            "at": 724.5,
+            "trusted": true,
+            "appliedAt": 725.1999999880791,
+            "frameAt": 728
+          },
+          {
+            "key": "c",
+            "at": 725.3999999761581,
+            "trusted": true,
+            "appliedAt": 725.8999999761581,
+            "frameAt": 728
+          },
+          {
+            "key": "d",
+            "at": 726.1999999880791,
+            "trusted": true,
+            "appliedAt": 726.5999999642372,
+            "frameAt": 728
+          }
+        ],
+        "pixels": {
+          "ink": 1780,
+          "chromatic": 0
+        }
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 1973152,
+          "totalBytes": 2936832,
+          "documents": 1,
+          "nodes": 19,
+          "jsEventListeners": 13
+        },
+        "after": {
+          "usedBytes": 4513220,
+          "totalBytes": 4964352,
+          "documents": 1,
+          "nodes": 132,
+          "jsEventListeners": 26
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 2,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "scenario": "typing",
+      "state": "warm",
+      "repetition": 0,
+      "latencyMs": {
+        "keyToApplied": [
+          1.100000023841858, 0.8999999761581421, 0.5999999642372131, 0.699999988079071,
+          0.5999999642372131, 0.800000011920929, 0.699999988079071, 0.699999988079071,
+          0.6000000238418579, 0.6000000238418579, 1, 0.5999999642372131, 0.6000000238418579,
+          0.699999988079071, 0.6000000238418579, 0.699999988079071, 0.6000000238418579,
+          0.6000000238418579, 0.699999988079071, 0.699999988079071, 0.5999999642372131,
+          0.7999999523162842, 1.300000011920929, 0.800000011920929, 0.6000000238418579,
+          0.6000000238418579, 0.6000000238418579, 0.5, 0.699999988079071, 0.6000000238418579,
+          0.6000000238418579, 0.699999988079071, 0.5, 0.6000000238418579, 0.9000000357627869, 0.5,
+          0.6000000238418579, 0.6000000238418579, 0.6000000238418579, 0.699999988079071
+        ],
+        "keyToFrame": [
+          5.199999988079071, 3.799999952316284, 2.599999964237213, 1.699999988079071,
+          0.7999999523162842, 16.200000047683716, 15, 14.100000023841858, 13.100000023841858,
+          12.200000047683716, 11.300000011920929, 10, 9.200000047683716, 8.300000011920929,
+          7.400000035762787, 6.5, 5.600000023841858, 4.700000047683716, 3.900000035762787, 3, 2, 1,
+          16.5, 14.899999976158142, 13.800000011920929, 13, 12.199999988079071, 11.399999976158142,
+          10.699999988079071, 9.800000011920929, 9, 8.099999964237213, 7.099999964237213,
+          6.300000011920929, 5.5, 4.300000011920929, 3.5, 2.699999988079071, 1.800000011920929,
+          1.0999999642372131
+        ],
+        "burstToPaintUpperBound": [124.40000003576279]
+      },
+      "throughput": {
+        "operations": 40,
+        "durationMs": 38.10000002384186,
+        "operationsPerSecond": 1049.8687657472226
+      },
+      "observation": {
+        "length": 4509,
+        "views": 1,
+        "cursor": {
+          "row": 8,
+          "column": 40
+        },
+        "keys": [
+          {
+            "key": "a",
+            "at": 935.3999999761581,
+            "trusted": true,
+            "appliedAt": 936.5,
+            "frameAt": 940.5999999642372
+          },
+          {
+            "key": "b",
+            "at": 936.8000000119209,
+            "trusted": true,
+            "appliedAt": 937.6999999880791,
+            "frameAt": 940.5999999642372
+          },
+          {
+            "key": "c",
+            "at": 938,
+            "trusted": true,
+            "appliedAt": 938.5999999642372,
+            "frameAt": 940.5999999642372
+          },
+          {
+            "key": "d",
+            "at": 938.8999999761581,
+            "trusted": true,
+            "appliedAt": 939.5999999642372,
+            "frameAt": 940.5999999642372
+          },
+          {
+            "key": "e",
+            "at": 939.8000000119209,
+            "trusted": true,
+            "appliedAt": 940.3999999761581,
+            "frameAt": 940.5999999642372
+          },
+          {
+            "key": "f",
+            "at": 941.0999999642372,
+            "trusted": true,
+            "appliedAt": 941.8999999761581,
+            "frameAt": 957.3000000119209
+          },
+          {
+            "key": "g",
+            "at": 942.3000000119209,
+            "trusted": true,
+            "appliedAt": 943,
+            "frameAt": 957.3000000119209
+          },
+          {
+            "key": "h",
+            "at": 943.1999999880791,
+            "trusted": true,
+            "appliedAt": 943.8999999761581,
+            "frameAt": 957.3000000119209
+          },
+          {
+            "key": "i",
+            "at": 944.1999999880791,
+            "trusted": true,
+            "appliedAt": 944.8000000119209,
+            "frameAt": 957.3000000119209
+          },
+          {
+            "key": "j",
+            "at": 945.0999999642372,
+            "trusted": true,
+            "appliedAt": 945.6999999880791,
+            "frameAt": 957.3000000119209
+          },
+          {
+            "key": "k",
+            "at": 946,
+            "trusted": true,
+            "appliedAt": 947,
+            "frameAt": 957.3000000119209
+          },
+          {
+            "key": "l",
+            "at": 947.3000000119209,
+            "trusted": true,
+            "appliedAt": 947.8999999761581,
+            "frameAt": 957.3000000119209
+          },
+          {
+            "key": "m",
+            "at": 948.0999999642372,
+            "trusted": true,
+            "appliedAt": 948.6999999880791,
+            "frameAt": 957.3000000119209
+          },
+          {
+            "key": "n",
+            "at": 949,
+            "trusted": true,
+            "appliedAt": 949.6999999880791,
+            "frameAt": 957.3000000119209
+          },
+          {
+            "key": "o",
+            "at": 949.8999999761581,
+            "trusted": true,
+            "appliedAt": 950.5,
+            "frameAt": 957.3000000119209
+          },
+          {
+            "key": "p",
+            "at": 950.8000000119209,
+            "trusted": true,
+            "appliedAt": 951.5,
+            "frameAt": 957.3000000119209
+          },
+          {
+            "key": "q",
+            "at": 951.6999999880791,
+            "trusted": true,
+            "appliedAt": 952.3000000119209,
+            "frameAt": 957.3000000119209
+          },
+          {
+            "key": "r",
+            "at": 952.5999999642372,
+            "trusted": true,
+            "appliedAt": 953.1999999880791,
+            "frameAt": 957.3000000119209
+          },
+          {
+            "key": "s",
+            "at": 953.3999999761581,
+            "trusted": true,
+            "appliedAt": 954.0999999642372,
+            "frameAt": 957.3000000119209
+          },
+          {
+            "key": "t",
+            "at": 954.3000000119209,
+            "trusted": true,
+            "appliedAt": 955,
+            "frameAt": 957.3000000119209
+          },
+          {
+            "key": "u",
+            "at": 955.3000000119209,
+            "trusted": true,
+            "appliedAt": 955.8999999761581,
+            "frameAt": 957.3000000119209
+          },
+          {
+            "key": "v",
+            "at": 956.3000000119209,
+            "trusted": true,
+            "appliedAt": 957.0999999642372,
+            "frameAt": 957.3000000119209
+          },
+          {
+            "key": "w",
+            "at": 957.3999999761581,
+            "trusted": true,
+            "appliedAt": 958.6999999880791,
+            "frameAt": 973.8999999761581
+          },
+          {
+            "key": "x",
+            "at": 959,
+            "trusted": true,
+            "appliedAt": 959.8000000119209,
+            "frameAt": 973.8999999761581
+          },
+          {
+            "key": "y",
+            "at": 960.0999999642372,
+            "trusted": true,
+            "appliedAt": 960.6999999880791,
+            "frameAt": 973.8999999761581
+          },
+          {
+            "key": "z",
+            "at": 960.8999999761581,
+            "trusted": true,
+            "appliedAt": 961.5,
+            "frameAt": 973.8999999761581
+          },
+          {
+            "key": "0",
+            "at": 961.6999999880791,
+            "trusted": true,
+            "appliedAt": 962.3000000119209,
+            "frameAt": 973.8999999761581
+          },
+          {
+            "key": "1",
+            "at": 962.5,
+            "trusted": true,
+            "appliedAt": 963,
+            "frameAt": 973.8999999761581
+          },
+          {
+            "key": "2",
+            "at": 963.1999999880791,
+            "trusted": true,
+            "appliedAt": 963.8999999761581,
+            "frameAt": 973.8999999761581
+          },
+          {
+            "key": "3",
+            "at": 964.0999999642372,
+            "trusted": true,
+            "appliedAt": 964.6999999880791,
+            "frameAt": 973.8999999761581
+          },
+          {
+            "key": "4",
+            "at": 964.8999999761581,
+            "trusted": true,
+            "appliedAt": 965.5,
+            "frameAt": 973.8999999761581
+          },
+          {
+            "key": "5",
+            "at": 965.8000000119209,
+            "trusted": true,
+            "appliedAt": 966.5,
+            "frameAt": 973.8999999761581
+          },
+          {
+            "key": "6",
+            "at": 966.8000000119209,
+            "trusted": true,
+            "appliedAt": 967.3000000119209,
+            "frameAt": 973.8999999761581
+          },
+          {
+            "key": "7",
+            "at": 967.5999999642372,
+            "trusted": true,
+            "appliedAt": 968.1999999880791,
+            "frameAt": 973.8999999761581
+          },
+          {
+            "key": "8",
+            "at": 968.3999999761581,
+            "trusted": true,
+            "appliedAt": 969.3000000119209,
+            "frameAt": 973.8999999761581
+          },
+          {
+            "key": "9",
+            "at": 969.5999999642372,
+            "trusted": true,
+            "appliedAt": 970.0999999642372,
+            "frameAt": 973.8999999761581
+          },
+          {
+            "key": "a",
+            "at": 970.3999999761581,
+            "trusted": true,
+            "appliedAt": 971,
+            "frameAt": 973.8999999761581
+          },
+          {
+            "key": "b",
+            "at": 971.1999999880791,
+            "trusted": true,
+            "appliedAt": 971.8000000119209,
+            "frameAt": 973.8999999761581
+          },
+          {
+            "key": "c",
+            "at": 972.0999999642372,
+            "trusted": true,
+            "appliedAt": 972.6999999880791,
+            "frameAt": 973.8999999761581
+          },
+          {
+            "key": "d",
+            "at": 972.8000000119209,
+            "trusted": true,
+            "appliedAt": 973.5,
+            "frameAt": 973.8999999761581
+          }
+        ],
+        "pixels": {
+          "ink": 1780,
+          "chromatic": 0
+        }
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 4214108,
+          "totalBytes": 4820992,
+          "documents": 1,
+          "nodes": 132,
+          "jsEventListeners": 26
+        },
+        "after": {
+          "usedBytes": 4702000,
+          "totalBytes": 5226496,
+          "documents": 1,
+          "nodes": 132,
+          "jsEventListeners": 26
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 2,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "scenario": "find-all",
+      "state": "cold",
+      "repetition": 0,
+      "latencyMs": {
+        "queryToCount": [22.900000035762787]
+      },
+      "observation": {
+        "query": "needle",
+        "expectedCount": 1,
+        "displayedCount": "1 of 1",
+        "trustedInput": true
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 1973152,
+          "totalBytes": 2936832,
+          "documents": 1,
+          "nodes": 19,
+          "jsEventListeners": 13
+        },
+        "after": {
+          "usedBytes": 4308488,
+          "totalBytes": 4964352,
+          "documents": 1,
+          "nodes": 200,
+          "jsEventListeners": 40
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 2,
+        "retainedObjects": 2,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "scenario": "find-all",
+      "state": "warm",
+      "repetition": 0,
+      "latencyMs": {
+        "queryToCount": [12.099999964237213]
+      },
+      "observation": {
+        "query": "needle",
+        "expectedCount": 1,
+        "displayedCount": "1 of 1",
+        "trustedInput": true
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 4308964,
+          "totalBytes": 4964352,
+          "documents": 1,
+          "nodes": 190,
+          "jsEventListeners": 40
+        },
+        "after": {
+          "usedBytes": 4556632,
+          "totalBytes": 5226496,
+          "documents": 1,
+          "nodes": 200,
+          "jsEventListeners": 40
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 2,
+        "retainedObjects": 2,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "scenario": "scroll",
+      "state": "cold",
+      "repetition": 0,
+      "latencyMs": {
+        "wheelToPaintUpperBound": [
+          101.10000002384186, 97.30000001192093, 97.69999998807907, 98.80000001192093,
+          97.79999995231628
+        ]
+      },
+      "observation": {
+        "sweeps": [
+          {
+            "row": 47,
+            "pixels": {
+              "ink": 485,
+              "chromatic": 0
+            }
+          },
+          {
+            "row": 96,
+            "pixels": {
+              "ink": 530,
+              "chromatic": 0
+            }
+          },
+          {
+            "row": 199,
+            "pixels": {
+              "ink": 598,
+              "chromatic": 0
+            }
+          },
+          {
+            "row": 150,
+            "pixels": {
+              "ink": 559,
+              "chromatic": 0
+            }
+          },
+          {
+            "row": 103,
+            "pixels": {
+              "ink": 536,
+              "chromatic": 0
+            }
+          }
+        ],
+        "trustedInput": true,
+        "horizontal": false
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 1973152,
+          "totalBytes": 2936832,
+          "documents": 1,
+          "nodes": 19,
+          "jsEventListeners": 13
+        },
+        "after": {
+          "usedBytes": 3732916,
+          "totalBytes": 4558848,
+          "documents": 1,
+          "nodes": 154,
+          "jsEventListeners": 26
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 2,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "scenario": "scroll",
+      "state": "warm",
+      "repetition": 0,
+      "latencyMs": {
+        "wheelToPaintUpperBound": [
+          100.39999997615814, 98.70000004768372, 98.5, 98.69999998807907, 98.69999998807907
+        ]
+      },
+      "observation": {
+        "sweeps": [
+          {
+            "row": 47,
+            "pixels": {
+              "ink": 485,
+              "chromatic": 0
+            }
+          },
+          {
+            "row": 96,
+            "pixels": {
+              "ink": 530,
+              "chromatic": 0
+            }
+          },
+          {
+            "row": 199,
+            "pixels": {
+              "ink": 598,
+              "chromatic": 0
+            }
+          },
+          {
+            "row": 150,
+            "pixels": {
+              "ink": 559,
+              "chromatic": 0
+            }
+          },
+          {
+            "row": 103,
+            "pixels": {
+              "ink": 536,
+              "chromatic": 0
+            }
+          }
+        ],
+        "trustedInput": true,
+        "horizontal": false
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 3732824,
+          "totalBytes": 4558848,
+          "documents": 1,
+          "nodes": 154,
+          "jsEventListeners": 26
+        },
+        "after": {
+          "usedBytes": 3876764,
+          "totalBytes": 4820992,
+          "documents": 1,
+          "nodes": 154,
+          "jsEventListeners": 26
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 2,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "scenario": "churn",
+      "state": "cold",
+      "repetition": 0,
+      "latencyMs": {
+        "editDelete": [115.60000002384186]
+      },
+      "throughput": {
+        "operations": 200,
+        "durationMs": 115.60000002384186,
+        "operationsPerSecond": 1730.1038058715494
+      },
+      "observation": {
+        "durationMs": 115.60000002384186,
+        "operations": 200,
+        "revisions": 200,
+        "length": 4469,
+        "views": 3,
+        "cursor": {
+          "row": 199,
+          "column": 22
+        }
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 1973152,
+          "totalBytes": 2936832,
+          "documents": 1,
+          "nodes": 19,
+          "jsEventListeners": 13
+        },
+        "after": {
+          "usedBytes": 4834532,
+          "totalBytes": 6012928,
+          "documents": 1,
+          "nodes": 307,
+          "jsEventListeners": 26
+        },
+        "postChurn": {
+          "usedBytes": 6303992,
+          "totalBytes": 8634368,
+          "documents": 1,
+          "nodes": 730,
+          "jsEventListeners": 110
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 4,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "ordinary",
+      "fixtureHash": "cf222f566db91e6c7a2002434ca0fb320f781bec1cf07f954f067c07511da197",
+      "scenario": "churn",
+      "state": "warm",
+      "repetition": 0,
+      "latencyMs": {
+        "editDelete": [101.60000002384186]
+      },
+      "throughput": {
+        "operations": 200,
+        "durationMs": 101.60000002384186,
+        "operationsPerSecond": 1968.503936545937
+      },
+      "observation": {
+        "durationMs": 101.60000002384186,
+        "operations": 200,
+        "revisions": 200,
+        "length": 4469,
+        "views": 3,
+        "cursor": {
+          "row": 199,
+          "column": 22
+        }
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 4509972,
+          "totalBytes": 4820992,
+          "documents": 1,
+          "nodes": 307,
+          "jsEventListeners": 26
+        },
+        "after": {
+          "usedBytes": 5108696,
+          "totalBytes": 5750784,
+          "documents": 1,
+          "nodes": 307,
+          "jsEventListeners": 26
+        },
+        "postChurn": {
+          "usedBytes": 6281180,
+          "totalBytes": 7323648,
+          "documents": 1,
+          "nodes": 730,
+          "jsEventListeners": 110
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 4,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "long-line",
+      "fixtureHash": "467fa816efc5aa5c082ed44ea4dc10bbbb41da16faf4d4822aa3d122edc628f7",
+      "scenario": "open",
+      "state": "cold",
+      "repetition": 0,
+      "latencyMs": {
+        "attach": [45.69999998807907],
+        "visibleTextUpperBound": [119.39999997615814]
+      },
+      "observation": {
+        "geometry": [
+          {
+            "className": "editor-virtualized editor",
+            "rect": {
+              "x": 8,
+              "y": 8,
+              "width": 900,
+              "height": 320,
+              "top": 8,
+              "right": 908,
+              "bottom": 328,
+              "left": 8
+            },
+            "clientHeight": 320,
+            "scrollHeight": 320,
+            "scrollTop": 0,
+            "windowY": 0
+          },
+          {
+            "className": "editor-virtualized-input",
+            "rect": {
+              "x": 8,
+              "y": 8,
+              "width": 1,
+              "height": 20,
+              "top": 8,
+              "right": 9,
+              "bottom": 28,
+              "left": 8
+            },
+            "clientHeight": 20,
+            "scrollHeight": 20,
+            "scrollTop": 0,
+            "windowY": 0
+          }
+        ],
+        "now": 678.8999999761581,
+        "start": 557,
+        "paints": [
+          {
+            "documentId": "long-line",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 602.5999999642372
+          },
+          {
+            "documentId": "long-line",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "plain",
+            "at": 602.5999999642372
+          }
+        ],
+        "diagnostics": [],
+        "state": {
+          "documentId": "long-line",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": null,
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "plain",
+          "cursor": {
+            "row": 0,
+            "column": 1048594
+          },
+          "length": 1048594,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "scroll": {
+          "top": 0,
+          "left": 0
+        },
+        "rows": [
+          {
+            "row": 0,
+            "text": "const needle = \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "height": 20
+          }
+        ],
+        "text": {
+          "length": 1048594,
+          "views": 1,
+          "cursor": {
+            "row": 0,
+            "column": 1048594
+          }
+        },
+        "textPixels": {
+          "ink": 2243,
+          "chromatic": 0
+        },
+        "highlightPixels": null
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 1973152,
+          "totalBytes": 2936832,
+          "documents": 1,
+          "nodes": 19,
+          "jsEventListeners": 13
+        },
+        "after": {
+          "usedBytes": 3373116,
+          "totalBytes": 3772416,
+          "documents": 1,
+          "nodes": 78,
+          "jsEventListeners": 26
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 2,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "long-line",
+      "fixtureHash": "467fa816efc5aa5c082ed44ea4dc10bbbb41da16faf4d4822aa3d122edc628f7",
+      "scenario": "open",
+      "state": "warm",
+      "repetition": 0,
+      "latencyMs": {
+        "attach": [36.40000003576279],
+        "visibleTextUpperBound": [95.69999998807907]
+      },
+      "observation": {
+        "geometry": [
+          {
+            "className": "editor-virtualized editor",
+            "rect": {
+              "x": 8,
+              "y": 8,
+              "width": 900,
+              "height": 320,
+              "top": 8,
+              "right": 908,
+              "bottom": 328,
+              "left": 8
+            },
+            "clientHeight": 320,
+            "scrollHeight": 320,
+            "scrollTop": 0,
+            "windowY": 0
+          },
+          {
+            "className": "editor-virtualized-input",
+            "rect": {
+              "x": 8,
+              "y": 8,
+              "width": 1,
+              "height": 20,
+              "top": 8,
+              "right": 9,
+              "bottom": 28,
+              "left": 8
+            },
+            "clientHeight": 20,
+            "scrollHeight": 20,
+            "scrollTop": 0,
+            "windowY": 0
+          }
+        ],
+        "now": 793.8999999761581,
+        "start": 696.0999999642372,
+        "paints": [
+          {
+            "documentId": "long-line",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "text",
+            "at": 732.5
+          },
+          {
+            "documentId": "long-line",
+            "documentGeneration": 1,
+            "textVersion": 1,
+            "phase": "highlight-settled",
+            "status": "plain",
+            "at": 732.5
+          }
+        ],
+        "diagnostics": [],
+        "state": {
+          "documentId": "long-line",
+          "documentMode": "session",
+          "editability": "editable",
+          "languageId": null,
+          "syntaxStatus": "plain",
+          "initialHighlightStatus": "plain",
+          "cursor": {
+            "row": 0,
+            "column": 1048594
+          },
+          "length": 1048594,
+          "canUndo": false,
+          "canRedo": false,
+          "isDirty": false
+        },
+        "scroll": {
+          "top": 0,
+          "left": 0
+        },
+        "rows": [
+          {
+            "row": 0,
+            "text": "const needle = \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "height": 20
+          }
+        ],
+        "text": {
+          "length": 1048594,
+          "views": 1,
+          "cursor": {
+            "row": 0,
+            "column": 1048594
+          }
+        },
+        "textPixels": {
+          "ink": 2243,
+          "chromatic": 0
+        },
+        "highlightPixels": null
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 3375064,
+          "totalBytes": 3772416,
+          "documents": 1,
+          "nodes": 78,
+          "jsEventListeners": 26
+        },
+        "after": {
+          "usedBytes": 3520672,
+          "totalBytes": 4034560,
+          "documents": 1,
+          "nodes": 78,
+          "jsEventListeners": 26
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 2,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "long-line",
+      "fixtureHash": "467fa816efc5aa5c082ed44ea4dc10bbbb41da16faf4d4822aa3d122edc628f7",
+      "scenario": "jump",
+      "state": "cold",
+      "repetition": 0,
+      "latencyMs": {
+        "commandToPaintUpperBound": [129.9000000357628]
+      },
+      "observation": {
+        "target": {
+          "at": 681.0999999642372,
+          "row": 0,
+          "column": 943734,
+          "offset": 943734,
+          "text": "aaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "cursor": {
+          "row": 0,
+          "column": 943734
+        },
+        "pixels": {
+          "ink": 2402,
+          "chromatic": 0
+        }
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 1973152,
+          "totalBytes": 2936832,
+          "documents": 1,
+          "nodes": 19,
+          "jsEventListeners": 13
+        },
+        "after": {
+          "usedBytes": 3592376,
+          "totalBytes": 4296704,
+          "documents": 1,
+          "nodes": 120,
+          "jsEventListeners": 26
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 2,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "long-line",
+      "fixtureHash": "467fa816efc5aa5c082ed44ea4dc10bbbb41da16faf4d4822aa3d122edc628f7",
+      "scenario": "jump",
+      "state": "warm",
+      "repetition": 0,
+      "latencyMs": {
+        "commandToPaintUpperBound": [130.80000001192093]
+      },
+      "observation": {
+        "target": {
+          "at": 927.5,
+          "row": 0,
+          "column": 943734,
+          "offset": 943734,
+          "text": "aaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "cursor": {
+          "row": 0,
+          "column": 943734
+        },
+        "pixels": {
+          "ink": 2402,
+          "chromatic": 0
+        }
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 3592996,
+          "totalBytes": 4034560,
+          "documents": 1,
+          "nodes": 120,
+          "jsEventListeners": 26
+        },
+        "after": {
+          "usedBytes": 3760360,
+          "totalBytes": 4558848,
+          "documents": 1,
+          "nodes": 120,
+          "jsEventListeners": 26
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 2,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "long-line",
+      "fixtureHash": "467fa816efc5aa5c082ed44ea4dc10bbbb41da16faf4d4822aa3d122edc628f7",
+      "scenario": "typing",
+      "state": "cold",
+      "repetition": 0,
+      "latencyMs": {
+        "keyToApplied": [
+          31.600000023841858, 27.599999964237213, 28.200000047683716, 27.30000001192093,
+          26.30000001192093, 27.30000001192093, 28.19999998807907, 26.899999976158142, 27.5,
+          26.600000023841858, 27.099999964237213, 26.19999998807907, 27.30000001192093,
+          26.19999998807907, 26.799999952316284, 26.399999976158142, 29.299999952316284,
+          26.700000047683716, 25.599999964237213, 25.69999998807907, 25.5, 25.5, 25.80000001192093,
+          25.400000035762787, 25.399999976158142, 25.599999964237213, 25.5, 25.19999998807907,
+          25.80000001192093, 26.30000001192093, 25.600000023841858, 25.5, 25.30000001192093,
+          25.899999976158142, 25.5, 25.700000047683716, 25.5, 25.200000047683716,
+          25.399999976158142, 25.19999998807907
+        ],
+        "keyToFrame": [
+          31.80000001192093, 27.799999952316284, 28.30000001192093, 27.399999976158142,
+          26.400000035762787, 27.5, 28.30000001192093, 27.099999964237213, 27.600000023841858,
+          26.69999998807907, 27.19999998807907, 26.30000001192093, 27.30000001192093,
+          26.30000001192093, 26.899999976158142, 26.5, 29.399999976158142, 26.80000001192093,
+          25.599999964237213, 25.69999998807907, 25.5, 25.599999964237213, 25.899999976158142, 25.5,
+          25.5, 25.69999998807907, 25.5, 25.30000001192093, 25.899999976158142, 26.30000001192093,
+          25.69999998807907, 25.599999964237213, 25.399999976158142, 26, 25.5, 25.700000047683716,
+          25.600000023841858, 25.200000047683716, 25.5, 25.30000001192093
+        ],
+        "burstToPaintUpperBound": [1175]
+      },
+      "throughput": {
+        "operations": 40,
+        "durationMs": 1090.5,
+        "operationsPerSecond": 36.68042182485099
+      },
+      "observation": {
+        "length": 1048634,
+        "views": 1,
+        "cursor": {
+          "row": 0,
+          "column": 40
+        },
+        "keys": [
+          {
+            "key": "a",
+            "at": 719.8999999761581,
+            "trusted": true,
+            "appliedAt": 751.5,
+            "frameAt": 751.6999999880791
+          },
+          {
+            "key": "b",
+            "at": 752.5,
+            "trusted": true,
+            "appliedAt": 780.0999999642372,
+            "frameAt": 780.2999999523163
+          },
+          {
+            "key": "c",
+            "at": 780.7999999523163,
+            "trusted": true,
+            "appliedAt": 809,
+            "frameAt": 809.0999999642372
+          },
+          {
+            "key": "d",
+            "at": 809.6999999880791,
+            "trusted": true,
+            "appliedAt": 837,
+            "frameAt": 837.0999999642372
+          },
+          {
+            "key": "e",
+            "at": 838.7999999523163,
+            "trusted": true,
+            "appliedAt": 865.0999999642372,
+            "frameAt": 865.1999999880791
+          },
+          {
+            "key": "f",
+            "at": 865.7999999523163,
+            "trusted": true,
+            "appliedAt": 893.0999999642372,
+            "frameAt": 893.2999999523163
+          },
+          {
+            "key": "g",
+            "at": 893.8999999761581,
+            "trusted": true,
+            "appliedAt": 922.0999999642372,
+            "frameAt": 922.1999999880791
+          },
+          {
+            "key": "h",
+            "at": 923.1999999880791,
+            "trusted": true,
+            "appliedAt": 950.0999999642372,
+            "frameAt": 950.2999999523163
+          },
+          {
+            "key": "i",
+            "at": 950.8999999761581,
+            "trusted": true,
+            "appliedAt": 978.3999999761581,
+            "frameAt": 978.5
+          },
+          {
+            "key": "j",
+            "at": 979.0999999642372,
+            "trusted": true,
+            "appliedAt": 1005.6999999880791,
+            "frameAt": 1005.7999999523163
+          },
+          {
+            "key": "k",
+            "at": 1006.5,
+            "trusted": true,
+            "appliedAt": 1033.5999999642372,
+            "frameAt": 1033.699999988079
+          },
+          {
+            "key": "l",
+            "at": 1034.199999988079,
+            "trusted": true,
+            "appliedAt": 1060.3999999761581,
+            "frameAt": 1060.5
+          },
+          {
+            "key": "m",
+            "at": 1060.8999999761581,
+            "trusted": true,
+            "appliedAt": 1088.199999988079,
+            "frameAt": 1088.199999988079
+          },
+          {
+            "key": "n",
+            "at": 1088.5999999642372,
+            "trusted": true,
+            "appliedAt": 1114.7999999523163,
+            "frameAt": 1114.8999999761581
+          },
+          {
+            "key": "o",
+            "at": 1115.5,
+            "trusted": true,
+            "appliedAt": 1142.2999999523163,
+            "frameAt": 1142.3999999761581
+          },
+          {
+            "key": "p",
+            "at": 1142.8999999761581,
+            "trusted": true,
+            "appliedAt": 1169.2999999523163,
+            "frameAt": 1169.3999999761581
+          },
+          {
+            "key": "q",
+            "at": 1170,
+            "trusted": true,
+            "appliedAt": 1199.2999999523163,
+            "frameAt": 1199.3999999761581
+          },
+          {
+            "key": "r",
+            "at": 1199.7999999523163,
+            "trusted": true,
+            "appliedAt": 1226.5,
+            "frameAt": 1226.5999999642372
+          },
+          {
+            "key": "s",
+            "at": 1227.199999988079,
+            "trusted": true,
+            "appliedAt": 1252.7999999523163,
+            "frameAt": 1252.7999999523163
+          },
+          {
+            "key": "t",
+            "at": 1253.5,
+            "trusted": true,
+            "appliedAt": 1279.199999988079,
+            "frameAt": 1279.199999988079
+          },
+          {
+            "key": "u",
+            "at": 1279.7999999523163,
+            "trusted": true,
+            "appliedAt": 1305.2999999523163,
+            "frameAt": 1305.2999999523163
+          },
+          {
+            "key": "v",
+            "at": 1306,
+            "trusted": true,
+            "appliedAt": 1331.5,
+            "frameAt": 1331.5999999642372
+          },
+          {
+            "key": "w",
+            "at": 1332.199999988079,
+            "trusted": true,
+            "appliedAt": 1358,
+            "frameAt": 1358.0999999642372
+          },
+          {
+            "key": "x",
+            "at": 1359.7999999523163,
+            "trusted": true,
+            "appliedAt": 1385.199999988079,
+            "frameAt": 1385.2999999523163
+          },
+          {
+            "key": "y",
+            "at": 1385.699999988079,
+            "trusted": true,
+            "appliedAt": 1411.0999999642372,
+            "frameAt": 1411.199999988079
+          },
+          {
+            "key": "z",
+            "at": 1411.699999988079,
+            "trusted": true,
+            "appliedAt": 1437.2999999523163,
+            "frameAt": 1437.3999999761581
+          },
+          {
+            "key": "0",
+            "at": 1438,
+            "trusted": true,
+            "appliedAt": 1463.5,
+            "frameAt": 1463.5
+          },
+          {
+            "key": "1",
+            "at": 1464.0999999642372,
+            "trusted": true,
+            "appliedAt": 1489.2999999523163,
+            "frameAt": 1489.3999999761581
+          },
+          {
+            "key": "2",
+            "at": 1489.8999999761581,
+            "trusted": true,
+            "appliedAt": 1515.699999988079,
+            "frameAt": 1515.7999999523163
+          },
+          {
+            "key": "3",
+            "at": 1517.699999988079,
+            "trusted": true,
+            "appliedAt": 1544,
+            "frameAt": 1544
+          },
+          {
+            "key": "4",
+            "at": 1544.5999999642372,
+            "trusted": true,
+            "appliedAt": 1570.199999988079,
+            "frameAt": 1570.2999999523163
+          },
+          {
+            "key": "5",
+            "at": 1570.699999988079,
+            "trusted": true,
+            "appliedAt": 1596.199999988079,
+            "frameAt": 1596.2999999523163
+          },
+          {
+            "key": "6",
+            "at": 1596.8999999761581,
+            "trusted": true,
+            "appliedAt": 1622.199999988079,
+            "frameAt": 1622.2999999523163
+          },
+          {
+            "key": "7",
+            "at": 1625.3999999761581,
+            "trusted": true,
+            "appliedAt": 1651.2999999523163,
+            "frameAt": 1651.3999999761581
+          },
+          {
+            "key": "8",
+            "at": 1653.199999988079,
+            "trusted": true,
+            "appliedAt": 1678.699999988079,
+            "frameAt": 1678.699999988079
+          },
+          {
+            "key": "9",
+            "at": 1679.2999999523163,
+            "trusted": true,
+            "appliedAt": 1705,
+            "frameAt": 1705
+          },
+          {
+            "key": "a",
+            "at": 1705.7999999523163,
+            "trusted": true,
+            "appliedAt": 1731.2999999523163,
+            "frameAt": 1731.3999999761581
+          },
+          {
+            "key": "b",
+            "at": 1731.7999999523163,
+            "trusted": true,
+            "appliedAt": 1757,
+            "frameAt": 1757
+          },
+          {
+            "key": "c",
+            "at": 1757.8999999761581,
+            "trusted": true,
+            "appliedAt": 1783.2999999523163,
+            "frameAt": 1783.3999999761581
+          },
+          {
+            "key": "d",
+            "at": 1785.199999988079,
+            "trusted": true,
+            "appliedAt": 1810.3999999761581,
+            "frameAt": 1810.5
+          }
+        ],
+        "pixels": {
+          "ink": 2286,
+          "chromatic": 0
+        }
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 1973152,
+          "totalBytes": 2936832,
+          "documents": 1,
+          "nodes": 19,
+          "jsEventListeners": 13
+        },
+        "after": {
+          "usedBytes": 4305244,
+          "totalBytes": 5226496,
+          "documents": 1,
+          "nodes": 78,
+          "jsEventListeners": 26
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 2,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "long-line",
+      "fixtureHash": "467fa816efc5aa5c082ed44ea4dc10bbbb41da16faf4d4822aa3d122edc628f7",
+      "scenario": "typing",
+      "state": "warm",
+      "repetition": 0,
+      "latencyMs": {
+        "keyToApplied": [
+          30.400000035762787, 28, 27.80000001192093, 27.900000035762787, 27.69999998807907,
+          28.799999952316284, 27.100000023841858, 28.799999952316284, 27.30000001192093,
+          32.90000003576279, 26.80000001192093, 27.900000035762787, 29.299999952316284,
+          27.399999976158142, 27.099999964237213, 27.099999964237213, 25.899999976158142, 26,
+          25.69999998807907, 26.19999998807907, 26.299999952316284, 26.200000047683716, 26,
+          25.599999964237213, 25.899999976158142, 25.900000035762787, 26.399999976158142,
+          27.19999998807907, 26.899999976158142, 25.5, 26.100000023841858, 25.19999998807907,
+          25.600000023841858, 25.5, 25.600000023841858, 25.69999998807907, 25.5, 25.30000001192093,
+          25.599999964237213, 25.80000001192093
+        ],
+        "keyToFrame": [
+          30.600000023841858, 28, 27.80000001192093, 28, 27.899999976158142, 28.799999952316284,
+          27.200000047683716, 28.899999976158142, 27.5, 33, 27, 28, 29.299999952316284,
+          27.600000023841858, 27.19999998807907, 27.19999998807907, 25.899999976158142, 26,
+          25.80000001192093, 26.30000001192093, 26.399999976158142, 26.30000001192093,
+          26.099999964237213, 25.69999998807907, 26, 25.900000035762787, 26.5, 27.30000001192093,
+          27, 25.5, 26.100000023841858, 25.299999952316284, 25.700000047683716, 25.5,
+          25.69999998807907, 25.80000001192093, 25.599999964237213, 25.400000035762787,
+          25.599999964237213, 25.900000035762787
+        ],
+        "burstToPaintUpperBound": [1203.5]
+      },
+      "throughput": {
+        "operations": 40,
+        "durationMs": 1123.800000011921,
+        "operationsPerSecond": 35.593521978622256
+      },
+      "observation": {
+        "length": 1048634,
+        "views": 1,
+        "cursor": {
+          "row": 0,
+          "column": 40
+        },
+        "keys": [
+          {
+            "key": "a",
+            "at": 2084.599999964237,
+            "trusted": true,
+            "appliedAt": 2115,
+            "frameAt": 2115.199999988079
+          },
+          {
+            "key": "b",
+            "at": 2115.800000011921,
+            "trusted": true,
+            "appliedAt": 2143.800000011921,
+            "frameAt": 2143.800000011921
+          },
+          {
+            "key": "c",
+            "at": 2144.5,
+            "trusted": true,
+            "appliedAt": 2172.300000011921,
+            "frameAt": 2172.300000011921
+          },
+          {
+            "key": "d",
+            "at": 2172.899999976158,
+            "trusted": true,
+            "appliedAt": 2200.800000011921,
+            "frameAt": 2200.899999976158
+          },
+          {
+            "key": "e",
+            "at": 2201.300000011921,
+            "trusted": true,
+            "appliedAt": 2229,
+            "frameAt": 2229.199999988079
+          },
+          {
+            "key": "f",
+            "at": 2229.800000011921,
+            "trusted": true,
+            "appliedAt": 2258.599999964237,
+            "frameAt": 2258.599999964237
+          },
+          {
+            "key": "g",
+            "at": 2259.099999964237,
+            "trusted": true,
+            "appliedAt": 2286.199999988079,
+            "frameAt": 2286.300000011921
+          },
+          {
+            "key": "h",
+            "at": 2286.800000011921,
+            "trusted": true,
+            "appliedAt": 2315.599999964237,
+            "frameAt": 2315.699999988079
+          },
+          {
+            "key": "i",
+            "at": 2316.099999964237,
+            "trusted": true,
+            "appliedAt": 2343.399999976158,
+            "frameAt": 2343.599999964237
+          },
+          {
+            "key": "j",
+            "at": 2344.099999964237,
+            "trusted": true,
+            "appliedAt": 2377,
+            "frameAt": 2377.099999964237
+          },
+          {
+            "key": "k",
+            "at": 2377.5,
+            "trusted": true,
+            "appliedAt": 2404.300000011921,
+            "frameAt": 2404.5
+          },
+          {
+            "key": "l",
+            "at": 2404.899999976158,
+            "trusted": true,
+            "appliedAt": 2432.800000011921,
+            "frameAt": 2432.899999976158
+          },
+          {
+            "key": "m",
+            "at": 2433.300000011921,
+            "trusted": true,
+            "appliedAt": 2462.599999964237,
+            "frameAt": 2462.599999964237
+          },
+          {
+            "key": "n",
+            "at": 2463.199999988079,
+            "trusted": true,
+            "appliedAt": 2490.599999964237,
+            "frameAt": 2490.800000011921
+          },
+          {
+            "key": "o",
+            "at": 2491.300000011921,
+            "trusted": true,
+            "appliedAt": 2518.399999976158,
+            "frameAt": 2518.5
+          },
+          {
+            "key": "p",
+            "at": 2537.5,
+            "trusted": true,
+            "appliedAt": 2564.599999964237,
+            "frameAt": 2564.699999988079
+          },
+          {
+            "key": "q",
+            "at": 2565.300000011921,
+            "trusted": true,
+            "appliedAt": 2591.199999988079,
+            "frameAt": 2591.199999988079
+          },
+          {
+            "key": "r",
+            "at": 2591.800000011921,
+            "trusted": true,
+            "appliedAt": 2617.800000011921,
+            "frameAt": 2617.800000011921
+          },
+          {
+            "key": "s",
+            "at": 2619.5,
+            "trusted": true,
+            "appliedAt": 2645.199999988079,
+            "frameAt": 2645.300000011921
+          },
+          {
+            "key": "t",
+            "at": 2645.899999976158,
+            "trusted": true,
+            "appliedAt": 2672.099999964237,
+            "frameAt": 2672.199999988079
+          },
+          {
+            "key": "u",
+            "at": 2672.800000011921,
+            "trusted": true,
+            "appliedAt": 2699.099999964237,
+            "frameAt": 2699.199999988079
+          },
+          {
+            "key": "v",
+            "at": 2699.599999964237,
+            "trusted": true,
+            "appliedAt": 2725.800000011921,
+            "frameAt": 2725.899999976158
+          },
+          {
+            "key": "w",
+            "at": 2726.300000011921,
+            "trusted": true,
+            "appliedAt": 2752.300000011921,
+            "frameAt": 2752.399999976158
+          },
+          {
+            "key": "x",
+            "at": 2753,
+            "trusted": true,
+            "appliedAt": 2778.599999964237,
+            "frameAt": 2778.699999988079
+          },
+          {
+            "key": "y",
+            "at": 2779.300000011921,
+            "trusted": true,
+            "appliedAt": 2805.199999988079,
+            "frameAt": 2805.300000011921
+          },
+          {
+            "key": "z",
+            "at": 2805.899999976158,
+            "trusted": true,
+            "appliedAt": 2831.800000011921,
+            "frameAt": 2831.800000011921
+          },
+          {
+            "key": "0",
+            "at": 2833.800000011921,
+            "trusted": true,
+            "appliedAt": 2860.199999988079,
+            "frameAt": 2860.300000011921
+          },
+          {
+            "key": "1",
+            "at": 2861,
+            "trusted": true,
+            "appliedAt": 2888.199999988079,
+            "frameAt": 2888.300000011921
+          },
+          {
+            "key": "2",
+            "at": 2888.699999988079,
+            "trusted": true,
+            "appliedAt": 2915.599999964237,
+            "frameAt": 2915.699999988079
+          },
+          {
+            "key": "3",
+            "at": 2916.300000011921,
+            "trusted": true,
+            "appliedAt": 2941.800000011921,
+            "frameAt": 2941.800000011921
+          },
+          {
+            "key": "4",
+            "at": 2942.599999964237,
+            "trusted": true,
+            "appliedAt": 2968.699999988079,
+            "frameAt": 2968.699999988079
+          },
+          {
+            "key": "5",
+            "at": 2971.300000011921,
+            "trusted": true,
+            "appliedAt": 2996.5,
+            "frameAt": 2996.599999964237
+          },
+          {
+            "key": "6",
+            "at": 2997.099999964237,
+            "trusted": true,
+            "appliedAt": 3022.699999988079,
+            "frameAt": 3022.800000011921
+          },
+          {
+            "key": "7",
+            "at": 3024.5,
+            "trusted": true,
+            "appliedAt": 3050,
+            "frameAt": 3050
+          },
+          {
+            "key": "8",
+            "at": 3050.399999976158,
+            "trusted": true,
+            "appliedAt": 3076,
+            "frameAt": 3076.099999964237
+          },
+          {
+            "key": "9",
+            "at": 3076.899999976158,
+            "trusted": true,
+            "appliedAt": 3102.599999964237,
+            "frameAt": 3102.699999988079
+          },
+          {
+            "key": "a",
+            "at": 3103.300000011921,
+            "trusted": true,
+            "appliedAt": 3128.800000011921,
+            "frameAt": 3128.899999976158
+          },
+          {
+            "key": "b",
+            "at": 3130.399999976158,
+            "trusted": true,
+            "appliedAt": 3155.699999988079,
+            "frameAt": 3155.800000011921
+          },
+          {
+            "key": "c",
+            "at": 3156.300000011921,
+            "trusted": true,
+            "appliedAt": 3181.899999976158,
+            "frameAt": 3181.899999976158
+          },
+          {
+            "key": "d",
+            "at": 3182.599999964237,
+            "trusted": true,
+            "appliedAt": 3208.399999976158,
+            "frameAt": 3208.5
+          }
+        ],
+        "pixels": {
+          "ink": 2286,
+          "chromatic": 0
+        }
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 4018936,
+          "totalBytes": 4820992,
+          "documents": 1,
+          "nodes": 78,
+          "jsEventListeners": 26
+        },
+        "after": {
+          "usedBytes": 4414844,
+          "totalBytes": 4964352,
+          "documents": 1,
+          "nodes": 78,
+          "jsEventListeners": 26
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 2,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "long-line",
+      "fixtureHash": "467fa816efc5aa5c082ed44ea4dc10bbbb41da16faf4d4822aa3d122edc628f7",
+      "scenario": "find-all",
+      "state": "cold",
+      "repetition": 0,
+      "latencyMs": {
+        "queryToCount": [24.5]
+      },
+      "observation": {
+        "query": "needle",
+        "expectedCount": 1,
+        "displayedCount": "1 of 1",
+        "trustedInput": true
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 1973152,
+          "totalBytes": 2936832,
+          "documents": 1,
+          "nodes": 19,
+          "jsEventListeners": 13
+        },
+        "after": {
+          "usedBytes": 5093716,
+          "totalBytes": 6017024,
+          "documents": 1,
+          "nodes": 149,
+          "jsEventListeners": 40
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 2,
+        "retainedObjects": 2,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "long-line",
+      "fixtureHash": "467fa816efc5aa5c082ed44ea4dc10bbbb41da16faf4d4822aa3d122edc628f7",
+      "scenario": "find-all",
+      "state": "warm",
+      "repetition": 0,
+      "latencyMs": {
+        "queryToCount": [19.700000047683716]
+      },
+      "observation": {
+        "query": "needle",
+        "expectedCount": 1,
+        "displayedCount": "1 of 1",
+        "trustedInput": true
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 5090436,
+          "totalBytes": 6017024,
+          "documents": 1,
+          "nodes": 149,
+          "jsEventListeners": 40
+        },
+        "after": {
+          "usedBytes": 5366356,
+          "totalBytes": 6279168,
+          "documents": 1,
+          "nodes": 149,
+          "jsEventListeners": 40
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 2,
+        "retainedObjects": 2,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "long-line",
+      "fixtureHash": "467fa816efc5aa5c082ed44ea4dc10bbbb41da16faf4d4822aa3d122edc628f7",
+      "scenario": "scroll",
+      "state": "cold",
+      "repetition": 0,
+      "latencyMs": {
+        "wheelToPaintUpperBound": [
+          101.10000002384186, 97.90000003576279, 99.30000001192093, 98.19999998807907,
+          98.39999997615814
+        ]
+      },
+      "observation": {
+        "sweeps": [
+          {
+            "row": 0,
+            "pixels": {
+              "ink": 2465,
+              "chromatic": 0
+            }
+          },
+          {
+            "row": 0,
+            "pixels": {
+              "ink": 2438,
+              "chromatic": 0
+            }
+          },
+          {
+            "row": 0,
+            "pixels": {
+              "ink": 2410,
+              "chromatic": 0
+            }
+          },
+          {
+            "row": 0,
+            "pixels": {
+              "ink": 2461,
+              "chromatic": 0
+            }
+          },
+          {
+            "row": 0,
+            "pixels": {
+              "ink": 2430,
+              "chromatic": 0
+            }
+          }
+        ],
+        "trustedInput": true,
+        "horizontal": true
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 1973152,
+          "totalBytes": 2936832,
+          "documents": 1,
+          "nodes": 19,
+          "jsEventListeners": 13
+        },
+        "after": {
+          "usedBytes": 3476912,
+          "totalBytes": 4296704,
+          "documents": 1,
+          "nodes": 78,
+          "jsEventListeners": 26
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 2,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "long-line",
+      "fixtureHash": "467fa816efc5aa5c082ed44ea4dc10bbbb41da16faf4d4822aa3d122edc628f7",
+      "scenario": "scroll",
+      "state": "warm",
+      "repetition": 0,
+      "latencyMs": {
+        "wheelToPaintUpperBound": [
+          100.59999996423721, 98.30000001192093, 98.30000001192093, 98.89999997615814, 98.5
+        ]
+      },
+      "observation": {
+        "sweeps": [
+          {
+            "row": 0,
+            "pixels": {
+              "ink": 2465,
+              "chromatic": 0
+            }
+          },
+          {
+            "row": 0,
+            "pixels": {
+              "ink": 2438,
+              "chromatic": 0
+            }
+          },
+          {
+            "row": 0,
+            "pixels": {
+              "ink": 2410,
+              "chromatic": 0
+            }
+          },
+          {
+            "row": 0,
+            "pixels": {
+              "ink": 2461,
+              "chromatic": 0
+            }
+          },
+          {
+            "row": 0,
+            "pixels": {
+              "ink": 2430,
+              "chromatic": 0
+            }
+          }
+        ],
+        "trustedInput": true,
+        "horizontal": true
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 3477584,
+          "totalBytes": 4034560,
+          "documents": 1,
+          "nodes": 78,
+          "jsEventListeners": 26
+        },
+        "after": {
+          "usedBytes": 3629728,
+          "totalBytes": 4296704,
+          "documents": 1,
+          "nodes": 78,
+          "jsEventListeners": 26
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 2,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "long-line",
+      "fixtureHash": "467fa816efc5aa5c082ed44ea4dc10bbbb41da16faf4d4822aa3d122edc628f7",
+      "scenario": "churn",
+      "state": "cold",
+      "repetition": 0,
+      "latencyMs": {
+        "editDelete": [10747.900000035763]
+      },
+      "throughput": {
+        "operations": 200,
+        "durationMs": 10747.900000035763,
+        "operationsPerSecond": 18.60828626981406
+      },
+      "observation": {
+        "durationMs": 10747.900000035763,
+        "operations": 200,
+        "revisions": 200,
+        "length": 1048594,
+        "views": 3,
+        "cursor": {
+          "row": 0,
+          "column": 1048594
+        }
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 1973152,
+          "totalBytes": 2936832,
+          "documents": 1,
+          "nodes": 19,
+          "jsEventListeners": 13
+        },
+        "after": {
+          "usedBytes": 4853760,
+          "totalBytes": 6275072,
+          "documents": 1,
+          "nodes": 188,
+          "jsEventListeners": 26
+        },
+        "postChurn": {
+          "usedBytes": 7377348,
+          "totalBytes": 8114176,
+          "documents": 1,
+          "nodes": 212,
+          "jsEventListeners": 110
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 4,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    },
+    {
+      "fixture": "long-line",
+      "fixtureHash": "467fa816efc5aa5c082ed44ea4dc10bbbb41da16faf4d4822aa3d122edc628f7",
+      "scenario": "churn",
+      "state": "warm",
+      "repetition": 0,
+      "latencyMs": {
+        "editDelete": [10730.899999976158]
+      },
+      "throughput": {
+        "operations": 200,
+        "durationMs": 10730.899999976158,
+        "operationsPerSecond": 18.637765704688736
+      },
+      "observation": {
+        "durationMs": 10730.899999976158,
+        "operations": 200,
+        "revisions": 200,
+        "length": 1048594,
+        "views": 3,
+        "cursor": {
+          "row": 0,
+          "column": 1048594
+        }
+      },
+      "diagnostics": [],
+      "memory": {
+        "status": "supported",
+        "method": "CDP HeapProfiler.collectGarbage + Runtime.getHeapUsage + Memory.getDOMCounters",
+        "before": {
+          "usedBytes": 4522224,
+          "totalBytes": 5345280,
+          "documents": 1,
+          "nodes": 188,
+          "jsEventListeners": 26
+        },
+        "after": {
+          "usedBytes": 4992696,
+          "totalBytes": 5750784,
+          "documents": 1,
+          "nodes": 78,
+          "jsEventListeners": 26
+        },
+        "postChurn": {
+          "usedBytes": 7153788,
+          "totalBytes": 7852032,
+          "documents": 1,
+          "nodes": 212,
+          "jsEventListeners": 110
+        }
+      },
+      "cleanup": {
+        "trackedObjects": 4,
+        "retainedObjects": 0,
+        "hosts": 0,
+        "pendingFrames": 0,
+        "active": false
+      },
+      "correct": true
+    }
+  ]
+}

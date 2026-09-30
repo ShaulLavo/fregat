@@ -1,0 +1,14 @@
+{
+  "repository": "microsoft/vscode-textbuffer",
+  "commit": "fdca8848ba80c9421cce1894bc32851e1730bc88",
+  "files": {
+    "LICENSE": "4b1ad51b2f0efc36f38aa3349a9f30fbd9217547",
+    "src/index.ts": "313c91be560680d5b61e73aed44d3ad15f43d715",
+    "src/common/charCode.ts": "fda49c070b4513a004aebcb15699a8ae21cfdd7b",
+    "src/common/position.ts": "cf38501b38929c145c62a4f804110cc4663cca4a",
+    "src/common/range.ts": "e719ab678074602d6d0544096eea0898a67a1478",
+    "src/pieceTreeBase.ts": "016844e6cbb22cb54885e13896b3e283982bce53",
+    "src/pieceTreeBuilder.ts": "ac35e29f30ede21de40f4095bab8b523e16272c2",
+    "src/rbTreeBase.ts": "9821e61c6f9dc14a1bde71659591d34d503c422e"
+  }
+}

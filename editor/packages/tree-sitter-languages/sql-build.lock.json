@@ -1,0 +1,19 @@
+{
+  "repository": "https://github.com/DerekStride/tree-sitter-sql",
+  "revision": "97614d051eebfd3bc5d97c0bdb5a1638719ca811",
+  "archiveSha256": "e86cc2ce2abc7ebc337180fdd06328f79d5d71b6e148dd6d1c313d48edc0f375",
+  "parserSha256": "36ffce6999124e9762054f9bfe2cd3778db05288feb33a4e150dc17df2e73026",
+  "parserABI": 15,
+  "compiler": "wasi-sdk 34; tree-sitter 0.27.0",
+  "cliVersion": "tree-sitter 0.27.0",
+  "wasmSha256": "13df5dd065a3870728b32f37089b3bf6f54ec0868c3840d718d60ffb084a6365",
+  "querySources": [
+    {
+      "file": "queries/highlights.scm",
+      "revision": "97614d051eebfd3bc5d97c0bdb5a1638719ca811",
+      "sha256": "25b2a7b5e60f04012c28a5cf2a224311bdb213361ba2c6439bd50ea3fafb0c64"
+    }
+  ],
+  "adaptedQuerySha256": "e0780d48190be2ece884abf551da50d8011a946e7e3fb39ee48fbe5a28f158ab",
+  "licenseSha256": "3b3e4e4252d5d7d1c18e1257005f23242bf0580ad619204fd093c99b8c56748d"
+}

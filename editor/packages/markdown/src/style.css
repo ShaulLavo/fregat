@@ -1,0 +1,41 @@
+/*
+ * Markdown live preview. The buffer still holds markdown source, so these rules only style what the
+ * inline transform already decided to show — they never hide anything themselves.
+ *
+ * The editor mirrors each row's replacement kinds as `editor-inline-<kind>` classes and routes
+ * restyled rows through DOM-measured geometry, so a heading row may change font metrics without
+ * breaking caret math. Row height stays fixed: sizes below must fit within --editor-row-height.
+ */
+.editor-virtualized {
+  --editor-markdown-heading-scale: 1;
+}
+
+.editor-markdown-link {
+  color: var(--editor-link-color, currentColor);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.editor-inline-widget.editor-markdown-text {
+  white-space: pre;
+}
+
+.editor-markdown-padding {
+  visibility: hidden;
+}
+
+.editor-virtualized-row[class*='editor-inline-heading-marker-'] {
+  font-weight: 700;
+}
+
+.editor-virtualized-row.editor-inline-heading-marker-1 {
+  font-size: calc(1em * 1.35 * var(--editor-markdown-heading-scale));
+}
+
+.editor-virtualized-row.editor-inline-heading-marker-2 {
+  font-size: calc(1em * 1.2 * var(--editor-markdown-heading-scale));
+}
+
+.editor-virtualized-row.editor-inline-heading-marker-3 {
+  font-size: calc(1em * 1.1 * var(--editor-markdown-heading-scale));
+}

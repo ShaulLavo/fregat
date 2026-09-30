@@ -1,0 +1,161 @@
+{
+  "duplicateModules": {
+    "lsp-plugin-vs-typescript-lsp": [
+      {
+        "files": [
+          "packages/lsp-plugin/src/index.ts",
+          "packages/typescript-lsp/src/index.ts"
+        ],
+        "modulePath": "index.ts"
+      },
+      {
+        "files": [
+          "packages/lsp-plugin/src/paths.ts",
+          "packages/typescript-lsp/src/paths.ts"
+        ],
+        "modulePath": "paths.ts"
+      },
+      {
+        "files": [
+          "packages/lsp-plugin/src/plugin.ts",
+          "packages/typescript-lsp/src/plugin.ts"
+        ],
+        "modulePath": "plugin.ts"
+      },
+      {
+        "files": [
+          "packages/lsp-plugin/src/types.ts",
+          "packages/typescript-lsp/src/types.ts"
+        ],
+        "modulePath": "types.ts"
+      }
+    ]
+  },
+  "expectedPackageScripts": [
+    "build",
+    "test",
+    "typecheck",
+    "lint",
+    "format",
+    "format:check"
+  ],
+  "ignoredRoots": [
+    ".desloppify",
+    ".git",
+    ".turbo",
+    "coverage",
+    "dist",
+    "node_modules",
+    "opensrc",
+    "references"
+  ],
+  "missingPackageScripts": {},
+  "packageCycles": [],
+  "schemaVersion": 1,
+  "sourceCycles": {
+    "editor": [
+      [
+        "packages/editor/src/displayTransforms.ts",
+        "packages/editor/src/graphemes.ts",
+        "packages/editor/src/textCharacters.ts",
+        "packages/editor/src/textContent.ts",
+        "packages/editor/src/textMeasurements.ts"
+      ],
+      [
+        "packages/editor/src/documentSession.ts",
+        "packages/editor/src/historySerialization.ts",
+        "packages/editor/src/syntax/session.ts",
+        "packages/editor/src/viewFolds.ts"
+      ],
+      [
+        "packages/editor/src/editor/cursorHistory.ts",
+        "packages/editor/src/editor/decorationStore.ts",
+        "packages/editor/src/editor/editorUtils.ts",
+        "packages/editor/src/editor/folds.ts",
+        "packages/editor/src/editor/jumpHistory.ts",
+        "packages/editor/src/editor/paintSnapshot.ts",
+        "packages/editor/src/editor/preparedDocument.ts",
+        "packages/editor/src/editor/runtime.ts",
+        "packages/editor/src/editor/selectionReveal.ts",
+        "packages/editor/src/editor/syntaxController.ts",
+        "packages/editor/src/editor/types.ts",
+        "packages/editor/src/plugins.ts",
+        "packages/editor/src/virtualization/fixedRowVirtualizer.ts",
+        "packages/editor/src/virtualization/foldMarkerSource.ts",
+        "packages/editor/src/virtualization/geckoHighlightRepaint.ts",
+        "packages/editor/src/virtualization/pointViewport.ts",
+        "packages/editor/src/virtualization/rowDecorationProjection.ts",
+        "packages/editor/src/virtualization/scrollViewport.ts",
+        "packages/editor/src/virtualization/sharedTokenHighlights.ts",
+        "packages/editor/src/virtualization/virtualizedTextView.ts",
+        "packages/editor/src/virtualization/virtualizedTextViewBidi.ts",
+        "packages/editor/src/virtualization/virtualizedTextViewComposition.ts",
+        "packages/editor/src/virtualization/virtualizedTextViewGeometry.ts",
+        "packages/editor/src/virtualization/virtualizedTextViewHelpers.ts",
+        "packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts",
+        "packages/editor/src/virtualization/virtualizedTextViewHighlights.ts",
+        "packages/editor/src/virtualization/virtualizedTextViewInternals.ts",
+        "packages/editor/src/virtualization/virtualizedTextViewLayout.ts",
+        "packages/editor/src/virtualization/virtualizedTextViewRows.ts",
+        "packages/editor/src/virtualization/virtualizedTextViewSelectionLayer.ts",
+        "packages/editor/src/virtualization/virtualizedTextViewTypes.ts",
+        "packages/editor/src/virtualization/wheelScrollTarget.ts"
+      ],
+      [
+        "packages/editor/src/shiki/scopedTokens.ts",
+        "packages/editor/src/shiki/tokenizer.ts"
+      ],
+      [
+        "packages/editor/src/syntax/packedTokens.ts",
+        "packages/editor/src/syntax/tokenStore.ts",
+        "packages/editor/src/tokens.ts"
+      ],
+      [
+        "packages/editor/src/virtualization/displayProjectionBuild.ts",
+        "packages/editor/src/virtualization/displayProjectionWrap.ts"
+      ]
+    ],
+    "editor-virtualization": [
+      [
+        "packages/editor/src/virtualization/displayProjectionBuild.ts",
+        "packages/editor/src/virtualization/displayProjectionWrap.ts"
+      ],
+      [
+        "packages/editor/src/virtualization/scrollViewport.ts",
+        "packages/editor/src/virtualization/virtualizedTextViewGeometry.ts",
+        "packages/editor/src/virtualization/virtualizedTextViewHelpers.ts",
+        "packages/editor/src/virtualization/virtualizedTextViewHiddenCharacters.ts",
+        "packages/editor/src/virtualization/virtualizedTextViewInternals.ts"
+      ]
+    ],
+    "lsp-core": [],
+    "lsp-plugin": [
+      [
+        "packages/lsp-plugin/src/diagnostics.ts",
+        "packages/lsp-plugin/src/document.ts",
+        "packages/lsp-plugin/src/documentSnapshot.ts",
+        "packages/lsp-plugin/src/documentSync.ts",
+        "packages/lsp-plugin/src/documentSyncController.ts",
+        "packages/lsp-plugin/src/lane.ts",
+        "packages/lsp-plugin/src/lspConnection.ts",
+        "packages/lsp-plugin/src/pluginTypes.ts",
+        "packages/lsp-plugin/src/types.ts",
+        "packages/lsp-plugin/src/viewDocumentSnapshot.ts"
+      ],
+      [
+        "packages/lsp-plugin/src/workspaceEdit.ts",
+        "packages/lsp-plugin/src/workspaceTextEdits.ts"
+      ]
+    ],
+    "plugin-ui": [
+      [
+        "packages/plugin-ui/src/hoverController.ts",
+        "packages/plugin-ui/src/hoverParticipant.ts",
+        "packages/plugin-ui/src/hoverPlugin.ts",
+        "packages/plugin-ui/src/hoverRegistry.ts",
+        "packages/plugin-ui/src/hoverToken.ts"
+      ]
+    ],
+    "typescript-lsp": []
+  }
+}

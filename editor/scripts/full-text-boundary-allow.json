@@ -1,0 +1,42 @@
+[
+  {
+    "file": "packages/editor/src/editor/viewSnapshot.ts",
+    "function": "serializeEditorViewSnapshot",
+    "reason": "Explicit full-view serialization of the revision the snapshot captured; the caller owns the string."
+  },
+  {
+    "file": "packages/editor/src/shiki/workerClient.ts",
+    "function": "openPayloadText",
+    "reason": "The Shiki worker's open message is a whole-document protocol payload; later edits are incremental."
+  },
+  {
+    "file": "packages/lsp/src/client.ts",
+    "function": "documentPayloadText",
+    "reason": "LSP didOpen, and didSave when the server asks for text, send the whole document by protocol."
+  },
+  {
+    "file": "packages/lsp/src/positions.ts",
+    "function": "fullSyncPayloadText",
+    "reason": "LSP full-sync mode and incremental recovery (E007 reasons) send the whole document by protocol."
+  },
+  {
+    "file": "packages/diff/src/editorDiffPlugin.ts",
+    "function": "liveDiffDocumentText",
+    "reason": "The live diff compares whole documents and the diff library takes strings."
+  },
+  {
+    "file": "packages/react/src/index.tsx",
+    "function": "createFullTextSelector",
+    "reason": "Backs the explicitly requested useFullText subscription, which owns and releases the string."
+  },
+  {
+    "file": "packages/textbuffer/src/documentText.ts",
+    "function": "pieceTableDocumentText",
+    "reason": "Save serialization: restores the document's line endings and byte order mark for writing."
+  },
+  {
+    "file": "packages/solid/src/index.ts",
+    "function": "readWholeRevision",
+    "reason": "Backs Solid's explicitly called materializeFullText accessor, which caches one pair and clears it on disposal."
+  }
+]

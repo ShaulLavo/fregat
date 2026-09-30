@@ -1,0 +1,91 @@
+{
+  "baselineCommit": "33e632a6ff8ee35a670c4f4636c0f6f84d36295a",
+  "before": {
+    "sourceRoot": "/work/tmp/editor-e034-fixes/baseline-33e632a",
+    "depth": 250000,
+    "rows": 500005,
+    "codeUnits": 5750033,
+    "budget": {
+      "maxRows": 128,
+      "maxCodeUnits": 32768,
+      "maxBlocks": 128
+    },
+    "slices": 11995,
+    "foldCount": 250001,
+    "maximumPositions": {
+      "positionCalls": 250006,
+      "durationMs": 14.400756000000001,
+      "rowsRead": 0,
+      "propagationRows": 37,
+      "metadataSteps": 0,
+      "stackSteps": 0
+    },
+    "maximumStackSteps": 0,
+    "maximumStackSliceMs": 0,
+    "stackOnlySlices": 0,
+    "diagnostics": {
+      "snapshotIdentity": 1,
+      "configurationIdentity": "2::4",
+      "maxSliceMs": 14.40021200000001,
+      "metadataSteps": 35158,
+      "maxMetadataStepsPerSlice": 128,
+      "retainedBytesEstimated": true,
+      "rowsRead": 500005,
+      "codeUnitsRead": 5750033,
+      "factBlocksRebuilt": 3907,
+      "factBlocksReused": 0,
+      "propagationRows": 1000010,
+      "foldCount": 250001,
+      "materializations": 0,
+      "retainedBytes": 41000472,
+      "durationMs": 344.9759260000031,
+      "outcome": "completed",
+      "coldReason": "initial"
+    }
+  },
+  "after": {
+    "sourceRoot": "/work/projects/Editor",
+    "depth": 250000,
+    "rows": 500005,
+    "codeUnits": 5750033,
+    "budget": {
+      "maxRows": 128,
+      "maxCodeUnits": 32768,
+      "maxBlocks": 128
+    },
+    "slices": 13949,
+    "foldCount": 250001,
+    "maximumPositions": {
+      "positionCalls": 788,
+      "durationMs": 0.06573200000002544,
+      "rowsRead": 0,
+      "propagationRows": 128,
+      "metadataSteps": 0,
+      "stackSteps": 0
+    },
+    "maximumStackSteps": 128,
+    "maximumStackSliceMs": 0.4437690000000316,
+    "stackOnlySlices": 1953,
+    "diagnostics": {
+      "snapshotIdentity": 1,
+      "configurationIdentity": "2::4",
+      "maxSliceMs": 1.063964999999996,
+      "metadataSteps": 35158,
+      "maxMetadataStepsPerSlice": 128,
+      "stackSteps": 250000,
+      "maxStackStepsPerSlice": 128,
+      "retainedBytesEstimated": true,
+      "rowsRead": 500005,
+      "codeUnitsRead": 5750033,
+      "factBlocksRebuilt": 3907,
+      "factBlocksReused": 0,
+      "propagationRows": 1000010,
+      "foldCount": 250001,
+      "materializations": 0,
+      "retainedBytes": 41000472,
+      "durationMs": 354.276842999999,
+      "outcome": "completed",
+      "coldReason": "initial"
+    }
+  }
+}

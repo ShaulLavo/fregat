@@ -1,0 +1,90 @@
+export {
+  clientSupportsDidSave,
+  defaultClientCapabilities,
+  documentSyncModeFromCapabilities,
+  documentSyncOptionsFromCapabilities,
+  mergeClientCapabilities,
+  composeWorkspaceEditClientCapabilities,
+} from './capabilities'
+export {
+  SEMANTIC_TOKEN_MODIFIERS,
+  SEMANTIC_TOKEN_TYPES,
+  semanticTokensClientCapability,
+  type SemanticTokensClientCapabilityOptions,
+  type SemanticTokenFormat,
+  type SemanticTokensRequestOptions,
+} from './semanticTokens'
+export {
+  LspClient,
+  type LspClientConfig,
+  type LspClientState,
+  type RequestOptions as LspRequestOptions,
+} from './client'
+export {
+  createLspContentChanges,
+  createLspContentChangesInSnapshot,
+  lspPositionToOffset,
+  lspPositionToOffsetInSnapshot,
+  offsetToLspPosition,
+  offsetToLspPositionInSnapshot,
+  textEditsToLspContentChanges,
+  textEditsToLspContentChangesInSnapshot,
+  textEditToLspContentChange,
+  textEditToLspContentChangeInSnapshot,
+  type LspContentChangeOptions,
+} from './positions'
+export {
+  LSP_SERVER_EXITED,
+  LspRequestCancelledError,
+  LspResponseError,
+  LspServerExitedError,
+  METHOD_NOT_FOUND,
+  REQUEST_CANCELLED,
+  type LspServerExitedParams,
+} from './protocol'
+export {
+  LspTransportClosedError,
+  createWebSocketLspTransport,
+  createWorkerLspTransport,
+  type LspManagedTransport,
+  type LspWebSocketConstructor,
+  type LspWebSocketLike,
+  type LspWebSocketTransportOptions,
+  type LspWorkerLike,
+  type LspWorkerMessageFormat,
+  type LspWorkerTransportOptions,
+} from './transports'
+export type {
+  LspLineStarts,
+  LspDocument,
+  LspDocumentChange,
+  LspDocumentOpenSnapshotOptions,
+  LspDocumentOpenSnapshotResult,
+  LspDocumentSaveSync,
+  LspDocumentSyncMode,
+  LspDocumentSyncOptions,
+  LspDocumentTransitionOptions,
+  LspDocumentTransitionNotification,
+  LspDocumentTransitionResult,
+  LspClientWorkspace,
+  LspNotificationHandler,
+  LspRequestHandle,
+  LspServerRequestHandler,
+  LspServerMessageHandler,
+  LspServerMessageNotification,
+  PublishDiagnosticsNotificationParams,
+  LspTextDocumentSnapshot,
+  LspTextEdit,
+  LspTextSnapshot,
+  LspTransport,
+  LspTransportHandler,
+  LspUnhandledNotificationHandler,
+  LspWorkspaceSyncTarget,
+  LspWorkspaceDocumentAttachment,
+  LspWorkspaceFactory,
+  LspWorkspaceSnapshotEditOptions,
+  LspWorkspaceUnchangedSourceOptions,
+} from './types'
+export { LspWorkspace, arrayLspLineStarts } from './workspace'
+export type * as lsp from 'vscode-languageserver-protocol'
+export { recordLspPerformanceDiagnostic } from './performanceDiagnostics'

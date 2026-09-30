@@ -1,0 +1,1493 @@
+{
+  "note": "108 validated samples per run. Fixture manifests, workload config, browser, hardware and runtime match. Before is clean b31e22e; intermediate uses 256-unit pages; final uses clipped 16 Ki-unit pages and selective borrowed-chunk detachment. One baseline run, not a freshly calibrated E002 gate.",
+  "before": {
+    "commit": "b31e22eb18c240d04ade431e44a80fa60e694aa4",
+    "dirty": false,
+    "sourceHash": "3bf811f8c63d310b56fe0d9cc4a0b3579969e19850f87825928a8a58f8f1e53e",
+    "coreDirectory": "/work/projects/Editor/packages/editor",
+    "browser": {
+      "engine": "chromium",
+      "version": "153.0.8010.12",
+      "headless": true
+    },
+    "hardware": {
+      "cpu": "Intel(R) Core(TM) i7-14700K",
+      "logicalCpus": 28,
+      "memoryBytes": 33369657344,
+      "architecture": "x64",
+      "platform": "linux",
+      "release": "7.1.9-arch1-2"
+    },
+    "runtime": "v26.7.0",
+    "unsupportedMemory": {
+      "processRss": "No portable renderer process RSS API; CDP reports heap and DOM counts.",
+      "userAgentSpecificMemory": "Cross-origin isolation is not required by this runner."
+    }
+  },
+  "after": {
+    "commit": "b31e22eb18c240d04ade431e44a80fa60e694aa4",
+    "dirty": true,
+    "sourceHash": "15134de4d7954d2b73f423d9327a96042c0a1cb48a788a0c2d09bd4d973d0dfc",
+    "coreDirectory": "/work/projects/Editor/packages/editor",
+    "browser": {
+      "engine": "chromium",
+      "version": "153.0.8010.12",
+      "headless": true
+    },
+    "hardware": {
+      "cpu": "Intel(R) Core(TM) i7-14700K",
+      "logicalCpus": 28,
+      "memoryBytes": 33369657344,
+      "architecture": "x64",
+      "platform": "linux",
+      "release": "7.1.9-arch1-2"
+    },
+    "runtime": "v26.7.0",
+    "unsupportedMemory": {
+      "processRss": "No portable renderer process RSS API; CDP reports heap and DOM counts.",
+      "userAgentSpecificMemory": "Cross-origin isolation is not required by this runner."
+    }
+  },
+  "rows": [
+    {
+      "key": "ordinary/single/typing/inputToApplied",
+      "count": 72,
+      "beforeP50Ms": 0.5999999046325684,
+      "beforeP95Ms": 0.8999998569488525,
+      "smallPagesP95Ms": 0.9000000953674316,
+      "finalP50Ms": 0.5999999046325684,
+      "finalP95Ms": 1.1000001430511475,
+      "deltaP95Ms": 0.20000028610229492
+    },
+    {
+      "key": "ordinary/single/typing/dispatch",
+      "count": 72,
+      "beforeP50Ms": 0.5999999046325684,
+      "beforeP95Ms": 0.8999998569488525,
+      "smallPagesP95Ms": 0.9000000953674316,
+      "finalP50Ms": 0.5999999046325684,
+      "finalP95Ms": 1.1000001430511475,
+      "deltaP95Ms": 0.20000028610229492
+    },
+    {
+      "key": "ordinary/single/typing/inputToFrame",
+      "count": 72,
+      "beforeP50Ms": 7,
+      "beforeP95Ms": 15.600000143051147,
+      "smallPagesP95Ms": 14.899999856948853,
+      "finalP50Ms": 7.3999998569488525,
+      "finalP95Ms": 15.099999904632568,
+      "deltaP95Ms": -0.5000002384185791
+    },
+    {
+      "key": "ordinary/single/typing/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 115.59999990463257,
+      "beforeP95Ms": 127.19999980926514,
+      "smallPagesP95Ms": 131.10000014305115,
+      "finalP50Ms": 116.70000004768372,
+      "finalP95Ms": 132.89999985694885,
+      "deltaP95Ms": 5.700000047683716
+    },
+    {
+      "key": "ordinary/single/repeat/inputToApplied",
+      "count": 72,
+      "beforeP50Ms": 0.5999999046325684,
+      "beforeP95Ms": 1.1999998092651367,
+      "smallPagesP95Ms": 1.1000001430511475,
+      "finalP50Ms": 0.5999999046325684,
+      "finalP95Ms": 0.9000000953674316,
+      "deltaP95Ms": -0.2999997138977051
+    },
+    {
+      "key": "ordinary/single/repeat/dispatch",
+      "count": 72,
+      "beforeP50Ms": 0.5999999046325684,
+      "beforeP95Ms": 1.1999998092651367,
+      "smallPagesP95Ms": 1.1000001430511475,
+      "finalP50Ms": 0.5999999046325684,
+      "finalP95Ms": 0.9000000953674316,
+      "deltaP95Ms": -0.2999997138977051
+    },
+    {
+      "key": "ordinary/single/repeat/inputToFrame",
+      "count": 72,
+      "beforeP50Ms": 7.299999952316284,
+      "beforeP95Ms": 15.200000047683716,
+      "smallPagesP95Ms": 15.100000143051147,
+      "finalP50Ms": 8.100000143051147,
+      "finalP95Ms": 14.799999952316284,
+      "deltaP95Ms": -0.40000009536743164
+    },
+    {
+      "key": "ordinary/single/repeat/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 116,
+      "beforeP95Ms": 131.89999985694885,
+      "smallPagesP95Ms": 116.70000004768372,
+      "finalP50Ms": 115.90000009536743,
+      "finalP95Ms": 116.5,
+      "deltaP95Ms": -15.399999856948853
+    },
+    {
+      "key": "ordinary/single/composition-update/inputToApplied",
+      "count": 36,
+      "beforeP50Ms": 0,
+      "beforeP95Ms": 0.10000014305114746,
+      "smallPagesP95Ms": 0.10000014305114746,
+      "finalP50Ms": 0,
+      "finalP95Ms": 0.20000004768371582,
+      "deltaP95Ms": 0.09999990463256836
+    },
+    {
+      "key": "ordinary/single/composition-update/dispatch",
+      "count": 36,
+      "beforeP50Ms": 0,
+      "beforeP95Ms": 0.10000014305114746,
+      "smallPagesP95Ms": 0.10000014305114746,
+      "finalP50Ms": 0,
+      "finalP95Ms": 0.10000014305114746,
+      "deltaP95Ms": 0
+    },
+    {
+      "key": "ordinary/single/composition-update/inputToFrame",
+      "count": 36,
+      "beforeP50Ms": 7.799999952316284,
+      "beforeP95Ms": 10.600000143051147,
+      "smallPagesP95Ms": 10.599999904632568,
+      "finalP50Ms": 7.599999904632568,
+      "finalP95Ms": 10.799999952316284,
+      "deltaP95Ms": 0.19999980926513672
+    },
+    {
+      "key": "ordinary/single/composition-update/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 99.20000004768372,
+      "beforeP95Ms": 99.69999980926514,
+      "smallPagesP95Ms": 115.70000004768372,
+      "finalP50Ms": 98.60000014305115,
+      "finalP95Ms": 99.30000019073486,
+      "deltaP95Ms": -0.39999961853027344
+    },
+    {
+      "key": "ordinary/single/composition-commit/inputToApplied",
+      "count": 36,
+      "beforeP50Ms": 0.5,
+      "beforeP95Ms": 1.2999999523162842,
+      "smallPagesP95Ms": 1.4000000953674316,
+      "finalP50Ms": 0.5,
+      "finalP95Ms": 1.2999999523162842,
+      "deltaP95Ms": 0
+    },
+    {
+      "key": "ordinary/single/composition-commit/dispatch",
+      "count": 36,
+      "beforeP50Ms": 0.5,
+      "beforeP95Ms": 1.2999999523162842,
+      "smallPagesP95Ms": 1.4000000953674316,
+      "finalP50Ms": 0.5,
+      "finalP95Ms": 1.2999999523162842,
+      "deltaP95Ms": 0
+    },
+    {
+      "key": "ordinary/single/composition-commit/inputToFrame",
+      "count": 36,
+      "beforeP50Ms": 8.5,
+      "beforeP95Ms": 16,
+      "smallPagesP95Ms": 15.400000095367432,
+      "finalP50Ms": 6.8999998569488525,
+      "finalP95Ms": 15.399999856948853,
+      "deltaP95Ms": -0.6000001430511475
+    },
+    {
+      "key": "ordinary/single/composition-commit/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 116.60000014305115,
+      "beforeP95Ms": 116.79999995231628,
+      "smallPagesP95Ms": 115.89999985694885,
+      "finalP50Ms": 115.60000014305115,
+      "finalP95Ms": 115.70000004768372,
+      "deltaP95Ms": -1.0999999046325684
+    },
+    {
+      "key": "ordinary/single/paste/inputToApplied",
+      "count": 24,
+      "beforeP50Ms": 4.5,
+      "beforeP95Ms": 7.799999952316284,
+      "smallPagesP95Ms": 5.700000047683716,
+      "finalP50Ms": 4.300000190734863,
+      "finalP95Ms": 6.700000047683716,
+      "deltaP95Ms": -1.0999999046325684
+    },
+    {
+      "key": "ordinary/single/paste/dispatch",
+      "count": 24,
+      "beforeP50Ms": 4.5,
+      "beforeP95Ms": 7.799999952316284,
+      "smallPagesP95Ms": 5.700000047683716,
+      "finalP50Ms": 4.300000190734863,
+      "finalP95Ms": 6.700000047683716,
+      "deltaP95Ms": -1.0999999046325684
+    },
+    {
+      "key": "ordinary/single/paste/inputToFrame",
+      "count": 24,
+      "beforeP50Ms": 9.699999809265137,
+      "beforeP95Ms": 19,
+      "smallPagesP95Ms": 15.099999904632568,
+      "finalP50Ms": 9.200000047683716,
+      "finalP95Ms": 16.799999952316284,
+      "deltaP95Ms": -2.200000047683716
+    },
+    {
+      "key": "ordinary/single/paste/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 148.20000004768372,
+      "beforeP95Ms": 160.60000014305115,
+      "smallPagesP95Ms": 131.09999990463257,
+      "finalP50Ms": 146.29999995231628,
+      "finalP95Ms": 146.90000009536743,
+      "deltaP95Ms": -13.700000047683716
+    },
+    {
+      "key": "ordinary/single/undo/inputToApplied",
+      "count": 36,
+      "beforeP50Ms": 0.5,
+      "beforeP95Ms": 1.0999999046325684,
+      "smallPagesP95Ms": 0.8999998569488525,
+      "finalP50Ms": 0.5999999046325684,
+      "finalP95Ms": 1,
+      "deltaP95Ms": -0.09999990463256836
+    },
+    {
+      "key": "ordinary/single/undo/dispatch",
+      "count": 36,
+      "beforeP50Ms": 0.5,
+      "beforeP95Ms": 1,
+      "smallPagesP95Ms": 1,
+      "finalP50Ms": 0.5,
+      "finalP95Ms": 0.8999998569488525,
+      "deltaP95Ms": -0.10000014305114746
+    },
+    {
+      "key": "ordinary/single/undo/inputToFrame",
+      "count": 36,
+      "beforeP50Ms": 8.399999856948853,
+      "beforeP95Ms": 15,
+      "smallPagesP95Ms": 15.900000095367432,
+      "finalP50Ms": 7.400000095367432,
+      "finalP95Ms": 15.899999856948853,
+      "deltaP95Ms": 0.8999998569488525
+    },
+    {
+      "key": "ordinary/single/undo/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 116.79999995231628,
+      "beforeP95Ms": 132.60000014305115,
+      "smallPagesP95Ms": 117.29999995231628,
+      "finalP50Ms": 115.60000014305115,
+      "finalP95Ms": 116,
+      "deltaP95Ms": -16.600000143051147
+    },
+    {
+      "key": "ordinary/multiple/typing/inputToApplied",
+      "count": 72,
+      "beforeP50Ms": 0.8000001907348633,
+      "beforeP95Ms": 1.2000000476837158,
+      "smallPagesP95Ms": 1.2999999523162842,
+      "finalP50Ms": 0.8999998569488525,
+      "finalP95Ms": 1.2999999523162842,
+      "deltaP95Ms": 0.09999990463256836
+    },
+    {
+      "key": "ordinary/multiple/typing/dispatch",
+      "count": 72,
+      "beforeP50Ms": 0.8000001907348633,
+      "beforeP95Ms": 1.2000000476837158,
+      "smallPagesP95Ms": 1.2999999523162842,
+      "finalP50Ms": 0.8999998569488525,
+      "finalP95Ms": 1.2999999523162842,
+      "deltaP95Ms": 0.09999990463256836
+    },
+    {
+      "key": "ordinary/multiple/typing/inputToFrame",
+      "count": 72,
+      "beforeP50Ms": 7.5,
+      "beforeP95Ms": 14.599999904632568,
+      "smallPagesP95Ms": 14.900000095367432,
+      "finalP50Ms": 7.800000190734863,
+      "finalP95Ms": 15.299999952316284,
+      "deltaP95Ms": 0.7000000476837158
+    },
+    {
+      "key": "ordinary/multiple/typing/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 135.70000004768372,
+      "beforeP95Ms": 135.79999995231628,
+      "smallPagesP95Ms": 135,
+      "finalP50Ms": 134,
+      "finalP95Ms": 136,
+      "deltaP95Ms": 0.20000004768371582
+    },
+    {
+      "key": "ordinary/multiple/repeat/inputToApplied",
+      "count": 72,
+      "beforeP50Ms": 0.8000001907348633,
+      "beforeP95Ms": 1.5999999046325684,
+      "smallPagesP95Ms": 1.4000000953674316,
+      "finalP50Ms": 0.8999998569488525,
+      "finalP95Ms": 1.5,
+      "deltaP95Ms": -0.09999990463256836
+    },
+    {
+      "key": "ordinary/multiple/repeat/dispatch",
+      "count": 72,
+      "beforeP50Ms": 0.8000001907348633,
+      "beforeP95Ms": 1.5999999046325684,
+      "smallPagesP95Ms": 1.4000000953674316,
+      "finalP50Ms": 0.8999998569488525,
+      "finalP95Ms": 1.5,
+      "deltaP95Ms": -0.09999990463256836
+    },
+    {
+      "key": "ordinary/multiple/repeat/inputToFrame",
+      "count": 72,
+      "beforeP50Ms": 8.299999952316284,
+      "beforeP95Ms": 15.100000143051147,
+      "smallPagesP95Ms": 15.099999904632568,
+      "finalP50Ms": 7.800000190734863,
+      "finalP95Ms": 15.299999952316284,
+      "deltaP95Ms": 0.19999980926513672
+    },
+    {
+      "key": "ordinary/multiple/repeat/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 134.20000004768372,
+      "beforeP95Ms": 135.09999990463257,
+      "smallPagesP95Ms": 133.10000014305115,
+      "finalP50Ms": 133.5,
+      "finalP95Ms": 134,
+      "deltaP95Ms": -1.0999999046325684
+    },
+    {
+      "key": "ordinary/multiple/composition-update/inputToApplied",
+      "count": 36,
+      "beforeP50Ms": 0,
+      "beforeP95Ms": 0.20000004768371582,
+      "smallPagesP95Ms": 0.19999980926513672,
+      "finalP50Ms": 0,
+      "finalP95Ms": 0.10000014305114746,
+      "deltaP95Ms": -0.09999990463256836
+    },
+    {
+      "key": "ordinary/multiple/composition-update/dispatch",
+      "count": 36,
+      "beforeP50Ms": 0,
+      "beforeP95Ms": 0.10000014305114746,
+      "smallPagesP95Ms": 0.10000014305114746,
+      "finalP50Ms": 0,
+      "finalP95Ms": 0.10000014305114746,
+      "deltaP95Ms": 0
+    },
+    {
+      "key": "ordinary/multiple/composition-update/inputToFrame",
+      "count": 36,
+      "beforeP50Ms": 6.900000095367432,
+      "beforeP95Ms": 11,
+      "smallPagesP95Ms": 10.900000095367432,
+      "finalP50Ms": 6.799999952316284,
+      "finalP95Ms": 10.600000143051147,
+      "deltaP95Ms": -0.39999985694885254
+    },
+    {
+      "key": "ordinary/multiple/composition-update/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 101.09999990463257,
+      "beforeP95Ms": 112.89999985694885,
+      "smallPagesP95Ms": 99.19999980926514,
+      "finalP50Ms": 99,
+      "finalP95Ms": 99,
+      "deltaP95Ms": -13.899999856948853
+    },
+    {
+      "key": "ordinary/multiple/composition-commit/inputToApplied",
+      "count": 36,
+      "beforeP50Ms": 0.7999999523162842,
+      "beforeP95Ms": 1.7999999523162842,
+      "smallPagesP95Ms": 1.9000000953674316,
+      "finalP50Ms": 0.7999999523162842,
+      "finalP95Ms": 1.7000000476837158,
+      "deltaP95Ms": -0.09999990463256836
+    },
+    {
+      "key": "ordinary/multiple/composition-commit/dispatch",
+      "count": 36,
+      "beforeP50Ms": 0.7999999523162842,
+      "beforeP95Ms": 1.7999999523162842,
+      "smallPagesP95Ms": 1.9000000953674316,
+      "finalP50Ms": 0.7999999523162842,
+      "finalP95Ms": 1.6000001430511475,
+      "deltaP95Ms": -0.19999980926513672
+    },
+    {
+      "key": "ordinary/multiple/composition-commit/inputToFrame",
+      "count": 36,
+      "beforeP50Ms": 6.700000047683716,
+      "beforeP95Ms": 15.099999904632568,
+      "smallPagesP95Ms": 14.900000095367432,
+      "finalP50Ms": 7.1000001430511475,
+      "finalP95Ms": 15.200000047683716,
+      "deltaP95Ms": 0.10000014305114746
+    },
+    {
+      "key": "ordinary/multiple/composition-commit/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 114.5,
+      "beforeP95Ms": 117.20000004768372,
+      "smallPagesP95Ms": 134.59999990463257,
+      "finalP50Ms": 116.70000004768372,
+      "finalP95Ms": 118.20000004768372,
+      "deltaP95Ms": 1
+    },
+    {
+      "key": "ordinary/multiple/paste/inputToApplied",
+      "count": 24,
+      "beforeP50Ms": 4.8999998569488525,
+      "beforeP95Ms": 7.299999952316284,
+      "smallPagesP95Ms": 7,
+      "finalP50Ms": 5.299999952316284,
+      "finalP95Ms": 7.8999998569488525,
+      "deltaP95Ms": 0.5999999046325684
+    },
+    {
+      "key": "ordinary/multiple/paste/dispatch",
+      "count": 24,
+      "beforeP50Ms": 4.900000095367432,
+      "beforeP95Ms": 7.299999952316284,
+      "smallPagesP95Ms": 7,
+      "finalP50Ms": 5.299999952316284,
+      "finalP95Ms": 7.8999998569488525,
+      "deltaP95Ms": 0.5999999046325684
+    },
+    {
+      "key": "ordinary/multiple/paste/inputToFrame",
+      "count": 24,
+      "beforeP50Ms": 11.799999952316284,
+      "beforeP95Ms": 16,
+      "smallPagesP95Ms": 17.800000190734863,
+      "finalP50Ms": 9.400000095367432,
+      "finalP95Ms": 18,
+      "deltaP95Ms": 2
+    },
+    {
+      "key": "ordinary/multiple/paste/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 147.70000004768372,
+      "beforeP95Ms": 148,
+      "smallPagesP95Ms": 165.20000004768372,
+      "finalP50Ms": 147.29999995231628,
+      "finalP95Ms": 149.40000009536743,
+      "deltaP95Ms": 1.4000000953674316
+    },
+    {
+      "key": "ordinary/multiple/undo/inputToApplied",
+      "count": 36,
+      "beforeP50Ms": 0.9000000953674316,
+      "beforeP95Ms": 2.299999952316284,
+      "smallPagesP95Ms": 1.5,
+      "finalP50Ms": 0.7999999523162842,
+      "finalP95Ms": 1.4000000953674316,
+      "deltaP95Ms": -0.8999998569488525
+    },
+    {
+      "key": "ordinary/multiple/undo/dispatch",
+      "count": 36,
+      "beforeP50Ms": 0.8999998569488525,
+      "beforeP95Ms": 2.200000047683716,
+      "smallPagesP95Ms": 1.2999999523162842,
+      "finalP50Ms": 0.7999999523162842,
+      "finalP95Ms": 1.2000000476837158,
+      "deltaP95Ms": -1
+    },
+    {
+      "key": "ordinary/multiple/undo/inputToFrame",
+      "count": 36,
+      "beforeP50Ms": 8.100000143051147,
+      "beforeP95Ms": 14.399999856948853,
+      "smallPagesP95Ms": 15.600000143051147,
+      "finalP50Ms": 7.900000095367432,
+      "finalP95Ms": 15.200000047683716,
+      "deltaP95Ms": 0.8000001907348633
+    },
+    {
+      "key": "ordinary/multiple/undo/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 117.09999990463257,
+      "beforeP95Ms": 135,
+      "smallPagesP95Ms": 118.90000009536743,
+      "finalP50Ms": 116.10000014305115,
+      "finalP95Ms": 118,
+      "deltaP95Ms": -17
+    },
+    {
+      "key": "short-lines/single/typing/inputToApplied",
+      "count": 72,
+      "beforeP50Ms": 0.5,
+      "beforeP95Ms": 1.2999999523162842,
+      "smallPagesP95Ms": 1.3999998569488525,
+      "finalP50Ms": 0.5,
+      "finalP95Ms": 1.2999999523162842,
+      "deltaP95Ms": 0
+    },
+    {
+      "key": "short-lines/single/typing/dispatch",
+      "count": 72,
+      "beforeP50Ms": 0.5,
+      "beforeP95Ms": 1.2999999523162842,
+      "smallPagesP95Ms": 1.3999998569488525,
+      "finalP50Ms": 0.5,
+      "finalP95Ms": 1.2999999523162842,
+      "deltaP95Ms": 0
+    },
+    {
+      "key": "short-lines/single/typing/inputToFrame",
+      "count": 72,
+      "beforeP50Ms": 8.299999952316284,
+      "beforeP95Ms": 15,
+      "smallPagesP95Ms": 15.5,
+      "finalP50Ms": 8.5,
+      "finalP95Ms": 15.199999809265137,
+      "deltaP95Ms": 0.19999980926513672
+    },
+    {
+      "key": "short-lines/single/typing/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 132.70000004768372,
+      "beforeP95Ms": 133,
+      "smallPagesP95Ms": 147.79999995231628,
+      "finalP50Ms": 132,
+      "finalP95Ms": 133.39999985694885,
+      "deltaP95Ms": 0.39999985694885254
+    },
+    {
+      "key": "short-lines/single/repeat/inputToApplied",
+      "count": 72,
+      "beforeP50Ms": 0.5,
+      "beforeP95Ms": 1,
+      "smallPagesP95Ms": 0.8000001907348633,
+      "finalP50Ms": 0.5,
+      "finalP95Ms": 1.0999999046325684,
+      "deltaP95Ms": 0.09999990463256836
+    },
+    {
+      "key": "short-lines/single/repeat/dispatch",
+      "count": 72,
+      "beforeP50Ms": 0.5,
+      "beforeP95Ms": 1,
+      "smallPagesP95Ms": 0.8000001907348633,
+      "finalP50Ms": 0.5,
+      "finalP95Ms": 1.0999999046325684,
+      "deltaP95Ms": 0.09999990463256836
+    },
+    {
+      "key": "short-lines/single/repeat/inputToFrame",
+      "count": 72,
+      "beforeP50Ms": 7.1000001430511475,
+      "beforeP95Ms": 15.299999952316284,
+      "smallPagesP95Ms": 15.5,
+      "finalP50Ms": 7.700000047683716,
+      "finalP95Ms": 15.299999952316284,
+      "deltaP95Ms": 0
+    },
+    {
+      "key": "short-lines/single/repeat/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 132.90000009536743,
+      "beforeP95Ms": 133.20000004768372,
+      "smallPagesP95Ms": 134.10000014305115,
+      "finalP50Ms": 133.5,
+      "finalP95Ms": 134.90000009536743,
+      "deltaP95Ms": 1.7000000476837158
+    },
+    {
+      "key": "short-lines/single/composition-update/inputToApplied",
+      "count": 36,
+      "beforeP50Ms": 0,
+      "beforeP95Ms": 0.10000014305114746,
+      "smallPagesP95Ms": 0.20000004768371582,
+      "finalP50Ms": 0,
+      "finalP95Ms": 0.10000014305114746,
+      "deltaP95Ms": 0
+    },
+    {
+      "key": "short-lines/single/composition-update/dispatch",
+      "count": 36,
+      "beforeP50Ms": 0,
+      "beforeP95Ms": 0.10000014305114746,
+      "smallPagesP95Ms": 0.20000004768371582,
+      "finalP50Ms": 0,
+      "finalP95Ms": 0.10000014305114746,
+      "deltaP95Ms": 0
+    },
+    {
+      "key": "short-lines/single/composition-update/inputToFrame",
+      "count": 36,
+      "beforeP50Ms": 8,
+      "beforeP95Ms": 10.600000143051147,
+      "smallPagesP95Ms": 10,
+      "finalP50Ms": 7.3999998569488525,
+      "finalP95Ms": 11,
+      "deltaP95Ms": 0.39999985694885254
+    },
+    {
+      "key": "short-lines/single/composition-update/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 99.89999985694885,
+      "beforeP95Ms": 101.20000004768372,
+      "smallPagesP95Ms": 115.40000009536743,
+      "finalP50Ms": 99.79999995231628,
+      "finalP95Ms": 99.79999995231628,
+      "deltaP95Ms": -1.4000000953674316
+    },
+    {
+      "key": "short-lines/single/composition-commit/inputToApplied",
+      "count": 36,
+      "beforeP50Ms": 0.5,
+      "beforeP95Ms": 1,
+      "smallPagesP95Ms": 0.8999998569488525,
+      "finalP50Ms": 0.5,
+      "finalP95Ms": 1,
+      "deltaP95Ms": 0
+    },
+    {
+      "key": "short-lines/single/composition-commit/dispatch",
+      "count": 36,
+      "beforeP50Ms": 0.40000009536743164,
+      "beforeP95Ms": 1,
+      "smallPagesP95Ms": 0.8999998569488525,
+      "finalP50Ms": 0.5,
+      "finalP95Ms": 1,
+      "deltaP95Ms": 0
+    },
+    {
+      "key": "short-lines/single/composition-commit/inputToFrame",
+      "count": 36,
+      "beforeP50Ms": 8,
+      "beforeP95Ms": 15.5,
+      "smallPagesP95Ms": 15.200000047683716,
+      "finalP50Ms": 8,
+      "finalP95Ms": 15.599999904632568,
+      "deltaP95Ms": 0.09999990463256836
+    },
+    {
+      "key": "short-lines/single/composition-commit/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 149.20000004768372,
+      "beforeP95Ms": 150,
+      "smallPagesP95Ms": 148.39999985694885,
+      "finalP50Ms": 148.70000004768372,
+      "finalP95Ms": 149.09999990463257,
+      "deltaP95Ms": -0.9000000953674316
+    },
+    {
+      "key": "short-lines/single/paste/inputToApplied",
+      "count": 24,
+      "beforeP50Ms": 4.099999904632568,
+      "beforeP95Ms": 7.8999998569488525,
+      "smallPagesP95Ms": 6.1000001430511475,
+      "finalP50Ms": 4.1000001430511475,
+      "finalP95Ms": 7.1000001430511475,
+      "deltaP95Ms": -0.7999997138977051
+    },
+    {
+      "key": "short-lines/single/paste/dispatch",
+      "count": 24,
+      "beforeP50Ms": 4.1000001430511475,
+      "beforeP95Ms": 7.8999998569488525,
+      "smallPagesP95Ms": 6.1000001430511475,
+      "finalP50Ms": 4.1000001430511475,
+      "finalP95Ms": 7.1000001430511475,
+      "deltaP95Ms": -0.7999997138977051
+    },
+    {
+      "key": "short-lines/single/paste/inputToFrame",
+      "count": 24,
+      "beforeP50Ms": 8.799999952316284,
+      "beforeP95Ms": 17.299999952316284,
+      "smallPagesP95Ms": 19,
+      "finalP50Ms": 9.099999904632568,
+      "finalP95Ms": 16.59999990463257,
+      "deltaP95Ms": -0.7000000476837158
+    },
+    {
+      "key": "short-lines/single/paste/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 164.40000009536743,
+      "beforeP95Ms": 179.70000004768372,
+      "smallPagesP95Ms": 164.60000014305115,
+      "finalP50Ms": 166.70000004768372,
+      "finalP95Ms": 181.70000004768372,
+      "deltaP95Ms": 2
+    },
+    {
+      "key": "short-lines/single/undo/inputToApplied",
+      "count": 36,
+      "beforeP50Ms": 0.6000001430511475,
+      "beforeP95Ms": 1.1000001430511475,
+      "smallPagesP95Ms": 0.8999998569488525,
+      "finalP50Ms": 0.5,
+      "finalP95Ms": 0.7999999523162842,
+      "deltaP95Ms": -0.3000001907348633
+    },
+    {
+      "key": "short-lines/single/undo/dispatch",
+      "count": 36,
+      "beforeP50Ms": 0.6000001430511475,
+      "beforeP95Ms": 1.2000000476837158,
+      "smallPagesP95Ms": 0.7999999523162842,
+      "finalP50Ms": 0.5,
+      "finalP95Ms": 0.8999998569488525,
+      "deltaP95Ms": -0.3000001907348633
+    },
+    {
+      "key": "short-lines/single/undo/inputToFrame",
+      "count": 36,
+      "beforeP50Ms": 8.199999809265137,
+      "beforeP95Ms": 16,
+      "smallPagesP95Ms": 15.5,
+      "finalP50Ms": 6.299999952316284,
+      "finalP95Ms": 15.400000095367432,
+      "deltaP95Ms": -0.5999999046325684
+    },
+    {
+      "key": "short-lines/single/undo/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 132.40000009536743,
+      "beforeP95Ms": 132.59999990463257,
+      "smallPagesP95Ms": 115.29999995231628,
+      "finalP50Ms": 115.60000014305115,
+      "finalP95Ms": 115.89999985694885,
+      "deltaP95Ms": -16.700000047683716
+    },
+    {
+      "key": "short-lines/multiple/typing/inputToApplied",
+      "count": 72,
+      "beforeP50Ms": 0.7999999523162842,
+      "beforeP95Ms": 1.7999999523162842,
+      "smallPagesP95Ms": 1.6999998092651367,
+      "finalP50Ms": 0.7999999523162842,
+      "finalP95Ms": 1.7000000476837158,
+      "deltaP95Ms": -0.09999990463256836
+    },
+    {
+      "key": "short-lines/multiple/typing/dispatch",
+      "count": 72,
+      "beforeP50Ms": 0.7999999523162842,
+      "beforeP95Ms": 1.7999999523162842,
+      "smallPagesP95Ms": 1.6999998092651367,
+      "finalP50Ms": 0.7999999523162842,
+      "finalP95Ms": 1.7000000476837158,
+      "deltaP95Ms": -0.09999990463256836
+    },
+    {
+      "key": "short-lines/multiple/typing/inputToFrame",
+      "count": 72,
+      "beforeP50Ms": 7.900000095367432,
+      "beforeP95Ms": 15.700000047683716,
+      "smallPagesP95Ms": 15.100000143051147,
+      "finalP50Ms": 7.5,
+      "finalP95Ms": 15.400000095367432,
+      "deltaP95Ms": -0.2999999523162842
+    },
+    {
+      "key": "short-lines/multiple/typing/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 166.39999985694885,
+      "beforeP95Ms": 167.40000009536743,
+      "smallPagesP95Ms": 165.5,
+      "finalP50Ms": 149.79999995231628,
+      "finalP95Ms": 164.90000009536743,
+      "deltaP95Ms": -2.5
+    },
+    {
+      "key": "short-lines/multiple/repeat/inputToApplied",
+      "count": 72,
+      "beforeP50Ms": 0.8000001907348633,
+      "beforeP95Ms": 1.7000000476837158,
+      "smallPagesP95Ms": 1.7999999523162842,
+      "finalP50Ms": 0.7999999523162842,
+      "finalP95Ms": 1.7000000476837158,
+      "deltaP95Ms": 0
+    },
+    {
+      "key": "short-lines/multiple/repeat/dispatch",
+      "count": 72,
+      "beforeP50Ms": 0.8000001907348633,
+      "beforeP95Ms": 1.6000001430511475,
+      "smallPagesP95Ms": 1.7000000476837158,
+      "finalP50Ms": 0.7999999523162842,
+      "finalP95Ms": 1.7000000476837158,
+      "deltaP95Ms": 0.09999990463256836
+    },
+    {
+      "key": "short-lines/multiple/repeat/inputToFrame",
+      "count": 72,
+      "beforeP50Ms": 7.6000001430511475,
+      "beforeP95Ms": 16.200000047683716,
+      "smallPagesP95Ms": 15.799999952316284,
+      "finalP50Ms": 7.5,
+      "finalP95Ms": 15.800000190734863,
+      "deltaP95Ms": -0.39999985694885254
+    },
+    {
+      "key": "short-lines/multiple/repeat/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 165.20000004768372,
+      "beforeP95Ms": 192.69999980926514,
+      "smallPagesP95Ms": 165.59999990463257,
+      "finalP50Ms": 149.89999985694885,
+      "finalP95Ms": 166.89999985694885,
+      "deltaP95Ms": -25.799999952316284
+    },
+    {
+      "key": "short-lines/multiple/composition-update/inputToApplied",
+      "count": 36,
+      "beforeP50Ms": 0,
+      "beforeP95Ms": 0.10000014305114746,
+      "smallPagesP95Ms": 0.10000014305114746,
+      "finalP50Ms": 0,
+      "finalP95Ms": 0.10000014305114746,
+      "deltaP95Ms": 0
+    },
+    {
+      "key": "short-lines/multiple/composition-update/dispatch",
+      "count": 36,
+      "beforeP50Ms": 0,
+      "beforeP95Ms": 0.10000014305114746,
+      "smallPagesP95Ms": 0.10000014305114746,
+      "finalP50Ms": 0,
+      "finalP95Ms": 0.10000014305114746,
+      "deltaP95Ms": 0
+    },
+    {
+      "key": "short-lines/multiple/composition-update/inputToFrame",
+      "count": 36,
+      "beforeP50Ms": 6.800000190734863,
+      "beforeP95Ms": 10.300000190734863,
+      "smallPagesP95Ms": 10.5,
+      "finalP50Ms": 6.299999952316284,
+      "finalP95Ms": 9.299999952316284,
+      "deltaP95Ms": -1.000000238418579
+    },
+    {
+      "key": "short-lines/multiple/composition-update/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 132.70000004768372,
+      "beforeP95Ms": 133.29999995231628,
+      "smallPagesP95Ms": 132.5,
+      "finalP50Ms": 115.60000014305115,
+      "finalP95Ms": 134.40000009536743,
+      "deltaP95Ms": 1.1000001430511475
+    },
+    {
+      "key": "short-lines/multiple/composition-commit/inputToApplied",
+      "count": 36,
+      "beforeP50Ms": 0.7000000476837158,
+      "beforeP95Ms": 1.3999998569488525,
+      "smallPagesP95Ms": 1.4000000953674316,
+      "finalP50Ms": 0.8000001907348633,
+      "finalP95Ms": 1.3999998569488525,
+      "deltaP95Ms": 0
+    },
+    {
+      "key": "short-lines/multiple/composition-commit/dispatch",
+      "count": 36,
+      "beforeP50Ms": 0.7000000476837158,
+      "beforeP95Ms": 1.3999998569488525,
+      "smallPagesP95Ms": 1.4000000953674316,
+      "finalP50Ms": 0.8000001907348633,
+      "finalP95Ms": 1.2999999523162842,
+      "deltaP95Ms": -0.09999990463256836
+    },
+    {
+      "key": "short-lines/multiple/composition-commit/inputToFrame",
+      "count": 36,
+      "beforeP50Ms": 8.799999952316284,
+      "beforeP95Ms": 16.100000143051147,
+      "smallPagesP95Ms": 15.599999904632568,
+      "finalP50Ms": 7.699999809265137,
+      "finalP95Ms": 15.799999952316284,
+      "deltaP95Ms": -0.3000001907348633
+    },
+    {
+      "key": "short-lines/multiple/composition-commit/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 150.30000019073486,
+      "beforeP95Ms": 164.59999990463257,
+      "smallPagesP95Ms": 150.29999995231628,
+      "finalP50Ms": 146.5,
+      "finalP95Ms": 148.79999995231628,
+      "deltaP95Ms": -15.799999952316284
+    },
+    {
+      "key": "short-lines/multiple/paste/inputToApplied",
+      "count": 24,
+      "beforeP50Ms": 5.199999809265137,
+      "beforeP95Ms": 6.599999904632568,
+      "smallPagesP95Ms": 6,
+      "finalP50Ms": 4.900000095367432,
+      "finalP95Ms": 6.799999952316284,
+      "deltaP95Ms": 0.20000004768371582
+    },
+    {
+      "key": "short-lines/multiple/paste/dispatch",
+      "count": 24,
+      "beforeP50Ms": 5.199999809265137,
+      "beforeP95Ms": 6.599999904632568,
+      "smallPagesP95Ms": 6,
+      "finalP50Ms": 4.900000095367432,
+      "finalP95Ms": 6.799999952316284,
+      "deltaP95Ms": 0.20000004768371582
+    },
+    {
+      "key": "short-lines/multiple/paste/inputToFrame",
+      "count": 24,
+      "beforeP50Ms": 10.5,
+      "beforeP95Ms": 18.200000047683716,
+      "smallPagesP95Ms": 15.799999952316284,
+      "finalP50Ms": 11.100000143051147,
+      "finalP95Ms": 17.399999856948853,
+      "deltaP95Ms": -0.8000001907348633
+    },
+    {
+      "key": "short-lines/multiple/paste/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 196.89999985694885,
+      "beforeP95Ms": 199.59999990463257,
+      "smallPagesP95Ms": 181.5,
+      "finalP50Ms": 180.89999985694885,
+      "finalP95Ms": 182.19999980926514,
+      "deltaP95Ms": -17.40000009536743
+    },
+    {
+      "key": "short-lines/multiple/undo/inputToApplied",
+      "count": 36,
+      "beforeP50Ms": 0.7999999523162842,
+      "beforeP95Ms": 1.3000001907348633,
+      "smallPagesP95Ms": 1.3999998569488525,
+      "finalP50Ms": 0.7000000476837158,
+      "finalP95Ms": 1.2000000476837158,
+      "deltaP95Ms": -0.10000014305114746
+    },
+    {
+      "key": "short-lines/multiple/undo/dispatch",
+      "count": 36,
+      "beforeP50Ms": 0.7999999523162842,
+      "beforeP95Ms": 1.3000001907348633,
+      "smallPagesP95Ms": 1.2999999523162842,
+      "finalP50Ms": 0.7000000476837158,
+      "finalP95Ms": 1.2000000476837158,
+      "deltaP95Ms": -0.10000014305114746
+    },
+    {
+      "key": "short-lines/multiple/undo/inputToFrame",
+      "count": 36,
+      "beforeP50Ms": 8.400000095367432,
+      "beforeP95Ms": 15.700000047683716,
+      "smallPagesP95Ms": 15.300000190734863,
+      "finalP50Ms": 7.5,
+      "finalP95Ms": 15.200000047683716,
+      "deltaP95Ms": -0.5
+    },
+    {
+      "key": "short-lines/multiple/undo/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 131.10000014305115,
+      "beforeP95Ms": 132,
+      "smallPagesP95Ms": 132.29999995231628,
+      "finalP50Ms": 132.79999995231628,
+      "finalP95Ms": 147.90000009536743,
+      "deltaP95Ms": 15.900000095367432
+    },
+    {
+      "key": "long-line/single/typing/inputToApplied",
+      "count": 72,
+      "beforeP50Ms": 0.7999999523162842,
+      "beforeP95Ms": 1.9000000953674316,
+      "smallPagesP95Ms": 2.8000001907348633,
+      "finalP50Ms": 0.7999999523162842,
+      "finalP95Ms": 1.0999999046325684,
+      "deltaP95Ms": -0.8000001907348633
+    },
+    {
+      "key": "long-line/single/typing/dispatch",
+      "count": 72,
+      "beforeP50Ms": 0.7999999523162842,
+      "beforeP95Ms": 1.9000000953674316,
+      "smallPagesP95Ms": 2.700000047683716,
+      "finalP50Ms": 0.7999999523162842,
+      "finalP95Ms": 1.0999999046325684,
+      "deltaP95Ms": -0.8000001907348633
+    },
+    {
+      "key": "long-line/single/typing/inputToFrame",
+      "count": 72,
+      "beforeP50Ms": 7.599999904632568,
+      "beforeP95Ms": 14.899999856948853,
+      "smallPagesP95Ms": 16,
+      "finalP50Ms": 7.799999952316284,
+      "finalP95Ms": 15.199999809265137,
+      "deltaP95Ms": 0.2999999523162842
+    },
+    {
+      "key": "long-line/single/typing/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 116.79999995231628,
+      "beforeP95Ms": 133,
+      "smallPagesP95Ms": 149.89999985694885,
+      "finalP50Ms": 116.09999990463257,
+      "finalP95Ms": 116.29999995231628,
+      "deltaP95Ms": -16.700000047683716
+    },
+    {
+      "key": "long-line/single/repeat/inputToApplied",
+      "count": 72,
+      "beforeP50Ms": 0.7999999523162842,
+      "beforeP95Ms": 1.4000000953674316,
+      "smallPagesP95Ms": 2.5,
+      "finalP50Ms": 0.8000001907348633,
+      "finalP95Ms": 1.5,
+      "deltaP95Ms": 0.09999990463256836
+    },
+    {
+      "key": "long-line/single/repeat/dispatch",
+      "count": 72,
+      "beforeP50Ms": 0.7999999523162842,
+      "beforeP95Ms": 1.4000000953674316,
+      "smallPagesP95Ms": 2.5,
+      "finalP50Ms": 0.8000001907348633,
+      "finalP95Ms": 1.5,
+      "deltaP95Ms": 0.09999990463256836
+    },
+    {
+      "key": "long-line/single/repeat/inputToFrame",
+      "count": 72,
+      "beforeP50Ms": 7.400000095367432,
+      "beforeP95Ms": 15.400000095367432,
+      "smallPagesP95Ms": 16.40000009536743,
+      "finalP50Ms": 7.099999904632568,
+      "finalP95Ms": 15.700000047683716,
+      "deltaP95Ms": 0.2999999523162842
+    },
+    {
+      "key": "long-line/single/repeat/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 132.5,
+      "beforeP95Ms": 132.70000004768372,
+      "smallPagesP95Ms": 149.09999990463257,
+      "finalP50Ms": 132.5,
+      "finalP95Ms": 133.10000014305115,
+      "deltaP95Ms": 0.40000009536743164
+    },
+    {
+      "key": "long-line/single/composition-update/inputToApplied",
+      "count": 36,
+      "beforeP50Ms": 0,
+      "beforeP95Ms": 0.10000014305114746,
+      "smallPagesP95Ms": 0.20000004768371582,
+      "finalP50Ms": 0,
+      "finalP95Ms": 0.10000014305114746,
+      "deltaP95Ms": 0
+    },
+    {
+      "key": "long-line/single/composition-update/dispatch",
+      "count": 36,
+      "beforeP50Ms": 0,
+      "beforeP95Ms": 0.10000014305114746,
+      "smallPagesP95Ms": 0.20000004768371582,
+      "finalP50Ms": 0,
+      "finalP95Ms": 0.10000014305114746,
+      "deltaP95Ms": 0
+    },
+    {
+      "key": "long-line/single/composition-update/inputToFrame",
+      "count": 36,
+      "beforeP50Ms": 8.099999904632568,
+      "beforeP95Ms": 11.699999809265137,
+      "smallPagesP95Ms": 11.299999952316284,
+      "finalP50Ms": 9.5,
+      "finalP95Ms": 12.899999856948853,
+      "deltaP95Ms": 1.2000000476837158
+    },
+    {
+      "key": "long-line/single/composition-update/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 99.79999995231628,
+      "beforeP95Ms": 114.79999995231628,
+      "smallPagesP95Ms": 100.70000004768372,
+      "finalP50Ms": 99.70000004768372,
+      "finalP95Ms": 99.90000009536743,
+      "deltaP95Ms": -14.899999856948853
+    },
+    {
+      "key": "long-line/single/composition-commit/inputToApplied",
+      "count": 36,
+      "beforeP50Ms": 1,
+      "beforeP95Ms": 2,
+      "smallPagesP95Ms": 4.700000047683716,
+      "finalP50Ms": 0.8999998569488525,
+      "finalP95Ms": 2,
+      "deltaP95Ms": 0
+    },
+    {
+      "key": "long-line/single/composition-commit/dispatch",
+      "count": 36,
+      "beforeP50Ms": 1,
+      "beforeP95Ms": 2,
+      "smallPagesP95Ms": 4.5,
+      "finalP50Ms": 0.8999998569488525,
+      "finalP95Ms": 2,
+      "deltaP95Ms": 0
+    },
+    {
+      "key": "long-line/single/composition-commit/inputToFrame",
+      "count": 36,
+      "beforeP50Ms": 8.099999904632568,
+      "beforeP95Ms": 16.09999990463257,
+      "smallPagesP95Ms": 15.5,
+      "finalP50Ms": 8.099999904632568,
+      "finalP95Ms": 15.700000047683716,
+      "deltaP95Ms": -0.39999985694885254
+    },
+    {
+      "key": "long-line/single/composition-commit/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 115.20000004768372,
+      "beforeP95Ms": 132.20000004768372,
+      "smallPagesP95Ms": 143.20000004768372,
+      "finalP50Ms": 114.10000014305115,
+      "finalP95Ms": 116,
+      "deltaP95Ms": -16.200000047683716
+    },
+    {
+      "key": "long-line/single/paste/inputToApplied",
+      "count": 24,
+      "beforeP50Ms": 4.5,
+      "beforeP95Ms": 6,
+      "smallPagesP95Ms": 6,
+      "finalP50Ms": 4.299999952316284,
+      "finalP95Ms": 5.5,
+      "deltaP95Ms": -0.5
+    },
+    {
+      "key": "long-line/single/paste/dispatch",
+      "count": 24,
+      "beforeP50Ms": 4.5,
+      "beforeP95Ms": 6,
+      "smallPagesP95Ms": 6,
+      "finalP50Ms": 4.299999952316284,
+      "finalP95Ms": 5.5,
+      "deltaP95Ms": -0.5
+    },
+    {
+      "key": "long-line/single/paste/inputToFrame",
+      "count": 24,
+      "beforeP50Ms": 9.899999856948853,
+      "beforeP95Ms": 18,
+      "smallPagesP95Ms": 16.299999952316284,
+      "finalP50Ms": 9.799999952316284,
+      "finalP95Ms": 15,
+      "deltaP95Ms": -3
+    },
+    {
+      "key": "long-line/single/paste/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 149.60000014305115,
+      "beforeP95Ms": 158.5,
+      "smallPagesP95Ms": 150.89999985694885,
+      "finalP50Ms": 131.5,
+      "finalP95Ms": 132.40000009536743,
+      "deltaP95Ms": -26.09999990463257
+    },
+    {
+      "key": "long-line/single/undo/inputToApplied",
+      "count": 36,
+      "beforeP50Ms": 0.8000001907348633,
+      "beforeP95Ms": 1.7999999523162842,
+      "smallPagesP95Ms": 2.8999998569488525,
+      "finalP50Ms": 0.8000001907348633,
+      "finalP95Ms": 1.5,
+      "deltaP95Ms": -0.2999999523162842
+    },
+    {
+      "key": "long-line/single/undo/dispatch",
+      "count": 36,
+      "beforeP50Ms": 0.7999999523162842,
+      "beforeP95Ms": 1.7999999523162842,
+      "smallPagesP95Ms": 2.9000000953674316,
+      "finalP50Ms": 0.7999999523162842,
+      "finalP95Ms": 1.6000001430511475,
+      "deltaP95Ms": -0.19999980926513672
+    },
+    {
+      "key": "long-line/single/undo/inputToFrame",
+      "count": 36,
+      "beforeP50Ms": 8.799999952316284,
+      "beforeP95Ms": 15.200000047683716,
+      "smallPagesP95Ms": 15.799999952316284,
+      "finalP50Ms": 7.900000095367432,
+      "finalP95Ms": 15.800000190734863,
+      "deltaP95Ms": 0.6000001430511475
+    },
+    {
+      "key": "long-line/single/undo/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 116.09999990463257,
+      "beforeP95Ms": 116.09999990463257,
+      "smallPagesP95Ms": 131.39999985694885,
+      "finalP50Ms": 115.70000004768372,
+      "finalP95Ms": 116.10000014305115,
+      "deltaP95Ms": 2.384185791015625e-7
+    },
+    {
+      "key": "long-line/multiple/typing/inputToApplied",
+      "count": 72,
+      "beforeP50Ms": 1.3000001907348633,
+      "beforeP95Ms": 1.8000001907348633,
+      "smallPagesP95Ms": 2.5,
+      "finalP50Ms": 1.4000000953674316,
+      "finalP95Ms": 1.7000000476837158,
+      "deltaP95Ms": -0.10000014305114746
+    },
+    {
+      "key": "long-line/multiple/typing/dispatch",
+      "count": 72,
+      "beforeP50Ms": 1.3000001907348633,
+      "beforeP95Ms": 1.8000001907348633,
+      "smallPagesP95Ms": 2.4000000953674316,
+      "finalP50Ms": 1.4000000953674316,
+      "finalP95Ms": 1.7000000476837158,
+      "deltaP95Ms": -0.10000014305114746
+    },
+    {
+      "key": "long-line/multiple/typing/inputToFrame",
+      "count": 72,
+      "beforeP50Ms": 8,
+      "beforeP95Ms": 15.400000095367432,
+      "smallPagesP95Ms": 15.900000095367432,
+      "finalP50Ms": 8,
+      "finalP95Ms": 16.200000047683716,
+      "deltaP95Ms": 0.7999999523162842
+    },
+    {
+      "key": "long-line/multiple/typing/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 133.20000004768372,
+      "beforeP95Ms": 148.79999995231628,
+      "smallPagesP95Ms": 149.79999995231628,
+      "finalP50Ms": 148.70000004768372,
+      "finalP95Ms": 149.10000014305115,
+      "deltaP95Ms": 0.3000001907348633
+    },
+    {
+      "key": "long-line/multiple/repeat/inputToApplied",
+      "count": 72,
+      "beforeP50Ms": 1.5,
+      "beforeP95Ms": 3.0999999046325684,
+      "smallPagesP95Ms": 3.0999999046325684,
+      "finalP50Ms": 1.4000000953674316,
+      "finalP95Ms": 2.700000047683716,
+      "deltaP95Ms": -0.39999985694885254
+    },
+    {
+      "key": "long-line/multiple/repeat/dispatch",
+      "count": 72,
+      "beforeP50Ms": 1.5,
+      "beforeP95Ms": 3.200000047683716,
+      "smallPagesP95Ms": 3.0999999046325684,
+      "finalP50Ms": 1.4000000953674316,
+      "finalP95Ms": 2.700000047683716,
+      "deltaP95Ms": -0.5
+    },
+    {
+      "key": "long-line/multiple/repeat/inputToFrame",
+      "count": 72,
+      "beforeP50Ms": 7.900000095367432,
+      "beforeP95Ms": 17.5,
+      "smallPagesP95Ms": 16.600000143051147,
+      "finalP50Ms": 8.200000047683716,
+      "finalP95Ms": 15.599999904632568,
+      "deltaP95Ms": -1.9000000953674316
+    },
+    {
+      "key": "long-line/multiple/repeat/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 149.90000009536743,
+      "beforeP95Ms": 166.80000019073486,
+      "smallPagesP95Ms": 165.30000019073486,
+      "finalP50Ms": 132.69999980926514,
+      "finalP95Ms": 150,
+      "deltaP95Ms": -16.800000190734863
+    },
+    {
+      "key": "long-line/multiple/composition-update/inputToApplied",
+      "count": 36,
+      "beforeP50Ms": 0,
+      "beforeP95Ms": 0.10000014305114746,
+      "smallPagesP95Ms": 0.10000014305114746,
+      "finalP50Ms": 0,
+      "finalP95Ms": 0.20000004768371582,
+      "deltaP95Ms": 0.09999990463256836
+    },
+    {
+      "key": "long-line/multiple/composition-update/dispatch",
+      "count": 36,
+      "beforeP50Ms": 0,
+      "beforeP95Ms": 0.10000014305114746,
+      "smallPagesP95Ms": 0.10000014305114746,
+      "finalP50Ms": 0,
+      "finalP95Ms": 0.20000004768371582,
+      "deltaP95Ms": 0.09999990463256836
+    },
+    {
+      "key": "long-line/multiple/composition-update/inputToFrame",
+      "count": 36,
+      "beforeP50Ms": 7,
+      "beforeP95Ms": 10.900000095367432,
+      "smallPagesP95Ms": 11.5,
+      "finalP50Ms": 9,
+      "finalP95Ms": 12.400000095367432,
+      "deltaP95Ms": 1.5
+    },
+    {
+      "key": "long-line/multiple/composition-update/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 99.20000004768372,
+      "beforeP95Ms": 99.79999995231628,
+      "smallPagesP95Ms": 100.59999990463257,
+      "finalP50Ms": 100,
+      "finalP95Ms": 100,
+      "deltaP95Ms": 0.20000004768371582
+    },
+    {
+      "key": "long-line/multiple/composition-commit/inputToApplied",
+      "count": 36,
+      "beforeP50Ms": 1.6999998092651367,
+      "beforeP95Ms": 3.200000047683716,
+      "smallPagesP95Ms": 3.799999952316284,
+      "finalP50Ms": 1.6999998092651367,
+      "finalP95Ms": 4.8999998569488525,
+      "deltaP95Ms": 1.6999998092651367
+    },
+    {
+      "key": "long-line/multiple/composition-commit/dispatch",
+      "count": 36,
+      "beforeP50Ms": 1.6000001430511475,
+      "beforeP95Ms": 3.200000047683716,
+      "smallPagesP95Ms": 3.799999952316284,
+      "finalP50Ms": 1.6000001430511475,
+      "finalP95Ms": 5,
+      "deltaP95Ms": 1.7999999523162842
+    },
+    {
+      "key": "long-line/multiple/composition-commit/inputToFrame",
+      "count": 36,
+      "beforeP50Ms": 9.600000143051147,
+      "beforeP95Ms": 15.799999952316284,
+      "smallPagesP95Ms": 15.599999904632568,
+      "finalP50Ms": 9.400000095367432,
+      "finalP95Ms": 17.09999990463257,
+      "deltaP95Ms": 1.2999999523162842
+    },
+    {
+      "key": "long-line/multiple/composition-commit/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 131.39999985694885,
+      "beforeP95Ms": 131.89999985694885,
+      "smallPagesP95Ms": 132.60000014305115,
+      "finalP50Ms": 131.19999980926514,
+      "finalP95Ms": 132.5,
+      "deltaP95Ms": 0.6000001430511475
+    },
+    {
+      "key": "long-line/multiple/paste/inputToApplied",
+      "count": 24,
+      "beforeP50Ms": 5.5,
+      "beforeP95Ms": 8.700000047683716,
+      "smallPagesP95Ms": 6.5,
+      "finalP50Ms": 5,
+      "finalP95Ms": 6.200000047683716,
+      "deltaP95Ms": -2.5
+    },
+    {
+      "key": "long-line/multiple/paste/dispatch",
+      "count": 24,
+      "beforeP50Ms": 5.5,
+      "beforeP95Ms": 8.700000047683716,
+      "smallPagesP95Ms": 6.5,
+      "finalP50Ms": 5,
+      "finalP95Ms": 6.300000190734863,
+      "deltaP95Ms": -2.3999998569488525
+    },
+    {
+      "key": "long-line/multiple/paste/inputToFrame",
+      "count": 24,
+      "beforeP50Ms": 11.400000095367432,
+      "beforeP95Ms": 16.800000190734863,
+      "smallPagesP95Ms": 18.09999990463257,
+      "finalP50Ms": 10.400000095367432,
+      "finalP95Ms": 17.5,
+      "deltaP95Ms": 0.6999998092651367
+    },
+    {
+      "key": "long-line/multiple/paste/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 148.70000004768372,
+      "beforeP95Ms": 165.40000009536743,
+      "smallPagesP95Ms": 149.70000004768372,
+      "finalP50Ms": 148.59999990463257,
+      "finalP95Ms": 148.89999985694885,
+      "deltaP95Ms": -16.50000023841858
+    },
+    {
+      "key": "long-line/multiple/undo/inputToApplied",
+      "count": 36,
+      "beforeP50Ms": 1.2999999523162842,
+      "beforeP95Ms": 2,
+      "smallPagesP95Ms": 2.799999952316284,
+      "finalP50Ms": 1.3999998569488525,
+      "finalP95Ms": 2.0999999046325684,
+      "deltaP95Ms": 0.09999990463256836
+    },
+    {
+      "key": "long-line/multiple/undo/dispatch",
+      "count": 36,
+      "beforeP50Ms": 1.2999999523162842,
+      "beforeP95Ms": 1.8999998569488525,
+      "smallPagesP95Ms": 2.799999952316284,
+      "finalP50Ms": 1.3999998569488525,
+      "finalP95Ms": 2.0999999046325684,
+      "deltaP95Ms": 0.20000004768371582
+    },
+    {
+      "key": "long-line/multiple/undo/inputToFrame",
+      "count": 36,
+      "beforeP50Ms": 8.300000190734863,
+      "beforeP95Ms": 15,
+      "smallPagesP95Ms": 15.799999952316284,
+      "finalP50Ms": 8.799999952316284,
+      "finalP95Ms": 15.5,
+      "deltaP95Ms": 0.5
+    },
+    {
+      "key": "long-line/multiple/undo/burstToPaintUpperBound",
+      "count": 3,
+      "beforeP50Ms": 115.89999985694885,
+      "beforeP95Ms": 116.80000019073486,
+      "smallPagesP95Ms": 133.60000014305115,
+      "finalP50Ms": 116.40000009536743,
+      "finalP95Ms": 116.80000019073486,
+      "deltaP95Ms": 0
+    }
+  ]
+}

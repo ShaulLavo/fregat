@@ -1,0 +1,11 @@
+{
+  "runtime": "v26.7.0",
+  "units": 52428800,
+  "deletedUnits": 10,
+  "resentUnits": 16364,
+  "newWorkerChunks": 2,
+  "reusedPrefixSpan": true,
+  "reusedTailId": true,
+  "reclaimMs": 0.9657849999999826,
+  "descriptorMs": 0.7786090000000172
+}

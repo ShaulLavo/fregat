@@ -1,13 +1,5 @@
 name: Setup
-description: Installs the toolchain, provisions the sibling @singapore-editor editor packages, and installs dependencies.
-
-inputs:
-  editor-ref:
-    description: Commit of the ShaulLavo/singapore checkout the @singapore-editor/* links resolve to. Pinned so an Editor merge cannot redden every Platform PR at once; a Platform change that needs newer Editor code bumps it in the same commit.
-    default: eb7c9cbb991bbd429868c9dbc4a511ff671671df
-  ghostty-ref:
-    description: Git ref of the ShaulLavo/ghostty-webgpu checkout the ghostty-webgpu link resolves to.
-    default: c490d8625b913853f062df9051a92295963abff5
+description: Installs the toolchain and workspace dependencies, then builds Editor and ghostty packages.
 
 runs:
   using: composite
@@ -25,15 +17,8 @@ runs:
     - name: Setup Node
       uses: actions/setup-node@v4
       with:
-        node-version: 22
+        node-version: 24
 
-    # The @singapore-editor/* packages are not installable from npm — @singapore-editor/decode
-    # has never been published, and the rest are consumed from source well past
-    # their published 0.1.1. Root `overrides` redirects all of them to
-    # `link:@singapore-editor/*`, which resolves through Bun's global link registry.
-    # A developer machine populates that registry by hand; here we rebuild it
-    # from a clone. The clone must land at the *sibling* path because the
-    # tracked `packages/editor-*` symlinks point at `../../Editor/packages/*`.
     # Workspace search shells out to `fd` and `rg`, and silently degrades to a
     # different provider when either is missing — so without these the search
     # tests do not fail loudly, they assert against the fallback's results.
@@ -64,68 +49,10 @@ runs:
         git config --global user.email 'ci@example.com'
         git config --global user.name 'CI'
 
-    # `singapore` is the same repo a developer machine checks out as `Editor`;
-    # it was renamed, and the old URL survives only on GitHub's redirect.
-    - name: Clone editor packages
-      shell: bash
-      env:
-        EDITOR_REF: ${{ inputs.editor-ref }}
-      run: |
-        git init "$GITHUB_WORKSPACE/../Editor"
-        git -C "$GITHUB_WORKSPACE/../Editor" remote add origin https://github.com/ShaulLavo/singapore.git
-        git -C "$GITHUB_WORKSPACE/../Editor" fetch --depth 1 origin "$EDITOR_REF"
-        git -C "$GITHUB_WORKSPACE/../Editor" checkout --detach FETCH_HEAD
-
-    # Every @singapore-editor package exports `./dist/*`, so an unbuilt checkout
-    # resolves to nothing and typecheck fails with TS2307. The build is a pure
-    # function of the pinned ref and the Bun that ran it (turbo's outputs are
-    # `dist/**`), so it is cached on exactly those; examples are never linked.
-    # `runner.workspace` is the sibling directory: the cache refuses `..` paths.
-    - name: Restore editor build
-      id: editor-dist
-      uses: actions/cache@v4
-      with:
-        path: ${{ runner.workspace }}/Editor/packages/*/dist
-        key: ${{ runner.os }}-editor-dist-${{ inputs.editor-ref }}-bun-${{ steps.bun.outputs.bun-version }}
-
-    - name: Build editor packages
-      shell: bash
-      working-directory: ${{ github.workspace }}/../Editor
-      env:
-        BUILD: ${{ steps.editor-dist.outputs.cache-hit != 'true' }}
-      run: |
-        bun install --frozen-lockfile
-        if [ "$BUILD" = true ]; then bun run build --filter='./packages/*'; fi
-
-    - name: Link editor packages
-      shell: bash
-      working-directory: ${{ github.workspace }}/../Editor
-      run: |
-        for package in packages/*/; do
-          (cd "$package" && bun link)
-        done
-
-    # ghostty-webgpu is consumed from source the same way: the npm release is
-    # behind the checkout, and the root override is `link:ghostty-webgpu`.
-    # The sibling path mirrors the developer layout (`../ghostty-webgpu`).
-    - name: Clone ghostty-webgpu
-      shell: bash
-      env:
-        GHOSTTY_REF: ${{ inputs.ghostty-ref }}
-      run: |
-        git init "$GITHUB_WORKSPACE/../ghostty-webgpu"
-        git -C "$GITHUB_WORKSPACE/../ghostty-webgpu" remote add origin https://github.com/ShaulLavo/ghostty-webgpu.git
-        git -C "$GITHUB_WORKSPACE/../ghostty-webgpu" fetch --depth 1 origin "$GHOSTTY_REF"
-        git -C "$GITHUB_WORKSPACE/../ghostty-webgpu" checkout --detach FETCH_HEAD
-
-    - name: Build and link ghostty-webgpu
-      shell: bash
-      working-directory: ${{ github.workspace }}/../ghostty-webgpu
-      run: |
-        bun install --frozen-lockfile
-        bun run build
-        bun link
-
     - name: Install dependencies
       shell: bash
       run: bun install --frozen-lockfile
+
+    - name: Build workspace packages
+      shell: bash
+      run: bun run build:workspaces

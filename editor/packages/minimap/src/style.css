@@ -1,0 +1,97 @@
+.editor-minimap {
+  --editor-minimap-background: #1e1e1e;
+  --editor-minimap-background-opacity: 0.5;
+  --editor-minimap-selection-highlight: rgba(56, 189, 248, 0.5);
+  --editor-minimap-slider-background: rgba(121, 121, 121, 0.12);
+  --editor-minimap-slider-hover-background: rgba(121, 121, 121, 0.2);
+  --editor-minimap-slider-active-background: rgba(121, 121, 121, 0.3);
+
+  bottom: 0;
+  overflow: hidden;
+  position: absolute;
+  top: 0;
+  z-index: 5;
+}
+
+.editor-minimap-right {
+  right: 0;
+}
+
+.editor-minimap-left {
+  left: 0;
+}
+
+.editor[data-editor-presentation='provisional'] ~ .editor-minimap {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.editor-minimap-canvas,
+.editor-minimap-slider,
+.editor-minimap-shadow {
+  left: 0;
+  position: absolute;
+  top: 0;
+}
+
+.editor-minimap-decorations {
+  pointer-events: none;
+}
+
+.editor-minimap-slider {
+  contain: strict;
+  cursor: default;
+  width: 100%;
+}
+
+.editor-minimap-slider-horizontal {
+  background: var(--editor-minimap-slider-background);
+  height: 100%;
+  width: 100%;
+}
+
+.editor-minimap-slider:hover .editor-minimap-slider-horizontal {
+  background: var(--editor-minimap-slider-hover-background);
+}
+
+.editor-minimap-slider.active .editor-minimap-slider-horizontal {
+  background: var(--editor-minimap-slider-active-background);
+}
+
+.editor-minimap.slider-mouseover .editor-minimap-slider {
+  opacity: 0;
+  transition: opacity 100ms linear;
+}
+
+.editor-minimap.slider-mouseover:hover .editor-minimap-slider,
+.editor-minimap.slider-mouseover .editor-minimap-slider.active {
+  opacity: 1;
+}
+
+.editor-minimap-shadow-hidden {
+  width: 0;
+}
+
+.editor-minimap-shadow-visible {
+  box-shadow: -6px 0 6px rgba(0, 0, 0, 0.35);
+  height: 100%;
+  left: -6px;
+  pointer-events: none;
+  width: 6px;
+}
+
+.editor-minimap-autohide-mouseover,
+.editor-minimap-autohide-scroll {
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+
+.editor-minimap-autohide-scroll {
+  pointer-events: none;
+}
+
+.editor-minimap-autohide-mouseover:hover,
+.editor-minimap-autohide-scroll.active {
+  opacity: 1;
+  pointer-events: auto;
+}

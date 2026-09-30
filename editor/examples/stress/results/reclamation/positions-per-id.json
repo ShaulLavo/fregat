@@ -1,0 +1,95 @@
+{
+  "runtime": "Node v26.7.0",
+  "measuredAt": "2026-09-25T13:57:47.215Z",
+  "note": "Text reclamation runs every 2000 cycles in both; compaction only where compacted. Bytes are V8 heapUsed after two forced collections, relative to the fresh snapshot. The slope between 20,000 and 100,000 cycles is the cost of one more insertion.",
+  "bytesPerInsertion": {
+    "compacted": 22.006314298804618,
+    "control": 258.18817943271273
+  },
+  "runs": [
+    {
+      "cycles": 20000,
+      "compacted": true,
+      "pieces": 156,
+      "ids": 20006,
+      "bytes": 1718168
+    },
+    {
+      "cycles": 100000,
+      "compacted": true,
+      "pieces": 186,
+      "ids": 100036,
+      "bytes": 3466256
+    },
+    {
+      "cycles": 20000,
+      "compacted": false,
+      "pieces": 20056,
+      "ids": 20006,
+      "bytes": 6211320
+    },
+    {
+      "cycles": 100000,
+      "compacted": false,
+      "pieces": 100086,
+      "ids": 100036,
+      "bytes": 26877368
+    },
+    {
+      "cycles": 20000,
+      "compacted": true,
+      "pieces": 156,
+      "ids": 20006,
+      "bytes": 1698376
+    },
+    {
+      "cycles": 100000,
+      "compacted": true,
+      "pieces": 186,
+      "ids": 100036,
+      "bytes": 3468744
+    },
+    {
+      "cycles": 20000,
+      "compacted": false,
+      "pieces": 20056,
+      "ids": 20006,
+      "bytes": 6216784
+    },
+    {
+      "cycles": 100000,
+      "compacted": false,
+      "pieces": 100086,
+      "ids": 100036,
+      "bytes": 26884856
+    },
+    {
+      "cycles": 20000,
+      "compacted": true,
+      "pieces": 156,
+      "ids": 20006,
+      "bytes": 1704336
+    },
+    {
+      "cycles": 100000,
+      "compacted": true,
+      "pieces": 186,
+      "ids": 100036,
+      "bytes": 3469376
+    },
+    {
+      "cycles": 20000,
+      "compacted": false,
+      "pieces": 20056,
+      "ids": 20006,
+      "bytes": 6222944
+    },
+    {
+      "cycles": 100000,
+      "compacted": false,
+      "pieces": 100086,
+      "ids": 100036,
+      "bytes": 26877224
+    }
+  ]
+}

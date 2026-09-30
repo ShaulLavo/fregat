@@ -1,0 +1,72 @@
+{
+  "scope": "Five review findings: repeated sparse copies, heap acceptance quantity, small undo slices, unchanged tail ownership, UTF16 copy throughput. E006 metadata milestone remains open.",
+  "recordedAt": "2026-09-23T16:10:57.223587+00:00",
+  "focusedTests": {
+    "textbuffer": 147,
+    "core": 121,
+    "treeSitterSourceUnit": 20,
+    "treeSitterBrowser": 57,
+    "platformWorkspaceEditAndRetention": 73
+  },
+  "selectedTestsTotal": 418,
+  "typechecksPassed": ["textbuffer", "core", "tree-sitter", "stress"],
+  "lintPassed": ["textbuffer", "core (two existing warnings)", "tree-sitter", "stress"],
+  "buildsPassed": ["textbuffer", "core"],
+  "packageSmoke": "passed",
+  "rootFormatCheck": "passed",
+  "inputSamples": 108,
+  "inputRunId": "820f8c9c-4b79-4317-8184-2b6526c48b51",
+  "inputLimit": "Observational single-run comparison; no E002 calibrated speedup claim. Some report analysis/artifact compression overlapped the run; see input summary.",
+  "mountedSamples": 30,
+  "additionalHeapCaptures": 2,
+  "bundleHash": "af8ddcb95159618396edfc5cc801f05987bf62fd310b4529ecb5652b64e59601",
+  "stringAcceptance": {
+    "passed": true,
+    "medianThreshold": 0.1,
+    "quantity": "baseline-subtracted string, concatenated string, sliced string self_size across the isolate",
+    "totalHeap": "observation only",
+    "retainedCodeUnits": "decrease required in every sample"
+  },
+  "runtimeSourceDigests": {
+    "textbuffer": "f0569b3385afe27af9210aa9c7d05b624f8cc46f72bace1b09c018b6265b6c02",
+    "editor": "3069e10620ebaf8e60414f53df709567a4381fd53a3862790e31ea4a4bb221cf",
+    "tree-sitter": "32b689d6efe87f1d2a38031bd377fef608546f737ddf29cf4da60747f0ef3849"
+  },
+  "runtimeSourceDigestMethod": "sha256 over sorted repo-relative path, NUL, content, NUL of all src/**/*.ts excluding *.test.ts, including untracked files.",
+  "inverseStringParents": {
+    "mixed": {
+      "inverseEditArrays": 202,
+      "distinctTextReferences": 87,
+      "stringGraphNodes": 87,
+      "stringGraphBytes": 89096,
+      "distinctSliceParents": 0,
+      "sliceParentBytes": 0,
+      "note": "Unique string nodes reachable from inverse edit text, including sliced/cons parents. Other owners can share these bytes; this is not exclusive retained size."
+    },
+    "survivors": {
+      "inverseEditArrays": 202,
+      "distinctTextReferences": 101,
+      "stringGraphNodes": 101,
+      "stringGraphBytes": 97200,
+      "distinctSliceParents": 0,
+      "sliceParentBytes": 0,
+      "note": "Unique string nodes reachable from inverse edit text, including sliced/cons parents. Other owners can share these bytes; this is not exclusive retained size."
+    }
+  },
+  "limits": [
+    "Position metadata is not bounded.",
+    "Inverse copies are bounded to 1024 UTF16 units per edit; larger payloads retain their existing path.",
+    "String categories are whole-isolate shallow sums including backing nodes, not exclusive document retained bytes.",
+    "Full workspace/core suites were not repeated; prior baseline failures remain documented."
+  ],
+  "evidence": [
+    "followup-live.json",
+    "followup-heap.json",
+    "followup-snapshots.sha256",
+    "followup-copy.json",
+    "followup-copy-repeat.json",
+    "followup-repeat.json",
+    "followup-input-summary.json",
+    "followup-input.json.gz"
+  ]
+}

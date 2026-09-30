@@ -57,7 +57,7 @@ export function writeDevTypeConfig(webRoot: string, packages: readonly DevPackag
     extends: path.join(webRoot, 'tsconfig.app.json'),
     compilerOptions: {
       tsBuildInfoFile: path.join(webRoot, 'node_modules/.tmp/tsconfig.dev.tsbuildinfo'),
-      // Sibling repositories own unused-symbol checks; the normal build still checks ours.
+      // Workspace packages own unused-symbol checks; the normal build still checks ours.
       noUnusedLocals: false,
       noUnusedParameters: false,
       paths: {
@@ -83,10 +83,7 @@ function packageRoot(webRoot: string, name: string): string {
   const linked = candidates
     .map((base) => path.join(base, 'node_modules', name))
     .find((candidate) => fs.existsSync(path.join(candidate, 'package.json')))
-  if (!linked)
-    throw createScriptError(
-      `Missing ${name}. Run bun link in its source checkout, then bun install in Platform.`,
-    )
+  if (!linked) throw createScriptError(`Missing ${name}. Run bun install at the repository root.`)
 
   return fs.realpathSync(linked)
 }
@@ -147,7 +144,7 @@ function editorSourcePath(root: string, target: string, id: string): string {
     .find((candidate) => fs.existsSync(candidate))
   if (!file)
     throw createScriptError(
-      `Missing source for ${id} at ${base}. Restore the linked checkout; development never falls back to dist.`,
+      `Missing source for ${id} at ${base}. Run bun install at the repository root to restore workspace packages.`,
     )
 
   return fs.realpathSync(file)

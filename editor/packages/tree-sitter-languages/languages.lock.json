@@ -1,0 +1,1958 @@
+{
+  "schemaVersion": 1,
+  "manifestHash": "33678241f42e9f42b0be049581bae1f4be92448b0bf77ec476f30502f5659e80",
+  "languages": [
+    {
+      "id": "javascript",
+      "parserABI": 15,
+      "source": {
+        "package": "tree-sitter-javascript",
+        "version": "0.25.0",
+        "repository": "https://github.com/tree-sitter/tree-sitter-javascript",
+        "license": "MIT",
+        "compiler": "upstream artifact; compiler not recorded",
+        "revision": "44c892e0be055ac465d5eeddae6d3e194424e7de",
+        "queryRevision": "44c892e0be055ac465d5eeddae6d3e194424e7de",
+        "integrity": "sha512-1fCbmzAskZkxcZzN41sFZ2br2iqTYP3tKls1b/HKGNPQUVOpsUxpmGxdN/wMqAk3jYZnYBR1dd/y/0avMeU7dw==",
+        "tarball": "https://registry.npmjs.org/tree-sitter-javascript/-/tree-sitter-javascript-0.25.0.tgz"
+      },
+      "sourceFiles": [
+        {
+          "file": "grammar.js",
+          "sha256": "80b3c803ee463fa769dbaf71537b8b7d432e108c28d7ba16cc0511cce8b110ab"
+        },
+        {
+          "file": "package.json",
+          "sha256": "6a1b9e54d5b3a44b88d849e3799dc25682da7bcd26a70a425971277e0bc32462"
+        },
+        {
+          "file": "src/grammar.json",
+          "sha256": "7d9364b824be9250ba023065784550475d277b9dc9a7d20f9bebe9e471c908c3"
+        },
+        {
+          "file": "src/node-types.json",
+          "sha256": "188a8baa97018edaf63bf7ece372c07bc0d74d1301004bc8f211eb7dee5a6e70"
+        },
+        {
+          "file": "src/parser.c",
+          "sha256": "67209ca7ef6e1a4f74e29e48b5928455f892fe1821a3960fbcd62f4e972f7384"
+        },
+        {
+          "file": "src/scanner.c",
+          "sha256": "b3d3f64284d97bf80749c026862427782cf7ecc0b7dc094e6698ab311c9a42c7"
+        },
+        {
+          "file": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94"
+        },
+        {
+          "file": "src/tree_sitter/parser.h",
+          "sha256": "180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2"
+        },
+        {
+          "file": "tree-sitter.json",
+          "sha256": "43f1abe79d69601f9699d292ccbdcf04c8c836911984bd6e466c8368711a1d65"
+        }
+      ],
+      "files": [
+        {
+          "file": "tree-sitter-javascript/tree-sitter-javascript.wasm",
+          "sha256": "5fb488d0cabb4775a594bab85682de5ad6ce83c0d6ac997a9f82dd084d571240"
+        },
+        {
+          "file": "./queries/javascript-highlights.scm",
+          "sha256": "5f13a9435d7a49d6cbaab666cb1ebe79bce439a4d31cd50767e4617854f25eb8"
+        },
+        {
+          "file": "tree-sitter-javascript/queries/highlights-jsx.scm",
+          "sha256": "0cad1712acaf40804bc5dc7c8476858752c1f549cdf7d8c63c747317be0f8fa6"
+        },
+        {
+          "file": "./queries/javascript-folds.scm",
+          "sha256": "4c86bde89691f06b6272669cae7551c83e4d6b59482d97c895501fc950f9b253"
+        },
+        {
+          "file": "./queries/jsx-folds.scm",
+          "sha256": "471bfddab35b5676c66a07d9476ef654cb2c66fab8893e6c5749113c0859922a"
+        },
+        {
+          "file": "./queries/javascript-injections.scm",
+          "sha256": "ebb7b92910ab116b98be93f299da04623a2c8824a86cd0669ef71bc403d9bb5e"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "9af40b86547c58a9cd91b127758d09241e5737dd7c96269199c888db4e47d0fc"
+        },
+        {
+          "kind": "folds",
+          "sha256": "f6a31a7c2162ddee3e2e66290b4805807458533043ff043bfdf2e15c758f49ee"
+        },
+        {
+          "kind": "injections",
+          "sha256": "ebb7b92910ab116b98be93f299da04623a2c8824a86cd0669ef71bc403d9bb5e"
+        }
+      ]
+    },
+    {
+      "id": "typescript",
+      "parserABI": 14,
+      "source": {
+        "package": "tree-sitter-typescript",
+        "version": "0.23.2",
+        "repository": "https://github.com/tree-sitter/tree-sitter-typescript",
+        "license": "MIT",
+        "compiler": "upstream artifact; compiler not recorded",
+        "revision": "f975a621f4e7f532fe322e13c4f79495e0a7b2e7",
+        "queryRevision": "f975a621f4e7f532fe322e13c4f79495e0a7b2e7",
+        "integrity": "sha512-e04JUUKxTT53/x3Uq1zIL45DoYKVfHH4CZqwgZhPg5qYROl5nQjV+85ruFzFGZxu+QeFVbRTPDRnqL9UbU4VeA==",
+        "tarball": "https://registry.npmjs.org/tree-sitter-typescript/-/tree-sitter-typescript-0.23.2.tgz"
+      },
+      "sourceFiles": [
+        {
+          "file": "common/define-grammar.js",
+          "sha256": "c2ac6894e0db6164f56dc339788d9da2da60ce1f81d888e6b74a74fc81db818f"
+        },
+        {
+          "file": "common/scanner.h",
+          "sha256": "da66ef2bd14a3f7ea743e25ba068c6c9aae2c3509db200ff80c4a0e6116e564c"
+        },
+        {
+          "file": "package.json",
+          "sha256": "26892ef49837678a747f81e344ed26938ec5804e29e003ad34fd5a3c87c68baf"
+        },
+        {
+          "file": "tree-sitter.json",
+          "sha256": "4f39daa6a0bde84506cdeaf0b4460ed262df880030b3e6073868d0c746932291"
+        },
+        {
+          "file": "tsx/grammar.js",
+          "sha256": "19b7bc89bac1dfbb64e01ca15ca52345056028c2582d71762efd675af947a0f6"
+        },
+        {
+          "file": "tsx/package.json",
+          "sha256": "d91e8e983679ba8bb4736e0680dc895513f2f10a7e7ff833bcc5f9e92ef0dfeb"
+        },
+        {
+          "file": "tsx/src/grammar.json",
+          "sha256": "f98a7830b67be266c9e9effb673a5fc154ad6aa26f87f7c6d4a9191e09d8b357"
+        },
+        {
+          "file": "tsx/src/node-types.json",
+          "sha256": "78b5789145286799a27a0a7ecc36cc1bcb151f94ec7fa631b248459867010c8c"
+        },
+        {
+          "file": "tsx/src/parser.c",
+          "sha256": "1902cb53fa7ff5179df89b2eea863165e84c8cc866226419dc26921d8c055885"
+        },
+        {
+          "file": "tsx/src/scanner.c",
+          "sha256": "d563cd30b2f39718c9ae4292795c5ce03a2ad01954ba3a86ef84c2781a736673"
+        },
+        {
+          "file": "tsx/src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "tsx/src/tree_sitter/array.h",
+          "sha256": "4ff743903dc46f5db6aa54f31c6b4d160a8a9779e5b2ab1ee59ae7ebcd850ea1"
+        },
+        {
+          "file": "tsx/src/tree_sitter/parser.h",
+          "sha256": "a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a"
+        },
+        {
+          "file": "typescript/grammar.js",
+          "sha256": "7e4109889b2ce2731dde89f82f545a12f1e54a286f72bc874f1aed9965c5d5ae"
+        },
+        {
+          "file": "typescript/package.json",
+          "sha256": "fcbd2e0fb7e7eed1af20cfd562cd3c3b22c839cb95b9d18df5793b850bd601dd"
+        },
+        {
+          "file": "typescript/src/grammar.json",
+          "sha256": "99dc4b95424dff47c89acb50d5d3f25b081b07eaff43994b7881dccd4186b214"
+        },
+        {
+          "file": "typescript/src/node-types.json",
+          "sha256": "c790a733fc756b54d4e54dceeb7d2d51e40d8b57136e70277753a75804cce3e3"
+        },
+        {
+          "file": "typescript/src/parser.c",
+          "sha256": "74fe453edd70f4eae9af0a1050cbd7943d8971d59165b6aaebbaa0a0b716d1aa"
+        },
+        {
+          "file": "typescript/src/scanner.c",
+          "sha256": "9125013b42cb888379d9be909f1d73dfb75a37626c2cdbf4122718a2b431a6d3"
+        },
+        {
+          "file": "typescript/src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "typescript/src/tree_sitter/array.h",
+          "sha256": "4ff743903dc46f5db6aa54f31c6b4d160a8a9779e5b2ab1ee59ae7ebcd850ea1"
+        },
+        {
+          "file": "typescript/src/tree_sitter/parser.h",
+          "sha256": "a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a"
+        }
+      ],
+      "files": [
+        {
+          "file": "tree-sitter-typescript/tree-sitter-typescript.wasm",
+          "sha256": "778025db5a8be0e70f8ccc3671e486dfeddd048c25d9e8a70c26de2e1bf6f97d"
+        },
+        {
+          "file": "./queries/typescript-highlights.scm",
+          "sha256": "5e449bfe55190c18253431446bc75ab316ea70637e2143c5081973b0a9d90b8b"
+        },
+        {
+          "file": "./queries/javascript-highlights.scm",
+          "sha256": "5f13a9435d7a49d6cbaab666cb1ebe79bce439a4d31cd50767e4617854f25eb8"
+        },
+        {
+          "file": "./queries/typescript-folds.scm",
+          "sha256": "ca55b02fbf87a695062652c30d0aa89061514b2250db8264900ebb5088f9423e"
+        },
+        {
+          "file": "./queries/javascript-folds.scm",
+          "sha256": "4c86bde89691f06b6272669cae7551c83e4d6b59482d97c895501fc950f9b253"
+        },
+        {
+          "file": "./queries/javascript-injections.scm",
+          "sha256": "ebb7b92910ab116b98be93f299da04623a2c8824a86cd0669ef71bc403d9bb5e"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "77fa8dff364244b826127184195feeb0e9f0855d7c6712ad448c9f674d5bb54f"
+        },
+        {
+          "kind": "folds",
+          "sha256": "3d2c8ac85b88303e0c02ceccb52bdfa045468efdb3979d58fbbe97ddf9e3df69"
+        },
+        {
+          "kind": "injections",
+          "sha256": "ebb7b92910ab116b98be93f299da04623a2c8824a86cd0669ef71bc403d9bb5e"
+        }
+      ]
+    },
+    {
+      "id": "tsx",
+      "parserABI": 14,
+      "source": {
+        "package": "tree-sitter-typescript",
+        "version": "0.23.2",
+        "repository": "https://github.com/tree-sitter/tree-sitter-typescript",
+        "license": "MIT",
+        "compiler": "upstream artifact; compiler not recorded",
+        "revision": "f975a621f4e7f532fe322e13c4f79495e0a7b2e7",
+        "queryRevision": "f975a621f4e7f532fe322e13c4f79495e0a7b2e7",
+        "integrity": "sha512-e04JUUKxTT53/x3Uq1zIL45DoYKVfHH4CZqwgZhPg5qYROl5nQjV+85ruFzFGZxu+QeFVbRTPDRnqL9UbU4VeA==",
+        "tarball": "https://registry.npmjs.org/tree-sitter-typescript/-/tree-sitter-typescript-0.23.2.tgz"
+      },
+      "sourceFiles": [
+        {
+          "file": "common/define-grammar.js",
+          "sha256": "c2ac6894e0db6164f56dc339788d9da2da60ce1f81d888e6b74a74fc81db818f"
+        },
+        {
+          "file": "common/scanner.h",
+          "sha256": "da66ef2bd14a3f7ea743e25ba068c6c9aae2c3509db200ff80c4a0e6116e564c"
+        },
+        {
+          "file": "package.json",
+          "sha256": "26892ef49837678a747f81e344ed26938ec5804e29e003ad34fd5a3c87c68baf"
+        },
+        {
+          "file": "tree-sitter.json",
+          "sha256": "4f39daa6a0bde84506cdeaf0b4460ed262df880030b3e6073868d0c746932291"
+        },
+        {
+          "file": "tsx/grammar.js",
+          "sha256": "19b7bc89bac1dfbb64e01ca15ca52345056028c2582d71762efd675af947a0f6"
+        },
+        {
+          "file": "tsx/package.json",
+          "sha256": "d91e8e983679ba8bb4736e0680dc895513f2f10a7e7ff833bcc5f9e92ef0dfeb"
+        },
+        {
+          "file": "tsx/src/grammar.json",
+          "sha256": "f98a7830b67be266c9e9effb673a5fc154ad6aa26f87f7c6d4a9191e09d8b357"
+        },
+        {
+          "file": "tsx/src/node-types.json",
+          "sha256": "78b5789145286799a27a0a7ecc36cc1bcb151f94ec7fa631b248459867010c8c"
+        },
+        {
+          "file": "tsx/src/parser.c",
+          "sha256": "1902cb53fa7ff5179df89b2eea863165e84c8cc866226419dc26921d8c055885"
+        },
+        {
+          "file": "tsx/src/scanner.c",
+          "sha256": "d563cd30b2f39718c9ae4292795c5ce03a2ad01954ba3a86ef84c2781a736673"
+        },
+        {
+          "file": "tsx/src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "tsx/src/tree_sitter/array.h",
+          "sha256": "4ff743903dc46f5db6aa54f31c6b4d160a8a9779e5b2ab1ee59ae7ebcd850ea1"
+        },
+        {
+          "file": "tsx/src/tree_sitter/parser.h",
+          "sha256": "a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a"
+        },
+        {
+          "file": "typescript/grammar.js",
+          "sha256": "7e4109889b2ce2731dde89f82f545a12f1e54a286f72bc874f1aed9965c5d5ae"
+        },
+        {
+          "file": "typescript/package.json",
+          "sha256": "fcbd2e0fb7e7eed1af20cfd562cd3c3b22c839cb95b9d18df5793b850bd601dd"
+        },
+        {
+          "file": "typescript/src/grammar.json",
+          "sha256": "99dc4b95424dff47c89acb50d5d3f25b081b07eaff43994b7881dccd4186b214"
+        },
+        {
+          "file": "typescript/src/node-types.json",
+          "sha256": "c790a733fc756b54d4e54dceeb7d2d51e40d8b57136e70277753a75804cce3e3"
+        },
+        {
+          "file": "typescript/src/parser.c",
+          "sha256": "74fe453edd70f4eae9af0a1050cbd7943d8971d59165b6aaebbaa0a0b716d1aa"
+        },
+        {
+          "file": "typescript/src/scanner.c",
+          "sha256": "9125013b42cb888379d9be909f1d73dfb75a37626c2cdbf4122718a2b431a6d3"
+        },
+        {
+          "file": "typescript/src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "typescript/src/tree_sitter/array.h",
+          "sha256": "4ff743903dc46f5db6aa54f31c6b4d160a8a9779e5b2ab1ee59ae7ebcd850ea1"
+        },
+        {
+          "file": "typescript/src/tree_sitter/parser.h",
+          "sha256": "a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a"
+        }
+      ],
+      "files": [
+        {
+          "file": "tree-sitter-typescript/tree-sitter-tsx.wasm",
+          "sha256": "79e5da75ea62855a0cd67177685f0164eac87d5f630b3cbe1e0a099751ad30f8"
+        },
+        {
+          "file": "./queries/typescript-highlights.scm",
+          "sha256": "5e449bfe55190c18253431446bc75ab316ea70637e2143c5081973b0a9d90b8b"
+        },
+        {
+          "file": "./queries/javascript-highlights.scm",
+          "sha256": "5f13a9435d7a49d6cbaab666cb1ebe79bce439a4d31cd50767e4617854f25eb8"
+        },
+        {
+          "file": "tree-sitter-javascript/queries/highlights-jsx.scm",
+          "sha256": "0cad1712acaf40804bc5dc7c8476858752c1f549cdf7d8c63c747317be0f8fa6"
+        },
+        {
+          "file": "./queries/typescript-folds.scm",
+          "sha256": "ca55b02fbf87a695062652c30d0aa89061514b2250db8264900ebb5088f9423e"
+        },
+        {
+          "file": "./queries/javascript-folds.scm",
+          "sha256": "4c86bde89691f06b6272669cae7551c83e4d6b59482d97c895501fc950f9b253"
+        },
+        {
+          "file": "./queries/jsx-folds.scm",
+          "sha256": "471bfddab35b5676c66a07d9476ef654cb2c66fab8893e6c5749113c0859922a"
+        },
+        {
+          "file": "./queries/javascript-injections.scm",
+          "sha256": "ebb7b92910ab116b98be93f299da04623a2c8824a86cd0669ef71bc403d9bb5e"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "cd836d32d8ccf301b9771c9ed2f718d2ce809fd41ddbc718ca69df813daaff64"
+        },
+        {
+          "kind": "folds",
+          "sha256": "3a55528d1f143136d3e5eda7ff4620c344f807f7e77533cec9a0d0cd8216a355"
+        },
+        {
+          "kind": "injections",
+          "sha256": "ebb7b92910ab116b98be93f299da04623a2c8824a86cd0669ef71bc403d9bb5e"
+        }
+      ]
+    },
+    {
+      "id": "html",
+      "parserABI": 14,
+      "source": {
+        "package": "tree-sitter-html",
+        "version": "0.23.2",
+        "repository": "https://github.com/tree-sitter/tree-sitter-html",
+        "license": "MIT",
+        "compiler": "upstream artifact; compiler not recorded",
+        "revision": "5a5ca8551a179998360b4a4ca2c0f366a35acc03",
+        "queryRevision": "5a5ca8551a179998360b4a4ca2c0f366a35acc03",
+        "integrity": "sha512-TN+l+7cCeLx9db/1RhRSqMAZO/266Oh2BHb8J8hMSSFLuzYvFTYP/UnD3S0mny5awzw05KzFNgu2vnwzN9wVJg==",
+        "tarball": "https://registry.npmjs.org/tree-sitter-html/-/tree-sitter-html-0.23.2.tgz"
+      },
+      "sourceFiles": [
+        {
+          "file": "grammar.js",
+          "sha256": "c139ccf784d7f2c377cbf702e0fe1daaa8e9ac2d76a7a8c0f81bfdb387b45ee2"
+        },
+        {
+          "file": "package.json",
+          "sha256": "888318a5ddb9303c7dfa83ed130d47c93c9f579eb78dcc31f40e58b7cf4e3997"
+        },
+        {
+          "file": "src/grammar.json",
+          "sha256": "242c55ee874835b2d47288859878a0cf5dba50ffaae861a81d19fef6d010e227"
+        },
+        {
+          "file": "src/node-types.json",
+          "sha256": "e04d0a6e667ee3773ceeb0751466ce314f29bafc9b1c7d2466414c39c3eda178"
+        },
+        {
+          "file": "src/parser.c",
+          "sha256": "65768172733b3bbe461cbdc14ea928f00fbfcc51d8ac68f0a5c72071c6a0bbf1"
+        },
+        {
+          "file": "src/scanner.c",
+          "sha256": "5c0a0567e010277b81fe63be0acd04f6b44c3ef3063ac01429b910c1d22f0dca"
+        },
+        {
+          "file": "src/tag.h",
+          "sha256": "aaf1a10c8a2f685ef51a4aa6c01a2cbe166bff67eeccf6b9501a625b71f9ab70"
+        },
+        {
+          "file": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "src/tree_sitter/array.h",
+          "sha256": "4ff743903dc46f5db6aa54f31c6b4d160a8a9779e5b2ab1ee59ae7ebcd850ea1"
+        },
+        {
+          "file": "src/tree_sitter/parser.h",
+          "sha256": "a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a"
+        },
+        {
+          "file": "tree-sitter.json",
+          "sha256": "ca1f39442fecd2135b8bc8bf664615cc4b967d8e4780587b299cdf227010e1b5"
+        }
+      ],
+      "files": [
+        {
+          "file": "tree-sitter-html/tree-sitter-html.wasm",
+          "sha256": "c48fcd82c7ea8bf943180088ba7f28c48b2bb5287874179168bf9d31e394cf85"
+        },
+        {
+          "file": "tree-sitter-html/queries/highlights.scm",
+          "sha256": "1ebb3811a8cdc054385b847a3aac6fbf7079faefd5b3dfab5bbad256cd5afdcf"
+        },
+        {
+          "file": "./queries/html-folds.scm",
+          "sha256": "d03a6a4b424ed10db2be752f1c4605bf1b6ae23363eb6eaa5ee15b4b32d228b5"
+        },
+        {
+          "file": "tree-sitter-html/queries/injections.scm",
+          "sha256": "6faa29537e952ee444aaa6ac00f72956d13f65616aade74bd665f5ac405f9c32"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "1ebb3811a8cdc054385b847a3aac6fbf7079faefd5b3dfab5bbad256cd5afdcf"
+        },
+        {
+          "kind": "folds",
+          "sha256": "d03a6a4b424ed10db2be752f1c4605bf1b6ae23363eb6eaa5ee15b4b32d228b5"
+        },
+        {
+          "kind": "injections",
+          "sha256": "6faa29537e952ee444aaa6ac00f72956d13f65616aade74bd665f5ac405f9c32"
+        }
+      ]
+    },
+    {
+      "id": "css",
+      "parserABI": 15,
+      "source": {
+        "package": "tree-sitter-css",
+        "version": "0.25.0",
+        "repository": {
+          "type": "git",
+          "url": "git+https://github.com/tree-sitter/tree-sitter-css.git"
+        },
+        "license": "MIT",
+        "compiler": "upstream artifact; compiler not recorded",
+        "revision": "dda5cfc5722c429eaba1c910ca32c2c0c5bb1a3f",
+        "queryRevision": "dda5cfc5722c429eaba1c910ca32c2c0c5bb1a3f",
+        "integrity": "sha512-FRc9R8ePrwJiUhZsuZ/wcFQ3K8Z+9yCgDrrUjuYswGWlN89UvcB9vslTUGZElQWGwhS8sUw3/r2n4lpb2sxT4Q==",
+        "tarball": "https://registry.npmjs.org/tree-sitter-css/-/tree-sitter-css-0.25.0.tgz"
+      },
+      "sourceFiles": [
+        {
+          "file": "grammar.js",
+          "sha256": "c6d9efdeaf3a4902f026849e08a103a6d1ec1f015c5f396d3fe92dc57ce034ae"
+        },
+        {
+          "file": "package.json",
+          "sha256": "074f92a25e9272478986165fd7673889676aaaeb9163bdcba068798c185a74ca"
+        },
+        {
+          "file": "src/grammar.json",
+          "sha256": "1a170e0c93009b5b592a611c663d4af4d625ddb97ebff1550c3e7f32fd045292"
+        },
+        {
+          "file": "src/node-types.json",
+          "sha256": "fbbf8d22d82608f6d2f61cfdb374e6758779754fb2f42643e9dc5af6ead0d5d2"
+        },
+        {
+          "file": "src/parser.c",
+          "sha256": "2e5150071220012ee635ac9e2119f4f3a93e0b51a7a3b69ab0cd87c18cf5e51e"
+        },
+        {
+          "file": "src/scanner.c",
+          "sha256": "18dae8c8c4f515f28a3dc7ffb5bda259b06013a752921dc411a2fad8ecf78988"
+        },
+        {
+          "file": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94"
+        },
+        {
+          "file": "src/tree_sitter/parser.h",
+          "sha256": "180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2"
+        },
+        {
+          "file": "tree-sitter.json",
+          "sha256": "c425a4125bb8c1907db2f5c4837bfdd9e14e796960e68384c962a719c94bbd16"
+        }
+      ],
+      "files": [
+        {
+          "file": "tree-sitter-css/tree-sitter-css.wasm",
+          "sha256": "8a23977fe271357cce6f254ef88c9bebf3854602d8046605aef6a45c02135c59"
+        },
+        {
+          "file": "tree-sitter-css/queries/highlights.scm",
+          "sha256": "23f7948a3817a0d06d7120158c3bee4ec5b58daa77e524985a4738b364db17b2"
+        },
+        {
+          "file": "./queries/css-folds.scm",
+          "sha256": "6948d107112f1799139d04e14b3de4e16b706f0422325a966d408e2dd80e2978"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "23f7948a3817a0d06d7120158c3bee4ec5b58daa77e524985a4738b364db17b2"
+        },
+        {
+          "kind": "folds",
+          "sha256": "6948d107112f1799139d04e14b3de4e16b706f0422325a966d408e2dd80e2978"
+        },
+        {
+          "kind": "injections",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "id": "json",
+      "parserABI": 14,
+      "source": {
+        "package": "tree-sitter-json",
+        "version": "0.24.8",
+        "repository": "https://github.com/tree-sitter/tree-sitter-json",
+        "license": "MIT",
+        "compiler": "upstream artifact; compiler not recorded",
+        "revision": "ee35a6ebefcef0c5c416c0d1ccec7370cfca5a24",
+        "queryRevision": "ee35a6ebefcef0c5c416c0d1ccec7370cfca5a24",
+        "integrity": "sha512-Tc9ZZYwHyWZ3Tt1VEw7Pa2scu1YO7/d2BCBbKTx5hXwig3UfdQjsOPkPyLpDJOn/m1UBEWYAtSdGAwCSyagBqQ==",
+        "tarball": "https://registry.npmjs.org/tree-sitter-json/-/tree-sitter-json-0.24.8.tgz"
+      },
+      "sourceFiles": [
+        {
+          "file": "grammar.js",
+          "sha256": "ecf4f5324171c5c1a94ba428c16711dc0316d3b2405ebf103be6e3eeb17de5dc"
+        },
+        {
+          "file": "package.json",
+          "sha256": "843df6f8d6a40ab7f12b91b5e688a1a603e65c27f797671240ecf87e1af14644"
+        },
+        {
+          "file": "src/grammar.json",
+          "sha256": "6a823bbabc1bbf85f4d7bedfff359e1751011294ac670bd51788c9aff0d68637"
+        },
+        {
+          "file": "src/node-types.json",
+          "sha256": "620b6f5d38676a97526e9d128972d4b156ddbdf6e130cd7e6b9c35e6823e943f"
+        },
+        {
+          "file": "src/parser.c",
+          "sha256": "e8e1ff5df0d73e3b82574129724e68ef4fa0faf1b8c43dd3f5c1a84839f830ab"
+        },
+        {
+          "file": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "src/tree_sitter/array.h",
+          "sha256": "4ff743903dc46f5db6aa54f31c6b4d160a8a9779e5b2ab1ee59ae7ebcd850ea1"
+        },
+        {
+          "file": "src/tree_sitter/parser.h",
+          "sha256": "a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a"
+        },
+        {
+          "file": "tree-sitter.json",
+          "sha256": "30d71de6bbd5c46237ff53746661b97ac31b426b263cf9baeb65e6d01f9f361d"
+        }
+      ],
+      "files": [
+        {
+          "file": "tree-sitter-json/tree-sitter-json.wasm",
+          "sha256": "d2119fb98d5912719b13f9458574f8608d2d29dfbe45f6be1f860ea1fe2a2405"
+        },
+        {
+          "file": "tree-sitter-json/queries/highlights.scm",
+          "sha256": "0511524465b56aed122580792254e68b6abbbfde7119f1d02b135acbe278233f"
+        },
+        {
+          "file": "./queries/json-folds.scm",
+          "sha256": "22c4b185c8c3c6693e5d14af8a02b13d17c58c3cfe33d6fb5a0869406c2804a2"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "1294928a9732f6607d2a150e3ec2bd895b9cbb3d0c394d3c283f556b21211e81"
+        },
+        {
+          "kind": "folds",
+          "sha256": "22c4b185c8c3c6693e5d14af8a02b13d17c58c3cfe33d6fb5a0869406c2804a2"
+        },
+        {
+          "kind": "injections",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "id": "markdown",
+      "parserABI": 15,
+      "source": {
+        "package": "tree-sitter-md",
+        "version": "0.1.1",
+        "repository": "https://github.com/ShaulLavo/tree-sitter-md",
+        "revision": "ff455a7dd3dc6177ddaf6879de462cecc34df73f",
+        "license": "MIT",
+        "compiler": "wasi-sdk 34"
+      },
+      "sourceFiles": [
+        {
+          "file": "package.json",
+          "sha256": "49818836ad67a68872724af7d684cce027e7519af23f38ac9cbdc99aa3a3adf2"
+        }
+      ],
+      "files": [
+        {
+          "file": "tree-sitter-md/tree-sitter-markdown.wasm",
+          "sha256": "4d71e4c53f38c368b3c80fad9a6ff5d000873b2e63d8666ac9dac8ff736b6367"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "folds",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "injections",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "id": "astro",
+      "parserABI": 14,
+      "source": {
+        "repository": "https://github.com/virchau13/tree-sitter-astro",
+        "revision": "213f6e6973d9b456c6e50e86f19f66877e7ef0ee",
+        "queryRevision": "213f6e6973d9b456c6e50e86f19f66877e7ef0ee",
+        "license": "MIT",
+        "compiler": "wasi-sdk 34; tree-sitter 0.27.0"
+      },
+      "sourceFiles": [],
+      "files": [
+        {
+          "file": "./grammars/tree-sitter-astro.wasm",
+          "sha256": "602004854e05205f4a0f4890283c4693e0533f1a497e42053a38572610aa3163"
+        },
+        {
+          "file": "./queries/astro-highlights.scm",
+          "sha256": "e3f84e9cc30f82b01f8c16b62bcd68f47e7be40caa18cf29bc062a711447a30e"
+        },
+        {
+          "file": "./queries/astro-folds.scm",
+          "sha256": "cf79e1b7591d6e5c96b71ea41e6c0c6346fd8b479f26c35efea7b3eb24ef86af"
+        },
+        {
+          "file": "./queries/astro-injections.scm",
+          "sha256": "3f6e6e324f85e5d6a907221d6059e468a385907e10960247c0ed5b29a0543204"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "e3f84e9cc30f82b01f8c16b62bcd68f47e7be40caa18cf29bc062a711447a30e"
+        },
+        {
+          "kind": "folds",
+          "sha256": "cf79e1b7591d6e5c96b71ea41e6c0c6346fd8b479f26c35efea7b3eb24ef86af"
+        },
+        {
+          "kind": "injections",
+          "sha256": "3f6e6e324f85e5d6a907221d6059e468a385907e10960247c0ed5b29a0543204"
+        }
+      ]
+    },
+    {
+      "id": "python",
+      "parserABI": 15,
+      "source": {
+        "package": "tree-sitter-python",
+        "version": "0.25.0",
+        "repository": "https://github.com/tree-sitter/tree-sitter-python",
+        "license": "MIT",
+        "compiler": "upstream artifact; compiler not recorded",
+        "revision": "293fdc02038ee2bf0e2e206711b69c90ac0d413f",
+        "queryRevision": "293fdc02038ee2bf0e2e206711b69c90ac0d413f",
+        "integrity": "sha512-eCmJx6zQa35GxaCtQD+wXHOhYqBxEL+bp71W/s3fcDMu06MrtzkVXR437dRrCrbrDbyLuUDJpAgycs7ncngLXw==",
+        "tarball": "https://registry.npmjs.org/tree-sitter-python/-/tree-sitter-python-0.25.0.tgz"
+      },
+      "sourceFiles": [
+        {
+          "file": "grammar.js",
+          "sha256": "48bb681fdcc51784077b7d2cbc138a1994309400d32e4ac74fcd304d9fe8ad81"
+        },
+        {
+          "file": "package.json",
+          "sha256": "cc682da95140c947fa0d67f9307e2017def0b4584c15b60386344ac78853d1a8"
+        },
+        {
+          "file": "src/grammar.json",
+          "sha256": "2adc15e78f4dae293e85de1517c45bcee2f8b075fa30a083c658925b944afec4"
+        },
+        {
+          "file": "src/node-types.json",
+          "sha256": "a2456847bea3adff5b2222b2f7b03a870159470d8908622204e6eb29ee2fe45e"
+        },
+        {
+          "file": "src/parser.c",
+          "sha256": "a895f10b3cf7b2608f3283b43cd5cfed70971c7ee4a0136abbaaccbc4a7a25e0"
+        },
+        {
+          "file": "src/scanner.c",
+          "sha256": "6db82134ac2d4c90a1a1475487a625cface02662ebda9b7478cad9c7147e9afe"
+        },
+        {
+          "file": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94"
+        },
+        {
+          "file": "src/tree_sitter/parser.h",
+          "sha256": "180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2"
+        },
+        {
+          "file": "tree-sitter.json",
+          "sha256": "0682bc3796601f623928259e244fa45c113f286cac7606719db792911cf051f9"
+        }
+      ],
+      "files": [
+        {
+          "file": "tree-sitter-python/tree-sitter-python.wasm",
+          "sha256": "16108b50df4ee9a30168794252ab55e7c93bfc5765d7fa0aa3e335752c515f47"
+        },
+        {
+          "file": "tree-sitter-python/queries/highlights.scm",
+          "sha256": "a6708f209381618e2b398972c8f1ccd892f0c064eab35a2a3f911c3e22e79a7e"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "32fffb050babac4e1626330570e61a8a1af733835a9657a795cdf63ad1875470"
+        },
+        {
+          "kind": "folds",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "injections",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "id": "shellscript",
+      "parserABI": 15,
+      "source": {
+        "package": "tree-sitter-bash",
+        "version": "0.25.1",
+        "repository": "https://github.com/tree-sitter/tree-sitter-bash",
+        "license": "MIT",
+        "compiler": "upstream artifact; compiler not recorded",
+        "revision": "801326684a26ffc4e749bb016c50c6c30bdfa345",
+        "queryRevision": "801326684a26ffc4e749bb016c50c6c30bdfa345",
+        "integrity": "sha512-7hMytuYIMoXOq24yRulgIxthE9YmggZIOHCyPTTuJcu6EU54tYD+4G39cUb28kxC6jMf/AbPfWGLQtgPTdh3xw==",
+        "tarball": "https://registry.npmjs.org/tree-sitter-bash/-/tree-sitter-bash-0.25.1.tgz"
+      },
+      "sourceFiles": [
+        {
+          "file": "grammar.js",
+          "sha256": "3c125330d995968a7e3a4fc71617aa73472449f5a6c254f39da2d8860a47bf65"
+        },
+        {
+          "file": "package.json",
+          "sha256": "757d74350c9a8cf2635010326ef3b28b59c392e705906af4d98e5a45fcaff32d"
+        },
+        {
+          "file": "src/grammar.json",
+          "sha256": "6c14f325170826cbc6c523ff5c2aeaa46f24bbff3a6e5eadb4533d9838fe3d81"
+        },
+        {
+          "file": "src/node-types.json",
+          "sha256": "b644629f7f9460cb0af080cb88f3bef898e6c47b6f8a76ed512b67ae16ef5ac5"
+        },
+        {
+          "file": "src/parser.c",
+          "sha256": "0021866dd2a7fccdfc94fafdca7d9863a891b5577b9eacdde1b6030585d3e186"
+        },
+        {
+          "file": "src/scanner.c",
+          "sha256": "7cc25d70626f8939b35ecd504bf724e2001b817412aa29bceb4c4955a91558a9"
+        },
+        {
+          "file": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94"
+        },
+        {
+          "file": "src/tree_sitter/parser.h",
+          "sha256": "180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2"
+        },
+        {
+          "file": "tree-sitter.json",
+          "sha256": "d58a0b1c3a697323c10303a4f7a81782d5bdcfc74c3ed78e2bab4575f531ea3b"
+        }
+      ],
+      "files": [
+        {
+          "file": "tree-sitter-bash/tree-sitter-bash.wasm",
+          "sha256": "8292919c88a0f7d3fb31d0cd0253ca5a9531bc1ede82b0537f2c63dd8abe6a7a"
+        },
+        {
+          "file": "tree-sitter-bash/queries/highlights.scm",
+          "sha256": "b74220d954f485b7626d2b2b61f37b522e12eb1830803e388e57dd797dc99f11"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "b74220d954f485b7626d2b2b61f37b522e12eb1830803e388e57dd797dc99f11"
+        },
+        {
+          "kind": "folds",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "injections",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "id": "rust",
+      "parserABI": 14,
+      "source": {
+        "package": "tree-sitter-rust",
+        "version": "0.24.0",
+        "repository": "https://github.com/tree-sitter/tree-sitter-rust",
+        "license": "MIT",
+        "compiler": "upstream artifact; compiler not recorded",
+        "revision": "18b0515fca567f5a10aee9978c6d2640e878671a",
+        "queryRevision": "18b0515fca567f5a10aee9978c6d2640e878671a",
+        "integrity": "sha512-NWemUDf629Tfc90Y0Z55zuwPCAHkLxWnMf2RznYu4iBkkrQl2o/CHGB7Cr52TyN5F1DAx8FmUnDtCy9iUkXZEQ==",
+        "tarball": "https://registry.npmjs.org/tree-sitter-rust/-/tree-sitter-rust-0.24.0.tgz"
+      },
+      "sourceFiles": [
+        {
+          "file": "grammar.js",
+          "sha256": "89e73563ab0636c18e6137eeb0508b2e1d37322ee702634aaa1c47e32a5e1364"
+        },
+        {
+          "file": "package.json",
+          "sha256": "58a2042ba3e6930f4cc34412fad2525da503c5de034b6050fdb096bfe5b31ead"
+        },
+        {
+          "file": "src/grammar.json",
+          "sha256": "44d1e437723c597b1f63085d0fd4691d6b3639695c1828feed1b2434212197c5"
+        },
+        {
+          "file": "src/node-types.json",
+          "sha256": "7aa048da68d64014402935bec749d57e05b1fd0d7fee1d111edfffc537342e1b"
+        },
+        {
+          "file": "src/parser.c",
+          "sha256": "a0f424079fd2ba8fe6ae29538e4a773e43c7a1271e6962eb6e8185f67a5c0db9"
+        },
+        {
+          "file": "src/scanner.c",
+          "sha256": "77faa4943da96dcb17d9c2a735bdbf7702287b52a1d2971117b167e47e318620"
+        },
+        {
+          "file": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94"
+        },
+        {
+          "file": "src/tree_sitter/parser.h",
+          "sha256": "11b654fbba7770b1c710cc14b169be2deb5d89c0f87233d4605037c26c1ff657"
+        },
+        {
+          "file": "tree-sitter.json",
+          "sha256": "b16e2387d3150735eed1548d3797522fbd77ec81d5f47a781df9a276b5ff3086"
+        }
+      ],
+      "files": [
+        {
+          "file": "tree-sitter-rust/tree-sitter-rust.wasm",
+          "sha256": "f65f354215611fd94ad34134b3427eb3d58cbb745df7b6509ba722184db73d57"
+        },
+        {
+          "file": "tree-sitter-rust/queries/highlights.scm",
+          "sha256": "0f0343107f14a7690157f51090a979eb8f8bfe4eada7c61763ddb4c54b1311d1"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "cd85694c452f1654753ec1b6db822c4b7335af268ba59d4f5f9cd96f706697c4"
+        },
+        {
+          "kind": "folds",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "injections",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "id": "go",
+      "parserABI": 15,
+      "source": {
+        "package": "tree-sitter-go",
+        "version": "0.25.0",
+        "repository": "https://github.com/tree-sitter/tree-sitter-go",
+        "license": "MIT",
+        "compiler": "upstream artifact; compiler not recorded",
+        "revision": "1547678a9da59885853f5f5cc8a99cc203fa2e2c",
+        "queryRevision": "1547678a9da59885853f5f5cc8a99cc203fa2e2c",
+        "integrity": "sha512-APBc/Dq3xz/e35Xpkhb1blu5UgW+2E3RyGWawZSCNcbGwa7jhSQPS8KsUupuzBla8PCo8+lz9W/JDJjmfRa2tw==",
+        "tarball": "https://registry.npmjs.org/tree-sitter-go/-/tree-sitter-go-0.25.0.tgz"
+      },
+      "sourceFiles": [
+        {
+          "file": "grammar.js",
+          "sha256": "53e114833c6769d8a86b9e2dfab8bb68b0aaf185e7008a5c572bfa21b77aff1b"
+        },
+        {
+          "file": "package.json",
+          "sha256": "63e08578adc8af9f86e45dc3127bc61722b4abb9c2e78cf6e1cc0b121f132f82"
+        },
+        {
+          "file": "src/grammar.json",
+          "sha256": "0dcc665aa521a1b73a200be13b4e376780cca037d764a165f12864babfe28000"
+        },
+        {
+          "file": "src/node-types.json",
+          "sha256": "8d77e723df0f0dfccb66d4571a5c3c17ecfb6c90959044c0992146b21f383bff"
+        },
+        {
+          "file": "src/parser.c",
+          "sha256": "3dbf6ed1238b5dfcf2be4d2f2d4cb27a14d34f34d7784eccccbfd532fd4a6d85"
+        },
+        {
+          "file": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94"
+        },
+        {
+          "file": "src/tree_sitter/parser.h",
+          "sha256": "180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2"
+        },
+        {
+          "file": "tree-sitter.json",
+          "sha256": "80d8a24648d35abb30a3cb2dbcc3a1af3919f274bcabcc277c0d9535d60abf9e"
+        }
+      ],
+      "files": [
+        {
+          "file": "tree-sitter-go/tree-sitter-go.wasm",
+          "sha256": "9504573f352b20be7f2f1911754d710622aedc15afff16d5ed8fb5645681aee7"
+        },
+        {
+          "file": "tree-sitter-go/queries/highlights.scm",
+          "sha256": "81182c986547eba7fa6316e82dfd621fb13b8fc89efac85432aee51a48ed0896"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "839ee0af48d759fa89e22538627787fbdf6e816ff544c109af83474952a097a2"
+        },
+        {
+          "kind": "folds",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "injections",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "id": "yaml",
+      "parserABI": 14,
+      "source": {
+        "package": "@tree-sitter-grammars/tree-sitter-yaml",
+        "version": "0.7.1",
+        "repository": "https://github.com/tree-sitter-grammars/tree-sitter-yaml",
+        "license": "MIT",
+        "compiler": "upstream artifact; compiler not recorded",
+        "revision": "9632edc32eb86966a482fcb3c9a7f4bb78ae0ddb",
+        "queryRevision": "9632edc32eb86966a482fcb3c9a7f4bb78ae0ddb",
+        "integrity": "sha512-AynBwkIoQCTgjDR33bDUp9Mqq+YTco0is3n5hRApMqG9of/6A4eQsfC1/uSEeHSUyMQSYawcAWamsexnVpIP4Q==",
+        "tarball": "https://registry.npmjs.org/@tree-sitter-grammars/tree-sitter-yaml/-/tree-sitter-yaml-0.7.1.tgz"
+      },
+      "sourceFiles": [
+        {
+          "file": "grammar.js",
+          "sha256": "390488273d970a8c78c7b9ab0cdf3cbf1b12a8833c29fe7041bd181bd851c8d7"
+        },
+        {
+          "file": "package.json",
+          "sha256": "6abef4dd5cbc62ffc8d35a02aaab6e471224102892f180cc66f264f85c78bd4c"
+        },
+        {
+          "file": "src/grammar.json",
+          "sha256": "a2c03fcc9bd9b7843780854f5e8264c9d465a34172b530d9511d6e89c5d2630e"
+        },
+        {
+          "file": "src/node-types.json",
+          "sha256": "1238b6c89fc6afb9723b6463a365843aa87e478025490660e5acfc9adaaf809b"
+        },
+        {
+          "file": "src/parser.c",
+          "sha256": "58f7ad557784734e8ad1cf2d3f82b7e5414b7a2eba7acb62c0b885490a0aa33a"
+        },
+        {
+          "file": "src/scanner.c",
+          "sha256": "9cd962f7c7541247cfc7ebf661abaa5d9b642d27de16575c87093496557aae59"
+        },
+        {
+          "file": "src/schema.core.c",
+          "sha256": "91e56c3f3ae6fad1803b739ce4eb4568a782a9aec710f733db2f3e38d407a4d5"
+        },
+        {
+          "file": "src/schema.json.c",
+          "sha256": "3a18e4406aa8cdaea2806483e11c50e1a392fd72cf8f54ab7f189b3728836949"
+        },
+        {
+          "file": "src/schema.legacy.c",
+          "sha256": "4f7ca12361e848214beceaa95ae615048317039ea4736c6eec956e3e8da4694c"
+        },
+        {
+          "file": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94"
+        },
+        {
+          "file": "src/tree_sitter/parser.h",
+          "sha256": "180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2"
+        },
+        {
+          "file": "tree-sitter.json",
+          "sha256": "f2c265d26baa81b322f2eecde587a7cb81e7763fca31c0d6b11dce040494ed47"
+        }
+      ],
+      "files": [
+        {
+          "file": "@tree-sitter-grammars/tree-sitter-yaml/tree-sitter-yaml.wasm",
+          "sha256": "e752dc21c3591df9b45692fe417d101f45d1828c28c44d79005f4066dc7e4e91"
+        },
+        {
+          "file": "@tree-sitter-grammars/tree-sitter-yaml/queries/highlights.scm",
+          "sha256": "2fbfbbd5ca0928d0a7e09e59f8f2964b14a328a7ee0ce799270d9013dcce49a0"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "b6842d72fd52890292f9ba8c5d2bafb20ba63a5105e1775d51ced19aeec91f8f"
+        },
+        {
+          "kind": "folds",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "injections",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "id": "toml",
+      "parserABI": 14,
+      "source": {
+        "package": "@tree-sitter-grammars/tree-sitter-toml",
+        "version": "0.7.0",
+        "repository": "https://github.com/tree-sitter-grammars/tree-sitter-toml",
+        "license": "MIT",
+        "compiler": "upstream artifact; compiler not recorded",
+        "revision": "64b56832c2cffe41758f28e05c756a3a98d16f41",
+        "queryRevision": "64b56832c2cffe41758f28e05c756a3a98d16f41",
+        "integrity": "sha512-873Kl518Qm5ghbWadISY41rwFjee0v+2bU4twwvAw2VAJcWwj2vBo3F3hOCXfbqHaFiqc4qh6eLhkMl2YZJS0g==",
+        "tarball": "https://registry.npmjs.org/@tree-sitter-grammars/tree-sitter-toml/-/tree-sitter-toml-0.7.0.tgz"
+      },
+      "sourceFiles": [
+        {
+          "file": "grammar.js",
+          "sha256": "ed5125db94891531c9fe79f50850a8694510cf0cf24794c28176b13766c09ed4"
+        },
+        {
+          "file": "package.json",
+          "sha256": "2b5a98ea10e2266178da669605f2ee65d9bbfd60b85307d6dde7bc35004ab0a2"
+        },
+        {
+          "file": "src/grammar.json",
+          "sha256": "fe710cf103c58a843cadba4bc64f6bef1306c90421616ebce56c9120871e28db"
+        },
+        {
+          "file": "src/node-types.json",
+          "sha256": "db9ba87309dd4b5a3fe107ddb20858f869cf40c199cad3ae9d99029240ccf419"
+        },
+        {
+          "file": "src/parser.c",
+          "sha256": "1991a2608e6f0214e563fe5f762e8df72954dc69a3dd9a1e22ea8a870e4052c3"
+        },
+        {
+          "file": "src/scanner.c",
+          "sha256": "b25ff3b5034f40046e9a041d1e9110aa46d081706bbd1b748b480701aa6f5bde"
+        },
+        {
+          "file": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "src/tree_sitter/array.h",
+          "sha256": "4ff743903dc46f5db6aa54f31c6b4d160a8a9779e5b2ab1ee59ae7ebcd850ea1"
+        },
+        {
+          "file": "src/tree_sitter/parser.h",
+          "sha256": "a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a"
+        },
+        {
+          "file": "tree-sitter.json",
+          "sha256": "2979dffa7c7f2de9e2b52f19dc60d79c139042ff07bc5d92fb7276b76e97e677"
+        }
+      ],
+      "files": [
+        {
+          "file": "@tree-sitter-grammars/tree-sitter-toml/tree-sitter-toml.wasm",
+          "sha256": "1ac6a83826c35a68857f8325e00c78f6bcbef4eb6db3931a6cf3041f76e5e09f"
+        },
+        {
+          "file": "@tree-sitter-grammars/tree-sitter-toml/queries/highlights.scm",
+          "sha256": "2fb5c61d33a70389312254c9c392e2c5dd6313d958d6e5f8f74cadd5e0811707"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "4baa59b6f8f113b5078248ed30f3a03a24bec76885e895d66ebe07c3b9a83276"
+        },
+        {
+          "kind": "folds",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "injections",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "id": "c",
+      "parserABI": 15,
+      "source": {
+        "package": "tree-sitter-c",
+        "version": "0.24.1",
+        "repository": "https://github.com/tree-sitter/tree-sitter-c",
+        "license": "MIT",
+        "compiler": "upstream artifact; compiler not recorded",
+        "revision": "7fa1be1b694b6e763686793d97da01f36a0e5c12",
+        "queryRevision": "7fa1be1b694b6e763686793d97da01f36a0e5c12",
+        "integrity": "sha512-lkYwWN3SRecpvaeqmFKkuPNR3ZbtnvHU+4XAEEkJdrp3JfSp2pBrhXOtvfsENUneye76g889Y0ddF2DM0gEDpA==",
+        "tarball": "https://registry.npmjs.org/tree-sitter-c/-/tree-sitter-c-0.24.1.tgz"
+      },
+      "sourceFiles": [
+        {
+          "file": "grammar.js",
+          "sha256": "f362b9fe06db321464fc77f1e5ba2ce089baec9d18f4defddb0c9ca87885e546"
+        },
+        {
+          "file": "package.json",
+          "sha256": "2ce1a96088083cd4006539032ec4c4ca40ced6e0ae410c97e211f65db26de8fe"
+        },
+        {
+          "file": "src/grammar.json",
+          "sha256": "d0bc53bfd8e9eff4d5e0c3ca2c8049bec2caa8a15f119807de68fd527f172368"
+        },
+        {
+          "file": "src/node-types.json",
+          "sha256": "23e819ef1eefd357bb6eba844f47f8492f6a88da3e5046b06ec4acd4da8a9fd6"
+        },
+        {
+          "file": "src/parser.c",
+          "sha256": "e1b618bc80b8983b43893f98ce1bd8a23a3ccc7d726bed6624b5c4c6c85d5e1c"
+        },
+        {
+          "file": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94"
+        },
+        {
+          "file": "src/tree_sitter/parser.h",
+          "sha256": "180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2"
+        },
+        {
+          "file": "tree-sitter.json",
+          "sha256": "c750191a1bc866b349bb58764ce3a53e2276fd55d4a94e4a448876f9d1266806"
+        }
+      ],
+      "files": [
+        {
+          "file": "tree-sitter-c/tree-sitter-c.wasm",
+          "sha256": "c852c2a85ebf2beb636aa3b0ef7f7e70458684d74f6741b20dcb296885bed9f9"
+        },
+        {
+          "file": "tree-sitter-c/queries/highlights.scm",
+          "sha256": "3378d854dda695b2b282b9468247524ed4271ef74af691033d2e36883379409c"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "322a44587768ac99a3c706570e5ba461c8830d6838f791b973a96aa679eb07aa"
+        },
+        {
+          "kind": "folds",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "injections",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "id": "cpp",
+      "parserABI": 14,
+      "source": {
+        "package": "tree-sitter-cpp",
+        "version": "0.23.4",
+        "repository": "https://github.com/tree-sitter/tree-sitter-cpp",
+        "license": "MIT",
+        "compiler": "upstream artifact; compiler not recorded",
+        "revision": "f41e1a044c8a84ea9fa8577fdd2eab92ec96de02",
+        "queryRevision": "f41e1a044c8a84ea9fa8577fdd2eab92ec96de02",
+        "integrity": "sha512-qR5qUDyhZ5jJ6V8/umiBxokRbe89bCGmcq/dk94wI4kN86qfdV8k0GHIUEKaqWgcu42wKal5E97LKpLeVW8sKw==",
+        "tarball": "https://registry.npmjs.org/tree-sitter-cpp/-/tree-sitter-cpp-0.23.4.tgz"
+      },
+      "sourceFiles": [
+        {
+          "file": "grammar.js",
+          "sha256": "d02422914b390597e589dcd61f21b340e3a6b407a0b278119b7d90f57595e58b"
+        },
+        {
+          "file": "package.json",
+          "sha256": "bfde98d506b0847f2093336e5b4d7394dd311e78da69e22e5ecd73fba6db6066"
+        },
+        {
+          "file": "src/grammar.json",
+          "sha256": "c0a93751d708440bb2c1929d738a5b03c4b835f61e5aeb580d0af269faf68f8d"
+        },
+        {
+          "file": "src/node-types.json",
+          "sha256": "fdfd4b1f3dca1516616a1eb615bb6c1ad3082b8937ad21070d0def5dcfe7e535"
+        },
+        {
+          "file": "src/parser.c",
+          "sha256": "2a35a43b4af6c9f7b69624ac00c2c50808912591450dc79c05dea03ac1bae814"
+        },
+        {
+          "file": "src/scanner.c",
+          "sha256": "cf60387d290271f4d2fb558d0569b2b9ef879cb72206a9df5cc73b0b1a4b20ff"
+        },
+        {
+          "file": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "src/tree_sitter/array.h",
+          "sha256": "4ff743903dc46f5db6aa54f31c6b4d160a8a9779e5b2ab1ee59ae7ebcd850ea1"
+        },
+        {
+          "file": "src/tree_sitter/parser.h",
+          "sha256": "a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a"
+        },
+        {
+          "file": "tree-sitter.json",
+          "sha256": "ce25741bbbe08ee97750bc3e34bd33260bc2e8a9d8d5339cec3e744db53e35a0"
+        }
+      ],
+      "files": [
+        {
+          "file": "tree-sitter-cpp/tree-sitter-cpp.wasm",
+          "sha256": "174eb0deb75b2ec7881bcacda9f995648d8e683956e5c2267e69ab6dc503fcbf"
+        },
+        {
+          "file": "tree-sitter-c/queries/highlights.scm",
+          "sha256": "3378d854dda695b2b282b9468247524ed4271ef74af691033d2e36883379409c"
+        },
+        {
+          "file": "tree-sitter-cpp/queries/highlights.scm",
+          "sha256": "52136576a9a9dacd9e95a8de0f351689bf46140738572ab4e9f24c9278e6b458"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "f04aefefd1022bb35441eb1fe43b6e1f53c2522521ebb2185b185c3531896420"
+        },
+        {
+          "kind": "folds",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "injections",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "id": "csharp",
+      "parserABI": 15,
+      "source": {
+        "package": "tree-sitter-c-sharp",
+        "version": "0.23.5",
+        "repository": "https://github.com/tree-sitter/tree-sitter-c-sharp",
+        "license": "MIT",
+        "compiler": "upstream artifact; compiler not recorded",
+        "revision": "cac6d5fb595f5811a076336682d5d595ac1c9e85",
+        "queryRevision": "cac6d5fb595f5811a076336682d5d595ac1c9e85",
+        "integrity": "sha512-xJGOeXPMmld0nES5+080N/06yY6LQi+KWGWV4LfZaZe6srJPtUtfhIbRSN7EZN6IaauzW28v6W4QHFwmeUW6HQ==",
+        "tarball": "https://registry.npmjs.org/tree-sitter-c-sharp/-/tree-sitter-c-sharp-0.23.5.tgz"
+      },
+      "sourceFiles": [
+        {
+          "file": "grammar.js",
+          "sha256": "f8987de3258e79dad5a7134ba4e1202271f2a8f53e13ec8ddcfb82a9168ff0ff"
+        },
+        {
+          "file": "package.json",
+          "sha256": "a76d617869801ea0e9969a06725a776a3e94076311a45f072a30aaaa497f47ea"
+        },
+        {
+          "file": "src/grammar.json",
+          "sha256": "143aeac9b44ab76868c59b601d0d67a475dddd77ab782fa7db79ce30372ecd14"
+        },
+        {
+          "file": "src/node-types.json",
+          "sha256": "91d69f7e0d97c002e738a09caadd8ddfa36b1552f7ae94303cc53b03b28551c0"
+        },
+        {
+          "file": "src/parser.c",
+          "sha256": "0a2651e49de7c7237c535c41a132a7ec0424da79d12f197f1df3edd7d6ea4427"
+        },
+        {
+          "file": "src/scanner.c",
+          "sha256": "00920daa0fdf3050d441475e8effe996b60ee8acc1bdbcbbc4c83d56a6987705"
+        },
+        {
+          "file": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "src/tree_sitter/array.h",
+          "sha256": "31e60a1bff6f715afacce03b5b70efe42b58371b4f9595dd4af52a577ff9608c"
+        },
+        {
+          "file": "src/tree_sitter/parser.h",
+          "sha256": "180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2"
+        },
+        {
+          "file": "tree-sitter.json",
+          "sha256": "7f65dca6680effa50fcc49abcf1346ee3067c5d1881b2e2fc46c5d1eec34e736"
+        }
+      ],
+      "files": [
+        {
+          "file": "tree-sitter-c-sharp/tree-sitter-c_sharp.wasm",
+          "sha256": "6f69e1cae44e1c32c1eccc170dc5a9778fb94ff716f71113fe1f8c4299aa2f40"
+        },
+        {
+          "file": "tree-sitter-c-sharp/queries/highlights.scm",
+          "sha256": "ab8a9930aeeee70fa2dbfde82e4763170b7e826bc642338ad0683772c20c060f"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "a81b348e511fd6a374bc7ae54cf3ceafad7473a76d3e2f30471348c4fc689dde"
+        },
+        {
+          "kind": "folds",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "injections",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "id": "java",
+      "parserABI": 14,
+      "source": {
+        "package": "tree-sitter-java",
+        "version": "0.23.5",
+        "repository": "https://github.com/tree-sitter/tree-sitter-java",
+        "license": "MIT",
+        "compiler": "upstream artifact; compiler not recorded",
+        "revision": "94703d5a6bed02b98e438d7cad1136c01a60ba2c",
+        "queryRevision": "94703d5a6bed02b98e438d7cad1136c01a60ba2c",
+        "integrity": "sha512-Yju7oQ0Xx7GcUT01mUglPP+bYfvqjNCGdxqigTnew9nLGoII42PNVP3bHrYeMxswiCRM0yubWmN5qk+zsg0zMA==",
+        "tarball": "https://registry.npmjs.org/tree-sitter-java/-/tree-sitter-java-0.23.5.tgz"
+      },
+      "sourceFiles": [
+        {
+          "file": "grammar.js",
+          "sha256": "b89ada7566bda16a8d7a710755c27824d6097e44b8d3b1dafbb749f3c34d13e0"
+        },
+        {
+          "file": "package.json",
+          "sha256": "c0c99e633aa28b2c1c58e61f91211391a9363d7d532aa5795bf4003f2dc14dba"
+        },
+        {
+          "file": "src/grammar.json",
+          "sha256": "47ca521cd7a888d671d9f26301e8697fa686e04912032e959d242b5f25877eb6"
+        },
+        {
+          "file": "src/node-types.json",
+          "sha256": "19c46facc653381c337ff6cad75dd8b052524179a366c80825d6d0010520eef2"
+        },
+        {
+          "file": "src/parser.c",
+          "sha256": "4add5150cf4531eb5dd97f3343dcf65cd11704c84711348b328582b83424a0e4"
+        },
+        {
+          "file": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94"
+        },
+        {
+          "file": "src/tree_sitter/parser.h",
+          "sha256": "a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a"
+        },
+        {
+          "file": "tree-sitter.json",
+          "sha256": "5b8f0cb5514a4a04720beba0e5991c48837844fe0ce2ba2d02ec7e6a44a344d8"
+        }
+      ],
+      "files": [
+        {
+          "file": "tree-sitter-java/tree-sitter-java.wasm",
+          "sha256": "4fdeac4ca6ca089f06c6f7e562abcac1733cd465728cc7031ebb73c2019122c4"
+        },
+        {
+          "file": "tree-sitter-java/queries/highlights.scm",
+          "sha256": "576c0df8df0b116cd642140ddc508c01f9d3283582afd8581c1f35caf4d71386"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "576c0df8df0b116cd642140ddc508c01f9d3283582afd8581c1f35caf4d71386"
+        },
+        {
+          "kind": "folds",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "injections",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "id": "php",
+      "parserABI": 15,
+      "source": {
+        "package": "tree-sitter-php",
+        "version": "0.24.2",
+        "repository": "https://github.com/tree-sitter/tree-sitter-php",
+        "license": "MIT",
+        "compiler": "upstream artifact; compiler not recorded",
+        "revision": "5b5627faaa290d89eb3d01b9bf47c3bb9e797dea",
+        "queryRevision": "5b5627faaa290d89eb3d01b9bf47c3bb9e797dea",
+        "integrity": "sha512-zwgAePc/HozNaWOOfwRAA+3p8yhuehRw8Fb7vn5qd2XjiIc93uJPryDTMYTSjBRjVIUg/KY6pM3rRzs8dSwKfw==",
+        "tarball": "https://registry.npmjs.org/tree-sitter-php/-/tree-sitter-php-0.24.2.tgz"
+      },
+      "sourceFiles": [
+        {
+          "file": "common/define-grammar.js",
+          "sha256": "b48e551fd26e2ff45e3366fb2adc0689f0b8e026238c6926efa60cc567dd66bf"
+        },
+        {
+          "file": "common/scanner.h",
+          "sha256": "de8eb36bc8f517ab9f3eaf82e3825d7b3e11b62e9471545f4c906100cfce0e07"
+        },
+        {
+          "file": "package.json",
+          "sha256": "f8264526c8c1c1c051fcf33b3f87c7591720af339f15bef2e041f853fdb8fb06"
+        },
+        {
+          "file": "php_only/grammar.js",
+          "sha256": "573860765669f90e59b6d9f902b86a51671a2cd0b58cab5b403f66564d358dfb"
+        },
+        {
+          "file": "php_only/package.json",
+          "sha256": "256d6141bbdbe379fa5e5f47ac4019dca3fa23963f02659285c05cf6345aa616"
+        },
+        {
+          "file": "php_only/src/grammar.json",
+          "sha256": "dc988b70eb4fd439524ddcd0e9558bcee089318d188474f4c5d2c64763a698b7"
+        },
+        {
+          "file": "php_only/src/node-types.json",
+          "sha256": "01d5a2f271bdd46326641477aa2ad0f3e7e4a3a973edc3ab9c627461ae50b15b"
+        },
+        {
+          "file": "php_only/src/parser.c",
+          "sha256": "bc796948b625f74e390cfd1254392136c86fafbd2dc0c9d93360ec20bc6b0dfb"
+        },
+        {
+          "file": "php_only/src/scanner.c",
+          "sha256": "7a91ec341bef67f006e508f720edcd70b0d0eb73773584afa87ab7d12be25b14"
+        },
+        {
+          "file": "php_only/src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "php_only/src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94"
+        },
+        {
+          "file": "php_only/src/tree_sitter/parser.h",
+          "sha256": "180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2"
+        },
+        {
+          "file": "php/grammar.js",
+          "sha256": "a9f44740c7a11a673a997c42486954482084cdadecbbce89f5bcd066bfd853a5"
+        },
+        {
+          "file": "php/package.json",
+          "sha256": "1bd0d42935d3a8c0e049294ee566ebed8a4f1efa882ae13a39e49cb0a649110b"
+        },
+        {
+          "file": "php/src/grammar.json",
+          "sha256": "9fde102523bb500359f1c09872862f1e84eea214886cb5f63bc80918ce8cfdd3"
+        },
+        {
+          "file": "php/src/node-types.json",
+          "sha256": "26acb820c9088382d10440c71457188005a277bfee45be8bb20e8df388c1a50a"
+        },
+        {
+          "file": "php/src/parser.c",
+          "sha256": "59ad8e5e4fde3fe60687a488ab8420612840cc966b83739af1b3a4317ed27ec6"
+        },
+        {
+          "file": "php/src/scanner.c",
+          "sha256": "58c92cafe4ebda509c3ad3864fa6fc0e9877bbac26e17a03d23ea2101c291ad5"
+        },
+        {
+          "file": "php/src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "php/src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94"
+        },
+        {
+          "file": "php/src/tree_sitter/parser.h",
+          "sha256": "180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2"
+        },
+        {
+          "file": "tree-sitter.json",
+          "sha256": "4cf51cc1a80e6e74d42b1020ab5c6ef14e33f656844dbb53319404966a821402"
+        }
+      ],
+      "files": [
+        {
+          "file": "tree-sitter-php/tree-sitter-php.wasm",
+          "sha256": "d4df6a6ff08c87c3ec4f9cbb785fe09998a0cb570e03f57d7b19b3acfb146aa7"
+        },
+        {
+          "file": "tree-sitter-php/queries/highlights.scm",
+          "sha256": "a2a7367659cff3b4be09961c8117d69a9b8703bfc266f8092e089b1760f197e9"
+        },
+        {
+          "file": "tree-sitter-php/queries/injections.scm",
+          "sha256": "8ea6bcf32f19a43cb102fb962d8fa9395a51d08102c0a4495b61a923887fc5cd"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "cdfd75021955f82a8722ec6a4c9ee2c70b0ad97f0b03ed4f0bef0e4d9a0b0365"
+        },
+        {
+          "kind": "folds",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "injections",
+          "sha256": "8ea6bcf32f19a43cb102fb962d8fa9395a51d08102c0a4495b61a923887fc5cd"
+        }
+      ]
+    },
+    {
+      "id": "lua",
+      "parserABI": 15,
+      "source": {
+        "package": "@tree-sitter-grammars/tree-sitter-lua",
+        "version": "0.4.1",
+        "repository": "https://github.com/tree-sitter-grammars/tree-sitter-lua",
+        "license": "MIT",
+        "compiler": "upstream artifact; compiler not recorded",
+        "licenseFile": "LICENSE.md",
+        "revision": "816840c592ab973500ae9750763c707b447e7fef",
+        "queryRevision": "816840c592ab973500ae9750763c707b447e7fef",
+        "integrity": "sha512-EwagFaU6ZveVk18/Y8qUhZkkiBKnQ7dSCHbm//TUroLVKy3i1rOYGy/cNHtSkAb1eDvS1HhCLybH2S541Cya/g==",
+        "tarball": "https://registry.npmjs.org/@tree-sitter-grammars/tree-sitter-lua/-/tree-sitter-lua-0.4.1.tgz"
+      },
+      "sourceFiles": [
+        {
+          "file": "grammar.js",
+          "sha256": "33ff71b891a9de3e46877a63284fec2c7965139c7b2ba5e8562d2ca66e6d0f09"
+        },
+        {
+          "file": "package.json",
+          "sha256": "6ebfdb46ed8c3a0d69b9e644d76eea4a11e82ad0b0012e534ee03b901674b39c"
+        },
+        {
+          "file": "src/grammar.json",
+          "sha256": "3560bbacef7fcfc234c629a1e55d691a52df51af5d8ea4da993034e93f949fd6"
+        },
+        {
+          "file": "src/node-types.json",
+          "sha256": "be4ebbb4a86d443797f40f4db56bb7e1130aaf0f64966deab5b8b46325a3abe4"
+        },
+        {
+          "file": "src/parser.c",
+          "sha256": "b34a362e43f0311f405721f3089e94f97f31da403b154d456d093e64609a4081"
+        },
+        {
+          "file": "src/scanner.c",
+          "sha256": "35bbd630b5a7421d46d2e91185eeea09bf78565d44cb676b63ca20d0f1b54bbd"
+        },
+        {
+          "file": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94"
+        },
+        {
+          "file": "src/tree_sitter/parser.h",
+          "sha256": "180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2"
+        },
+        {
+          "file": "tree-sitter.json",
+          "sha256": "3781ccbbf68c13ffbc4c09c5c65f9bfe2b1b9986d61add3bc72e3c7267ea288b"
+        }
+      ],
+      "files": [
+        {
+          "file": "@tree-sitter-grammars/tree-sitter-lua/tree-sitter-lua.wasm",
+          "sha256": "6d95607fc7d78964cfdf065ccb1ba76be5ed217c5ec0d0a3cace13c59fa1ae43"
+        },
+        {
+          "file": "@tree-sitter-grammars/tree-sitter-lua/queries/highlights.scm",
+          "sha256": "0ddb74b9e476d0b183a39a275dc9a6a370a69fb94bc9f7e6fac4c2cbe64f7b75"
+        },
+        {
+          "file": "@tree-sitter-grammars/tree-sitter-lua/queries/injections.scm",
+          "sha256": "74914a7e9801547dad61d5b348d7b2128e8d426d51cbabb19053b75763764d33"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "c09c83229ca00a05b53fa33aac3cbcdef77f55efe5d50c5200c6adbdb744156d"
+        },
+        {
+          "kind": "folds",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "injections",
+          "sha256": "74914a7e9801547dad61d5b348d7b2128e8d426d51cbabb19053b75763764d33"
+        }
+      ]
+    },
+    {
+      "id": "svelte",
+      "parserABI": 14,
+      "source": {
+        "package": "tree-sitter-svelte",
+        "version": "0.11.0",
+        "repository": {
+          "type": "git",
+          "url": "git+https://github.com/Himujjal/tree-sitter-svelte.git"
+        },
+        "license": "MIT",
+        "compiler": "upstream artifact; compiler not recorded",
+        "revision": "be7f2e7db1fc19f0852265ec60923fc058380739",
+        "queryRevision": "be7f2e7db1fc19f0852265ec60923fc058380739",
+        "integrity": "sha512-HqhbQ6Q4wMMGe2akVpcoVbhAoSO3Wf5/n0JYIP/9XGlF6kG46lU0II3MNVZANpBk8O90vM9OEKyD/EGrECvxbA==",
+        "tarball": "https://registry.npmjs.org/tree-sitter-svelte/-/tree-sitter-svelte-0.11.0.tgz"
+      },
+      "sourceFiles": [
+        {
+          "file": "grammar.js",
+          "sha256": "bce5b2221fb13577027a810449c4367f9dbed38bb3fb5e630fc6c2657cea7a62"
+        },
+        {
+          "file": "nodemon.json",
+          "sha256": "2bba6242e243bc1687b92f2c6cd22c45456b0f8d7c565abe2fbf938ee91a56ed"
+        },
+        {
+          "file": "package.json",
+          "sha256": "489d82e274bfa34585b5c151935169492549b6205bb03c3a2735aeabb32780df"
+        },
+        {
+          "file": "src/allocator.h",
+          "sha256": "01a7f8eed20ba62e4312d363e099e5b51004c8f401e915fbbfe2122f95ad43b4"
+        },
+        {
+          "file": "src/ekstring.h",
+          "sha256": "9236524533213a9f08c182d1c22e6593386b49196f9f64d6500c381eb8b583bb"
+        },
+        {
+          "file": "src/grammar.json",
+          "sha256": "6f71cc031416c3d27d8911a9aa0493efa2d922aa09de91aededec3c2cd0f25c8"
+        },
+        {
+          "file": "src/node-types.json",
+          "sha256": "bdd28bfceb0b782c7c459a16225a48674ce9a5077b9bc39e2923a7134c515d90"
+        },
+        {
+          "file": "src/parser.c",
+          "sha256": "d65d31631d425ac2ad9eb48ede4fb4d46be13f36203673c067b2379929cfbbd6"
+        },
+        {
+          "file": "src/scanner.c",
+          "sha256": "43d5f3e554e28d5ee95d69bbc5079ecce54f6774b3590e867acda37a444e3821"
+        },
+        {
+          "file": "src/tag.h",
+          "sha256": "8e33d4ae534eb48e9784b6f2fd3b7fde8d56dd7957f4b64b973aef307a4017e8"
+        },
+        {
+          "file": "src/tree_sitter/parser.h",
+          "sha256": "ab104936984904469572a4e868149f7a22fb2929347f837ae6a1f9b790f1b173"
+        },
+        {
+          "file": "src/uthash.h",
+          "sha256": "7f8b0b8d8efd0d3afeb16552ce38263191b6657d2abbad5abd897a6e5a805436"
+        },
+        {
+          "file": "src/vc_vector.h",
+          "sha256": "a52366108e838e4e3a794c959dfa567d34e844f44154d2fcf6bb8d5b33710d4b"
+        }
+      ],
+      "files": [
+        {
+          "file": "tree-sitter-svelte/tree-sitter-svelte.wasm",
+          "sha256": "0ed8d4aca53f9f1bafc1844575dcb259a598cca099105b772f6c0c6bcbd299b4"
+        },
+        {
+          "file": "tree-sitter-svelte/queries/highlights.scm",
+          "sha256": "14de775ed1b2df48f5b622da52d14d80337ad2b406177b1cca0e21134f9b0d25"
+        },
+        {
+          "file": "tree-sitter-svelte/queries/folds.scm",
+          "sha256": "ced221fce7c720530aa18f158c5091085605c1c3bf00627c325f77436886674f"
+        },
+        {
+          "file": "./queries/svelte-injections.scm",
+          "sha256": "51a5bfb755d3a2745cebd4648c4c2ca7917a8905362f3f979b5c07af25e303b4"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "9ade819bae4c7ca0a3292ead5d438975a9a3d945abb17648c27d961e7eed6f9d"
+        },
+        {
+          "kind": "folds",
+          "sha256": "ced221fce7c720530aa18f158c5091085605c1c3bf00627c325f77436886674f"
+        },
+        {
+          "kind": "injections",
+          "sha256": "51a5bfb755d3a2745cebd4648c4c2ca7917a8905362f3f979b5c07af25e303b4"
+        }
+      ]
+    },
+    {
+      "id": "sql",
+      "parserABI": 15,
+      "source": {
+        "repository": "https://github.com/DerekStride/tree-sitter-sql",
+        "revision": "97614d051eebfd3bc5d97c0bdb5a1638719ca811",
+        "queryRevision": "97614d051eebfd3bc5d97c0bdb5a1638719ca811",
+        "license": "MIT",
+        "compiler": "wasi-sdk 34; tree-sitter 0.27.0"
+      },
+      "sourceFiles": [],
+      "files": [
+        {
+          "file": "./grammars/tree-sitter-sql.wasm",
+          "sha256": "13df5dd065a3870728b32f37089b3bf6f54ec0868c3840d718d60ffb084a6365"
+        },
+        {
+          "file": "./queries/sql-highlights.scm",
+          "sha256": "e0780d48190be2ece884abf551da50d8011a946e7e3fb39ee48fbe5a28f158ab"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "14dcaae604bd913d763be1d942085179f8406d1c99ae12df19137d784ebd76ec"
+        },
+        {
+          "kind": "folds",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "injections",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "id": "mdx",
+      "parserABI": 15,
+      "source": {
+        "repository": "https://github.com/srazzak/tree-sitter-mdx",
+        "revision": "3aa29e8de1bf0213948a04fe953039b6ab73777b",
+        "queryRevision": "3aa29e8de1bf0213948a04fe953039b6ab73777b",
+        "license": "MIT",
+        "compiler": "wasi-sdk 34; tree-sitter 0.27.0"
+      },
+      "sourceFiles": [],
+      "files": [
+        {
+          "file": "./grammars/tree-sitter-mdx.wasm",
+          "sha256": "71c92f82a0805e336b60b08a62d1cc48be287cb699cc943acad8640829624245"
+        },
+        {
+          "file": "./queries/mdx-highlights.scm",
+          "sha256": "9d4be8b024b6a299d52ed27f55b74fe27b8f8729d6246aac075d13d587cf990f"
+        },
+        {
+          "file": "./queries/mdx-injections.scm",
+          "sha256": "78cc79db0c2f07522328fef0f426e8bf7f0ff587467eeccbc21aa4827807e733"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "9d4be8b024b6a299d52ed27f55b74fe27b8f8729d6246aac075d13d587cf990f"
+        },
+        {
+          "kind": "folds",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "injections",
+          "sha256": "78cc79db0c2f07522328fef0f426e8bf7f0ff587467eeccbc21aa4827807e733"
+        }
+      ]
+    }
+  ]
+}

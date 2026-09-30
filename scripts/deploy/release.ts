@@ -69,7 +69,7 @@ export async function readCheckout(): Promise<Checkout> {
   if (!commit) throw createScriptError(`${checkoutRoot} is not a git checkout.`)
 
   const status = await run(['git', 'status', '--porcelain', '-z'], { cwd: checkoutRoot })
-  const editor = path.join(checkoutRoot, '../Editor')
+  const editor = path.join(checkoutRoot, 'editor')
   return {
     commit,
     branch: await output(['git', 'branch', '--show-current'], checkoutRoot),

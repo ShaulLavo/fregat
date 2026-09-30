@@ -83,7 +83,6 @@
         "skills/port-pstack.ts",
         "themes/import-omarchy-palette.ts",
         "themes/import-omarchy-wallpapers.ts",
-        "check-linked-sources.ts",
         "generate-unicode-confusables.mjs",
         "themes/import-omarchy-theme.ts",
         "themes/generate-omarchy-catalog.ts",
@@ -100,7 +99,7 @@
       ]
     },
     ".": {
-      "ignoreDependencies": ["turbo"]
+      "ignoreDependencies": ["typescript-api"]
     },
     "apps/tui": {
       "entry": [
@@ -112,6 +111,181 @@
     },
     "packages/pty": {
       "entry": ["test/nvim-smoke.ts", "test/fixtures/child.ts"]
+    },
+    "editor/packages/decode": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
+    },
+    "editor/packages/diff": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
+    },
+    "editor/packages/editor": {
+      "entry": [
+        "src/debug.ts",
+        "src/editor.ts",
+        "src/index.ts",
+        "src/logging/evlog.ts",
+        "src/logging/index.ts",
+        "src/public/document.ts",
+        "src/public/extensions.ts",
+        "src/public/keymap.ts",
+        "src/public/rendering.ts",
+        "src/public/secondaryViews.ts",
+        "src/public/syntax.ts",
+        "src/public/testing.ts",
+        "src/shiki/index.ts",
+        "src/**/*.worker.ts",
+        "bench/**/*.ts",
+        "test/types/**/*.ts"
+      ],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"],
+      "ignoreDependencies": ["@playwright/test"]
+    },
+    "editor/packages/find": {
+      "entry": ["src/index.ts", "bench/**/*.ts"],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"],
+      "ignoreDependencies": ["@playwright/test"]
+    },
+    "editor/packages/gutters": {
+      "entry": ["src/foldGutter.ts", "src/index.ts", "src/lineGutter.ts"],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
+    },
+    "editor/packages/lsp": {
+      "entry": ["src/index.ts", "src/positions.ts", "src/types.ts"],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
+    },
+    "editor/packages/lsp-plugin": {
+      "entry": [
+        "src/completion.ts",
+        "src/completionController.ts",
+        "src/definitionLinkController.ts",
+        "src/definitionNavigation.ts",
+        "src/diagnostics.ts",
+        "src/diagnosticsPresenter.ts",
+        "src/documentSync.ts",
+        "src/documentSyncController.ts",
+        "src/hoverParticipant.ts",
+        "src/index.ts",
+        "src/paths.ts",
+        "src/plugin.styles.ts",
+        "src/pluginTypes.ts",
+        "src/websocket.ts",
+        "src/workspaceEdit.ts"
+      ],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
+    },
+    "editor/packages/markdown": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
+    },
+    "editor/packages/minimap": {
+      "entry": ["src/index.ts", "src/**/*.worker.ts", "bench/**/*.ts"],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"]
+    },
+    "editor/packages/paged": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
+    },
+    "editor/packages/panes": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
+    },
+    "editor/packages/plugin-ui": {
+      "entry": [
+        "src/anchoredSurface.ts",
+        "src/hoverController.ts",
+        "src/hoverParticipant.ts",
+        "src/hoverPlugin.ts",
+        "src/hoverRegistry.ts",
+        "src/hoverToken.ts",
+        "src/index.ts",
+        "src/markdownTooltip.ts",
+        "src/offsetRange.ts",
+        "src/styles.ts",
+        "src/tooltip.ts"
+      ],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
+    },
+    "editor/packages/react": {
+      "entry": ["src/index.tsx"],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"],
+      "ignoreDependencies": ["@playwright/test"]
+    },
+    "editor/packages/scope-lines": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"],
+      "ignoreDependencies": ["@playwright/test"]
+    },
+    "editor/packages/solid": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
+    },
+    "editor/packages/spellcheck": {
+      "entry": ["src/index.ts", "src/**/*.worker.ts", "bench/**/*.ts"],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"]
+    },
+    "editor/packages/textbuffer": {
+      "entry": ["src/*.ts", "src/debug.ts", "src/diagnostics.ts", "src/index.ts"],
+      "project": ["src/**/*.{ts,tsx}"]
+    },
+    "editor/packages/tree-sitter": {
+      "entry": ["src/index.ts", "src/**/*.worker.ts", "bench/**/*.ts"],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"],
+      "ignoreDependencies": ["@playwright/test"]
+    },
+    "editor/packages/tree-sitter-languages": {
+      "entry": ["src/index.ts", "src/metadata.ts"],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"],
+      "ignoreDependencies": ["tree-sitter-cli"]
+    },
+    "editor/packages/typescript-lsp": {
+      "entry": [
+        "src/index.ts",
+        "src/server.ts",
+        "src/tsDiagnostics.ts",
+        "src/**/*.worker.ts",
+        "bench/**/*.ts"
+      ],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"]
+    },
+    "editor": {
+      "entry": ["scripts/*.{ts,mjs}", "knip.ts"],
+      "project": ["scripts/**/*.{ts,mjs}"]
+    },
+    "editor/examples/stress": {
+      "entry": [
+        "*.html",
+        "*.mjs",
+        "test/*.mjs",
+        "src/{boundary,consumers,copies,dispatch,firstPaint,geometry}.ts",
+        "src/paged/proof.ts"
+      ],
+      "project": ["src/**/*.ts", "*.mjs"],
+      "ignoreBinaries": ["taskset"],
+      "ignoreDependencies": ["@singapore-editor/gutters"]
+    },
+    "editor/examples/app": {
+      "entry": ["index.html", "src/jumpHistoryDemo.ts"],
+      "project": ["src/**/*.{ts,tsx}"]
+    },
+    "ghostty-webgpu": {
+      "entry": ["src/index.ts", "src/xterm/terminal.ts", "scripts/**/*.ts", "bench/**/*.ts"],
+      "project": ["src/**/*.ts", "scripts/**/*.ts", "bench/**/*.ts"],
+      "ignoreUnresolved": ["scripts/copy-build-assets.ts"],
+      "ignoreDependencies": ["@xterm/addon-*"]
+    },
+    "ghostty-webgpu/demo": {
+      "entry": ["src/client.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "ghostty-webgpu/site": {
+      "entry": ["src/main.ts", "scripts/*.ts"],
+      "project": ["src/**/*.{ts,astro}", "scripts/**/*.ts"]
     }
+  },
+  "ignore": ["editor/**/*.d.css.ts"],
+  "ignoreIssues": {
+    "ghostty-webgpu/src/core/abi.ts": ["types", "enumMembers"]
   }
 }

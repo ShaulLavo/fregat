@@ -1,0 +1,18 @@
+.editor-virtualized-gutter-label {
+  color: var(--editor-gutter-foreground);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  justify-content: flex-end;
+  line-height: inherit;
+  padding-left: 2px;
+  padding-right: 4px;
+  tab-size: var(--editor-tab-size, 4);
+}
+
+.editor-virtualized-line-number::before {
+  content: counter(editor-line, var(--editor-line-gutter-counter-style, decimal));
+}
+
+.editor-virtualized-line-number-active {
+  color: var(--editor-gutter-active-foreground);
+}

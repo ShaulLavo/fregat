@@ -1,0 +1,494 @@
+{
+  "browser": "153.0.8010.12",
+  "bundleHash": "308c6d99c38213d355faa2cd731e934f74504e4270b0bc198b298765cc6936b5",
+  "measuredAt": "2026-09-23T10:00:39.561Z",
+  "note": "Workloads: aligned (16 KiB inserts, all deleted), survivors (1 KiB inserts keeping 64 units), mixed (1 KiB inserts, three of four deleted). Two mounted editors sharing the default 200-state history. Same-page CDP GC before/after automatic maintenance. Trusted typing and peer rendering checked after full undo/redo. No typing-to-paint latency claim.",
+  "samples": [
+    {
+      "workload": "aligned",
+      "cycles": 500,
+      "churnMs": 774.5,
+      "revision": 1001,
+      "deletedUnits": 8192000,
+      "liveUnits": 14,
+      "heapBefore": 17776772,
+      "heapAfter": 5756492,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 400,
+        "codeUnits": 6553600,
+        "snapshots": 202,
+        "maxSliceMs": 0.20000004768371582
+      },
+      "dirty": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": []
+    },
+    {
+      "workload": "aligned",
+      "cycles": 500,
+      "churnMs": 766.2000000476837,
+      "revision": 1001,
+      "deletedUnits": 8192000,
+      "liveUnits": 14,
+      "heapBefore": 17467488,
+      "heapAfter": 5447284,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 400,
+        "codeUnits": 6553600,
+        "snapshots": 202,
+        "maxSliceMs": 0.20000004768371582
+      },
+      "dirty": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": []
+    },
+    {
+      "workload": "aligned",
+      "cycles": 500,
+      "churnMs": 139.29999995231628,
+      "revision": 1001,
+      "deletedUnits": 8192000,
+      "liveUnits": 14,
+      "heapBefore": 10160348,
+      "heapAfter": 3763964,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 400,
+        "codeUnits": 6553600,
+        "snapshots": 202,
+        "maxSliceMs": 0.2999999523162842
+      },
+      "dirty": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": []
+    },
+    {
+      "workload": "aligned",
+      "cycles": 1000,
+      "churnMs": 1406.5,
+      "revision": 2001,
+      "deletedUnits": 16384000,
+      "liveUnits": 14,
+      "heapBefore": 33044140,
+      "heapAfter": 5870716,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 900,
+        "codeUnits": 14745600,
+        "snapshots": 202,
+        "maxSliceMs": 0.2999999523162842
+      },
+      "dirty": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": []
+    },
+    {
+      "workload": "aligned",
+      "cycles": 1000,
+      "churnMs": 244.30000019073486,
+      "revision": 2001,
+      "deletedUnits": 16384000,
+      "liveUnits": 14,
+      "heapBefore": 18582700,
+      "heapAfter": 3999688,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 900,
+        "codeUnits": 14745600,
+        "snapshots": 202,
+        "maxSliceMs": 0.20000004768371582
+      },
+      "dirty": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": []
+    },
+    {
+      "workload": "aligned",
+      "cycles": 1000,
+      "churnMs": 1408.6000001430511,
+      "revision": 2001,
+      "deletedUnits": 16384000,
+      "liveUnits": 14,
+      "heapBefore": 33051352,
+      "heapAfter": 5878008,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 900,
+        "codeUnits": 14745600,
+        "snapshots": 202,
+        "maxSliceMs": 0.19999980926513672
+      },
+      "dirty": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": []
+    },
+    {
+      "workload": "survivors",
+      "cycles": 500,
+      "churnMs": 856.7999999523163,
+      "revision": 1001,
+      "deletedUnits": 480000,
+      "liveUnits": 32014,
+      "heapBefore": 4652304,
+      "heapAfter": 4761372,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 0,
+        "codeUnits": 0,
+        "snapshots": 0,
+        "maxSliceMs": 0.20000004768371582
+      },
+      "dirty": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": []
+    },
+    {
+      "workload": "survivors",
+      "cycles": 500,
+      "churnMs": 862.7999999523163,
+      "revision": 1001,
+      "deletedUnits": 480000,
+      "liveUnits": 32014,
+      "heapBefore": 4653744,
+      "heapAfter": 4762728,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 0,
+        "codeUnits": 0,
+        "snapshots": 0,
+        "maxSliceMs": 0.20000004768371582
+      },
+      "dirty": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": []
+    },
+    {
+      "workload": "survivors",
+      "cycles": 500,
+      "churnMs": 856,
+      "revision": 1001,
+      "deletedUnits": 480000,
+      "liveUnits": 32014,
+      "heapBefore": 4654376,
+      "heapAfter": 4763360,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 0,
+        "codeUnits": 0,
+        "snapshots": 0,
+        "maxSliceMs": 0.20000004768371582
+      },
+      "dirty": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": []
+    },
+    {
+      "workload": "survivors",
+      "cycles": 1000,
+      "churnMs": 120.90000009536743,
+      "revision": 2001,
+      "deletedUnits": 960000,
+      "liveUnits": 64014,
+      "heapBefore": 5632200,
+      "heapAfter": 5792340,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 0,
+        "codeUnits": 0,
+        "snapshots": 0,
+        "maxSliceMs": 0.20000004768371582
+      },
+      "dirty": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": []
+    },
+    {
+      "workload": "survivors",
+      "cycles": 1000,
+      "churnMs": 1836.7000000476837,
+      "revision": 2001,
+      "deletedUnits": 960000,
+      "liveUnits": 64014,
+      "heapBefore": 6275172,
+      "heapAfter": 6298260,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 0,
+        "codeUnits": 0,
+        "snapshots": 0,
+        "maxSliceMs": 0.20000004768371582
+      },
+      "dirty": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": []
+    },
+    {
+      "workload": "survivors",
+      "cycles": 1000,
+      "churnMs": 120,
+      "revision": 2001,
+      "deletedUnits": 960000,
+      "liveUnits": 64014,
+      "heapBefore": 5629696,
+      "heapAfter": 5789992,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 0,
+        "codeUnits": 0,
+        "snapshots": 0,
+        "maxSliceMs": 0.2999999523162842
+      },
+      "dirty": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": []
+    },
+    {
+      "workload": "mixed",
+      "cycles": 500,
+      "churnMs": 631,
+      "revision": 876,
+      "deletedUnits": 384000,
+      "liveUnits": 128014,
+      "heapBefore": 4045040,
+      "heapAfter": 4158780,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 0,
+        "codeUnits": 0,
+        "snapshots": 0,
+        "maxSliceMs": 0.2999999523162842
+      },
+      "dirty": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": []
+    },
+    {
+      "workload": "mixed",
+      "cycles": 500,
+      "churnMs": 632.4000000953674,
+      "revision": 876,
+      "deletedUnits": 384000,
+      "liveUnits": 128014,
+      "heapBefore": 4046732,
+      "heapAfter": 4161876,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 0,
+        "codeUnits": 0,
+        "snapshots": 0,
+        "maxSliceMs": 0.20000004768371582
+      },
+      "dirty": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": []
+    },
+    {
+      "workload": "mixed",
+      "cycles": 500,
+      "churnMs": 64,
+      "revision": 876,
+      "deletedUnits": 384000,
+      "liveUnits": 128014,
+      "heapBefore": 3539008,
+      "heapAfter": 3710876,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 0,
+        "codeUnits": 0,
+        "snapshots": 0,
+        "maxSliceMs": 0.20000004768371582
+      },
+      "dirty": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": []
+    },
+    {
+      "workload": "mixed",
+      "cycles": 1000,
+      "churnMs": 1231.6000001430511,
+      "revision": 1751,
+      "deletedUnits": 768000,
+      "liveUnits": 256014,
+      "heapBefore": 5013392,
+      "heapAfter": 5117336,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 0,
+        "codeUnits": 0,
+        "snapshots": 0,
+        "maxSliceMs": 0.3000001907348633
+      },
+      "dirty": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": []
+    },
+    {
+      "workload": "mixed",
+      "cycles": 1000,
+      "churnMs": 1229.2000000476837,
+      "revision": 1751,
+      "deletedUnits": 768000,
+      "liveUnits": 256014,
+      "heapBefore": 5018196,
+      "heapAfter": 5124496,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 0,
+        "codeUnits": 0,
+        "snapshots": 0,
+        "maxSliceMs": 0.20000004768371582
+      },
+      "dirty": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": []
+    },
+    {
+      "workload": "mixed",
+      "cycles": 1000,
+      "churnMs": 1236.3999998569489,
+      "revision": 1751,
+      "deletedUnits": 768000,
+      "liveUnits": 256014,
+      "heapBefore": 5009412,
+      "heapAfter": 5117720,
+      "stats": {
+        "completed": 1,
+        "cancelled": 0,
+        "chunks": 0,
+        "codeUnits": 0,
+        "snapshots": 0,
+        "maxSliceMs": 0.20000004768371582
+      },
+      "dirty": true,
+      "history": {
+        "valid": true,
+        "count": 200
+      },
+      "peerTextsMatch": true,
+      "trustedTyping": true,
+      "replacementAndDisposal": true,
+      "consoleErrors": []
+    }
+  ]
+}

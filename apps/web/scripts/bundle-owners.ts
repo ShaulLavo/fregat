@@ -15,26 +15,22 @@ export type OwnerRow = {
 const FEATURE_DEPTH = 5
 const SOURCE_DEPTH = 4
 const PACKAGE_DEPTH = 2
-type LinkedCheckout = { readonly owner: string; readonly root: string }
 
 /**
  * Folds a module id to who owns its bytes: a feature directory, a source
- * directory, a workspace package, a linked checkout, or `node_modules` whole.
+ * directory, a workspace package, a workspace family, or `node_modules` whole.
  */
-export function moduleOwner(
-  rawId: string,
-  repoRoot: string,
-  linked: readonly LinkedCheckout[] = [],
-): string {
+export function moduleOwner(rawId: string, repoRoot: string): string {
   if (rawId.startsWith('\0') || rawId.includes('virtual:')) return 'virtual'
   const id = rawId.split('?')[0] ?? rawId
-  // First, so a linked checkout's vendored dependency is not counted as its own code.
+  // Dependencies inside a family are counted separately from its source.
   if (id.includes('/node_modules/')) return 'node_modules'
 
   const relative = path.relative(repoRoot, id)
-  if (relative.startsWith('..')) return linkedCheckout(id, repoRoot, linked)
+  if (relative.startsWith('..')) return 'external'
 
   const segments = relative.split(path.sep)
+  if (segments[0] === 'editor' || segments[0] === 'ghostty-webgpu') return segments[0]
   if (relative.startsWith('apps/web/src/features/')) return directoryOwner(segments, FEATURE_DEPTH)
   if (relative.startsWith('apps/web/src/')) return directoryOwner(segments, SOURCE_DEPTH)
   return directoryOwner(segments, PACKAGE_DEPTH)
@@ -46,20 +42,10 @@ function directoryOwner(segments: readonly string[], depth: number): string {
   return segments.slice(0, Math.min(depth, segments.length - 1)).join('/')
 }
 
-function linkedCheckout(id: string, repoRoot: string, linked: readonly LinkedCheckout[]): string {
-  for (const checkout of linked) {
-    if (id === checkout.root || id.startsWith(`${checkout.root}${path.sep}`)) return checkout.owner
-  }
-  const sibling = path.relative(path.dirname(repoRoot), id)
-  if (sibling.startsWith('..')) return 'external'
-  return sibling.split(path.sep)[0] ?? 'external'
-}
-
 export function attributeOwners(
   chunks: readonly BundleStatsChunk[],
   firstLoadNames: ReadonlySet<string>,
   repoRoot: string,
-  linked: readonly LinkedCheckout[] = [],
 ): OwnerRow[] {
   const rows = new Map<string, Mutable<OwnerRow>>()
   for (const chunk of chunks) {
@@ -67,7 +53,7 @@ export function attributeOwners(
     if (rendered === 0) continue
     const inFirstLoad = firstLoadNames.has(chunk.fileName)
     for (const module of chunk.modules) {
-      const row = rowFor(rows, moduleOwner(module.id, repoRoot, linked))
+      const row = rowFor(rows, moduleOwner(module.id, repoRoot))
       if (!inFirstLoad) {
         row.lazyRendered += module.renderedLength
         continue

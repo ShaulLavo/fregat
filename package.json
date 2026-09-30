@@ -15,7 +15,12 @@
       "packages/utils",
       "scripts",
       "packages/push",
-      "hotkeys/packages/*"
+      "hotkeys/packages/*",
+      "editor/packages/*",
+      "editor/examples/*",
+      "ghostty-webgpu",
+      "ghostty-webgpu/demo",
+      "ghostty-webgpu/site"
     ],
     "catalog": {
       "@opentui/core": "0.5.12",
@@ -53,9 +58,11 @@
     "server:install": "bun scripts/install-server.ts",
     "format": "bun run --filter '*' format",
     "format:check": "bun run --filter '*' format:check",
-    "typecheck": "bun scripts/check-linked-sources.ts && bun run --sequential --filter '*' typecheck",
-    "test": "bun run test:scripts && bun run --filter '*' test",
-    "generated:check": "bun run icons:generate:check && bun run settings:schema:check && bun run settings:reference:check && bun run themes:palette-css:check && bun run --cwd apps/server codex-protocol:check && bun run syntax:coverage:check",
+    "typecheck": "bun run build:workspaces && bun run --sequential --filter '*' typecheck",
+    "test": "bun run build:workspaces && bun run test:scripts && bun run --sequential --filter '*' test",
+    "generated:check": "bun run icons:generate:check && bun run settings:schema:check && bun run settings:reference:check && bun run themes:palette-css:check && bun run --cwd apps/server codex-protocol:check && bun run syntax:coverage:check && bun run native:workflow:check",
+    "native:workflow": "bun ghostty-webgpu/scripts/config-resolver-native/generate-workspace-workflow.ts --write",
+    "native:workflow:check": "bun ghostty-webgpu/scripts/config-resolver-native/generate-workspace-workflow.ts --check",
     "settings:reference": "bun scripts/generate-settings-reference.ts",
     "settings:reference:check": "bun scripts/generate-settings-reference.ts --check",
     "settings:schema": "bun scripts/generate-settings-schema.ts",
@@ -64,7 +71,7 @@
     "icons:generate:check": "bun scripts/icons/generate.ts --check",
     "themes:palette-css": "bun scripts/themes/generate-palette-css.ts",
     "themes:palette-css:check": "bun scripts/themes/generate-palette-css.ts --check",
-    "test:scripts": "bun --bun vitest run scripts/claude-gpt/gateway.test.ts scripts/lint/query-api.test.mjs scripts/agent/isolated-server.test.ts scripts/agent/fixture-processes.test.ts scripts/agent/paths.test.ts scripts/agent/provider-access.test.ts scripts/agent/native-fixtures.test.ts scripts/agent/trace-summary.test.ts scripts/deploy/release.test.ts scripts/dev-sources.test.ts scripts/generate-spring-easings.test.ts scripts/runtime-network.test.ts scripts/port-holders.test.ts scripts/restart-on-change.test.ts scripts/run-with-env.test.ts scripts/web-layering.test.ts scripts/web-entry.test.ts scripts/lint/web-boundaries.test.ts scripts/lint/web-design-census.test.ts scripts/lint/log-noise-census.test.ts scripts/deploy/systemd/promote.test.ts scripts/deploy/systemd.test.ts scripts/deploy/restart.test.ts scripts/deploy/release-assets.test.ts scripts/deploy/live-refusals.test.ts scripts/deploy/live-verdict.test.ts scripts/deploy/web-release.test.ts scripts/lint/react-compiler-census.test.ts scripts/lint/react-compiler-explain.test.ts scripts/lint/duplicate-functions.test.mjs apps/web/scripts/app-save-hmr-plugin.test.ts apps/web/scripts/phosphor-weight-plugin.test.ts apps/web/scripts/bundle-owners.test.ts apps/web/scripts/bundle-gate.test.ts apps/web/vite.config.test.ts scripts/licenses/notices.test.ts scripts/licenses/runtime.test.ts apps/web/scripts/shell-chunks-plugin.test.ts apps/web/scripts/first-load-files.test.ts scripts/bundle-imports.test.ts scripts/release/*.test.mjs --environment node",
+    "test:scripts": "bun --bun vitest run scripts/claude-gpt/gateway.test.ts scripts/lint/query-api.test.mjs scripts/agent/isolated-server.test.ts scripts/agent/fixture-processes.test.ts scripts/agent/paths.test.ts scripts/agent/provider-access.test.ts scripts/agent/native-fixtures.test.ts scripts/agent/trace-summary.test.ts scripts/deploy/release.test.ts scripts/dev-sources.test.ts scripts/dev.test.ts scripts/build-graph.test.ts scripts/native-workflow.test.ts scripts/workflow-dispatch.test.ts scripts/workspace-verification.test.ts scripts/editor-workspace-root.test.ts scripts/generate-spring-easings.test.ts scripts/runtime-network.test.ts scripts/port-holders.test.ts scripts/restart-on-change.test.ts scripts/run-with-env.test.ts scripts/web-layering.test.ts scripts/web-entry.test.ts scripts/lint/web-boundaries.test.ts scripts/lint/web-design-census.test.ts scripts/lint/log-noise-census.test.ts scripts/deploy/systemd/promote.test.ts scripts/deploy/systemd.test.ts scripts/deploy/restart.test.ts scripts/deploy/release-assets.test.ts scripts/deploy/live-refusals.test.ts scripts/deploy/live-verdict.test.ts scripts/deploy/web-release.test.ts scripts/lint/react-compiler-census.test.ts scripts/lint/react-compiler-explain.test.ts scripts/lint/duplicate-functions.test.mjs apps/web/scripts/app-save-hmr-plugin.test.ts apps/web/scripts/phosphor-weight-plugin.test.ts apps/web/scripts/bundle-owners.test.ts apps/web/scripts/bundle-gate.test.ts apps/web/vite.config.test.ts scripts/licenses/notices.test.ts scripts/licenses/runtime.test.ts apps/web/scripts/shell-chunks-plugin.test.ts apps/web/scripts/first-load-files.test.ts scripts/bundle-imports.test.ts scripts/release/*.test.mjs --environment node",
     "verify": "bun run typecheck && bun run lint && bun run query:check && bun run design:census && bun run compiler:census && bun run errors:census && bun run format:check && bun run generated:check && bun run unused:check && bun run --cwd apps/web bundle:gate && bun run test",
     "dupes": "jscpd apps packages scripts --threshold 0",
     "dupes:report": "jscpd apps packages scripts --reporters html,console --output ./jscpd-report",
@@ -80,6 +87,7 @@
     "syntax:coverage": "bun apps/web/scripts/syntax-coverage.ts",
     "syntax:coverage:check": "bun apps/web/scripts/syntax-coverage.ts --check",
     "query:check": "node scripts/lint/query-api.mjs",
+    "build:workspaces": "turbo run build --filter='./editor/packages/*' --filter=ghostty-webgpu",
     "changeset": "node node_modules/@changesets/cli/bin.js",
     "release": "bun x turbo run build --filter=\"@singapore-editor/*\" --filter=\"@fregat/*\" --filter=ghostty-webgpu && bun scripts/release/prepare.mjs && node node_modules/@changesets/cli/bin.js publish"
   },
@@ -95,31 +103,13 @@
     "oxlint": "1.85.0",
     "turbo": "^2.11.4",
     "typescript": "7.0.2",
+    "typescript-api": "npm:typescript@~6.0.3",
+    "vite": "catalog:",
     "vitest": "catalog:"
   },
   "overrides": {
     "@opentui/core": "https://github.com/ShaulLavo/bubli/releases/download/v0.5.12-bubli.2/opentui-core-0.5.12-bubli.2.tgz",
     "@opentui/react": "https://github.com/ShaulLavo/bubli/releases/download/v0.5.12-bubli.2/opentui-react-0.5.12-bubli.2.tgz",
-    "@singapore-editor/core": "link:@singapore-editor/core",
-    "@singapore-editor/decode": "link:@singapore-editor/decode",
-    "@singapore-editor/diff": "link:@singapore-editor/diff",
-    "@singapore-editor/find": "link:@singapore-editor/find",
-    "@singapore-editor/gutters": "link:@singapore-editor/gutters",
-    "@singapore-editor/lsp": "link:@singapore-editor/lsp",
-    "@singapore-editor/lsp-plugin": "link:@singapore-editor/lsp-plugin",
-    "@singapore-editor/markdown": "link:@singapore-editor/markdown",
-    "@singapore-editor/minimap": "link:@singapore-editor/minimap",
-    "@singapore-editor/paged": "link:@singapore-editor/paged",
-    "@singapore-editor/panes": "link:@singapore-editor/panes",
-    "@singapore-editor/plugin-ui": "link:@singapore-editor/plugin-ui",
-    "@singapore-editor/react": "link:@singapore-editor/react",
-    "@singapore-editor/scope-lines": "link:@singapore-editor/scope-lines",
-    "@singapore-editor/spellcheck": "link:@singapore-editor/spellcheck",
-    "@singapore-editor/textbuffer": "link:@singapore-editor/textbuffer",
-    "@singapore-editor/tree-sitter": "link:@singapore-editor/tree-sitter",
-    "@singapore-editor/tree-sitter-languages": "link:@singapore-editor/tree-sitter-languages",
-    "@singapore-editor/typescript-lsp": "link:@singapore-editor/typescript-lsp",
-    "ghostty-webgpu": "link:ghostty-webgpu",
     "lodash-es": "4.18.1",
     "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#e2985e0"
   },
@@ -127,7 +117,6 @@
     "node": ">=22.12"
   },
   "packageManager": "bun@1.4.2",
-  "//singapore-editor-links": "The @singapore-editor/* `link:` overrides above resolve through a `bun link` registration pointing at the sibling ../../Editor checkout — there is no npm fallback (@singapore-editor/decode is unpublished). CI reproduces that by cloning ShaulLavo/singapore as a sibling, building it, and linking each package; see .github/actions/setup/action.yml.",
   "patchedDependencies": {
     "vitest@5.0.2": "patches/vitest@5.0.2.patch"
   }

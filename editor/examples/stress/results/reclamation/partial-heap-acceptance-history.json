@@ -1,0 +1,35 @@
+{
+  "lostObservation": {
+    "workload": "mixed",
+    "cycles": 500,
+    "heapBefore": 3758416,
+    "heapAfter": 3780140,
+    "heapDelta": 21724,
+    "artifactLoss": "The failed run stdout JSON was overwritten by the retry before it was copied. These fields are preserved from exact tool stderr; repetition, stats, and preceding sample records from that run are unavailable."
+  },
+  "earlierThresholdFailure": {
+    "workload": "survivors",
+    "heapBefore": 4207148,
+    "heapAfter": 4051560,
+    "threshold": "10% reduction per sample",
+    "artifactLoss": "This first expanded assertion attempt predates partial-failure JSON reporting; the exact failure survives in tool stderr, but preceding samples were not written."
+  },
+  "acceptanceChanges": [
+    "Initially required more than 10% heap reduction in every churn sample.",
+    "After an observed survivor failure, changed to more than 10% median paired reduction per workload/cycle group plus positive release in every sample.",
+    "After an observed mixed sample grew 21,724 bytes, removed per-sample positivity while retaining the median threshold and storage-retirement check.",
+    "Final matrix explicitly uses observe-only. The revised median threshold was selected after these observations; it is not a predeclared or calibrated acceptance pass."
+  ],
+  "preservedReproduction": "candidate-live-assertion-interrupted.json contains 17 completed samples, including mixed 500 repetition 0 growing 21,724 bytes with 294,912 retired UTF-16 units, 128,014 live units, 200 valid undo/redo states and 202 republished snapshots.",
+  "finalObservation": "candidate-live-final-observe.json",
+  "subsequentCorrection": {
+    "artifact": "partial-live-chromium.json",
+    "changes": [
+      "Detach only proper substrings created by insertion splitting; preserve fully retained complete small inputs.",
+      "Use up to 16 Ki-unit measurement blocks clipped to requested text, with two cached boundary variants per page."
+    ],
+    "thresholdChanged": false,
+    "allThirtySamplesReleaseHeap": true,
+    "experimentalTenPercentMedianTarget": "Still unmet by survivors, mixed and paragraph at 500 cycles; passed by those workloads at 1000 cycles."
+  }
+}

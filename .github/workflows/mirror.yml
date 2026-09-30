@@ -57,7 +57,7 @@ jobs:
             echo '::notice::Mirror skipped: a newer main snapshot is available.'
             exit 0
           fi
-          if [ ! -d "$FAMILY_FOLDER" ]; then
+          if [ "$(git cat-file -t "HEAD:$FAMILY_FOLDER" 2>/dev/null || true)" != tree ]; then
             echo "::notice::Mirror skipped: $FAMILY_FOLDER has not landed yet."
             exit 0
           fi

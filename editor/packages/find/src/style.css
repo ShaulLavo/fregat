@@ -1,0 +1,198 @@
+.editor-find-widget {
+  --editor-find-background-fallback: #252526;
+  --editor-find-border-fallback: rgba(255, 255, 255, 0.12);
+  --editor-find-control-background-fallback: #3c3c3c;
+  --editor-find-control-border-fallback: rgba(255, 255, 255, 0.16);
+  --editor-find-count-fallback: #a1a1aa;
+  --editor-find-focus-fallback: #007fd4;
+  --editor-find-foreground-fallback: #cccccc;
+  --editor-find-hover-background-fallback: rgba(255, 255, 255, 0.12);
+  --editor-find-placeholder-fallback: #8f8f8f;
+  --editor-find-strong-foreground-fallback: #ffffff;
+
+  align-items: stretch;
+  background: color-mix(
+    in srgb,
+    var(--editor-background, var(--editor-find-background-fallback)) 94%,
+    var(--editor-foreground, var(--editor-find-foreground-fallback)) 6%
+  );
+  border: 1px solid var(--editor-find-border-fallback);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+  box-sizing: border-box;
+  color: var(--editor-foreground, var(--editor-find-foreground-fallback));
+  display: flex;
+  flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 12px;
+  gap: 4px;
+  max-width: min(620px, calc(100% - 24px));
+  padding: 6px;
+  position: absolute;
+  right: 18px;
+  top: 8px;
+  z-index: 20;
+}
+
+.editor-find-widget[hidden] {
+  display: none;
+}
+
+.editor-find-row {
+  align-items: center;
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+}
+
+.editor-find-replace-row {
+  padding-left: 28px;
+}
+
+.editor-find-replace-row[hidden] {
+  display: none;
+}
+
+.editor-find-input-frame {
+  align-items: center;
+  background: color-mix(
+    in srgb,
+    var(--editor-background, var(--editor-find-control-background-fallback)) 86%,
+    var(--editor-foreground, var(--editor-find-foreground-fallback)) 14%
+  );
+  border: 1px solid var(--editor-find-control-border-fallback);
+  box-sizing: border-box;
+  display: flex;
+  flex: 1 1 250px;
+  height: 24px;
+  min-width: 180px;
+}
+
+.editor-find-input-frame:focus-within {
+  border-color: var(--editor-caret-color, var(--editor-find-focus-fallback));
+}
+
+.editor-find-input {
+  background: transparent;
+  border: 0;
+  box-sizing: border-box;
+  color: var(--editor-foreground, var(--editor-find-strong-foreground-fallback));
+  flex: 1 1 auto;
+  font: inherit;
+  height: 100%;
+  min-width: 0;
+  outline: none;
+  padding: 2px 6px;
+}
+
+.editor-find-input::placeholder {
+  color: color-mix(
+    in srgb,
+    var(--editor-foreground, var(--editor-find-placeholder-fallback)) 58%,
+    transparent
+  );
+}
+
+.editor-find-input-standalone {
+  background: color-mix(
+    in srgb,
+    var(--editor-background, var(--editor-find-control-background-fallback)) 86%,
+    var(--editor-foreground, var(--editor-find-foreground-fallback)) 14%
+  );
+  border: 1px solid var(--editor-find-control-border-fallback);
+  flex: 1 1 250px;
+  height: 24px;
+  min-width: 180px;
+}
+
+.editor-find-input-standalone:focus {
+  border-color: var(--editor-caret-color, var(--editor-find-focus-fallback));
+}
+
+.editor-find-input-controls {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  height: 100%;
+  padding-right: 2px;
+}
+
+.editor-find-count {
+  color: color-mix(
+    in srgb,
+    var(--editor-foreground, var(--editor-find-count-fallback)) 72%,
+    transparent
+  );
+  flex: 0 0 auto;
+  min-width: 64px;
+  text-align: right;
+}
+
+.editor-find-button {
+  align-items: center;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  color: var(--editor-foreground, var(--editor-find-foreground-fallback));
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 24px;
+  font: inherit;
+  height: 24px;
+  justify-content: center;
+  line-height: 0;
+  min-width: 24px;
+  padding: 0;
+  width: 24px;
+}
+
+.editor-find-button:focus-visible {
+  outline: 1px solid var(--editor-caret-color, var(--editor-find-focus-fallback));
+  outline-offset: -1px;
+}
+
+.editor-find-button .editor-find-icon {
+  display: block;
+  height: 16px;
+  width: 16px;
+}
+
+.editor-find-button:hover,
+.editor-find-button.active,
+.editor-find-button[aria-expanded='true'],
+.editor-find-button[aria-pressed='true'] {
+  background: color-mix(
+    in srgb,
+    var(--editor-foreground, var(--editor-find-hover-background-fallback)) 14%,
+    transparent
+  );
+}
+
+.editor-find-button.active,
+.editor-find-button[aria-expanded='true'],
+.editor-find-button[aria-pressed='true'] {
+  color: var(--editor-foreground, var(--editor-find-strong-foreground-fallback));
+}
+
+@media (prefers-color-scheme: light) {
+  .editor-find-widget {
+    --editor-find-background-fallback: #ffffff;
+    --editor-find-border-fallback: rgba(15, 23, 42, 0.16);
+    --editor-find-control-background-fallback: #f8fafc;
+    --editor-find-control-border-fallback: rgba(15, 23, 42, 0.18);
+    --editor-find-count-fallback: #64748b;
+    --editor-find-focus-fallback: #2563eb;
+    --editor-find-foreground-fallback: #0f172a;
+    --editor-find-hover-background-fallback: rgba(15, 23, 42, 0.1);
+    --editor-find-placeholder-fallback: #64748b;
+    --editor-find-strong-foreground-fallback: #020617;
+  }
+}
+
+.editor-find-replace-toggle .editor-find-icon {
+  transition: transform 120ms ease;
+}
+
+.editor-find-replace-toggle[aria-expanded='true'] .editor-find-icon {
+  transform: rotate(90deg);
+}

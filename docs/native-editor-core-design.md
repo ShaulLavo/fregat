@@ -23,7 +23,7 @@ The primary implementation references are:
 
 | concern                         | source                                                                                                                                                                               |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| web buffer                      | `../Editor/packages/editor/src/pieceTable/` and `../Editor/packages/editor/test/pieceTable-*.test.ts`                                                                                |
+| web buffer                      | `editor/packages/editor/src/pieceTable/` and `editor/packages/editor/test/pieceTable-*.test.ts`                                                                                      |
 | CodeEdit line tree              | `CodeEditTextView/Sources/CodeEditTextView/TextLineStorage/TextLineStorage.swift:14-639` and `TextLineStorage+Node.swift:53-70`                                                      |
 | CodeEdit viewport layout        | `CodeEditTextView/Sources/CodeEditTextView/TextLayoutManager/TextLayoutManager+Layout.swift:65-277`                                                                                  |
 | Runestone line aggregates       | `Runestone/Sources/Runestone/LineManager/DocumentLineNodeData.swift:4-32` and `LineManager.swift:51-377`                                                                             |
@@ -131,8 +131,8 @@ The source directory has exactly 19 TypeScript files and 3,569 lines. Production
 Regenerate the inventory with:
 
 ```bash
-rg --files ../Editor/packages/editor/src/pieceTable | sort
-wc -l ../Editor/packages/editor/src/pieceTable/*
+rg --files editor/packages/editor/src/pieceTable | sort
+wc -l editor/packages/editor/src/pieceTable/*
 ```
 
 ### Source inventory and direct imports
@@ -165,7 +165,7 @@ The `imports` column lists only imports within `src/pieceTable/`. It is the depe
 
 Translate `pieceTable.test.ts` into `Tests/EditorCoreTests/PieceTableTests.swift` before production types exist. Keep its seeded random generator and its UTF-16 string oracle. The initial test target must fail to compile until the public shape exists and remain red until wave 9 supplies the complete API. It is the port's executable specification, not a per-wave gate.
 
-The 35 tests are the first specification, not the whole specification. The sibling `../Editor/packages/editor/test/` directory has 12 focused `pieceTable-*.test.ts` suites with another 1,868 lines and 108 tests. Translate all of them before implementation and assign each suite to the wave that owns its primary behavior:
+The 35 tests are the first specification, not the whole specification. The sibling `editor/packages/editor/test/` directory has 12 focused `pieceTable-*.test.ts` suites with another 1,868 lines and 108 tests. Translate all of them before implementation and assign each suite to the wave that owns its primary behavior:
 
 | suite         | tests | implementation owner |
 | ------------- | ----: | -------------------: |

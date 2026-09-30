@@ -1,0 +1,55 @@
+{
+  "browser": "153.0.8010.12",
+  "measuredAt": "2026-09-23T08:29:30.949Z",
+  "note": "Chromium storage benchmark. Explicit CDP GC; old snapshots held then released. No mounted editor or typing-to-paint claim. Timing uses the browser clock and is advisory.",
+  "samples": [
+    {
+      "mode": "control",
+      "cycles": 5000,
+      "liveText": "prefix suffix",
+      "retainedTextValid": true,
+      "nodes": 5002,
+      "pins": 50,
+      "issues": [],
+      "maxMaintenanceMs": 0,
+      "heapWithPins": 25371900,
+      "heapAfterRelease": 6341088
+    },
+    {
+      "mode": "reclaim",
+      "cycles": 5000,
+      "liveText": "prefix suffix",
+      "retainedTextValid": true,
+      "nodes": 5002,
+      "pins": 50,
+      "issues": [],
+      "maxMaintenanceMs": 0.20000004768371582,
+      "heapWithPins": 24785592,
+      "heapAfterRelease": 1227700
+    },
+    {
+      "mode": "control",
+      "cycles": 10000,
+      "liveText": "prefix suffix",
+      "retainedTextValid": true,
+      "nodes": 10002,
+      "pins": 100,
+      "issues": [],
+      "maxMaintenanceMs": 0,
+      "heapWithPins": 84689664,
+      "heapAfterRelease": 12225256
+    },
+    {
+      "mode": "reclaim",
+      "cycles": 10000,
+      "liveText": "prefix suffix",
+      "retainedTextValid": true,
+      "nodes": 10002,
+      "pins": 100,
+      "issues": [],
+      "maxMaintenanceMs": 0.10000014305114746,
+      "heapWithPins": 88404988,
+      "heapAfterRelease": 2010144
+    }
+  ]
+}

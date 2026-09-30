@@ -1,6 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalEnv": ["NODE_ENV", "VITE_SERVER_URL"],
+  "globalEnv": ["NODE_ENV", "VITE_SERVER_URL", "VITE_BASE_PATH"],
   "globalPassThroughEnv": [
     "FS_DEV_MAX_TEXT_FILE_BYTES",
     "FS_HOST",
@@ -46,6 +46,9 @@
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["dist/**"]
     },
+    "ghostty-webgpu-site#build": {
+      "dependsOn": ["^build", "ghostty-webgpu#build"]
+    },
     "lint": {
       "dependsOn": ["^lint"]
     },
@@ -67,6 +70,69 @@
     "dev": {
       "cache": false,
       "persistent": true
+    },
+    "@singapore-editor/core#typecheck": {
+      "dependsOn": [
+        "build",
+        "@singapore-editor/decode#build",
+        "@singapore-editor/diff#build",
+        "@singapore-editor/find#build",
+        "@singapore-editor/gutters#build",
+        "@singapore-editor/markdown#build",
+        "@singapore-editor/scope-lines#build",
+        "@singapore-editor/tree-sitter-languages#build"
+      ]
+    },
+    "@singapore-editor/react#typecheck": {
+      "dependsOn": ["^build", "build", "@singapore-editor/tree-sitter-languages#build"]
+    },
+    "@singapore-editor/tree-sitter#typecheck": {
+      "dependsOn": [
+        "^build",
+        "build",
+        "@singapore-editor/markdown#build",
+        "@singapore-editor/tree-sitter-languages#build"
+      ]
+    },
+    "@singapore-editor/core#test": {
+      "dependsOn": [
+        "build",
+        "@singapore-editor/tree-sitter-languages#build",
+        "@singapore-editor/diff#build",
+        "@singapore-editor/gutters#build"
+      ],
+      "cache": false
+    },
+    "@singapore-editor/react#test": {
+      "dependsOn": ["^build", "build", "@singapore-editor/tree-sitter-languages#build"]
+    },
+    "@singapore-editor/tree-sitter#test": {
+      "dependsOn": [
+        "^build",
+        "build",
+        "@singapore-editor/markdown#build",
+        "@singapore-editor/tree-sitter-languages#build"
+      ]
+    },
+    "@singapore-editor/markdown#typecheck": {
+      "dependsOn": ["^build", "build", "@singapore-editor/tree-sitter-languages#build"]
+    },
+    "@singapore-editor/markdown#test": {
+      "dependsOn": ["^build", "build", "@singapore-editor/tree-sitter-languages#build"]
+    },
+    "@singapore-editor/stress#test": {
+      "dependsOn": ["^build", "build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/docs/performance/e034-*.json.gz"]
     }
-  }
+  },
+  "agentGuidance": false,
+  "globalDependencies": [
+    ".oxfmtrc.json",
+    "patches/**",
+    "editor/scripts/build-package.ts",
+    "editor/tsconfig.json",
+    "editor/global.d.ts",
+    "editor/examples/app/tsconfig.json",
+    "editor/scripts/workspace-root*"
+  ]
 }

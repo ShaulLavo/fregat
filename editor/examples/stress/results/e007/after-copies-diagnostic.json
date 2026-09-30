@@ -1,0 +1,377 @@
+{
+  "commit": "4c03e0d379bf6a0844bdf3537eed78d8c96027df",
+  "diff": "",
+  "diagnostics": true,
+  "repetitions": 5,
+  "sizes": [65536, 4194304, 50331648],
+  "samples": [
+    {
+      "size": 65536,
+      "emptyHeap": 642236,
+      "openHeap": 896284,
+      "liveHeap": 1059020,
+      "disposedHeap": 1006320,
+      "retained": 0,
+      "open": {
+        "operation": "open",
+        "durationMs": 37.5,
+        "fullReads": 1,
+        "fullReadUnits": 65536,
+        "wireUnits": 65536
+      },
+      "operations": [
+        {
+          "operation": "skipped-edit",
+          "durationMs": 1.100000023841858,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.2999999523162842,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.3999999761581421,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.3999999761581421,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.30000007152557373,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.20000004768371582,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.2999999523162842,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.20000004768371582,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.19999992847442627,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.20000004768371582,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.09999990463256836,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.30000007152557373,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.19999992847442627,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 0.10000002384185791,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.20000004768371582,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        }
+      ]
+    },
+    {
+      "size": 4194304,
+      "emptyHeap": 642236,
+      "openHeap": 5028336,
+      "liveHeap": 5186656,
+      "disposedHeap": 1003496,
+      "retained": 0,
+      "open": {
+        "operation": "open",
+        "durationMs": 57.39999997615814,
+        "fullReads": 1,
+        "fullReadUnits": 4194304,
+        "wireUnits": 4194304
+      },
+      "operations": [
+        {
+          "operation": "skipped-edit",
+          "durationMs": 1.399999976158142,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 1.3000000715255737,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 1.5,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 1.399999976158142,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 2,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 1.100000023841858,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 1.2000000476837158,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 1.100000023841858,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.7999999523162842,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 0.6000000238418579,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 1.100000023841858,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 0.7999999523162842,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 1.100000023841858,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 1.0999999046325684,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 1.2000000476837158,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        }
+      ]
+    },
+    {
+      "size": 50331648,
+      "emptyHeap": 642236,
+      "openHeap": 51165828,
+      "liveHeap": 51323908,
+      "disposedHeap": 1003404,
+      "retained": 0,
+      "open": {
+        "operation": "open",
+        "durationMs": 220.79999995231628,
+        "fullReads": 1,
+        "fullReadUnits": 50331648,
+        "wireUnits": 50331648
+      },
+      "operations": [
+        {
+          "operation": "skipped-edit",
+          "durationMs": 5.200000047683716,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 9.399999976158142,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 11.600000023841858,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 9.199999928474426,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 9,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 9.399999976158142,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 8.400000095367432,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 8,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 8.199999928474426,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 7.899999976158142,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 7.700000047683716,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 7.799999952316284,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "skipped-edit",
+          "durationMs": 7.899999976158142,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 3
+        },
+        {
+          "operation": "undo-branch",
+          "durationMs": 7.700000047683716,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        },
+        {
+          "operation": "incremental",
+          "durationMs": 8.600000023841858,
+          "fullReads": 0,
+          "fullReadUnits": 0,
+          "wireUnits": 1
+        }
+      ]
+    }
+  ],
+  "memoryBoundary": "main-renderer CDP heap after forced GC; excludes worker heap",
+  "browser": "153.0.8010.12"
+}

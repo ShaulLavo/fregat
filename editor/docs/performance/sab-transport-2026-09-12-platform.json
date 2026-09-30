@@ -1,0 +1,21 @@
+{
+  "url": "http://127.0.0.1:3300/",
+  "capturedAt": "2026-09-12T07:44:23.284Z",
+  "headers": {
+    "cache-control": "no-cache",
+    "connection": "keep-alive",
+    "content-encoding": "gzip",
+    "content-type": "text/html",
+    "date": "Sat, 12 Sep 2026 07:44:23 GMT",
+    "etag": "W/\"1ac1-i4+9c+h05kzI69paR+aCM4RbbWY\"",
+    "keep-alive": "timeout=5",
+    "transfer-encoding": "chunked",
+    "vary": "Origin"
+  },
+  "capability": {
+    "crossOriginIsolated": false,
+    "sharedArrayBuffer": false,
+    "growableSharedArrayBuffer": false,
+    "waitAsync": true
+  }
+}

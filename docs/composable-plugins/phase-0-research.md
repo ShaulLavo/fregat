@@ -190,7 +190,7 @@ operations. µs per operation:
   `PlatformCommandId` union). Plugin commands need a runtime segment in the palette, keybinding table
   and recorder.
 - The Singapore hook inventory is complete and current in E027's
-  [extension-hooks.md](../../../Editor/docs/architecture/extension-hooks.md); this research reuses it
+  [extension-hooks.md](../../editor/docs/architecture/extension-hooks.md); this research reuses it
   and does not repeat it. First-party consumers per contribution kind: Editor has 15 view, 4 command,
   2 capability, 2 edit, 1 decoration and 1 internal feature registration across 15 files; Platform adds 9
   view contributions (diff scroll bridge, diff language, diagnostic peek, diff presentation, unicode

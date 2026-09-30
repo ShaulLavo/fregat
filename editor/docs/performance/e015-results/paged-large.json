@@ -1,0 +1,165 @@
+{
+  "commit": "fad0eef5c96dbfed54f06b250dbdd05f50b71f56",
+  "at": "2026-09-28T18:22:49.186Z",
+  "memory": "CDP main-renderer heap after GC; peak is sampled JS heap and may miss brief allocations; excludes process RSS",
+  "viewport": {
+    "width": 1200,
+    "height": 720
+  },
+  "sizes": [
+    314572800,
+    629145600
+  ],
+  "modes": [
+    "paged"
+  ],
+  "samples": [
+    {
+      "mode": "paged",
+      "size": 314572800,
+      "opened": {
+        "bytes": 314572800,
+        "firstRangeMs": 2.4000000953674316,
+        "indexedMs": 2104.300000190735,
+        "tile": "row🙂 é 中 payload\r\n",
+        "tileBytes": 25,
+        "stats": {
+          "state": "ready",
+          "lines": 12582913,
+          "utf16Length": 251658240,
+          "checkpoints": 1200,
+          "checkpointStride": 262144,
+          "cachedBytes": 8388608,
+          "peakCachedBytes": 8388608,
+          "inFlight": 0,
+          "peakInFlight": 2,
+          "bytesRead": 314638336,
+          "views": 1
+        }
+      },
+      "checks": {
+        "jumpMs": 39.6975910000001,
+        "copied": "w🙂 e",
+        "sweep": {
+          "state": "ready",
+          "lines": 12582913,
+          "utf16Length": 251658240,
+          "checkpoints": 1200,
+          "checkpointStride": 262144,
+          "cachedBytes": 8388608,
+          "peakCachedBytes": 8388608,
+          "inFlight": 0,
+          "peakInFlight": 2,
+          "bytesRead": 629538816,
+          "views": 2
+        },
+        "stats": {
+          "state": "ready",
+          "lines": 12582913,
+          "utf16Length": 251658240,
+          "checkpoints": 1200,
+          "checkpointStride": 262144,
+          "cachedBytes": 8388608,
+          "peakCachedBytes": 8388608,
+          "inFlight": 0,
+          "peakInFlight": 2,
+          "bytesRead": 629538816,
+          "views": 1
+        }
+      },
+      "emptyHeap": {
+        "usedSize": 758552,
+        "totalSize": 1310720,
+        "embedderHeapUsedSize": 316168,
+        "backingStorageSize": 118674
+      },
+      "liveHeap": {
+        "usedSize": 2373700,
+        "totalSize": 3006464,
+        "embedderHeapUsedSize": 551624,
+        "backingStorageSize": 8560552
+      },
+      "peakHeap": 7449256,
+      "disposedHeap": {
+        "usedSize": 2296112,
+        "totalSize": 3006464,
+        "embedderHeapUsedSize": 389568,
+        "backingStorageSize": 119554
+      }
+    },
+    {
+      "mode": "paged",
+      "size": 629145600,
+      "opened": {
+        "bytes": 629145600,
+        "firstRangeMs": 2.299999952316284,
+        "indexedMs": 4291.5,
+        "tile": "row🙂 é 中 payload\r\n",
+        "tileBytes": 25,
+        "stats": {
+          "state": "ready",
+          "lines": 25165825,
+          "utf16Length": 503316480,
+          "checkpoints": 2400,
+          "checkpointStride": 262144,
+          "cachedBytes": 8388608,
+          "peakCachedBytes": 8388608,
+          "inFlight": 0,
+          "peakInFlight": 2,
+          "bytesRead": 629211136,
+          "views": 1
+        }
+      },
+      "checks": {
+        "jumpMs": 39.88306299999931,
+        "copied": "w🙂 e",
+        "sweep": {
+          "state": "ready",
+          "lines": 25165825,
+          "utf16Length": 503316480,
+          "checkpoints": 2400,
+          "checkpointStride": 262144,
+          "cachedBytes": 8388608,
+          "peakCachedBytes": 8388608,
+          "inFlight": 0,
+          "peakInFlight": 2,
+          "bytesRead": 1258684416,
+          "views": 2
+        },
+        "stats": {
+          "state": "ready",
+          "lines": 25165825,
+          "utf16Length": 503316480,
+          "checkpoints": 2400,
+          "checkpointStride": 262144,
+          "cachedBytes": 8388608,
+          "peakCachedBytes": 8388608,
+          "inFlight": 0,
+          "peakInFlight": 2,
+          "bytesRead": 1258684416,
+          "views": 1
+        }
+      },
+      "emptyHeap": {
+        "usedSize": 758552,
+        "totalSize": 1310720,
+        "embedderHeapUsedSize": 323128,
+        "backingStorageSize": 118674
+      },
+      "liveHeap": {
+        "usedSize": 2411324,
+        "totalSize": 3006464,
+        "embedderHeapUsedSize": 550952,
+        "backingStorageSize": 8560555
+      },
+      "peakHeap": 10430688,
+      "disposedHeap": {
+        "usedSize": 2297028,
+        "totalSize": 3006464,
+        "embedderHeapUsedSize": 389368,
+        "backingStorageSize": 119554
+      }
+    }
+  ],
+  "browser": "153.0.8010.12"
+}

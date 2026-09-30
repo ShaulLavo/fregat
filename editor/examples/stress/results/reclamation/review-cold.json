@@ -1,0 +1,65 @@
+{
+  "note": "Real DisplayProjection.getLineText on a fresh unwrapped ASCII line. Eager reproduction changes only page acquisition to copyTextRange, retaining the same new handle-based index implementation. Each process forces GC before and after acquisition and after first RTL classification/column lookup. Classification is the same full-line measurement path first paint consumes, not a browser paint timing. String backing was flattened before the baseline. No edits or maintenance occur.",
+  "rows": [
+    {
+      "kind": "eager",
+      "repetition": 1,
+      "node": "v26.7.0",
+      "units": 33554432,
+      "acquisitionMs": 623.6577970000001,
+      "acquiredHeapBytes": 34932104,
+      "classificationMs": 66.66844000000003,
+      "classifiedHeapBytes": 91831344
+    },
+    {
+      "kind": "eager",
+      "repetition": 2,
+      "node": "v26.7.0",
+      "units": 33554432,
+      "acquisitionMs": 607.695406,
+      "acquiredHeapBytes": 34932104,
+      "classificationMs": 66.51807499999995,
+      "classifiedHeapBytes": 91831344
+    },
+    {
+      "kind": "eager",
+      "repetition": 3,
+      "node": "v26.7.0",
+      "units": 33554432,
+      "acquisitionMs": 609.702947,
+      "acquiredHeapBytes": 34933080,
+      "classificationMs": 66.353614,
+      "classifiedHeapBytes": 91832320
+    },
+    {
+      "kind": "borrowed",
+      "repetition": 1,
+      "node": "v26.7.0",
+      "units": 33554432,
+      "acquisitionMs": 3.0539850000000044,
+      "acquiredHeapBytes": 2093032,
+      "classificationMs": 81.66091200000001,
+      "classifiedHeapBytes": 58982672
+    },
+    {
+      "kind": "borrowed",
+      "repetition": 2,
+      "node": "v26.7.0",
+      "units": 33554432,
+      "acquisitionMs": 5.770048000000003,
+      "acquiredHeapBytes": 2562416,
+      "classificationMs": 80.84100900000001,
+      "classifiedHeapBytes": 58981856
+    },
+    {
+      "kind": "borrowed",
+      "repetition": 3,
+      "node": "v26.7.0",
+      "units": 33554432,
+      "acquisitionMs": 2.999223999999998,
+      "acquiredHeapBytes": 2199272,
+      "classificationMs": 76.37805699999998,
+      "classifiedHeapBytes": 58979808
+    }
+  ]
+}

@@ -1,0 +1,821 @@
+{
+  "schemaVersion": 1,
+  "designHash": "51bed406554f96acd4e651ac6623a8e19e3ca61719f634e0d831a5d0b16c8c29",
+  "purpose": "final",
+  "method": "Paired whole-block percentile bootstrap of pooled p95 differences; no individual-key or within-context resampling. One-sided Bonferroni bounds within each declared metric family.",
+  "uncertainty": "Bootstrap bounds are approximate with finite independent browser blocks, quantized clocks and a tail estimand. A nonsignificant difference is not equivalence. Warm documents share one context per arm/group and remain together in every resample.",
+  "blocks": 24,
+  "boundsAvailable": true,
+  "bootstrapDraws": 32768,
+  "familywiseAlpha": 0.05,
+  "numericalEpsilonMs": 1e-7,
+  "quantizationEnvelopeMs": 0.2,
+  "observedClockGridMs": [
+    {
+      "block": "block-01",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-02",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-03",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-04",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-05",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-06",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-07",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-08",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-09",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-10",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-11",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-12",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-13",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-14",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-15",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-16",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-17",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-18",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-19",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-20",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-21",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-22",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-23",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    },
+    {
+      "block": "block-24",
+      "baseline": 0.1,
+      "control": 0.1,
+      "candidate": 0.1
+    }
+  ],
+  "controls": {
+    "passed": true,
+    "meaning": "No detected baseline/control arm drift; this is an instrument check, not proof of equality."
+  },
+  "acceptance": {
+    "passed": false,
+    "status": "unresolved",
+    "marginMs": 0,
+    "quantizationEnvelopeIsAcceptanceMargin": false
+  },
+  "runIds": [
+    {
+      "block": "block-01",
+      "order": [
+        "baseline",
+        "control",
+        "candidate"
+      ],
+      "baseline": "03d17037-b5ba-4d8a-a7a6-b934552778e5",
+      "control": "ee20f6c8-db0a-47e3-9f42-338c9b59c360",
+      "candidate": "8a9f3f88-4aca-4919-94f0-f244ddae1de0"
+    },
+    {
+      "block": "block-02",
+      "order": [
+        "control",
+        "candidate",
+        "baseline"
+      ],
+      "baseline": "8246e6e1-f144-404b-82dc-df4fc9745393",
+      "control": "4c5bacc0-f027-4b94-846d-edaa9699cd72",
+      "candidate": "9560c022-f9e4-4280-9718-92b7c2c1de80"
+    },
+    {
+      "block": "block-03",
+      "order": [
+        "candidate",
+        "baseline",
+        "control"
+      ],
+      "baseline": "85c1e208-b3fd-46d5-9502-0cd00eb0fb9e",
+      "control": "274c775b-331e-4dcd-8f9c-d50aaca3b9aa",
+      "candidate": "b4329498-8f6a-4814-845e-bca0f4db95d6"
+    },
+    {
+      "block": "block-04",
+      "order": [
+        "candidate",
+        "control",
+        "baseline"
+      ],
+      "baseline": "46f9dca6-d388-4dd9-8fad-f1a4001f727a",
+      "control": "c296a110-35f2-4744-90fd-077768485400",
+      "candidate": "bf09e0de-3b9d-44cd-9933-ffb6caa26caa"
+    },
+    {
+      "block": "block-05",
+      "order": [
+        "control",
+        "baseline",
+        "candidate"
+      ],
+      "baseline": "f966e504-3a07-4039-81b2-4a94474b8cd0",
+      "control": "108de706-3577-4aa8-a274-396ec26e2b82",
+      "candidate": "1fc22622-b51d-45c2-9814-3b77e6a2295b"
+    },
+    {
+      "block": "block-06",
+      "order": [
+        "baseline",
+        "candidate",
+        "control"
+      ],
+      "baseline": "57cacd3b-3fa4-43b2-b5f9-8fbcf231752b",
+      "control": "a8d63e97-f308-4dbf-8a4c-a65dfb3ad8c3",
+      "candidate": "787023c1-508f-4e37-8744-0fd1b33dc8f3"
+    },
+    {
+      "block": "block-07",
+      "order": [
+        "baseline",
+        "control",
+        "candidate"
+      ],
+      "baseline": "0f6c4537-aa75-4723-b39d-51c557ee70b4",
+      "control": "30dbed0d-48ce-4ba0-bbaf-ab65f57c40f1",
+      "candidate": "f2baaccc-80a8-4831-bc4a-a37d65117c36"
+    },
+    {
+      "block": "block-08",
+      "order": [
+        "control",
+        "candidate",
+        "baseline"
+      ],
+      "baseline": "3e834221-8b5e-4a77-8dfa-6f188007b625",
+      "control": "fd40a9d3-46c1-4358-9693-a75b712a9b8d",
+      "candidate": "7379ecf3-1666-411c-8208-ed2c3bb096c2"
+    },
+    {
+      "block": "block-09",
+      "order": [
+        "candidate",
+        "baseline",
+        "control"
+      ],
+      "baseline": "15de82b2-b25e-41f7-98db-b7cb7432d897",
+      "control": "78f8f24d-3003-46ef-a336-2e8200ad3dab",
+      "candidate": "9671102a-1513-40ba-a7c4-5411c698950d"
+    },
+    {
+      "block": "block-10",
+      "order": [
+        "candidate",
+        "control",
+        "baseline"
+      ],
+      "baseline": "37fa620b-d547-4361-ac38-d6317509eb0f",
+      "control": "73582d8e-5189-4d7f-a156-e2e7e27b1ceb",
+      "candidate": "52ab4abc-d5eb-4c10-8ae5-40c5ffeb62aa"
+    },
+    {
+      "block": "block-11",
+      "order": [
+        "control",
+        "baseline",
+        "candidate"
+      ],
+      "baseline": "e2ffddf9-b5c9-4c90-a707-c781cd36001c",
+      "control": "e6868f76-e86e-4bc6-84e1-cee62c0023ff",
+      "candidate": "3bfd9238-6fa3-4c61-9580-bc7679dc40c8"
+    },
+    {
+      "block": "block-12",
+      "order": [
+        "baseline",
+        "candidate",
+        "control"
+      ],
+      "baseline": "3a1cbc48-7d24-4937-b11d-079a3ebd0fb2",
+      "control": "24889a80-0c0e-4abc-8e0f-a1cfece58858",
+      "candidate": "d8f9b344-d86f-4ef3-87a1-ca8c4e9ea758"
+    },
+    {
+      "block": "block-13",
+      "order": [
+        "baseline",
+        "control",
+        "candidate"
+      ],
+      "baseline": "9ed6582b-1bfd-41d7-b213-f0f792e26eed",
+      "control": "0b279bbf-9a10-4a61-a765-9ae9e3a86f32",
+      "candidate": "6ccf686f-f9b7-4f96-8535-01e6fa344621"
+    },
+    {
+      "block": "block-14",
+      "order": [
+        "control",
+        "candidate",
+        "baseline"
+      ],
+      "baseline": "22526de7-17e0-4088-af38-7bef54b86f35",
+      "control": "80987524-58e8-4680-a69b-f91257d3b2f0",
+      "candidate": "c3b3a14b-b0ef-44e1-9af0-ff5b8458cdc7"
+    },
+    {
+      "block": "block-15",
+      "order": [
+        "candidate",
+        "baseline",
+        "control"
+      ],
+      "baseline": "5c9c5dc0-9500-4ab9-9e60-cee341fdcba9",
+      "control": "b5172212-13d3-4162-9508-3882ca44a64c",
+      "candidate": "90b84486-01cd-4974-aaf8-445a81448cc9"
+    },
+    {
+      "block": "block-16",
+      "order": [
+        "candidate",
+        "control",
+        "baseline"
+      ],
+      "baseline": "7e3d49df-a921-49db-896a-34534835cb5e",
+      "control": "97def892-77af-4d90-9e1a-74ec1ee8562d",
+      "candidate": "38051030-ad9c-4475-9fcf-cb89b3eb47d6"
+    },
+    {
+      "block": "block-17",
+      "order": [
+        "control",
+        "baseline",
+        "candidate"
+      ],
+      "baseline": "0c0adcc8-3eda-47ef-8790-ccf808d84583",
+      "control": "43b1e752-4609-4f4e-ba06-44c2c04b37cb",
+      "candidate": "42eb5a9b-fe33-4a42-9b07-7498c30c0c1f"
+    },
+    {
+      "block": "block-18",
+      "order": [
+        "baseline",
+        "candidate",
+        "control"
+      ],
+      "baseline": "d378f254-bb5e-489d-b708-2feae0c75f93",
+      "control": "2eaca8cc-4ad9-4842-b4cb-ef8fc3cc38ca",
+      "candidate": "3a8d893c-7ec1-4521-97e0-d372df956e53"
+    },
+    {
+      "block": "block-19",
+      "order": [
+        "baseline",
+        "control",
+        "candidate"
+      ],
+      "baseline": "66c13b79-519b-4270-8aac-b141eebd23b8",
+      "control": "3746dec1-9684-4766-9de4-7783867dc678",
+      "candidate": "25dbb1aa-7c62-4ddb-8de5-6b509b17b4c9"
+    },
+    {
+      "block": "block-20",
+      "order": [
+        "control",
+        "candidate",
+        "baseline"
+      ],
+      "baseline": "632f2fad-0073-4df0-9ab4-ff5123e33b3d",
+      "control": "804351b2-576a-442d-af4e-c36208d5617d",
+      "candidate": "8e03dad5-a38c-4f7a-8e13-68ab9c887ab4"
+    },
+    {
+      "block": "block-21",
+      "order": [
+        "candidate",
+        "baseline",
+        "control"
+      ],
+      "baseline": "1a33aeb0-c9e0-4913-a373-64e81efed4bf",
+      "control": "d1426e88-3428-465b-8b5a-d197cb22551b",
+      "candidate": "493612f2-2b9e-42e5-88ca-008a4261342e"
+    },
+    {
+      "block": "block-22",
+      "order": [
+        "candidate",
+        "control",
+        "baseline"
+      ],
+      "baseline": "f9087e93-7e5f-4f23-aa67-9350d7518b46",
+      "control": "7316abba-aadb-4367-b88b-fe2b2c878486",
+      "candidate": "5031c145-ba5a-4a0a-8e7a-acb17f749814"
+    },
+    {
+      "block": "block-23",
+      "order": [
+        "control",
+        "baseline",
+        "candidate"
+      ],
+      "baseline": "fc490215-2cb2-4aad-be12-2c22c0c6e9fb",
+      "control": "0f997030-16ae-4632-b83d-d82bb39f52d1",
+      "candidate": "3807dc59-bdaf-47a5-b442-633f389e973f"
+    },
+    {
+      "block": "block-24",
+      "order": [
+        "baseline",
+        "candidate",
+        "control"
+      ],
+      "baseline": "f9b9c27f-9f43-4c97-a5ce-f4dc812372f4",
+      "control": "3fee9c37-c045-42d3-9c9a-55da67b31a41",
+      "candidate": "e97d763c-794e-4576-af1c-5dabbad94856"
+    }
+  ],
+  "metrics": [
+    {
+      "group": "short-lines/direct/none/cold",
+      "metric": "inputApplied",
+      "family": "primary",
+      "samples": {
+        "candidate": 4320,
+        "pooledControls": 8640
+      },
+      "candidateP95Ms": 1.4000000059604645,
+      "referenceP95Ms": 1.5,
+      "differenceMs": -0.09999999403953552,
+      "lowerMs": -0.09999999403953552,
+      "upperMs": 0,
+      "strictNoRegression": true,
+      "demonstratedRegression": false,
+      "withinQuantizationEnvelope": true,
+      "control": {
+        "baselineP95Ms": 1.5,
+        "controlP95Ms": 1.5,
+        "lowerMs": 0,
+        "upperMs": 0,
+        "detectedDrift": false
+      }
+    },
+    {
+      "group": "short-lines/direct/none/cold",
+      "metric": "textCallback",
+      "family": "primary",
+      "samples": {
+        "candidate": 120,
+        "pooledControls": 240
+      },
+      "candidateP95Ms": 21.5,
+      "referenceP95Ms": 58.599999994039536,
+      "differenceMs": -37.099999994039536,
+      "lowerMs": -37.39999997615814,
+      "upperMs": -36.30000001192093,
+      "strictNoRegression": true,
+      "demonstratedRegression": false,
+      "withinQuantizationEnvelope": true,
+      "control": {
+        "baselineP95Ms": 58.5,
+        "controlP95Ms": 58.599999994039536,
+        "lowerMs": -0.6999999582767487,
+        "upperMs": 0.5999999940395355,
+        "detectedDrift": false
+      }
+    },
+    {
+      "group": "short-lines/direct/none/cold",
+      "metric": "inputFrame",
+      "family": "secondary",
+      "samples": {
+        "candidate": 4320,
+        "pooledControls": 8640
+      },
+      "candidateP95Ms": 15,
+      "referenceP95Ms": 10.700000017881393,
+      "differenceMs": 4.299999982118607,
+      "lowerMs": 4.100000023841858,
+      "upperMs": 4.5,
+      "strictNoRegression": false,
+      "demonstratedRegression": true,
+      "withinQuantizationEnvelope": false,
+      "control": {
+        "baselineP95Ms": 10.699999988079071,
+        "controlP95Ms": 10.800000011920929,
+        "lowerMs": -0.20000001788139343,
+        "upperMs": 0.4000000059604645,
+        "detectedDrift": false
+      }
+    },
+    {
+      "group": "short-lines/direct/none/cold",
+      "metric": "visibleTextUpperBound",
+      "family": "secondary",
+      "samples": {
+        "candidate": 120,
+        "pooledControls": 240
+      },
+      "candidateP95Ms": 97.19999998807907,
+      "referenceP95Ms": 133.30000001192093,
+      "differenceMs": -36.10000002384186,
+      "lowerMs": -39,
+      "upperMs": -33.20000001788139,
+      "strictNoRegression": true,
+      "demonstratedRegression": false,
+      "withinQuantizationEnvelope": true,
+      "control": {
+        "baselineP95Ms": 134.59999999403954,
+        "controlP95Ms": 132.19999998807907,
+        "lowerMs": -5.999999970197678,
+        "upperMs": 1.199999988079071,
+        "detectedDrift": false
+      }
+    },
+    {
+      "group": "short-lines/direct/none/warm",
+      "metric": "inputApplied",
+      "family": "primary",
+      "samples": {
+        "candidate": 4320,
+        "pooledControls": 8640
+      },
+      "candidateP95Ms": 0.9000000059604645,
+      "referenceP95Ms": 1,
+      "differenceMs": -0.09999999403953552,
+      "lowerMs": -0.09999999403953552,
+      "upperMs": 0,
+      "strictNoRegression": true,
+      "demonstratedRegression": false,
+      "withinQuantizationEnvelope": true,
+      "control": {
+        "baselineP95Ms": 1,
+        "controlP95Ms": 1,
+        "lowerMs": -0.09999999403953552,
+        "upperMs": 0.09999999403953552,
+        "detectedDrift": false
+      }
+    },
+    {
+      "group": "short-lines/direct/none/warm",
+      "metric": "textCallback",
+      "family": "primary",
+      "samples": {
+        "candidate": 120,
+        "pooledControls": 240
+      },
+      "candidateP95Ms": 8.900000005960464,
+      "referenceP95Ms": 39.19999998807907,
+      "differenceMs": -30.299999982118607,
+      "lowerMs": -30.599999994039536,
+      "upperMs": -29.599999994039536,
+      "strictNoRegression": true,
+      "demonstratedRegression": false,
+      "withinQuantizationEnvelope": true,
+      "control": {
+        "baselineP95Ms": 38.900000005960464,
+        "controlP95Ms": 39.30000001192093,
+        "lowerMs": -0.29999998211860657,
+        "upperMs": 1.399999976158142,
+        "detectedDrift": false
+      }
+    },
+    {
+      "group": "short-lines/direct/none/warm",
+      "metric": "inputFrame",
+      "family": "secondary",
+      "samples": {
+        "candidate": 4320,
+        "pooledControls": 8640
+      },
+      "candidateP95Ms": 9.899999976158142,
+      "referenceP95Ms": 13.5,
+      "differenceMs": -3.600000023841858,
+      "lowerMs": -3.7000000178813934,
+      "upperMs": -3.5,
+      "strictNoRegression": true,
+      "demonstratedRegression": false,
+      "withinQuantizationEnvelope": true,
+      "control": {
+        "baselineP95Ms": 13.5,
+        "controlP95Ms": 13.400000005960464,
+        "lowerMs": -0.30000001192092896,
+        "upperMs": 0.09999999403953552,
+        "detectedDrift": false
+      }
+    },
+    {
+      "group": "short-lines/direct/none/warm",
+      "metric": "visibleTextUpperBound",
+      "family": "secondary",
+      "samples": {
+        "candidate": 120,
+        "pooledControls": 240
+      },
+      "candidateP95Ms": 77.60000002384186,
+      "referenceP95Ms": 106.69999998807907,
+      "differenceMs": -29.099999964237213,
+      "lowerMs": -30.099999994039536,
+      "upperMs": -28,
+      "strictNoRegression": true,
+      "demonstratedRegression": false,
+      "withinQuantizationEnvelope": true,
+      "control": {
+        "baselineP95Ms": 106.69999998807907,
+        "controlP95Ms": 106.5,
+        "lowerMs": -1.399999976158142,
+        "upperMs": 2.0999999940395355,
+        "detectedDrift": false
+      }
+    },
+    {
+      "group": "short-lines/prepared/none/cold",
+      "metric": "inputApplied",
+      "family": "primary",
+      "samples": {
+        "candidate": 4320,
+        "pooledControls": 8640
+      },
+      "candidateP95Ms": 1.5,
+      "referenceP95Ms": 1.5,
+      "differenceMs": 0,
+      "lowerMs": -0.09999999403953552,
+      "upperMs": 0,
+      "strictNoRegression": true,
+      "demonstratedRegression": false,
+      "withinQuantizationEnvelope": true,
+      "control": {
+        "baselineP95Ms": 1.5,
+        "controlP95Ms": 1.5,
+        "lowerMs": 0,
+        "upperMs": 0,
+        "detectedDrift": false
+      }
+    },
+    {
+      "group": "short-lines/prepared/none/cold",
+      "metric": "textCallback",
+      "family": "primary",
+      "samples": {
+        "candidate": 120,
+        "pooledControls": 240
+      },
+      "candidateP95Ms": 11.800000011920929,
+      "referenceP95Ms": 18.600000023841858,
+      "differenceMs": -6.800000011920929,
+      "lowerMs": -6.999999970197678,
+      "upperMs": -6.699999988079071,
+      "strictNoRegression": true,
+      "demonstratedRegression": false,
+      "withinQuantizationEnvelope": true,
+      "control": {
+        "baselineP95Ms": 18.69999998807907,
+        "controlP95Ms": 18.599999994039536,
+        "lowerMs": -0.4000000059604645,
+        "upperMs": 0.09999999403953552,
+        "detectedDrift": false
+      }
+    },
+    {
+      "group": "short-lines/prepared/none/cold",
+      "metric": "inputFrame",
+      "family": "secondary",
+      "samples": {
+        "candidate": 4320,
+        "pooledControls": 8640
+      },
+      "candidateP95Ms": 14.5,
+      "referenceP95Ms": 10.699999988079071,
+      "differenceMs": 3.800000011920929,
+      "lowerMs": 3.5,
+      "upperMs": 4.0999999940395355,
+      "strictNoRegression": false,
+      "demonstratedRegression": true,
+      "withinQuantizationEnvelope": false,
+      "control": {
+        "baselineP95Ms": 10.699999988079071,
+        "controlP95Ms": 10.599999994039536,
+        "lowerMs": -0.30000001192092896,
+        "upperMs": 0.19999998807907104,
+        "detectedDrift": false
+      }
+    },
+    {
+      "group": "short-lines/prepared/none/cold",
+      "metric": "visibleTextUpperBound",
+      "family": "secondary",
+      "samples": {
+        "candidate": 120,
+        "pooledControls": 240
+      },
+      "candidateP95Ms": 86.90000000596046,
+      "referenceP95Ms": 93.7000000178814,
+      "differenceMs": -6.800000011920929,
+      "lowerMs": -8.400000005960464,
+      "upperMs": -6,
+      "strictNoRegression": true,
+      "demonstratedRegression": false,
+      "withinQuantizationEnvelope": true,
+      "control": {
+        "baselineP95Ms": 93.60000002384186,
+        "controlP95Ms": 93.80000001192093,
+        "lowerMs": -0.9000000059604645,
+        "upperMs": 1.0999999940395355,
+        "detectedDrift": false
+      }
+    },
+    {
+      "group": "short-lines/prepared/none/warm",
+      "metric": "inputApplied",
+      "family": "primary",
+      "samples": {
+        "candidate": 4320,
+        "pooledControls": 8640
+      },
+      "candidateP95Ms": 0.9000000059604645,
+      "referenceP95Ms": 1,
+      "differenceMs": -0.09999999403953552,
+      "lowerMs": -0.09999999403953552,
+      "upperMs": 0.09999999403953552,
+      "strictNoRegression": false,
+      "demonstratedRegression": false,
+      "withinQuantizationEnvelope": true,
+      "control": {
+        "baselineP95Ms": 1,
+        "controlP95Ms": 1,
+        "lowerMs": -0.09999999403953552,
+        "upperMs": 0.09999999403953552,
+        "detectedDrift": false
+      }
+    },
+    {
+      "group": "short-lines/prepared/none/warm",
+      "metric": "textCallback",
+      "family": "primary",
+      "samples": {
+        "candidate": 120,
+        "pooledControls": 240
+      },
+      "candidateP95Ms": 3.0999999940395355,
+      "referenceP95Ms": 8.5,
+      "differenceMs": -5.4000000059604645,
+      "lowerMs": -5.5999999940395355,
+      "upperMs": -5.200000017881393,
+      "strictNoRegression": true,
+      "demonstratedRegression": false,
+      "withinQuantizationEnvelope": true,
+      "control": {
+        "baselineP95Ms": 8.400000005960464,
+        "controlP95Ms": 8.5,
+        "lowerMs": -0.30000001192092896,
+        "upperMs": 0.4999999701976776,
+        "detectedDrift": false
+      }
+    },
+    {
+      "group": "short-lines/prepared/none/warm",
+      "metric": "inputFrame",
+      "family": "secondary",
+      "samples": {
+        "candidate": 4320,
+        "pooledControls": 8640
+      },
+      "candidateP95Ms": 10,
+      "referenceP95Ms": 13.099999994039536,
+      "differenceMs": -3.0999999940395355,
+      "lowerMs": -3.300000011920929,
+      "upperMs": -2.800000011920929,
+      "strictNoRegression": true,
+      "demonstratedRegression": false,
+      "withinQuantizationEnvelope": true,
+      "control": {
+        "baselineP95Ms": 13.099999994039536,
+        "controlP95Ms": 13.100000023841858,
+        "lowerMs": -0.19999998807907104,
+        "upperMs": 0.29999998211860657,
+        "detectedDrift": false
+      }
+    },
+    {
+      "group": "short-lines/prepared/none/warm",
+      "metric": "visibleTextUpperBound",
+      "family": "secondary",
+      "samples": {
+        "candidate": 120,
+        "pooledControls": 240
+      },
+      "candidateP95Ms": 71.90000000596046,
+      "referenceP95Ms": 77.2999999821186,
+      "differenceMs": -5.399999976158142,
+      "lowerMs": -6.199999988079071,
+      "upperMs": -4.199999958276749,
+      "strictNoRegression": true,
+      "demonstratedRegression": false,
+      "withinQuantizationEnvelope": true,
+      "control": {
+        "baselineP95Ms": 76.7999999821186,
+        "controlP95Ms": 77.40000000596046,
+        "lowerMs": -1,
+        "upperMs": 1.5999999940395355,
+        "detectedDrift": false
+      }
+    }
+  ]
+}

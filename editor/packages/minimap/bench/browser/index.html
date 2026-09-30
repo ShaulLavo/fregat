@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Minimap browser measurement</title>
+    <style>
+      body {
+        margin: 0;
+        background: #111;
+        color: #fff;
+        font-family: monospace;
+      }
+      #editor {
+        position: relative;
+        display: flex;
+        width: 1000px;
+        height: 700px;
+        margin: 16px;
+      }
+      #editor .editor {
+        --editor-background: #111;
+        --editor-foreground: #fff;
+      }
+      #editor .editor-minimap {
+        --editor-minimap-background-opacity: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="editor"></main>
+    <script type="module" src="../browser.ts"></script>
+  </body>
+</html>
