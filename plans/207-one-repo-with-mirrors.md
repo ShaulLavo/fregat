@@ -3,6 +3,8 @@
 ## Status and authorization
 
 - Status: APPROVED 2026-09-29, requested by the owner.
+- The owner authorized final fixes and merging PR #199 on 2026-09-30. Mirror pushes must
+  fast-forward without force; integration edits may change the split commit ids.
 - Owner decision: all code we write for Fregat lives in the Fregat monorepo. Flagship packages
   that others should use standalone (the Editor, ghostty-webgpu, and `@fregat/hotkeys` from
   [203](203-fregat-hotkeys.md)) each keep a public repo that CI fills with an exact copy of their
@@ -18,7 +20,11 @@
 
 ## Cutover window and release conditions
 
-The rehearsal is complete; draft PR #199 imports the source histories into an isolated branch. The coordinator captures final source heads under the owner's freeze and runs subtree pulls before merge. This plan requires a scoped
+The source import and integration are implemented in PR #199; its merge is authorized.
+The final source heads remain Editor `17a020ad4b98830aeebdb106af95de8f06694973` and ghostty
+`fd5c74283f83f780fcf60aab970d4c1fa6cc06cd`, with clean sibling checkouts on 2026-09-30.
+Both edited family splits accept ordinary pushes to mirrors seeded at those heads.
+This plan requires a scoped
 write hold, not a repository-wide freeze. Land or park open Editor/ghostty PRs, obtain the
 owner's session freeze, record final source heads and dirty-state ownership, and refresh
 the split/fast-forward proof against those heads. Keep sibling writes paused from that
