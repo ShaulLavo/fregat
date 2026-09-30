@@ -1,3 +1,3 @@
 export function matchesOrchestrationRpc(url: URL): boolean {
-  return /\/orchestration\/rpc(?:\?|$)/.test(url.href)
+  return url.pathname.endsWith('/orchestration/rpc')
 }
