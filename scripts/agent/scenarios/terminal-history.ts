@@ -1,3 +1,4 @@
+import { stageRelease } from './server-update'
 import { ok, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
 import { installCaptureTerminalNamespace } from '../product-terminal'
@@ -72,7 +73,8 @@ export const terminalHistory: Scenario = {
   description:
     'Create an isolated shell, replay output to a second viewer and reconnect, then clear shared history and verify replay stays empty.',
   inspect: async (page) => inspection.get(page) ?? null,
-  async run(page, { step }) {
+  async run(page, { step, server }) {
+    ok(server, 'Terminal restart proof needs a throwaway API server')
     const prefix = `history-verification-${crypto.randomUUID()}-`
     const suffix = `HISTORY_${crypto.randomUUID().replaceAll('-', '')}`
     const marker = `TERMINAL_${suffix}`
@@ -118,6 +120,52 @@ export const terminalHistory: Scenario = {
         'Reconnect must replay marker',
       )
       await step('history-replayed-with-second-viewer')
+      await selectors
+        .terminalSurface(page)
+        .first()
+        .click({ position: { x: 100, y: 60 } })
+      await page.keyboard.type(
+        'PLAN126_API_TOKEN=survives; printf "\\nAPI_BEFORE_%s\\n" "$PLAN126_API_TOKEN"',
+      )
+      await page.keyboard.press('Enter')
+      await until(
+        page,
+        () => first.at(-1)?.output.includes('API_BEFORE_survives') === true,
+        'Shell has restart token',
+      )
+      const firstCount = first.length
+      const secondCount = other.length
+      await stageRelease(server)
+      await selectors.serverUpdateRestart(page).waitFor()
+      await selectors.serverUpdateRestart(page).click()
+      await selectors.serverUpdate(page).waitFor({ state: 'detached', timeout: 20_000 })
+      await until(
+        page,
+        () =>
+          first.length > firstCount &&
+          other.length > secondCount &&
+          first.at(-1)?.ready === true &&
+          other.at(-1)?.ready === true,
+        'Both viewers reconnect after API restart',
+      )
+      ok(
+        first.at(-1)?.output.includes(marker) && other.at(-1)?.output.includes(marker),
+        'Both viewers replay the pre-restart history',
+      )
+      await selectors
+        .terminalSurface(page)
+        .first()
+        .click({ position: { x: 100, y: 60 } })
+      await page.keyboard.type('printf "\\nAPI_AFTER_%s\\n" "$PLAN126_API_TOKEN"')
+      await page.keyboard.press('Enter')
+      await until(
+        page,
+        () =>
+          first.at(-1)?.output.includes('API_AFTER_survives') === true &&
+          other.at(-1)?.output.includes('API_AFTER_survives') === true,
+        'The same shell serves both viewers after API restart',
+      )
+      await step('api-restart-preserves-shell-history-and-two-viewers')
       await selectors
         .terminalSurface(page)
         .first()

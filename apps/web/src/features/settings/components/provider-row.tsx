@@ -35,7 +35,9 @@ export function ProviderRow({
         />
       </div>
       <ProviderValues agentView={agentView} instance={instance} />
-      <ProviderUpdate label={label} providerInstanceId={instance.providerInstanceId} />
+      {instance.enabled ? (
+        <ProviderUpdate label={label} providerInstanceId={instance.providerInstanceId} />
+      ) : null}
     </div>
   )
 }

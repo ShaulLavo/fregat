@@ -1,8 +1,19 @@
 import { ok, strictEqual } from 'node:assert/strict'
+import { connectSecondOwner } from '../second-owner'
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
-import { dispatch, openChatWorkspace, readShell, waitForCompletedTurn } from './chat-verification'
-import { holdTurns, withConversationProvider } from './native-provider-verification'
+import {
+  collectOrchestrationBases,
+  dispatch,
+  openChatWorkspace,
+  readShell,
+  waitForCompletedTurn,
+} from './chat-verification'
+import {
+  holdTurns,
+  registerFixtureProject,
+  withConversationProvider,
+} from './native-provider-verification'
 
 export const sessionLifecycle: Scenario = {
   name: 'session-lifecycle',
@@ -10,7 +21,11 @@ export const sessionLifecycle: Scenario = {
   description:
     'Drive pin, settle, snooze, exact timer wake, bulk snooze and Undo in disposable sessions, then snooze a turn the Codex conversation fixture holds running.',
   async run(page, { step }) {
+    const bases = collectOrchestrationBases(page)
     const { base, worktree } = await openChatWorkspace(page)
+    const remote = await connectSecondOwner(page, bases)
+    const remoteBase = `${remote.origin}/orchestration`
+    const remoteWorktree = await registerFixtureProject(page, remoteBase, worktree.canonicalPath)
     await withConversationProvider(page, base, 'session-lifecycle', async (native) => {
       const first = crypto.randomUUID()
       const second = crypto.randomUUID()
@@ -28,6 +43,14 @@ export const sessionLifecycle: Scenario = {
           modelSelection: native.model,
           worktreeTarget: { kind: 'current', worktreeId: worktree.id },
         })
+      const remoteTitle = `${prefix} remote twin`
+      await dispatch(page, remoteBase, {
+        type: 'session.create',
+        sessionId: first,
+        title: remoteTitle,
+        modelSelection: native.model,
+        worktreeTarget: { kind: 'current', worktreeId: remoteWorktree.id },
+      })
       const act = async (label: string) => {
         await selectors.sessionByTitle(page, title).click({ button: 'right' })
         await selectors.sessionLifecycleAction(page, label).click()
@@ -39,7 +62,13 @@ export const sessionLifecycle: Scenario = {
         await step('pinned')
         await act('Mark as settled')
         await selectors.sessionInShelf(page, title, 'Settled').waitFor()
-        await step('settle-clears-pin')
+        strictEqual(
+          (await readShell(page, remoteBase)).sessions.find((session) => session.id === first)
+            ?.settledOverride,
+          null,
+        )
+        await selectors.sessionInShelf(page, remoteTitle, 'Active').waitFor()
+        await step('settle-clears-pin-keeps-remote-twin-active')
         await act('Move to active')
         await selectors.sessionInShelf(page, title, 'Active').waitFor()
         await act('Snooze…')
@@ -55,6 +84,8 @@ export const sessionLifecycle: Scenario = {
         await step('custom-six-second-snooze')
         await selectors.sessionInShelf(page, title, 'Active').waitFor({ timeout: 10_000 })
         await step('timer-moves-session-without-an-event')
+        await dispatch(page, remoteBase, { type: 'session.archive', sessionId: first })
+        await selectors.sessionByTitle(page, remoteTitle).waitFor({ state: 'hidden' })
         await selectors.sessionByTitle(page, title).click()
         await selectors.sessionByTitle(page, other).click({ modifiers: ['Shift'] })
         await step('bulk-toolbar-at-rail-width')
@@ -106,6 +137,9 @@ export const sessionLifecycle: Scenario = {
           await dispatch(page, base, { type: 'session.delete', sessionId })
         }
       }
+    }).finally(async () => {
+      await page.goto('about:blank')
+      await remote.stop()
     })
   },
 }

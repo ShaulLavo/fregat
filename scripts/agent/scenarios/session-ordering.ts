@@ -1,15 +1,33 @@
-import { ok } from 'node:assert/strict'
+import { ok, strictEqual } from 'node:assert/strict'
+import { connectSecondOwner } from '../second-owner'
+import { registerFixtureProject, installConversationProvider } from './native-provider-verification'
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
-import { createSession, dispatch, openChatWorkspace, readShell } from './chat-verification'
+import {
+  collectOrchestrationBases,
+  createSession,
+  dispatch,
+  openChatWorkspace,
+  readShell,
+} from './chat-verification'
 
 export const sessionOrdering: Scenario = {
   name: 'session-ordering',
   description:
     'Move disposable sessions between empty shelves by pointer and keyboard, then verify persisted active ordering after reload.',
   async run(page, { step }) {
+    const bases = collectOrchestrationBases(page)
     const workspace = await openChatWorkspace(page)
+    const remote = await connectSecondOwner(page, bases)
+    const remoteBase = `${remote.origin}/orchestration`
+    const remoteWorktree = await registerFixtureProject(
+      page,
+      remoteBase,
+      workspace.worktree.canonicalPath,
+    )
     const { base } = workspace
+    const native = await installConversationProvider(page, base, 'ordering-local')
+    const remoteNative = await installConversationProvider(page, remoteBase, 'ordering-remote')
     const first = crypto.randomUUID()
     const second = crypto.randomUUID()
     const prefix = `Ordering verification ${first.slice(0, 8)}`
@@ -18,7 +36,15 @@ export const sessionOrdering: Scenario = {
       [first, title],
       [second, `${prefix} second`],
     ])
-      await createSession(page, workspace, sessionId, label)
+      await createSession(page, workspace, sessionId, label, native.model)
+    const remoteTitle = `${prefix} remote twin`
+    await createSession(
+      page,
+      { base: remoteBase, project: undefined, worktree: remoteWorktree },
+      first,
+      remoteTitle,
+      remoteNative.model,
+    )
     const pointerTo = async (shelf: 'pinned' | 'active' | 'settled') => {
       const source = await selectors.sessionByTitle(page, title).boundingBox()
       const target = await selectors.sessionShelfTarget(page, shelf).boundingBox()
@@ -40,7 +66,13 @@ export const sessionOrdering: Scenario = {
       await pointerTo('pinned')
       await step('after-pointer')
       await selectors.sessionInShelf(page, title, 'Pinned').waitFor()
-      await step('pointer-empty-pinned')
+      strictEqual(
+        (await readShell(page, remoteBase)).sessions.find((session) => session.id === first)
+          ?.pinnedAt,
+        null,
+      )
+      await selectors.sessionInShelf(page, remoteTitle, 'Active').waitFor()
+      await step('pointer-pins-only-owning-environment')
       await pointerTo('settled')
       await selectors.sessionInShelf(page, title, 'Settled').waitFor()
       await step('pointer-empty-settled')
@@ -59,7 +91,13 @@ export const sessionOrdering: Scenario = {
       )
       const active = (await readShell(page, base)).sessions.find((session) => session.id === first)
       ok(active?.activeOrderKey && !active.pinnedAt && active.settledOverride === 'active')
-      await step('pointer-active-key')
+      const remoteActive = (await readShell(page, remoteBase)).sessions.find(
+        (session) => session.id === first,
+      )
+      ok(remoteActive?.activeOrderKey && remoteActive.activeOrderKey !== active.activeOrderKey)
+      strictEqual(remoteActive.pinnedAt, null)
+      strictEqual(remoteActive.settledOverride, null)
+      await step('pointer-materializes-distinct-keys-on-each-owner')
       await page.reload()
       await selectors.sessionSearch(page).fill(prefix)
       await selectors.sessionInShelf(page, title, 'Active').waitFor()
@@ -71,6 +109,8 @@ export const sessionOrdering: Scenario = {
       await page.waitForURL((url) => url.href.includes(first))
       await dispatch(page, base, { type: 'session.delete', sessionId: second })
       await selectors.sessionByTitle(page, `${prefix} second`).waitFor({ state: 'hidden' })
+      await dispatch(page, remoteBase, { type: 'session.archive', sessionId: first })
+      await selectors.sessionByTitle(page, remoteTitle).waitFor({ state: 'hidden' })
       const row = selectors.sessionByTitle(page, title)
       await row.focus()
       await page.keyboard.press('Space')
@@ -82,11 +122,19 @@ export const sessionOrdering: Scenario = {
       await step('keyboard-second-target')
       await page.keyboard.press('Space')
       await selectors.sessionInShelf(page, title, 'Pinned').waitFor()
-      await step('keyboard-empty-pinned-after-reload')
+      ok(
+        (await readShell(page, remoteBase)).sessions.find((session) => session.id === first)
+          ?.archivedAt,
+      )
+      await step('keyboard-pinned-after-two-owner-reload')
     } finally {
       await dispatch(page, base, { type: 'session.delete', sessionId: first })
       if ((await readShell(page, base)).sessions.some((session) => session.id === second))
         await dispatch(page, base, { type: 'session.delete', sessionId: second })
+      await native.remove()
+      await remoteNative.remove()
+      await page.goto('about:blank')
+      await remote.stop()
     }
   },
 }

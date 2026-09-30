@@ -685,6 +685,8 @@ export type ProviderAdapter = {
     cwd: string
     sessionId: SessionId
   }) => Promise<Pick<ProviderSessionHooks, 'errors' | 'hooks'> | null>
+  /** Checks quiet provider work before idle cleanup closes its process. */
+  hasBackgroundWork?: (input: { sessionId: SessionId }) => Promise<boolean>
   /** Stops one background task without stopping the agent. */
   stopBackgroundTask?: (input: { sessionId: SessionId; taskId: string }) => Promise<void>
   /** Pauses, resumes or clears the session's goal without a turn; the adapter reports the result. */

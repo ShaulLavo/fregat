@@ -650,6 +650,23 @@ export class ProviderService {
       return null
     }
     if (!routed.adapter) return this.releaseUnroutedBinding(routed.binding)
+    if (input.idleBefore && routed.adapter.hasBackgroundWork) {
+      if (await routed.adapter.hasBackgroundWork({ sessionId: input.sessionId })) return null
+      if (
+        this.shuttingDown ||
+        this.isLaunching(input.sessionId) ||
+        this.keepsProcess(input.sessionId)
+      )
+        return null
+      const current = this.sessionDirectory
+        .listIdleSince(input.idleBefore, 'ready')
+        .find((binding) => binding.sessionId === input.sessionId)
+      if (
+        current?.runtimeEpoch !== routed.binding.runtimeEpoch ||
+        current.lastSeenAt !== routed.binding.lastSeenAt
+      )
+        return null
+    }
 
     await this.stopAndRelease(routed.adapter, input.sessionId)
     this.sessionDirectory.markSeen(input.sessionId)

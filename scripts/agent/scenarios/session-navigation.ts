@@ -1,37 +1,70 @@
+import { connectSecondOwner } from '../second-owner'
 import { ok, strictEqual } from 'node:assert/strict'
 import type { Scenario } from './index'
 import { holdToConfirm, selectors } from '../selectors'
 import { createGitFixture, fixtureGit, releaseFixture } from '../fixture-workspace'
-import { dispatch, openChat, readShell } from './chat-verification'
+import { collectOrchestrationBases, dispatch, openChat, readShell } from './chat-verification'
 import { isDraftChatUrl } from './draft-sessions'
-import { registerFixtureProject } from './native-provider-verification'
+import { registerFixtureProject, installConversationProvider } from './native-provider-verification'
 
 export const sessionNavigation: Scenario = {
   name: 'session-navigation',
   description:
     'Archive the current session into its project draft, preserve a background archive route, and delete into the first surviving session. Uses three sessions in a disposable project.',
   async run(page, { step }) {
+    const bases = collectOrchestrationBases(page)
     const base = await openChat(page)
+    const remote = await connectSecondOwner(page, bases)
+    const remoteBase = `${remote.origin}/orchestration`
     const root = await createGitFixture('session-navigation')
     await fixtureGit(root, ['commit', '--quiet', '-m', 'fixture'])
     const worktree = await registerFixtureProject(page, base, root)
+    const remoteWorktree = await registerFixtureProject(page, remoteBase, root)
     const ids = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()]
     const prefix = `Navigation verification ${ids[0]!.slice(0, 8)}`
     const titles = ids.map((_, index) => `${prefix} ${index + 1}`)
     const created: string[] = []
+    const native = await installConversationProvider(page, base, 'navigation-local')
+    const remoteNative = await installConversationProvider(page, remoteBase, 'navigation-remote')
     try {
       for (const [index, sessionId] of ids.entries()) {
         await dispatch(page, base, {
           type: 'session.create',
           sessionId,
           title: titles[index],
-          modelSelection: { providerInstanceId: 'codex', model: 'gpt-5.5' },
+          modelSelection: native.model,
           worktreeTarget: { kind: 'current', worktreeId: worktree.id },
         })
         created.push(sessionId)
       }
+      const remoteTitle = `${prefix} remote twin`
+      await dispatch(page, remoteBase, {
+        type: 'session.create',
+        sessionId: ids[0],
+        title: remoteTitle,
+        modelSelection: remoteNative.model,
+        worktreeTarget: { kind: 'current', worktreeId: remoteWorktree.id },
+      })
       await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
       await selectors.sessionSearch(page).fill(prefix)
+      await selectors.sessionByTitle(page, remoteTitle).click()
+      await page.waitForURL((url) => url.href.includes(ids[0]!) && url.pathname.includes('/@'))
+      const remoteRoute = new URL(page.url()).pathname
+      await selectors.sessionByTitle(page, titles[0]!).click({ button: 'right' })
+      await selectors.archiveSession(page).click()
+      await selectors.sessionByTitle(page, titles[0]!).waitFor({ state: 'hidden' })
+      strictEqual(
+        new URL(page.url()).pathname,
+        remoteRoute,
+        'Archiving the same-id row on another owner preserves the viewed route',
+      )
+      strictEqual(
+        (await readShell(page, remoteBase)).sessions.find((session) => session.id === ids[0])
+          ?.archivedAt,
+        null,
+      )
+      await step('same-id-background-archive-keeps-remote-route')
+      await dispatch(page, base, { type: 'session.unarchive', sessionId: ids[0] })
       await selectors.sessionByTitle(page, titles[0]!).click({ button: 'right' })
       await step('owner-copy-actions')
       await selectors.copySessionPath(page).click()
@@ -68,7 +101,13 @@ export const sessionNavigation: Scenario = {
       if (await selectors.confirmSessionDelete(page).isVisible())
         await holdToConfirm(page, selectors.confirmSessionDelete(page), landed)
       await landed()
-      await step('delete-opens-first-surviving-project-session')
+      await selectors.sessionByTitle(page, remoteTitle).waitFor()
+      strictEqual(
+        (await readShell(page, remoteBase)).sessions.find((session) => session.id === ids[0])
+          ?.archivedAt,
+        null,
+      )
+      await step('delete-opens-owning-survivor-keeps-remote-twin')
       ok(
         !(await readShell(page, base)).sessions.some((session) => session.id === ids[0]),
         'Deleted fixture must be absent from owner snapshot',
@@ -84,6 +123,10 @@ export const sessionNavigation: Scenario = {
         projectId: worktree.projectId,
         force: true,
       })
+      await native.remove()
+      await remoteNative.remove()
+      await page.goto('about:blank')
+      await remote.stop()
       await releaseFixture(root)
     }
   },

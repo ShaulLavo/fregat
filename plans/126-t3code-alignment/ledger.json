@@ -167,7 +167,8 @@
       "execution_evidence": [
         "lifecycle-grouping-delivery.md",
         "Live lifecycle evidence /work/tmp/fregat-evidence/20260920T140116Z-scenario-session-lifecycle; screenshots reviewed; multi-owner grouping live prerequisite unavailable; repository_path subproject registration remains open",
-        "2026-09-26 audit (status-2026-09-26.md): implemented; session-lifecycle sends a real provider turn and needs H4. Left: move it to a native fixture and add a second owner (connectSecondOwner). Batch B."
+        "2026-09-26 audit (status-2026-09-26.md): implemented; session-lifecycle sends a real provider turn and needs H4. Left: move it to a native fixture and add a second owner (connectSecondOwner). Batch B.",
+        "2026-09-30 bounded foundations closeout (bounded-closeout-2026-09-30.md): same-ID two-owner settle/shelf identity, native held-turn snooze and timer wake proved; descriptor/DST and full lifecycle matrix retain their owning acceptance."
       ]
     },
     {
@@ -181,7 +182,8 @@
       "execution_evidence": [
         "lifecycle-grouping-delivery.md",
         "Live lifecycle evidence /work/tmp/fregat-evidence/20260920T140116Z-scenario-session-lifecycle; screenshots reviewed; multi-owner grouping live prerequisite unavailable; repository_path subproject registration remains open",
-        "2026-09-26 audit (status-2026-09-26.md): as LIFE-03. Post-pin 1a0c915c (settling closes idle shells) is tracked in delta-2026-09-26.md, batch E."
+        "2026-09-26 audit (status-2026-09-26.md): as LIFE-03. Post-pin 1a0c915c (settling closes idle shells) is tracked in delta-2026-09-26.md, batch E.",
+        "2026-09-30 bounded foundations closeout (bounded-closeout-2026-09-30.md): three-row native-provider transport failure proves clear-before-outcomes, exact 2-success/1-failure counts and success-only Undo; stop ordering/whole row is not recertified."
       ]
     },
     {
@@ -197,7 +199,8 @@
         "Pinned ordering oracle1621cases; source-derived negative controls; server active lifecycle and UI drag tests pass",
         "Release143358; live pointer empty shelves, canonical reload order, keyboard pin proof: /work/tmp/fregat-evidence/20260920T144130Z-scenario-session-ordering",
         "Cross-owner live ordering remains unproven; full group not runtime-compared",
-        "2026-09-26 audit (status-2026-09-26.md): scripts/agent/scenarios/session-ordering.ts passed today with the H4 repair at /work/tmp/fregat-evidence/20260926T093837Z-scenario-session-ordering (one owner). Left: two-owner drag step. Batch B."
+        "2026-09-26 audit (status-2026-09-26.md): scripts/agent/scenarios/session-ordering.ts passed today with the H4 repair at /work/tmp/fregat-evidence/20260926T093837Z-scenario-session-ordering (one owner). Left: two-owner drag step. Batch B.",
+        "2026-09-30 bounded foundations closeout (bounded-closeout-2026-09-30.md): same-ID two-owner pointer/keyboard transitions, distinct active keys and reload ordering proved; order-specific failure rollback remains separate."
       ]
     },
     {
@@ -227,7 +230,8 @@
       "execution_evidence": [
         "search-delivery.md",
         "/work/tmp/fregat-evidence/20260920T140044Z-scenario-session-search; single-owner browser passed, distinct two-owner server tests passed; two-owner live unavailable",
-        "2026-09-26 audit (status-2026-09-26.md): implemented; session-search sends a real provider turn and session-search-environments expects pre-existing owners. Left: move both onto connectSecondOwner and a native fixture. Batch B."
+        "2026-09-26 audit (status-2026-09-26.md): implemented; session-search sends a real provider turn and session-search-environments expects pre-existing owners. Left: move both onto connectSecondOwner and a native fixture. Batch B.",
+        "2026-09-30 bounded foundations closeout (bounded-closeout-2026-09-30.md): same-ID two-owner native reply search and stale/cache ownership proved; disconnect-partial-search and full filter/archive matrix remain separate."
       ]
     },
     {
@@ -259,7 +263,8 @@
         "/work/tmp/fregat-evidence/20260920T152347Z-scenario-session-navigation/summary.md records completed copy, current/background archive and deletion navigation checks",
         "Recorded tests cover two owners with identical session IDs, partial deletion failure and route changes during an archive; native renderer tests cover bulk failure retention",
         "Remaining: two-owner live navigation, independently removed failed rows, interruption semantics and full upstream navigation comparison",
-        "2026-09-26 audit (status-2026-09-26.md): scripts/agent/scenarios/session-navigation.ts passed today with the H4 repair at /work/tmp/fregat-evidence/20260926T093854Z-scenario-session-navigation (one owner). Left: two-owner step with identical session IDs. Batch B."
+        "2026-09-26 audit (status-2026-09-26.md): scripts/agent/scenarios/session-navigation.ts passed today with the H4 repair at /work/tmp/fregat-evidence/20260926T093854Z-scenario-session-navigation (one owner). Left: two-owner step with identical session IDs. Batch B.",
+        "2026-09-30 bounded foundations closeout (bounded-closeout-2026-09-30.md): same-ID two-owner archive/delete navigation and three-row middle-failure delete retention proved; independently removed failed rows/full upstream comparison remain separate."
       ]
     },
     {
@@ -521,7 +526,8 @@
         "Native child live142923: completed parent working, child idle and late metadata/reload remains ready; screenshots inspected",
         "Monitor-only native Codex wire and automatic settlement are not claimed",
         "Decided 2026-09-25: owner — recheck the monitor-only signal against Codex 0.157 (approved).",
-        "2026-09-26 audit (status-2026-09-26.md): background-liveness passed today after H1 at /work/tmp/fregat-evidence/20260926T094109Z-scenario-background-liveness. Left: the monitor-only recheck on Codex 0.157 (decided). Batch C."
+        "2026-09-26 audit (status-2026-09-26.md): background-liveness passed today after H1 at /work/tmp/fregat-evidence/20260926T094109Z-scenario-background-liveness. Left: the monitor-only recheck on Codex 0.157 (decided). Batch C.",
+        "2026-09-30 bounded foundations closeout (bounded-closeout-2026-09-30.md): installed0.159.2 exact schema/tag reviewed; scoped backgroundTerminals/list guard preserves ready native process past injected35minutes and releases on empty list. Periodic/race/pending/error boundaries tested. Nonterminal monitor signals, child-owned silent shells after idle and live-account lifecycle remain unverified."
       ]
     },
     {
@@ -636,7 +642,8 @@
       "acceptance": "adjacent.md, EXT-05, Acceptance / verification",
       "execution_evidence": [
         "terminal-delivery.md: detached lifetime, durable raw history, shared clear and shell restart delivered. Live evidence 20260920T160608Z-scenario-terminal-history; 38 service,16 agent terminal/history,4 TUI attach tests; full attach/host equivalence remains open.",
-        "2026-09-26 audit (status-2026-09-26.md): PR #32 (Plan 149) adds host-owned PTYs, restart survival and cursor-based recovery. terminal-history fails today on H6 (second viewer shares a browser context). Left after #32: H6 and a server-restart step. Batch E."
+        "2026-09-26 audit (status-2026-09-26.md): PR #32 (Plan 149) adds host-owned PTYs, restart survival and cursor-based recovery. terminal-history fails today on H6 (second viewer shares a browser context). Left after #32: H6 and a server-restart step. Batch E.",
+        "2026-09-30 bounded foundations closeout (bounded-closeout-2026-09-30.md): actual throwaway API restart preserves shared shell token/history for two viewers; clear/reconnect and explicit replacement shell proved. No production PID, detached TTL/byte-fidelity or desktop certification claimed."
       ]
     },
     {

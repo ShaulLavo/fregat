@@ -124,6 +124,9 @@ export const selectors = {
   snoozeCustomSubmit: (page: Page) =>
     page.getByRole('button', { name: 'Snooze until chosen time', exact: true }),
   snoozeDialog: (page: Page) => page.getByRole('dialog', { name: 'Snooze sessions', exact: true }),
+  selectedSessionsToolbar: (page: Page) => page.getByRole('toolbar', { name: 'Selected sessions' }),
+  markedSession: (page: Page, title: string) =>
+    page.getByTitle(title, { exact: true }).and(page.locator('[data-marked]')),
   sessionBulkActions: (page: Page) =>
     page
       .getByRole('toolbar', { name: 'Selected sessions' })
