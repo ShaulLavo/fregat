@@ -1,5 +1,5 @@
 import { gzipSync } from 'node:zlib'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { cpus, platform, release, totalmem, arch } from 'node:os'
@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { chromium } from '@playwright/test'
 import { build } from 'vite'
-import { createManifest } from './fixtures.mjs'
+import { createManifest, readFrozenManifest } from './fixtures.mjs'
 import { scenarios, states, validateResult } from './results.mjs'
 import { runScenario } from './scenarios.mjs'
 import { fail } from './errors.mjs'
@@ -16,6 +16,9 @@ import { operationsPerSample, runInputSuite } from './input-scenarios.mjs'
 import { inputScenarios, inputViewModes, validateInputResult } from './input-results.mjs'
 import { profileScenario, profileSourceMaps } from './profile.mjs'
 import { hashBenchmarkSource, loadCorePackage } from './core-package.mjs'
+import { loadPackageSet } from './package-set.mjs'
+import { inputConsumerIds } from './input-configurations.mjs'
+import { installInputWorkerProof } from './input-worker-proof.mjs'
 
 const root = dirname(fileURLToPath(import.meta.url))
 const repository = resolve(root, '../..')
@@ -34,6 +37,9 @@ const { values } = parseArgs({
     url: { type: 'string' },
     'profile-directory': { type: 'string' },
     'core-directory': { type: 'string' },
+    'packages-directory': { type: 'string' },
+    'fixture-directory': { type: 'string' },
+    consumers: { type: 'string', default: 'native' },
   },
 })
 const integer = (text, name) => {
@@ -42,10 +48,17 @@ const integer = (text, name) => {
   return value
 }
 if (!['stress', 'input-latency'].includes(values.suite)) fail('Unknown suite')
+if (!inputConsumerIds.includes(values.consumers)) fail('Unknown input consumer configuration')
+if (values['packages-directory'] && (values.url || values['core-directory']))
+  fail('A frozen package set requires an independent runner build')
+const packageSet = values['packages-directory']
+  ? await loadPackageSet(values['packages-directory'])
+  : null
 if (values['core-directory'] && values.url)
   fail('--core-directory requires a runner build, not --url')
 const core = await loadCorePackage(
-  values['core-directory'] ?? resolve(repository, 'packages/editor'),
+  values['core-directory'] ??
+    (packageSet ? resolve(packageSet.directory, 'editor') : resolve(repository, 'packages/editor')),
 )
 const inputSuite = values.suite === 'input-latency'
 if (!inputSuite && (values['input-smoke'] || Number(values['slowdown-ms']) !== 0))
@@ -79,13 +92,19 @@ if (inputSuite) {
     compositionCommitTrust: 'cdp-untrusted-compositionend',
     isolation: 'closed-browser-context-per-fixture-view-scenario',
     paste: 'native-clipboard-shortcut-128-unicode-fragments',
+    consumers: values.consumers,
+    fixtures: values['fixture-directory'] ? 'frozen-hashed-files' : 'seeded-generator',
   })
   delete config.typedText
   delete config.churnCycles
   if (!Number.isFinite(config.slowdownMs) || config.slowdownMs < 0) fail('Invalid slowdown')
   if (values['profile-directory']) fail('Use normal input runs for the input budget')
 }
-const manifest = createManifest(integer(values.seed, 'seed'))
+if (inputSuite && values.consumers !== 'native' && (!packageSet || !values['fixture-directory']))
+  fail('Expanded consumer calibration requires a frozen complete package set and fixture files')
+const manifest = values['fixture-directory']
+  ? await readFrozenManifest(values['fixture-directory'])
+  : createManifest(integer(values.seed, 'seed'))
 if (inputSuite)
   manifest.fixtures = manifest.fixtures.filter((fixture) =>
     ['ordinary', 'short-lines', 'long-line'].includes(fixture.id),
@@ -123,7 +142,7 @@ try {
       root,
       configFile: false,
       logLevel: 'warn',
-      resolve: { alias: core.aliases },
+      resolve: { alias: packageSet?.aliases ?? core.aliases },
       plugins: values['profile-directory'] ? [profileSourceMaps()] : [],
       worker: { format: 'es' },
       build: {
@@ -133,6 +152,14 @@ try {
         sourcemap: Boolean(values['profile-directory']),
       },
     })
+  if (values['fixture-directory']) {
+    await mkdir(resolve(directory, 'frozen-fixtures'))
+    for (const fixture of manifest.fixtures)
+      await cp(
+        resolve(values['fixture-directory'], `${fixture.id}.txt`),
+        resolve(directory, 'frozen-fixtures', `${fixture.id}.txt`),
+      )
+  }
   if (values['profile-directory'])
     await cp(directory, resolve(values['profile-directory'], 'build'), { recursive: true })
   browser = await chromium.launch({ headless: true, env: { ...process.env, TMPDIR: directory } })
@@ -185,6 +212,7 @@ async function newPage(browser) {
   })
   if (!values.url) await context.route('**/*', (route) => routeAsset(route))
   const page = await context.newPage()
+  if (inputSuite && values.consumers !== 'native') await page.addInitScript(installInputWorkerProof)
   page.setDefaultTimeout(30_000)
   page.on('pageerror', (error) =>
     console.error(JSON.stringify({ event: 'stress.pageerror', message: error.message })),
@@ -351,10 +379,32 @@ async function environment(browser) {
     'packages',
     'examples/stress',
   ).split('\n')
+  const instrumentFiles = files
+    .filter(
+      (file) =>
+        file.startsWith('examples/stress/') &&
+        !file.includes('/test/') &&
+        !file.includes('/results/'),
+    )
+    .sort()
+  const instrument = createHash('sha256')
+  for (const file of instrumentFiles)
+    instrument.update(file).update(await readFile(resolve(repository, file)))
+  const instrumentHash = instrument.digest('hex')
   return {
     commit: git('rev-parse', 'HEAD'),
     dirty: Boolean(git('status', '--porcelain')),
-    sourceHash: await hashBenchmarkSource(repository, files, core.sourceDirectory),
+    sourceHash: packageSet
+      ? createHash('sha256').update(instrumentHash).update(packageSet.sourceHash).digest('hex')
+      : await hashBenchmarkSource(repository, files, core.sourceDirectory),
+    instrumentHash,
+    packageSet: packageSet
+      ? {
+          manifest: packageSet.manifest,
+          sourceHash: packageSet.sourceHash,
+          buildHash: packageSet.buildHash,
+        }
+      : null,
     coreDirectory: core.directory,
     browser: { engine: 'chromium', version: browser.version(), headless: true },
     hardware: {

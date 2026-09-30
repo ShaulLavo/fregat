@@ -11,6 +11,7 @@ import { typeScript } from '@singapore-editor/tree-sitter-languages'
 import '@singapore-editor/core/style.css'
 import '@singapore-editor/find/style.css'
 import { createInputLatencyProbe } from './inputLatency.ts'
+import { createInputConsumers } from './inputConsumers.ts'
 import { fixtureFacts, generateFixture, normalizedText, type FixtureId } from './fixtures.ts'
 
 type Diagnostic = {
@@ -30,6 +31,7 @@ type Active = {
   readonly buffer: EditorTextBuffer
   readonly editors: readonly Editor[]
   readonly inputAbort: AbortController
+  readonly consumers: ReturnType<typeof createInputConsumers> | null
 }
 
 declare global {
@@ -68,10 +70,14 @@ function current(): Active {
   return active
 }
 
-async function prepare(id: FixtureId, seed: number, instrumented: boolean) {
-  dispose()
+async function prepare(id: FixtureId, seed: number, instrumented: boolean, frozen = false) {
+  await dispose()
   fixture = id
-  source = generateFixture(id, seed)
+  if (frozen) {
+    const response = await fetch(`/frozen-fixtures/${id}.txt`)
+    check(response.ok, 'Frozen fixture is unavailable')
+    source = await response.text()
+  } else source = generateFixture(id, seed)
   expected = normalizedText(source)
   cancelled = false
   paints = []
@@ -104,16 +110,19 @@ function createHost(index: number): HTMLElement {
   return host
 }
 
-function open(multiple: boolean, highlight: boolean) {
+function open(multiple: boolean, highlight: boolean, consumerId?: string) {
   start = performance.now()
   const buffer = createEditorTextBuffer(source)
   const editors: Editor[] = []
   const inputAbort = new AbortController()
-  active = { buffer, editors, inputAbort }
+  const consumers = consumerId ? createInputConsumers(consumerId, fixture) : null
+  active = { buffer, editors, inputAbort, consumers }
   for (let index = 0; index < (multiple ? 3 : 1); index++) {
     const editor = new Editor(createHost(index), {
       lineHeight: 20,
-      plugins: highlight ? [typeScript(), createEditorFindPlugin()] : [createEditorFindPlugin()],
+      plugins:
+        consumers?.plugins ??
+        (highlight ? [typeScript(), createEditorFindPlugin()] : [createEditorFindPlugin()]),
       onInitialPaint: (event) => paints.push({ ...event, at: performance.now() }),
       onChange: (_state, change) => {
         if (change?.kind === 'edit') recordAppliedKey()
@@ -124,7 +133,7 @@ function open(multiple: boolean, highlight: boolean) {
     editors.push(editor)
     editor.attachSession(createEditorBufferSession(buffer), {
       documentId: fixture,
-      languageId: highlight ? 'typescript' : null,
+      languageId: consumers || highlight ? 'typescript' : null,
     })
   }
   editors[0]!
@@ -282,8 +291,9 @@ function verifyRows() {
   return rows.map((row) => row.row)
 }
 
-function dispose() {
+async function dispose() {
   inputLatency.dispose()
+  const consumers = active?.consumers
   if (active) {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
     released = [active.buffer, ...active.editors].map((value) => new WeakRef(value))
@@ -300,6 +310,15 @@ function dispose() {
   paints = []
   keys = []
   diagnostics = []
+  await consumers?.dispose()
+}
+
+async function settleConsumers() {
+  const { consumers, editors } = current()
+  if (!consumers) return null
+  const readiness = await consumers.settle(editors)
+  const highlights = [...CSS.highlights].map(([name, ranges]) => ({ name, ranges: ranges.size }))
+  return { ...readiness, highlights }
 }
 
 function retention() {
@@ -330,6 +349,7 @@ const bridge = {
   revealHidden,
   dispose,
   retention,
+  settleConsumers,
   cancel: () => {
     cancelled = true
   },

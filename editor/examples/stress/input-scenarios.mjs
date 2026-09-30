@@ -2,6 +2,7 @@ import { expect } from '@playwright/test'
 import { fail } from './errors.mjs'
 import { correlateInputEvents } from './input-correlation.mjs'
 import { inputScenarios, inputViewModes } from './input-results.mjs'
+import { assertConsumerReadiness } from './input-configurations.mjs'
 
 export const operationsPerSample = {
   typing: 24,
@@ -83,10 +84,15 @@ export async function runSample(
   const beforeMemory = await readMemory(cdp)
   const config = result.config
   const count = config.operationsPerSample[scenario]
+  const consumerId = config.consumers ?? 'native'
   const facts = await page.evaluate(
-    async ({ fixture, seed, diagnostics, multiple }) => {
-      const facts = await __stress.prepare(fixture, seed, diagnostics)
-      __stress.open(multiple, fixture === 'ordinary')
+    async ({ fixture, seed, diagnostics, multiple, frozen, consumerId }) => {
+      const facts = await __stress.prepare(fixture, seed, diagnostics, frozen)
+      __stress.open(
+        multiple,
+        fixture === 'ordinary',
+        consumerId === 'native' ? undefined : consumerId,
+      )
       return facts
     },
     {
@@ -94,11 +100,15 @@ export async function runSample(
       seed: result.manifest.seed,
       diagnostics: config.diagnostics,
       multiple: views === 'multiple',
+      frozen: config.fixtures === 'frozen-hashed-files',
+      consumerId,
     },
   )
   if (facts.sha256 !== fixture.sha256) fail('Input fixture hash mismatch')
-  if (fixture.id === 'ordinary')
+  if (consumerId === 'native' && fixture.id === 'ordinary')
     await page.waitForFunction(() => __stress.observe().state.initialHighlightStatus === 'painted')
+  const opened =
+    consumerId === 'native' ? null : await settleConsumers(page, consumerId, fixture.id, views)
   const target = await page.evaluate(
     ({ scenario, slowdownMs, count }) => {
       const target = __stress.inputLatency.prepare(scenario, slowdownMs)
@@ -130,6 +140,9 @@ export async function runSample(
       await expect(page.locator('#view-2 [data-editor-virtual-row]').first()).toBeVisible()
     const rendered = await page.evaluate(() => __stress.inputLatency.verifyRendered())
     await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 450)))
+    const settled = opened
+      ? await settleConsumers(page, consumerId, fixture.id, views, opened)
+      : null
     const diagnostic = await page.evaluate(() => {
       const { diagnostics, droppedDiagnostics } = __stress.observe()
       return { diagnostics, droppedDiagnostics }
@@ -162,7 +175,15 @@ export async function runSample(
         inputToFrame: events.map((event) => event.frameAt - event.at),
         burstToPaintUpperBound: [paint.completedAt - events[0].at],
       },
-      observation: { ...observation, ...diagnostic, target, paint, rendered, correlations },
+      observation: {
+        ...observation,
+        ...diagnostic,
+        target,
+        paint,
+        rendered,
+        correlations,
+        ...(opened ? { consumers: { opened, settled } } : {}),
+      },
       correct: true,
     }
   } catch (error) {
@@ -253,4 +274,13 @@ async function observePaint(page, scenario, before, observation) {
   const imageChanged = !before.equals(screenshot)
   if (!imageChanged) fail(`No changed pixels after ${scenario}`)
   return { method: 'screenshot-completion-upper-bound', startedAt, completedAt, imageChanged }
+}
+
+async function settleConsumers(page, consumerId, fixture, views, opened = null) {
+  const readiness = await page.evaluate(async () => ({
+    ...(await __stress.settleConsumers()),
+    workers: globalThis.__inputWorkerProof.map((worker) => ({ ...worker })),
+  }))
+  assertConsumerReadiness(readiness, consumerId, fixture, views, opened)
+  return readiness
 }
