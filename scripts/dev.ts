@@ -39,7 +39,7 @@ async function runDev() {
 
   console.log(`[dev] Client: ${runtimeUrl(webHost, ports.web)}`)
   const child = Bun.spawn({
-    cmd: [turbo, 'dev', ...args],
+    cmd: [turbo, 'dev', '--filter=web', '--filter=server', '--filter=desktop', ...args],
     cwd: root,
     env,
     stderr: 'inherit',
