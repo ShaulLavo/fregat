@@ -1,5 +1,5 @@
 import { use, useEffect, useState } from 'react'
-import type { TokensResult } from 'shiki/core'
+import type { HighlightResult } from '@singapore-editor/highlighting'
 
 import { CodeHighlighterContext } from '../providers/code-highlighter-context'
 import { highlightCache } from '../state/highlight-cache'
@@ -7,7 +7,7 @@ import { estimateHighlightBytes, highlightCacheKey } from '../utils/highlight'
 
 type HighlightState = {
   readonly key: string
-  readonly result: TokensResult
+  readonly result: HighlightResult
 }
 
 /**
@@ -23,7 +23,7 @@ export function useHighlightedCode({
   readonly cacheable: boolean
   readonly code: string
   readonly language: string
-}): TokensResult | null {
+}): HighlightResult | null {
   const highlighter = use(CodeHighlighterContext)
   const [highlighted, setHighlighted] = useState<HighlightState | null>(null)
   const key = highlighter
@@ -37,15 +37,15 @@ export function useHighlightedCode({
     if (cacheable && highlightCache.get(key)) return
 
     let active = true
-    const accept = (result: TokensResult) => {
+    const accept = (result: HighlightResult) => {
       if (cacheable) highlightCache.set(key, result, estimateHighlightBytes(result))
       if (!active) return
 
       setHighlighted({ key, result })
     }
 
-    // A loaded grammar answers synchronously and never calls back; an unloaded
-    // one returns null now and calls back once the grammar is in.
+    // A highlighter that already holds the answer returns it and never calls back; otherwise it
+    // returns null now and calls back once the worker replies.
     const immediate = highlighter.highlight({ code, language }, accept)
     if (immediate) accept(immediate)
 

@@ -3,7 +3,8 @@ import { cn } from '@workspace/ui/lib/utils'
 
 import type { useCodeThemePreview } from '@/lib/code-theme/hooks/use-preview'
 import { editorThemeColorMode } from '@/lib/code-theme/utils/catalog'
-import { CODE_THEME_PREVIEW_SAMPLE, previewLines } from '@/lib/code-theme/utils/preview'
+import { highlightLines } from '@singapore-editor/highlighting'
+import { CODE_THEME_PREVIEW_SAMPLE } from '@/lib/code-theme/utils/preview'
 import { FixWithAgentButton } from '@/components/fix-with-agent-button'
 
 export function CodeThemePreview({
@@ -56,7 +57,7 @@ export function CodeThemePreview({
           style={{ color: preview.result.foreground }}
         >
           <code>
-            {previewLines(CODE_THEME_PREVIEW_SAMPLE, preview.result.tokens).map(
+            {highlightLines(CODE_THEME_PREVIEW_SAMPLE, preview.result.tokens).map(
               (line, lineIndex) => (
                 <span className='flex min-w-max pr-4' key={lineIndex}>
                   <span

@@ -15,3 +15,5 @@ export type {
 export { highlightingGrammar, HIGHLIGHTING_DOCUMENT_LANGUAGES } from './languages'
 export { resolveHighlightTheme } from './theme'
 export type { HighlightTheme, ResolvedHighlightTheme } from './theme'
+export { highlightLines } from './lines'
+export type { HighlightSegment } from './lines'

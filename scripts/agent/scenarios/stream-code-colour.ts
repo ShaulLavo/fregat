@@ -29,7 +29,7 @@ export const streamCodeColour = isolatedNativeScenario({
         const block = answer.querySelector(${JSON.stringify(selectors.chatCodeBlockSelector)})
         if (!block) return null
         return {
-          coloured: block.querySelectorAll('pre code span[style*="--code-token-color"]').length,
+          coloured: block.querySelectorAll('pre code span[style*="color"]').length,
           incomplete: block.hasAttribute('data-incomplete'),
           length: (block.querySelector('pre')?.textContent ?? '').length,
         }

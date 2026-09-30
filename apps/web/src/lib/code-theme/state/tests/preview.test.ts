@@ -1,10 +1,11 @@
 import { expect, test } from '../../../../../test/fixtures'
 import { loadCodeThemePreview } from '@/lib/code-theme/state/preview'
-import { CODE_THEME_PREVIEW_SAMPLE, previewLines } from '@/lib/code-theme/utils/preview'
+import { highlightLines } from '@singapore-editor/highlighting'
+import { CODE_THEME_PREVIEW_SAMPLE } from '@/lib/code-theme/utils/preview'
 import type { HighlightResult } from '@singapore-editor/highlighting'
 
 function lines(preview: HighlightResult) {
-  return previewLines(CODE_THEME_PREVIEW_SAMPLE, preview.tokens)
+  return highlightLines(CODE_THEME_PREVIEW_SAMPLE, preview.tokens)
 }
 
 function colorOf(preview: HighlightResult, word: string) {
