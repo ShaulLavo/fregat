@@ -6556,6 +6556,12 @@
         },
         {
           "kind": "unknown",
+          "name": "DEFAULT_SHIKI_MAX_TOKENIZATION_LINE_LENGTH",
+          "source": "packages/editor/src/shiki/workerClient.ts",
+          "via": "packages/editor/src/shiki/index.ts"
+        },
+        {
+          "kind": "unknown",
           "name": "EDITOR_SHIKI_SYNTAX_SCOPE_MAPPINGS",
           "source": "packages/editor/src/shiki/theme.ts",
           "via": "packages/editor/src/shiki/index.ts"

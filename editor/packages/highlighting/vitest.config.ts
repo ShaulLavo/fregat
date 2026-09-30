@@ -41,6 +41,13 @@ export default defineConfig({
       },
       {
         // The real Shiki worker and grammars.
+        optimizeDeps: {
+          include: [
+            '@singapore-editor/core > @shikijs/engine-oniguruma',
+            '@singapore-editor/core > @shikijs/engine-oniguruma/wasm-inlined',
+            'shiki/core',
+          ],
+        },
         test: {
           name: 'browser',
           include: ['test/**/*.browser.test.ts'],
