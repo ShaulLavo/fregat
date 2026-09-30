@@ -1,7 +1,12 @@
 # Bounded foundations closeout, 2026-09-30
 
 Status: Approved. This delivery finishes the assigned two-owner proofs, fixture Settings repair,
-and a scoped idle-cleanup guard. Plan 126 remains open for its other acceptance and owner gates.
+and a scoped idle-cleanup guard. [PR #210](https://github.com/ShaulLavo/fregat/pull/210) merged it
+as `4edb43b18` after independent review, with all PR checks green. On the final PR head
+`614e672fe`, which contains main `3ca862a4b`, a throwaway source server passed `look --doctor`,
+native background liveness, two-owner bulk failure/Undo and the scoped silent-terminal guard.
+Production server deployment is still pending.
+Plan 126 remains open for its other acceptance and owner gates.
 The ledger's row statuses stay in progress because these cases do not certify each whole group.
 
 ## Delivered behavior
