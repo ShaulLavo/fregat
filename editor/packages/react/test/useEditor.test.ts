@@ -67,6 +67,36 @@ afterEach(() => {
 })
 
 describe('useEditor', () => {
+  it('moves selector subscriptions to a replacement controller', () => {
+    const first = mountReactEditor({ document: { text: 'alpha', documentId: 'a.ts' } })
+    const second = mountReactEditor({ document: { text: 'beta', documentId: 'b.ts', revision: 1 } })
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    let text = ''
+    const onText = (value: string) => {
+      text = value
+    }
+    const render = (controller: ReactEditorController) => {
+      act(() => root.render(createElement(FullTextProbe, { controller, onText })))
+    }
+    try {
+      render(first.controller)
+      expect(text).toBe('alpha')
+      render(second.controller)
+      expect(text).toBe('beta')
+      second.render({ document: { text: 'updated beta', documentId: 'b.ts', revision: 2 } })
+      expect(text).toBe('updated beta')
+      first.render({ document: { text: 'old owner', documentId: 'a.ts' } })
+      expect(text).toBe('updated beta')
+    } finally {
+      act(() => root.unmount())
+      host.remove()
+      first.dispose()
+      second.dispose()
+    }
+  })
+
   it('mounts, initializes the store, and disposes with the React tree', () => {
     const mounted = mountReactEditor({
       document: { text: 'alpha', documentId: 'a.ts', revision: 1 },

@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { createServer, type ViteDevServer } from 'vite'
 import { expect, test, vi } from 'vitest'
-import { devSourcePlugin } from './dev-source-plugin'
+import { sourceAliases } from '../../../scripts/dev-sources'
 
 const sourceTest = test.extend<{
   root: string
@@ -33,8 +33,8 @@ const sourceTest = test.extend<{
       logLevel: 'silent',
       optimizeDeps: { noDiscovery: true, include: [] },
       server: { middlewareMode: true, watch: null, ws: false },
-      plugins: [
-        devSourcePlugin([
+      resolve: {
+        alias: sourceAliases([
           {
             name: 'fixture-library',
             root: library,
@@ -42,6 +42,8 @@ const sourceTest = test.extend<{
             entries: new Map([['fixture-library', path.join(library, 'src/index.ts')]]),
           },
         ]),
+      },
+      plugins: [
         {
           name: 'record-processed-update',
           hotUpdate: {
@@ -64,14 +66,20 @@ const sourceTest = test.extend<{
 })
 
 sourceTest(
-  'loaded package source still reloads mounted implementations',
+  'Vite propagates package edits through the normal module graph',
   async ({ root, hmr: { server, processed } }) => {
     const send = vi.spyOn(server.environments.client.hot, 'send')
     const file = path.join(root, 'library/src/index.ts')
     expect(server.environments.client.moduleGraph.getModulesByFile(file)?.size).toBe(1)
     server.watcher.emit('change', file)
     await expect.poll(() => processed.has(file)).toBe(true)
-    expect(send).toHaveBeenCalledExactlyOnceWith({ type: 'full-reload' })
+    await expect
+      .poll(() =>
+        send.mock.calls.some(
+          ([payload]) => typeof payload === 'object' && payload.type === 'full-reload',
+        ),
+      )
+      .toBe(true)
   },
 )
 

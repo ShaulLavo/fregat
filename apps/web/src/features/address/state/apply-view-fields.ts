@@ -1,3 +1,4 @@
+import { readTerminalNamespace } from '@/lib/terminal-namespace'
 import type { Address } from '@workspace/client-core/address/grammar'
 import { descriptorFor, SETTING_IDS } from '@workspace/contracts'
 import type { AddressApplyReason } from '@/features/address/state/apply-view'
@@ -58,7 +59,7 @@ export function applyAddressFields({
 
 function applyPanels(address: Address, store: EditorWorkspaceStoreApi, reason: AddressApplyReason) {
   const state = store.getState()
-  const defaults = createDefaultWorkbenchPanels()
+  const defaults = createDefaultWorkbenchPanels(readTerminalNamespace())
   const side = address.side ?? (reason !== 'boot' ? defaults.activeSidebarTab : null)
   const bottom = address.bottom ?? (reason !== 'boot' ? defaults.activeBottomTab : null)
   let panels = state.workbenchPanels

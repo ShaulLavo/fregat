@@ -1,3 +1,4 @@
+import { readTerminalNamespace } from '@/lib/terminal-namespace'
 import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
 import { useQueryClient } from '@tanstack/react-query'
@@ -49,7 +50,9 @@ export function useTerminalTabActions(rootPath: string) {
       if (ownedFocus) focusTerminal(panels.activeTerminalTabId)
     },
     openTab: () => {
-      const panels = update(openTerminalTabInWorkbenchPanels)
+      const panels = update((current) =>
+        openTerminalTabInWorkbenchPanels(current, readTerminalNamespace()),
+      )
       focusTerminal(panels.activeTerminalTabId)
     },
     renameTab: (tabId: string, name: string) => {

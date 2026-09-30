@@ -1,4 +1,5 @@
 import { useChatModeSession } from '@/features/chat-mode/providers/session-context'
+import { readTerminalNamespace } from '@/lib/terminal-namespace'
 
 /** The shell every session shares while none is on the stage. */
 const COMPOSER_TERMINAL_ID = 'chat-terminal'
@@ -18,7 +19,8 @@ const COMPOSER_TERMINAL_ID = 'chat-terminal'
  */
 export function useSessionTerminalId() {
   const { activeSession } = useChatModeSession()
-  if (!activeSession.sessionId) return COMPOSER_TERMINAL_ID
+  const namespace = readTerminalNamespace()
+  if (!activeSession.sessionId) return `${namespace}${COMPOSER_TERMINAL_ID}`
 
-  return `chat-terminal:${activeSession.sessionId}`
+  return `${namespace}chat-terminal:${activeSession.sessionId}`
 }

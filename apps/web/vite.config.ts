@@ -7,8 +7,7 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { portFromEnv, runtimeUrl, serverUrlFromEnv } from '../../scripts/runtime-network'
 import { createScriptError } from '../../scripts/structured-errors'
-import { readDevSources } from '../../scripts/dev-sources'
-import { devSourcePlugin } from './scripts/dev-source-plugin'
+import { readDevSources, sourceAliases } from '../../scripts/dev-sources'
 import { appSaveHmrPlugin } from './scripts/app-save-hmr-plugin'
 import { bundleStatsPlugin } from './scripts/bundle-stats-plugin'
 import { demoPreviewPlugin } from './scripts/demo-preview-plugin'
@@ -93,6 +92,10 @@ export default defineConfig(({ command, isPreview, mode }) => {
       // The scanner skips excluded editor sources and their workers, so it never sees these
       // imports; found on a cold server mid-session instead, each one reloads the page.
       include: [
+        'evlog/client',
+        '@singapore-editor/markdown > micromark-util-decode-string',
+        '@singapore-editor/markdown > micromark-util-normalize-identifier',
+        '@singapore-editor/markdown > tree-sitter-md',
         '@singapore-editor/core > @shikijs/engine-oniguruma',
         '@singapore-editor/core > @shikijs/engine-oniguruma/wasm-inlined',
         '@singapore-editor/core > shiki/core',
@@ -108,7 +111,6 @@ export default defineConfig(({ command, isPreview, mode }) => {
       shellChunksPlugin(import.meta.dirname),
       demoPreviewPlugin(import.meta.dirname),
       devPagePlugin(),
-      devSourcePlugin(packages),
       appSaveHmrPlugin({
         url: serverUrlFromEnv(process.env),
         origin: runtimeUrl(devServerHost, devServerPort),
@@ -118,6 +120,8 @@ export default defineConfig(({ command, isPreview, mode }) => {
         compiler: { logDiagnostics: true },
         exclude: [
           /\/node_modules\//,
+          // Cached component modules retain WASM owners across Fast Refresh.
+          /\/features\/terminal\/components\/(panel|saved-viewport)\.tsx$/,
           ...linkedDist.map((pkg) => new RegExp(`^${escapeRegExp(pkg.root)}/`)),
           ...packages
             .filter((pkg) => pkg.name !== '@singapore-editor/react')
@@ -132,11 +136,14 @@ export default defineConfig(({ command, isPreview, mode }) => {
       bundleStatsPlugin(),
     ],
     resolve: {
-      alias: {
-        '@': path.resolve(import.meta.dirname, './src'),
-        // Isolated installs resolve these from their owning workspace, where they are declared.
-        ...Object.fromEntries(sharedMarkdown.map((name) => [name, markdownRequire.resolve(name)])),
-      },
+      alias: [
+        { find: '@', replacement: path.resolve(import.meta.dirname, './src') },
+        ...sharedMarkdown.map((name) => ({
+          find: name,
+          replacement: markdownRequire.resolve(name),
+        })),
+        ...sourceAliases(packages),
+      ],
       // Linked checkouts share the app's React, hotkey manager and evlog globals.
       dedupe: ['react', 'react-dom', 'evlog', '@tanstack/hotkeys'],
     },

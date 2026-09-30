@@ -1,6 +1,6 @@
 import { ok } from 'node:assert/strict'
 import type { WebSocketRoute } from 'playwright'
-import { installCaptureSocketPrefix } from '../product-terminal'
+import { installCaptureTerminalNamespace } from '../product-terminal'
 import { runPaletteCommand, selectors } from '../selectors'
 import { openChat } from './chat-verification'
 import type { Scenario } from './index'
@@ -27,7 +27,7 @@ export const connectionRefusalRetention: Scenario = {
       })
     })
     const prefix = `refusal-${crypto.randomUUID()}-`
-    await page.addInitScript(installCaptureSocketPrefix, prefix)
+    await installCaptureTerminalNamespace(page, prefix)
     const owners = new Map<string, URL>()
     let output = ''
     let ready = false

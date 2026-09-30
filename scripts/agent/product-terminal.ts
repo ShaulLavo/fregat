@@ -30,7 +30,7 @@ export async function isolateProductTerminals(page: Page, evidence: Evidence) {
     const session = { socketUrl: socket.url(), killUrl: url.href, worktreeId, terminalId }
     sessions.set(JSON.stringify([url.origin, worktreeId, terminalId]), session)
   })
-  await page.addInitScript(installCaptureSocketPrefix, prefix)
+  await installCaptureTerminalNamespace(page, prefix)
 
   return async () => {
     if (!page.isClosed())
@@ -50,24 +50,11 @@ export async function isolateProductTerminals(page: Page, evidence: Evidence) {
   }
 }
 
-export function installCaptureSocketPrefix(prefix: string) {
-  const NativeWebSocket = globalThis.WebSocket
-  // Browser storage is fresh, but the server's terminal-1 session may belong to the user.
-  globalThis.WebSocket = new Proxy(NativeWebSocket, {
-    construct(target, args, newTarget) {
-      const url = new URL(String(args[0]), Reflect.get(globalThis, 'location').href)
-      if (!url.pathname.endsWith('/terminal')) return Reflect.construct(target, args, newTarget)
-      const terminalId = url.searchParams.get('terminalId')
-      if (!terminalId || url.searchParams.has('agentSessionId'))
-        throw new DOMException(
-          'Product captures require an isolated shell terminal.',
-          'NotSupportedError',
-        )
-      if (!terminalId.startsWith(prefix))
-        url.searchParams.set('terminalId', `${prefix}${terminalId}`)
-      return Reflect.construct(target, [url.href, ...args.slice(1)], newTarget)
-    },
-  })
+export async function installCaptureTerminalNamespace(page: Page, prefix: string) {
+  await page.addInitScript((namespace) => {
+    if (location.protocol !== 'http:' && location.protocol !== 'https:') return
+    sessionStorage.setItem('fregat.terminal-namespace', namespace)
+  }, prefix)
 }
 
 export async function killCaptureTerminal(request: APIRequestContext, session: CaptureTerminal) {

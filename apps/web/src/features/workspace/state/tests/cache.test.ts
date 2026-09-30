@@ -22,7 +22,7 @@ import {
   INVALID_DOCUMENT_IDS,
   INVALID_SETTINGS_SURFACE_IDS,
 } from '../../../../../test/factories/document-targets'
-import { afterEach, beforeEach, describe } from 'vitest'
+import { afterEach, beforeEach, describe, vi } from 'vitest'
 import { expect, test as it } from '../../../../../test/fixtures'
 
 import type { PickedFsEntry } from '@/lib/file-system-types'
@@ -62,6 +62,24 @@ import {
 const STORE = new Map<string, string>()
 
 describe('workspace cache', () => {
+  it('applies capture ownership to restored terminals once', () => {
+    const slice = emptyWorkspaceSlice()
+    writeRootFolderCache(testScopedStorage, pickedDirectory('/repo'))
+    writeWorkspaceSliceCache(testScopedStorage, '/repo', slice)
+    vi.stubGlobal('sessionStorage', { getItem: () => 'capture-' })
+    try {
+      const restored = readWorkspaceCache(testScopedStorage).workspaces['/repo']!
+      expect(restored.workbenchPanels.activeTerminalTabId).toBe('capture-terminal-1')
+      expect(restored.workbenchPanels.terminalTabs.map((tab) => tab.id)).toEqual([
+        'capture-terminal-1',
+      ])
+      writeWorkspaceSliceCache(testScopedStorage, '/repo', restored)
+      expect(readWorkspaceCache(testScopedStorage).workspaces['/repo']).toEqual(restored)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   beforeEach(() => {
     STORE.clear()
     Object.defineProperty(globalThis, 'localStorage', {

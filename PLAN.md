@@ -10,8 +10,8 @@ The [September 29 inventory](plans/inventory-2026-09-29.md) reconciles the remai
 work across Fregat, Editor, Ghostty, the parser and native clients. It is a dated
 snapshot; this file remains the scheduler and each plan remains its scope authority.
 
-1. **Close delivered residues and the existing wave-2 queue, starting with 132.** Verify before retiring
-   implemented plans. Keep **132 → 179 → 099 units 0–1 → 114 → 126 → 156 P0–P2** as
+1. **Close delivered residues and the existing wave-2 queue, starting with 179.** Verify before retiring
+   implemented plans. Keep **179 → 099 units 0–1 → 114 → 126 → 156 P0–P2** as
    the default closeout order. Independent proofs and Platform-only slices can run
    alongside the active lane. 207's source migration and tooling alignment landed in
    PRs #199 and #201; all three mirrors passed ancestry and exact-tree checks. Editor
@@ -46,18 +46,21 @@ Before 204/205 mirror a consumer of hotkeys, prove standalone installation and s
 
 ## Wave 2 closeout and dependency order
 
-The owner's remaining closeout queue is **132 → 179 → 099 → 114 → 126 → 156**. This is a
+[132](plans/132-process-and-dev-ownership.md) delivered development ownership closeout on
+2026-09-30: standard Vite updates, unified typechecks, cold-cache proof and explicit terminal
+capture ownership. Its Mac vibrancy checks are owned by 114 Gate 3.
+
+The owner's remaining closeout queue is **179 → 099 → 114 → 126 → 156**. This is a
 default work order, not a chain of prerequisites. Independent work can move earlier. See the
 [remaining phase checklist](docs/next-wave.md#wave-2-closeout-reconciled-2026-09-28).
 
-| Work                                                                 | Dependency that matters                                                                                                                                                        |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [132: dev/process ownership](plans/132-process-and-dev-ownership.md) | Reconcile development plumbing; the schema collapse is deployed. No repeat database reset. Transfer obsolete Electrobun vibrancy work to 114.                                  |
-| [179: content isolation](plans/179-isolating-foreign-content.md)     | Instrument style costs before Mermaid/CSS performance claims. Its isolation policy also applies to 156.                                                                        |
-| [099: document contributions](plans/099-document-contributions.md)   | Units 0–1 refresh the consumer baseline and implement canonical publication. Include 198's landed retained-analysis subscriber. Units 2–7 retain their explicit gate.          |
-| [114: desktop shell](plans/114-polaron-shell.md)                     | Preserve mesh-owned servers and terminals. Native host checks precede Electrobun removal.                                                                                      |
-| [126: T3 alignment](plans/126-t3code-alignment.md)                   | Reconcile delivered batches first. Desktop host cases consume 114; independent chat/provider/server proofs can run earlier.                                                    |
-| [156: rich documents](plans/156-documents-in-the-editor.md)          | P0–P2 use existing file/buffer identity and the isolation policy. Binary guards and PDF viewing do not need all of 099 or 126. Later format/editing phases retain their gates. |
+| Work                                                               | Dependency that matters                                                                                                                                                        |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [179: content isolation](plans/179-isolating-foreign-content.md)   | Instrument style costs before Mermaid/CSS performance claims. Its isolation policy also applies to 156.                                                                        |
+| [099: document contributions](plans/099-document-contributions.md) | Units 0–1 refresh the consumer baseline and implement canonical publication. Include 198's landed retained-analysis subscriber. Units 2–7 retain their explicit gate.          |
+| [114: desktop shell](plans/114-polaron-shell.md)                   | Preserve mesh-owned servers and terminals. Native host checks precede Electrobun removal.                                                                                      |
+| [126: T3 alignment](plans/126-t3code-alignment.md)                 | Reconcile delivered batches first. Desktop host cases consume 114; independent chat/provider/server proofs can run earlier.                                                    |
+| [156: rich documents](plans/156-documents-in-the-editor.md)        | P0–P2 use existing file/buffer identity and the isolation policy. Binary guards and PDF viewing do not need all of 099 or 126. Later format/editing phases retain their gates. |
 
 This queue does not certify other plans as complete or authorize gated implementation, account
 spending, or state deletion. Their explicit decisions remain in the owning plans.

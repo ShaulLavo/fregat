@@ -62,8 +62,8 @@ export const SIDEBAR_MAX_SIZE = 520
 export const BOTTOM_MIN_SIZE = 140
 export const BOTTOM_MAX_SIZE = 480
 
-export function createDefaultWorkbenchPanels(): WorkbenchPanels {
-  const terminal = createTerminalTabRecord([], 1)
+export function createDefaultWorkbenchPanels(terminalNamespace = ''): WorkbenchPanels {
+  const terminal = createTerminalTabRecord([], 1, terminalNamespace)
   return {
     activeBottomTab: 'terminal',
     activeGitTab: 'changes',
@@ -81,9 +81,12 @@ export function createDefaultWorkbenchPanels(): WorkbenchPanels {
   }
 }
 
-export function openTerminalTabInWorkbenchPanels(panels: WorkbenchPanels): WorkbenchPanels {
+export function openTerminalTabInWorkbenchPanels(
+  panels: WorkbenchPanels,
+  terminalNamespace = '',
+): WorkbenchPanels {
   const terminalTabSequence = panels.terminalTabSequence + 1
-  const tab = createTerminalTabRecord(panels.terminalTabs, terminalTabSequence)
+  const tab = createTerminalTabRecord(panels.terminalTabs, terminalTabSequence, terminalNamespace)
   return {
     ...panels,
     activeTerminalTabId: tab.id,

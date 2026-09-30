@@ -59,8 +59,13 @@ test('native host scopes tags, replaces pending notices, handles refusal, focus 
 test('the badge repaints the page icon in place and gives it back on focus', () => {
   installNotificationPlatform()
   // happy-dom has no 2D canvas; the badge only needs one to draw into.
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
-    new Proxy({}, { get: () => () => {}, set: () => true }) as CanvasRenderingContext2D,
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
+    new Proxy(HTMLCanvasElement.prototype.getContext, {
+      apply(_target, _receiver, args) {
+        if (args[0] !== '2d') return null
+        return new Proxy({}, { get: () => () => {}, set: () => true })
+      },
+    }),
   )
   vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(
     'data:image/png;base64,YmFkZ2U=',

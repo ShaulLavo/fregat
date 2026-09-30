@@ -1,6 +1,6 @@
 import { ok, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
-import { installCaptureSocketPrefix } from '../product-terminal'
+import { installCaptureTerminalNamespace } from '../product-terminal'
 import { runPaletteCommand, selectors, waitForApp } from '../selectors'
 import type { Scenario } from './index'
 import { openWiredContextPage } from '../wired-context'
@@ -16,15 +16,7 @@ const inspection = new WeakMap<Page, unknown>()
 
 async function isolate(page: Page, prefix: string, owners: Map<string, URL>) {
   const connections: ObservedTerminal[] = []
-  await page.addInitScript(installCaptureSocketPrefix, prefix)
-  await page.route(/\/terminal\/(?:clear|kill|restart)$/, async (route) => {
-    const body = route.request().postDataJSON()
-    ok(typeof body?.terminalId === 'string', 'Terminal mutation must carry an ID')
-    const terminalId = body.terminalId.startsWith(prefix)
-      ? body.terminalId
-      : prefix + body.terminalId
-    await route.continue({ postData: JSON.stringify({ ...body, terminalId }) })
-  })
+  await installCaptureTerminalNamespace(page, prefix)
   page.on('websocket', (socket) => {
     const url = new URL(socket.url())
     if (!url.pathname.endsWith('/terminal')) return
@@ -69,6 +61,8 @@ async function until(page: Page, condition: () => boolean, label: string) {
 
 async function showTerminal(page: Page) {
   await waitForApp(page)
+  if (await selectors.terminalSurface(page).first().isVisible()) return
+  await selectors.windowToolbar(page).click({ position: { x: 300, y: 10 } })
   await runPaletteCommand(page, 'Show terminal')
   await selectors.terminalSurface(page).first().waitFor()
 }

@@ -295,6 +295,7 @@ export const terminalTabs: Scenario = {
   async run(page, { step }) {
     await runPaletteCommand(page, 'Show terminal')
     await selectors.newTerminal(page).click()
+    await expectTerminalFocus(page)
     const list = selectors.terminalList(page)
     await list.waitFor()
     await list.focus()

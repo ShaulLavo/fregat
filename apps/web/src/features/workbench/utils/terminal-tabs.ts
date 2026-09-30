@@ -22,9 +22,10 @@ const TERMINAL_TITLE_PATTERN = /^Terminal (\d+)$/
 export function createTerminalTabRecord(
   existing: readonly TerminalTabRecord[],
   sequence: number,
+  namespace = '',
 ): TerminalTabRecord {
   return {
-    id: `${TERMINAL_TAB_ID_PREFIX}${sequence}`,
+    id: `${namespace}${TERMINAL_TAB_ID_PREFIX}${sequence}`,
     name: null,
     process: null,
     shellTitle: null,

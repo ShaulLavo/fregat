@@ -1,3 +1,4 @@
+import { readTerminalNamespace } from '@/lib/terminal-namespace'
 import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
 import { workbenchCommandMetadata } from '@workspace/client-core/commands/workbench'
 import {
@@ -1264,7 +1265,7 @@ export const workspaceCommands = [
       if (!rootPath) return declined
 
       const panels = showWorkbenchBottomTab(
-        openTerminalTabInWorkbenchPanels(snapshot.workbenchPanels),
+        openTerminalTabInWorkbenchPanels(snapshot.workbenchPanels, readTerminalNamespace()),
         'terminal',
       )
       return afterNavigation(

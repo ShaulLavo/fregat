@@ -1,3 +1,4 @@
+import { readTerminalNamespace } from '@/lib/terminal-namespace'
 import type { EditorTabRecord } from '@/lib/documents/utils/types'
 import { selectWorktreeAtPath } from '@workspace/client-core/chat/selectors'
 import { activeProjectSession } from '@/features/chat-mode/utils/active-session'
@@ -51,7 +52,7 @@ function snapshotFromStore(
   const entry = environments.entries[environments.activeOrigin]
   const environmentId = entry?.kind === 'primary' ? null : (entry?.environmentId ?? null)
   const panels = state.workbenchPanels
-  const defaults = createDefaultWorkbenchPanels()
+  const defaults = createDefaultWorkbenchPanels(readTerminalNamespace())
 
   return {
     ...emptyAddressSnapshot(),

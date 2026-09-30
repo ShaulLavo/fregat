@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun run --parallel dev:vite dev:types",
-    "build": "tsc --build && bun --bun --env-file=../../.env vite build",
+    "build": "bun run typecheck && bun --bun --env-file=../../.env vite build",
     "bundle:report": "bun scripts/bundle-report.ts",
     "bundle:gate": "bun scripts/bundle-gate.ts",
     "proof:workspace-reload": "bun scripts/workspace-reload-proof.mjs --check",
@@ -33,7 +33,7 @@
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "test:tree-browser": "vitest run --config vitest.tree-browser.config.ts",
     "test:durations": "bun --bun vitest run --project node --project dom --reporter=json --outputFile=node_modules/.cache/shard-durations-report.json; bun scripts/shard-durations.ts node_modules/.cache/shard-durations-report.json",
-    "typecheck": "tsc --build",
+    "typecheck": "bun ../../scripts/check-dev-types.ts",
     "preview": "bun --bun --env-file=../../.env vite preview",
     "dev:vite": "bun ../../scripts/run-with-env.ts vite",
     "dev:types": "bun ../../scripts/check-dev-types.ts --watch",

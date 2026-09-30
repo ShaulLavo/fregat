@@ -1,3 +1,4 @@
+import { readTerminalNamespace } from '@/lib/terminal-namespace'
 import { readReloadCache } from '@/lib/reload-cache'
 import { entryTypeSchema, workspaceSearchMatchSchema } from '@workspace/contracts'
 import {
@@ -656,6 +657,9 @@ function restoredSliceForWorkspace(
   slice: StoredWorkspaceSlice,
 ): CachedWorkspaceSlice | null {
   const root = workspaceRoot(rootPath)
+  const terminalNamespace = readTerminalNamespace()
+  const terminalId = (id: string) =>
+    id.startsWith(terminalNamespace) ? id : terminalNamespace + id
   const editorGroups = {
     ...slice.workbenchPanels.editorGroups,
     root: restoredGroupNode(slice.workbenchPanels.editorGroups.root, root),
@@ -672,9 +676,14 @@ function restoredSliceForWorkspace(
     }),
     workbenchPanels: normalizeWorkbenchPanels({
       ...slice.workbenchPanels,
+      activeTerminalTabId:
+        slice.workbenchPanels.activeTerminalTabId === null
+          ? null
+          : terminalId(slice.workbenchPanels.activeTerminalTabId),
       editorGroups,
       terminalTabs: slice.workbenchPanels.terminalTabs.map((tab) => ({
         ...tab,
+        id: terminalId(tab.id),
         process: null,
         shellTitle: null,
       })),
@@ -784,7 +793,7 @@ export function emptyWorkspaceSlice(): CachedWorkspaceSlice {
     recentlyClosedTabs: [],
     reopenScrollPositions: [],
     viewScrollPositions: [],
-    workbenchPanels: createDefaultWorkbenchPanels(),
+    workbenchPanels: createDefaultWorkbenchPanels(readTerminalNamespace()),
   }
 }
 

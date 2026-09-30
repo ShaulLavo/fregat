@@ -175,7 +175,8 @@ type ReactEditorControllerPrivate = ReactEditorController & {
   readonly [CONTROLLER_PRIVATE]: ReactEditorControllerImplementation
 }
 
-const CONTROLLER_PRIVATE = Symbol('controller-private')
+// Selectors can run during Fast Refresh before the controller's owner rerenders.
+const CONTROLLER_PRIVATE = Symbol.for('@singapore-editor/react/controller-private')
 const NO_DOCUMENT = Symbol('no-document')
 const EMPTY_PLUGINS: readonly EditorPlugin[] = []
 const DOCUMENT_OPTION_NAMES = new Set(['rangeDecorations', 'selection', 'scrollPosition'])
@@ -201,7 +202,12 @@ const selectUpdateKind = (
 
 export function useEditor(options: ReactEditorOptions = {}): ReactEditorController {
   // Lazy state, not a lazily filled ref: render reads it, and refs are off-limits in render.
-  const [controller] = useState(() => new ReactEditorControllerImplementation(options))
+  const [held, setHeld] = useState(() => new ReactEditorControllerImplementation(options))
+  const controller =
+    held.constructor === ReactEditorControllerImplementation
+      ? held
+      : new ReactEditorControllerImplementation(options)
+  if (controller !== held) setHeld(controller)
 
   controller.setOptions(options)
   useControlledOptionSync(controller, options)
@@ -234,7 +240,13 @@ export function useEditorSelector<T>(
 ): T {
   const store = internalController(controller).store
   // Lazy state, not a lazily filled ref: render reads it, and refs are off-limits in render.
-  const [subscription] = useState(() => store.createSubscription(selector, isEqual))
+  const [held, setHeld] = useState(() => ({
+    store,
+    subscription: store.createSubscription(selector, isEqual),
+  }))
+  const subscription =
+    held.store === store ? held.subscription : store.createSubscription(selector, isEqual)
+  if (subscription !== held.subscription) setHeld({ store, subscription })
 
   store.refreshSubscription(subscription, selector, isEqual)
 

@@ -1,32 +1,35 @@
 # Processes, leases and dev plumbing each get an owner
 
-Status: Approved, active wave 2 closeout, updated 2026-09-30. Phase 1 and the schema collapse
-are delivered; phases 2 and 3 retain the items below.
+Status: Approved, development closeout delivered 2026-09-30; native checks transferred to 114.
 
-## Active closeout after the package move, 2026-09-30
+Plan numbers record creation order. The process-ownership work predates 207;
+207 supplies canonical package locations for its final development checks.
 
-Plan numbers record creation order. This plan's process ownership and development plumbing
-predate 207; the source migration now supplies canonical package locations for its remaining work.
+## Development closeout
 
-- [x] Update the general roadmap for 207's delivered source migration and deferred publication.
-- [x] Prove loaded source still reloads and generated/unserved package files do not reload.
-- [x] Restrict the reload hook to modules served in the browser environment.
-- [x] Pass whole-tree gates and the full repository typecheck.
-- [x] Restart the mesh-managed dev route and verify the application loads.
+- [x] Replace the custom source reload plugin with standard Vite resolution and watching.
+- [x] Unify browser, Node and source typechecks; repair the canvas/WebGPU spy overload.
+- [x] Replace retained Editor adapter controllers and selector subscriptions during Fast Refresh.
+- [x] Give terminal WASM owners Vite's native page reload boundary through React-plugin exclusions.
+- [x] Record current Vite memory and cold dependency loading evidence.
+- [x] Replace capture WebSocket rewriting with explicit terminal IDs across reloads and actions.
+- [x] Pass focused tests and gates, and update the roadmap.
+- [ ] Commit, push and deploy the verified closeout.
 
-Baseline `typecheck:dev` fails in the notification badge test: its 2D canvas spy conflicts with
-the WebGPU `getContext` overload loaded by Ghostty's source types. Keep this failure in the
-configuration follow-up; it predates this HMR change. Resource disposal and memory measurements
-remain separate closeout units below. The 13 focused Vite/source-resolution tests and normal
-web typecheck pass. The real Vite watcher regression failed before the fix for both generated
-and unloaded files; both pass after the fix, and loaded source still sends one full reload.
-After restarting `:5173` on `omarchy`, `agent:browser look --doctor` passed with no browser
-or log problems. Screenshot read back in `/work/tmp/fregat-evidence/20260930T084038Z-look-1440x1000/`.
+Vite's module graph owns browser updates. The Editor React adapter refreshes in place;
+Editor core and terminal resource owners use native page reloads. The terminal panel and
+saved viewport hold cached modules and WASM resources, so Fast Refresh would retain old
+implementations. Their explicit React-plugin exclusions let ordinary Vite propagation
+reach the page boundary. No source plugin or reload callback is needed.
 
-Turbo owns task scheduling and build dependencies. Vite serves these packages directly from
-source. The current Editor controller is retained in React state and the Ghostty runtime has
-a static query with infinite retention. Ordinary unmount disposal exists; safe replacement
-across hot updates still needs proof before removing the reload fallback.
+All web typecheck entry points run the browser/Node project build and the generated source
+configuration. The source configuration shares Vite's alias map. Producer packages own
+source unused checks. The canvas fixture preserves the DOM/WebGPU overloaded signature.
+
+Capture ownership is selected before navigation and stored per browser tab. Factories,
+cache admission, chat terminals and commands use the same namespace; transport remains
+the native WebSocket. The real terminal-history scenario proves two-viewer replay, clear,
+reload, restart and owned cleanup.
 
 ## Delivered schema collapse
 
@@ -42,39 +45,57 @@ for this plan. The historical backup/reset procedure remains in
 does not establish which backups were retained. A future schema bump needs its own concrete
 state-loss review and authorization.
 
-## Phase 2 remaining
+## Transferred native work
 
-- Item 10: reconcile the generated tsconfig from `dev-sources.ts` with every typecheck path.
-  Editor sources must be checked under the intended settings without competing configurations.
-- Item 12: prove hot updates replace the retained Editor controller and cached Ghostty runtime,
-  releasing their resources, then remove the forced full reload from `devSourcePlugin`.
-  Preserve the fallback until that proof passes; ordinary unmount disposal is already present.
-- Re-measure Vite memory against today's Vite/rolldown versions. The 2026-09-25 proposal for
-  `RAYON_NUM_THREADS=4 MIMALLOC_PURGE_DELAY=0` is not in `apps/web`'s `dev:vite`. Treat the old
-  2.50 GB → 1.31 GB result as a historical experiment, not current proof. Use the existing
-  configuration policy for any permanent tuning; avoid adding speculative environment controls.
+Electrobun's window-title vibrancy workaround belongs to
+[Plan 114 Gate 3](114-polaron-shell.md#gate-3--macos-m), which replaces that host.
+Mac window ownership and vibrancy remain unverified here. The current desktop connects to
+mesh-owned servers; quitting it flushes observability and does not own their shutdown.
+Gate 3 must preserve that ownership before Electrobun removal.
 
-Linked-source dependency prebundling landed in `6d940b3c5`: `optimizeDeps.include` explicitly
-lists transitive dependencies of the excluded Editor packages. Recheck a cold cache for late
-optimizer reloads before changing it. The former proposal to add all sources to
-`optimizeDeps.entries` is superseded unless that proof finds a remaining gap.
+## Verification record
 
-## Phase 3 remaining and transferred work
+The normal Vite watcher tests cover loaded source, unloaded source and generated output.
+The live `dev-package-updates` scenario mounts the editor and terminal, invalidates both
+packages, verifies replacement and shell replay, and verifies generated output leaves the
+page running. This proof uses standard Vite aliases and no source reload hook.
 
-- The Electrobun `vibrancy.m` window-title lookup is transferred to Plan 114 Gate 3, which replaces
-  that host. Verify native window ownership and vibrancy on the Mac there; do not repair an
-  Electrobun pointer workaround solely to delete it afterward.
-- Item 11 remains deferred: the harness patches `globalThis.WebSocket` to rewrite terminal ids.
-  The capture prefix identifies terminals for `chat-queue`, `terminal-history` and product
-  captures. Default browser runs have isolated servers; only `--shared-dev` needs this behavior.
-  Remove it only with equivalent capture ownership across reloads.
+The historical 2026-09-25 memory tuning experiment is superseded by current measurements.
+No thread-count or allocator environment tuning is introduced. Existing explicit dependency
+prebundling remains; change it only if cold-start evidence identifies a missing dependency.
 
-## Order and closeout
+The mesh-managed sequence passed with no console errors, failed requests or application
+warn/error logs. Screenshot and frames were read back from
+`/work/tmp/fregat-evidence/20260930T111254Z-scenario-dev-package-updates/`.
+A second sequence against an empty-cache Vite instance passed in
+`/work/tmp/fregat-evidence/20260930T111338Z-scenario-dev-package-updates/`.
+The cold log initially exposed late discovery of `evlog/client`, the two Markdown micromark
+utilities and `tree-sitter-md`; adding those four inputs to prebundling removes that late
+optimizer reload. The final log contains one initial optimization and no later reoptimization.
 
-Finish the bounded development-plumbing work before Plan 114's launcher cutover. The existing
-desktop connects to mesh-managed servers and its quit path only flushes desktop observability;
-114 must preserve that ownership. This plan does not own shared-server or terminal-host shutdown.
+On Vite 8.3.1 / Bun 1.4.2, the isolated Vite process measured 2,140,311,552 bytes peak RSS
+and 1,819,598,848 bytes at the end of the editor/terminal update sequence; server readiness
+was 204 ms. These are process measurements for this workload, not a before/after speed claim.
+The program, configuration, log and samples remain in
+`/work/tmp/fregat-evidence/plan132-cold-vite/`. No allocator/thread tuning was needed to
+close this evidence item.
 
-Close each remaining item with the narrow relevant configuration/lifecycle test and actual
-cold-start, HMR or memory evidence. Record transferred/deferred items explicitly. No UI or schema
-change is required merely to reconcile this plan.
+Earlier incomplete-optimizer runs also produced Chromium compositor crash dumps and failed
+module requests. Resource checks found no OOM or descriptor exhaustion; the dumps lack
+Chromium symbols. Both final update runs passed after completing prebundling. The exact
+compositor failure mechanism remains unconfirmed; no browser flags or host settings changed.
+A later Chromium `chat-queue` run hit the same failure. Its Firefox run passed the full
+queued text/file/terminal payload proof in
+`/work/tmp/fregat-evidence/20260930T111954Z-scenario-chat-queue/`. This broader Chromium
+verification remains unconfirmed; the required package-update sequence passed on Chromium.
+
+Terminal history and owned cleanup passed in
+`/work/tmp/fregat-evidence/20260930T110313Z-scenario-terminal-history/`: clear and kill each
+returned 200 for the capture-owned terminal. Native Mac checks remain with 114 Gate 3.
+
+The product-capture workbench/chat retention proof passed in
+`/work/tmp/fregat-evidence/20260930T111732Z-scenario-bottom-panel-persistence/`;
+its workbench and chat terminals were both killed successfully with no unowned connections.
+Terminal-tab navigation passed in
+`/work/tmp/fregat-evidence/20260930T112105Z-scenario-terminal-tabs/` after waiting for the
+new terminal's initial focus before testing list navigation. Its capture cleanup passed too.

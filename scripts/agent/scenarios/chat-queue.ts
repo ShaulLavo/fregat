@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import type { Page } from 'playwright'
 import * as v from 'valibot'
 import { attachmentUploadTicketSchema } from '../../../packages/contracts/src/index'
-import { installCaptureSocketPrefix, killCaptureTerminal } from '../product-terminal'
+import { installCaptureTerminalNamespace, killCaptureTerminal } from '../product-terminal'
 import { runPaletteCommand, selectors } from '../selectors'
 import {
   isolatedNativeScenario,
@@ -75,7 +75,7 @@ async function isolateTerminals(page: Page) {
   const prefix = `queue-verification-${crypto.randomUUID()}-`
   const owners = new Map<string, URL>()
   const state = { ready: false, output: '' }
-  await page.addInitScript(installCaptureSocketPrefix, prefix)
+  await installCaptureTerminalNamespace(page, prefix)
   page.on('websocket', (socket) => {
     const url = new URL(socket.url())
     if (!url.pathname.endsWith('/terminal')) return

@@ -23,23 +23,18 @@ export function readDevSources(webRoot: string): readonly DevPackage[] {
   return [...editors.map((name) => readEditorPackage(webRoot, name)), readGhosttyPackage(webRoot)]
 }
 
-// Exact entries first; a pattern entry (`@x/internal/*` → `<root>/src/*`)
-// resolves the remainder against the source extensions at request time.
-export function resolveDevSource(
-  entries: ReadonlyMap<string, string>,
-  specifier: string,
-): string | null {
-  const exact = entries.get(specifier)
-  if (exact) return exact
-
-  for (const [id, base] of entries) {
-    if (!id.endsWith('/*') || !specifier.startsWith(id.slice(0, -1))) continue
-    const stem = base.slice(0, -1) + specifier.slice(id.length - 1)
-    const file = sourceExtensions.map((extension) => stem + extension).find(fs.existsSync)
-    if (file) return fs.realpathSync(file)
-  }
-
-  return null
+export function sourceAliases(packages: readonly DevPackage[]) {
+  return packages.flatMap((pkg) =>
+    [...pkg.entries].map(([id, file]) => {
+      const wildcard = id.endsWith('/*')
+      const specifier = wildcard ? id.slice(0, -1) : id
+      const escaped = specifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      return {
+        find: new RegExp(`^${escaped}${wildcard ? '([^?]+)' : '(?=\\?|$)'}`),
+        replacement: wildcard ? file.slice(0, -1) + '$1' : file,
+      }
+    }),
+  )
 }
 
 export function sourcePaths(packages: readonly DevPackage[]): Record<string, string[]> {
@@ -72,10 +67,6 @@ export function writeDevTypeConfig(webRoot: string, packages: readonly DevPackag
   fs.mkdirSync(path.dirname(file), { recursive: true })
   if (!fs.existsSync(file) || fs.readFileSync(file, 'utf8') !== text) fs.writeFileSync(file, text)
   return file
-}
-
-export function reportDevSources(packages: readonly DevPackage[], log: (line: string) => void) {
-  for (const pkg of packages) log(`[dev:source] ${pkg.name} → ${pkg.root}`)
 }
 
 function packageRoot(webRoot: string, name: string): string {
@@ -150,7 +141,7 @@ function editorSourcePath(root: string, target: string, id: string): string {
   return fs.realpathSync(file)
 }
 
-// `./dist/*.js` becomes `<root>/src/*`; tsconfig paths and resolveDevSource
+// `./dist/*.js` becomes `<root>/src/*`; tsconfig paths and Vite aliases
 // both substitute the remainder.
 function editorSourcePattern(root: string, target: string, id: string): string {
   if (!target.startsWith('./dist/') || !target.endsWith('/*.js'))

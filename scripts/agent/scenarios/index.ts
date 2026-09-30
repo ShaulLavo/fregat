@@ -403,7 +403,10 @@ import { demoStartup } from './demo-startup'
 import { demoThemeStartup } from './demo-theme-startup'
 import { demoWallpaperStartup } from './demo-wallpaper-startup'
 
+import { devPackageUpdates } from './dev-package-updates'
+
 export const scenarios: readonly Scenario[] = [
+  devPackageUpdates,
   editorPagedReadonly,
   diffNoFlicker,
   savedComparisonNoFlicker,
