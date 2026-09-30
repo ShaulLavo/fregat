@@ -69,7 +69,7 @@ describe('AutoCloseStore', () => {
     store.track(snapshot, snapshot, 1, ')')
 
     const typed = insertIntoPieceTable(snapshot, 1, 'ab')
-    store.advance(typed)
+    store.advance(snapshot, typed)
 
     expect(characterAt(typed, 3)).toBe(')')
     expect(store.hasCloserAt(typed, 3, ')')).toBe(true)
@@ -82,7 +82,7 @@ describe('AutoCloseStore', () => {
     store.track(snapshot, snapshot, 1, ')')
 
     const deleted = applyBatchToPieceTable(snapshot, [{ from: 1, text: '', to: 2 }])
-    store.advance(deleted)
+    store.advance(snapshot, deleted)
 
     expect(store.hasCloserAt(deleted, 1, ')')).toBe(false)
   })
@@ -113,7 +113,7 @@ describe('AutoCloseStore', () => {
     store.track(snapshot, snapshot, 1, ')')
     store.clear()
 
-    store.advance(snapshot)
+    store.advance(snapshot, snapshot)
 
     expect(store.hasCloserAt(snapshot, 1, ')')).toBe(false)
   })
@@ -141,6 +141,22 @@ describe('AutoCloseStore', () => {
 
     expect(store.hasCloserAt(nested, 3, ')')).toBe(true)
     expect(store.hasCloserAt(nested, 4, ')')).toBe(false)
+  })
+
+  it('cannot revive an outer pair by advancing from a foreign snapshot', () => {
+    const outer = snapshotOf('()')
+    const store = new AutoCloseStore()
+    store.track(outer, outer, 1, ')')
+    const foreign = insertIntoPieceTable(outer, 1, 'a')
+    const typed = insertIntoPieceTable(foreign, 2, 'b')
+
+    store.advance(foreign, typed)
+    expect(store.hasCloserAt(typed, 3, ')')).toBe(false)
+    const nested = insertIntoPieceTable(typed, 3, '()')
+    store.track(typed, nested, 4, ')')
+
+    expect(store.hasCloserAt(nested, 4, ')')).toBe(true)
+    expect(store.hasCloserAt(nested, 5, ')')).toBe(false)
   })
 
   it('tracks several carets at once', () => {

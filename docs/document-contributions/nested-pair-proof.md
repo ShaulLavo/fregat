@@ -58,3 +58,27 @@ runs are retained as failed verification; the final run uses two paint frames.
 The Settings preview scenario from PR212, history policy, calibration package sets,
 and performance baselines remain unchanged. This proves the tiny TypeScript fixture
 in Chromium; it makes no throughput, long-line, or cross-browser performance claim.
+
+## Independent review repair
+
+The review at `https://github.com/ShaulLavo/fregat/pull/214#issuecomment-5917537495`
+found an introduced ownership regression. Typing `(`, inserting `a` through the shared session
+outside the controller, then typing `b())` produced `(ab())` instead of `(ab()))`. Ordinary
+typing advanced tracking onto its new snapshot without checking the foreign starting snapshot,
+so the next nested insertion preserved an outer pair whose ownership had been revoked.
+
+`red-foreign-controller.log` reproduces that exact real-controller failure while 43 controls
+pass. `advance` now requires both snapshots and clears tracking when the starting snapshot is
+foreign. `track` uses the same check. All seven controller advance callers supply their starting
+snapshot: ordinary typing, snippet and linked-edit mirrors, type-over, pair deletion, snippet
+movement and inline acceptance. No compatibility overload or history grouping change was added.
+
+The real-controller regression and pair-store invalidation control pass along with 216 focused
+input/pair/history/document/snippet/linked-edit tests in `green-ownership.log`; all 16 inline
+suggestion checks pass in `green-inline-ownership.log`, for 232 focused checks.
+
+The doctor reports no problems. The stable-source app proof at
+`evidence/20260930T185307Z-scenario-editor-type-burst` again verifies exact typing and full
+restoration after 106 Undo commands. `inspection.json` retains the actual text, and both typed
+and restored screenshots were read back. No failed requests, page errors or application
+warn/error logs occurred; fixture and GPU console warnings remain.

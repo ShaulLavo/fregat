@@ -34,7 +34,7 @@ export class AutoCloseStore {
     offset: number,
     closerChar: string,
   ): void {
-    if (this.validForSnapshot !== previousSnapshot) this.pairs = []
+    this.advance(previousSnapshot, snapshot)
     this.validForSnapshot = snapshot
     // Right bias: text typed between the delimiters must push the closer along, which is exactly
     // what makes type-over still work after editing inside the pair.
@@ -72,13 +72,12 @@ export class AutoCloseStore {
     })
   }
 
-  /**
-   * Carries the store onto the snapshot this editor just produced. Anything that arrives on a
-   * snapshot we did not hand forward — paste, undo, an edit from another view — leaves the store
-   * behind and it clears on the next read.
-   */
-  advance(snapshot: PieceTableSnapshot): void {
-    if (this.validForSnapshot === null) return
+  /** Carries pairs across owned transitions; a foreign starting snapshot revokes ownership. */
+  advance(previousSnapshot: PieceTableSnapshot, snapshot: PieceTableSnapshot): void {
+    if (this.validForSnapshot !== previousSnapshot) {
+      this.clear()
+      return
+    }
 
     this.validForSnapshot = snapshot
   }

@@ -164,6 +164,19 @@ describe('auto-closing pairs', () => {
   })
 
   // A closer the editor did not insert must still be typeable.
+  it('revokes outer pair ownership after a foreign edit followed by ordinary typing', () => {
+    const session = createDocumentSession('')
+    editor.attachSession(session, { languageId: 'typescript' })
+    editor.focus()
+    type('(')
+    session.applyEdits([{ from: 1, to: 1, text: 'a' }])
+    editor.setSelection(2, 2)
+
+    type('b', '(', ')', ')')
+
+    expect(editor.materializeFullText()).toBe('(ab()))')
+  })
+
   it('keeps outer closers tracked while inserting and typing over nested pairs', () => {
     type('(', '(', 'a', ')', ')')
 
