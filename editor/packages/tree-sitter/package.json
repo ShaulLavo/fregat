@@ -31,7 +31,7 @@
   "dependencies": {
     "@singapore-editor/core": "workspace:*",
     "tree-sitter-md": "0.1.1",
-    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#ba4f1d2"
+    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#5fe5ea0"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
