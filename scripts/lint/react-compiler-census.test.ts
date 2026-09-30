@@ -121,6 +121,7 @@ test('every whole-tree gate runs in the commit hook, in verify and in CI', () =>
 
   const gates = manifest.scripts.gates.split('&&').map((part) => part.trim())
   expect(gates).toEqual([
+    'bun run workspace:check',
     'bun run dupes:functions',
     'bun run dupes',
     'bun run design:census',

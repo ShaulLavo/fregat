@@ -20,9 +20,15 @@ The original licence is in [LICENSE](LICENSE) and in each package.
 
 ## Development
 
+Development happens in the [Fregat monorepo](https://github.com/ShaulLavo/fregat/tree/main/hotkeys).
+This repository mirrors its `hotkeys/` folder. Submit changes to Fregat.
+
+From the standalone mirror:
+
 ```sh
-bun run --filter '@fregat/*' test
-bun run --filter '@fregat/*' typecheck
-bun run --cwd hotkeys/packages/hotkeys build
-bun hotkeys/packages/hotkeys/bench/lookup.ts
+bun install
+bun run verify
+bun packages/hotkeys/bench/lookup.ts
 ```
+
+From Fregat, run `bun run --cwd hotkeys verify`.

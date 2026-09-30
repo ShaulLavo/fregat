@@ -6,14 +6,19 @@
     "site:dev": "astro dev",
     "site:build": "bun ../../scripts/build-site.ts",
     "site:preview": "astro preview",
-    "typecheck": "astro check"
+    "typecheck": "astro check",
+    "lint": "oxlint .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check ."
   },
   "dependencies": {
     "astro": "^7.3.5"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
     "sharp": "^0.35.4",
-    "typescript": "^6.0.3"
+    "typescript": "npm:typescript@6.0.3"
   }
 }

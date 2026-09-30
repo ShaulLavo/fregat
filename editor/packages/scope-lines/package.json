@@ -35,11 +35,11 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
-    "@vitest/browser-playwright": "^5.0.2",
+    "@vitest/browser-playwright": "5.0.2",
     "happy-dom": "^20.14.5",
     "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
     "typescript": "7.0.2",
-    "vitest": "^5.0.2"
+    "vitest": "5.0.2"
   }
 }

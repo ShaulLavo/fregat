@@ -20,10 +20,10 @@
     "evlog": "catalog:"
   },
   "devDependencies": {
-    "@types/bun": "1.4.2",
+    "@types/bun": "catalog:",
     "electrobun": "2.0.1",
-    "oxfmt": "0.70.0",
-    "oxlint": "1.85.0",
-    "typescript": "^7.0.2"
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "typescript": "catalog:"
   }
 }
