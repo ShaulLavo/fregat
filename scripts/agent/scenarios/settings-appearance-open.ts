@@ -1,12 +1,11 @@
 import { ok } from 'node:assert/strict'
 import type { Page } from 'playwright'
 import type { Scenario } from './index'
-import { selectors } from '../selectors'
+import { chords, pressShortcut, selectors } from '../selectors'
 
 const DARK = 'editor.codeTheme.dark'
 const LIGHT = 'editor.codeTheme.light'
 
-// Inside the settings scroller's visible box, which ends above the bottom panel.
 function onScreen(element: Element) {
   const rect = element.getBoundingClientRect()
   let scroller = element.parentElement
@@ -27,10 +26,10 @@ async function offScreenWithoutPreview(page: Page, id: string) {
 export const settingsAppearanceOpen: Scenario = {
   name: 'settings-appearance-open',
   description:
-    'Open Settings with Ctrl+,: the code theme rows sit below the fold and highlight nothing. Scrolling to the top of Appearance shows the dark row, whose preview paints while the light row below stays unhighlighted; scrolling to the light row paints its preview. Trace it to see what the previews cost the main thread.',
+    'Open Settings with its keyboard shortcut: the code theme rows sit below the fold and highlight nothing. Scrolling to the dark row paints its preview while the light row below stays unhighlighted; scrolling to the light row paints its preview. Trace it to see what the previews cost the main thread.',
   capture: { width: 1440, height: 1000 },
   async run(page, { step }) {
-    await page.keyboard.press('Control+,')
+    await pressShortcut(page, chords.settings)
     await selectors.settingsRow(page, DARK).waitFor()
     // Long enough for a preview that started on mount to paint.
     await page.waitForTimeout(1_000)
@@ -38,9 +37,14 @@ export const settingsAppearanceOpen: Scenario = {
     await offScreenWithoutPreview(page, LIGHT)
     await step('settings-open')
 
-    await selectors
-      .settingsRow(page, 'workbench.theme')
-      .evaluate((element) => element.scrollIntoView({ block: 'start' }))
+    await selectors.settingsRow(page, DARK).evaluate((element) => {
+      element.scrollIntoView({ block: 'end' })
+      let scroller = element.parentElement
+      while (scroller && !/auto|scroll/.test(getComputedStyle(scroller).overflowY))
+        scroller = scroller.parentElement
+      // Show half this row, keeping the following row fully below every viewport.
+      scroller?.scrollBy(0, -element.getBoundingClientRect().height / 2)
+    })
     await selectors.settingsCodeThemePreview(page, DARK).waitFor()
     await offScreenWithoutPreview(page, LIGHT)
     await step('appearance-shown')
