@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from 'vitest'
 
 import {
   createHighlightingService,
+  highlightLines,
   type HighlightTheme,
   type HighlightingService,
 } from '../src/index'
@@ -64,6 +65,36 @@ describe('standalone highlighting in the real worker', () => {
     }
     expect(Object.isFrozen(result)).toBe(true)
     expect(Object.isFrozen(result.tokens[0]?.style)).toBe(true)
+  })
+
+  test('CRLF, lone CR and mixed separators keep offsets into exactly the submitted text', async () => {
+    const text = 'const a = 1\r\n// note\r\nlet b = 2\r\nconst c = 3\nlet d = 4\rx\r\n'
+    const result = await service().highlight(text, {
+      language: 'ts',
+      theme: vscodeTheme('#ff0000'),
+    })
+
+    const keywords = result.tokens
+      .filter((token) => token.style.color?.toLowerCase() === '#ff0000')
+      .map((token) => [token.start, text.slice(token.start, token.end)])
+    expect(keywords).toEqual([
+      [0, 'const'],
+      [8, '='],
+      [22, 'let'],
+      [28, '='],
+      [33, 'const'],
+      [41, '='],
+      [45, 'let'],
+      [51, '='],
+    ])
+    const comment = result.tokens.filter((token) => token.style.fontStyle === 'italic')
+    expect(text.slice(comment[0]?.start, comment.at(-1)?.end)).toBe('// note')
+
+    const painted = highlightLines(text, result.tokens)
+      .flat()
+      .filter((segment) => segment.style?.color?.toLowerCase() === '#ff0000')
+      .map((segment) => segment.text)
+    expect(painted).toEqual(['const', '=', 'let', '=', 'const', '=', 'let', '='])
   })
 
   test('snippets leave lines over the configured limit as one plain token', async () => {
