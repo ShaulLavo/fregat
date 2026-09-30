@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll } from 'vitest'
 import { server } from '../msw/server'
+import { stopRequestOwners } from './request-lifecycle'
 
 // The `'error'` string strategy prints and rejects the *request*, not the test: an
 // operation that treats a failed background fetch as ordinary (a retrying query, a
@@ -21,7 +22,8 @@ beforeAll(() =>
     },
   }),
 )
-afterEach(() => {
+afterEach(({ task }) => {
+  stopRequestOwners(task)
   server.resetHandlers()
   const seen = unhandled
   unhandled = []
