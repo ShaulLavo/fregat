@@ -4,7 +4,8 @@ import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import { runMutation } from '@/lib/mutations/run'
 import { mermaidQueryKeys } from '@/features/chat/utils/query-keys'
 import { chatMutationKeys } from '@/features/chat/utils/mutation-keys'
-import { isolateDiagramClasses } from '@/features/chat/utils/diagram-classes'
+import type mermaid from 'mermaid'
+import { withIsolatedDiagramClasses } from '@/features/chat/state/diagram-parser'
 import type { MermaidTheme } from '@/features/chat/utils/diagram-theme'
 
 export type MermaidRenderer = {
@@ -12,6 +13,11 @@ export type MermaidRenderer = {
 }
 
 type MermaidModule = {
+  mermaidAPI: {
+    getDiagramFromText(
+      chart: string,
+    ): Promise<Pick<Awaited<ReturnType<typeof mermaid.mermaidAPI.getDiagramFromText>>, 'parser'>>
+  }
   initialize(config: Record<string, unknown>): void
   render(id: string, text: string): Promise<{ readonly svg: string }>
 }
@@ -104,9 +110,9 @@ async function renderDiagram(mermaid: MermaidModule, chart: string, theme: Merma
       themeVariables: { ...theme.variables, darkMode: theme.colorMode === 'dark' },
     })
     nextDiagramId += 1
-    const { svg } = await mermaid.render(
-      `chat-mermaid-${nextDiagramId}`,
-      isolateDiagramClasses(chart),
+    const diagram = await mermaid.mermaidAPI.getDiagramFromText(chart)
+    const { svg } = await withIsolatedDiagramClasses(diagram.parser, () =>
+      mermaid.render(`chat-mermaid-${nextDiagramId}`, chart),
     )
     log.info({
       action: 'chat.mermaid.render',

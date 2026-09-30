@@ -35,9 +35,39 @@ Browser regression reproduction failed before the change: `classDef hidden` comp
 coverage includes flowchart, state and class diagrams, preserving labels/comments and default
 styling. The state grammar rejects hyphenated class names, so the shared prefix uses underscores.
 Verification: 23 focused tests passed, workspace package builds completed, web/source and script
-typechecks passed, and repository gates passed. Renderer acquisition/serialization and source
-transformation tests pass; trace tests cover nested
+typechecks passed, and repository gates passed. Renderer acquisition/serialization and parsed-class boundary tests pass; trace tests cover nested
 same-interval events and one following-recalc attribution for simultaneous stylesheet writes.
+
+Independent review found two regressions at `837f3841d`: whole-source class rewriting changed
+visible sequence messages, state descriptions, class members and quoted flow labels; a completed
+font load did not change the family-only snapshot. The five added browser regressions failed on
+that head (`/work/tmp/plan179-wave/review/red.log`).
+
+The repair passes the original chart unchanged to Mermaid. Its public `getDiagramFromText` API
+loads the grammar, then a scoped parser adapter namespaces CSS-definition/attachment arguments
+and discriminated state/block AST records before measurement. Parser/database bindings are restored
+in `finally`; class-diagram node identities and renderer-internal classes remain intact. Definitions
+accept both strings and arrays; the literal `default` identity keeps its upstream semantics. Parsed
+mindmap decorations, block classes and ER classes use the same boundary. Kanban currently drops
+custom classes in its upstream `getData` projection; its visible text remains unchanged.
+
+The font source now holds a stable family/generation snapshot and releases its MutationObserver
+and font listener with the component subscription. Completed font batches advance the generation,
+including when the selected family is unchanged. Each mount renders anew; there is no SVG result
+cache. Actual asynchronously registered JetBrains Mono WOFF2 changes the diagram viewBox, and
+remove/remount under that unchanged loaded family reproduces the loaded viewBox. Pending old-font
+and unmounted render results stay discarded.
+
+Repair verification: 22 real Chromium tests and five focused unit tests pass. Coverage includes all
+four visible-text failures, custom/internal/default classes, class-node IDs, URL and marker references,
+comments/directives, multiline labels, parser/render failure cleanup, real late font loading, stable
+snapshots, listener cleanup and stale results. Exact logs: `review/final-browser.log`,
+`review/final-unit.log`, `review/types-gates.log` and `review/final-build.log` beneath
+`/work/tmp/plan179-wave/`. Fallback/loaded screenshots were read back from
+`/work/tmp/plan179-wave/review/surface-mermaid-font-{fallback,loaded}.png`.
+The adapter uses Mermaid 12's parser semantic database contract and performs one discovery parse
+before the library's render parse. The existing steady-state CSS comparison below measures the
+retained SVG display boundary, not parser or initial diagram-render throughput.
 
 UI fixture scenario `chat-mermaid` passed and all four screenshots were read in
 `/work/tmp/fregat-evidence/20260930T132820Z-scenario-chat-mermaid/`: visible custom class, remeasured

@@ -1,33 +1,31 @@
-const CLASS_PREFIX = 'mermaid_user_'
-
-export function isolateDiagramClasses(chart: string): string {
-  const editable = maskQuotedText(chart)
-  const replacements: { start: number; end: number; text: string }[] = []
-  const pattern =
-    /\bclassDef\s+([\w,-]+)|\b(?:class|cssClass)\s+[^\n;{}]+?\s+([\w,-]+)(?=\s*(?:[;\n]|$))|:::([\w,-]+)/g
-  for (const match of editable.matchAll(pattern)) {
-    const group = match[1] ?? match[2] ?? match[3]
-    if (!group) continue
-    const offset = match[0].lastIndexOf(group)
-    const text = group
-      .split(',')
-      .map((name) => (name === 'default' ? name : `${CLASS_PREFIX}${name}`))
-      .join(',')
-    replacements.push({
-      start: match.index + offset,
-      end: match.index + offset + group.length,
-      text,
-    })
-  }
-  let result = chart
-  for (const replacement of replacements.reverse())
-    result = `${result.slice(0, replacement.start)}${replacement.text}${result.slice(replacement.end)}`
-  return result
+export function diagramClassNames(names: string): string {
+  return names.replace(/[^\s,]+/g, (name) => (name === 'default' ? name : `mermaid_user_${name}`))
 }
 
-function maskQuotedText(chart: string) {
-  return chart.replace(
-    /\[[^\]\n]*\]|\([^)\n]*\)|\{[^}\n]*\}|%%[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`[^`]*`/g,
-    (text) => text.replace(/[^\n]/g, ' '),
+export function isolateDiagramRecords(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(isolateDiagramRecords)
+  if (!value || typeof value !== 'object' || (!('stmt' in value) && !('type' in value)))
+    return value
+  const statement = 'stmt' in value ? value.stmt : value.type
+  return Object.fromEntries(
+    Object.entries(value).map(([key, field]) => [key, isolateRecordField(statement, key, field)]),
   )
+}
+
+function isolateRecordField(statement: unknown, key: string, value: unknown): unknown {
+  if (key === 'doc' || key === 'state1' || key === 'state2' || key === 'children')
+    return isolateDiagramRecords(value)
+  if (statement === 'classDef' && key === 'id' && typeof value === 'string')
+    return diagramClassNames(value)
+  if (statement === 'applyClass' && key === 'styleClass' && typeof value === 'string')
+    return diagramClassNames(value)
+  if (statement === 'state' && key === 'classes' && Array.isArray(value))
+    return value.map((name) => (typeof name === 'string' ? diagramClassNames(name) : name))
+  return value
+}
+
+export function isolateDiagramDecoration(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || !('class' in value) || typeof value.class !== 'string')
+    return value
+  return { ...value, class: diagramClassNames(value.class) }
 }

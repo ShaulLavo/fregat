@@ -6,12 +6,14 @@ import { resourceQueryClient } from '@/lib/resources/state/query-client'
 
 afterEach(() => setMermaidLoader(null))
 
+const mermaidAPI = { getDiagramFromText: async () => ({ parser: { parse() {} } }) }
+
 test('concurrent fences share acquisition and a failed library can be requested again', async () => {
   let attempts = 0
   setMermaidLoader(async () => {
     attempts += 1
     if (attempts === 1) throw new Error('fixture import failure')
-    return { initialize() {}, render: async () => ({ svg: '<svg />' }) }
+    return { mermaidAPI, initialize() {}, render: async () => ({ svg: '<svg />' }) }
   })
   const failed = await Promise.allSettled([
     resourceQueryClient.query(mermaidQueryOptions),
@@ -34,6 +36,7 @@ test('renderer configuration remains owned by its diagram until rendering settle
     return { svg: `${text}:${theme}` }
   })
   setMermaidLoader(async () => ({
+    mermaidAPI,
     initialize: (config) => {
       theme = (config.themeVariables as { darkMode: boolean }).darkMode
     },
