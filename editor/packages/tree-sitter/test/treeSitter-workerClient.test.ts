@@ -66,6 +66,9 @@ class FakeWorker {
 describe('tree-sitter worker client language registration cache', () => {
   afterEach(async () => {
     FakeWorker.autoResolve = true
+    for (const worker of fakeWorkers) {
+      for (const request of worker.messages) worker.resolveRequest(request)
+    }
     await currentClient?.dispose()
     currentClient = null
     fakeWorkers.length = 0
@@ -134,6 +137,66 @@ describe('tree-sitter worker client language registration cache', () => {
     expect(
       nextWorker.messages.some((message) => message.payload.type === 'registerLanguages'),
     ).toBe(true)
+  })
+
+  it('terminates a busy owned worker and settles registration and idle without its reply', async () => {
+    const client = await loadWorkerClient()
+    await client.registerLanguages([languageDescriptor('typescript')])
+    FakeWorker.autoResolve = false
+    const registration = client.registerLanguages([languageDescriptor('other')])
+    const result = registration.catch((error: unknown) => error)
+    await vi.waitFor(() => expect(registerLanguageRequests()).toHaveLength(2))
+    const worker = fakeWorkerAt(0)
+    const terminate = vi.spyOn(worker, 'terminate')
+    const lateMessage = worker.onmessage
+    const lateError = worker.onerror
+    const idle = client.awaitIdleFence()
+    const disposed = client.dispose()
+
+    expect(client.dispose()).toBe(disposed)
+    expect(worker.isTerminated).toBe(true)
+    await disposed
+    expect(await result).toEqual(new Error('Tree-sitter worker disposed'))
+    await idle
+    expect(terminate).toHaveBeenCalledOnce()
+    lateMessage?.(
+      new MessageEvent('message', {
+        data: { id: registerLanguageRequests()[1]!.id, ok: true },
+      }),
+    )
+    lateError?.(new ErrorEvent('error', { message: 'late worker error' }))
+    expect(client.inspect()).toMatchObject({
+      lifecycle: 'disposed',
+      pendingRequests: 0,
+      lastError: null,
+      cache: {
+        registeredLanguages: 0,
+        sourceChunks: { documents: 0, sentChunks: 0, sourceEpochs: 0 },
+      },
+    })
+    await client.registerLanguages([languageDescriptor('later')])
+    expect(fakeWorkers).toHaveLength(1)
+  })
+
+  it('keeps registration cache empty when a reply is delivered just before owner disposal', async () => {
+    const client = await loadWorkerClient()
+    await client.registerLanguages([languageDescriptor('typescript')])
+    FakeWorker.autoResolve = false
+    const registration = client.warmLanguages([languageDescriptor('other')])
+    await vi.waitFor(() => expect(registerLanguageRequests()).toHaveLength(2))
+    const worker = fakeWorkerAt(0)
+    worker.resolveRequest(registerLanguageRequests()[1]!)
+    await client.dispose()
+    await registration
+    await client.awaitIdleFence()
+    expect(client.inspect()).toMatchObject({
+      lifecycle: 'disposed',
+      pendingRequests: 0,
+      cache: { registeredLanguages: 0 },
+    })
+    expect(
+      worker.messages.filter((request) => request.payload.type === 'warmLanguages'),
+    ).toHaveLength(0)
   })
 
   it('exposes worker lifecycle and source chunk cache accounting', async () => {
