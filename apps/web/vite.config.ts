@@ -121,7 +121,9 @@ export default defineConfig(({ command, isPreview, mode }) => {
         exclude: [
           /\/node_modules\//,
           // Cached component modules retain WASM owners across Fast Refresh.
-          /\/features\/terminal\/components\/(panel|saved-viewport)\.tsx$/,
+          ...(packages.length > 0
+            ? [/\/features\/terminal\/components\/(panel|saved-viewport)\.tsx$/]
+            : []),
           ...linkedDist.map((pkg) => new RegExp(`^${escapeRegExp(pkg.root)}/`)),
           ...packages
             .filter((pkg) => pkg.name !== '@singapore-editor/react')

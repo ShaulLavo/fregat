@@ -14,7 +14,7 @@ Plan numbers record creation order. The process-ownership work predates 207;
 - [x] Record current Vite memory and cold dependency loading evidence.
 - [x] Replace capture WebSocket rewriting with explicit terminal IDs across reloads and actions.
 - [x] Pass focused tests and gates, and update the roadmap.
-- [ ] Commit, push and deploy the verified closeout.
+- [x] Commit, push and deploy the verified closeout.
 
 Vite's module graph owns browser updates. The Editor React adapter refreshes in place;
 Editor core and terminal resource owners use native page reloads. The terminal panel and
@@ -99,3 +99,8 @@ its workbench and chat terminals were both killed successfully with no unowned c
 Terminal-tab navigation passed in
 `/work/tmp/fregat-evidence/20260930T112105Z-scenario-terminal-tabs/` after waiting for the
 new terminal's initial focus before testing list navigation. Its capture cleanup passed too.
+
+Commit `459ec5732` passed all 108 focused tests, whole-tree gates and the full repository
+typecheck, then shipped as `20260930T112423Z-459ec573-main`; the mesh live check passed.
+A final configuration follow-up scopes the terminal Fast Refresh exclusions to source
+serving, retaining production React Compiler optimization. Native server code is unchanged.
