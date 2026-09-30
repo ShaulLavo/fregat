@@ -13,6 +13,7 @@ export type AppSaveServer = {
 
 /** A file the app itself saved is already what the editor shows, so it skips the hot update. */
 export function appSaveHmrPlugin(server: AppSaveServer): Plugin {
+  const ask = appWriteAsker(server)
   return {
     name: 'platform-app-save-hmr',
     apply: 'serve',
@@ -20,7 +21,7 @@ export function appSaveHmrPlugin(server: AppSaveServer): Plugin {
       order: 'pre',
       async handler({ file, read, type }) {
         if (type === 'delete') return
-        const answer = await askAppWrite(server, file, await read())
+        const answer = await ask(file, await read())
         if (answer.warning) this.environment.logger.warn(answer.warning)
         if (!answer.appWrite) return
 
@@ -30,7 +31,24 @@ export function appSaveHmrPlugin(server: AppSaveServer): Plugin {
   }
 }
 
-type AppWriteAnswer = { readonly appWrite: boolean; readonly warning?: string }
+type AppWriteAnswer = {
+  readonly appWrite: boolean
+  readonly warning?: string
+  /** The server turned away this dev server's origin, so it refuses every file alike. */
+  readonly refused?: boolean
+}
+
+/** Asks per file until the server refuses the origin; after that each change hot-updates unasked. */
+export function appWriteAsker(server: AppSaveServer) {
+  let refused = false
+  return async (file: string, content: string): Promise<AppWriteAnswer> => {
+    if (refused) return { appWrite: false }
+
+    const answer = await askAppWrite(server, file, content)
+    refused ||= answer.refused === true
+    return answer
+  }
+}
 
 /** Whether the server's last app write to `file` produced exactly `content`. */
 export async function askAppWrite(
@@ -44,12 +62,21 @@ export async function askAppWrite(
   const request = new Request(url, { headers: { origin: server.origin } })
   try {
     const response = await (server.fetcher ?? fetch)(request)
+    if (response.status === 401 || response.status === 403) return refusal(server, response.status)
     if (!response.ok) return unanswered(`${url.origin} answered ${response.status} for ${file}`)
 
     const body: unknown = await response.json()
     return { appWrite: isAppWriteAnswer(body) && body.appWrite === true }
   } catch (error) {
     return unanswered(`${url.origin} did not answer for ${file}: ${String(error)}`)
+  }
+}
+
+function refusal(server: AppSaveServer, status: number): AppWriteAnswer {
+  return {
+    appWrite: false,
+    refused: true,
+    warning: `[app-save] ${server.url} answered ${status} to origin ${server.origin}; every change hot-updates as an outside edit until this dev server restarts`,
   }
 }
 

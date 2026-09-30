@@ -3,7 +3,7 @@ import { mkdir, realpath, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import { makeTestServer, type TestServer } from '../test/server'
-import { askAppWrite, type AppSaveServer } from './app-save-hmr-plugin'
+import { appWriteAsker, askAppWrite, type AppSaveServer } from './app-save-hmr-plugin'
 
 const servers: TestServer[] = []
 
@@ -85,7 +85,7 @@ test('a server that cannot answer leaves the change to hot update, with a warnin
   const file = path.join(root, 'app.ts')
 
   const refused = await askAppWrite({ ...source, origin: 'http://127.0.0.1:1' }, file, 'x')
-  expect(refused.appWrite).toBe(false)
+  expect(refused).toMatchObject({ appWrite: false, refused: true })
   expect(refused.warning).toContain('answered 403')
 
   const down = await askAppWrite(
@@ -98,4 +98,23 @@ test('a server that cannot answer leaves the change to hot update, with a warnin
   )
   expect(down.appWrite).toBe(false)
   expect(down.warning).toContain('did not answer')
+})
+
+test('an origin the server refuses is asked once, then every change hot-updates unasked', async () => {
+  const { root, server } = await devServer()
+  let requests = 0
+  const ask = appWriteAsker({
+    url: 'http://127.0.0.1:3001',
+    origin: 'http://127.0.0.1:1',
+    fetcher: (request) => {
+      requests += 1
+      return server.app.handle(request)
+    },
+  })
+
+  const first = await ask(path.join(root, 'a.ts'), 'x')
+  expect(first).toMatchObject({ appWrite: false, refused: true })
+  expect(first.warning).toContain('until this dev server restarts')
+  expect(await ask(path.join(root, 'b.ts'), 'x')).toEqual({ appWrite: false })
+  expect(requests).toBe(1)
 })
