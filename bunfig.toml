@@ -1,0 +1,3 @@
+# Isolated installs resolve type peers (e.g. @types/react for @phosphor-icons/react) only from the local store.
+[install]
+globalStore = false
