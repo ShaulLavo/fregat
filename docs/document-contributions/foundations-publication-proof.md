@@ -69,6 +69,14 @@ compensation continue publishing at their existing accepted local boundary.
   adoption now preserves an unchanged immutable source object; both originating/non-originating
   protocol-version checks pass.
 
+Independent review found that the mounted editor kept a publication after dispatch, so an eventless
+segment rotation left contribution cursors on the old segment. It also found that source readers
+used the mutable buffer head during nested delivery. The publication now exists only within the
+synchronous delivery scope, and public editor, edit, decoration and feature source readers use its
+captured snapshot. Two mounted-plugin regressions failed at `1cbdeae7847f` and pass after the fix;
+they verify source/cursor agreement and live segment rotation. Their raw logs are
+`public-contributions-red.log` and `public-contributions-green.log` in the evidence directory.
+
 Retained-analysis proofs cover equivalent/incompatible configurations, distinct ranges, source
 shortening, stale range replies, edit supersession, hover cancellation with an active view,
 owner disposal, theme refresh and 20 acquire/release cycles. Workspace eviction disposes clean
@@ -84,13 +92,13 @@ three unchanged headless publication controls, an independent holdout, candidate
 samples retain checkout's size-dependent snapshot diff as mutation work. They are diagnostic
 samples, not a browser input-latency acceptance or a performance improvement claim.
 
-Checks: 159 focused core tests, 20 LSP synchronization tests, 61 Platform document/retention/runtime
+Checks: 161 focused core tests, 20 LSP synchronization tests, 61 Platform document/retention/runtime
 and language-server admission tests, and seven real-worker prepared-open browser tests. The latter
 run against private ports 5219/33319 and cover query-ready first-frame attachment, prepared
 promotion without duplicate requests, dirty retained text before a delayed read and independent
 Shiki/Tree-sitter readiness. Canonical workspace builds and affected typechecks are required too.
 
-The full expanded consumer-matrix native-input calibration has not run. Chat/workbench pixel-level
+Unit 0 remains partial. The full expanded consumer-matrix native-input calibration has not run. Chat/workbench pixel-level
 comparison of every visible token, retained parser/WASM byte accounting, an independent inactive
 analysis budget and full memory-pressure/first-frame matrix remain Plan 198 acceptance work. No
 budget was invented from document text size alone. These limitations do not expand authorization

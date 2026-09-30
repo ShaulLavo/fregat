@@ -1,7 +1,7 @@
 # Plan 099: Route document consumers through one contribution runtime
 
 Status: unit 1 publication implemented and focused proof delivered in the foundations wave,
-2026-09-30. Unit 0 current inventory and headless controls are refreshed; the full expanded
+2026-09-30. Unit 0 is partial: current inventory and headless controls are refreshed; the full expanded
 consumer-matrix native-input calibration remains unverified. The session diff correction and
 Editor E057 transport removal landed. Retained-analysis subscribers now consume captured frames.
 See [current publication proof](../docs/document-contributions/foundations-publication-proof.md). Units 2–7 retain their explicit implementation gate. Requested on 2026-09-12.

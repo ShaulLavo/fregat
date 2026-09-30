@@ -1713,7 +1713,11 @@ export class Editor {
   }
 
   getTextSnapshot(): TextSnapshot {
-    return this.session?.getTextSnapshot() ?? this.textSnapshot
+    return (
+      this.bufferPublication?.change.textSnapshot ??
+      this.session?.getTextSnapshot() ??
+      this.textSnapshot
+    )
   }
 
   getMergeConflicts(): readonly MergeConflictRegion[] {
@@ -3427,7 +3431,7 @@ export class Editor {
       hasDocument: () => this.session !== null,
       log: (event) => this.log(event),
       materializeFullText: () => this.materializeFullText(),
-      getTextSnapshot: () => this.session?.getTextSnapshot() ?? null,
+      getTextSnapshot: () => (this.session ? this.getTextSnapshot() : null),
       getDocumentSyncPoint: () => this.currentDocumentEditChain().point,
       changesSinceDocumentSyncPoint: (point, scope) =>
         this.currentDocumentEditChain().changesSince(point, scope),
@@ -3451,7 +3455,7 @@ export class Editor {
       hasDocument: () => this.session !== null,
       log: (event) => this.log(event),
       materializeFullText: () => this.materializeFullText(),
-      getTextSnapshot: () => this.session?.getTextSnapshot() ?? null,
+      getTextSnapshot: () => (this.session ? this.getTextSnapshot() : null),
       getDocumentSyncPoint: () => this.currentDocumentEditChain().point,
       changesSinceDocumentSyncPoint: (point, scope) =>
         this.currentDocumentEditChain().changesSince(point, scope),
@@ -3476,7 +3480,7 @@ export class Editor {
       hasDocument: () => this.session !== null,
       log: (event) => this.log(event),
       materializeFullText: () => this.materializeFullText(),
-      getTextSnapshot: () => this.session?.getTextSnapshot() ?? null,
+      getTextSnapshot: () => (this.session ? this.getTextSnapshot() : null),
       getDocumentSyncPoint: () => this.currentDocumentEditChain().point,
       changesSinceDocumentSyncPoint: (point, scope) =>
         this.currentDocumentEditChain().changesSince(point, scope),
@@ -3533,7 +3537,7 @@ export class Editor {
     const session = editorBufferSession(this.session)
     if (!session) return this.detachedEditChain
     const publication = this.bufferPublication
-    if (publication?.change.textSnapshot === this.textSnapshot) {
+    if (publication) {
       return {
         point: publication.syncPointAfter,
         changesSince: publication.changesSinceDocumentSyncPoint,
@@ -3571,23 +3575,27 @@ export class Editor {
   private handleBufferChange(session: EditorBufferSession, event: EditorTextBufferChange): void {
     if (this.session !== session) return
     this.bufferPublication = event
-    const pending = this.pendingBufferChangeOptions.get(event.change.textSnapshot)
-    if (event.change.kind !== 'synchronize' && event.sourceViewId !== session.view.viewId) {
-      session.view.acceptBufferSelections(markSelectionSetDirty(session.view.getSelections()))
+    try {
+      const pending = this.pendingBufferChangeOptions.get(event.change.textSnapshot)
+      if (event.change.kind !== 'synchronize' && event.sourceViewId !== session.view.viewId) {
+        session.view.acceptBufferSelections(markSelectionSetDirty(session.view.getSelections()))
+      }
+      this.pendingBufferChangeOptions.delete(event.change.textSnapshot)
+      const change = {
+        ...event.change,
+        timings: pending?.change.timings ?? event.change.timings,
+        selections: session.view.getSelections(),
+      }
+      if (isTextSessionChange(change)) this.publishedBufferSnapshots.add(change.textSnapshot)
+      this.applyPublishedSessionChange(
+        change,
+        pending?.totalName ?? 'editor.bufferChange',
+        pending?.totalStart ?? nowMs(),
+        pending?.options ?? {},
+      )
+    } finally {
+      if (this.bufferPublication === event) this.bufferPublication = null
     }
-    this.pendingBufferChangeOptions.delete(event.change.textSnapshot)
-    const change = {
-      ...event.change,
-      timings: pending?.change.timings ?? event.change.timings,
-      selections: session.view.getSelections(),
-    }
-    if (isTextSessionChange(change)) this.publishedBufferSnapshots.add(change.textSnapshot)
-    this.applyPublishedSessionChange(
-      change,
-      pending?.totalName ?? 'editor.bufferChange',
-      pending?.totalStart ?? nowMs(),
-      pending?.options ?? {},
-    )
   }
 
   private disposeBufferSubscriptions(): void {
