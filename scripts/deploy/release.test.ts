@@ -162,7 +162,7 @@ await buildWeb({ name: 'fixture', directory, web: directory + '/web', server: di
 test.each([false, true])(
   'web deployment builds %s stale workspace exports before consumers',
   async (stale) => {
-    const directory = mkdtempSync('/work/tmp/platform-deploy-workspaces-')
+    const directory = mkdtempSync(path.join(tmpdir(), 'platform-deploy-workspaces-'))
     try {
       createWebBuildFixture(directory, stale)
       const child = Bun.spawn([process.execPath, 'invoke.ts'], {
@@ -191,7 +191,7 @@ test.each([false, true])(
 )
 
 test('a failed workspace build stops web deployment before consumer compilation', async () => {
-  const directory = mkdtempSync('/work/tmp/platform-deploy-workspaces-')
+  const directory = mkdtempSync(path.join(tmpdir(), 'platform-deploy-workspaces-'))
   try {
     createWebBuildFixture(directory, false, true)
     const child = Bun.spawn([process.execPath, 'invoke.ts'], {
