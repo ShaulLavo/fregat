@@ -31,7 +31,7 @@
       "file": "examples/stress/src/browser.ts",
       "id": "examples/stress/src/browser.ts:requestAnimationFrame:dffa87e548",
       "justification": "Benchmark observation of the first animation frame after an applied key; it records a timestamp only, tracks the frame handle, and cancels pending frames on disposal.",
-      "line": 151,
+      "line": 169,
       "snippet": "const frame = requestAnimationFrame(() => {"
     },
     {
@@ -39,7 +39,7 @@
       "file": "examples/stress/src/browser.ts",
       "id": "examples/stress/src/browser.ts:setTimeout:e5c148c176",
       "justification": "The bounded churn benchmark yields to the browser every ten iterations so cancellation and rendering can run. The timer only resolves the awaited promise; the next iteration checks cancellation before editing.",
-      "line": 220,
+      "line": 238,
       "snippet": "if (index % 10 === 0) await new Promise((resolve) => setTimeout(resolve, 0))"
     },
     {
@@ -89,6 +89,22 @@
       "justification": "Benchmark settle between phases: it only resolves the awaited promise, so deferred editor work finishes before counts are taken.",
       "line": 369,
       "snippet": "return new Promise<void>((resolve) => setTimeout(resolve, 200))"
+    },
+    {
+      "api": "setTimeout",
+      "file": "examples/stress/src/inputConsumers.ts",
+      "id": "examples/stress/src/inputConsumers.ts:setTimeout:afcb682cec",
+      "justification": "Harness readiness only, outside every measured input interval: highlight status and minimap render acceptance publish no completion event to await, so this checks once per frame-length wait until the bounded deadline.",
+      "line": 133,
+      "snippet": "await new Promise((resolve) => setTimeout(resolve, 16))"
+    },
+    {
+      "api": "setTimeout",
+      "file": "examples/stress/src/inputConsumers.ts",
+      "id": "examples/stress/src/inputConsumers.ts:setTimeout:e6ad51d957",
+      "justification": "Harness readiness only, outside every measured input interval: the idle fences resolve before edits schedule their follow-up syntax requests, so readiness waits and checks again, bounded by the 30 s settle deadline.",
+      "line": 92,
+      "snippet": "await new Promise((resolve) => setTimeout(resolve, 50))"
     },
     {
       "api": "queueMicrotask",

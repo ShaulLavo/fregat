@@ -86,6 +86,9 @@ export function createInputConsumers(id: string, fixture: string, length: number
         await tree?.awaitIdleFence()
         await shiki?.awaitIdleFence()
         if (configuration.minimap) await minimapRendersAccepted()
+        // @justification Harness readiness only, outside every measured input interval: the idle
+        // fences resolve before edits schedule their follow-up syntax requests, so readiness waits
+        // and checks again, bounded by the 30 s settle deadline.
         await new Promise((resolve) => setTimeout(resolve, 50))
       } while (!quiet() && performance.now() < deadline)
       return {
@@ -124,6 +127,9 @@ type WorkerProof = {
 async function until(settled: () => boolean, timeoutMs = 30_000) {
   const deadline = performance.now() + timeoutMs
   while (!settled() && performance.now() < deadline)
+    // @justification Harness readiness only, outside every measured input interval: highlight
+    // status and minimap render acceptance publish no completion event to await, so this checks
+    // once per frame-length wait until the bounded deadline.
     await new Promise((resolve) => setTimeout(resolve, 16))
 }
 
