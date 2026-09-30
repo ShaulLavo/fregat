@@ -225,7 +225,7 @@ export class TreeSitterWorkerClient implements TreeSitterBackend {
     payload: TreeSitterBackendParsePayload,
   ): Promise<TreeSitterParseResult | TreeSitterParseAckResult | undefined> {
     const handle = await this.ensureWorkerReady()
-    if (!handle) return undefined
+    if (!handle || this.worker !== handle) return undefined
     const source = this.createSourceDescriptor(payload.runtimeSessionId, payload.snapshot)
     const request: TreeSitterParseDocumentRequest = {
       type: 'parse',
@@ -261,7 +261,7 @@ export class TreeSitterWorkerClient implements TreeSitterBackend {
     payload: TreeSitterBackendEditPayload,
   ): Promise<TreeSitterParseResult | TreeSitterParseAckResult | undefined> {
     const handle = await this.ensureWorkerReady()
-    if (!handle) return undefined
+    if (!handle || this.worker !== handle) return undefined
     const source = this.createSourceDescriptor(payload.runtimeSessionId, payload.snapshot)
     const result = await this.postDocumentRequest({
       type: 'edit',

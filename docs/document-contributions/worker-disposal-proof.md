@@ -14,7 +14,9 @@ retained state and rejects pending RPCs with its existing disposal error. Repeat
 returns the same promise. Late messages and errors cannot revive the closed owner. A delivered
 Tree-sitter registration reply can have a queued continuation when disposal begins; handle
 identity checks prevent that continuation from repopulating the registration cache or sending
-warm-up work after closure.
+warm-up work after closure. Parse and edit readiness continuations also check the current
+handle before creating source descriptors, so disposal cannot be followed by newly retained
+document source.
 
 Document-only disposal remains scoped to its runtime session. It leaves the shared worker
 available to other views. Existing delayed registration and theme behavior is preserved: a
@@ -57,3 +59,17 @@ release a busy worker without its cooperation. It does not make that fixture fin
 work, certify long-line support, alter its recorded exclusions, or complete Unit 0. The frozen
 package sets, delayed-negative controls and calibration policy are untouched. No live provider
 or account is involved.
+
+## Independent review repair
+
+The review at `https://github.com/ShaulLavo/fregat/pull/213#issuecomment-5917307032`
+found that parse/edit readiness continuations could recreate retained source after synchronous
+disposal. The two real-owner regressions reproduce this with the existing injected worker
+transport: both fail on the reviewed head with one retained document, while 19 controls pass.
+Both pass after current-handle checks run before descriptor creation. Closed callers resolve
+with `undefined`, no parse/edit message is posted, and source retention, pending requests and
+the owner idle fence are empty/settled.
+
+`red-late-source.log` records the two failures; `green-late-source.log` records all 21
+Tree-sitter transport/registration checks passing. The new checks use the real owner and
+piece-table snapshot and control only the external Worker transport.

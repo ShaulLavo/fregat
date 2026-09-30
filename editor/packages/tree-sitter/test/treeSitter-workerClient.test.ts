@@ -139,6 +139,39 @@ describe('tree-sitter worker client language registration cache', () => {
     ).toBe(true)
   })
 
+  it.each(['parse', 'edit'] as const)(
+    '%s cannot retain source after the ready continuation outlives disposal',
+    async (method) => {
+      const client = await loadWorkerClient()
+      await client.warmLanguages([])
+      const payload = {
+        documentId: 'doc.ts',
+        runtimeSessionId: 'runtime-doc.ts',
+        languageId: 'typescript',
+        snapshotVersion: 1,
+        snapshot: createPieceTableSnapshot('const answer = 1;'),
+        includeHighlights: true,
+      }
+      const result =
+        method === 'parse'
+          ? client.parse(payload)
+          : client.edit({ ...payload, previousSnapshotVersion: 0, edits: [], inputEdits: [] })
+      await Promise.resolve()
+      await client.dispose()
+      await expect(result).resolves.toBeUndefined()
+      await client.awaitIdleFence()
+
+      expect(client.inspect()).toMatchObject({
+        lifecycle: 'disposed',
+        pendingRequests: 0,
+        cache: { sourceChunks: { documents: 0, sentChunks: 0, sourceEpochs: 0 } },
+      })
+      expect(fakeWorkerAt(0).messages.some((request) => request.payload.type === method)).toBe(
+        false,
+      )
+    },
+  )
+
   it('terminates a busy owned worker and settles registration and idle without its reply', async () => {
     const client = await loadWorkerClient()
     await client.registerLanguages([languageDescriptor('typescript')])
