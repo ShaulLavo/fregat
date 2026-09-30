@@ -37,7 +37,7 @@ WEB_PORT=5214 bun run agent:browser scenario approval-turn-ended
 bun run agent:browser look --doctor
 ```
 
-Passes when the release route answers, the app renders, no alert is on screen, and the probe records no page execution or required frontend load errors. Script and stylesheet console errors count when their source URL identifies a loaded frontend asset. Raw warnings and other request problems stay in the evidence. Run it first whenever anything looks off, and again after any failed drive.
+Passes when the release route answers, the app renders, no alert is on screen, and the probe records no page execution or required frontend load errors. Script and stylesheet console errors count when their source URL identifies a loaded frontend asset. An aborted request whose initiating frame has detached stays in raw evidence with its frame provenance and allows a healthy result. Raw warnings and other request problems stay in the evidence. Run it first whenever anything looks off, and again after any failed drive.
 
 ## Drive
 

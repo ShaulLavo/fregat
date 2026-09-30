@@ -782,6 +782,7 @@ async function doctor(page: Page, url: string, ready: boolean, observed: Observe
   }
   for (const request of observed.failedRequests) {
     if (!frontendTypes.has(request.type)) continue
+    if (request.error === 'net::ERR_ABORTED' && request.frameDetached === true) continue
     reasons.push(
       `${request.type} load failed (${request.error ?? 'request failed'}): ${request.url}`,
     )

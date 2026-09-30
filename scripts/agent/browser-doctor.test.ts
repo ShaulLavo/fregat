@@ -10,7 +10,10 @@ const cases = [
   { mode: 'module504', code: 1, consoleCapture: true },
   { mode: 'aborted-script', code: 1, consoleCapture: false },
   { mode: 'module-mime', code: 1, consoleCapture: true },
+  { mode: 'stylesheet-mime', code: 1, consoleCapture: true },
+  { mode: 'cancelled-iframe-script', code: 0, consoleCapture: true },
   { mode: 'runtime-error', code: 1, consoleCapture: true },
+  { mode: 'runtime-error-no-console', code: 1, consoleCapture: false },
   { mode: 'load-during-release', code: 1, consoleCapture: true },
   { mode: 'release503', code: 1, consoleCapture: true },
 ] as const
@@ -20,7 +23,25 @@ test.each(cases)('doctor classifies $mode through the real CLI', async (fixture)
   let releaseRequests = 0
   let heldScript: ServerResponse | undefined
   let heldRelease: ServerResponse | undefined
+  const frameReady = Promise.withResolvers<void>()
   const server = createServer((request, response) => {
+    if (request.url === '/frame.js') {
+      frameReady.resolve()
+      return
+    }
+    if (request.url === '/frame-ready') {
+      void frameReady.promise.then(() => response.writeHead(200).end())
+      return
+    }
+    if (request.url === '/required.css') {
+      response
+        .writeHead(200, {
+          'content-type': 'text/html',
+          'x-content-type-options': 'nosniff',
+        })
+        .end('Fixture stylesheet')
+      return
+    }
     if (request.url === '/release' && fixture.mode === 'load-during-release') {
       releaseRequests += 1
       heldRelease = response
@@ -53,7 +74,7 @@ test.each(cases)('doctor classifies $mode through the real CLI', async (fixture)
         'content-type': fixture.mode === 'module-mime' ? 'text/html' : 'text/javascript',
       })
       response.end(
-        fixture.mode === 'runtime-error'
+        fixture.mode === 'runtime-error' || fixture.mode === 'runtime-error-no-console'
           ? 'throw new Error("Fixture startup failed")'
           : 'document.querySelector("[aria-label]").textContent = "Fully loaded"',
       )
@@ -64,10 +85,17 @@ test.each(cases)('doctor classifies $mode through the real CLI', async (fixture)
       return
     }
     response.writeHead(200, { 'content-type': 'text/html' })
-    response.end(
+    const extra: Record<string, string> = {
+      'stylesheet-mime': '<link rel="stylesheet" href="/required.css">',
+      'cancelled-iframe-script':
+        '<iframe srcdoc="<script async src=/frame.js></script>"></iframe><script type="module">await fetch("/frame-ready"); document.querySelector("iframe").remove()</script>',
+    }
+    const script =
       fixture.mode === 'load-during-release'
-        ? `<!doctype html><title>Doctor fixture</title><div aria-label="Window toolbar">Partial shell</div><script type="module" async src="/required.js" onerror="fetch('/failure-recorded')"></script>`
-        : '<!doctype html><title>Doctor fixture</title><div aria-label="Window toolbar">Partial shell</div><script type="module" src="/required.js"></script>',
+        ? `<script type="module" async src="/required.js" onerror="fetch('/failure-recorded')"></script>`
+        : '<script type="module" src="/required.js"></script>'
+    response.end(
+      `<!doctype html><title>Doctor fixture</title><div aria-label="Window toolbar">Partial shell</div>${extra[fixture.mode] ?? ''}${script}`,
     )
   })
   try {
@@ -116,7 +144,7 @@ test.each(cases)('doctor classifies $mode through the real CLI', async (fixture)
     }
     if (fixture.mode === 'aborted-script') {
       expect(observed.failedRequests).toContainEqual(
-        expect.objectContaining({ url: `${url}required.js` }),
+        expect.objectContaining({ url: `${url}required.js`, frameUrl: url, frameDetached: false }),
       )
       expect(observed.errors).toEqual([])
       expect(observed.consoleCapture).toBe(false)
@@ -128,7 +156,30 @@ test.each(cases)('doctor classifies $mode through the real CLI', async (fixture)
         expect.objectContaining({ level: 'error', url: `${url}required.js` }),
       )
     }
-    if (fixture.mode === 'runtime-error')
+    if (fixture.mode === 'stylesheet-mime' || fixture.mode === 'cancelled-iframe-script') {
+      const resource = fixture.mode === 'stylesheet-mime' ? 'required.css' : 'frame.js'
+      expect(observed.failedRequests).toContainEqual(
+        expect.objectContaining({
+          url: `${url}${resource}`,
+          error: 'net::ERR_ABORTED',
+          frameUrl: fixture.mode === 'stylesheet-mime' ? url : 'about:srcdoc',
+          frameDetached: fixture.mode === 'cancelled-iframe-script',
+        }),
+      )
+      expect(observed.errors).toEqual([])
+      expect(observed.failedResponses).toEqual([])
+    }
+    if (fixture.mode === 'stylesheet-mime') {
+      expect(observed.consoleErrors.join('\n')).toContain('MIME')
+      expect(observed.consoleDetails).toContainEqual(
+        expect.objectContaining({ level: 'error', url }),
+      )
+    }
+    if (fixture.mode === 'cancelled-iframe-script') {
+      expect(observed.consoleErrors).toEqual([])
+      expect(observed.assets).toContain(`${url}required.js`)
+    }
+    if (fixture.mode === 'runtime-error' || fixture.mode === 'runtime-error-no-console')
       expect(observed.errors).toContain('Fixture startup failed')
     expect({ code, health: observed.health }, stdout + stderr).toMatchObject({
       code: fixture.code,
