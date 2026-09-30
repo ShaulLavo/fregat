@@ -17,7 +17,7 @@ export const terminalOfflineHost: Scenario = {
     const fixture = await createGitFixture('terminal-offline')
     let blocked = false
     const connection: { current: WebSocketRoute | null } = { current: null }
-    await page.routeWebSocket('**/orchestration/rpc', (socket) => {
+    await page.routeWebSocket(/\/orchestration\/rpc(?:\?|$)/, (socket) => {
       if (blocked) return void socket.close({ code: 1001, reason: 'Fixture connection offline' })
       connection.current = socket
       socket.connectToServer()
