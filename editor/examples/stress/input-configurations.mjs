@@ -44,31 +44,36 @@ export function inputConsumerConfiguration(id, fixture, length) {
 
 const syntaxHighlight = /^editor-shared-token-/
 
-// Shiki leaves lines over its limit as one plain token; the owner's count must match the lines the
-// current text actually has over that limit, per live session.
+// Shiki leaves lines over its limit as one plain token. Every view owns a live session, hidden
+// ones included, so the owner reports each over-limit line once per view.
 function plainFallback(readiness, check) {
   const { maxTokenizationLineLength: limit, untokenizedLines: reported } = readiness.shiki
   const overLimit = readiness.overLimitLines
   check(Number.isInteger(limit) && limit > 0, 'Shiki reports no tokenization line limit')
   check(Number.isInteger(reported) && Number.isInteger(overLimit), 'Plain-line counts are missing')
-  if (overLimit === 0) {
-    check(reported === 0, `Shiki reports ${reported} plain lines with none over the limit`)
-    return false
-  }
-  check(
-    reported > 0 && reported % overLimit === 0,
-    `plain lines ${reported} for ${overLimit} over the limit`,
-  )
-  return true
+  const expected = overLimit * readiness.views.length
+  check(reported === expected, `Shiki reports ${reported} plain lines, expected ${expected}`)
+  return overLimit > 0
 }
 
-// Every painted token range in a plain document carries one colour, the rendered text colour.
-function uniformPlainOutput(tokens, rowColor, check) {
+// A document that is only plain lines paints each line as one range per visible view, in the
+// rendered text colour.
+function uniformPlainOutput(tokens, readiness, check) {
   const painted = tokens.filter((entry) => entry.ranges > 0)
   const colors = new Set(painted.map((entry) => normalizedColor(entry.color)))
   check(colors.size <= 1, `plain output has ${colors.size} token colours`)
   if (colors.size === 1)
-    check(colors.has(normalizedColor(rowColor)), `plain token colour differs from the text colour`)
+    check(
+      colors.has(normalizedColor(readiness.rowColor)),
+      'plain token colour differs from the text colour',
+    )
+  if (readiness.overLimitLines !== readiness.lineCount) return
+  const visible = readiness.views.filter((view) => view.visible).length
+  const ranges = painted.reduce((sum, entry) => sum + entry.ranges, 0)
+  check(
+    ranges === readiness.overLimitLines * visible,
+    `plain output has ${ranges} ranges for ${visible} visible views`,
+  )
 }
 
 function normalizedColor(color) {
@@ -138,7 +143,7 @@ export function assertConsumerReadiness(readiness, id, fixture, length, views, s
   const plain = expected.shiki ? plainFallback(readiness, check) : false
   const tokens = readiness.highlights.filter((entry) => syntaxHighlight.test(entry.name))
   const tokenRanges = tokens.reduce((sum, entry) => sum + entry.ranges, 0)
-  if (plain) uniformPlainOutput(tokens, readiness.rowColor, check)
+  if (plain) uniformPlainOutput(tokens, readiness, check)
   else check(syntax ? tokenRanges > 0 : tokens.length === 0, `syntax token ranges ${tokenRanges}`)
   for (const view of readiness.views) {
     check(

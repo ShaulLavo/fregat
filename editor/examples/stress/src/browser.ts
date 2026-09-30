@@ -329,6 +329,7 @@ async function settleConsumers() {
   return {
     ...readiness,
     highlights,
+    lineCount: buffer.materializeFullText().split('\n').length,
     overLimitLines:
       lineLimit === null ? null : linesLongerThan(buffer.materializeFullText(), lineLimit),
     rowColor: row ? getComputedStyle(row).color : null,

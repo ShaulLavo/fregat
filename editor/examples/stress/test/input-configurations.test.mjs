@@ -29,6 +29,7 @@ function readiness(id, overrides = {}) {
       ? { ...owner, maxTokenizationLineLength: 20_000, untokenizedLines: 0 }
       : null,
     overLimitLines: 0,
+    lineCount: 1,
     rowColor: 'rgb(225, 228, 232)',
     highlights: syntax ? [{ name: 'editor-shared-token-0', ranges: 4 }] : [],
     views: [
@@ -122,7 +123,7 @@ test('pauses analysis consumers above the Platform analysis limit', () => {
 
 test('accepts uniform plain output when the reported plain lines match the text', () => {
   const plain = readiness('shiki', {
-    shiki: { ...owner, maxTokenizationLineLength: 20_000, untokenizedLines: 3 },
+    shiki: { ...owner, maxTokenizationLineLength: 20_000, untokenizedLines: 1 },
     overLimitLines: 1,
     highlights: [{ name: 'editor-shared-token-0', ranges: 1, color: '#e1e4e8' }],
   })
@@ -135,6 +136,12 @@ test('rejects plain output with a wrong count, a second colour or a missing limi
   const base = { ...owner, maxTokenizationLineLength: 20_000, untokenizedLines: 1 }
   const cases = [
     { shiki: { ...base, untokenizedLines: 0 }, overLimitLines: 1 },
+    { shiki: { ...base, untokenizedLines: 2 }, overLimitLines: 1 },
+    {
+      shiki: base,
+      overLimitLines: 1,
+      highlights: [{ name: 'editor-shared-token-0', ranges: 2, color: '#e1e4e8' }],
+    },
     { shiki: base, overLimitLines: 0 },
     {
       shiki: base,
