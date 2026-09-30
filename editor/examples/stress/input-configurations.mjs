@@ -154,11 +154,59 @@ export function assertConsumerReadiness(readiness, id, fixture, length, views, s
       expected.minimap ? view.minimapElements > 0 : view.minimapElements === 0,
       'minimap element presence',
     )
-    // A hidden view mounts no rows, so its gutter proves nothing until it is revealed.
+    // A hidden view mounts no rows, so its gutter and token ranges prove nothing until it is revealed.
     if (!view.visible) continue
     check(
       expected.platform ? view.gutterElements > 0 : view.gutterElements === 0,
       'gutter element presence',
     )
+    viewOutput(view, readiness, { syntax, plain }, check)
+  }
+  consumerReceipts(readiness, expected, check)
+}
+
+// Each visible view paints its own token ranges: one per plain line when the document is only
+// plain lines, some when syntax is live, none without syntax.
+function viewOutput(view, readiness, { syntax, plain }, check) {
+  const label = `view ${readiness.views.indexOf(view)}`
+  if (!syntax) return check(view.tokenRanges === 0, `${label} has ${view.tokenRanges} token ranges`)
+  if (plain && readiness.overLimitLines === readiness.lineCount)
+    return check(
+      view.tokenRanges === readiness.overLimitLines,
+      `${label} has ${view.tokenRanges} plain ranges`,
+    )
+  check(view.tokenRanges > 0, `${label} has no token ranges`)
+}
+
+// Every live session of a configured consumer received the current text and its last source
+// request was answered; unconfigured consumers have no sessions. Shiki opens one session per view.
+function consumerReceipts(readiness, expected, check) {
+  const sessions = readiness.sessions ?? []
+  for (const [kind, active] of [
+    ['treeSitter', expected.treeSitter],
+    ['shiki', expected.shiki],
+  ]) {
+    const own = sessions.filter((session) => session.kind === kind)
+    if (!active) {
+      check(own.length === 0, `${kind} has ${own.length} live sessions while disabled`)
+      continue
+    }
+    check(own.length > 0, `${kind} has no live session`)
+    if (kind === 'shiki')
+      check(
+        own.length === readiness.views.length,
+        `shiki has ${own.length} sessions for ${readiness.views.length} views`,
+      )
+    for (const [index, session] of own.entries()) {
+      const label = `${kind} session ${index}`
+      check(!session.failed, `${label} last source request failed`)
+      check(session.answered, `${label} last source request is unanswered`)
+      check(session.current, `${label} received text that differs from the document`)
+      if (kind === 'treeSitter')
+        check(
+          session.answeredVersion === session.requestedVersion,
+          `${label} answered version ${session.answeredVersion} of ${session.requestedVersion}`,
+        )
+    }
   }
 }

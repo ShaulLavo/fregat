@@ -38,6 +38,8 @@ declare global {
   var __stress: typeof bridge
   var __EDITOR_PERFORMANCE_DIAGNOSTICS__: ((event: Diagnostic) => void) | null
   var __inputWorkerProof: readonly { readonly terminated: boolean }[] | undefined
+  var __inputWorkerSources: Map<string, ConsumerSession> | undefined
+  var __inputReadinessNegative: string | null | undefined
 }
 
 let active: Active | null = null
@@ -318,6 +320,8 @@ async function settleConsumers() {
   const { consumers, editors, buffer } = current()
   if (!consumers) return null
   const readiness = await consumers.settle(editors)
+  if (globalThis.__inputReadinessNegative === 'drop-view-ranges') dropLastVisibleViewRanges()
+  const text = buffer.materializeFullText()
   const colors = highlightColors()
   const highlights = [...CSS.highlights].map(([name, ranges]) => ({
     name,
@@ -328,12 +332,70 @@ async function settleConsumers() {
   const row = document.querySelector('#view-0 [data-editor-virtual-row]')
   return {
     ...readiness,
+    views: readiness.views.map((view, index) => ({ ...view, tokenRanges: viewTokenRanges(index) })),
+    sessions: consumerSessions(text),
     highlights,
-    lineCount: buffer.materializeFullText().split('\n').length,
-    overLimitLines:
-      lineLimit === null ? null : linesLongerThan(buffer.materializeFullText(), lineLimit),
+    lineCount: text.split('\n').length,
+    overLimitLines: lineLimit === null ? null : linesLongerThan(text, lineLimit),
     rowColor: row ? getComputedStyle(row).color : null,
   }
+}
+
+type ConsumerSession = {
+  readonly kind: string
+  readonly worker: { readonly terminated: boolean }
+  readonly text: string | null
+  readonly requested: number
+  readonly answered: number
+  readonly failed: number
+  readonly requestedVersion: number | null
+  readonly answeredVersion: number | null
+  readonly disposed: boolean
+}
+
+// Each live consumer session's receipt: the source its worker last received equals the current
+// text, and that request was answered.
+function consumerSessions(text: string) {
+  const sessions: Iterable<ConsumerSession> = globalThis.__inputWorkerSources?.values() ?? []
+  return [...sessions]
+    .filter(
+      (session) =>
+        !session.disposed &&
+        !session.worker.terminated &&
+        (session.kind === 'shiki' || session.kind === 'treeSitter'),
+    )
+    .map((session) => ({
+      kind: session.kind,
+      current: session.text === text,
+      answered: session.requested > 0 && session.answered === session.requested,
+      failed: session.failed === session.requested && session.requested > 0,
+      requestedVersion: session.requestedVersion,
+      answeredVersion: session.answeredVersion,
+    }))
+}
+
+function tokenHighlights() {
+  return [...CSS.highlights].filter(([name]) => name.startsWith('editor-shared-token-'))
+}
+
+function viewTokenRanges(index: number): number {
+  const host = document.getElementById(`view-${index}`)
+  if (!host) return 0
+  let count = 0
+  for (const [, ranges] of tokenHighlights())
+    for (const range of ranges) if (host.contains(range.startContainer)) count++
+  return count
+}
+
+// Probe-only negative: the last visible view loses its token ranges while the others keep theirs.
+function dropLastVisibleViewRanges() {
+  const visible = current()
+    .editors.map((_, index) => document.getElementById(`view-${index}`))
+    .filter((host): host is HTMLElement => Boolean(host?.checkVisibility()))
+  const host = visible.at(-1)
+  if (!host || visible.length < 2) return
+  for (const [, ranges] of tokenHighlights())
+    for (const range of [...ranges]) if (host.contains(range.startContainer)) ranges.delete(range)
 }
 
 function linesLongerThan(text: string, limit: number): number {

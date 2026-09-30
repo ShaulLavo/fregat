@@ -40,6 +40,7 @@ const { values } = parseArgs({
     'packages-directory': { type: 'string' },
     'fixture-directory': { type: 'string' },
     consumers: { type: 'string', default: 'native' },
+    'readiness-negative': { type: 'string' },
   },
 })
 const integer = (text, name) => {
@@ -49,6 +50,10 @@ const integer = (text, name) => {
 }
 if (!['stress', 'input-latency'].includes(values.suite)) fail('Unknown suite')
 if (!inputConsumerIds.includes(values.consumers)) fail('Unknown input consumer configuration')
+const readinessNegatives = ['corrupt-tree-sitter-edit', 'drop-view-ranges']
+const readinessNegative = values['readiness-negative'] ?? null
+if (readinessNegative !== null && !readinessNegatives.includes(readinessNegative))
+  fail('Unknown readiness negative')
 if (values['packages-directory'] && (values.url || values['core-directory']))
   fail('A frozen package set requires an independent runner build')
 const packageSet = values['packages-directory']
@@ -93,6 +98,7 @@ if (inputSuite) {
     isolation: 'closed-browser-context-per-fixture-view-scenario',
     paste: 'native-clipboard-shortcut-128-unicode-fragments',
     consumers: values.consumers,
+    ...(readinessNegative ? { readinessNegative } : {}),
     fixtures: values['fixture-directory'] ? 'frozen-hashed-files' : 'seeded-generator',
   })
   delete config.typedText
@@ -212,7 +218,8 @@ async function newPage(browser) {
   })
   if (!values.url) await context.route('**/*', (route) => routeAsset(route))
   const page = await context.newPage()
-  if (inputSuite && values.consumers !== 'native') await page.addInitScript(installInputWorkerProof)
+  if (inputSuite && values.consumers !== 'native')
+    await page.addInitScript(installInputWorkerProof, readinessNegative)
   page.setDefaultTimeout(30_000)
   page.on('pageerror', (error) =>
     console.error(JSON.stringify({ event: 'stress.pageerror', message: error.message })),
