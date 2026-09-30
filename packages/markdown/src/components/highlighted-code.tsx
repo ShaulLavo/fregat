@@ -1,7 +1,7 @@
 import type { ComponentProps } from 'react'
-import { highlightLines, type HighlightResult } from '@singapore-editor/highlighting'
+import { highlightLines } from '@singapore-editor/highlighting'
 
-import { useHighlightedCode } from '../hooks/use-highlighted-code'
+import { useHighlightedCode, type HighlightedText } from '../hooks/use-highlighted-code'
 import { completedCodePrefix } from '../utils/highlight'
 
 type HighlightedCodeProps = Omit<ComponentProps<'pre'>, 'children'> & {
@@ -26,7 +26,8 @@ export function HighlightedCode({ code, incomplete, language, ...props }: Highli
   return (
     <pre {...props}>
       <code className='font-mono'>
-        {highlighted ? renderTokenLines(prefix.highlightable, highlighted) : prefix.highlightable}
+        {highlighted ? renderTokenLines(highlighted) : null}
+        {prefix.highlightable.slice(highlighted?.code.length ?? 0)}
         {trailingText(prefix.highlightable, prefix.trailing)}
       </code>
     </pre>
@@ -41,8 +42,8 @@ function trailingText(highlightable: string, trailing: string) {
 }
 
 // Token colours are theme values computed at runtime, so they can only be inline styles.
-function renderTokenLines(code: string, highlighted: HighlightResult) {
-  const lines = highlightLines(code, highlighted.tokens)
+function renderTokenLines(highlighted: HighlightedText) {
+  const lines = highlightLines(highlighted.code, highlighted.result.tokens)
   const lastLineIndex = lines.length - 1
 
   return lines.map((line, lineIndex) => (

@@ -19,7 +19,10 @@ export function codeThemePreviewQueryOptions(themeId: string) {
           signal,
         })
       } catch (error) {
-        log.error({ action: 'code-theme.preview_failed', area: 'appearance', themeId, error })
+        // A preview scrolled or hovered away is cancelled, not failed.
+        if (!signal.aborted) {
+          log.error({ action: 'code-theme.preview_failed', area: 'appearance', themeId, error })
+        }
         throw error
       }
     },

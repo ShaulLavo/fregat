@@ -7,10 +7,20 @@ import { estimateHighlightBytes, highlightCacheKey } from '../utils/highlight'
 
 type HighlightState = {
   readonly key: string
+  readonly code: string
+  readonly result: HighlightResult
+}
+
+/** Tokens and the exact text they cover, which may be a prefix of the text on screen. */
+export type HighlightedText = {
+  readonly code: string
   readonly result: HighlightResult
 }
 
 /**
+ * Streaming only appends, so while the worker highlights a longer prefix the last answer still
+ * covers the start of the text and keeps painting; the new lines stay plain until it replies.
+ *
  * `cacheable` is false while a fence is still streaming: those token arrays are
  * superseded by the next chunk, so caching them would fill the budget with
  * garbage and evict the finished blocks the user scrolls back to.
@@ -23,7 +33,7 @@ export function useHighlightedCode({
   readonly cacheable: boolean
   readonly code: string
   readonly language: string
-}): HighlightResult | null {
+}): HighlightedText | null {
   const highlighter = use(CodeHighlighterContext)
   const [highlighted, setHighlighted] = useState<HighlightState | null>(null)
   const key = highlighter
@@ -41,7 +51,7 @@ export function useHighlightedCode({
       if (cacheable) highlightCache.set(key, result, estimateHighlightBytes(result))
       if (!active) return
 
-      setHighlighted({ key, result })
+      setHighlighted({ key, code, result })
     }
 
     // A highlighter that already holds the answer returns it and never calls back; otherwise it
@@ -54,8 +64,9 @@ export function useHighlightedCode({
     }
   }, [cacheable, code, highlighter, key, language])
 
-  if (cached) return cached
-  if (highlighted?.key === key) return highlighted.result
+  if (cached) return { code, result: cached }
+  if (!highlighted) return null
+  if (highlighted.key === key || code.startsWith(highlighted.code)) return highlighted
 
   return null
 }
