@@ -1,7 +1,7 @@
 # Monorepo migration completion
 
-Status: Approved by the owner on 2026-09-30. npm authentication, initial publication and
-trusted-publisher setup wait until this migration is complete.
+Status: Source migration delivered on 2026-09-30, authorized by the owner. npm authentication,
+initial publication and trusted-publisher setup remain deferred.
 
 ## Completion checks
 
@@ -20,10 +20,10 @@ commit and passes its live check. Existing standalone checkouts remain untouched
 - [x] Align shared tooling and add checks for the concrete gaps found by the audit.
 - [x] Make the hotkeys mirror independently installable and verifiable.
 - [x] Configure repository-scoped mirror authentication and create the hotkeys repository.
-- [ ] Verify ordinary mirror pushes, exact trees and standalone checks.
-- [ ] Independently review the changes, pass local checks and remote CI, then merge.
-- [ ] Update the shared checkout, deploy and inspect the served release.
-- [ ] Record completed source migration and the separately deferred npm steps in Plan 207.
+- [x] Verify ordinary mirror pushes, exact trees and standalone checks.
+- [x] Independently review the changes, pass local checks and remote CI, then merge.
+- [x] Update the shared checkout, deploy and inspect the served release.
+- [x] Record completed source migration and the separately deferred npm steps in Plan 207.
 
 ## Verification and decisions
 
@@ -56,3 +56,23 @@ typechecks and language-service tests. Independent review found no remaining blo
 The local checklist and decision log are in `/work/tmp/monorepo-completion/`. Verification
 logs and standalone checkouts use that directory. Architecture exploration is skipped
 because this work preserves the imported package APIs and existing subtree mirror layout.
+
+PR [#201](https://github.com/ShaulLavo/fregat/pull/201) merged as `f1b47731d` after all
+22 PR checks passed. Main CI, sites and textbuffer workflows also passed after the merge.
+The deployed release `20260930T072758Z-f1b47731-main` reports a clean checkout and a passed
+live check. Browser evidence in `/work/tmp/monorepo-completion/browser/` confirms the imported
+Editor source opens and paints, language services start, and the terminal renderer mounts.
+The screenshots were read back.
+
+All three ordinary mirror pushes succeeded and their Git trees exactly match the canonical
+folders: Editor `d306b1194448a1ebd02953a4a9c95535995ee748`, ghostty
+`b512f097c7fc675ce738780881c5f84850495af2`, hotkeys
+`3feaf86ec1597510c9a9085ca95c501f1fe79f69`. The first Ubuntu mirror run exposed Dash's
+1000-call recursion cap during ghostty's history split. Invoking the installed subtree script
+through Bash fixes that runner difference; independent review and mirror tests pass, and the
+same command produced the exact ghostty tree and pushed it without force. The corrective
+workflow run is the final automatic-mirroring check.
+
+No npm authentication, package publication or trusted-publisher settings changed. The
+`NPM_TRUSTED_PUBLISHING` switch remains absent. Existing sibling checkouts remain untouched;
+Fregat and the mirror README instructions now identify the canonical development location.

@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: APPROVED 2026-09-29, requested by the owner.
+- Status: SOURCE MIGRATION DELIVERED 2026-09-30. npm publication remains deferred.
 - The owner authorized final fixes and merging PR #199 on 2026-09-30. Mirror pushes must
   fast-forward without force; integration edits may change the split commit ids.
 - Owner decision: all code we write for Fregat lives in the Fregat monorepo. Flagship packages
@@ -14,23 +14,19 @@
   by this plan. The owner's revised [202](202-tui-ui.md) keeps terminal UI in `apps/tui/src/ui/`
   on upstream OpenTUI; it creates no toolkit package or mirror. The former bubli fork is not a
   pending relocation or release workstream.
-- Needs the owner: freezing the Editor and ghostty-webgpu checkouts for the cutover (other
-  sessions work in them), npm trusted-publishing setup
-  for the three families, and approval before any force-push to `singapore` or `ghostty-webgpu`.
+- Source migration needs no owner action. npm authentication, initial publication and
+  trusted-publisher configuration are a separate, deferred delivery unit. Old standalone
+  checkouts remain available; deleting them or changing their permissions is outside this run.
 
 ## Cutover window and release conditions
 
-The source import and integration are implemented in PR #199; its merge is authorized.
-The final source heads remain Editor `17a020ad4b98830aeebdb106af95de8f06694973` and ghostty
+PR #199 delivered the source import; PR #201 completed package alignment and CI coverage.
+The captured import heads were Editor `17a020ad4b98830aeebdb106af95de8f06694973` and ghostty
 `fd5c74283f83f780fcf60aab970d4c1fa6cc06cd`, with clean sibling checkouts on 2026-09-30.
-Both edited family splits accept ordinary pushes to mirrors seeded at those heads.
-This plan requires a scoped
-write hold, not a repository-wide freeze. Land or park open Editor/ghostty PRs, obtain the
-owner's session freeze, record final source heads and dirty-state ownership, and refresh
-the split/fast-forward proof against those heads. Keep sibling writes paused from that
-final-head capture through the first verified mirror push. Release the hold with Fregat
-as canonical source. Documentation, read-only baselines and independent Platform work
-can continue during the hold. Do not discard another session's changes or delete old checkouts.
+Both heads remain ancestors of the delivered mirror splits. All three mirrors accepted
+ordinary pushes and their trees match the canonical folders. This verifies the cutover
+against the actual remote heads without discarding external commits or rewriting history.
+Future development belongs in Fregat; sibling checkouts remain untouched references.
 
 The owner requested complete source migration, tooling alignment and CI verification on
 2026-09-30, with all npm setup and publication deferred until that work is finished. The
@@ -101,12 +97,12 @@ fregat/
         `MIRROR_EDITOR_SSH_KEY`, `MIRROR_GHOSTTY_SSH_KEY` and `MIRROR_HOTKEYS_SSH_KEY`
         authenticate only their respective repository. SSH verifies GitHub's published host
         keys. The workflow removes its temporary private key after each job.
-  - [ ] Freeze direct writes to the mirror mains at the final source-head capture and inspect
-        the first successful split pushes before releasing the cutover hold.
+  - [x] Capture the source heads, prove ancestry against the actual mirror heads and inspect
+        the first successful ordinary pushes. Canonical development now happens in Fregat.
 - Local verification used the workflow's exact shell against three temporary bare repos:
   first pushes, repeated unchanged splits and later fast-forwards passed. A divergent mirror
   rejected the push, returned exit 1 and retained its outside commit. Missing-folder and
-  missing-credential paths passed. First remote pushes are verified after the completion PR lands.
+  missing-credential paths passed. First remote pushes and exact tree equality passed after PR #201 merged.
 
 ## Rehearsal findings (2026-09-29)
 
@@ -194,8 +190,8 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
 - [x] Scratch rehearsal in `/work/tmp/plan207-*`: subtree-add both repos into a Fregat clone,
       update workspaces, run install, build, typecheck and the test suites; split `editor/` and
       compare commit ids with singapore's main.
-- [ ] Owner freeze: land or park open work in the Editor and ghostty-webgpu (including open PRs
-      such as singapore #62), then stop sessions from writing to those checkouts.
+- [x] Capture clean source heads and verify the delivered splits fast-forward the actual
+      remote mains. No external commit or uncommitted sibling work was removed.
 - [x] Subtree-add `editor/` and `ghostty-webgpu/` into the integration branch; update root workspaces. PR #199 imports Editor `17a020ad4b98830aeebdb106af95de8f06694973` and ghostty `fd5c74283f83f780fcf60aab970d4c1fa6cc06cd`; both initial subtree splits reproduce the source heads exactly.
 - [x] Remove the `packages/editor-*` symlinks, the `link:ghostty-webgpu` override, and the
       `editor-ref`/`ghostty-ref` checkout steps and dist caches from
@@ -206,15 +202,16 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
       path filters; keep each family's standalone workflows inside its folder.
 - [x] One set of tooling: a single formatter version, one vitest patch, one lockfile; delete the
       duplicates. Keep `bun run gates` and the Editor's health checks green.
-- [x] Mirror workflow with local fast-forward/rejection proofs and missing-folder/token skips.
-- [ ] First authorized pushes to the three mirrors; update their READMEs.
+- [x] Mirror workflow with local fast-forward/rejection proofs, missing-folder skips and
+      explicit failures for missing deploy keys.
+- [x] First authorized ordinary pushes to the three mirrors; update their READMEs.
 - [x] Root Changesets, fixed groups and a scratch hotkeys npm pack dry run with resolved ranges.
 - [x] Release workflow opening version PRs, with tokenless npm publishing behind the owner switch.
-- [ ] First real publish after the owner sets up npm; mirror GitHub release projection.
-- [ ] Retire the old checkouts: `/work/projects/Editor` and `/work/projects/ghostty-webgpu`
-      become read-only references (the owner decides when to delete them); update AGENTS.md
-      (Editor symlink, `ghostty-webgpu` link, `editor-ref` rules), memory notes and scripts that
-      assume `../Editor`. PR #199 updates the repository rules and current scripts; checkout retirement and external memory edits remain with the coordinator.
+- [ ] Deferred npm phase: first real publication and trusted publishing. Mirror GitHub
+      release projection is separate follow-up work.
+- [x] Update repository rules and current scripts to the canonical source folders. Retain
+      `/work/projects/Editor` and `/work/projects/ghostty-webgpu` as references without changing
+      permissions, deleting data or editing global memory outside this checkout.
 - [x] Deploy PR #199 with `bun run deploy --server --restart` and confirm the live check.
 
 ## Source-integration validation
@@ -227,7 +224,7 @@ Family formatter options match Fregat; generated-file exclusions remain with eac
 
 Editor and ghostty sites join Fregat's existing Pages artifact at `editor/` and `ghostty-webgpu/`, sharing one deployment. Native config-resolver workflows remain manual dispatches. The integration regenerates ghostty's bootstrap input closure after removing its family lockfile and uses repository-relative Git object paths for a nested checkout.
 
-Local gates, typecheck, web build and Editor health pass. The updated quick-open scenario completed and its screenshots were read at `/work/tmp/fregat-evidence/20260929T201255Z-scenario-quick-open-editor-source/`. All workspace suites completed; targeted reruns pass for the migrated browser boundaries and the local OpenSSH username environment. Root lint, the first-load byte gate, both family site builds, ghostty package smoke and the tree-sitter browser worker pass. GitHub CI remains in progress. Mirror/publish workflows, source freeze, checkout retirement and deployment are owned by other lanes or the coordinator.
+Local gates, typecheck, web build and Editor health pass. The updated quick-open scenario completed and its screenshots were read at `/work/tmp/fregat-evidence/20260929T201255Z-scenario-quick-open-editor-source/`. All workspace suites completed; targeted reruns pass for the migrated browser boundaries and the local OpenSSH username environment. Root lint, the first-load byte gate, both family site builds, ghostty package smoke and the tree-sitter browser worker pass. PR #199 CI and its deployment passed. PR #201 completed the remaining source-migration work; the delivery evidence follows.
 
 ## Acceptance
 
@@ -235,5 +232,27 @@ Local gates, typecheck, web build and Editor health pass. The updated quick-open
   sibling repos and no `*-ref` pins remain.
 - `singapore` and `ghostty-webgpu` update automatically from Fregat main and pass their
   standalone CI from the copied folder.
-- A published `@singapore-editor/core` installs and runs in an empty project without Fregat.
+- Exact family folders install, build and verify independently of Fregat. Published-package
+  installation belongs to the deferred npm phase.
 - `bun run gates`, the Editor health checks and the deploy live check pass.
+
+## Migration completion (2026-09-30)
+
+PR [#201](https://github.com/ShaulLavo/fregat/pull/201) merged as `f1b47731d` with all 22 PR
+checks passing. Shared tool pins are checked across 45 manifests. TypeScript 7 CLI and the
+TypeScript 6 JavaScript API have explicit ownership. Root lint, formatting, cache inputs,
+23 workspace builds and isolated mirror installations include the imported families and hotkeys.
+Reusable library CI is part of the main verdict; each mirror also runs its standalone CI.
+
+Separate writable SSH deploy keys authenticate the three mirrors. The delivered splits are
+Editor `d306b1194448a1ebd02953a4a9c95535995ee748`, ghostty
+`b512f097c7fc675ce738780881c5f84850495af2` and hotkeys
+`3feaf86ec1597510c9a9085ca95c501f1fe79f69`; all trees match Fregat exactly.
+The mirror workflow invokes Git's subtree script through Bash to avoid Ubuntu Dash's
+recursion cap on imported history. No force push was used.
+
+Release `20260930T072758Z-f1b47731-main` passed the live check. Editor, language-service and
+terminal browser evidence was inspected in `/work/tmp/monorepo-completion/browser/`.
+The [completion checklist](207-migration-completion.md) records the remaining automatic
+mirror correction check. npm remains disabled and deferred; plans 204–206 remain subsequent
+feature work, including cross-family consumers that need the first hotkeys publication.

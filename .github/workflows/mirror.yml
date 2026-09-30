@@ -70,7 +70,9 @@ jobs:
             echo "::notice::Mirror skipped: $FAMILY_FOLDER has not landed yet."
             exit 0
           fi
-          split=$(git subtree split --prefix="$FAMILY_FOLDER" HEAD)
+          # Dash caps recursion at 1000 calls; the imported history needs Bash.
+          git_exec_path="$(git --exec-path)"
+          split=$(GIT_EXEC_PATH="$git_exec_path" PATH="$git_exec_path:$PATH" bash "$git_exec_path/git-subtree" split --prefix="$FAMILY_FOLDER" HEAD)
           if ! git push "git@github.com:$MIRROR_REPOSITORY.git" "$split:refs/heads/main"; then
             echo "::error::Mirror push rejected or failed for $MIRROR_REPOSITORY. Reconcile its main with the family split before retrying."
             exit 1
