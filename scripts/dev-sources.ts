@@ -103,8 +103,6 @@ function readGhosttyPackage(webRoot: string): DevPackage {
   const root = packageRoot(webRoot, name)
   const entries = new Map([
     [name, requiredFile(root, 'src/index.ts')],
-    [`${name}/xterm`, requiredFile(root, 'src/xterm/terminal.ts')],
-    [`${name}/xterm.css`, requiredFile(root, 'src/xterm/css/xterm.css')],
     [`${name}/ghostty-vt.wasm`, requiredFile(root, 'ghostty-vt.wasm')],
     [`${name}/bridge.wasm`, requiredFile(root, 'bridge.wasm')],
   ])

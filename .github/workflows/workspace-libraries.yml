@@ -35,12 +35,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-      - name: Initialize xterm reference
-        run: git submodule update --init --depth=1 ghostty-webgpu/references/xterm.js
       - name: Install Chromium
         run: ghostty-webgpu/node_modules/.bin/playwright install --with-deps chromium
       - name: Verify terminal library and browser package
         run: bun run --cwd ghostty-webgpu verify
+      - name: Verify browser package with production npm settings
+        env:
+          NODE_ENV: production
+          npm_config_omit: dev
+        run: bun run --cwd ghostty-webgpu test:package
       - name: Classify native resolver state
         id: native-state
         working-directory: ghostty-webgpu

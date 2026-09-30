@@ -276,10 +276,8 @@
       "project": ["src/**/*.{ts,tsx}"]
     },
     "ghostty-webgpu": {
-      "entry": ["src/index.ts", "src/xterm/terminal.ts", "scripts/**/*.ts", "bench/**/*.ts"],
-      "project": ["src/**/*.ts", "scripts/**/*.ts", "bench/**/*.ts"],
-      "ignoreUnresolved": ["scripts/copy-build-assets.ts"],
-      "ignoreDependencies": ["@xterm/addon-*"]
+      "entry": ["src/index.ts", "scripts/**/*.ts", "bench/**/*.ts"],
+      "project": ["src/**/*.ts", "scripts/**/*.ts", "bench/**/*.ts"]
     },
     "ghostty-webgpu/demo": {
       "entry": ["src/client.ts"],

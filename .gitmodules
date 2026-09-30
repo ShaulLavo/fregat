@@ -1,4 +1,0 @@
-[submodule "ghostty-xterm"]
-  path = ghostty-webgpu/references/xterm.js
-  url = https://github.com/xtermjs/xterm.js.git
-  shallow = true
