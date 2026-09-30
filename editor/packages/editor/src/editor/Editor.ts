@@ -3527,9 +3527,18 @@ export class Editor {
     })
   }
 
+  private bufferPublication: EditorTextBufferChange | null = null
+
   private currentDocumentEditChain(): Pick<DocumentEditChain, 'changesSince' | 'point'> {
     const session = editorBufferSession(this.session)
     if (!session) return this.detachedEditChain
+    const publication = this.bufferPublication
+    if (publication?.change.textSnapshot === this.textSnapshot) {
+      return {
+        point: publication.syncPointAfter,
+        changesSince: publication.changesSinceDocumentSyncPoint,
+      }
+    }
     return {
       point: session.buffer.getDocumentSyncPoint(),
       changesSince: (point, scope) => session.buffer.changesSinceDocumentSyncPoint(point, scope),
@@ -3561,6 +3570,7 @@ export class Editor {
 
   private handleBufferChange(session: EditorBufferSession, event: EditorTextBufferChange): void {
     if (this.session !== session) return
+    this.bufferPublication = event
     const pending = this.pendingBufferChangeOptions.get(event.change.textSnapshot)
     if (event.change.kind !== 'synchronize' && event.sourceViewId !== session.view.viewId) {
       session.view.acceptBufferSelections(markSelectionSetDirty(session.view.getSelections()))
@@ -3581,6 +3591,7 @@ export class Editor {
   }
 
   private disposeBufferSubscriptions(): void {
+    this.bufferPublication = null
     this.unsubscribeBufferChanges?.()
     this.unsubscribeLeaseChanges?.()
     this.unsubscribeBufferChanges = null

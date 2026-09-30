@@ -1,4 +1,4 @@
-import type { EditorTextBuffer } from '@singapore-editor/core/document'
+import type { EditorTextBuffer, EditorTextBufferChange } from '@singapore-editor/core/document'
 import type { LanguageServerDocumentSnapshot } from './types'
 
 export function bufferDocumentSnapshot({
@@ -6,14 +6,16 @@ export function bufferDocumentSnapshot({
   documentId,
   uri,
   languageId,
+  publication,
 }: {
   readonly buffer: EditorTextBuffer
   readonly documentId?: string
   readonly uri: string
   readonly languageId: string
+  readonly publication?: EditorTextBufferChange
 }): LanguageServerDocumentSnapshot {
-  const textSnapshot = buffer.getTextSnapshot()
-  const point = buffer.getDocumentSyncPoint()
+  const textSnapshot = publication?.change.textSnapshot ?? buffer.getTextSnapshot()
+  const point = publication?.syncPointAfter ?? buffer.getDocumentSyncPoint()
   const lineStartsView = {
     length: textSnapshot.lineCount,
     at: (index: number) =>
@@ -33,7 +35,9 @@ export function bufferDocumentSnapshot({
     textVersion: point.textVersion,
     documentSyncPoint: point,
     changesSinceDocumentSyncPoint: (previous, scope) =>
-      buffer.changesSinceDocumentSyncPoint(previous, scope),
+      publication
+        ? publication.changesSinceDocumentSyncPoint(previous, scope)
+        : buffer.changesSinceDocumentSyncPoint(previous, scope),
     lineStartsView,
     get lineStarts() {
       return lineStartsView.toArray()

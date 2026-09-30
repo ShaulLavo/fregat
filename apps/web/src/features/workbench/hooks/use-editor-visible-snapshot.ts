@@ -123,14 +123,14 @@ export function useEditorVisibleSnapshot({
 
   useLayoutEffect(() => {
     if (!buffer || !matchesTarget || path === null || rootPath === null) return
-    const discardDirty = () => {
-      if (!buffer.isDirty()) return
+    const discardDirty = (dirty: boolean) => {
+      if (!dirty) return
       capture.cancel()
       removeEditorVisibleSnapshotCacheForPath(storage, { path, rootPath })
       setCached((current) => (current.record ? { ...current, record: null } : current))
     }
-    discardDirty()
-    return buffer.subscribe(discardDirty)
+    discardDirty(buffer.isDirty())
+    return buffer.subscribe(({ change }) => discardDirty(change.isDirty))
   }, [buffer, capture, matchesTarget, path, rootPath, storage])
 
   useEffect(() => addLifecycleFlush(capture.flush), [capture])

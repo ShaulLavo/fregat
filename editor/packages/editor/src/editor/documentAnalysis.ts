@@ -1,4 +1,8 @@
-import type { DocumentSessionChange, EditorTextBuffer } from '../documentSession'
+import type {
+  DocumentSessionChange,
+  EditorTextBuffer,
+  EditorTextBufferChange,
+} from '../documentSession'
 import type { DocumentTextSnapshot } from '../documentTextSnapshot'
 import type {
   EditorHighlighterProvider,
@@ -71,6 +75,7 @@ class AnalysisEntry<T> {
   private interests = 0
   private queuedRevision = -1
   private generation = 0
+  private pendingInterest = new AbortController()
   private tail: Promise<unknown> = Promise.resolve()
   private state: EditorAnalysisRead<T>
 
@@ -106,10 +111,13 @@ class AnalysisEntry<T> {
     return this.state.revision === revision ? this.state : { kind: 'pending', revision }
   }
 
-  changed(change: DocumentSessionChange): void {
-    const revision = this.buffer.getRevision()
-    if (revision === this.queuedRevision) return
-    this.enqueue(revision, () => this.session.applyChange(change))
+  changed(event: EditorTextBufferChange): void {
+    if (event.revisionAfter <= this.queuedRevision) return
+    this.enqueue(
+      event.revisionAfter,
+      () => this.session.applyChange(event.change),
+      event.change.textSnapshot,
+    )
   }
 
   synchronize(): void {
@@ -127,8 +135,9 @@ class AnalysisEntry<T> {
   async current(): Promise<T> {
     this.synchronize()
     const revision = this.buffer.getRevision()
-    await this.tail
-    this.assertCurrent(revision)
+    const generation = this.generation
+    await interruptible(this.tail, this.pendingInterest.signal)
+    this.assertCurrent(revision, generation)
     const state = this.read()
     if (state.kind === 'ready') return state.result
     if (state.kind === 'failed') throw state.error
@@ -138,26 +147,34 @@ class AnalysisEntry<T> {
   async query(run: () => Promise<T>): Promise<T> {
     await this.current()
     const revision = this.buffer.getRevision()
+    const generation = this.generation
+    const interest = this.pendingInterest.signal
     const result = this.tail.then(() => {
-      this.assertCurrent(revision)
+      this.assertCurrent(revision, generation)
       return run()
     })
     this.tail = result.catch(() => undefined)
-    const value = await interruptible(result, this.cancellation.signal)
-    this.assertCurrent(revision)
+    const value = await interruptible(interruptible(result, this.cancellation.signal), interest)
+    this.assertCurrent(revision, generation)
     return value
   }
 
   dispose(): void {
     if (this.cancellation.signal.aborted) return
     this.cancellation.abort()
+    this.pendingInterest.abort()
     this.session.dispose()
   }
 
-  private enqueue(revision: number, run: () => Promise<T>): void {
+  private enqueue(
+    revision: number,
+    run: () => Promise<T>,
+    snapshot = this.buffer.getTextSnapshot(),
+  ): void {
+    this.pendingInterest.abort()
+    this.pendingInterest = new AbortController()
     this.queuedRevision = revision
     const generation = ++this.generation
-    const snapshot = this.buffer.getTextSnapshot()
     this.state = { kind: 'pending', revision }
     const result = this.tail.then(() => {
       if (this.cancellation.signal.aborted) throw cancelled()
@@ -180,8 +197,12 @@ class AnalysisEntry<T> {
     this.state = state
   }
 
-  private assertCurrent(revision: number): void {
-    if (this.cancellation.signal.aborted || revision !== this.buffer.getRevision())
+  private assertCurrent(revision: number, generation = this.generation): void {
+    if (
+      this.cancellation.signal.aborted ||
+      revision !== this.buffer.getRevision() ||
+      generation !== this.generation
+    )
       throw cancelled()
   }
 }
@@ -239,11 +260,11 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
     return pending
   }
 
-  override changed(change: DocumentSessionChange): void {
-    if (this.rangeRevision === this.buffer.getRevision()) return
-    this.rangeRevision = this.buffer.getRevision()
+  override changed(event: EditorTextBufferChange): void {
+    if (event.revisionAfter <= this.rangeRevision) return
+    this.rangeRevision = event.revisionAfter
     this.ranges.clear()
-    super.changed(change)
+    super.changed(event)
   }
 }
 
@@ -262,9 +283,9 @@ export function createEditorDocumentAnalysis(options: {
   let disposed = false
   let unsubscribe: (() => void) | undefined
   const subscribe = () => {
-    unsubscribe ??= buffer.subscribe(({ change }) => {
-      for (const { entry } of structural) entry.changed(change)
-      for (const { entry } of highlighters) entry.changed(change)
+    unsubscribe ??= buffer.subscribe((event) => {
+      for (const { entry } of structural) entry.changed(event)
+      for (const { entry } of highlighters) entry.changed(event)
     })
   }
   return {

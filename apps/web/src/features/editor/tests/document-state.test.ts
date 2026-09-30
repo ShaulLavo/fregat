@@ -20,6 +20,7 @@ import {
 } from '@singapore-editor/core/document'
 import {
   createEditorDocumentAnalysis,
+  createEditorPreparedDocument,
   type EditorPreparedDocument,
 } from '@singapore-editor/core/editor'
 
@@ -147,6 +148,48 @@ describe('editor document store state identity', () => {
     const replaced = store.getState().ensureLiveEditorDocument(rewritten)
     expect(replaced.buffer).not.toBe(view.buffer)
     expect(replaced.buffer.canUndo()).toBe(false)
+  })
+
+  it('records text committed inside an earlier logical publication', () => {
+    const store = createEditorDocumentStore()
+    const file = fileResult('/repo/nested.ts')
+    const buffer = createEditorTextBuffer(file.content)
+    const session = createEditorBufferSession(buffer)
+    buffer.subscribe((event) => {
+      if (event.change.kind === 'synchronize') session.applyText('!')
+    })
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'nested.ts' })
+    const preparedDocument = createEditorPreparedDocument({
+      buffer,
+      analysis,
+      configuredTabSize: 4,
+      tabSizePolicy: 'fixed',
+      folding: false,
+      documentConfigurationTag: [],
+      documentId: 'nested.ts',
+      languageId: null,
+    })
+    store.getState().ensureEditorView(tabId('nested'), file, {
+      kind: 'clean',
+      buffer,
+      file,
+      fileVersion: file.version,
+      path: file.path,
+      preparedDocument,
+      snapshot: buffer.getSnapshot(),
+    })
+    const before = store.getState().dirtyContentRevision
+    const result = commitPreparedDocumentTransaction(
+      { buffer, sourceView: null },
+      prepareDocumentTransaction(buffer, [], 2, null),
+      { history: { groupId: 'nested-logical', kind: 'external-barrier' } },
+    )
+    expect(result.status).toBe('logical-only')
+    const state = store.getState()
+    expect(state.dirtyContentRevision).toBe(before + 1)
+    expect(state.dirtyDocumentKeys.has(testDocumentKey(file.path))).toBe(true)
+    expect(state.getLiveEditorDocument(testDocumentKey(file.path))?.localRevision).toBe(2)
+    store.getState().deleteLiveEditorDocument(testDocumentKey(file.path))
   })
 
   it('records a logical synchronize revision without changing content dirty or sync state', () => {

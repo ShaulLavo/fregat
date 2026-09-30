@@ -1,0 +1,341 @@
+repo	category	owner	file	line	text
+Editor	publish	core mutation	Editor:packages/editor/src/documentSession.ts	1772	for (const event of this.pendingChanges) this.changes.fire(event)
+Editor	publish	view presentation	Editor:packages/editor/src/mergeConflictPlugin.ts	349	this.emitChange()
+Editor	publish	view presentation	Editor:packages/editor/src/mergeConflictPlugin.ts	352	private emitChange(): void {
+Editor	publish	view presentation	Editor:packages/editor/src/virtualization/fixedRowVirtualizer.ts	210	this.emitChange()
+Editor	publish	view presentation	Editor:packages/editor/src/virtualization/fixedRowVirtualizer.ts	217	this.emitChange()
+Editor	publish	view presentation	Editor:packages/editor/src/virtualization/fixedRowVirtualizer.ts	353	this.emitChange()
+Editor	publish	view presentation	Editor:packages/editor/src/virtualization/fixedRowVirtualizer.ts	361	this.emitChange()
+Editor	publish	view presentation	Editor:packages/editor/src/virtualization/fixedRowVirtualizer.ts	398	this.emitChange()
+Editor	publish	view presentation	Editor:packages/editor/src/virtualization/fixedRowVirtualizer.ts	653	private emitChange(): void {
+Editor	publish	view presentation	Editor:packages/editor/src/editor/Editor.ts	702	notifyChangeWithTiming: (change) => this.notifyChangeWithTiming(change),
+Editor	publish	view presentation	Editor:packages/editor/src/editor/Editor.ts	4381	this.sessionOptions.onChange?.(passChange)
+Editor	publish	view presentation	Editor:packages/editor/src/editor/Editor.ts	4390	this.notifyChangeWithTiming(passChange),
+Editor	publish	view presentation	Editor:packages/editor/src/editor/Editor.ts	4680	private notifyChangeWithTiming(change: DocumentSessionChange): void {
+Editor	publish	view presentation	Editor:packages/editor/src/editor/inputSelectionController.ts	205	notifyChangeWithTiming(change: DocumentSessionChange): void
+Editor	publish	view presentation	Editor:packages/editor/src/editor/inputSelectionController.ts	3488	this.options.notifyChangeWithTiming(timedChange)
+Editor	subscribe	domain adapter	Editor:packages/lsp-plugin/src/bufferSync.ts	36	const unsubscribe = options.buffer.subscribe((event) =>
+Editor	subscribe	view presentation	Editor:packages/editor/src/mergeConflictPlugin.ts	175	public handleEditorChange(change: EditorContributionChange | null): void {
+Editor	subscribe	view presentation	Editor:packages/editor/src/mergeConflictPlugin.ts	524	handleEditorChange: (change) => controller.handleEditorChange(change),
+Editor	subscribe	domain adapter	Editor:packages/diff/src/editorDiffPlugin.ts	433	handleEditorChange: (change) => contribution.handleEditorChange(change),
+Editor	subscribe	domain adapter	Editor:packages/diff/src/editorDiffPlugin.ts	547	handleEditorChange(change: EditorContributionChange | null): void {
+Editor	subscribe	domain adapter	Editor:packages/lsp-plugin/src/document.ts	104	options.buffer.subscribe((event) => {
+Editor	subscribe	view presentation	Editor:packages/editor/src/historyViewer.ts	137	this.unsubscribe = buffer.subscribe(() => this.refreshGraph())
+Editor	subscribe	view presentation	Editor:packages/editor/src/plugins.ts	892	handleEditorChange?(change: EditorContributionChange | null): void
+Editor	subscribe	view presentation	Editor:packages/editor/src/plugins.ts	902	handleEditorChange?(change: EditorContributionChange | null): void
+Editor	subscribe	document contribution	Editor:packages/editor/src/editor/documentAnalysis.ts	286	unsubscribe ??= buffer.subscribe((event) => {
+Editor	subscribe	view presentation	Editor:packages/editor/src/editor/Editor.ts	1020	if (this.session) this.viewContributions.notify('document', null)
+Editor	subscribe	view presentation	Editor:packages/editor/src/editor/Editor.ts	1041	this.viewContributions.notify('document', null)
+Editor	subscribe	view presentation	Editor:packages/editor/src/editor/Editor.ts	1833	onDidChangeContentHeight(listener: (height: number) => void): EditorDisposable {
+Editor	subscribe	view presentation	Editor:packages/editor/src/editor/Editor.ts	2634	if (notify) contribution.handleEditorChange?.(null)
+Editor	subscribe	view presentation	Editor:packages/editor/src/editor/Editor.ts	2691	if (notify) contribution.handleEditorChange?.(null)
+Editor	subscribe	view presentation	Editor:packages/editor/src/editor/Editor.ts	3563	this.unsubscribeBufferChanges = bufferSession.buffer.subscribe((event) =>
+Editor	subscribe	view presentation	Editor:packages/editor/src/editor/Editor.ts	3972	this.viewContributions.notify(kind, change ?? null, also)
+Editor	subscribe	view presentation	Editor:packages/editor/src/editor/Editor.ts	3998	contribution.handleEditorChange?.(change)
+Editor	session	domain adapter	Editor:packages/typescript-lsp/src/workerOwner.ts	149	return new Worker(new URL('./typescriptLsp.worker.ts', import.meta.url), {
+Editor	session	domain adapter	Editor:packages/tree-sitter/src/treeSitter/workerClient.ts	374	const handle = new Worker(new URL('./treeSitter.worker.ts', import.meta.url), {
+Editor	session	domain adapter	Editor:packages/tree-sitter/src/index.ts	142	return new TreeSitterSyntaxSession({
+Editor	session	domain adapter	Editor:packages/lsp-plugin/src/document.ts	96	export function createLanguageServerDocument(
+Editor	session	domain adapter	Editor:packages/lsp-plugin/src/document.ts	100	return new LanguageServerDocument(
+Editor	session	domain adapter	Editor:packages/lsp-plugin/src/plugin.ts	473	new LanguageServerDocument(
+Editor	session	view presentation	Editor:packages/spellcheck/src/service.ts	90	new Worker(new URL('./spellcheck.worker.ts', import.meta.url), { type: 'module' })
+Editor	session	domain adapter	Editor:packages/editor/src/shiki/workerClient.ts	246	new Worker(new URL('./shiki.worker.ts', import.meta.url), { type: 'module' })
+Editor	session	document contribution	Editor:packages/minimap/src/workerClient.ts	135	new Worker(new URL('./minimap.worker.ts', import.meta.url), { type: 'module' })
+Editor	session	domain adapter	Editor:packages/editor/src/shiki/plugin.ts	102	return owner.createSession({
+Editor	session	domain adapter	Editor:packages/diff/src/diffSyntax.ts	373	const session = await service.createSession(document)
+Editor	session	domain adapter	Editor:packages/diff/src/diffSyntax.ts	497	const session = provider.createSession(highlighterSessionOptions(document))
+Editor	session	domain adapter	Editor:packages/diff/src/diffSyntax.ts	517	const session = provider.createSession(syntaxSessionOptions(document))
+Editor	session	view presentation	Editor:packages/editor/src/plugins.ts	1400	const session = provider.createSession(options)
+Editor	session	view presentation	Editor:packages/editor/src/plugins.ts	1426	public createSyntaxSession(options: EditorSyntaxSessionOptions): EditorSyntaxSession | null {
+Editor	session	view presentation	Editor:packages/editor/src/plugins.ts	1428	const session = provider.createSession(options)
+Editor	session	document contribution	Editor:packages/editor/src/editor/documentAnalysis.ts	300	const session = request.provider.createSession({
+Editor	session	document contribution	Editor:packages/editor/src/editor/documentAnalysis.ts	332	const session = request.provider.createSession({
+Editor	session	document contribution	Editor:packages/minimap/src/plugin.ts	99	this.client = new MinimapWorkerClient({
+Editor	session	document contribution	Editor:packages/editor/src/editor/snippetTokensFeature.ts	82	pluginHost.createSyntaxSession(syntaxOptions)
+Editor	session	document contribution	Editor:packages/editor/src/editor/snippetTokensFeature.ts	100	source.highlighter?.createSession(document) ?? source.syntax?.createSession(syntaxOptions)
+Editor	session	document contribution	Editor:packages/editor/src/editor/syntaxController.ts	448	this.syntaxSession = prepared?.structural?.session ?? this.createSyntaxSession(document)
+Editor	session	document contribution	Editor:packages/editor/src/editor/syntaxController.ts	607	this.syntaxSession = this.createSyntaxSession({
+Editor	session	document contribution	Editor:packages/editor/src/editor/syntaxController.ts	816	private createSyntaxSession(
+Editor	session	document contribution	Editor:packages/editor/src/editor/syntaxController.ts	843	this.options.pluginHost.createSyntaxSession(sessionOptions) ??
+Editor	session	document contribution	Editor:packages/editor/src/editor/syntaxController.ts	967	this.syntaxSession = this.createSyntaxSession({
+Editor	message	domain adapter	Editor:packages/typescript-lsp/src/workerOwner.ts	52	handle.postMessage(message)
+Editor	message	domain adapter	Editor:packages/typescript-lsp/src/worker/session.ts	336	if (message.method === 'textDocument/didOpen') return handleDidOpen(message.params)
+Editor	message	domain adapter	Editor:packages/typescript-lsp/src/worker/session.ts	337	if (message.method === 'textDocument/didChange') return handleDidChange(message.params)
+Editor	message	domain adapter	Editor:packages/typescript-lsp/src/worker/session.ts	338	if (message.method === 'textDocument/didClose') return handleDidClose(message.params)
+Editor	message	domain adapter	Editor:packages/typescript-lsp/src/typescriptLsp.worker.ts	5	post: (message) => workerGlobal.postMessage(message),
+Editor	message	domain adapter	Editor:packages/typescript-lsp/src/server.ts	38	worker.postMessage(decodeSocketMessage(message))
+Editor	message	domain adapter	Editor:packages/tree-sitter/src/treeSitter/workerClient.ts	227	type: 'parse',
+Editor	message	domain adapter	Editor:packages/tree-sitter/src/treeSitter/workerClient.ts	263	type: 'edit',
+Editor	message	domain adapter	Editor:packages/tree-sitter/src/treeSitter/workerClient.ts	291	type: 'queryRange',
+Editor	message	domain adapter	Editor:packages/tree-sitter/src/treeSitter/workerClient.ts	326	await this.postRequest({ type: 'disposeDocument', runtimeSessionId }, false)
+Editor	message	domain adapter	Editor:packages/tree-sitter/src/treeSitter/workerClient.ts	424	handle.postMessage(request)
+Editor	message	domain adapter	Editor:packages/tree-sitter/src/treeSitter/types.ts	123	readonly type: 'parse'
+Editor	message	domain adapter	Editor:packages/tree-sitter/src/treeSitter/types.ts	137	readonly type: 'edit'
+Editor	message	domain adapter	Editor:packages/tree-sitter/src/treeSitter/types.ts	154	readonly type: 'queryRange'
+Editor	message	domain adapter	Editor:packages/tree-sitter/src/treeSitter/types.ts	192	readonly type: 'disposeDocument'
+Editor	message	document contribution	Editor:packages/minimap/src/workerClient.ts	153	handle.postMessage(request, transfer)
+Editor	message	document contribution	Editor:packages/minimap/src/workerClient.ts	157	handle.postMessage(request)
+Editor	message	document contribution	Editor:packages/minimap/src/workerClient.ts	363	this.post({ type: 'openDocument', document: this.trackedDocumentPayload(snapshot) })
+Editor	message	document contribution	Editor:packages/minimap/src/workerClient.ts	484	this.post({ type: 'replaceDocument', document: this.trackedDocumentPayload(snapshot) })
+Editor	message	document contribution	Editor:packages/minimap/src/workerClient.ts	519	this.post({ type: 'applyEdit', edit: update.edits[0]!, document })
+Editor	message	document contribution	Editor:packages/minimap/src/workerClient.ts	523	this.post({ type: 'applyEdits', edits: update.edits, document })
+Editor	message	document contribution	Editor:packages/minimap/src/workerClient.ts	1777	type: 'edit',
+Editor	message	document contribution	Editor:packages/minimap/src/types.ts	177	| { readonly type: 'openDocument'; readonly document: MinimapDocumentPayload }
+Editor	message	document contribution	Editor:packages/minimap/src/types.ts	178	| { readonly type: 'replaceDocument'; readonly document: MinimapDocumentPayload }
+Editor	message	document contribution	Editor:packages/minimap/src/types.ts	180	readonly type: 'applyEdit'
+Editor	message	document contribution	Editor:packages/minimap/src/types.ts	185	readonly type: 'applyEdits'
+Editor	message	document contribution	Editor:packages/minimap/src/minimap.worker.ts	88	globalThis.postMessage(response)
+Editor	message	view presentation	Editor:packages/spellcheck/src/spellcheck.worker.ts	45	scope.postMessage(response)
+Editor	message	view presentation	Editor:packages/spellcheck/src/service.ts	46	this.worker.postMessage({ type: 'setAcceptedWords', words })
+Editor	message	view presentation	Editor:packages/spellcheck/src/service.ts	78	this.ensureWorker().postMessage(build(id))
+Editor	message	view presentation	Editor:packages/spellcheck/src/service.ts	96	worker.postMessage({ type: 'setAcceptedWords', words: this.acceptedWords })
+Editor	message	domain adapter	Editor:packages/lsp/src/client.ts	203	this.trySendNotification('textDocument/didOpen', {
+Editor	message	domain adapter	Editor:packages/lsp/src/client.ts	218	this.trySendNotification('textDocument/didChange', {
+Editor	message	domain adapter	Editor:packages/lsp/src/client.ts	229	this.trySendNotification('textDocument/didSave', {
+Editor	message	domain adapter	Editor:packages/lsp/src/client.ts	240	this.trySendNotification('textDocument/didClose', {
+Editor	message	domain adapter	Editor:packages/lsp/src/transports.ts	37	addEventListener(type: 'open', handler: EventListener): void
+Editor	message	domain adapter	Editor:packages/lsp/src/transports.ts	41	removeEventListener(type: 'open', handler: EventListener): void
+Editor	message	domain adapter	Editor:packages/lsp/src/transports.ts	196	this.worker.postMessage(this.encodeMessage(message))
+Editor	message	domain adapter	Editor:packages/editor/src/shiki/workerTypes.ts	34	readonly type: 'open'
+Editor	message	domain adapter	Editor:packages/editor/src/shiki/workerTypes.ts	41	readonly type: 'edit'
+Editor	message	domain adapter	Editor:packages/editor/src/shiki/workerTypes.ts	57	readonly type: 'disposeDocument'
+Editor	message	domain adapter	Editor:packages/editor/src/shiki/workerClient.ts	184	this.postRequest({ type: 'disposeDocument', runtimeSessionId }, false).then(() => undefined),
+Editor	message	domain adapter	Editor:packages/editor/src/shiki/workerClient.ts	267	handle.postMessage(request)
+Editor	message	domain adapter	Editor:packages/editor/src/shiki/workerClient.ts	398	type: 'open',
+Editor	message	domain adapter	Editor:packages/editor/src/shiki/workerClient.ts	523	type: 'open',
+Editor	message	domain adapter	Editor:packages/editor/src/shiki/workerClient.ts	535	type: 'edit',
+Editor	message	domain adapter	Editor:packages/editor/src/shiki/shiki.worker.ts	329	workerScope.postMessage(response)
+Editor	message	domain adapter	Editor:packages/editor/src/shiki/shiki.worker.ts	332	workerScope.postMessage(response, transfers)
+Editor	materialize	domain adapter	Editor:packages/tree-sitter/src/session.ts	569	const edit = diffPieceTableSnapshots(
+Editor	materialize	domain adapter	Editor:packages/tree-sitter/src/session.ts	581	return pieceTableSnapshotsHaveSameText(
+Editor	materialize	view presentation	Editor:packages/react/src/index.tsx	130	materializeFullText(): string
+Editor	materialize	view presentation	Editor:packages/react/src/index.tsx	374	public materializeFullText(): string {
+Editor	materialize	view presentation	Editor:packages/react/src/index.tsx	375	return this.getEditor()?.materializeFullText() ?? ''
+Editor	materialize	view presentation	Editor:packages/react/src/index.tsx	1129	text = source ? source.readRange(0, source.length) : ''
+Editor	materialize	view presentation	Editor:packages/markdown/src/semanticEdit.ts	29	const code = source.readRange(start + width, end - width)
+Editor	materialize	view presentation	Editor:packages/markdown/src/semanticEdit.ts	37	const marker = source.readRange(start, start + width)
+Editor	materialize	view presentation	Editor:packages/markdown/src/semanticEdit.ts	38	const prefix = quoteCode(source.readRange(contentStart, from), marker)
+Editor	materialize	view presentation	Editor:packages/markdown/src/semanticEdit.ts	39	const selected = source.readRange(from, to)
+Editor	materialize	view presentation	Editor:packages/markdown/src/semanticEdit.ts	40	const suffix = quoteCode(source.readRange(to, contentEnd), marker)
+Editor	materialize	view presentation	Editor:packages/markdown/src/semanticEdit.ts	62	return source.readRange(start, lineEnd).match(/^`+/)?.[0].length ?? 1
+Editor	materialize	view presentation	Editor:packages/markdown/src/semanticEdit.ts	75	const suffix = source.readRange(end, link.end)
+Editor	materialize	view presentation	Editor:packages/spellcheck/src/controller.ts	192	const source = text.readRange(region.start, region.end)
+Editor	materialize	view presentation	Editor:packages/spellcheck/src/controller.ts	213	const lineWords = this.lineWords(text.readRange(range.start, range.end), local)
+Editor	materialize	view presentation	Editor:packages/spellcheck/src/controller.ts	292	if (!text || foldApostrophes(text.readRange(issue.start, issue.end)) !== issue.word)
+Editor	materialize	view presentation	Editor:packages/markdown/src/replacements.ts	53	const width = source.readRange(spec.startIndex, spec.endIndex).length
+Editor	materialize	view presentation	Editor:packages/markdown/src/replacements.ts	116	const source = text.readRange(span.start, span.end)
+Editor	materialize	view presentation	Editor:packages/markdown/src/replacements.ts	129	return text.readRange(span.start, span.start + 2) === '~~' ? 2 : 1
+Editor	materialize	view presentation	Editor:packages/markdown/src/replacements.ts	133	text.readRange(span.start + count, span.start + count + 1) === '`'
+Editor	materialize	view presentation	Editor:packages/markdown/src/replacements.ts	160	const source = text.readRange(start, end)
+Editor	materialize	view presentation	Editor:packages/markdown/src/replacements.ts	184	while (offset + count < text.length && text.readRange(offset + count, offset + count + 1) === ' ')
+Editor	materialize	view presentation	Editor:packages/markdown/src/markEdit.ts	33	const text = source.readRange(from, to)
+Editor	materialize	view presentation	Editor:packages/markdown/src/markEdit.ts	81	if (kind === Kind.Link) return source.readRange(start, start + 1) === '[' ? start + 1 : null
+Editor	materialize	view presentation	Editor:packages/markdown/src/markEdit.ts	120	const prefix = source.readRange(start, from)
+Editor	materialize	view presentation	Editor:packages/markdown/src/markEdit.ts	121	const suffix = source.readRange(to, end)
+Editor	materialize	view presentation	Editor:packages/markdown/src/markEdit.ts	161	if (kind === Kind.Strong || source.readRange(start, start + 2) === '~~') return 2
+Editor	materialize	view presentation	Editor:packages/markdown/src/linkRender.ts	45	let text = source.readRange(label.start, label.end)
+Editor	materialize	view presentation	Editor:packages/markdown/src/linkDestination.ts	14	const suffix = source.readRange(label.end, link.end)
+Editor	materialize	view presentation	Editor:packages/markdown/src/linkDestination.ts	16	const raw = source.readRange(link.start, link.end)
+Editor	materialize	view presentation	Editor:packages/markdown/src/linkDestination.ts	18	const target = source.readRange(label.start, label.end)
+Editor	materialize	view presentation	Editor:packages/markdown/src/linkDestination.ts	25	const identifier = normalizeIdentifier(reference || source.readRange(label.start, label.end))
+Editor	materialize	view presentation	Editor:packages/markdown/src/linkDestination.ts	28	const definition = source.readRange(records[index]!, records[index + 1]!).trimStart()
+Editor	materialize	view presentation	Editor:packages/markdown/src/authoringPlugin.ts	38	if (!/^\s*(?:[-+*]|\d+[.)])\s/.test(source.readRange(line.start, line.end)))
+Editor	materialize	view presentation	Editor:packages/plugin-ui/src/offsetRange.ts	69	const local = hoverTargetRange(source.readRange(from, to), offset - from)
+Editor	materialize	domain adapter	Editor:packages/diff/src/model.ts	49	export function createTextDiff(options: CreateTextDiffOptions): DiffFile {
+Editor	materialize	view presentation	Editor:packages/markdown/src/authoring.ts	53	const text = source.readRange(from, to).replace(/\r$/, '')
+Editor	materialize	view presentation	Editor:packages/markdown/src/authoring.ts	71	const text = source.readRange(start, end)
+Editor	materialize	view presentation	Editor:packages/markdown/src/authoring.ts	72	const before = source.readRange(source.lineRange(source.lineAt(start)).start, start)
+Editor	materialize	view presentation	Editor:packages/markdown/src/authoring.ts	73	const after = source.readRange(end, source.lineRange(source.lineAt(end)).end)
+Editor	materialize	view presentation	Editor:packages/markdown/src/authoring.ts	113	const selected = source.readRange(start, end) || 'link text'
+Editor	materialize	view presentation	Editor:packages/markdown/src/authoring.ts	221	source.readRange(Math.max(0, firstEnd - 1), Math.min(source.length, firstEnd + 1)) === '\r\n'
+Editor	materialize	document contribution	Editor:packages/minimap/src/workerClient.ts	1072	text: text.snapshot.readRange(startOffset, clippedEnd),
+Editor	materialize	domain adapter	Editor:packages/lsp/src/positions.ts	286	return document.textSnapshot.readRange(probeStart, nextStart)
+Editor	materialize	domain adapter	Editor:packages/lsp/src/positions.ts	306	return document.textSnapshot.readRange(0, document.textSnapshot.length)
+Editor	materialize	view presentation	Editor:packages/solid/src/index.ts	236	cachedText = source ? source.readRange(0, source.length) : ''
+Editor	materialize	view presentation	Editor:packages/find/src/search.ts	55	readRange: (start, end) => snapshot.readRange(start, end),
+Editor	materialize	view presentation	Editor:packages/find/src/search.ts	419	const text = source.readRange(offset, Math.min(source.length, offset + 2))
+Editor	materialize	view presentation	Editor:packages/find/src/search.ts	726	const text = source.readRange(start, Math.max(start, lineEndAt(source, last)))
+Editor	materialize	view presentation	Editor:packages/find/src/search.ts	762	return { text: source.readRange(start, end), start, from: Math.max(0, range.start - start) }
+Editor	materialize	view presentation	Editor:packages/scope-lines/src/stickyScroll.ts	440	lines.push(range ? textSnapshot.readRange(range.start, range.end) : '')
+Editor	materialize	domain adapter	Editor:packages/diff/src/editorDiffPlugin.ts	446	const file = createTextDiff({
+Editor	materialize	domain adapter	Editor:packages/diff/src/editorDiffPlugin.ts	504	return context.materializeFullText()
+Editor	materialize	domain adapter	Editor:packages/lsp/src/client.ts	572	return document.textSnapshot.readRange(0, document.textSnapshot.length)
+Editor	materialize	view presentation	Editor:packages/scope-lines/src/index.ts	501	return textSnapshot.readRange(start, end)
+Editor	materialize	view presentation	Editor:packages/find/src/plugin.ts	554	readRange: (start, end) => text.readRange(start, end),
+Editor	materialize	domain adapter	Editor:packages/lsp-plugin/src/completionController.ts	582	const before = source.readRange(windowStart, offset)
+Editor	materialize	view presentation	Editor:packages/find/src/findController.ts	884	return source.readRange(selection.startOffset, selection.endOffset)
+Editor	materialize	view presentation	Editor:packages/find/src/findController.ts	891	const text = source.readRange(line.start, line.end)
+Editor	materialize	domain adapter	Editor:packages/lsp-plugin/src/codeActions.ts	90	const around = document.textSnapshot.readRange(start - 1, start + 1)
+Editor	materialize	domain adapter	Editor:packages/lsp-plugin/src/formatOnType.ts	287	const read = (start: number, end: number): string => source.readRange(start, end)
+Editor	materialize	domain adapter	Editor:packages/lsp-plugin/src/formatting.ts	63	document.textSnapshot.readRange(edit.from, edit.to),
+Editor	materialize	domain adapter	Editor:packages/lsp-plugin/src/formatting.ts	80	return edits.some((edit) => text.readRange(edit.from, edit.to) !== edit.text)
+Editor	materialize	domain adapter	Editor:packages/lsp-plugin/src/sourceText.ts	27	return document.textSnapshot.readRange(offset, offset + 1)
+Editor	materialize	domain adapter	Editor:packages/lsp-plugin/src/sourceText.ts	43	const found = find(document.textSnapshot.readRange(from, to), offset - from)
+Editor	materialize	domain adapter	Editor:packages/lsp-plugin/src/sourceText.ts	77	readRange: (start, end) => textSnapshot.readRange(start, end),
+Editor	materialize	domain adapter	Editor:packages/lsp-plugin/src/workspaceTextEdits.ts	275	const effective = !pieceTableSnapshotsHaveSameText(snapshotBefore, candidate)
+Editor	materialize	domain adapter	Editor:packages/lsp-plugin/src/workspaceTextEdits.ts	561	if (!pieceTableSnapshotsHaveSameText(snapshotBefore, state.snapshot)) return
+Editor	materialize	domain adapter	Editor:packages/lsp-plugin/src/workspaceTextEdits.ts	574	const edit = diffPieceTableSnapshots(segment.snapshotBefore, segment.snapshotAfter)
+Editor	materialize	domain adapter	Editor:packages/lsp-plugin/src/plugin.ts	1058	const currentName = document.textSnapshot.readRange(range.start, range.end)
+Editor	materialize	view presentation	Editor:packages/editor/src/documentTextSnapshot.ts	47	materializeFullText(): string
+Editor	materialize	view presentation	Editor:packages/editor/src/documentTextSnapshot.ts	98	return measureString(snapshot.readRange(start, end))
+Editor	materialize	view presentation	Editor:packages/editor/src/documentTextSnapshot.ts	152	materializeFullText(): string {
+Editor	materialize	view presentation	Editor:packages/editor/src/documentTextSnapshot.ts	256	materializeFullText(): string {
+Editor	materialize	view presentation	Editor:packages/editor/src/documentTextSnapshot.ts	327	(from, to) => source.readRange(start + from, start + to),
+Editor	materialize	core mutation	Editor:packages/editor/src/historySerialization.ts	124	const edit = diffPieceTableSnapshots(parentSnapshot, node.snapshot)
+Editor	materialize	core mutation	Editor:packages/editor/src/documentSession.ts	123	materializeFullText(): string
+Editor	materialize	core mutation	Editor:packages/editor/src/documentSession.ts	234	materializeFullText(): string
+Editor	materialize	core mutation	Editor:packages/editor/src/documentSession.ts	853	public materializeFullText(): string {
+Editor	materialize	core mutation	Editor:packages/editor/src/documentSession.ts	854	return this.textSnapshot.materializeFullText()
+Editor	materialize	core mutation	Editor:packages/editor/src/documentSession.ts	939	const edit = diffPieceTableSnapshots(from, next.current)
+Editor	materialize	core mutation	Editor:packages/editor/src/documentSession.ts	1030	const dirty = !pieceTableSnapshotsHaveSameText(snapshot, this.cleanSnapshot)
+Editor	materialize	core mutation	Editor:packages/editor/src/documentSession.ts	2006	public materializeFullText(): string {
+Editor	materialize	core mutation	Editor:packages/editor/src/documentSession.ts	2007	return this.buffer.materializeFullText()
+Editor	materialize	core mutation	Editor:packages/editor/src/documentSession.ts	2168	public materializeFullText(): string {
+Editor	materialize	core mutation	Editor:packages/editor/src/documentSession.ts	2169	return this.textSnapshot.materializeFullText()
+Editor	materialize	core mutation	Editor:packages/editor/src/documentSession.ts	2510	const hasTextChange = !pieceTableSnapshotsHaveSameText(snapshotBefore, candidate)
+Editor	materialize	core mutation	Editor:packages/editor/src/documentSession.ts	2639	? diffPieceTableSnapshots(snapshotAfter, snapshotBefore)
+Editor	materialize	core mutation	Editor:packages/editor/src/documentSession.ts	2640	: diffPieceTableSnapshots(snapshotBefore, snapshotAfter)
+Editor	materialize	view presentation	Editor:packages/editor/src/mergeConflicts.ts	152	if (MARKERS.has(source.readRange(lineStart, lineStart + MARKER_LENGTH))) return true
+Editor	materialize	view presentation	Editor:packages/editor/src/mergeConflicts.ts	324	const replacement = ranges.map((range) => source.readRange(range.start, range.end)).join('')
+Editor	materialize	view presentation	Editor:packages/editor/src/plugins.ts	711	materializeFullText(): string
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/Editor.ts	1705	materializeFullText(): string {
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/Editor.ts	1706	return this.getTextSnapshot().materializeFullText()
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/Editor.ts	3429	materializeFullText: () => this.materializeFullText(),
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/Editor.ts	3453	materializeFullText: () => this.materializeFullText(),
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/Editor.ts	3478	materializeFullText: () => this.materializeFullText(),
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/Editor.ts	5152	return countLineBreaks(edit.text) - countLineBreaks(previousText.readRange(edit.from, edit.to))
+Editor	materialize	view presentation	Editor:packages/editor/src/virtualization/virtualizedTextViewSelectionLayer.ts	101	if (view.model.textSnapshot.readRange(row.startOffset - 1, row.startOffset) !== '\n') return null
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/editActions.ts	481	const slice = source.readRange(selection.startOffset, selection.endOffset)
+Editor	materialize	document contribution	Editor:packages/editor/src/editor/documentAnalysis.ts	245	const state = this.readRange(range)
+Editor	materialize	document contribution	Editor:packages/editor/src/editor/documentAnalysis.ts	395	const state = entry.readRange(demand)
+Editor	materialize	document contribution	Editor:packages/editor/src/editor/documentAnalysis.ts	399	const state = entry.readRange(demand)
+Editor	materialize	document contribution	Editor:packages/editor/src/editor/documentAnalysis.ts	406	: entry.readRange(range ?? demand),
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/lineMap.ts	88	return this.source.readRange(from, to)
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/lineMap.ts	157	const text = source.readRange(start, end)
+Editor	materialize	view presentation	Editor:packages/editor/src/virtualization/displayProjectionText.ts	111	return snapshot.readRange(start, end)
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/ghostText.ts	86	const changes = ghostTextDiff(source.readRange(edit.from, edit.to), edit.text)
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/ghostText.ts	235	const replaced = source.readRange(from, to)
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/ghostText.ts	255	const replacedIndentation = source.readRange(edit.from, indentEnd)
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/occurrences.ts	49	const query = source.readRange(selection.startOffset, selection.endOffset)
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/occurrences.ts	56	return { query: source.readRange(range.start, range.end), range }
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/occurrences.ts	146	text: source.readRange(readStart, Math.min(source.length, end + query.length + 1)),
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/occurrences.ts	171	const text = source.readRange(start, Math.min(source.length, match.end + 2))
+Editor	materialize	view presentation	Editor:packages/editor/src/virtualization/virtualizedTextViewHighlights.ts	1560	snapshot.readRange(offset, offset + 1).charCodeAt(0),
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/viewSnapshot.ts	125	fullText: source.readRange(0, source.length),
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/viewSnapshot.ts	213	const sourceText = snapshot.textSnapshot.readRange(chunk.sourceStartOffset, chunk.sourceEndOffset)
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/navigationTargets.ts	104	cached = { start, text: textSnapshot.readRange(start, end) }
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/folds.ts	262	return text.readRange(start, end)
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/selectionRanges.ts	56	const part = wordPartRangeAtOffset(textSnapshot.readRange(word.start, word.end), word, offset)
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/tokenProjection.ts	63	text: batch.after.readRange(change.afterFrom, change.afterTo),
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/tokenProjection.ts	346	return text.readRange(start, end)
+Editor	materialize	view presentation	Editor:packages/editor/src/textWindows.ts	16	const text = source.readRange(offset, Math.min(end, offset + TEXT_WINDOW_LENGTH))
+Editor	materialize	view presentation	Editor:packages/editor/src/textWindows.ts	30	if (visit(source.readRange(offset, windowEnd), offset) === false) return
+Editor	materialize	view presentation	Editor:packages/editor/src/textWindows.ts	62	const text = this.source.readRange(start, Math.min(this.length, start + TEXT_WINDOW_LENGTH))
+Editor	materialize	view presentation	Editor:packages/editor/src/textWindows.ts	84	const text = source.readRange(offset, Math.min(end, offset + size))
+Editor	materialize	view presentation	Editor:packages/editor/src/textContent.ts	16	return this.readRange(from, Math.max(from, to))
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/rowWindow.ts	28	const text = source.readRange(start, end)
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/textCursor.ts	69	if (end > pageStart + CURSOR_PAGE) return this.source.readRange(start, end)
+Editor	materialize	view presentation	Editor:packages/editor/src/editor/textCursor.ts	79	page = this.source.readRange(pageStart, Math.min(this.length, pageStart + CURSOR_PAGE))
+Editor	materialize	domain adapter	Editor:packages/editor/src/shiki/workerClient.ts	389	if (this.opened && pieceTableSnapshotsHaveSameText(this.snapshot, snapshot)) {
+Editor	materialize	domain adapter	Editor:packages/editor/src/shiki/workerClient.ts	529	const fallbackEdit = diffPieceTableSnapshots(this.snapshot, change.snapshot)
+Editor	materialize	domain adapter	Editor:packages/editor/src/shiki/workerClient.ts	569	return textSnapshot.materializeFullText()
+Editor	materialize	domain adapter	Editor:packages/editor/src/shiki/workerClient.ts	584	!pieceTableSnapshotsHaveSameText(
+Editor	cursor	view presentation	Editor:packages/find/src/plugin.ts	475	snapshot.changesSinceDocumentSyncPoint(this.elsewhereSyncPoint, null)?.edits ?? null
+Editor	cursor	core mutation	Editor:packages/editor/src/documentSession.ts	153	changesSinceDocumentSyncPoint(
+Editor	cursor	core mutation	Editor:packages/editor/src/documentSession.ts	238	getDocumentSyncPoint(): DocumentSyncPoint
+Editor	cursor	core mutation	Editor:packages/editor/src/documentSession.ts	239	changesSinceDocumentSyncPoint(
+Editor	cursor	core mutation	Editor:packages/editor/src/documentSession.ts	869	public getDocumentSyncPoint(): DocumentSyncPoint {
+Editor	cursor	core mutation	Editor:packages/editor/src/documentSession.ts	873	public changesSinceDocumentSyncPoint(
+Editor	cursor	core mutation	Editor:packages/editor/src/documentSession.ts	877	return this.editChain.changesSince(point, scope)
+Editor	cursor	core mutation	Editor:packages/editor/src/documentSession.ts	1757	this.editChain.changesSince(point, scope, syncPointAfter),
+Editor	cursor	view presentation	Editor:packages/editor/src/mergeConflictPlugin.ts	55	getDocumentSyncPoint(): DocumentSyncPoint
+Editor	cursor	view presentation	Editor:packages/editor/src/mergeConflictPlugin.ts	56	changesSinceDocumentSyncPoint(
+Editor	cursor	view presentation	Editor:packages/editor/src/mergeConflictPlugin.ts	199	const point = current ? this.host.getDocumentSyncPoint() : null
+Editor	cursor	view presentation	Editor:packages/editor/src/mergeConflictPlugin.ts	328	const changes = this.host.changesSinceDocumentSyncPoint(this.parsedPoint, null)
+Editor	cursor	view presentation	Editor:packages/editor/src/mergeConflictPlugin.ts	535	getDocumentSyncPoint: () => context.getDocumentSyncPoint(),
+Editor	cursor	view presentation	Editor:packages/editor/src/mergeConflictPlugin.ts	537	context.changesSinceDocumentSyncPoint(point, scope),
+Editor	cursor	view presentation	Editor:packages/editor/src/plugins.ts	714	getDocumentSyncPoint(): DocumentSyncPoint
+Editor	cursor	view presentation	Editor:packages/editor/src/plugins.ts	715	changesSinceDocumentSyncPoint(
+Editor	cursor	domain adapter	Editor:packages/lsp-plugin/src/documentSync.ts	399	const changes = snapshot.changesSinceDocumentSyncPoint(point, scope)
+Editor	cursor	domain adapter	Editor:packages/lsp-plugin/src/documentSnapshot.ts	18	const point = publication?.syncPointAfter ?? buffer.getDocumentSyncPoint()
+Editor	cursor	domain adapter	Editor:packages/lsp-plugin/src/documentSnapshot.ts	39	? publication.changesSinceDocumentSyncPoint(previous, scope)
+Editor	cursor	domain adapter	Editor:packages/lsp-plugin/src/documentSnapshot.ts	40	: buffer.changesSinceDocumentSyncPoint(previous, scope),
+Editor	cursor	document contribution	Editor:packages/editor/src/editor/syntaxController.ts	2329	const composed = chain.changesSince(point, null)
+Editor	cursor	view presentation	Editor:packages/editor/src/semanticTokenLayer.ts	194	const changes = snapshot.changesSinceDocumentSyncPoint(point, null)
+Editor	cursor	view presentation	Editor:packages/editor/src/editor/Editor.ts	3433	this.currentDocumentEditChain().changesSince(point, scope),
+Editor	cursor	view presentation	Editor:packages/editor/src/editor/Editor.ts	3457	this.currentDocumentEditChain().changesSince(point, scope),
+Editor	cursor	view presentation	Editor:packages/editor/src/editor/Editor.ts	3482	this.currentDocumentEditChain().changesSince(point, scope),
+Editor	cursor	view presentation	Editor:packages/editor/src/editor/Editor.ts	3543	point: session.buffer.getDocumentSyncPoint(),
+Editor	cursor	view presentation	Editor:packages/editor/src/editor/Editor.ts	3544	changesSince: (point, scope) => session.buffer.changesSinceDocumentSyncPoint(point, scope),
+Editor	cursor	view presentation	Editor:packages/editor/src/editor/Editor.ts	3754	) => sync.changesSince(point, scope),
+Editor	subscribe	view presentation	Editor:examples/stress/src/consumers.ts	77	const unsubscribe = buffer.subscribe(({ change }) => {
+Editor	session	view presentation	Editor:examples/stress/src/copies.ts	86	const session = owner.createSession({
+Editor	session	view presentation	Editor:examples/stress/src/copies.ts	141	const fresh = owner.createSession({
+Editor	materialize	view presentation	Editor:examples/stress/src/inputLatency.ts	170	check(buffer.materializeFullText() === expected, `${scenario} produced incorrect document text`)
+Editor	materialize	view presentation	Editor:examples/stress/src/inputLatency.ts	172	check(editor.materializeFullText() === expected, 'A peer view missed an input edit')
+Editor	materialize	view presentation	Editor:examples/stress/src/firstPaint.ts	220	correctText: editor.materializeFullText() === source,
+Editor	materialize	view presentation	Editor:examples/stress/src/browser.ts	160	check(buffer.materializeFullText() === text, 'Shared buffer text differs from expected edits')
+Editor	materialize	view presentation	Editor:examples/stress/src/browser.ts	162	check(editor.materializeFullText() === text, 'A view missed the shared edit')
+Editor	materialize	view presentation	Editor:examples/stress/src/browser.ts	218	check(buffer.getTextSnapshot().readRange(0, 4) === '😀e\u0301', 'Churn insertion did not apply')
+Editor	materialize	view presentation	Editor:examples/stress/src/boundary.ts	177	const text = active.editors[0]!.materializeFullText()
+Editor	materialize	view presentation	Editor:examples/app/src/sourceController.ts	218	const text = this.editor.materializeFullText()
+Editor	materialize	view presentation	Editor:examples/app/src/modal/modalPlugin.ts	157	return offset + nextWordOffset(source.readRange(offset, end), 0)
+Editor	materialize	view presentation	Editor:examples/app/src/modal/modalPlugin.ts	160	return start + previousWordOffset(source.readRange(start, offset), offset - start)
+Editor	materialize	view presentation	Editor:examples/app/src/modal/modalPlugin.ts	174	const chunk = text(scope).readRange(offset, Math.min(lineEnd, offset + 32))
+Editor	materialize	view presentation	Editor:examples/app/src/modal/modalPlugin.ts	180	const chunk = text(scope).readRange(Math.max(lineStart, offset - 32), offset)
+Editor	materialize	view presentation	Editor:examples/app/src/modal/modalPlugin.ts	224	const word = wordRangeAtOffset(source.readRange(range.start, range.end), offset - range.start)
+Editor	materialize	view presentation	Editor:examples/app/src/components/historyPanel.ts	229	return createTextDiff({
+Platform	subscribe	view presentation	Platform:apps/web/src/features/workbench/hooks/use-editor-visible-snapshot.ts	133	return buffer.subscribe(({ change }) => discardDirty(change.isDirty))
+Platform	subscribe	domain adapter	Platform:apps/web/src/features/workbench/components/markdown-preview-pane.tsx	59	const subscribe = useCallback((listener: () => void) => buffer.subscribe(listener), [buffer])
+Platform	subscribe	host transaction policy	Platform:apps/web/src/features/editor/state/workspace-document-service.ts	1412	const unsubscribe = document.buffer.subscribe((event) =>
+Platform	subscribe	host transaction policy	Platform:apps/web/src/features/editor/state/language-server-documents.ts	59	const unsubscribe = buffer.subscribe(({ change }) => {
+Platform	session	view presentation	Platform:apps/server/src/fs/native-watch-host.ts	75	const worker = new Worker(this.workerPath, options)
+Platform	session	view presentation	Platform:apps/web/src/demo/state/orchestration.ts	109	this.createSession(command.sessionId, command)
+Platform	session	view presentation	Platform:apps/web/src/demo/state/orchestration.ts	116	this.createSession(command.sessionId, create)
+Platform	session	domain adapter	Platform:apps/web/src/features/search/state/result-syntax-cache.ts	77	const session = this.provider.createSession({
+Platform	session	view presentation	Platform:apps/web/src/features/editor/utils/language-server-plugin.ts	204	document: createLanguageServerDocument({
+Platform	message	host transaction policy	Platform:apps/web/src/lib/document-symbols.ts	187	method: 'textDocument/didOpen',
+Platform	message	view presentation	Platform:apps/web/src/demo-entry.ts	60	parent.postMessage({ type: 'fregat-demo-ready' }, parentOrigin)
+Platform	message	view presentation	Platform:apps/web/src/demo-entry.ts	72	parent.postMessage({ type: 'fregat-demo-error', message }, parentOrigin)
+Platform	message	view presentation	Platform:apps/server/src/fs/native-watch-host.ts	68	this.ensureWorker().postMessage(request)
+Platform	message	view presentation	Platform:apps/tui/src/viewer/state/lsp.ts	106	await client.notify('textDocument/didOpen', {
+Platform	message	view presentation	Platform:apps/tui/src/viewer/state/lsp.ts	148	.notify('textDocument/didClose', { textDocument: { uri } })
+Platform	message	view presentation	Platform:apps/server/src/lsp/proxy-session.ts	1175	if (message.method === 'textDocument/didOpen') return this.handleDidOpen(connection, message)
+Platform	message	view presentation	Platform:apps/server/src/lsp/proxy-session.ts	1176	if (message.method === 'textDocument/didChange')
+Platform	message	view presentation	Platform:apps/server/src/lsp/proxy-session.ts	1178	if (message.method === 'textDocument/didClose') return this.handleDidClose(connection, message)
+Platform	message	view presentation	Platform:apps/server/src/lsp/proxy-session.ts	1397	method: 'textDocument/didClose',
+Platform	message	view presentation	Platform:apps/server/src/lsp/proxy-session.ts	1407	method: 'textDocument/didChange',
+Platform	materialize	view presentation	Platform:apps/web/src/state/diagnostic-fix.ts	83	lines.push(text.readRange(range.start, range.end).replace(/\r?\n$/, ''))
+Platform	materialize	view presentation	Platform:apps/web/src/lib/text-snapshot-equality.ts	4	export function textSnapshotEqualsText(textSnapshot: TextReadSnapshot, text: string) {
+Platform	materialize	host transaction policy	Platform:apps/web/src/lib/file-snapshot.ts	12	return 'content' in file ? file.content : file.textSnapshot.materializeFullText()
+Platform	materialize	host transaction policy	Platform:apps/web/src/lib/file-snapshot.ts	18	return { ...metadata, content: textSnapshot.materializeFullText() }
+Platform	materialize	view presentation	Platform:apps/web/src/keymap/workspace-commands.ts	583	text: text.readRange(startOffset, endOffset),
+Platform	materialize	view presentation	Platform:apps/web/src/features/command-palette/hooks/use-symbols.ts	58	? selectedDocument.buffer.materializeFullText()
+Platform	materialize	view presentation	Platform:apps/web/src/features/workspace/state/event-conflict-adapter.ts	322	return context.getLiveEditorDocument(fileDocumentKey(path))?.buffer.materializeFullText() ?? ''
+Platform	materialize	view presentation	Platform:apps/web/src/features/workspace/state/conflict-editor-resolution.ts	103	const text = textSnapshot.materializeFullText()
+Platform	materialize	view presentation	Platform:apps/web/src/features/workspace/state/conflict-editor-resolution.ts	108	if (!textSnapshotEqualsText(resolution.buffer.getTextSnapshot(), text)) return null
+Platform	materialize	view presentation	Platform:apps/server/src/fs/read-sessions.ts	49	return this.track(() => this.readRange(id, start, end, signal))
+Platform	materialize	view presentation	Platform:apps/web/src/features/editor/utils/text-snapshot.ts	26	rawEnd > start && textSnapshot.readRange(rawEnd - 1, rawEnd) === '\r' ? rawEnd - 1 : rawEnd
+Platform	materialize	view presentation	Platform:apps/web/src/features/editor/utils/text-snapshot.ts	31	text: textSnapshot.readRange(start, end),
+Platform	materialize	view presentation	Platform:apps/web/src/features/workspace/hooks/use-events.ts	783	?.buffer.materializeFullText() ?? null
+Platform	materialize	view presentation	Platform:apps/web/src/features/editor/utils/history-compare.ts	26	return createTextDiff({
+Platform	materialize	view presentation	Platform:apps/web/src/features/editor/state/file-sync-service.ts	219	const text = textSnapshot.materializeFullText()
+Platform	materialize	domain adapter	Platform:apps/web/src/features/editor/hooks/use-diff-language-context.ts	31	text: analysisAllowed ? (buffer?.materializeFullText() ?? null) : null,
+Platform	materialize	host transaction policy	Platform:apps/web/src/features/editor/state/workspace-document-service.ts	403	if (existing && textSnapshotEqualsText(existing.buffer.getTextSnapshot(), input.content)) {
+Platform	materialize	host transaction policy	Platform:apps/web/src/features/editor/state/workspace-document-service.ts	490	textSnapshotEqualsText(existing.buffer.getTextSnapshot(), materializeFileSnapshotText(file))
+Platform	materialize	host transaction policy	Platform:apps/web/src/features/editor/state/workspace-document-service.ts	957	if (textSnapshotEqualsText(document.buffer.getTextSnapshot(), text)) return false
+Platform	materialize	host transaction policy	Platform:apps/web/src/features/editor/state/workspace-document-service.ts	1023	if (!textSnapshotEqualsText(document.buffer.getTextSnapshot(), savedText)) return false
+Platform	materialize	host transaction policy	Platform:apps/web/src/features/editor/state/workspace-document-service.ts	1229	!textSnapshotEqualsText(existing.buffer.getTextSnapshot(), materializeFileSnapshotText(file))
+Platform	materialize	view presentation	Platform:apps/web/src/features/editor/state/unicode-hover-plugin.ts	49	const text = snapshot.textSnapshot.readRange(offset, offset + 2)
+Platform	materialize	view presentation	Platform:apps/web/src/features/editor/components/compare-saved-view.tsx	50	const snapshot = { revision, text: buffer?.materializeFullText() ?? null }
+Platform	materialize	view presentation	Platform:apps/web/src/features/editor/components/compare-saved-view.tsx	87	return createTextDiff({
+Platform	materialize	view presentation	Platform:apps/web/src/features/editor/state/semantic-token-controller.ts	760	// The snapshot overload, not the string one: `materializeFullText()` would
+Platform	materialize	view presentation	Platform:apps/web/src/features/search/utils/result-syntax-plugin.ts	192	lines.push({ start, end, text: snapshot.readRange(start, end) })
+Platform	materialize	view presentation	Platform:apps/web/src/features/search/state/dirty-documents.ts	19	dirtyDocuments.push({ path, text: document.buffer.materializeFullText() })
+Platform	materialize	view presentation	Platform:apps/web/src/features/workbench/hooks/use-document-symbol-tree.ts	35	text: liveDocument?.buffer.isDirty() ? liveDocument.buffer.materializeFullText() : null,
+Platform	materialize	view presentation	Platform:apps/web/src/features/settings/state/sync-service.ts	117	const posted = document.buffer.materializeFullText()
+Platform	materialize	view presentation	Platform:apps/web/src/features/settings/state/diagnostics-plugin.ts	72	if (!textSnapshotEqualsText(editor.textSnapshot, snapshot.file.text)) {
+Platform	materialize	domain adapter	Platform:apps/web/src/features/workbench/components/markdown-preview-pane.tsx	62	const text = deferredSnapshot.readRange(0, deferredSnapshot.length)
+Platform	materialize	view presentation	Platform:apps/web/src/features/settings/components/raw-conflict-banner.tsx	27	const localText = document.buffer.materializeFullText()
+Platform	cursor	host transaction policy	Platform:apps/web/src/features/editor/state/workspace-edit-service.ts	2998	const expectedPoint = target.buffer.getDocumentSyncPoint()
+Platform	materialize	view presentation	Platform:packages/client-core/src/git/diff-files.ts	45	createTextDiff({

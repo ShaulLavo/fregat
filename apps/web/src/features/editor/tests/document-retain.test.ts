@@ -11,6 +11,7 @@ import { isSavableEditorDocument } from '@/features/editor/utils/save'
 import { retentionForProjects } from '@/features/editor/utils/document-retention'
 import { createEditorBufferSession } from '@singapore-editor/core/document'
 import { expect, test } from '../../../../test/fixtures'
+import { vi } from 'vitest'
 
 function fileResult(path: string, content = 'hello') {
   return {
@@ -218,4 +219,26 @@ test('documentSizes reports every live document, including the unevictable ones'
   expect(sizes.get(testDocumentKey('/repo/dirty.ts'))).toBe('hello'.length)
   expect(sizes.get(testDocumentKey('conflict-diff:1'))).toBe('conflict body'.length)
   expect(sizes.size).toBe(4)
+})
+
+test('releases evicted analysis while retaining dirty analysis, text and undo history', () => {
+  const service = new WorkspaceDocumentService()
+  const clean = service.ensureView(tabId('clean-analysis'), fileResult('/repo/clean-analysis.ts'))
+  const dirty = service.ensureView(tabId('dirty-analysis'), fileResult('/repo/dirty-analysis.ts'))
+  const edit = createEditorBufferSession(dirty.buffer, dirty.view)
+  edit.applyText('!')
+  const releaseClean = vi.spyOn(clean.analysis, 'dispose')
+  const releaseDirty = vi.spyOn(dirty.analysis, 'dispose')
+  service.retain({ documentKeys: new Set(), tabIds: new Set() })
+  expect(releaseClean).toHaveBeenCalledOnce()
+  expect(releaseDirty).not.toHaveBeenCalled()
+  expect(service.getLiveDocument(testDocumentKey('/repo/dirty-analysis.ts'))?.analysis).toBe(
+    dirty.analysis,
+  )
+  expect(dirty.buffer.materializeFullText()).toBe('hello!')
+  expect(edit.undo().kind).toBe('undo')
+  expect(dirty.buffer.materializeFullText()).toBe('hello')
+  service.retain({ documentKeys: new Set(), tabIds: new Set() })
+  expect(releaseClean).toHaveBeenCalledOnce()
+  expect(releaseDirty).toHaveBeenCalledOnce()
 })
