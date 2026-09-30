@@ -895,6 +895,25 @@ function handle(message) {
     return
   }
   if (
+    ['chat-mermaid', 'editor-mermaid-style', 'editor-style-baseline'].includes(scenario) &&
+    message.method === 'turn/start'
+  ) {
+    const turn = startOwnTurn(message)
+    agentMessage(
+      turn,
+      `${turn}-answer`,
+      [
+        '```mermaid',
+        'flowchart TD',
+        ' A[Visible label]:::hidden --> B[End]',
+        ' classDef hidden fill:#abcdef',
+        '```',
+      ].join('\n'),
+    )
+    endTurn(turn, 'completed')
+    return
+  }
+  if (
     ['response-delivery', 'physical-chat'].includes(scenario) &&
     message.method === 'turn/start'
   ) {
