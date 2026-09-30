@@ -10,7 +10,7 @@ export const chatDraftSentLeftover = isolatedNativeScenario({
   name: 'chat-draft-sent-leftover',
   description:
     'Stash a message, restore it into a new session draft and send it; the sent text does not linger in the rail’s Drafts list.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { orchestration, sessionId, step }) {
     const messages = selectors.chatMessages(page)
     const text = 'Is the timer right?'

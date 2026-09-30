@@ -10,7 +10,7 @@ export const mcpApproval = isolatedNativeScenario({
   name: 'mcp-approval',
   description:
     'Approve native app access after reload, verify the exact reply, and remove the isolated provider/session.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { step, root }) {
     await requestAppApproval(page)
     await step('native-app-access-request')

@@ -158,7 +158,7 @@ the command that requests them.
 The live browser verifier uses the running app and an existing SSH machine:
 
 ```sh
-node apps/web/scripts/verify-federated-environments.mjs \
+node apps/web/scripts/verify-federated-environments.ts \
   --app-url <running-web-url> --server-url <running-api-url> \
   --machine <configured-machine-name> \
   --primary-root <disposable-local-checkout> --remote-root <disposable-remote-checkout> \

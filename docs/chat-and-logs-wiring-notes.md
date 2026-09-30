@@ -76,6 +76,6 @@ Finish wiring rather than shelve. The existing panels mount through a small fron
 ## Verification
 
 - `bun run --filter web typecheck` passed before and after the mount.
-- `bun run --filter web lint` passed with existing warnings in `scripts/editor-scroll-benchmark.mjs`, `test/factories/chat.ts`, and `vitest.config.ts`.
+- `bun run --filter web lint` passed with existing warnings in `scripts/editor-scroll-benchmark.ts`, `test/factories/chat.ts`, and `vitest.config.ts`.
 - `bun run --filter web test` passed on the clean rerun: 85 files, 446 tests.
 - Initial full test run failed two DOM tests by timeout while knip was running in parallel; rerunning the two failed tests alone passed, and the subsequent full run passed.

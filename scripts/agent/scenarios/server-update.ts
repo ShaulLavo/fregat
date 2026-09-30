@@ -132,7 +132,7 @@ export const serverUpdate: Scenario = {
     await isolatedNativeScenario({
       name: NAME,
       description: DESCRIPTION,
-      fixture: new URL('../fixtures/native-queue.mjs', import.meta.url),
+      fixture: new URL('../fixtures/native-queue.ts', import.meta.url),
       drive: (driven, native) => drive(driven, native, server),
     }).run(page, context)
     await page.goto(initialUrl)

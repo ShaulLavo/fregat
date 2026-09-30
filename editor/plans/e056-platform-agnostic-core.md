@@ -138,7 +138,7 @@ The detailed P00-P14 units define owners, prerequisites, exit evidence and rollb
   just old core plus new DOM. No retuned limits, unbounded queues or document-wide render payloads.
 - Check built core declarations without DOM/React ambients, real DOM/RSD package resolution,
   worker/CSS exclusion on native, explicit disposal and no unintended listeners or retained owners.
-- Run `node scripts/check-editor-backlog.mjs` for plan inventory changes. Implementation uses
+- Run `node scripts/check-editor-backlog.ts` for plan inventory changes. Implementation uses
   existing `bun run build`, `bun run health`, `bun run typecheck`, `bun run test`, `bun run lint`
   and `bun run format:check`, plus provisioned Fregat's `bun run verify`. Run package scripts,
   never `bun test`. Replay `bun run --cwd examples/stress input:proof` as saved-evidence validation;

@@ -18,7 +18,7 @@ export const sessionTitles = isolatedNativeScenario({
   name: 'session-titles',
   description:
     'Generate and regenerate titles through an isolated native provider; preserve manual rename against a delayed result, reload, fail visibly and retry.',
-  fixture: new URL('../fixtures/native-titles.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-titles.ts', import.meta.url),
   async drive(page, { step, root, orchestration, providerInstanceId }) {
     const base = orchestration.replace(/\/orchestration$/, '')
     const before = await settingsSnapshot(page, base)

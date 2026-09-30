@@ -161,7 +161,7 @@ Do not claim zero overhead or a speedup merely because React no longer paints th
 
 ## Implementation order and ownership
 
-1. Record actual cached-first-paint, normal startup, live-ready, typing, scrolling, and capture baselines using the [editor-open benchmark](../apps/web/scripts/editor-open-benchmark.mjs) and running app.
+1. Record actual cached-first-paint, normal startup, live-ready, typing, scrolling, and capture baselines using the [editor-open benchmark](../apps/web/scripts/editor-open-benchmark.ts) and running app.
 2. Establish the native provisional/authoritative presentation boundary, including all supported visible contribution writes. Prove normal row/chunk reuse and update behavior before expanding the API.
 3. Add bounded native capture/restore, attempt/generation tracking, and the synchronous first-authoritative commit. Prove empty-file handling and data-ready versus paint-ready ordering.
 4. Wire the React host for both immediately available documents with delayed highlights and delayed file data. Preserve existing document/session/prepared-open semantics and native command API; add only restoration and eligibility synchronization.

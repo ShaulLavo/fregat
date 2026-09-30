@@ -68,7 +68,7 @@ at `f947685`:
 An earlier one-off run of the same setup measured step 2: comment toggle 55.5 → 5.0 ms, move line
 down 77.2 → 5.4 ms, join lines 37.6 → 4.5 ms, delete word left 5.8 → 1.9 ms.
 
-The [E033](e033-full-text-boundary.md) boundary workload (`examples/stress/boundary.mjs`,
+The [E033](e033-full-text-boundary.md) boundary workload (`examples/stress/boundary.ts`,
 contributions, 48M) times typing and undo, which never reach these commands. Four control and four
 change runs, with builds alternated and a load average of 12–14, gave typing medians of 1.4–2.4 ms
 (control) and 1.5–3.2 ms (change), and undo medians of 1.3–2.5 ms and 1.4–3.0 ms. Which side is

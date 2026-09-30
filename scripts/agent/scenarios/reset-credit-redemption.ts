@@ -10,7 +10,7 @@ export const resetCreditRedemption = isolatedNativeScenario({
   name: 'reset-credit-redemption',
   description:
     'A fixture Codex account at its session limit offers its reset credit in the usage meter; Cancel spends nothing, Confirm consumes it once and the meter reads the reset limits.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { step, root }) {
     const consumed = async () =>
       (await nativeLog(root)).filter((entry) => entry.event === 'reset-consume')

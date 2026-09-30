@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { createManifest } from '../fixtures.mjs'
+import { createManifest } from '../fixtures.ts'
 import { fixtureFacts, generateFixture, normalizedText } from '../src/fixtures.ts'
 import { createDocumentSession, createEditorTextBuffer } from '@singapore-editor/core/document'
 

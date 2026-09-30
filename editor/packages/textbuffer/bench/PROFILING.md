@@ -62,7 +62,7 @@ GC timings come from their own clean-build pass, not from a heavily instrumented
 
 ## Probes and interpretation
 
-`probes.mjs` parses emitted JavaScript and inserts counters into temporary copies under
+`probes.ts` parses emitted JavaScript and inserts counters into temporary copies under
 `bench/.cache/`. It does not wrap exported functions, so internal recursion is visible too.
 Production source and emitted-build hashes are checked before and after the complete run.
 `probe-manifest.json` lists instrumented function locations, input hashes and output hashes.

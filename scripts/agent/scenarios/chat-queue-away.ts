@@ -13,7 +13,7 @@ export const chatQueueAway = isolatedNativeScenario({
   name: 'chat-queue-away',
   description:
     'Queue a follow-up during a running turn, open a new draft so the session is off screen, let the fixture reach a tool boundary: the follow-up reaches the provider, and the session shows it when reopened.',
-  fixture: new URL('../fixtures/native-queue.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-queue.ts', import.meta.url),
   async drive(page, { step, root, orchestration }) {
     const base = orchestration.replace(/\/orchestration$/, '')
     const before = await settingsSnapshot(page, base)

@@ -110,5 +110,5 @@ dimension should read the `write*` function, not the store.
 The obvious home for a "clear X when Y is deleted" hook is next to the delete, which for us is
 `features/chat-mode/hooks/use-session-actions.ts`. That is a feature-to-feature import and
 `platform-boundaries(feature-imports)` rejects it. Only `bun run --cwd apps/web lint` catches
-this — not `bun run gates`, not `scripts/lint/web-boundaries.mjs`, not the boundary tests. Put
+this — not `bun run gates`, not `scripts/lint/web-boundaries.ts`, not the boundary tests. Put
 the invalidation inside the feature that owns the record and drive it from an event.

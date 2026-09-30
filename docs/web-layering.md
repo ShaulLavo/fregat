@@ -75,7 +75,7 @@ The smaller moves follow the same rule:
 - Copy Path sections have three feature consumers and live under `keymap/menus`.
   Null absolute paths disable only Copy Path. Relative paths remain enabled.
 
-`node scripts/web-layering.mjs '@/lib/search-match-entry'` regenerates an import census.
+`node scripts/web-layering.ts '@/lib/search-match-entry'` regenerates an import census.
 It reports production import statements, files, consumer buckets, and test consumers.
 The census parses source with Oxc, excludes test directories and fixtures from production
 counts, and includes the app-level test directory in test consumers. Its `--root` option

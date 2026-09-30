@@ -13,8 +13,8 @@ python3 bench/plot-height.py bench/results/height-standard/height.json
 ```
 
 `bench:check` builds the package, prepares the pinned control and runs the Vitest suite, which
-includes the measurement tests in `height.test.mjs`. `tree-shape.mjs` holds the read-only
-measurement; `height.mjs` is the replay driver.
+includes the measurement tests in `height.test.ts`. `tree-shape.ts` holds the read-only
+measurement; `height.ts` is the replay driver.
 
 Open `bench/results/height-standard/index.html` for the plots. The directory also contains raw JSON,
 CSV, a Markdown summary, the generated edit traces, and source/build hashes.
@@ -24,7 +24,7 @@ CSV, a Markdown summary, the generated edit traces, and source/build hashes.
 The default run uses edit-trace seeds `20260916,7`. The Singapore tree is an AVL tree, so a trace
 has one shape; the priority-seed sweep went with the treaps. VS Code runs once per trace.
 
-The six shared edit workloads come from `fixtures.mjs`: typing, random insertions, random replacements,
+The six shared edit workloads come from `fixtures.ts`: typing, random insertions, random replacements,
 eight-cursor batches, mixed churn, and large paste/delete. Five additional traces exercise prepending,
 a fixed middle position, alternating ends, repeated insert/delete at one position, and a shrinking
 document. Those stress traces use 5,000 edits each. CI runs the smoke profile on pull requests and the

@@ -8,7 +8,7 @@ import { afterEach, expect, test } from 'vitest'
 import { PanelLoading } from '@/features/git/components/panel-loading'
 import { TreeLoading } from '@/features/workspace/components/tree-loading'
 
-// Primitive geometry only. scripts/verify-web-design.mjs measures the real app
+// Primitive geometry only. scripts/verify-web-design.ts measures the real app
 // and compares retained and replaced headers while real requests are pending.
 const BAR_HEIGHT = { compact: 36, cozy: 40 } as const
 

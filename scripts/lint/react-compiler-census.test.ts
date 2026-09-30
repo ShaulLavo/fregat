@@ -2,11 +2,9 @@ import { readFileSync } from 'node:fs'
 
 import { expect, test } from 'vitest'
 
-// @ts-expect-error The census is a plain ES module and the scripts workspace has no `allowJs`.
-import { causeOf, censusSource, evaluate } from './react-compiler-census.mjs'
+import { causeOf, censusSource, evaluate } from './react-compiler-census.ts'
 
-type Hit = { readonly file: string; readonly line: number; readonly value: string }
-type Census = { readonly hits: Readonly<Record<string, readonly Hit[]>> }
+type Census = ReturnType<typeof censusSource>
 
 const REFUSED = [
   "import { useRef } from 'react'",
@@ -99,7 +97,7 @@ test('is wired into the repository: a script entry, the verify chain and CI', ()
   ) as { scripts: Record<string, string> }
 
   expect(manifest.scripts['compiler:census']).toBe(
-    'node scripts/lint/react-compiler-census.mjs --check',
+    'node scripts/lint/react-compiler-census.ts --check',
   )
   expect(manifest.scripts.verify).toContain('bun run design:census && bun run compiler:census')
   expect(manifest.scripts['test:scripts']).toContain('scripts/lint/react-compiler-census.test.ts')

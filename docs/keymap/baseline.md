@@ -18,7 +18,7 @@ See [delivery](delivery.md) for the completed runtime and Platform migration.
 From the Platform root:
 
 ```sh
-bun --cwd apps/web scripts/keymap-baseline.mjs > /work/tmp/keymap-baseline.json
+bun --cwd apps/web scripts/keymap-baseline.ts > /work/tmp/keymap-baseline.json
 ```
 
 The script resolves Editor through the installed package, compares normalized source

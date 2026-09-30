@@ -3,7 +3,7 @@
 Run from the Editor repository:
 
 ```sh
-node packages/minimap/bench/browser-runner.mjs --label=after
+node packages/minimap/bench/browser-runner.ts --label=after
 ```
 
 The runner builds the current Editor and minimap sources with Vite, launches the installed

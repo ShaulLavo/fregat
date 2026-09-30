@@ -42,8 +42,8 @@ zero drift.
   `virtualRoot`, `virtualScroll`, `expectRenameToRemainActive`), `tree-pane.browser.tsx`
   (`fileTreeShadowRoot()` and eight helpers), `FileTree.test.tsx` host detection.
 - Scripts: `scripts/agent/tree-occlusion.ts:5-14`, `scenarios/workbench-list-focus.ts:70-78`,
-  `scenarios/large-folder.ts:157`, `apps/web/scripts/verify-web-design.mjs:514-524`,
-  `apps/web/scripts/workspace-reload-proof.mjs:483`. Selectors in `scripts/agent/selectors.ts` keep
+  `scenarios/large-folder.ts:157`, `apps/web/scripts/verify-web-design.ts:514-524`,
+  `apps/web/scripts/workspace-reload-proof.ts:483`. Selectors in `scripts/agent/selectors.ts` keep
   working as long as the roles and `aria-label='Folder tree'` stay.
 
 ## Risks

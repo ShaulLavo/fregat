@@ -260,16 +260,16 @@ async function installFixture(fixture: string, sources: readonly Probe[] = probe
   await mkdir(join(fixture, 'scripts/lint'), { recursive: true })
   await copyFile(join(REPOSITORY, '.oxlintrc.json'), join(fixture, '.oxlintrc.json'))
   await copyFile(
-    join(REPOSITORY, 'scripts/lint/web-boundaries.mjs'),
-    join(fixture, 'scripts/lint/web-boundaries.mjs'),
+    join(REPOSITORY, 'scripts/lint/web-boundaries.ts'),
+    join(fixture, 'scripts/lint/web-boundaries.ts'),
   )
   await copyFile(
-    join(REPOSITORY, 'scripts/lint/web-boundary-imports.mjs'),
-    join(fixture, 'scripts/lint/web-boundary-imports.mjs'),
+    join(REPOSITORY, 'scripts/lint/web-boundary-imports.ts'),
+    join(fixture, 'scripts/lint/web-boundary-imports.ts'),
   )
   await copyFile(
-    join(REPOSITORY, 'scripts/lint/web-feature-imports.mjs'),
-    join(fixture, 'scripts/lint/web-feature-imports.mjs'),
+    join(REPOSITORY, 'scripts/lint/web-feature-imports.ts'),
+    join(fixture, 'scripts/lint/web-feature-imports.ts'),
   )
   await writeFile(join(fixture, 'scripts/lint/web-feature-allow.json'), '[]\n')
   await symlink(

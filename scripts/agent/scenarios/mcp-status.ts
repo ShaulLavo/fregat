@@ -7,7 +7,7 @@ export const mcpStatus = isolatedNativeScenario({
   name: 'mcp-status',
   description:
     'A fixture Codex reports three MCP servers (user HTTP with tools, user HTTP signed out, project stdio failing): the chat shows the failure row, the header popover lists each with its source, origin or transport, and tool count, and switching one off reopens the thread without it.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { root, step }) {
     await sendPrompt(page, 'Report MCP status.')
     const messages = selectors.chatMessages(page)

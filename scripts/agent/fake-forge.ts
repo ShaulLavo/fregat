@@ -1,10 +1,11 @@
+import { fixtureSource } from './fixture-source'
 import { scratchPath } from './paths'
-import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { createScriptError } from '../structured-errors'
 
-/** What `fake-gh.mjs` answers for a branch: GitHub's GraphQL node shape. */
+/** What `fake-gh.ts` answers for a branch: GitHub's GraphQL node shape. */
 export type FakePullRequest = {
   number: number
   title: string
@@ -30,7 +31,7 @@ export async function createFakeForge(
   pullRequest: FakePullRequest | null = null,
   detail: FakePullRequestDetail | null = null,
 ) {
-  const cli = await fakeCli('gh', 'fake-gh.mjs')
+  const cli = await fakeCli('gh', 'fake-gh.ts')
   const branches = pullRequest ? { '*': pullRequest } : {}
   await writeFile(
     join(cli.directory, 'forge.json'),
@@ -44,12 +45,15 @@ export async function createFakeForge(
 
 /** A directory holding a fake `glab` with no merge request until one is created. */
 export function createFakeGitLab() {
-  return fakeCli('glab', 'fake-glab.mjs')
+  return fakeCli('glab', 'fake-glab.ts')
 }
 
 async function fakeCli(binary: string, fixture: string) {
   const directory = await mkdtemp(scratchPath(`fregat-fake-${binary}-`))
-  await copyFile(new URL(`./fixtures/${fixture}`, import.meta.url), join(directory, binary))
+  await writeFile(
+    join(directory, binary),
+    await fixtureSource(new URL(`./fixtures/${fixture}`, import.meta.url)),
+  )
   await chmod(join(directory, binary), 0o755)
   return {
     directory,

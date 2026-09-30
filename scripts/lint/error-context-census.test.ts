@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { expect, test } from 'vitest'
 
-const script = new URL('error-context-census.mjs', import.meta.url).pathname
+const script = new URL('error-context-census.ts', import.meta.url).pathname
 
 function run() {
   return execFileSync('node', [script, '--check'], {

@@ -7,7 +7,7 @@ export const chatMarkdownFence = isolatedNativeScenario({
   name: 'chat-markdown-fence',
   description:
     'An assistant message with a fenced ts block paints more than one token colour once Shiki loads.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { step }) {
     await selectors.chatMessage(page).fill('Reply with a fenced TypeScript block.')
     await selectors.chatSend(page).click()

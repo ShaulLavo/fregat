@@ -131,15 +131,15 @@ The syntax rows remain useful historical clues, but their calibration was not re
 
 ## 5. Interaction harness status — repaired
 
-`bench-workspace.mjs` now imports `WORKSPACE_CACHE_STORAGE_KEYS` and `workspaceSliceStorageKey` from the v19 cache module. It seeds the root folder, workspace index, workbench layout, and per-project slice in their owned locations. A missing mounted editor throws an explicit schema-drift error before any measurement.
+`bench-workspace.ts` now imports `WORKSPACE_CACHE_STORAGE_KEYS` and `workspaceSliceStorageKey` from the v19 cache module. It seeds the root folder, workspace index, workbench layout, and per-project slice in their owned locations. A missing mounted editor throws an explicit schema-drift error before any measurement.
 
 Both Chromium gates pass with the required `--disable-frame-rate-limit --disable-gpu-vsync` launch contract. The old 12 ms typing ceiling had never run against a mounted editor; the real gate produced a 27.80 ms maximum trial p95 with a 0.51 ms steady edit mean at 82.73 ms calibration. Its frame-completion ceiling is now 30 ms, while the independent edit-work ceiling remains 3 ms. Scroll remains below its existing 10 ms ceiling at a 4.05 ms median with 81.33 ms calibration.
 
 ```bash
 cd apps/web
-bun scripts/editor-typing-benchmark.mjs --gate --browsers=chromium \
+bun scripts/editor-typing-benchmark.ts --gate --browsers=chromium \
   --app-url=http://127.0.0.1:3000/ --server-url=http://127.0.0.1:3001
-bun scripts/editor-scroll-benchmark.mjs --gate --browsers=chromium \
+bun scripts/editor-scroll-benchmark.ts --gate --browsers=chromium \
   --app-url=http://127.0.0.1:3000/ --server-url=http://127.0.0.1:3001
 ```
 

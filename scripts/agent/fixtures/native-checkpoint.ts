@@ -1,0 +1,205 @@
+#!/usr/bin/env node
+import {
+  fixtureIO,
+  trackLifecycle,
+  codexInitialization,
+  codexModels,
+  beginTurn,
+  readRequests,
+} from './runtime.ts'
+import type { FixtureRequest, CheckpointEdit, CheckpointControl } from './protocol.ts'
+import { execFileSync } from 'node:child_process'
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { dirname, isAbsolute, join, normalize } from 'node:path'
+
+/**
+ * A Codex app-server stand-in whose conversation turns edit named files, so the
+ * real server photographs a real checkpoint. No credentials, no tokens.
+ *
+ * `checkpoint-control.json` beside this file drives it:
+ *   { cwd, turns: [[edit…], …], hold }
+ * Turn N applies `turns[N-1]` (missing means no edits: a ready, empty turn).
+ * Every edit is refused unless the thread's working directory is exactly `cwd`,
+ * the disposable repository the scenario created and recorded.
+ * While `hold` is true a finished edit waits before completing, so a scenario
+ * can look at the pending state without sleeping.
+ */
+const { root, record, send } = fixtureIO(import.meta.url)
+const threadId = `checkpoint-thread-${process.pid}`
+let turnNumber = 0
+let conversationTurns = 0
+let threadCwd = process.cwd()
+const held = new Set<string>()
+// Conversation turns, oldest first, so a rewind can list and drop them.
+const turns: string[] = []
+const control = (): CheckpointControl =>
+  JSON.parse(readFileSync(join(root, 'checkpoint-control.json'), 'utf8'))
+const thread = () => ({
+  id: threadId,
+  sessionId: threadId,
+  projectId: null,
+  cliVersion: 'verification',
+  createdAt: 0,
+  updatedAt: 0,
+  cwd: threadCwd,
+  ephemeral: true,
+  modelProvider: 'openai',
+  preview: 'Checkpoint verification',
+  source: 'appServer',
+  status: { type: 'idle' },
+  turns: [],
+})
+trackLifecycle(record)
+
+function finish(turnId: unknown, text: string) {
+  send({
+    method: 'item/completed',
+    params: { threadId, turnId, item: { id: `${turnId}-answer`, type: 'agentMessage', text } },
+  })
+  send({
+    method: 'turn/completed',
+    params: { threadId, turn: { id: turnId, status: 'completed', items: [] } },
+  })
+  record({ event: 'turn-completed', pid: process.pid, turnId })
+}
+
+setInterval(() => {
+  if (!held.size || control().hold) return
+  for (const turnId of held) {
+    held.delete(turnId)
+    finish(turnId, 'CHECKPOINT_TURN_DONE')
+  }
+}, 50)
+
+/** A relative path that stays inside the fixture; anything else aborts the turn. */
+function inside(path: string) {
+  const clean = normalize(path)
+  if (isAbsolute(clean) || clean.startsWith('..')) throw new Error(`Refused path ${path}`)
+  return join(threadCwd, clean)
+}
+
+function applyEdit(edit: CheckpointEdit) {
+  if (edit.op === 'write') {
+    mkdirSync(dirname(inside(edit.path)), { recursive: true })
+    writeFileSync(inside(edit.path), edit.text)
+    return
+  }
+  if (edit.op === 'delete') {
+    rmSync(inside(edit.path))
+    return
+  }
+  // What an agent's shell does in its checkout: `git checkout -b`, `git commit`.
+  if (edit.op === 'git') {
+    execFileSync('git', ['-C', threadCwd, ...edit.args], { stdio: 'ignore' })
+    return
+  }
+  if (edit.op === 'rename') {
+    mkdirSync(dirname(inside(edit.to)), { recursive: true })
+    renameSync(inside(edit.path), inside(edit.to))
+    return
+  }
+  throw new Error(`Unknown edit ${JSON.stringify(edit)}`)
+}
+
+/** Returns the refusal reason, or null once the turn's edits are on disk. */
+function applyTurnEdits(settings: CheckpointControl) {
+  if (threadCwd !== settings.cwd) return `cwd ${threadCwd} is not the fixture ${settings.cwd}`
+  for (const edit of settings.turns[conversationTurns - 1] ?? []) applyEdit(edit)
+  return null
+}
+
+function startTurn(message: FixtureRequest) {
+  const turnId = `${threadId}-${++turnNumber}`
+  const isTitle = JSON.stringify(message.params).includes('Conversation contents (reference data):')
+  beginTurn(send, message, threadId, turnId)
+  if (isTitle) {
+    finish(turnId, JSON.stringify({ title: 'Checkpoint fixture', needsRefinement: false }))
+    return
+  }
+
+  conversationTurns += 1
+  turns.push(turnId)
+  const settings = control()
+  const refused = applyTurnEdits(settings)
+  record({ event: 'conversation-turn', pid: process.pid, turnId, refused })
+  if (refused) {
+    send({
+      method: 'turn/completed',
+      params: { threadId, turn: { id: turnId, status: 'failed', items: [] } },
+    })
+    return
+  }
+  if (settings.hold) {
+    held.add(turnId)
+    return
+  }
+  finish(turnId, 'CHECKPOINT_TURN_DONE')
+}
+
+function result(message: FixtureRequest) {
+  switch (message.method) {
+    case 'initialize':
+      return codexInitialization(root)
+    case 'account/read':
+      return { account: { type: 'apiKey' }, requiresOpenaiAuth: false }
+    case 'model/list':
+      return codexModels('Checkpoint fixture', 'Isolated checkpoint protocol fixture')
+    case 'thread/start':
+    case 'thread/resume':
+      threadCwd = message.params?.cwd ?? threadCwd
+      return {
+        thread: thread(),
+        model: 'gpt-5.5',
+        modelProvider: 'openai',
+        cwd: threadCwd,
+        approvalPolicy: 'never',
+        approvalsReviewer: 'user',
+        sandbox: { type: 'dangerFullAccess' },
+      }
+    case 'thread/read':
+      return { thread: thread() }
+    case 'thread/list':
+      return { data: [], nextCursor: null }
+    case 'skills/list':
+      return { data: [] }
+    case 'thread/turns/list':
+      return { data: turns.toReversed().map((id) => ({ id })), nextCursor: null }
+    case 'turn/interrupt':
+      for (const turnId of held) {
+        held.delete(turnId)
+        send({
+          method: 'turn/completed',
+          params: { threadId, turn: { id: turnId, status: 'interrupted', items: [] } },
+        })
+      }
+      return {}
+    default:
+      return undefined
+  }
+}
+
+/** Drops the turn and everything after it, after `revertDelayMs` so a caller can watch it run. */
+function revert(message: FixtureRequest) {
+  const index = turns.indexOf(message.params?.beforeTurnId)
+  if (index >= 0) turns.splice(index)
+  record({ event: 'revert', pid: process.pid, beforeTurnId: message.params?.beforeTurnId })
+  setTimeout(
+    () => send({ id: message.id, result: { thread: thread() } }),
+    control().revertDelayMs ?? 0,
+  )
+}
+
+function handle(message: FixtureRequest) {
+  if (message.id === undefined) return
+  if (message.method === 'turn/start') return startTurn(message)
+  if (message.method === 'thread/revert') return revert(message)
+
+  const answer = result(message)
+  if (answer !== undefined) return send({ id: message.id, result: answer })
+  send({
+    id: message.id,
+    error: { code: -32601, message: `Unsupported checkpoint fixture method ${message.method}` },
+  })
+}
+
+readRequests(handle)

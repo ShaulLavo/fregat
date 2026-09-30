@@ -33,7 +33,9 @@ const run = async (size: number) => {
   }
 }
 const dispose = () => {
-  retained?.highlighter.dispose()
+  const highlighter = retained?.highlighter
+  if (highlighter && 'dispose' in highlighter && typeof highlighter.dispose === 'function')
+    highlighter.dispose()
   retained = null
 }
 declare global {

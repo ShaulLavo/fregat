@@ -19,7 +19,7 @@ export const streamCodeColour = isolatedNativeScenario({
   name: 'stream-code-colour',
   description:
     'Stream a TypeScript fence in about ten chunks and count coloured token spans every animation frame; fails if the count ever drops while the block streams or settles.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { step, orchestration, root }) {
     const blockFrames = await streamedFrames<CodeFrame>(
       page,

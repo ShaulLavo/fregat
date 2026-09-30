@@ -35,30 +35,19 @@ function installDom(): Document {
   const window = new Window({
     url: 'http://localhost/',
   })
-  const global = globalThis as typeof globalThis & {
-    document: Document
-    window: Window
-    HTMLElement: typeof HTMLElement
-    HTMLDivElement: typeof HTMLDivElement
-    HTMLSpanElement: typeof HTMLSpanElement
-    HTMLTextAreaElement: typeof HTMLTextAreaElement
-    Node: typeof Node
-    Text: typeof Text
-    Range: typeof Range
-    Highlight: typeof BenchmarkHighlight
-  }
-
-  global.window = window
-  global.document = window.document
-  global.HTMLElement = window.HTMLElement
-  global.HTMLDivElement = window.HTMLDivElement
-  global.HTMLSpanElement = window.HTMLSpanElement
-  global.HTMLTextAreaElement = window.HTMLTextAreaElement
-  global.Node = window.Node
-  global.Text = window.Text
-  global.Range = window.Range
-  global.Highlight = BenchmarkHighlight
-  return window.document
+  Object.assign(globalThis, {
+    window,
+    document: window.document,
+    HTMLElement: window.HTMLElement,
+    HTMLDivElement: window.HTMLDivElement,
+    HTMLSpanElement: window.HTMLSpanElement,
+    HTMLTextAreaElement: window.HTMLTextAreaElement,
+    Node: window.Node,
+    Text: window.Text,
+    Range: window.Range,
+    Highlight: BenchmarkHighlight,
+  })
+  return globalThis.document
 }
 
 function createView(document: Document): VirtualizedTextView {

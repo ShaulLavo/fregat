@@ -791,7 +791,7 @@ bun run --cwd packages/editor bench:transforms
 bun run --cwd packages/editor bench:virtualization
 bun run bench:input --repetitions 3 --output /work/tmp/plan099/candidate.json.gz
 bun run --cwd examples/stress bench:first-paint --output /work/tmp/plan099/first-paint.json
-node examples/stress/input-compare.mjs check /work/tmp/plan099/control-1.json.gz /work/tmp/plan099/candidate.json.gz /work/tmp/plan099/calibration.json.gz
+node examples/stress/input-compare.ts check /work/tmp/plan099/control-1.json.gz /work/tmp/plan099/candidate.json.gz /work/tmp/plan099/calibration.json.gz
 ```
 
 Run minimap's real browser/unit checks when migrating its renderer boundary. Its `test` script

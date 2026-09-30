@@ -15,7 +15,7 @@ export const chatCitationElsewhere = isolatedNativeScenario({
   name: 'chat-citation-elsewhere',
   description:
     'Quote lines of working notes inside a settled turn’s fold and stash the quote; restore and send it from a new session; its chip opens the first session, unfolds the turn and marks the notes.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { orchestration, sessionId, step }) {
     const messages = selectors.chatMessages(page)
     await sendPrompt(page, 'Walk me through it.')

@@ -4,7 +4,7 @@ From the repository root:
 
 ```sh
 bun run --cwd packages/textbuffer build
-node examples/stress/reclamation-paste.mjs --label candidate --output /work/tmp/reclamation-paste.json
+bun examples/stress/reclamation-paste.ts --label candidate --output /work/tmp/reclamation-paste.json
 ```
 
 The default runs three fresh Node processes for each scenario after a 16 Mi-code-unit ASCII paste:

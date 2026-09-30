@@ -27,7 +27,7 @@ const scenario = isolatedNativeScenario({
   name: 'push-session-notice',
   description:
     'With push on and this browser registered, a completed turn pushes nothing while the page is focused and one encrypted notice once it is backgrounded; the worker shows it, and its click opens the session route.',
-  fixture: new URL('../fixtures/native-titles.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-titles.ts', import.meta.url),
   async drive(page, { step, root, orchestration, sessionId }) {
     const title = `push-session-notice verification ${sessionId.slice(0, 8)}`
     const pushed: Uint8Array[] = []

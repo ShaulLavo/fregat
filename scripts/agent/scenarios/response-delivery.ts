@@ -25,7 +25,7 @@ export const responseDelivery = isolatedNativeScenario({
   name: 'response-delivery',
   description:
     'A native reasoning stream retains all buffered content in its expanded activity and completes the assistant response.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { step, orchestration }) {
     const base = orchestration.replace(/\/orchestration$/, '')
     const before = await settingsSnapshot(page, base)

@@ -4,7 +4,7 @@ From the repository root, build textbuffer, then compare page sizes:
 
 ```sh
 bun run --cwd packages/textbuffer build
-bun examples/stress/reclamation-measurements.mjs --output /work/tmp/reclamation-measurements.json
+bun examples/stress/reclamation-measurements.ts --output /work/tmp/reclamation-measurements.json
 ```
 
 The probe bundles the actual measurement code three times, changing only `SOURCE_PAGE_LENGTH` to 256, 4096 and 16384 code units. It does not edit source files. Each candidate runs in three fresh Node processes, warms a one-million-character ASCII line and 20 edits, then measures 100 more edits. Each edit inserts a character inside the line and creates a fresh snapshot wrapper.

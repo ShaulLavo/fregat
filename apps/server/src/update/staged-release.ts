@@ -9,7 +9,7 @@ export type StagedReleaseRead =
   | { staged: StagedRelease; reason: null }
   | { staged: null; reason: 'no-root' | 'absent' | 'dangling' | 'same-as-running' }
 
-// Written by scripts/deploy/live-check.mjs.
+// Written by scripts/deploy/live-check.ts.
 const liveCheckReportSchema = v.object({
   release: v.pipe(v.string(), v.nonEmpty()),
   status: v.picklist(['passed', 'failed']),

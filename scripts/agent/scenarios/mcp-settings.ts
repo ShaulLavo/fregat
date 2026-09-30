@@ -7,7 +7,7 @@ export const mcpSettings = isolatedNativeScenario({
   name: 'mcp-settings',
   description:
     'Settings › MCP servers with a fixture Codex: picking the instance lists its user and project servers with status, facts and files; Add server writes an HTTP server through config/batchWrite with a masked header; Delete removes it again; a signed-out server signs in by pasting the address its page ended on, as from a phone.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { root, step }) {
     await selectors.sidebarSettingsButton(page, 'Chat').click()
     await selectors.settingsSearch(page).fill('mcp')

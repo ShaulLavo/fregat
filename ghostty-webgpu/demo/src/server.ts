@@ -17,7 +17,7 @@ import { MAX_PTY_INPUT_BYTES, parseClientMessage } from './protocol.js'
 
 const DEMO_ROOT = fileURLToPath(new URL('../', import.meta.url))
 export const DEFAULT_PTY_CWD = dirname(DEMO_ROOT)
-const BRIDGE_MODULE = fileURLToPath(new URL('./pty-bridge.mjs', import.meta.url))
+const BRIDGE_MODULE = fileURLToPath(new URL('./pty-bridge.ts', import.meta.url))
 const INITIAL_COLS = 80
 const INITIAL_ROWS = 24
 const MAX_BRIDGE_LINE_CHARS = 24 * 1024 * 1024

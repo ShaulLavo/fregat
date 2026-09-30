@@ -7,7 +7,7 @@ export const fileAttachments = isolatedNativeScenario({
   name: 'file-attachments',
   description:
     'Upload and recover a general file draft; an expired upload says so and retries; an offline upload fails without sending and retries online; dropped and pasted files stage like picked ones; send through a native provider, preview and download exact bytes.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { step }) {
     const content = 'General file verification.\n'
     const prompt = 'Read the attached verification file.'

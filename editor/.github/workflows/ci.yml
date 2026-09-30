@@ -66,7 +66,7 @@ jobs:
         uses: ./.github/actions/setup
 
       - name: Check turbo inputs
-        run: bun scripts/check-turbo-inputs.mjs
+        run: bun scripts/check-turbo-inputs.ts
 
       - name: Check native language catalog
         run: bun run --cwd packages/tree-sitter-languages languages:generate -- --check

@@ -4,7 +4,7 @@ Build textbuffer, then run the isolated V8 comparison:
 
 ```sh
 bun run --cwd packages/textbuffer build
-bun examples/stress/reclamation-cold.mjs --output /work/tmp/reclamation-cold.json
+bun examples/stress/reclamation-cold.ts --output /work/tmp/reclamation-cold.json
 ```
 
 The default is a fresh 32 Mi UTF-16-unit ASCII line, with three Node processes per variant.

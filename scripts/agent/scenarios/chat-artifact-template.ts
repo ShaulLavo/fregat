@@ -9,7 +9,7 @@ export const chatArtifactTemplate = isolatedNativeScenario({
   name: 'chat-artifact-template',
   description:
     'An answer carrying an artifact-template directive renders a card between its paragraphs; Use appends the template prompt to the composer once, however often it is clicked.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { step }) {
     await sendPrompt(page, 'Save a template.')
     const messages = selectors.chatMessages(page)

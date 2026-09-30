@@ -16,7 +16,7 @@ export const stoppedTurnReasons = isolatedNativeScenario({
   name: 'stopped-turn-reasons',
   description:
     'Stop a partial answer three ways — the Stop button, a runtime stop through the command API, a provider failure — and read each status line; Resend message resends the same message while the reader, scrolled up, keeps their place.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { step, root, orchestration, sessionId }) {
     const setting = { key: 'chat.responseStreamingMode', value: 'token' }
     // Each status line is checked and screenshotted; the drive goes on so one run shows all three.

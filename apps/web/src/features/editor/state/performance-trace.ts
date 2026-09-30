@@ -27,7 +27,7 @@ type EditorPerformanceTraceEvent =
       readonly name: string
     }
 
-type EditorPerformanceTraceReport = {
+export type EditorPerformanceTraceReport = {
   readonly durationMs: number
   readonly disabledFeatures: readonly string[]
   readonly dom: Readonly<Record<string, number>>
@@ -55,7 +55,7 @@ type EditorPerformanceTraceTargetSummary = {
   readonly type: string
 }
 
-type EditorPerformanceTraceHandle = {
+export type EditorPerformanceTraceHandle = {
   beginEditorOpenSample(request: EditorOpenSampleTarget): { readonly sampleId: string }
   download(): EditorPerformanceTraceReport
   mark(name: string, detail?: Readonly<Record<string, unknown>>): void

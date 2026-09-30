@@ -16,7 +16,7 @@ export const chatMultipleModels = isolatedNativeScenario({
   name: 'chat-multiple-models',
   description:
     'In a new draft, Shift+select a second model and send: two sessions start, each on its own new worktree, each with the same prompt on its own model. Deletes the sessions and releases their worktrees.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   prepareWorktree: () => draftFixture('multiple-models'),
   async drive(page, { step, orchestration, sessionId, projectId, providerInstanceId, root }) {
     await openIsolatedDraft(page, { orchestration, projectId, providerInstanceId })

@@ -14,7 +14,7 @@ export const sessionNotifications = isolatedNativeScenario({
   name: 'session-notifications',
   description:
     'Focused toast opens its owner; background native notices badge once, focus clears, reload and archived completion stay silent.',
-  fixture: new URL('../fixtures/native-titles.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-titles.ts', import.meta.url),
   async drive(page, { step, root, orchestration, sessionId, providerInstanceId, worktreeId }) {
     const base = orchestration.replace(/\/orchestration$/, '')
     const before = await settingsSnapshot(page, base)

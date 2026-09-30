@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.app.json",
+  "compilerOptions": {
+    "types": ["bun", "node", "vite/client"],
+    "erasableSyntaxOnly": false
+  },
+  "include": ["*.ts", "../src/lib/platform/platform.d.ts", "*.tsx"],
+  "exclude": ["node_modules"]
+}

@@ -1,7 +1,6 @@
 import { expect, test } from 'vitest'
 
-// @ts-expect-error The tool is a plain ES module and the scripts workspace has no `allowJs`.
-import { auditManualMemos, explainSource } from './react-compiler-explain.mjs'
+import { auditManualMemos, explainSource } from './react-compiler-explain.ts'
 
 type Block = { readonly keys: readonly string[]; readonly yields: readonly string[] }
 type Explained = {

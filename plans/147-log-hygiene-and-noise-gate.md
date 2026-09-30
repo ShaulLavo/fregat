@@ -154,9 +154,9 @@ There is no runtime log gate. `bun run gates` covers source only (`package.json:
    non-zero; the report lists the top groups with a sample line each.
 3. `bun run logs:census` in `package.json`. It reads runtime logs, not source, so it is not part of
    `gates` or `verify`.
-4. `scripts/deploy/live-check.mjs` runs it over the last 24h of `/work/platform-production/logs`.
+4. `scripts/deploy/live-check.ts` runs it over the last 24h of `/work/platform-production/logs`.
    A group the previous release already had is reported as known and does not fail the deploy,
-   matching the check's existing pre-existing handling (`live-check.mjs:2`, `:71-75`).
+   matching the check's existing pre-existing handling (`live-check.ts:2`, `:71-75`).
 
 Carried over from Plan 125, closed 2026-09-25 (its result is
 [observability admission and retention](../docs/observability-overhead.md)). Measure each before

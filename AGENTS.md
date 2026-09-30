@@ -52,7 +52,7 @@
 
 ## Design Language
 
-`scripts/lint/web-design-census.mjs` enforces most of this; exceptions live in `scripts/lint/web-design-allow.json` with a reason. A case these rules do not cover needs a new token, not a local choice.
+`scripts/lint/web-design-census.ts` enforces most of this; exceptions live in `scripts/lint/web-design-allow.json` with a reason. A case these rules do not cover needs a new token, not a local choice.
 
 - Tailwind classes and `@workspace/ui` primitives only. No raw CSS or inline `style` except runtime-computed values. No raw `<button>`/`<input>` when a primitive exists, and no restyling primitives at the call site (no radius class, no hover on `Button`).
 - Colors are theme tokens only: no palette classes, hex or `oklch()`, no hand-rolled `dark:` pairs. Status: `destructive`, `info`, `success`, `warning`; diffs: `diff-added`, `diff-removed`. Tokens take opacity (`bg-success/10`). A missing color goes into `packages/ui/src/styles/globals.css` (`:root`, `.dark`, `@theme inline`).

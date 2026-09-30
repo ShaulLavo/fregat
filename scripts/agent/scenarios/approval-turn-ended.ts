@@ -11,7 +11,7 @@ export const approvalTurnEnded = isolatedNativeScenario({
   name: 'approval-turn-ended',
   description:
     'Stop a turn while its approval is open: the panel closes, the transcript keeps an Ended unanswered receipt and the stopped line, and Continue starts a new turn.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { step, root }) {
     await requestAppApproval(page)
     await step('approval-open')

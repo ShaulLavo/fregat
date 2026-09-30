@@ -27,14 +27,14 @@ The landing change alternated with its parent commit on one quiet machine, 15 sa
 workload ([summary](../../examples/stress/results/reclamation/positions-landing-bench.json),
 raw runs beside it). Medians in milliseconds, baseline / candidate / baseline / candidate:
 
-| Workload | Singapore median | Ratio to vscode-textbuffer |
-| --- | ---: | ---: |
-| Sequential typing | 0.433 / 0.425 / 0.420 / 0.436 | 0.67 / 0.69 / 0.67 / 0.68 |
-| Random insertions | 1.876 / 1.869 / 1.835 / 1.807 | 1.59 / 1.50 / 1.55 / 1.52 |
-| Random replacements | 2.607 / 2.332 / 2.673 / 2.300 | 1.80 / 1.65 / 1.87 / 1.62 |
-| Mixed edit churn | 2.927 / 2.664 / 2.943 / 2.689 | 2.28 / 2.15 / 2.35 / 2.21 |
-| ASCII replacements | 2.341 / 2.080 / 2.588 / 2.115 | 1.69 / 1.51 / 1.80 / 1.54 |
-| Anchor density | 10.58 / 10.97 / 10.53 / 11.03 | — |
+| Workload            |              Singapore median | Ratio to vscode-textbuffer |
+| ------------------- | ----------------------------: | -------------------------: |
+| Sequential typing   | 0.433 / 0.425 / 0.420 / 0.436 |  0.67 / 0.69 / 0.67 / 0.68 |
+| Random insertions   | 1.876 / 1.869 / 1.835 / 1.807 |  1.59 / 1.50 / 1.55 / 1.52 |
+| Random replacements | 2.607 / 2.332 / 2.673 / 2.300 |  1.80 / 1.65 / 1.87 / 1.62 |
+| Mixed edit churn    | 2.927 / 2.664 / 2.943 / 2.689 |  2.28 / 2.15 / 2.35 / 2.21 |
+| ASCII replacements  | 2.341 / 2.080 / 2.588 / 2.115 |  1.69 / 1.51 / 1.80 / 1.54 |
+| Anchor density      | 10.58 / 10.97 / 10.53 / 11.03 |                          — |
 
 Replacement-heavy lanes got 9–18% faster; typing and large pastes did not move. Anchor density
 is 4% slower in both pairs. That lane has two modes about 10% apart that change with warmup
@@ -148,12 +148,12 @@ maintains. They hold deleted anchors throughout and assert that each resolves ex
 control. Pieces are the current tree after clearing history; heap is Bun's live JSC heap after a
 forced collection, with the default 200 history states still held.
 
-| 20,000 cycles | Pieces, control → compacted | Heap with history, control → compacted |
-| --- | ---: | ---: |
-| Paragraph replaced at one spot | 20,002 → 4 | 39.1 MB → 2.6 MB |
-| Word typed and backspaced per unit, 64 spots | 80,064 → 192 | 20.2 MB → 3.8 MB |
-| Scattered inserts, deletes and replacements | 35,315 → 2,838 | 10.4 MB → 2.9 MB |
-| `x` appended between deleted `y`s | 60,001 → 40,001 | 77.9 MB → 52.7 MB |
+| 20,000 cycles                                | Pieces, control → compacted | Heap with history, control → compacted |
+| -------------------------------------------- | --------------------------: | -------------------------------------: |
+| Paragraph replaced at one spot               |                  20,002 → 4 |                       39.1 MB → 2.6 MB |
+| Word typed and backspaced per unit, 64 spots |                80,064 → 192 |                       20.2 MB → 3.8 MB |
+| Scattered inserts, deletes and replacements  |              35,315 → 2,838 |                       10.4 MB → 2.9 MB |
+| `x` appended between deleted `y`s            |             60,001 → 40,001 |                      77.9 MB → 52.7 MB |
 
 The first two stop growing after their first pass: 4 and 192 pieces at 1,000, 5,000 and 20,000
 cycles. Scattered edits leave 2,913 pieces at 5,000 cycles and 2,838 at 20,000. Those are the
@@ -167,16 +167,16 @@ collection timing in these runs, and is not used.
 cycle's tombstones with a different visible piece, so one trailing run keeps a stand-in per cycle
 and every pass plans all of it. The first version checked each slot against every other and walked
 the blocker chain per slot, and planned a run without yielding. The
-[probe](../../examples/stress/reclamation-positions-latency.mjs) compacts every 1,000 cycles and
+[probe](../../examples/stress/reclamation-positions-latency.ts) compacts every 1,000 cycles and
 times each step of the job in thread CPU time, best of three processes
 ([before](../../examples/stress/results/reclamation/positions-latency-before.json),
 [after](../../examples/stress/results/reclamation/positions-latency-after.json)):
 
-| Document length | Longest step, first version | Longest step now |
-| --- | ---: | ---: |
-| 4,000 characters | 19.9 ms | 1.5 ms |
-| 8,000 characters | 79.6 ms | 1.6 ms |
-| 16,000 characters | 496 ms | 2.0 ms |
+| Document length   | Longest step, first version | Longest step now |
+| ----------------- | --------------------------: | ---------------: |
+| 4,000 characters  |                     19.9 ms |           1.5 ms |
+| 8,000 characters  |                     79.6 ms |           1.6 ms |
+| 16,000 characters |                      496 ms |           2.0 ms |
 
 The remaining growth is collection work that rises with the heap: labelled by phase, the slow
 steps fall in every phase alike. The textbuffer tests, the maintenance tests and the headless
@@ -237,8 +237,8 @@ bun run --cwd packages/textbuffer test
 bun run --cwd packages/textbuffer bench:check
 bun run --cwd packages/editor test --project node test/storageMaintenance.node.test.ts
 bun run --cwd packages/editor bench:reclamation-positions
-node --expose-gc examples/stress/reclamation-positions-per-id.mjs
-node examples/stress/reclamation-positions-soak.mjs 400 800
-node examples/stress/reclamation-positions-latency.mjs
+node --expose-gc examples/stress/reclamation-positions-per-id.ts
+node examples/stress/reclamation-positions-soak.ts 400 800
+node examples/stress/reclamation-positions-latency.ts
 bun run --cwd packages/textbuffer bench -- --only sequential-typing,random-replacements --samples 15
 ```

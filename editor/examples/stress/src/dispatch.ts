@@ -58,4 +58,9 @@ async function measure(): Promise<Sample> {
   return { medianUs: sorted[Math.floor(sorted.length / 2)]!, calls: calls / (12 * 400) }
 }
 
-;(window as unknown as { dispatch: unknown }).dispatch = { setup, measure }
+declare global {
+  interface Window {
+    dispatch: { setup: typeof setup; measure: typeof measure }
+  }
+}
+window.dispatch = { setup, measure }

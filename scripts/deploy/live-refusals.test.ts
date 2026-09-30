@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
 
-import { readRefusals, refusalFailures, refusedLogLines } from './live-refusals.mjs'
+import { readRefusals, refusalFailures, refusedLogLines } from './live-refusals.ts'
 
 const release = '20260926T142757Z-6ad8ac64-w2-batch1'
 const origin = 'https://omarchy.mesh.shaulavo.dev/platform'

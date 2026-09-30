@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calibrate, compare, scenarios, states, validateResult } from '../results.mjs'
+import { calibrate, compare, scenarios, states, validateResult } from '../results.ts'
 
 function result(id = 'control-1', duration = 10) {
   const fixture = { id: 'ordinary', sha256: 'a'.repeat(64) }

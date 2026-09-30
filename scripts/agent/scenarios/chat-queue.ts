@@ -156,7 +156,7 @@ export const chatQueue = isolatedNativeScenario({
   name: 'chat-queue',
   description:
     'Queue FIFO follow-ups at tool boundaries, hold for approval, send or restore explicitly, and recover text/file/terminal payload before a rejected Stop.',
-  fixture: new URL('../fixtures/native-queue.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-queue.ts', import.meta.url),
   async drive(page, { step, root, orchestration }) {
     const base = orchestration.replace(/\/orchestration$/, '')
     const before = await settingsSnapshot(page, base)

@@ -14,7 +14,7 @@ export const approvalReconnect = isolatedNativeScenario({
   name: 'approval-reconnect',
   description:
     'Drop the orchestration socket while an approval is pending: the panel keeps the request with its buttons disabled and says it may already be answered elsewhere; on reconnect the line goes and the approval is answered once.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { step, root }) {
     const socket = await droppableOrchestrationSocket(page)
     await page.reload()

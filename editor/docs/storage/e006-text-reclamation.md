@@ -70,16 +70,16 @@ sliced-string `codePointAt` read beyond the logical end.
 The previous implementation copied eagerly during measurement construction; calling it lazy
 was incorrect. Simply copying on first read would move that full copy into first paint because
 the RTL classifier reads every page. The
-[cold probe](../../examples/stress/reclamation-cold.mjs) exercises real `DisplayProjection`
+[cold probe](../../examples/stress/reclamation-cold.ts) exercises real `DisplayProjection`
 acquisition and the first classification on a fresh 32 Mi-unit ASCII line, with three isolated
 Node processes per variant. [Results](../../examples/stress/results/reclamation/review-cold.json):
 
-| Median, 32 Mi units | Eager-copy reproduction | Borrowed pages |
-| --- | ---: | ---: |
-| Measurement acquisition | 609.70 ms | 3.05 ms |
-| Retained heap after acquisition | 34.93 MB | 2.20 MB |
-| First classification and column lookup | 66.52 ms | 80.84 ms |
-| Retained heap after classification | 91.83 MB | 58.98 MB |
+| Median, 32 Mi units                    | Eager-copy reproduction | Borrowed pages |
+| -------------------------------------- | ----------------------: | -------------: |
+| Measurement acquisition                |               609.70 ms |        3.05 ms |
+| Retained heap after acquisition        |                34.93 MB |        2.20 MB |
+| First classification and column lookup |                66.52 ms |       80.84 ms |
+| Retained heap after classification     |                91.83 MB |       58.98 MB |
 
 The reproduction changes only page acquisition in the new handle-based index implementation.
 It isolates copying, not all differences from clean HEAD. First classification still scans and
@@ -100,7 +100,7 @@ Bounded movable measurement pages address the separate lifetime of rendering cac
 
 ## Mounted browser evidence
 
-The [live harness](../../examples/stress/reclamation-live.mjs) mounts two editors sharing a
+The [live harness](../../examples/stress/reclamation-live.ts) mounts two editors sharing a
 buffer. It keeps the default 200 history states, checks revision/dirty/snapshot identity,
 traverses retained undo and redo, sends trusted input, verifies peer text and disposal, and
 rejects browser errors. Six workloads cover whole chunks, small survivors, mixed deletion,
@@ -110,12 +110,12 @@ The [first corrected Chromium 153 run](../../examples/stress/results/reclamation
 contains 30 samples, three per workload/size. All correctness checks pass. The unchanged
 experimental 10% median total-heap target was unmet in that run:
 
-| Workload | 500 cycles | 1,000 cycles |
-| --- | ---: | ---: |
-| Aligned whole chunks | 67.84% | 81.89% |
-| 64-unit survivors | 4.46% | 10.74% |
-| Mixed deletions | 1.36% | 6.34% |
-| Fixed-size paragraph | 3.48% | 13.03% |
+| Workload             | 500 cycles | 1,000 cycles |
+| -------------------- | ---------: | -----------: |
+| Aligned whole chunks |     67.84% |       81.89% |
+| 64-unit survivors    |      4.46% |       10.74% |
+| Mixed deletions      |      1.36% |        6.34% |
+| Fixed-size paragraph |      3.48% |       13.03% |
 
 The largest observed maintenance slice was 5.20 ms; the 2 ms scheduling target is soft.
 Original-text release reduces median absolute heap from 15,464,024 B with
@@ -175,14 +175,14 @@ records bundle identity, exact retaining paths, raw-snapshot checksums and repro
 Four compressed snapshots and the
 [portable analyzer](../../examples/stress/reclamation-live-heap.py) are stored beside it.
 
-| Post-maintenance growth above mounted baseline | Mixed | Survivors |
-| --- | ---: | ---: |
-| Total browser JS heap growth | 3,976,816 B | 4,458,884 B |
-| Newly compiled code and compiler metadata | 2,012,208 B | 2,124,868 B |
-| Flat string allocations | 1,144,316 B | 1,028,688 B |
-| Piece-tree node objects | 219,840 B | 274,980 B |
-| Piece objects | 76,760 B | 115,960 B |
-| Reverse-index split objects | 0 B | 89,312 B |
+| Post-maintenance growth above mounted baseline |       Mixed |   Survivors |
+| ---------------------------------------------- | ----------: | ----------: |
+| Total browser JS heap growth                   | 3,976,816 B | 4,458,884 B |
+| Newly compiled code and compiler metadata      | 2,012,208 B | 2,124,868 B |
+| Flat string allocations                        | 1,144,316 B | 1,028,688 B |
+| Piece-tree node objects                        |   219,840 B |   274,980 B |
+| Piece objects                                  |    76,760 B |   115,960 B |
+| Reverse-index split objects                    |         0 B |    89,312 B |
 
 Those allocation rows are disjoint shallow-size categories, not a complete partition. Tree
 counts include historical and live states and omit supporting arrays; they are not a tombstone
@@ -206,7 +206,7 @@ to position metadata. The previously recorded failures remain intact.
 
 `copyRange` now reuses every fully covered physical span. Only trimmed spans receive new
 strings and owners. This keeps existing measurement indexes and worker chunk IDs for untouched
-text. The [50 Mi-unit probe](../../examples/stress/reclamation-repeat.mjs) reclaims an original,
+text. The [50 Mi-unit probe](../../examples/stress/reclamation-repeat.ts) reclaims an original,
 then deletes ten more units near its end and reclaims again. It preserves the prefix span and
 tail ID, sends only 16,364 units in two replacement worker chunks, and takes 0.97 ms for the
 second maintenance pass in one Node 26 observation. This is not a calibrated latency limit.
@@ -223,7 +223,7 @@ The [follow-up heap report](../../examples/stress/results/reclamation/followup-h
 compressed snapshots retain the evidence and the analyzer's ownership caveats.
 
 `copyTextRange` uses `Reflect.apply(String.fromCharCode, null, units)` to avoid the typed-array
-iterator while preserving arbitrary UTF-16. The [copy probe](../../examples/stress/reclamation-copy.mjs)
+iterator while preserving arbitrary UTF-16. The [copy probe](../../examples/stress/reclamation-copy.ts)
 compares both implementations with alternating order and seven samples per size. The initial
 Node 26 observation for 16 Ki units was 0.263 ms with spread and 0.051 ms with apply.
 
@@ -245,12 +245,12 @@ observational; heap snapshots make this run unsuitable for input-latency compari
 The [follow-up Chromium 153 run](../../examples/stress/results/reclamation/followup-live.json)
 passes all 30 mounted samples with gates enabled:
 
-| Workload | String reduction, 500 / 1,000 cycles | Total-heap reduction, 500 / 1,000 cycles |
-| --- | ---: | ---: |
-| Aligned whole chunks | 79.93% / 89.96% | 67.36% / 81.66% |
-| 64-unit survivors | 48.01% / 63.10% | 4.99% / 12.13% |
-| Mixed deletions | 26.57% / 35.87% | 1.99% / 7.29% |
-| Fixed-size paragraph | 31.50% / 55.43% | 5.41% / 16.94% |
+| Workload             | String reduction, 500 / 1,000 cycles | Total-heap reduction, 500 / 1,000 cycles |
+| -------------------- | -----------------------------------: | ---------------------------------------: |
+| Aligned whole chunks |                      79.93% / 89.96% |                          67.36% / 81.66% |
+| 64-unit survivors    |                      48.01% / 63.10% |                           4.99% / 12.13% |
+| Mixed deletions      |                      26.57% / 35.87% |                            1.99% / 7.29% |
+| Fixed-size paragraph |                      31.50% / 55.43% |                           5.41% / 16.94% |
 
 The paste-tail case releases 99.83% of string growth. At 500 cycles, retained code units fall
 from 512,014 to 128,014 for survivors and to 217,102 for mixed edits. Paragraph storage falls
@@ -270,10 +270,10 @@ The [portable Node probe](../../examples/stress/reclamation-paste.md) uses three
 per scenario. [Its comparison](../../examples/stress/results/reclamation/partial-paste-summary.json)
 isolates survivor detachment within the sparse implementation, rather than comparing clean HEAD:
 
-| 16 Mi-unit paste survivor | Before detachment | Final retained heap | Before / final insertion |
-| --- | ---: | ---: | ---: |
-| 64-unit writable tail | 17,336,136 B | 581,800 B | 3.976 / 4.034 ms |
-| Complete 16 Ki closed chunk | 17,332,000 B | 592,744 B | 3.943 / 4.082 ms |
+| 16 Mi-unit paste survivor   | Before detachment | Final retained heap | Before / final insertion |
+| --------------------------- | ----------------: | ------------------: | -----------------------: |
+| 64-unit writable tail       |      17,336,136 B |           581,800 B |         3.976 / 4.034 ms |
+| Complete 16 Ki closed chunk |      17,332,000 B |           592,744 B |         3.943 / 4.082 ms |
 
 Median stage-sampled peak grew from 18.65 MB to 18.98–19.13 MB. A partially retained closed
 chunk already released the parent through sparse copying and remains the control. These are
@@ -290,11 +290,11 @@ p95 fell from 0.70–0.79 ms to 0.023–0.024 ms across three processes. The
 validates all 108 final samples and matches the clean `b31e22e` control's fixtures, options,
 Chromium 153, machine and Node version. Input-to-applied p95 observations:
 
-| Case | Before | Final |
-| --- | ---: | ---: |
-| Long line, one view, typing | 1.9 ms | 1.1 ms |
-| Long line, multiple views, typing | 1.8 ms | 1.7 ms |
-| Long line, multiple views, paste | 8.7 ms | 6.2 ms |
+| Case                                          | Before |  Final |
+| --------------------------------------------- | -----: | -----: |
+| Long line, one view, typing                   | 1.9 ms | 1.1 ms |
+| Long line, multiple views, typing             | 1.8 ms | 1.7 ms |
+| Long line, multiple views, paste              | 8.7 ms | 6.2 ms |
 | Long line, multiple views, composition commit | 3.2 ms | 4.9 ms |
 
 The last case's median stays 1.7 ms; its first commit is slower in two final repetitions.
@@ -308,10 +308,10 @@ second independent clean `b31e22e` baseline and the corrected borrowed-page buil
 all 108 correctness samples; manifests, options, Chromium 153, hardware and Node match. The
 baseline source hashes also match. The two flagged p95 rows are:
 
-| Metric, multiple views | Original baseline | Eager pages | Repeated baseline | Borrowed pages |
-| --- | ---: | ---: | ---: | ---: |
-| Long-line composition, input to applied | 3.2 ms | 4.9 ms | 4.0 ms | 3.8 ms |
-| Ordinary paste, input to frame | 16.0 ms | 18.0 ms | 19.4 ms | 16.8 ms |
+| Metric, multiple views                  | Original baseline | Eager pages | Repeated baseline | Borrowed pages |
+| --------------------------------------- | ----------------: | ----------: | ----------------: | -------------: |
+| Long-line composition, input to applied |            3.2 ms |      4.9 ms |            4.0 ms |         3.8 ms |
+| Ordinary paste, input to frame          |           16.0 ms |     18.0 ms |           19.4 ms |        16.8 ms |
 
 “Multiple” in this harness means views, not multiple carets. The repeat baseline's own movement
 shows why the earlier pair alone cannot establish a regression. This still is not a calibrated
@@ -369,9 +369,9 @@ Reproduce after building workspace dependencies:
 bun run --cwd packages/textbuffer build
 bun run --cwd packages/editor build
 bun run --cwd examples/stress bench:reclamation-live
-node examples/stress/reclamation-repeat.mjs
-node examples/stress/reclamation-copy.mjs
-node examples/stress/reclamation-paste.mjs --output /work/tmp/e006-paste.json
+node examples/stress/reclamation-repeat.ts
+node examples/stress/reclamation-copy.ts
+node examples/stress/reclamation-paste.ts --output /work/tmp/e006-paste.json
 bun run --cwd examples/stress bench:input --output /work/tmp/e006-input.json --repetitions 3
 bun run --cwd packages/textbuffer test
 bun run --cwd packages/editor test --project node test/storageMaintenance.node.test.ts src/textMeasurements.test.ts

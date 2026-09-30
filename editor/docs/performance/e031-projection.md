@@ -125,15 +125,15 @@ The eager control is reproducible from a frozen source copy. From the repository
 mkdir -p /work/tmp/e031-control
 git archive ff1dfeda9e52b308f57915da7372f7ac6e5f04f9 packages/editor/src packages/editor/package.json | tar -x -C /work/tmp/e031-control
 ln -s /work/projects/Editor/packages/editor/node_modules /work/tmp/e031-control/node_modules
-bun packages/editor/bench/captureEagerProjection.mjs --core-directory /work/tmp/e031-control/packages/editor --output /work/tmp/e031-eager.json
+bun packages/editor/bench/captureEagerProjection.ts --core-directory /work/tmp/e031-control/packages/editor --output /work/tmp/e031-eager.json
 ```
 
 The browser runners accept `--core-directory` for frozen packages with matching `src` and `dist`.
 The recorded runs used these commands from `examples/stress`:
 
 ```sh
-node first-paint.mjs --core-directory /work/tmp/e031-accepted/packages/editor --repetitions 1 --output /work/tmp/e031-first-paint.json
-node run.mjs --core-directory /work/tmp/e031-accepted/packages/editor --repetitions 1 --warmups 1 --output /work/tmp/e031-stress.json.gz
-node run.mjs --suite input-latency --core-directory /work/tmp/e031-final-gate/packages/editor --repetitions 3 --warmups 1 --output /work/tmp/e031-input.json.gz
-node input-compare.mjs check results/input-latency/control-1.json.gz /work/tmp/e031-input.json.gz results/input-latency/calibration.json.gz
+node first-paint.ts --core-directory /work/tmp/e031-accepted/packages/editor --repetitions 1 --output /work/tmp/e031-first-paint.json
+node run.ts --core-directory /work/tmp/e031-accepted/packages/editor --repetitions 1 --warmups 1 --output /work/tmp/e031-stress.json.gz
+node run.ts --suite input-latency --core-directory /work/tmp/e031-final-gate/packages/editor --repetitions 3 --warmups 1 --output /work/tmp/e031-input.json.gz
+node input-compare.ts check results/input-latency/control-1.json.gz /work/tmp/e031-input.json.gz results/input-latency/calibration.json.gz
 ```

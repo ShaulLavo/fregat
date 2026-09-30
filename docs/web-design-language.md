@@ -11,7 +11,7 @@ choices. This reference records ownership, deliberate exceptions, and verificati
 | Corners             | Controls use `md`, floating surfaces use `lg`, and bars, rows, panes, and tabs are square. Primitives own their corners.                  | [`globals.css`](../packages/ui/src/styles/globals.css) and the shared controls                                 |
 | Bars                | Horizontal bars measure 36 px compact and 40 px cozy. Vertical rails use the same dimension.                                              | [`PaneBar`](../packages/ui/src/components/pane-bar.tsx), `--bar-height`, `--bar-padding-x`, and `--rail-width` |
 | Density             | Shared `--density-*` variables supply changing dimensions; the old `compact:` variant is gone.                                            | `globals.css` and the appearance provider                                                                      |
-| Dividers            | None. Surfaces separate by tone; chips and callouts are fills. Edge borders and `border-border`/`border-subtle` fail the census.          | `hairlines` in `web-design-census.mjs`; floating surfaces keep `ring-1 ring-foreground/10`                     |
+| Dividers            | None. Surfaces separate by tone; chips and callouts are fills. Edge borders and `border-border`/`border-subtle` fail the census.          | `hairlines` in `web-design-census.ts`; floating surfaces keep `ring-1 ring-foreground/10`                      |
 | Type                | UI sizes are `text-sm`, `text-xs`, `text-2xs` and `text-3xs`. Bar titles use `text-xs font-medium`. Changing numbers use tabular figures. | The theme type scale and consumers                                                                             |
 | Fills and elevation | Rows use the row tokens, toggles use `bg-accent`, menus use `shadow-md`, and modals use `shadow-xl`.                                      | Shared primitives and row consumers                                                                            |
 
@@ -72,7 +72,7 @@ broad directory exclusion.
 
 ## Enforcement
 
-[`web-design-census.mjs`](../scripts/lint/web-design-census.mjs) parses class expressions with
+[`web-design-census.ts`](../scripts/lint/web-design-census.ts) parses class expressions with
 `oxc-parser`, including multiline expressions and TypeScript class-string owners. It validates
 radius, density variants, bar heights, dividers, type sizes, elevation, buttons, row fills,
 icon size tokens, text alpha, icon-only hints, and palette leaks. Invalid allow-list entries and
@@ -98,7 +98,7 @@ measurements supply the integration evidence those tests could not provide.
 Run the browser check against an existing app and an isolated verification workspace:
 
 ```sh
-node apps/web/scripts/verify-web-design.mjs \
+node apps/web/scripts/verify-web-design.ts \
   --fixture /work/tmp/platform-plan100-closeout/fixture.json \
   --output-dir /work/tmp/platform-plan100-closeout/visual
 ```

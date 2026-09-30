@@ -15,7 +15,7 @@ export const chatGitTurnRows = isolatedNativeScenario({
   name: 'chat-git-turn-rows',
   description:
     'Working tree and Turn scopes of the chat Git tool draw the same file row: one native turn edits a file, and both scopes show it with its status.',
-  fixture: new URL('../fixtures/native-checkpoint.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-checkpoint.ts', import.meta.url),
   prepareWorktree: prepareFixture,
   async drive(page, { root, step, worktreePath }) {
     await changeAppConstant(page, root, worktreePath)

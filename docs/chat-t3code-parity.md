@@ -184,7 +184,7 @@ CHAT_PROOF_URL=https://omarchy.mesh.shaulavo.dev \
 CHAT_PROOF_SERVER=https://omarchy.mesh.shaulavo.dev/platform-api \
 CHAT_PROOF_NATIVE_SNAPSHOT=/work/tmp/platform-chat-parity/native-session.json \
 CHAT_PROOF_SNAPSHOT=/work/tmp/platform-chat-review/session.json \
-node scripts/chat-parity-proof.mjs
+node scripts/chat-parity-proof.ts
 ```
 
 The optional captured-session input contains private local history and is not committed. This machine's proof uses the configured filesystem root `/`, root-relative API paths, and an approved browser Origin. The production mapping uses the session's explicit canonical/API root pair rather than assuming that root.
@@ -199,7 +199,7 @@ Run this additional browser check from `apps/web`:
 PLAYWRIGHT_BROWSERS_PATH=/work/cache/ms-playwright \
 CHAT_PROOF_URL=https://omarchy.mesh.shaulavo.dev \
 CHAT_PROOF_SERVER=https://omarchy.mesh.shaulavo.dev/platform-api \
-node scripts/chat-review-proof.mjs
+node scripts/chat-review-proof.ts
 ```
 
 ## CI review and baseline repairs

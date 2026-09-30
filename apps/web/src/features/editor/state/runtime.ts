@@ -17,7 +17,7 @@ import {
   type CommitMessageDraft,
   type GitStoreApi,
 } from '@/features/git/state/store'
-import { workspaceLocationId } from '@/features/workspace/utils/location'
+import { workspaceLocationId } from '@/lib/workspace-location'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { LanguageServerDocumentSyncController } from '@singapore-editor/lsp-plugin/document-sync-controller'
 import type { QueryClient } from '@tanstack/react-query'

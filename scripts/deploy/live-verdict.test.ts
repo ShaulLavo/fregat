@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { liveVerdict } from './live-verdict.mjs'
+import { liveVerdict } from './live-verdict.ts'
 
 test('shared log noise cannot fail a healthy candidate when a group crosses its daily budget', () => {
   expect(

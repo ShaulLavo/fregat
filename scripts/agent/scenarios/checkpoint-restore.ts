@@ -32,7 +32,7 @@ export const checkpointRestore = isolatedNativeScenario({
   name: 'checkpoint-restore',
   description:
     'Rewind a native fixture conversation to its first turn: the dialog closes on the held confirm, and while the rewind runs that turn shows a live dot and "Rewinding…", later turns recede and no other turn offers a revert.',
-  fixture: new URL('../fixtures/native-checkpoint.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-checkpoint.ts', import.meta.url),
   prepareWorktree: async () => {
     const fixture = await createGitFixture('checkpoint-restore')
     await fixtureGit(fixture, ['commit', '--quiet', '-m', 'fixture'])

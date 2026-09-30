@@ -134,7 +134,7 @@ export const fileLabelCohesion = isolatedNativeScenario({
   name: 'file-label-cohesion',
   description:
     'One disposable repository: a native checkpoint turn marks A/D/R/M the same in the timeline and the Turn panel, then Search (sidebar and editor) and Git rows show the basename before a deep directory.',
-  fixture: new URL('../fixtures/native-checkpoint.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-checkpoint.ts', import.meta.url),
   prepareWorktree: prepareFixture,
   async drive(page, { root, step, worktreePath }) {
     await writeFile(

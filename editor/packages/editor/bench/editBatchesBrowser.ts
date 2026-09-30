@@ -1,0 +1,133 @@
+import type { EditorPerformanceDiagnostic } from '../src/editor/performanceDiagnostics.ts'
+import type { FixtureId } from '../../../examples/stress/src/fixtures.ts'
+import { Editor } from '@singapore-editor/core/editor'
+import '@singapore-editor/core/style.css'
+import { generateFixture } from '../../../examples/stress/src/fixtures.ts'
+import { inspectProjections, installProjections } from './editBatchProjections.ts'
+
+let editor: Editor | null = null
+let source = ''
+let kind = 'single-edit'
+let phase = 'inactive'
+let synchronous = counts()
+let deferred = counts()
+let initial: ReturnType<typeof installProjections> | null = null
+
+function counts() {
+  return { fullTextReads: 0, sourceBytesRead: 0, fullTextBytesRead: 0, sourceIndexBytesRead: 0 }
+}
+
+function diagnostic(event: Pick<EditorPerformanceDiagnostic, 'name' | 'detail'>) {
+  if (phase === 'inactive') return
+  const target = phase === 'synchronous' ? synchronous : deferred
+  if (event.name === 'textSnapshot.sourceIndex')
+    target.sourceIndexBytesRead += Number(event.detail?.sourceBytesRead ?? 0)
+  if (event.name !== 'textSnapshot.read') return
+  target.fullTextReads += Number(event.detail?.fullTextReads ?? 0)
+  target.sourceBytesRead += Number(event.detail?.sourceBytesRead ?? 0)
+  if (event.detail?.fullTextReads)
+    target.fullTextBytesRead += Number(event.detail.sourceBytesRead ?? 0)
+}
+
+async function prepare(
+  fixture: FixtureId,
+  operation: string,
+  instrumented: boolean,
+  decorated: boolean,
+) {
+  phase = 'inactive'
+  globalThis.__EDITOR_PERFORMANCE_DIAGNOSTICS__ = instrumented ? diagnostic : undefined
+  editor?.dispose()
+  document.body.replaceChildren()
+  source = generateFixture(fixture)
+  kind = operation
+  const host = document.createElement('div')
+  host.id = 'editor'
+  host.style.cssText = 'position:relative;width:800px;height:800px;display:flex;overflow:hidden'
+  document.body.append(host)
+  editor = new Editor(host, { wordWrap: false, textMetrics: { rowHeight: 20, characterWidth: 8 } })
+  editor.openDocument({ documentId: 'e032.txt', text: source })
+  await new Promise(requestAnimationFrame)
+  await new Promise(requestAnimationFrame)
+  initial = decorated ? installProjections(editor) : null
+}
+
+function edit() {
+  synchronous = counts()
+  deferred = counts()
+  phase = 'synchronous'
+  const startedAt = performance.now()
+  const edits = [{ from: 0, to: 0, text: 'prefix\n' }]
+  if (kind === 'sparse-batch')
+    edits.push({ from: source.length, to: source.length, text: '\nsuffix' })
+  current().edit(edits)
+  const committedAt = performance.now()
+  phase = 'deferred'
+  return {
+    startedAt,
+    committedAt,
+    synchronous,
+    projections: inspectProjections(current(), initial),
+  }
+}
+
+function inspect() {
+  phase = 'inactive'
+  const expected = `prefix\n${source}${kind === 'single-edit' ? '' : '\nsuffix'}`
+  const textCorrect = current().materializeFullText() === expected
+  const firstRow = document.querySelector('[data-editor-virtual-row="0"]')
+  const last = current()
+    .getTextSnapshot()
+    .readRange(expected.length - 32, expected.length)
+  return {
+    textCorrect,
+    firstRow: firstRow?.textContent,
+    suffixCorrect: last === expected.slice(-32),
+    deferred,
+    projections: inspectProjections(current(), initial),
+  }
+}
+
+function dispose() {
+  phase = 'inactive'
+  editor?.dispose()
+  editor = null
+  source = ''
+  initial = null
+  document.body.replaceChildren()
+}
+
+function clearFoldsOnNextFrame() {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      current().setSyntaxFolds([])
+      resolve()
+    })
+  })
+}
+
+function fullReadOnNextFrame() {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      current().materializeFullText()
+      resolve()
+    })
+  })
+}
+
+export const bridge = {
+  prepare,
+  edit,
+  inspect,
+  dispose,
+  clearFoldsOnNextFrame,
+  fullReadOnNextFrame,
+}
+
+function current(): Editor {
+  if (!editor) throw new TypeError('Benchmark editor is not mounted')
+  return editor
+}
+declare global {
+  var __e032: typeof bridge
+}

@@ -17,7 +17,7 @@ export const chatQueueStopUpload = isolatedNativeScenario({
   name: 'chat-queue-stop-upload',
   description:
     'Queue a follow-up, start a file upload the network holds, and press Stop: the follow-up is back in the composer once while the interrupt is still pending, the held upload then lands on the same draft, and nothing reaches the provider.',
-  fixture: new URL('../fixtures/native-queue.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-queue.ts', import.meta.url),
   async drive(page, { step, root, orchestration }) {
     const base = orchestration.replace(/\/orchestration$/, '')
     const before = await settingsSnapshot(page, base)

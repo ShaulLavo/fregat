@@ -183,7 +183,7 @@ function describe(frames: readonly ScrollFrame[], pick: (frame: ScrollFrame) => 
 }
 
 const TOKEN_STREAMING = { key: 'chat.responseStreamingMode', value: 'token' }
-const fixture = new URL('../fixtures/native-codex.mjs', import.meta.url)
+const fixture = new URL('../fixtures/native-codex.ts', import.meta.url)
 
 export const chatScrollPark = isolatedNativeScenario({
   name: 'chat-scroll-park',

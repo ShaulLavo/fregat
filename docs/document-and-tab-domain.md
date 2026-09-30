@@ -98,7 +98,7 @@ semantics remain as characterized. The [async operation ownership reference](asy
 
 ## Enforcement and verification
 
-The configured Oxlint plugin, `scripts/lint/web-boundaries.mjs`, enforces production shared-layer
+The configured Oxlint plugin, `scripts/lint/web-boundaries.ts`, enforces production shared-layer
 imports, pure document dependencies, and reserved-prefix codec boundaries. Pure dependencies
 include the two protected path helpers. Test exceptions use file suffixes. Tailwind named
 container variants such as `@max-3xl/settings:grid` are recognized as CSS syntax; a separate

@@ -20,7 +20,7 @@ export const chatBackgroundStart = isolatedNativeScenario({
   name: 'chat-background-start',
   description:
     'In a new draft set to New worktree from `release`, Ctrl+Enter three times fast: each start gets its own worktree, the user stays on an empty draft with the same workspace and base branch, and the sessions appear in the rail.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   prepareWorktree: () => draftFixture('background-start', ['release']),
   async drive(page, { step, orchestration, sessionId, projectId, providerInstanceId }) {
     await openIsolatedDraft(page, { orchestration, projectId, providerInstanceId })

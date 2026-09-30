@@ -6,7 +6,7 @@ Plan 135 implementation is complete on L6. Final integration checks follow the o
 
 P0 migrated 46 calls in 24 source/test files. The inventory contained fetch and prefetch calls, with no ensure or infinite variants. None of the option factories used by those callers supplies `select`. Required reads keep their failure behavior; optional warmups resolve void on success and failure. No cache data shape changed.
 
-`scripts/lint/query-api.mjs` parses maintained source with the existing Oxc parser. It rejects deprecated member reads, including optional/computed calls and alias extraction/destructuring. Strings and comments remain valid. It failed against the prior source and passes after migration. Its seven cases pass, with 110 owner tests across 12 web files and a passing web typecheck. `query:check` runs in verify, gates and CI. The final rebase must rerun it.
+`scripts/lint/query-api.ts` parses maintained source with the existing Oxc parser. It rejects deprecated member reads, including optional/computed calls and alias extraction/destructuring. Strings and comments remain valid. It failed against the prior source and passes after migration. Its seven cases pass, with 110 owner tests across 12 web files and a passing web typecheck. `query:check` runs in verify, gates and CI. The final rebase must rerun it.
 
 ## Browser resources and routes
 

@@ -7,7 +7,7 @@ export const chatComposerEditing = isolatedNativeScenario({
   name: 'chat-composer-editing',
   description:
     'With chat.sendShortcut set to mod-enter, Enter adds a line and Ctrl+Enter sends the two-line message. On a touch device Return adds a line under any shortcut and the Send button sends. A 40 KB paste folds into pasted-text.txt, and Ctrl+Shift+V pastes it inline. Restores the setting.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { step, orchestration }) {
     const composer = selectors.chatMessage(page)
     const messages = selectors.chatMessages(page)

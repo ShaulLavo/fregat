@@ -7,15 +7,15 @@ copies but retains the complete buffer and indexes. The new `@singapore-editor/p
 supports a separate read-only range view with stable global positions. It never impersonates a
 complete `TextSnapshot`.
 
-| Capability | Resident Editor | Streamed resident construction | Paged read-only |
-| --- | --- | --- | --- |
-| Text retained | Complete | Complete, appended from decoded chunks | 8 MiB raw page cache |
-| First usable content | After complete construction | After complete construction in this proof | First range during indexing |
-| Edit, undo, save | Yes | Same complete buffer after construction | Unavailable |
-| Syntax and LSP | Subject to host tiers | Same host tiers | Unavailable |
-| Global line jump | Indexed complete buffer | Indexed complete buffer | Sparse index; discovery may wait |
-| Copy | Complete document | Complete document | Up to 1 MiB of UTF-16 text |
-| Revision safety | Host owns reads/writes | Host owns stream revision | Every range repeats opening revision |
+| Capability           | Resident Editor             | Streamed resident construction            | Paged read-only                      |
+| -------------------- | --------------------------- | ----------------------------------------- | ------------------------------------ |
+| Text retained        | Complete                    | Complete, appended from decoded chunks    | 8 MiB raw page cache                 |
+| First usable content | After complete construction | After complete construction in this proof | First range during indexing          |
+| Edit, undo, save     | Yes                         | Same complete buffer after construction   | Unavailable                          |
+| Syntax and LSP       | Subject to host tiers       | Same host tiers                           | Unavailable                          |
+| Global line jump     | Indexed complete buffer     | Indexed complete buffer                   | Sparse index; discovery may wait     |
+| Copy                 | Complete document           | Complete document                         | Up to 1 MiB of UTF-16 text           |
+| Revision safety      | Host owns reads/writes      | Host owns stream revision                 | Every range repeats opening revision |
 
 Go for the read-only capability envelope. Keep resident editing at its measured supported limit.
 Editable paging needs a separate dirty-page/history/save design. Streaming is useful for lowering
@@ -25,8 +25,8 @@ construction copies; it does not solve steady-state residency.
 
 ```sh
 bun run stress:build
-node examples/stress/paged.mjs --sizes 52428800,209715200 --modes resident,streamed --output /work/tmp/editor-paged/resident.json
-node examples/stress/paged.mjs --sizes 314572800,629145600 --modes paged --output /work/tmp/editor-paged/paged.json
+node examples/stress/paged.ts --sizes 52428800,209715200 --modes resident,streamed --output /work/tmp/editor-paged/resident.json
+node examples/stress/paged.ts --sizes 314572800,629145600 --modes paged --output /work/tmp/editor-paged/paged.json
 ```
 
 The range source generates deterministic repeated UTF-8 containing a surrogate pair, a combining
@@ -51,14 +51,14 @@ The source generator is part of construction CPU and does not represent disk/net
 First-range time ends at decoded DOM update, not physical display paint. Jump time includes
 Playwright UI dispatch and DOM observation.
 
-| Mode/input | Construction/index | Steady JS heap | Backing storage | Sampled JS peak |
-| --- | ---: | ---: | ---: | ---: |
-| Resident 50 MiB | 446 ms | 76.8 MiB | 8.1 MiB | 196.8 MiB |
-| Streamed 50 MiB | 217 ms | 77.6 MiB | 0.16 MiB | 82.5 MiB |
-| Resident 200 MiB | 1776 ms | 304.8 MiB | 32.1 MiB | 784.8 MiB |
-| Streamed 200 MiB | 832 ms | 307.1 MiB | 0.16 MiB | 318.9 MiB |
-| Paged 300 MiB | 2104 ms index | 2.26 MiB | 8.16 MiB | 7.10 MiB |
-| Paged 600 MiB | 4292 ms index | 2.30 MiB | 8.16 MiB | 9.95 MiB |
+| Mode/input       | Construction/index | Steady JS heap | Backing storage | Sampled JS peak |
+| ---------------- | -----------------: | -------------: | --------------: | --------------: |
+| Resident 50 MiB  |             446 ms |       76.8 MiB |         8.1 MiB |       196.8 MiB |
+| Streamed 50 MiB  |             217 ms |       77.6 MiB |        0.16 MiB |        82.5 MiB |
+| Resident 200 MiB |            1776 ms |      304.8 MiB |        32.1 MiB |       784.8 MiB |
+| Streamed 200 MiB |             832 ms |      307.1 MiB |        0.16 MiB |       318.9 MiB |
+| Paged 300 MiB    |      2104 ms index |       2.26 MiB |        8.16 MiB |        7.10 MiB |
+| Paged 600 MiB    |      4292 ms index |       2.30 MiB |        8.16 MiB |        9.95 MiB |
 
 Paged first ranges took 2.4/2.3ms and distant UI jumps 39.7/39.9ms. The 300/600 MiB sweeps retained
 exactly 8 MiB cached pages with at most two reads in flight and 1200/2400 checkpoints. The index

@@ -17,7 +17,7 @@ bun run bench -- --only random-replacements,ranges-after-churn --samples 3
 ```
 
 `bench:check` builds the package, fetches/builds the pinned control and runs Vitest adapter/oracle tests.
-`bench` also rebuilds both implementations, even when invoked directly as `node bench/run.mjs`.
+`bench` also rebuilds both implementations, even when invoked directly as `node bench/run.ts`.
 Timing runs use native Node child processes, not Bun's JavaScript engine. Node 24 is used in CI.
 The first preparation needs access to raw.githubusercontent.com; subsequent runs reuse source only
 after verifying each pinned Git blob hash. Compiled output is rebuilt, never trusted from cache.
@@ -131,8 +131,8 @@ is deterministic where a timing threshold is not. Lower the ceilings in the same
 change that earns them; regenerate them only after a deliberate change in the measured work.
 
 ```sh
-node bench/budgets.mjs
-node bench/budgets.mjs --write --margin 0.02
+node bench/budgets.ts
+node bench/budgets.ts --write --margin 0.02
 ```
 
 ## Tree shape

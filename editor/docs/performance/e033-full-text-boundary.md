@@ -36,4 +36,4 @@ Measured on two views over a fragmented document, median p95 input-to-applied, c
 
 At 48M with contributions, the open heap went from 194 to 98 MiB and open time from 244 to 46 ms.
 Retained heap after disposal matched control. The workload is
-`examples/stress/boundary.mjs`; see the [stress README](../../examples/stress/README.md).
+`examples/stress/boundary.ts`; see the [stress README](../../examples/stress/README.md).

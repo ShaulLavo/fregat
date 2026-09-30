@@ -12,7 +12,7 @@
         "src/provider/claude-discovery-worker.ts",
         "src/fs/watch-worker.ts",
         "src/fs/tests/fixtures/crashing-watch-worker.ts",
-        "test/factories/claude-ipc.cjs",
+        "test/factories/claude-ipc.ts",
         "src/installation/remote-support.ts",
         "src/terminal-host/main.ts",
         "scripts/pty-benchmark.ts",
@@ -32,19 +32,19 @@
         "src/demo-entry.ts",
         "src/dev-entry.tsx",
         "src/features/address/tests/navigation.types.ts",
-        "scripts/chat-parity-proof.mjs",
-        "scripts/diff-reload-proof.mjs",
-        "scripts/terminal-reload-proof.mjs",
-        "scripts/chat-review-proof.mjs",
-        "scripts/chat-review-proof-entry.mjs",
-        "scripts/chat-scroll-proof.mjs",
-        "scripts/chat-scroll-proof-entry.mjs",
+        "scripts/chat-parity-proof.ts",
+        "scripts/diff-reload-proof.ts",
+        "scripts/terminal-reload-proof.ts",
+        "scripts/chat-review-proof.ts",
+        "scripts/chat-review-proof-entry.tsx",
+        "scripts/chat-scroll-proof.ts",
+        "scripts/chat-scroll-proof-entry.tsx",
         "scripts/chat-snapshot-benchmark.ts",
-        "scripts/keymap-baseline.mjs",
-        "scripts/verify-federated-environments.mjs",
-        "scripts/verify-web-design.mjs",
+        "scripts/keymap-baseline.ts",
+        "scripts/verify-federated-environments.ts",
+        "scripts/verify-web-design.ts",
         "scripts/syntax-coverage.ts",
-        "scripts/verify-workspace-navigation.mjs",
+        "scripts/verify-workspace-navigation.ts",
         "test/factories/chat-proof-workspace.tsx"
       ],
       "ignoreFiles": [
@@ -62,10 +62,10 @@
         "claude-gpt/run.ts",
         "large-file/bench.ts",
         "agent/injected/renders.ts",
-        "agent/fixtures/fake-*.mjs",
+        "agent/fixtures/fake-*.ts",
         "agent/logs.ts",
         "deploy/mesh.ts",
-        "deploy/live-check.mjs",
+        "deploy/live-check.ts",
         "deploy/systemd/promote.ts",
         "desktop-dev.ts",
         "dev.ts",
@@ -79,11 +79,11 @@
         "pair.ts",
         "prod.ts",
         "tui.ts",
-        "web-layering.mjs",
+        "web-layering.ts",
         "skills/port-pstack.ts",
         "themes/import-omarchy-palette.ts",
         "themes/import-omarchy-wallpapers.ts",
-        "generate-unicode-confusables.mjs",
+        "generate-unicode-confusables.ts",
         "themes/import-omarchy-theme.ts",
         "themes/generate-omarchy-catalog.ts",
         "parity/background.ts",
@@ -139,8 +139,7 @@
         "bench/**/*.ts",
         "test/types/**/*.ts"
       ],
-      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"],
-      "ignoreDependencies": ["@playwright/test"]
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"]
     },
     "editor/packages/find": {
       "entry": ["src/index.ts", "bench/**/*.ts"],
@@ -250,18 +249,18 @@
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"]
     },
     "editor": {
-      "entry": ["scripts/*.{ts,mjs}", "knip.ts"],
-      "project": ["scripts/**/*.{ts,mjs}"]
+      "entry": ["scripts/*.ts", "knip.ts"],
+      "project": ["scripts/**/*.ts"]
     },
     "editor/examples/stress": {
       "entry": [
         "*.html",
-        "*.mjs",
-        "test/*.mjs",
+        "*.ts",
+        "test/*.ts",
         "src/{boundary,consumers,copies,dispatch,firstPaint,geometry}.ts",
         "src/paged/proof.ts"
       ],
-      "project": ["src/**/*.ts", "*.mjs"],
+      "project": ["src/**/*.ts", "*.ts"],
       "ignoreBinaries": ["taskset"],
       "ignoreDependencies": ["@singapore-editor/gutters"]
     },

@@ -94,7 +94,7 @@ only DOM line breaking (VS Code's approach) is.
 
 ## Steps
 
-1. **Accuracy gate.** Using `examples/stress/geometry.mjs --font-check`, compare table-summed
+1. **Accuracy gate.** Using `examples/stress/geometry.ts --font-check`, compare table-summed
    widths with `Range` widths for 2,000 real lines (Platform sources, Markdown, CJK) in Noto Sans,
    Liberation Sans and a CJK face. Evidence: the error distribution in px per line length, and the
    margin that keeps overflow at zero.

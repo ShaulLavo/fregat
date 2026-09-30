@@ -10,7 +10,7 @@ export const turnFilesNoFlicker = isolatedNativeScenario({
   name: 'turn-files-no-flicker',
   description:
     'Select successive fixture turns with delayed checkpoint reads and retain their hunks and counts.',
-  fixture: new URL('../fixtures/native-checkpoint.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-checkpoint.ts', import.meta.url),
   prepareWorktree: prepareFixture,
   async drive(page, { root, step, worktreePath }) {
     await writeFile(

@@ -30,7 +30,7 @@ export type LiveCheckTarget = {
   directory: string
   /** The release whose live-check.json is the baseline. */
   previous: string | null
-  /** The checkout that holds live-check.mjs. */
+  /** The checkout that holds live-check.ts. */
   source: string
 }
 
@@ -58,7 +58,7 @@ export function liveCheckCommand(
   const baseline = target.previous ? path.join(target.previous, 'live-check.json') : ''
   const argv = [
     Bun.which('node', { PATH }) ?? 'node',
-    path.join(target.source, 'scripts/deploy/live-check.mjs'),
+    path.join(target.source, 'scripts/deploy/live-check.ts'),
     `--release=${target.name}`,
     `--out=${target.directory}`,
     `--baseline=${baseline}`,

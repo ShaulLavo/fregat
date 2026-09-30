@@ -64,7 +64,7 @@ export const providerModelOptions = isolatedNativeScenario({
   name: 'provider-model-options',
   description:
     'Advertised model choices reach native turn/start exactly; untouched options are omitted and model changes reconcile unsupported choices.',
-  fixture: new URL('../fixtures/native-model-options.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-model-options.ts', import.meta.url),
   async drive(page, { step, root, orchestration, projectId, providerInstanceId }) {
     const before = (await readShell(page, orchestration)).projects.find(
       (project) => project.id === projectId,

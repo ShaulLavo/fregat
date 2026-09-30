@@ -9,7 +9,7 @@ export const questionHistory = isolatedNativeScenario({
   name: 'question-history',
   description:
     'A fixture Codex asks a blocking question; the answer is picked with a digit and sent with a file. The provider gets the answer, and the work log keeps the question, the answer and the file.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { root, step }) {
     await sendPrompt(page, 'Ask the blocking question.')
     const question = selectors.asyncQuestion(page, PROMPT)

@@ -40,7 +40,7 @@ test.each(['editor', 'singapore', 'nested'])(
       )
       writeFileSync(path.join(root, 'turbo.json'), JSON.stringify({ tasks: {} }))
     }
-    const scripts = ['check-turbo-inputs.mjs', 'workspace-root.ts', 'update-tree-sitter-x.ts']
+    const scripts = ['check-turbo-inputs.ts', 'workspace-root.ts', 'update-tree-sitter-x.ts']
     for (const file of scripts) {
       copyFileSync(
         path.join(repository, 'editor/scripts', file),
@@ -48,7 +48,7 @@ test.each(['editor', 'singapore', 'nested'])(
       )
     }
     try {
-      const check = Bun.spawnSync(['bun', 'scripts/check-turbo-inputs.mjs'], { cwd: family })
+      const check = Bun.spawnSync(['bun', 'scripts/check-turbo-inputs.ts'], { cwd: family })
       expect(check.exitCode, check.stderr.toString()).toBe(0)
       const result = Bun.spawnSync(
         [

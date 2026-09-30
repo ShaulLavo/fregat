@@ -7,7 +7,7 @@ export const nativePermissionGrant = isolatedNativeScenario({
   name: 'native-permission-grant',
   description:
     'A native Codex permission request is allowed for the session; the reply carries the requested network profile with session scope under the original request id, and the turn finishes.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { step, root }) {
     await sendPrompt(page, 'Install the dependency.')
     const approval = selectors.genericApproval(page)

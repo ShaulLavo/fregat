@@ -57,5 +57,5 @@ are caller-owned: a host retaining every result defeats the bounded-memory contr
 windows when a view changes, and dispose views/documents when closed.
 
 The browser proof and resident/streamed/paged comparison run through
-`node examples/stress/paged.mjs --output /work/tmp/editor-paged/result.json` after building the
+`node examples/stress/paged.ts --output /work/tmp/editor-paged/result.json` after building the
 workspace. See `docs/performance/e015-paged-proof.md` for evidence and the capability decision.

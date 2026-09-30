@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { expect, test } from 'vitest'
 
-const script = join(import.meta.dirname, 'web-layering.mjs')
+const script = join(import.meta.dirname, 'web-layering.ts')
 
 test('census counts real imports and separates all test consumers', async () => {
   const root = await mkdtemp(join(tmpdir(), 'web-layering-'))

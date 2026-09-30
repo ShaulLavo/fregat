@@ -22,7 +22,7 @@ export const chatReviewContext = isolatedNativeScenario({
   name: 'chat-review-context',
   description:
     'Comment on a changed line in the session’s diff and send it: the provider gets the quoted lines and comment, the sent message shows a chip, the chip opens the file, and after the line changes on disk the chip reports the change. A comment on a deleted line opens that file’s diff.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   prepareWorktree: () => draftFixture('review-context'),
   async drive(page, { root, step, worktreePath }) {
     const file = path.join(worktreePath, 'values.ts')

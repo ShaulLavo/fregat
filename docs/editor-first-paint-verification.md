@@ -23,7 +23,7 @@ The implementation is concentrated in these files:
 | Platform host        | `apps/web/src/features/editor/components/editor.tsx` and `features/workbench/components/file-editor-body.tsx`: mount while file data is pending and show truthful loading status.                                                                                          |
 | Platform persistence | `apps/web/src/features/workbench/hooks/use-editor-visible-snapshot.ts`, new `state/snapshot-capture.ts`, and `apps/web/src/lib/editor-visible-snapshot-cache.ts`: eligibility, explicit capture, identity checks, and bounded storage.                                     |
 | Platform plugins     | `apps/web/src/features/editor/utils/plugins.ts` and `decode-mode.ts`: current minimap configuration before admission, replayable SVG fold icons, and decode eligibility.                                                                                                   |
-| Open benchmark       | `apps/web/scripts/editor-open-benchmark.mjs`: reseed opaque envelopes without rewriting native internals; accept prepared opens that reach live paint immediately.                                                                                                         |
+| Open benchmark       | `apps/web/scripts/editor-open-benchmark.ts`: reseed opaque envelopes without rewriting native internals; accept prepared opens that reach live paint immediately.                                                                                                          |
 
 ## Verification method
 

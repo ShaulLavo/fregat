@@ -35,7 +35,7 @@ export const phoneComposer: Scenario = {
     const api = base.replace(/\/orchestration$/, '')
     const native = await installNativeProvider(page, api, {
       name: 'phone-composer',
-      fixture: new URL('../fixtures/native-model-options.mjs', import.meta.url),
+      fixture: new URL('../fixtures/native-model-options.ts', import.meta.url),
       displayLabel: 'Codex',
     })
     const sessionId = crypto.randomUUID()

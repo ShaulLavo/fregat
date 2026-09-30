@@ -7,7 +7,7 @@ export const chatStashContext = isolatedNativeScenario({
   name: 'chat-stash-context',
   description:
     'Stash an image-only message, then swap a complete image/file draft and recover it after reload before native delivery.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { step }) {
     await attachFile(page, {
       name: 'stash.png',

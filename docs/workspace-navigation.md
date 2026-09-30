@@ -41,7 +41,7 @@ automatic repository cloning remain outside this implementation.
 
 ## Verification
 
-[`verify-workspace-navigation.mjs`](../apps/web/scripts/verify-workspace-navigation.mjs) drives
+[`verify-workspace-navigation.ts`](../apps/web/scripts/verify-workspace-navigation.ts) drives
 the running app with Playwright. It checks the app and API environment identities, creates
 disposable Git workspaces and metadata-only conversations, and removes its own fixtures.
 It does not start a development server or invoke a provider.
@@ -57,7 +57,7 @@ uses the existing Linux app. `--second-machine` names a configured machine;
 `--second-fixture-parent` gives an absolute directory on that machine for disposable files.
 
 ```sh
-node apps/web/scripts/verify-workspace-navigation.mjs \
+node apps/web/scripts/verify-workspace-navigation.ts \
   --app-url <running-web-url> --server-url <running-api-url> \
   --second-machine <configured-machine-name> \
   --second-fixture-parent <remote-disposable-parent> \

@@ -24,11 +24,11 @@ Dependencies must remain resolvable from the preserved directory. From the repos
 
 ```sh
 bun run stress:build
-node examples/stress/first-paint.mjs --core-directory /work/tmp/editor-e003-baseline --output /work/tmp/editor-e003/before.json
-node examples/stress/first-paint.mjs --core-directory /work/tmp/editor-e003-baseline --output /work/tmp/editor-e003/control.json
-node examples/stress/first-paint.mjs --output /work/tmp/editor-e003/after.json
-node examples/stress/first-paint.mjs --core-directory /work/tmp/editor-e003-baseline --repetitions 1 --diagnostics --output /work/tmp/editor-e003/diagnostic-before.json
-node examples/stress/first-paint.mjs --repetitions 1 --diagnostics --output /work/tmp/editor-e003/diagnostic-after.json
+bun examples/stress/first-paint.ts --core-directory /work/tmp/editor-e003-baseline --output /work/tmp/editor-e003/before.json
+bun examples/stress/first-paint.ts --core-directory /work/tmp/editor-e003-baseline --output /work/tmp/editor-e003/control.json
+bun examples/stress/first-paint.ts --output /work/tmp/editor-e003/after.json
+bun examples/stress/first-paint.ts --core-directory /work/tmp/editor-e003-baseline --repetitions 1 --diagnostics --output /work/tmp/editor-e003/diagnostic-before.json
+bun examples/stress/first-paint.ts --repetitions 1 --diagnostics --output /work/tmp/editor-e003/diagnostic-after.json
 bun run --cwd examples/stress first-paint:proof
 ```
 
@@ -118,4 +118,4 @@ remain until their browser context closes; worker heap bytes are not measured he
 - Diagnostics: [before](diagnostic-before.json), [after](diagnostic-after.json).
 - Ordinary holdout: [before](ordinary-before-holdout.json), [after](ordinary-after-holdout.json).
 - Disposal: [cleanup probe](cleanup-probe.json).
-- Replay and all groups: [comparison](comparison.json), [verification script](../../test/verify-first-paint.mjs).
+- Replay and all groups: [comparison](comparison.json), [verification script](../../test/verify-first-paint.ts).

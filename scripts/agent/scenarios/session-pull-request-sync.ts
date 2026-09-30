@@ -22,7 +22,7 @@ export const sessionPullRequestSync = isolatedNativeScenario({
   name: 'session-pull-request-sync',
   description:
     "A session in its own worktree, a forge that has an open pull request for that worktree's branch: the server finds it without a request from the page and publishes it on the worktree.",
-  fixture: new URL('../fixtures/native-checkpoint.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-checkpoint.ts', import.meta.url),
   prepareWorktree: () => committedFixture('pull-request-sync'),
   newWorktree: true,
   async prepareServer() {

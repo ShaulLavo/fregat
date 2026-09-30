@@ -20,7 +20,7 @@ jobs:
       - name: Check generated language catalog
         run: bun run --cwd editor/packages/tree-sitter-languages languages:generate -- --check
       - name: Check task inputs
-        run: bun editor/scripts/check-turbo-inputs.mjs
+        run: bun editor/scripts/check-turbo-inputs.ts
       - name: Check architecture health
         run: bun run --cwd editor health
       - name: Test Editor packages and examples

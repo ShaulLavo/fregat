@@ -13,11 +13,8 @@ import '@singapore-editor/find/style.css'
 import { createInputLatencyProbe } from './inputLatency.ts'
 import { fixtureFacts, generateFixture, normalizedText, type FixtureId } from './fixtures.ts'
 
-type Diagnostic = {
-  readonly name: string
-  readonly durationMs?: number
-  readonly detail?: Readonly<Record<string, unknown>>
-}
+type Diagnostic =
+  import('../../../packages/editor/src/editor/performanceDiagnostics.ts').EditorPerformanceDiagnostic
 type KeySample = {
   readonly key: string
   readonly at: number
@@ -34,7 +31,11 @@ type Active = {
 
 declare global {
   var __stress: typeof bridge
-  var __EDITOR_PERFORMANCE_DIAGNOSTICS__: ((event: Diagnostic) => void) | null
+  var __EDITOR_PERFORMANCE_DIAGNOSTICS__:
+    | ((event: Diagnostic) => void)
+    | { enabled?: boolean; record?: (event: Diagnostic) => void }
+    | null
+    | undefined
 }
 
 let active: Active | null = null

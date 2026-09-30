@@ -35,7 +35,7 @@ cancels pending chords. Terminal forwarding uses the shared runtime's ownership 
 Reproduce the comparison from the Platform root:
 
 ```sh
-bun --cwd apps/web scripts/keymap-baseline.mjs --baseline ../../docs/keymap/matcher-baseline.json > /work/tmp/keymap-final.json
+bun --cwd apps/web scripts/keymap-baseline.ts --baseline ../../docs/keymap/matcher-baseline.json > /work/tmp/keymap-final.json
 ```
 
 The [recorded comparison](verification.json) includes original and final timings.

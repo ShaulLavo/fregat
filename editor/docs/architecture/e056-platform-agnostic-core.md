@@ -642,7 +642,7 @@ performed when this research was added to the repository.
 [SG19]: https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/packages/editor/package.json
 [SG20]: https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/scripts/build-package.ts
 [SG21]: https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/package.json
-[SG22]: https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/scripts/architecture-health.mjs
+[SG22]: https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/scripts/architecture-health.ts
 [SG23]: https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/docs/performance/input-latency.md
 [SG24]: https://github.com/ShaulLavo/singapore/blob/45e22a495902c577243334586bc391f04201a827/packages/editor/test/imeComposition.browser.test.ts
 [FG01]: https://github.com/ShaulLavo/fregat/blob/43d3ac1762d4eb01f4521554967e666336858e33/package.json

@@ -7,7 +7,7 @@ import type { Browser, Page } from 'playwright'
 
 import { createEvidence, type Evidence } from './evidence'
 import { formatLogEvent, readLogs } from './logs'
-import { attachObserver, observedProblems, serializable } from './observe.mjs'
+import { attachObserver, observedProblems, serializable } from './observe.ts'
 import { scenarioNamed, scenarios, type Scenario } from './scenarios/index'
 import { settleRunningAnimations, waitForApp } from './selectors'
 import { compareTraceSummaries, formatTraceSummary, summarizeTrace } from './trace-summary'

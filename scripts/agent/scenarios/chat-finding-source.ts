@@ -13,7 +13,7 @@ export const chatFindingSource = isolatedNativeScenario({
   name: 'chat-finding-source',
   description:
     'A fixture reviewer finds a problem on a.txt lines 1–2; sent, the finding’s chip opens a.txt, then reports the lines changed, then the file gone.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   prepareWorktree: () => committedFixture('finding-source'),
   async drive(page, { step, worktreePath }) {
     const file = path.join(worktreePath, 'a.txt')

@@ -27,8 +27,8 @@ Install Chromium separately if it is missing, with Playwright's browser cache on
 | Row and long-line mounting      | `bench:virtualization`                                 | Keep happy-dom allocation/count checks; it does not measure browser paint.                       |
 | Piece traversal                 | `bench:walker`                                         | Keep sequential/random-access comparisons.                                                       |
 | Parsing, queries, injections    | `packages/tree-sitter` `bench:syntax`                  | Keep worker timing and process memory measurements.                                              |
-| Application open / filesystem   | Platform `editor-open-benchmark.mjs`                   | Remains Platform-owned; this suite starts before `createEditorTextBuffer` and view construction. |
-| Application typing              | Platform `editor-typing-benchmark.mjs`                 | Retain its trusted-key timestamp to applied-edit / next-frame definition here.                   |
+| Application open / filesystem   | Platform `editor-open-benchmark.ts`                    | Remains Platform-owned; this suite starts before `createEditorTextBuffer` and view construction. |
+| Application typing              | Platform `editor-typing-benchmark.ts`                  | Retain its trusted-key timestamp to applied-edit / next-frame definition here.                   |
 | Full standalone scenarios       | `examples/stress` `bench`                              | Open, highlight, jump, typing, find-all, wheel sweeps, edit/delete retention.                    |
 
 The older generators exercise different algorithms, sizes, and edit distributions. None is an
@@ -40,7 +40,7 @@ normalized line count, longest line, search count, and SHA-256 for every fixture
 
 ## Full-text boundary workload (E033)
 
-`node boundary.mjs --output /work/tmp/editor-e033/boundary/run.json` opens two views over a
+`bun boundary.ts --output /work/tmp/editor-e033/boundary/run.json` opens two views over a
 document fragmented by 32 replacements at 65,536, 4,194,304 and 50,331,648 units. The content above
 the filler is fixed, so the viewport, captures, caret and conflict stay the same as the size grows.
 `plain` has no plugins. `contributions` adds Markdown (fixed captures), scope-lines, decode and the
@@ -60,7 +60,7 @@ external strings; it is not a measurement of live WASM trees alone.
 
 ## Row geometry workload (E036)
 
-`node geometry.mjs --output /work/tmp/editor-e036/run.json` opens one 900x600 view over 3,000-line
+`bun geometry.ts --output /work/tmp/editor-e036/run.json` opens one 900x600 view over 3,000-line
 fixtures: Go indented with tabs and the same text with four spaces, both again padded to 180 columns,
 Markdown with inline replacements, and Unicode. Each fixture runs one counting pass (geometry
 diagnostics and rect-read counters on) and `--repetitions` timing passes (both off), each in a fresh
@@ -69,7 +69,7 @@ The summary reports mounted rows per geometry path, builds and sweeps per operat
 CDP layout, script and task time, and dispatch-to-applied latency. `--font-check "a,b"` instead
 hit-tests every third column of the space-indented fixture in each font and times a monospace probe.
 
-`node blink.mjs --output /work/tmp/editor-e036/blink.json` measures whole-browser CPU from `/proc`
+`bun blink.ts --output /work/tmp/editor-e036/blink.json` measures whole-browser CPU from `/proc`
 while a focused view sits idle: CSS blink, a JS interval, and no blink, interleaved per round.
 Headless compositing is software; pass `--headed` for a GPU reading.
 
@@ -204,11 +204,11 @@ Use an isolated checkout for a long comparison if other work may change the repo
 Copy their built outputs and point workspace dependency links at the isolated checkout too.
 
 ```sh
-node examples/stress/fallback-validation-design.mjs /work/tmp/e034-design.json /work/tmp/e034-captures
-node examples/stress/fallback-experiment.mjs --design /work/tmp/e034-design.json \
+bun examples/stress/fallback-validation-design.ts /work/tmp/e034-design.json /work/tmp/e034-captures
+bun examples/stress/fallback-experiment.ts --design /work/tmp/e034-design.json \
   --baseline-core /work/tmp/e034-baseline --candidate-core /work/tmp/e034-candidate \
   --cpu-affinity 8,10,12,14
-node examples/stress/fallback-validation.mjs /work/tmp/e034-design.json /work/tmp/e034-report.json
+bun examples/stress/fallback-validation.ts /work/tmp/e034-design.json /work/tmp/e034-report.json
 ```
 
 For a larger declaration, append its block count after the capture directory, for example `24`.
@@ -223,7 +223,7 @@ one-sided bounds for p95 input-to-change and initial text callbacks. Acceptance 
 upper bound at or below zero and no detected unchanged-control drift. An unresolved result exits
 nonzero. A clock-resolution envelope is explanatory and does not relax that requirement.
 Frame and screenshot-completion times remain separate secondary measurements. The older
-`fallback-compare.mjs` prints descriptive summaries; it is not the acceptance validator.
+`fallback-compare.ts` prints descriptive summaries; it is not the acceptance validator.
 
 ## Hidden retained views
 
@@ -323,7 +323,7 @@ resolvable from that directory. After building the public packages, run the runn
 the existing builds:
 
 ```sh
-node examples/stress/run.mjs --suite input-latency --core-directory /work/tmp/editor-input/baseline/packages/editor --repetitions 3 --output /work/tmp/editor-input/control-1.json.gz
+bun examples/stress/run.ts --suite input-latency --core-directory /work/tmp/editor-input/baseline/packages/editor --repetitions 3 --output /work/tmp/editor-input/control-1.json.gz
 ```
 
 Use the same frozen directory for all three controls and the independent reference rerun.
@@ -338,8 +338,8 @@ matched. Moving an identical source tree does not change its identity.
 Calibrate and check the independent rerun:
 
 ```sh
-node examples/stress/input-compare.mjs calibrate /work/tmp/editor-input/calibration.json.gz /work/tmp/editor-input/control-1.json.gz /work/tmp/editor-input/control-2.json.gz /work/tmp/editor-input/control-3.json.gz
-node examples/stress/input-compare.mjs check /work/tmp/editor-input/control-1.json.gz /work/tmp/editor-input/rerun.json.gz /work/tmp/editor-input/calibration.json.gz
+bun examples/stress/input-compare.ts calibrate /work/tmp/editor-input/calibration.json.gz /work/tmp/editor-input/control-1.json.gz /work/tmp/editor-input/control-2.json.gz /work/tmp/editor-input/control-3.json.gz
+bun examples/stress/input-compare.ts check /work/tmp/editor-input/control-1.json.gz /work/tmp/editor-input/rerun.json.gz /work/tmp/editor-input/calibration.json.gz
 ```
 
 Each input limit is the largest control p95 plus the largest of three times the between-run p95
@@ -361,14 +361,14 @@ Check a candidate build against those established limits. Preserve the controls 
 
 ```sh
 bun run bench:input --repetitions 3 --output /work/tmp/editor-input/candidate.json.gz
-node examples/stress/input-compare.mjs check /work/tmp/editor-input/control-1.json.gz /work/tmp/editor-input/candidate.json.gz /work/tmp/editor-input/calibration.json.gz
+bun examples/stress/input-compare.ts check /work/tmp/editor-input/control-1.json.gz /work/tmp/editor-input/candidate.json.gz /work/tmp/editor-input/calibration.json.gz
 ```
 
 Prove the gate catches delayed work with a real 20 ms pause inside each measured input operation:
 
 ```sh
 bun run bench:input --repetitions 3 --slowdown-ms 20 --output /work/tmp/editor-input/delayed.json.gz
-node examples/stress/input-compare.mjs check /work/tmp/editor-input/control-1.json.gz /work/tmp/editor-input/delayed.json.gz /work/tmp/editor-input/calibration.json.gz --allow-slowdown
+bun examples/stress/input-compare.ts check /work/tmp/editor-input/control-1.json.gz /work/tmp/editor-input/delayed.json.gz /work/tmp/editor-input/calibration.json.gz --allow-slowdown
 ```
 
 The delayed comparison must exit with status 1 and report failed synchronous-duration groups.
@@ -377,7 +377,7 @@ Collect diagnostic phase correlations separately:
 
 ```sh
 bun run bench:input --repetitions 1 --diagnostics --output /work/tmp/editor-input/diagnostic.json.gz
-node examples/stress/test/verify-input-results.mjs /work/tmp/editor-input
+bun examples/stress/test/verify-input-results.ts /work/tmp/editor-input
 ```
 
 Keep the candidate source unchanged for its delayed and diagnostic runs. The proof command checks

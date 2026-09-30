@@ -52,7 +52,7 @@ Every explicit copy goes through `lib/clipboard.ts`, which tries `navigator.clip
 
 ## File labels
 
-`FileLabel` (`components/file-label.tsx`) draws a file as icon, basename, then muted directory, so a right cut eats the directory; `FileStatusCell` draws the change letter. Git rows, Search group headers (sidebar and editor), the Turn panel and the timeline's changed-files tree share them. `scenario file-label-cohesion` makes a disposable repository, registers it as its own project, and runs a native checkpoint fixture (`fixtures/native-checkpoint.mjs`, no tokens) whose turn adds, deletes, renames and modifies named files. It asserts A/D/R/M in both the timeline tree and the Turn panel, then basename-first rows in Search and Git for a file twelve directories deep. It deletes the session, project and provider it created and releases the fixture; `inspection.json` records each.
+`FileLabel` (`components/file-label.tsx`) draws a file as icon, basename, then muted directory, so a right cut eats the directory; `FileStatusCell` draws the change letter. Git rows, Search group headers (sidebar and editor), the Turn panel and the timeline's changed-files tree share them. `scenario file-label-cohesion` makes a disposable repository, registers it as its own project, and runs a native checkpoint fixture (`fixtures/native-checkpoint.ts`, no tokens) whose turn adds, deletes, renames and modifies named files. It asserts A/D/R/M in both the timeline tree and the Turn panel, then basename-first rows in Search and Git for a file twelve directories deep. It deletes the session, project and provider it created and releases the fixture; `inspection.json` records each.
 
 ## Base components
 

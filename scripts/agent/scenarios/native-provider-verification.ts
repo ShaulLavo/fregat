@@ -1,6 +1,7 @@
+import { fixtureSource } from '../fixture-source'
 import { scratchPath } from '../paths'
 import { ok } from 'node:assert/strict'
-import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Page } from 'playwright'
 import * as v from 'valibot'
@@ -191,7 +192,7 @@ export async function installNativeProvider(
   const root = await mkdtemp(scratchPath(`fregat-${input.name}-native-`))
   // Claude's SDK runs a path without a script extension directly, as it runs the real CLI.
   const binary = join(root, kind === 'codex' ? 'codex.mjs' : 'claude')
-  await copyFile(input.fixture, binary)
+  await writeFile(binary, await fixtureSource(input.fixture))
   await chmod(binary, 0o700)
   await writeFile(join(root, 'scenario'), input.name)
   const providerInstanceId = `verify-${crypto.randomUUID()}`
@@ -235,10 +236,10 @@ export async function installNativeProvider(
 }
 
 /** The Codex stand-in whose threads persist, fork, rewind and compact; see the fixture's header. */
-const CONVERSATION_FIXTURE = new URL('../fixtures/native-conversation.mjs', import.meta.url)
+const CONVERSATION_FIXTURE = new URL('../fixtures/native-conversation.ts', import.meta.url)
 
 /** The Claude Code stand-in speaking the SDK's stream-json protocol; see the fixture's header. */
-const CLAUDE_FIXTURE = new URL('../fixtures/native-claude.mjs', import.meta.url)
+const CLAUDE_FIXTURE = new URL('../fixtures/native-claude.ts', import.meta.url)
 const CLAUDE_FIXTURE_MODEL = 'claude-haiku-4-5'
 
 async function withClaudeProvider<T>(

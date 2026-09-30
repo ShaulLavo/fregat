@@ -53,7 +53,7 @@ export const checkpointDiffTokens = isolatedNativeScenario({
   name: 'checkpoint-diff-tokens',
   description:
     'A turn edits lines 5 and 30 of two files and re-indents line 3; the checkpoint diff of the second file colours every row from its own source line from its complete blob pair, stacked and then split under tree-sitter and Shiki. Run with FS_DEV_MAX_TEXT_FILE_BYTES=500 and the pair is over the text limit: the patch is drawn uncoloured under the partial notice.',
-  fixture: new URL('../fixtures/native-checkpoint.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-checkpoint.ts', import.meta.url),
   prepareWorktree: prepareFixture,
   async drive(page, { orchestration, root, step, worktreePath }) {
     await writeFile(

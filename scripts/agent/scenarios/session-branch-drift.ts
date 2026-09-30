@@ -13,7 +13,7 @@ export const sessionBranchDrift = isolatedNativeScenario({
   name: 'session-branch-drift',
   description:
     "A session in its own worktree whose agent runs `git checkout -b`: the worktree's branch in the header follows it when the turn ends.",
-  fixture: new URL('../fixtures/native-checkpoint.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-checkpoint.ts', import.meta.url),
   prepareWorktree: () => committedFixture('branch-drift'),
   newWorktree: true,
   async drive(page, { root, step, orchestration, worktreeId, worktreePath }) {

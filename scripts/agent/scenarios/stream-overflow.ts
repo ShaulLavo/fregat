@@ -105,7 +105,7 @@ export const streamOverflow = isolatedNativeScenario({
   name: 'stream-overflow',
   description:
     'Withhold session ACKs during a 2,500-paragraph fixture answer, assert delivery failure and resubscription from the applied cursor, then compare every client paragraph before and after reload.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { step, sessionId }) {
     const proof = await interruptDelivery(page, sessionId)
     await sendPrompt(page, 'Write the long answer.')

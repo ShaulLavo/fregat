@@ -6,7 +6,7 @@ export const physicalChat = isolatedNativeScenario({
   name: 'physical-chat',
   description:
     'Stream a fixture response with physical feel and verify scrolling never replays a timeline entrance.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { step, orchestration }) {
     const base = orchestration.replace(/\/orchestration$/, '')
     const feel = process.env.PHYSICAL_BASELINE === '1' ? 'flat' : 'playful'

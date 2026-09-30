@@ -92,11 +92,11 @@ textarea composition commit. Nothing can be deleted while other engines still ne
 From `examples/stress`, after `bun run build` at the repository root:
 
 ```sh
-node geometry.mjs --output /work/tmp/editor-e036/run.json --repetitions 5
-node geometry.mjs --output /work/tmp/editor-e036/fonts.json --font-check "monospace,Liberation Sans"
-node blink.mjs --output /work/tmp/editor-e036/blink.json --headed
-node edit-context-probe.mjs --output /work/tmp/editor-e036/edit-context-events.json
-node profile-input-layout.mjs --mode trace --repetitions 1 --groups ordinary/single/typing \
+node geometry.ts --output /work/tmp/editor-e036/run.json --repetitions 5
+node geometry.ts --output /work/tmp/editor-e036/fonts.json --font-check "monospace,Liberation Sans"
+node blink.ts --output /work/tmp/editor-e036/blink.json --headed
+node edit-context-probe.ts --output /work/tmp/editor-e036/edit-context-events.json
+node profile-input-layout.ts --mode trace --repetitions 1 --groups ordinary/single/typing \
   --output /work/tmp/editor-e036/layout-trace
 ```
 

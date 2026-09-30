@@ -24,7 +24,7 @@ runs:
     # Turbo replays a task whose inputs are unchanged, so a PR re-runs only what its change can
     # reach. Each job saves its own cache, keyed by commit; a restore falls back to this job's
     # newest cache, then any job's (builds are shared), on this branch and then on main.
-    # `scripts/check-turbo-inputs.mjs` fails CI when a package reads a file its task's hash does not cover.
+    # `scripts/check-turbo-inputs.ts` fails CI when a package reads a file its task's hash does not cover.
     - name: Restore turbo cache
       uses: actions/cache@v6
       with:

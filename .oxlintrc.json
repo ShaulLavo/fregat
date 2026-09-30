@@ -5,7 +5,7 @@
     "oxc-plugin-react-compiler/eslint",
     {
       "name": "platform-boundaries",
-      "specifier": "./scripts/lint/web-boundaries.mjs"
+      "specifier": "./scripts/lint/web-boundaries.ts"
     }
   ],
   "ignorePatterns": ["apps/desktop/build/**", "apps/desktop/.hutch/**"],

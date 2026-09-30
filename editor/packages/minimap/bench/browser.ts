@@ -151,3 +151,5 @@ async function pixels() {
 
 const bridge = { prepare, reset, scroll, run, report, pixels }
 Object.assign(globalThis, { __minimapBench: bridge })
+
+export type MinimapBenchBridge = typeof bridge

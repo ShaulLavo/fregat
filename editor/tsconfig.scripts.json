@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["bun"],
+    "erasableSyntaxOnly": true,
+    "typeRoots": ["../scripts/node_modules/@types", "./node_modules/@types"]
+  },
+  "include": [
+    "scripts/architecture-health.ts",
+    "scripts/check-editor-backlog.ts",
+    "scripts/check-full-text-boundary.ts",
+    "scripts/check-turbo-inputs.ts",
+    "packages/*/scripts/**/*.ts"
+  ],
+  "exclude": ["**/node_modules", "**/dist", "opensrc"]
+}

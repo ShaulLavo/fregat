@@ -10,7 +10,7 @@ export const worktreeCleanupOnDelete = isolatedNativeScenario({
   name: 'worktree-cleanup-on-delete',
   description:
     'Delete the only session in its own worktree with Also remove its worktree on: once the session stops, the server removes the checkout through the worktree lifecycle and keeps its branch.',
-  fixture: new URL('../fixtures/native-checkpoint.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-checkpoint.ts', import.meta.url),
   prepareWorktree: () => committedFixture('worktree-cleanup'),
   newWorktree: true,
   async drive(page, { step, orchestration, worktreeId, worktreePath }) {

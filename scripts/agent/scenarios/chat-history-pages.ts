@@ -4,7 +4,7 @@ import { isolatedNativeScenario } from './native-provider-verification'
 export const chatHistoryPages = isolatedNativeScenario({
   name: 'chat-history-pages',
   description: 'Reload a long conversation and load its earlier messages through the timeline.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { step }) {
     await selectors.chatMessage(page).fill('Create the history page fixture.')
     await selectors.chatSend(page).click()

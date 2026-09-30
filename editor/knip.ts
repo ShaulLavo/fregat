@@ -69,24 +69,24 @@ const config: KnipConfig = {
     'tree-sitter-cli',
     '@playwright/test',
   ],
-  // taskset (util-linux) pins CPU affinity in examples/stress/fallback-experiment.mjs.
+  // taskset (util-linux) pins CPU affinity in examples/stress/fallback-experiment.ts.
   ignoreBinaries: ['taskset'],
   workspaces: {
     '.': {
-      entry: ['scripts/*.{ts,mjs}'],
-      project: ['scripts/**/*.{ts,mjs}'],
+      entry: ['scripts/*.ts'],
+      project: ['scripts/**/*.ts'],
     },
     ...Object.fromEntries(packages.map((name) => [`packages/${name}`, packageWorkspace(name)])),
-    // Top-level scripts run directly (`node x.mjs`). Knip reads only Vite's index.html, so each
+    // Top-level scripts run directly (`bun x.ts`). Knip reads only Vite's index.html, so each
     // other page's module script is listed: boundary, consumers, copies, first-paint, geometry.
     'examples/stress': {
       entry: [
         'index.html',
         'src/{boundary,consumers,copies,firstPaint,geometry}.ts',
-        '*.mjs',
-        'test/*.mjs',
+        '*.ts',
+        'test/*.ts',
       ],
-      project: ['src/**/*.ts', '*.mjs'],
+      project: ['src/**/*.ts', '*.ts'],
     },
     // jump-history.html loads src/jumpHistoryDemo.ts.
     'examples/app': {

@@ -11,7 +11,7 @@ export const sessionAutoSettle = isolatedNativeScenario({
   name: 'session-auto-settle',
   description:
     'A session in its own worktree whose pull request the forge reports merged after the session began: the server settles it and the rail moves it to Settled.',
-  fixture: new URL('../fixtures/native-checkpoint.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-checkpoint.ts', import.meta.url),
   prepareWorktree: () => committedFixture('auto-settle'),
   newWorktree: true,
   async prepareServer() {

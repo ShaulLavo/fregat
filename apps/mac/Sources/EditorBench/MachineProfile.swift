@@ -45,7 +45,7 @@ struct MachineProfile {
   }
 
   /// Fixed integer workload, identical in shape to the web harness's in-page
-  /// calibration loop (`apps/web/scripts/bench-workspace.mjs`). Compare it only
+  /// calibration loop (`apps/web/scripts/bench-workspace.ts`). Compare it only
   /// against other EditorBench runs — Swift and V8 do not produce comparable
   /// absolute times — and read every result in this run relative to it.
   static func cpuCalibration() -> Double {

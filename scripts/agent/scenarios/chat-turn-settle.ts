@@ -33,7 +33,7 @@ export const chatTurnSettle = isolatedNativeScenario({
   name: 'chat-turn-settle',
   description:
     'A finished turn keeps its answer still: the Working row becomes the finished status in the same slot under the prompt, for a turn with no tool steps and for one with a tool. The first turn keeps its status and place once the next prompt runs, and the fold caret turns when it opens.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { step, root }) {
     const turns = [
       await settleTurn(page, root, step, 1, 'no-tool', 'Answer without tools.'),

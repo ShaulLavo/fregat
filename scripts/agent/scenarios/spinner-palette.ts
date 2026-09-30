@@ -8,7 +8,7 @@ export const spinnerPalette = isolatedNativeScenario({
   name: 'spinner-palette',
   description:
     'A working session breathes its rail and header status dots and draws its timeline spinner from the theme primary, in dark and light.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { step, sessionId }) {
     const sage = BUNDLED_THEMES.find((theme) => theme.id === 'sage')
     ok(sage, 'Bundled Sage theme exists')

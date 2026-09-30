@@ -26,7 +26,7 @@ with the later candidate would attribute viewport work to E034. The final compar
 the baseline and control at `88cd55d`, which includes both fixes. The earlier runs remain under
 `/work/tmp/editor-e034/historical-30ae9` and are excluded from the results below.
 
-The runner is [`examples/stress/first-paint.mjs`](../../examples/stress/first-paint.mjs).
+The runner is [`examples/stress/first-paint.ts`](../../examples/stress/first-paint.ts).
 It builds against the selected core package and serves production assets through Playwright
 request interception. It starts no server. Each result records source, core build, and browser
 bundle hashes. The unchanged control uses the same frozen core.
@@ -165,7 +165,7 @@ gutter is installed.
 The summary command is:
 
 ```sh
-node examples/stress/fallback-compare.mjs \
+node examples/stress/fallback-compare.ts \
 	docs/performance/e034-before.json.gz \
 	docs/performance/e034-control.json.gz \
 	docs/performance/e034-after.json.gz
@@ -410,16 +410,16 @@ All values below are milliseconds. The difference is candidate p95 minus pooled 
 Each group contains 120 recorded documents and 4,320 input events per arm. The input measurement
 ends at `onChange`; the text callback records the public initial paint event.
 
-| Attachment | Metric | Pooled controls p95 | Candidate p95 | Difference | Lower bound | Upper bound |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| Direct, cold | Input to onChange | 1.5 | 1.4 | -0.1 | -0.1 | 0.0 |
-| Direct, cold | Text callback | 58.6 | 21.5 | -37.1 | -37.4 | -36.3 |
-| Direct, warm | Input to onChange | 1.0 | 0.9 | -0.1 | -0.1 | 0.0 |
-| Direct, warm | Text callback | 39.2 | 8.9 | -30.3 | -30.6 | -29.6 |
-| Prepared, cold | Input to onChange | 1.5 | 1.5 | 0.0 | -0.1 | 0.0 |
-| Prepared, cold | Text callback | 18.6 | 11.8 | -6.8 | -7.0 | -6.7 |
-| Prepared, warm | Input to onChange | 1.0 | 0.9 | -0.1 | -0.1 | +0.1 |
-| Prepared, warm | Text callback | 8.5 | 3.1 | -5.4 | -5.6 | -5.2 |
+| Attachment     | Metric            | Pooled controls p95 | Candidate p95 | Difference | Lower bound | Upper bound |
+| -------------- | ----------------- | ------------------: | ------------: | ---------: | ----------: | ----------: |
+| Direct, cold   | Input to onChange |                 1.5 |           1.4 |       -0.1 |        -0.1 |         0.0 |
+| Direct, cold   | Text callback     |                58.6 |          21.5 |      -37.1 |       -37.4 |       -36.3 |
+| Direct, warm   | Input to onChange |                 1.0 |           0.9 |       -0.1 |        -0.1 |         0.0 |
+| Direct, warm   | Text callback     |                39.2 |           8.9 |      -30.3 |       -30.6 |       -29.6 |
+| Prepared, cold | Input to onChange |                 1.5 |           1.5 |        0.0 |        -0.1 |         0.0 |
+| Prepared, cold | Text callback     |                18.6 |          11.8 |       -6.8 |        -7.0 |        -6.7 |
+| Prepared, warm | Input to onChange |                 1.0 |           0.9 |       -0.1 |        -0.1 |        +0.1 |
+| Prepared, warm | Text callback     |                 8.5 |           3.1 |       -5.4 |        -5.6 |        -5.2 |
 
 Each block ran baseline, unchanged control, and candidate in separate Chromium processes.
 All six orders occurred four times. The analyzer used 32,768 seeded resamples of whole paired
@@ -448,18 +448,18 @@ Preparation includes buffer creation and completes before the prepared attachmen
 Direct attachment has no preparation stage. The input workload executes its first fold command
 before typing, so it measures edits of a ready index rather than input during initial discovery.
 
-| Attachment | Cost | Baseline p95 | Control p95 | Candidate p95 |
-| --- | --- | ---: | ---: | ---: |
-| Direct, cold | First fold command | 83.2 | 83.2 | 127.1 |
-| Direct, cold | Fold-all | 6.4 | 6.4 | 9.4 |
-| Direct, warm | First fold command | 69.3 | 69.4 | 120.0 |
-| Direct, warm | Fold-all | 5.2 | 5.2 | 8.1 |
-| Prepared, cold | Preparation | 122.1 | 122.3 | 153.1 |
-| Prepared, cold | First fold command | 2.4 | 2.3 | 1.7 |
-| Prepared, cold | Fold-all | 6.4 | 6.4 | 9.3 |
-| Prepared, warm | Preparation | 102.1 | 102.3 | 144.0 |
-| Prepared, warm | First fold command | 1.4 | 1.4 | 0.9 |
-| Prepared, warm | Fold-all | 5.3 | 5.3 | 8.0 |
+| Attachment     | Cost               | Baseline p95 | Control p95 | Candidate p95 |
+| -------------- | ------------------ | -----------: | ----------: | ------------: |
+| Direct, cold   | First fold command |         83.2 |        83.2 |         127.1 |
+| Direct, cold   | Fold-all           |          6.4 |         6.4 |           9.4 |
+| Direct, warm   | First fold command |         69.3 |        69.4 |         120.0 |
+| Direct, warm   | Fold-all           |          5.2 |         5.2 |           8.1 |
+| Prepared, cold | Preparation        |        122.1 |       122.3 |         153.1 |
+| Prepared, cold | First fold command |          2.4 |         2.3 |           1.7 |
+| Prepared, cold | Fold-all           |          6.4 |         6.4 |           9.3 |
+| Prepared, warm | Preparation        |        102.1 |       102.3 |         144.0 |
+| Prepared, warm | First fold command |          1.4 |         1.4 |           0.9 |
+| Prepared, warm | Fold-all           |          5.3 |         5.3 |           8.0 |
 
 Buffer creation p95 ranges from 32.4 to 38.7 ms in the baseline groups and from 6.0 to 7.0 ms
 in the candidate. Ready preparation and direct first-command discovery still cost more, as does
@@ -469,10 +469,10 @@ The following cells show initial → edited memory p95 in MiB. Each sample sums 
 `usedSize + backingStorageSize` after forced collection. These process-level values include
 benchmark reference strings and editor storage, so they do not isolate index allocation.
 
-| Attachment | Baseline | Control | Candidate |
-| --- | ---: | ---: | ---: |
-| Direct, cold | 22.17 → 51.40 | 22.17 → 51.40 | 39.84 → 55.08 |
-| Direct, warm | 23.50 → 51.95 | 23.50 → 51.95 | 41.25 → 55.63 |
+| Attachment     |      Baseline |       Control |     Candidate |
+| -------------- | ------------: | ------------: | ------------: |
+| Direct, cold   | 22.17 → 51.40 | 22.17 → 51.40 | 39.84 → 55.08 |
+| Direct, warm   | 23.50 → 51.95 | 23.50 → 51.95 | 41.25 → 55.63 |
 | Prepared, cold | 24.41 → 53.71 | 24.41 → 53.71 | 42.19 → 57.41 |
 | Prepared, warm | 25.80 → 54.29 | 25.80 → 54.29 | 43.59 → 57.98 |
 

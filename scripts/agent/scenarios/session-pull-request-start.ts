@@ -67,7 +67,7 @@ export const sessionPullRequestStart = isolatedNativeScenario({
   name: 'session-pull-request-start',
   description:
     "Start a session from a GitHub pull request URL through the palette: it opens in its own worktree at the pull request's head, the header links the pull request, and a push lands on the pull request's branch.",
-  fixture: new URL('../fixtures/native-checkpoint.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-checkpoint.ts', import.meta.url),
   prepareWorktree: pullRequestCheckout,
   async prepareServer() {
     forge = await createFakeForge(null, PULL_REQUEST)

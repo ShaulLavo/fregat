@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["bun"],
+    "typeRoots": [
+      "./node_modules/@types",
+      "../node_modules/@types",
+      "../../scripts/node_modules/@types"
+    ],
+    "erasableSyntaxOnly": true
+  },
+  "include": ["src/pty-bridge.ts"]
+}

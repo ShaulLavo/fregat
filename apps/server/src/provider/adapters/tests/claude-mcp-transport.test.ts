@@ -22,7 +22,7 @@ it('keeps the MCP bearer out of real SDK argv and debug logs, delivering it over
     auth: signedInClaudeAuth(),
     resolveExecutable: async () => ({
       ...FAKE_CLAUDE_EXECUTABLE,
-      path: path.resolve(import.meta.dirname, '../../../../test/factories/claude-ipc.cjs'),
+      path: path.resolve(import.meta.dirname, '../../../../test/factories/claude-ipc.ts'),
     }),
     createQuery: (input) => {
       if (input.options.strictMcpConfig) return new FakeClaudeQuery() as unknown as Query
@@ -32,7 +32,7 @@ it('keeps the MCP bearer out of real SDK argv and debug logs, delivering it over
           ...input.options,
           env: { ...process.env, FAKE_CLAUDE_IPC_CAPTURE: capture },
           spawnClaudeCodeProcess: (options) => {
-            expect([options.command, ...options.args].join(' ')).toContain('claude-ipc.cjs')
+            expect([options.command, ...options.args].join(' ')).toContain('claude-ipc.ts')
             argv.push(options.args)
             return input.options.spawnClaudeCodeProcess!(options)
           },

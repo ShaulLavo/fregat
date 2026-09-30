@@ -1,7 +1,6 @@
 import { spawn, type ChildProcessByStdio } from 'node:child_process'
 import {
   chmodSync,
-  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -18,6 +17,7 @@ import { createInterface } from 'node:readline'
 import type { Readable, Writable } from 'node:stream'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { fixtureSource } from './fixture-source'
 import {
   liveNativeProcesses,
   reapNativeProcesses,
@@ -75,10 +75,10 @@ class FixtureProcess {
   }
 }
 
-function fixtureRoot(name: string, fixture: string, binary: string) {
+async function fixtureRoot(name: string, fixture: string, binary: string) {
   const root = mkdtempSync(path.join(scratch, `${name}-`))
   const file = path.join(root, binary)
-  copyFileSync(path.join(FIXTURES, fixture), file)
+  writeFileSync(file, await fixtureSource(path.join(FIXTURES, fixture)))
   chmodSync(file, 0o700)
   const repo = path.join(root, 'repo')
   mkdirSync(repo)
@@ -86,8 +86,8 @@ function fixtureRoot(name: string, fixture: string, binary: string) {
   return { root, file, repo }
 }
 
-function startClaude(name: string, permissionMode: string, prepare?: (repo: string) => void) {
-  const { root, file, repo } = fixtureRoot(name, 'native-claude.mjs', 'claude')
+async function startClaude(name: string, permissionMode: string, prepare?: (repo: string) => void) {
+  const { root, file, repo } = await fixtureRoot(name, 'native-claude.ts', 'claude')
   prepare?.(repo)
   const args = [
     '--output-format',
@@ -133,10 +133,10 @@ async function settles(check: () => boolean) {
 }
 
 describe("the Claude fixture's Bash tool", () => {
-  let claude: ReturnType<typeof startClaude>
+  let claude: Awaited<ReturnType<typeof startClaude>>
 
   beforeAll(async () => {
-    claude = startClaude('bash', 'bypassPermissions', (repo) =>
+    claude = await startClaude('bash', 'bypassPermissions', (repo) =>
       symlinkSync(outside, path.join(repo, 'link')),
     )
     await claude.fixture.next((message) => message.type === 'control_response')
@@ -198,7 +198,7 @@ require('node:readline').createInterface({ input: process.stdin }).on('line', (l
 
 describe('a fixture whose stdin closes mid-approval', () => {
   it('Claude exits and takes its MCP server and background task with it', async () => {
-    const { fixture, repo, root } = startClaude('close', 'default', (checkout) => {
+    const { fixture, repo, root } = await startClaude('close', 'default', (checkout) => {
       writeFileSync(path.join(checkout, 'mcp.cjs'), MCP_SERVER)
       writeFileSync(
         path.join(checkout, '.mcp.json'),
@@ -234,8 +234,8 @@ describe('a fixture whose stdin closes mid-approval', () => {
     expect(existsSync(path.join(repo, 'marker.txt'))).toBe(false)
   }, 30_000)
 
-  function startCodex(name: string, hold: boolean) {
-    const { root, file, repo } = fixtureRoot(name, 'native-conversation.mjs', 'codex.mjs')
+  async function startCodex(name: string, hold: boolean) {
+    const { root, file, repo } = await fixtureRoot(name, 'native-conversation.ts', 'codex.mjs')
     if (hold) writeFileSync(path.join(root, 'hold'), '')
     const fixture = new FixtureProcess(file, [], { cwd: repo, env: { CODEX_HOME: root } })
     fixture.send({ id: 1, method: 'initialize', params: {} })
@@ -257,7 +257,7 @@ describe('a fixture whose stdin closes mid-approval', () => {
   }
 
   it('Codex exits with a command approval pending', async () => {
-    const { fixture, repo } = startCodex('codex-approval', false)
+    const { fixture, repo } = await startCodex('codex-approval', false)
     await turn(fixture, 'Run exactly `touch marker.txt` and reply with exactly DONE.')
     await fixture.next((message) => message.method === 'item/commandExecution/requestApproval')
     fixture.child.stdin.end()
@@ -266,7 +266,7 @@ describe('a fixture whose stdin closes mid-approval', () => {
   }, 30_000)
 
   it('Codex exits with a turn held running', async () => {
-    const { fixture } = startCodex('codex-hold', true)
+    const { fixture } = await startCodex('codex-hold', true)
     await turn(fixture, 'Reply with exactly HELD.')
     await fixture.next((message) => message.method === 'turn/started')
     fixture.child.stdin.end()

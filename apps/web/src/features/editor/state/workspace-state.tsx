@@ -1,5 +1,5 @@
 import type { OrchestrationWorktreeShell, WorktreeId } from '@workspace/contracts'
-import type { WorktreeIdsByRootPath } from '@/features/workspace/utils/location'
+import type { WorktreeIdsByRootPath } from '@/lib/workspace-location'
 import type { PickedFsEntry } from '@/lib/file-system-types'
 import type { ChatModePanels } from '@/features/chat-mode/utils/panels'
 import type { WorkbenchLayout } from '@/features/workbench/utils/layout'

@@ -122,7 +122,7 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
 - Root `typecheck`/`test`/`lint` now cover all Editor packages, examples and ghostty's browser
   tests; typecheck needs the Editor packages built first.
 - Layout-dependent scripts to update: `bundle-report.ts`, `bundle-owners.test.ts`,
-  `editor-open-benchmark.mjs`, `terminal-reload-proof.mjs`, the `quick-open-linked-file`
+  `editor-open-benchmark.ts`, `terminal-reload-proof.ts`, the `quick-open-linked-file`
   scenario; delete `check-linked-sources.ts`. The setup action loses six sibling clone/build/link
   steps.
 - oxfmt/oxlint versions already match; `.oxfmtrc.json` configs differ. The vitest patch is
@@ -140,7 +140,7 @@ Scratch rehearsal: `/work/reports/keymap-wave/207-rehearsal.md` (`/work/tmp/plan
   and `release` scripts. Private workspaces have versioning and tags disabled. Editor and
   ghostty fixed groups warn while their workspace folders are absent, then activate after the move.
 - npm packs `workspace:*` verbatim even after `changeset version`. The release script first
-  builds public packages, then `scripts/release/prepare.mjs` resolves workspace references
+  builds public packages, then `scripts/release/prepare.ts` resolves workspace references
   against package versions and catalog references against the root catalogs. It validates all
   public manifests before writing them in the disposable CI checkout; private manifests stay
   unchanged. Preparation sets each public manifest's repository to `ShaulLavo/fregat` and its

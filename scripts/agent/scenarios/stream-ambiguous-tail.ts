@@ -12,7 +12,7 @@ export const streamAmbiguousTail = isolatedNativeScenario({
   name: 'stream-ambiguous-tail',
   description:
     'Stream an answer whose tail pauses on `#`, `## `, an open backtick, a table header without its separator and a bare list marker; no animation frame may paint that syntax as text.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { step, orchestration, root }) {
     const frames = await streamedFrames<TailFrame>(
       page,

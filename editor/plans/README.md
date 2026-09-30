@@ -398,10 +398,10 @@ and source-topic coverage. Update it with the corresponding plan or completed re
 From the Editor repository, run:
 
 ```sh
-node scripts/check-editor-backlog.mjs
+node scripts/check-editor-backlog.ts
 ```
 
-The [verifier](../scripts/check-editor-backlog.mjs) checks titles and metadata, local Markdown
+The [verifier](../scripts/check-editor-backlog.ts) checks titles and metadata, local Markdown
 file links, required sections, unique IDs/files, missing dependencies, dependency cycles, orphan
 plans, and coverage of every original TODO heading. It does not prove a source claim, benchmark,
 or proposed feature; those require the plan's execution checks. Cross-repository links assume

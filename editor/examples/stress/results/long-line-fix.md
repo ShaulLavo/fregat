@@ -87,7 +87,7 @@ From the repository root:
 
 ```sh
 bun run bench:stress --fixtures ordinary,long-line,unicode --repetitions 3 --output /work/tmp/editor-long-line-candidate.json
-node examples/stress/test/summarize-change.mjs examples/stress/results/long-line-fix-before.json /work/tmp/editor-long-line-candidate.json
+bun examples/stress/test/summarize-change.ts examples/stress/results/long-line-fix-before.json /work/tmp/editor-long-line-candidate.json
 bun run --cwd packages/editor test --project node src/textMeasurements.test.ts
 bun run --cwd packages/editor test --project browser test/longLineMeasurements.browser.test.ts
 ```

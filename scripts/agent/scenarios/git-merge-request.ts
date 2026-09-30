@@ -33,7 +33,7 @@ export const gitMergeRequest = isolatedNativeScenario({
   name: 'git-merge-request',
   description:
     'A session on a branch one commit ahead, whose remote is GitLab: the header offers Push and open merge request through glab, which pushes the commit and shows the new request.',
-  fixture: new URL('../fixtures/native-checkpoint.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-checkpoint.ts', import.meta.url),
   prepareWorktree: gitLabCheckout,
   async prepareServer() {
     forge = await createFakeGitLab()

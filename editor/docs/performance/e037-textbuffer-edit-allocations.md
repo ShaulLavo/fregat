@@ -33,7 +33,7 @@ commissioned it stays as the record of the starting point.
 - `bench/budgets.json` holds a ceiling per workload for every structural counter at seed
   `20260916`, for the smoke and standard profiles, with a 2% margin. `bench:check` fails on a count
   over its ceiling, on a budget whose counter no longer exists, and on a structural counter with
-  no budget. Regenerate with `node bench/budgets.mjs --write` only after a deliberate change.
+  no budget. Regenerate with `node bench/budgets.ts --write` only after a deliberate change.
 - The `typing-with-lookups` workload converts the caret to a row and column after every keystroke.
   It is a shared timing lane and a budgeted counter lane; the height replay excludes it.
 
@@ -118,7 +118,7 @@ package's node and dom projects and the tree-sitter tests. New tests: `reads.tes
 probe on every boundary class and a churned emoji document against a string oracle;
 `edits.test.ts` checks the single-edit path against `snapBatchEditRanges` including 300 fuzzed
 edits; `reverseIndex.test.ts` requires exactly one reverse entry per non-empty piece after a
-split and a churn sequence; `bench/budgets.test.mjs` is the counter gate.
+split and a churn sequence; `bench/budgets.test.ts` is the counter gate.
 
 ## Left for the successors
 

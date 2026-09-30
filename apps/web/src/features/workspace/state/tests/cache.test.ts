@@ -33,12 +33,9 @@ import {
   setWorkbenchSidebarTab,
 } from '@/features/workbench/utils/panels'
 import {
-  WORKSPACE_CACHE_STORAGE_KEYS,
   WORKSPACE_SLICE_LIMIT,
   emptyWorkspaceSlice,
   readWorkspaceCache,
-  searchBufferStorageKey,
-  workspaceSliceStorageKey,
   type CachedSearchBufferState,
   type CachedWorkspaceSlice,
   writeRootFolderCache,
@@ -50,6 +47,11 @@ import {
   writeWorkspaceIndexCache,
   writeWorkspaceSliceCache,
 } from '@/features/workspace/state/cache'
+import {
+  WORKSPACE_CACHE_STORAGE_KEYS,
+  searchBufferStorageKey,
+  workspaceSliceStorageKey,
+} from '@/lib/workspace-cache-keys'
 import { createDefaultChatModePanels } from '@/features/chat-mode/utils/panels'
 import { createDefaultWorkbenchLayout } from '@/features/workbench/utils/layout'
 import { DEFAULT_WORKSPACE_UI_MODE } from '@/lib/ui-mode'

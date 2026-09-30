@@ -11,7 +11,7 @@ export const sessionNoFlicker = isolatedNativeScenario({
   name: 'session-no-flicker',
   description:
     'Switch cold conversations in chat and the sidebar, checking blank frames, paired titles and scroll isolation with a fixture provider.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { step, root, orchestration, providerInstanceId, sessionId, worktreeId }) {
     const duplicateKeys: string[] = []
     page.on('console', (message) => {

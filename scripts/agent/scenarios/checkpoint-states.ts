@@ -46,7 +46,7 @@ export const checkpointStates = isolatedNativeScenario({
   name: 'checkpoint-states',
   description:
     'A native checkpoint fixture: turn 1 edits a file (available in the timeline and the Turn panel), turn 2 edits nothing (the Turn panel says so, the timeline adds nothing).',
-  fixture: new URL('../fixtures/native-checkpoint.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-checkpoint.ts', import.meta.url),
   prepareWorktree: prepareFixture,
   async drive(page, { root, step, worktreePath }) {
     await changeAppConstant(page, root, worktreePath)

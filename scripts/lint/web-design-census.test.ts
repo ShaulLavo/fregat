@@ -2,8 +2,7 @@ import { readFileSync } from 'node:fs'
 
 import { expect, test } from 'vitest'
 
-// @ts-expect-error The census is a plain ES module and the scripts workspace has no `allowJs`.
-import { censusSource, evaluate, isTestFile, TARGETS } from './web-design-census.mjs'
+import { censusSource, evaluate, isTestFile, TARGETS } from './web-design-census.ts'
 
 type Hit = { readonly file: string; readonly line: number; readonly value: string }
 
@@ -21,7 +20,7 @@ test('a native role button also needs a primitive or an explicit exception', () 
   const subject = censusFile('apps/web/src/probe.tsx', '<div role="button" />')
   expect(gate(subject).offenders.rawControls.map((hit) => hit.value)).toEqual(['role="button"'])
 })
-type Census = { readonly hits: Readonly<Record<string, readonly Hit[]>> }
+type Census = ReturnType<typeof censusSource>
 type Result = {
   readonly offenders: Readonly<Record<string, readonly Hit[]>>
   readonly allowProblems: readonly string[]
@@ -374,7 +373,7 @@ test('is wired into the repository: a script entry and a place in the verify cha
     readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
   ) as { readonly scripts: Readonly<Record<string, string>> }
 
-  expect(manifest.scripts['design:census']).toContain('web-design-census.mjs --check')
+  expect(manifest.scripts['design:census']).toContain('web-design-census.ts --check')
   expect(manifest.scripts.verify).toContain('bun run design:census')
 })
 

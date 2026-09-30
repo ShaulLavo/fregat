@@ -138,7 +138,7 @@ Other sessions have uncommitted work there: commit only your own paths with
   compiler lanes, its 2421 KB figure, and add 114 and 165.
 - Editor: close E018, E033, E047 and E049 (a short reference doc each, plan deleted, backlog
   Completed); fix E051's links; add a backlog entry for the whole-document `commandDocumentText`
-  copy; move E030 to Platform as a parked plan. Run `node scripts/check-editor-backlog.mjs` until it passes.
+  copy; move E030 to Platform as a parked plan. Run `node scripts/check-editor-backlog.ts` until it passes.
 - `git worktree remove /work/worktrees/platform/plan-145-approval-rules` (merged in `89c58188`).
 
 ### L0 — font catalog (already running in the main checkout)

@@ -181,7 +181,24 @@ export function createInputLatencyProbe(options: Options) {
       'Repeated keydown lost the repeat flag',
     )
     return {
-      events: samples,
+      events: samples.map((sample) => {
+        check(
+          sample.appliedAt !== null &&
+            sample.completedAt !== null &&
+            sample.frameAt !== null &&
+            sample.revisionAfter !== null &&
+            sample.inputType !== null,
+          'Missing completed input timing',
+        )
+        return {
+          ...sample,
+          appliedAt: sample.appliedAt,
+          completedAt: sample.completedAt,
+          frameAt: sample.frameAt,
+          revisionAfter: sample.revisionAfter,
+          inputType: sample.inputType,
+        }
+      }),
       cursor,
       offset,
       revision: buffer.getRevision(),

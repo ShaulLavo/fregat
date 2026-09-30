@@ -8,7 +8,7 @@ export const chatStream = isolatedNativeScenario({
   name: 'chat-stream',
   description:
     'Expand a running command and verify its completed output follows the end beyond the detail height cap.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { step, root }) {
     await selectors.chatMessage(page).fill('Stream the work-log fixture.')
     await selectors.chatSend(page).click()

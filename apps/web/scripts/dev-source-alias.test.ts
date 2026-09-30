@@ -1,3 +1,4 @@
+import { isRecord } from '@workspace/utils/objects'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -73,13 +74,7 @@ sourceTest(
     expect(server.environments.client.moduleGraph.getModulesByFile(file)?.size).toBe(1)
     server.watcher.emit('change', file)
     await expect.poll(() => processed.has(file)).toBe(true)
-    await expect
-      .poll(() =>
-        send.mock.calls.some(
-          ([payload]) => typeof payload === 'object' && payload.type === 'full-reload',
-        ),
-      )
-      .toBe(true)
+    await expect.poll(() => send.mock.calls.some(([payload]) => isFullReload(payload))).toBe(true)
   },
 )
 
@@ -94,3 +89,7 @@ sourceTest.for(['library/dist/index.js', 'library/src/unloaded.ts'])(
     expect(send).not.toHaveBeenCalled()
   },
 )
+
+function isFullReload(payload: unknown) {
+  return isRecord(payload) && payload.type === 'full-reload'
+}

@@ -116,7 +116,7 @@ compare every retained token offset and both fold boundaries with the expected f
 Run the source proof from the repository root:
 
 ```sh
-bun packages/editor/bench/editBatches.mjs --output /work/tmp/e032-source.json --require-incremental
+bun packages/editor/bench/editBatches.ts --output /work/tmp/e032-source.json --require-incremental
 ```
 
 It records full-read calls and bytes, range-read count and maximum span, reads spanning the
@@ -138,7 +138,7 @@ screenshots. It also requires zero synchronous and zero deferred full-document r
 diagnostic sample. Full-document correctness reads happen after timing and diagnostics.
 
 ```sh
-TMPDIR=/work/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
+TMPDIR=/work/tmp node packages/editor/bench/editBatchesBrowserRunner.ts \
   --output /work/tmp/e032-browser.json --require-incremental
 ```
 
@@ -168,9 +168,9 @@ The original baseline can be recreated without switching the checkout:
 mkdir -p /work/tmp/e032-baseline
 git archive 6492651 packages/editor/src packages/editor/package.json | tar -x -C /work/tmp/e032-baseline
 ln -sfn "$(pwd)/packages/editor/node_modules" /work/tmp/e032-baseline/node_modules
-bun packages/editor/bench/editBatches.mjs --core-directory /work/tmp/e032-baseline/packages/editor \
+bun packages/editor/bench/editBatches.ts --core-directory /work/tmp/e032-baseline/packages/editor \
   --output /work/tmp/e032-before-source.json
-TMPDIR=/work/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
+TMPDIR=/work/tmp node packages/editor/bench/editBatchesBrowserRunner.ts \
   --core-directory /work/tmp/e032-baseline/packages/editor --output /work/tmp/e032-before-browser.json
 ```
 
@@ -304,14 +304,14 @@ decorated cases fail the gate. The runner also asserts post-screenshot token off
 observations, benchmark fingerprint, and exact source/build hashes for both revisions.
 
 ```sh
-TMPDIR=/work/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
+TMPDIR=/work/tmp node packages/editor/bench/editBatchesBrowserRunner.ts \
   --core-directory /work/tmp/e032-reviewed/packages/editor --verify-guards \
   --output /work/tmp/e032-reviewed-guard-proof.json
 ```
 
 ## Build correspondence control
 
-[`editBatchesBuildProof.mjs`](../../packages/editor/bench/editBatchesBuildProof.mjs) deliberately
+[`editBatchesBuildProof.ts`](../../packages/editor/bench/editBatchesBuildProof.ts) deliberately
 pairs baseline source with candidate output in a temporary package. The ordinary package loader
 accepts that pair, reproducing the review finding. The control invokes the same rebuild function
 as the browser runner and verifies unchanged baseline source, exact clean baseline output, and
@@ -321,7 +321,7 @@ because the bundler embeds package paths in output comments. No hash normalizati
 the clean reference build, and the repaired build.
 
 ```sh
-node packages/editor/bench/editBatchesBuildProof.mjs \
+node packages/editor/bench/editBatchesBuildProof.ts \
 	--baseline-core-directory /work/tmp/e032-baseline/packages/editor \
 	--candidate-core-directory /work/tmp/e032-reviewed/packages/editor \
 	--output /work/tmp/e032-build-proof.json
@@ -351,7 +351,7 @@ a separate comparison from the ten-group matrix.
 
 ```sh
 e032_control() {
-	TMPDIR=/work/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
+	TMPDIR=/work/tmp node packages/editor/bench/editBatchesBrowserRunner.ts \
 		--group ordinary:single-edit:decorated --repetitions 100 --warmups 10 "$@"
 }
 e032_control --core-directory /work/tmp/e032-baseline/packages/editor --output /work/tmp/e032-control-a1.json
@@ -387,7 +387,7 @@ The slower observations remain in the artifact, including the 4.2 ms baseline ma
 
 ```sh
 e032_large_control() {
-  TMPDIR=/work/tmp node packages/editor/bench/editBatchesBrowserRunner.mjs \
+  TMPDIR=/work/tmp node packages/editor/bench/editBatchesBrowserRunner.ts \
     --group short-lines:single-edit:decorated --repetitions 100 --warmups 10 "$@"
 }
 e032_large_control --core-directory /work/tmp/e032-baseline/packages/editor --output /work/tmp/e032-large-a1.json

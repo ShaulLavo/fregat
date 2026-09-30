@@ -17,7 +17,7 @@ export const approvalTwoTabs = isolatedNativeScenario({
   name: 'approval-two-tabs',
   description:
     'Two windows answer one approval differently at once, then one window double-clicks the next: one answer reaches the agent each time, one decided receipt per request, and no window shows a second decision.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { step, root, orchestration, sessionId }) {
     await requestAppApproval(page)
     const other = await openSecondWindow(page, orchestration)

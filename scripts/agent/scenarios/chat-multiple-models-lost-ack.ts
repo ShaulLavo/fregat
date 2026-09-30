@@ -27,7 +27,7 @@ export const chatMultipleModelsLostAck = isolatedNativeScenario({
   name: 'chat-multiple-models-lost-ack',
   description:
     'Send one draft to two models while the server’s reply to the second start is dropped and its socket closed: the draft keeps only the unconfirmed model, and retrying with Send, Enter, Ctrl+Enter or Cmd+Enter resends the same start, which the server answers as done. Two sessions and one provider turn per model.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   prepareWorktree: () => draftFixture('multiple-models-lost-ack'),
   async drive(page, context) {
     const fixtureUrl = page.url()

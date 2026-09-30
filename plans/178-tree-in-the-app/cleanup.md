@@ -11,7 +11,7 @@
 2. **Package.** `@workspace/tree` exports the model only. Drop `react`, `react-dom` and `zustand`
    from its dependencies, its `browser` test project, `FileTree.test.tsx`, `public-api.test.ts`.
    Its node tests stay.
-3. **Census.** `web-design-census.mjs` and `react-compiler-census.mjs` roots cover the moved view;
+3. **Census.** `web-design-census.ts` and `react-compiler-census.ts` roots cover the moved view;
    `packages/tree` leaves the compiler census (no React left). The allow lists hold only Q1
    exceptions, each citing it.
 4. **Rules and docs.**

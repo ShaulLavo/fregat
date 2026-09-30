@@ -100,8 +100,8 @@ this plan did not touch.
 
 Structural counters, standard profile, from the regenerated budgets against the E044 budgets:
 
-| Lane                | Nodes touched (`own`) | Nodes cloned     | Nodes created |
-| ------------------- | --------------------- | ---------------- | ------------- |
+| Lane                | Nodes touched (`own`) | Nodes cloned     | Nodes created  |
+| ------------------- | --------------------- | ---------------- | -------------- |
 | random-insertions   | 46,069 to 18,629      | 17,265 to 15,758 | 4,580 to 3,055 |
 | random-replacements | 112,832 to 36,775     | 40,529 to 32,066 | 7,520 to 4,525 |
 | mixed-edit-churn    | 92,506 to 31,010      | 31,838 to 26,445 | 6,960 to 3,993 |
@@ -154,7 +154,7 @@ index 27.9%, buffer store and line index 20.8%. Self: `insertReverseIndexNode` 1
 - All of the above also ran green under all four bake-off configurations at `c9ad15d`.
 - `packages/editor`: 2,676 tests, including the rewritten `pieceTable-tree` and
   `pieceTable-inspection` tests and the two browser suites after rebuilding the editor `dist`.
-- `bun run bench:test`: 73 tests with the counter budgets regenerated; `probes.mjs` instruments
+- `bun run bench:test`: 73 tests with the counter budgets regenerated; `probes.ts` instruments
   `node.js` and `join.js`. `bun run bench:height -- --profile standard`: 0 failures.
 - Timing: `drive.sh` for the bake-off and `final.sh` for the final comparison, both in the
   evidence tarball with `summarize.mjs`, the profile report and the height samples.

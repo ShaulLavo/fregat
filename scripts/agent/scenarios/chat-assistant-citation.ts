@@ -32,7 +32,7 @@ export const chatAssistantCitation = isolatedNativeScenario({
   name: 'chat-assistant-citation',
   description:
     'Select two lines of an earlier reply and comment on them; stashing the message takes the quote along and restoring brings it back; the provider gets the quoted lines, the sent message shows a chip for them, and the chip scrolls back to that reply and marks it.',
-  fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
+  fixture: new URL('../fixtures/native-codex.ts', import.meta.url),
   async drive(page, { root, step }) {
     const messages = selectors.chatMessages(page)
     await sendPrompt(page, 'Explain the cache.')

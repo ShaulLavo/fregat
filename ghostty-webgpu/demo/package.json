@@ -14,5 +14,8 @@
     "@webgpu/types": "0.1.74",
     "typescript": "7.0.2",
     "vitest": "5.0.2"
+  },
+  "engines": {
+    "node": ">=22.18.0"
   }
 }

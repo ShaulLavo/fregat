@@ -252,6 +252,8 @@
       },
       "devDependencies": {
         "@playwright/test": "^1.63.0",
+        "@types/bun": "1.4.2",
+        "@types/node": "^26.6.3",
         "oxfmt": "0.70.0",
         "oxlint": "1.85.0",
         "typescript": "7.0.2",
@@ -939,6 +941,7 @@
         "@types/node": "^26.6.3",
         "@valibot/to-json-schema": "1.8.0",
         "oxc-parser": "0.151.0",
+        "oxc-transform-react": "^0.151.0",
         "oxfmt": "catalog:",
         "oxlint": "catalog:",
         "playwright": "catalog:",

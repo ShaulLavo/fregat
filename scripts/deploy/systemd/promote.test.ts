@@ -160,7 +160,7 @@ test('a valid release is promoted and its live check starts outside the service'
   expect(argv).toContain(
     `--property=ExecStopPost=-${process.execPath} ${path.join(root, 'bin/promote.ts')} notify`,
   )
-  const script = argv.indexOf('/work/checkout/scripts/deploy/live-check.mjs')
+  const script = argv.indexOf('/work/checkout/scripts/deploy/live-check.ts')
   expect(argv[script - 1]).toMatch(/node$/)
   expect(argv.slice(script + 1)).toEqual([
     '--release=B',
@@ -190,7 +190,7 @@ test('the inline check runs in the checkout without waiting for a restart', () =
   expect(command.cwd).toBe('/work/checkout')
   expect(command.env.PATH).toBe(process.env.PATH)
   expect(command.argv.slice(1)).toEqual([
-    '/work/checkout/scripts/deploy/live-check.mjs',
+    '/work/checkout/scripts/deploy/live-check.ts',
     '--release=B',
     '--out=/r/B',
     '--baseline=',

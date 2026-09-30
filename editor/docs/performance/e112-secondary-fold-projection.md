@@ -11,7 +11,7 @@ getter once, then passed with zero reads until a consumer explicitly requested s
 Build packages with `bun run stress:build`, then run:
 
 ```sh
-node examples/stress/boundary.mjs --configs minimap,folds --sizes 10485760 \
+node examples/stress/boundary.ts --configs minimap,folds --sizes 10485760 \
   --operations 50 --warmups 10 --key-delay 80 --output /work/tmp/editor-112/run.json
 ```
 
@@ -21,10 +21,10 @@ keys, then fifty measured native keys. Text export, undo and object release chec
 This fixture stresses fold count. It does not represent every language or long-line document.
 The unpaced burst hid this regression because it completed before the minimap's 300ms flush.
 
-| Configuration | Control input→applied p95 | Candidate input→applied p95 | Control input→frame p95 | Candidate input→frame p95 |
-| --- | ---: | ---: | ---: | ---: |
-| Minimap | 158.6 ms | 2.2 ms | 159.1 ms | 15.9 ms |
-| Same text without minimap | 2.0 ms | 1.4 ms | 16.2 ms | 15.6 ms |
+| Configuration             | Control input→applied p95 | Candidate input→applied p95 | Control input→frame p95 | Candidate input→frame p95 |
+| ------------------------- | ------------------------: | --------------------------: | ----------------------: | ------------------------: |
+| Minimap                   |                  158.6 ms |                      2.2 ms |                159.1 ms |                   15.9 ms |
+| Same text without minimap |                    2.0 ms |                      1.4 ms |                 16.2 ms |                   15.6 ms |
 
 An earlier control/candidate pair gave 153.6/2.4ms with minimap. The saved matched pair includes
 worker GC sampling in both arms. The first pair's control lacked worker sampling, so the saved
