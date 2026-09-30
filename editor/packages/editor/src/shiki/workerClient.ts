@@ -217,16 +217,15 @@ export class ShikiWorkerOwner {
 
   private async finishDispose(): Promise<void> {
     const handle = this.worker
-    if (!handle) {
-      this.clearRetainedState('disposed')
-      return
-    }
-
+    this.worker = null
     try {
-      await this.postRequest({ type: 'dispose' }, false)
+      if (handle) {
+        handle.onmessage = null
+        handle.onerror = null
+        // A busy worker cannot acknowledge disposal; termination releases its message loop.
+        handle.terminate()
+      }
     } finally {
-      handle.terminate()
-      if (this.worker === handle) this.worker = null
       this.clearRetainedState('disposed')
       this.rejectPendingRequests(new Error('Shiki worker disposed'))
     }
