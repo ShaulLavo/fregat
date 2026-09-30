@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 # A second push to a PR branch makes the first run's answer worthless. On main every
 # run finishes, so main always has a verdict; pushes during a run collapse into one
