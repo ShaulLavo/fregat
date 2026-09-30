@@ -4,6 +4,7 @@ import {
   assertConsumerReadiness,
   inputConsumerConfiguration,
   minimapLimitCodeUnits,
+  unsupportedInputFixtures,
 } from '../input-configurations.mjs'
 
 const owner = { lifecycle: 'ready', pendingRequests: 0, lastError: null }
@@ -114,4 +115,11 @@ test('pauses analysis consumers above the Platform analysis limit', () => {
   expect(inputConsumerConfiguration('all', 'long-line', minimapLimitCodeUnits + 1)).toMatchObject({
     minimap: false,
   })
+})
+
+test('records the long-line fixture as unsupported only for Shiki configurations', () => {
+  for (const id of ['shiki', 'tree-sitter-shiki', 'shiki-minimap', 'all', 'platform'])
+    expect(unsupportedInputFixtures(id)).toEqual(['long-line'])
+  for (const id of ['native', 'disabled', 'tree-sitter', 'minimap', 'tree-sitter-minimap'])
+    expect(unsupportedInputFixtures(id)).toEqual([])
 })

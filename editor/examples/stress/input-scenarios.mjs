@@ -15,7 +15,9 @@ export const operationsPerSample = {
 const pasteText = 'paste 😀 e\u0301 '.repeat(128)
 
 export async function runInputSuite(browser, result, { newPage, readMemory, smoke }) {
-  const fixtures = smoke ? result.manifest.fixtures.slice(0, 1) : result.manifest.fixtures
+  const unsupported = result.config.unsupportedFixtures ?? []
+  const supported = result.manifest.fixtures.filter((fixture) => !unsupported.includes(fixture.id))
+  const fixtures = smoke ? supported.slice(0, 1) : supported
   const views = smoke ? ['single'] : inputViewModes
   for (const fixture of fixtures)
     for (const view of views)

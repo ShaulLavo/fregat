@@ -17,7 +17,7 @@ import { inputScenarios, inputViewModes, validateInputResult } from './input-res
 import { profileScenario, profileSourceMaps } from './profile.mjs'
 import { hashBenchmarkSource, loadCorePackage } from './core-package.mjs'
 import { loadPackageSet } from './package-set.mjs'
-import { inputConsumerIds } from './input-configurations.mjs'
+import { inputConsumerIds, unsupportedInputFixtures } from './input-configurations.mjs'
 import { installInputWorkerProof } from './input-worker-proof.mjs'
 
 const root = dirname(fileURLToPath(import.meta.url))
@@ -93,6 +93,7 @@ if (inputSuite) {
     isolation: 'closed-browser-context-per-fixture-view-scenario',
     paste: 'native-clipboard-shortcut-128-unicode-fragments',
     consumers: values.consumers,
+    unsupportedFixtures: unsupportedInputFixtures(values.consumers),
     fixtures: values['fixture-directory'] ? 'frozen-hashed-files' : 'seeded-generator',
   })
   delete config.typedText

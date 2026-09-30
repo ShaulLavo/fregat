@@ -100,6 +100,11 @@ function validateConfig(config) {
   if (typeof config.diagnostics !== 'boolean') fail('Missing diagnostics mode')
   finite(config.slowdownMs, 'slowdown duration')
   keys(config.operationsPerSample, inputScenarios, 'operation counts')
+  if (config.unsupportedFixtures !== undefined) {
+    if (!Array.isArray(config.unsupportedFixtures)) fail('Invalid unsupported fixture list')
+    for (const id of config.unsupportedFixtures)
+      if (!fixtureIds.includes(id)) fail('Unknown unsupported fixture')
+  }
   for (const scenario of inputScenarios)
     integer(config.operationsPerSample[scenario], `${scenario} operation count`, 1)
 }
@@ -120,7 +125,10 @@ export function validateInputResult(result) {
   const seen = new Set()
   for (const sample of result.samples) validateSample(sample, result, seen)
   const expected =
-    fixtureIds.length * inputViewModes.length * inputScenarios.length * result.config.repetitions
+    (fixtureIds.length - (result.config.unsupportedFixtures?.length ?? 0)) *
+    inputViewModes.length *
+    inputScenarios.length *
+    result.config.repetitions
   if (seen.size !== expected) fail(`Missing samples: expected ${expected}, got ${seen.size}`)
   return result
 }
@@ -130,6 +138,7 @@ function validateSample(sample, result, seen) {
   const fixture = result.manifest.fixtures.find((entry) => entry.id === sample.fixture)
   if (
     !fixture ||
+    result.config.unsupportedFixtures?.includes(fixture.id) ||
     !inputViewModes.includes(sample.views) ||
     !inputScenarios.includes(sample.scenario) ||
     sample.state !== 'warm'

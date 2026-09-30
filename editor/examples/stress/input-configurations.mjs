@@ -42,6 +42,15 @@ export function inputConsumerConfiguration(id, fixture, length) {
   }
 }
 
+// Shiki has no line-length cap: its worker never finishes the 1 MB line (no sample in 400 s),
+// and ShikiWorkerOwner.dispose waits for that busy worker's reply, so disposal stalls and the
+// worker leaks. Shiki configurations record the fixture as unsupported instead of measuring it.
+export function unsupportedInputFixtures(id) {
+  if (!inputConsumerIds.includes(id))
+    throw new TypeError(`Unknown input consumer configuration: ${id}`)
+  return id.includes('shiki') || id === 'all' || id === 'platform' ? ['long-line'] : []
+}
+
 const syntaxHighlight = /^editor-shared-token-/
 
 function owner(snapshot, active, name, check) {
