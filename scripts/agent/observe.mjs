@@ -29,7 +29,11 @@ export function attachObserver(page, base, { consoleCapture = true } = {}) {
         })
     })
   page.on('requestfailed', (request) =>
-    observed.failedRequests.push({ url: request.url(), error: request.failure()?.errorText }),
+    observed.failedRequests.push({
+      url: request.url(),
+      error: request.failure()?.errorText,
+      type: request.resourceType(),
+    }),
   )
   page.on('request', (request) => {
     recordLogUpload(request, observed.logUploads)

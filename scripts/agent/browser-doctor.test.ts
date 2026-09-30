@@ -1,4 +1,4 @@
-import { createServer } from 'node:http'
+import { createServer, type ServerResponse } from 'node:http'
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -11,13 +11,27 @@ const cases = [
   { mode: 'aborted-script', code: 1, consoleCapture: false },
   { mode: 'module-mime', code: 1, consoleCapture: true },
   { mode: 'runtime-error', code: 1, consoleCapture: true },
+  { mode: 'load-during-release', code: 1, consoleCapture: true },
   { mode: 'release503', code: 1, consoleCapture: true },
 ] as const
 
 test.each(cases)('doctor classifies $mode through the real CLI', async (fixture) => {
   const scratch = await mkdtemp(path.join(tmpdir(), 'fregat-doctor-test-'))
   let releaseRequests = 0
+  let heldScript: ServerResponse | undefined
+  let heldRelease: ServerResponse | undefined
   const server = createServer((request, response) => {
+    if (request.url === '/release' && fixture.mode === 'load-during-release') {
+      releaseRequests += 1
+      heldRelease = response
+      heldScript?.writeHead(504, { 'content-type': 'text/javascript' }).end()
+      return
+    }
+    if (request.url === '/failure-recorded') {
+      heldRelease?.writeHead(200, { 'content-type': 'application/json' }).end('{}')
+      response.writeHead(204).end()
+      return
+    }
     if (request.url === '/release') {
       releaseRequests += 1
       response.writeHead(fixture.mode === 'release503' ? 503 : 200, {
@@ -28,6 +42,10 @@ test.each(cases)('doctor classifies $mode through the real CLI', async (fixture)
     }
     if (request.url === '/required.js' && fixture.mode === 'aborted-script') {
       response.destroy()
+      return
+    }
+    if (request.url === '/required.js' && fixture.mode === 'load-during-release') {
+      heldScript = response
       return
     }
     if (request.url === '/required.js') {
@@ -47,7 +65,9 @@ test.each(cases)('doctor classifies $mode through the real CLI', async (fixture)
     }
     response.writeHead(200, { 'content-type': 'text/html' })
     response.end(
-      '<!doctype html><title>Doctor fixture</title><div aria-label="Window toolbar">Partial shell</div><script type="module" src="/required.js"></script>',
+      fixture.mode === 'load-during-release'
+        ? `<!doctype html><title>Doctor fixture</title><div aria-label="Window toolbar">Partial shell</div><script type="module" async src="/required.js" onerror="fetch('/failure-recorded')"></script>`
+        : '<!doctype html><title>Doctor fixture</title><div aria-label="Window toolbar">Partial shell</div><script type="module" src="/required.js"></script>',
     )
   })
   try {
@@ -87,7 +107,7 @@ test.each(cases)('doctor classifies $mode through the real CLI', async (fixture)
     if (!run) expect.fail(stdout + stderr)
     const observed = JSON.parse(await readFile(path.join(scratch, run, 'observed.json'), 'utf8'))
     expect(releaseRequests).toBe(1)
-    if (fixture.mode === 'module504') {
+    if (fixture.mode === 'module504' || fixture.mode === 'load-during-release') {
       expect(observed.failedResponses).toContainEqual({
         url: `${url}required.js`,
         status: 504,
@@ -114,7 +134,13 @@ test.each(cases)('doctor classifies $mode through the real CLI', async (fixture)
       code: fixture.code,
       health: { ok: fixture.code === 0 },
     })
-    if (fixture.mode === 'healthy') expect(observed.health.reasons).toEqual([])
+    if (fixture.mode === 'healthy') {
+      expect(observed.health.reasons).toEqual([])
+      expect(observed.assets).toContain(`${url}required.js`)
+      expect(observed.errors).toEqual([])
+      expect(observed.failedRequests).toEqual([])
+      expect(observed.failedResponses).toEqual([])
+    }
   } finally {
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),

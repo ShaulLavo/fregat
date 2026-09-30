@@ -14,7 +14,7 @@ export type Observed = {
     columnNumber: number
   }[]
   failedResponses: { url: string; status: number; type: string }[]
-  failedRequests: { url: string; error: string | undefined }[]
+  failedRequests: { url: string; error: string | undefined; type: string }[]
   loopbackRequests: string[]
   assets: Set<string>
   apiResponses: { url: string; status: number }[]
