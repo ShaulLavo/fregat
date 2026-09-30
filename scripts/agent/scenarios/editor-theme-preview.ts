@@ -60,8 +60,13 @@ export const editorThemePreview: Scenario = {
     )
     const steadyStart = marks.filter((mark) => mark.name === 'theme-preview:hover')[1]!.at
     const finish = marks.find((mark) => mark.name === 'theme-preview:finished')!.at
+    // Snippet highlights for the palette's preview panel carry no document session.
     const requests = marks.filter(
-      (mark) => mark.at >= steadyStart && mark.at < finish && mark.detail?.family === 'shiki',
+      (mark) =>
+        mark.at >= steadyStart &&
+        mark.at < finish &&
+        mark.detail?.family === 'shiki' &&
+        mark.detail.type !== 'highlight',
     )
     await evidence.json('theme-worker-requests.json', { steadyStart, finish, requests })
     ok(requests.length > 0, 'Theme switches produce worker recolors')

@@ -17,13 +17,13 @@ import {
   createMarkdownPreviewPlugin,
 } from '@singapore-editor/markdown'
 import { createScopeLinesPlugin } from '@singapore-editor/scope-lines'
-import { createTreeSitterSyntaxPlugin } from '@singapore-editor/tree-sitter'
-import { subscribeActiveShikiTheme } from '@/features/editor/state/color-theme-store'
+import { createHighlightingPlugin } from '@singapore-editor/highlighting'
 import {
-  editorShikiHighlighterProvider,
-  editorSyntaxHighlightingSource,
-  editorTreeSitterSyntaxProvider,
+  EDITOR_PALETTE_SOURCE,
+  EDITOR_THEME_SOURCE,
+  editorSyntaxColors,
 } from '@/features/editor/state/syntax-highlighting'
+import { highlightingService } from '@/lib/highlighting/state/service'
 import { reportError, toClientError } from '@/lib/client-error-taxonomy'
 import { log } from '@/lib/client-logging'
 import { editorPerformanceFeatureDisabled } from '@/features/editor/state/performance-trace'
@@ -189,52 +189,19 @@ function disposeAll(disposables: readonly EditorDisposable[]) {
 function createEditorSyntaxHighlightingPlugins(
   languageId: EditorSyntaxLanguageId | null,
 ): readonly EditorPlugin[] {
-  if (editorSyntaxHighlightingSource(undefined, languageId) === 'disabled') return []
-
-  const treeSitter = editorTreeSitterSyntaxProvider()
+  const source = editorSyntaxColors(undefined, languageId)
+  if (source === 'disabled') return []
 
   return [
-    // Tree-sitter stays for structure (folds/brackets); its token output is
-    // suppressed automatically once the shiki highlighter session exists.
-    createTreeSitterSyntaxPlugin(treeSitter, {
-      name: 'platform.tree-sitter-syntax',
+    createHighlightingPlugin({
+      name: 'platform.syntax',
+      service: highlightingService(),
+      theme:
+        languageId === 'markdown' || languageId === 'mdx'
+          ? EDITOR_PALETTE_SOURCE
+          : EDITOR_THEME_SOURCE,
     }),
-    createEditorShikiHighlighterPlugin(languageId),
   ]
-}
-
-/** Only changing syntax engines replaces the provider; theme changes stay inside its sessions. */
-function createEditorShikiHighlighterPlugin(
-  languageId: EditorSyntaxLanguageId | null,
-): EditorPlugin {
-  return {
-    name: 'platform.shiki-highlighter',
-    activate: (context) => {
-      let registration: EditorDisposable | null = null
-
-      const syncRegistration = () => {
-        const enabled = editorSyntaxHighlightingSource(undefined, languageId) === 'shiki'
-        if (enabled === (registration !== null)) return
-
-        registration?.dispose()
-        registration = null
-        if (!enabled) return
-
-        registration = context.registerHighlighter(editorShikiHighlighterProvider())
-      }
-
-      syncRegistration()
-      const unsubscribe = subscribeActiveShikiTheme(syncRegistration)
-
-      return {
-        dispose: () => {
-          unsubscribe()
-          registration?.dispose()
-          registration = null
-        },
-      }
-    },
-  }
 }
 
 async function loadPlugin(

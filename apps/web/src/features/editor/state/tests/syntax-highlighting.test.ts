@@ -1,38 +1,38 @@
 import { afterAll } from 'vitest'
 
 import {
-  disposeEditorShikiWorkerOwner,
-  disposeEditorTreeSitterSyntaxProvider,
-  editorDiffSyntaxConfiguration,
-  editorSyntaxHighlightingSource,
-  editorShikiHighlighterProvider,
-  editorTreeSitterSyntaxProvider,
+  disposeEditorSyntaxHighlighting,
+  editorDiffSyntax,
+  editorHighlighterProvider,
+  editorSyntaxColors,
+  editorSyntaxProvider,
 } from '@/features/editor/state/syntax-highlighting'
 import { expect, test } from '../../../../../test/fixtures'
 
 afterAll(async () => {
-  await disposeEditorShikiWorkerOwner()
-  await disposeEditorTreeSitterSyntaxProvider()
+  await disposeEditorSyntaxHighlighting()
 })
 
-test('diffs receive the same Shiki provider used by regular editors', () => {
-  const configuration = editorDiffSyntaxConfiguration(editorSyntaxHighlightingSource('dark-plus'))
+test('diffs under an imported theme borrow the highlighter regular editors register', () => {
+  const colors = editorSyntaxColors('dark-plus')
+  const syntax = editorDiffSyntax(colors)
 
-  expect(configuration.source).toBe('shiki')
-  expect(configuration.backend.kind).toBe('highlighter')
-  if (configuration.backend.kind !== 'highlighter') return
-
-  expect(configuration.backend.provider).toBe(editorShikiHighlighterProvider())
+  expect(colors).toBe('vscode')
+  expect(syntax.theme).not.toBeNull()
+  // One object per theme source and engine, so a recolor keeps the diff plugin.
+  expect(editorDiffSyntax(colors).backend).toBe(syntax.backend)
+  if (syntax.backend.kind === 'highlighter') {
+    expect(syntax.backend.provider).toBe(editorHighlighterProvider())
+  }
 })
 
-test('diffs receive the same tree-sitter provider used by regular editors', () => {
-  const configuration = editorDiffSyntaxConfiguration(
-    editorSyntaxHighlightingSource('tree-sitter-dark'),
-  )
+test('diffs under a built-in palette borrow the regular Tree-sitter provider', () => {
+  const syntax = editorDiffSyntax(editorSyntaxColors('tree-sitter-dark'))
 
-  expect(configuration.source).toBe('tree-sitter')
-  expect(configuration.backend.kind).toBe('tree-sitter')
-  if (configuration.backend.kind !== 'tree-sitter') return
+  expect(syntax.backend.kind).toBe('tree-sitter')
+  expect(syntax.backend.provider).toBe(editorSyntaxProvider())
+})
 
-  expect(configuration.backend.provider).toBe(editorTreeSitterSyntaxProvider())
+test('markdown keeps the editor palette under an imported theme', () => {
+  expect(editorSyntaxColors('dark-plus', 'markdown')).toBe('editor')
 })

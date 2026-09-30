@@ -1,5 +1,5 @@
 import { createContext } from 'react'
-import type { TokensResult } from 'shiki/core'
+import type { HighlightResult } from '@singapore-editor/highlighting'
 
 export type HighlightInput = {
   readonly code: string
@@ -13,11 +13,11 @@ export type HighlightInput = {
  */
 export type CodeHighlighter = {
   readonly dispose: () => void
-  /** Returns tokens synchronously when the grammar is loaded, otherwise calls back. */
+  /** Returns tokens synchronously when it already has them, otherwise calls back once. */
   readonly highlight: (
     input: HighlightInput,
-    onResult: (result: TokensResult) => void,
-  ) => TokensResult | null
+    onResult: (result: HighlightResult) => void,
+  ) => HighlightResult | null
   /** Identity of the active palette; part of every highlight cache key. */
   readonly themeKey: string
 }

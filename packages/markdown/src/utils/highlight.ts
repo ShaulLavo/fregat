@@ -1,6 +1,6 @@
-import type { TokensResult } from 'shiki/core'
+import type { HighlightResult } from '@singapore-editor/highlighting'
 
-/** Rough per-token overhead: content string plus the style/attr objects around it. */
+/** Rough per-token overhead: offsets plus the style object around them. */
 const TOKEN_OVERHEAD_BYTES = 96
 
 /**
@@ -19,16 +19,8 @@ export function highlightCacheKey({
   return `${themeKey}:${language}:${code.length}:${fnv1a32(code).toString(36)}`
 }
 
-export function estimateHighlightBytes(result: TokensResult) {
-  let bytes = 0
-  for (const line of result.tokens) {
-    bytes += TOKEN_OVERHEAD_BYTES
-    for (const token of line) {
-      bytes += TOKEN_OVERHEAD_BYTES + token.content.length * 2
-    }
-  }
-
-  return bytes
+export function estimateHighlightBytes(result: HighlightResult) {
+  return result.tokens.length * TOKEN_OVERHEAD_BYTES
 }
 
 /**

@@ -23,7 +23,7 @@ export type EditorThemeOption = {
  * capture kind — where a VSCode theme colors TextMate scopes through shiki. That
  * is why picking one is not just a palette swap: shiki has to be off the document
  * entirely for tree-sitter's tokens to reach the screen. See
- * `editorSyntaxHighlightingSource`.
+ * `editorSyntaxColors`.
  */
 const BUILTIN_EDITOR_THEMES = [
   {

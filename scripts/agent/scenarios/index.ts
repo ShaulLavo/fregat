@@ -250,6 +250,7 @@ import { editorExternalEdit } from './editor-external-edit'
 import { editorLinkedPackage } from './editor-linked-package'
 import { editorOfflineResync } from './editor-offline-resync'
 import { editorThemePreview } from './editor-theme-preview'
+import { codeThemeNativePreview } from './code-theme-native-preview'
 import { editorNativeCoverage } from './editor-native-coverage'
 import { editorSyntaxBenchmark } from './editor-syntax-benchmark'
 import { bundleWallpapers } from './bundle-wallpapers'
@@ -611,6 +612,7 @@ export const scenarios: readonly Scenario[] = [
   settingsProviderUpdate,
   claudeUsageImport,
   editorThemePreview,
+  codeThemeNativePreview,
   editorSyntaxBenchmark('native'),
   editorNativeCoverage('light'),
   editorNativeCoverage('dark'),

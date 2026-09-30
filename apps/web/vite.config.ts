@@ -101,6 +101,7 @@ export default defineConfig(({ command, isPreview, mode }) => {
         '@singapore-editor/core > shiki/core',
         '@singapore-editor/core > shiki/textmate',
         '@singapore-editor/diff > diff',
+        '@singapore-editor/highlighting > shiki/langs',
         '@singapore-editor/plugin-ui > remark-stringify',
         '@singapore-editor/spellcheck > cspell-trie-lib',
         '@singapore-editor/tree-sitter > web-tree-sitter',

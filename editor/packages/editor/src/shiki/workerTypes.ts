@@ -78,6 +78,17 @@ export type ShikiWorkerThemeRequest = {
   readonly themeRegistrations: readonly ShikiWorkerThemeRegistration[]
 }
 
+// A standalone snippet: tokenized whole and forgotten, so no document state outlives the reply. The
+// theme name is revision-qualified by the caller, so same-name themes with other content never meet.
+export type ShikiWorkerHighlightRequest = {
+  readonly type: 'highlight'
+  readonly text: string
+  readonly lang: string | null
+  readonly theme: string
+  readonly languageRegistrations: readonly ShikiWorkerLanguageRegistration[]
+  readonly themeRegistration: ShikiWorkerThemeRegistration
+}
+
 export type ShikiWorkerPreloadRequest = {
   readonly type: 'preload'
   readonly languageRegistrations: readonly ShikiWorkerLanguageRegistration[]
@@ -94,6 +105,7 @@ export type ShikiWorkerRequestPayload =
   | ShikiWorkerDisposeRequest
   | ShikiWorkerPreloadRequest
   | ShikiWorkerThemeRequest
+  | ShikiWorkerHighlightRequest
 
 // An edit answers with the re-tokenized lines only; the client splices them into the full
 // packed tokens it kept from the last open, so a keystroke never ships the whole document back.

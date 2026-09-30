@@ -14,10 +14,7 @@ import { LoadingState } from '@workspace/ui/components/loading-state'
 import { DiffPane } from '@/features/editor/components/diff-pane'
 import { useDiffPanes } from '@/features/editor/hooks/use-diff-panes'
 import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
-import {
-  editorDiffSyntaxConfiguration,
-  editorSyntaxHighlightingSource,
-} from '@/features/editor/state/syntax-highlighting'
+import { editorDiffSyntax, editorSyntaxColors } from '@/features/editor/state/syntax-highlighting'
 import type { DiffLanguageServerContext } from '@/features/editor/utils/diff-language-context'
 import type { EditorDiffViewMode } from '@/features/editor/utils/diff-view-mode'
 
@@ -45,9 +42,9 @@ export function DiffEditor({
   tabId?: TabId
 }) {
   const { editorTheme, shikiTheme } = useEditorColorTheme()
-  const source = editorSyntaxHighlightingSource(shikiTheme)
+  const colors = editorSyntaxColors(shikiTheme)
   // Stable backend identity preserves diff sessions when only their colors change.
-  const syntax = editorDiffSyntaxConfiguration(source)
+  const syntax = editorDiffSyntax(colors)
   // Split is two plugin instances, and a separator row is one region shown twice. Without a shared
   // store a gutter click would expand one pane and leave the other where it was, misaligning every
   // row below — the one property split mode exists to hold.
@@ -87,13 +84,27 @@ export function DiffEditor({
           presentation={presentation.diffPanes.stacked}
           side='stacked'
           syntaxBackend={syntax.backend}
-          syntaxHighlight={syntax.enabled}
-          syntaxSource={syntax.source}
+          syntaxHighlight={syntax.theme !== null}
+          syntaxTheme={syntax.theme}
           tabId={tabId}
           theme={editorTheme}
         />
       </div>
     )
+  }
+
+  const splitPane = {
+    file,
+    languageServer,
+    regions: regionStore,
+    syntaxBackend: syntax.backend,
+    syntaxHighlight: syntax.theme !== null,
+    syntaxTheme: syntax.theme,
+    tabId,
+    theme: editorTheme,
+    onFocus: panes.handleFocus,
+    onRegisterEditor: panes.registerEditor,
+    onScroll: panes.handleScroll,
   }
 
   return (
@@ -108,39 +119,11 @@ export function DiffEditor({
         }}
       >
         <ResizablePanel className='min-h-0 min-w-0 overflow-hidden' id='diff-old'>
-          <DiffPane
-            file={file}
-            languageServer={languageServer}
-            regions={regionStore}
-            presentation={presentation.diffPanes.old}
-            side='old'
-            syntaxBackend={syntax.backend}
-            syntaxHighlight={syntax.enabled}
-            syntaxSource={syntax.source}
-            tabId={tabId}
-            theme={editorTheme}
-            onFocus={panes.handleFocus}
-            onRegisterEditor={panes.registerEditor}
-            onScroll={panes.handleScroll}
-          />
+          <DiffPane {...splitPane} presentation={presentation.diffPanes.old} side='old' />
         </ResizablePanel>
         <ResizableHandle id='diff-panes-handle' withHandle />
         <ResizablePanel className='min-h-0 min-w-0 overflow-hidden' id='diff-new'>
-          <DiffPane
-            file={file}
-            languageServer={languageServer}
-            regions={regionStore}
-            presentation={presentation.diffPanes.new}
-            side='new'
-            syntaxBackend={syntax.backend}
-            syntaxHighlight={syntax.enabled}
-            syntaxSource={syntax.source}
-            tabId={tabId}
-            theme={editorTheme}
-            onFocus={panes.handleFocus}
-            onRegisterEditor={panes.registerEditor}
-            onScroll={panes.handleScroll}
-          />
+          <DiffPane {...splitPane} presentation={presentation.diffPanes.new} side='new' />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>
