@@ -262,6 +262,24 @@ Evidence (all under `/work/tmp/fregat-evidence/` unless noted):
 - `renders editor-theme-preview`: `CodeThemePreviewPanel` 16 → 19 renders, the extra three with no DOM change (≈1 ms subtree), page totals within run-to-run variance (6756/7482 main, 7485/6764/7523 branch). Suspected cause: the worker reply arrives in a later task, so the held subject renders once more per new theme.
 - Screenshots read back: palette preview, Settings dark preview (`20260930T140245Z…/02-appearance-shown.png`), streamed fence, diffs, Native Light preview.
 
+Review round (`review_highlighting` on `c2061eba0`), fixed in `5e4820029`:
+
+- **Test config:** the config serves from the shared Editor `workspaceRoot`, so `check-turbo-inputs.mjs` passes. It failed before, logged in `/work/tmp/foundations-highlighting/round3/f1-turbo-before.log`.
+- **Markdown hold:** a streamed fence holds only an answer from the current highlighter's theme and the same language, and paints plain text when no highlighter applies. Two new `highlighted-code.test.tsx` cases failed before the fix.
+- **Content revisions:**
+  - Documents and prepared diffs re-read an imported theme's content when their source notifies, and recolour under a content-revision worker name.
+  - Snippet revisions come from content on every call, not from object identity.
+- **Disposal:**
+  - Disposal settles callers waiting on shared grammar acquisition, then stops the workers.
+  - The diff store is terminal: a parse returned after disposal, or a preparation that settles after it, is disposed and never kept.
+- **Named colours:**
+  - Named palette colours take precedence over shorthand fields, as `applyEditorTheme` paints them, in both `resolveEditorThemeColor` and the new core `effectiveEditorTheme`.
+  - Snippets and the TextMate palette conversion read their colours through that policy.
+- **Grammar outages:** a known grammar that fails to load rejects with `failed`. Unknown languages stay plain text. Chromium keeps a failed dynamic import for the life of the page, so that grammar recovers on the next page load; the service caches no failure.
+- **Proof:** `test/review.browser.test.ts` has 10 cases. Eight fail on the reviewed head's sources, and all ten pass with the fixes. There is also a core DOM-parity test, `themeColorResolve.browser.test.ts`, which failed before.
+- **Checks:** highlighting node 10, Chromium 28, Firefox/WebKit 34; core 127; markdown 88; affected web node+dom tests 1691; web typecheck clean.
+- **Height CI:** repaired separately in PR #206. The textbuffer workflows install only that package, and the pinned control is vendored. PR #202's height job needs #206 merged first.
+
 Pre-existing failures (owners assigned by the coordinator):
 
 - `editor-theme-preview` 15 !== 5 recolor requests, also on main: Plan 179 worker.
