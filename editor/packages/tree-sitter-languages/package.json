@@ -52,7 +52,7 @@
     "tree-sitter-java": "0.23.5",
     "tree-sitter-javascript": "0.25.0",
     "tree-sitter-json": "0.24.8",
-    "tree-sitter-md": "0.1.1",
+    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#4505683e843b71ef2d0cb3938eb0c9a503c28147",
     "tree-sitter-php": "0.24.2",
     "tree-sitter-python": "0.25.0",
     "tree-sitter-rust": "0.24.0",
@@ -67,7 +67,7 @@
     "tree-sitter-cli": "0.27.0",
     "typescript": "7.0.2",
     "vitest": "5.0.2",
-    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#e2985e0"
+    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#f73fbfd866b94a33791afff08a7278546b1771a2"
   },
   "peerDependencies": {
     "@singapore-editor/core": "workspace:*",

@@ -25,6 +25,8 @@ jobs:
       - uses: actions/checkout@v6
 
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
 
       - name: Pin the newest build
         run: bun run --cwd editor tree-sitter-x:update
@@ -36,7 +38,8 @@ jobs:
         run: |
           if git diff --quiet; then exit 0; fi
           pin=$(command grep -oh 'tree-sitter-x#[0-9a-f]*' editor/packages/tree-sitter/package.json | cut -d'#' -f2)
-          branch="tree-sitter-x/$pin"
+          markdown=$(command grep -oh 'tree-sitter-md#[0-9a-f]*' editor/packages/tree-sitter/package.json | cut -d'#' -f2)
+          branch="tree-sitter-x/$pin-$markdown"
           pull=$(gh api --method GET --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls" \
             -f state=all -f base=main -f head="${GITHUB_REPOSITORY%%/*}:$branch" \
             -f sort=created -f direction=desc -F per_page=100 |
@@ -57,7 +60,7 @@ jobs:
             read -r commit _ <<< "$remote"
           fi
           title="Update tree-sitter-x to $pin"
-          body="Pins web-tree-sitter to [tree-sitter-x@$pin](https://github.com/ShaulLavo/tree-sitter-x/commit/$pin), the newest build of the fork's web-tree-sitter branch."
+          body="Pins web-tree-sitter to [tree-sitter-x@$pin](https://github.com/ShaulLavo/tree-sitter-x/commit/$pin) and its matching required Markdown peer to [tree-sitter-md@$markdown](https://github.com/ShaulLavo/tree-sitter-md/commit/$markdown)."
           if [ "$state" = OPEN ]; then
             gh pr edit "$number" --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
           else

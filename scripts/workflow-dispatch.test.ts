@@ -39,6 +39,9 @@ test('the parser updater dispatches the CI verdict that includes Editor checks',
 })
 
 function updaterFixture(existingBranch: boolean) {
+  const runtime = 'a'.repeat(40)
+  const markdown = 'b'.repeat(40)
+  const branch = `tree-sitter-x/${runtime}-${markdown}`
   const root = mkdtempSync(path.join(tmpdir(), 'platform-parser-workflow-'))
   const directory = path.join(root, 'checkout')
   const github = path.join(root, 'github')
@@ -63,20 +66,23 @@ function updaterFixture(existingBranch: boolean) {
     writeFileSync(
       manifest,
       JSON.stringify({
-        dependencies: { 'web-tree-sitter': `github:ShaulLavo/tree-sitter-x#${revision}` },
+        dependencies: {
+          'web-tree-sitter': `github:ShaulLavo/tree-sitter-x#${revision}`,
+          'tree-sitter-md': `github:ShaulLavo/tree-sitter-md#${markdown}`,
+        },
       }),
     )
-  pin('e2985e0')
+  pin('c'.repeat(40))
   git('add', '.')
   git('commit', '-qm', 'initial pin')
   if (existingBranch) {
-    git('switch', '-qc', 'tree-sitter-x/ba4f1d2')
-    pin('ba4f1d2')
+    git('switch', '-qc', branch)
+    pin(runtime)
     git('commit', '-qam', 'update pin')
-    git('push', '-q', 'origin', 'HEAD:refs/heads/tree-sitter-x/ba4f1d2')
+    git('push', '-q', 'origin', `HEAD:refs/heads/${branch}`)
     git('switch', '-q', 'main')
   }
-  pin('ba4f1d2')
+  pin(runtime)
   const gh = path.join(bin, 'gh')
   writeFileSync(
     gh,
@@ -126,7 +132,7 @@ esac
   )!.run!
   const invoke = () => {
     git('switch', '-q', 'main')
-    pin('ba4f1d2')
+    pin(runtime)
     return Bun.spawnSync(['bash', '-e', '-o', 'pipefail', '-c', command], {
       cwd: directory,
       env: {
@@ -138,7 +144,7 @@ esac
       },
     })
   }
-  return { root, github, git, invoke }
+  return { root, github, git, invoke, branch }
 }
 
 test.each([false, true])(
@@ -149,14 +155,14 @@ test.each([false, true])(
       const denied = path.join(fixture.github, 'deny-create')
       writeFileSync(denied, '')
       expect(fixture.invoke().exitCode).not.toBe(0)
-      const pushed = fixture.git('ls-remote', 'origin', 'refs/heads/tree-sitter-x/ba4f1d2')
-      expect(pushed).toContain('refs/heads/tree-sitter-x/ba4f1d2')
+      const pushed = fixture.git('ls-remote', 'origin', `refs/heads/${fixture.branch}`)
+      expect(pushed).toContain(`refs/heads/${fixture.branch}`)
       unlinkSync(denied)
       const recovered = fixture.invoke()
       expect(recovered.exitCode, recovered.stderr.toString()).toBe(0)
       expect(readFileSync(path.join(fixture.github, 'pr'), 'utf8').trim()).toBe('OPEN')
       expect(existsSync(path.join(fixture.github, 'run'))).toBe(true)
-      expect(fixture.git('ls-remote', 'origin', 'refs/heads/tree-sitter-x/ba4f1d2')).toBe(pushed)
+      expect(fixture.git('ls-remote', 'origin', `refs/heads/${fixture.branch}`)).toBe(pushed)
       expect(fixture.invoke().exitCode).toBe(0)
       const commands = readFileSync(path.join(fixture.github, 'commands'), 'utf8')
       expect(commands.match(/^pr create /gm)).toHaveLength(2)
@@ -225,8 +231,8 @@ test.each([false, true])(
       writeFileSync(path.join(fixture.github, 'pull-pages.json'), JSON.stringify([foreign, own]))
       const result = fixture.invoke()
       expect(result.exitCode, result.stderr.toString()).toBe(0)
-      expect(fixture.git('ls-remote', 'origin', 'refs/heads/tree-sitter-x/ba4f1d2')).toContain(
-        'refs/heads/tree-sitter-x/ba4f1d2',
+      expect(fixture.git('ls-remote', 'origin', `refs/heads/${fixture.branch}`)).toContain(
+        `refs/heads/${fixture.branch}`,
       )
       expect(existsSync(path.join(fixture.github, 'run'))).toBe(true)
       const commands = readFileSync(path.join(fixture.github, 'commands'), 'utf8')
@@ -247,10 +253,10 @@ test.each(['pr', 'run'])('parser update propagates %s query failures', (operatio
   const fixture = updaterFixture(true)
   try {
     writeFileSync(path.join(fixture.github, `deny-${operation}-query`), '')
-    const before = fixture.git('ls-remote', 'origin', 'refs/heads/tree-sitter-x/ba4f1d2')
+    const before = fixture.git('ls-remote', 'origin', `refs/heads/${fixture.branch}`)
     expect(fixture.invoke().exitCode).toBe(78)
     expect(existsSync(path.join(fixture.github, 'run'))).toBe(false)
-    expect(fixture.git('ls-remote', 'origin', 'refs/heads/tree-sitter-x/ba4f1d2')).toBe(before)
+    expect(fixture.git('ls-remote', 'origin', `refs/heads/${fixture.branch}`)).toBe(before)
   } finally {
     rmSync(fixture.root, { recursive: true, force: true })
   }

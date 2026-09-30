@@ -26,12 +26,13 @@
     "typecheck": "tsc --noEmit",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
-    "format:check": "oxfmt --check ."
+    "format:check": "oxfmt --check .",
+    "test:runtime": "vitest run test/runtime-identity.test.ts"
   },
   "dependencies": {
     "@singapore-editor/core": "workspace:*",
-    "tree-sitter-md": "0.1.1",
-    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#e2985e0"
+    "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#4505683e843b71ef2d0cb3938eb0c9a503c28147",
+    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#f73fbfd866b94a33791afff08a7278546b1771a2"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
