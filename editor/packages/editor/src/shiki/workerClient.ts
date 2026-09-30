@@ -521,10 +521,18 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
 
     const registrations = await next.registrations
     if (this.disposed) return
+    // A theme answer carries only theme registrations; the session keeps the grammar it opened
+    // with, or the next reopen (worker restart, changed line limit) would load no language.
+    const current = await this.registrations
+    const themed: ShikiResolvedRegistrations = {
+      languageRegistrations: current.languageRegistrations,
+      themeRegistration: registrations.themeRegistration,
+      themeRegistrations: registrations.themeRegistrations,
+    }
 
     if (!this.opened) {
       this.theme = next.theme
-      this.registrations = Promise.resolve(registrations)
+      this.registrations = Promise.resolve(themed)
       return
     }
 
@@ -537,7 +545,7 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
     if (this.disposed) return
 
     this.theme = next.theme
-    this.registrations = Promise.resolve(registrations)
+    this.registrations = Promise.resolve(themed)
     this.adoptEditResult(result)
   }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createDocumentTextSnapshot, createPieceTableSnapshot } from '../../src'
 import { createShikiWorkerOwner, type ShikiResolvedRegistrations } from '../../src/shiki'
-import { generateFixture } from '../../../../examples/stress/src/fixtures'
+import { generateFixture } from '../../../../examples/stress/src/fixtures.ts'
 
 // The frozen calibration fixture: one 1,048,594-unit line that never finished tokenizing uncapped.
 const longLineSha256 = '467fa816efc5aa5c082ed44ea4dc10bbbb41da16faf4d4822aa3d122edc628f7'
