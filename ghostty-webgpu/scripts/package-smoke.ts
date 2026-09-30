@@ -492,6 +492,7 @@ async function verifyTypes(root: string): Promise<void> {
       'npm',
       'install',
       '--dry-run=false',
+      '--include=dev',
       '--ignore-scripts',
       '--no-audit',
       '--no-fund',

@@ -23,6 +23,11 @@ jobs:
       - run: bunx playwright install --with-deps chromium
       - name: Verify browser package
         run: bun run verify
+      - name: Verify browser package with production npm settings
+        env:
+          NODE_ENV: production
+          npm_config_omit: dev
+        run: bun run test:package
 
   native-artifacts:
     runs-on: ubuntu-latest
