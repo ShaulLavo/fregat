@@ -1083,3 +1083,41 @@ async function checkCli(directory) {
   expect(invoke('check', 'control-1.json', 'delayed.json', calibrationPath).status).not.toBe(0)
   expect(invoke('calibrate', calibrationPath, 'control-1.json').status).not.toBe(0)
 }
+
+describe('instrument and package pairing', () => {
+  const identity = (run, { instrument = 'i', source = 's', build = 'b', external = 'e' } = {}) => {
+    run.environment.instrumentHash = instrument.repeat(64)
+    run.environment.packageSet = {
+      sourceHash: source.repeat(64),
+      buildHash: build.repeat(64),
+      externalHash: external.repeat(64),
+    }
+    return run
+  }
+  const paired = () => controls().map((run) => identity(run))
+
+  it('rejects controls from different instruments or baseline builds', () => {
+    const mixedInstrument = paired()
+    identity(mixedInstrument[2], { instrument: 'j' })
+    expect(() => calibrateInput(mixedInstrument)).toThrow(/instrument source/)
+    const mixedBuild = paired()
+    identity(mixedBuild[1], { build: 'c' })
+    expect(() => calibrateInput(mixedBuild)).toThrow(/control package builds/)
+  })
+
+  it('requires the calibrated build for a holdout and lets only a candidate change the product', () => {
+    const runs = paired()
+    const calibration = calibrateInput(runs)
+    const otherBuild = identity(result('other-build', 10), { source: 't', build: 'c' })
+    expect(() => compareInput(runs[0], otherBuild, calibration, { sameBuild: true })).toThrow(
+      /holdout or delayed control package identity/,
+    )
+    expect(compareInput(runs[0], otherBuild, calibration).passed).toBe(true)
+    const otherExternal = identity(result('other-external', 10), { build: 'c', external: 'f' })
+    expect(() => compareInput(runs[0], otherExternal, calibration)).toThrow(
+      /external dependency bytes/,
+    )
+    const otherInstrument = identity(result('other-instrument', 10), { instrument: 'j' })
+    expect(() => compareInput(runs[0], otherInstrument, calibration)).toThrow(/instrument source/)
+  })
+})

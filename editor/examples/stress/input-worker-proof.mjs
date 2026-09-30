@@ -1,12 +1,14 @@
-// Installed into the page before the app loads. It observes worker traffic without changing it,
-// except for the probe-only readiness negatives, which a measured run never sets.
+// Installed into the page before the app loads. On the capture path it only keeps references to the
+// message fragments and ids the page already posted; readiness replays them after the measured
+// interval. It changes nothing, except for the probe-only readiness negatives, which a measured run
+// never sets.
 export function installInputWorkerProof(negative = null) {
   const NativeWorker = globalThis.Worker
   globalThis.__inputWorkerProof = []
-  globalThis.__inputReadinessNegative = negative
-  // Source each consumer session last received, rebuilt from the actual request payloads.
   globalThis.__inputWorkerSources = new Map()
+  globalThis.__inputReadinessNegative = negative
   let corruptedTreeSitterEdit = false
+  let droppedMinimapEdit = false
 
   const kindOf = (url) => {
     if (url.includes('minimap.worker')) return 'minimap'
@@ -23,9 +25,7 @@ export function installInputWorkerProof(negative = null) {
       sessions.set(id, {
         kind: proof.kind,
         worker: proof,
-        id,
-        text: null,
-        chunks: new Map(),
+        log: [],
         requested: 0,
         answered: 0,
         failed: 0,
@@ -36,30 +36,7 @@ export function installInputWorkerProof(negative = null) {
     return sessions.get(id)
   }
 
-  // Shiki applies one batch of edits against the text before the batch, last position first.
-  const applyEdits = (text, edits) => {
-    const ordered = [...edits].sort((left, right) => right.from - left.from || right.to - left.to)
-    let next = text
-    for (const edit of ordered) next = next.slice(0, edit.from) + edit.text + next.slice(edit.to)
-    return next
-  }
-
-  // Tree-sitter keeps sent chunks per session and forgets the ones a descriptor stops naming.
-  const treeSitterSource = (session, source) => {
-    for (const chunk of source.chunks) session.chunks.set(chunk.chunkId, chunk.text)
-    const referenced = new Set(source.pieces.map((piece) => piece.chunkId))
-    for (const chunkId of session.chunks.keys())
-      if (!referenced.has(chunkId)) session.chunks.delete(chunkId)
-    let text = ''
-    for (const piece of source.pieces) {
-      const chunk = session.chunks.get(piece.chunkId)
-      if (chunk === undefined) return null
-      text += chunk.slice(piece.start, piece.start + piece.length)
-    }
-    return text.length === source.length ? text : null
-  }
-
-  const observeRequest = (proof, message) => {
+  const observeSource = (proof, message) => {
     const payload = message?.payload
     if (!payload || typeof payload !== 'object' || typeof message.id !== 'number') return
     const id = payload.runtimeSessionId
@@ -69,54 +46,92 @@ export function installInputWorkerProof(negative = null) {
       session.disposed = true
       return
     }
-    const shikiSource =
-      proof.kind === 'shiki' && (payload.type === 'open' || payload.type === 'edit')
-    const treeSource =
+    const shiki = proof.kind === 'shiki' && (payload.type === 'open' || payload.type === 'edit')
+    const tree =
       proof.kind === 'treeSitter' && (payload.type === 'parse' || payload.type === 'edit')
-    if (!shikiSource && !treeSource) return
-    if (shikiSource)
-      session.text =
-        payload.type === 'open'
-          ? payload.text
-          : session.text === null
-            ? null
-            : applyEdits(session.text, payload.edits)
-    if (treeSource) session.text = treeSitterSource(session, payload.source)
+    if (!shiki && !tree) return
+    session.log.push(payload)
     session.requested = message.id
     session.requestedVersion = payload.snapshotVersion ?? null
-    proof.requests.set(message.id, { session, type: payload.type })
+    proof.requests.set(message.id, session)
+  }
+
+  const observeMinimap = (proof, message) => {
+    if (!message || typeof message !== 'object') return
+    if (['openDocument', 'replaceDocument', 'applyEdit', 'applyEdits'].includes(message.type)) {
+      proof.sourceUpdates++
+      proof.minimapLog.push(message)
+    }
+    if (message.type === 'render') {
+      proof.latestRender = message.sequence
+      proof.renderAfterSource = proof.minimapLog.length
+    }
   }
 
   const observeResponse = (proof, data) => {
-    const request = proof.requests.get(data?.id)
-    if (!request) return
+    const session = proof.requests.get(data?.id)
+    if (!session) return
     proof.requests.delete(data.id)
-    if (data.id !== request.session.requested) return
+    if (data.id !== session.requested) return
     if (!data.ok) {
-      request.session.failed = data.id
+      session.failed = data.id
       return
     }
-    request.session.answered = data.id
-    request.session.answeredVersion = data.result?.snapshotVersion ?? null
+    session.answered = data.id
+    session.answeredVersion = data.result?.snapshotVersion ?? null
+  }
+
+  const liveMinimaps = () =>
+    globalThis.__inputWorkerProof.filter((worker) => worker.minimap && !worker.terminated)
+
+  // Probe-only negatives: one Tree-sitter edit reaches its worker with a changed character, or one
+  // minimap view misses its first edit after input while the others receive theirs.
+  const negativeMessage = (proof, message) => {
+    const payload = message?.payload
+    if (
+      negative === 'corrupt-tree-sitter-edit' &&
+      !corruptedTreeSitterEdit &&
+      proof.kind === 'treeSitter' &&
+      payload?.type === 'edit' &&
+      payload.source.chunks.length > 0
+    ) {
+      corruptedTreeSitterEdit = true
+      const [first, ...rest] = payload.source.chunks
+      const text = first.text.slice(0, -1) + (first.text.at(-1) === 'x' ? 'y' : 'x')
+      const chunks = [{ ...first, text }, ...rest]
+      return { ...message, payload: { ...payload, source: { ...payload.source, chunks } } }
+    }
+    if (
+      negative === 'stale-minimap-view' &&
+      !droppedMinimapEdit &&
+      liveMinimaps()[1] === proof &&
+      (message?.type === 'applyEdit' || message?.type === 'applyEdits')
+    ) {
+      droppedMinimapEdit = true
+      return null
+    }
+    return message
   }
 
   globalThis.Worker = class extends NativeWorker {
     constructor(url, options) {
       super(url, options)
+      const kind = kindOf(String(url))
       this.proof = {
         url: String(url),
-        kind: kindOf(String(url)),
-        minimap: String(url).includes('minimap.worker'),
+        kind,
+        minimap: kind === 'minimap',
         terminated: false,
         sourceUpdates: 0,
         latestRender: 0,
         acceptedRender: 0,
+        renderAfterSource: 0,
         renders: 0,
       }
       Object.defineProperty(this.proof, 'requests', { value: new Map(), enumerable: false })
+      Object.defineProperty(this.proof, 'minimapLog', { value: [], enumerable: false })
       globalThis.__inputWorkerProof.push(this.proof)
-      this.addEventListener('message', (event) => {
-        const { data } = event
+      this.addEventListener('message', ({ data }) => {
         observeResponse(this.proof, data)
         if (data?.type !== 'rendered' || data.sequence !== this.proof.latestRender) return
         this.proof.acceptedRender = data.sequence
@@ -125,35 +140,11 @@ export function installInputWorkerProof(negative = null) {
     }
 
     postMessage(message, ...options) {
-      const payload = message?.payload
-      if (
-        negative === 'corrupt-tree-sitter-edit' &&
-        !corruptedTreeSitterEdit &&
-        this.proof.kind === 'treeSitter' &&
-        payload?.type === 'edit' &&
-        payload.source.chunks.length > 0
-      ) {
-        // Probe-only negative: one current edit reaches the Tree-sitter worker with a changed
-        // character, so that consumer parses text that differs from the document.
-        corruptedTreeSitterEdit = true
-        const [first, ...rest] = payload.source.chunks
-        const last = first.text.at(-1)
-        const text = first.text.slice(0, -1) + (last === 'x' ? 'y' : 'x')
-        message = {
-          ...message,
-          payload: {
-            ...payload,
-            source: { ...payload.source, chunks: [{ ...first, text }, ...rest] },
-          },
-        }
-      }
-      observeRequest(this.proof, message)
-      if (this.proof.minimap && message && typeof message === 'object') {
-        if (['openDocument', 'replaceDocument', 'applyEdit', 'applyEdits'].includes(message.type))
-          this.proof.sourceUpdates++
-        if (message.type === 'render') this.proof.latestRender = message.sequence
-      }
-      return super.postMessage(message, ...options)
+      const sent = negative ? negativeMessage(this.proof, message) : message
+      if (sent === null) return undefined
+      if (this.proof.minimap) observeMinimap(this.proof, sent)
+      else observeSource(this.proof, sent)
+      return super.postMessage(sent, ...options)
     }
 
     terminate() {
@@ -161,4 +152,71 @@ export function installInputWorkerProof(negative = null) {
       return super.terminate()
     }
   }
+}
+
+// Readiness replays run after the measured interval, from the fragments recorded above.
+
+/** Shiki: the open text, then each batch of edits against the text before it, last position first. */
+export function replayShikiSource(log) {
+  let text = null
+  for (const payload of log) {
+    if (payload.type === 'open') {
+      text = payload.text
+      continue
+    }
+    if (text === null) return null
+    const ordered = [...payload.edits].sort(
+      (left, right) => right.from - left.from || right.to - left.to,
+    )
+    for (const edit of ordered) text = text.slice(0, edit.from) + edit.text + text.slice(edit.to)
+  }
+  return text
+}
+
+/** Tree-sitter: the worker's chunk cache rules, then the last descriptor's pieces. */
+export function replayTreeSitterSource(log) {
+  const chunks = new Map()
+  let text = null
+  for (const { source } of log) {
+    for (const chunk of source.chunks) chunks.set(chunk.chunkId, chunk.text)
+    const referenced = new Set(source.pieces.map((piece) => piece.chunkId))
+    for (const chunkId of chunks.keys()) if (!referenced.has(chunkId)) chunks.delete(chunkId)
+    text = ''
+    for (const piece of source.pieces) {
+      const chunk = chunks.get(piece.chunkId)
+      if (chunk === undefined) return null
+      text += chunk.slice(piece.start, piece.start + piece.length)
+    }
+    if (text.length !== source.length) return null
+  }
+  return text
+}
+
+/** Minimap: the line summaries the worker holds after its document and every summary patch. */
+export function replayMinimapLines(log) {
+  let lines = null
+  let textLength = null
+  for (const message of log) {
+    if (message.type === 'openDocument' || message.type === 'replaceDocument') {
+      lines = [...message.document.lines]
+      textLength = message.document.textLength
+      continue
+    }
+    if (lines === null) return null
+    const patch = message.document.summaryPatch
+    lines.splice(patch.startLine, patch.deleteCount, ...patch.lines)
+    textLength = patch.textLength
+  }
+  return lines === null ? null : { lines, textLength }
+}
+
+/** A minimap line summary matches a line when its length is exact and its text is a prefix. */
+export function minimapMatches(replayed, text) {
+  if (!replayed || replayed.textLength !== text.length) return false
+  const lines = text.split('\n')
+  if (replayed.lines.length !== lines.length) return false
+  return replayed.lines.every(
+    (summary, index) =>
+      summary.length === lines[index].length && lines[index].startsWith(summary.text),
+  )
 }

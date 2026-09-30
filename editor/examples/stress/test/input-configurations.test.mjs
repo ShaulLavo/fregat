@@ -42,6 +42,7 @@ function readiness(id, overrides = {}) {
       ...(configuration.treeSitter ? [session('treeSitter')] : []),
       ...(configuration.shiki ? [session('shiki')] : []),
     ],
+    minimaps: configuration.minimap ? [{ current: true, renderedAfterSource: true }] : [],
     overLimitLines: 0,
     lineCount: 1,
     rowColor: 'rgb(225, 228, 232)',
@@ -74,10 +75,7 @@ test('accepts each configuration when exactly its consumers produced output', ()
 test('rejects a missing, extra, stalled or silent consumer', () => {
   const cases = [
     ['minimap', { workers: [] }],
-    [
-      'minimap',
-      { workers: [worker('minimap', { sourceUpdates: 1, latestRender: 4, acceptedRender: 3 })] },
-    ],
+    ['minimap', { minimaps: [{ current: true, renderedAfterSource: false }] }],
     ['tree-sitter', { tree: { ...owner, pendingRequests: 1 } }],
     ['shiki', { highlights: [] }],
     ['disabled', { workers: [worker('shiki')] }],
@@ -109,23 +107,32 @@ test('rejects a missing, extra, stalled or silent consumer', () => {
     ).toThrow(/Consumer readiness/)
 })
 
-test('requires the minimap to receive the input edit', () => {
-  const opened = readiness('minimap')
-  expect(() =>
-    assertConsumerReadiness(
-      readiness('minimap'),
-      'minimap',
-      'ordinary',
-      4469,
-      'single',
-      'typing',
-      opened,
-    ),
-  ).toThrow(/no edit/)
-  const edited = readiness('minimap', { workers: [minimap(2)] })
-  expect(() =>
-    assertConsumerReadiness(edited, 'minimap', 'ordinary', 4469, 'single', 'typing', opened),
-  ).not.toThrow()
+test('rejects one stale minimap view while another holds the current text', () => {
+  const views = (count) =>
+    Array.from({ length: count }, (_, index) => ({
+      initialHighlightStatus: 'plain',
+      visible: index < 2,
+      tokenRanges: 0,
+      minimapElements: 1,
+      gutterElements: 0,
+    }))
+  const three = (receipts) =>
+    readiness('minimap', {
+      views: views(3),
+      workers: [minimap(), minimap(), minimap()],
+      minimaps: receipts,
+    })
+  const ok = { current: true, renderedAfterSource: true }
+  const assert = (state) => () =>
+    assertConsumerReadiness(state, 'minimap', 'ordinary', 4469, 'multiple', 'typing', null)
+  expect(assert(three([ok, ok, ok]))).not.toThrow()
+  expect(assert(three([ok, { ...ok, current: false }, ok]))).toThrow(
+    /minimap 1 holds text that differs/,
+  )
+  expect(assert(three([ok, ok, { ...ok, renderedAfterSource: false }]))).toThrow(
+    /minimap 2 has no accepted render/,
+  )
+  expect(assert(three([ok, ok]))).toThrow(/minimap receipts 2 for 3 workers/)
 })
 
 test('pauses analysis consumers above the Platform analysis limit', () => {

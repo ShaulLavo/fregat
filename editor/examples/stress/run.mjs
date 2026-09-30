@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { cpus, platform, release, totalmem, arch } from 'node:os'
-import { dirname, resolve, extname, sep } from 'node:path'
+import { basename, dirname, resolve, extname, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { chromium } from '@playwright/test'
@@ -17,6 +17,7 @@ import { inputScenarios, inputViewModes, validateInputResult } from './input-res
 import { profileScenario, profileSourceMaps } from './profile.mjs'
 import { hashBenchmarkSource, loadCorePackage } from './core-package.mjs'
 import { externalReceipt, loadPackageSet } from './package-set.mjs'
+import { recordModules, verifyRuntimeGraph } from './runtime-graph.mjs'
 import { inputConsumerIds } from './input-configurations.mjs'
 import { installInputWorkerProof } from './input-worker-proof.mjs'
 
@@ -50,7 +51,7 @@ const integer = (text, name) => {
 }
 if (!['stress', 'input-latency'].includes(values.suite)) fail('Unknown suite')
 if (!inputConsumerIds.includes(values.consumers)) fail('Unknown input consumer configuration')
-const readinessNegatives = ['corrupt-tree-sitter-edit', 'drop-view-ranges']
+const readinessNegatives = ['corrupt-tree-sitter-edit', 'drop-view-ranges', 'stale-minimap-view']
 const readinessNegative = values['readiness-negative'] ?? null
 if (readinessNegative !== null && !readinessNegatives.includes(readinessNegative))
   fail('Unknown readiness negative')
@@ -59,6 +60,18 @@ if (values['packages-directory'] && (values.url || values['core-directory']))
 const packageSet = values['packages-directory']
   ? await loadPackageSet(values['packages-directory'])
   : null
+// The stress page bundles its own dependencies and these grammar and theme packages; their bytes
+// are part of the instrument's identity. The runtime-graph check rejects anything else it bundles.
+const instrumentReceipt = await externalReceipt(
+  dirname(root),
+  [basename(root)],
+  [
+    { from: root, name: '@shikijs/langs' },
+    { from: root, name: '@shikijs/themes' },
+  ],
+)
+const runtimeModules = new Set()
+let runtimeGraph = null
 if (values['core-directory'] && values.url)
   fail('--core-directory requires a runner build, not --url')
 const core = await loadCorePackage(
@@ -106,8 +119,10 @@ if (inputSuite) {
   if (!Number.isFinite(config.slowdownMs) || config.slowdownMs < 0) fail('Invalid slowdown')
   if (values['profile-directory']) fail('Use normal input runs for the input budget')
 }
-if (inputSuite && values.consumers !== 'native' && (!packageSet || !values['fixture-directory']))
-  fail('Expanded consumer calibration requires a frozen complete package set and fixture files')
+if (inputSuite && (!packageSet || !values['fixture-directory']))
+  fail(
+    'The input suite measures a frozen package set with its external receipt and frozen fixture files',
+  )
 const manifest = values['fixture-directory']
   ? await readFrozenManifest(values['fixture-directory'])
   : createManifest(integer(values.seed, 'seed'))
@@ -149,15 +164,35 @@ try {
       configFile: false,
       logLevel: 'warn',
       resolve: { alias: packageSet?.aliases ?? core.aliases },
-      plugins: values['profile-directory'] ? [profileSourceMaps()] : [],
-      worker: { format: 'es' },
+      plugins: [
+        recordModules(runtimeModules),
+        ...(values['profile-directory'] ? [profileSourceMaps()] : []),
+      ],
+      worker: { format: 'es', plugins: () => [recordModules(runtimeModules)] },
       build: {
         outDir: directory,
         emptyOutDir: true,
         minify: !values['profile-directory'],
-        sourcemap: Boolean(values['profile-directory']),
+        // Hidden maps leave the served code unchanged; the runtime-graph check reads their sources.
+        sourcemap: values['profile-directory'] ? true : 'hidden',
       },
     })
+  if (packageSet && !values.url) {
+    runtimeGraph = await verifyRuntimeGraph({
+      ids: runtimeModules,
+      outDir: directory,
+      instrumentRoot: root,
+      packageSetDirectory: packageSet.directory,
+      receiptRoots: [
+        ...packageSet.manifest.external.packages.map((entry) => entry.root),
+        ...instrumentReceipt.packages.map((entry) => entry.root),
+      ],
+    })
+    if (runtimeGraph.escaped.length)
+      fail(
+        `Bundled runtime code escapes the frozen receipts: ${runtimeGraph.escaped.slice(0, 5).join(', ')}`,
+      )
+  }
   if (values['fixture-directory']) {
     await mkdir(resolve(directory, 'frozen-fixtures'))
     for (const fixture of manifest.fixtures)
@@ -413,17 +448,8 @@ async function environment(browser) {
           externalHash: packageSet.externalHash,
         }
       : null,
-    // The stress page bundles these itself; their bytes are part of the instrument's identity.
-    instrumentExternal: (
-      await externalReceipt(
-        root,
-        [],
-        [
-          { from: root, name: '@shikijs/langs' },
-          { from: root, name: '@shikijs/themes' },
-        ],
-      )
-    ).sha256,
+    instrumentExternal: instrumentReceipt.sha256,
+    runtimeGraph,
     coreDirectory: core.directory,
     browser: { engine: 'chromium', version: browser.version(), headless: true },
     hardware: {

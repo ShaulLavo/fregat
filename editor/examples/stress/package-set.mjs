@@ -163,7 +163,7 @@ export async function loadPackageSet(path) {
   const directory = resolve(path)
   const manifest = JSON.parse(await readFile(resolve(directory, manifestName), 'utf8'))
   if (
-    ![1, 2].includes(manifest.schemaVersion) ||
+    manifest.schemaVersion !== 2 ||
     !Array.isArray(manifest.packages) ||
     !manifest.packages.length
   )
@@ -183,10 +183,7 @@ export async function loadPackageSet(path) {
     const actual = await inspectPackage(packageDirectory, expected.folder)
     for (const key of ['name', 'version', 'manifestHash', 'sourceHash', 'buildHash'])
       if (actual[key] !== expected[key]) fail(`Frozen package ${expected.name} changed ${key}`)
-    if (
-      manifest.schemaVersion === 2 &&
-      JSON.stringify(actual.links) !== JSON.stringify(expected.links)
-    )
+    if (JSON.stringify(actual.links) !== JSON.stringify(expected.links))
       fail(`Frozen package ${expected.name} resolves its dependencies elsewhere`)
     for (const [subpath, target] of Object.entries(expected.exports)) {
       const entry = typeof target === 'string' ? target : (target.import ?? target.default)
@@ -212,32 +209,28 @@ export async function loadPackageSet(path) {
     }
   }
   aliases.sort((left, right) => String(right.find).length - String(left.find).length)
-  let externalHash = null
-  if (manifest.schemaVersion === 2) {
-    const actual = await externalReceipt(
-      directory,
-      manifest.packages.map((entry) => entry.folder),
-    )
-    if (actual.sha256 !== manifest.external?.sha256) {
-      const changed = actual.packages
-        .filter(
-          (entry) =>
-            !manifest.external?.packages.some(
-              (recorded) => recorded.root === entry.root && recorded.sha256 === entry.sha256,
-            ),
-        )
-        .map((entry) => `${entry.name}@${entry.version}`)
-      fail(
-        `Frozen external dependencies changed: ${changed.join(', ') || 'membership or resolution'}`,
+  const external = await externalReceipt(
+    directory,
+    manifest.packages.map((entry) => entry.folder),
+  )
+  if (external.sha256 !== manifest.external?.sha256) {
+    const changed = external.packages
+      .filter(
+        (entry) =>
+          !manifest.external?.packages.some(
+            (recorded) => recorded.root === entry.root && recorded.sha256 === entry.sha256,
+          ),
       )
-    }
-    externalHash = actual.sha256
+      .map((entry) => `${entry.name}@${entry.version}`)
+    fail(
+      `Frozen external dependencies changed: ${changed.join(', ') || 'membership or resolution'}`,
+    )
   }
   return {
     directory,
     aliases,
     manifest,
-    externalHash,
+    externalHash: external.sha256,
     sourceHash: digest(
       JSON.stringify(
         manifest.packages.map(({ name, sourceHash, manifestHash }) => ({

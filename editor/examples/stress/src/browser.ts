@@ -12,6 +12,12 @@ import '@singapore-editor/core/style.css'
 import '@singapore-editor/find/style.css'
 import { createInputLatencyProbe } from './inputLatency.ts'
 import { createInputConsumers } from './inputConsumers.ts'
+import {
+  minimapMatches,
+  replayMinimapLines,
+  replayShikiSource,
+  replayTreeSitterSource,
+} from '../input-worker-proof.mjs'
 import { fixtureFacts, generateFixture, normalizedText, type FixtureId } from './fixtures.ts'
 
 type Diagnostic = {
@@ -334,6 +340,7 @@ async function settleConsumers() {
     ...readiness,
     views: readiness.views.map((view, index) => ({ ...view, tokenRanges: viewTokenRanges(index) })),
     sessions: consumerSessions(text),
+    minimaps: minimapReceipts(text),
     highlights,
     lineCount: text.split('\n').length,
     overLimitLines: lineLimit === null ? null : linesLongerThan(text, lineLimit),
@@ -344,7 +351,7 @@ async function settleConsumers() {
 type ConsumerSession = {
   readonly kind: string
   readonly worker: { readonly terminated: boolean }
-  readonly text: string | null
+  readonly log: readonly unknown[]
   readonly requested: number
   readonly answered: number
   readonly failed: number
@@ -353,8 +360,17 @@ type ConsumerSession = {
   readonly disposed: boolean
 }
 
-// Each live consumer session's receipt: the source its worker last received equals the current
-// text, and that request was answered.
+type MinimapProof = {
+  readonly terminated: boolean
+  readonly minimap: boolean
+  readonly minimapLog: readonly unknown[]
+  readonly latestRender: number
+  readonly acceptedRender: number
+  readonly renderAfterSource: number
+}
+
+// Each live consumer session's receipt, replayed after the measured interval: the source its
+// worker last received equals the current text, and that request was answered.
 function consumerSessions(text: string) {
   const sessions: Iterable<ConsumerSession> = globalThis.__inputWorkerSources?.values() ?? []
   return [...sessions]
@@ -364,13 +380,34 @@ function consumerSessions(text: string) {
         !session.worker.terminated &&
         (session.kind === 'shiki' || session.kind === 'treeSitter'),
     )
-    .map((session) => ({
-      kind: session.kind,
-      current: session.text === text,
-      answered: session.requested > 0 && session.answered === session.requested,
-      failed: session.failed === session.requested && session.requested > 0,
-      requestedVersion: session.requestedVersion,
-      answeredVersion: session.answeredVersion,
+    .map((session) => {
+      const source =
+        session.kind === 'shiki'
+          ? replayShikiSource(session.log)
+          : replayTreeSitterSource(session.log)
+      return {
+        kind: session.kind,
+        current: source === text,
+        answered: session.requested > 0 && session.answered === session.requested,
+        failed: session.failed === session.requested && session.requested > 0,
+        requestedVersion: session.requestedVersion,
+        answeredVersion: session.answeredVersion,
+      }
+    })
+}
+
+// Each live minimap worker, one per view: its replayed line summaries match the current text, and
+// its accepted render was requested after its last source update.
+function minimapReceipts(text: string) {
+  const workers = (globalThis.__inputWorkerProof ?? []) as readonly MinimapProof[]
+  return workers
+    .filter((worker) => worker.minimap && !worker.terminated)
+    .map((worker) => ({
+      current: minimapMatches(replayMinimapLines(worker.minimapLog), text),
+      renderedAfterSource:
+        worker.renderAfterSource === worker.minimapLog.length &&
+        worker.latestRender > 0 &&
+        worker.acceptedRender === worker.latestRender,
     }))
 }
 

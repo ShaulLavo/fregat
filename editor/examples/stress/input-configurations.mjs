@@ -94,12 +94,6 @@ function workerCount(workers, pattern) {
   return workers.filter((worker) => pattern.test(worker.url)).length
 }
 
-function minimapSource(proof) {
-  return proof.workers
-    .filter((worker) => !worker.terminated && worker.minimap)
-    .reduce((sum, worker) => sum + worker.sourceUpdates, 0)
-}
-
 // Proves each configured consumer is live and produced output, and that no other consumer is.
 export function assertConsumerReadiness(readiness, id, fixture, length, views, scenario, opened) {
   const expected = inputConsumerConfiguration(id, fixture, length)
@@ -130,15 +124,20 @@ export function assertConsumerReadiness(readiness, id, fixture, length, views, s
     minimaps.length === (expected.minimap ? viewCount : 0),
     `minimap worker count ${minimaps.length}`,
   )
-  for (const worker of minimaps) {
-    check(worker.sourceUpdates > 0, 'minimap received no source')
+  // Every live minimap worker, one per view, holds the current text and rendered after its last
+  // source update; a sum over workers could hide one stale view.
+  const receipts = readiness.minimaps ?? []
+  check(
+    receipts.length === minimaps.length,
+    `minimap receipts ${receipts.length} for ${minimaps.length} workers`,
+  )
+  for (const [index, receipt] of receipts.entries()) {
+    check(receipt.current, `minimap ${index} holds text that differs from the document`)
     check(
-      worker.latestRender > 0 && worker.acceptedRender === worker.latestRender,
-      'minimap render not accepted',
+      receipt.renderedAfterSource,
+      `minimap ${index} has no accepted render after its last source update`,
     )
   }
-  if (opened && minimaps.length && scenario !== 'composition-update')
-    check(minimapSource(readiness) > minimapSource(opened), 'minimap received no edit')
   const syntax = expected.treeSitter || expected.shiki
   const plain = expected.shiki ? plainFallback(readiness, check) : false
   const tokens = readiness.highlights.filter((entry) => syntaxHighlight.test(entry.name))

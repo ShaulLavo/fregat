@@ -365,6 +365,15 @@ function comparable(left, right, allowSlowdown = false) {
     right.environment.instrumentExternal,
     'instrument external dependencies',
   )
+  same(left.environment.instrumentHash, right.environment.instrumentHash, 'instrument source')
+}
+
+// Product source, build and external dependency bytes of the frozen set a run measured.
+function packageIdentity(run) {
+  const set = run.environment.packageSet
+  return set
+    ? { sourceHash: set.sourceHash, buildHash: set.buildHash, externalHash: set.externalHash }
+    : null
 }
 
 function range(values) {
@@ -403,6 +412,11 @@ export function calibrateInput(controls) {
       fail('Calibration requires clean controls without injected delay')
     same(first.environment.commit, control.environment.commit, 'control commits')
     same(first.environment.sourceHash, control.environment.sourceHash, 'control source trees')
+    same(
+      packageIdentity(first),
+      packageIdentity(control),
+      'control package builds and external bytes',
+    )
   }
   const summaries = controls.map(summarizeInputResult)
   return {
@@ -437,8 +451,19 @@ function validateCalibration(baseline, calibration) {
   same(baseline, storedBaseline, 'calibration baseline observations')
 }
 
-export function compareInput(baseline, candidate, calibration, { allowSlowdown = false } = {}) {
+export function compareInput(
+  baseline,
+  candidate,
+  calibration,
+  { allowSlowdown = false, sameBuild = false } = {},
+) {
   comparable(baseline, candidate, allowSlowdown)
+  // A holdout or delayed control measures the calibrated build; a candidate differs only in product.
+  const expected = packageIdentity(baseline)
+  const actual = packageIdentity(candidate)
+  if (sameBuild || allowSlowdown)
+    same(expected, actual, 'holdout or delayed control package identity')
+  else same(expected?.externalHash, actual?.externalHash, 'candidate external dependency bytes')
   validateCalibration(baseline, calibration)
   if (calibration.controls.includes(candidate.id)) fail('Candidate must be an independent run')
   if (allowSlowdown && candidate.config.slowdownMs <= 0)
